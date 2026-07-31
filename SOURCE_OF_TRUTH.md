@@ -1021,6 +1021,35 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-31 (round 9) — "Back to Ask" moved OUT of the canvas to the top-left,
+  above the stats and the category legend (owner call; round 8's open item, now
+  closed).** The rationale is the hierarchy one: it is NAVIGATION (it leaves the
+  view) and the legend chips are FILTERS that act on the view, so navigation
+  sitting under them inverted the relationship — the same rule round 3 applied to
+  the desktop toolbar. **Matched to the app's existing in-content return control
+  rather than invented:** "Back to Insights" (`Feed.tsx`) is the identical
+  pattern — chevron + the destination's own icon + label, as a pill at the top of
+  the content — so this reuses that treatment with Ask's `MessagesSquare`. (The
+  shared `MobileSubheader` is the OTHER back convention and is deliberately not
+  used here: it pads for `env(safe-area-inset-top)` for fixed sub-view overlays,
+  and the graph is a view mode rendered under the global header, so it would have
+  double-padded the notch.)
+  **The move DELETED code rather than adding it** — `backPillRef`, the `backPill`
+  field on the draw state, and the reserved rect in the label pass are all gone
+  (verified: no `backPill` identifier remains). That reservation never worked
+  properly anyway: `fits()` has exactly ONE call site, in the node-label pass, so
+  the cluster-caption loop ignored it and the floating pill sliced the "CULINARY
+  TECHNIQUE" caption in the owner's screenshot. Out of the canvas, the whole
+  class of collision is gone instead of needing a second rect check.
+  ⚠️ **The one non-obvious bit — the canvas height is now CONDITIONAL.**
+  `onBackToAsk` is set only on the Ask → Graph path, so the row exists only
+  sometimes; the reserve went `100dvh-268px` → `-308px` (`sm`: `-290` → `-330`)
+  **only when the button is present**. A flat bump would have shortened the graph
+  for everyone arriving from the toolbar, where there is no such row.
+  tsc 0. eslint unchanged — still the one PRE-EXISTING `modelRef.current = model`
+  error, no new ones. Pixel work, so **owner device QA** on both entry paths:
+  Ask → Graph (row present, graph not overflowing) and toolbar → Graph (no row,
+  graph exactly as tall as before).
 - **2026-07-30 (round 8) — Ask → Graph focus no longer snaps back to the whole
   graph a second after it lands (owner QA).** Tapping the Graph chip on a cited
   card showed the right dot, then ~1s later dumped you into the full graph; a

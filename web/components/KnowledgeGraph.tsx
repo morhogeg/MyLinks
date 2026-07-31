@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowUpRight, ChevronLeft, LocateFixed, Waypoints, X } from 'lucide-react';
+import { ArrowUpRight, ChevronLeft, LocateFixed, MessagesSquare, Waypoints, X } from 'lucide-react';
 import { AskHints, Link } from '@/lib/types';
 import { buildGraphModel, edgeReason, spacingScale, GraphModel, GraphNode, BuildSignal } from '@/lib/graph';
 import { getCategoryColorStyle } from '@/lib/colors';
@@ -169,9 +169,6 @@ export default function KnowledgeGraph({
     // Screen-space rects of the island captions drawn last frame, for tap tests.
     const captionRectsRef = useRef<{ x1: number; y1: number; x2: number; y2: number; cluster: number }[]>([]);
     const openRef = useRef(onOpenCard);
-    // Chrome the label pass must avoid (see draw()).
-    const backPillRef = useRef(false);
-    backPillRef.current = !!onBackToAsk;
     const restoreRef = useRef<GraphRestoreFocus | null>(restoreFocus ?? null);
     restoreRef.current = restoreFocus ?? restoreRef.current;
     const onRestoreConsumedRef = useRef(onRestoreConsumed);
@@ -398,7 +395,6 @@ export default function KnowledgeGraph({
                     hover: hoverRef.current,
                     categoryFocus: focusRef.current,
                     clusterFocus: clusterFocusRef.current,
-                    backPill: backPillRef.current,
                 });
             }
         };
@@ -769,6 +765,32 @@ export default function KnowledgeGraph({
 
     return (
         <div className="space-y-3 animate-fade-in">
+            {/* Back to the Ask conversation that opened this view. TOP-LEFT,
+                above the stats and the category legend — it is NAVIGATION (it
+                leaves the view), while the legend chips are FILTERS that act on
+                the view, so it must not sit below them (owner call; same rule as
+                round 3's desktop toolbar). Styled as the app's existing
+                in-content return control — see "Back to Insights"
+                (Feed.tsx): chevron + the destination's own icon + label.
+                It used to float over the canvas at top-3 start-3, which sliced
+                the cluster caption behind it: the reserved rect was only
+                honoured by the node-label pass (`fits()`), never by the caption
+                loop. Moving it out deletes that reservation entirely instead of
+                needing a second collision check. Only present on Ask → Graph. */}
+            {onBackToAsk && (
+                <div className="-mx-2 px-2 sm:mx-0 sm:px-0">
+                    <button
+                        onClick={onBackToAsk}
+                        aria-label="Back to the chat"
+                        className="inline-flex items-center gap-1 ps-1.5 pe-3 py-1.5 rounded-full bg-card border border-border-subtle text-xs font-semibold text-text-secondary hover:text-text hover:border-accent/40 shadow-sm transition-colors cursor-pointer"
+                    >
+                        <ChevronLeft className="w-4 h-4 shrink-0 rtl:rotate-180 text-accent" />
+                        <MessagesSquare className="w-3.5 h-3.5 shrink-0 text-accent" />
+                        <span>Back to Ask</span>
+                    </button>
+                </div>
+            )}
+
             {/* Stats + legend header */}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-0.5">
                 <div className="text-[13px] font-medium text-text-secondary tabular-nums">
@@ -827,8 +849,15 @@ export default function KnowledgeGraph({
             {/* The constellation */}
             <div
                 ref={containerRef}
-                /* Mobile reserves less chrome now that the legend is one row. */
-                className="relative overflow-hidden rounded-2xl border border-border-subtle h-[calc(100dvh-268px)] min-h-[420px] sm:h-[calc(100dvh-290px)] sm:min-h-[460px]"
+                /* Mobile reserves less chrome now that the legend is one row.
+                   The Back-to-Ask row exists ONLY on the Ask → Graph path, so
+                   its ~40px (28px control + the 12px space-y gap) is reserved
+                   only then — a flat bump would shorten the graph for everyone
+                   who arrived from the toolbar, where there is no such row. */
+                className={`relative overflow-hidden rounded-2xl border border-border-subtle min-h-[420px] sm:min-h-[460px] ${onBackToAsk
+                    ? 'h-[calc(100dvh-308px)] sm:h-[calc(100dvh-330px)]'
+                    : 'h-[calc(100dvh-268px)] sm:h-[calc(100dvh-290px)]'
+                    }`}
                 style={{ background: 'radial-gradient(120% 100% at 50% 38%, var(--card), var(--background) 88%)' }}
             >
                 <canvas
@@ -837,21 +866,6 @@ export default function KnowledgeGraph({
                     role="img"
                     aria-label="Knowledge graph of your saved cards and their connections"
                 />
-
-                {/* Back to the Ask conversation that opened this view. Floats
-                    over the canvas in the same material as the re-fit control,
-                    at the opposite corner so the two never collide on either
-                    breakpoint. Only present on the Ask → Graph path. */}
-                {onBackToAsk && (
-                    <button
-                        onClick={onBackToAsk}
-                        aria-label="Back to the chat"
-                        className="absolute top-3 start-3 z-10 inline-flex items-center gap-1 h-9 ps-2 pe-3.5 rounded-full bg-card/90 backdrop-blur border border-border-subtle text-text-secondary hover:text-text hover:bg-card-hover shadow-sm transition-colors cursor-pointer"
-                    >
-                        <ChevronLeft className="w-4 h-4 shrink-0 rtl:rotate-180" />
-                        <span className="text-[13px] font-semibold">Back to Ask</span>
-                    </button>
-                )}
 
                 {/* Re-fit control */}
                 {model && !showLoading && !showEmpty && (
@@ -1210,7 +1224,7 @@ function draw(
     model: GraphModel,
     cam: Camera,
     palette: Palette,
-    state: { selected: number | null; hover: number | null; categoryFocus: string | null; clusterFocus: number | null; backPill?: boolean },
+    state: { selected: number | null; hover: number | null; categoryFocus: string | null; clusterFocus: number | null },
 ): CaptionRect[] {
     const ctx = canvas.getContext('2d');
     if (!ctx) return [];
@@ -1331,10 +1345,6 @@ function draw(
             ? { x1: viewW - 60, y1: viewH - 60, x2: viewW - 4, y2: viewH - 4 }
             : { x1: viewW - 60, y1: 4, x2: viewW - 4, y2: 60 },
     ];
-    if (state.backPill) {
-        // "Back to Ask" pill, top-start (mirrors its absolute placement).
-        placed.push({ x1: 4, y1: 4, x2: 160, y2: 56 });
-    }
     if (state.selected !== null || state.clusterFocus !== null) {
         placed.push(isDesktop
             // Mirrors the panel's own sizing (PANEL_CLASS_W at end-3 / the
