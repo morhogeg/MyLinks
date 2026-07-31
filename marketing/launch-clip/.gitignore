@@ -1,0 +1,5 @@
+node_modules/
+out/
+# Regenerable and large: `npm run score` rewrites it byte-identically (the synth
+# is seeded), so the 12MB wav does not belong in git.
+public/score.wav

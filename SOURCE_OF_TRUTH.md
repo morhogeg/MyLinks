@@ -748,6 +748,19 @@ The multi-user auth work is **fully written but not live**:
 
 ### 🟢 P3 — product roadmap (post-launch)
 
+G0. **[x] Launch film built** *(2026-07-29 — `marketing/launch-clip/`, 67s
+    1920×1080 + `.srt`; details and the reuse caveats in §8 "Launch film".
+    **Re-cut 2026-07-30** around `docs/BRANDING.md`-adjacent story work: act one
+    is now platform fragmentation, the turn gathers five surfaces into one, the
+    library visibly mixes platforms, and the endcard lost the icon tile — owner
+    review round 1, see §9.)*
+    Open follow-ups, none blocking: **(a)** a 9:16 cut for
+    TikTok/Reels/Shorts — every scene reframes around `BASE_SCALE`/`BASE_Y` in
+    `src/film/anim.ts`, so a vertical composition is a reframe, not a rebuild;
+    **(b)** swap the endcard's closing line for the App Store badge once the
+    listing exists; **(c)** owner review of the score — the mix was verified by
+    per-bar RMS, not by ear (no audio device in the cloud sandbox).
+
 G1. **[ ] Category casing normalized at the SOURCE.** The Graph merges
     "Sports"/"sports" display-side (2026-07-28 round 3), but the backend still
     saves whatever casing the model emits, so facets/filters elsewhere can
@@ -1010,6 +1023,30 @@ the origin story (WhatsApp self-messages), the capture surface, and the free tie
 (`docs/APP_STORE.md` §2; reasoning in `docs/BRANDING.md` D-2 — it opens on
 capture and ends on the knowledge graph on purpose) / promo text: "Machina reads everything you save — links, screenshots, videos — and
 answers questions from it, with sources."
+
+*Launch film (BUILT 2026-07-29):* `marketing/launch-clip/` — a 67s,
+1920×1080 film rendered from code (Remotion for picture, a dependency-free Node
+synth for the score), **superseding the "30-second screen-recorded demo"** in
+step (3) above: a recording needs a signed-in device with a real library, and this
+needs one command. It runs cold open → **five platforms drifting apart and
+fading** (Instagram, X, YouTube, WhatsApp-to-yourself, Reading List) → **the five
+gathering into one point the brackets close around** → `[ MACHINA ]` → share sheet
++ the real five-phase pipeline → meaning-search → **Ask with three citation chips
+(the hero beat)** → the graph → digest → endcard. **The story is the founder
+letter's**: the problem is fragmentation, not clutter ("you never remember where
+you saved it"), the promise is one place that actually READS what you save
+("saving was never the hard part"), and the close is the letter's belief
+("recalling it is how you learn it") rather than an availability claim.
+`npm run render` (see that folder's README). Three compositions ship: scored +
+captioned (the deliverable), silent + captioned (for a voice-over), and clean (no
+score, no captions — for social cuts; captions also emit as `.srt`). Two things to
+know before reusing it: the UI is **rebuilt from the shipped components**
+(`src/theme.ts` ports `globals.css` tokens, `src/ui/Brand.tsx` carries the real
+wordmark path data, the checklist is `web/lib/scanPhases.ts` verbatim) so it drifts
+if those change; and the endcard's last line (`Your knowledge, on iPhone.`) is the
+one slot meant to become a real App Store badge/URL once the listing is live —
+nothing in the film claims availability yet. The stills it renders double as the
+X-thread screenshots the posts above ask for.
 
 *Where to "advertise" for free:* X (primary), Product Hunt, Hacker News,
 r/PKMS + r/productivity (follow self-promo rules: give value first), Indie
@@ -1345,6 +1382,251 @@ exact-match, capped.
   `panelReserve()` now reads `window.innerWidth`. Desktop-only, so build 1250
   (iOS never reaches `lg:`) did not need re-triggering.
   Frontend-only → Vercel + TestFlight.
+- **2026-07-30 (same session, round 7) — reframed for a phone, real graph, and
+  the tagline threaded through (owner review round 7).** **(1) EVERY app shot is
+  now magnified.** Watching on a phone, the device sat too far away to read —
+  the previous framing was 0.86–1.3× with the whole handset in shot. Product
+  scenes now run **1.4–2.0×**, cropping the device top and bottom the way a real
+  product film does, with a new `focusY(screenY, scale)` helper in
+  `film/anim.ts` that puts a chosen point of the SCREEN at a chosen point of the
+  FRAME — so each shot aims at what matters (the checklist, the answer + chips,
+  the card stack) instead of the zoom pushing content out of frame. `BASE_X`
+  went 268→330 and the caption column narrowed to keep a clean gutter.
+  **(2) The graph is the SHIPPED design now, not a mockup.** Ported from
+  `KnowledgeGraph.tsx`'s canvas code: node bodies are the **category colour**
+  with a lit top-left radial and a 0.35-alpha ring (they were white discs with
+  coloured rings), edges are **muted grey** at 0.13–0.35 alpha (the app only
+  colours an edge when a selection lights it — the coloured constellation was
+  invented), the canvas sits in a `rounded-2xl` hairline container over
+  `radial-gradient(120% 100% at 50% 38%, var(--card), var(--background) 88%)`,
+  and labels are 600/700 11px in `textSecondary` with a **card-toned** halo
+  stroke (the app's own QA note says a background-toned halo smears ghosts).
+  **(3) The tagline is threaded through the film** — CAPTURE / ASK / CONNECT
+  print as a letterspaced kicker above the line on their respective beats, so a
+  viewer can place each act inside `Capture. Ask. Connect.` **(4) Collections
+  and Digest are separate scenes** with their own framing and their own lines
+  ("Group them the way you think." / "And it brings the right one back.") —
+  sharing two bars behind a whip-cut, they read as one feature. Film is **75s**,
+  30 bars. **(5) The act-one loss line is active:** "And almost none of it comes
+  back" → **"And you can never get back to it."** — the complaint was never that
+  it fails to return to you, it is that YOU cannot get back to IT.
+  Repo-only, no app code, nothing to deploy.
+- **2026-07-30 (same session, round 6) — the score's instrument was the bug, and
+  the script tightened again (owner review round 6).** **(1) "The music sounds
+  Chinese" was a correct diagnosis of a real mistake, and it was not a mix
+  problem.** The film's rhythmic voice was a **Karplus-Strong pluck** — a
+  physically modelled plucked STRING — playing **chord-tone-only** arpeggios into
+  a long reverb. That is, acoustically, how you synthesize a koto. Fixed at both
+  causes: the instrument is now a **detuned band-limited saw pulse** (fast
+  attack, short decay, falling brightness, short send) with an **FM electric
+  piano** carrying the melody, and the NOTES now walk the C-major scale using
+  degrees 0-2-3-4-6, which puts **E→F and B→C** in the line — the two semitones a
+  pentatonic scale by definition cannot contain. Worth keeping: the first attempt
+  at this fix swapped the instrument but left the shape at 0-2-4-5 (C E G A),
+  which is *still pentatonic*, and it took checking the scheduled pitch classes
+  to catch that. **(2) The platform-name line is cut** — Instagram/X/YouTube are
+  written on the panels, so captioning them was pure redundancy. **(3) "And then
+  it's gone" → "And almost none of it comes back."** — the fade-out IS the
+  disappearing; the line's job is what it costs you, not narrating the picture.
+  **(4) The library beat is about ACCESS, not cleverness:** "All of it, already
+  sorted" / "Find it without remembering where" → **"Browse it, search it, filter
+  it."** / **"However you remember it."** **(5) Camera:** the Ask shot now holds
+  ~7° off-axis through the typing and streaming and **squares up to dead-on
+  exactly as the three citations land** (off-axis→on-axis is the move that says
+  "this is the point"); the graph orbits slowly *through* square-on rather than
+  sitting at a fixed angle; the library counter-settles as the filter snaps; and
+  scene dissolves went 9–10 frames → 4, so cuts land on the bar line instead of
+  softening across it. Repo-only, no app code, nothing to deploy.
+- **2026-07-30 (same session, round 5) — the pipeline becomes a SHOT, and the
+  score stops being in a minor key (owner review round 5).** **(1) The magic is
+  the five phases, and the film was throwing them away** — the checklist ran for
+  ~2s at thumbnail size while the camera sat wide. Capture went 4→5 bars and the
+  pipeline now runs **~5.5s under a hard push-in** (roughly a second a phase), so
+  a viewer can actually read *Reading the page → Writing the summary → Searching
+  connections* and understand what pressing share bought them. Per the note,
+  reading and filing are ONE step, so one heading covers the whole thing:
+  **"Machina reads it, summarizes it, files it."** Film is now **70s**.
+  **(2) "Then you can't remember which one" is gone** → **"And then it's gone."**,
+  landing exactly as the five panels fade out; the old line explained the picture
+  instead of finishing it. **(3) The turn names the product:** "One place for
+  everything you save" (generic) → **"Machina keeps every save in one place."**
+  **(4) The library payoff is a callback, not a shrug:** "So you can actually
+  find it again" → **"Find it without remembering where."**, which answers act
+  one's complaint directly. Its partner line is "All of it, already sorted."
+  **(5) THE SCORE IS RE-ANCHORED FROM A MINOR TO C MAJOR.** The chords were
+  always the same four; the film walked them Am9→F→C→G (i–VI–III–VII), which
+  starts on the minor tonic — that ordering *was* the gloom. Walked C→G→Am→F
+  (I–V–vi–IV) it opens bright, passes through the minor, and **ends resolved at
+  home on C** (the endcard pedal is a C chord now, not an A). Also: the first two
+  bars are voiced an octave up (a low drone was the other half of it), the
+  arpeggio now starts with act one instead of silence, and the boot's impact is
+  softer with a brighter shimmer over it. Repo-only, no app code, nothing to
+  deploy.
+- **2026-07-30 (same session, round 4) — launch film explains the product
+  properly (owner review round 4).** The note behind all six items: *"do a much
+  better job at explaining the value of the app"* — one place for every saved
+  link, analyzed and filed, connected, and made usable by Ask. **(1) Capture is
+  now SCHEMATIC.** It showed one article, one share sheet, then Machina — which
+  proves Machina can take a link, not that it takes them from anywhere. The sheet
+  now slides up ONCE and holds while the world behind it cross-cuts through an
+  Instagram carousel, a YouTube video and an article (the sheet's preview row
+  names each one). Same gesture, three places, no copy, then inside the app for
+  the pipeline. **(2) The demo library is platform-rich**, using the app's OWN
+  marks — this needed `lucide-react` pinned back to **0.563.0**, the version
+  `web/` uses: the film had drifted to lucide 1.x, which has dropped brand icons
+  entirely. Best consequence: **the three Ask citations are now a Nature paper, a
+  YouTube video and an Instagram carousel**, so the hero beat's chips prove the
+  one-place claim by themselves. **(3) Act one gained an opening SENTENCE** ("You
+  save things everywhere.") — it used to open on the bare platform list, which is
+  a fragment, not an opening. Scatter went 3→4 bars, so the film is **67.5s**
+  again and `BAR_CHORDS` is back to 27 entries. **(4) "Saving was never the hard
+  part" is cut.** **(5) Collections are TOPICS** — "From YouTube"/"Saved on X"
+  described where a card came from, which is exactly the organising principle
+  Machina replaces. **(6) The score is livelier** without becoming a trailer: a
+  moving bassline (root–fifth–octave instead of a downbeat pedal), backbeat
+  claps, 16th hats plus a shaker once the film is at full tilt, and the plucked
+  figure regrouped 3+3+2 instead of straight eighths. Per-bar RMS re-verified —
+  no clipping, no holes. Repo-only, no app code, nothing to deploy.
+- **2026-07-30 (same session, round 3) — launch film layout + motion pass (owner
+  review round 3).** Six notes, four of them real defects. **(1) Caption 4
+  ("Saving was never the hard part") was sitting over Machina's OWN analyzing
+  screen** — a line about the act of saving, played over our pipeline. Retimed to
+  end before the cut into the app, so it now runs over Safari + the iOS share
+  sheet where it belongs. **(2) Captions moved off the bottom into a LEFT
+  COLUMN.** Type centred under the device sat in its shadow and made the film look
+  subtitled; product scenes now hold the device right (`BASE_X` in
+  `film/anim.ts`) with the line set left, ranged against a short accent rule —
+  the editorial two-column setting. Beats with no device (scatter, the turn) keep
+  a centred line, declared per cue via `place` in `timeline.mjs`. **(3) The name
+  no longer lands three times.** The turn used to resolve into a full
+  `[ MACHINA ]` lockup between the boot at 0:00 and the endcard; it now closes on
+  the MARK holding what it gathered and pushes through into the product — the
+  same gesture the boot exits on. Name = small at the start, big at the end.
+  **(4) Two jitters in the Ask beat, both real bugs:** the typing helper added a
+  sine wobble to the CHARACTER COUNT, which could go backwards between frames, so
+  the question bubble grew and shrank a character at a time (the cadence is now
+  per-character dwell times, monotonic by construction); and the half-typed
+  question was rendered in BOTH the composer and a chat bubble, so the same
+  unfinished sentence was on screen twice — the bubble now only exists after the
+  question is sent. Caption motion also rounds to whole pixels, since sub-pixel
+  translation re-rasterizes glyphs every frame and shimmers at this size.
+  **(5) "Every save connects to the rest" was an untrue claim** → "See how your
+  saves connect." **(6) The endcard mark now ARRIVES** — `AnimatedMark` in
+  `ui/Brand.tsx` ports the app's own `launchAt` motion from `CitationMark`
+  (arms draw out from corner ticks via the two clip rects, brackets close, point
+  strikes last), played at 1.9× the app's 39-frame launch because the endcard is
+  settling rather than booting. Repo-only, no app code, nothing to deploy.
+- **2026-07-30 (same session, round 2) — launch film copy pass + boot-screen cold
+  open (owner review round 2).** Owner note: focus the messaging on what the app
+  actually is — **one place for every saved link, analyzed/filed/organized,
+  connected, and made usable by Ask** — and stop wandering into narratives that
+  don't serve it. Changes: **(1) Cold open is now the app's real `BootScreen`**,
+  ported frame-for-frame from `web/app/page.tsx` + `globals.css` keyframes
+  (brackets 0.55s/ease-modal/0.14s delay, point strike 0.36s/ease-spring/0.6s,
+  glow 0.7s, MACHINA fading in as its letterspacing breathes 0.30em→0.46em in
+  the launch monospace setting, then the push-through exit that dissolves into
+  the film). It is **one bar (2.5s)** instead of two, so **every scene shifted a
+  bar earlier and the film is now 65s** (was 67.5s). **(2) The score's
+  arrangement now derives from `SCENES`** rather than hardcoded bar numbers, and
+  `BAR_CHORDS` asserts its length equals `TOTAL_BARS` — a retime used to be able
+  to silently put the wrong chord under a scene. **(3) Copy rewritten**:
+  "Somewhere else" → the platforms are named ("Instagram. X. YouTube.
+  WhatsApp."); the searchable-by-meaning narrative is **dropped entirely** (owner:
+  not the thing to focus on) and that beat is now "Summarized, tagged and filed
+  for you." → "So you can actually find it again."; the word **"library" is gone
+  from the film**, captions AND in-app strings (it read as limiting) — the Ask
+  blank slate is "Ask anything you've saved" and the search placeholder is
+  "Search everything you saved", **which means the shipped app still says
+  "library" in both places and may want the same edit**; "One place for all of
+  it" → "One place for everything you save"; the digest line is "Nothing worth
+  keeping stays buried". **(4) The endcard no longer closes on learning** —
+  "Recalling it is how you learn it" was pulled (owner: "I am not a learning
+  app") for **"Everything you save, finally useful."**, which is the letter's own
+  word for the payoff. Repo-only, no app code, nothing to deploy.
+- **2026-07-30 — launch film re-cut around the founder letter (owner review
+  round 1).** Design, grade, rhythm and score structure were signed off as-is
+  ("the design is perfect"); the note was that the MESSAGES needed dramatic
+  tightening, so this round changed only story and copy. **(1) Act one is now
+  fragmentation, not clutter.** The old scene was one generic read-later list
+  that "finds nothing"; the letter's actual complaint is that everything was
+  "scattered across five platforms, quietly disappearing" and you cannot recall
+  WHICH app swallowed it. New `Scatter` scene: five un-branded platform surfaces
+  (Instagram Saved, X Bookmarks, YouTube Watch later, WhatsApp-to-yourself,
+  Safari Reading List) floating in 3D, drifting apart, then fading out one at a
+  time to an empty frame. Platform hues are the app's own `PLATFORM_RGB`; glyphs
+  are generic marks beside the platform NAME in type, never a reproduced logo.
+  **(2) The turn is now a move, not a claim.** The wordmark scene opens with the
+  same five panels rushing back to exactly where they drifted from
+  (`CONSTELLATION` is shared by both scenes) and collapsing into one point of
+  light that the brackets close around, then open to release the name. The
+  `Capture. Ask. Connect.` tagline moved OUT of this scene (it lives on the
+  endcard) so the beat carries one line of type, not two. **(3) The library is
+  visibly multi-platform** — two article cards became a YouTube save and an
+  Instagram save, with the app's platform bylines — because "one place for all of
+  it" has to be shown in the feed, not just captioned. **(4) Captions rewritten
+  and shortened** (11 cues, bar 21 deliberately silent): fragmentation → "one
+  place for all of it" → "saving was never the hard part" → "Machina reads what
+  you save" → meaning-search → Ask → graph → digest. **(5) Endcard: the app-icon
+  TILE is gone** (owner note — the grey squircle read as a screenshot of an icon);
+  it is the bare Citation mark now, matching `docs/BRANDING.md`'s
+  bare-glyph-in-the-header call, and the closing line is the letter's belief
+  instead of an availability claim. Score re-rendered for the new act-one hits
+  (converge whoosh + riser, collapse impact, release shimmer). **Two rendering
+  bugs found by still/encode review, worth remembering — all three are the same
+  lesson, that this film's bugs are invisible in code and obvious in a frame:**
+  (a) the collapse flash was a plain decay, so it sat at FULL brightness through
+  the entire gather and washed the incoming panels into one white blob (it now
+  builds with the gather and spikes on the landing); (b) an **unbraced `/* */`
+  block comment in JSX children position rendered as literal on-screen text** —
+  the first cut of the scatter scene shipped three paragraphs of my own comment
+  next to the panels, caught only by pulling frames out of the encoded mp4, so
+  every JSX comment in the film is now `{/* … */}`; (c) centring a panel with
+  `translate(-50%,-50%)` made it overflow its transformed parent and the two
+  lower panels were clipped mid-header. That one survived two wrong diagnoses
+  (transform order, then filter region) before the right fix, which was to stop
+  needing the transform at all: `PANEL_W`/`PANEL_H` are fixed and centring is
+  negative margins, i.e. layout. Verified: `tsc` 0; scene-by-scene stills at every
+  new beat; full re-render; and a new **`npm run verify`** that fails on a
+  clipped master, on any bar sitting >3.5dB below its neighbours, and on
+  overlapping captions — the last one exists because cue 3 ran 0.2 bars into cue
+  4 and would have stacked two lines on screen. Repo-only, no app code, nothing
+  to deploy.
+- **2026-07-29 (later, separate session) — launch film built from code
+  (`marketing/launch-clip/`).** A 67s 1920×1080 launch clip, rendered rather than
+  edited: **Remotion** for picture, a **dependency-free Node synth** for the score,
+  and **`timeline.mjs` as the single source of truth for TIME** — 96 BPM, one bar =
+  2.5s = 75 frames, every scene boundary on a bar line, and the arrangement walks
+  the same bar map, so risers land on the bar before a cut and the sub thumps on
+  the frame the card lands. Nine scenes: cold open (the citation mark assembles) →
+  the generic un-branded pile that finds nothing → `[ MACHINA ]` (brackets open,
+  the name resolves between them) → capture (share sheet → the real five phases
+  from `lib/scanPhases.ts` → finished card) → meaning-search → **Ask + three
+  citation chips** → graph → digest → endcard. Fidelity is deliberate: `theme.ts`
+  ports `globals.css` tokens, `ui/Brand.tsx` carries the real wordmark/glyph path
+  data, type is the same self-hosted Geist — **so the film drifts if those change**
+  (noted in its README). Demo content is ONE coherent research trail so the beats
+  are honest: the Ask answer is genuinely assemblable from those three cards, and
+  the search query *"why cramming never sticks"* shares **not one word** with the
+  cards it retrieves, which is the only way that beat proves semantic search
+  instead of ⌘F. **Environment gotchas worth keeping** (all four cost real time):
+  Remotion can't download its own Chrome here (`remotion.media` not in the egress
+  allowlist) → `setBrowserExecutable` at the container's Playwright build, and it
+  must be the **headless-shell** binary because full `chrome` rejects the old
+  `--headless` flag; **TypeScript must be 5.x** (Remotion's esbuild loader calls
+  `typescript.sys`, absent from TS 7's `require` shape); fonts are
+  **base64-inlined with no `delayRender` gate** — Google Fonts is unreachable,
+  serving woff2 from `public/` stalled a frame ~500 in, and the rescue `setTimeout`
+  could never fire because **Remotion freezes page timers**, so the lesson is that
+  *any* pending `delayRender` on a page that wedges kills the whole render;
+  **concurrency 2**, since at 4 a page wedged around frame 512 while those same
+  frames render fine in isolation. Verified: `tsc` 0; 2025/2025 frames encoded
+  (67.56s, h264 + AAC); scene-by-scene still review at every beat; score checked
+  by per-bar RMS/peak (no clipping, DC ≈ 0, and the digest bar's earlier 4dB hole
+  filled so the exhale doesn't read as the music stopping). **Not verified by ear
+  — no audio device in the sandbox; owner should listen before publishing.**
+  Repo-only change (no app code, no deploy): `out/` and the 12MB `score.wav` are
+  gitignored because the synth is seeded and `npm run score` reproduces it
+  byte-identically.
 - **2026-07-29 — TestFlight 90382 daily upload limit hit (rounds 16–17 are web-
   only for now).** Runs **#246 (`4bc9afb`, Back to Ask) and #247 (`a2ef9b4`,
   cluster button row) both FAILED at upload** — App Store Connect error
