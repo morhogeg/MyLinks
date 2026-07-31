@@ -66,12 +66,12 @@ export const Film: React.FC<{ withAudio?: boolean; withSubtitles?: boolean }> = 
           on the dark grade but washes the dark cold open on the light grade. */}
       {withSubtitles && <Subtitles />}
 
-      {/* the first and last breath of black — no film starts on a lit frame */}
+      {/* the first breath — the light film blooms in from white */}
       <AbsoluteFill
         style={{
-          background: '#000',
+          background: '#FFFFFF',
           opacity: Math.max(
-            frame < 6 ? 1 - frame / 6 : 0,
+            frame < 8 ? 1 - frame / 8 : 0,
             0,
           ),
           pointerEvents: 'none',

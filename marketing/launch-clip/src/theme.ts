@@ -66,9 +66,9 @@ export type Theme = typeof dark;
 
 /**
  * The film is graded LIGHT (owner call, 2026-07-31) — the product's daytime
- * face. The one deliberate exception is the cold open: the shipped BootScreen
- * is fixed graphite regardless of theme, so the boot stays dark and its
- * push-through exit is the moment the film blooms into the light.
+ * face, bookends included: the cold open runs the shipped BootScreen MOTION in
+ * the endcard's ink-on-paper palette rather than the app's graphite ground
+ * (owner call, round 10 — one grade for the whole film).
  */
 export const T = light;
 

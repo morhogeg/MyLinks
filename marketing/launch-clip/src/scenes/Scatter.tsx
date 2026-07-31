@@ -29,10 +29,13 @@ import { drift, prog, ramp, EASE_IN_OUT, EASE_OUT } from '../film/anim';
 export const Scatter: React.FC = () => {
   const f = useCurrentFrame();
   const fr = useFraming();
-  // vertical: the constellation narrows to fit the 1080 width and stretches
-  // tall, so the five surfaces still surround the viewer instead of clipping
-  const fit = fr.vertical ? 0.8 : 1;
-  const vy = fr.vertical ? 1.9 : 1;
+  // The panels must be READABLE — at the old framing they were surfaces you
+  // squinted at (owner note). Positions compress toward centre and the camera
+  // holds much closer, so each surface is legible at a glance; the drift is
+  // shorter for the same reason. Vertical squeezes x hard and opens y instead.
+  const vx = fr.vertical ? 0.45 : 0.82;
+  const vy = fr.vertical ? 1.45 : 0.85;
+  const dv = 0.55; // drift travel, both axes
 
   // the panels arrive fast, then keep drifting apart for the whole scene
   const arrive = prog(f, 0, 36, EASE_OUT);
@@ -41,7 +44,7 @@ export const Scatter: React.FC = () => {
   // camera: a slow lateral drift across the constellation, easing back so all
   // five are in frame by the time they start disappearing
   const pull = prog(f, 0, 150, EASE_IN_OUT);
-  const camScale = (1.14 - pull * 0.2) * fit;
+  const camScale = (1.38 - pull * 0.24) * (fr.vertical ? 0.88 : 1);
   const camRotY = ramp(f, [0, 210], [9, -7], EASE_IN_OUT);
   const camX = ramp(f, [0, 210], [-70, 60], EASE_IN_OUT);
   const camY = drift(f, 8, 300) - 18;
@@ -75,8 +78,8 @@ export const Scatter: React.FC = () => {
             // …and goes quiet one by one, in a different order than it arrived
             const gone = prog(f, 118 + ((i * 13) % 5) * 10, 152 + ((i * 13) % 5) * 10, EASE_IN_OUT);
 
-            const x = p.x + p.dx * apart;
-            const y = (p.y + p.dy * apart) * vy;
+            const x = (p.x + p.dx * apart * dv) * vx;
+            const y = (p.y + p.dy * apart * dv) * vy;
             const z = p.z - inT * 0 - (1 - inT) * 260;
             const depthBlur = Math.abs(p.z) / 165 + gone * 5;
 

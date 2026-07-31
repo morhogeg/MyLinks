@@ -5,12 +5,12 @@ screen recording: the picture is [Remotion](https://remotion.dev) (React → fra
 the score is synthesized by a Node script, and both read their timing from one
 shared file.
 
-**The film is graded light** (owner call) — the product's daytime face, white set,
-ink typography. The one deliberate exception is the cold open: the shipped
-`BootScreen` is fixed graphite regardless of theme, so the boot stays dark and its
-push-through exit is the moment the film blooms into the light. Act one's loss
-runs the same logic in reverse: the platform panels *bleach out* into the paper
-rather than sinking into black.
+**The film is graded light, bookends included** (owner call) — the product's
+daytime face, white set, ink typography. The cold open runs the shipped
+`BootScreen` MOTION (same keyframes, same delays) in the endcard's ink-on-paper
+palette rather than the app's graphite ground, so the film opens and closes in
+the same light. Act one's loss reads in the same grade: the platform panels
+*bleach out* into the paper rather than sinking into black.
 
 ```bash
 cd marketing/launch-clip
@@ -64,7 +64,7 @@ owner ruled out: it is **not** a learning app, and it does **not** sell
 
 | Bars | Time | Scene | What it does |
 |---|---|---|---|
-| 0–1 | 0:00 | `ColdOpen` | **The app booting** — the real `BootScreen`, ported from `web/app/page.tsx` (deliberately dark) |
+| 0–1 | 0:00 | `ColdOpen` | **The app booting** — the real `BootScreen` motion, in the film's light grade |
 | 1–4 | 0:02.5 | `Scatter` | Five platforms drifting apart — Instagram, X, YouTube, WhatsApp, Reading List — then bleaching out one by one |
 | 4–6 | 0:10 | `WordmarkScene` | The five rush back and collapse into one point of ink; the mark closes around it, then pushes through into the product |
 | 6–11 | 0:15 | `Capture` | **One share sheet, three sources behind it** (the sheet names each one) → the five-phase pipeline, held ~5.5s under a push-in → a finished card |
@@ -200,12 +200,13 @@ harmony and a completely different mood — that ordering is what made an earlie
 cut read as gloomy. Per-bar density brings percussion in for capture, peaks on
 Ask, and drops to a held C pedal for the endcard.
 
-**The score has a split personality, deliberately:** act one (the struggle)
-keeps its Am shadow and sparse bed; from capture onward every scene opens on
-the tonic, Am never lands on a scene boundary, a four-on-the-floor kick plus
-off-beat open hats carry the product act, the pulse doubles to 16ths from the
-hero scene, and a quiet keys lead-in sings over capture/library before the full
-melody enters with Ask.
+**The score has a split personality, deliberately:** bar 3 — the loss — is the
+ONLY minor chord in the entire film; everything after the turn is I–IV–V
+sunshine (C, F, G), every scene opening on the tonic and closing on V. A
+four-on-the-floor kick plus off-beat open hats carry the product act, the pulse
+doubles to 16ths from the hero scene, a high sparkle pad voice rides over the
+product bars, and a quiet keys lead-in sings over capture/library before the
+full melody enters with Ask.
 
 There is no audio device in the render environment, so the mix is verified
 numerically — `npm run verify` prints per-bar RMS and peak, DC offset and a

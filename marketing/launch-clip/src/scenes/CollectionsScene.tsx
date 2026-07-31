@@ -22,9 +22,10 @@ export const CollectionsScene: React.FC = () => {
 
   const push = prog(f, 26, 200, EASE_IN_OUT);
   const scale = 1.42 + push * 0.22;
-  // the grid fills the frame, drifting down through the second row
-  const target = ramp(f, [26, 200], [270, 355], EASE_IN_OUT);
-  const y = fr.focusY(target, scale * fr.scaleMul) + drift(f, 4, 240);
+  // the grid fills the frame, drifting down through the second row — vertical
+  // shortens the travel so the device top never rides into the caption block
+  const target = ramp(f, [26, 200], [270, fr.vertical ? 315 : 355], EASE_IN_OUT);
+  const y = fr.focusY(target, scale * fr.scaleMul) + drift(f, 4, 240) + (fr.vertical ? 90 : 0);
   const rotY = ramp(f, [0, 210], [10, 4], EASE_IN_OUT);
 
   const out = 1 - prog(f, 213, 225);

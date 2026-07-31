@@ -87,7 +87,9 @@ export const SUBTITLES = [
   // the earlier lines ("group them the way you think") were too coy to land.
   { bar: 23.35, bars: 1.5, place: 'left', text: 'Gather them into collections.' },
   { bar: 24.95, bars: 0.95, place: 'left', text: 'Yours to shape.' },
-  { bar: 26.35, bars: 1.5, place: 'left', text: 'Every week, it writes up what you saved.' },
+  // The digest's value is the NOTICING, not the writing — it reads your week
+  // and surfaces the pattern you didn't see ("You circled one idea all week").
+  { bar: 26.35, bars: 1.5, place: 'left', text: 'Every week, it finds the patterns you missed.' },
   { bar: 27.95, bars: 0.95, place: 'left', text: 'And brings back what you forgot.' },
 ];
 

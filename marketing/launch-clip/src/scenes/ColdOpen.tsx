@@ -4,15 +4,16 @@ import { mono } from '../fonts';
 import { prog, ramp, EASE_MODAL, EASE_OUT, EASE_SPRING } from '../film/anim';
 
 /**
- * Cold open — the app launching.
+ * Cold open — the app launching, in the film's light grade (owner call: the
+ * whole film is light, bookends included, so the boot wears the endcard's
+ * palette — ink mark on paper — rather than the shipped graphite ground).
  *
- * Not an invented title card: this is `BootScreen` from `web/app/page.tsx`,
- * ported frame-for-frame from its CSS keyframes in `globals.css`, down to the
- * delays. Same staged arrival the identity spec calls for ("the arms join. The
- * brackets close. The point lands. Only then does the wordmark arrive"), same
- * letterspaced monospace setting for MACHINA, same radial graphite ground, and
- * the same push-through exit the app plays when auth resolves — which doubles
- * as the cut into the film.
+ * The MOTION is still `BootScreen` from `web/app/page.tsx`, ported
+ * frame-for-frame from its CSS keyframes in `globals.css`, down to the delays:
+ * same staged arrival ("the arms join. The brackets close. The point lands.
+ * Only then does the wordmark arrive"), same letterspaced monospace setting
+ * for MACHINA, and the same push-through exit that doubles as the cut into
+ * the film.
  *
  * Timings below are the shipped values in seconds × 30fps:
  *   brackets  0.55s ease-modal  delay 0.14   →  f 4–21
@@ -40,9 +41,9 @@ export const ColdOpen: React.FC = () => {
   return (
     <AbsoluteFill
       style={{
-        // the boot frame's own ground — fixed graphite, not a themed surface
+        // the light boot ground — a white pool on the film's paper set
         backgroundImage:
-          'radial-gradient(120% 90% at 50% 42%, #131319, #050507 72%)',
+          'radial-gradient(120% 90% at 50% 42%, #FFFFFF, #E9EBF0 72%)',
         alignItems: 'center',
         justifyContent: 'center',
         opacity: dissolve,
@@ -57,14 +58,15 @@ export const ColdOpen: React.FC = () => {
         }}
       >
         <span style={{ position: 'relative', display: 'inline-flex' }}>
-          {/* the halo breathes with LIGHT, never the ink */}
+          {/* the halo breathes with LIGHT, never the ink — on paper it is a
+              soft white bloom */}
           <span
             style={{
               position: 'absolute',
               inset: '-45%',
               borderRadius: '50%',
               background:
-                'radial-gradient(closest-side, rgba(174,184,206,0.20), rgba(174,184,206,0) 72%)',
+                'radial-gradient(closest-side, rgba(255,255,255,0.9), rgba(255,255,255,0) 72%)',
               opacity: Math.max(0, Math.sin(((f - 48) / 126) * Math.PI * 2)) * 0.9,
             }}
           />
@@ -72,8 +74,8 @@ export const ColdOpen: React.FC = () => {
             style={{
               position: 'relative',
               width: MARK_W,
-              color: '#FFFFFF',
-              filter: `drop-shadow(0 0 ${glow * 54}px rgba(174,184,206,${glow * 0.34}))`,
+              color: '#14141B',
+              filter: `drop-shadow(0 ${glow * 10}px ${glow * 44}px rgba(24,32,48,${glow * 0.3}))`,
             }}
           >
             <svg viewBox="288 292 448 416" style={{ width: '100%', height: 'auto' }} fill="currentColor">
@@ -89,14 +91,14 @@ export const ColdOpen: React.FC = () => {
         </span>
 
         {/* MACHINA — the launch setting: letterspaced monospace that breathes
-            open as it fades in (0.30em → 0.46em), never the drawn wordmark. */}
+            open as it fades in (0.30em → 0.46em), in ink. */}
         <span
           style={{
             marginTop: MARK_W * 0.359,
             fontFamily: mono,
             fontSize: MARK_W * 0.145,
             textTransform: 'uppercase',
-            color: '#E6E6F0',
+            color: '#26262E',
             letterSpacing: `${ramp(f, [32, 53], [0.3, 0.46], EASE_OUT)}em`,
             textIndent: '0.46em',
             opacity: word,

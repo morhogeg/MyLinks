@@ -226,8 +226,10 @@ export const CONSTELLATION: {
   dy: number;
 }[] = [
   { k: 'instagram', x: -472, y: -158, z: -130, rotY: 17, rotX: -6, dx: -120, dy: -46 },
-  { k: 'x', x: 118, y: -224, z: 90, rotY: -13, rotX: 6, dx: 62, dy: -104 },
-  { k: 'youtube', x: 512, y: -22, z: -185, rotY: -19, rotX: -4, dx: 132, dy: 20 },
+  { k: 'x', x: 80, y: -234, z: 90, rotY: -13, rotX: 6, dx: 62, dy: -104 },
+  // nudged right+down when the constellation compressed (round 10), so X's
+  // panel stops covering this one's header
+  { k: 'youtube', x: 560, y: 16, z: -185, rotY: -19, rotX: -4, dx: 132, dy: 20 },
   { k: 'whatsapp', x: -308, y: 176, z: 125, rotY: 15, rotX: 7, dx: -104, dy: 78 },
   { k: 'reading', x: 282, y: 232, z: -70, rotY: -11, rotX: 8, dx: 74, dy: 92 },
 ];

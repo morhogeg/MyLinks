@@ -97,7 +97,8 @@ const pad = (startSec, lenSec, midi, level, panPos) => {
   const f = mtof(midi);
   const dets = [0, -0.07, 0.06, -0.13, 0.11];
   const phase = dets.map(() => rnd() * Math.PI);
-  const filt = lp(1500 + level * 900);
+  // opened up from 1500+900 — the darker pad was half of the "gloomy" reading
+  const filt = lp(1900 + level * 1300);
   render(
     startSec,
     lenSec + 2.2,
@@ -407,18 +408,18 @@ const CHORDS = {
 // note was "the music at the beginning is too gloomy", and that ordering IS the
 // gloom. Walked C → G → Am → F (I–V–vi–IV) the same four chords open bright,
 // touch the minor in passing, and the film can end resolved at home on C.
-// The split personality is deliberate (owner note: the struggle can stay
-// moody, the product must sound like SUCCESS): act one keeps its Am shadow,
-// and from capture onward every scene OPENS on the tonic, Am never lands on a
-// scene boundary, and scene-final bars lean on V so each cut arrives as a
-// resolution.
+// The split personality is deliberate (owner notes ×2: the struggle can stay
+// moody, but the rest must sound like a LAUNCH): bar 3 is now the ONLY minor
+// chord in the entire film — the loss gets one shadow and the product act is
+// pure I–IV–V sunshine, every scene opening on the tonic and closing on V so
+// each cut arrives as a resolution.
 const BAR_CHORDS = [
   'Cmaj7', // 0     cold open (the boot) — opens major
-  'Cmaj7', 'G6', 'Am9', // 1–3   scatter — ends on the minor: the loss
+  'Cmaj7', 'G6', 'Am9', // 1–3   scatter — the film's single minor bar: the loss
   'Fmaj7', 'Cmaj7', // 4–5   the turn lifts on F and resolves home as the mark locks
-  'Cmaj7', 'G6', 'Am9', 'Fmaj7', 'G6', // 6–10  capture — V pushes into the library
-  'Cmaj7', 'Am9', 'Fmaj7', 'G6', // 11–14 library
-  'Cmaj7', 'G6', 'Am9', 'Fmaj7', 'G6', // 15–19 ask — V lands the graph bloom on I
+  'Cmaj7', 'Fmaj7', 'G6', 'Cmaj7', 'G6', // 6–10  capture
+  'Cmaj7', 'Fmaj7', 'Cmaj7', 'G6', // 11–14 library
+  'Cmaj7', 'Fmaj7', 'G6', 'Cmaj7', 'G6', // 15–19 ask — V lands the graph bloom on I
   'Cmaj7', 'Fmaj7', 'G6', // 20–22 graph
   'Cmaj7', 'Fmaj7', 'G6', // 23–25 collections
   'Fmaj7', 'Cmaj7', 'G6', // 26–28 digest — warm IV first
@@ -486,6 +487,11 @@ for (let bar = 0; bar < BAR_CHORDS.length; bar++) {
     pad(t0, BAR, m + lift, padLevel * (i === 0 ? 1 : 0.85), panPos);
   });
   pad(t0, BAR, ch.bass + 12, padLevel * 0.6, 0);
+  // a high sparkle voice over the product act — the top chord tone an octave
+  // up, quiet, which is what makes the bed read as sunlight instead of fog
+  if (bar >= CAPTURE_BAR && bar < ENDCARD_BAR) {
+    pad(t0, BAR, ch.upper[3] + 12, padLevel * 0.34, bar % 2 ? 0.35 : -0.35);
+  }
 
   // ── bass: a MOVING line once the film is properly under way, not a pedal.
   // The single downbeat sub was what made the earlier cut feel like a bed
@@ -575,30 +581,30 @@ for (const m of [48, 64, 67, 72]) pad(b(ENDCARD_BAR), BAR * 3 - 0.3, m, 0.075, m
 // 23–25, digest 26–28, endcard 29–31.
 const MELODY = [
   [15, 0, 64], [15, 1.5, 65], [15, 3, 67], //  Cmaj7: E4 F4 G4  (E→F right away)
-  [16, 0, 67], [16, 1.5, 69], [16, 3, 71], //  G6:    G4 A4 B4  (up to the leading tone)
-  [17, 0, 72], [17, 2, 71], //  Am9:   C5 B4     (resolve down)
-  [18, 0, 69], [18, 1.5, 67], [18, 3, 64], //  Fmaj7: A4 G4 E4
-  [19, 0, 65], [19, 2, 67], [19, 3, 71], //  G6:    F4 G4 B4  (leading tone into the bloom)
-  [20, 0, 72], [20, 2, 71], [21, 0, 69], [21, 2, 67], [22, 0, 65], [22, 2, 67], // graph
+  [16, 0, 67], [16, 1.5, 69], [16, 3, 72], //  Fmaj7: G4 A4 C5  (rising)
+  [17, 0, 74], [17, 2, 71], //  G6:    D5 B4
+  [18, 0, 72], [18, 1.5, 71], [18, 3, 69], //  Cmaj7: C5 B4 A4
+  [19, 0, 67], [19, 2, 69], [19, 3, 71], //  G6:    G4 A4 B4  (leading tone into the bloom)
+  [20, 0, 72], [20, 2, 71], [21, 0, 69], [21, 2, 67], [22, 0, 74], [22, 2, 71], // graph
   [23, 0, 72], [24, 1, 69], [25, 0, 71], // collections — kept high, kept bright
-  [26, 0, 72], [27, 0, 69], [27, 2, 65], [28, 0, 67], // digest
+  [26, 0, 69], [27, 0, 67], [27, 2, 72], [28, 0, 71], // digest — warm, rising
   [29, 0, 64], [29, 2, 65], [30, 0, 69], [31, 0, 72], [31, 1.5, 76], // …home on C
 ];
 
 for (const [bar, bt, m] of MELODY) {
   const last = bar >= ENDCARD_BAR;
-  keys(beat(bar, bt), m, last ? 0.2 : 0.155, bar % 2 ? 0.2 : -0.2, last ? 2.6 : 1.5);
+  keys(beat(bar, bt), m, last ? 0.2 : 0.17, bar % 2 ? 0.2 : -0.2, last ? 2.6 : 1.5);
 }
 
 // A light LEAD-IN line under capture + library — single bright keys notes on
 // scene pulses, so the product act sings from its first bar instead of waiting
 // nine bars for the hero melody. Quiet by design: a promise, not the tune.
 const LEAD_IN = [
-  [6, 0, 67], [7, 2, 71], [8, 0, 72], [9, 2, 69], [10, 0, 71],
-  [11, 0, 72], [12, 2, 72], [13, 0, 69], [14, 2, 71],
+  [6, 0, 67], [7, 2, 69], [8, 0, 71], [9, 2, 72], [10, 0, 71],
+  [11, 0, 72], [12, 2, 69], [13, 0, 72], [14, 2, 71],
 ];
 for (const [bar, bt, m] of LEAD_IN) {
-  keys(beat(bar, bt), m, 0.105, bar % 2 ? -0.25 : 0.25, 1.3);
+  keys(beat(bar, bt), m, 0.12, bar % 2 ? -0.25 : 0.25, 1.3);
 }
 
 // ── risers into the hard cuts (the bar-5 riser is the short one into capture)

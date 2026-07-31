@@ -1058,6 +1058,34 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-31 (launch film, round 10) — light bookends, readable scatter, a
+  digest line with teeth, the vertical collision fixed, and the gloom cut from
+  the score (owner notes ×5 + screenshot).**
+  **(1) The cold open is LIGHT now** — the shipped `BootScreen` MOTION
+  (keyframes and delays untouched) in the endcard's ink-on-paper palette, so
+  the film opens and closes in one grade; the first breath fades from white,
+  not black. `theme.ts`/README notes updated — the "boot stays graphite" call
+  from round 8 is overruled by the owner.
+  **(2) Scatter panels are READABLE:** constellation positions compress
+  (landscape ×0.82, vertical ×0.45 wide / ×1.45 tall), drift travel halves,
+  and the camera holds ~20% closer — the five surfaces are now legible at a
+  glance instead of specks (owner: "almost impossible to see what they are").
+  The wordmark gather uses the same factors so it still undoes the same
+  scatter, and X/YouTube panel positions got a nudge so the compression didn't
+  stack X's panel over YouTube's header.
+  **(3) Digest caption:** "Every week, it writes up what you saved." → **"Every
+  week, it finds the patterns you missed."** — the value is the NOTICING (the
+  on-screen headline literally shows a found pattern), not the writing.
+  **(4) Vertical collision fixed (owner screenshot):** the digest/collections
+  camera travel lifted the device top INTO the caption block; both scenes now
+  shorten the travel and bias the device down in vertical only.
+  **(5) The score sheds the last of the gloom:** bar 3 (the loss) is the ONLY
+  minor chord left in the film — the entire product act is I–IV–V; the pad's
+  lowpass opens (1500→1900 base), a high sparkle pad voice rides the product
+  bars, and melody/lead-in levels come up. Act-one struggle bars keep their
+  minor as the owner asked in round 9.
+  Verified: tsc 0, verify green, stills both formats at every changed beat.
+  **Score still unheard — owner must listen.**
 - **2026-07-31 (launch film, round 9) — taps drive the cuts, the graph wears the
   app's real chrome, search finds ONE card, the score's back half goes upbeat,
   and a vertical 1080×1920 edition ships (owner notes ×4 + polish round).**

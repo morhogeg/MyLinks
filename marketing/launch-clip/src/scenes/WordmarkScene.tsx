@@ -25,9 +25,12 @@ import { drift, prog, ramp, EASE_IN_OUT, EASE_OUT } from '../film/anim';
 export const WordmarkScene: React.FC = () => {
   const f = useCurrentFrame();
   const fr = useFraming();
-  // the same narrowing the scatter used, so the gather undoes the same scatter
-  const fit = fr.vertical ? 0.8 : 1;
-  const vy = fr.vertical ? 1.9 : 1;
+  // the same compression + camera the scatter ended on, so the gather undoes
+  // the same scatter
+  const vx = fr.vertical ? 0.45 : 0.82;
+  const vy = fr.vertical ? 1.45 : 0.85;
+  const dv = 0.55;
+  const fit = (fr.vertical ? 0.88 : 1) * 1.14; // ≈ the scatter's final camScale
 
   // ── 1. the gather (frames 0–26): panels fly to centre and collapse
   const gather = prog(f, 0, 26, EASE_IN_OUT);
@@ -104,8 +107,8 @@ export const WordmarkScene: React.FC = () => {
           <div style={{ position: 'relative', width: 1, height: 1, transformStyle: 'preserve-3d', transform: `scale(${fit})` }}>
             {CONSTELLATION.map((p) => {
               // start where the scatter left them (fully drifted), end at centre
-              const x = (p.x + p.dx) * (1 - gather);
-              const y = (p.y + p.dy) * (1 - gather) * vy;
+              const x = (p.x + p.dx * dv) * vx * (1 - gather);
+              const y = (p.y + p.dy * dv) * vy * (1 - gather);
               const z = p.z * (1 - gather);
               return (
                 <div
