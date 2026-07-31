@@ -83,41 +83,45 @@ export const SUBTITLES = [
   // grow, and lands the loss as the wrong pile opens.
   // Every line below was workshopped with the owner line-by-line (round 13) —
   // do not rewrite without them.
-  { bar: 1.15, bars: 1.4, place: 'bottom', text: 'You save it here. And here. And here.' },
-  { bar: 2.6, bars: 0.75, place: 'bottom', text: 'Multiple apps, countless saved links.' },
-  // The emotional bottom — riding the bar-3 minor while the wrong silo opens.
-  // "where it IS" (owner call): the thing still exists, you just can't reach it.
-  { bar: 3.4, bars: 1.75, place: 'bottom', text: 'Then you need one thing back — and you have no idea where it is.' },
+  // Concrete things, not "it" (owner note, round 13c) — the line names what
+  // the pictures show.
+  { bar: 1.1, bars: 1.4, place: 'bottom', text: 'A recipe here. A video there. A thread somewhere else.' },
+  { bar: 2.55, bars: 0.7, place: 'bottom', text: 'Multiple apps, countless saved links.' },
+  // A DELIBERATE BEAT OF SILENCE (bars 3.25–3.7) — the first wrong pile opens
+  // with no words at all, then the truth lands over the second one. Owner's
+  // wording ("rarely", not "never" — bold but honest), on the bar-3 minor.
+  { bar: 3.7, bars: 1.2, place: 'bottom', text: 'Saved, and rarely seen again.' },
   // The turn is an INTRODUCTION now (owner call, round 13b) — the film stops
   // describing and presents the product by name.
   { bar: 5.45, bars: 1.35, place: 'bottom', kicker: 'Introducing', text: 'Machina — one place for all your saved links.' },
-  // "without leaving where you are" (owner refinement of the round-12 line).
-  { bar: 7.35, bars: 1.25, place: 'left', kicker: 'Capture', text: 'One tap, and it’s saved — without leaving where you are.' },
+  // Value first (owner note, round 13c): anything + anywhere. No tap-count
+  // claim — the share sheet is two touches (owner correction).
+  { bar: 7.35, bars: 1.25, place: 'left', kicker: 'Capture', text: 'Save anything, from anywhere.' },
   { bar: 8.95, bars: 2.4, place: 'left', text: 'Machina reads it, summarizes it, and files it.' },
-  // THE PROMISE — Machina carries the memory burden. One line for the whole
-  // library beat (the owner cut the search caption: the picture — a query that
-  // shares no words with the one card it finds — plays under this line).
-  { bar: 12.3, bars: 2.45, place: 'left', text: 'Machina remembers, so you don’t have to.' },
-  // "ask it anything" mushed into "ask HER anything" out loud — the name
-  // carries the line instead of the pronoun (owner note, round 12).
-  { bar: 15.35, bars: 1.6, place: 'left', kicker: 'Ask', text: 'Then ask Machina anything.' },
+  // THE PROMISE — four words, two verbs. One line for the whole library beat;
+  // the search (a query sharing no words with the one card it finds) plays
+  // wordless underneath and proves the second half.
+  { bar: 12.3, bars: 2.45, place: 'left', text: 'Lose nothing. Find everything.' },
+  // A new feature, not a continuation — no "Then" (owner note, round 13c).
+  // The name still carries the line: "ask it" mushed out loud (round 12).
+  { bar: 15.35, bars: 1.6, place: 'left', kicker: 'Ask', text: 'Ask Machina anything.' },
   // Ends BEFORE the Graph-chip tap at 19.5 — during the dive the device rises
-  // through the caption band. The claim, made unambiguous in round 13b: the
-  // answers draw on ONLY what you saved (trust, not just convenience).
-  { bar: 17.4, bars: 1.9, place: 'left', text: 'Every answer is built only from what you saved.' },
+  // through the caption band. The claim: the answers' only source is your own
+  // saves ("straight from" — round 13c, after two unclear tries).
+  { bar: 17.4, bars: 1.9, place: 'left', text: 'Every answer comes straight from your saves.' },
   // The graph beat says why it matters, not what it is (round 13). "months
   // apart" was cut by the owner — the WHEN isn't the point, the noticing is.
   { bar: 20.4, bars: 2.3, place: 'left', kicker: 'Connect', text: 'Machina notices when things you saved belong together.' },
-  { bar: 23.3, bars: 1.35, place: 'left', text: 'Or group your saves into collections.' },
-  // Collections are YOUR shape of thinking, not an access claim (owner call).
-  { bar: 24.8, bars: 1.15, place: 'left', text: 'Organized the way you think.' },
-  // The digest introduced as the thing you DON'T ask for — a deliberate rhyme
-  // with the Ask kicker line, and "keep circling" is the on-screen headline.
-  { bar: 26.1, bars: 1.65, place: 'left', text: 'You don’t even have to ask — Machina spots what you keep circling.' },
-  // "yours" sits sentence-final so the voice stresses it naturally — the
-  // owner asked for emphasis on YOUR schedule, and terminal position is how a
-  // TTS does that without sounding acted.
-  { bar: 27.75, bars: 1.25, place: 'left', text: 'And brings the right ones back — on a schedule that’s yours.' },
+  // A new feature, not a continuation — no "Or" (owner note, round 13c).
+  { bar: 23.3, bars: 1.35, place: 'left', text: 'Group your saves into collections.' },
+  // YOU did the grouping — this line is what it buys you: the topic is
+  // COMPLETE, because everything you saved about it landed there.
+  { bar: 24.8, bars: 1.15, place: 'left', text: 'Every topic you care about, complete.' },
+  // ONE line for the whole digest beat (rounds of iteration ended here: no
+  // patterns jargon, no schedule talk, no reminders vibe — the concrete value
+  // of the weekly synthesis, which is what the screen shows). The resurfaced
+  // card below the write-up plays as a wordless grace note.
+  { bar: 26.1, bars: 2.6, place: 'left', text: 'And Machina turns your saves into one short read.' },
 ];
 
 /**
@@ -125,13 +129,17 @@ export const SUBTITLES = [
  * quarter-note grid so the ticks read as the score acknowledging the finger.
  * The Scatter scene derives its local frames from these; the score ticks them.
  */
-// Widened round 13b (owner: the save run played too fast) — 0.35-bar spacing,
-// still on the grid, last landing well clear of the bar-3 loss.
-export const SAVES = [1.25, 1.6, 1.95, 2.3, 2.65];
+// Widened again in round 13c (owner: still too fast) — a dotted-eighth train,
+// every contact on the 16th grid, last landing clear of the bar-3 loss. The
+// perceived slowdown also comes from the surfaces LINGERING after their tap
+// (they drift off toward their silo instead of hard-cutting).
+export const SAVES = [1.25, 1.625, 2.0, 2.375, 2.75];
 
 /** Sound-design hits, in bars — the picture events the score has to acknowledge. */
 export const HITS = {
-  bootStrike: 0.32,
+  // moved 0.32 → 0.35 (round 13c): the impact now lands exactly on the dot's
+  // spring peak in the boot, so the ding IS the point striking, not near it
+  bootStrike: 0.35,
   bootExit: 0.78,
   // the loss: the wrong pile opened twice, on and after the bar-3 minor
   lossOpenA: 3.07,

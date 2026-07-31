@@ -97,8 +97,8 @@ export const Scatter: React.FC = () => {
             const alive = 0.45 + 0.55 * prog(f, land - 4, land + 8, EASE_OUT);
             // the pile keeps growing through beat B — items nobody will read
             const grow =
-              prog(f, land, 112 + i * 8, EASE_IN_OUT) * 0.5 +
-              prog(f, 112 + i * 8, 148 + i * 5, EASE_IN_OUT) * 0.5;
+              prog(f, land, land + 30, EASE_IN_OUT) * 0.5 +
+              prog(f, land + 30, land + 65, EASE_IN_OUT) * 0.5;
             // landing bounce
             const bounce = Math.max(0, 1 - Math.abs(f - land - 4) / 9) * 0.06;
             // the wrong-pile opens (beat C)
@@ -171,11 +171,14 @@ export const Scatter: React.FC = () => {
             );
           })}
 
-          {/* ── beat A: the surfaces, one gesture each, hard in and out */}
+          {/* ── beat A: the surfaces. Each one LINGERS after its tap (round
+              13c: the hard in-and-out read as too fast) — after the save it
+              drifts off toward its own silo and fades while the next surface
+              rises over it, so the run reads as a cascade, not a slideshow. */}
           {CONSTELLATION.map((p, i) => {
             const c = CONTACTS[i];
             const enter = prog(f, c - 17, c - 5, EASE_OUT);
-            const exit = prog(f, c + 4, c + 10, EASE_MODAL);
+            const exit = prog(f, c + 6, c + 36, EASE_IN_OUT);
             if (enter <= 0 || exit >= 1) return null;
             const save = prog(f, c - 4, c + 4);
             const ctl = SURFACE_CTL[p.k];
@@ -189,11 +192,13 @@ export const Scatter: React.FC = () => {
                   marginLeft: -215,
                   marginTop: -SURFACE_H / 2 - 20,
                   transform: [
-                    `translate3d(0px, ${(1 - enter) * 44 - exit * 26}px, 0)`,
-                    `scale(${(0.95 + enter * 0.05 + exit * 0.02) * (fr.vertical ? 0.9 : 1)})`,
+                    `translate3d(${exit * siloPos[i].x * 0.3}px, ${
+                      (1 - enter) * 44 + exit * siloPos[i].y * 0.3
+                    }px, 0)`,
+                    `scale(${(0.95 + enter * 0.05 - exit * 0.12) * (fr.vertical ? 0.9 : 1)})`,
                   ].join(' '),
                   opacity: enter * (1 - exit),
-                  zIndex: 50,
+                  zIndex: 50 + i,
                 }}
               >
                 <div style={{ position: 'relative' }}>

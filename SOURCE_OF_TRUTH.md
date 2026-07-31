@@ -1058,6 +1058,36 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-31 (launch film, round 13c) — the WRITING round ("act as an Apple
+  copywriter"): fourteen owner notes plus a line-by-line workshop, and four
+  non-copy fixes.** The final 13-caption script (each line owner-shaped over
+  several exchanges): "A recipe here. A video there. A thread somewhere else."
+  / "Multiple apps, countless saved links." / *silence while the first wrong
+  pile opens* / "Saved, and rarely seen again." (owner's "rarely" — bold but
+  honest) / INTRODUCING (sized as its own LINE, not a label) + "Machina — one
+  place for all your saved links." / "Save anything, from anywhere." (one-tap
+  claim cut — the share sheet is two touches) / "Machina reads it, summarizes
+  it, and files it." / **"Lose nothing. Find everything."** (the promise) /
+  "Ask Machina anything." (no "Then" — features are not continuations; same
+  fix dropped "Or" from collections) / "Every answer comes straight from your
+  saves." / "Machina notices when things you saved belong together." / "Group
+  your saves into collections." / "Every topic you care about, complete." /
+  **"And Machina turns your saves into one short read."** — the digest beat
+  ended a long loop: patterns-you-missed (negative), schedule-that's-yours
+  ("are we in 1998?"), gift-before-the-birthday (reads as a reminders app) all
+  REJECTED; the product has BOTH curated digests and weekly synthesis, the
+  screen shows the synthesis, so the line names that and nothing else.
+  Non-copy fixes: **(1)** `bootStrike` 0.32→0.35 — the boot's ding now lands
+  exactly on the dot's spring peak; **(2)** the save run slowed again (SAVES →
+  dotted-eighth train) and surfaces now LINGER — each drifts off toward its
+  silo while the next rises over it, a cascade instead of a slideshow;
+  **(3)** the pipeline checklist's radio circles replaced by the APP'S MARK —
+  active phase carries the ANIMATED breathing mark, done phases hold it solid,
+  pending faint; the sheet-header mark removed (owner: the logo belongs on the
+  phases, once); **(4)** Ask gained the vertical +90 down-bias (caption was
+  clipping the device top — same fix library/digest carry). Verified: tsc 0,
+  verify green (13 captions), all VO lines fit, stills at every changed beat,
+  encode + RMS checks on the delivered mp4.
 - **2026-07-31 (launch film, round 13b) — five owner fixes on the 13 cut.**
   (1) The save run breathes: `SAVES` spacing 0.25→0.35 bars (taps still on the
   grid, last landing clear of the bar-3 loss), act-one captions retimed to

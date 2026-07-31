@@ -195,16 +195,17 @@ export const Subtitles: React.FC = () => {
               }}
             >
               {s.kicker && (
-                /* centred beats can carry a kicker too — round 13b's
-                   "INTRODUCING" over the turn is the first user */
+                /* centred beats can carry a kicker too — "INTRODUCING" over
+                   the turn. Sized as a LINE, not a label (owner note, round
+                   13c: it should read as its own line above the name). */
                 <span
                   style={{
                     fontFamily: sans,
-                    fontSize: vertical ? 17 : 15,
-                    fontWeight: 700,
-                    letterSpacing: '0.34em',
+                    fontSize: vertical ? 30 : 24,
+                    fontWeight: 600,
+                    letterSpacing: '0.3em',
                     textTransform: 'uppercase',
-                    color: 'rgba(75,85,99,0.72)',
+                    color: 'rgba(55,63,75,0.8)',
                     opacity: enter,
                   }}
                 >

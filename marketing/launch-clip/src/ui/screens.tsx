@@ -508,22 +508,9 @@ export const AnalyzingScreen: React.FC<{
             transform: `scale(${1 - cardEnter * 0.05})`,
           }}
         >
+          {/* No mark in the header (owner note, round 13c) — the living logo
+              moved DOWN into the checklist, one per phase. */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 11, marginBottom: 16 }}>
-            {/* the app's ANIMATED mark as the thinking orb — arms draw, brackets
-                close, the point strikes, then BREATHES while the pipeline runs
-                (owner notes, rounds 11–12: unmistakably the app's living logo) */}
-            <div
-              style={{
-                width: 38,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: T.accent,
-                filter: `drop-shadow(0 0 ${5 + (progress % 20) * 0.4}px ${T.accentRing})`,
-              }}
-            >
-              <AnimatedMark id="scan" u={markU} pulse={markPulse} style={{ width: 34, height: 'auto' }} />
-            </div>
             <div>
               <div style={{ fontSize: 13.5, fontWeight: 600, color: T.text }}>
                 {LINK_SCAN_STEPS[step]}
@@ -561,26 +548,28 @@ export const AnalyzingScreen: React.FC<{
               const active = i === step;
               return (
                 <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                  {/* The app's own mark as the phase indicator (owner call,
+                      round 13c — no generic radio circles): the ACTIVE phase
+                      carries the ANIMATED mark, launching and then breathing
+                      the app's searching pulse; done phases hold it solid;
+                      pending phases hold it faint. */}
                   <div
                     style={{
                       width: 15,
-                      height: 15,
-                      borderRadius: 15,
-                      border: `1.5px solid ${done || active ? 'rgba(20,20,27,0.45)' : T.borderStrong}`,
-                      background: done ? T.accent : 'transparent',
+                      height: 17,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       flexShrink: 0,
+                      color: T.accent,
+                      opacity: active ? 1 : done ? 0.9 : 0.22,
+                      filter: active ? `drop-shadow(0 0 5px ${T.accentRing})` : undefined,
                     }}
                   >
-                    {done && (
-                      <svg width="9" height="9" viewBox="0 0 12 12">
-                        <path d="M2 6.4 4.6 9 10 3.2" fill="none" stroke={T.accentInk} strokeWidth="2" strokeLinecap="round" />
-                      </svg>
-                    )}
-                    {active && (
-                      <div style={{ width: 5, height: 5, borderRadius: 5, background: T.accent }} />
+                    {active ? (
+                      <AnimatedMark id={`step-${i}`} u={markU} pulse={markPulse} style={{ width: 14, height: 'auto' }} />
+                    ) : (
+                      <CitationGlyph style={{ width: 12, height: 14 }} />
                     )}
                   </div>
                   <span
