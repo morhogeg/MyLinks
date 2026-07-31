@@ -36,15 +36,21 @@ const SCENE_COMPONENTS: Record<string, React.FC> = {
  * one subtitle track over the whole picture, which is what makes nine separately
  * built scenes look like one piece of film.
  */
-export const Film: React.FC<{ withAudio?: boolean; withSubtitles?: boolean }> = ({
+export const Film: React.FC<{
+  withAudio?: boolean;
+  withSubtitles?: boolean;
+  /** 'score.wav' (music only) or 'score-vo.wav' (music + voice-over mix). */
+  audioFile?: string;
+}> = ({
   withAudio = true,
   withSubtitles = true,
+  audioFile = 'score.wav',
 }) => {
   const frame = useCurrentFrame();
 
   return (
     <AbsoluteFill style={{ background: SET_BG, fontFamily: sans }}>
-      {withAudio && <Audio src={staticFile('score.wav')} />}
+      {withAudio && <Audio src={staticFile(audioFile)} />}
 
       {SCENES.map((s) => {
         const C = SCENE_COMPONENTS[s.id];

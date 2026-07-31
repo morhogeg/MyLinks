@@ -27,10 +27,10 @@ export const WordmarkScene: React.FC = () => {
   const fr = useFraming();
   // the same compression + camera the scatter ended on, so the gather undoes
   // the same scatter
-  const vx = fr.vertical ? 0.45 : 0.82;
-  const vy = fr.vertical ? 1.45 : 0.85;
+  const vx = fr.vertical ? 0.42 : 0.78;
+  const vy = fr.vertical ? 1.45 : 0.82;
   const dv = 0.55;
-  const fit = (fr.vertical ? 0.88 : 1) * 1.14; // ≈ the scatter's final camScale
+  const fit = (fr.vertical ? 0.88 : 1) * 1.22; // ≈ the scatter's final camScale
 
   // ── 1. the gather (frames 0–26): panels fly to centre and collapse
   const gather = prog(f, 0, 26, EASE_IN_OUT);
@@ -121,7 +121,7 @@ export const WordmarkScene: React.FC = () => {
                     marginTop: PANEL_OFFSET.y,
                     transform: [
                       `translate3d(${x}px, ${y}px, ${z}px)`,
-                      `rotateY(${p.rotY * (1 - gather)}deg) rotateX(${p.rotX * (1 - gather)}deg)`,
+                      `rotateY(${p.rotY * 0.55 * (1 - gather)}deg) rotateX(${p.rotX * 0.55 * (1 - gather)}deg)`,
                       `scale(${1 - gather * 0.78})`,
                     ].join(' '),
                     opacity: Math.pow(1 - gather, 0.45),

@@ -73,6 +73,8 @@ export const Capture: React.FC = () => {
   const inApp = f >= 118;
   const progress = ramp(f, [126, 292], [3, 100], EASE_IN_OUT);
   const cardEnter = prog(f, 288, 312, EASE_MODAL);
+  // the app's animated mark launches as the analyzing sheet arrives
+  const markU = prog(f, 120, 159, EASE_OUT);
 
   // ── camera: angled hold on the sheet, then a straight 2D push onto the
   // checklist (2D so the small type stays sharp), easing back out as the
@@ -113,7 +115,7 @@ export const Capture: React.FC = () => {
           <FloorGlow y={890} w={720} opacity={0.5} />
           <Phone sweep={f < 38 ? f / 38 : null}>
             {inApp ? (
-              <AnalyzingScreen progress={progress} cardEnter={cardEnter} />
+              <AnalyzingScreen progress={progress} cardEnter={cardEnter} markU={markU} />
             ) : (
               <>
                 <div style={{ position: 'absolute', inset: 0, opacity: cutDip }}>

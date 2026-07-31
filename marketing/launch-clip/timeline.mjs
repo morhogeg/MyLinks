@@ -81,12 +81,17 @@ export const SUBTITLES = [
   // anyone ever has. (Deliberately not a "search by meaning" claim.)
   { bar: 13.3, bars: 1.5, place: 'left', text: 'Even when you only half-remember it.' },
   { bar: 15.35, bars: 1.6, place: 'left', kicker: 'Ask', text: 'Then ask it anything.' },
-  { bar: 17.4, bars: 2.3, place: 'left', text: 'Answers built from what you saved.' },
+  // Ends BEFORE the Graph-chip tap at 19.5 — during the dive the device rises
+  // through the caption band, and a line still on screen got clipped by the
+  // phone (owner note, round 11).
+  { bar: 17.4, bars: 1.9, place: 'left', text: 'Answers built from what you saved.' },
   { bar: 20.4, bars: 1.8, place: 'left', kicker: 'Connect', text: 'See how it all connects.' },
   // Collections and the digest each say what the feature DOES for you —
   // the earlier lines ("group them the way you think") were too coy to land.
-  { bar: 23.35, bars: 1.5, place: 'left', text: 'Gather them into collections.' },
-  { bar: 24.95, bars: 0.95, place: 'left', text: 'Yours to shape.' },
+  { bar: 23.3, bars: 1.35, place: 'left', text: 'Gather them into collections.' },
+  // The payoff is ACCESS, not ownership — "yours to shape" said nothing
+  // (owner note, round 11).
+  { bar: 24.8, bars: 1.15, place: 'left', text: 'Everything on a topic, one tap away.' },
   // The digest's value is the NOTICING, not the writing — it reads your week
   // and surfaces the pattern you didn't see ("You circled one idea all week").
   { bar: 26.35, bars: 1.5, place: 'left', text: 'Every week, it finds the patterns you missed.' },

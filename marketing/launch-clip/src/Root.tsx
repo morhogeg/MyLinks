@@ -61,5 +61,24 @@ export const RemotionRoot: React.FC = () => (
       height={WIDTH}
       defaultProps={{ withAudio: false, withSubtitles: true }}
     />
+    {/* voice-over editions — public/score-vo.wav from audio/mix-vo.mjs */}
+    <Composition
+      id="MachinaLaunchVO"
+      component={Film}
+      durationInFrames={TOTAL_FRAMES}
+      fps={FPS}
+      width={WIDTH}
+      height={HEIGHT}
+      defaultProps={{ withAudio: true, withSubtitles: true, audioFile: 'score-vo.wav' }}
+    />
+    <Composition
+      id="MachinaLaunchVerticalVO"
+      component={Film}
+      durationInFrames={TOTAL_FRAMES}
+      fps={FPS}
+      width={HEIGHT}
+      height={WIDTH}
+      defaultProps={{ withAudio: true, withSubtitles: true, audioFile: 'score-vo.wav' }}
+    />
   </>
 );

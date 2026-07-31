@@ -179,6 +179,28 @@ narrowed and stretched tall, plus per-scene vertical nudges where a shot's
 transform origin made the shared focus line miss. Change a scene once and both
 formats pick it up.
 
+## The voice-over
+
+A female neural voice (Kokoro `af_heart`, run LOCALLY — no API key, no cloud)
+speaks every caption plus a closing line, mixed over the score with 35% ducking
+under each line:
+
+```bash
+pip install kokoro-onnx soundfile
+# one-time model fetch (~350MB, gitignored under out/vo/):
+curl -L -o out/vo/kokoro-v1.0.onnx  https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx
+curl -L -o out/vo/voices-v1.0.bin   https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin
+python3 audio/synth-vo.py    # → out/vo/line-NN.wav + manifest.json (asserts each line fits its caption window)
+node audio/mix-vo.mjs        # → public/score-vo.wav (music ducked under voice)
+```
+
+The VO lines in `audio/synth-vo.py` MIRROR `SUBTITLES` in `timeline.mjs` — if a
+caption changes, change it there too (captions stay burned in, so a drifted VO
+is instantly audible). `MachinaLaunchVO` / `MachinaLaunchVerticalVO` render the
+spoken editions; the plain compositions are untouched. edge-tts (Azure neural
+voices) was tried first and is BLOCKED here — the egress proxy refuses
+WebSockets — which is why the pipeline is local Kokoro.
+
 ## The score
 
 `audio/score.mjs` — no dependencies, deterministic (seeded LCG, so every render

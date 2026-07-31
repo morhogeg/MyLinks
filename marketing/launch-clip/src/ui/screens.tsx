@@ -13,7 +13,7 @@ import {
   TabBar,
   Tap,
 } from './app';
-import { CitationGlyph } from './Brand';
+import { AnimatedMark, CitationGlyph } from './Brand';
 import {
   ASK_ANSWER,
   ASK_QUESTION,
@@ -479,7 +479,10 @@ export const AnalyzingScreen: React.FC<{
   progress: number;
   /** 0–1 entrance of the finished card. */
   cardEnter?: number;
-}> = ({ progress, cardEnter = 0 }) => {
+  /** 0–1 launch progress of the ANIMATED mark — the app's own thinking orb
+   *  (CitationMark's launch motion), not a static glyph in a tile. */
+  markU?: number;
+}> = ({ progress, cardEnter = 0, markU = 1 }) => {
   const step = progress >= 92 ? 4 : progress >= 72 ? 3 : progress >= 50 ? 2 : progress >= 25 ? 1 : 0;
   const card = byId('sleep');
   return (
@@ -503,20 +506,19 @@ export const AnalyzingScreen: React.FC<{
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 11, marginBottom: 16 }}>
+            {/* the app's ANIMATED mark as the thinking orb — arms draw, brackets
+                close, the point strikes — bare, no tile (owner note, round 11) */}
             <div
               style={{
                 width: 30,
-                height: 30,
-                borderRadius: 10,
-                background: 'rgba(20,20,27,0.06)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: T.accent,
-                boxShadow: `0 0 ${8 + (progress % 20)}px -3px ${T.accentRing}`,
+                filter: `drop-shadow(0 0 ${5 + (progress % 20) * 0.4}px ${T.accentRing})`,
               }}
             >
-              <CitationGlyph style={{ width: 12, height: 14 }} />
+              <AnimatedMark id="scan" u={markU} style={{ width: 26, height: 'auto' }} />
             </div>
             <div>
               <div style={{ fontSize: 13.5, fontWeight: 600, color: T.text }}>

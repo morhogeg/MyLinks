@@ -1058,6 +1058,38 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-31 (launch film, round 11) — a real VOICE-OVER, crisp close scatter,
+  the animated mark in the pipeline, collections copy with value, and a hotter
+  mix (owner notes ×6).**
+  **(1) VOICE-OVER, synthesized LOCALLY:** edge-tts (Azure neural voices) is
+  blocked in the sandbox (the egress proxy refuses WebSockets — TLS itself was
+  solved by appending `/root/.ccr/ca-bundle.crt` to certifi), so the pipeline
+  is **Kokoro `af_heart`** via kokoro-onnx (~350MB model fetched from GitHub
+  releases into gitignored `out/vo/`). `audio/synth-vo.py` speaks every caption
+  + a closing line (15 lines, each asserted to fit its caption window);
+  `audio/mix-vo.mjs` mixes them over the score with 35% ducking/120ms ramps →
+  `public/score-vo.wav`; new `MachinaLaunchVO` / `MachinaLaunchVerticalVO`
+  compositions (Film gained an `audioFile` prop). Both plain and VO editions
+  render. **VO lines mirror SUBTITLES by hand — a caption change must touch
+  synth-vo.py too** (noted in README). ⚠️ Nobody has HEARD the voice or the
+  "Machina" pronunciation — a voice sample was sent to the owner for judgment.
+  **(2) Scatter: closer AND crisp** — camera up to 1.46 base, positions tighter,
+  depth-of-field blur DELETED while panels are alive (it read as bad rendering,
+  not lens), panel/camera 3D angles roughly halved (3D rotation makes Chromium
+  snapshot-and-scale layers, which was the YouTube/Safari softness the owner
+  flagged).
+  **(3) The pipeline sheet's round icon tile is gone** — the app's ANIMATED
+  mark (`AnimatedMark`, the CitationMark launch: arms draw, brackets close,
+  point strikes) plays bare as the thinking orb, launching as the sheet lands
+  (`markU` prop).
+  **(4) Collections line:** "Yours to shape." → **"Everything on a topic, one
+  tap away."** — access, not ownership. **Ask caption B now ends BEFORE the
+  Graph-chip tap** (bars 2.3→1.9) so the line never rides into the rising
+  device (owner note #1, both formats).
+  **(5) Mix energy:** kicks +~20%, claps up, pulse brighter (lp 2600→3300) and
+  louder, reverb wet 0.5→0.42 (dry = awake), master target 0.86, risers hotter.
+  Verified: tsc 0, verify green, VO presence + ducking confirmed numerically
+  per-line, stills both formats. **Score + voice still unheard in-sandbox.**
 - **2026-07-31 (launch film, round 10) — light bookends, readable scatter, a
   digest line with teeth, the vertical collision fixed, and the gloom cut from
   the score (owner notes ×5 + screenshot).**

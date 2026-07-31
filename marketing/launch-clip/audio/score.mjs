@@ -179,7 +179,7 @@ const pluck = (startSec, midi, level = 0.2, panPos = 0, damp = 0.5) => {
 const pulse = (startSec, midi, level = 0.14, panPos = 0, decay = 0.34) => {
   const f = mtof(midi);
   const det = [0, -0.08, 0.09];
-  const filt = lp(2600);
+  const filt = lp(3300);
   const HARM = 9;
   render(
     startSec,
@@ -505,18 +505,18 @@ for (let bar = 0; bar < BAR_CHORDS.length; bar++) {
 
   // ── percussion — the product act dances, act one only breathes
   if (d >= 0.7 && bar < ENDCARD_BAR) {
-    kick(t0, 0.34 + 0.2 * d);
-    kick(beat(bar, 2), 0.3 + 0.16 * d);
+    kick(t0, 0.42 + 0.22 * d);
+    kick(beat(bar, 2), 0.38 + 0.18 * d);
     // FOUR-ON-THE-FLOOR through the product act: beats 1 and 3 join once the
     // film is at full tilt — this is the single biggest "upbeat" lever
     if (d >= 0.88 && bar < DIGEST_BAR) {
-      kick(beat(bar, 1), 0.24 + 0.08 * d);
-      kick(beat(bar, 3), 0.24 + 0.08 * d);
+      kick(beat(bar, 1), 0.3 + 0.1 * d);
+      kick(beat(bar, 3), 0.3 + 0.1 * d);
     }
     // the backbeat — beats 2 and 4
     if (d >= 0.78 && bar < DIGEST_BAR) {
-      clap(beat(bar, 1), 0.11 + 0.05 * d);
-      clap(beat(bar, 3), 0.11 + 0.05 * d);
+      clap(beat(bar, 1), 0.16 + 0.05 * d);
+      clap(beat(bar, 3), 0.16 + 0.05 * d);
     }
     if (d >= 0.82 && bar < DIGEST_BAR) rim(beat(bar, 2), 0.1 + 0.05 * d);
     if (d >= 0.8 && bar < DIGEST_BAR) {
@@ -562,7 +562,7 @@ for (let bar = 0; bar < BAR_CHORDS.length; bar++) {
       pulse(
         beat(bar, on),
         m,
-        (dense ? 0.085 : 0.105) * (0.62 + 0.38 * d),
+        (dense ? 0.105 : 0.125) * (0.62 + 0.38 * d),
         ((k % 4) / 3) * 1.1 - 0.55,
         dense ? 0.26 : 0.34,
       );
@@ -608,7 +608,7 @@ for (const [bar, bt, m] of LEAD_IN) {
 }
 
 // ── risers into the hard cuts (the bar-5 riser is the short one into capture)
-for (const r of RISERS) riser(b(r), BAR * (r === 5 ? 1 : 1.4), 0.085);
+for (const r of RISERS) riser(b(r), BAR * (r === 5 ? 1 : 1.4), 0.095);
 
 // ── sound design against the picture
 // the boot: the brackets close, the point strikes, then the mark pushes past
@@ -722,7 +722,7 @@ whoosh(b(HITS.endcard) - 0.35, 0.9, 0.07, 0);
   const chR = makeChannel(spread);
   const preL = lp(7200);
   const preR = lp(7200);
-  const wet = 0.5;
+  const wet = 0.42;
   for (let i = 0; i < N; i++) {
     const x = SEND[i] * 0.8;
     L[i] += preL(chL(x)) * wet;
@@ -755,7 +755,7 @@ whoosh(b(HITS.endcard) - 0.35, 0.9, 0.07, 0);
   }
   // Normalize to a comfortable bed level — the film is narrated by pictures and
   // subtitles, so the music must never be the loudest thing in the room.
-  const target = 0.82;
+  const target = 0.86;
   const g = peak > 0 ? target / peak : 1;
   for (let i = 0; i < N; i++) {
     L[i] *= g;

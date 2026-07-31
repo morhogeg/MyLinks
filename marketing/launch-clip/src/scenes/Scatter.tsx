@@ -29,12 +29,11 @@ import { drift, prog, ramp, EASE_IN_OUT, EASE_OUT } from '../film/anim';
 export const Scatter: React.FC = () => {
   const f = useCurrentFrame();
   const fr = useFraming();
-  // The panels must be READABLE — at the old framing they were surfaces you
-  // squinted at (owner note). Positions compress toward centre and the camera
-  // holds much closer, so each surface is legible at a glance; the drift is
+  // The panels must be READABLE — positions compress toward centre and the
+  // camera holds close, so each surface is legible at a glance; the drift is
   // shorter for the same reason. Vertical squeezes x hard and opens y instead.
-  const vx = fr.vertical ? 0.45 : 0.82;
-  const vy = fr.vertical ? 1.45 : 0.85;
+  const vx = fr.vertical ? 0.42 : 0.78;
+  const vy = fr.vertical ? 1.45 : 0.82;
   const dv = 0.55; // drift travel, both axes
 
   // the panels arrive fast, then keep drifting apart for the whole scene
@@ -42,10 +41,12 @@ export const Scatter: React.FC = () => {
   const apart = ramp(f, [26, 190], [0, 1], EASE_IN_OUT);
 
   // camera: a slow lateral drift across the constellation, easing back so all
-  // five are in frame by the time they start disappearing
+  // five are in frame by the time they start disappearing. Angles are shallow —
+  // 3D rotation makes Chromium snapshot-and-scale the layer, which softens the
+  // panel type, and the surfaces must stay CRISP (owner note, round 11).
   const pull = prog(f, 0, 150, EASE_IN_OUT);
-  const camScale = (1.38 - pull * 0.24) * (fr.vertical ? 0.88 : 1);
-  const camRotY = ramp(f, [0, 210], [9, -7], EASE_IN_OUT);
+  const camScale = (1.46 - pull * 0.24) * (fr.vertical ? 0.88 : 1);
+  const camRotY = ramp(f, [0, 210], [6, -5], EASE_IN_OUT);
   const camX = ramp(f, [0, 210], [-70, 60], EASE_IN_OUT);
   const camY = drift(f, 8, 300) - 18;
 
@@ -81,7 +82,10 @@ export const Scatter: React.FC = () => {
             const x = (p.x + p.dx * apart * dv) * vx;
             const y = (p.y + p.dy * apart * dv) * vy;
             const z = p.z - inT * 0 - (1 - inT) * 260;
-            const depthBlur = Math.abs(p.z) / 165 + gone * 5;
+            // NO depth-of-field blur while a panel is alive — at this scale it
+            // read as a rendering flaw, not as a lens. Blur only joins the
+            // bleach-out.
+            const depthBlur = gone * 5;
 
             return (
               <div
@@ -95,7 +99,8 @@ export const Scatter: React.FC = () => {
                   marginTop: PANEL_OFFSET.y,
                   transform: [
                     `translate3d(${x}px, ${y}px, ${z}px)`,
-                    `rotateY(${p.rotY}deg) rotateX(${p.rotX}deg)`,
+                    // shallow angles — crispness over drama (see camera note)
+                    `rotateY(${p.rotY * 0.55}deg) rotateX(${p.rotX * 0.55}deg)`,
                   ].join(' '),
                   opacity: inT * (1 - gone) * arrive,
                   // the light-grade exit: desaturate and OVER-brighten, so the
