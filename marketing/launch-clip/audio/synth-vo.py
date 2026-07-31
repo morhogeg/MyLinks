@@ -28,21 +28,21 @@ BAR_SEC = 2.5
 SAY_NAME = "Makeena"
 
 LINES = [
-    (1.1, 1.4, "A recipe here. A video there. A thread somewhere else."),
-    (2.55, 0.7, "Multiple apps, countless saved links."),
+    (1.0, 0.7, "You save things everywhere."),
+    (1.75, 1.15, "A recipe here. A video there. A thread somewhere else."),
+    (2.95, 0.7, "Multiple apps, countless saved links."),
     # a deliberate beat of silence before this one — the first wrong pile
     # opens wordless (owner note, round 13c)
-    (3.7, 1.2, "Saved, and rarely seen again."),
+    (4.05, 1.35, "Saved, and rarely seen again."),
     (5.45, 1.35, f"Introducing {SAY_NAME} — one place for all your saved links."),
     (7.35, 1.25, "Save anything, from anywhere."),
     (8.95, 2.4, f"{SAY_NAME} reads it, summarizes it, and files it."),
-    (12.3, 2.45, "Lose nothing. Find everything."),
+    (12.3, 2.45, "From now on — lose nothing. Find everything."),
     (15.35, 1.6, f"Ask {SAY_NAME} anything."),
     (17.4, 1.9, "Every answer comes straight from your saves."),
     (20.4, 2.3, f"{SAY_NAME} notices when things you saved belong together."),
-    (23.3, 1.35, "Group your saves into collections."),
-    (24.8, 1.15, "Every topic you care about, complete."),
-    (26.1, 2.6, f"And {SAY_NAME} turns your saves into one short read."),
+    (23.3, 2.65, "Group your saves into collections that mirror how you think."),
+    (26.1, 2.6, f"And {SAY_NAME} turns your saves into one short read, delivered to you."),
     # the closing statement, over the endcard's own line
     (30.1, 1.6, f"{SAY_NAME}. Everything you save — finally useful."),
 ]

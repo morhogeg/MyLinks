@@ -83,14 +83,15 @@ export const SUBTITLES = [
   // grow, and lands the loss as the wrong pile opens.
   // Every line below was workshopped with the owner line-by-line (round 13) —
   // do not rewrite without them.
-  // Concrete things, not "it" (owner note, round 13c) — the line names what
-  // the pictures show.
-  { bar: 1.1, bars: 1.4, place: 'bottom', text: 'A recipe here. A video there. A thread somewhere else.' },
-  { bar: 2.55, bars: 0.7, place: 'bottom', text: 'Multiple apps, countless saved links.' },
+  // The opener states the habit, then the list makes it concrete (round 13d:
+  // both, in that order — the film was starting mid-thought without the first).
+  { bar: 1.0, bars: 0.7, place: 'bottom', text: 'You save things everywhere.' },
+  { bar: 1.75, bars: 1.15, place: 'bottom', text: 'A recipe here. A video there. A thread somewhere else.' },
+  { bar: 2.95, bars: 0.7, place: 'bottom', text: 'Multiple apps, countless saved links.' },
   // A DELIBERATE BEAT OF SILENCE (bars 3.25–3.7) — the first wrong pile opens
   // with no words at all, then the truth lands over the second one. Owner's
   // wording ("rarely", not "never" — bold but honest), on the bar-3 minor.
-  { bar: 3.7, bars: 1.2, place: 'bottom', text: 'Saved, and rarely seen again.' },
+  { bar: 4.05, bars: 1.35, place: 'bottom', text: 'Saved, and rarely seen again.' },
   // The turn is an INTRODUCTION now (owner call, round 13b) — the film stops
   // describing and presents the product by name.
   { bar: 5.45, bars: 1.35, place: 'bottom', kicker: 'Introducing', text: 'Machina — one place for all your saved links.' },
@@ -101,7 +102,7 @@ export const SUBTITLES = [
   // THE PROMISE — four words, two verbs. One line for the whole library beat;
   // the search (a query sharing no words with the one card it finds) plays
   // wordless underneath and proves the second half.
-  { bar: 12.3, bars: 2.45, place: 'left', text: 'Lose nothing. Find everything.' },
+  { bar: 12.3, bars: 2.45, place: 'left', text: 'From now on — lose nothing. Find everything.' },
   // A new feature, not a continuation — no "Then" (owner note, round 13c).
   // The name still carries the line: "ask it" mushed out loud (round 12).
   { bar: 15.35, bars: 1.6, place: 'left', kicker: 'Ask', text: 'Ask Machina anything.' },
@@ -113,15 +114,14 @@ export const SUBTITLES = [
   // apart" was cut by the owner — the WHEN isn't the point, the noticing is.
   { bar: 20.4, bars: 2.3, place: 'left', kicker: 'Connect', text: 'Machina notices when things you saved belong together.' },
   // A new feature, not a continuation — no "Or" (owner note, round 13c).
-  { bar: 23.3, bars: 1.35, place: 'left', text: 'Group your saves into collections.' },
-  // YOU did the grouping — this line is what it buys you: the topic is
-  // COMPLETE, because everything you saved about it landed there.
-  { bar: 24.8, bars: 1.15, place: 'left', text: 'Every topic you care about, complete.' },
+  // ONE line for the whole collections beat (round 13d) — the grouping and
+  // its point in the same breath.
+  { bar: 23.3, bars: 2.65, place: 'left', text: 'Group your saves into collections that mirror how you think.' },
   // ONE line for the whole digest beat (rounds of iteration ended here: no
   // patterns jargon, no schedule talk, no reminders vibe — the concrete value
   // of the weekly synthesis, which is what the screen shows). The resurfaced
   // card below the write-up plays as a wordless grace note.
-  { bar: 26.1, bars: 2.6, place: 'left', text: 'And Machina turns your saves into one short read.' },
+  { bar: 26.1, bars: 2.6, place: 'left', text: 'And Machina turns your saves into one short read, delivered to you.' },
 ];
 
 /**

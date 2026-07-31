@@ -1058,6 +1058,18 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-31 (launch film, round 13d) — four script refinements on the 13c
+  cut (owner: "Good", plus notes).** (1) The opener is back AND concrete —
+  **"You save things everywhere."** then **"A recipe here. A video there. A
+  thread somewhere else."**, two captions across the save run (the film had
+  started mid-thought on the list alone); the loss line moved to 4.05 to keep
+  the deliberate silence after the tally. (2) The library promise gains
+  runway: **"From now on — lose nothing. Find everything."** (3) Collections
+  is ONE line for the whole beat, per the owner's phrasing: **"Group your
+  saves into collections that mirror how you think."** ("Every topic you care
+  about, complete." cut). (4) The digest line ends **"…one short read,
+  delivered to you."** 14 spoken lines, all re-synthesized and fit; 13
+  captions, verify green; score unchanged (bar map untouched).
 - **2026-07-31 (launch film, round 13c) — the WRITING round ("act as an Apple
   copywriter"): fourteen owner notes plus a line-by-line workshop, and four
   non-copy fixes.** The final 13-caption script (each line owner-shaped over
