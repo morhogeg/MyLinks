@@ -28,20 +28,21 @@ BAR_SEC = 2.5
 SAY_NAME = "Makeena"
 
 LINES = [
-    (1.15, 1.25, "You save it here. And here. And here."),
-    (2.45, 0.8, "Multiple apps, countless saved links."),
-    (3.25, 1.75, "Then you need one thing back — and you have no idea where it is."),
-    (5.5, 1.1, f"So {SAY_NAME} keeps it all in one place."),
+    (1.15, 1.4, "You save it here. And here. And here."),
+    (2.6, 0.75, "Multiple apps, countless saved links."),
+    (3.4, 1.75, "Then you need one thing back — and you have no idea where it is."),
+    (5.45, 1.35, f"Introducing {SAY_NAME} — one place for all your saved links."),
     (7.35, 1.25, "One tap, and it's saved — without leaving where you are."),
     (8.95, 2.4, f"{SAY_NAME} reads it, summarizes it, and files it."),
     (12.3, 2.45, f"{SAY_NAME} remembers, so you don't have to."),
     (15.35, 1.6, f"Then ask {SAY_NAME} anything."),
-    (17.4, 1.9, "Get answers from your saves — and nothing else."),
+    (17.4, 1.9, "Every answer is built only from what you saved."),
     (20.4, 2.3, f"{SAY_NAME} notices when things you saved belong together."),
     (23.3, 1.35, "Or group your saves into collections."),
     (24.8, 1.15, "Organized the way you think."),
     (26.1, 1.65, f"You don't even have to ask — {SAY_NAME} spots what you keep circling."),
-    (27.8, 1.2, "And brings the right ones back — on your schedule."),
+    # "yours" sentence-final so the voice stresses it naturally (owner note).
+    (27.75, 1.25, "And brings the right ones back — on a schedule that's yours."),
     # the closing statement, over the endcard's own line
     (30.1, 1.6, f"{SAY_NAME}. Everything you save — finally useful."),
 ]

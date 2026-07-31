@@ -187,11 +187,30 @@ export const Subtitles: React.FC = () => {
                 right: 0,
                 bottom: vertical ? 210 : 92,
                 display: 'flex',
-                justifyContent: 'center',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 16,
                 opacity: o,
                 transform: `translateY(${travel}px)`,
               }}
             >
+              {s.kicker && (
+                /* centred beats can carry a kicker too — round 13b's
+                   "INTRODUCING" over the turn is the first user */
+                <span
+                  style={{
+                    fontFamily: sans,
+                    fontSize: vertical ? 17 : 15,
+                    fontWeight: 700,
+                    letterSpacing: '0.34em',
+                    textTransform: 'uppercase',
+                    color: 'rgba(75,85,99,0.72)',
+                    opacity: enter,
+                  }}
+                >
+                  {s.kicker}
+                </span>
+              )}
               <span
                 style={{
                   fontFamily: sans,

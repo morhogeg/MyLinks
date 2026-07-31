@@ -1058,6 +1058,21 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-31 (launch film, round 13b) — five owner fixes on the 13 cut.**
+  (1) The save run breathes: `SAVES` spacing 0.25→0.35 bars (taps still on the
+  grid, last landing clear of the bar-3 loss), act-one captions retimed to
+  match. (2) The turn is an INTRODUCTION: kicker "INTRODUCING" (centred
+  captions gained kicker support in `Subtitles.tsx`) over **"Machina — one
+  place for all your saved links."** (owner's line), VO to match — replaces
+  "So Machina keeps it all in one place." (3) Ask claim clarified to trust:
+  "Get answers from your saves — and nothing else." → **"Every answer is built
+  only from what you saved."** (4) Digest cadence line ends **"…on a schedule
+  that's yours."** — "yours" sentence-final because Kokoro ignores emphasis
+  markup, and terminal position is how a TTS stresses a word naturally (owner:
+  emphasize YOUR). (5) Endcard slowed ~1s: each element enters later/slower,
+  fade-out pushed to the last 23 frames. All 15 VO lines re-synthesized and
+  fit; verify green; stills at the three changed beats; RMS + encode-frame
+  checks re-run on the delivered mp4.
 - **2026-07-31 (launch film, round 13) — act one becomes a STORY, the script is
   workshopped line-by-line with the owner, and the demo library goes DIVERSE.**
   **(1) Act one rebuilt as scattered saving** (scatter 3→4 bars, bars 1–5):

@@ -32,15 +32,17 @@ export const Endcard: React.FC = () => {
   const f = useCurrentFrame();
   const fr = useFraming();
 
-  const icon = prog(f, 2, 26, EASE_OUT);
-  const word = prog(f, 52, 88, EASE_MODAL);
-  const tag = prog(f, 74, 108, EASE_MODAL);
-  const rule = prog(f, 108, 140, EASE_MODAL);
-  const foot = prog(f, 120, 150, EASE_MODAL);
+  // Slowed in round 13b (owner: the last slide was a bit fast) — each element
+  // gets its own breath, and the frame holds a full second after the footer.
+  const icon = prog(f, 2, 30, EASE_OUT);
+  const word = prog(f, 56, 96, EASE_MODAL);
+  const tag = prog(f, 94, 130, EASE_MODAL);
+  const rule = prog(f, 134, 166, EASE_MODAL);
+  const foot = prog(f, 148, 182, EASE_MODAL);
 
-  const bloom = Math.max(0, 1 - Math.max(0, f - 30) / 34);
+  const bloom = Math.max(0, 1 - Math.max(0, f - 34) / 36);
   const float = drift(f, 4, 300);
-  const out = 1 - prog(f, 186, 222);
+  const out = 1 - prog(f, 202, 225);
 
   return (
     <AbsoluteFill style={{ background: SET_BG, opacity: out }}>

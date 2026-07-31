@@ -83,12 +83,14 @@ export const SUBTITLES = [
   // grow, and lands the loss as the wrong pile opens.
   // Every line below was workshopped with the owner line-by-line (round 13) —
   // do not rewrite without them.
-  { bar: 1.15, bars: 1.25, place: 'bottom', text: 'You save it here. And here. And here.' },
-  { bar: 2.45, bars: 0.8, place: 'bottom', text: 'Multiple apps, countless saved links.' },
+  { bar: 1.15, bars: 1.4, place: 'bottom', text: 'You save it here. And here. And here.' },
+  { bar: 2.6, bars: 0.75, place: 'bottom', text: 'Multiple apps, countless saved links.' },
   // The emotional bottom — riding the bar-3 minor while the wrong silo opens.
   // "where it IS" (owner call): the thing still exists, you just can't reach it.
-  { bar: 3.25, bars: 1.75, place: 'bottom', text: 'Then you need one thing back — and you have no idea where it is.' },
-  { bar: 5.5, bars: 1.1, place: 'bottom', text: 'So Machina keeps it all in one place.' },
+  { bar: 3.4, bars: 1.75, place: 'bottom', text: 'Then you need one thing back — and you have no idea where it is.' },
+  // The turn is an INTRODUCTION now (owner call, round 13b) — the film stops
+  // describing and presents the product by name.
+  { bar: 5.45, bars: 1.35, place: 'bottom', kicker: 'Introducing', text: 'Machina — one place for all your saved links.' },
   // "without leaving where you are" (owner refinement of the round-12 line).
   { bar: 7.35, bars: 1.25, place: 'left', kicker: 'Capture', text: 'One tap, and it’s saved — without leaving where you are.' },
   { bar: 8.95, bars: 2.4, place: 'left', text: 'Machina reads it, summarizes it, and files it.' },
@@ -100,9 +102,9 @@ export const SUBTITLES = [
   // carries the line instead of the pronoun (owner note, round 12).
   { bar: 15.35, bars: 1.6, place: 'left', kicker: 'Ask', text: 'Then ask Machina anything.' },
   // Ends BEFORE the Graph-chip tap at 19.5 — during the dive the device rises
-  // through the caption band. The claim: answers come from YOUR saves and
-  // nowhere else. "Get answers" — owner call, round 13.
-  { bar: 17.4, bars: 1.9, place: 'left', text: 'Get answers from your saves — and nothing else.' },
+  // through the caption band. The claim, made unambiguous in round 13b: the
+  // answers draw on ONLY what you saved (trust, not just convenience).
+  { bar: 17.4, bars: 1.9, place: 'left', text: 'Every answer is built only from what you saved.' },
   // The graph beat says why it matters, not what it is (round 13). "months
   // apart" was cut by the owner — the WHEN isn't the point, the noticing is.
   { bar: 20.4, bars: 2.3, place: 'left', kicker: 'Connect', text: 'Machina notices when things you saved belong together.' },
@@ -112,7 +114,10 @@ export const SUBTITLES = [
   // The digest introduced as the thing you DON'T ask for — a deliberate rhyme
   // with the Ask kicker line, and "keep circling" is the on-screen headline.
   { bar: 26.1, bars: 1.65, place: 'left', text: 'You don’t even have to ask — Machina spots what you keep circling.' },
-  { bar: 27.8, bars: 1.2, place: 'left', text: 'And brings the right ones back — on your schedule.' },
+  // "yours" sits sentence-final so the voice stresses it naturally — the
+  // owner asked for emphasis on YOUR schedule, and terminal position is how a
+  // TTS does that without sounding acted.
+  { bar: 27.75, bars: 1.25, place: 'left', text: 'And brings the right ones back — on a schedule that’s yours.' },
 ];
 
 /**
@@ -120,7 +125,9 @@ export const SUBTITLES = [
  * quarter-note grid so the ticks read as the score acknowledging the finger.
  * The Scatter scene derives its local frames from these; the score ticks them.
  */
-export const SAVES = [1.25, 1.5, 1.75, 2.0, 2.25];
+// Widened round 13b (owner: the save run played too fast) — 0.35-bar spacing,
+// still on the grid, last landing well clear of the bar-3 loss.
+export const SAVES = [1.25, 1.6, 1.95, 2.3, 2.65];
 
 /** Sound-design hits, in bars — the picture events the score has to acknowledge. */
 export const HITS = {
