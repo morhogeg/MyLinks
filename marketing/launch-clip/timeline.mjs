@@ -103,9 +103,9 @@ export const SUBTITLES = [
   // through the caption band. The claim: answers come from YOUR saves and
   // nowhere else. "Get answers" — owner call, round 13.
   { bar: 17.4, bars: 1.9, place: 'left', text: 'Get answers from your saves — and nothing else.' },
-  // The graph beat says why it matters, not what it is (round 13): things
-  // saved months apart turning out to be the same interest.
-  { bar: 20.4, bars: 2.3, place: 'left', kicker: 'Connect', text: 'Machina notices when things you saved months apart belong together.' },
+  // The graph beat says why it matters, not what it is (round 13). "months
+  // apart" was cut by the owner — the WHEN isn't the point, the noticing is.
+  { bar: 20.4, bars: 2.3, place: 'left', kicker: 'Connect', text: 'Machina notices when things you saved belong together.' },
   { bar: 23.3, bars: 1.35, place: 'left', text: 'Or group your saves into collections.' },
   // Collections are YOUR shape of thinking, not an access claim (owner call).
   { bar: 24.8, bars: 1.15, place: 'left', text: 'Organized the way you think.' },

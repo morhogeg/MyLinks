@@ -37,7 +37,7 @@ LINES = [
     (12.3, 2.45, f"{SAY_NAME} remembers, so you don't have to."),
     (15.35, 1.6, f"Then ask {SAY_NAME} anything."),
     (17.4, 1.9, "Get answers from your saves — and nothing else."),
-    (20.4, 2.3, f"{SAY_NAME} notices when things you saved months apart belong together."),
+    (20.4, 2.3, f"{SAY_NAME} notices when things you saved belong together."),
     (23.3, 1.35, "Or group your saves into collections."),
     (24.8, 1.15, "Organized the way you think."),
     (26.1, 1.65, f"You don't even have to ask — {SAY_NAME} spots what you keep circling."),

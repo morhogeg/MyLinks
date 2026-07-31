@@ -1078,8 +1078,9 @@ exact-match, capped.
   "…no idea where it IS" (not *went*) / "without leaving where you are" /
   promise = **"Machina remembers, so you don't have to."** (the owner CUT the
   separate search caption — the zero-overlap search plays wordless under the
-  promise) / "Get answers…" / "Machina notices when things you saved months
-  apart belong together." / "Organized the way you think." / digest =
+  promise) / "Get answers…" / "Machina notices when things you saved belong
+  together." ("months apart" cut by the owner — the when isn't the point) /
+  "Organized the way you think." / digest =
   **"You don't even have to ask — Machina spots what you keep circling."**
   (deliberate rhyme with the Ask kicker; "keep circling" is the on-screen
   headline) + "…on your schedule." (weekly-cadence claim dropped; kicker
