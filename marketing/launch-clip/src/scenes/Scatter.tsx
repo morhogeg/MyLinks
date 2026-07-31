@@ -74,7 +74,7 @@ export const Scatter: React.FC = () => {
   const camX = -(siloPos[WRONG_A].x * wA + siloPos[WRONG_B].x * wB) * 0.6;
   const camY = -(siloPos[WRONG_A].y * wA + siloPos[WRONG_B].y * wB) * 0.6 + drift(f, 6, 320);
 
-  const out = 1 - prog(f, 288, 300);
+  const out = 1 - prog(f, 363, 375);
 
   return (
     <AbsoluteFill style={{ background: SET_BG, opacity: out }}>
@@ -112,7 +112,7 @@ export const Scatter: React.FC = () => {
             const shutAt = i === WRONG_A ? LOSS.shutA : i === WRONG_B ? LOSS.shutB : -100;
             const shutThud = Math.max(0, 1 - Math.abs(f - shutAt - 4) / 8) * 0.05;
             // the light-grade exit: bleach into the paper, staggered
-            const gone = prog(f, 245 + ((i * 13) % 5) * 8, 278 + ((i * 13) % 5) * 8, EASE_IN_OUT);
+            const gone = prog(f, 318 + ((i * 13) % 5) * 8, 352 + ((i * 13) % 5) * 8, EASE_IN_OUT);
 
             const count = SILO_BASE_COUNT[p.k] + (f >= land ? 1 : 0);
 
@@ -226,7 +226,7 @@ export const Scatter: React.FC = () => {
       <AbsoluteFill
         style={{
           background: `radial-gradient(78% 66% at 50% 48%, rgba(238,240,244,0) 42%, rgba(244,246,249,${
-            0.2 + prog(f, 240, 296) * 0.55
+            0.2 + prog(f, 315, 370) * 0.55
           }) 100%)`,
           pointerEvents: 'none',
         }}

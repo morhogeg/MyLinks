@@ -36,18 +36,21 @@ export const SCENES = [
   // the film's single minor chord — which is why this act is four bars: the
   // extra bar came from the library's browse-before-search stretch, the
   // slowest beat in the product act.
-  { id: 'scatter', bar: 1, bars: 4 }, //  2.5 – 12.5  save everywhere → piles → the loss
-  { id: 'wordmark', bar: 5, bars: 2 }, // 12.5 – 17.5  five silos become one point
+  // FIVE bars (round 13e — the owner called act one too fast three times; the
+  // fix is structural time, not trims): saves at one gesture per half-bar, the
+  // piles get a breath, and the loss sits on bar 4 — WITH the film's single
+  // minor chord, which moves with it. The bar came from collections (3→2),
+  // which carries one caption now and no longer needs three.
+  { id: 'scatter', bar: 1, bars: 5 }, //  2.5 – 15.0  save everywhere → piles → the loss
+  { id: 'wordmark', bar: 6, bars: 2 }, // 15.0 – 20.0  five silos become one point
   // FIVE bars: the pipeline is the magic and needs ~5.5s to be readable.
-  { id: 'capture', bar: 7, bars: 5 }, // 17.5 – 30.0  CAPTURE
-  { id: 'library', bar: 12, bars: 3 }, // 30.0 – 37.5  search finds the one you meant
+  { id: 'capture', bar: 8, bars: 5 }, // 20.0 – 32.5  CAPTURE
+  { id: 'library', bar: 13, bars: 3 }, // 32.5 – 40.0  search finds the one you meant
   // The hero gets five bars: the typing, the stream and the three citations
   // were racing the captions at four.
-  { id: 'ask', bar: 15, bars: 5 }, // 37.5 – 50.0  ASK
-  { id: 'graph', bar: 20, bars: 3 }, // 50.0 – 57.5  CONNECT
-  // Collections and the digest are separate features with separate beats —
-  // three bars each, enough to read the screen AND the line.
-  { id: 'collections', bar: 23, bars: 3 }, // 57.5 – 65.0  the ones you shape
+  { id: 'ask', bar: 16, bars: 5 }, // 40.0 – 52.5  ASK
+  { id: 'graph', bar: 21, bars: 3 }, // 52.5 – 60.0  CONNECT
+  { id: 'collections', bar: 24, bars: 2 }, // 60.0 – 65.0  one line, one grid
   { id: 'digest', bar: 26, bars: 3 }, // 65.0 – 72.5  the ones it brings back
   { id: 'endcard', bar: 29, bars: 3 }, // 72.5 – 80.0  lockup
 ];
@@ -85,38 +88,39 @@ export const SUBTITLES = [
   // do not rewrite without them.
   // The opener states the habit, then the list makes it concrete (round 13d:
   // both, in that order — the film was starting mid-thought without the first).
-  { bar: 1.0, bars: 0.7, place: 'bottom', text: 'You save things everywhere.' },
-  { bar: 1.75, bars: 1.15, place: 'bottom', text: 'A recipe here. A video there. A thread somewhere else.' },
-  { bar: 2.95, bars: 0.7, place: 'bottom', text: 'Multiple apps, countless saved links.' },
-  // A DELIBERATE BEAT OF SILENCE (bars 3.25–3.7) — the first wrong pile opens
+  // Act-one lines carry real AIR between them (round 13e — the owner: VO too
+  // fast, needs breaks) and their VO speaks at 0.9 speed (synth-vo.py).
+  { bar: 1.05, bars: 0.85, place: 'bottom', text: 'You save things everywhere.' },
+  { bar: 2.0, bars: 1.35, place: 'bottom', text: 'A recipe here. A video there. A thread somewhere else.' },
+  { bar: 3.6, bars: 0.7, place: 'bottom', text: 'Multiple apps, countless saved links.' },
+  // A DELIBERATE BEAT OF SILENCE (bars 4.3–4.8) — the first wrong pile opens
   // with no words at all, then the truth lands over the second one. Owner's
-  // wording ("rarely", not "never" — bold but honest), on the bar-3 minor.
-  { bar: 4.05, bars: 1.35, place: 'bottom', text: 'Saved, and rarely seen again.' },
+  // wording ("rarely", not "never" — bold but honest), on the bar-4 minor.
+  { bar: 4.8, bars: 1.3, place: 'bottom', text: 'Saved, and rarely seen again.' },
   // The turn is an INTRODUCTION now (owner call, round 13b) — the film stops
   // describing and presents the product by name.
-  { bar: 5.45, bars: 1.35, place: 'bottom', kicker: 'Introducing', text: 'Machina — one place for all your saved links.' },
+  { bar: 6.45, bars: 1.35, place: 'bottom', kicker: 'Introducing', text: 'Machina — one place for all your saved links.' },
   // Value first (owner note, round 13c): anything + anywhere. No tap-count
   // claim — the share sheet is two touches (owner correction).
-  { bar: 7.35, bars: 1.25, place: 'left', kicker: 'Capture', text: 'Save anything, from anywhere.' },
-  { bar: 8.95, bars: 2.4, place: 'left', text: 'Machina reads it, summarizes it, and files it.' },
-  // THE PROMISE — four words, two verbs. One line for the whole library beat;
-  // the search (a query sharing no words with the one card it finds) plays
-  // wordless underneath and proves the second half.
-  { bar: 12.3, bars: 2.45, place: 'left', text: 'From now on — lose nothing. Find everything.' },
+  { bar: 8.35, bars: 1.25, place: 'left', kicker: 'Capture', text: 'Save anything, from anywhere.' },
+  { bar: 9.95, bars: 2.4, place: 'left', text: 'Machina reads it, summarizes it, and files it.' },
+  // THE PROMISE — one line for the whole library beat; the search (a query
+  // sharing no words with the one card it finds) plays wordless underneath
+  // and proves the second half.
+  { bar: 13.3, bars: 2.45, place: 'left', text: 'From now on — lose nothing. Find everything.' },
   // A new feature, not a continuation — no "Then" (owner note, round 13c).
   // The name still carries the line: "ask it" mushed out loud (round 12).
-  { bar: 15.35, bars: 1.6, place: 'left', kicker: 'Ask', text: 'Ask Machina anything.' },
-  // Ends BEFORE the Graph-chip tap at 19.5 — during the dive the device rises
+  { bar: 16.35, bars: 1.6, place: 'left', kicker: 'Ask', text: 'Ask Machina anything.' },
+  // Ends BEFORE the Graph-chip tap at 20.5 — during the dive the device rises
   // through the caption band. The claim: the answers' only source is your own
   // saves ("straight from" — round 13c, after two unclear tries).
-  { bar: 17.4, bars: 1.9, place: 'left', text: 'Every answer comes straight from your saves.' },
+  { bar: 18.4, bars: 1.9, place: 'left', text: 'Every answer comes straight from your saves.' },
   // The graph beat says why it matters, not what it is (round 13). "months
   // apart" was cut by the owner — the WHEN isn't the point, the noticing is.
-  { bar: 20.4, bars: 2.3, place: 'left', kicker: 'Connect', text: 'Machina notices when things you saved belong together.' },
-  // A new feature, not a continuation — no "Or" (owner note, round 13c).
-  // ONE line for the whole collections beat (round 13d) — the grouping and
-  // its point in the same breath.
-  { bar: 23.3, bars: 2.65, place: 'left', text: 'Group your saves into collections that mirror how you think.' },
+  { bar: 21.4, bars: 2.3, place: 'left', kicker: 'Connect', text: 'Machina notices when things you saved belong together.' },
+  // ONE line for the whole (now two-bar) collections beat — the grouping and
+  // its point in the same breath (owner's phrasing, round 13d).
+  { bar: 24.25, bars: 1.7, place: 'left', text: 'Group your saves into collections that mirror how you think.' },
   // ONE line for the whole digest beat (rounds of iteration ended here: no
   // patterns jargon, no schedule talk, no reminders vibe — the concrete value
   // of the weekly synthesis, which is what the screen shows). The resurfaced
@@ -129,11 +133,10 @@ export const SUBTITLES = [
  * quarter-note grid so the ticks read as the score acknowledging the finger.
  * The Scatter scene derives its local frames from these; the score ticks them.
  */
-// Widened again in round 13c (owner: still too fast) — a dotted-eighth train,
-// every contact on the 16th grid, last landing clear of the bar-3 loss. The
-// perceived slowdown also comes from the surfaces LINGERING after their tap
-// (they drift off toward their silo instead of hard-cutting).
-export const SAVES = [1.25, 1.625, 2.0, 2.375, 2.75];
+// Round 13e: one gesture per HALF-BAR (1.25s each) — act one finally has the
+// time the owner kept asking for. Surfaces still linger after their tap and
+// drift off toward their silo, so the run reads as a cascade.
+export const SAVES = [1.25, 1.75, 2.25, 2.75, 3.25];
 
 /** Sound-design hits, in bars — the picture events the score has to acknowledge. */
 export const HITS = {
@@ -141,39 +144,40 @@ export const HITS = {
   // spring peak in the boot, so the ding IS the point striking, not near it
   bootStrike: 0.35,
   bootExit: 0.78,
-  // the loss: the wrong pile opened twice, on and after the bar-3 minor
-  lossOpenA: 3.07,
-  lossShutA: 3.53,
-  lossOpenB: 3.67,
-  lossShutB: 4.13,
-  converge: 5.0,
-  collapse: 5.35,
-  markLock: 5.55,
-  deviceIn: 7.0,
-  shareSheet: 7.6,
-  sourceCutA: 7.75,
-  sourceCutB: 8.17,
-  pipelineIn: 8.6,
-  cardLands: 10.85,
-  searchIn: 12.0,
-  filterSnap: 13.85,
-  askIn: 15.0,
-  answerStart: 16.5,
-  citations: 18.05,
+  // the loss: the wrong pile opened twice, on and after the bar-4 minor
+  // (the film's single minor moved to bar 4 with the loss in round 13e)
+  lossOpenA: 4.07,
+  lossShutA: 4.53,
+  lossOpenB: 4.67,
+  lossShutB: 5.13,
+  converge: 6.0,
+  collapse: 6.35,
+  markLock: 6.55,
+  deviceIn: 8.0,
+  shareSheet: 8.6,
+  sourceCutA: 8.75,
+  sourceCutB: 9.17,
+  pipelineIn: 9.6,
+  cardLands: 11.85,
+  searchIn: 13.0,
+  filterSnap: 14.85,
+  askIn: 16.0,
+  answerStart: 17.5,
+  citations: 19.05,
   // the finger tapping the Graph chip — the cut into the graph is a TAP now,
   // not an edit decision
-  graphTap: 19.5,
-  graphBloom: 20.0,
-  collectionsIn: 23.0,
+  graphTap: 20.5,
+  graphBloom: 21.0,
+  collectionsIn: 24.0,
   digestIn: 26.0,
   endcard: 29.0,
 };
 
 /**
  * Risers, placed to END on the reveal they lead into (round 13): the turn's
- * collapse (5.0), the Machina icon on the share sheet (~7.6), the library
- * (12.0), the first Ask answer (16.5), the graph bloom (20.0), the endcard
- * (29.0). The bar-4 riser is the short one — it doubles as the search-tension
+ * collapse (6.0), the Machina icon on the share sheet (~8.6), the library
+ * (13.0), the first Ask answer (17.5), the graph bloom (21.0), the endcard
+ * (29.0). The bar-5 riser is the short one — it doubles as the search-tension
  * exit of act one.
  */
-export const RISERS = [4.0, 6.3, 10.7, 15.2, 18.6, 27.6];
+export const RISERS = [5.0, 7.3, 11.7, 16.2, 19.6, 27.6];

@@ -415,16 +415,17 @@ const CHORDS = {
 // each cut arrives as a resolution.
 const BAR_CHORDS = [
   'Cmaj7', // 0     cold open (the boot) — opens major
-  // Act one (round 13): the save-run stays bright, bar 3 is the LOSS — the
-  // film's single minor bar — and bar 4 hangs on the dominant while the wrong
-  // pile is opened a second time: searching, unresolved, but NOT a second minor.
-  'Cmaj7', 'G6', 'Am9', 'G6', // 1–4   saves fly → piles grow → the loss → still looking
-  'Fmaj7', 'Cmaj7', // 5–6   the turn lifts on F and resolves home as the mark locks
-  'Cmaj7', 'Fmaj7', 'G6', 'Cmaj7', 'G6', // 7–11  capture
-  'Cmaj7', 'Fmaj7', 'G6', // 12–14 library — opens on the tonic, closes on V
-  'Cmaj7', 'Fmaj7', 'G6', 'Cmaj7', 'G6', // 15–19 ask — V lands the graph bloom on I
-  'Cmaj7', 'Fmaj7', 'G6', // 20–22 graph
-  'Cmaj7', 'Fmaj7', 'G6', // 23–25 collections
+  // Act one (round 13e, five bars): the save-run stays bright, bar 4 is the
+  // LOSS — the film's single minor bar, moved here WITH the loss beat — and
+  // bar 5 hangs on the dominant while the wrong pile is opened a second time:
+  // searching, unresolved, but NOT a second minor.
+  'Cmaj7', 'G6', 'Fmaj7', 'Am9', 'G6', // 1–5  saves fly → piles grow → the loss → still looking
+  'Fmaj7', 'Cmaj7', // 6–7   the turn lifts on F and resolves home as the mark locks
+  'Cmaj7', 'Fmaj7', 'G6', 'Cmaj7', 'G6', // 8–12  capture
+  'Cmaj7', 'Fmaj7', 'G6', // 13–15 library — opens on the tonic, closes on V
+  'Cmaj7', 'Fmaj7', 'G6', 'Cmaj7', 'G6', // 16–20 ask — V lands the graph bloom on I
+  'Cmaj7', 'Fmaj7', 'G6', // 21–23 graph
+  'Cmaj7', 'G6', // 24–25 collections — tonic in, V out
   'Fmaj7', 'Cmaj7', 'G6', // 26–28 digest — warm IV first
   'Cmaj7', 'Fmaj7', 'Cmaj7', // 29–31 endcard — home, a last breath of F, home
 ];
@@ -584,13 +585,13 @@ for (const m of [48, 64, 67, 72]) pad(b(ENDCARD_BAR), BAR * 3 - 0.3, m, 0.075, m
 // place — the act-one bar came from library, so ask 15–19, graph 20–22,
 // collections 23–25, digest 26–28, endcard 29–31 are unchanged).
 const MELODY = [
-  [15, 0, 64], [15, 1.5, 65], [15, 3, 67], //  Cmaj7: E4 F4 G4  (E→F right away)
-  [16, 0, 67], [16, 1.5, 69], [16, 3, 72], //  Fmaj7: G4 A4 C5  (rising)
-  [17, 0, 74], [17, 2, 71], //  G6:    D5 B4
-  [18, 0, 72], [18, 1.5, 71], [18, 3, 69], //  Cmaj7: C5 B4 A4
-  [19, 0, 67], [19, 2, 69], [19, 3, 71], //  G6:    G4 A4 B4  (leading tone into the bloom)
-  [20, 0, 72], [20, 2, 71], [21, 0, 69], [21, 2, 67], [22, 0, 74], [22, 2, 71], // graph
-  [23, 0, 72], [24, 1, 69], [25, 0, 71], // collections — kept high, kept bright
+  [16, 0, 64], [16, 1.5, 65], [16, 3, 67], //  Cmaj7: E4 F4 G4  (E→F right away)
+  [17, 0, 67], [17, 1.5, 69], [17, 3, 72], //  Fmaj7: G4 A4 C5  (rising)
+  [18, 0, 74], [18, 2, 71], //  G6:    D5 B4
+  [19, 0, 72], [19, 1.5, 71], [19, 3, 69], //  Cmaj7: C5 B4 A4
+  [20, 0, 67], [20, 2, 69], [20, 3, 71], //  G6:    G4 A4 B4  (leading tone into the bloom)
+  [21, 0, 72], [21, 2, 71], [22, 0, 69], [22, 2, 67], [23, 0, 74], [23, 2, 71], // graph
+  [24, 0, 72], [25, 1, 69], // collections — kept high, kept bright
   [26, 0, 69], [27, 0, 67], [27, 2, 72], [28, 0, 71], // digest — warm, rising
   [29, 0, 64], [29, 2, 65], [30, 0, 69], [31, 0, 72], [31, 1.5, 76], // …home on C
 ];
@@ -604,17 +605,17 @@ for (const [bar, bt, m] of MELODY) {
 // scene pulses, so the product act sings from its first bar instead of waiting
 // nine bars for the hero melody. Quiet by design: a promise, not the tune.
 const LEAD_IN = [
-  [7, 0, 67], [8, 2, 69], [9, 0, 71], [10, 2, 72], [11, 0, 71],
-  [12, 0, 72], [13, 2, 69], [14, 2, 71],
+  [8, 0, 67], [9, 2, 69], [10, 0, 71], [11, 2, 72], [12, 0, 71],
+  [13, 0, 72], [14, 2, 69], [15, 2, 71],
 ];
 for (const [bar, bt, m] of LEAD_IN) {
   keys(beat(bar, bt), m, 0.12, bar % 2 ? -0.25 : 0.25, 1.3);
 }
 
 // ── risers, each ENDING on the reveal it leads into (see timeline.mjs):
-// 4.0→the collapse, 6.3→the share-sheet Machina icon, 10.7→the library,
-// 15.2→the first answer, 18.6→the graph bloom, 27.6→the endcard.
-for (const r of RISERS) riser(b(r), BAR * (r === 4 ? 1 : 1.4), 0.095);
+// 5.0→the collapse, 7.3→the share-sheet Machina icon, 11.7→the library,
+// 16.2→the first answer, 19.6→the graph bloom, 27.6→the endcard.
+for (const r of RISERS) riser(b(r), BAR * (r === 5 ? 1 : 1.4), 0.095);
 
 // ── sound design against the picture
 // the boot: the brackets close, the point strikes, then the mark pushes past

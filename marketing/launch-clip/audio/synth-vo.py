@@ -27,21 +27,24 @@ BAR_SEC = 2.5
 # real spelling.
 SAY_NAME = "Makeena"
 
+# (bar, bars, text, speed?) — speed defaults to 0.95 (owner-approved).
+# Act one speaks at 0.9 (round 13e: the owner heard the opening VO as rushed),
+# and the retimed caption windows put real air between the lines.
 LINES = [
-    (1.0, 0.7, "You save things everywhere."),
-    (1.75, 1.15, "A recipe here. A video there. A thread somewhere else."),
-    (2.95, 0.7, "Multiple apps, countless saved links."),
+    (1.05, 0.85, "You save things everywhere.", 0.9),
+    (2.0, 1.35, "A recipe here. A video there. A thread somewhere else.", 0.9),
+    (3.6, 0.7, "Multiple apps, countless saved links.", 0.9),
     # a deliberate beat of silence before this one — the first wrong pile
     # opens wordless (owner note, round 13c)
-    (4.05, 1.35, "Saved, and rarely seen again."),
-    (5.45, 1.35, f"Introducing {SAY_NAME} — one place for all your saved links."),
-    (7.35, 1.25, "Save anything, from anywhere."),
-    (8.95, 2.4, f"{SAY_NAME} reads it, summarizes it, and files it."),
-    (12.3, 2.45, "From now on — lose nothing. Find everything."),
-    (15.35, 1.6, f"Ask {SAY_NAME} anything."),
-    (17.4, 1.9, "Every answer comes straight from your saves."),
-    (20.4, 2.3, f"{SAY_NAME} notices when things you saved belong together."),
-    (23.3, 2.65, "Group your saves into collections that mirror how you think."),
+    (4.8, 1.3, "Saved, and rarely seen again.", 0.9),
+    (6.45, 1.35, f"Introducing {SAY_NAME} — one place for all your saved links."),
+    (8.35, 1.25, "Save anything, from anywhere."),
+    (9.95, 2.4, f"{SAY_NAME} reads it, summarizes it, and files it."),
+    (13.3, 2.45, "From now on — lose nothing. Find everything."),
+    (16.35, 1.6, f"Ask {SAY_NAME} anything."),
+    (18.4, 1.9, "Every answer comes straight from your saves."),
+    (21.4, 2.3, f"{SAY_NAME} notices when things you saved belong together."),
+    (24.25, 1.7, "Group your saves into collections that mirror how you think."),
     (26.1, 2.6, f"And {SAY_NAME} turns your saves into one short read, delivered to you."),
     # the closing statement, over the endcard's own line
     (30.1, 1.6, f"{SAY_NAME}. Everything you save — finally useful."),
@@ -51,8 +54,10 @@ k = Kokoro(os.path.join(VO, "kokoro-v1.0.onnx"), os.path.join(VO, "voices-v1.0.b
 
 manifest = []
 ok = True
-for i, (bar, bars, text) in enumerate(LINES):
-    samples, sr = k.create(text, voice="af_heart", speed=0.95)
+for i, line in enumerate(LINES):
+    bar, bars, text = line[0], line[1], line[2]
+    speed = line[3] if len(line) > 3 else 0.95
+    samples, sr = k.create(text, voice="af_heart", speed=speed)
     path = os.path.join(VO, f"line-{i:02d}.wav")
     sf.write(path, samples, sr)
     dur = len(samples) / sr

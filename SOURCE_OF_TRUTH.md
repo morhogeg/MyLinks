@@ -1058,6 +1058,21 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-31 (launch film, round 13e) — act one gets a FIFTH bar (the
+  structural fix after three "too fast" notes).** Scatter 4→5 bars; the bar
+  came from collections (3→2 — one caption now, 5s is comfortable). Saves run
+  at one gesture per half-bar (1.25s each, was 0.94s); the loss beat and the
+  film's SINGLE minor chord moved together to bar 4 (still exactly one minor —
+  the "bar 3" wording in older entries described the old map, the rule is one
+  minor ON the loss); act-one VO speaks at 0.9 speed (synth-vo.py gained
+  per-line speed; the rest stays at the approved 0.95) with real gaps between
+  lines. Product act deliberately unchanged — genre-standard pace, owner asked
+  and this is my recommendation. Whole back half shifted +1 bar (capture 8,
+  library 13, ask 16, graph 21, collections 24, digest 26 and endcard 29
+  unchanged): BAR_CHORDS reworked (32 asserts), MELODY/LEAD_IN shifted, HITS
+  re-derived, risers re-anchored (5.0/7.3/11.7/16.2/19.6/27.6), Scatter
+  bleach/out retimed, CollectionsScene compressed. Verify green, all 14 VO
+  lines fit, stills at the changed beats.
 - **2026-07-31 (launch film, round 13d) — four script refinements on the 13c
   cut (owner: "Good", plus notes).** (1) The opener is back AND concrete —
   **"You save things everywhere."** then **"A recipe here. A video there. A

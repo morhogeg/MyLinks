@@ -18,17 +18,19 @@ export const CollectionsScene: React.FC = () => {
   const f = useCurrentFrame();
   const fr = useFraming();
 
-  const enter = prog(f, 2, 74, EASE_MODAL);
+  // TWO bars now (round 13e — the bar went to act one; with a single caption
+  // this beat reads comfortably at 5s): everything proportionally tighter.
+  const enter = prog(f, 2, 56, EASE_MODAL);
 
-  const push = prog(f, 26, 200, EASE_IN_OUT);
+  const push = prog(f, 18, 132, EASE_IN_OUT);
   const scale = 1.42 + push * 0.22;
   // the grid fills the frame, drifting down through the second row — vertical
   // shortens the travel so the device top never rides into the caption block
-  const target = ramp(f, [26, 200], [270, fr.vertical ? 315 : 355], EASE_IN_OUT);
+  const target = ramp(f, [18, 132], [270, fr.vertical ? 315 : 355], EASE_IN_OUT);
   const y = fr.focusY(target, scale * fr.scaleMul) + drift(f, 4, 240) + (fr.vertical ? 90 : 0);
-  const rotY = ramp(f, [0, 210], [10, 4], EASE_IN_OUT);
+  const rotY = ramp(f, [0, 140], [10, 4], EASE_IN_OUT);
 
-  const out = 1 - prog(f, 213, 225);
+  const out = 1 - prog(f, 138, 150);
   const inFade = prog(f, 0, 4);
 
   return (
