@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronLeft, Crosshair, Instagram, Lock, Newspaper, Play, Share2, Sparkles, Waypoints, Youtube } from 'lucide-react';
+import { ChevronLeft, Crosshair, Instagram, Lock, MessagesSquare, Newspaper, Play, Share2, Sparkles, Waypoints, Youtube } from 'lucide-react';
 import { T, categoryColor } from '../theme';
 import { sans } from '../fonts';
 import { StatusBar, HomeIndicator, SCREEN_W, SCREEN_H } from './Phone';
@@ -11,6 +11,7 @@ import {
   Screen,
   SearchField,
   TabBar,
+  Tap,
 } from './app';
 import { CitationGlyph } from './Brand';
 import {
@@ -323,9 +324,11 @@ export const ShareSheet: React.FC<{
   open: number;
   /** 0–1 how selected the Machina row is. */
   pick?: number;
+  /** 0–1 fingertip gesture over the Machina icon (see `Tap`). */
+  tap?: number;
   /** What is actually being shared — the sheet must name the source behind it. */
   item?: { title: string; site: string; mark?: string };
-}> = ({ open, pick = 0, item }) => {
+}> = ({ open, pick = 0, tap = 0, item }) => {
   const shared = item ?? { title: INCOMING.headline, site: INCOMING.site };
   const H = 420;
   return (
@@ -401,6 +404,7 @@ export const ShareSheet: React.FC<{
             <div key={a.name} style={{ width: 62, textAlign: 'center' }}>
               <div
                 style={{
+                  position: 'relative',
                   width: 58,
                   height: 58,
                   borderRadius: 14,
@@ -426,6 +430,7 @@ export const ShareSheet: React.FC<{
                     <CitationGlyph style={{ width: '100%', height: '100%' }} />
                   </div>
                 )}
+                {a.machina && <Tap t={tap} size={50} />}
               </div>
               <div
                 style={{
@@ -621,9 +626,11 @@ export const AskScreen: React.FC<{
   /** 0–1 per-source chip entrance */
   sources?: number[];
   graphChip?: number;
+  /** 0–1 the finger tapping the Graph chip — the film's cut into the graph. */
+  graphTap?: number;
   thinking?: number;
   scrollY?: number;
-}> = ({ typed = 0, streamed = 0, sources = [], graphChip = 0, thinking = 0, scrollY = 0 }) => {
+}> = ({ typed = 0, streamed = 0, sources = [], graphChip = 0, graphTap = 0, thinking = 0, scrollY = 0 }) => {
   const q = ASK_QUESTION.slice(0, typed);
   const answer = ASK_ANSWER.slice(0, streamed);
   const asked = typed >= ASK_QUESTION.length;
@@ -740,7 +747,13 @@ export const AskScreen: React.FC<{
 
               {graphChip > 0 && (
                 <div style={{ marginTop: 12 }}>
-                  <GraphChip opacity={graphChip} />
+                  <span style={{ position: 'relative', display: 'inline-flex' }}>
+                    <GraphChip
+                      opacity={graphChip}
+                      pressed={graphTap > 0 ? Math.min(1, graphTap / 0.5) * (1 - Math.max(0, (graphTap - 0.6) / 0.4)) : 0}
+                    />
+                    <Tap t={graphTap} />
+                  </span>
                 </div>
               )}
             </div>
@@ -817,7 +830,21 @@ export const AskScreen: React.FC<{
 /**
  * The knowledge graph. The app draws it on canvas; here it is SVG so edges can
  * be stroke-dashed into existence and nodes can bloom on their own schedule.
+ *
+ * The chrome above the canvas is the SHIPPED layout, not an invention: the
+ * "Back to Ask" pill sits at the top of the content (navigation), then the
+ * stats line, then the category legend chips (filters that act on the view) —
+ * the exact hierarchy the app settled on. The pill is present from the first
+ * frame because in the film the user has just TAPPED Graph on a cited answer.
  */
+const GRAPH_LEGEND = [
+  { name: 'Neuroscience', n: 2 },
+  { name: 'Learning', n: 2 },
+  { name: 'Focus', n: 2 },
+  { name: 'Reading', n: 2 },
+  { name: 'Product', n: 2 },
+];
+
 export const GraphScreen: React.FC<{
   /** 0–1 how much of the graph has been drawn. */
   draw: number;
@@ -827,9 +854,10 @@ export const GraphScreen: React.FC<{
 }> = ({ draw, labels = 0, backPill = 0 }) => {
   const W = SCREEN_W;
   const H = SCREEN_H;
-  // The canvas is inset in a rounded container, exactly as the app lays it out.
+  // The canvas is inset in a rounded container, exactly as the app lays it out —
+  // below the back pill / stats / legend stack.
   const PAD = 14;
-  const TOP = 118;
+  const TOP = 218;
   const BOT = 104;
   const cw = W - PAD * 2;
   const chh = H - TOP - BOT;
@@ -841,6 +869,66 @@ export const GraphScreen: React.FC<{
     <Screen>
       <StatusBar />
       <AppHeader title="Graph" showSearch={false} />
+
+      {/* back pill → stats → legend, the shipped top-of-content stack */}
+      <div style={{ position: 'absolute', top: 105, left: PAD, right: PAD, opacity: backPill }}>
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 5,
+            padding: '6px 12px 6px 6px',
+            borderRadius: 999,
+            background: T.card,
+            border: `1px solid ${T.border}`,
+            boxShadow: '0 1px 2px rgba(16,24,40,0.06)',
+            fontSize: 12,
+            fontWeight: 600,
+            color: T.textSecondary,
+            marginTop: 10,
+          }}
+        >
+          <ChevronLeft size={15} color={T.accent} />
+          <MessagesSquare size={13} color={T.accent} />
+          Back to Ask
+        </div>
+        <div style={{ marginTop: 9, fontSize: 12.5, fontWeight: 500, color: T.textSecondary, fontVariantNumeric: 'tabular-nums' }}>
+          {GRAPH_NODES.length} connected cards
+          <span style={{ color: T.textMuted }}> · </span>
+          {GRAPH_EDGES.length} connections
+          <span style={{ color: T.textMuted }}> · </span>
+          {CLUSTERS.length} clusters
+        </div>
+        <div style={{ marginTop: 8, display: 'flex', gap: 6, overflow: 'hidden' }}>
+          {GRAPH_LEGEND.map((c) => {
+            const col = categoryColor(c.name);
+            return (
+              <span
+                key={c.name}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  height: 27,
+                  padding: '0 10px',
+                  borderRadius: 999,
+                  border: `1px solid ${T.border}`,
+                  background: T.card,
+                  fontSize: 11.5,
+                  fontWeight: 500,
+                  color: T.textSecondary,
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                }}
+              >
+                <span style={{ width: 8, height: 8, borderRadius: 8, background: col.fg, flexShrink: 0 }} />
+                {c.name}
+                <span style={{ color: T.textMuted, fontVariantNumeric: 'tabular-nums' }}>{c.n}</span>
+              </span>
+            );
+          })}
+        </div>
+      </div>
 
       {/* The app's own canvas container: rounded-2xl, a hairline, and a
           card→background radial. Ported from KnowledgeGraph.tsx's inline style
@@ -973,30 +1061,7 @@ export const GraphScreen: React.FC<{
         </svg>
       </div>
 
-      {/* Back to Ask (top-start) and the re-fit control (bottom-end) */}
-      <div
-        style={{
-          position: 'absolute',
-          top: TOP + 12,
-          left: PAD + 10,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 5,
-          padding: '7px 12px 7px 9px',
-          borderRadius: 999,
-          background: 'rgba(255,255,255,0.85)',
-          backdropFilter: 'blur(12px)',
-          border: `1px solid ${T.borderStrong}`,
-          fontSize: 12,
-          fontWeight: 600,
-          color: T.text,
-          opacity: backPill,
-          transform: `translateY(${(1 - backPill) * -6}px)`,
-        }}
-      >
-        <ChevronLeft size={14} />
-        Back to Ask
-      </div>
+      {/* the re-fit control (bottom-end, inside the canvas — as shipped) */}
       <div
         style={{
           position: 'absolute',

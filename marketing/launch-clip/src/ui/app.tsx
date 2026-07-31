@@ -507,8 +507,13 @@ export const CitationChip: React.FC<{
   );
 };
 
-/** The quiet dashed "Graph" chip the app appends to a cited answer. */
-export const GraphChip: React.FC<{ opacity?: number }> = ({ opacity = 1 }) => (
+/** The quiet dashed "Graph" chip the app appends to a cited answer.
+ *  `pressed` (0–1) is the touch-down state: the chip fills and dips like a
+ *  real control, so the cut into the graph reads as a TAP, not an edit. */
+export const GraphChip: React.FC<{ opacity?: number; pressed?: number }> = ({
+  opacity = 1,
+  pressed = 0,
+}) => (
   <span
     style={{
       display: 'inline-flex',
@@ -517,14 +522,44 @@ export const GraphChip: React.FC<{ opacity?: number }> = ({ opacity = 1 }) => (
       fontSize: 10.5,
       fontWeight: 600,
       letterSpacing: '0.02em',
-      color: T.textSecondary,
-      border: `1px dashed ${T.borderStrong}`,
+      color: T.text,
+      background: `rgba(20,20,27,${0.04 + pressed * 0.08})`,
+      border: `1px ${pressed > 0.4 ? 'solid' : 'dashed'} ${T.borderStrong}`,
       borderRadius: 999,
       padding: '4px 9px',
       opacity,
+      transform: `scale(${1 - pressed * 0.06})`,
     }}
   >
     <Waypoints size={11} />
     Graph
   </span>
 );
+
+/**
+ * A fingertip. Rendered inside a `position: relative` parent, centred on it:
+ * the pad lands (scales in, darkens), then lifts as a ripple that expands and
+ * fades. `t` runs 0–1 over the whole gesture; contact is at ~0.5.
+ */
+export const Tap: React.FC<{ t: number; size?: number }> = ({ t, size = 44 }) => {
+  if (t <= 0 || t >= 1) return null;
+  const down = Math.min(1, t / 0.45); // approach + land
+  const up = Math.max(0, (t - 0.5) / 0.5); // lift + ripple
+  return (
+    <span
+      style={{
+        position: 'absolute',
+        left: '50%',
+        top: '50%',
+        width: size,
+        height: size,
+        pointerEvents: 'none',
+        transform: `translate(-50%, -50%) scale(${0.7 + down * 0.3 + up * 0.9})`,
+        borderRadius: '50%',
+        background: `rgba(20,20,27,${0.22 * down * (1 - up)})`,
+        border: `1.5px solid rgba(20,20,27,${0.3 * (1 - up) * down})`,
+        boxShadow: `0 0 0 ${up * 14}px rgba(20,20,27,${0.1 * (1 - up)})`,
+      }}
+    />
+  );
+};

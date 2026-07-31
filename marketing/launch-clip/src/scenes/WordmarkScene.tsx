@@ -2,6 +2,7 @@ import React from 'react';
 import { AbsoluteFill, useCurrentFrame } from 'remotion';
 
 import { SET_BG, Stage } from '../film/effects';
+import { useFraming } from '../film/format';
 import { CONSTELLATION, PANEL_OFFSET, PlatformPanel } from '../ui/platforms';
 import { drift, prog, ramp, EASE_IN_OUT, EASE_OUT } from '../film/anim';
 
@@ -23,6 +24,10 @@ import { drift, prog, ramp, EASE_IN_OUT, EASE_OUT } from '../film/anim';
  */
 export const WordmarkScene: React.FC = () => {
   const f = useCurrentFrame();
+  const fr = useFraming();
+  // the same narrowing the scatter used, so the gather undoes the same scatter
+  const fit = fr.vertical ? 0.8 : 1;
+  const vy = fr.vertical ? 1.9 : 1;
 
   // ── 1. the gather (frames 0–26): panels fly to centre and collapse
   const gather = prog(f, 0, 26, EASE_IN_OUT);
@@ -96,11 +101,11 @@ export const WordmarkScene: React.FC = () => {
             justifyContent: 'center',
           }}
         >
-          <div style={{ position: 'relative', width: 1, height: 1, transformStyle: 'preserve-3d' }}>
+          <div style={{ position: 'relative', width: 1, height: 1, transformStyle: 'preserve-3d', transform: `scale(${fit})` }}>
             {CONSTELLATION.map((p) => {
               // start where the scatter left them (fully drifted), end at centre
               const x = (p.x + p.dx) * (1 - gather);
-              const y = (p.y + p.dy) * (1 - gather);
+              const y = (p.y + p.dy) * (1 - gather) * vy;
               const z = p.z * (1 - gather);
               return (
                 <div
@@ -146,7 +151,7 @@ export const WordmarkScene: React.FC = () => {
             position: 'relative',
             width: 1500,
             height: 400,
-            transform: `translateY(${float}px) scale(${outScale * pushScale})`,
+            transform: `translateY(${float}px) scale(${outScale * pushScale * (fr.vertical ? 0.8 : 1)})`,
           }}
         >
           {bracket(-1)}

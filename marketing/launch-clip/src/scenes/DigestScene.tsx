@@ -1,8 +1,9 @@
 import React from 'react';
 import { AbsoluteFill, useCurrentFrame } from 'remotion';
 import { Phone } from '../ui/Phone';
+import { useFraming } from '../film/format';
 import { FloorGlow, Rig, SET_BG, Stage } from '../film/effects';
-import { BASE_X, drift, focusY, prog, ramp, EASE_IN_OUT, EASE_MODAL } from '../film/anim';
+import { drift, prog, ramp, EASE_IN_OUT, EASE_MODAL } from '../film/anim';
 import { DigestScreen } from '../ui/screens';
 
 /**
@@ -15,6 +16,7 @@ import { DigestScreen } from '../ui/screens';
  */
 export const DigestScene: React.FC = () => {
   const f = useCurrentFrame();
+  const fr = useFraming();
 
   const digEnter = prog(f, 4, 32, EASE_MODAL);
   const revEnter = prog(f, 66, 96, EASE_MODAL);
@@ -23,7 +25,7 @@ export const DigestScene: React.FC = () => {
   const scale = 1.46 + push * 0.24;
   // from the synthesis card down to the resurfaced save under it
   const target = ramp(f, [56, 190], [280, 405], EASE_IN_OUT);
-  const y = focusY(target, scale) + drift(f, 4, 220);
+  const y = fr.focusY(target, scale * fr.scaleMul) + drift(f, 4, 220);
   const rotY = ramp(f, [0, 210], [-8, -3], EASE_IN_OUT);
 
   const out = 1 - prog(f, 213, 225);
@@ -32,7 +34,7 @@ export const DigestScene: React.FC = () => {
   return (
     <AbsoluteFill style={{ background: SET_BG, opacity: out * inFade }}>
       <Stage intensity={0.64} backlight={0.36} />
-      <Rig scale={scale} rotY={rotY} x={BASE_X} y={y} origin="center 40%">
+      <Rig scale={scale * fr.scaleMul} rotY={rotY} x={fr.baseX} y={y} origin="center 40%">
         <div style={{ position: 'relative' }}>
           <FloorGlow y={890} w={700} opacity={0.45} />
           <Phone>

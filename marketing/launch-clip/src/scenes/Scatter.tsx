@@ -2,6 +2,7 @@ import React from 'react';
 import { AbsoluteFill, useCurrentFrame } from 'remotion';
 import { CONSTELLATION, PANEL_OFFSET, PlatformPanel } from '../ui/platforms';
 import { SET_BG, Stage } from '../film/effects';
+import { useFraming } from '../film/format';
 import { drift, prog, ramp, EASE_IN_OUT, EASE_OUT } from '../film/anim';
 
 /**
@@ -27,6 +28,11 @@ import { drift, prog, ramp, EASE_IN_OUT, EASE_OUT } from '../film/anim';
  */
 export const Scatter: React.FC = () => {
   const f = useCurrentFrame();
+  const fr = useFraming();
+  // vertical: the constellation narrows to fit the 1080 width and stretches
+  // tall, so the five surfaces still surround the viewer instead of clipping
+  const fit = fr.vertical ? 0.8 : 1;
+  const vy = fr.vertical ? 1.9 : 1;
 
   // the panels arrive fast, then keep drifting apart for the whole scene
   const arrive = prog(f, 0, 36, EASE_OUT);
@@ -35,7 +41,7 @@ export const Scatter: React.FC = () => {
   // camera: a slow lateral drift across the constellation, easing back so all
   // five are in frame by the time they start disappearing
   const pull = prog(f, 0, 150, EASE_IN_OUT);
-  const camScale = 1.14 - pull * 0.2;
+  const camScale = (1.14 - pull * 0.2) * fit;
   const camRotY = ramp(f, [0, 210], [9, -7], EASE_IN_OUT);
   const camX = ramp(f, [0, 210], [-70, 60], EASE_IN_OUT);
   const camY = drift(f, 8, 300) - 18;
@@ -70,7 +76,7 @@ export const Scatter: React.FC = () => {
             const gone = prog(f, 118 + ((i * 13) % 5) * 10, 152 + ((i * 13) % 5) * 10, EASE_IN_OUT);
 
             const x = p.x + p.dx * apart;
-            const y = p.y + p.dy * apart;
+            const y = (p.y + p.dy * apart) * vy;
             const z = p.z - inT * 0 - (1 - inT) * 260;
             const depthBlur = Math.abs(p.z) / 165 + gone * 5;
 

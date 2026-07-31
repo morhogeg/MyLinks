@@ -1,19 +1,20 @@
 import React from 'react';
-import { AbsoluteFill, interpolate, useCurrentFrame } from 'remotion';
+import { AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig } from 'remotion';
 import { SUBTITLES, BAR_FRAMES } from '../../timeline.mjs';
 import { sans } from '../fonts';
 
 /**
  * Captions, laid out rather than subtitled.
  *
- * A line centred under the device was the wrong place twice over: it sat in the
- * device's shadow, and it made the film look like something with subtitles
- * burned on. So product beats put the type in a LEFT COLUMN with the device
- * held right of centre — the editorial two-column setting — and only the beats
- * with no device (the scatter, the lockup) keep a centred line.
+ * Landscape master: product beats put the type in a LEFT COLUMN with the device
+ * held right of centre — the editorial two-column setting — and only beats with
+ * no device (the scatter, the turn) keep a centred line. A line centred under
+ * the device was the wrong place twice over: it sat in the device's shadow, and
+ * it made the film look like something with subtitles burned on.
  *
- * Which one a cue uses is declared per cue in `timeline.mjs`; the scenes shift
- * their device by `BASE_X` to open the column.
+ * Vertical edition: there is no side column, so product-beat lines become a
+ * centred block at the TOP of the frame (the device sits lower, leaving that
+ * band clear), and device-less lines stay at the bottom.
  *
  * All motion here lands on WHOLE pixels. Sub-pixel translation forces Chromium
  * to re-rasterize the glyphs every frame, which reads as a shimmer on type this
@@ -27,6 +28,8 @@ const COLUMN_W = 665;
 
 export const Subtitles: React.FC = () => {
   const frame = useCurrentFrame();
+  const { width, height } = useVideoConfig();
+  const vertical = height > width;
 
   return (
     <AbsoluteFill style={{ pointerEvents: 'none' }}>
@@ -49,6 +52,57 @@ export const Subtitles: React.FC = () => {
         const o = Math.min(enter, exit);
         // eased separately from the fade, and rounded — see the note above
         const travel = Math.round((1 - Math.pow(enter, 0.42)) * 16);
+
+        if (s.place === 'left' && vertical) {
+          // the vertical edition's product caption: a centred block at the top
+          return (
+            <div
+              key={s.text}
+              style={{
+                position: 'absolute',
+                left: 60,
+                right: 60,
+                top: Math.round(height * 0.075) + travel,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 16,
+                opacity: o,
+                textAlign: 'center',
+              }}
+            >
+              {s.kicker && (
+                <span
+                  style={{
+                    fontFamily: sans,
+                    fontSize: 17,
+                    fontWeight: 700,
+                    letterSpacing: '0.34em',
+                    textTransform: 'uppercase',
+                    color: 'rgba(75,85,99,0.72)',
+                    opacity: enter,
+                  }}
+                >
+                  {s.kicker}
+                </span>
+              )}
+              <span
+                style={{
+                  fontFamily: sans,
+                  fontSize: 56,
+                  fontWeight: 500,
+                  lineHeight: 1.14,
+                  letterSpacing: '-0.026em',
+                  color: 'rgba(17,24,39,0.96)',
+                  textShadow: '0 1px 2px rgba(255,255,255,0.6), 0 2px 30px rgba(238,240,244,0.9)',
+                  maxWidth: 940,
+                }}
+              >
+                {s.text}
+              </span>
+            </div>
+          );
+        }
 
         if (s.place === 'left') {
           return (
@@ -131,7 +185,7 @@ export const Subtitles: React.FC = () => {
                 position: 'absolute',
                 left: 0,
                 right: 0,
-                bottom: 92,
+                bottom: vertical ? 210 : 92,
                 display: 'flex',
                 justifyContent: 'center',
                 opacity: o,
@@ -141,13 +195,14 @@ export const Subtitles: React.FC = () => {
               <span
                 style={{
                   fontFamily: sans,
-                  fontSize: 44,
+                  fontSize: vertical ? 54 : 44,
                   fontWeight: 500,
                   letterSpacing: '-0.024em',
                   color: 'rgba(17,24,39,0.96)',
                   textShadow: '0 1px 2px rgba(255,255,255,0.6), 0 8px 34px rgba(238,240,244,0.9)',
                   textAlign: 'center',
-                  maxWidth: 1300,
+                  maxWidth: vertical ? 940 : 1300,
+                  padding: '0 60px',
                 }}
               >
                 {s.text}

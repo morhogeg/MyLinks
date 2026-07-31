@@ -1,8 +1,9 @@
 import React from 'react';
 import { AbsoluteFill, useCurrentFrame } from 'remotion';
 import { Phone } from '../ui/Phone';
+import { useFraming } from '../film/format';
 import { FloorGlow, Rig, SET_BG, Stage } from '../film/effects';
-import { BASE_X, drift, focusY, prog, ramp, EASE_IN_OUT, EASE_MODAL, EASE_OUT } from '../film/anim';
+import { drift, prog, ramp, EASE_IN_OUT, EASE_MODAL, EASE_OUT } from '../film/anim';
 import {
   AnalyzingScreen,
   ArticleScreen,
@@ -34,6 +35,7 @@ const CUTS = [0, 56, 88]; // frames where the world behind the sheet swaps
 
 export const Capture: React.FC = () => {
   const f = useCurrentFrame();
+  const fr = useFraming();
 
   // ── the device arrives
   const entry = prog(f, 0, 30, EASE_OUT);
@@ -54,6 +56,14 @@ export const Capture: React.FC = () => {
     prog(f, 58, 70, EASE_OUT) * (1 - prog(f, 80, 88)),
     prog(f, 92, 106, EASE_OUT),
   );
+  // …and a FINGER lands on it each time, just ahead of the pulse — the pulses
+  // read as consequences of a tap instead of the UI acting on its own
+  const taps = [
+    prog(f, 26, 46, EASE_IN_OUT),
+    prog(f, 52, 72, EASE_IN_OUT),
+    prog(f, 86, 106, EASE_IN_OUT),
+  ];
+  const tap = taps.find((t) => t > 0 && t < 1) ?? 0;
 
   // ── inside the app. THE PIPELINE IS THE PRODUCT, so it gets the time and the
   // size: ~5.5 seconds under a hard push-in, roughly a second per phase, which
@@ -79,7 +89,11 @@ export const Capture: React.FC = () => {
   const target = inApp
     ? ramp(f, [128, 300], [300, 250], EASE_IN_OUT)
     : ramp(f, [0, 60], [480, 560], EASE_IN_OUT);
-  const camY = focusY(target, scale) + drift(f, 5, 320);
+  // Vertical re-aim, per phase (the phase switch is a hard cut, so the jump is
+  // invisible): the share-sheet shot drops the device so its top clears the
+  // caption band; the pipeline shot lifts it to close the dead gap under it.
+  const vNudge = fr.vertical ? (inApp ? -230 : 300) : 0;
+  const camY = fr.focusY(target, scale * fr.scaleMul) + drift(f, 5, 320) + vNudge;
 
   const out = 1 - prog(f, 363, 375);
 
@@ -87,11 +101,11 @@ export const Capture: React.FC = () => {
     <AbsoluteFill style={{ background: SET_BG, opacity: out * entry }}>
       <Stage intensity={0.66} backlight={0.4} drift={push * 0.4} />
       <Rig
-        scale={scale}
+        scale={scale * fr.scaleMul}
         rotY={rotY}
         rotX={rotX}
         rotZ={rotZ}
-        x={x + BASE_X}
+        x={x + fr.baseX}
         y={yIn + camY}
         origin="center 16%"
       >
@@ -115,7 +129,7 @@ export const Capture: React.FC = () => {
                     zIndex: 70,
                   }}
                 />
-                <ShareSheet open={sheet} pick={pick} item={source.item} />
+                <ShareSheet open={sheet} pick={pick} tap={tap} item={source.item} />
               </>
             )}
           </Phone>

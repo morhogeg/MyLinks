@@ -40,10 +40,11 @@ film is worse than no film.
 **The demo content is one coherent research trail** (`src/data/library.ts`), not a
 grab-bag. That is load-bearing three times over: the Ask scene's answer is
 genuinely assemblable from those specific cards; the search scene's query —
-*"why cramming never sticks"* — shares **not one word** with the three cards it
-retrieves, which is the only way that beat proves semantic search rather than ⌘F;
-and the feed visibly mixes YouTube, Instagram, X and articles, which is what
-proves "one place for all of it" instead of merely captioning it.
+*"why cramming never sticks"* — shares **not one word** with the ONE card it
+retrieves (a single survivor reads as the app *finding the thing*, where three
+read as a filter narrowing), which is the only way that beat proves retrieval
+rather than ⌘F; and the feed visibly mixes YouTube, Instagram, X and articles,
+which is what proves "one place for all of it" instead of merely captioning it.
 
 **The story is the founder letter's, not a feature list.** The problem is
 *fragmentation*, not clutter — things saved across Instagram, X, YouTube,
@@ -108,6 +109,13 @@ seconds and without a word of copy.
 The same argument then closes itself in the Ask beat: the three citation chips
 under the answer are a Nature paper, a YouTube video and an Instagram carousel.
 
+**Every cut is finger-motivated.** A `Tap` fingertip (in `ui/app.tsx`) lands on
+the Machina icon ahead of each pulse in the share sheet, and the Ask scene ends
+with a tap on the **Graph** chip — the chip presses, the camera dives after it,
+and the graph screen arrives as a navigation (its Back-to-Ask / stats / legend
+header present from the first frame). The film never cuts because an editor
+wanted to; someone on screen always does something first.
+
 **The pipeline is a shot, not a transition.** The five phases from
 `web/lib/scanPhases.ts` run for ~5.5 seconds under a hard 2D push-in — about a
 second per phase, which is what it takes to actually read them. It is the one
@@ -155,10 +163,21 @@ the same gesture the boot exits on.
 
 ## Compositions
 
-- **`MachinaLaunch`** — the deliverable (score + burned-in captions)
+- **`MachinaLaunch`** — the deliverable (score + burned-in captions, 1920×1080)
 - **`MachinaLaunchSilent`** — captions, no score (for a voice-over pass)
 - **`MachinaLaunchClean`** — no score, no captions (social cuts, stills, or
   captions laid on in an external editor from the `.srt`)
+- **`MachinaLaunchVertical`** — the **1080×1920 portrait edition** (iPhone /
+  Reels / Shorts), rendered with
+  `npx remotion render src/index.ts MachinaLaunchVertical out/machina-launch-vertical.mp4`
+- **`MachinaLaunchVerticalSilent`** — vertical, no score (stills QA)
+
+The vertical editions are the SAME scene code reframed through
+`src/film/format.ts` (`useFraming()`): device centred and slightly lower,
+product captions as a centred block at the top, the scatter constellation
+narrowed and stretched tall, plus per-scene vertical nudges where a shot's
+transform origin made the shared focus line miss. Change a scene once and both
+formats pick it up.
 
 ## The score
 
@@ -180,6 +199,13 @@ resolved at home on C. The same four chords walked Am → F → C → G is the s
 harmony and a completely different mood — that ordering is what made an earlier
 cut read as gloomy. Per-bar density brings percussion in for capture, peaks on
 Ask, and drops to a held C pedal for the endcard.
+
+**The score has a split personality, deliberately:** act one (the struggle)
+keeps its Am shadow and sparse bed; from capture onward every scene opens on
+the tonic, Am never lands on a scene boundary, a four-on-the-floor kick plus
+off-beat open hats carry the product act, the pulse doubles to 16ths from the
+hero scene, and a quiet keys lead-in sings over capture/library before the full
+melody enters with Ask.
 
 There is no audio device in the render environment, so the mix is verified
 numerically — `npm run verify` prints per-bar RMS and peak, DC offset and a

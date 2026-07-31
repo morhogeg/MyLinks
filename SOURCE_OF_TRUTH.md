@@ -1058,6 +1058,42 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-31 (launch film, round 9) — taps drive the cuts, the graph wears the
+  app's real chrome, search finds ONE card, the score's back half goes upbeat,
+  and a vertical 1080×1920 edition ships (owner notes ×4 + polish round).**
+  **(1) The Ask → Graph cut is a TAP now:** a reusable `Tap` fingertip lands on
+  the answer's Graph chip (chip presses and fills, `HITS.graphTap` ticks), the
+  camera dives after it, and the graph ARRIVES as a navigation. The same
+  fingertip taps the Machina icon in the share sheet ahead of each pulse — no
+  cut in the film happens without someone on screen doing something first.
+  **(2) The graph screen now carries the SHIPPED top-of-content stack** ported
+  from `KnowledgeGraph.tsx` + round 9's app hierarchy: Back-to-Ask pill
+  (chevron + MessagesSquare, present from frame one since the user just tapped
+  Graph), the "12 connected cards · 16 connections · 3 clusters" stats line,
+  and the category legend chips with colored dots (overflowing the edge like
+  the app's scrollable row); the old floating in-canvas pill is gone, the
+  in-canvas re-fit control stays.
+  **(3) Search retrieves ONE card** (`SEARCH_HITS = ['retrieval']`, camera
+  lands on it) — three survivors read as a filter narrowing; one reads as the
+  app finding THE thing, which is what "Even when you only half-remember it."
+  needs. Still zero word overlap with the query.
+  **(4) The score's product act is UPBEAT while act one keeps the struggle**
+  (owner note): from capture on, every scene opens on the tonic and Am never
+  lands on a scene boundary; four-on-the-floor kicks + off-beat OPEN hats
+  (new `hat(open)` mode) through library→collections; the pulse doubles to
+  16ths from Ask (was graph); a quiet keys lead-in line sings over
+  capture/library before the melody proper. Act-one bars untouched.
+  **(5) VERTICAL EDITION — `MachinaLaunchVertical`, 1080×1920** (+Silent), the
+  same scene code reframed through new `src/film/format.ts` (`useFraming()`):
+  device centred/lower with a 1.3× presence bump, product captions become a
+  centred top block (`Subtitles` reads `useVideoConfig`), the scatter/gather
+  constellation narrows 0.8× and stretches 1.9× tall, endcard scales up, and
+  three per-scene vertical nudges fix shots whose transform origin made the
+  shared focus line miss (capture per-phase ±, graph +230). Renders to
+  `out/machina-launch-vertical.mp4`; both formats share every future edit.
+  Verified: tsc 0, `npm run verify` green, stills for BOTH formats at every
+  changed beat, encode-frame QA on both mp4s. **Score still unheard by human
+  ears — owner must listen before publishing.**
 - **2026-07-31 (launch film, round 8) — the film goes LIGHT, gains 5s of product
   time, and the copy tightens (owner notes ×4 + a general sweep).**
   **(1) The whole film is regraded to the app's light mode** (`theme.ts` `T =

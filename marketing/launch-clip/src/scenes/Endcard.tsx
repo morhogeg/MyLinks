@@ -2,6 +2,7 @@ import React from 'react';
 import { AbsoluteFill, useCurrentFrame } from 'remotion';
 import { AnimatedMark, MARK_LAUNCH_FRAMES, Wordmark } from '../ui/Brand';
 import { SET_BG, Stage } from '../film/effects';
+import { useFraming } from '../film/format';
 import { drift, prog, ramp, EASE_MODAL, EASE_OUT } from '../film/anim';
 import { sans } from '../fonts';
 
@@ -29,6 +30,7 @@ import { sans } from '../fonts';
  */
 export const Endcard: React.FC = () => {
   const f = useCurrentFrame();
+  const fr = useFraming();
 
   const icon = prog(f, 2, 26, EASE_OUT);
   const word = prog(f, 52, 88, EASE_MODAL);
@@ -56,7 +58,7 @@ export const Endcard: React.FC = () => {
         style={{
           alignItems: 'center',
           justifyContent: 'center',
-          transform: `translateY(${float}px)`,
+          transform: `translateY(${float}px) scale(${fr.vertical ? 1.16 : 1})`,
         }}
       >
         <div

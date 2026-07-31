@@ -147,12 +147,16 @@ export const INCOMING = {
 };
 
 /**
- * The search demo. The query shares NOT ONE word with the cards it retrieves —
+ * The search demo. The query shares NOT ONE word with the card it retrieves —
  * that is the whole point of the scene, and it is why the phrasing here is
  * fixed rather than decorative.
+ *
+ * ONE result, deliberately (owner call): three matches read as a filter doing
+ * roughly the right thing; a single card left standing reads as the app
+ * FINDING the thing you meant.
  */
 export const SEARCH_QUERY = 'why cramming never sticks';
-export const SEARCH_HITS = ['sleep', 'retrieval', 'curve'];
+export const SEARCH_HITS = ['retrieval'];
 
 /** The Ask exchange. */
 export const ASK_QUESTION = 'Why do I keep forgetting what I read?';

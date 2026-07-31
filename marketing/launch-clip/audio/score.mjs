@@ -264,14 +264,15 @@ const kick = (startSec, level = 0.5) => {
   );
 };
 
-/** Hat — noise through a highpass, very short. Sits at the edge of audible. */
-const hat = (startSec, level = 0.05, panPos = 0.15) => {
+/** Hat — noise through a highpass, very short. Sits at the edge of audible.
+ *  `open` lets it ring a little — the off-beat open hat is the upbeat engine. */
+const hat = (startSec, level = 0.05, panPos = 0.15, open = false) => {
   const h = hp(6500);
   render(
     startSec,
-    0.09,
-    (t) => h(rnd()) * Math.exp(-t * 90) * level,
-    { pan: panPos, send: 0.18 },
+    open ? 0.22 : 0.09,
+    (t) => h(rnd()) * Math.exp(-t * (open ? 34 : 90)) * level,
+    { pan: panPos, send: open ? 0.24 : 0.18 },
   );
 };
 
@@ -406,16 +407,21 @@ const CHORDS = {
 // note was "the music at the beginning is too gloomy", and that ordering IS the
 // gloom. Walked C → G → Am → F (I–V–vi–IV) the same four chords open bright,
 // touch the minor in passing, and the film can end resolved at home on C.
+// The split personality is deliberate (owner note: the struggle can stay
+// moody, the product must sound like SUCCESS): act one keeps its Am shadow,
+// and from capture onward every scene OPENS on the tonic, Am never lands on a
+// scene boundary, and scene-final bars lean on V so each cut arrives as a
+// resolution.
 const BAR_CHORDS = [
   'Cmaj7', // 0     cold open (the boot) — opens major
   'Cmaj7', 'G6', 'Am9', // 1–3   scatter — ends on the minor: the loss
   'Fmaj7', 'Cmaj7', // 4–5   the turn lifts on F and resolves home as the mark locks
-  'G6', 'Am9', 'Fmaj7', 'Cmaj7', 'G6', // 6–10  capture
-  'Am9', 'Fmaj7', 'Cmaj7', 'G6', // 11–14 library
-  'Cmaj7', 'G6', 'Am9', 'Fmaj7', 'Cmaj7', // 15–19 ask — the hero opens at home
-  'Am9', 'Fmaj7', 'Cmaj7', // 20–22 graph
-  'G6', 'Cmaj7', 'G6', // 23–25 collections
-  'Am9', 'Fmaj7', 'G6', // 26–28 digest, leaning toward the resolve
+  'Cmaj7', 'G6', 'Am9', 'Fmaj7', 'G6', // 6–10  capture — V pushes into the library
+  'Cmaj7', 'Am9', 'Fmaj7', 'G6', // 11–14 library
+  'Cmaj7', 'G6', 'Am9', 'Fmaj7', 'G6', // 15–19 ask — V lands the graph bloom on I
+  'Cmaj7', 'Fmaj7', 'G6', // 20–22 graph
+  'Cmaj7', 'Fmaj7', 'G6', // 23–25 collections
+  'Fmaj7', 'Cmaj7', 'G6', // 26–28 digest — warm IV first
   'Cmaj7', 'Fmaj7', 'Cmaj7', // 29–31 endcard — home, a last breath of F, home
 ];
 
@@ -429,16 +435,18 @@ if (BAR_CHORDS.length !== TOTAL_BARS) {
 const sceneOfBar = (bar) => SCENES.find((sc) => bar >= sc.bar && bar < sc.bar + sc.bars)?.id;
 
 /** How much of the arrangement is switched on, per scene. */
+// Product scenes run HOT (owner note: upbeat once the app appears) — the
+// four-on-the-floor and the off-beat hats key off these thresholds.
 const SCENE_DENSITY = {
   coldOpen: 0.3,
   scatter: 0.62,
   wordmark: 0.62,
-  capture: 0.78,
-  library: 0.9,
+  capture: 0.85,
+  library: 0.95,
   ask: 1.0,
-  graph: 0.94,
-  collections: 0.82,
-  digest: 0.74,
+  graph: 0.96,
+  collections: 0.9,
+  digest: 0.78,
   endcard: 0.52,
 };
 
@@ -457,7 +465,10 @@ const ARP_FROM = SCENES.find((x) => x.id === 'scatter').bar;
 const GRAPH_END = SCENES.find((x) => x.id === 'graph');
 const DIGEST_BAR = SCENES.find((x) => x.id === 'digest').bar;
 const ENDCARD_BAR = SCENES.find((x) => x.id === 'endcard').bar;
-const SIXTEENTH_FROM = GRAPH_END.bar;
+// the pulse figure doubles to 16ths from the HERO on — the drive used to wait
+// for the graph, which left Ask feeling half-lit
+const SIXTEENTH_FROM = SCENES.find((x) => x.id === 'ask').bar;
+void GRAPH_END;
 
 for (let bar = 0; bar < BAR_CHORDS.length; bar++) {
   const ch = CHORDS[BAR_CHORDS[bar]];
@@ -486,15 +497,20 @@ for (let bar = 0; bar < BAR_CHORDS.length; bar++) {
     if (d >= 0.84) sub(beat(bar, 3.5), ch.bass + 7, 0.15, 0.26);
   }
 
-  // ── percussion
+  // ── percussion — the product act dances, act one only breathes
   if (d >= 0.7 && bar < ENDCARD_BAR) {
     kick(t0, 0.34 + 0.2 * d);
     kick(beat(bar, 2), 0.3 + 0.16 * d);
-    if (d >= 0.82 && bar < DIGEST_BAR) kick(beat(bar, 3.5), 0.2);
+    // FOUR-ON-THE-FLOOR through the product act: beats 1 and 3 join once the
+    // film is at full tilt — this is the single biggest "upbeat" lever
+    if (d >= 0.88 && bar < DIGEST_BAR) {
+      kick(beat(bar, 1), 0.24 + 0.08 * d);
+      kick(beat(bar, 3), 0.24 + 0.08 * d);
+    }
     // the backbeat — beats 2 and 4
     if (d >= 0.78 && bar < DIGEST_BAR) {
-      clap(beat(bar, 1), 0.1 + 0.05 * d);
-      clap(beat(bar, 3), 0.1 + 0.05 * d);
+      clap(beat(bar, 1), 0.11 + 0.05 * d);
+      clap(beat(bar, 3), 0.11 + 0.05 * d);
     }
     if (d >= 0.82 && bar < DIGEST_BAR) rim(beat(bar, 2), 0.1 + 0.05 * d);
     if (d >= 0.8 && bar < DIGEST_BAR) {
@@ -503,6 +519,10 @@ for (let bar = 0; bar < BAR_CHORDS.length; bar++) {
       for (let k = 0; k < steps; k++) {
         const accent = k % (steps / 4) === 0 ? 0.9 : k % 2 ? 1 : 0.55;
         hat(beat(bar, (k * 4) / steps), 0.036 * accent * d, k % 2 ? 0.22 : -0.18);
+      }
+      // the OFF-BEAT open hat — the "and" of every beat, the lift itself
+      if (d >= 0.85) {
+        for (let k = 0; k < 4; k++) hat(beat(bar, k + 0.5), 0.03 * d, 0.1, true);
       }
       for (let k = 0; k < 16; k++) shaker(beat(bar, k * 0.25), 0.022 * d, k % 2 ? 0.34 : -0.3);
     }
@@ -558,9 +578,9 @@ const MELODY = [
   [16, 0, 67], [16, 1.5, 69], [16, 3, 71], //  G6:    G4 A4 B4  (up to the leading tone)
   [17, 0, 72], [17, 2, 71], //  Am9:   C5 B4     (resolve down)
   [18, 0, 69], [18, 1.5, 67], [18, 3, 64], //  Fmaj7: A4 G4 E4
-  [19, 0, 65], [19, 2, 67], //  Cmaj7: F4 G4
-  [20, 0, 72], [20, 2, 71], [21, 0, 69], [21, 2, 67], [22, 0, 65], [22, 2, 64], // graph
-  [23, 0, 67], [24, 1, 71], [25, 0, 69], // collections
+  [19, 0, 65], [19, 2, 67], [19, 3, 71], //  G6:    F4 G4 B4  (leading tone into the bloom)
+  [20, 0, 72], [20, 2, 71], [21, 0, 69], [21, 2, 67], [22, 0, 65], [22, 2, 67], // graph
+  [23, 0, 72], [24, 1, 69], [25, 0, 71], // collections — kept high, kept bright
   [26, 0, 72], [27, 0, 69], [27, 2, 65], [28, 0, 67], // digest
   [29, 0, 64], [29, 2, 65], [30, 0, 69], [31, 0, 72], [31, 1.5, 76], // …home on C
 ];
@@ -568,6 +588,17 @@ const MELODY = [
 for (const [bar, bt, m] of MELODY) {
   const last = bar >= ENDCARD_BAR;
   keys(beat(bar, bt), m, last ? 0.2 : 0.155, bar % 2 ? 0.2 : -0.2, last ? 2.6 : 1.5);
+}
+
+// A light LEAD-IN line under capture + library — single bright keys notes on
+// scene pulses, so the product act sings from its first bar instead of waiting
+// nine bars for the hero melody. Quiet by design: a promise, not the tune.
+const LEAD_IN = [
+  [6, 0, 67], [7, 2, 71], [8, 0, 72], [9, 2, 69], [10, 0, 71],
+  [11, 0, 72], [12, 2, 72], [13, 0, 69], [14, 2, 71],
+];
+for (const [bar, bt, m] of LEAD_IN) {
+  keys(beat(bar, bt), m, 0.105, bar % 2 ? -0.25 : 0.25, 1.3);
 }
 
 // ── risers into the hard cuts (the bar-5 riser is the short one into capture)
@@ -611,6 +642,10 @@ shimmer(b(HITS.filterSnap), [76, 83], 0.045);
 whoosh(b(HITS.askIn) - 0.3, 0.8, 0.08, 0.3);
 tick(b(HITS.answerStart), 0.075, 1.5);
 shimmer(b(HITS.citations), [72, 76, 79, 84, 88], 0.055);
+
+// the finger landing on the Graph chip — a real UI tick, then the dive
+tick(b(HITS.graphTap), 0.11, 1.25);
+whoosh(b(HITS.graphTap) + 0.05, 0.6, 0.06, 0.2);
 
 impact(b(HITS.graphBloom), 0.3);
 whoosh(b(HITS.graphBloom) - 0.2, 0.9, 0.07, 0);

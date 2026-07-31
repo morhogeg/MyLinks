@@ -109,6 +109,9 @@ export const HITS = {
   askIn: 15.0,
   answerStart: 16.5,
   citations: 18.05,
+  // the finger tapping the Graph chip — the cut into the graph is a TAP now,
+  // not an edit decision
+  graphTap: 19.5,
   graphBloom: 20.0,
   collectionsIn: 23.0,
   digestIn: 26.0,
