@@ -1021,6 +1021,49 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-30 (round 8) — Ask → Graph focus no longer snaps back to the whole
+  graph a second after it lands (owner QA).** Tapping the Graph chip on a cited
+  card showed the right dot, then ~1s later dumped you into the full graph; a
+  second attempt stuck. **Root cause is a race with the lazy library fetch, not
+  the graph:** entering graph view fires `ensureLibrary()` (`Feed.tsx:826`), a
+  one-shot `getDocs` of the WHOLE library. The graph builds from the partial pool
+  and applies the restore correctly, then calls `onRestoreConsumed()` → parent
+  nulls `graphRestore`. When the fetch lands, `libraryLinks` changes →
+  `graphLinks` gets a new identity → `KnowledgeGraph`'s `[links]` build effect
+  re-runs → `setSelected(null)` + `autoFitRef.current = true`, and the one-shot
+  restore is already spent. The retry "worked" only because `ensureLibrary` is a
+  no-op once cached, so the pool never changed — **a self-healing symptom that
+  makes this look intermittent when it is deterministic on a cold library.**
+  **Fix — preserve focus by CARD ID, not by restore payload.** Node indices are
+  rebuilt from scratch each build; card ids are not. A new `selectedCardIdRef`
+  mirrors the selection, the build effect captures it before clearing, and after
+  the model lands it re-resolves `restore?.selectedId ?? keepId`. This also fixes
+  the general case nobody had reported: ANY rebuild (a new save arriving on the
+  snapshot, a filter change) used to silently dump you out of the card you were
+  exploring. `autoFitRef` is claimed in the same tick as the model so the camera
+  doesn't lurch toward the full-graph fit for a render.
+  Implementation note: the ref is written from an EFFECT, not during render —
+  `react-hooks/immutability` rejects a render-phase ref mutation that an effect
+  then reads (this is why the fix does not simply read `modelRef` in the effect).
+  ⚠️ **Known, PRE-EXISTING and untouched:** `KnowledgeGraph.tsx` does not pass
+  eslint — `modelRef.current = model` trips that same rule on a clean tree.
+  Verified against a stashed tree; not introduced here, not fixed here.
+  ⚠️ **Not empirically verified** — this needs a live Firebase pool and a canvas,
+  so unlike round 7 there is no probe behind it. tsc 0. **Owner device QA:** cold
+  app → Ask → Graph chip on a cited card → the dot must HOLD past the ~1s mark.
+  **Open, raised by the owner, not yet built:** move "Back to Ask" out of the
+  canvas to above the stats + category chips. Evidence it is right: it is
+  navigation (leaves the view) sitting below the category chips, which are
+  filters that act ON the view — the inverse of round 3's desktop-toolbar rule.
+  It also costs legibility today — the floating pill slices the "CULINARY
+  TECHNIQUE" cluster caption in the owner's screenshot, because the reserved
+  rect is only consulted by the node-label pass (`fits()`, one call site at
+  `:1470`); the caption loop ignores it. Moving it out would let
+  `backPillRef` + the `backPill` reservation be deleted outright rather than
+  patched with a second rect check. **The one real cost to design around:**
+  `onBackToAsk` is only set on the Ask → Graph path, so the extra row exists
+  only sometimes — the canvas `h-[calc(100dvh-268px)]` would have to become
+  conditional or the graph is short for everyone else.
 - **2026-07-30 (round 7) — Ask's suggested chips no longer re-offer the question
   you just asked (owner QA).** Tapping a chip, finishing the answer, then hitting
   **New** greeted you with the identical chip set: `newChat()`

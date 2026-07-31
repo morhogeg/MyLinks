@@ -186,6 +186,16 @@ export default function KnowledgeGraph({
         followRef.current = selected;
         if (selected !== null) autoFitRef.current = false;
     }, [selected]);
+    // The focused CARD ID, mirrored off the index-based selection. Node indices
+    // are rebuilt from scratch on every model build, card ids are not — so this
+    // is what lets a rebuild put you back where you were (see the build effect).
+    // Written from an effect rather than during render: the build effect reads
+    // it, and a render-phase ref mutation read inside an effect is exactly what
+    // react-hooks/immutability rejects.
+    const selectedCardIdRef = useRef<string | null>(null);
+    useEffect(() => {
+        selectedCardIdRef.current = selected !== null ? model?.nodes[selected]?.id ?? null : null;
+    }, [selected, model]);
     useEffect(() => {
         clusterFitRef.current = clusterFocus;
         if (clusterFocus !== null) autoFitRef.current = false;
@@ -197,6 +207,17 @@ export default function KnowledgeGraph({
     useEffect(() => {
         const signal: BuildSignal = { cancelled: false };
         setBuilding(true);
+        // The focused card's ID, captured BEFORE the index-based selection is
+        // cleared. Node indices don't survive a rebuild, but card ids do — so a
+        // rebuild re-resolves the same card instead of dumping you back to the
+        // whole graph. This is load-bearing for the Ask → Graph hand-off:
+        // entering the graph kicks off ensureLibrary()'s one-shot full-library
+        // getDocs (Feed.tsx), which lands ~1s later, changes `links`, and re-runs
+        // this effect. The restore payload is one-shot and already consumed by
+        // then, so without this the focus visibly snapped back to the full graph
+        // a second after it appeared — and only "worked" on a second attempt,
+        // when the library was already cached and the pool never changed.
+        const keepId = selectedCardIdRef.current;
         setSelected(null);
         buildGraphModel(links, signal).then((m) => {
             if (signal.cancelled || !m) return;
@@ -212,12 +233,24 @@ export default function KnowledgeGraph({
             // Coming back from an Ask this graph launched: re-open the focus
             // that launched it, so Ask reads as a detour, not an exit.
             const restore = restoreRef.current;
+            // An explicit restore wins; otherwise keep whatever the user was
+            // already looking at. A missing id (card deleted or filtered out of
+            // the pool) simply falls through to the default full-graph fit.
+            const focusId = restore?.selectedId ?? keepId;
+            if (focusId) {
+                const idx = m.nodes.findIndex((n) => n.id === focusId);
+                if (idx >= 0) {
+                    setSelected(idx);
+                    // Claim the camera in the same tick the model lands. The
+                    // [selected] effect also does this, but only a render later
+                    // — long enough for the rAF loop to start easing back to the
+                    // full-graph fit and show a lurch.
+                    autoFitRef.current = false;
+                }
+            }
             if (restore) {
                 restoreRef.current = null;
-                if (restore.selectedId) {
-                    const idx = m.nodes.findIndex((n) => n.id === restore.selectedId);
-                    if (idx >= 0) setSelected(idx);
-                } else if (restore.clusterAnchorId) {
+                if (!restore.selectedId && restore.clusterAnchorId) {
                     const anchor = m.nodes.find((n) => n.id === restore.clusterAnchorId);
                     if (anchor) setClusterFocus(anchor.cluster);
                 }
