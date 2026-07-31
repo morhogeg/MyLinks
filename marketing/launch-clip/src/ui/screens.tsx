@@ -482,7 +482,10 @@ export const AnalyzingScreen: React.FC<{
   /** 0–1 launch progress of the ANIMATED mark — the app's own thinking orb
    *  (CitationMark's launch motion), not a static glyph in a tile. */
   markU?: number;
-}> = ({ progress, cardEnter = 0, markU = 1 }) => {
+  /** Current frame — after the launch, the point BREATHES (the app's searching
+   *  state), so the mark is visibly alive for the whole pipeline. */
+  markPulse?: number | null;
+}> = ({ progress, cardEnter = 0, markU = 1, markPulse = null }) => {
   const step = progress >= 92 ? 4 : progress >= 72 ? 3 : progress >= 50 ? 2 : progress >= 25 ? 1 : 0;
   const card = byId('sleep');
   return (
@@ -507,10 +510,11 @@ export const AnalyzingScreen: React.FC<{
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 11, marginBottom: 16 }}>
             {/* the app's ANIMATED mark as the thinking orb — arms draw, brackets
-                close, the point strikes — bare, no tile (owner note, round 11) */}
+                close, the point strikes, then BREATHES while the pipeline runs
+                (owner notes, rounds 11–12: unmistakably the app's living logo) */}
             <div
               style={{
-                width: 30,
+                width: 38,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -518,7 +522,7 @@ export const AnalyzingScreen: React.FC<{
                 filter: `drop-shadow(0 0 ${5 + (progress % 20) * 0.4}px ${T.accentRing})`,
               }}
             >
-              <AnimatedMark id="scan" u={markU} style={{ width: 26, height: 'auto' }} />
+              <AnimatedMark id="scan" u={markU} pulse={markPulse} style={{ width: 34, height: 'auto' }} />
             </div>
             <div>
               <div style={{ fontSize: 13.5, fontWeight: 600, color: T.text }}>

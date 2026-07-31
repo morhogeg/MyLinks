@@ -147,15 +147,24 @@ const launchAt = (u: number) => {
   };
 };
 
-/** The app's animated mark, driven by an explicit 0–1 progress. */
+/** The app's animated mark, driven by an explicit 0–1 progress.
+ *  `pulse` is the app's SEARCHING state: after the launch resolves, the point
+ *  keeps a slow quiet breath (opacity floored at 0.46, exactly the app's own
+ *  waiting motion) — pass the current frame and the mark stays visibly alive. */
 export const AnimatedMark: React.FC<{
   /** 0 → nothing drawn, 1 → the locked mark. Run it over ~39 frames for the app's pace. */
   u: number;
+  /** Current frame, to drive the point's breathing once u ≥ 1. */
+  pulse?: number | null;
   style?: React.CSSProperties;
   id?: string;
-}> = ({ u, style, id = 'mk' }) => {
+}> = ({ u, pulse = null, style, id = 'mk' }) => {
   const f = launchAt(c01(u));
   const [l, r] = bracketPaths(f.spread);
+  const breathe =
+    pulse !== null && u >= 1
+      ? 0.46 + 0.54 * (0.5 + 0.5 * Math.sin((pulse / 38) * Math.PI * 2))
+      : 1;
   return (
     <svg viewBox={VIEWBOX_ROAM} style={style} fill="currentColor">
       <defs>
@@ -170,7 +179,7 @@ export const AnimatedMark: React.FC<{
         <path d={l} />
         <path d={r} />
       </g>
-      <circle cx={CX} cy={CY} r={f.dotR} opacity={f.dotOp} />
+      <circle cx={CX} cy={CY} r={f.dotR} opacity={f.dotOp * breathe} />
     </svg>
   );
 };

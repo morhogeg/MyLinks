@@ -1058,6 +1058,32 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-31 (launch film, round 12) — the script is rewritten for the EAR,
+  "Makeena", and the mark breathes through the pipeline (owner notes ×7; voice
+  itself approved).** **(1) Pronunciation:** the VO speaks the name as
+  **"Makeena"** (mah-KEE-nah, machine in Latin — owner's call); the respelling
+  lives only in `audio/synth-vo.py` (`SAY_NAME`), captions keep "Machina".
+  **(2) Spoken-first script pass, captions and VO moving together** (the rule
+  is now documented in both files: a caption edit MUST touch synth-vo.py):
+  "And lose them everywhere." → **"And never see them again."** (spoken, the
+  everywhere-echo grated); "Machina keeps it all…" gains the connector **"So"**;
+  "Share it from anywhere." → **"One tap, and it's saved — without leaving the
+  app."** (share-TO-Machina + the no-app-switching claim, owner note); "…files
+  it." → **"…and files it."**; "Then ask it anything." → **"Then ask Machina
+  anything."** ("ask it" mushed into "ask her" out loud); "Answers built from
+  what you saved." → **"Answers from your saves — and nothing else."**
+  (only-your-saves emphasis); "Gather them…" → **"Or group your saves into
+  collections."** (connector); "Every week, it finds…" → **"Every week,
+  Machina finds…"**; closing VO now signs off **"Makeena. Everything you
+  save — finally useful."** All 15 lines re-synthesized and asserted to fit.
+  **(3) The pipeline mark is unmistakably ALIVE:** `AnimatedMark` gained a
+  `pulse` prop — after the launch resolves, the point breathes with the app's
+  own searching motion (0.46 opacity floor); the analyzing sheet renders it at
+  34px and Capture feeds it the frame.
+  **(4) Deliverable narrowed by owner: the VERTICAL VO film only.** Other
+  compositions still build but are not rendered/delivered this round.
+  Verified: tsc 0, verify green, all VO lines fit, stills at the changed beats.
+  ⚠️ "Makeena" pronunciation sent as a sample but only the owner's ears decide.
 - **2026-07-31 (launch film, round 11) — a real VOICE-OVER, crisp close scatter,
   the animated mark in the pipeline, collections copy with value, and a hotter
   mix (owner notes ×6).**

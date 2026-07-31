@@ -115,7 +115,7 @@ export const Capture: React.FC = () => {
           <FloorGlow y={890} w={720} opacity={0.5} />
           <Phone sweep={f < 38 ? f / 38 : null}>
             {inApp ? (
-              <AnalyzingScreen progress={progress} cardEnter={cardEnter} markU={markU} />
+              <AnalyzingScreen progress={progress} cardEnter={cardEnter} markU={markU} markPulse={f} />
             ) : (
               <>
                 <div style={{ position: 'absolute', inset: 0, opacity: cutDip }}>

@@ -68,33 +68,38 @@ export const SUBTITLES = [
   // held right; 'bottom' is the centred line, for beats with no device.
   // `kicker` prints the tagline word for that act above the line — CAPTURE /
   // ASK / CONNECT — so a viewer can place each beat inside the tagline.
+  //
+  // The script is written for the EAR first (round 12: the film is narrated —
+  // audio/synth-vo.py speaks these exact lines, so they must flow as speech):
+  // connectors carry the argument ("So…", "Then…", "Or…"), no echoed words
+  // between neighbouring lines, and the product is named where a pronoun would
+  // mumble. A caption edit here MUST be mirrored in audio/synth-vo.py.
   { bar: 1.3, bars: 1.4, place: 'bottom', text: 'You save things everywhere.' },
-  // A hard parallel to the opening line. Earlier candidates narrated the
-  // picture ("and then it's gone") or got tangled in a clause ("and you can
-  // never get back to it"); the loss reads cleanest as the mirror of the save.
-  { bar: 2.85, bars: 1.1, place: 'bottom', text: 'And lose them everywhere.' },
-  { bar: 4.55, bars: 1.05, place: 'bottom', text: 'Machina keeps it all in one place.' },
-  { bar: 6.5, bars: 1.0, place: 'left', kicker: 'Capture', text: 'Share it from anywhere.' },
-  { bar: 7.8, bars: 2.6, place: 'left', text: 'Machina reads it, summarizes it, files it.' },
+  // Spoken, the old "And lose them everywhere." echoed the opener's last word —
+  // the loss now lands without the repetition (owner note, round 12).
+  { bar: 2.85, bars: 1.1, place: 'bottom', text: 'And never see them again.' },
+  { bar: 4.55, bars: 1.05, place: 'bottom', text: 'So Machina keeps it all in one place.' },
+  // "Share it from anywhere" sounded like sharing WITH someone; the point is
+  // saving TO Machina without ever switching apps (owner note, round 12).
+  { bar: 6.35, bars: 1.25, place: 'left', kicker: 'Capture', text: 'One tap, and it’s saved — without leaving the app.' },
+  { bar: 7.95, bars: 2.4, place: 'left', text: 'Machina reads it, summarizes it, and files it.' },
   { bar: 11.4, bars: 1.6, place: 'left', text: 'Browse it, search it, filter it.' },
   // The library payoff — retrieval works from a half-memory, which is all
   // anyone ever has. (Deliberately not a "search by meaning" claim.)
   { bar: 13.3, bars: 1.5, place: 'left', text: 'Even when you only half-remember it.' },
-  { bar: 15.35, bars: 1.6, place: 'left', kicker: 'Ask', text: 'Then ask it anything.' },
+  // "ask it anything" mushed into "ask HER anything" out loud — the name
+  // carries the line instead of the pronoun (owner note, round 12).
+  { bar: 15.35, bars: 1.6, place: 'left', kicker: 'Ask', text: 'Then ask Machina anything.' },
   // Ends BEFORE the Graph-chip tap at 19.5 — during the dive the device rises
-  // through the caption band, and a line still on screen got clipped by the
-  // phone (owner note, round 11).
-  { bar: 17.4, bars: 1.9, place: 'left', text: 'Answers built from what you saved.' },
+  // through the caption band. The claim: answers come from YOUR saves and
+  // nowhere else (owner note, round 12).
+  { bar: 17.4, bars: 1.9, place: 'left', text: 'Answers from your saves — and nothing else.' },
   { bar: 20.4, bars: 1.8, place: 'left', kicker: 'Connect', text: 'See how it all connects.' },
-  // Collections and the digest each say what the feature DOES for you —
-  // the earlier lines ("group them the way you think") were too coy to land.
-  { bar: 23.3, bars: 1.35, place: 'left', text: 'Gather them into collections.' },
-  // The payoff is ACCESS, not ownership — "yours to shape" said nothing
-  // (owner note, round 11).
+  { bar: 23.3, bars: 1.35, place: 'left', text: 'Or group your saves into collections.' },
   { bar: 24.8, bars: 1.15, place: 'left', text: 'Everything on a topic, one tap away.' },
-  // The digest's value is the NOTICING, not the writing — it reads your week
-  // and surfaces the pattern you didn't see ("You circled one idea all week").
-  { bar: 26.35, bars: 1.5, place: 'left', text: 'Every week, it finds the patterns you missed.' },
+  // The digest's value is the NOTICING — and spoken, "it" was ambiguous, so
+  // the product takes the credit by name.
+  { bar: 26.35, bars: 1.5, place: 'left', text: 'Every week, Machina finds the patterns you missed.' },
   { bar: 27.95, bars: 0.95, place: 'left', text: 'And brings back what you forgot.' },
 ];
 

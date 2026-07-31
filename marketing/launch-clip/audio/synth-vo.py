@@ -22,23 +22,28 @@ VO = os.path.join(ROOT, "out", "vo")
 
 BAR_SEC = 2.5
 
+# The brand reads "Machina" but is SPOKEN "mah-KEE-nah" (machine, in Latin) —
+# the respelling below is for the synthesizer's ear only; captions keep the
+# real spelling.
+SAY_NAME = "Makeena"
+
 LINES = [
     (1.3, 1.4, "You save things everywhere."),
-    (2.85, 1.1, "And lose them everywhere."),
-    (4.55, 1.05, "Machina keeps it all in one place."),
-    (6.5, 1.0, "Share it from anywhere."),
-    (7.8, 2.6, "Machina reads it, summarizes it, files it."),
+    (2.85, 1.1, "And never see them again."),
+    (4.55, 1.05, f"So {SAY_NAME} keeps it all in one place."),
+    (6.35, 1.25, "One tap, and it's saved — without leaving the app."),
+    (7.95, 2.4, f"{SAY_NAME} reads it, summarizes it, and files it."),
     (11.4, 1.6, "Browse it, search it, filter it."),
     (13.3, 1.5, "Even when you only half-remember it."),
-    (15.35, 1.6, "Then ask it anything."),
-    (17.4, 1.9, "Answers built from what you saved."),
+    (15.35, 1.6, f"Then ask {SAY_NAME} anything."),
+    (17.4, 1.9, "Answers from your saves — and nothing else."),
     (20.4, 1.8, "See how it all connects."),
-    (23.3, 1.35, "Gather them into collections."),
+    (23.3, 1.35, "Or group your saves into collections."),
     (24.8, 1.15, "Everything on a topic, one tap away."),
-    (26.35, 1.5, "Every week, it finds the patterns you missed."),
+    (26.35, 1.5, f"Every week, {SAY_NAME} finds the patterns you missed."),
     (27.95, 0.95, "And brings back what you forgot."),
     # the closing statement, over the endcard's own line
-    (30.1, 1.6, "Everything you save. Finally useful."),
+    (30.1, 1.6, f"{SAY_NAME}. Everything you save — finally useful."),
 ]
 
 k = Kokoro(os.path.join(VO, "kokoro-v1.0.onnx"), os.path.join(VO, "voices-v1.0.bin"))
