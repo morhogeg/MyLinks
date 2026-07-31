@@ -3,7 +3,7 @@ import { AbsoluteFill, useCurrentFrame } from 'remotion';
 import { Phone } from '../ui/Phone';
 import { useFraming } from '../film/format';
 import { FloorGlow, Rig, SET_BG, Stage } from '../film/effects';
-import { drift, prog, ramp, EASE_IN_OUT, EASE_MODAL, EASE_OUT } from '../film/anim';
+import { drift, prog, ramp, EASE_IN_OUT, EASE_MODAL, EASE_OUT, EASE_SPRING } from '../film/anim';
 import {
   AnalyzingScreen,
   ArticleScreen,
@@ -27,9 +27,9 @@ import {
  */
 
 const SOURCES = [
-  { Screen: InstagramSource, item: { title: 'The forgetting curve, replicated', site: 'instagram.com' } },
-  { Screen: YouTubeSource, item: { title: 'Retrieval practice beats re-reading', site: 'youtube.com' } },
-  { Screen: ArticleScreen, item: { title: 'Sleep-dependent memory consolidation', site: 'nature.com' } },
+  { Screen: InstagramSource, item: { title: 'One-pan lemon chicken with orzo', site: 'instagram.com' } },
+  { Screen: YouTubeSource, item: { title: 'Three days in Lisbon', site: 'youtube.com' } },
+  { Screen: ArticleScreen, item: { title: 'The case for the shoulder-season trip', site: 'theatlantic.com' } },
 ];
 const CUTS = [0, 56, 88]; // frames where the world behind the sheet swaps
 
@@ -72,7 +72,9 @@ export const Capture: React.FC = () => {
   // pressing share.
   const inApp = f >= 118;
   const progress = ramp(f, [126, 292], [3, 100], EASE_IN_OUT);
-  const cardEnter = prog(f, 288, 312, EASE_MODAL);
+  // the finished card SETTLES with a spring overshoot (round 13 energy pass) —
+  // the one moment in the beat that deserves a physical landing
+  const cardEnter = prog(f, 288, 314, EASE_SPRING);
   // the app's animated mark launches as the analyzing sheet arrives
   const markU = prog(f, 120, 159, EASE_OUT);
 

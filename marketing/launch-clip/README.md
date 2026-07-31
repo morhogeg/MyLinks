@@ -37,22 +37,27 @@ five real phases from `web/lib/scanPhases.ts`; the type is the same Geist the ap
 self-hosts. **If a token changes in `globals.css`, change it here too** — a drifted
 film is worse than no film.
 
-**The demo content is one coherent research trail** (`src/data/library.ts`), not a
-grab-bag. That is load-bearing three times over: the Ask scene's answer is
-genuinely assemblable from those specific cards; the search scene's query —
-*"why cramming never sticks"* — shares **not one word** with the ONE card it
-retrieves (a single survivor reads as the app *finding the thing*, where three
-read as a filter narrowing), which is the only way that beat proves retrieval
-rather than ⌘F; and the feed visibly mixes YouTube, Instagram, X and articles,
-which is what proves "one place for all of it" instead of merely captioning it.
+**The demo content is one person's actual week** (`src/data/library.ts`) — a
+recipe, an apartment listing, a workout, a gift idea, a trip being circled, an
+article a friend sent. Universal on purpose (round 13): the film has to land on
+people who never once thought about where their saved links go. It is still one
+coherent life, not a grab-bag, because that is load-bearing three times over:
+the Ask scene's answer is genuinely assemblable from the three travel saves;
+the search scene's query — *"easy dinner for guests"* — shares **not one word**
+with the ONE card it retrieves (the one-pan lemon chicken; a single survivor
+reads as the app *finding the thing*, where three read as a filter narrowing),
+which is the only way that beat proves retrieval rather than ⌘F; and the feed
+visibly mixes YouTube, Instagram, X and articles, which is what proves "one
+place for all of it" instead of merely captioning it.
 
 **The story is the founder letter's, not a feature list.** The problem is
 *fragmentation*, not clutter — things saved across Instagram, X, YouTube,
-WhatsApp-to-yourself and Reading List, and no memory of which app swallowed
-which. So act one scatters those five surfaces across the frame and lets them
-drift apart and fade ("quietly disappearing"), act two gathers them into one
-point of light that the brackets close around, and the middle acts follow what the
-product actually does, in order: **saving was never the hard part → Machina reads
+WhatsApp-to-yourself and Safari tabs, and no memory of which app swallowed
+which. So act one ACTS IT OUT: five saves, five separate silos, the piles going
+unreadable, and one person opening the wrong pile twice looking for one thing
+("quietly disappearing", felt rather than captioned); act two gathers the silos
+into one point of light that the brackets close around, and the middle acts
+follow what the product actually does, in order: **saving was never the hard part → Machina reads
 what you save → summarized, tagged and filed → so you can find it again → then
 ask it anything → answers built from what you saved → every save connects to the
 rest → nothing worth keeping stays buried.** The film closes on
@@ -65,10 +70,10 @@ owner ruled out: it is **not** a learning app, and it does **not** sell
 | Bars | Time | Scene | What it does |
 |---|---|---|---|
 | 0–1 | 0:00 | `ColdOpen` | **The app booting** — the real `BootScreen` motion, in the film's light grade |
-| 1–4 | 0:02.5 | `Scatter` | Five platforms drifting apart — Instagram, X, YouTube, WhatsApp, Reading List — then bleaching out one by one |
-| 4–6 | 0:10 | `WordmarkScene` | The five rush back and collapse into one point of ink; the mark closes around it, then pushes through into the product |
-| 6–11 | 0:15 | `Capture` | **One share sheet, three sources behind it** (the sheet names each one) → the five-phase pipeline, held ~5.5s under a push-in → a finished card |
-| 11–15 | 0:27.5 | `Library` | Browse, search, filter — even from half a memory |
+| 1–5 | 0:02.5 | `Scatter` | **Scattered saving, as a story**: five save gestures (bookmark / playlist / send-to-self / star / one-more-tab), each flying into its own silo → the piles grow unreadable → **the loss on bar 3** (the film's only minor chord): the wrong pile opened twice |
+| 5–7 | 0:12.5 | `WordmarkScene` | The five silos rush back and collapse into one point of ink; the mark closes around it, then pushes through into the product |
+| 7–12 | 0:17.5 | `Capture` | **One share sheet, three sources behind it** (the sheet names each one) → the five-phase pipeline, held ~5.5s under a push-in → a finished card |
+| 12–15 | 0:30 | `Library` | The feed, then the search that finds the one you meant |
 | 15–20 | 0:37.5 | `AskScene` | **The hero, five bars.** Question → streamed answer → three citation chips, from three different platforms |
 | 20–23 | 0:50 | `GraphScene` | Edges draw in staggered — connections being found, not a diagram revealed |
 | 23–26 | 0:57.5 | `CollectionsScene` | The organising that is yours |
@@ -85,16 +90,26 @@ arrive), same launch monospace setting for MACHINA, same push-through exit, with
 the CSS keyframe delays from `globals.css` converted to frames. **If the boot
 screen changes in the app, change it here too.**
 
-The `Scatter` scene is deliberately **un-branded** — five generic platform
-surfaces, no Machina chrome anywhere. If it wore the app's chrome, the audience
-would read the failure as the product's. Platform hues come from the app's own
-`PLATFORM_RGB` (with one light-grade exception: X's dark-theme silver vanishes on
-white, so X wears its light-mode black), and the glyphs are generic marks (play
-triangle, bubble, bookmark) beside the platform's name in type rather than
-reproductions of anyone's logo.
+The `Scatter` scene is a three-beat story (round 13), not a description. Beat A:
+a fast run across the five surfaces, each with its own real save gesture — the
+tap contacts sit ON the quarter-note grid (`SAVES` in `timeline.mjs`) so the
+score ticks every one, and each save flies off into that platform's own silo.
+Beat B: the silos sit apart, growing stacks of edge-on, faded, title-less cards
+— deliberately unreadable, because that is the honest state of a buried save.
+Beat C, **on bar 3, the film's only minor chord**: a fingertip opens the wrong
+pile, fans through more unreadable cards, drops it shut, and tries a second
+pile — the loss is someone failing to find one thing, not an abstract fade.
+Then the piles bleach into the paper and the wordmark's gather answers it.
 
-`CONSTELLATION` in `src/ui/platforms.tsx` is shared by both scenes on purpose: the
-panels gather back to exactly where they drifted out from, because the gather only
+The scene stays deliberately **un-branded** — no Machina chrome anywhere. If it
+wore the app's chrome, the audience would read the failure as the product's.
+Platform hues come from the app's own `PLATFORM_RGB` (with one light-grade
+exception: X's dark-theme silver vanishes on white, so X wears its light-mode
+black), and the glyphs are generic marks (play triangle, bubble, bookmark)
+beside the platform's name in type rather than reproductions of anyone's logo.
+
+`CONSTELLATION` in `src/ui/platforms.tsx` is shared by both scenes on purpose:
+the silos gather back from exactly where they piled up, because the gather only
 reads as an answer if it undoes the same scatter.
 
 ## Capture is schematic on purpose

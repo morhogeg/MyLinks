@@ -18,7 +18,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BAR, BEAT, TOTAL_SEC, TOTAL_BARS, SCENES, HITS, RISERS } from '../timeline.mjs';
+import { BAR, BEAT, TOTAL_SEC, TOTAL_BARS, SCENES, HITS, RISERS, SAVES } from '../timeline.mjs';
 
 const SR = 44100;
 const OUT_SEC = TOTAL_SEC + 1.2; // room for the final reverb tail
@@ -415,10 +415,13 @@ const CHORDS = {
 // each cut arrives as a resolution.
 const BAR_CHORDS = [
   'Cmaj7', // 0     cold open (the boot) — opens major
-  'Cmaj7', 'G6', 'Am9', // 1–3   scatter — the film's single minor bar: the loss
-  'Fmaj7', 'Cmaj7', // 4–5   the turn lifts on F and resolves home as the mark locks
-  'Cmaj7', 'Fmaj7', 'G6', 'Cmaj7', 'G6', // 6–10  capture
-  'Cmaj7', 'Fmaj7', 'Cmaj7', 'G6', // 11–14 library
+  // Act one (round 13): the save-run stays bright, bar 3 is the LOSS — the
+  // film's single minor bar — and bar 4 hangs on the dominant while the wrong
+  // pile is opened a second time: searching, unresolved, but NOT a second minor.
+  'Cmaj7', 'G6', 'Am9', 'G6', // 1–4   saves fly → piles grow → the loss → still looking
+  'Fmaj7', 'Cmaj7', // 5–6   the turn lifts on F and resolves home as the mark locks
+  'Cmaj7', 'Fmaj7', 'G6', 'Cmaj7', 'G6', // 7–11  capture
+  'Cmaj7', 'Fmaj7', 'G6', // 12–14 library — opens on the tonic, closes on V
   'Cmaj7', 'Fmaj7', 'G6', 'Cmaj7', 'G6', // 15–19 ask — V lands the graph bloom on I
   'Cmaj7', 'Fmaj7', 'G6', // 20–22 graph
   'Cmaj7', 'Fmaj7', 'G6', // 23–25 collections
@@ -577,8 +580,9 @@ for (const m of [48, 64, 67, 72]) pad(b(ENDCARD_BAR), BAR * 3 - 0.3, m, 0.075, m
 // ── melody: enters with the hero scene (Ask), returns for the endcard
 // Stepwise, and deliberately full of the semitones a pentatonic line cannot
 // contain: B→C over the G, E→F over the F. 67 = G4, 72 = C5.
-// Bar numbers follow the 32-bar map: ask 15–19, graph 20–22, collections
-// 23–25, digest 26–28, endcard 29–31.
+// Bar numbers follow the 32-bar map (round 13 kept the whole back half in
+// place — the act-one bar came from library, so ask 15–19, graph 20–22,
+// collections 23–25, digest 26–28, endcard 29–31 are unchanged).
 const MELODY = [
   [15, 0, 64], [15, 1.5, 65], [15, 3, 67], //  Cmaj7: E4 F4 G4  (E→F right away)
   [16, 0, 67], [16, 1.5, 69], [16, 3, 72], //  Fmaj7: G4 A4 C5  (rising)
@@ -600,15 +604,17 @@ for (const [bar, bt, m] of MELODY) {
 // scene pulses, so the product act sings from its first bar instead of waiting
 // nine bars for the hero melody. Quiet by design: a promise, not the tune.
 const LEAD_IN = [
-  [6, 0, 67], [7, 2, 69], [8, 0, 71], [9, 2, 72], [10, 0, 71],
-  [11, 0, 72], [12, 2, 69], [13, 0, 72], [14, 2, 71],
+  [7, 0, 67], [8, 2, 69], [9, 0, 71], [10, 2, 72], [11, 0, 71],
+  [12, 0, 72], [13, 2, 69], [14, 2, 71],
 ];
 for (const [bar, bt, m] of LEAD_IN) {
   keys(beat(bar, bt), m, 0.12, bar % 2 ? -0.25 : 0.25, 1.3);
 }
 
-// ── risers into the hard cuts (the bar-5 riser is the short one into capture)
-for (const r of RISERS) riser(b(r), BAR * (r === 5 ? 1 : 1.4), 0.095);
+// ── risers, each ENDING on the reveal it leads into (see timeline.mjs):
+// 4.0→the collapse, 6.3→the share-sheet Machina icon, 10.7→the library,
+// 15.2→the first answer, 18.6→the graph bloom, 27.6→the endcard.
+for (const r of RISERS) riser(b(r), BAR * (r === 4 ? 1 : 1.4), 0.095);
 
 // ── sound design against the picture
 // the boot: the brackets close, the point strikes, then the mark pushes past
@@ -619,6 +625,22 @@ impact(b(HITS.bootStrike), 0.26);
 shimmer(b(HITS.bootStrike) + 0.1, [79, 84, 88], 0.055);
 whoosh(b(HITS.bootExit), 0.62, 0.1, 0);
 riser(b(HITS.bootExit) - 0.1, 0.7, 0.07);
+
+// act one: each save gesture gets a tick ON the beat, a breath of air for the
+// fly-off, and a soft landing thump as it drops into its silo — the score
+// acknowledging the finger, which is what makes the run feel driven.
+SAVES.forEach((s, i) => {
+  tick(b(s), 0.095, 1.05 + i * 0.09);
+  whoosh(b(s) + 0.04, 0.4, 0.045, i % 2 ? 0.3 : -0.3);
+  sub(b(s + 0.21), 45, 0.14, 0.25); // the landing, ~0.21 bars later
+});
+
+// the loss: two DULL opens (pitched under the save ticks — same gesture,
+// nothing found) and a heavier shut-thud each time the pile drops back
+tick(b(HITS.lossOpenA), 0.09, 0.72);
+sub(b(HITS.lossShutA), 43, 0.24, 0.32);
+tick(b(HITS.lossOpenB), 0.09, 0.66);
+sub(b(HITS.lossShutB), 41, 0.28, 0.36);
 
 // the gather: five things rushing to one place, then landing as one
 whoosh(b(HITS.converge) - 0.15, 0.9, 0.1, -0.35);

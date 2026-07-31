@@ -3,7 +3,7 @@ import { AbsoluteFill, useCurrentFrame } from 'remotion';
 
 import { SET_BG, Stage } from '../film/effects';
 import { useFraming } from '../film/format';
-import { CONSTELLATION, PANEL_OFFSET, PlatformPanel } from '../ui/platforms';
+import { CONSTELLATION, Silo, SILO_BASE_COUNT, SILO_OFFSET } from '../ui/platforms';
 import { drift, prog, ramp, EASE_IN_OUT, EASE_OUT } from '../film/anim';
 
 /**
@@ -26,11 +26,11 @@ export const WordmarkScene: React.FC = () => {
   const f = useCurrentFrame();
   const fr = useFraming();
   // the same compression + camera the scatter ended on, so the gather undoes
-  // the same scatter
+  // the same scatter — round 13: what rushes back in is the SILOS (the piles
+  // act one actually built), from the exact positions they piled up in
   const vx = fr.vertical ? 0.42 : 0.78;
   const vy = fr.vertical ? 1.45 : 0.82;
-  const dv = 0.55;
-  const fit = (fr.vertical ? 0.88 : 1) * 1.22; // ≈ the scatter's final camScale
+  const fit = (fr.vertical ? 0.9 : 1) * 1.22;
 
   // ── 1. the gather (frames 0–26): panels fly to centre and collapse
   const gather = prog(f, 0, 26, EASE_IN_OUT);
@@ -106,9 +106,9 @@ export const WordmarkScene: React.FC = () => {
         >
           <div style={{ position: 'relative', width: 1, height: 1, transformStyle: 'preserve-3d', transform: `scale(${fit})` }}>
             {CONSTELLATION.map((p) => {
-              // start where the scatter left them (fully drifted), end at centre
-              const x = (p.x + p.dx * dv) * vx * (1 - gather);
-              const y = (p.y + p.dy * dv) * vy * (1 - gather);
+              // start where the scatter left them (the pile positions), end at centre
+              const x = p.x * vx * (1 - gather);
+              const y = p.y * vy * (1 - gather);
               const z = p.z * (1 - gather);
               return (
                 <div
@@ -117,8 +117,8 @@ export const WordmarkScene: React.FC = () => {
                     position: 'absolute',
                     left: 0,
                     top: 0,
-                    marginLeft: PANEL_OFFSET.x,
-                    marginTop: PANEL_OFFSET.y,
+                    marginLeft: SILO_OFFSET.x,
+                    marginTop: SILO_OFFSET.y,
                     transform: [
                       `translate3d(${x}px, ${y}px, ${z}px)`,
                       `rotateY(${p.rotY * 0.55 * (1 - gather)}deg) rotateX(${p.rotX * 0.55 * (1 - gather)}deg)`,
@@ -130,7 +130,7 @@ export const WordmarkScene: React.FC = () => {
                     filter: `blur(${gather * 4}px)`,
                   }}
                 >
-                  <PlatformPanel k={p.k} />
+                  <Silo k={p.k} grow={1} count={SILO_BASE_COUNT[p.k] + 1} />
                 </div>
               );
             })}
