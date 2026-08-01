@@ -471,11 +471,23 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
             onLinkAdded();
 
             if (!isPlainLink) {
-                // Video LINK — today's behavior: close immediately; the bottom pill
-                // (useProcessingBanner) carries the rest, as before.
-                setProgress(100);
+                // Video LINK — close immediately; the bottom pill
+                // (useProcessingBanner) carries the rest.
+                //
+                // The bar does NOT jump to 100 here: this ack only means the
+                // URL was QUEUED — a video analysis runs
+                // ~a minute after it. Snapping to 100% announced a finish that
+                // had not happened, and the card then sat in the feed visibly
+                // still working (owner-reported 2026-08-01). The capture is
+                // durable either way (the placeholder card is already written),
+                // so the honest surface is the pill: it ramps from that card's
+                // own clock and flips to "Saved to Machina" when the card
+                // actually resolves. Leaving `progress` where the ramp reached
+                // hands over mid-flight instead of finishing early. The SAVE
+                // itself is worth confirming — hence the buzz and a toast that
+                // says exactly what happened: captured now, analysing still.
                 hapticSuccess();
-                toast.success('Saved to Machina');
+                toast.success('Saved — analyzing in the background');
                 setUrl('');
                 setIsExpanded(false);
                 setIsLoading(false);

@@ -1058,6 +1058,40 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-01 — Round 2 of the device-QA fixes: the Instagram play badge, and
+  the in-app "+" saves get the same progress honesty.**
+  **(1) The play triangle on Instagram posters is BURNED INTO THE PIXELS** —
+  confirmed from owner screenshots of two reels (identical white triangle,
+  centred) plus a re-read of every render path: nothing in the app draws it (the
+  social-post cover in `LinkDetailModal` and the video banner in `Card` are bare
+  `<img>`s; the only Play glyphs are YouTube's watch pill and the "Key moments"
+  heading). It comes from Instagram's CDN, which lists its transforms in the
+  poster URL's **`stp=`** parameter — an underscore-joined token list whose
+  `tt<N>` token composites the overlay. Fixed on BOTH sides, deliberately:
+  `functions/scraper.py::_instagram_poster_without_play_badge` strips the token
+  for newly-saved reels and **verifies the candidate actually serves an image
+  before storing it** (falls back to the original otherwise, and never touches a
+  bridge-served URL, which carries no `stp`); and the client twin
+  `web/lib/instagramPoster.ts` + `components/ui/PosterImage.tsx` applies the same
+  rule at RENDER time, which repairs **every reel already in the library** with
+  no migration. **Gotcha found while verifying (Chromium):** the first
+  `PosterImage` fell back via `onError` only, and an `<img>` that fails BEFORE
+  hydration never delivers that event — so it also inspects the element on ref
+  attach (`complete && naturalWidth === 0` = already failed). Verified: rewritten
+  URL sticks when it loads, reverts to the stored URL when refused, untouched
+  when there is no badge token; the URL surgery is unit-checked on both sides
+  (CDN URL with/without the token, bridge URL, YouTube URL, unparseable value).
+  **If the badge survives on a NEW save, the token guess was wrong for that
+  poster** — the scraper logs which path it took, so check the functions log
+  before changing anything else. **(2) In-app "+" saves now reflect the true
+  state too** (owner: "should be applied to all saves"). Audited all four: the
+  plain-link dialog already runs off the card doc, and image and note saves
+  already await the real Firestore write before saying Done — but the **video
+  (YouTube) path snapped the bar to 100% and toasted "Saved to Machina" on the
+  ENQUEUE ack**, roughly a minute before analysis finishes. It now hands over
+  mid-ramp to the Firestore-driven pill (which ends on the card actually
+  resolving) and says what is true at that moment: "Saved — analyzing in the
+  background". tsc 0, py_compile clean, lint at baseline.
 - **2026-08-01 — Four owner fixes from device QA: the photo scanner wears the
   mark, cards stop saying "the author", and "Saved" stops lying.**
   **(1) Photo saves carry the Citation mark** like every other save — the

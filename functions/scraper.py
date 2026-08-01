@@ -11,7 +11,7 @@ import ipaddress
 import requests
 import logging
 from typing import Optional
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlsplit, urlunsplit, parse_qsl, urlencode
 
 logger = logging.getLogger(__name__)
 
@@ -388,7 +388,7 @@ def linkedin_author_from_url(url: str) -> Optional[str]:
     `linkedinAuthor` in web/lib/platform.tsx.
     """
     try:
-        from urllib.parse import urlparse
+        from urllib.parse import urlparse, urlsplit, urlunsplit, parse_qsl, urlencode
         parsed = urlparse(url)
         host = parsed.hostname or ''
         if host.startswith('www.'):
@@ -1029,6 +1029,56 @@ def _og_indicates_video(soup, url: str = "") -> bool:
     return any(h in u for h in _OG_VIDEO_URL_HINTS)
 
 
+# Instagram CDN posters carry their transform list in the URL's `stp=` query
+# parameter — an underscore-joined set of tokens (crop, size, sharpen…). For a
+# VIDEO post one of those tokens composites a play triangle ONTO the frame, which
+# is why reel thumbnails arrive with a play button burned into the pixels and no
+# client-side change can remove it (owner-reported 2026-08-01: nothing in the app
+# draws that glyph). The only lever is to ask the CDN for the frame WITHOUT the
+# overlay transform.
+_IG_PLAY_BADGE_TOKENS = re.compile(r'^tt\d+$')
+
+
+def _instagram_poster_without_play_badge(image_url: str) -> str:
+    """An Instagram poster URL with the play-overlay transform removed.
+
+    Best-effort and SELF-VERIFYING: the candidate is only returned if the CDN
+    actually serves an image for it, so a token we guessed wrong about (or a
+    poster from a bridge service, whose URLs carry no `stp` at all) simply falls
+    back to the original. Never raises — a thumbnail is cosmetic.
+    """
+    if not image_url:
+        return image_url
+    try:
+        parts = urlsplit(image_url)
+        params = parse_qsl(parts.query, keep_blank_values=True)
+        changed = False
+        cleaned = []
+        for key, value in params:
+            if key == 'stp' and value:
+                kept = [t for t in value.split('_') if not _IG_PLAY_BADGE_TOKENS.match(t)]
+                if len(kept) != len(value.split('_')):
+                    changed = True
+                    if not kept:
+                        continue  # the whole transform list was the overlay
+                    value = '_'.join(kept)
+            cleaned.append((key, value))
+        if not changed:
+            return image_url
+        candidate = urlunsplit((parts.scheme, parts.netloc, parts.path,
+                                urlencode(cleaned, doseq=True), parts.fragment))
+        # Verify before adopting: an unhappy CDN answers 403/404 for an edited
+        # transform list, and a broken thumbnail is worse than a badged one.
+        probe = safe_get(candidate, timeout=5)
+        if probe.ok and probe.headers.get('Content-Type', '').lower().startswith('image/'):
+            logger.info("Instagram poster: dropped play-badge transform")
+            return candidate
+        logger.info(f"Instagram poster: badge-free variant rejected ({probe.status_code}) — keeping original")
+    except Exception as e:
+        logger.warning(f"Instagram poster badge strip failed: {e}")
+    return image_url
+
+
 def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
     """
     Scrape Instagram URLs using direct scraping first (reliable with mobile headers),
@@ -1195,7 +1245,7 @@ def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
         # their og:image poster frame still makes a good card banner — surface it
         # so video posts get a thumbnail like YouTube. Photo posts leave this empty
         # (their cover already flows through image_urls → the vision thumbnail).
-        "video_thumbnail_url": best_image if (is_video and best_image) else "",
+        "video_thumbnail_url": _instagram_poster_without_play_badge(best_image) if (is_video and best_image) else "",
     }
 
 

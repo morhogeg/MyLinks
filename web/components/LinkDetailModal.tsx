@@ -6,6 +6,7 @@ import SourceByline from './SourceByline';
 import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, Check, Network, Play, Youtube, ImageOff, Image as ImageIcon, Layers, Share2, ChevronLeft, StickyNote, Waypoints } from 'lucide-react';
 import { getPlatform } from '@/lib/platform';
 import SimpleMarkdown from './SimpleMarkdown';
+import PosterImage from './ui/PosterImage';
 import { openExternal } from '@/lib/share';
 import { getCategoryColorStyle } from '@/lib/colors';
 import CategoryInput from './CategoryInput';
@@ -644,9 +645,8 @@ export default function LinkDetailModal({
                         and image blocks own their own rendering above/below. */}
                     {!link.hideThumbnail && link.sourceType !== 'youtube' && link.sourceType !== 'image' && link.metadata?.thumbnailUrl && (
                         <div className="mb-6 rounded-2xl overflow-hidden border border-border-subtle bg-black/40">
-                            <img
+                            <PosterImage
                                 src={link.metadata.thumbnailUrl}
-                                alt=""
                                 className="w-full h-auto max-h-[400px] object-contain"
                             />
                         </div>
