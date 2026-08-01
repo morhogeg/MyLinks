@@ -49,6 +49,8 @@ interface CardProps {
     onRetry?: (link: Link) => void;
     /** Toggle the card's thumbnail banner on/off (⋯ → Hide image / Show image). */
     onToggleThumbnail?: (link: Link) => void;
+    /** ⋯ → See in graph: open the Graph focused on this card. */
+    onOpenInGraph?: (link: Link) => void;
 }
 
 /**
@@ -76,6 +78,7 @@ function Card({
     onRemoveFromCollection,
     onRetry,
     onToggleThumbnail,
+    onOpenInGraph,
 }: CardProps) {
     const isRtl = link.language === 'he' || hasHebrew(link.title) || hasHebrew(link.summary);
     const [isEditingCategory, setIsEditingCategory] = useState(false);
@@ -611,6 +614,7 @@ function Card({
             onShare={onShare}
             onTogglePrivate={onTogglePrivate}
             onToggleThumbnail={onToggleThumbnail}
+            onOpenInGraph={onOpenInGraph}
             removeFromCollection={
                 activeCollectionId && onRemoveFromCollection
                     ? {

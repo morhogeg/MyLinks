@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, LinkStatus, UserNote } from '@/lib/types';
 import SourceByline from './SourceByline';
-import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, Check, Network, Play, Youtube, ImageOff, Image as ImageIcon, Layers, Share2, ChevronLeft, StickyNote } from 'lucide-react';
+import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, Check, Network, Play, Youtube, ImageOff, Image as ImageIcon, Layers, Share2, ChevronLeft, StickyNote, Waypoints } from 'lucide-react';
 import { getPlatform } from '@/lib/platform';
 import SimpleMarkdown from './SimpleMarkdown';
 import { openExternal } from '@/lib/share';
@@ -65,6 +65,11 @@ interface LinkDetailModalProps {
     onUpdateReminder: (link: Link) => void;
     onOpenOtherLink?: (link: Link) => void;
     excludeRelatedIds?: string[];  // cards already behind you in the back-stack
+    /** Open the Graph focused on this card. Deliberately NOT in the top action
+     *  row — that row already scrolls horizontally on a phone. It lives on the
+     *  "Related cards" header instead, which is where the connections story
+     *  already is, and which only renders when there ARE connections to see. */
+    onOpenInGraph?: (link: Link) => void;
     onAddToCollection?: (link: Link) => void;
     onShare?: (link: Link) => void;
     /** Toggle the card's thumbnail banner on/off (Hide image / Show image). */
@@ -95,6 +100,7 @@ export default function LinkDetailModal({
     onUpdateReminder,
     onOpenOtherLink,
     excludeRelatedIds,
+    onOpenInGraph,
     onAddToCollection,
     onShare,
     onToggleThumbnail,
@@ -1091,10 +1097,26 @@ export default function LinkDetailModal({
                             navigates. */}
                         {relatedCards.length > 0 && (
                             <div className="mb-8 border-t border-border-subtle pt-6">
-                                <h3 className={`text-sm font-bold text-text-muted uppercase tracking-wider mb-4 flex items-center gap-2 ${isRtl ? 'flex-row-reverse' : ''}`}>
-                                    <Network className="w-4 h-4" />
-                                    {isRtl ? 'כרטיסים קשורים' : 'Related cards'}
-                                </h3>
+                                <div className={`mb-4 flex items-center justify-between gap-3 ${isRtl ? 'flex-row-reverse' : ''}`}>
+                                    <h3 className={`text-sm font-bold text-text-muted uppercase tracking-wider flex items-center gap-2 ${isRtl ? 'flex-row-reverse' : ''}`}>
+                                        <Network className="w-4 h-4" />
+                                        {isRtl ? 'כרטיסים קשורים' : 'Related cards'}
+                                    </h3>
+                                    {/* The list above is this card's connections as a
+                                        list; this opens the same ties as a map, with
+                                        the card itself in focus. */}
+                                    {onOpenInGraph && (
+                                        <button
+                                            onClick={() => onOpenInGraph(link)}
+                                            title={isRtl ? 'הצג בגרף' : 'See this card in the graph'}
+                                            aria-label={isRtl ? 'הצג בגרף' : 'See this card in the graph'}
+                                            className={`shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-card-hover border border-border-subtle text-[12px] font-semibold text-text-secondary hover:text-text hover:border-accent/40 transition-colors cursor-pointer ${isRtl ? 'flex-row-reverse' : ''}`}
+                                        >
+                                            <Waypoints className="w-3.5 h-3.5 shrink-0 text-accent" />
+                                            <span>{isRtl ? 'הצג בגרף' : 'See in graph'}</span>
+                                        </button>
+                                    )}
+                                </div>
                                 <div className="grid gap-3">
                                     {relatedCards.map(({ link: rel, reason, strong }) => {
                                         // Each piece takes its OWN direction from its own text: the title

@@ -825,13 +825,30 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     useEffect(() => {
         if (viewMode === 'graph') ensureLibrary();
     }, [viewMode, ensureLibrary]);
+    // A card-focused entry ("See in graph") maps the WHOLE library even when the
+    // feed is filtered: the question is "what is this card connected to", and a
+    // search-scoped pool would answer it wrongly — the neighbours the filter
+    // excluded would simply be missing, with the card looking lonelier than it
+    // is. The override is one-shot: the moment the user touches a filter while
+    // in the graph, the graph goes back to mirroring the grid (below).
+    const [graphIgnoresFilters, setGraphIgnoresFilters] = useState(false);
+    const feedFilterSignature =
+        `${searchQuery.trim()}|${filter}|${[...selectedCategory].sort().join(',')}`
+        + `|${[...selectedTags].sort().join(',')}|${[...selectedSources].sort().join(',')}`
+        + `|${[...selectedCollections].sort().join(',')}`;
+    const graphEntrySignature = useRef(feedFilterSignature);
+    useEffect(() => {
+        if (graphIgnoresFilters && graphEntrySignature.current !== feedFilterSignature) {
+            setGraphIgnoresFilters(false);
+        }
+    }, [graphIgnoresFilters, feedFilterSignature]);
     // True when the grid's filters/search currently scope the library — the
     // graph then maps exactly what the grid shows (filteredLinks); with nothing
     // active it maps the WHOLE library (window ∪ snapshot), not just the loaded
     // window. Same pending/privacy gates as My Notes.
-    const graphFiltersActive =
+    const graphFiltersActive = !graphIgnoresFilters && (
         !!searchQuery.trim() || filter !== 'all' || selectedCategory.size > 0
-        || selectedTags.size > 0 || selectedSources.size > 0 || selectedCollections.size > 0;
+        || selectedTags.size > 0 || selectedSources.size > 0 || selectedCollections.size > 0);
     const graphLinks = useMemo(() => {
         if (viewMode !== 'graph') return [];
         const base = graphFiltersActive
@@ -864,6 +881,23 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         setGraphFromChat(fromChatId);
         setViewMode('graph');
     }, []);
+    // A card → the Graph, focused on that card: the "See in graph" button on an
+    // open card's Related list, and the ⋯ menu's row on a closed one. Reuses the
+    // focus machinery the Ask citation chip already drives
+    // (GraphRestoreFocus.selectedId), so the graph opens with the card selected,
+    // its neighbourhood lit and the panel naming each tie. The open card is
+    // dismissed first — stack and all, since the graph replaces the whole view
+    // underneath it (setLinkStack/setActiveLinkId inline rather than
+    // closeActiveLinkStack: setters are stable, so this callback is too).
+    const handleOpenCardInGraph = useCallback((link: Link) => {
+        setLinkStack([]);
+        setActiveLinkId(null);
+        setGraphRestore({ selectedId: link.id });
+        setGraphFromChat(null);  // not an Ask detour — no "Back to Ask" chip
+        graphEntrySignature.current = feedFilterSignature;
+        setGraphIgnoresFilters(true);
+        setViewMode('graph');
+    }, [feedFilterSignature]);
     const handleBackToAsk = useCallback(() => {
         if (!graphFromChat) return;
         setAskOpenChat((prev) => ({ id: graphFromChat, nonce: (prev?.nonce ?? 0) + 1 }));
@@ -886,7 +920,12 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         // Leaving the graph retires the Ask return path: a later graph entry
         // from the library must not offer "Back to Ask" to a stale chat.
         // (handleBackToAsk has already captured the id by the time this runs.)
-        if (prevViewMode.current === 'graph' && viewMode !== 'graph') setGraphFromChat(null);
+        if (prevViewMode.current === 'graph' && viewMode !== 'graph') {
+            setGraphFromChat(null);
+            // The whole-library override belongs to ONE card-focused entry —
+            // the next graph entry mirrors the grid's filters again.
+            setGraphIgnoresFilters(false);
+        }
         prevViewMode.current = viewMode;
     }, [viewMode]);
     // Graph → Collections: keep a cluster as a real collection.
@@ -1523,6 +1562,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                 onShare={handleShareCard}
                                 onTogglePrivate={handleToggleCardPrivate}
                                 onToggleThumbnail={handleToggleThumbnail}
+                                onOpenInGraph={isEffectivelyPrivateCard(link) ? undefined : handleOpenCardInGraph}
                                 cardCollections={cardCollectionsByLink.get(link.id)}
                                 activeCollectionId={openCol.id}
                                 onRemoveFromCollection={handleRemoveFromCollection}
@@ -2597,6 +2637,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                         onShare={handleShareCard}
                                         onTogglePrivate={handleToggleCardPrivate}
                                         onToggleThumbnail={handleToggleThumbnail}
+                                        onOpenInGraph={isEffectivelyPrivateCard(link) ? undefined : handleOpenCardInGraph}
                                         cardCollections={cardCollectionsByLink.get(link.id)}
                                         activeCollectionId={openCol?.id}
                                         onRemoveFromCollection={handleRemoveFromCollection}
@@ -2630,6 +2671,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                     onShare={handleShareCard}
                                     onTogglePrivate={handleToggleCardPrivate}
                                     onToggleThumbnail={handleToggleThumbnail}
+                                    onOpenInGraph={isEffectivelyPrivateCard(link) ? undefined : handleOpenCardInGraph}
                                     cardCollections={cardCollectionsByLink.get(link.id)}
                                     activeCollectionId={activeCollectionId}
                                     onRemoveFromCollection={handleRemoveFromCollection}
@@ -2774,6 +2816,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                     onDelete={handleDelete}
                     onOpenOtherLink={openRelatedLink}
                     excludeRelatedIds={linkStack}
+                    onOpenInGraph={isEffectivelyPrivateCard(activeLink) ? undefined : handleOpenCardInGraph}
                     onAddToCollection={(link) => setAddToCollectionLink(link)}
                     onShare={handleShareCard}
                     onToggleThumbnail={handleToggleThumbnail}

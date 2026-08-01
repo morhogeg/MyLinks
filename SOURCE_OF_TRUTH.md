@@ -1058,6 +1058,34 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-01 — "See in graph" from a card (both states).** Every card can now
+  open the Graph focused on ITSELF, so its connections are visible as a map, not
+  just as the Related list. Costs nothing at runtime: the graph is a client-side
+  canvas over cards already in memory (no API, no Gemini, no extra reads), and
+  the focus machinery already existed — `GraphRestoreFocus.selectedId`, built for
+  the Ask citation chip. **Placement (owner call, after review):** OPEN state →
+  a pill on the **"Related cards" section header**, not the top action row (that
+  row already scrolls horizontally on a phone, and the section only renders when
+  there ARE connections, so the entry point is self-gating); CLOSED state → a
+  **"See in graph" row in the ⋯ sheet** (`CardActionSheet`, shared by grid Card
+  and ListCard), placed with "Open source" as navigation, above the state
+  toggles. Two correctness details that were NOT free: **(1)** the graph pool
+  mirrors the grid's filters, which would answer "what is this connected to"
+  wrongly (filtered-out neighbours simply missing) — a card-focused entry now
+  maps the WHOLE library (`graphIgnoresFilters` in Feed), one-shot: touching any
+  filter while in the graph, or leaving it, restores grid-mirroring. **(2)** a
+  card with no qualifying tie is NOT a node (`graph.ts` `if (!degree[i])
+  continue`), and the ⋯ row can't cheaply know that in advance, so the graph now
+  SAYS so — `“<title>” isn’t on the map yet — no connections to other cards`,
+  same honesty rule as the cited-set banner — and the request survives the
+  rebuild that `ensureLibrary()` triggers on entry, so a card that only becomes
+  connected once the full library lands still gets focused (verified in
+  Chromium: notice on the partial pool → focus + notice gone on the full one).
+  Private cards never offer it (they're excluded from the graph pool);
+  processing/failed cards don't either. tsc 0, lint unchanged (same 13
+  pre-existing problems), render-verified on a throwaway harness: modal LTR+RTL
+  and light+dark, ⋯ sheet, focus lands on the requested node with its
+  neighbourhood lit and the panel naming each tie.
 - **2026-08-01 (launch film, round 13i) — act-one taps land ON their buttons.**
   The `SURFACE_CTL` offsets dated from the first surface layouts and had
   drifted as the layouts evolved (worst: X's star and YouTube's Save pill —

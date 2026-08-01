@@ -153,6 +153,15 @@ export default function KnowledgeGraph({
     // indices die on every rebuild, so storing ids means the highlight survives
     // the same library-fetch rebuild that used to drop single-card focus.
     const [citedIds, setCitedIds] = useState<string[] | null>(null);
+    // Title of a card the user explicitly asked to see ("⋯ → See in graph") that
+    // the map CANNOT show: a card with no qualifying tie is not a node
+    // (graph.ts), so focusing it is impossible. Same honesty rule as the cited
+    // set below — say it, never open the plain graph and let it read as broken.
+    const [unmappedCard, setUnmappedCard] = useState<string | null>(null);
+    // That request outlives one build: entering the Graph kicks off the
+    // full-library fetch, so the card may only become a node on the SECOND
+    // build. The id is retried until it resolves (or the user moves on).
+    const pendingFocusIdRef = useRef<string | null>(null);
     const [savingCluster, setSavingCluster] = useState(false);
     const [savedClusters, setSavedClusters] = useState<Set<number>>(new Set());
     // Bumped by the MutationObserver when the .light class flips — palette and
@@ -278,9 +287,13 @@ export default function KnowledgeGraph({
                 autoFitRef.current = false;
             }
             // An explicit restore wins; otherwise keep whatever the user was
-            // already looking at. A missing id (card deleted or filtered out of
-            // the pool) simply falls through to the default full-graph fit.
-            const focusId = restore?.citedIds?.length ? null : restore?.selectedId ?? keepId;
+            // already looking at, then any card-focus request still waiting for
+            // the library to arrive.
+            if (restore?.selectedId) pendingFocusIdRef.current = restore.selectedId;
+            const focusId = restore?.citedIds?.length
+                ? null
+                : restore?.selectedId ?? keepId ?? pendingFocusIdRef.current;
+            let unmapped: string | null = null;
             if (focusId) {
                 const idx = m.nodes.findIndex((n) => n.id === focusId);
                 if (idx >= 0) {
@@ -290,8 +303,17 @@ export default function KnowledgeGraph({
                     // — long enough for the rAF loop to start easing back to the
                     // full-graph fit and show a lurch.
                     autoFitRef.current = false;
+                    if (pendingFocusIdRef.current === focusId) pendingFocusIdRef.current = null;
+                } else if (pendingFocusIdRef.current === focusId) {
+                    // Asked for by name and not on the map. Name it back to the
+                    // user; the pending id stays set so the post-fetch rebuild
+                    // gets one more chance to resolve it.
+                    unmapped = links.find((l) => l.id === focusId)?.title || 'That card';
                 }
+                // A `keepId` that no longer resolves (card deleted, or filtered
+                // out of the pool) still falls through to the full-graph fit.
             }
+            setUnmappedCard(unmapped);
             if (restore) {
                 restoreRef.current = null;
                 if (!restore.selectedId && restore.clusterAnchorId) {
@@ -645,6 +667,10 @@ export default function KnowledgeGraph({
                 const caption = captionRectsRef.current.find(
                     (r) => p2.x >= r.x1 && p2.x <= r.x2 && p2.y >= r.y1 && p2.y <= r.y2,
                 );
+                // Either way the user has moved on from a card-focus request:
+                // retire it so a later rebuild can't resurrect its notice.
+                pendingFocusIdRef.current = null;
+                setUnmappedCard(null);
                 if (caption) {
                     hapticLight();
                     setSelected(null);
@@ -882,6 +908,30 @@ export default function KnowledgeGraph({
                         <ChevronLeft className="w-4 h-4 shrink-0 rtl:rotate-180 text-accent" />
                         <MessagesSquare className="w-3.5 h-3.5 shrink-0 text-accent" />
                         <span>Back to Ask</span>
+                    </button>
+                </div>
+            )}
+
+            {/* A card the user asked to see that has no connections yet. Same
+                rule as the cited banner below: the graph says why it can't
+                honour the request instead of opening unmarked. */}
+            {unmappedCard && (
+                <div className="flex items-center gap-x-3 px-0.5 text-[13px] font-medium">
+                    {/* One paragraph, not two flex children: on a phone this
+                        wraps, and a muted fragment starting its own line read
+                        like a stray bullet. */}
+                    <p className="flex-1 min-w-0 text-text">
+                        {`“${unmappedCard}” isn’t on the map yet`}
+                        <span className="text-text-muted"> — no connections to other cards</span>
+                    </p>
+                    <button
+                        onClick={() => {
+                            pendingFocusIdRef.current = null;
+                            setUnmappedCard(null);
+                        }}
+                        className="ms-auto shrink-0 text-[12px] font-semibold text-accent hover:underline cursor-pointer"
+                    >
+                        Dismiss
                     </button>
                 </div>
             )}
