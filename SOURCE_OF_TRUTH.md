@@ -1058,6 +1058,31 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-01 — The card → graph → Ask trail now HOLDS (owner: "the back to
+  card must hold").** Reported: open a card → *See in graph* (chip present) →
+  *Ask about these* → Ask had no way back to the graph, and returning to the
+  graph had lost "Back to card" entirely. Two causes, both in Feed's view
+  bookkeeping. **(1)** The leave-the-graph effect retired `graphFromCard`
+  unconditionally, so the hop into Ask — which the code itself calls "a detour
+  from the graph, not an exit", and which `graphRestore` already survives —
+  destroyed the card context. It is now kept when the graph is left FOR ASK and
+  retired by the Ask branch if the detour ends anywhere else, so the trail
+  either continues or closes cleanly. `graphIgnoresFilters` rides the same rule
+  (the pool must not change under the user mid-detour). **(2)** Ask had no
+  return path at all: new `onBackToGraph` on `AskBrain`, set only when Ask was
+  entered via "Ask about these" (`askFromGraph`, false for every other entrance
+  — tab bar, toolbar, and the "Back to Ask" unwind, which is itself the
+  destination and must not offer a walk back round the loop). It renders the
+  SAME pill the graph's own chips use, above the scroll area so it can't scroll
+  away mid-answer, and the mobile header chevron + edge-swipe now unwind one hop
+  to the graph instead of dumping the user at the library. Verified in Chromium:
+  chip renders, and header-back and chip both call the graph return (0 exits).
+  **Known depth limit (deliberate, documented rather than fixed):** these are
+  one-hop contexts, not a real navigation stack. The reported trail (card →
+  graph → Ask → graph → card) is whole; a deeper walk — e.g. Ask → graph via an
+  answer's Graph chip → "Back to Ask" — still unwinds correctly one hop at a
+  time but drops the older card context at the end. A general fix is a Feed
+  nav-stack refactor; not worth its regression surface for a path nobody has hit.
 - **2026-08-01 — Ask answers stop coming back as a wall of text (5th report —
   fixed deterministically this time, not with more prompt).** The RAG prompt has
   demanded paragraph structure since 2026-07-28, in TWO places: a rule in the

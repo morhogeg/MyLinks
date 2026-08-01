@@ -885,11 +885,19 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // Ask is a detour from the graph, not an exit.
     const [graphAsk, setGraphAsk] = useState<{ question: string; hints?: import('@/lib/askSuggestions').AskHints; restore?: import('./KnowledgeGraph').GraphRestoreFocus; nonce: number } | null>(null);
     const [graphRestore, setGraphRestore] = useState<import('./KnowledgeGraph').GraphRestoreFocus | null>(null);
+    // True while the Ask on screen was opened FROM the graph ("Ask about these").
+    // Ask then offers its own way back, and the whole trail behind it — the
+    // graph's focus AND the card that opened the graph — is held, not dropped.
+    const [askFromGraph, setAskFromGraph] = useState(false);
     const handleAskCluster = useCallback((question: string, hints: import('@/lib/askSuggestions').AskHints, restore: import('./KnowledgeGraph').GraphRestoreFocus) => {
         setGraphAsk((prev) => ({ question, hints, restore, nonce: (prev?.nonce ?? 0) + 1 }));
         setGraphRestore(restore);
+        setAskFromGraph(true);
         setViewMode('ask');
     }, []);
+    // Ask → the graph it came from. `graphRestore` was set at the hand-off and
+    // deliberately survives the detour, so the graph reopens on the same focus.
+    const handleBackToGraph = useCallback(() => setViewMode('graph'), []);
     // An answer's "Graph" chip: open the Graph focused on the chat's origin
     // cluster (graph-born chats) or the cited card's neighborhood. The chat id
     // rides along so the graph can offer a way BACK into that conversation —
@@ -950,6 +958,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     const handleBackToAsk = useCallback(() => {
         if (!graphFromChat) return;
         setAskOpenChat((prev) => ({ id: graphFromChat, nonce: (prev?.nonce ?? 0) + 1 }));
+        // This IS the unwind (Ask → graph → Ask): the chat is the destination,
+        // so it must not offer a "Back to graph" that walks the loop again.
+        setAskFromGraph(false);
         setViewMode('ask');
     }, [graphFromChat]);
     // A graph hand-off is for ONE Ask entry. Clear it the moment Ask is left,
@@ -965,17 +976,32 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         if (prevViewMode.current === 'ask' && viewMode !== 'ask') {
             setGraphAsk(null);
             setAskOpenChat(null);
+            // Going back to the graph continues the trail (card → graph → Ask →
+            // graph); anywhere else ends it, so the return paths retire together.
+            if (viewMode !== 'graph') {
+                setAskFromGraph(false);
+                setGraphFromCard(null);
+            }
         }
         // Leaving the graph retires the Ask return path: a later graph entry
         // from the library must not offer "Back to Ask" to a stale chat.
         // (handleBackToAsk has already captured the id by the time this runs.)
         if (prevViewMode.current === 'graph' && viewMode !== 'graph') {
             setGraphFromChat(null);
-            // handleBackToCard has already captured what it needs by now.
-            setGraphFromCard(null);
+            // ASK IS A DETOUR, NOT AN EXIT. Dropping the card context here is
+            // what made "Back to card" vanish after a trip through "Ask about
+            // these" (owner report 2026-08-01): the user came back to the graph
+            // and the way home was gone. The Ask branch above retires it if the
+            // detour ends somewhere else. handleBackToCard has already captured
+            // what it needs by the time this runs.
+            if (viewMode !== 'ask') {
+                setGraphFromCard(null);
+                setAskFromGraph(false);
+            }
             // The whole-library override belongs to ONE card-focused entry —
-            // the next graph entry mirrors the grid's filters again.
-            setGraphIgnoresFilters(false);
+            // the next graph entry mirrors the grid's filters again. It rides
+            // the same detour rule so the pool doesn't change under the user.
+            if (viewMode !== 'ask') setGraphIgnoresFilters(false);
         }
         prevViewMode.current = viewMode;
     }, [viewMode]);
@@ -1389,6 +1415,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
             setGraphAsk(null);
             setGraphRestore(null);
             setAskOpenChat(null);
+            setAskFromGraph(false);
             setViewMode('ask');
         }
         else setViewMode('digest');
@@ -2016,7 +2043,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                 data-tour="ask"
                                 // Blank-slate entrance, same as the mobile tab
                                 // (clears a pending graph hand-off — see selectTab).
-                                onClick={() => { setGraphAsk(null); setGraphRestore(null); setAskOpenChat(null); setViewMode('ask'); }}
+                                onClick={() => { setGraphAsk(null); setGraphRestore(null); setAskOpenChat(null); setAskFromGraph(false); setViewMode('ask'); }}
                                 title="Ask your brain"
                                 aria-label="Ask your brain"
                                 className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
@@ -2530,6 +2557,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             links={visibleLinks}
                             initialAsk={graphAsk}
                             onOpenGraphFocus={handleOpenGraphFocus}
+                            onBackToGraph={askFromGraph ? handleBackToGraph : undefined}
                             openChatId={askOpenChat}
                         />
                     ) : filteredLinks.length === 0 && pendingCards.length === 0 ? (
