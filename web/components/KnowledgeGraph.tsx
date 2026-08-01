@@ -1,9 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowUpRight, ChevronLeft, LocateFixed, MessagesSquare, Waypoints, X } from 'lucide-react';
+import { ArrowUpRight, ChevronLeft, FileText, LocateFixed, MessagesSquare, Waypoints, X } from 'lucide-react';
 import { AskHints, Link } from '@/lib/types';
-import { buildGraphModel, edgeReason, spacingScale, GraphModel, GraphNode, BuildSignal } from '@/lib/graph';
+import { buildGraphModel, edgeReason, GraphModel, GraphNode, BuildSignal } from '@/lib/graph';
+import { tick, ALPHA_MIN } from '@/lib/graphPhysics';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { getDominantDirection } from '@/lib/rtl';
 import { hapticLight } from '@/lib/haptics';
@@ -79,13 +80,6 @@ function readPalette(): Palette {
     };
 }
 
-// ── Simulation constants ─────────────────────────────────────────────────────
-const REPULSION = 4200;        // many-body charge (world units²)
-const REPULSION_MAX_DIST = 480;
-const GRAVITY = 0.05;          // pull toward the node's ISLAND anchor (per component)
-const VELOCITY_DECAY = 0.8;
-const ALPHA_DECAY = 0.99;
-const ALPHA_MIN = 0.015;
 const TAP_SLOP = 7;            // px of movement that still counts as a tap
 
 // ── Desktop panel geometry — ONE source of truth ─────────────────────────────
@@ -119,6 +113,7 @@ export default function KnowledgeGraph({
     onRestoreConsumed,
     onSaveCluster,
     onBackToAsk,
+    onBackToCard,
 }: {
     /** The card pool (already privacy-filtered by the Feed). */
     links: Link[];
@@ -139,6 +134,10 @@ export default function KnowledgeGraph({
     /** Present only when the Graph was opened FROM an Ask answer — returns to
      *  that conversation (leaving Ask unmounted it, so this reopens it). */
     onBackToAsk?: () => void;
+    /** Present only when the Graph was opened FROM a card ("See in graph") —
+     *  reopens that card where the user left it. Mutually exclusive with
+     *  onBackToAsk: each entry point clears the other's context. */
+    onBackToCard?: () => void;
 }) {
     const containerRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -898,17 +897,32 @@ export default function KnowledgeGraph({
                 honoured by the node-label pass (`fits()`), never by the caption
                 loop. Moving it out deletes that reservation entirely instead of
                 needing a second collision check. Only present on Ask → Graph. */}
-            {onBackToAsk && (
+            {(onBackToAsk || onBackToCard) && (
                 <div className="-mx-2 px-2 sm:mx-0 sm:px-0">
-                    <button
-                        onClick={onBackToAsk}
-                        aria-label="Back to the chat"
-                        className="inline-flex items-center gap-1 ps-1.5 pe-3 py-1.5 rounded-full bg-card border border-border-subtle text-xs font-semibold text-text-secondary hover:text-text hover:border-accent/40 shadow-sm transition-colors cursor-pointer"
-                    >
-                        <ChevronLeft className="w-4 h-4 shrink-0 rtl:rotate-180 text-accent" />
-                        <MessagesSquare className="w-3.5 h-3.5 shrink-0 text-accent" />
-                        <span>Back to Ask</span>
-                    </button>
+                    {onBackToAsk ? (
+                        <button
+                            onClick={onBackToAsk}
+                            aria-label="Back to the chat"
+                            className="inline-flex items-center gap-1 ps-1.5 pe-3 py-1.5 rounded-full bg-card border border-border-subtle text-xs font-semibold text-text-secondary hover:text-text hover:border-accent/40 shadow-sm transition-colors cursor-pointer"
+                        >
+                            <ChevronLeft className="w-4 h-4 shrink-0 rtl:rotate-180 text-accent" />
+                            <MessagesSquare className="w-3.5 h-3.5 shrink-0 text-accent" />
+                            <span>Back to Ask</span>
+                        </button>
+                    ) : (
+                        // Same control, same slot, same grammar — only the
+                        // destination differs (see the comment above: this row
+                        // is NAVIGATION, which is why it sits above the legend).
+                        <button
+                            onClick={onBackToCard}
+                            aria-label="Back to the card"
+                            className="inline-flex items-center gap-1 ps-1.5 pe-3 py-1.5 rounded-full bg-card border border-border-subtle text-xs font-semibold text-text-secondary hover:text-text hover:border-accent/40 shadow-sm transition-colors cursor-pointer"
+                        >
+                            <ChevronLeft className="w-4 h-4 shrink-0 rtl:rotate-180 text-accent" />
+                            <FileText className="w-3.5 h-3.5 shrink-0 text-accent" />
+                            <span>Back to card</span>
+                        </button>
+                    )}
                 </div>
             )}
 
@@ -1274,82 +1288,6 @@ export default function KnowledgeGraph({
 }
 
 // ── Physics ──────────────────────────────────────────────────────────────────
-
-function tick(model: GraphModel, alphaRef: { current: number }) {
-    const alpha = alphaRef.current;
-    const { nodes, edges } = model;
-    const n = nodes.length;
-    // Small graphs spread out (see lib/graph.ts spacingScale) — the same factor
-    // the builder used for island radii, so seeds and forces agree.
-    const spacing = spacingScale(n);
-    const repulsion = REPULSION * spacing * spacing;
-    const repulsionMax = REPULSION_MAX_DIST * spacing;
-
-    // Many-body repulsion + collision, one O(n²) pass.
-    for (let i = 0; i < n; i++) {
-        const a = nodes[i];
-        for (let j = i + 1; j < n; j++) {
-            const b = nodes[j];
-            let dx = b.x - a.x;
-            let dy = b.y - a.y;
-            let d2 = dx * dx + dy * dy;
-            if (d2 === 0) {
-                dx = (Math.random() - 0.5) * 0.1;
-                dy = (Math.random() - 0.5) * 0.1;
-                d2 = dx * dx + dy * dy;
-            }
-            if (d2 > repulsionMax * repulsionMax) continue;
-            const d = Math.sqrt(d2);
-            let f = (repulsion * alpha) / d2;
-            // Hard-core collision: overlapping nodes push apart decisively.
-            const minDist = a.r + b.r + 6;
-            if (d < minDist) f += ((minDist - d) / minDist) * 2.5;
-            const fx = (dx / d) * f;
-            const fy = (dy / d) * f;
-            a.vx -= fx;
-            a.vy -= fy;
-            b.vx += fx;
-            b.vy += fy;
-        }
-    }
-
-    // Edge springs — stronger ties pull shorter.
-    for (const e of edges) {
-        const a = nodes[e.a];
-        const b = nodes[e.b];
-        const dx = b.x - a.x;
-        const dy = b.y - a.y;
-        const d = Math.max(1, Math.hypot(dx, dy));
-        const strength = 0.35 + Math.max(0, Math.min(1, (e.weight - 0.7) / 0.3)) * 0.5;
-        const rest = a.r + b.r + (65 + (1 - strength) * 130) * spacing;
-        const f = ((d - rest) / d) * 0.08 * strength * alpha * 8;
-        const fx = dx * f;
-        const fy = dy * f;
-        a.vx += fx;
-        a.vy += fy;
-        b.vx -= fx;
-        b.vy -= fy;
-    }
-
-    // Weak centering gravity + integration.
-    for (const node of nodes) {
-        if (node.fx !== null && node.fy !== null) {
-            node.x = node.fx;
-            node.y = node.fy;
-            node.vx = 0;
-            node.vy = 0;
-            continue;
-        }
-        node.vx += (node.cx - node.x) * GRAVITY * alpha;
-        node.vy += (node.cy - node.y) * GRAVITY * alpha;
-        node.vx *= VELOCITY_DECAY;
-        node.vy *= VELOCITY_DECAY;
-        node.x += node.vx;
-        node.y += node.vy;
-    }
-
-    alphaRef.current = Math.max(0, alpha * ALPHA_DECAY - 0.0001);
-}
 
 /** Camera that frames the whole graph with padding, clamped to sane zooms. */
 function fitCamera(model: GraphModel, canvas: HTMLCanvasElement): Camera | null {

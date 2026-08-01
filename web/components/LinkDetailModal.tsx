@@ -78,6 +78,10 @@ interface LinkDetailModalProps {
     /** Open revealed at the My-notes section (set when entered from the
         central My Notes view, so the user lands on what they came for). */
     scrollToNotes?: boolean;
+    /** Open revealed at the "Related cards" section — set when returning from
+        the Graph this card sent the user to, so "Back to card" lands on the
+        exact spot the "See in graph" button was tapped from, not the top. */
+    scrollToRelated?: boolean;
 }
 
 export default function LinkDetailModal({
@@ -106,6 +110,7 @@ export default function LinkDetailModal({
     onShare,
     onToggleThumbnail,
     scrollToNotes,
+    scrollToRelated,
 }: LinkDetailModalProps) {
     const [isEditingCategory, setIsEditingCategory] = useState(false);
     const [now, setNow] = useState<number>(0);
@@ -173,6 +178,7 @@ export default function LinkDetailModal({
     const noteEditorRef = useRef<HTMLDivElement>(null);
     const noteActionRef = useRef<'save' | 'cancel' | 'delete' | null>(null);
     const notesSectionRef = useRef<HTMLDivElement>(null);
+    const relatedSectionRef = useRef<HTMLDivElement>(null);
 
     // Entered from the central My Notes view: reveal the notes section once the
     // entrance animation has settled, so the user lands on what they tapped —
@@ -182,6 +188,18 @@ export default function LinkDetailModal({
         if (!scrollToNotes) return;
         const t = setTimeout(() => {
             notesSectionRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        }, 320);
+        return () => clearTimeout(t);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Returning from the Graph this card opened: land back on the Related cards
+    // section, where the "See in graph" button is — same mount-only rule as the
+    // notes reveal above, so walking on to another card opens normally.
+    useEffect(() => {
+        if (!scrollToRelated) return;
+        const t = setTimeout(() => {
+            relatedSectionRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
         }, 320);
         return () => clearTimeout(t);
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1096,7 +1114,7 @@ export default function LinkDetailModal({
                             entry resolves to a live card, so tapping always
                             navigates. */}
                         {relatedCards.length > 0 && (
-                            <div className="mb-8 border-t border-border-subtle pt-6">
+                            <div ref={relatedSectionRef} className="mb-8 border-t border-border-subtle pt-6 scroll-mt-4">
                                 <div className={`mb-4 flex items-center justify-between gap-3 ${isRtl ? 'flex-row-reverse' : ''}`}>
                                     <h3 className={`text-sm font-bold text-text-muted uppercase tracking-wider flex items-center gap-2 ${isRtl ? 'flex-row-reverse' : ''}`}>
                                         <Network className="w-4 h-4" />

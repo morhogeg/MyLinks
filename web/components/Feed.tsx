@@ -895,6 +895,13 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // rides along so the graph can offer a way BACK into that conversation —
     // leaving Ask unmounts it, and the Ask tab is deliberately blank-slate.
     const [graphFromChat, setGraphFromChat] = useState<string | null>(null);
+    // The card a "See in graph" entry came from, and where it should return to.
+    // Cleared on leaving the graph, so a later entry never offers a stale card.
+    const [graphFromCard, setGraphFromCard] = useState<
+        { id: string; atRelated: boolean; returnTo: typeof viewMode } | null
+    >(null);
+    // One-shot: the returning card opens revealed at its Related cards section.
+    const [detailScrollToRelated, setDetailScrollToRelated] = useState(false);
     const [askOpenChat, setAskOpenChat] = useState<{ id: string; nonce: number } | null>(null);
     const handleOpenGraphFocus = useCallback((focus: import('./KnowledgeGraph').GraphRestoreFocus, fromChatId: string | null) => {
         setGraphRestore(focus);
@@ -909,15 +916,37 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // dismissed first — stack and all, since the graph replaces the whole view
     // underneath it (setLinkStack/setActiveLinkId inline rather than
     // closeActiveLinkStack: setters are stable, so this callback is too).
-    const handleOpenCardInGraph = useCallback((link: Link) => {
+    const handleOpenCardInGraph = useCallback((link: Link, atRelated: boolean) => {
         setLinkStack([]);
         setActiveLinkId(null);
         setGraphRestore({ selectedId: link.id });
         setGraphFromChat(null);  // not an Ask detour — no "Back to Ask" chip
+        // Remember the way back. `atRelated` is true when the card was OPEN and
+        // the user tapped the pill on its Related list (so returning should land
+        // there, where the button is) and false for the ⋯ menu on a closed card
+        // (there was no scroll position — that card opens normally).
+        setGraphFromCard({
+            id: link.id,
+            atRelated,
+            returnTo: viewMode === 'graph' ? 'grid' : viewMode,
+        });
         graphEntrySignature.current = feedFilterSignature;
         setGraphIgnoresFilters(true);
         setViewMode('graph');
-    }, [feedFilterSignature]);
+    }, [feedFilterSignature, viewMode]);
+    // Stable per-origin callbacks: `Card` is memoized, so an inline arrow here
+    // would hand every card a new prop identity on every Feed render and defeat
+    // that memo across the whole feed.
+    const openInGraphFromMenu = useCallback((l: Link) => handleOpenCardInGraph(l, false), [handleOpenCardInGraph]);
+    const openInGraphFromOpenCard = useCallback((l: Link) => handleOpenCardInGraph(l, true), [handleOpenCardInGraph]);
+    // "Back to card" — the graph's counterpart to "Back to Ask": reopen the card
+    // that sent the user here, on the view they were on, at the spot they left.
+    const handleBackToCard = useCallback(() => {
+        if (!graphFromCard) return;
+        setDetailScrollToRelated(graphFromCard.atRelated);
+        setViewMode(graphFromCard.returnTo);
+        setActiveLinkId(graphFromCard.id);
+    }, [graphFromCard]);
     const handleBackToAsk = useCallback(() => {
         if (!graphFromChat) return;
         setAskOpenChat((prev) => ({ id: graphFromChat, nonce: (prev?.nonce ?? 0) + 1 }));
@@ -942,6 +971,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         // (handleBackToAsk has already captured the id by the time this runs.)
         if (prevViewMode.current === 'graph' && viewMode !== 'graph') {
             setGraphFromChat(null);
+            // handleBackToCard has already captured what it needs by now.
+            setGraphFromCard(null);
             // The whole-library override belongs to ONE card-focused entry —
             // the next graph entry mirrors the grid's filters again.
             setGraphIgnoresFilters(false);
@@ -973,6 +1004,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     useEffect(() => {
         if (!activeLinkId && detailScrollToNotes) setDetailScrollToNotes(false);
     }, [activeLinkId, detailScrollToNotes]);
+    useEffect(() => {
+        if (!activeLinkId && detailScrollToRelated) setDetailScrollToRelated(false);
+    }, [activeLinkId, detailScrollToRelated]);
     useEffect(() => {
         if (!libraryFacet) return;
         // The 'notes' facet is a place, not a grid filter — open My Notes.
@@ -1582,7 +1616,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                 onShare={handleShareCard}
                                 onTogglePrivate={handleToggleCardPrivate}
                                 onToggleThumbnail={handleToggleThumbnail}
-                                onOpenInGraph={isEffectivelyPrivateCard(link) ? undefined : handleOpenCardInGraph}
+                                onOpenInGraph={isEffectivelyPrivateCard(link) ? undefined : openInGraphFromMenu}
                                 cardCollections={cardCollectionsByLink.get(link.id)}
                                 activeCollectionId={openCol.id}
                                 onRemoveFromCollection={handleRemoveFromCollection}
@@ -2622,6 +2656,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             onRestoreConsumed={() => setGraphRestore(null)}
                             onSaveCluster={handleSaveCluster}
                             onBackToAsk={graphFromChat ? handleBackToAsk : undefined}
+                            onBackToCard={graphFromCard ? handleBackToCard : undefined}
                         />
                     ) : viewMode === 'review' ? (
                         <SwipeDeck
@@ -2657,7 +2692,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                         onShare={handleShareCard}
                                         onTogglePrivate={handleToggleCardPrivate}
                                         onToggleThumbnail={handleToggleThumbnail}
-                                        onOpenInGraph={isEffectivelyPrivateCard(link) ? undefined : handleOpenCardInGraph}
+                                        onOpenInGraph={isEffectivelyPrivateCard(link) ? undefined : openInGraphFromMenu}
                                         cardCollections={cardCollectionsByLink.get(link.id)}
                                         activeCollectionId={openCol?.id}
                                         onRemoveFromCollection={handleRemoveFromCollection}
@@ -2691,7 +2726,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                     onShare={handleShareCard}
                                     onTogglePrivate={handleToggleCardPrivate}
                                     onToggleThumbnail={handleToggleThumbnail}
-                                    onOpenInGraph={isEffectivelyPrivateCard(link) ? undefined : handleOpenCardInGraph}
+                                    onOpenInGraph={isEffectivelyPrivateCard(link) ? undefined : openInGraphFromMenu}
                                     cardCollections={cardCollectionsByLink.get(link.id)}
                                     activeCollectionId={activeCollectionId}
                                     onRemoveFromCollection={handleRemoveFromCollection}
@@ -2836,11 +2871,12 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                     onDelete={handleDelete}
                     onOpenOtherLink={openRelatedLink}
                     excludeRelatedIds={linkStack}
-                    onOpenInGraph={isEffectivelyPrivateCard(activeLink) ? undefined : handleOpenCardInGraph}
+                    onOpenInGraph={isEffectivelyPrivateCard(activeLink) ? undefined : openInGraphFromOpenCard}
                     onAddToCollection={(link) => setAddToCollectionLink(link)}
                     onShare={handleShareCard}
                     onToggleThumbnail={handleToggleThumbnail}
                     scrollToNotes={detailScrollToNotes}
+                    scrollToRelated={detailScrollToRelated}
                 />
             )}
 

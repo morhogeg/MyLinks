@@ -1058,6 +1058,32 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-01 — Graph round 2: "Back to card", and the settle stops shaking.**
+  **(1) "Back to card"** — the graph opened via *See in graph* now carries the
+  same chip "Back to Ask" uses (same slot above the legend, same pill, chevron +
+  destination icon + label; they are mutually exclusive, each entry clearing the
+  other's context). It returns to the **exact card and place**: Feed remembers
+  `{id, atRelated, returnTo}` at entry, so the pill on an open card's Related
+  list comes back **scrolled to that section** (new one-shot `scrollToRelated`
+  on `LinkDetailModal`, mirroring the existing `scrollToNotes` mount-only
+  reveal), while the ⋯-menu entry — where no card was open — reopens the card
+  normally, and both restore the view the user was on. **(2) The first seconds
+  of the graph were genuinely broken, and it was the physics, not the camera.**
+  Repulsion is an inverse-square law with NO distance floor, so a pair of nodes
+  that happened to seed close together produced an unbounded impulse. Measured
+  before changing anything (the sim was extracted to **`web/lib/graphPhysics.ts`**
+  precisely so it could be run headless over a real `buildGraphModel` output):
+  on an 80-card graph the peak single-tick displacement was **965 px** — a node
+  crossing the whole canvas in one frame — with repeated 300–800 px frames for
+  the first ~30 ticks. Two bounds fix it: a **distance floor** on the repulsion
+  term (below "touching", the force stops growing; the linear hard-core
+  collision term does the separating) and a **per-tick speed cap**
+  (`MAX_STEP = 16` world units × the layout's spacing). After: peak **16 px**,
+  **zero** jitter spikes, and convergence unchanged (tick-120 and tick-300
+  residual motion match the old numbers to 2 decimals) — so the "dots coming
+  together" animation the owner liked is intact, it just no longer teleports.
+  Verified at 8, 80 and 300 nodes. tsc 0, lint at baseline; chip + return-scroll
+  render-verified in Chromium.
 - **2026-08-01 — Round 2 of the device-QA fixes: the Instagram play badge, and
   the in-app "+" saves get the same progress honesty.**
   **(1) The play triangle on Instagram posters is BURNED INTO THE PIXELS** —
