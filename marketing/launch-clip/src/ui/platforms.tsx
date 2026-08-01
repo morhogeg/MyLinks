@@ -88,12 +88,16 @@ export const SURFACE_H = 330;
  * Where each platform's save CONTROL sits, relative to the surface centre —
  * the Tap fingertip lands here, and the flying save launches from here.
  */
+// Re-measured against the CURRENT layouts (round 13i — several taps were
+// landing beside their buttons): offsets are the control's true centre,
+// derived from the layout maths (header 52px + padding 16 + block heights),
+// relative to the surface centre (215, 165).
 export const SURFACE_CTL: Record<PlatformKey, { x: number; y: number }> = {
-  instagram: { x: 176, y: 96 },
-  youtube: { x: 58, y: 118 },
-  whatsapp: { x: 172, y: 112 },
-  x: { x: 92, y: 112 },
-  reading: { x: 170, y: 128 },
+  instagram: { x: 180, y: 112 }, // bookmark, right end of the action row
+  youtube: { x: 153, y: 131 }, // the right-aligned Save pill
+  whatsapp: { x: 180, y: 132 }, // send button, composer bottom-right
+  x: { x: 172, y: 132 }, // star, right end of the action row
+  reading: { x: 145, y: 132 }, // the tabs pill, bottom-right
 };
 
 const surfaceShell = (k: PlatformKey, children: React.ReactNode) => {
