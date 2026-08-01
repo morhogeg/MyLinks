@@ -248,7 +248,10 @@ export const SYNTHESIS = {
   body: 'The AI thread, Maya’s article, and a philosophy video about machine minds — three saves, one question: what stays human. You might be ready to write your own take.',
 };
 
+// The resurfaced card must RELATE to the write-up above it (owner note, 13f):
+// the digest circles the AI/what-stays-human idea, so the card it brings back
+// is the philosophy video from that same thread — saved months ago, unwatched.
 export const REVIEW = {
-  title: 'Gift idea: the ceramic pour-over set',
-  meta: 'Saved 30 days ago · never revisited',
+  title: 'Can a machine ever understand?',
+  meta: 'Saved 2 months ago · never revisited',
 };

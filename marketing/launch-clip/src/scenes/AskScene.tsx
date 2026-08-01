@@ -42,7 +42,7 @@ export const AskScene: React.FC = () => {
   // squares up to dead-on exactly as the three citations land. Off-axis to
   // on-axis is the move that says "this is the point" without a caption doing
   // it — and the citations are the point of the whole film.
-  const rotY = ramp(f, [0, 26], [11, 7], EASE_OUT) * (1 - prog(f, 228, 296, EASE_IN_OUT));
+  const rotY = 0; // zero 3D — crispness over drama (round 13f)
   // from the question, down onto the answer and its three chips — then onto
   // the Graph chip itself as the finger lands
   const target = ramp(f, [140, 300], [300, 375], EASE_IN_OUT) + dive * 95;
