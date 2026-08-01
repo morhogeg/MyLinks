@@ -277,38 +277,78 @@ export const YouTubeSource: React.FC = () => (
   <Screen style={{ background: '#ffffff' }}>
     <StatusBar />
     <div style={{ position: 'absolute', top: 54, left: 0, right: 0, bottom: 0 }}>
+      {/* A thumbnail that READS like a real YouTube thumb (owner note, 13h):
+          bold statement type on the image + a duration badge — without
+          reproducing any actual copyrighted frame. */}
       <div
         style={{
+          position: 'relative',
           height: 220,
-          background: 'linear-gradient(160deg, rgba(255,0,0,0.10), rgba(233,235,241,0.95))',
+          background:
+            'linear-gradient(160deg, rgba(20,22,28,0.92), rgba(52,56,66,0.9) 55%, rgba(255,0,0,0.25))',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
+          padding: '0 34px',
           borderBottom: '1px solid rgba(0,0,0,0.07)',
         }}
       >
+        <span
+          style={{
+            fontSize: 30,
+            fontWeight: 900,
+            lineHeight: 1.08,
+            letterSpacing: '-0.02em',
+            textTransform: 'uppercase',
+            color: '#ffffff',
+            textShadow: '0 2px 14px rgba(0,0,0,0.5)',
+          }}
+        >
+          AI can’t
+          <br />
+          take this.
+        </span>
         <div
           style={{
-            width: 54,
-            height: 54,
-            borderRadius: 54,
-            background: 'rgba(17,19,24,0.55)',
+            position: 'absolute',
+            left: 16,
+            bottom: 12,
+            width: 44,
+            height: 44,
+            borderRadius: 44,
+            background: 'rgba(17,19,24,0.6)',
             border: '1px solid rgba(255,255,255,0.4)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <Play size={20} fill="#ffffff" strokeWidth={0} />
+          <Play size={17} fill="#ffffff" strokeWidth={0} />
         </div>
+        <span
+          style={{
+            position: 'absolute',
+            right: 12,
+            bottom: 12,
+            padding: '3px 7px',
+            borderRadius: 5,
+            background: 'rgba(0,0,0,0.75)',
+            color: '#ffffff',
+            fontSize: 11.5,
+            fontWeight: 600,
+            fontVariantNumeric: 'tabular-nums',
+          }}
+        >
+          21:07
+        </span>
       </div>
       <div style={{ padding: '16px 16px 0' }}>
         <div style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.22, letterSpacing: '-0.02em', color: '#111318' }}>
-          Can a machine ever understand?
+          What AI can’t take from you
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 11 }}>
           <Youtube size={15} color="rgb(255,0,0)" />
-          <span style={{ fontSize: 12.5, color: '#606068' }}>Philosophy Tube · 1.8M views</span>
+          <span style={{ fontSize: 12.5, color: '#606068' }}>IAmMarkManson · 3.1M views</span>
         </div>
       </div>
     </div>

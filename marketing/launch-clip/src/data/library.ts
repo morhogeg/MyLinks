@@ -120,13 +120,13 @@ export const CARDS: Card[] = [
   {
     id: 'machineminds',
     category: 'Philosophy',
-    title: 'Can a machine ever understand?',
+    title: 'What AI can’t take from you',
     summary:
-      'Forty minutes on the Chinese Room and what “knowing” even means — the rare video essay that changes how you argue.',
-    source: 'Philosophy Tube',
+      'Twenty blunt minutes on the one thing machines can’t do — care. Swearing included. Weirdly hopeful by the end.',
+    source: 'IAmMarkManson',
     sourceKind: 'youtube',
     tags: ['minds', 'watch-again'],
-    readTime: 40,
+    readTime: 21,
     age: '2mo ago',
   },
 ];
@@ -174,12 +174,12 @@ export const ASK_QUESTION = 'What have I been saving about AI?';
 export const ASK_ANSWER = [
   'Your saves circle one question: what stays human.',
   '',
-  'The thread you starred argues AI takes the typing and leaves the judgment, the article Maya sent maps which jobs actually shift, and that philosophy video pushes further — whether a machine can understand at all.',
+  'The thread you starred argues AI takes the typing and leaves the judgment, the article Maya sent maps which jobs actually shift, and Mark Manson’s video says the quiet part: the human bit was always the point.',
 ].join('\n');
 
 export const ASK_SOURCES = [
   { id: 'aithread', label: '@futuretense', kind: 'x' as const, title: 'What AI actually changes about work' },
-  { id: 'machineminds', label: 'Philosophy Tube', kind: 'youtube' as const, title: 'Can a machine ever understand?' },
+  { id: 'machineminds', label: 'IAmMarkManson', kind: 'youtube' as const, title: 'What AI can’t take from you' },
   { id: 'aiarticle', label: 'theatlantic.com', kind: 'link' as const, title: 'The jobs AI actually changes' },
 ];
 
@@ -197,7 +197,7 @@ export const GRAPH_NODES: {
   // The caption's claim lives in cluster 0: the thread saved two days ago and
   // the philosophy video saved two months ago sit on the same island.
   { id: 'aithread', x: 0.33, y: 0.36, r: 15, cluster: 0, category: 'AI', label: 'AI & work' },
-  { id: 'machineminds', x: 0.47, y: 0.27, r: 13, cluster: 0, category: 'Philosophy', label: 'Machine minds' },
+  { id: 'machineminds', x: 0.47, y: 0.27, r: 13, cluster: 0, category: 'Philosophy', label: 'What AI can’t take' },
   { id: 'aiarticle', x: 0.24, y: 0.5, r: 11, cluster: 0, category: 'AI' },
   { id: 'agents', x: 0.42, y: 0.5, r: 9, cluster: 0, category: 'AI' },
   { id: 'ethics', x: 0.35, y: 0.62, r: 8, cluster: 0, category: 'Philosophy' },
@@ -245,13 +245,13 @@ export const CLUSTERS = [
 export const SYNTHESIS = {
   kicker: 'In your saves',
   title: 'You keep circling one idea',
-  body: 'The AI thread, Maya’s article, and a philosophy video about machine minds — three saves, one question: what stays human. You might be ready to write your own take.',
+  body: 'The AI thread, Maya’s article, and Mark Manson’s video — three saves, one question: what stays human. You might be ready to write your own take.',
 };
 
 // The resurfaced card must RELATE to the write-up above it (owner note, 13f):
 // the digest circles the AI/what-stays-human idea, so the card it brings back
 // is the philosophy video from that same thread — saved months ago, unwatched.
 export const REVIEW = {
-  title: 'Can a machine ever understand?',
+  title: 'What AI can’t take from you',
   meta: 'Saved 2 months ago · never revisited',
 };

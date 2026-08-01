@@ -1058,6 +1058,18 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-01 (launch film, round 13h) — three owner notes on the 13g cut.**
+  (1) The Ask caption's second line was clipping into the device top on the
+  vertical — bias 90→170 (same family as the library/digest fixes). (2) The
+  demo YouTube save is now **Mark Manson's** (owner request): channel
+  `IAmMarkManson`, video **"What AI can't take from you"** — which slots
+  STRAIGHT into the AI/what-stays-human trio, so the Ask answer, citation
+  chip, graph label, digest body and resurfaced card all moved with it
+  coherently. (3) "Real video in the thumbnail?" — declined (a recognisable
+  copyrighted frame in a launch film is a rights problem, and the film's
+  standing rule is generic marks, never reproductions); instead both YouTube
+  surfaces got a thumbnail that READS real: bold statement type ("AI CAN'T
+  TAKE THIS."), duration badge 21:07, view count. tsc 0, stills verified.
 - **2026-08-01 (launch film, round 13g) — the digest line, workshopped to its
   final form: "Behind the scenes, Machina pieces it all together — ready when
   you are."** Replaces "…one short read — delivered to you." after the owner

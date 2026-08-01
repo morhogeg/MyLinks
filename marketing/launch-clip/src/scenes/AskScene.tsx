@@ -48,7 +48,7 @@ export const AskScene: React.FC = () => {
   const target = ramp(f, [140, 300], [300, 375], EASE_IN_OUT) + dive * 95;
   // vertical: bias the device down so its top clears the two-line caption
   // block (owner screenshot note, round 13c — same fix library/digest carry)
-  const y = fr.focusY(target, scale * fr.scaleMul) + drift(f, 3, 300) + (fr.vertical ? 90 : 0);
+  const y = fr.focusY(target, scale * fr.scaleMul) + drift(f, 3, 300) + (fr.vertical ? 170 : 0);
 
   const out = 1 - prog(f, 363, 375);
   const inFade = prog(f, 0, 4);
