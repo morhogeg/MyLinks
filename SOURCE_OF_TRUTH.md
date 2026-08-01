@@ -1058,6 +1058,13 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-01 (launch film, round 13i) — act-one taps land ON their buttons.**
+  The `SURFACE_CTL` offsets dated from the first surface layouts and had
+  drifted as the layouts evolved (worst: X's star and YouTube's Save pill —
+  the fingertip rippled beside the control while the button still lit).
+  Re-derived every offset from the current layout maths; the fly-chip launch
+  points move with them since they share the same constants. Stills at all
+  five contacts verified centred.
 - **2026-08-01 (launch film, round 13h) — three owner notes on the 13g cut.**
   (1) The Ask caption's second line was clipping into the device top on the
   vertical — bias 90→170 (same family as the library/digest fixes). (2) The
