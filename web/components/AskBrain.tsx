@@ -7,6 +7,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import { getDominantDirection } from '@/lib/rtl';
+import { breakIntoParagraphs } from '@/lib/answerLayout';
 import SourceByline from '@/components/SourceByline';
 import { getPlatform, platformIcon, platformColor } from '@/lib/platform';
 import { appCheckHeaders } from '@/lib/firebase';
@@ -113,7 +114,13 @@ function MarkdownMessage({ content, dir: dirProp }: { content: string; dir?: 'rt
                 code: ({ children }) => <code className="px-1 py-0.5 rounded bg-card-hover text-[13px] font-mono">{children}</code>,
             }}
         >
-            {normalizeListMarkers(content)}
+            {/* Two normalisations, both deterministic and text-preserving:
+                stray list markers become real markdown, and a long answer the
+                model returned as one unbroken block gets paragraph breaks (see
+                lib/answerLayout — the prompt has asked for this since July and
+                the model still doesn't always comply). Answers the model DID
+                format pass through both untouched. */}
+            {breakIntoParagraphs(normalizeListMarkers(content))}
         </ReactMarkdown>
     );
 }

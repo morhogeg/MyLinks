@@ -1058,6 +1058,35 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-01 — Ask answers stop coming back as a wall of text (5th report —
+  fixed deterministically this time, not with more prompt).** The RAG prompt has
+  demanded paragraph structure since 2026-07-28, in TWO places: a rule in the
+  main list ("never return one unbroken block…") and `_STRUCTURE_REMINDER`
+  appended at the output-format position, which the 07-28 session added
+  precisely because the rule alone was being ignored. It is still ignored. Two
+  facts from the reported screenshot decided the approach: the renderer is a
+  real markdown renderer (`MarkdownMessage` — paragraphs, lists, headings all
+  supported, `remark-breaks` for single newlines), and nothing server-side
+  collapses whitespace — so the model genuinely returned one block, and a third
+  prompt tweak would have been the third coin flip. **New: `web/lib/answerLayout.ts`
+  `breakIntoParagraphs`, applied in the Ask renderer** next to the existing
+  `normalizeListMarkers` — a deterministic FLOOR under the prompt (which still
+  asks, because a model that structures its own answer does it better than any
+  splitter). It only ever inserts blank lines — no word changes, nothing
+  reorders — and backs off entirely when the answer contains ANY line break
+  (paragraphs, list, `**bold**` mini-heading, table) or is under 320 chars, so
+  well-formatted and short answers are untouched. Grouping is by LENGTH
+  (~220 chars/paragraph), not sentence count: **the reported wall was only
+  three sentences long** — a count-based rule (the first thing I wrote) left it
+  completely unchanged, which the unit test caught. The sentence splitter guards
+  decimals, initials and abbreviations. Because it runs at render time it also
+  repairs answers ALREADY in chat history, and covers both RAG paths (native
+  buffered + web streamed) without either knowing; greedy-from-the-start
+  grouping is prefix-stable, so a streaming answer's paragraph breaks never
+  move as text arrives. Verified: the exact reported answer renders as 3
+  paragraphs (one per idea), a short answer stays 1, and every "model formatted
+  it itself" case passes through byte-identical. No backend change → no
+  functions deploy.
 - **2026-08-01 — Graph round 2: "Back to card", and the settle stops shaking.**
   **(1) "Back to card"** — the graph opened via *See in graph* now carries the
   same chip "Back to Ask" uses (same slot above the legend, same pill, chevron +
