@@ -88,8 +88,11 @@ export const Capture: React.FC = () => {
   // shot, so it stays a touch wider) and then the checklist, which is the thing
   // the film is actually here to show and gets a hard read at ~1.95×.
   const scale = ramp(f, [0, 30], [1.24, 1.3], EASE_OUT) + push * 0.65 - settle * 0.14;
-  const rotY = ramp(f, [0, 118], [13, 10], EASE_IN_OUT) * (1 - shot);
-  const rotX = ramp(f, [0, 118], [6, 4], EASE_IN_OUT) * (1 - shot);
+  // ZERO 3D (round 13f): any rotateY/rotateX makes Chromium snapshot-and-
+  // scale the layer — the owner's "blurry until the camera zooms in". The
+  // film is 2D-crisp everywhere now; rotZ (a 2D rotation) is fine.
+  const rotY = 0;
+  const rotX = 0;
   const target = inApp
     ? ramp(f, [128, 300], [300, 250], EASE_IN_OUT)
     : ramp(f, [0, 60], [480, 560], EASE_IN_OUT);

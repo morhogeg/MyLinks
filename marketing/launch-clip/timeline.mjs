@@ -107,7 +107,7 @@ export const SUBTITLES = [
   // THE PROMISE — one line for the whole library beat; the search (a query
   // sharing no words with the one card it finds) plays wordless underneath
   // and proves the second half.
-  { bar: 13.3, bars: 2.45, place: 'left', text: 'From now on — lose nothing. Find everything.' },
+  { bar: 13.3, bars: 2.45, place: 'left', text: 'From now on — lose nothing. And find everything.' },
   // A new feature, not a continuation — no "Then" (owner note, round 13c).
   // The name still carries the line: "ask it" mushed out loud (round 12).
   { bar: 16.35, bars: 1.6, place: 'left', kicker: 'Ask', text: 'Ask Machina anything.' },
@@ -125,7 +125,7 @@ export const SUBTITLES = [
   // patterns jargon, no schedule talk, no reminders vibe — the concrete value
   // of the weekly synthesis, which is what the screen shows). The resurfaced
   // card below the write-up plays as a wordless grace note.
-  { bar: 26.1, bars: 2.6, place: 'left', text: 'And Machina turns your saves into one short read, delivered to you.' },
+  { bar: 26.1, bars: 2.6, place: 'left', text: 'And Machina turns your saves into one short read — delivered to you.' },
 ];
 
 /**

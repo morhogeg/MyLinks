@@ -70,7 +70,11 @@ export const Scatter: React.FC = () => {
   const wB =
     prog(f, LOSS.openB - 8, LOSS.openB + 12, EASE_IN_OUT) *
     (1 - prog(f, LOSS.shutB, LOSS.shutB + 27, EASE_IN_OUT));
-  const camScale = (fr.vertical ? 0.9 : 1) * (1 + 0.15 * (wA + wB));
+  // beat A plays CLOSE (round 13f — the owner twice called the surfaces too
+  // far away): the camera holds ~24% tighter while the gestures run, easing
+  // back out as the piles become the subject
+  const closeUp = 1 - prog(f, 215, 252, EASE_IN_OUT);
+  const camScale = (fr.vertical ? 0.9 : 1) * (1 + 0.24 * closeUp + 0.15 * (wA + wB));
   const camX = -(siloPos[WRONG_A].x * wA + siloPos[WRONG_B].x * wB) * 0.6;
   const camY = -(siloPos[WRONG_A].y * wA + siloPos[WRONG_B].y * wB) * 0.6 + drift(f, 6, 320);
 
@@ -195,7 +199,7 @@ export const Scatter: React.FC = () => {
                     `translate3d(${exit * siloPos[i].x * 0.3}px, ${
                       (1 - enter) * 44 + exit * siloPos[i].y * 0.3
                     }px, 0)`,
-                    `scale(${(0.95 + enter * 0.05 - exit * 0.12) * (fr.vertical ? 0.9 : 1)})`,
+                    `scale(${(0.95 + enter * 0.05 - exit * 0.12) * (fr.vertical ? 1.04 : 1.14)})`,
                   ].join(' '),
                   opacity: enter * (1 - exit),
                   zIndex: 50 + i,

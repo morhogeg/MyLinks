@@ -28,7 +28,7 @@ export const DigestScene: React.FC = () => {
   // device's top edge INTO the caption block (owner screenshot, round 10).
   const target = ramp(f, [56, 190], [280, fr.vertical ? 340 : 405], EASE_IN_OUT);
   const y = fr.focusY(target, scale * fr.scaleMul) + drift(f, 4, 220) + (fr.vertical ? 120 : 0);
-  const rotY = ramp(f, [0, 210], [-8, -3], EASE_IN_OUT);
+  const rotY = 0; // zero 3D — crispness over drama (round 13f)
 
   const out = 1 - prog(f, 213, 225);
   const inFade = prog(f, 0, 4);

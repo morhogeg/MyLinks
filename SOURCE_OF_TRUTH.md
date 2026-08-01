@@ -1058,6 +1058,22 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-01 (launch film, round 13f) — six post-ship fixes from owner
+  device screenshots.** (1) **The blur is gone at the ROOT:** every product
+  scene's `rotateY`/`rotateX` is now 0 — 3D rotation makes Chromium
+  snapshot-and-scale the layer (round 11 halved the angles for this exact
+  reason; 13f finishes the job), which was "blurry until the camera zooms
+  in". Only 2D transforms remain. (2) Act-one surfaces play ~40% BIGGER
+  (beat-A camera holds 24% closer + surface scale up) — they were "too far"
+  twice. (3) VO dichotomy carved: "From now on. Lose nothing. And find
+  everything." (full stops force the breaks; caption shows the dash version).
+  (4) The pipeline checklist now MATCHES the shipped Add-to-Machina sheet
+  exactly (owner screenshot): done = bare black check, active = the animated
+  breathing mark, pending = empty grey circles. (5) Digest VO breaks before
+  "Delivered to you." (6) Digest de-genericized: the sparkle icon replaced
+  with the app's own glyph, and the resurfaced card is now the philosophy
+  video (2mo, never revisited) so it belongs to the write-up above it — the
+  gift card was unrelated. Verify green, VO refit, stills + encode checks.
 - **2026-08-01 — LAUNCH FILM SHIPPED to `main` (merge `903ba2a`), owner:
   "It's great."** Rounds 13–13e merged from
   `claude/machina-launch-film-v2-bq359g` (film code only + this doc — no

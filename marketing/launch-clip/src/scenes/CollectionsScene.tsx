@@ -28,7 +28,7 @@ export const CollectionsScene: React.FC = () => {
   // shortens the travel so the device top never rides into the caption block
   const target = ramp(f, [18, 132], [270, fr.vertical ? 315 : 355], EASE_IN_OUT);
   const y = fr.focusY(target, scale * fr.scaleMul) + drift(f, 4, 240) + (fr.vertical ? 90 : 0);
-  const rotY = ramp(f, [0, 140], [10, 4], EASE_IN_OUT);
+  const rotY = 0; // zero 3D — crispness over drama (round 13f)
 
   const out = 1 - prog(f, 138, 150);
   const inFade = prog(f, 0, 4);

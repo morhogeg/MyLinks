@@ -45,7 +45,7 @@ export const Library: React.FC = () => {
   // same fix digest/collections carry (round 10's collision, resurfaced here
   // when round 13's earlier push lifted the device sooner)
   const y = fr.focusY(target, scale * fr.scaleMul) + drift(f, 4, 280) + (fr.vertical ? 130 : 0);
-  const rotY = ramp(f, [0, 40], [-9, -4], EASE_OUT) * (1 - prog(f, 138, 180, EASE_IN_OUT));
+  const rotY = 0; // zero 3D — crispness over drama (round 13f)
 
   const out = 1 - prog(f, 213, 225);
   const inFade = prog(f, 0, 4);

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronLeft, Crosshair, Instagram, Lock, MessagesSquare, Newspaper, Play, Share2, Sparkles, Waypoints, Youtube } from 'lucide-react';
+import { ChevronLeft, Crosshair, Instagram, Lock, MessagesSquare, Newspaper, Play, Share2, Waypoints, Youtube } from 'lucide-react';
 import { T, categoryColor } from '../theme';
 import { sans } from '../fonts';
 import { StatusBar, HomeIndicator, SCREEN_W, SCREEN_H } from './Phone';
@@ -548,28 +548,39 @@ export const AnalyzingScreen: React.FC<{
               const active = i === step;
               return (
                 <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                  {/* The app's own mark as the phase indicator (owner call,
-                      round 13c — no generic radio circles): the ACTIVE phase
-                      carries the ANIMATED mark, launching and then breathing
-                      the app's searching pulse; done phases hold it solid;
-                      pending phases hold it faint. */}
+                  {/* MATCH THE SHIPPED SHEET (owner screenshot, round 13f):
+                      done = a bare black checkmark, active = the app's
+                      ANIMATED mark breathing its searching pulse, pending =
+                      an empty grey circle. */}
                   <div
                     style={{
-                      width: 15,
+                      width: 16,
                       height: 17,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       flexShrink: 0,
-                      color: T.accent,
-                      opacity: active ? 1 : done ? 0.9 : 0.22,
-                      filter: active ? `drop-shadow(0 0 5px ${T.accentRing})` : undefined,
                     }}
                   >
-                    {active ? (
-                      <AnimatedMark id={`step-${i}`} u={markU} pulse={markPulse} style={{ width: 14, height: 'auto' }} />
-                    ) : (
-                      <CitationGlyph style={{ width: 12, height: 14 }} />
+                    {done && (
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={T.accent} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M4 12.5 9.5 18 20 6.5" />
+                      </svg>
+                    )}
+                    {active && (
+                      <span style={{ color: T.accent, display: 'inline-flex' }}>
+                        <AnimatedMark id={`step-${i}`} u={markU} pulse={markPulse} style={{ width: 14, height: 'auto' }} />
+                      </span>
+                    )}
+                    {!done && !active && (
+                      <div
+                        style={{
+                          width: 14,
+                          height: 14,
+                          borderRadius: 14,
+                          border: `1.5px solid ${T.borderStrong}`,
+                        }}
+                      />
                     )}
                   </div>
                   <span
@@ -1110,6 +1121,7 @@ export const DigestScreen: React.FC<{ enter?: number; reviewEnter?: number }> = 
       >
         <div style={{ height: 2, background: T.accentGradient, opacity: 0.75 }} />
         <div style={{ padding: 18 }}>
+          {/* The app's own glyph, not a generic sparkle (owner note, 13f) */}
           <div
             style={{
               display: 'flex',
@@ -1122,7 +1134,9 @@ export const DigestScreen: React.FC<{ enter?: number; reviewEnter?: number }> = 
               color: T.textMuted,
             }}
           >
-            <Sparkles size={11} color={T.accent} />
+            <span style={{ color: T.accent, display: 'inline-flex' }}>
+              <CitationGlyph style={{ width: 9, height: 11 }} />
+            </span>
             {SYNTHESIS.kicker}
           </div>
           <h2
