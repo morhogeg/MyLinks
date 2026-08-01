@@ -125,7 +125,10 @@ export const SUBTITLES = [
   // patterns jargon, no schedule talk, no reminders vibe — the concrete value
   // of the weekly synthesis, which is what the screen shows). The resurfaced
   // card below the write-up plays as a wordless grace note.
-  { bar: 26.1, bars: 2.6, place: 'left', text: 'And Machina turns your saves into one short read — delivered to you.' },
+  // Round 13g (workshopped): proactivity explicit ("Behind the scenes"),
+  // synthesis value in kitchen-table words, the result on YOUR timing. "it
+  // all" not "your saves" — the two lines before already say saves/saved.
+  { bar: 26.1, bars: 2.6, place: 'left', text: 'Behind the scenes, Machina pieces it all together — ready when you are.' },
 ];
 
 /**
