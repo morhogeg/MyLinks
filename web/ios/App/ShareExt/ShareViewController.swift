@@ -401,8 +401,10 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
 
         // The brand mark, working — the Citation mark above the % counter, the
         // same glyph the in-app scan surfaces ride (LinkScanProgress /
-        // AnalyzingBanner via OrbStatus). Replaces the retired Thinking Orb.
-        // Hidden in image mode (the image itself is the visual there).
+        // ImageScanProgress / AnalyzingBanner). Every save wears it, photos
+        // included: sharing a picture used to be the one flow with no mark at
+        // all, which read as a different app's loader. Hidden until a flow
+        // starts; both presentScan and presentLinkScan reveal it.
         citationMark.isHidden = true
         citationMark.translatesAutoresizingMaskIntoConstraints = false
         previewView.addSubview(citationMark)
@@ -910,10 +912,14 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         guard !isImageFlow, !isLinkFlow else { return }
         isImageFlow = true
         if let image = image { imageView.image = image }
+        citationMark.isHidden = false
         beginScanAnimation()
         view.setNeedsLayout()
         view.layoutIfNeeded()
         layoutSweepGradient()
+        // Started AFTER layout, same reason as the link flow: the arrival
+        // animation measures the slot's real bounds.
+        citationMark.start()
     }
 
     /// Show the native scan animation for a shared link/text: a faux page preview

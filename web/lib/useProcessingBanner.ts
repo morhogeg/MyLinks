@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from './types';
 import type { AnalyzingState } from '@/components/AnalyzingBanner';
-import { progressFor, CEILING } from './shareProgress';
+import { progressFor, CEILING, toMs, cardStartMs } from './shareProgress';
 import { stageProgress } from './scanPhases';
 import { lastShareHandoff } from './shareConfig';
 import { claimCardCapture, finishCardCapture, isCardCaptureFinished } from './captureLifecycle';
@@ -27,22 +27,11 @@ import { claimCardCapture, finishCardCapture, isCardCaptureFinished } from './ca
  * can flash "Saved" and slide away.
  */
 
-/** Coerce a Firestore timestamp field (ms number, or legacy ISO string) to ms. */
-function toMs(v: number | string | undefined): number | null {
-    if (typeof v === 'number' && isFinite(v) && v > 0) return v;
-    if (typeof v === 'string') {
-        const t = Date.parse(v);
-        if (!isNaN(t)) return t;
-    }
-    return null;
-}
-
 /** The shared start clock a card anchors its ramp to, or null if it has none.
     Same precedence the ramp below uses, so the latch and the ramp always agree
-    about which capture a card belongs to. */
-function cardStartOf(l: Link): number | null {
-    return toMs(l.processingStartedAt) ?? toMs(l.createdAt);
-}
+    about which capture a card belongs to. (Shared with the optimistic bridge —
+    see lib/shareProgress.) */
+const cardStartOf = (l: Link) => cardStartMs(l);
 
 export function useProcessingBanner(links: Link[], suppressId?: string | null): AnalyzingState | null {
     const firstSeen = useRef<Map<string, number>>(new Map());

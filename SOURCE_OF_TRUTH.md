@@ -1058,6 +1058,49 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-01 — Four owner fixes from device QA: the photo scanner wears the
+  mark, cards stop saying "the author", and "Saved" stops lying.**
+  **(1) Photo saves carry the Citation mark** like every other save — the
+  in-app `ImageScanProgress` swapped its generic lucide `ScanText` glyph for
+  `CitationMark` (motion picked per phase from the same verb→motion table
+  `lib/scanPhases.ts` states: searching while it reads, shaping while it writes,
+  solving while it files), and the **iOS Share Extension HUD** now reveals the
+  mark in image mode too (`presentScan` — it was deliberately hidden, "the image
+  is the visual there", which made a photo share the one flow with no brand at
+  all). **(2)+(3) Prompt copy** (`functions/ai_service.py`): the instruction that
+  asked for a trailing **"Conclusions"** section is DELETED and replaced by an
+  explicit ban on any closing "Conclusions / Summary / Takeaways" section in any
+  language (the write-up ends on its last key point); **"the author" is now
+  forbidden outright** — it was in the prompt's own list of approved factual
+  phrasings ("The author argues…"), which is why every Key Points bullet opened
+  with it. The rule names the alternatives: state the claim directly, or name
+  the real person/publication when the content does. Ships with a functions
+  deploy scoped to `analyze_link,analyze_image,process_link_background`;
+  **existing cards keep their stored text** — only new/re-analyzed saves get the
+  new phrasing. **(4) The share progress bar told the truth about "Saved".**
+  `useSharedCaptureBanner` used to declare a capture done on a TIMER — feed
+  authoritative + nothing processing for 4s — which fired in the gap between the
+  upload finishing and the backend writing its placeholder card: the bar flashed
+  "Saved", then the card appeared, still working, seconds later (and the capture
+  latch then suppressed the real banner, so the skeleton sat there with no
+  progress at all). The finish frame is now driven by EVIDENCE: Feed publishes
+  `readyCaptureAt` (newest capture clock among NON-processing cards, via the new
+  shared `cardStartMs`/`toMs` helpers in `lib/shareProgress.ts`) up through
+  `page.tsx`, and the bridge may only say "Saved" once that reaches its own
+  capture's start clock (±2s of NTP skew). The timer survives ONLY as a give-up
+  for the case where no card is ever coming (a deduped re-share is a server
+  no-op), and is now 15s measured from when we actually began waiting. tsc 0,
+  py_compile clean, lint unchanged; photo scanner render-verified in Chromium
+  (all five phases, light + dark). **Still open — owner input needed:** the
+  Instagram **play icon** on pulled images. Nothing in the app draws it (no play
+  overlay exists in `Card`/`LinkDetailModal` for social posters — only YouTube's
+  "Watch on YouTube" pill and the "Key moments" heading use a Play glyph), so it
+  is burned into the poster we fetch — most likely the bridge-derived og:image
+  (`instagramez`/`kkinstagram`/`ddinstagram` in `scraper.py::_scrape_instagram_url`,
+  used as `video_thumbnail_url` for reels). The sandbox cannot reach Instagram
+  (egress policy 403s the CONNECT) to confirm which source burns it in, so the
+  next session should get a card screenshot + the card's `metadata.thumbnailUrl`
+  before changing the scraper.
 - **2026-08-01 — "See in graph" from a card (both states).** Every card can now
   open the Graph focused on ITSELF, so its connections are visible as a map, not
   just as the Related list. Costs nothing at runtime: the graph is a client-side
