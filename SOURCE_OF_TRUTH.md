@@ -1058,6 +1058,15 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-01 (launch film, round 13g) — the digest line, workshopped to its
+  final form: "Behind the scenes, Machina pieces it all together — ready when
+  you are."** Replaces "…one short read — delivered to you." after the owner
+  pushed on both halves. Explored and dropped: "delivered to you" (courier-y),
+  "keeps turning your saves into short reads" (undersold the value), "keeps
+  making sense of" (phrasing), "has been piecing" (stronger tense but breaks
+  the two-line vertical rule), dropping "ready when you are" (all process, no
+  payoff). VO speaks it with a full stop before "Ready"; caption shows the
+  dash. Single-line change; everything else untouched.
 - **2026-08-01 (launch film, round 13f) — six post-ship fixes from owner
   device screenshots.** (1) **The blur is gone at the ROOT:** every product
   scene's `rotateY`/`rotateX` is now 0 — 3D rotation makes Chromium

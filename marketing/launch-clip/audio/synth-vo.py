@@ -48,8 +48,8 @@ LINES = [
     (18.4, 1.9, "Every answer comes straight from your saves."),
     (21.4, 2.3, f"{SAY_NAME} notices when things you saved belong together."),
     (24.25, 1.7, "Group your saves into collections that mirror how you think."),
-    # Full stop before "delivered" = the audible break the owner asked for.
-    (26.1, 2.6, f"And {SAY_NAME} turns your saves into one short read. Delivered to you."),
+    # Full stop before "Ready" = the audible break; caption shows the dash.
+    (26.1, 2.6, f"Behind the scenes, {SAY_NAME} pieces it all together. Ready when you are."),
     # the closing statement, over the endcard's own line
     (30.1, 1.6, f"{SAY_NAME}. Everything you save — finally useful."),
 ]
