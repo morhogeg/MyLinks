@@ -214,35 +214,55 @@ export const SaveSurface: React.FC<{ k: PlatformKey; save: number }> = ({ k, sav
       <>
         <div
           style={{
+            position: 'relative',
             height: 168,
             borderRadius: 12,
-            background: 'linear-gradient(160deg, rgba(255,0,0,0.1), rgba(233,235,241,0.95))',
+            background:
+              'linear-gradient(160deg, rgba(20,22,28,0.92), rgba(52,56,66,0.9) 55%, rgba(255,0,0,0.25))',
             border: '1px solid rgba(16,24,40,0.07)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            padding: '0 26px',
+            overflow: 'hidden',
           }}
         >
-          <div
+          {/* reads like a real thumb: bold statement type + duration badge */}
+          <span
             style={{
-              width: 46,
-              height: 46,
-              borderRadius: 46,
-              background: 'rgba(17,19,24,0.55)',
-              border: '1px solid rgba(255,255,255,0.4)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
+              fontSize: 24,
+              fontWeight: 900,
+              lineHeight: 1.08,
+              letterSpacing: '-0.02em',
+              textTransform: 'uppercase',
+              color: '#ffffff',
+              textShadow: '0 2px 12px rgba(0,0,0,0.5)',
             }}
           >
-            <Play size={17} fill="#ffffff" strokeWidth={0} />
-          </div>
+            AI can’t take this.
+          </span>
+          <span
+            style={{
+              position: 'absolute',
+              right: 10,
+              bottom: 10,
+              padding: '2px 6px',
+              borderRadius: 5,
+              background: 'rgba(0,0,0,0.75)',
+              color: '#ffffff',
+              fontSize: 10.5,
+              fontWeight: 600,
+              fontVariantNumeric: 'tabular-nums',
+            }}
+          >
+            21:07
+          </span>
         </div>
         <div style={{ marginTop: 12, fontSize: 15.5, fontWeight: 700, letterSpacing: '-0.02em', color: '#111318' }}>
-          Can a machine ever understand?
+          What AI can’t take from you
         </div>
         <div style={{ display: 'flex', alignItems: 'center', marginTop: 10 }}>
-          <span style={{ fontSize: 12, color: '#606068' }}>Philosophy Tube</span>
+          <span style={{ fontSize: 12, color: '#606068' }}>IAmMarkManson</span>
           <span style={{ marginLeft: 'auto' }}>
             <ActionButton save={save} ink={p.rgb} wide>
               <Plus size={15} strokeWidth={2.6} />
