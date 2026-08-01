@@ -1058,6 +1058,19 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-01 — LAUNCH FILM SHIPPED to `main` (merge `903ba2a`), owner:
+  "It's great."** Rounds 13–13e merged from
+  `claude/machina-launch-film-v2-bq359g` (film code only + this doc — no
+  web/functions/hosting surfaces, so no deploys beyond the merge; Vercel's
+  auto-build of main is a no-op for the film). The delivered master is
+  `MachinaLaunchVerticalVO` (1080×1920, 80s, local Kokoro VO) — re-render with
+  `npx remotion render src/index.ts MachinaLaunchVerticalVO
+  out/machina-launch-vertical-vo.mp4` after `npm run score && npm run captions
+  && npm run verify` (VO model fetch + synth per README when lines change).
+  Remaining owner gates before publishing: LISTEN to the mix and the "Makeena"
+  pronunciation (never heard in-sandbox, only verified numerically), and swap
+  the endcard footer line for the App Store badge/URL once the listing is live.
+  Detail on every decision: the round 13–13e entries below.
 - **2026-07-31 (launch film, round 13e) — act one gets a FIFTH bar (the
   structural fix after three "too fast" notes).** Scatter 4→5 bars; the bar
   came from collections (3→2 — one caption now, 5s is comfortable). Saves run
