@@ -1,0 +1,33 @@
+{
+  "name": "machina-launch-clip",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts MachinaLaunch out/machina-launch.mp4",
+    "score": "node audio/score.mjs",
+    "captions": "node audio/captions.mjs",
+    "fonts": "node audio/embed-fonts.mjs",
+    "verify": "node audio/verify.mjs"
+  },
+  "dependencies": {
+    "@remotion/bundler": "^4.0.501",
+    "@remotion/cli": "^4.0.501",
+    "@remotion/media-utils": "^4.0.501",
+    "@remotion/noise": "^4.0.501",
+    "@remotion/paths": "^4.0.501",
+    "@remotion/renderer": "^4.0.501",
+    "@remotion/tailwind-v4": "^4.0.501",
+    "geist": "^1.7.2",
+    "lucide-react": "^0.563.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "remotion": "^4.0.501",
+    "tailwindcss": "^4.3.3"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "^5.9.3"
+  }
+}
