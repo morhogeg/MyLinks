@@ -201,6 +201,31 @@ The multi-user auth work is **fully written but not live**:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
+> **LAUNCH GATE (compiled 2026-08-02, "what is actually left before iOS
+> launch?").** Pointers only — the detail stays in the numbered tasks, so nothing
+> below is duplicated and nothing can drift. **Almost none of it is code.**
+> 1. **Trademark clearance for "Machina"** — task **8a** / BRANDING **A-1**. Do
+>    this FIRST: it is free, and it is the only open item that could veto the
+>    identity and force a rename, which gets more expensive every week.
+> 2. **Auth cutover** — task **2**. 4 GitHub repo secrets + 1 Vercel var + a
+>    one-line rules commit + one device check. The only hard blocker.
+> 3. **App Store Connect data entry** — tasks **8**, **9** + BRANDING **A-2**/
+>    **A-4**: nutrition label, metadata, 6 screenshots (shoot post-rename), demo
+>    account (only creatable after the cutover) + review notes.
+> 4. **On-device sweep** — task **11**, plus the Settings "Done" safe-area fix,
+>    which has still never been in a TestFlight build (see item 11a1).
+> 5. **Cost/key hygiene** — tasks **5** (rotate the Gemini key *into the paid
+>    project*, rotate the ASC `.p8`) and **19** (GCP budget alert, PITR/backups,
+>    uptime check; and drop `MONTHLY_ASK_QUOTA` off its 1000 dev value).
+> 6. **Unverified, close before launch** — **4b** (a weekly synthesis has still
+>    never been proven to generate end-to-end), **4c**, **21**.
+> 7. **Marketing coherence** — BRANDING **Q-4** (the hero is still contested three
+>    ways) and **A-5** (every §8 asset leads on Ask). ~~Q-1/Q-5, the tagline~~ —
+>    **closed 2026-08-02 by D-6**, see §9.
+>
+> Explicitly NOT gates: 11a2 (scan-phase wording drift), 11a3 (em dashes), 11d
+> (`next` upgrade / CSP), 12 (ingest-token Keychain).
+
 ### 🔴 P0 — launch blockers (in order)
 
 1. **[x] Native auth build green (iOS)** *(code done 2026-07-03 — root cause was
@@ -1016,8 +1041,13 @@ paid spend.
 > parts were making the share extension never lie about saving, and a knowledge
 > graph computed on every save. Happy to answer questions on the stack.
 
-*Product Hunt:* tagline "**Ask your bookmarks anything**"; first comment covers
-the origin story (WhatsApp self-messages), the capture surface, and the free tier.
+*Product Hunt:* tagline "**Everything you save, finally useful.**" — the product
+tagline (`docs/BRANDING.md` D-6), adopted here 2026-08-02, replacing
+~~"Ask your bookmarks anything"~~ which called the product *bookmarks* (a label
+the X-thread asset above explicitly disowns) and led on Ask (open question Q-4).
+First comment covers the origin story (WhatsApp self-messages), the capture
+surface, and the free tier — note that comment still leads on Ask, and rides
+BRANDING **A-5**'s pre-launch-week sweep of every asset on this page.
 
 *App Store subtitle/promo:* subtitle is `Capture. Ask. Connect.`
 (`docs/APP_STORE.md` §2; reasoning in `docs/BRANDING.md` D-2 — it opens on
@@ -1043,9 +1073,13 @@ score, no captions — for social cuts; captions also emit as `.srt`). Two thing
 know before reusing it: the UI is **rebuilt from the shipped components**
 (`src/theme.ts` ports `globals.css` tokens, `src/ui/Brand.tsx` carries the real
 wordmark path data, the checklist is `web/lib/scanPhases.ts` verbatim) so it drifts
-if those change; and the endcard's last line (`Your knowledge, on iPhone.`) is the
-one slot meant to become a real App Store badge/URL once the listing is live —
-nothing in the film claims availability yet. The stills it renders double as the
+if those change; and the endcard's last line — **`Everything you save, finally
+useful.`**, which is now the product tagline (`docs/BRANDING.md` D-6); this line
+was described here as `Your knowledge, on iPhone.` until 2026-08-02, stale since
+a later film round changed it — is the one slot meant to become a real App Store
+badge/URL once the listing is live, so **that swap now costs the tagline its
+best-placed appearance**; prefer adding the badge above the rule to replacing the
+line. Nothing in the film claims availability yet. The stills it renders double as the
 X-thread screenshots the posts above ask for.
 
 *Where to "advertise" for free:* X (primary), Product Hunt, Hacker News,
@@ -1057,6 +1091,41 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-08-02 — Machina has a tagline: "Everything you save, finally useful."
+  (owner's line), plus a compiled launch gate at the top of §4.** The owner asked
+  what was left before the iOS launch and set the tagline in the same breath.
+  **The tagline** is recorded as `docs/BRANDING.md` **D-6** and is the first
+  candidate in that file's history that makes a *promise* instead of narrating a
+  mechanism — precisely the flaw that killed `Save anything. It reads it.` and
+  `Analyzed, organized, connected` in the 2026-07-27 subtitle round — so it was
+  taken as-is; the work was deciding **where it goes**. It is **not** the App
+  Store subtitle: 36 chars against a 30-char field with no survivable cut, and it
+  re-spends `save`, already a Name token (the same rule that made D-2's subtitle
+  open on `Capture`). So it is a **new layer** — tagline = the promise, subtitle
+  = the phases — which also lets it dodge the one thing the subtitle can't:
+  `Everything you save` is capture and `finally useful` is the payoff capture
+  alone never delivers, so it stays true whichever way **Q-4** (the hero, still
+  contested three ways) lands, and Q-4 stops blocking having a line at all.
+  Landed on `web/app/layout.tsx` + `web/public/manifest.json` (`description`),
+  `README.md`, and §8's Product Hunt slot; closes BRANDING **Q-1**, **Q-5** and
+  **A-3**; a ⚠️ note in `docs/APP_STORE.md` §2 explains why it must not be pasted
+  into the Subtitle field, because "the app has a tagline, why isn't it the
+  subtitle?" is the obvious question and the answer isn't. **Two things surfaced
+  while landing it.** (1) The launch film's endcard **already** carried the exact
+  sentence — §8 still described that slot as `Your knowledge, on iPhone.`, stale
+  since a later film round — so the film needed no change, the doc did; §8 now
+  also warns that swapping that line for the App Store badge would cost the
+  tagline its best placement (add the badge *above* the rule instead). (2)
+  `README.md` opened with *"Your AI-powered personal knowledge base"* — a **live
+  D-3 violation** (`ai` on a user-visible surface) that the 2026-07-27 rename pass
+  missed, fixed by the same edit. **The launch gate** (new block at the top of §4)
+  is pointers to existing tasks, not new content: trademark clearance (8a/A-1)
+  first because it is free and is the only item that could force a rename, then
+  the auth cutover (2), App Store Connect entry (8/9 + A-2/A-4), the device sweep
+  (11), key/cost hygiene (5/19), the never-verified weekly synthesis (4b), and the
+  marketing-coherence questions (Q-4/A-5). Frontend strings + docs only — `tsc`
+  clean, no functions change, no rules change.
 
 - **2026-08-01 — The card → graph → Ask trail now HOLDS (owner: "the back to
   card must hold").** Reported: open a card → *See in graph* (chip present) →
