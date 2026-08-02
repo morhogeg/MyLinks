@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronLeft, Crosshair, Instagram, Lock, MessagesSquare, Newspaper, Play, Share2, Waypoints, Youtube } from 'lucide-react';
+import { ChevronLeft, Crosshair, Instagram, Lock, MessagesSquare, Newspaper, Play, Plus, Share2, Star, Youtube } from 'lucide-react';
 import { T, categoryColor } from '../theme';
 import { sans } from '../fonts';
 import { StatusBar, HomeIndicator, SCREEN_W, SCREEN_H } from './Phone';
@@ -25,7 +25,6 @@ import {
   GRAPH_NODES,
   FEED_ORDER,
   INCOMING,
-  REVIEW,
   SYNTHESIS,
 } from '../data/library';
 
@@ -1147,163 +1146,167 @@ export const DigestScreen: React.FC<{ enter?: number; reviewEnter?: number }> = 
   <Screen>
     <StatusBar />
     <AppHeader title="Digest" showSearch={false} />
-    <div style={{ position: 'absolute', top: 105, left: 0, right: 0, bottom: 0, padding: '18px 16px' }}>
+    <div style={{ position: 'absolute', top: 105, left: 0, right: 0, bottom: 0, padding: '14px 14px' }}>
+      {/* THE REAL SYNTHESIS READING VIEW (owner call, round 13j) — ported from
+          the shipped SynthesisCard.tsx `alwaysOpen` layout: accent-tinted card,
+          masthead (glyph + THIS WEEK IN MACHINA + title + week·saves), the
+          narrative lead, the amber STANDOUT card (doubling as the resurfaced
+          save), the italic "Worth sitting with" question, and the Your-notes
+          footer. Not an approximation — the same hierarchy, radii and type
+          scale, in the film's light tokens. */}
       <div
         style={{
-          borderRadius: 20,
+          borderRadius: 18,
           background: T.card,
-          border: `1px solid ${T.border}`,
+          border: '1px solid rgba(20,20,27,0.22)',
           boxShadow: T.shadowCard,
           overflow: 'hidden',
           opacity: enter,
           transform: `translateY(${(1 - enter) * 18}px)`,
+          padding: '18px 16px 16px',
         }}
       >
-        <div style={{ height: 2, background: T.accentGradient, opacity: 0.75 }} />
-        <div style={{ padding: 18 }}>
-          {/* The app's own glyph, not a generic sparkle (owner note, 13f) */}
+        {/* masthead */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 7,
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: '0.14em',
+            textTransform: 'uppercase',
+            color: T.accent,
+          }}
+        >
+          <CitationGlyph style={{ width: 9, height: 11 }} />
+          This week in Machina
+        </div>
+        <h2
+          style={{
+            margin: '9px 0 0',
+            fontSize: 21,
+            lineHeight: 1.15,
+            fontWeight: 700,
+            letterSpacing: '-0.01em',
+            color: T.text,
+          }}
+        >
+          {SYNTHESIS.title}
+        </h2>
+        <div style={{ marginTop: 5, fontSize: 12, color: T.textMuted }}>{SYNTHESIS.meta}</div>
+
+        {/* the narrative lead */}
+        <p style={{ margin: '13px 0 0', fontSize: 13.5, lineHeight: 1.65, color: T.text }}>
+          {SYNTHESIS.lead}
+        </p>
+
+        {/* STANDOUT — the resurfaced save, exactly the app's card */}
+        <div
+          style={{
+            marginTop: 16,
+            borderRadius: 16,
+            border: `1px solid ${T.border}`,
+            background: T.fillSubtle,
+            padding: '13px 15px',
+            opacity: reviewEnter,
+            transform: `translateY(${(1 - reviewEnter) * 14}px)`,
+          }}
+        >
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 7,
-              fontSize: 9.5,
-              fontWeight: 800,
-              letterSpacing: '0.15em',
+              gap: 5,
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+              color: '#D97706',
+            }}
+          >
+            <Star size={12} fill="#D97706" strokeWidth={0} />
+            Standout
+          </div>
+          <div style={{ marginTop: 6, fontSize: 14.5, fontWeight: 700, lineHeight: 1.25, color: T.text }}>
+            {SYNTHESIS.standoutTitle}
+          </div>
+          <div style={{ marginTop: 4, fontSize: 12.5, lineHeight: 1.6, color: T.textSecondary }}>
+            {SYNTHESIS.standoutReason}
+          </div>
+        </div>
+
+        {/* Worth sitting with — the open question, italic, as shipped */}
+        <div
+          style={{
+            marginTop: 10,
+            borderRadius: 16,
+            background: T.fillSubtle,
+            padding: '13px 15px',
+            opacity: reviewEnter,
+            transform: `translateY(${(1 - reviewEnter) * 14}px)`,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: '0.14em',
               textTransform: 'uppercase',
               color: T.textMuted,
             }}
           >
-            <span style={{ color: T.accent, display: 'inline-flex' }}>
-              <CitationGlyph style={{ width: 9, height: 11 }} />
+            Worth sitting with
+          </div>
+          <div style={{ marginTop: 6, fontSize: 13.5, lineHeight: 1.6, color: T.text, fontStyle: 'italic' }}>
+            {SYNTHESIS.question}
+          </div>
+        </div>
+
+        {/* Your notes — the footer the user writes; empty state as shipped */}
+        <div
+          style={{
+            marginTop: 16,
+            paddingTop: 13,
+            borderTop: `1px solid ${T.border}`,
+            opacity: reviewEnter * 0.95,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                color: T.textMuted,
+              }}
+            >
+              Your notes
             </span>
-            {SYNTHESIS.kicker}
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                height: 28,
+                padding: '0 11px 0 8px',
+                borderRadius: 999,
+                border: `1px solid ${T.borderStrong}`,
+                background: T.card,
+                fontSize: 11.5,
+                fontWeight: 700,
+                color: T.text,
+              }}
+            >
+              <Plus size={12} strokeWidth={2.6} />
+              Add a note
+            </span>
           </div>
-          <h2
-            style={{
-              margin: '12px 0 0',
-              fontSize: 20,
-              lineHeight: 1.18,
-              fontWeight: 700,
-              letterSpacing: '-0.025em',
-              color: T.text,
-            }}
-          >
-            {SYNTHESIS.title}
-          </h2>
-          <p style={{ margin: '11px 0 0', fontSize: 13, lineHeight: 1.55, color: T.textSecondary }}>
-            {SYNTHESIS.body}
-          </p>
-          <div style={{ marginTop: 15, display: 'flex', gap: 7 }}>
-            {['AI', 'Philosophy', 'Sent by Maya'].map((t) => (
-              <span
-                key={t}
-                style={{
-                  fontSize: 9,
-                  fontWeight: 900,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  padding: '3px 7px',
-                  borderRadius: 6,
-                  background: T.fillSubtle,
-                  color: 'rgba(102,102,102,0.9)',
-                }}
-              >
-                {t}
-              </span>
-            ))}
+          <div style={{ marginTop: 8, fontSize: 12, lineHeight: 1.5, color: T.textMuted }}>
+            Nothing yet — jot down what you want to carry forward from this week.
           </div>
         </div>
-      </div>
-
-      {/* the resurface nudge — spaced repetition, the loop closing */}
-      <div
-        style={{
-          marginTop: 14,
-          borderRadius: 18,
-          background: T.card,
-          border: `1px solid ${T.border}`,
-          boxShadow: T.shadowCard,
-          padding: 15,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          opacity: reviewEnter,
-          transform: `translateY(${(1 - reviewEnter) * 16}px)`,
-        }}
-      >
-        <div
-          style={{
-            width: 34,
-            height: 34,
-            borderRadius: 12,
-            background: 'rgba(20,20,27,0.06)',
-            color: T.accent,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-          }}
-        >
-          <Waypoints size={16} />
-        </div>
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: T.text, lineHeight: 1.25 }}>
-            {REVIEW.title}
-          </div>
-          <div style={{ fontSize: 11, color: T.textMuted, marginTop: 3 }}>{REVIEW.meta}</div>
-        </div>
-        <div
-          style={{
-            fontSize: 11.5,
-            fontWeight: 700,
-            padding: '7px 12px',
-            borderRadius: 999,
-            background: T.accentGradient,
-            color: T.accentInk,
-            flexShrink: 0,
-          }}
-        >
-          Review
-        </div>
-      </div>
-
-      {/* Earlier entries — the digest is a recurring habit, not a one-off card,
-          and the empty half-screen made it look like a first run. */}
-      <div style={{ marginTop: 22, opacity: reviewEnter * 0.9 }}>
-        <div
-          style={{
-            fontSize: 9.5,
-            fontWeight: 800,
-            letterSpacing: '0.15em',
-            textTransform: 'uppercase',
-            color: T.textMuted,
-            marginBottom: 11,
-          }}
-        >
-          Earlier
-        </div>
-        {[
-          { t: 'The apartment hunt, week three', m: 'Last week · 4 cards' },
-          { t: 'You saved five recipes, tried one', m: '2 weeks ago · 6 cards' },
-        ].map((r) => (
-          <div
-            key={r.t}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 11,
-              padding: '11px 0',
-              borderTop: `1px solid ${T.border}`,
-            }}
-          >
-            <Newspaper size={14} color={T.textMuted} style={{ flexShrink: 0 }} />
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 12.5, fontWeight: 500, color: T.textSecondary }}>{r.t}</div>
-              <div style={{ fontSize: 10.5, color: T.textMuted, marginTop: 2 }}>{r.m}</div>
-            </div>
-          </div>
-        ))}
       </div>
     </div>
     <TabBar active="digest" />
