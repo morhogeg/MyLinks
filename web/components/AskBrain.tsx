@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { ArrowUp, Plus, MessagesSquare, Copy, Check, TriangleAlert, Sparkles, RefreshCw, Square, RotateCcw, ArrowDown, X, Waypoints, Image as ImageIcon, StickyNote } from 'lucide-react';
+import { ArrowUp, Plus, MessagesSquare, Copy, Check, TriangleAlert, Sparkles, RefreshCw, Square, RotateCcw, ArrowDown, X, ChevronLeft, Waypoints, Image as ImageIcon, StickyNote } from 'lucide-react';
 import type { OrbState } from '@/components/ui/CitationMark';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import { getDominantDirection } from '@/lib/rtl';
+import { breakIntoParagraphs } from '@/lib/answerLayout';
 import SourceByline from '@/components/SourceByline';
 import { getPlatform, platformIcon, platformColor } from '@/lib/platform';
 import { appCheckHeaders } from '@/lib/firebase';
@@ -113,7 +114,13 @@ function MarkdownMessage({ content, dir: dirProp }: { content: string; dir?: 'rt
                 code: ({ children }) => <code className="px-1 py-0.5 rounded bg-card-hover text-[13px] font-mono">{children}</code>,
             }}
         >
-            {normalizeListMarkers(content)}
+            {/* Two normalisations, both deterministic and text-preserving:
+                stray list markers become real markdown, and a long answer the
+                model returned as one unbroken block gets paragraph breaks (see
+                lib/answerLayout — the prompt has asked for this since July and
+                the model still doesn't always comply). Answers the model DID
+                format pass through both untouched. */}
+            {breakIntoParagraphs(normalizeListMarkers(content))}
         </ReactMarkdown>
     );
 }
@@ -264,6 +271,11 @@ interface AskBrainProps {
     onOpenLink: (id: string) => void;
     /** Leave Ask mode (mobile shows a back button; desktop exits via the toolbar). */
     onExit?: () => void;
+    /** Present only when this Ask was opened FROM the graph ("Ask about these").
+     *  Returns there — the same standard back control the graph itself uses to
+     *  get back to Ask or to a card, so the trail unwinds one hop at a time
+     *  instead of dumping the user at the library. */
+    onBackToGraph?: () => void;
     /** True while a Feed-owned overlay (the cited-card LinkDetailModal, a sheet,
      *  a confirm dialog) is open ON TOP of Ask. That surface owns the edge-swipe
      *  back gesture and registers its own handler, so Ask must stand down —
@@ -290,7 +302,7 @@ interface AskBrainProps {
 
 const HISTORY_COLLAPSE_KEY = 'askbrain:histcollapsed';
 
-export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayOpen = false, links, initialAsk, onOpenGraphFocus, openChatId }: AskBrainProps) {
+export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackToGraph, overlayOpen = false, links, initialAsk, onOpenGraphFocus, openChatId }: AskBrainProps) {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
     const [isThinking, setIsThinking] = useState(false);
@@ -456,9 +468,15 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
     // own delete-confirm dialog. The history drawer stays handled here (it has no
     // handler of its own), so the swipe closes it rather than exiting Ask.
     const askEdgeSwipeEnabled = isMobile && !overlayOpen && chatToDelete === null;
+    // Back unwinds one hop: to the graph that opened this Ask when there is one,
+    // otherwise out of Ask entirely.
+    const goBack = useCallback(() => {
+        if (onBackToGraph) onBackToGraph();
+        else onExit?.();
+    }, [onBackToGraph, onExit]);
     useEdgeSwipeBack(() => {
         if (historyOpen) setHistoryOpen(false);
-        else onExit?.();
+        else goBack();
     }, askEdgeSwipeEnabled);
 
     // Drive the mobile surface height from the visual viewport with *direct DOM
@@ -1151,7 +1169,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                 down past the status bar / notch. */}
             {isMobile && (
                 <MobileSubheader
-                    onBack={() => onExit?.()}
+                    onBack={goBack}
                     title="Ask Machina"
                     leading={
                         // A quiet icon button, same footprint as the back chevron and
@@ -1177,6 +1195,24 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                         </button>
                     )}
                 </MobileSubheader>
+            )}
+
+            {/* Back to the graph this Ask came from. Sized, styled and placed
+                exactly like the graph's own "Back to Ask" / "Back to card"
+                chips — one grammar for every return path in the app — and it
+                sits ABOVE the scroll area so it can't scroll away mid-answer. */}
+            {onBackToGraph && (
+                <div className="shrink-0 px-3 sm:px-1 pt-2">
+                    <button
+                        onClick={onBackToGraph}
+                        aria-label="Back to the graph"
+                        className="inline-flex items-center gap-1 ps-1.5 pe-3 py-1.5 rounded-full bg-card border border-border-subtle text-xs font-semibold text-text-secondary hover:text-text hover:border-accent/40 shadow-sm transition-colors cursor-pointer"
+                    >
+                        <ChevronLeft className="w-4 h-4 shrink-0 rtl:rotate-180 text-accent" />
+                        <Waypoints className="w-3.5 h-3.5 shrink-0 text-accent" />
+                        <span>Back to graph</span>
+                    </button>
+                </div>
             )}
 
             {/* Conversation */}

@@ -50,3 +50,23 @@ export function elapsedForProgress(pct: number): number {
     const clamped = Math.min(CEILING - 0.01, Math.max(START_PCT, pct));
     return -TAU_MS * Math.log((CEILING - clamped) / (CEILING - START_PCT));
 }
+
+/** Coerce a Firestore timestamp field (ms number, or legacy ISO string) to ms. */
+export function toMs(v: number | string | undefined): number | null {
+    if (typeof v === 'number' && isFinite(v) && v > 0) return v;
+    if (typeof v === 'string') {
+        const t = Date.parse(v);
+        if (!isNaN(t)) return t;
+    }
+    return null;
+}
+
+/**
+ * The wall clock a card anchors its capture to — the same epoch-ms base the
+ * Share Extension writes and {@link progressFor} ramps from. Every surface that
+ * asks "which capture does this card belong to?" reads it through here, so they
+ * can never disagree about a card's start.
+ */
+export function cardStartMs(l: { processingStartedAt?: number; createdAt?: number | string }): number | null {
+    return toMs(l.processingStartedAt) ?? toMs(l.createdAt);
+}

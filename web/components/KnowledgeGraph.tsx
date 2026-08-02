@@ -1,9 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowUpRight, ChevronLeft, LocateFixed, MessagesSquare, Waypoints, X } from 'lucide-react';
+import { ArrowUpRight, ChevronLeft, FileText, LocateFixed, MessagesSquare, Waypoints, X } from 'lucide-react';
 import { AskHints, Link } from '@/lib/types';
-import { buildGraphModel, edgeReason, spacingScale, GraphModel, GraphNode, BuildSignal } from '@/lib/graph';
+import { buildGraphModel, edgeReason, GraphModel, GraphNode, BuildSignal } from '@/lib/graph';
+import { tick, ALPHA_MIN } from '@/lib/graphPhysics';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { getDominantDirection } from '@/lib/rtl';
 import { hapticLight } from '@/lib/haptics';
@@ -79,13 +80,6 @@ function readPalette(): Palette {
     };
 }
 
-// ── Simulation constants ─────────────────────────────────────────────────────
-const REPULSION = 4200;        // many-body charge (world units²)
-const REPULSION_MAX_DIST = 480;
-const GRAVITY = 0.05;          // pull toward the node's ISLAND anchor (per component)
-const VELOCITY_DECAY = 0.8;
-const ALPHA_DECAY = 0.99;
-const ALPHA_MIN = 0.015;
 const TAP_SLOP = 7;            // px of movement that still counts as a tap
 
 // ── Desktop panel geometry — ONE source of truth ─────────────────────────────
@@ -119,6 +113,7 @@ export default function KnowledgeGraph({
     onRestoreConsumed,
     onSaveCluster,
     onBackToAsk,
+    onBackToCard,
 }: {
     /** The card pool (already privacy-filtered by the Feed). */
     links: Link[];
@@ -139,6 +134,10 @@ export default function KnowledgeGraph({
     /** Present only when the Graph was opened FROM an Ask answer — returns to
      *  that conversation (leaving Ask unmounted it, so this reopens it). */
     onBackToAsk?: () => void;
+    /** Present only when the Graph was opened FROM a card ("See in graph") —
+     *  reopens that card where the user left it. Mutually exclusive with
+     *  onBackToAsk: each entry point clears the other's context. */
+    onBackToCard?: () => void;
 }) {
     const containerRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -153,6 +152,15 @@ export default function KnowledgeGraph({
     // indices die on every rebuild, so storing ids means the highlight survives
     // the same library-fetch rebuild that used to drop single-card focus.
     const [citedIds, setCitedIds] = useState<string[] | null>(null);
+    // Title of a card the user explicitly asked to see ("⋯ → See in graph") that
+    // the map CANNOT show: a card with no qualifying tie is not a node
+    // (graph.ts), so focusing it is impossible. Same honesty rule as the cited
+    // set below — say it, never open the plain graph and let it read as broken.
+    const [unmappedCard, setUnmappedCard] = useState<string | null>(null);
+    // That request outlives one build: entering the Graph kicks off the
+    // full-library fetch, so the card may only become a node on the SECOND
+    // build. The id is retried until it resolves (or the user moves on).
+    const pendingFocusIdRef = useRef<string | null>(null);
     const [savingCluster, setSavingCluster] = useState(false);
     const [savedClusters, setSavedClusters] = useState<Set<number>>(new Set());
     // Bumped by the MutationObserver when the .light class flips — palette and
@@ -278,9 +286,13 @@ export default function KnowledgeGraph({
                 autoFitRef.current = false;
             }
             // An explicit restore wins; otherwise keep whatever the user was
-            // already looking at. A missing id (card deleted or filtered out of
-            // the pool) simply falls through to the default full-graph fit.
-            const focusId = restore?.citedIds?.length ? null : restore?.selectedId ?? keepId;
+            // already looking at, then any card-focus request still waiting for
+            // the library to arrive.
+            if (restore?.selectedId) pendingFocusIdRef.current = restore.selectedId;
+            const focusId = restore?.citedIds?.length
+                ? null
+                : restore?.selectedId ?? keepId ?? pendingFocusIdRef.current;
+            let unmapped: string | null = null;
             if (focusId) {
                 const idx = m.nodes.findIndex((n) => n.id === focusId);
                 if (idx >= 0) {
@@ -290,8 +302,17 @@ export default function KnowledgeGraph({
                     // — long enough for the rAF loop to start easing back to the
                     // full-graph fit and show a lurch.
                     autoFitRef.current = false;
+                    if (pendingFocusIdRef.current === focusId) pendingFocusIdRef.current = null;
+                } else if (pendingFocusIdRef.current === focusId) {
+                    // Asked for by name and not on the map. Name it back to the
+                    // user; the pending id stays set so the post-fetch rebuild
+                    // gets one more chance to resolve it.
+                    unmapped = links.find((l) => l.id === focusId)?.title || 'That card';
                 }
+                // A `keepId` that no longer resolves (card deleted, or filtered
+                // out of the pool) still falls through to the full-graph fit.
             }
+            setUnmappedCard(unmapped);
             if (restore) {
                 restoreRef.current = null;
                 if (!restore.selectedId && restore.clusterAnchorId) {
@@ -645,6 +666,10 @@ export default function KnowledgeGraph({
                 const caption = captionRectsRef.current.find(
                     (r) => p2.x >= r.x1 && p2.x <= r.x2 && p2.y >= r.y1 && p2.y <= r.y2,
                 );
+                // Either way the user has moved on from a card-focus request:
+                // retire it so a later rebuild can't resurrect its notice.
+                pendingFocusIdRef.current = null;
+                setUnmappedCard(null);
                 if (caption) {
                     hapticLight();
                     setSelected(null);
@@ -872,16 +897,55 @@ export default function KnowledgeGraph({
                 honoured by the node-label pass (`fits()`), never by the caption
                 loop. Moving it out deletes that reservation entirely instead of
                 needing a second collision check. Only present on Ask → Graph. */}
-            {onBackToAsk && (
+            {(onBackToAsk || onBackToCard) && (
                 <div className="-mx-2 px-2 sm:mx-0 sm:px-0">
+                    {onBackToAsk ? (
+                        <button
+                            onClick={onBackToAsk}
+                            aria-label="Back to the chat"
+                            className="inline-flex items-center gap-1 ps-1.5 pe-3 py-1.5 rounded-full bg-card border border-border-subtle text-xs font-semibold text-text-secondary hover:text-text hover:border-accent/40 shadow-sm transition-colors cursor-pointer"
+                        >
+                            <ChevronLeft className="w-4 h-4 shrink-0 rtl:rotate-180 text-accent" />
+                            <MessagesSquare className="w-3.5 h-3.5 shrink-0 text-accent" />
+                            <span>Back to Ask</span>
+                        </button>
+                    ) : (
+                        // Same control, same slot, same grammar — only the
+                        // destination differs (see the comment above: this row
+                        // is NAVIGATION, which is why it sits above the legend).
+                        <button
+                            onClick={onBackToCard}
+                            aria-label="Back to the card"
+                            className="inline-flex items-center gap-1 ps-1.5 pe-3 py-1.5 rounded-full bg-card border border-border-subtle text-xs font-semibold text-text-secondary hover:text-text hover:border-accent/40 shadow-sm transition-colors cursor-pointer"
+                        >
+                            <ChevronLeft className="w-4 h-4 shrink-0 rtl:rotate-180 text-accent" />
+                            <FileText className="w-3.5 h-3.5 shrink-0 text-accent" />
+                            <span>Back to card</span>
+                        </button>
+                    )}
+                </div>
+            )}
+
+            {/* A card the user asked to see that has no connections yet. Same
+                rule as the cited banner below: the graph says why it can't
+                honour the request instead of opening unmarked. */}
+            {unmappedCard && (
+                <div className="flex items-center gap-x-3 px-0.5 text-[13px] font-medium">
+                    {/* One paragraph, not two flex children: on a phone this
+                        wraps, and a muted fragment starting its own line read
+                        like a stray bullet. */}
+                    <p className="flex-1 min-w-0 text-text">
+                        {`“${unmappedCard}” isn’t on the map yet`}
+                        <span className="text-text-muted"> — no connections to other cards</span>
+                    </p>
                     <button
-                        onClick={onBackToAsk}
-                        aria-label="Back to the chat"
-                        className="inline-flex items-center gap-1 ps-1.5 pe-3 py-1.5 rounded-full bg-card border border-border-subtle text-xs font-semibold text-text-secondary hover:text-text hover:border-accent/40 shadow-sm transition-colors cursor-pointer"
+                        onClick={() => {
+                            pendingFocusIdRef.current = null;
+                            setUnmappedCard(null);
+                        }}
+                        className="ms-auto shrink-0 text-[12px] font-semibold text-accent hover:underline cursor-pointer"
                     >
-                        <ChevronLeft className="w-4 h-4 shrink-0 rtl:rotate-180 text-accent" />
-                        <MessagesSquare className="w-3.5 h-3.5 shrink-0 text-accent" />
-                        <span>Back to Ask</span>
+                        Dismiss
                     </button>
                 </div>
             )}
@@ -1224,82 +1288,6 @@ export default function KnowledgeGraph({
 }
 
 // ── Physics ──────────────────────────────────────────────────────────────────
-
-function tick(model: GraphModel, alphaRef: { current: number }) {
-    const alpha = alphaRef.current;
-    const { nodes, edges } = model;
-    const n = nodes.length;
-    // Small graphs spread out (see lib/graph.ts spacingScale) — the same factor
-    // the builder used for island radii, so seeds and forces agree.
-    const spacing = spacingScale(n);
-    const repulsion = REPULSION * spacing * spacing;
-    const repulsionMax = REPULSION_MAX_DIST * spacing;
-
-    // Many-body repulsion + collision, one O(n²) pass.
-    for (let i = 0; i < n; i++) {
-        const a = nodes[i];
-        for (let j = i + 1; j < n; j++) {
-            const b = nodes[j];
-            let dx = b.x - a.x;
-            let dy = b.y - a.y;
-            let d2 = dx * dx + dy * dy;
-            if (d2 === 0) {
-                dx = (Math.random() - 0.5) * 0.1;
-                dy = (Math.random() - 0.5) * 0.1;
-                d2 = dx * dx + dy * dy;
-            }
-            if (d2 > repulsionMax * repulsionMax) continue;
-            const d = Math.sqrt(d2);
-            let f = (repulsion * alpha) / d2;
-            // Hard-core collision: overlapping nodes push apart decisively.
-            const minDist = a.r + b.r + 6;
-            if (d < minDist) f += ((minDist - d) / minDist) * 2.5;
-            const fx = (dx / d) * f;
-            const fy = (dy / d) * f;
-            a.vx -= fx;
-            a.vy -= fy;
-            b.vx += fx;
-            b.vy += fy;
-        }
-    }
-
-    // Edge springs — stronger ties pull shorter.
-    for (const e of edges) {
-        const a = nodes[e.a];
-        const b = nodes[e.b];
-        const dx = b.x - a.x;
-        const dy = b.y - a.y;
-        const d = Math.max(1, Math.hypot(dx, dy));
-        const strength = 0.35 + Math.max(0, Math.min(1, (e.weight - 0.7) / 0.3)) * 0.5;
-        const rest = a.r + b.r + (65 + (1 - strength) * 130) * spacing;
-        const f = ((d - rest) / d) * 0.08 * strength * alpha * 8;
-        const fx = dx * f;
-        const fy = dy * f;
-        a.vx += fx;
-        a.vy += fy;
-        b.vx -= fx;
-        b.vy -= fy;
-    }
-
-    // Weak centering gravity + integration.
-    for (const node of nodes) {
-        if (node.fx !== null && node.fy !== null) {
-            node.x = node.fx;
-            node.y = node.fy;
-            node.vx = 0;
-            node.vy = 0;
-            continue;
-        }
-        node.vx += (node.cx - node.x) * GRAVITY * alpha;
-        node.vy += (node.cy - node.y) * GRAVITY * alpha;
-        node.vx *= VELOCITY_DECAY;
-        node.vy *= VELOCITY_DECAY;
-        node.x += node.vx;
-        node.y += node.vy;
-    }
-
-    alphaRef.current = Math.max(0, alpha * ALPHA_DECAY - 0.0001);
-}
 
 /** Camera that frames the whole graph with padding, clamped to sane zooms. */
 function fitCamera(model: GraphModel, canvas: HTMLCanvasElement): Camera | null {

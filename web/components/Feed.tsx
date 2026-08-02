@@ -56,6 +56,7 @@ import LoadMoreSentinel from './feed/LoadMoreSentinel';
 import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, Share2, Globe, Plus, Pencil, Newspaper, Sparkles, Lock, BookOpenCheck, ChevronLeft, BarChart3, StickyNote, Waypoints } from 'lucide-react';
 import { usePullToRefresh } from '@/lib/usePullToRefresh';
 import { useProcessingBanner } from '@/lib/useProcessingBanner';
+import { cardStartMs } from '@/lib/shareProgress';
 import { subscribeSyntheses, subscribeSynthesisNotes, saveSynthesisNotes } from '@/lib/synthesis';
 import { subscribeDigests, deleteDigest } from '@/lib/digest';
 import { PUSH_INTENT_EVENT, PUSH_FOREGROUND_EVENT, consumePendingPushIntent, readLocalPushPrompt, type PushIntent } from '@/lib/push';
@@ -87,7 +88,7 @@ const noop = () => { };
  * - Two card views (grid / list), plus review, ask, and collections modes
  * - Deep linking to specific links via URL params
  */
-function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onFeedLoadedChange, onOpenDigestSettings, onHasCardsChange, libraryFacet, onLibraryFacetApplied, onBackToInsights, headerCommand, onCapture, onTabChange, onFullBleedChange, suppressProcessingId }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onFeedLoadedChange?: (loaded: boolean) => void; onOpenDigestSettings?: () => void; onHasCardsChange?: (hasCards: boolean) => void; libraryFacet?: import('@/lib/stats').LibraryFacetRequest | null; onLibraryFacetApplied?: () => void; onBackToInsights?: () => void; headerCommand?: { action: 'search' | 'sources' | 'display'; nonce: number } | null; onCapture?: () => void; onTabChange?: (tab: BottomTab) => void; onFullBleedChange?: (full: boolean) => void; suppressProcessingId?: string | null }) {
+function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onFeedLoadedChange, onReadyCaptureChange, onOpenDigestSettings, onHasCardsChange, libraryFacet, onLibraryFacetApplied, onBackToInsights, headerCommand, onCapture, onTabChange, onFullBleedChange, suppressProcessingId }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onFeedLoadedChange?: (loaded: boolean) => void; onReadyCaptureChange?: (at: number) => void; onOpenDigestSettings?: () => void; onHasCardsChange?: (hasCards: boolean) => void; libraryFacet?: import('@/lib/stats').LibraryFacetRequest | null; onLibraryFacetApplied?: () => void; onBackToInsights?: () => void; headerCommand?: { action: 'search' | 'sources' | 'display'; nonce: number } | null; onCapture?: () => void; onTabChange?: (tab: BottomTab) => void; onFullBleedChange?: (full: boolean) => void; suppressProcessingId?: string | null }) {
     const searchParams = useSearchParams();
     const { uid } = useAuth();
     const toast = useToast();
@@ -356,6 +357,25 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         onProcessingChange?.(processingBanner);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [procSig]);
+
+    // EVIDENCE THAT A SHARED CAPTURE LANDED: the newest capture clock among cards
+    // that are NOT processing — i.e. a save that is genuinely finished. The
+    // optimistic Share-Extension bridge waits for this to reach its own capture's
+    // start before it may say "Saved"; without it the bridge was guessing on a
+    // timer and announced done while the card was still being written.
+    const readyCaptureAt = useMemo(() => {
+        let newest = 0;
+        for (const l of links) {
+            if (l.status === 'processing') continue;
+            const t = cardStartMs(l) ?? 0;
+            if (t > newest) newest = t;
+        }
+        return newest;
+    }, [links]);
+    useEffect(() => {
+        onReadyCaptureChange?.(readyCaptureAt);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [readyCaptureAt]);
 
     // Tell the page once the live library has produced its first Firestore
     // snapshot. The optimistic Share-Extension bridge (useSharedCaptureBanner)
@@ -825,13 +845,30 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     useEffect(() => {
         if (viewMode === 'graph') ensureLibrary();
     }, [viewMode, ensureLibrary]);
+    // A card-focused entry ("See in graph") maps the WHOLE library even when the
+    // feed is filtered: the question is "what is this card connected to", and a
+    // search-scoped pool would answer it wrongly — the neighbours the filter
+    // excluded would simply be missing, with the card looking lonelier than it
+    // is. The override is one-shot: the moment the user touches a filter while
+    // in the graph, the graph goes back to mirroring the grid (below).
+    const [graphIgnoresFilters, setGraphIgnoresFilters] = useState(false);
+    const feedFilterSignature =
+        `${searchQuery.trim()}|${filter}|${[...selectedCategory].sort().join(',')}`
+        + `|${[...selectedTags].sort().join(',')}|${[...selectedSources].sort().join(',')}`
+        + `|${[...selectedCollections].sort().join(',')}`;
+    const graphEntrySignature = useRef(feedFilterSignature);
+    useEffect(() => {
+        if (graphIgnoresFilters && graphEntrySignature.current !== feedFilterSignature) {
+            setGraphIgnoresFilters(false);
+        }
+    }, [graphIgnoresFilters, feedFilterSignature]);
     // True when the grid's filters/search currently scope the library — the
     // graph then maps exactly what the grid shows (filteredLinks); with nothing
     // active it maps the WHOLE library (window ∪ snapshot), not just the loaded
     // window. Same pending/privacy gates as My Notes.
-    const graphFiltersActive =
+    const graphFiltersActive = !graphIgnoresFilters && (
         !!searchQuery.trim() || filter !== 'all' || selectedCategory.size > 0
-        || selectedTags.size > 0 || selectedSources.size > 0 || selectedCollections.size > 0;
+        || selectedTags.size > 0 || selectedSources.size > 0 || selectedCollections.size > 0);
     const graphLinks = useMemo(() => {
         if (viewMode !== 'graph') return [];
         const base = graphFiltersActive
@@ -848,25 +885,82 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // Ask is a detour from the graph, not an exit.
     const [graphAsk, setGraphAsk] = useState<{ question: string; hints?: import('@/lib/askSuggestions').AskHints; restore?: import('./KnowledgeGraph').GraphRestoreFocus; nonce: number } | null>(null);
     const [graphRestore, setGraphRestore] = useState<import('./KnowledgeGraph').GraphRestoreFocus | null>(null);
+    // True while the Ask on screen was opened FROM the graph ("Ask about these").
+    // Ask then offers its own way back, and the whole trail behind it — the
+    // graph's focus AND the card that opened the graph — is held, not dropped.
+    const [askFromGraph, setAskFromGraph] = useState(false);
     const handleAskCluster = useCallback((question: string, hints: import('@/lib/askSuggestions').AskHints, restore: import('./KnowledgeGraph').GraphRestoreFocus) => {
         setGraphAsk((prev) => ({ question, hints, restore, nonce: (prev?.nonce ?? 0) + 1 }));
         setGraphRestore(restore);
+        setAskFromGraph(true);
         setViewMode('ask');
     }, []);
+    // Ask → the graph it came from. `graphRestore` was set at the hand-off and
+    // deliberately survives the detour, so the graph reopens on the same focus.
+    const handleBackToGraph = useCallback(() => setViewMode('graph'), []);
     // An answer's "Graph" chip: open the Graph focused on the chat's origin
     // cluster (graph-born chats) or the cited card's neighborhood. The chat id
     // rides along so the graph can offer a way BACK into that conversation —
     // leaving Ask unmounts it, and the Ask tab is deliberately blank-slate.
     const [graphFromChat, setGraphFromChat] = useState<string | null>(null);
+    // The card a "See in graph" entry came from, and where it should return to.
+    // Cleared on leaving the graph, so a later entry never offers a stale card.
+    const [graphFromCard, setGraphFromCard] = useState<
+        { id: string; atRelated: boolean; returnTo: typeof viewMode } | null
+    >(null);
+    // One-shot: the returning card opens revealed at its Related cards section.
+    const [detailScrollToRelated, setDetailScrollToRelated] = useState(false);
     const [askOpenChat, setAskOpenChat] = useState<{ id: string; nonce: number } | null>(null);
     const handleOpenGraphFocus = useCallback((focus: import('./KnowledgeGraph').GraphRestoreFocus, fromChatId: string | null) => {
         setGraphRestore(focus);
         setGraphFromChat(fromChatId);
         setViewMode('graph');
     }, []);
+    // A card → the Graph, focused on that card: the "See in graph" button on an
+    // open card's Related list, and the ⋯ menu's row on a closed one. Reuses the
+    // focus machinery the Ask citation chip already drives
+    // (GraphRestoreFocus.selectedId), so the graph opens with the card selected,
+    // its neighbourhood lit and the panel naming each tie. The open card is
+    // dismissed first — stack and all, since the graph replaces the whole view
+    // underneath it (setLinkStack/setActiveLinkId inline rather than
+    // closeActiveLinkStack: setters are stable, so this callback is too).
+    const handleOpenCardInGraph = useCallback((link: Link, atRelated: boolean) => {
+        setLinkStack([]);
+        setActiveLinkId(null);
+        setGraphRestore({ selectedId: link.id });
+        setGraphFromChat(null);  // not an Ask detour — no "Back to Ask" chip
+        // Remember the way back. `atRelated` is true when the card was OPEN and
+        // the user tapped the pill on its Related list (so returning should land
+        // there, where the button is) and false for the ⋯ menu on a closed card
+        // (there was no scroll position — that card opens normally).
+        setGraphFromCard({
+            id: link.id,
+            atRelated,
+            returnTo: viewMode === 'graph' ? 'grid' : viewMode,
+        });
+        graphEntrySignature.current = feedFilterSignature;
+        setGraphIgnoresFilters(true);
+        setViewMode('graph');
+    }, [feedFilterSignature, viewMode]);
+    // Stable per-origin callbacks: `Card` is memoized, so an inline arrow here
+    // would hand every card a new prop identity on every Feed render and defeat
+    // that memo across the whole feed.
+    const openInGraphFromMenu = useCallback((l: Link) => handleOpenCardInGraph(l, false), [handleOpenCardInGraph]);
+    const openInGraphFromOpenCard = useCallback((l: Link) => handleOpenCardInGraph(l, true), [handleOpenCardInGraph]);
+    // "Back to card" — the graph's counterpart to "Back to Ask": reopen the card
+    // that sent the user here, on the view they were on, at the spot they left.
+    const handleBackToCard = useCallback(() => {
+        if (!graphFromCard) return;
+        setDetailScrollToRelated(graphFromCard.atRelated);
+        setViewMode(graphFromCard.returnTo);
+        setActiveLinkId(graphFromCard.id);
+    }, [graphFromCard]);
     const handleBackToAsk = useCallback(() => {
         if (!graphFromChat) return;
         setAskOpenChat((prev) => ({ id: graphFromChat, nonce: (prev?.nonce ?? 0) + 1 }));
+        // This IS the unwind (Ask → graph → Ask): the chat is the destination,
+        // so it must not offer a "Back to graph" that walks the loop again.
+        setAskFromGraph(false);
         setViewMode('ask');
     }, [graphFromChat]);
     // A graph hand-off is for ONE Ask entry. Clear it the moment Ask is left,
@@ -882,11 +976,33 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         if (prevViewMode.current === 'ask' && viewMode !== 'ask') {
             setGraphAsk(null);
             setAskOpenChat(null);
+            // Going back to the graph continues the trail (card → graph → Ask →
+            // graph); anywhere else ends it, so the return paths retire together.
+            if (viewMode !== 'graph') {
+                setAskFromGraph(false);
+                setGraphFromCard(null);
+            }
         }
         // Leaving the graph retires the Ask return path: a later graph entry
         // from the library must not offer "Back to Ask" to a stale chat.
         // (handleBackToAsk has already captured the id by the time this runs.)
-        if (prevViewMode.current === 'graph' && viewMode !== 'graph') setGraphFromChat(null);
+        if (prevViewMode.current === 'graph' && viewMode !== 'graph') {
+            setGraphFromChat(null);
+            // ASK IS A DETOUR, NOT AN EXIT. Dropping the card context here is
+            // what made "Back to card" vanish after a trip through "Ask about
+            // these" (owner report 2026-08-01): the user came back to the graph
+            // and the way home was gone. The Ask branch above retires it if the
+            // detour ends somewhere else. handleBackToCard has already captured
+            // what it needs by the time this runs.
+            if (viewMode !== 'ask') {
+                setGraphFromCard(null);
+                setAskFromGraph(false);
+            }
+            // The whole-library override belongs to ONE card-focused entry —
+            // the next graph entry mirrors the grid's filters again. It rides
+            // the same detour rule so the pool doesn't change under the user.
+            if (viewMode !== 'ask') setGraphIgnoresFilters(false);
+        }
         prevViewMode.current = viewMode;
     }, [viewMode]);
     // Graph → Collections: keep a cluster as a real collection.
@@ -914,6 +1030,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     useEffect(() => {
         if (!activeLinkId && detailScrollToNotes) setDetailScrollToNotes(false);
     }, [activeLinkId, detailScrollToNotes]);
+    useEffect(() => {
+        if (!activeLinkId && detailScrollToRelated) setDetailScrollToRelated(false);
+    }, [activeLinkId, detailScrollToRelated]);
     useEffect(() => {
         if (!libraryFacet) return;
         // The 'notes' facet is a place, not a grid filter — open My Notes.
@@ -1296,6 +1415,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
             setGraphAsk(null);
             setGraphRestore(null);
             setAskOpenChat(null);
+            setAskFromGraph(false);
             setViewMode('ask');
         }
         else setViewMode('digest');
@@ -1523,6 +1643,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                 onShare={handleShareCard}
                                 onTogglePrivate={handleToggleCardPrivate}
                                 onToggleThumbnail={handleToggleThumbnail}
+                                onOpenInGraph={isEffectivelyPrivateCard(link) ? undefined : openInGraphFromMenu}
                                 cardCollections={cardCollectionsByLink.get(link.id)}
                                 activeCollectionId={openCol.id}
                                 onRemoveFromCollection={handleRemoveFromCollection}
@@ -1922,7 +2043,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                 data-tour="ask"
                                 // Blank-slate entrance, same as the mobile tab
                                 // (clears a pending graph hand-off — see selectTab).
-                                onClick={() => { setGraphAsk(null); setGraphRestore(null); setAskOpenChat(null); setViewMode('ask'); }}
+                                onClick={() => { setGraphAsk(null); setGraphRestore(null); setAskOpenChat(null); setAskFromGraph(false); setViewMode('ask'); }}
                                 title="Ask your brain"
                                 aria-label="Ask your brain"
                                 className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
@@ -2436,6 +2557,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             links={visibleLinks}
                             initialAsk={graphAsk}
                             onOpenGraphFocus={handleOpenGraphFocus}
+                            onBackToGraph={askFromGraph ? handleBackToGraph : undefined}
                             openChatId={askOpenChat}
                         />
                     ) : filteredLinks.length === 0 && pendingCards.length === 0 ? (
@@ -2562,6 +2684,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             onRestoreConsumed={() => setGraphRestore(null)}
                             onSaveCluster={handleSaveCluster}
                             onBackToAsk={graphFromChat ? handleBackToAsk : undefined}
+                            onBackToCard={graphFromCard ? handleBackToCard : undefined}
                         />
                     ) : viewMode === 'review' ? (
                         <SwipeDeck
@@ -2597,6 +2720,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                         onShare={handleShareCard}
                                         onTogglePrivate={handleToggleCardPrivate}
                                         onToggleThumbnail={handleToggleThumbnail}
+                                        onOpenInGraph={isEffectivelyPrivateCard(link) ? undefined : openInGraphFromMenu}
                                         cardCollections={cardCollectionsByLink.get(link.id)}
                                         activeCollectionId={openCol?.id}
                                         onRemoveFromCollection={handleRemoveFromCollection}
@@ -2630,6 +2754,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                     onShare={handleShareCard}
                                     onTogglePrivate={handleToggleCardPrivate}
                                     onToggleThumbnail={handleToggleThumbnail}
+                                    onOpenInGraph={isEffectivelyPrivateCard(link) ? undefined : openInGraphFromMenu}
                                     cardCollections={cardCollectionsByLink.get(link.id)}
                                     activeCollectionId={activeCollectionId}
                                     onRemoveFromCollection={handleRemoveFromCollection}
@@ -2774,10 +2899,12 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                     onDelete={handleDelete}
                     onOpenOtherLink={openRelatedLink}
                     excludeRelatedIds={linkStack}
+                    onOpenInGraph={isEffectivelyPrivateCard(activeLink) ? undefined : openInGraphFromOpenCard}
                     onAddToCollection={(link) => setAddToCollectionLink(link)}
                     onShare={handleShareCard}
                     onToggleThumbnail={handleToggleThumbnail}
                     scrollToNotes={detailScrollToNotes}
+                    scrollToRelated={detailScrollToRelated}
                 />
             )}
 
@@ -2932,14 +3059,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     );
 }
 
-export default function Feed({ onAskModeChange, onHideAddButton, onProcessingChange, onFeedLoadedChange, onOpenDigestSettings, onHasCardsChange, libraryFacet, onLibraryFacetApplied, onBackToInsights, headerCommand, onCapture, onTabChange, onFullBleedChange, suppressProcessingId }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onFeedLoadedChange?: (loaded: boolean) => void; onOpenDigestSettings?: () => void; onHasCardsChange?: (hasCards: boolean) => void; libraryFacet?: import('@/lib/stats').LibraryFacetRequest | null; onLibraryFacetApplied?: () => void; onBackToInsights?: () => void; headerCommand?: { action: 'search' | 'sources' | 'display'; nonce: number } | null; onCapture?: () => void; onTabChange?: (tab: BottomTab) => void; onFullBleedChange?: (full: boolean) => void; suppressProcessingId?: string | null }) {
+export default function Feed({ onAskModeChange, onHideAddButton, onProcessingChange, onFeedLoadedChange, onReadyCaptureChange, onOpenDigestSettings, onHasCardsChange, libraryFacet, onLibraryFacetApplied, onBackToInsights, headerCommand, onCapture, onTabChange, onFullBleedChange, suppressProcessingId }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onFeedLoadedChange?: (loaded: boolean) => void; onReadyCaptureChange?: (at: number) => void; onOpenDigestSettings?: () => void; onHasCardsChange?: (hasCards: boolean) => void; libraryFacet?: import('@/lib/stats').LibraryFacetRequest | null; onLibraryFacetApplied?: () => void; onBackToInsights?: () => void; headerCommand?: { action: 'search' | 'sources' | 'display'; nonce: number } | null; onCapture?: () => void; onTabChange?: (tab: BottomTab) => void; onFullBleedChange?: (full: boolean) => void; suppressProcessingId?: string | null }) {
     return (
         <Suspense fallback={
             <div className="flex items-center justify-center h-64">
                 <div className="w-8 h-8 border-2 border-text/20 border-t-text rounded-full animate-spin" />
             </div>
         }>
-            <FeedContent onAskModeChange={onAskModeChange} onHideAddButton={onHideAddButton} onProcessingChange={onProcessingChange} onFeedLoadedChange={onFeedLoadedChange} onOpenDigestSettings={onOpenDigestSettings} onHasCardsChange={onHasCardsChange} libraryFacet={libraryFacet} onLibraryFacetApplied={onLibraryFacetApplied} onBackToInsights={onBackToInsights} headerCommand={headerCommand} onCapture={onCapture} onTabChange={onTabChange} onFullBleedChange={onFullBleedChange} suppressProcessingId={suppressProcessingId} />
+            <FeedContent onAskModeChange={onAskModeChange} onHideAddButton={onHideAddButton} onProcessingChange={onProcessingChange} onFeedLoadedChange={onFeedLoadedChange} onReadyCaptureChange={onReadyCaptureChange} onOpenDigestSettings={onOpenDigestSettings} onHasCardsChange={onHasCardsChange} libraryFacet={libraryFacet} onLibraryFacetApplied={onLibraryFacetApplied} onBackToInsights={onBackToInsights} headerCommand={headerCommand} onCapture={onCapture} onTabChange={onTabChange} onFullBleedChange={onFullBleedChange} suppressProcessingId={suppressProcessingId} />
         </Suspense>
     );
 }

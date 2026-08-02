@@ -3,9 +3,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, LinkStatus, UserNote } from '@/lib/types';
 import SourceByline from './SourceByline';
-import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, Check, Network, Play, Youtube, ImageOff, Image as ImageIcon, Layers, Share2, ChevronLeft, StickyNote } from 'lucide-react';
+import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, Check, Network, Play, Youtube, ImageOff, Image as ImageIcon, Layers, Share2, ChevronLeft, StickyNote, Waypoints } from 'lucide-react';
 import { getPlatform } from '@/lib/platform';
 import SimpleMarkdown from './SimpleMarkdown';
+import PosterImage from './ui/PosterImage';
 import { openExternal } from '@/lib/share';
 import { getCategoryColorStyle } from '@/lib/colors';
 import CategoryInput from './CategoryInput';
@@ -65,6 +66,11 @@ interface LinkDetailModalProps {
     onUpdateReminder: (link: Link) => void;
     onOpenOtherLink?: (link: Link) => void;
     excludeRelatedIds?: string[];  // cards already behind you in the back-stack
+    /** Open the Graph focused on this card. Deliberately NOT in the top action
+     *  row — that row already scrolls horizontally on a phone. It lives on the
+     *  "Related cards" header instead, which is where the connections story
+     *  already is, and which only renders when there ARE connections to see. */
+    onOpenInGraph?: (link: Link) => void;
     onAddToCollection?: (link: Link) => void;
     onShare?: (link: Link) => void;
     /** Toggle the card's thumbnail banner on/off (Hide image / Show image). */
@@ -72,6 +78,10 @@ interface LinkDetailModalProps {
     /** Open revealed at the My-notes section (set when entered from the
         central My Notes view, so the user lands on what they came for). */
     scrollToNotes?: boolean;
+    /** Open revealed at the "Related cards" section — set when returning from
+        the Graph this card sent the user to, so "Back to card" lands on the
+        exact spot the "See in graph" button was tapped from, not the top. */
+    scrollToRelated?: boolean;
 }
 
 export default function LinkDetailModal({
@@ -95,10 +105,12 @@ export default function LinkDetailModal({
     onUpdateReminder,
     onOpenOtherLink,
     excludeRelatedIds,
+    onOpenInGraph,
     onAddToCollection,
     onShare,
     onToggleThumbnail,
     scrollToNotes,
+    scrollToRelated,
 }: LinkDetailModalProps) {
     const [isEditingCategory, setIsEditingCategory] = useState(false);
     const [now, setNow] = useState<number>(0);
@@ -166,6 +178,7 @@ export default function LinkDetailModal({
     const noteEditorRef = useRef<HTMLDivElement>(null);
     const noteActionRef = useRef<'save' | 'cancel' | 'delete' | null>(null);
     const notesSectionRef = useRef<HTMLDivElement>(null);
+    const relatedSectionRef = useRef<HTMLDivElement>(null);
 
     // Entered from the central My Notes view: reveal the notes section once the
     // entrance animation has settled, so the user lands on what they tapped —
@@ -175,6 +188,18 @@ export default function LinkDetailModal({
         if (!scrollToNotes) return;
         const t = setTimeout(() => {
             notesSectionRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        }, 320);
+        return () => clearTimeout(t);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Returning from the Graph this card opened: land back on the Related cards
+    // section, where the "See in graph" button is — same mount-only rule as the
+    // notes reveal above, so walking on to another card opens normally.
+    useEffect(() => {
+        if (!scrollToRelated) return;
+        const t = setTimeout(() => {
+            relatedSectionRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
         }, 320);
         return () => clearTimeout(t);
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -638,9 +663,8 @@ export default function LinkDetailModal({
                         and image blocks own their own rendering above/below. */}
                     {!link.hideThumbnail && link.sourceType !== 'youtube' && link.sourceType !== 'image' && link.metadata?.thumbnailUrl && (
                         <div className="mb-6 rounded-2xl overflow-hidden border border-border-subtle bg-black/40">
-                            <img
+                            <PosterImage
                                 src={link.metadata.thumbnailUrl}
-                                alt=""
                                 className="w-full h-auto max-h-[400px] object-contain"
                             />
                         </div>
@@ -1090,11 +1114,27 @@ export default function LinkDetailModal({
                             entry resolves to a live card, so tapping always
                             navigates. */}
                         {relatedCards.length > 0 && (
-                            <div className="mb-8 border-t border-border-subtle pt-6">
-                                <h3 className={`text-sm font-bold text-text-muted uppercase tracking-wider mb-4 flex items-center gap-2 ${isRtl ? 'flex-row-reverse' : ''}`}>
-                                    <Network className="w-4 h-4" />
-                                    {isRtl ? 'כרטיסים קשורים' : 'Related cards'}
-                                </h3>
+                            <div ref={relatedSectionRef} className="mb-8 border-t border-border-subtle pt-6 scroll-mt-4">
+                                <div className={`mb-4 flex items-center justify-between gap-3 ${isRtl ? 'flex-row-reverse' : ''}`}>
+                                    <h3 className={`text-sm font-bold text-text-muted uppercase tracking-wider flex items-center gap-2 ${isRtl ? 'flex-row-reverse' : ''}`}>
+                                        <Network className="w-4 h-4" />
+                                        {isRtl ? 'כרטיסים קשורים' : 'Related cards'}
+                                    </h3>
+                                    {/* The list above is this card's connections as a
+                                        list; this opens the same ties as a map, with
+                                        the card itself in focus. */}
+                                    {onOpenInGraph && (
+                                        <button
+                                            onClick={() => onOpenInGraph(link)}
+                                            title={isRtl ? 'הצג בגרף' : 'See this card in the graph'}
+                                            aria-label={isRtl ? 'הצג בגרף' : 'See this card in the graph'}
+                                            className={`shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-card-hover border border-border-subtle text-[12px] font-semibold text-text-secondary hover:text-text hover:border-accent/40 transition-colors cursor-pointer ${isRtl ? 'flex-row-reverse' : ''}`}
+                                        >
+                                            <Waypoints className="w-3.5 h-3.5 shrink-0 text-accent" />
+                                            <span>{isRtl ? 'הצג בגרף' : 'See in graph'}</span>
+                                        </button>
+                                    )}
+                                </div>
                                 <div className="grid gap-3">
                                     {relatedCards.map(({ link: rel, reason, strong }) => {
                                         // Each piece takes its OWN direction from its own text: the title

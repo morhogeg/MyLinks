@@ -25,26 +25,40 @@ import { beginShareCapture, finishShareCapture, isShareCaptureFinished } from '.
  * `processing` card streams in. If no card ever appears (e.g. a deduped re-share
  * is a server no-op), the optimistic banner eases to its ceiling and then
  * finishes gracefully on its own.
+ *
+ * WHAT "SAVED" IS ALLOWED TO MEAN. The finish frame is the one thing this
+ * bridge must never guess: it says the save is DONE. It is therefore driven by
+ * EVIDENCE — a ready (non-processing) card in the live feed stamped at or after
+ * this capture's start clock (`readyCaptureAt`) — never by a timer. The old
+ * rule ("feed loaded + nothing processing for 4s → done") declared victory
+ * during the gap between the upload finishing and the backend writing its
+ * placeholder, so on a slow connection the bar flashed "Saved" and the card
+ * then appeared, still working, a few seconds later (owner-reported 2026-08-01).
+ * The timer survives only as a give-up for the case where no card is EVER
+ * coming, and it is now patient enough to outlast a slow placeholder write.
  */
 const MAX_MS = 30_000; // give up (or never start) the optimistic banner past this age
-// Once the live feed is authoritative, a capture with no `processing` card has
-// already resolved to a ready card — but the server-side placeholder can lag the
-// app foreground by a beat, so allow this settle window before treating "feed
-// loaded + nothing processing" as "already done". Comfortably longer than a
-// placeholder write, far shorter than MAX_MS (which used to keep a finished
-// capture's bar ramping to ~92% for ~30s — the phantom this fixes).
-//
-// MEASURED FROM WHEN THE FEED BECAME AUTHORITATIVE, NOT FROM CAPTURE START. It
-// used to run from `startMs`, which made it dead on arrival: the user watches the
-// extension HUD for several seconds and only THEN opens the app, so by the first
-// Firestore snapshot the window was already spent and the bridge fired its finish
-// frame instantly — "Saved" before the placeholder had any chance to land. The
-// real card then streamed in and replayed the whole ramp (owner-reported: the bar
-// hit 100%, vanished, and started the phases over). The window only means
-// anything if it starts when we actually begin waiting for the card.
-const SETTLE_MS = 4_000;
+// How long we keep waiting for ANY sign of the capture — a `processing` card, or
+// a ready card stamped at/after its start — before concluding nothing is coming
+// (a deduped re-share is a server no-op: no card is ever written). This is a
+// give-up, NOT the normal path to "Saved"; the normal path is the evidence check
+// in the ticker below. Measured from when we actually began waiting (the later
+// of arming and the feed going authoritative), never from capture start — the
+// user watches the extension HUD for several seconds and only THEN opens the
+// app, so a window anchored at capture start is already spent on arrival.
+const NO_EVIDENCE_GIVE_UP_MS = 15_000;
+// Tolerance when matching a ready card's server-stamped clock against the
+// extension's device clock. Small on purpose: it only absorbs NTP-level skew,
+// never enough to let a card from an EARLIER capture pass as this one's.
+const CLOCK_SKEW_MS = 2_000;
 
-export function useSharedCaptureBanner(processingActive: boolean, feedLoaded = false): AnalyzingState | null {
+export function useSharedCaptureBanner(
+    processingActive: boolean,
+    feedLoaded = false,
+    /** Newest READY (non-processing) card's capture clock in the live feed, ms.
+     *  0 when the feed holds none. This is the evidence a capture landed. */
+    readyCaptureAt = 0,
+): AnalyzingState | null {
     // `startMs` is the shared capture-start wall clock (epoch ms) — progress is a
     // pure function of `Date.now() - startMs`, identical to what the extension
     // and the real processing banner compute.
@@ -65,6 +79,11 @@ export function useSharedCaptureBanner(processingActive: boolean, feedLoaded = f
     }, [processingActive]);
     // Latest feedLoaded, same reason — read inside the ticker without rebinding it.
     const feedRef = useRef(feedLoaded);
+    // Latest readyCaptureAt, same reason.
+    const readyRef = useRef(readyCaptureAt);
+    useEffect(() => {
+        readyRef.current = readyCaptureAt;
+    }, [readyCaptureAt]);
     // When the feed FIRST became authoritative (epoch ms, 0 = not yet). The settle
     // window runs from here, so it measures how long we've actually been waiting
     // for a placeholder rather than how long ago the user tapped Share.
@@ -144,13 +163,22 @@ export function useSharedCaptureBanner(processingActive: boolean, feedLoaded = f
                 return;
             }
             const t = Date.now();
-            // Feed is authoritative and shows nothing processing (past the settle
-            // window that covers a lagging placeholder write) → the capture already
-            // resolved to a ready card. Finish gracefully instead of ramping a fake
-            // % to MAX_MS while the done card sits in the feed (owner-reported: the
-            // bar "still works" after the card is ready).
+            // THE HONEST FINISH: the feed is authoritative and now holds a READY
+            // card belonging to this capture (stamped at/after its start clock).
+            // The save is genuinely done, so "Saved" is true — and because this
+            // waits for the card rather than for a clock, it can no longer fire
+            // during the gap before the backend writes its placeholder.
+            const landed =
+                feedRef.current &&
+                readyRef.current > 0 &&
+                readyRef.current >= signal.startMs - CLOCK_SKEW_MS;
+            // GIVE UP: no processing card, no ready card, and we have been
+            // waiting a long time — nothing is coming (a deduped re-share writes
+            // nothing at all). Finish rather than ramp forever.
             const waitingSince = Math.max(feedReadyAt.current, armedAt.current);
-            if (feedRef.current && waitingSince > 0 && t - waitingSince > SETTLE_MS) {
+            const givenUp =
+                feedRef.current && waitingSince > 0 && t - waitingSince > NO_EVIDENCE_GIVE_UP_MS;
+            if (landed || givenUp) {
                 // This capture has now shown its one finish frame — latch it so a
                 // late-arriving `processing` card can't reopen the banner and
                 // replay the phases (see captureLifecycle).

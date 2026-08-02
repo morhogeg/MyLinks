@@ -8,6 +8,7 @@ import { useState, memo } from 'react';
 import SourceByline from './SourceByline';
 import { cardThumbnailUrl } from '@/lib/cardThumbnail';
 import CitationMark from './ui/CitationMark';
+import PosterImage from './ui/PosterImage';
 import { useNow } from '@/lib/useNow';
 import SimpleMarkdown from './SimpleMarkdown';
 import { getCategoryColorStyle } from '@/lib/colors';
@@ -49,6 +50,8 @@ interface CardProps {
     onRetry?: (link: Link) => void;
     /** Toggle the card's thumbnail banner on/off (⋯ → Hide image / Show image). */
     onToggleThumbnail?: (link: Link) => void;
+    /** ⋯ → See in graph: open the Graph focused on this card. */
+    onOpenInGraph?: (link: Link) => void;
 }
 
 /**
@@ -76,6 +79,7 @@ function Card({
     onRemoveFromCollection,
     onRetry,
     onToggleThumbnail,
+    onOpenInGraph,
 }: CardProps) {
     const isRtl = link.language === 'he' || hasHebrew(link.title) || hasHebrew(link.summary);
     const [isEditingCategory, setIsEditingCategory] = useState(false);
@@ -249,9 +253,8 @@ function Card({
                 doesn't render as a tall banner. */}
             {!link.hideThumbnail && (link.sourceType === 'youtube' || link.metadata?.thumbnailIsVideo) && link.metadata?.thumbnailUrl && (
                 <div className="relative w-full h-28 sm:h-32 bg-black/40 overflow-hidden">
-                    <img
+                    <PosterImage
                         src={link.metadata.thumbnailUrl}
-                        alt=""
                         loading="lazy"
                         className="w-full h-full object-cover transition-transform duration-300 [@media(hover:hover)]:group-hover:scale-[1.03]"
                     />
@@ -611,6 +614,7 @@ function Card({
             onShare={onShare}
             onTogglePrivate={onTogglePrivate}
             onToggleThumbnail={onToggleThumbnail}
+            onOpenInGraph={onOpenInGraph}
             removeFromCollection={
                 activeCollectionId && onRemoveFromCollection
                     ? {

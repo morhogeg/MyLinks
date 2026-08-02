@@ -1,7 +1,7 @@
 'use client';
 
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, Star, Bell, Trash2, Circle, Check, X, ExternalLink, Layers, Share2, FolderMinus, Lock, ImageOff, Image as ImageIcon } from 'lucide-react';
+import { Archive, Star, Bell, Trash2, Circle, Check, X, ExternalLink, Layers, Share2, FolderMinus, Lock, ImageOff, Image as ImageIcon, Waypoints } from 'lucide-react';
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { IconButton } from './ui/Button';
@@ -24,6 +24,10 @@ interface CardActionSheetProps {
     onTogglePrivate?: (link: Link) => void;
     /** Toggle the card's thumbnail banner on/off. */
     onToggleThumbnail?: (link: Link) => void;
+    /** Open the Graph focused on this card's neighbourhood. Omitted for cards
+     *  that can never BE on the map — private ones are excluded from the graph
+     *  pool (Feed decides), so the row simply isn't offered there. */
+    onOpenInGraph?: (link: Link) => void;
     /** When viewing inside a collection, a one-tap remove from it. */
     removeFromCollection?: { name: string; onRemove: () => void };
 }
@@ -50,6 +54,7 @@ export default function CardActionSheet({
     onShare,
     onTogglePrivate,
     onToggleThumbnail,
+    onOpenInGraph,
     removeFromCollection,
 }: CardActionSheetProps) {
     useEffect(() => {
@@ -98,6 +103,15 @@ export default function CardActionSheet({
             label: 'Open source',
             icon: <ExternalLink className="w-5 h-5" />,
             onClick: () => window.open(link.url, '_blank', 'noopener,noreferrer'),
+        }] : []),
+        // Navigation, like "Open source" — sits above the state toggles. An
+        // in-flight or failed capture has no connections yet, so it never
+        // offers this.
+        ...(onOpenInGraph && link.status !== 'processing' && link.status !== 'failed' ? [{
+            key: 'graph',
+            label: 'See in graph',
+            icon: <Waypoints className="w-5 h-5" />,
+            onClick: () => onOpenInGraph(link),
         }] : []),
         {
             key: 'read',

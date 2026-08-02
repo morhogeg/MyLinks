@@ -1,12 +1,23 @@
 'use client';
 
-import { CheckCircle2, ScanText } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
+import CitationMark, { OrbState } from '@/components/ui/CitationMark';
 
 interface ImageScanProgressProps {
     /** Data URL of the image being analyzed. */
     imageSrc: string;
     /** 0–100. Drives the bar and the phase label. */
     progress: number;
+}
+
+/** The mark's motion for a phase — same verb→motion table the link scan rides
+ *  (lib/scanPhases.ts), so a photo save looks like every other save: reading is
+ *  a sweep, understanding is a ratchet, writing the card is a hold. */
+function orbFor(progress: number): OrbState {
+    if (progress >= 80) return 'solving';    // Organizing & tagging
+    if (progress >= 60) return 'shaping';    // Understanding / writing it up
+    if (progress >= 20) return 'searching';  // Scanning the image, reading text
+    return 'working';                        // Uploading
 }
 
 // Phase label derived purely from progress, so this component stays stateless.
@@ -54,7 +65,11 @@ export default function ImageScanProgress({ imageSrc, progress }: ImageScanProgr
                         <CheckCircle2 className="w-10 h-10 text-green-400 animate-fade-in" />
                     ) : (
                         <>
-                            <ScanText className="w-7 h-7 text-accent" />
+                            {/* OUR mark, not a generic scan glyph — every save
+                                surface carries the Citation mark while it works
+                                (LinkScanProgress, the Share Extension HUD), and
+                                a photo save was the one that didn't. */}
+                            <CitationMark state={orbFor(clamped)} size={30} className="text-white" />
                             <span className="text-2xl font-bold text-white tabular-nums" aria-hidden>
                                 {Math.round(clamped)}%
                             </span>

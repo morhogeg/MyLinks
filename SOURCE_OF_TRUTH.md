@@ -1071,6 +1071,191 @@ exact-match, capped.
   masthead+lead, then travels to STANDOUT + question; vertical travel capped
   (385) + bias 170 after still-QA caught the device riding into the caption.
   SYNTHESIS data reshaped; REVIEW retired.
+- **2026-08-01 — The card → graph → Ask trail now HOLDS (owner: "the back to
+  card must hold").** Reported: open a card → *See in graph* (chip present) →
+  *Ask about these* → Ask had no way back to the graph, and returning to the
+  graph had lost "Back to card" entirely. Two causes, both in Feed's view
+  bookkeeping. **(1)** The leave-the-graph effect retired `graphFromCard`
+  unconditionally, so the hop into Ask — which the code itself calls "a detour
+  from the graph, not an exit", and which `graphRestore` already survives —
+  destroyed the card context. It is now kept when the graph is left FOR ASK and
+  retired by the Ask branch if the detour ends anywhere else, so the trail
+  either continues or closes cleanly. `graphIgnoresFilters` rides the same rule
+  (the pool must not change under the user mid-detour). **(2)** Ask had no
+  return path at all: new `onBackToGraph` on `AskBrain`, set only when Ask was
+  entered via "Ask about these" (`askFromGraph`, false for every other entrance
+  — tab bar, toolbar, and the "Back to Ask" unwind, which is itself the
+  destination and must not offer a walk back round the loop). It renders the
+  SAME pill the graph's own chips use, above the scroll area so it can't scroll
+  away mid-answer, and the mobile header chevron + edge-swipe now unwind one hop
+  to the graph instead of dumping the user at the library. Verified in Chromium:
+  chip renders, and header-back and chip both call the graph return (0 exits).
+  **Known depth limit (deliberate, documented rather than fixed):** these are
+  one-hop contexts, not a real navigation stack. The reported trail (card →
+  graph → Ask → graph → card) is whole; a deeper walk — e.g. Ask → graph via an
+  answer's Graph chip → "Back to Ask" — still unwinds correctly one hop at a
+  time but drops the older card context at the end. A general fix is a Feed
+  nav-stack refactor; not worth its regression surface for a path nobody has hit.
+- **2026-08-01 — Ask answers stop coming back as a wall of text (5th report —
+  fixed deterministically this time, not with more prompt).** The RAG prompt has
+  demanded paragraph structure since 2026-07-28, in TWO places: a rule in the
+  main list ("never return one unbroken block…") and `_STRUCTURE_REMINDER`
+  appended at the output-format position, which the 07-28 session added
+  precisely because the rule alone was being ignored. It is still ignored. Two
+  facts from the reported screenshot decided the approach: the renderer is a
+  real markdown renderer (`MarkdownMessage` — paragraphs, lists, headings all
+  supported, `remark-breaks` for single newlines), and nothing server-side
+  collapses whitespace — so the model genuinely returned one block, and a third
+  prompt tweak would have been the third coin flip. **New: `web/lib/answerLayout.ts`
+  `breakIntoParagraphs`, applied in the Ask renderer** next to the existing
+  `normalizeListMarkers` — a deterministic FLOOR under the prompt (which still
+  asks, because a model that structures its own answer does it better than any
+  splitter). It only ever inserts blank lines — no word changes, nothing
+  reorders — and backs off entirely when the answer contains ANY line break
+  (paragraphs, list, `**bold**` mini-heading, table) or is under 320 chars, so
+  well-formatted and short answers are untouched. Grouping is by LENGTH
+  (~220 chars/paragraph), not sentence count: **the reported wall was only
+  three sentences long** — a count-based rule (the first thing I wrote) left it
+  completely unchanged, which the unit test caught. The sentence splitter guards
+  decimals, initials and abbreviations. Because it runs at render time it also
+  repairs answers ALREADY in chat history, and covers both RAG paths (native
+  buffered + web streamed) without either knowing; greedy-from-the-start
+  grouping is prefix-stable, so a streaming answer's paragraph breaks never
+  move as text arrives. Verified: the exact reported answer renders as 3
+  paragraphs (one per idea), a short answer stays 1, and every "model formatted
+  it itself" case passes through byte-identical. No backend change → no
+  functions deploy.
+- **2026-08-01 — Graph round 2: "Back to card", and the settle stops shaking.**
+  **(1) "Back to card"** — the graph opened via *See in graph* now carries the
+  same chip "Back to Ask" uses (same slot above the legend, same pill, chevron +
+  destination icon + label; they are mutually exclusive, each entry clearing the
+  other's context). It returns to the **exact card and place**: Feed remembers
+  `{id, atRelated, returnTo}` at entry, so the pill on an open card's Related
+  list comes back **scrolled to that section** (new one-shot `scrollToRelated`
+  on `LinkDetailModal`, mirroring the existing `scrollToNotes` mount-only
+  reveal), while the ⋯-menu entry — where no card was open — reopens the card
+  normally, and both restore the view the user was on. **(2) The first seconds
+  of the graph were genuinely broken, and it was the physics, not the camera.**
+  Repulsion is an inverse-square law with NO distance floor, so a pair of nodes
+  that happened to seed close together produced an unbounded impulse. Measured
+  before changing anything (the sim was extracted to **`web/lib/graphPhysics.ts`**
+  precisely so it could be run headless over a real `buildGraphModel` output):
+  on an 80-card graph the peak single-tick displacement was **965 px** — a node
+  crossing the whole canvas in one frame — with repeated 300–800 px frames for
+  the first ~30 ticks. Two bounds fix it: a **distance floor** on the repulsion
+  term (below "touching", the force stops growing; the linear hard-core
+  collision term does the separating) and a **per-tick speed cap**
+  (`MAX_STEP = 16` world units × the layout's spacing). After: peak **16 px**,
+  **zero** jitter spikes, and convergence unchanged (tick-120 and tick-300
+  residual motion match the old numbers to 2 decimals) — so the "dots coming
+  together" animation the owner liked is intact, it just no longer teleports.
+  Verified at 8, 80 and 300 nodes. tsc 0, lint at baseline; chip + return-scroll
+  render-verified in Chromium.
+- **2026-08-01 — Round 2 of the device-QA fixes: the Instagram play badge, and
+  the in-app "+" saves get the same progress honesty.**
+  **(1) The play triangle on Instagram posters is BURNED INTO THE PIXELS** —
+  confirmed from owner screenshots of two reels (identical white triangle,
+  centred) plus a re-read of every render path: nothing in the app draws it (the
+  social-post cover in `LinkDetailModal` and the video banner in `Card` are bare
+  `<img>`s; the only Play glyphs are YouTube's watch pill and the "Key moments"
+  heading). It comes from Instagram's CDN, which lists its transforms in the
+  poster URL's **`stp=`** parameter — an underscore-joined token list whose
+  `tt<N>` token composites the overlay. Fixed on BOTH sides, deliberately:
+  `functions/scraper.py::_instagram_poster_without_play_badge` strips the token
+  for newly-saved reels and **verifies the candidate actually serves an image
+  before storing it** (falls back to the original otherwise, and never touches a
+  bridge-served URL, which carries no `stp`); and the client twin
+  `web/lib/instagramPoster.ts` + `components/ui/PosterImage.tsx` applies the same
+  rule at RENDER time, which repairs **every reel already in the library** with
+  no migration. **Gotcha found while verifying (Chromium):** the first
+  `PosterImage` fell back via `onError` only, and an `<img>` that fails BEFORE
+  hydration never delivers that event — so it also inspects the element on ref
+  attach (`complete && naturalWidth === 0` = already failed). Verified: rewritten
+  URL sticks when it loads, reverts to the stored URL when refused, untouched
+  when there is no badge token; the URL surgery is unit-checked on both sides
+  (CDN URL with/without the token, bridge URL, YouTube URL, unparseable value).
+  **If the badge survives on a NEW save, the token guess was wrong for that
+  poster** — the scraper logs which path it took, so check the functions log
+  before changing anything else. **(2) In-app "+" saves now reflect the true
+  state too** (owner: "should be applied to all saves"). Audited all four: the
+  plain-link dialog already runs off the card doc, and image and note saves
+  already await the real Firestore write before saying Done — but the **video
+  (YouTube) path snapped the bar to 100% and toasted "Saved to Machina" on the
+  ENQUEUE ack**, roughly a minute before analysis finishes. It now hands over
+  mid-ramp to the Firestore-driven pill (which ends on the card actually
+  resolving) and says what is true at that moment: "Saved — analyzing in the
+  background". tsc 0, py_compile clean, lint at baseline.
+- **2026-08-01 — Four owner fixes from device QA: the photo scanner wears the
+  mark, cards stop saying "the author", and "Saved" stops lying.**
+  **(1) Photo saves carry the Citation mark** like every other save — the
+  in-app `ImageScanProgress` swapped its generic lucide `ScanText` glyph for
+  `CitationMark` (motion picked per phase from the same verb→motion table
+  `lib/scanPhases.ts` states: searching while it reads, shaping while it writes,
+  solving while it files), and the **iOS Share Extension HUD** now reveals the
+  mark in image mode too (`presentScan` — it was deliberately hidden, "the image
+  is the visual there", which made a photo share the one flow with no brand at
+  all). **(2)+(3) Prompt copy** (`functions/ai_service.py`): the instruction that
+  asked for a trailing **"Conclusions"** section is DELETED and replaced by an
+  explicit ban on any closing "Conclusions / Summary / Takeaways" section in any
+  language (the write-up ends on its last key point); **"the author" is now
+  forbidden outright** — it was in the prompt's own list of approved factual
+  phrasings ("The author argues…"), which is why every Key Points bullet opened
+  with it. The rule names the alternatives: state the claim directly, or name
+  the real person/publication when the content does. Ships with a functions
+  deploy scoped to `analyze_link,analyze_image,process_link_background`;
+  **existing cards keep their stored text** — only new/re-analyzed saves get the
+  new phrasing. **(4) The share progress bar told the truth about "Saved".**
+  `useSharedCaptureBanner` used to declare a capture done on a TIMER — feed
+  authoritative + nothing processing for 4s — which fired in the gap between the
+  upload finishing and the backend writing its placeholder card: the bar flashed
+  "Saved", then the card appeared, still working, seconds later (and the capture
+  latch then suppressed the real banner, so the skeleton sat there with no
+  progress at all). The finish frame is now driven by EVIDENCE: Feed publishes
+  `readyCaptureAt` (newest capture clock among NON-processing cards, via the new
+  shared `cardStartMs`/`toMs` helpers in `lib/shareProgress.ts`) up through
+  `page.tsx`, and the bridge may only say "Saved" once that reaches its own
+  capture's start clock (±2s of NTP skew). The timer survives ONLY as a give-up
+  for the case where no card is ever coming (a deduped re-share is a server
+  no-op), and is now 15s measured from when we actually began waiting. tsc 0,
+  py_compile clean, lint unchanged; photo scanner render-verified in Chromium
+  (all five phases, light + dark). **Still open — owner input needed:** the
+  Instagram **play icon** on pulled images. Nothing in the app draws it (no play
+  overlay exists in `Card`/`LinkDetailModal` for social posters — only YouTube's
+  "Watch on YouTube" pill and the "Key moments" heading use a Play glyph), so it
+  is burned into the poster we fetch — most likely the bridge-derived og:image
+  (`instagramez`/`kkinstagram`/`ddinstagram` in `scraper.py::_scrape_instagram_url`,
+  used as `video_thumbnail_url` for reels). The sandbox cannot reach Instagram
+  (egress policy 403s the CONNECT) to confirm which source burns it in, so the
+  next session should get a card screenshot + the card's `metadata.thumbnailUrl`
+  before changing the scraper.
+- **2026-08-01 — "See in graph" from a card (both states).** Every card can now
+  open the Graph focused on ITSELF, so its connections are visible as a map, not
+  just as the Related list. Costs nothing at runtime: the graph is a client-side
+  canvas over cards already in memory (no API, no Gemini, no extra reads), and
+  the focus machinery already existed — `GraphRestoreFocus.selectedId`, built for
+  the Ask citation chip. **Placement (owner call, after review):** OPEN state →
+  a pill on the **"Related cards" section header**, not the top action row (that
+  row already scrolls horizontally on a phone, and the section only renders when
+  there ARE connections, so the entry point is self-gating); CLOSED state → a
+  **"See in graph" row in the ⋯ sheet** (`CardActionSheet`, shared by grid Card
+  and ListCard), placed with "Open source" as navigation, above the state
+  toggles. Two correctness details that were NOT free: **(1)** the graph pool
+  mirrors the grid's filters, which would answer "what is this connected to"
+  wrongly (filtered-out neighbours simply missing) — a card-focused entry now
+  maps the WHOLE library (`graphIgnoresFilters` in Feed), one-shot: touching any
+  filter while in the graph, or leaving it, restores grid-mirroring. **(2)** a
+  card with no qualifying tie is NOT a node (`graph.ts` `if (!degree[i])
+  continue`), and the ⋯ row can't cheaply know that in advance, so the graph now
+  SAYS so — `“<title>” isn’t on the map yet — no connections to other cards`,
+  same honesty rule as the cited-set banner — and the request survives the
+  rebuild that `ensureLibrary()` triggers on entry, so a card that only becomes
+  connected once the full library lands still gets focused (verified in
+  Chromium: notice on the partial pool → focus + notice gone on the full one).
+  Private cards never offer it (they're excluded from the graph pool);
+  processing/failed cards don't either. tsc 0, lint unchanged (same 13
+  pre-existing problems), render-verified on a throwaway harness: modal LTR+RTL
+  and light+dark, ⋯ sheet, focus lands on the requested node with its
+  neighbourhood lit and the panel naming each tie.
 - **2026-08-01 (launch film, round 13i) — act-one taps land ON their buttons.**
   The `SURFACE_CTL` offsets dated from the first surface layouts and had
   drifted as the layouts evolved (worst: X's star and YouTube's Save pill —

@@ -31,6 +31,8 @@ interface ListCardProps {
     onShare?: (link: Link) => void;
     onTogglePrivate?: (link: Link) => void;
     onToggleThumbnail?: (link: Link) => void;
+    /** ⋯ → See in graph: open the Graph focused on this card. */
+    onOpenInGraph?: (link: Link) => void;
     /** Collections this card belongs to — names the "remove from" row. */
     cardCollections?: { id: string; name: string }[];
     /** Set when the feed is scoped to one collection (enables that row). */
@@ -67,6 +69,7 @@ function ListCard({
     onShare,
     onTogglePrivate,
     onToggleThumbnail,
+    onOpenInGraph,
     cardCollections,
     activeCollectionId,
     onRemoveFromCollection,
@@ -342,6 +345,7 @@ function ListCard({
                 onShare={onShare}
                 onTogglePrivate={onTogglePrivate}
                 onToggleThumbnail={onToggleThumbnail}
+                onOpenInGraph={onOpenInGraph}
                 removeFromCollection={
                     activeCollectionId && onRemoveFromCollection
                         ? {
