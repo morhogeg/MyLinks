@@ -26,8 +26,13 @@ export const DigestScene: React.FC = () => {
   // From the synthesis card down to the resurfaced save under it. Vertical
   // shortens the travel and adds a downward bias — the full journey lifted the
   // device's top edge INTO the caption block (owner screenshot, round 10).
-  const target = ramp(f, [56, 190], [280, fr.vertical ? 340 : 405], EASE_IN_OUT);
-  const y = fr.focusY(target, scale * fr.scaleMul) + drift(f, 4, 220) + (fr.vertical ? 120 : 0);
+  // the synthesis view is taller than the old two-card layout: read the
+  // masthead + lead first, then travel down to STANDOUT + the open question
+  // vertical travel capped well short of landscape's: the caption band owns
+  // the top of the frame for this ENTIRE beat, so the device must never rise
+  // into it (owner screenshot, round 13j still-QA)
+  const target = ramp(f, [56, 190], [290, fr.vertical ? 385 : 520], EASE_IN_OUT);
+  const y = fr.focusY(target, scale * fr.scaleMul) + drift(f, 4, 220) + (fr.vertical ? 170 : 0);
   const rotY = 0; // zero 3D — crispness over drama (round 13f)
 
   const out = 1 - prog(f, 213, 225);

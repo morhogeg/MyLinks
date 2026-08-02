@@ -239,19 +239,15 @@ export const CLUSTERS = [
   { name: 'Weeknight cooking', x: 0.55, y: 0.93 },
 ];
 
-/** The digest beat. (No "library" anywhere in the film — standing owner rule.
- *  Kicker dropped "This week" when the VO stopped claiming a weekly cadence —
- *  the schedule is the user's.) */
+/** The digest beat — the REAL synthesis reading view (owner call, 13j):
+ *  masthead, narrative lead, the STANDOUT card, and the open question, all
+ *  ported from the shipped SynthesisCard.tsx layout. The standout doubles as
+ *  the resurfaced-save moment (2mo old, never revisited). */
 export const SYNTHESIS = {
-  kicker: 'In your saves',
   title: 'You keep circling one idea',
-  body: 'The AI thread, Maya’s article, and Mark Manson’s video — three saves, one question: what stays human. You might be ready to write your own take.',
-};
-
-// The resurfaced card must RELATE to the write-up above it (owner note, 13f):
-// the digest circles the AI/what-stays-human idea, so the card it brings back
-// is the philosophy video from that same thread — saved months ago, unwatched.
-export const REVIEW = {
-  title: 'What AI can’t take from you',
-  meta: 'Saved 2 months ago · never revisited',
+  meta: 'Jul 21 – 27 · 8 saves',
+  lead: 'The AI thread, Maya’s article, and Mark Manson’s video — three saves, one question: what stays human. You might be ready to write your own take.',
+  standoutTitle: 'What AI can’t take from you',
+  standoutReason: 'Saved two months ago, never revisited — and it’s the missing half of the argument your newer saves are having.',
+  question: 'If the models take the typing, what’s the part of your work only you can do?',
 };

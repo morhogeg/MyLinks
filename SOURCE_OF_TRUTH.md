@@ -1058,6 +1058,19 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-01 (launch film, round 13j) — the digest beat shows the REAL
+  synthesis reading view (owner: "why are we showing a fake digest screen?").**
+  The film's invented digest card is replaced with a faithful port of the
+  shipped `SynthesisCard.tsx` `alwaysOpen` layout: accent-tinted card,
+  masthead (bare glyph + THIS WEEK IN MACHINA + title + "Jul 21 – 27 · 8
+  saves"), the narrative lead, the amber ★ STANDOUT card, the italic "Worth
+  sitting with" question, and the Your-notes footer with its shipped
+  empty-state line. Content stays the film's AI trio; the STANDOUT is Mark
+  Manson's video ("Saved two months ago, never revisited…"), so the old
+  resurfaced-save beat now lives inside the real layout. Camera reads
+  masthead+lead, then travels to STANDOUT + question; vertical travel capped
+  (385) + bias 170 after still-QA caught the device riding into the caption.
+  SYNTHESIS data reshaped; REVIEW retired.
 - **2026-08-01 (launch film, round 13i) — act-one taps land ON their buttons.**
   The `SURFACE_CTL` offsets dated from the first surface layouts and had
   drifted as the layouts evolved (worst: X's star and YouTube's Save pill —
