@@ -3,3 +3,4 @@
 2026-07-22T05:45:00Z redeploy send_digests (scheduler IAM fixed)
 2026-07-28T00:00:00Z unscoped deploy: light up M12 synthesis backend (task 4)
 2026-07-28T09:30:00Z deploy tag-language prompt fix to the analysis fns (f3055f8 was never deployed)
+2026-08-02T10:45:00Z auth cutover: REQUIRE_AUTH=true (backend enforcement on)
