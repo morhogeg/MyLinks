@@ -1092,6 +1092,39 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-02 — "More ideas" now rotates the WHOLE Ask chip row, not three of
+  four.** Owner report from device: tapping the refresh control on the Ask home
+  screen replaced every chip except the top one. It was structural, not a
+  glitch — `buildAskSuggestions` seated the latest-save chip **outside** the
+  rotated pool (`[...latestChips, ...rotate(pool, salt)]`), hard-pinned to
+  `newestReadyLink`, so the salt could only ever reword it from a list of THREE
+  phrasings; every third tap reproduced the top chip verbatim, and it was always
+  about the same card. **Fix: the card chip's ANCHOR rotates with the salt too**,
+  across the newest `RECENT_ANCHORS` (5) cards via the new `recentReadyLinks`
+  helper (`newestReadyLink` is now defined in terms of it, so there is one sort
+  order rather than two). Phrasings still rotate on their own cycle of 3, and 5
+  and 3 being coprime means a card/wording pair doesn't recur until the anchor
+  list has wrapped three times. **The pin existed for a real reason** — "a card
+  saved while Ask is open shows up in the chips immediately" — so that property
+  was preserved, just moved: salt 0 is the pristine set (newest save first), and
+  AskBrain now **resets the salt to 0 whenever the newest ready card id
+  changes**, i.e. a new save gives you a fresh newest-first set instead of
+  waiting its turn in the rotation. Two follow-on corrections the change forced:
+  the `rediscover` chip excluded `latest.id` and now excludes the **rotated
+  anchor** (once the anchor moves on, the newest card is fair game for
+  rediscovery, and the old filter would have let the anchor and the dusty chip
+  name the same card), and `suggestSalt` no longer starts at
+  `Math.random() * 997` — a random first impression was pointless once salt 0
+  became meaningful, and deterministic-from-0 is what makes "newest save first"
+  true on open. `newChat()`'s salt bump now genuinely retires the card it just
+  answered, which its own comment used to say it could not do. Verified on a
+  jiti harness over a 40-card synthetic library: salt 0 anchors the newest save,
+  **every slot changes on every bump**, the top chip walks 5 distinct cards, no
+  set contains a duplicate chip, a 1-card library still renders, and the `used`
+  sinking is intact (a tapped chip sinks rather than vanishing; the row stays
+  full; a tiny library with everything used still never renders empty).
+  Frontend-only — tsc 0, eslint 0 on both changed files, no backend change.
+
 - **2026-08-02 — Machina has a tagline: "Everything you save, finally useful."
   (owner's line), plus a compiled launch gate at the top of §4.** The owner asked
   what was left before the iOS launch and set the tagline in the same breath.

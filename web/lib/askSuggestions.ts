@@ -89,16 +89,22 @@ export function fullTitle(raw: string | undefined): string | null {
     return t && t.toLowerCase() !== 'untitled' ? t : null;
 }
 
+/** How many recent cards the card chip's anchor rotates through. Small on
+ *  purpose: past a handful, "recent" stops being true and the chip starts
+ *  offering cards the rediscover chip already covers. */
+const RECENT_ANCHORS = 5;
+
+/** The newest ready cards with a usable title, newest first (at most `max`). */
+export function recentReadyLinks(links: Link[], max = RECENT_ANCHORS): Link[] {
+    return readyLinks(links)
+        .filter(l => chipTitle(l.title))
+        .sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt))
+        .slice(0, max);
+}
+
 /** The newest ready card with a usable title, or null. */
 export function newestReadyLink(links: Link[]): Link | null {
-    let best: Link | null = null;
-    let bestTs = -1;
-    for (const l of readyLinks(links)) {
-        if (!chipTitle(l.title)) continue;
-        const ts = toMs(l.createdAt);
-        if (ts > bestTs) { best = l; bestTs = ts; }
-    }
-    return best;
+    return recentReadyLinks(links, 1)[0] ?? null;
 }
 
 /** Rotate `arr` so it starts at index `salt % length` (no-op when short). */
@@ -117,11 +123,12 @@ const MAX_CHIPS = 4;
  *
  * `used` is the keys already tapped this session, OLDEST FIRST. They sink to
  * the back of the list rather than being dropped, so the row can never render
- * empty in a small library (see the tail of this function). Note that salt
- * alone cannot retire a chip: it only rotates phrasings and pool ORDER, and
- * the latest-save chip is seated ahead of the pool regardless — so a new chat
- * that only bumped the salt would re-offer the same card in different words.
- * Retiring a chip is what `used` is for.
+ * empty in a small library (see the tail of this function). `used` is still
+ * what RETIRES a chip; salt only reorders and re-anchors.
+ *
+ * Salt 0 is the pristine set: newest save first, then the pool in its natural
+ * (most-saved-first) order. Every bump moves EVERY slot — see the card chip
+ * below.
  */
 export function buildAskSuggestions(
     links: Link[],
@@ -132,25 +139,40 @@ export function buildAskSuggestions(
     if (ready.length === 0) return [];
     const now = Date.now();
 
-    // ── Latest save — always first, keyed by card id so a new save animates in.
-    const latest = newestReadyLink(links);
-    const latestChips: AskSuggestion[] = [];
-    if (latest) {
+    // ── The card chip — one concrete question about a recent save, first slot.
+    //
+    // Its ANCHOR CARD rotates with the salt, not just its phrasing. This slot
+    // used to be hard-pinned to `newestReadyLink`, so "More ideas" refreshed
+    // three chips out of four and the top one merely got reworded — and with
+    // only three phrasings, every third tap reproduced it verbatim (owner
+    // report, 2026-08-02: "it replaces all chips except for the top one").
+    // Rotating the anchor as well is what makes the whole row turn over.
+    //
+    // Salt 0 still anchors on the newest save, and AskBrain resets the salt
+    // whenever a new card lands, so a save made while Ask is open is still the
+    // first thing offered — the property the old pin existed to guarantee.
+    const recent = recentReadyLinks(links);
+    const anchor: Link | undefined = rotate(recent, salt)[0];
+    const cardChips: AskSuggestion[] = [];
+    if (anchor) {
         // iso(): bidi-isolate the embedded title so a Hebrew title inside an
         // English chip/bubble renders as one intact run (defined below).
         // FULL title in both the pill and the sent question (owner rule:
         // never truncate — chips wrap instead).
-        const t = iso(fullTitle(latest.title)!);
+        const t = iso(fullTitle(anchor.title)!);
         const phrasings = [
             `What's the gist of "${t}"?`,
             `Key points from "${t}"`,
             `Why is "${t}" worth my time?`,
         ];
-        latestChips.push({
+        cardChips.push({
+            // Phrasing advances on a DIFFERENT cycle length (3) than the anchor
+            // (up to RECENT_ANCHORS), so consecutive taps rarely repeat a
+            // card/wording pair even once the anchor list wraps.
             text: rotate(phrasings, salt)[0],
             kind: 'latest',
-            key: `latest:${latest.id}`,
-            hints: { anchorTitles: [hintTitle(latest.title)!] },
+            key: `latest:${anchor.id}`,
+            hints: { anchorTitles: [hintTitle(anchor.title)!] },
         });
     }
 
@@ -230,10 +252,12 @@ export function buildAskSuggestions(
     });
 
     // Rediscovery: the dustiest card that was never opened — but never the
-    // same card as the latest-save chip (a tiny/stale library can make the
-    // newest card also the dustiest, yielding two chips about one card).
+    // same card as the card chip above (a tiny/stale library can make that
+    // card also the dustiest, yielding two chips about one card). Excludes the
+    // rotated ANCHOR, not the newest card: once the anchor rotates, the newest
+    // card is no longer on screen and is fair game for rediscovery.
     const dusty = ready
-        .filter(l => l.id !== latest?.id && !l.isRead && !l.lastViewedAt && chipTitle(l.title) && now - toMs(l.createdAt) > WEEK_MS)
+        .filter(l => l.id !== anchor?.id && !l.isRead && !l.lastViewedAt && chipTitle(l.title) && now - toMs(l.createdAt) > WEEK_MS)
         .sort((a, b) => toMs(a.createdAt) - toMs(b.createdAt))[0];
     if (dusty) {
         pool.push({
@@ -256,7 +280,7 @@ export function buildAskSuggestions(
         });
     }
 
-    const all = [...latestChips, ...rotate(pool, salt)];
+    const all = [...cardChips, ...rotate(pool, salt)];
     if (used.length === 0) return all.slice(0, MAX_CHIPS);
 
     // Chips already asked this session SINK rather than vanish: filtering them

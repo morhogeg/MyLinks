@@ -387,7 +387,10 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
     // recomputed on every links snapshot — so a card saved while Ask is open
     // shows up in the chips immediately. `suggestSalt` rotates the mix and the
     // phrasing; "More ideas" bumps it. All client-side, no extra tokens.
-    const [suggestSalt, setSuggestSalt] = useState(() => Math.floor(Math.random() * 997));
+    // Starts at 0 — the pristine set (newest save first, then top topics) —
+    // rather than at a random draw: the first thing you see on opening Ask
+    // should be your newest save, and "More ideas" is right there for variety.
+    const [suggestSalt, setSuggestSalt] = useState(0);
     // Chips already asked THIS SESSION, oldest first — they sink to the back of
     // the set instead of being re-offered. Deliberately in memory only: a
     // relaunch should be free to suggest them again, and persisting would
@@ -397,6 +400,16 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
         () => buildAskSuggestions(links, suggestSalt, usedSuggestions),
         [links, suggestSalt, usedSuggestions],
     );
+    // A brand-new save RESETS the rotation instead of waiting its turn. The
+    // card chip's anchor rotates with the salt (so "More ideas" turns over
+    // every slot, not three of four), which on its own would mean a card saved
+    // while Ask is open might not be the one offered. Snapping back to salt 0
+    // restores that guarantee — it is the same property the old hard pin gave,
+    // expressed as "new save ⇒ fresh set" instead of "this slot never moves".
+    const newestReadyId = newestReadyLink(links)?.id ?? null;
+    useEffect(() => {
+        if (newestReadyId) setSuggestSalt(0);
+    }, [newestReadyId]);
 
     // One-tap follow-ups under the latest answer, tailored to what it actually
     // discussed. The answer's citations only carry id/title/category, but the
@@ -625,10 +638,11 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
         lastSavedRef.current = '';
         setInput('');
         setFreshCard(null);         // the banner belongs to the conversation it appeared in
-        // Reword what survives. This is a COMPLEMENT to the used-key filter
-        // above, never the fix on its own: salt rotates phrasing and pool order
-        // but cannot retire the latest-save chip, so on its own it would greet a
-        // new chat with the same card it just answered, in different words.
+        // Turn the set over. Salt now re-anchors the card chip as well as
+        // rotating phrasings and pool order, so a new chat is not greeted by
+        // the same card it just answered. Still a COMPLEMENT to the used-key
+        // filter above, not a replacement: rotation reorders, `used` is what
+        // retires a chip the user actually tapped.
         setSuggestSalt(v => v + 1);
         textareaRef.current?.focus();
     };
