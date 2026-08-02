@@ -1099,6 +1099,14 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-02 (launch film, round 13n) — the film ENDS on the lockup, and
+  the desktop edition ships.** The endcard no longer fades to white — the
+  last frame is mark + wordmark + tagline + footer (what a finished player
+  freezes on; owner call). Both VO editions rendered and delivered:
+  `MachinaLaunchVerticalVO` (1080×1920) and `MachinaLaunchVO` (1920×1080,
+  first landscape delivery since the vertical-only narrowing in round 12 —
+  landscape still-QA'd at seven beats first: left-column captions and all
+  round-13 scenes frame correctly).
 - **2026-08-02 (launch film, round 13m) — the Manson thumbnail loses its
   invented text.** "USE AI. SCARE PEOPLE." misrepresented the real video's
   thumbnail (owner note — the actual still is him at the mic in a warm room,
