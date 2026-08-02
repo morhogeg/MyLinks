@@ -49,7 +49,9 @@ LINES = [
     (21.4, 2.3, f"{SAY_NAME} notices when things you saved belong together."),
     (24.25, 1.7, "Group your saves into collections that mirror how you think."),
     # Full stop before "Ready" = the audible break; caption shows the dash.
-    (26.1, 2.6, f"Behind the scenes, {SAY_NAME} pieces it all together. Ready when you are."),
+    # Spoken-only "And" (owner call, 13l): conversational lead-in the caption
+    # deliberately doesn't carry — same precedent as the SAY_NAME respelling.
+    (26.1, 2.6, f"And behind the scenes, {SAY_NAME} pieces it all together. Ready when you are."),
     # the closing statement, over the endcard's own line
     (30.1, 1.6, f"{SAY_NAME}. Everything you save — finally useful."),
 ]

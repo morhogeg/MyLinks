@@ -1058,6 +1058,12 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-02 (launch film, round 13l) — spoken-only "And" on the digest
+  line.** The VO now opens "And behind the scenes, Makeena pieces it all
+  together…" for conversational flow (owner call); the CAPTION deliberately
+  stays "Behind the scenes, …" — a documented spoken/written divergence, same
+  precedent as the "Makeena" respelling and the dash-vs-full-stop punctuation.
+  Line re-synthesized (4.42s / 7.4s window), remixed.
 - **2026-08-02 (launch film, round 13k) — the Manson video is the REAL one.**
   "What AI can't take from you" (invented) → **"How to Use AI to Improve
   Yourself So Much it Will Scare People"** (owner screenshot: 15:28, 206K
