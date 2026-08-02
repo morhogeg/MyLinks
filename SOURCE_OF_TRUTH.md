@@ -519,6 +519,13 @@ The multi-user auth work is **fully written but not live**:
     across onboarding, empty states and dialogs, each needing a judgement call on
     rhythm, and a blind find-and-replace would flatten the voice it is meant to
     protect.
+11a4. **[ ] Device-confirm the Ask "More ideas" rotation on build 1263** (fixed
+    2026-08-02, see §9). One tap should now change **all four** chips, including
+    the top one, and the top chip should name a **different card** each tap
+    (it walks the 5 newest saves), not just reword the same one. Also worth one
+    look: save something new while Ask is open — the row should snap back to a
+    newest-first set. Verified headlessly on a synthetic 40-card library, but
+    the reported symptom was on device, so it deserves the same eyes.
 11b. **[x] "Python tests" CI workflow is perpetually red** (runs #47–#51+): the
     only failures were 4 mocks in `functions/tests/test_embed_trigger_backstop.py`
     (`SimpleNamespace` lacks `_get_attributes` — firebase_functions version
@@ -1124,6 +1131,12 @@ exact-match, capped.
   sinking is intact (a tapped chip sinks rather than vanishing; the row stays
   full; a tiny library with everything used still never renders empty).
   Frontend-only — tsc 0, eslint 0 on both changed files, no backend change.
+  **SHIPPED:** commits `3a11577` + `96e4ce2`, merged to `main` as `c188dea`
+  → Vercel (desktop) + **TestFlight run #263 = build 1263**. No functions
+  deploy (nothing under `functions/**` changed) and no hosting deploy
+  (`firebase.json` untouched). The merge hit one conflict — both this branch
+  and main's launch-film rounds 13j/13k prepended §9 entries — resolved by
+  keeping both sides, this session's first.
 
 - **2026-08-02 — Machina has a tagline: "Everything you save, finally useful."
   (owner's line), plus a compiled launch gate at the top of §4.** The owner asked
