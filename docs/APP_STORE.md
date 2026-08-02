@@ -49,11 +49,21 @@ Notes for edge cases:
 |---|---|---|
 | **Name** | `Machina: Save & Recall` | 30 (22 used) |
 | **Subtitle** | `Capture. Ask. Connect.` | 30 (22 used) |
+| ~~Tagline~~ | The product tagline `Everything you save, finally useful.` is **not** an App Store field — see the note under this table before pasting it anywhere. | — |
 | **Category** | Primary: **Productivity**. Secondary (optional): Utilities. | |
 | **Privacy Policy URL** | `https://my-links-sable.vercel.app/privacy` | |
 | **Support URL** | `https://my-links-sable.vercel.app` | |
 | **Marketing URL** (optional) | `https://my-links-sable.vercel.app` | |
 | **Copyright** | `© 2026 Mor Hogeg` | |
+
+⚠️ **Do not put the tagline in the Subtitle field.** Machina's tagline is
+`Everything you save, finally useful.` (`docs/BRANDING.md` D-6) and it belongs on
+the web, the README, the film endcard and Product Hunt — **not here.** Two
+reasons, either one fatal: it is **36 characters** against a 30-character field
+with no cut that survives, and it re-spends **`save`**, already a Name token, so
+the index gains nothing while the field loses characters. `Capture. Ask.
+Connect.` stays. This note exists because "the app has a tagline, why isn't it
+the subtitle?" is the obvious question, and the answer is not obvious.
 
 **Promotional text** (170 chars, editable without review):
 

@@ -12,7 +12,10 @@ const geistMono = GeistMono;
 
 export const metadata: Metadata = {
   title: "Machina",
-  description: "Your AI-powered knowledge capture and retrieval system",
+  // The product tagline (docs/BRANDING.md D-6). Not the App Store subtitle —
+  // that stays `Capture. Ask. Connect.` (36 chars doesn't fit the 30-char field,
+  // and `save` is already a Name token).
+  description: "Everything you save, finally useful.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,

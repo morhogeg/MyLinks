@@ -1,6 +1,6 @@
 # Machina
 
-**Your AI-powered personal knowledge base — save anything, then just ask.**
+**Everything you save, finally useful.**
 
 Machina captures links and images from wherever you find them, reads and
 analyzes them with AI, and turns the pile into a knowledge base you can actually

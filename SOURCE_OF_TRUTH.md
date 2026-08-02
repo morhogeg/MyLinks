@@ -201,6 +201,31 @@ The multi-user auth work is **fully written but not live**:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
+> **LAUNCH GATE (compiled 2026-08-02, "what is actually left before iOS
+> launch?").** Pointers only — the detail stays in the numbered tasks, so nothing
+> below is duplicated and nothing can drift. **Almost none of it is code.**
+> 1. **Trademark clearance for "Machina"** — task **8a** / BRANDING **A-1**. Do
+>    this FIRST: it is free, and it is the only open item that could veto the
+>    identity and force a rename, which gets more expensive every week.
+> 2. **Auth cutover** — task **2**. 4 GitHub repo secrets + 1 Vercel var + a
+>    one-line rules commit + one device check. The only hard blocker.
+> 3. **App Store Connect data entry** — tasks **8**, **9** + BRANDING **A-2**/
+>    **A-4**: nutrition label, metadata, 6 screenshots (shoot post-rename), demo
+>    account (only creatable after the cutover) + review notes.
+> 4. **On-device sweep** — task **11**, plus the Settings "Done" safe-area fix,
+>    which has still never been in a TestFlight build (see item 11a1).
+> 5. **Cost/key hygiene** — tasks **5** (rotate the Gemini key *into the paid
+>    project*, rotate the ASC `.p8`) and **19** (GCP budget alert, PITR/backups,
+>    uptime check; and drop `MONTHLY_ASK_QUOTA` off its 1000 dev value).
+> 6. **Unverified, close before launch** — **4b** (a weekly synthesis has still
+>    never been proven to generate end-to-end), **4c**, **21**.
+> 7. **Marketing coherence** — BRANDING **Q-4** (the hero is still contested three
+>    ways) and **A-5** (every §8 asset leads on Ask). ~~Q-1/Q-5, the tagline~~ —
+>    **closed 2026-08-02 by D-6**, see §9.
+>
+> Explicitly NOT gates: 11a2 (scan-phase wording drift), 11a3 (em dashes), 11d
+> (`next` upgrade / CSP), 12 (ingest-token Keychain).
+
 ### 🔴 P0 — launch blockers (in order)
 
 1. **[x] Native auth build green (iOS)** *(code done 2026-07-03 — root cause was
@@ -494,6 +519,13 @@ The multi-user auth work is **fully written but not live**:
     across onboarding, empty states and dialogs, each needing a judgement call on
     rhythm, and a blind find-and-replace would flatten the voice it is meant to
     protect.
+11a4. **[ ] Device-confirm the Ask "More ideas" rotation on build 1263** (fixed
+    2026-08-02, see §9). One tap should now change **all four** chips, including
+    the top one, and the top chip should name a **different card** each tap
+    (it walks the 5 newest saves), not just reword the same one. Also worth one
+    look: save something new while Ask is open — the row should snap back to a
+    newest-first set. Verified headlessly on a synthetic 40-card library, but
+    the reported symptom was on device, so it deserves the same eyes.
 11b. **[x] "Python tests" CI workflow is perpetually red** (runs #47–#51+): the
     only failures were 4 mocks in `functions/tests/test_embed_trigger_backstop.py`
     (`SimpleNamespace` lacks `_get_attributes` — firebase_functions version
@@ -1016,8 +1048,13 @@ paid spend.
 > parts were making the share extension never lie about saving, and a knowledge
 > graph computed on every save. Happy to answer questions on the stack.
 
-*Product Hunt:* tagline "**Ask your bookmarks anything**"; first comment covers
-the origin story (WhatsApp self-messages), the capture surface, and the free tier.
+*Product Hunt:* tagline "**Everything you save, finally useful.**" — the product
+tagline (`docs/BRANDING.md` D-6), adopted here 2026-08-02, replacing
+~~"Ask your bookmarks anything"~~ which called the product *bookmarks* (a label
+the X-thread asset above explicitly disowns) and led on Ask (open question Q-4).
+First comment covers the origin story (WhatsApp self-messages), the capture
+surface, and the free tier — note that comment still leads on Ask, and rides
+BRANDING **A-5**'s pre-launch-week sweep of every asset on this page.
 
 *App Store subtitle/promo:* subtitle is `Capture. Ask. Connect.`
 (`docs/APP_STORE.md` §2; reasoning in `docs/BRANDING.md` D-2 — it opens on
@@ -1043,9 +1080,13 @@ score, no captions — for social cuts; captions also emit as `.srt`). Two thing
 know before reusing it: the UI is **rebuilt from the shipped components**
 (`src/theme.ts` ports `globals.css` tokens, `src/ui/Brand.tsx` carries the real
 wordmark path data, the checklist is `web/lib/scanPhases.ts` verbatim) so it drifts
-if those change; and the endcard's last line (`Your knowledge, on iPhone.`) is the
-one slot meant to become a real App Store badge/URL once the listing is live —
-nothing in the film claims availability yet. The stills it renders double as the
+if those change; and the endcard's last line — **`Everything you save, finally
+useful.`**, which is now the product tagline (`docs/BRANDING.md` D-6); this line
+was described here as `Your knowledge, on iPhone.` until 2026-08-02, stale since
+a later film round changed it — is the one slot meant to become a real App Store
+badge/URL once the listing is live, so **that swap now costs the tagline its
+best-placed appearance**; prefer adding the badge above the rule to replacing the
+line. Nothing in the film claims availability yet. The stills it renders double as the
 X-thread screenshots the posts above ask for.
 
 *Where to "advertise" for free:* X (primary), Product Hunt, Hacker News,
@@ -1064,6 +1105,80 @@ exact-match, capped.
   stays "Behind the scenes, …" — a documented spoken/written divergence, same
   precedent as the "Makeena" respelling and the dash-vs-full-stop punctuation.
   Line re-synthesized (4.42s / 7.4s window), remixed.
+- **2026-08-02 — "More ideas" now rotates the WHOLE Ask chip row, not three of
+  four.** Owner report from device: tapping the refresh control on the Ask home
+  screen replaced every chip except the top one. It was structural, not a
+  glitch — `buildAskSuggestions` seated the latest-save chip **outside** the
+  rotated pool (`[...latestChips, ...rotate(pool, salt)]`), hard-pinned to
+  `newestReadyLink`, so the salt could only ever reword it from a list of THREE
+  phrasings; every third tap reproduced the top chip verbatim, and it was always
+  about the same card. **Fix: the card chip's ANCHOR rotates with the salt too**,
+  across the newest `RECENT_ANCHORS` (5) cards via the new `recentReadyLinks`
+  helper (`newestReadyLink` is now defined in terms of it, so there is one sort
+  order rather than two). Phrasings still rotate on their own cycle of 3, and 5
+  and 3 being coprime means a card/wording pair doesn't recur until the anchor
+  list has wrapped three times. **The pin existed for a real reason** — "a card
+  saved while Ask is open shows up in the chips immediately" — so that property
+  was preserved, just moved: salt 0 is the pristine set (newest save first), and
+  AskBrain now **resets the salt to 0 whenever the newest ready card id
+  changes**, i.e. a new save gives you a fresh newest-first set instead of
+  waiting its turn in the rotation. Two follow-on corrections the change forced:
+  the `rediscover` chip excluded `latest.id` and now excludes the **rotated
+  anchor** (once the anchor moves on, the newest card is fair game for
+  rediscovery, and the old filter would have let the anchor and the dusty chip
+  name the same card), and `suggestSalt` no longer starts at
+  `Math.random() * 997` — a random first impression was pointless once salt 0
+  became meaningful, and deterministic-from-0 is what makes "newest save first"
+  true on open. `newChat()`'s salt bump now genuinely retires the card it just
+  answered, which its own comment used to say it could not do. Verified on a
+  jiti harness over a 40-card synthetic library: salt 0 anchors the newest save,
+  **every slot changes on every bump**, the top chip walks 5 distinct cards, no
+  set contains a duplicate chip, a 1-card library still renders, and the `used`
+  sinking is intact (a tapped chip sinks rather than vanishing; the row stays
+  full; a tiny library with everything used still never renders empty).
+  Frontend-only — tsc 0, eslint 0 on both changed files, no backend change.
+  **SHIPPED:** commits `3a11577` + `96e4ce2`, merged to `main` as `c188dea`
+  → Vercel (desktop) + **TestFlight run #263 = build 1263**. No functions
+  deploy (nothing under `functions/**` changed) and no hosting deploy
+  (`firebase.json` untouched). The merge hit one conflict — both this branch
+  and main's launch-film rounds 13j/13k prepended §9 entries — resolved by
+  keeping both sides, this session's first.
+
+- **2026-08-02 — Machina has a tagline: "Everything you save, finally useful."
+  (owner's line), plus a compiled launch gate at the top of §4.** The owner asked
+  what was left before the iOS launch and set the tagline in the same breath.
+  **The tagline** is recorded as `docs/BRANDING.md` **D-6** and is the first
+  candidate in that file's history that makes a *promise* instead of narrating a
+  mechanism — precisely the flaw that killed `Save anything. It reads it.` and
+  `Analyzed, organized, connected` in the 2026-07-27 subtitle round — so it was
+  taken as-is; the work was deciding **where it goes**. It is **not** the App
+  Store subtitle: 36 chars against a 30-char field with no survivable cut, and it
+  re-spends `save`, already a Name token (the same rule that made D-2's subtitle
+  open on `Capture`). So it is a **new layer** — tagline = the promise, subtitle
+  = the phases — which also lets it dodge the one thing the subtitle can't:
+  `Everything you save` is capture and `finally useful` is the payoff capture
+  alone never delivers, so it stays true whichever way **Q-4** (the hero, still
+  contested three ways) lands, and Q-4 stops blocking having a line at all.
+  Landed on `web/app/layout.tsx` + `web/public/manifest.json` (`description`),
+  `README.md`, and §8's Product Hunt slot; closes BRANDING **Q-1**, **Q-5** and
+  **A-3**; a ⚠️ note in `docs/APP_STORE.md` §2 explains why it must not be pasted
+  into the Subtitle field, because "the app has a tagline, why isn't it the
+  subtitle?" is the obvious question and the answer isn't. **Two things surfaced
+  while landing it.** (1) The launch film's endcard **already** carried the exact
+  sentence — §8 still described that slot as `Your knowledge, on iPhone.`, stale
+  since a later film round — so the film needed no change, the doc did; §8 now
+  also warns that swapping that line for the App Store badge would cost the
+  tagline its best placement (add the badge *above* the rule instead). (2)
+  `README.md` opened with *"Your AI-powered personal knowledge base"* — a **live
+  D-3 violation** (`ai` on a user-visible surface) that the 2026-07-27 rename pass
+  missed, fixed by the same edit. **The launch gate** (new block at the top of §4)
+  is pointers to existing tasks, not new content: trademark clearance (8a/A-1)
+  first because it is free and is the only item that could force a rename, then
+  the auth cutover (2), App Store Connect entry (8/9 + A-2/A-4), the device sweep
+  (11), key/cost hygiene (5/19), the never-verified weekly synthesis (4b), and the
+  marketing-coherence questions (Q-4/A-5). Frontend strings + docs only — `tsc`
+  clean, no functions change, no rules change.
+
 - **2026-08-02 (launch film, round 13k) — the Manson video is the REAL one.**
   "What AI can't take from you" (invented) → **"How to Use AI to Improve
   Yourself So Much it Will Scare People"** (owner screenshot: 15:28, 206K
