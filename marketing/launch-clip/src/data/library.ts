@@ -119,14 +119,14 @@ export const CARDS: Card[] = [
   },
   {
     id: 'machineminds',
-    category: 'Philosophy',
-    title: 'What AI can’t take from you',
+    category: 'AI',
+    title: 'How to Use AI to Improve Yourself So Much it Will Scare People',
     summary:
-      'Twenty blunt minutes on the one thing machines can’t do — care. Swearing included. Weirdly hopeful by the end.',
+      'Use the tools without outsourcing the thinking — blunt, funny, and specific about what to automate and what to keep yours.',
     source: 'IAmMarkManson',
     sourceKind: 'youtube',
-    tags: ['minds', 'watch-again'],
-    readTime: 21,
+    tags: ['self-improvement', 'watch-again'],
+    readTime: 15,
     age: '2mo ago',
   },
 ];
@@ -174,12 +174,12 @@ export const ASK_QUESTION = 'What have I been saving about AI?';
 export const ASK_ANSWER = [
   'Your saves circle one question: what stays human.',
   '',
-  'The thread you starred argues AI takes the typing and leaves the judgment, the article Maya sent maps which jobs actually shift, and Mark Manson’s video says the quiet part: the human bit was always the point.',
+  'The thread you starred argues AI takes the typing and leaves the judgment, the article Maya sent maps which jobs actually shift, and Mark Manson’s video flips it — use the machines to sharpen the human part.',
 ].join('\n');
 
 export const ASK_SOURCES = [
   { id: 'aithread', label: '@futuretense', kind: 'x' as const, title: 'What AI actually changes about work' },
-  { id: 'machineminds', label: 'IAmMarkManson', kind: 'youtube' as const, title: 'What AI can’t take from you' },
+  { id: 'machineminds', label: 'IAmMarkManson', kind: 'youtube' as const, title: 'How to Use AI to Improve Yourself So Much it Will Scare People' },
   { id: 'aiarticle', label: 'theatlantic.com', kind: 'link' as const, title: 'The jobs AI actually changes' },
 ];
 
@@ -197,7 +197,7 @@ export const GRAPH_NODES: {
   // The caption's claim lives in cluster 0: the thread saved two days ago and
   // the philosophy video saved two months ago sit on the same island.
   { id: 'aithread', x: 0.33, y: 0.36, r: 15, cluster: 0, category: 'AI', label: 'AI & work' },
-  { id: 'machineminds', x: 0.47, y: 0.27, r: 13, cluster: 0, category: 'Philosophy', label: 'What AI can’t take' },
+  { id: 'machineminds', x: 0.47, y: 0.27, r: 13, cluster: 0, category: 'AI', label: 'AI to improve yourself' },
   { id: 'aiarticle', x: 0.24, y: 0.5, r: 11, cluster: 0, category: 'AI' },
   { id: 'agents', x: 0.42, y: 0.5, r: 9, cluster: 0, category: 'AI' },
   { id: 'ethics', x: 0.35, y: 0.62, r: 8, cluster: 0, category: 'Philosophy' },
@@ -247,7 +247,7 @@ export const SYNTHESIS = {
   title: 'You keep circling one idea',
   meta: 'Jul 21 – 27 · 8 saves',
   lead: 'The AI thread, Maya’s article, and Mark Manson’s video — three saves, one question: what stays human. You might be ready to write your own take.',
-  standoutTitle: 'What AI can’t take from you',
+  standoutTitle: 'How to Use AI to Improve Yourself So Much it Will Scare People',
   standoutReason: 'Saved two months ago, never revisited — and it’s the missing half of the argument your newer saves are having.',
   question: 'If the models take the typing, what’s the part of your work only you can do?',
 };

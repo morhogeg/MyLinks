@@ -243,7 +243,7 @@ export const SaveSurface: React.FC<{ k: PlatformKey; save: number }> = ({ k, sav
               textShadow: '0 2px 12px rgba(0,0,0,0.5)',
             }}
           >
-            AI can’t take this.
+            Use AI. Scare people.
           </span>
           <span
             style={{
@@ -259,11 +259,11 @@ export const SaveSurface: React.FC<{ k: PlatformKey; save: number }> = ({ k, sav
               fontVariantNumeric: 'tabular-nums',
             }}
           >
-            21:07
+            15:28
           </span>
         </div>
-        <div style={{ marginTop: 12, fontSize: 15.5, fontWeight: 700, letterSpacing: '-0.02em', color: '#111318' }}>
-          What AI can’t take from you
+        <div style={{ marginTop: 12, fontSize: 15.5, fontWeight: 700, letterSpacing: '-0.02em', color: '#111318', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          How to Use AI to Improve Yourself So Much it Will Scare People
         </div>
         <div style={{ display: 'flex', alignItems: 'center', marginTop: 10 }}>
           <span style={{ fontSize: 12, color: '#606068' }}>IAmMarkManson</span>

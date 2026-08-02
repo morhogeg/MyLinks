@@ -303,9 +303,9 @@ export const YouTubeSource: React.FC = () => (
             textShadow: '0 2px 14px rgba(0,0,0,0.5)',
           }}
         >
-          AI can’t
+          Use AI.
           <br />
-          take this.
+          Scare people.
         </span>
         <div
           style={{
@@ -338,16 +338,16 @@ export const YouTubeSource: React.FC = () => (
             fontVariantNumeric: 'tabular-nums',
           }}
         >
-          21:07
+          15:28
         </span>
       </div>
       <div style={{ padding: '16px 16px 0' }}>
         <div style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.22, letterSpacing: '-0.02em', color: '#111318' }}>
-          What AI can’t take from you
+          How to Use AI to Improve Yourself So Much it Will Scare People
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 11 }}>
           <Youtube size={15} color="rgb(255,0,0)" />
-          <span style={{ fontSize: 12.5, color: '#606068' }}>IAmMarkManson · 3.1M views</span>
+          <span style={{ fontSize: 12.5, color: '#606068' }}>IAmMarkManson · 206K views</span>
         </div>
       </div>
     </div>
@@ -883,10 +883,10 @@ export const AskScreen: React.FC<{
  * frame because in the film the user has just TAPPED Graph on a cited answer.
  */
 const GRAPH_LEGEND = [
-  { name: 'AI', n: 3 },
+  { name: 'AI', n: 4 },
   { name: 'Home', n: 4 },
   { name: 'Cooking', n: 3 },
-  { name: 'Philosophy', n: 2 },
+  { name: 'Philosophy', n: 1 },
   { name: 'Travel', n: 1 },
 ];
 
