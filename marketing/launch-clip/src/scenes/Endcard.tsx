@@ -42,7 +42,10 @@ export const Endcard: React.FC = () => {
 
   const bloom = Math.max(0, 1 - Math.max(0, f - 34) / 36);
   const float = drift(f, 4, 300);
-  const out = 1 - prog(f, 202, 225);
+  // The film ENDS on the lockup (owner call, round 13n) — no fade to white,
+  // so the last frame is the mark + wordmark + tagline, which is also what a
+  // paused/finished player shows. The audio still carries the film fade.
+  const out = 1;
 
   return (
     <AbsoluteFill style={{ background: SET_BG, opacity: out }}>
