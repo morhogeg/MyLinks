@@ -1099,6 +1099,12 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-02 (launch film, round 13m) — the Manson thumbnail loses its
+  invented text.** "USE AI. SCARE PEOPLE." misrepresented the real video's
+  thumbnail (owner note — the actual still is him at the mic in a warm room,
+  no words). Both YouTube surfaces now show a WORDLESS podcast-room frame:
+  warm lamp glow, dark room tones, desk band, centred play button, 15:28
+  badge. Still synthetic (rights), but nothing invented is claimed.
 - **2026-08-02 (launch film, round 13l) — spoken-only "And" on the digest
   line.** The VO now opens "And behind the scenes, Makeena pieces it all
   together…" for conversational flow (owner call); the CAPTION deliberately

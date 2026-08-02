@@ -222,7 +222,7 @@ export const SaveSurface: React.FC<{ k: PlatformKey; save: number }> = ({ k, sav
             height: 168,
             borderRadius: 12,
             background:
-              'linear-gradient(160deg, rgba(20,22,28,0.92), rgba(52,56,66,0.9) 55%, rgba(255,0,0,0.25))',
+              'radial-gradient(58% 75% at 22% 32%, rgba(255,186,116,0.4), rgba(255,186,116,0) 62%), radial-gradient(40% 55% at 78% 25%, rgba(120,140,180,0.18), rgba(120,140,180,0) 60%), linear-gradient(168deg, #322b27, #423931 52%, #1a181c)',
             border: '1px solid rgba(16,24,40,0.07)',
             display: 'flex',
             alignItems: 'center',
@@ -231,20 +231,31 @@ export const SaveSurface: React.FC<{ k: PlatformKey; save: number }> = ({ k, sav
             overflow: 'hidden',
           }}
         >
-          {/* reads like a real thumb: bold statement type + duration badge */}
-          <span
+          {/* wordless podcast-room frame (13m) — no invented thumb text */}
+          <div
             style={{
-              fontSize: 24,
-              fontWeight: 900,
-              lineHeight: 1.08,
-              letterSpacing: '-0.02em',
-              textTransform: 'uppercase',
-              color: '#ffffff',
-              textShadow: '0 2px 12px rgba(0,0,0,0.5)',
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: 44,
+              background: 'linear-gradient(180deg, rgba(122,96,72,0.0), rgba(96,74,56,0.55))',
+            }}
+          />
+          <div
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 44,
+              background: 'rgba(17,19,24,0.6)',
+              border: '1px solid rgba(255,255,255,0.4)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
-            Use AI. Scare people.
-          </span>
+            <Play size={16} fill="#ffffff" strokeWidth={0} />
+          </div>
           <span
             style={{
               position: 'absolute',
