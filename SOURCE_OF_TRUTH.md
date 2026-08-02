@@ -1058,6 +1058,18 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-02 (launch film, round 13k) — the Manson video is the REAL one.**
+  "What AI can't take from you" (invented) → **"How to Use AI to Improve
+  Yourself So Much it Will Scare People"** (owner screenshot: 15:28, 206K
+  views, 2 months ago — the age even matches the card's "2mo ago"). Swapped
+  coherently through the card (category → AI, summary rewritten), the Ask
+  answer ("…Mark Manson's video flips it — use the machines to sharpen the
+  human part."), the citation chip, the graph label ("AI to improve
+  yourself") + legend counts, the digest STANDOUT, and both YouTube surfaces
+  (thumb text "USE AI. SCARE PEOPLE.", 15:28 badge, 206K views; the act-one
+  title truncates single-line with an ellipsis exactly as YouTube renders
+  long titles). Thumbnail stays synthetic — a real frame is a rights problem
+  (13h call) — but every visible FACT is now the real video's.
 - **2026-08-01 (launch film, round 13j) — the digest beat shows the REAL
   synthesis reading view (owner: "why are we showing a fake digest screen?").**
   The film's invented digest card is replaced with a faithful port of the
