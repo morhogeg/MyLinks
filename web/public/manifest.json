@@ -1,7 +1,7 @@
 {
   "name": "Machina",
   "short_name": "Machina",
-  "description": "Your AI-powered knowledge capture and retrieval system",
+  "description": "Everything you save, finally useful.",
   "start_url": "/",
   "display": "standalone",
   "display_override": [

@@ -91,6 +91,56 @@ plainness.
   excited to lead with) and carries almost no search volume. Keep as the fallback
   if `Save & Recall` ever tests badly.
 
+### D-6 · The product tagline is **"Everything you save, finally useful."** (2026-08-02)
+
+**Decision.** Machina now has a tagline, distinct from the App Store subtitle,
+and it is the owner's line: **`Everything you save, finally useful.`**
+
+It resolves **Q-1** (the AI-forward description string) and closes **A-3**.
+
+| Layer | Value | Field it lives in |
+|---|---|---|
+| **Tagline** (the promise) | `Everything you save, finally useful.` | web `<meta description>`, PWA manifest, public README, launch-film endcard, Product Hunt |
+| **App Store Subtitle** (the phases) | `Capture. Ask. Connect.` | App Store Connect — **unchanged** |
+
+**Why this line and not the two the owner already rejected.** The rejected
+subtitle candidates (`Save anything. It reads it.`, `Analyzed, organized,
+connected`) both failed the same way: they narrated a **mechanism**. This one
+makes a **promise** and never says how. It is also the film's own argument in one
+sentence, and it matches the App Store description's opening move ("You save
+links, screenshots, and videos everywhere — then never look at them again.
+Machina fixes the second half.") — so the storefront, the web tab, and the film
+finally tell one story.
+
+**Why it is NOT the subtitle.** Two hard reasons, either one sufficient:
+1. **Length.** 36 characters against a 30-character field. There is no cut that
+   survives — `Everything you save, finally useful` (35) still misses, and
+   dropping `Everything` guts the scope claim that does the work.
+2. **Token waste.** `save` is already a **Name** token (`Machina: Save & Recall`),
+   and Apple builds search phrases by combining tokens across Name + Subtitle +
+   keywords. A subtitle that re-spends an indexed token buys nothing. This is the
+   same rule that made the subtitle open on `Capture` in the first place (D-2).
+
+Outside the storefront fields neither constraint applies, which is exactly why
+the tagline is a *different layer* rather than a replacement.
+
+**What it does to Q-4 (the contested hero).** It declines to pick, on purpose,
+and that is the point: `Everything you save` is **capture**, `finally useful` is
+the payoff that capture alone never delivers — which is Ask *and* Connect
+together. So the tagline is true whichever way Q-4 settles, and no launch asset
+has to be rewritten twice. Q-4 stays open for the *asset copy*; it no longer
+blocks having a line.
+
+**D-3 compliance:** contains neither `second brain` nor `ai`. Adopting it on the
+README actually **fixed a live D-3 violation** — that page opened with *"Your
+AI-powered personal knowledge base"*, i.e. `ai` on a user-visible surface, which
+D-3 forbids and which the 2026-07-27 rename pass missed.
+
+**Watch the "finally".** It implies the prior failure was the user's tools, not
+the user — that reading is the whole product story (§8's "a graveyard", the
+film's act one), but if any future copy pairs it with a second scolding line the
+tone tips from wry to smug. One `finally` per surface.
+
 ### D-3 · "Second brain" lives in keywords only — never on the storefront (2026-07-27)
 
 **Decision.** `second brain` stays as the first token of the App Store keywords
@@ -207,6 +257,7 @@ duplicated here, so a change goes in ONE place):
 
 | Surface | Lives in |
 |---|---|
+| **Tagline** (D-6) — the ONE promise line | `web/app/layout.tsx` + `web/public/manifest.json` (`description`), `README.md` line 3, `marketing/launch-clip/src/scenes/Endcard.tsx` (footer), `SOURCE_OF_TRUTH.md` §8 (Product Hunt). Four surfaces, so a change is a four-file sweep — grep the exact string. |
 | App Store Name, Subtitle, keywords, promo text, description | `docs/APP_STORE.md` §2 |
 | Growth strategy, channel sequence, launch assets (X thread, Show HN, Product Hunt) | `SOURCE_OF_TRUTH.md` §8 |
 | Positioning statement / product one-liner | `SOURCE_OF_TRUTH.md` §1 |
@@ -242,14 +293,13 @@ trademark.** See A-1.
 
 ## 4. Open questions
 
-- **Q-1 · Is the tagline still too AI-forward?** The product description string
-  is still *"Your AI-powered knowledge capture and retrieval system"*
-  (`web/public/manifest.json`, `web/app/layout.tsx`). It has the same problem
-  D-1 solved for the name — it leads with the plumbing, and "capture and
-  retrieval system" is jargon besides. **Deliberately left unchanged** in the
-  rename pass: it is a positioning decision, not a naming one. Candidate
-  replacement: reuse the App Store subtitle (`Capture. Ask. Connect.`) so the storefront and the
-  web tab tell one story.
+- ~~**Q-1 · Is the tagline still too AI-forward?**~~ **CLOSED 2026-08-02 by D-6.**
+  The string was *"Your AI-powered knowledge capture and retrieval system"*
+  (`web/public/manifest.json`, `web/app/layout.tsx`) — plumbing-first, and jargon
+  besides. It is now the tagline `Everything you save, finally useful.` The
+  candidate answer recorded here (reuse the subtitle) was **not** taken: a
+  storefront subtitle is a tricolon of phases and a web-tab description wants a
+  promise, so they are deliberately two different lines telling one story.
 - **Q-2 · Does `Save & Recall` survive contact with real users?** Nothing has
   been tested. Apple's product-page optimization allows A/B testing the title and
   subtitle after launch — worth doing against the `Ask Your Saves` fallback.
@@ -258,12 +308,14 @@ trademark.** See A-1.
   preference currently point at three different answers. Cheap to settle now, and
   it determines whether the §8 launch copy is aimed correctly. **This is the
   highest-value open marketing question in this file.**
-- **Q-5 · The Product Hunt tagline contradicts our own copy.** §8 still carries
-  *"Ask your bookmarks anything"*. Two problems: it calls the product
-  **bookmarks**, which §8's own X-thread asset explicitly disowns (*"It's not a
-  bookmark manager. It's memory."*) and which D-2 rejected for the subtitle for
-  exactly that reason; and it leads on Ask, which is Q-4. Needs a rewrite before
-  launch week.
+- ~~**Q-5 · The Product Hunt tagline contradicts our own copy.**~~ **CLOSED
+  2026-08-02 by D-6.** §8 carried *"Ask your bookmarks anything"*, which called
+  the product **bookmarks** (a self-description §8's own X-thread asset disowns —
+  *"It's not a bookmark manager. It's memory."* — and which D-2 rejected from the
+  subtitle for exactly that reason) and led on Ask, which is Q-4. The Product
+  Hunt tagline is now the D-6 line, so it says neither. Note the *first comment*
+  under that launch still leads on Ask — that copy is A-5's problem, not this
+  one's.
 - **Q-3 · Is "Machina" worth keeping at all given C-1?** Not reopened here — the
   visual identity is fully built around it and the bundle ID assumes it. Revisit
   only if the trademark check (A-1) comes back badly.
@@ -276,7 +328,7 @@ trademark.** See A-1.
 |---|---|---|---|---|
 | **A-1** | **Trademark search for "Machina"** (USPTO + Israel TM register, classes 9 and 42) before App Store submission. The incumbent being an individual indie developer suggests low odds of a registered mark, but this is the one finding that could veto D-1/D-2. | Owner | App Store submission | ☐ open |
 | **A-2** | Enter the D-2 Name/Subtitle and the D-3 keywords into App Store Connect. Values are in `docs/APP_STORE.md` §2. | Owner | §4 task 8 | ☐ open |
-| **A-3** | Decide Q-1 (the AI-powered tagline). Two strings, one commit, no risk. | Next session | — | ☐ open |
+| ~~**A-3**~~ | ~~Decide Q-1 (the AI-powered tagline).~~ **DONE 2026-08-02** — D-6 settled it; landed in `layout.tsx`, `manifest.json`, `README.md` (which also cleared a D-3 `ai` violation) and the §8 Product Hunt slot. The launch film's endcard already carried the line. | — | — | ☑ done |
 | **A-5** | **Re-check every §8 launch asset against D-1/D-2/D-3 and Q-4** before launch week: no "Machina AI" anywhere, no "bookmarks" as a self-description (Q-5), and a hero consistent with whatever Q-4 settles on. The assets were written when the app was still called Machina AI. | Owner / next session | Launch week | ☐ open |
 | **A-4** | Rebuild any store/marketing screenshot that shows the old "Machina AI" label. The §4 task 9 shot-list has not been shot yet, so this is a "shoot it right", not a redo. | Owner | §4 task 9 | ☐ open |
 
@@ -286,6 +338,30 @@ trademark.** See A-1.
 
 > Newest first. One entry per conversation; conclusions belong in §1–§5, this is
 > the narrative of how they were reached.
+
+- **2026-08-02 — The app gets a tagline, and it is the owner's line.** Owner
+  proposed **"Everything you save, finally useful."** while asking what was left
+  before the iOS launch. It is the first candidate in this file's history that
+  makes a promise rather than narrating a mechanism — the exact flaw that killed
+  `Save anything. It reads it.` and `Analyzed, organized, connected` in the
+  2026-07-27 subtitle round — so it was taken essentially as-is (D-6). The only
+  real work was deciding **where it goes**. It cannot be the App Store subtitle:
+  36 characters against a 30-character field, with no survivable cut, and it
+  re-spends `save`, already a Name token, which is the same rule that forced the
+  subtitle to open on `Capture` back in D-2. So it becomes a **new layer** —
+  tagline (the promise) alongside subtitle (the phases) — which also lets it do
+  something the subtitle can't: it declines to pick a hero. `Everything you save`
+  is capture, `finally useful` is the payoff capture alone never delivers, so the
+  line stays true whichever way **Q-4** lands, and Q-4 no longer blocks having a
+  line. It closed **Q-1** (the AI-forward description string) and **A-3** with it.
+  Two discoveries while landing it: the launch film's endcard **already** carried
+  the exact sentence — `SOURCE_OF_TRUTH.md` §8 still described that slot as
+  `Your knowledge, on iPhone.`, stale since a later film round — so the film
+  needed no change, only the doc did; and `README.md` opened with *"Your
+  AI-powered personal knowledge base"*, a live **D-3 violation** (`ai` on a
+  user-visible surface) that the rename pass had missed, now fixed by the same
+  edit. It also replaced the Product Hunt tagline, closing **Q-5** — though the
+  first comment under that launch still leads on Ask, which stays A-5's problem.
 
 - **2026-07-27 (later) — Audit: is this file actually complete?** Owner asked
   whether every marketing decision so far was captured. It was not — the file
