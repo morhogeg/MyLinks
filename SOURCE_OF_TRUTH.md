@@ -1218,6 +1218,13 @@ exact-match, capped.
   masthead+lead, then travels to STANDOUT + question; vertical travel capped
   (385) + bias 170 after still-QA caught the device riding into the caption.
   SYNTHESIS data reshaped; REVIEW retired.
+- **2026-08-01 — Empty-state CTA wears our mark.** "Try it with an example" on a
+  brand-new empty feed carried lucide's `Sparkles` — generic AI chrome on the
+  one button a first-run user sees. Swapped for `CitationGlyph` (the static
+  brand mark; `CitationMark` is the animated WORKING indicator and would be
+  wrong on a CTA), sized `w-4 h-auto` like every other inline use so the
+  448:416 glyph keeps its ratio. `Sparkles` dropped from Feed's imports — it had
+  no other use. Render-verified light + dark.
 - **2026-08-01 — The card → graph → Ask trail now HOLDS (owner: "the back to
   card must hold").** Reported: open a card → *See in graph* (chip present) →
   *Ask about these* → Ask had no way back to the graph, and returning to the
