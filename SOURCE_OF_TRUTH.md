@@ -161,7 +161,31 @@ surface in the category and a knowledge graph computed on every save. The path t
 
 ## 3. Auth — exact current state (the thing everything gates on)
 
-The multi-user auth work is **fully written but not live**:
+> ## ✅ CUTOVER COMPLETE — 2026-08-02. Machina is multi-user and locked.
+>
+> Everything below this box describes the **pre-cutover** era and is kept only
+> so the history reads straight. The live state now:
+>
+> - `REQUIRE_AUTH=true` in the deployed functions (repo secret → `functions/.env`
+>   via deploy-functions run `30747580111`). Every data endpoint derives the
+>   workspace uid from a **verified ID token**; client-supplied uids are rejected.
+> - `NEXT_PUBLIC_REQUIRE_AUTH=true` on Vercel, and baked into TestFlight
+>   **build 1265** (dispatch with `require_auth` ticked — the
+>   `push main:trigger/testflight` shortcut hardcodes it OFF, see §4 task 2).
+> - **`firestore.rules` is LOCKED** — `firestore.rules.locked` was promoted on
+>   `main`; deploy-rules run `30804720363` ran the emulator suite, deployed, and
+>   probed the live DB: `Anonymous GET /users → HTTP 403`. Isolation is enforced
+>   by the database, not by the app.
+> - **Device-verified after the lock:** owner cards load, Safari share-sheet
+>   capture works, digest delete works (the S-9 carve-out); a second, non-owner
+>   Google account got its own auto-created workspace, sees only its own cards,
+>   and captured successfully from Chrome's share sheet.
+> - **`APPCHECK_ENFORCE` is deliberately still UNSET** — see §4 task 5. It was
+>   listed as part of this cutover and was removed from it on purpose.
+> - Rollback, if ever needed, is: revert the `firestore.rules` commit (redeploys
+>   via deploy-rules) and set the two `REQUIRE_AUTH` flags back to false.
+
+The multi-user auth work described below **was** fully written but not live:
 
 - **Code done:** Google + Apple sign-in on web and native (`web/lib/auth.ts`,
   `@capacitor-firebase/authentication@^8.3.0`), `AuthProvider` gating both
@@ -207,11 +231,16 @@ The multi-user auth work is **fully written but not live**:
 > 1. **Trademark clearance for "Machina"** — task **8a** / BRANDING **A-1**. Do
 >    this FIRST: it is free, and it is the only open item that could veto the
 >    identity and force a rename, which gets more expensive every week.
-> 2. **Auth cutover** — task **2**. 4 GitHub repo secrets + 1 Vercel var + a
->    one-line rules commit + one device check. The only hard blocker.
+> 2. ~~**Auth cutover** — task **2**.~~ **✅ DONE 2026-08-02** — flags on,
+>    rules locked, anonymous reads 403, second-account isolation device-verified.
+>    See §3 and task 2. **The hard blocker is gone.** Note it took *seven* steps,
+>    not the six listed here: a `require_auth=true` **iOS build** had to ship and
+>    be installed BEFORE the rules lock, or the app on every tester's phone dies
+>    in the gap. That step was missing from this list and from
+>    `NATIVE_AUTH_SETUP.md` §6 (which put it *after* the lock).
 > 3. **App Store Connect data entry** — tasks **8**, **9** + BRANDING **A-2**/
 >    **A-4**: nutrition label, metadata, 6 screenshots (shoot post-rename), demo
->    account (only creatable after the cutover) + review notes.
+>    account (**now creatable — it was blocked on the cutover**) + review notes.
 > 4. **On-device sweep** — task **11**, plus the Settings "Done" safe-area fix,
 >    which has still never been in a TestFlight build (see item 11a1).
 > 5. **Cost/key hygiene** — tasks **5** (rotate the Gemini key *into the paid
@@ -240,7 +269,50 @@ The multi-user auth work is **fully written but not live**:
    CI injects the `REVERSED_CLIENT_ID` URL scheme into Info.plist at build time
    (native Google sign-in couldn't return to the app otherwise;
    `NATIVE_AUTH_SETUP.md` §4.2 automated).
-2. **[ ] Auth cutover** *(code-side prep done 2026-07-03; owner steps remain).*
+2. **[x] Auth cutover — ✅ DONE 2026-08-02. Machina is multi-user and locked.**
+   Live state, evidence, and rollback: **§3** (top box). Executed in this order,
+   which differs from the checklist below in one load-bearing way:
+   1. `REQUIRE_AUTH=true` repo secret (it already existed with an unreadable
+      value — set deliberately, never assumed).
+   2. `OWNER_EMAIL` re-entered deliberately. GitHub's update page shows a
+      **blank** value box for an existing secret — that is the UI hiding it, not
+      an empty secret. It fails CLOSED ([`_owner_email_matches`](functions/main.py:2661)),
+      so a wrong value means the owner lands on the restricted screen.
+   3. **`require_auth=true` iOS build (1265) shipped, installed, device-verified
+      — BEFORE anything started enforcing.** ⚠️ **This step is missing from the
+      checklist below and `NATIVE_AUTH_SETUP.md` §6 puts it at step 6, AFTER the
+      rules lock. That ordering breaks every phone in the gap.** Dispatch it from
+      Actions with the `require_auth` **checkbox ticked** — `git push -f origin
+      main:trigger/testflight` hardcodes the flag OFF
+      ([ios-testflight.yml:130](.github/workflows/ios-testflight.yml:130)), so
+      the shortcut silently produces an ungated build. That happened once here
+      (build 1264, checkbox missed); the build log line
+      `NEXT_PUBLIC_REQUIRE_AUTH='…'` is the cheap way to check *before* spending
+      a TestFlight round-trip. A gated build that shows cards immediately is not
+      necessarily broken — Firebase persists the session in the WebView across
+      updates; the discriminator is whether Settings shows the **Account row**
+      ([MainView.tsx:41](web/components/settings/MainView.tsx:41)).
+   4. `NEXT_PUBLIC_REQUIRE_AUTH=true` on Vercel + redeploy with **build cache
+      off** (`NEXT_PUBLIC_*` is inlined at build time; a cached build ships the
+      old value and looks like the variable silently didn't work). Signing in on
+      web here is a free test of (2) — the flag also removes web's fallback
+      claim path ([AuthProvider.tsx:462](web/components/AuthProvider.tsx:462)).
+   5. Functions redeploy (unscoped — the `.env` rewrite must reach every
+      function; a `Deploy-Functions:` trailer would leave some endpoints still
+      trusting client uids). **This is where blast radius starts.**
+   6. Second non-owner Google account verified end-to-end **while the rules were
+      still open and rollback was one variable** — own auto-created workspace,
+      none of the owner's cards.
+   7. Rules lock merged → deploy-rules ran the emulator suite, deployed, probed:
+      `Anonymous GET /users → HTTP 403`.
+   8. Post-lock device sweep: owner cards, Safari **and** Chrome share-sheet
+      captures, digest delete (the S-9 carve-out), tester still isolated.
+
+   **`APPCHECK_ENFORCE=true` was CUT from this cutover on purpose** — it is
+   listed as one of the four secrets below and setting it would have taken the
+   native app down. See task 5.
+
+   *Historical detail below — kept for the reasoning, no longer a to-do list.*
    Prep completed: `firestore.rules.locked` updated — added `syntheses`;
    **rewrote the `users` read rule** (the old `owns()` `get()` was unprovable for
    the `authUids array-contains` list query and would have bricked every sign-in
@@ -349,10 +421,26 @@ The multi-user auth work is **fully written but not live**:
    COLLECTION-scope only; each `db.collection_group(...)` filter field needs a
    fieldOverride (or composite) at COLLECTION_GROUP scope in
    firestore.indexes.json.
-5. **[ ] Security config + key hygiene (30 min, do with #2):** set `ADMIN_TOKEN`,
-   `APPCHECK_ENFORCE=true`, `OWNER_EMAIL` in functions env. **Rotate the Gemini
-   key** (was pasted in chat 2026-06-23) and the **App Store Connect API `.p8`**
-   (pasted in plaintext during CI setup).
+5. **[ ] Security config + key hygiene.** `ADMIN_TOKEN` and `OWNER_EMAIL` are
+   **set and deployed** (2026-08-02, with the task-2 cutover). Still open:
+   **rotate the Gemini key** (was pasted in chat 2026-06-23) and the **App Store
+   Connect API `.p8`** (pasted in plaintext during CI setup).
+
+   🛑 **`APPCHECK_ENFORCE=true` — DO NOT set it as part of the auth cutover.
+   It was in that bundle and was deliberately removed 2026-08-02.** Setting it
+   today takes the **native app** down: App Check is initialized **browser-only**
+   via `ReCaptchaV3Provider` ([web/lib/firebase.ts:75-87](web/lib/firebase.ts:75)),
+   and there is no App Attest / DeviceCheck plugin in the committed SPM manifest
+   ([CapApp-SPM/Package.swift](web/ios/App/CapApp-SPM/Package.swift:14) — auth,
+   messaging, haptics, share only). So the native client sends **no**
+   `X-Firebase-AppCheck` header, and in enforce mode
+   [`_require_app_check`](functions/main.py:665) rejects the request outright.
+   Bundled with the auth flags, that would have surfaced as a native outage
+   looking exactly like an auth bug, during the one change where you least want
+   ambiguity. It is an **independent** change: before flipping it, (a) confirm
+   `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` is actually set in Vercel — unset means even
+   *web* sends no token and enforcing breaks web too — and (b) decide what native
+   attests with (App Attest plugin, or exempt the native origin).
    ⚠️ **`OWNER_EMAIL` is no longer optional (audit S-8, fixed 2026-07-24).** The
    legacy workspace-claim gate used to read `if not owner_email or email ==
    owner_email` — i.e. with the var UNSET (its state today) *any* verified
@@ -1099,6 +1187,35 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-02 — 🔓→🔒 THE AUTH CUTOVER IS DONE. Machina is multi-user, and
+  isolation is enforced by the database.** §4 task 2 — the only hard launch
+  blocker — is closed. `REQUIRE_AUTH=true` backend-side (functions run
+  `30747580111`), `NEXT_PUBLIC_REQUIRE_AUTH=true` on Vercel and baked into
+  TestFlight **build 1265**, and `firestore.rules.locked` promoted to
+  `firestore.rules` (deploy-rules run `30804720363`: emulator suite green,
+  deployed, live probe `Anonymous GET /users → HTTP 403`). Verified after the
+  lock, not assumed: owner cards load, Safari **and** Chrome share-sheet captures
+  work (the ingest-token path is untouched by the flags), digest delete works
+  (the S-9 carve-out), and a **second, non-owner Google account** on a different
+  phone got its own auto-created workspace and sees only its own cards. The
+  demo account for App Review is now creatable — it was blocked on exactly this.
+  **Three things the checklists got wrong, now fixed in §4 task 2 / task 5:**
+  (1) the six-bullet list omitted shipping a **`require_auth=true` iOS build**,
+  and `NATIVE_AUTH_SETUP.md` §6 puts it *after* the rules lock — which would
+  leave every phone dead in the gap; it must come **before** enforcement starts.
+  (2) `APPCHECK_ENFORCE=true` was bundled into the cutover and would have taken
+  the **native** app down (App Check is browser-only reCAPTCHA; no App Attest
+  plugin exists) — cut from the cutover, moved to task 5 as its own change with
+  prerequisites. (3) `git push -f origin main:trigger/testflight` **hardcodes
+  `require_auth` OFF**, so the usual shortcut silently produces an ungated build
+  (it did once here — build 1264); dispatch from the Actions UI with the
+  checkbox ticked and confirm via the build log's `NEXT_PUBLIC_REQUIRE_AUTH='…'`
+  line before installing. Two smaller traps worth not re-learning: GitHub shows a
+  **blank value box** for an existing secret (that is the UI hiding it, not an
+  empty secret — `OWNER_EMAIL` fails closed, so it was re-entered deliberately),
+  and a gated build that opens straight to the cards is not necessarily broken —
+  Firebase persists the WebView session across app updates, so the discriminator
+  is whether Settings shows the **Account row**.
 - **2026-08-02 (launch film, round 13n) — the film ENDS on the lockup, and
   the desktop edition ships.** The endcard no longer fades to white — the
   last frame is mark + wordmark + tagline + footer (what a finished player

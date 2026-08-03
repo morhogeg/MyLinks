@@ -149,7 +149,10 @@ Set these as **GitHub repo secrets** (Settings → Secrets and variables → Act
 - `OWNER_EMAIL` — your Google/Apple email. **Required**: the legacy-workspace
   claim gate fails closed without it (audit S-8).
 - `ADMIN_TOKEN` — any long random string.
-- `APPCHECK_ENFORCE` — `true`.
+- ~~`APPCHECK_ENFORCE` — `true`.~~ 🛑 **DO NOT. Removed from the cutover
+  2026-08-02** — App Check is browser-only reCAPTCHA and no App Attest plugin
+  exists, so enforcing it takes the **native** app down. It is an independent
+  change with its own prerequisites: SOURCE_OF_TRUTH §4 task 5.
 - `REQUIRE_AUTH` — **leave this one unset for now.** It is step 3.
 
 Then set `NEXT_PUBLIC_REQUIRE_AUTH=false` (or leave unset) in **Vercel**.
@@ -159,6 +162,24 @@ uid? If it does, `claim_workspace` short-circuits and the `OWNER_EMAIL` gate is
 never exercised.
 
 ### The steps
+
+> ## ✅ EXECUTED 2026-08-02 — and the order below is WRONG in one place.
+>
+> The cutover is done (SOURCE_OF_TRUTH §3). Keep this section for the reasoning,
+> but if you ever replay it: **step 6 (ship the `require_auth=true` iOS build)
+> must happen BEFORE step 3, not after step 5.** As written, the backend starts
+> rejecting tokenless clients at step 3 and the database locks at step 5, while
+> the app on every phone is still an ungated build that signs nobody in — so the
+> native app is dead from step 3 until someone installs a build that does not
+> exist yet. Correct order: **1 → 2 → 6 (build, install, verify) → 3 → 7 → 4 →
+> 5**. Note that step 7's new-user check also belongs *before* the lock: it is
+> the cheapest proof the backend flag really took, and while the rules are still
+> open, rollback is one variable.
+>
+> Also: the iOS build **must** be dispatched from the Actions UI with the
+> `require_auth` checkbox ticked. `git push -f origin main:trigger/testflight`
+> hardcodes it OFF (`ios-testflight.yml:130`) and silently ships an ungated
+> build.
 
 1. **Ship the config with auth still off.** Push any `functions/**` change to
    `main` (bump `functions/.deploy-ping` if you have nothing else). The
