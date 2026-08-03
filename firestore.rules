@@ -1,78 +1,130 @@
+// LIVE, LOCKED. This is the cutover ruleset, promoted from
+// `firestore.rules.locked` on 2026-08-02 (SOURCE_OF_TRUTH §4 task 2) once
+// REQUIRE_AUTH was enforced backend-side and sign-in was device-verified.
+// `firestore.rules.locked` remains the staging copy: edit it, let
+// `rules-tests.yml` prove it, then promote it here — deploy-rules.yml deploys
+// whatever this file says. See NATIVE_AUTH_SETUP.md ("Cutover order").
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users can access their own document.
+    // ── Multi-user access control (see AUTH_SPEC.md) ─────────────────────────
+    // Data docs are keyed by phone number, NOT the Firebase Auth uid, so a
+    // signed-in account owns a doc when its uid is in that doc's `authUids`
+    // array. The first-time link ("claim") and account deletion run server-side
+    // via the Admin SDK (claim_workspace / delete_account), which bypasses these
+    // rules — so the client only ever reads/updates a doc it already owns.
     //
-    // SECURITY — ACCEPTED RESIDUAL RISK (auth rollout in progress):
-    // Phase 1 (web Google Sign-In) is LIVE, but these rules stay open on purpose.
-    // The data doc is keyed by phone number, NOT the Auth uid, and the native iOS
-    // shell + share ingest paths still write without a user token.
-    // Locking now would brick them. Cloud Functions are hardened (App Check +
-    // pinned CORS + rate limiting), so the realistic abuse surface is reduced.
-    //
-    // PHASE 3 LOCK (apply once native sign-in + backend token verification land —
-    // see AUTH_SPEC.md). Ownership is membership in the doc's `authUids` array,
-    // because the doc ID is the phone number, not request.auth.uid:
-    //
-    //   function owns(uid) {
-    //     return request.auth != null
-    //       && get(/databases/$(database)/documents/users/$(uid))
-    //            .data.authUids.hasAny([request.auth.uid]);
-    //   }
-    //   match /users/{uid}             { allow read, write: if owns(uid);
-    //     match /links/{linkId}        { allow read, write: if owns(uid); }
-    //     match /chats/{chatId}        { allow read, write: if owns(uid); }
-    //     match /collections/{cid}     { allow read, write: if owns(uid); }
-    //   }
+    // ⚠️ Test with the emulator before deploying: `firestore-rules-test/` holds
+    // a rules-unit-testing suite that exercises exactly these rules (see its
+    // README). Deploying rules that are too tight will brick reads/writes until
+    // corrected. Deploy this ONLY after native + web sign-in and the claim flow
+    // are confirmed working (see NATIVE_AUTH_SETUP.md, "Cutover order").
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // True when the signed-in account is linked to the user doc `uid`. Costs one
+    // extra document read. Use only where `uid` is BOUND to a concrete value
+    // (subcollection paths, shared_* ownerUid fields) — get()/exists() cannot
+    // run in a LIST rule over /users where {uid} is an unbound wildcard.
+    function owns(uid) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(uid))
+        && (request.auth.uid in get(/databases/$(database)/documents/users/$(uid)).data.authUids);
+    }
+
     match /users/{uid} {
-      allow read, write: if true;
+      // Read = get + list, written against `resource` (NOT owns()) on purpose:
+      // the client resolves its workspace with the LIST query
+      //   collection('users').where('authUids', 'array-contains', <auth uid>)
+      // (AuthProvider.resolveDataDoc). Rules are not filters — a list rule must
+      // be provable from the query's own constraints, and the array-contains
+      // filter provably satisfies this condition. Any broader query on /users
+      // (e.g. the legacy limit(1) "first doc" lookup) is denied.
+      allow read: if isSignedIn() && request.auth.uid in resource.data.authUids;
+
+      // Owner-only updates (timezone, settings, digest prefs, ingest token…).
+      // Same resource-based check as read: only a doc already linked to this
+      // account can be touched, and only linked accounts can grow `authUids`.
+      allow update: if isSignedIn() && request.auth.uid in resource.data.authUids;
+
+      // User docs are created and deleted ONLY server-side (claim_workspace /
+      // delete_account, Admin SDK). If a future new-user onboarding creates the
+      // doc client-side instead, this needs a matching `allow create`.
+      allow create, delete: if false;
 
       match /links/{linkId} {
-        allow read, write: if true;
+        allow read, write: if owns(uid);
       }
 
       // Ask-your-brain saved conversations
       match /chats/{chatId} {
-        allow read, write: if true;
+        allow read, write: if owns(uid);
       }
 
       // User-curated collections of cards
       match /collections/{collectionId} {
-        allow read, write: if true;
+        allow read, write: if owns(uid);
       }
 
       // Weekly "What you learned" synthesis (M12). Written by Cloud Functions
-      // (admin SDK); the client only reads to surface the in-app recap card.
+      // (Admin SDK, bypasses rules); the client only reads to surface the
+      // in-app recap card (lib/synthesis.ts).
       match /syntheses/{weekId} {
-        allow read, write: if true;
+        allow read: if owns(uid);
+        allow write: if false;
       }
 
       // The user's OWN notes on a week (SynthesisCard's "Your notes"), keyed by
-      // the same weekId — a DIRECT client write, unlike the synthesis above.
-      //
-      // This match must exist even though the parent `users/{uid}` rule is
-      // `if true`: Firestore rules do NOT cascade into subcollections, so an
-      // undeclared subcollection is denied, which is exactly why every one of
-      // them is spelled out here. Shipping the locked-ruleset match without
-      // this one is what made "Add a note" fail with a permission error.
+      // the same weekId. Deliberately a separate collection rather than a field
+      // on the synthesis doc above: that doc is Cloud-Function-owned and stays
+      // write-denied, so a client can never damage the generated narrative
+      // while still being able to write its own margin notes. Fully owner
+      // read/write, like links/chats/collections — it is entirely user content.
       match /synthesisNotes/{weekId} {
-        allow read, write: if true;
+        allow read, write: if owns(uid);
       }
 
-      // Curated digests (in-app Digest section). Written by Cloud Functions
-      // (admin SDK); the client only reads to render the digest history.
+      // Curated digests (in-app Digest section). CONTENT is written by Cloud
+      // Functions (Admin SDK, bypasses rules); the client reads to render the
+      // digest history (lib/digest.ts).
+      //
+      // DELETE is the one client write allowed here: the per-digest "Delete"
+      // action in DigestCard removes a digest from the user's own history
+      // (lib/digest.ts deleteDigest → Feed.tsx). It is a destructive action on
+      // the caller's own data, so it needs no content validation — but create
+      // and update stay denied, so a client can never forge a digest or tamper
+      // with the curated cards inside one.
       match /digests/{digestId} {
-        allow read, write: if true;
+        allow read: if owns(uid);
+        allow delete: if owns(uid);
+        allow create, update: if false;
+      }
+
+      // Self-hosted product analytics (lib/analytics.ts). The client appends
+      // minimal, content-free event docs; only the owner (and the Admin SDK)
+      // can touch them. Mirrors the links/chats/collections owner check.
+      match /analytics_events/{eventId} {
+        allow read, write: if owns(uid);
+      }
+
+      // Self-hosted client error reports (lib/errorReporter.ts). Same
+      // owner-only access as analytics — append-only in practice.
+      match /client_errors/{errorId} {
+        allow read, write: if owns(uid);
       }
     }
 
-    // Shared collections & cards: public, read-only snapshots for share links.
-    // World-readable so logged-out visitors can open /c?id= and /s?id= pages.
-    // Writes are DENIED to clients: since the 5a share-privacy fix, publishing
-    // and unpublishing go exclusively through the Admin-SDK endpoints
-    // (`publish_share_http`/`unpublish_share_http`), so any direct client write
-    // here is defacement/spam, not a product path. Matches the locked ruleset.
+    // Shared collections & cards: public, read-only snapshots for share links so
+    // logged-out visitors can open /c?id= and /s?id= pages. Writes are Admin-SDK
+    // ONLY (via publish_share_http / unpublish_share_http) — never client-direct.
+    // This is the fix for the PII leak: the world-readable snapshot must not carry
+    // `ownerUid` (for the phone-keyed owner it's a phone number, and any client can
+    // read a public share doc). Rules can't hide a field, so the owner mapping
+    // lives in `shared_owners` (denied to clients, below) and clients can't write
+    // these docs to sneak `ownerUid` back in.
     match /shared_collections/{shareId} {
       allow read: if true;
       allow write: if false;
@@ -80,6 +132,11 @@ service cloud.firestore {
     match /shared_cards/{shareId} {
       allow read: if true;
       allow write: if false;
+    }
+    // shared_owners: functions-only shareId → ownerUid map. Never client-readable
+    // (that would re-expose the PII we just removed) or client-writable.
+    match /shared_owners/{shareId} {
+      allow read, write: if false;
     }
 
     // pending_processing: only Cloud Functions (admin SDK)
@@ -89,6 +146,25 @@ service cloud.firestore {
 
     // task_logs: only Cloud Functions (admin SDK)
     match /task_logs/{docId} {
+      allow read, write: if false;
+    }
+
+    // rate_limits: only Cloud Functions (admin SDK) — never client-writable.
+    match /rate_limits/{docId} {
+      allow read, write: if false;
+    }
+
+    // usage_quotas: only Cloud Functions (admin SDK) — per-uid monthly counters
+    // (see quota.py). Never client-readable or client-writable, so a client can't
+    // inspect or reset its own spend ceiling.
+    match /usage_quotas/{docId} {
+      allow read, write: if false;
+    }
+
+    // server_errors: only Cloud Functions (admin SDK) — durable 5xx records
+    // (see main.py _record_server_error). They can carry a workspace uid, so
+    // never client-readable; surfaced only via the admin debug_status endpoint.
+    match /server_errors/{docId} {
       allow read, write: if false;
     }
   }
