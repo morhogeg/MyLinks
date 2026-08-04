@@ -226,22 +226,24 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION OPEN (2026-08-03): ship a gated iOS build
+> ## 🚨 OWNER ACTION (2026-08-04): install build 1268 when it lands
 >
-> TestFlight builds **1266 and 1267 are ungated and dead** — they were pushed via
+> TestFlight builds **1266 and 1267 are ungated and dead** — pushed via
 > `git push -f origin main:trigger/testflight` two and four minutes *after* the
 > rules lock, and that shortcut hardcoded `NEXT_PUBLIC_REQUIRE_AUTH` OFF. An
 > ungated bundle can't read the locked database, so the app opens to nothing with
-> no sign-in UI to recover with. **Build 1265 is the last good one.**
+> no sign-in UI to recover with. **Do not install 1266 or 1267.**
 >
-> - **Right now:** install **1265** from TestFlight, or dispatch **iOS →
->   TestFlight** from the Actions UI to cut a fresh gated build.
-> - **The trap is fixed in the workflow** (2026-08-03): the gate now defaults
+> - **Fixed and shipped** in merge `c8ef0bf` (2026-08-04): the gate defaults
 >   **ON** for every trigger including push, the input is inverted to
 >   `legacy_no_auth` (rollback only), and a guard step refuses to build an
->   ungated bundle unless it was asked for explicitly. So the next push-to-build
->   is safe — but it still has to be *run*, and only the owner can dispatch
->   (cloud sessions get 403 on the dispatch API).
+>   ungated bundle. Push-to-build is the correct path again.
+> - **Build 1268** (run #268, sha `c8ef0bf`) is the first build off the fixed
+>   workflow — the recovery build. **Install it** once Apple finishes processing.
+> - **Until then:** install **1265**, the last good pre-break build.
+> - Confirm on device via Settings → the **Account row** is the discriminator
+>   for a gated build (a gated build opening straight to the cards is normal —
+>   Firebase persists the WebView session across app updates).
 
 > **LAUNCH GATE (compiled 2026-08-02, "what is actually left before iOS
 > launch?").** Pointers only — the detail stays in the numbered tasks, so nothing
@@ -1205,6 +1207,14 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-04 — SHIPPED the fail-closed fix.** Merge `c8ef0bf` to `main` →
+  Vercel redeployed the desktop web, and `main:trigger/testflight` cut **run
+  #268 → TestFlight build 1268**, the first build off the fixed workflow and the
+  recovery build for the dead 1266/1267. No `functions/**` changes, so no
+  Cloud Functions deploy; no `firebase.json` change, so no hosting deploy.
+  Owner: install **1268** when Apple finishes processing (1265 in the meantime);
+  the Settings **Account row** is the on-device discriminator for a gated build.
+  Details of the fix in the entry below.
 - **2026-08-03 — the push-to-build shortcut took the iPhone app down, and is now
   fail-closed.** Owner report: "the app isn't loading." Cause, not guesswork: the
   rules lock deployed at **10:13:38Z** (run `30804720363`), then two TestFlight
