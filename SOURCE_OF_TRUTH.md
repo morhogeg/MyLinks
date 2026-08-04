@@ -269,7 +269,10 @@ The multi-user auth work described below **was** fully written but not live:
 >    which has still never been in a TestFlight build (see item 11a1).
 > 5. **Cost/key hygiene** — tasks **5** (rotate the Gemini key *into the paid
 >    project*, rotate the ASC `.p8`) and **19** (GCP budget alert, PITR/backups,
->    uptime check; and drop `MONTHLY_ASK_QUOTA` off its 1000 dev value).
+>    uptime check). ~~drop `MONTHLY_ASK_QUOTA` off its 1000 dev value~~ — done
+>    2026-08-04, back to 100. The **GCP budget alert is now the top item here**:
+>    the Gemini spend cap is a kill-switch, not a monitor, and it takes the owner
+>    down with everyone else.
 > 6. **Unverified, close before launch** — **4b** (a weekly synthesis has still
 >    never been proven to generate end-to-end), **4c**, **21**.
 > 7. **Marketing coherence** — BRANDING **Q-4** (the hero is still contested three
@@ -749,11 +752,16 @@ The multi-user auth work described below **was** fully written but not live:
     a real web runner (vitest) is the right home for them.
 19. **[~] Cost guardrails — CODE HALF SHIPPED 2026-07-14 (production-readiness
     sprint, see `docs/PRODUCTION_READINESS_2026-07-14.md`).** Per-user monthly
-    quotas live in code (`functions/quota.py`: 150 saves / **1000 asks** per
-    month — the ask default was raised from 100 on 2026-07-25 after the owner hit
-    it mid-TestFlight and lost Ask until the 1st; ⚠️ **set `MONTHLY_ASK_QUOTA`
-    back to a public-tier value in the functions env before launch, don't ship
-    1000 to real users** — env-tunable `MONTHLY_SAVE_QUOTA`/`MONTHLY_ASK_QUOTA`,
+    quotas live in code (`functions/quota.py`: 150 saves / **100 asks** per
+    month). ~~The ask default was raised from 100 to 1000 on 2026-07-25 after the
+    owner hit it mid-TestFlight; set it back before real users.~~ **Done
+    2026-08-04** — back to 100 ahead of the first outside testers, which is §7's
+    own design number; at 150 saves + 100 asks, six users land near half the
+    ~₪50 Gemini cap. The per-user wall is the friendly failure (one person loses
+    Ask); the spend cap is the hostile one (every AI surface dies for everyone
+    until the 1st), and this ceiling exists so the friendly one happens first.
+    Env-tunable in either direction without a deploy —
+    `MONTHLY_SAVE_QUOTA`/`MONTHLY_ASK_QUOTA`,
     friendly 429s, refund
     on failed analyses), plus `max_instances` caps on every function, paid rate
     buckets fail closed, scheduler scans reworked (reminders via a bounded
@@ -1211,6 +1219,22 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-04 — Ask quota back to 100/month, ahead of inviting 4–5 friends as
+  TestFlight INTERNAL testers.** Owner is sharing with close friends and does not
+  want Beta App Review — internal testing needs none (up to 100 testers, builds
+  live as soon as they process, and `ITSAppUsesNonExemptEncryption=false` is
+  already in `Info.plist` so there is no per-build export-compliance prompt).
+  Build **1269** is already uploaded, so no new build is needed to invite them.
+  Cost was the real exposure, not security: saves stay at **150** (owner's call,
+  and §7's number), asks go **1000 → 100** (`functions/quota.py`). The 1000 was
+  correct only while the owner was simultaneously the sole user and the QA
+  tester; with real testers it bounds nothing. At 150 saves + 100 asks, six users
+  sit near half the ~₪50 cap. **Also corrected a stale blocker:** `AUDIT.md` says
+  `ingestToken` sits in a world-readable blast radius and "the first outside
+  TestFlight tester changes that" — that was written against
+  `allow read, write: if true`. The rules are locked now, so a user doc is only
+  readable by accounts in its `authUids`. Task 12 still has real work (Keychain,
+  rotation) but it does **not** gate inviting testers.
 - **2026-08-04 (ship) — both gap fixes are LIVE.** Merge `bd047a7`; all six
   workflows green on it: Deploy Cloud Functions #71 (`client_error_http` created
   in us-central1, scoped via the `Deploy-Functions:` merge line), Deploy Firebase

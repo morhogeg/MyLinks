@@ -44,14 +44,27 @@ _QUOTA_KINDS = {
     },
     "asks": {
         "env": "MONTHLY_ASK_QUOTA",
-        # Raised 100 → 1000 (2026-07-25): the owner hit the cap on their own
-        # device mid-TestFlight and Ask — the hero surface — was dead until the
-        # 1st. 100/month is a sane PUBLIC tier but far too tight for the single
-        # pre-launch user who is also the tester. Still a real ceiling (~33/day),
-        # so a runaway client or a leaked App Check token can't spend without
-        # bound. Revisit before public launch: set MONTHLY_ASK_QUOTA per tier in
-        # the functions env rather than shipping a per-tier default here.
-        "default": 1000,
+        # 1000 → 100 (2026-08-04), for the first outside testers.
+        #
+        # History: this was 100, raised to 1000 on 2026-07-25 because the owner
+        # hit the cap on their own device mid-TestFlight and Ask — the hero
+        # surface — was dead until the 1st. That raise was right for the
+        # condition it was made under: ONE user who was also the QA tester
+        # hammering the feature. With real testers on the app that condition is
+        # gone, and 1000/user stops bounding anything.
+        #
+        # Why 100 specifically: it is §7's own design number ("~150 saves and
+        # ~100 asks/month — above what an engaged user hits, so nobody ever sees
+        # the limit in month one"), and §7 prices a HEAVIER profile (300 saves +
+        # 100 asks + digests) at $1.30–2.00/mo. At 150 saves + 100 asks, six
+        # users land near half the ~₪50 Gemini spend cap — real headroom.
+        #
+        # The headroom is the point. This per-user wall is the FRIENDLY failure:
+        # one person loses Ask until the 1st. The spend cap is the hostile one —
+        # Google 429s with no free-tier fallback and every AI surface dies for
+        # everybody, owner included. This ceiling exists so the friendly failure
+        # always happens first.
+        "default": 100,
         "message": "Monthly question limit reached — resets on the 1st.",
     },
 }
