@@ -389,6 +389,12 @@ _RATE_LIMITS = {
     # query has a small cost).
     "search": (120, 3600, False),
     "search-uid": (120, 3600, False),
+    # Unauthenticated crash reports (client_error_http). Per-IP only — a caller
+    # with no workspace has no uid to bucket on — and fail CLOSED, because this
+    # is a public write surface. The client already caps itself at 20 reports
+    # per session and de-dupes identical messages, so 30/hr is generous for a
+    # real device and tight for anything else.
+    "client-error": (30, 3600, False),
 }
 
 # Input caps for client-supplied fields that flow into the Gemini prompt, so a
@@ -2975,6 +2981,103 @@ def unregister_device_token_http(req: https_fn.Request) -> https_fn.Response:
     except Exception as e:
         # A missing user doc means there is nothing to remove — idempotent.
         logger.info("Device token unregister skipped: %s", e)
+    return https_fn.Response(
+        json.dumps({"success": True}),
+        status=200, headers=headers, mimetype='application/json',
+    )
+
+
+# How long a client_error_reports record lives. Same policy as server_errors.
+_CLIENT_ERROR_TTL_DAYS = 14
+# Whole-body cap. A report is a message + stack + a few short fields; anything
+# larger is malformed or abusive. Checked before parsing, so a huge body is
+# rejected without being deserialized.
+MAX_CLIENT_ERROR_BYTES = 16 * 1024
+
+
+@https_fn.on_request(max_instances=3)
+def client_error_http(req: https_fn.Request) -> https_fn.Response:
+    """Record a client error that could NOT be written to Firestore.
+
+    WHY THIS EXISTS: `lib/errorReporter.ts` normally writes to
+    ``users/{uid}/client_errors``, which the locked rules gate behind
+    ``owns(uid)``. That works right up until the failure that matters most —
+    when workspace resolution itself fails, there is no uid, the rules would
+    deny the write anyway, and the reports die in a memory buffer that never
+    flushes. That is exactly what happened with ungated builds 1266/1267: the
+    app was dead on device for a day and the only detector was the owner
+    noticing. A client with no workspace needs a way to say so.
+
+    Deliberately accepts UNAUTHENTICATED reports, because "I could not sign in"
+    is one of the states worth hearing about. That makes it a public write
+    surface, so it is bounded on every axis: per-IP rate limit that fails
+    CLOSED, a pre-parse body-size cap, server-side truncation of every field,
+    and a fixed schema (nothing the caller sends is echoed back or trusted into
+    a query). Records land in the top-level ``client_error_reports``, which is
+    Admin-SDK-only — clients can neither read nor write it directly.
+    """
+    if req.method == 'OPTIONS':
+        return _cors_preflight(req)
+    headers = _cors_headers(req)
+    if req.method != 'POST':
+        return _error_response("Method not allowed", 405, headers)
+
+    # Per-IP only: the whole point is that the caller may have no identity.
+    rl = _rate_limited("client-error", client_ip(req), headers)
+    if rl:
+        return rl
+
+    raw = req.get_data(cache=False) or b""
+    if len(raw) > MAX_CLIENT_ERROR_BYTES:
+        return _error_response("Report too large", 413, headers)
+
+    try:
+        data = json.loads(raw.decode("utf-8") or "{}") or {}
+        if not isinstance(data, dict):
+            raise ValueError("body is not an object")
+    except Exception:
+        return _error_response("Invalid JSON", 400, headers)
+
+    def field(name: str, limit: int) -> str:
+        value = data.get(name)
+        return str(value)[:limit] if isinstance(value, (str, int, float)) else ""
+
+    message = field("message", 500)
+    if not message:
+        return _error_response("Missing message", 400, headers)
+
+    # Identity is optional and NEVER taken from the body — an unsigned report is
+    # recorded as anonymous rather than being allowed to claim a uid.
+    decoded = _verify_bearer(req)
+    auth_uid = decoded.get("uid") if decoded else None
+
+    try:
+        now = datetime.now(timezone.utc)
+        get_db().collection("client_error_reports").add({
+            "message": message,
+            "stack": field("stack", 2000),
+            "url": field("url", 300),
+            "source": field("source", 100),
+            "platform": field("platform", 16),
+            # Which bundle produced this — the build-info.json fields, so a
+            # report identifies the build without a device round-trip.
+            "buildNumber": field("buildNumber", 32),
+            "commit": field("commit", 64),
+            "requireAuth": bool(data.get("requireAuth")),
+            # Why the client fell back to this endpoint (e.g. "restricted").
+            "reason": field("reason", 64),
+            # Admin-only collection, so an auth uid is safe to store here; it is
+            # the verified one or None, never client-supplied.
+            "authUid": auth_uid,
+            "ip": client_ip(req),
+            "timestamp": now.isoformat(),
+            "expireAt": now + timedelta(days=_CLIENT_ERROR_TTL_DAYS),
+        })
+    except Exception as e:
+        # Never fail the caller on an observability write — it is already in a
+        # degraded state, and a 5xx here would just be noise it can't act on.
+        logger.warning("client_error_reports write failed (ignored): %s", e)
+
     return https_fn.Response(
         json.dumps({"success": True}),
         status=200, headers=headers, mimetype='application/json',

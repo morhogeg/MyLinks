@@ -348,7 +348,12 @@ test('shared_owners: denied for owner, stranger, and anon (read and write)', asy
 
 // ── Functions-only collections: always denied ────────────────────────────────
 
-for (const col of ['rate_limits', 'pending_processing', 'task_logs', 'usage_quotas', 'server_errors']) {
+// `client_error_reports` is in this list for a reason worth stating: it is
+// written by an endpoint that accepts UNAUTHENTICATED reports, so the only
+// thing keeping its rate limit and field truncation meaningful is that clients
+// cannot reach the collection directly. Reads stay denied because the records
+// carry an auth uid and an IP.
+for (const col of ['rate_limits', 'pending_processing', 'task_logs', 'usage_quotas', 'server_errors', 'client_error_reports']) {
   test(`${col}: denied for owner, stranger, and anon`, async () => {
     await assertFails(getDoc(doc(ownerDb(), col, 'x')));
     await assertFails(setDoc(doc(ownerDb(), col, 'x'), { a: 1 }));

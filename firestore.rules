@@ -167,5 +167,15 @@ service cloud.firestore {
     match /server_errors/{docId} {
       allow read, write: if false;
     }
+
+    // client_error_reports: only Cloud Functions (admin SDK) — crash reports
+    // from clients that could NOT write to users/{uid}/client_errors, i.e. the
+    // ones with no resolvable workspace (see main.py client_error_http). They
+    // carry an auth uid and an IP, so never client-readable; and the write must
+    // stay server-side so the endpoint's rate limit and field truncation can't
+    // be bypassed by talking to Firestore directly.
+    match /client_error_reports/{docId} {
+      allow read, write: if false;
+    }
   }
 }

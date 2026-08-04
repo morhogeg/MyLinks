@@ -166,6 +166,10 @@ jobs:
           # Resolved at the job level and asserted by the guard step above, so
           # the value that gets baked in is the value that was checked.
           NEXT_PUBLIC_REQUIRE_AUTH: ${{ env.REQUIRE_AUTH_VALUE }}
+          # Stamped into /build-info.json so a bundle can identify itself on
+          # device ("which build is this, from what commit?").
+          NEXT_PUBLIC_BUILD_NUMBER: ${{ steps.bn.outputs.value }}
+          NEXT_PUBLIC_COMMIT_SHA: ${{ github.sha }}
         run: |
           echo "NEXT_PUBLIC_REQUIRE_AUTH='${NEXT_PUBLIC_REQUIRE_AUTH}' (empty = ungated rollback build)"
           npm ci
@@ -174,6 +178,36 @@ jobs:
           test -f ios/App/App/public/index.html || { echo "::error::web bundle not synced"; exit 1; }
           echo "SPM plugins in the generated manifest (native firebase-auth included):"
           grep -E '\.product\(name: "Capacitor' ios/App/CapApp-SPM/Package.swift || true
+
+      # THE ARTIFACT-LEVEL CHECK. The guard step above validated the INPUT; this
+      # validates the OUTPUT, reading the copy of /build-info.json that cap sync
+      # placed inside the iOS target — i.e. the file that actually ships in the
+      # IPA. `build-info.json` is generated from the same `REQUIRE_AUTH` binding
+      # the app gates on (web/app/build-info.json/route.ts), so it catches the
+      # failures the input guard structurally cannot: a renamed env var, a
+      # changed check in lib/api.ts, or Next silently not inlining the value.
+      - name: Verify the built bundle is actually gated
+        working-directory: web
+        env:
+          LEGACY_NO_AUTH: ${{ inputs.legacy_no_auth }}
+        run: |
+          BI=ios/App/App/public/build-info.json
+          if [ ! -f "$BI" ]; then
+            echo "::error::$BI is missing — the build manifest didn't reach the iOS target. Did app/build-info.json/route.ts get removed, or did cap sync fail?"
+            exit 1
+          fi
+          echo "Shipping manifest: $(cat "$BI")"
+          GATED="$(node -e "process.stdout.write(String(require('./$BI').requireAuth))")"
+          if [ "$GATED" = "true" ]; then
+            echo "Bundle is gated — the shipped artifact agrees with the input guard."
+            exit 0
+          fi
+          if [ "$LEGACY_NO_AUTH" = "true" ]; then
+            echo "::warning::Shipped bundle is UNGATED, as requested by legacy_no_auth."
+            exit 0
+          fi
+          echo "::error::The built bundle reports requireAuth=$GATED despite the gate resolving to '$REQUIRE_AUTH_VALUE'. The env var did not reach the bundle — refusing to ship a dead app."
+          exit 1
 
       # Native Firebase (the @capacitor-firebase/authentication pod) reads
       # GoogleService-Info.plist at launch; it's gitignored, so materialize it

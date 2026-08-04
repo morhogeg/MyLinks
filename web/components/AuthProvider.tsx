@@ -13,7 +13,7 @@ import {
 import { syncShareConfigToNative } from '@/lib/shareConfig';
 import { readLocalAiConsent, writeLocalAiConsent } from '@/lib/aiConsent';
 import { setAnalyticsUid, flushSignIn, trackAppOpen, track } from '@/lib/analytics';
-import { installErrorReporter, reportError, flushBufferedReports } from '@/lib/errorReporter';
+import { installErrorReporter, reportError, flushBufferedReports, reportViaHttp } from '@/lib/errorReporter';
 import {
     initPushListeners, refreshPushRegistration, unregisterPush,
     readLocalPushPrompt, writeLocalPushPrompt,
@@ -301,6 +301,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 }
             } catch (err) {
                 console.error('Failed to resolve user workspace:', err);
+                reportError(err, 'auth-resolve-workspace');
                 if (!cancelled) { setRestricted(true); setUid(null); }
             } finally {
                 if (!cancelled) setLoading(false);
@@ -311,6 +312,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // retryNonce re-runs resolution (onAuthChange re-fires with the
         // current user on resubscribe) after a failed workspace setup.
     }, [retryNonce]);
+
+    // Workspace is unresolvable → Firestore-backed error reporting is dead with
+    // it: `users/{uid}/client_errors` needs an owned doc, and there isn't one,
+    // so the reporter's buffer would wait forever for a flush that never comes.
+    // Switch it to /api/client-error and drain the buffer. This is precisely the
+    // state that reported NOTHING when builds 1266/1267 shipped ungated — the
+    // app was dead on device for a day and the only detector was a human.
+    // Covers every path into `restricted` (both resolution effects), and
+    // reportViaHttp is idempotent, so re-renders cost nothing.
+    useEffect(() => {
+        if (restricted) reportViaHttp('workspace-unresolved');
+    }, [restricted]);
 
     // Dismiss the first-run welcome: record it on the user doc (authoritative,
     // survives devices) with a localStorage fallback if the write fails.

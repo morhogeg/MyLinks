@@ -1,8 +1,10 @@
-// STAGED, NOT LIVE. This is the locked target ruleset. The live `firestore.rules`
-// stays open until cutover so the current app keeps working. Deploy this only as
-// the LAST cutover step, after REQUIRE_AUTH is on and sign-in is verified:
-//   cp firestore.rules.locked firestore.rules && firebase deploy --only firestore:rules
-// See NATIVE_AUTH_SETUP.md ("Cutover order").
+// LIVE, LOCKED — this file and `firestore.rules` are the SAME ruleset.
+// Promoted to `firestore.rules` on 2026-08-02 (SOURCE_OF_TRUTH §4 task 2) once
+// REQUIRE_AUTH was enforced backend-side and sign-in was device-verified; the
+// old "STAGED, NOT LIVE" header here was stale from before that promotion.
+// This remains the staging copy: edit it, let `rules-tests.yml` prove it, then
+// copy it over `firestore.rules` — deploy-rules.yml deploys whatever THAT file
+// says. See NATIVE_AUTH_SETUP.md ("Cutover order").
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -164,6 +166,16 @@ service cloud.firestore {
     // (see main.py _record_server_error). They can carry a workspace uid, so
     // never client-readable; surfaced only via the admin debug_status endpoint.
     match /server_errors/{docId} {
+      allow read, write: if false;
+    }
+
+    // client_error_reports: only Cloud Functions (admin SDK) — crash reports
+    // from clients that could NOT write to users/{uid}/client_errors, i.e. the
+    // ones with no resolvable workspace (see main.py client_error_http). They
+    // carry an auth uid and an IP, so never client-readable; and the write must
+    // stay server-side so the endpoint's rate limit and field truncation can't
+    // be bypassed by talking to Firestore directly.
+    match /client_error_reports/{docId} {
       allow read, write: if false;
     }
   }
