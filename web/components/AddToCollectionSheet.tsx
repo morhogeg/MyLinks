@@ -140,7 +140,12 @@ export default function AddToCollectionSheet({
                 role="dialog"
                 aria-modal="true"
                 aria-label="Add to collection"
-                className="relative w-full sm:max-w-sm bg-card border-t sm:border border-border-strong rounded-t-3xl sm:rounded-3xl shadow-2xl animate-slide-up overflow-hidden safe-pb max-h-full sm:max-h-[80vh] flex flex-col"
+                /* Height is capped BELOW the status bar (inset + a 1.5rem breather)
+                   rather than at max-h-full: with a dozen collections the sheet grew
+                   to the full viewport and its grab handle sat under the notch, so it
+                   read as a screen that had slid too far up instead of a sheet. Same
+                   cap as SuggestionPreviewSheet — keep them in step. */
+                className="relative w-full sm:max-w-sm bg-card border-t sm:border border-border-strong rounded-t-3xl sm:rounded-3xl shadow-2xl animate-slide-up overflow-hidden safe-pb max-h-[calc(100%-env(safe-area-inset-top)-1.5rem)] sm:max-h-[80vh] flex flex-col"
             >
                 {/* Grab handle + header: the drag-to-dismiss zone on mobile. */}
                 <div {...handleProps}>

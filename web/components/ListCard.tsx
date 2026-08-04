@@ -30,7 +30,10 @@ interface ListCardProps {
     onAddToCollection?: (link: Link) => void;
     onShare?: (link: Link) => void;
     onTogglePrivate?: (link: Link) => void;
-    onToggleThumbnail?: (link: Link) => void;
+    // NOTE: deliberately NO onToggleThumbnail. A list row renders no thumbnail,
+    // so "Show image" here changed a field with nothing on screen to show for it
+    // — the tap read as broken. The toggle lives in the grid card and in the open
+    // card's top bar, which is where the banner is actually visible.
     /** ⋯ → See in graph: open the Graph focused on this card. */
     onOpenInGraph?: (link: Link) => void;
     /** Collections this card belongs to — names the "remove from" row. */
@@ -68,7 +71,6 @@ function ListCard({
     onAddToCollection,
     onShare,
     onTogglePrivate,
-    onToggleThumbnail,
     onOpenInGraph,
     cardCollections,
     activeCollectionId,
@@ -344,7 +346,6 @@ function ListCard({
                 onAddToCollection={onAddToCollection}
                 onShare={onShare}
                 onTogglePrivate={onTogglePrivate}
-                onToggleThumbnail={onToggleThumbnail}
                 onOpenInGraph={onOpenInGraph}
                 removeFromCollection={
                     activeCollectionId && onRemoveFromCollection

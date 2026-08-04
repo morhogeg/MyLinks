@@ -1,13 +1,13 @@
 'use client';
 
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
 import SourceByline from './SourceByline';
 import SimpleMarkdown from './SimpleMarkdown';
 import { hasHebrew } from '@/lib/rtl';
 import { hapticLight } from '@/lib/haptics';
-import { Check, Archive, Bell, RotateCcw, Sparkles, Info, X } from 'lucide-react';
+import { Check, Archive, Bell, RotateCcw, Sparkles, Info, X, Star } from 'lucide-react';
 import { REVIEW_SESSION_SIZE, isOpen, reviewSessionQueue } from '@/lib/reviewQueue';
 
 type SwipeDir = 'left' | 'right' | 'up';
@@ -27,6 +27,9 @@ interface SwipeDeckProps {
     onResetStatus: (link: Link) => void;
     /** Clear a reminder that was just set (used by Undo of an up-swipe). */
     onCancelRemind: (link: Link) => void;
+    /** Star/unstar the card in place, without advancing the deck — the card face's
+     *  own button. Must be referentially stable: CardFace is memoized. */
+    onToggleFavorite: (link: Link) => void;
     /** Outcome of the last reminder modal opened via `onRemind`: `saved` true if
      *  the user set a reminder, false if they cancelled/dismissed. `seq` bumps on
      *  every resolution so the same outcome twice still fires. */
@@ -74,6 +77,7 @@ export default function SwipeDeck({
     onOpen,
     onResetStatus,
     onCancelRemind,
+    onToggleFavorite,
     remindSignal,
     onExit,
 }: SwipeDeckProps) {
@@ -101,6 +105,12 @@ export default function SwipeDeck({
     // action, but the live `links` snapshot may lag a beat — without this
     // exception the just-undone card would be skipped as "acted on" for a frame.
     const undoneIds = useRef(new Set<string>());
+    // Cards starred from the card face THIS session. Favoriting writes
+    // `status: 'favorite'`, which reviewQueue.isOpen excludes — so without this
+    // exception the card the user just starred would stop being dealable and
+    // vanish from under their finger before they could swipe it. Starring is an
+    // annotation, not a verdict: the card stays until they act on it.
+    const favoritedIds = useRef(new Set<string>());
 
     // Live map so card faces render fresh data and deleted cards resolve to null.
     const byId = useMemo(() => {
@@ -115,7 +125,8 @@ export default function SwipeDeck({
     // A slot ahead of the pointer is dealable while its card is still open —
     // cards acted on OUTSIDE the deck's gestures mid-session (deleted, archived
     // elsewhere, reminder set from the detail modal) are skipped, not re-dealt.
-    const isDealable = (l: Link | null): l is Link => !!l && (isOpen(l) || undoneIds.current.has(l.id));
+    const isDealable = (l: Link | null): l is Link =>
+        !!l && (isOpen(l) || undoneIds.current.has(l.id) || favoritedIds.current.has(l.id));
 
     // First dealable card at/after the pointer.
     let currentIndex = pos;
@@ -148,6 +159,7 @@ export default function SwipeDeck({
         exitDir.current = null;
         pendingRemind.current = null;
         undoneIds.current = new Set();
+        favoritedIds.current = new Set();
     };
 
     // Self-heal an empty, untouched session: the deck mounted before links
@@ -309,6 +321,15 @@ export default function SwipeDeck({
         setDrag({ x: 0, y: 0 });
     };
 
+    // Star from the card face. Doesn't advance the deck and isn't undoable via the
+    // Undo button (which owns the last *swipe*) — it's a toggle, so tapping again
+    // is the undo. Stable identity keeps CardFace's memo intact across drag frames.
+    const toggleFavorite = useCallback((link: Link) => {
+        hapticLight();
+        favoritedIds.current.add(link.id); // see favoritedIds: keeps the card dealable
+        onToggleFavorite(link);
+    }, [onToggleFavorite]);
+
     const undo = () => {
         if (!lastAction) return;
         const { link, kind, index } = lastAction;
@@ -468,7 +489,7 @@ export default function SwipeDeck({
                                 pointerEvents: isTop ? 'auto' : 'none',
                             }}
                         >
-                            <CardFace link={link} />
+                            <CardFace link={link} onToggleFavorite={toggleFavorite} />
                             {isTop && (
                                 <>
                                     <HintBadge label="KEEP" color="34,197,94" icon={<Check className="w-4 h-4" />} opacity={rightHint} pos="left" />
@@ -604,9 +625,10 @@ function HintBadge({ label, color, icon, opacity, pos }: { label: string; color:
  *  Memoized: the deck re-renders on every drag pointermove frame, and without
  *  the memo all three stacked faces would re-run SimpleMarkdown parsing at
  *  pointer-event rate — only the wrapper's transform changes per frame. */
-const CardFace = memo(function CardFace({ link }: { link: Link }) {
+const CardFace = memo(function CardFace({ link, onToggleFavorite }: { link: Link; onToggleFavorite: (link: Link) => void }) {
     const isRtl = link.language === 'he' || hasHebrew(link.title) || hasHebrew(link.summary);
     const colorStyle = getCategoryColorStyle(link.category);
+    const isFavorite = link.status === 'favorite';
 
     return (
         <div className="h-full w-full surface-card bg-card rounded-2xl border border-border-subtle shadow-[var(--shadow-card)] p-5 sm:p-6 flex flex-col overflow-hidden">
@@ -625,7 +647,7 @@ const CardFace = memo(function CardFace({ link }: { link: Link }) {
                 </div>
             )}
 
-            {/* Header: category + source byline */}
+            {/* Header: category + source byline + star */}
             <div className="flex items-center justify-between gap-2 mb-4">
                 <span
                     className="text-[10px] uppercase font-black tracking-widest px-2 py-1 rounded-lg whitespace-nowrap"
@@ -633,7 +655,32 @@ const CardFace = memo(function CardFace({ link }: { link: Link }) {
                 >
                     {link.category}
                 </span>
-                <SourceByline link={link} />
+                <div className="flex items-center gap-1 min-w-0">
+                    <SourceByline link={link} />
+                    {/* Favorite, on the card face rather than as a fifth deck button —
+                        it's an annotation you make BEFORE deciding where the card goes,
+                        not a fourth destination. Same styling as the open card's top-bar
+                        star (LinkDetailModal) so one glyph means one thing app-wide.
+                        stopPropagation on pointerdown is load-bearing: without it the tap
+                        starts a drag (and the deck's onPointerUp opens the card). */}
+                    <button
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleFavorite(link);
+                        }}
+                        title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                        aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                        aria-pressed={isFavorite}
+                        /* -my-2 keeps the 40px tap target from growing the header row. */
+                        className={`shrink-0 -my-2 -me-1.5 h-10 w-10 rounded-xl flex items-center justify-center transition-colors ${isFavorite
+                            ? 'bg-yellow-500/10 text-yellow-500'
+                            : 'text-text-muted hover:text-yellow-500 hover:bg-card-hover'
+                            }`}
+                    >
+                        <Star className={`w-[18px] h-[18px] ${isFavorite ? 'fill-current' : ''}`} />
+                    </button>
+                </div>
             </div>
 
             {/* Title */}

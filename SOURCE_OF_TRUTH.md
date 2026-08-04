@@ -1219,6 +1219,45 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-04 (device QA, 4 UI fixes) — one of the four was a lie in the copy,
+  one was a dead button, and the review-deck star needed a queue exception to
+  work at all.** Owner ran the app on an iPhone and filed four items; all four
+  shipped. (1) **Read empty state was factually wrong** — it read "Cards you open
+  and finish collect here", but `isRead` is written *only* by the explicit Mark as
+  read action ([useLinkActions.ts:39](web/lib/useLinkActions.ts:39)); nothing
+  auto-marks on open, so the copy promised behavior that does not exist. Now
+  "Cards you mark as read collect here." (2) **Add-to-collection sheet ran under
+  the status bar** — it was `max-h-full`, so with a dozen collections it grew to
+  the full viewport and its grab handle sat under the notch, reading as a screen
+  slid too far up rather than a sheet. Capped at
+  `max-h-[calc(100%-env(safe-area-inset-top)-1.5rem)]`, the same cap
+  `SuggestionPreviewSheet` already used — **keep those two in step.** The
+  Collections *tab* needed nothing: its overlay pads through `MobileSubheader`,
+  which was already correct. (3) **"Show image" is gone from the list view** — a
+  `ListCard` renders no thumbnail, so the row's ⋯ offered a toggle that changed a
+  field with nothing on screen to show for it, and the tap read as broken.
+  `onToggleThumbnail` is now deliberately absent from `ListCardProps` (commented
+  as such) rather than special-cased inside the shared `CardActionSheet`, so the
+  grid card and the open card's top bar — where the banner is actually visible —
+  keep it. (4) **Review deck cards carry a star**, in the card-face header next to
+  the source byline; favoriting is an annotation you make *before* deciding where
+  the card goes, so it earns a button without a fifth deck destination. **The
+  non-obvious part:** favorite is `status: 'favorite'`, and `reviewQueue.isOpen`
+  *excludes* favorited cards — so starring the top card would have made it
+  undealable and yanked it out from under the user's finger mid-session. Fixed
+  with a `favoritedIds` session ref OR'd into `isDealable`, exactly parallel to
+  the existing `undoneIds` escape hatch (both cleared on `deal()`).
+  `stopPropagation` on the button's **pointerdown** is also load-bearing: without
+  it the tap starts a drag and the deck's `onPointerUp` opens the card. **Known
+  and accepted:** favorite and archived share one `status` field, so star →
+  swipe-left overwrites the star (swipe right/up preserve it). Archiving is the
+  stronger verdict and wins on purpose; the alternative was inventing a second
+  field for a rare combination. **Verified:** `npx tsc --noEmit` clean, `npm run
+  build` green. Note for fresh containers: the build prerenders `/_not-found`
+  through `lib/firebase.ts`, so with no `.env.local` it dies on
+  `auth/invalid-api-key` — that is a missing-env artifact, not a code failure
+  (re-run with dummy `NEXT_PUBLIC_FIREBASE_*` values to get a real signal). No
+  backend change, so no functions deploy.
 - **2026-08-04 — Ask quota back to 100/month, ahead of inviting 4–5 friends as
   TestFlight INTERNAL testers.** Owner is sharing with close friends and does not
   want Beta App Review — internal testing needs none (up to 100 testers, builds
