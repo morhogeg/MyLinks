@@ -1301,6 +1301,15 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
             toast.error("Couldn't save that. Please try again.");
         }
     }, [uid, toast]);
+    // Star from the deck's card face. Silent like the rest of the deck (the star
+    // fills in place — that IS the confirmation, and a toast would cover the
+    // action buttons). Note favorite and archived share one `status` field, so a
+    // later left-swipe overwrites the star: archiving is the stronger verdict and
+    // wins on purpose.
+    const swipeToggleFavorite = useCallback(
+        (link: Link) => handleStatusChange(link.id, link.status === 'favorite' ? 'unread' : 'favorite', { silent: true }),
+        [handleStatusChange],
+    );
     // Undo of an up-swipe: clear the reminder the deck just set for this card (F-29).
     // Clearing (not restoring a prior state) is safe because reviewQueue.isOpen
     // excludes reminder-pending cards from every deck queue — a dealt card can't
@@ -2591,7 +2600,10 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                 }
                                 : filter === 'read' ? {
                                     Icon: BookOpenCheck, title: 'Nothing read yet',
-                                    body: 'Cards you open and finish collect here.',
+                                    // Read is an EXPLICIT action (⋯ → Mark as read /
+                                    // the check on a card) — opening a card never sets
+                                    // it (lib/useLinkActions.ts). Don't promise otherwise.
+                                    body: 'Cards you mark as read collect here.',
                                 }
                                 : filter === 'private' ? {
                                     Icon: Lock, title: 'No private cards',
@@ -2702,6 +2714,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             onOpen={openLinkDetails}
                             onResetStatus={swipeResetStatus}
                             onCancelRemind={swipeCancelRemind}
+                            onToggleFavorite={swipeToggleFavorite}
                             remindSignal={remindSignal}
                             onExit={() => setViewMode(lastLayout.current === 'review' ? 'grid' : lastLayout.current)}
                         />
@@ -2726,7 +2739,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                         onAddToCollection={handleAddToCollection}
                                         onShare={handleShareCard}
                                         onTogglePrivate={handleToggleCardPrivate}
-                                        onToggleThumbnail={handleToggleThumbnail}
                                         onOpenInGraph={isEffectivelyPrivateCard(link) ? undefined : openInGraphFromMenu}
                                         cardCollections={cardCollectionsByLink.get(link.id)}
                                         activeCollectionId={openCol?.id}
