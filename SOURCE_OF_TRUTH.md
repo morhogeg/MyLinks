@@ -226,7 +226,7 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (2026-08-04): install build 1268 when it lands
+> ## 🚨 OWNER ACTION (2026-08-04): install build **1269** (supersedes 1268)
 >
 > TestFlight builds **1266 and 1267 are ungated and dead** — pushed via
 > `git push -f origin main:trigger/testflight` two and four minutes *after* the
@@ -238,9 +238,11 @@ The multi-user auth work described below **was** fully written but not live:
 >   **ON** for every trigger including push, the input is inverted to
 >   `legacy_no_auth` (rollback only), and a guard step refuses to build an
 >   ungated bundle. Push-to-build is the correct path again.
-> - **Build 1268** (run #268, sha `c8ef0bf`) is the first build off the fixed
->   workflow — the recovery build. **Install it** once Apple finishes processing.
-> - **Until then:** install **1265**, the last good pre-break build.
+> - **Build 1269** (run #269, sha `bd047a7`) is current — gated, and the first
+>   build carrying the artifact-level check and `/build-info.json`. **Install
+>   this one.** 1268 (run #268) was the recovery build and is also gated/safe,
+>   just superseded.
+> - **Fallback:** 1265, the last good pre-break build.
 > - Confirm on device via Settings → the **Account row** is the discriminator
 >   for a gated build (a gated build opening straight to the cards is normal —
 >   Firebase persists the WebView session across app updates). Every build from
@@ -1209,6 +1211,15 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-04 (ship) — both gap fixes are LIVE.** Merge `bd047a7`; all six
+  workflows green on it: Deploy Cloud Functions #71 (`client_error_http` created
+  in us-central1, scoped via the `Deploy-Functions:` merge line), Deploy Firebase
+  Hosting #4 (the `/api/client-error` rewrite), Firestore rules tests #10 +
+  Deploy Firestore rules #7 (**this is the CI run that validated the ruleset
+  change the sandbox couldn't** — the suite gates the deploy and both passed),
+  Python tests #85, and iOS → TestFlight #269 → **build 1269**, whose new
+  "Verify the built bundle is actually gated" step passed on a push-triggered
+  build. Vercel redeployed off the same `main` push. Owner: install **1269**.
 - **2026-08-04 — closed the two gaps the fail-closed fix left open.** Owner
   asked "is the app still safe, and how do we stop this recurring?" Answer to
   the first: yes — 1266/1267 were **dead, not leaky**. The locked rules denied an
