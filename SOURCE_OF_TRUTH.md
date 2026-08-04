@@ -1210,7 +1210,13 @@ exact-match, capped.
 - **2026-08-04 — SHIPPED the fail-closed fix.** Merge `c8ef0bf` to `main` →
   Vercel redeployed the desktop web, and `main:trigger/testflight` cut **run
   #268 → TestFlight build 1268**, the first build off the fixed workflow and the
-  recovery build for the dead 1266/1267. No `functions/**` changes, so no
+  recovery build for the dead 1266/1267. **Run #268 is green end to end** —
+  archive, export, entitlements, upload all succeeded (09:36:31Z). The fix is
+  proven on a real **push-triggered** build two ways: the new guard step passed
+  (on a push, `LEGACY_NO_AUTH` is empty, so the only branch that exits 0 is
+  `REQUIRE_AUTH_VALUE = "true"` — an empty gate fails the build), and the run's
+  own env echoes `REQUIRE_AUTH_VALUE: true`. Yesterday this same trigger produced
+  an ungated bundle. No `functions/**` changes, so no
   Cloud Functions deploy; no `firebase.json` change, so no hosting deploy.
   Owner: install **1268** when Apple finishes processing (1265 in the meantime);
   the Settings **Account row** is the on-device discriminator for a gated build.
