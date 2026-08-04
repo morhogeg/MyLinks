@@ -100,13 +100,21 @@ be in a git worktree under `~/MyLinks/.claude/worktrees/<name>` on a `claude/*` 
    ```bash
    git push -f origin main:trigger/testflight
    ```
-   This builds main's HEAD with default (legacy, require_auth off) behavior and
-   uploads to TestFlight automatically — no Xcode. Watch it via GitHub MCP
-   `actions_list` (`list_workflow_runs` for `ios-testflight.yml`); build number
-   = 1000 + run number. **Verified end-to-end 2026-07-17:** run #102 / build
-   1102 built and uploaded green from a session-pushed trigger branch. For a `require_auth=true` build, the owner must use
-   manual dispatch (Actions → *iOS → TestFlight* → Run workflow). `gh workflow
-   run` / MCP `actions_run_trigger` also work where dispatch is permitted.
+   This builds main's HEAD **with the auth gate ON** and uploads to TestFlight
+   automatically — no Xcode. Watch it via GitHub MCP `actions_list`
+   (`list_workflow_runs` for `ios-testflight.yml`); build number = 1000 + run
+   number. **Verified end-to-end 2026-07-17:** run #102 / build 1102 built and
+   uploaded green from a session-pushed trigger branch.
+
+   ⚠️ **Before 2026-08-03 this shortcut hardcoded the gate OFF** and shipped
+   ungated builds 1264/1266/1267 — the last two landed after the rules lock and
+   took the app down on device (SOURCE_OF_TRUTH §9, 2026-08-03). The default is
+   inverted now and a guard step fails the build rather than ship an ungated
+   bundle, so pushing the trigger branch is the correct path. An ungated build
+   is now **rollback only**: owner dispatch with `legacy_no_auth` ticked, valid
+   only while the Firestore rules are rolled back to the open ruleset. `gh
+   workflow run` / MCP `actions_run_trigger` also work where dispatch is
+   permitted.
 
 7. **Deploy Firebase Hosting** — only if `firebase.json` changed:
    `cd ~/MyLinks && ./deploy-hosting.sh`. Otherwise skip; the iPhone PWA is retired.

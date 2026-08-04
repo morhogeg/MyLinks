@@ -9,20 +9,26 @@ name: iOS → TestFlight
 on:
   workflow_dispatch:
     inputs:
-      require_auth:
+      legacy_no_auth:
         description: >-
-          Bake NEXT_PUBLIC_REQUIRE_AUTH=true into the bundle (shows the
-          Apple/Google sign-in gate + Account section on device). Use for
-          on-device auth verification and for the post-cutover store builds.
-          Default OFF = legacy pre-cutover behavior (no sign-in UI).
+          ROLLBACK ONLY — build WITHOUT the sign-in gate (empty
+          NEXT_PUBLIC_REQUIRE_AUTH = pre-cutover behavior). Valid only while the
+          Firestore rules are rolled back to the open ruleset: against the LOCKED
+          rules an ungated bundle can't read anything and opens to an empty app
+          with no sign-in UI to recover with. Leave OFF for every normal build.
         type: boolean
         default: false
   # PUSH-TO-BUILD: cloud sessions can't call the dispatch API (403 for the
   # GitHub App integration), so moving this branch is the programmatic trigger:
   #   git push -f origin main:trigger/testflight
   # builds whatever commit the branch points at (normally main's HEAD) with the
-  # default legacy behavior (require_auth off — same as a default dispatch).
-  # For a require_auth=true build, use manual dispatch.
+  # post-cutover default — auth gate ON, same as a default dispatch.
+  #
+  # It did NOT always: until 2026-08-03 this shortcut hardcoded the gate OFF
+  # (a push event carries no `inputs`), so it silently shipped ungated builds
+  # 1264, 1266 and 1267 — the last two landing minutes after the rules lock,
+  # which is what took the app down. The default is inverted now; see the
+  # REQUIRE_AUTH_VALUE note below and SOURCE_OF_TRUTH §9 (2026-08-03).
   push:
     branches: [trigger/testflight]
   # AUTO-BUILD TEMPORARILY GATED during the multi-user auth cutover.
@@ -60,6 +66,18 @@ jobs:
       API_BASE: https://secondbrain-app-94da2.web.app
       TEAM_ID: 8Y2M94RUHG
       BUNDLE_ID: com.morhogeg.machina
+      # THE AUTH GATE, resolved once for both the guard step and the build step
+      # (they must never disagree). Defaults to 'true' on EVERY trigger: the
+      # locked ruleset denies every read to an unauthenticated client, so an
+      # ungated bundle is a dead app, and `inputs.legacy_no_auth` is undefined
+      # on a push event — `null != true` is true, so push builds resolve to
+      # 'true'. Only an explicit rollback dispatch turns it off.
+      #
+      # Written as `!= true && 'true' || ''` and NOT `== true && '' || 'true'`
+      # on purpose: `&&`/`||` here are value-selecting, so a FALSY left-hand
+      # result falls through to the right-hand side. `true && '' || 'true'`
+      # yields 'true', not '' — the empty string has to stay on the `||` side.
+      REQUIRE_AUTH_VALUE: ${{ inputs.legacy_no_auth != true && 'true' || '' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -113,6 +131,26 @@ jobs:
           fi
           echo "Required Firebase secrets present."
 
+      # Fail closed on a dead bundle — the same class of failure as the empty
+      # Firebase config guarded above, and the one that actually shipped. An
+      # ungated build archives green, passes every check here, and uploads to
+      # TestFlight; the breakage only appears on device, as an app that opens to
+      # nothing. Refuse to build one unless it was asked for explicitly.
+      - name: Verify the auth gate will be baked in
+        env:
+          LEGACY_NO_AUTH: ${{ inputs.legacy_no_auth }}
+        run: |
+          if [ "$REQUIRE_AUTH_VALUE" = "true" ]; then
+            echo "Auth gate ON — NEXT_PUBLIC_REQUIRE_AUTH=true will be baked in."
+            exit 0
+          fi
+          if [ "$LEGACY_NO_AUTH" = "true" ]; then
+            echo "::warning::Building UNGATED because legacy_no_auth was ticked. This bundle can only work against the OPEN (rolled-back) Firestore ruleset — against the locked rules it opens to an empty app."
+            exit 0
+          fi
+          echo "::error::Refusing to build: the auth gate resolved to '' without an explicit legacy_no_auth dispatch. An ungated bundle cannot read the locked database — it would ship a dead app to TestFlight."
+          exit 1
+
       - name: Build web bundle + Capacitor sync
         working-directory: web
         env:
@@ -125,11 +163,11 @@ jobs:
           NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
           NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
           NEXT_PUBLIC_RECAPTCHA_SITE_KEY: ${{ secrets.NEXT_PUBLIC_RECAPTCHA_SITE_KEY }}
-          # Flag-gated auth cutover: only baked in when the run is dispatched
-          # with require_auth=true (see NATIVE_AUTH_SETUP.md).
-          NEXT_PUBLIC_REQUIRE_AUTH: ${{ inputs.require_auth == true && 'true' || '' }}
+          # Resolved at the job level and asserted by the guard step above, so
+          # the value that gets baked in is the value that was checked.
+          NEXT_PUBLIC_REQUIRE_AUTH: ${{ env.REQUIRE_AUTH_VALUE }}
         run: |
-          echo "NEXT_PUBLIC_REQUIRE_AUTH='${NEXT_PUBLIC_REQUIRE_AUTH}' (empty = pre-cutover legacy behavior)"
+          echo "NEXT_PUBLIC_REQUIRE_AUTH='${NEXT_PUBLIC_REQUIRE_AUTH}' (empty = ungated rollback build)"
           npm ci
           npm run build
           npx cap sync ios

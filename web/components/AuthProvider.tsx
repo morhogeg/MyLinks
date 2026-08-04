@@ -213,7 +213,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setNeedsOnboarding(false);
     }, []);
 
-    // ── Legacy native path (pre-cutover only): load the owner workspace, no gate.
+    // ── Legacy native path (rollback only): load the owner workspace, no gate.
+    //
+    // Kept, not deleted, because §3's documented rollback — revert the
+    // firestore.rules commit, set both REQUIRE_AUTH flags back to false — lands
+    // here. But it is viable ONLY against the OPEN ruleset: the locked rules
+    // deny this unbounded `users limit(1)` list by name (see firestore.rules),
+    // and with the gate off there is no sign-in screen to recover with. A
+    // swallowed error here therefore renders an empty app and hides the cause,
+    // which is exactly how ungated builds 1266/1267 failed on device. So a
+    // failure now surfaces as the restricted screen instead of nothing.
     useEffect(() => {
         if (REQUIRE_AUTH || !native) return;
         let cancelled = false;
@@ -221,21 +230,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             try {
                 const snapshot = await getDocs(query(collection(db, 'users'), limit(1)));
                 if (cancelled) return;
-                if (!snapshot.empty) {
-                    const userDoc = snapshot.docs[0];
-                    setUid(userDoc.id);
-                    attachUserDoc(userDoc.id, userDoc.data());
-                    reconcileAiConsent(userDoc.id, userDoc.data());
-                    attachPush(userDoc.id, userDoc.data());
+                if (snapshot.empty) {
+                    setRestricted(true);
+                    return;
                 }
+                const userDoc = snapshot.docs[0];
+                setRestricted(false);
+                setUid(userDoc.id);
+                attachUserDoc(userDoc.id, userDoc.data());
+                reconcileAiConsent(userDoc.id, userDoc.data());
+                attachPush(userDoc.id, userDoc.data());
             } catch (err) {
                 console.error('Failed to look up user:', err);
+                reportError(err, 'auth-legacy-native-lookup');
+                if (!cancelled) { setRestricted(true); setUid(null); }
             } finally {
                 if (!cancelled) setLoading(false);
             }
         })();
         return () => { cancelled = true; };
-    }, []);
+        // retryNonce drives "Try again" on the restricted screen here too.
+    }, [retryNonce]);
 
     // ── Real sign-in path: web always; native only when REQUIRE_AUTH is on. ──
     useEffect(() => {
@@ -315,19 +330,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // During loading we render children so the page shows its own spinner (and
     // SSR/first paint stay consistent — loading starts true).
     const gated = REQUIRE_AUTH || !native;
-    if (gated && !loading) {
-        if (!authUid) {
-            return (
-                <AuthContext.Provider value={value}>
-                    <LoginScreen onSignIn={signIn} showApple={!native || REQUIRE_AUTH} />
-                </AuthContext.Provider>
-            );
-        }
+    if (!loading) {
+        // A failed workspace resolution ALWAYS surfaces — deliberately checked
+        // before the gate, and outside it. In legacy native mode there is no
+        // sign-in screen to fall back to, so falling through to children with a
+        // null uid renders an empty app and hides the cause. `restricted` is
+        // only ever set after a real failure, so this can't pre-empt a healthy
+        // load; and where it was reachable before, it was reachable only with
+        // authUid already set, so ordering it first changes nothing there.
+        //
+        // Cause of the failure varies: resolution failed AND the backend
+        // couldn't (or, pre-cutover, wouldn't) create a workspace; or, in
+        // legacy native, the owner-workspace lookup was denied.
         if (restricted) {
-            // Edge case only: resolution failed AND the backend couldn't (or,
-            // pre-cutover, wouldn't) create a workspace. Post-cutover the
-            // screen offers a retry; pre-cutover it keeps the owner-account
-            // message (live behavior unchanged).
             return (
                 <AuthContext.Provider value={value}>
                     <LoginScreen
@@ -335,9 +350,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         email={email}
                         onSignIn={signIn}
                         onSignOut={signOut}
-                        onRetry={REQUIRE_AUTH ? () => setRetryNonce((n) => n + 1) : undefined}
+                        // Retry re-runs resolution: the real path when enforcing,
+                        // the legacy lookup on native (both keyed on retryNonce).
+                        // Pre-cutover WEB keeps the non-owner message, no retry.
+                        onRetry={REQUIRE_AUTH || native ? () => setRetryNonce((n) => n + 1) : undefined}
                         showApple={!native || REQUIRE_AUTH}
                     />
+                </AuthContext.Provider>
+            );
+        }
+        if (gated && !authUid) {
+            return (
+                <AuthContext.Provider value={value}>
+                    <LoginScreen onSignIn={signIn} showApple={!native || REQUIRE_AUTH} />
                 </AuthContext.Provider>
             );
         }
