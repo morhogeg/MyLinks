@@ -93,9 +93,11 @@ SDK). That native SDK ships its own privacy manifest — no action needed for it
    `./build-ios.sh` + Xcode builds: copy `REVERSED_CLIENT_ID` from the plist into
    **Info → URL Types**. Without it the native Google flow can't return to the
    app. *(Apple sign-in needs no URL scheme.)*
-   **Sign-in-enabled TestFlight builds:** dispatch the *iOS → TestFlight* workflow
-   with the **`require_auth: true`** input — it bakes `NEXT_PUBLIC_REQUIRE_AUTH=true`
-   into the bundle. Default runs (input off) keep the pre-cutover legacy behavior.
+   **Sign-in-enabled TestFlight builds:** every build bakes
+   `NEXT_PUBLIC_REQUIRE_AUTH=true` by default since 2026-08-03 — dispatch *or*
+   push to `trigger/testflight`. Only a dispatch with **`legacy_no_auth: true`**
+   produces the pre-cutover ungated bundle, and that is valid only while the
+   Firestore rules are rolled back to the open ruleset.
 3. **Privacy manifests:** add `App/PrivacyInfo.xcprivacy` to the **App** target and
    `ShareExt/PrivacyInfo.xcprivacy` to the **ShareExt** target (each: File
    Inspector → Target Membership, and confirm it's in *Copy Bundle Resources*).
@@ -176,10 +178,13 @@ never exercised.
 > the cheapest proof the backend flag really took, and while the rules are still
 > open, rollback is one variable.
 >
-> Also: the iOS build **must** be dispatched from the Actions UI with the
+> ~~Also: the iOS build **must** be dispatched from the Actions UI with the
 > `require_auth` checkbox ticked. `git push -f origin main:trigger/testflight`
 > hardcodes it OFF (`ios-testflight.yml:130`) and silently ships an ungated
-> build.
+> build.~~ **Fixed 2026-08-03** — after it caught us a third time (builds 1264,
+> 1266, 1267). The gate now defaults ON for every trigger including push, the
+> input is inverted to `legacy_no_auth` (rollback only), and a guard step
+> refuses to build an ungated bundle. Either trigger is safe now.
 
 1. **Ship the config with auth still off.** Push any `functions/**` change to
    `main` (bump `functions/.deploy-ping` if you have nothing else). The

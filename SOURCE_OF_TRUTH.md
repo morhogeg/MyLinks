@@ -71,7 +71,8 @@ surface in the category and a knowledge graph computed on every save. The path t
     (`.github/workflows/ios-testflight.yml`, macOS runner, cloud-managed signing,
     build number = 1000 + run number). Trigger from any session with
     `git push -f origin main:trigger/testflight` (the dispatch API 403s for the
-    GitHub App); manual dispatch (owner) for `require_auth=true` builds.
+    GitHub App). Every build is auth-gated by default since 2026-08-03; owner
+    dispatch with `legacy_no_auth` is the rollback-only ungated build.
   - **Firebase Hosting** (`secondbrain-app-94da2.web.app`) — no longer a user-facing
     deploy target (the iPhone PWA is retired in favor of the native app), but the
     origin still matters: it serves the `/api/*` rewrites the native app calls
@@ -224,6 +225,23 @@ The multi-user auth work described below **was** fully written but not live:
 > before flipping, set the Apple **Services ID + `.p8`** for web Apple sign-in, and
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
+
+> ## 🚨 OWNER ACTION OPEN (2026-08-03): ship a gated iOS build
+>
+> TestFlight builds **1266 and 1267 are ungated and dead** — they were pushed via
+> `git push -f origin main:trigger/testflight` two and four minutes *after* the
+> rules lock, and that shortcut hardcoded `NEXT_PUBLIC_REQUIRE_AUTH` OFF. An
+> ungated bundle can't read the locked database, so the app opens to nothing with
+> no sign-in UI to recover with. **Build 1265 is the last good one.**
+>
+> - **Right now:** install **1265** from TestFlight, or dispatch **iOS →
+>   TestFlight** from the Actions UI to cut a fresh gated build.
+> - **The trap is fixed in the workflow** (2026-08-03): the gate now defaults
+>   **ON** for every trigger including push, the input is inverted to
+>   `legacy_no_auth` (rollback only), and a guard step refuses to build an
+>   ungated bundle unless it was asked for explicitly. So the next push-to-build
+>   is safe — but it still has to be *run*, and only the owner can dispatch
+>   (cloud sessions get 403 on the dispatch API).
 
 > **LAUNCH GATE (compiled 2026-08-02, "what is actually left before iOS
 > launch?").** Pointers only — the detail stays in the numbered tasks, so nothing
@@ -1187,6 +1205,38 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-03 — the push-to-build shortcut took the iPhone app down, and is now
+  fail-closed.** Owner report: "the app isn't loading." Cause, not guesswork: the
+  rules lock deployed at **10:13:38Z** (run `30804720363`), then two TestFlight
+  builds went out at **10:15** and **10:17** — runs #266/#267 → **builds 1266 and
+  1267** — both `push` events on `trigger/testflight`. A push event carries no
+  `inputs`, so `ios-testflight.yml`'s `inputs.require_auth == true && 'true' || ''`
+  baked the gate **OFF**. The failure chain: `AuthProvider` skips the sign-in path
+  entirely when `!REQUIRE_AUTH && native`, falls to the legacy
+  `getDocs(query(collection(db,'users'), limit(1)))` — the exact unbounded list
+  `firestore.rules` denies **by name** — the error was swallowed by a bare
+  `catch`, and `gated` was `false` so no sign-in screen rendered either. Blank
+  app, no error, nothing in the logs. This is the **third** ungated build from
+  this shortcut (1264 was the first, recorded yesterday); documenting the trap
+  twice did not stop it, so it is now structural. **Three fixes:** (1) the gate
+  defaults **ON** for every trigger — the input is inverted to `legacy_no_auth`
+  (rollback only) and resolved once into a job-level `REQUIRE_AUTH_VALUE` so the
+  guard and the build can't disagree; note it is written `!= true && 'true' || ''`
+  and *not* `== true && '' || 'true'`, because these operators select a value and
+  a falsy left-hand result falls through — the empty string must stay on the `||`
+  side, which is the same class of bug as the original. (2) A **fail-closed guard
+  step** refuses to build an ungated bundle without an explicit `legacy_no_auth`
+  dispatch — an ungated build archives green and ships, so the only place to
+  catch it is before the build. (3) The legacy native path now **fails loudly**:
+  denied or empty lookup sets `restricted`, and the restricted screen renders
+  outside the gate (with a working "Try again" — `retryNonce` now drives the
+  legacy effect too). The legacy path was **kept, not deleted**, because §3's
+  documented rollback (revert the rules commit + both flags false) lands on it;
+  what was wrong was that it failed silently, not that it exists. **Builds
+  1266/1267 are not repairable from here** — the fix only makes the *next* build
+  correct. Owner: install 1265 or dispatch a fresh build (see the OWNER ACTION
+  box in §4). Verified: `npx tsc --noEmit` clean, `npm run build` green, workflow
+  YAML parses and the guard sits before the build step.
 - **2026-08-02 — 🔓→🔒 THE AUTH CUTOVER IS DONE. Machina is multi-user, and
   isolation is enforced by the database.** §4 task 2 — the only hard launch
   blocker — is closed. `REQUIRE_AUTH=true` backend-side (functions run
