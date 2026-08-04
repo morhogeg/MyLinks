@@ -243,7 +243,9 @@ The multi-user auth work described below **was** fully written but not live:
 > - **Until then:** install **1265**, the last good pre-break build.
 > - Confirm on device via Settings → the **Account row** is the discriminator
 >   for a gated build (a gated build opening straight to the cards is normal —
->   Firebase persists the WebView session across app updates).
+>   Firebase persists the WebView session across app updates). Every build from
+>   2026-08-04 on also ships **`/build-info.json`** (`requireAuth`, `buildNumber`,
+>   `commit`), so a build can be identified without guessing.
 
 > **LAUNCH GATE (compiled 2026-08-02, "what is actually left before iOS
 > launch?").** Pointers only — the detail stays in the numbered tasks, so nothing
@@ -1207,6 +1209,64 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-04 — closed the two gaps the fail-closed fix left open.** Owner
+  asked "is the app still safe, and how do we stop this recurring?" Answer to
+  the first: yes — 1266/1267 were **dead, not leaky**. The locked rules denied an
+  unauthenticated client, which is the security working; isolation is enforced by
+  the database, so a misconfigured client sees nothing rather than someone else's
+  data. Availability failure, not a security failure. The 2026-08-03 client diff
+  also weakened nothing (sign-in condition byte-identical; `restricted` now
+  *blocks* rendering where children previously rendered). **Two real gaps
+  remained, now closed:**
+  **(1) The guard checked the INPUT, not the artifact.** It verified
+  `REQUIRE_AUTH_VALUE` before the build but proved nothing about the bundle — a
+  renamed env var, a changed `=== 'true'` in `lib/api.ts`, or Next not inlining
+  would pass the guard and still ship a dead app. New
+  `web/app/build-info.json/route.ts` imports `REQUIRE_AUTH` **from `@/lib/api`**
+  — the same binding the app gates on, through the same bundler inlining — and
+  emits `/build-info.json` (requireAuth + buildNumber + commit). A new workflow
+  step reads the copy `cap sync` put in the **iOS target** (the file that ships
+  in the IPA) and fails the build if `requireAuth` isn't true. Verified in BOTH
+  directions locally: a gated build emits `true`, and a reproduction of
+  yesterday's ungated build emits `false` and would fail the step. The manifest
+  also ships to the device, so "what does this build think?" is answerable from
+  a running app.
+  **(2) A broken client couldn't report that it was broken.** `errorReporter`
+  writes to `users/{uid}/client_errors`, gated behind `owns(uid)` — so exactly
+  when workspace resolution fails there is no uid, the buffer waits for a flush
+  that never comes, and NOTHING is reported. That is why the outage was
+  invisible for a day with a human as the only detector. New
+  `client_error_http` (`/api/client-error`, rewrites in `firebase.json` +
+  `web/vercel.json`) accepts reports **with or without** an identity;
+  `reportViaHttp()` switches the reporter to it the moment AuthProvider sets
+  `restricted`, draining the buffer. Because it accepts unauthenticated writes
+  it is bounded on every axis: per-IP rate limit `client-error` (30/hr,
+  **fail-closed**), 16KB pre-parse body cap → 413, server-side truncation of
+  every field, identity taken from the verified token and **never** the body,
+  and records land in `client_error_reports` — Admin-SDK-only, denied to clients
+  in both rulesets (so the endpoint's limits can't be bypassed by writing to
+  Firestore directly) and TTL'd at 14 days like `server_errors`.
+  **Verified:** 566 backend tests pass (13 new in
+  `tests/test_client_error_report.py` covering the caps, the byte-cap/truncation
+  ordering, token-not-body identity, per-IP fail-closed bucketing, and that a
+  Firestore failure never fails an already-degraded caller); `tsc --noEmit`
+  clean; `npm run build` green; lint problem count **identical to baseline**
+  (13/5 errors/8 warnings — measured by stashing the changes, so zero
+  introduced). `firestore.rules.locked` was re-synced with `firestore.rules`
+  (bodies now identical; its header still said "STAGED, NOT LIVE" from before
+  the promotion — corrected). **Could NOT verify locally:** the rules emulator
+  JAR download is blocked by the sandbox proxy, so the rules suite did not run
+  here — `rules-tests.yml` and `deploy-rules.yml`'s own test gate run it in CI
+  before any deploy, and the rules change is purely additive (Firestore
+  default-denies unmatched paths, so the new block can only document the
+  default, never loosen it).
+  **Still open, deliberately:** App Check remains unenforced (task 5 — enforcing
+  it today takes native down: browser-only reCAPTCHA, no App Attest plugin).
+  And nothing yet checks that a rules tightening is compatible with the build
+  currently on phones — `deploy-rules.yml` probes anonymously for 403 but never
+  asks "does the live TestFlight build still work?". That is the ordering hazard
+  that caused this incident; it is less likely now that builds default to gated,
+  but it is not guarded.
 - **2026-08-04 — SHIPPED the fail-closed fix.** Merge `c8ef0bf` to `main` →
   Vercel redeployed the desktop web, and `main:trigger/testflight` cut **run
   #268 → TestFlight build 1268**, the first build off the fixed workflow and the

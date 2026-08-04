@@ -30,7 +30,8 @@
 
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebase';
-import { isNativeApp } from './api';
+import { isNativeApp, apiUrl, fetchWithTimeout, REQUIRE_AUTH } from './api';
+import { authHeaders } from './auth';
 import { getAnalyticsUid } from './analytics';
 
 const MAX_REPORTS_PER_SESSION = 20;
@@ -43,6 +44,10 @@ const MAX_BUFFERED_REPORTS = 20;
 
 let reportCount = 0;
 let installed = false;
+// Set once the workspace is known to be unresolvable: from then on reports go
+// to /api/client-error instead of Firestore (which would deny the write).
+let httpFallback = false;
+let httpReason = '';
 const seenMessages = new Set<string>();
 const buffered: { error: unknown; source: string }[] = [];
 
@@ -70,7 +75,10 @@ export function reportError(error: unknown, source: string): void {
     try {
         const uid = getAnalyticsUid();
         if (!uid) {
-            if (buffered.length < MAX_BUFFERED_REPORTS) buffered.push({ error, source });
+            // Once we know the workspace will never resolve, buffering is just
+            // a slower way of losing the report — send it over HTTP instead.
+            if (httpFallback) postReport(error, source);
+            else if (buffered.length < MAX_BUFFERED_REPORTS) buffered.push({ error, source });
             return;
         }
         writeReport(uid, error, source);
@@ -89,39 +97,105 @@ export function flushBufferedReports(): void {
     for (const r of pending) reportError(r.error, r.source);
 }
 
+/**
+ * Give up on the Firestore path and send everything over HTTP instead.
+ *
+ * Called by AuthProvider the moment it concludes a workspace can't be resolved
+ * (the `restricted` state). Until now that conclusion was terminal for
+ * reporting: no uid means no `users/{uid}/client_errors` write — the locked
+ * rules deny it — so the buffer above waited for a flush that would never come.
+ * A dead build therefore reported NOTHING, which is why ungated builds
+ * 1266/1267 were invisible until a human noticed the app was blank.
+ *
+ * `/api/client-error` takes reports with or without a signed-in identity, so
+ * "I could not get a workspace" finally reaches us. `reason` records what led
+ * here. Idempotent: the first call drains the buffer, later ones are no-ops.
+ */
+export function reportViaHttp(reason: string): void {
+    if (httpFallback) return;
+    httpFallback = true;
+    httpReason = reason;
+    const pending = buffered.splice(0, buffered.length);
+    for (const r of pending) postReport(r.error, r.source);
+}
+
+/**
+ * Build the common record, applying the session cap and de-duplication.
+ * Returns null when this report should be dropped — so BOTH sinks (Firestore
+ * and HTTP) share one budget and a fallback can't re-spend the caps.
+ */
+function buildRecord(error: unknown, source: string): Record<string, unknown> | null {
+    if (reportCount >= MAX_REPORTS_PER_SESSION) return null;
+
+    const err = error as { message?: unknown; stack?: unknown } | undefined;
+    const rawMessage =
+        (typeof err?.message === 'string' && err.message) ||
+        (typeof error === 'string' ? error : '') ||
+        'Unknown error';
+    const message = truncate(rawMessage, MAX_MESSAGE_LEN);
+
+    // De-dupe identical messages within the session (a render loop throws
+    // the same error repeatedly).
+    const dedupeKey = `${source}:${message}`;
+    if (seenMessages.has(dedupeKey)) return null;
+    seenMessages.add(dedupeKey);
+    reportCount += 1;
+
+    const stack = typeof err?.stack === 'string' ? truncate(err.stack, MAX_STACK_LEN) : null;
+    // Path + search only — no hash, which can carry app state. On native the
+    // origin is capacitor://localhost, which is fine to record.
+    const url = typeof window !== 'undefined'
+        ? truncate(window.location.pathname + window.location.search, 300)
+        : '';
+
+    return { message, stack, url, source, platform: platform(), ts: Date.now() };
+}
+
+/**
+ * Send one report to `/api/client-error` — the sink for clients that have no
+ * workspace to write to. Carries a Bearer token when one exists (signed in but
+ * unresolvable workspace, the common case) and goes anonymous when it doesn't.
+ * Swallows every failure, including its own.
+ */
+function postReport(error: unknown, source: string): void {
+    try {
+        const record = buildRecord(error, source);
+        if (!record) return;
+
+        void (async () => {
+            let headers: Record<string, string> = { 'Content-Type': 'application/json' };
+            try {
+                headers = { ...headers, ...(await authHeaders()) };
+            } catch {
+                // No token available — an anonymous report is still worth having.
+            }
+            await fetchWithTimeout(apiUrl('/api/client-error'), {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                    ...record,
+                    // Which bundle is this? The whole point of the fallback is
+                    // diagnosing builds that can't talk to the database.
+                    buildNumber: process.env.NEXT_PUBLIC_BUILD_NUMBER || '',
+                    commit: process.env.NEXT_PUBLIC_COMMIT_SHA || '',
+                    requireAuth: REQUIRE_AUTH,
+                    reason: httpReason,
+                }),
+            }, 10_000);
+        })().catch(() => { /* never re-report our own report */ });
+    } catch {
+        // Reporting must never throw.
+    }
+}
+
 /** Actually write one record for a known uid. Swallows every failure. */
 function writeReport(uid: string, error: unknown, source: string): void {
     try {
-        if (reportCount >= MAX_REPORTS_PER_SESSION) return;
-
-        const err = error as { message?: unknown; stack?: unknown } | undefined;
-        const rawMessage =
-            (typeof err?.message === 'string' && err.message) ||
-            (typeof error === 'string' ? error : '') ||
-            'Unknown error';
-        const message = truncate(rawMessage, MAX_MESSAGE_LEN);
-
-        // De-dupe identical messages within the session (a render loop throws
-        // the same error repeatedly).
-        const dedupeKey = `${source}:${message}`;
-        if (seenMessages.has(dedupeKey)) return;
-        seenMessages.add(dedupeKey);
-        reportCount += 1;
-
-        const stack = typeof err?.stack === 'string' ? truncate(err.stack, MAX_STACK_LEN) : null;
-        // Path + search only — no hash, which can carry app state. On native the
-        // origin is capacitor://localhost, which is fine to record.
-        const url = typeof window !== 'undefined'
-            ? truncate(window.location.pathname + window.location.search, 300)
-            : '';
+        const record = buildRecord(error, source);
+        if (!record) return;
 
         void addDoc(collection(db, 'users', uid, 'client_errors'), {
-            message,
-            stack,
-            url,
-            source,
-            platform: platform(),
-            ts: Date.now(),
+            ...record,
             createdAt: serverTimestamp(),
         }).catch(() => { /* fire-and-forget — never re-report our own write */ });
     } catch {
