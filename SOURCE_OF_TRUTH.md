@@ -226,7 +226,17 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (2026-08-04): install build **1269** (supersedes 1268)
+> ## 🚨 OWNER ACTION (2026-08-04): install build **1270** (supersedes 1269)
+>
+> **1270** (run #270, sha `5441f16`) is the current build — gated, and the first
+> carrying the four device-QA UI fixes (read empty-state copy, add-to-collection
+> sheet inset, no dead "Show image" in list view, star on review-deck cards; see
+> the newest §9 entry). 1269 stays the fallback. The box below is kept for the
+> 1266/1267 history, which still matters.
+>
+> ---
+>
+> ## 🚨 (superseded) OWNER ACTION (2026-08-04): install build **1269**
 >
 > TestFlight builds **1266 and 1267 are ungated and dead** — pushed via
 > `git push -f origin main:trigger/testflight` two and four minutes *after* the
@@ -1253,7 +1263,10 @@ exact-match, capped.
   swipe-left overwrites the star (swipe right/up preserve it). Archiving is the
   stronger verdict and wins on purpose; the alternative was inventing a second
   field for a rare combination. **Verified:** `npx tsc --noEmit` clean, `npm run
-  build` green. Note for fresh containers: the build prerenders `/_not-found`
+  build` green. **Shipped:** merge `5441f16` to `main` → Vercel redeployed the
+  desktop web, and `main:trigger/testflight` cut run **#270 → TestFlight build
+  1270** (gated by default since the 2026-08-03 fix; supersedes 1269 as the build
+  to install). Note for fresh containers: the build prerenders `/_not-found`
   through `lib/firebase.ts`, so with no `.env.local` it dies on
   `auth/invalid-api-key` — that is a missing-env artifact, not a code failure
   (re-run with dummy `NEXT_PUBLIC_FIREBASE_*` values to get a real signal). No
