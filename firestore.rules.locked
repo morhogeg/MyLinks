@@ -126,12 +126,24 @@ service cloud.firestore {
     // read a public share doc). Rules can't hide a field, so the owner mapping
     // lives in `shared_owners` (denied to clients, below) and clients can't write
     // these docs to sneak `ownerUid` back in.
+    // GET, not READ — the difference is the whole point. `read` covers get AND
+    // list, so `allow read: if true` let anyone holding the (public) project id
+    // enumerate EVERY share doc every user has ever published, without holding a
+    // single one of those links. A share link only ever fetches one doc by id.
+    //
+    // Nothing client-side reads these at all: /s and /c are served by the
+    // `share_page` Cloud Function via Hosting rewrites (Admin SDK, bypasses
+    // rules) — there is no /s or /c route in the Next app, and web/lib/share.ts
+    // does no Firestore reads. `get` stays open only so a future client-rendered
+    // share page keeps working; `list` has no consumer and never did.
     match /shared_collections/{shareId} {
-      allow read: if true;
+      allow get: if true;
+      allow list: if false;
       allow write: if false;
     }
     match /shared_cards/{shareId} {
-      allow read: if true;
+      allow get: if true;
+      allow list: if false;
       allow write: if false;
     }
     // shared_owners: functions-only shareId → ownerUid map. Never client-readable
