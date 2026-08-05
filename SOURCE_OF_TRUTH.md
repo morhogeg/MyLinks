@@ -226,13 +226,17 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (2026-08-04): install build **1270** (supersedes 1269)
+> ## 🚨 OWNER ACTION (2026-08-05): install build **1272** (supersedes 1270/1271)
 >
-> **1270** (run #270, sha `5441f16`) is the current build — gated, and the first
-> carrying the four device-QA UI fixes (read empty-state copy, add-to-collection
-> sheet inset, no dead "Show image" in list view, star on review-deck cards; see
-> the newest §9 entry). 1269 stays the fallback. The box below is kept for the
-> 1266/1267 history, which still matters.
+> **1272** (run #272, sha `18175cd`) is the current build — gated, and the first
+> carrying the 2026-08-05 device-QA round: the favourite star (no chip when open,
+> a marker on starred grid cards), the toast that now names the ACTION rather
+> than the destination status, and the Settings row that shows the email instead
+> of truncating it. 1270 stays the fallback. The category fix from the same round
+> is BACKEND-only (functions run #73) — it is already live and needs no build,
+> but it only affects newly analysed cards; existing ones keep their category
+> until edited. The box below is kept for the 1266/1267 history, which still
+> matters.
 >
 > ---
 >
@@ -1229,6 +1233,15 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-05 (ship) — round 2 is LIVE.** Merge `18175cd`. Deploy Cloud
+  Functions **#73** green (`analyze_link`, `analyze_image`, `ask_brain`,
+  `share_ingest`, `process_link_background` — scoped via the `Deploy-Functions:`
+  merge line, and the two `get_user_vocabulary` callers verified by AST before
+  pushing rather than by eye). Python tests **#87** green. iOS → TestFlight
+  **#272 → build 1272**, both gate checks passing (input guard + the artifact
+  check on the shipped bundle). Vercel redeployed off the same push. **The
+  category work needs no app update** — it is backend-only and already affects
+  new saves; the toast and Settings fixes need 1272.
 - **2026-08-05 (device QA, round 2) — a toast that named the wrong action, a
   category prompt with no menu for everyday life, and truncation eating the
   email.** Three owner items.
