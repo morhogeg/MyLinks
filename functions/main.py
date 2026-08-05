@@ -47,6 +47,7 @@ from models import LinkStatus, ReminderStatus
 from ai_service import GeminiService, AnalysisError
 from link_service import (
     save_link_to_firestore, get_user_tags, get_user_vocabulary, is_hebrew,
+    canonical_category, run_category_migration,
     ensure_ingest_token, find_user_by_ingest_token, link_exists_for_url,
     pending_exists_for_url, find_data_uid_by_auth_uid, delete_user_data,
     create_workspace,
@@ -1131,7 +1132,10 @@ def _build_link_data(*, url, title, summary, detailed_summary, source_type,
         "summary": summary,
         "detailedSummary": detailed_summary,
         "tags": analysis.get("tags", []),
-        "category": analysis.get("category", "General"),
+        # Canonicalised here because this is the ONE place analysis becomes a
+        # stored card — so no model answer can reintroduce a case-variant of a
+        # category that already exists (link_service.canonical_category).
+        "category": canonical_category(analysis.get("category", "")) or "General",
         "status": LinkStatus.UNREAD.value,
         "createdAt": int(datetime.now(timezone.utc).timestamp() * 1000),
         "language": analysis.get("language", "en"),
@@ -3739,8 +3743,35 @@ def run_processing_janitor() -> dict:
 
 @scheduler_fn.on_schedule(schedule="every 5 minutes", max_instances=1)
 def sweep_stuck_processing(event: scheduler_fn.ScheduledEvent) -> None:
-    """Every 5 min: age out captures stuck in `processing` (see run_processing_janitor)."""
+    """Every 5 min: age out captures stuck in `processing` (see run_processing_janitor).
+
+    Also carries the one-shot category-case backfill. It rides an existing tick
+    rather than getting its own schedule because it runs once and then costs a
+    single marker read forever after; a dedicated job would be permanent
+    infrastructure for a one-time fix. It never raises, so the janitor's real
+    work is unaffected either way.
+    """
     run_processing_janitor()
+    run_category_migration()
+
+
+@https_fn.on_request(max_instances=1)
+def force_category_migration(req: https_fn.Request) -> https_fn.Response:
+    """Manual trigger for the category-case backfill (admin-gated).
+
+    The scheduled tick runs it within ~5 minutes of deploy, so this exists for
+    the two cases that need a human: verifying the result immediately, and
+    re-running after the marker doc has been cleared by hand.
+    """
+    guard = _require_admin(req)
+    if guard:
+        return guard
+    try:
+        report = run_category_migration()
+        return https_fn.Response(json.dumps(report, indent=2), status=200, mimetype="application/json")
+    except Exception as e:
+        logger.error(f"Manual category migration failed: {e}")
+        return https_fn.Response(f"Error: {e}", status=500)
 
 
 @https_fn.on_request(max_instances=1)

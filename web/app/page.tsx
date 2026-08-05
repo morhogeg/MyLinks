@@ -8,7 +8,8 @@ import AnalyzingBanner, { AnalyzingState } from "@/components/AnalyzingBanner";
 import SettingsModal from "@/components/SettingsModal";
 import ScrollToTop from "@/components/ScrollToTop";
 import OnboardingTour, { ONBOARDING_STORAGE_KEY } from "@/components/OnboardingTour";
-import { Settings, Search, Globe, SlidersHorizontal } from "lucide-react";
+import { Settings, Search, Globe } from "lucide-react";
+import DisplayGlyph from "@/components/feed/DisplayGlyph";
 import ThemeToggle from "@/components/ThemeToggle";
 import { CitationGlyph, Wordmark } from "@/components/ui/Wordmark";
 import { IconButton } from "@/components/ui/Button";
@@ -140,6 +141,10 @@ export default function Home() {
   // captureSignal to pop AddLinkForm open. `feedTab` mirrors Feed's active
   // bottom tab so the glyphs only show on Home, where they apply.
   const [headerCommand, setHeaderCommand] = useState<{ action: 'search' | 'sources' | 'display'; nonce: number } | null>(null);
+  // How many filters the feed currently has on. Drives the header glyph's
+  // active state — Feed owns the filter state, so it reports the count up the
+  // same way it reports onHasCardsChange.
+  const [activeFilterCount, setActiveFilterCount] = useState(0);
   const [captureSignal, setCaptureSignal] = useState(0);
   const [feedTab, setFeedTab] = useState<'home' | 'collections' | 'ask' | 'digest'>('home');
   const sendHeaderCommand = (action: 'search' | 'sources' | 'display') =>
@@ -288,14 +293,10 @@ export default function Home() {
                 >
                   <Globe className="w-[19px] h-[19px]" />
                 </button>
-                <button
-                  data-tour="views"
+                <DisplayGlyph
+                  activeFilterCount={activeFilterCount}
                   onClick={() => sendHeaderCommand('display')}
-                  aria-label="View, sort, and filter options"
-                  className="h-10 w-10 flex items-center justify-center text-text-secondary hover:text-text active:text-text transition-colors"
-                >
-                  <SlidersHorizontal className="w-[19px] h-[19px]" />
-                </button>
+                />
               </div>
             )}
             {/* Theme toggle is desktop-only — on mobile/iOS it lives in Settings,
@@ -323,7 +324,7 @@ export default function Home() {
         {/* The feed is already live via onSnapshot, so a new save streams in on
             its own — no remount needed. (Previously keyed on refreshKey, which
             tore down listeners and wiped view/filter/search on every add.) */}
-        <Feed onAskModeChange={setIsAskMode} onHideAddButton={setHideAddButton} onProcessingChange={setProcessing} onFeedLoadedChange={setFeedLoaded} onReadyCaptureChange={setReadyCaptureAt} onOpenDigestSettings={() => { setSettingsSection('digest'); setIsSettingsOpen(true); }} onHasCardsChange={setHasCards} libraryFacet={libraryFacet} onLibraryFacetApplied={() => setLibraryFacet(null)} onBackToInsights={() => { setSettingsSection('stats'); setIsSettingsOpen(true); }} headerCommand={headerCommand} onCapture={() => setCaptureSignal((n) => n + 1)} onTabChange={setFeedTab} onFullBleedChange={setIsFullBleed} suppressProcessingId={dialogCardId} />
+        <Feed onAskModeChange={setIsAskMode} onHideAddButton={setHideAddButton} onProcessingChange={setProcessing} onFeedLoadedChange={setFeedLoaded} onReadyCaptureChange={setReadyCaptureAt} onOpenDigestSettings={() => { setSettingsSection('digest'); setIsSettingsOpen(true); }} onHasCardsChange={setHasCards} onActiveFilterCountChange={setActiveFilterCount} libraryFacet={libraryFacet} onLibraryFacetApplied={() => setLibraryFacet(null)} onBackToInsights={() => { setSettingsSection('stats'); setIsSettingsOpen(true); }} headerCommand={headerCommand} onCapture={() => setCaptureSignal((n) => n + 1)} onTabChange={setFeedTab} onFullBleedChange={setIsFullBleed} suppressProcessingId={dialogCardId} />
       </main>
 
       {/* Add Link FAB — hidden in Ask & Collections (neither view captures links). */}

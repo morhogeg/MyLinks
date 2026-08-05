@@ -4,6 +4,7 @@ import { authHeaders } from './auth';
 import { apiUrl, fetchWithTimeout } from './api';
 
 import { AnalyzeResponse, Link, LinkMetadata, LinkStatus, User, UserNote } from './types';
+import { canonicalCategory } from './category';
 
 /**
  * Normalize a Firestore link doc into a safe `Link`.
@@ -308,7 +309,7 @@ export async function enrichNoteCard(uid: string, cardId: string, text: string):
         // power filtering.
         const patch: Record<string, unknown> = {};
         if (Array.isArray(l.tags) && l.tags.length) patch.tags = l.tags;
-        if (l.category) patch.category = l.category;
+        if (l.category) patch.category = canonicalCategory(l.category) || 'General';
         if (Array.isArray(l.concepts) && l.concepts.length) patch.concepts = l.concepts;
         if (Array.isArray(l.relatedLinks) && l.relatedLinks.length) patch.relatedLinks = l.relatedLinks;
         if (Object.keys(patch).length) {
@@ -372,7 +373,7 @@ export async function retryFailedLink(uid: string, link: Link): Promise<void> {
             summary: l.summary,
             detailedSummary: l.detailedSummary ?? null,
             tags: l.tags ?? [],
-            category: l.category ?? 'General',
+            category: canonicalCategory(l.category ?? '') || 'General',
             language: l.language ?? 'en',
             metadata: {
                 originalTitle: l.metadata?.originalTitle ?? '',
@@ -453,7 +454,10 @@ export async function updateLinkTags(uid: string, id: string, tags: string[]): P
  */
 export async function updateLinkCategory(uid: string, id: string, category: string): Promise<void> {
     const linkRef = doc(db, 'users', uid, 'links', id);
-    await updateDoc(linkRef, { category });
+    // Canonicalised on the way in, so typing "sports" into the category editor
+    // joins the existing "Sports" instead of forking a second one that differs
+    // only by case. Matches the backend's canonical_category exactly.
+    await updateDoc(linkRef, { category: canonicalCategory(category) || 'General' });
 }
 
 /**
