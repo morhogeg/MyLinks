@@ -269,7 +269,12 @@ Requirements for the analysis:
    - **CRITICAL**: The sourceName MUST ALWAYS be in English or its original brand name.
    - **NEVER use "Machina" or any name of this assistant/app as the sourceName** — you are the analyzer, not the publisher. If the publisher cannot be determined from the content, use the site's domain name (e.g. "nytimes.com"). Never invent a publisher.
 
-6. category: Assign exactly one high-level category (e.g., Tech, Health, Philosophy, Business, Research, Science, Finance, Productivity, Design, Career). If the content is a recipe, use "Recipe".
+6. category: Assign exactly one high-level category naming the content's PRIMARY SUBJECT.
+   - **REUSE FIRST**: If an "Existing Categories" list is provided and one of its entries genuinely fits, use it EXACTLY as written. A new category is for content that truly has no home yet — not a synonym or a near-miss of one that already exists (never "Finances" when "Finance" exists, never "Parenting" when "Family" does).
+   - **CHOOSE BY SUBJECT, NOT BY ANGLE.** Categorise what the content is ABOUT, not an incidental frame it happens to use. Money, statistics, or a company being mentioned does not make something Business or Finance. Ask: if this card sat in a folder, what would the folder be called? An article on what it costs a household to raise children is about family life and the economy of ordinary people — Society or Family, NOT Business.
+   - **Business/Finance are narrow**: Business is commerce, companies, industry and markets; Finance is investing, banking and personal money management. Neither is a catch-all for "mentions costs".
+   - Draw from the full range of human interests, not just professional ones — e.g. Tech, Science, Health, Society, Politics, Family, Culture, History, Philosophy, Psychology, Education, Travel, Food, Sports, Design, Career, Business, Finance, Productivity. This list is illustrative, not exhaustive: prefer an accurate category outside it over a poor fit inside it.
+   - If the content is a recipe, use "Recipe".
    - **CRITICAL**: The category MUST ALWAYS be in English, even if the content is in another language.
 
 7. tags: Provide 3 to 5 specific, relevant tags for organization (aim for 3-4; use 5 only when genuinely warranted).
@@ -840,8 +845,24 @@ class GeminiService:
             if isinstance(t, str) and bool(has_hebrew(t)) == content_hebrew
         ]
 
+    @staticmethod
+    def _categories_context(existing_categories: list) -> str:
+        """The "reuse these categories" half of the prompt (see SYSTEM_PROMPT rule 6).
+
+        Tags have had this since the beginning; categories never did, which is why
+        they drifted — every card picked one from scratch with no idea what the
+        workspace already used. Unlike tags there is no language filter: the
+        category is always English by prompt rule, whatever the content's language.
+        """
+        if not existing_categories:
+            return ""
+        return (
+            "\n\nExisting Categories in Brain (REUSE one of these verbatim when it "
+            f"genuinely fits; only create a new one when none does):\n{', '.join(existing_categories)}"
+        )
+
     def analyze_text(self, text: str, existing_tags: list = None, content_type: str = None,
-                     attempts: int = _MAX_GENERATE_ATTEMPTS) -> dict:
+                     attempts: int = _MAX_GENERATE_ATTEMPTS, existing_categories: list = None) -> dict:
         """Analyze text content using Gemini. Raises AnalysisError on failure.
 
         content_type is accepted for caller compatibility; video content is
@@ -855,15 +876,17 @@ class GeminiService:
             f"\n\nExisting Tags in Brain (Reuse ONLY those in the content's language):\n{', '.join(existing_tags)}"
             if existing_tags else ""
         )
+        cats_context = self._categories_context(existing_categories)
 
-        prompt = f"{SYSTEM_PROMPT}{tags_context}\n\nContent to analyze:\n{clean_text}"
+        prompt = f"{SYSTEM_PROMPT}{tags_context}{cats_context}\n\nContent to analyze:\n{clean_text}"
         return self._enforce_tag_language(
             self._generate_json([prompt], "text analysis", attempts=attempts))
 
     def analyze_text_with_images(self, text: str, images: list, existing_tags: list = None,
                                  content_type: str = None, image_is_primary: bool = False,
                                  image_text_dense: bool = False,
-                                 attempts: int = _MAX_GENERATE_ATTEMPTS) -> dict:
+                                 attempts: int = _MAX_GENERATE_ATTEMPTS,
+                                 existing_categories: list = None) -> dict:
         """Analyze text PLUS the images embedded in it in a SINGLE multimodal Gemini
         call, so the resulting card reflects what the images show — not just the
         surrounding words.
@@ -903,6 +926,7 @@ class GeminiService:
             f"\n\nExisting Tags in Brain (Reuse ONLY those in the content's language):\n{', '.join(existing_tags)}"
             if existing_tags else ""
         )
+        cats_context = self._categories_context(existing_categories)
 
         if image_is_primary:
             image_guidance = f"""The content below is an IMAGE-FIRST social post: {len(images)} image(s) from the
@@ -933,7 +957,7 @@ gap with a place, name, or date from your own knowledge."""
             media_resolution = ("MEDIA_RESOLUTION_MEDIUM" if image_text_dense
                                 else "MEDIA_RESOLUTION_LOW")
 
-        prompt = f"""{SYSTEM_PROMPT}{tags_context}
+        prompt = f"""{SYSTEM_PROMPT}{tags_context}{cats_context}
 
 {image_guidance}
 
@@ -951,7 +975,7 @@ Content to analyze:
         ))
 
     def analyze_youtube(self, watch_url: str, existing_tags: list = None,
-                        attempts: int = _MAX_GENERATE_ATTEMPTS) -> dict:
+                        attempts: int = _MAX_GENERATE_ATTEMPTS, existing_categories: list = None) -> dict:
         """Analyze an actual YouTube video via Gemini's native video ingestion.
 
         Google fetches and watches the video on its own infrastructure, so this
@@ -966,7 +990,8 @@ Content to analyze:
             f"\n\nExisting Tags in Brain (Reuse ONLY those in the content's language):\n{', '.join(existing_tags)}"
             if existing_tags else ""
         )
-        prompt = f"{VIDEO_ANALYSIS_PROMPT}{tags_context}"
+        cats_context = self._categories_context(existing_categories)
+        prompt = f"{VIDEO_ANALYSIS_PROMPT}{tags_context}{cats_context}"
 
         contents = [
             types.Part(file_data=types.FileData(file_uri=watch_url)),
@@ -982,7 +1007,7 @@ Content to analyze:
         ))
 
     def analyze_image(self, image_bytes: bytes, mime_type: str, existing_tags: list = None,
-                      attempts: int = _MAX_GENERATE_ATTEMPTS) -> dict:
+                      attempts: int = _MAX_GENERATE_ATTEMPTS, existing_categories: list = None) -> dict:
         """Analyze image content using Gemini vision. Raises AnalysisError on failure.
 
         `attempts` is threaded to _generate_json (synchronous callers pass 2)."""
@@ -990,8 +1015,9 @@ Content to analyze:
             f"\n\nExisting Tags in Brain (Reuse ONLY those in the content's language):\n{', '.join(existing_tags)}"
             if existing_tags else ""
         )
+        cats_context = self._categories_context(existing_categories)
 
-        prompt = f"""{SYSTEM_PROMPT}{tags_context}
+        prompt = f"""{SYSTEM_PROMPT}{tags_context}{cats_context}
 
 Based on the image provided, extract the text and analyze it according to the instructions above.
 If the image contains a tweet or social media post, extract the content as if it were the text.

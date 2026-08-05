@@ -1229,6 +1229,55 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-05 (device QA, round 2) — a toast that named the wrong action, a
+  category prompt with no menu for everyday life, and truncation eating the
+  email.** Three owner items.
+  **(1) "Marked as unread" on un-starring.** `useLinkActions` labelled the
+  DESTINATION status, and `unread` is where three different actions land —
+  un-favourite, un-archive, and an explicit mark-as-unread — so it could never
+  say which one happened. Predates the new star badge (the ⋯ sheet and list view
+  had it too); the badge just made it easy to hit. Fix: label the TRANSITION.
+  New shared `StatusChangeHandler` type carries `opts.from` (the status being
+  left), all four prop declarations use it, and the eight toggle-off call sites
+  pass it. Now: "Removed from favorites" / "Unarchived" / "Marked as unread".
+  **(2) A household-economics article filed under Business.** Two causes, both
+  fixed. The prompt's category list (`ai_service.py` rule 6) was almost entirely
+  professional — Tech, Business, Research, Finance, Productivity, Design, Career
+  — with nothing for society, family or everyday life, so an article on what it
+  costs to raise a child reached for the nearest money-shaped bucket. Rule 6 now
+  spans human interests, adds **CHOOSE BY SUBJECT, NOT BY ANGLE** (mentioning
+  money is not Business) and narrows what Business/Finance mean. Second, deeper:
+  the model was **never told which categories already exist** — tags always had
+  an "Existing Tags" reuse list, categories had nothing, so every card invented
+  one and they drifted. Now plumbed end to end: `get_user_vocabulary(uid)`
+  returns tags AND categories from ONE scan (deliberately one function — a
+  separate categories query would double the Firestore cost of every save),
+  same private-card exclusion and usage ranking as tags, capped at
+  `MAX_PROMPT_CATEGORIES=20`; `_sanitize_categories` bounds the client-supplied
+  twin; all four `analyze_*` methods take `existing_categories` and render a
+  reuse block. The web client sends `existingCategories` from a new
+  `getUserCategories`.
+  **(3) Settings account row.** It read `Signed in with Google · morhogeg@g…` —
+  a fixed-length, low-value prefix pushing the one identifying string off the
+  end, so truncation ate exactly the part worth reading. Reversed to
+  `morhogeg@gmail.com · Google`; `providerName` (bare) is now the source of
+  truth and `providerLabel` (the sentence, still used on the Account screen) is
+  derived from it, so they can't disagree.
+  **Verified:** 586 backend tests (**+20 new** — `test_category_vocabulary.py`
+  covers the one-scan builder, usage ranking, the private-only exclusion, caps
+  and trimming, plus the prompt contract; `test_sanitizers.py` gains the
+  `_sanitize_categories` twin). `tsc` clean; lint 13 problems, **identical to
+  baseline**. Settings row **render-verified** light AND dark at 390px across
+  five cases (owner's real pair, over-long email, Apple private relay,
+  provider-unknown, no email): the real pair now fits whole, provider-unknown
+  shows the email with no dangling separator, and the no-email fallback still
+  reads "Signed in". **Process note:** `test_processing_stage` failed first run
+  because it stubbed `get_user_tags`, which that path no longer calls — the test
+  correctly caught the change; stub updated to `get_user_vocabulary`. And the
+  render harness needs to be **SSR-only**: hydration does not complete in this
+  sandbox (the dev server's HMR websocket is blocked), so anything gated on
+  `useEffect` screenshots blank — a `?case=` param silently photographed case 0
+  five times before that was spotted.
 - **2026-08-05 (device QA) — the favourite star: no chip when open, and a
   marker on starred grid cards.** Two owner items from an iPhone screenshot.
   (1) **Open card**: the active star sat in a `bg-yellow-500/10` square that read

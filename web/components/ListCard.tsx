@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useRef, useState } from 'react';
-import { Link, LinkStatus } from '@/lib/types';
+import { Link, StatusChangeHandler } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { getDirection } from '@/lib/rtl';
 import { getPlatform, platformIcon, platformColor, PLATFORM_LABELS, xHandle, prettyHost } from '@/lib/platform';
@@ -13,7 +13,7 @@ import CardActionSheet from './CardActionSheet';
 interface ListCardProps {
     link: Link;
     onOpenDetails: (link: Link) => void;
-    onStatusChange: (id: string, status: LinkStatus) => void;
+    onStatusChange: StatusChangeHandler;
     /** Remove the link (routed through the parent's branded confirm dialog). */
     onDelete?: (id: string) => void;
     isSelectionMode?: boolean;
@@ -138,7 +138,7 @@ function ListCard({
         if (axis.current === 'h' && Math.abs(o) >= TRIGGER) {
             if (o > 0) {
                 hapticLight(); // swipe-right-to-favorite: positive, non-destructive — a crisp light tap
-                onStatusChange(link.id, isFavorite ? 'unread' : 'favorite');
+                onStatusChange(link.id, isFavorite ? 'unread' : 'favorite', { from: link.status });
             } else {
                 hapticMedium(); // swipe-left-to-delete: a firmer tap acknowledges the destructive intent (parent confirms)
                 onDelete?.(link.id);
@@ -305,7 +305,7 @@ function ListCard({
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
-                                onStatusChange(link.id, 'unread');
+                                onStatusChange(link.id, 'unread', { from: 'favorite' });
                             }}
                             aria-label="Remove from favorites"
                             className="shrink-0 w-9 h-11 flex items-center justify-center rounded-lg text-yellow-500 transition-colors"

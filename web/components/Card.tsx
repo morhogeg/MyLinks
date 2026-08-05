@@ -2,7 +2,7 @@
 // Refreshed colors
 
 
-import { Link, LinkStatus } from '@/lib/types';
+import { Link, StatusChangeHandler } from '@/lib/types';
 import { Archive, Star, Clock, Trash2, Bell, Pencil, Circle, Check, MoreHorizontal, ExternalLink, Layers, Share2, RotateCcw, AlertTriangle, StickyNote, Lock, ImageOff, Image as ImageIcon } from 'lucide-react';
 import { useState, memo } from 'react';
 import SourceByline from './SourceByline';
@@ -21,7 +21,7 @@ import { getNotes } from '@/lib/notes';
 interface CardProps {
     link: Link;
     onOpenDetails: (link: Link) => void;
-    onStatusChange: (id: string, status: LinkStatus) => void;
+    onStatusChange: StatusChangeHandler;
     onReadStatusChange: (id: string, isRead: boolean) => void;
     onUpdateCategory: (id: string, category: string) => void;
     allCategories: string[];
@@ -324,7 +324,7 @@ function Card({
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
-                            onStatusChange(link.id, link.status === 'favorite' ? 'unread' : 'favorite');
+                            onStatusChange(link.id, link.status === 'favorite' ? 'unread' : 'favorite', { from: link.status });
                         }}
                         title={link.status === 'favorite' ? 'Remove from favorites' : 'Add to favorites'}
                         className={`p-1.5 rounded-full transition-all flex items-center justify-center ${link.status === 'favorite' ? 'text-yellow-500 bg-yellow-500/10' : 'text-text-muted hover:text-accent'
@@ -335,7 +335,7 @@ function Card({
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
-                            onStatusChange(link.id, link.status === 'archived' ? 'unread' : 'archived');
+                            onStatusChange(link.id, link.status === 'archived' ? 'unread' : 'archived', { from: link.status });
                         }}
                         title={link.status === 'archived' ? 'Unarchive' : 'Archive'}
                         className="p-1.5 rounded-full text-text-muted hover:text-accent transition-all flex items-center justify-center"
@@ -496,7 +496,7 @@ function Card({
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    onStatusChange(link.id, 'unread');
+                                    onStatusChange(link.id, 'unread', { from: 'favorite' });
                                 }}
                                 aria-label="Remove from favorites"
                                 title="Remove from favorites"

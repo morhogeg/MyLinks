@@ -12,6 +12,24 @@ export type LinkStatus = 'unread' | 'archived' | 'favorite';
 // in-flight; the feed renders them as skeleton / retry cards.
 export type CaptureState = LinkStatus | 'processing' | 'failed';
 
+/**
+ * Card status-change handler, shared by every surface that can change one
+ * (Card, ListCard, CardActionSheet, LinkDetailModal).
+ *
+ * `from` is the status the card is LEAVING. Pass it whenever you toggle a state
+ * off, because `unread` is the destination of three different actions —
+ * un-favourite, un-archive, and an explicit "mark as unread" — so the
+ * destination alone cannot say what the user did. Without it, un-starring a
+ * card toasted "Marked as unread". See lib/useLinkActions.
+ */
+export type StatusChangeHandler = (
+  id: string,
+  status: LinkStatus,
+  // `from` is CaptureState, not LinkStatus: callers pass `link.status`
+  // straight through, and an in-flight card can still be processing/failed.
+  opts?: { silent?: boolean; from?: CaptureState },
+) => void;
+
 export interface LinkMetadata {
   originalTitle: string;
   estimatedReadTime: number; // in minutes

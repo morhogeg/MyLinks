@@ -21,6 +21,12 @@ logger = logging.getLogger(__name__)
 # — the server-side builder (get_user_tags) went uncapped until 2026-07-27.
 MAX_PROMPT_TAGS = 50
 
+# Categories are a much smaller vocabulary than tags by design — one per card,
+# high-level, meant to be reused. A cap well below MAX_PROMPT_TAGS keeps the
+# reuse list short enough that the model treats it as a menu rather than as
+# noise; a long list of near-duplicates would defeat the point.
+MAX_PROMPT_CATEGORIES = 20
+
 # Defaults for a brand-new workspace. Mirrors DEFAULT_SETTINGS in
 # web/lib/useUserSettings.ts — keep the two in sync.
 DEFAULT_USER_SETTINGS = {
@@ -204,6 +210,57 @@ def get_user_tags(uid: str) -> list:
     # card's use of it simply not counted toward its rank.
     ranked = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
     return [tag for tag, _ in ranked[:MAX_PROMPT_TAGS]]
+
+
+def get_user_vocabulary(uid: str) -> tuple:
+    """The user's tag AND category vocabulary, from ONE pass over their cards.
+
+    Categories drifted because the analysis prompt had never been told which
+    ones already exist: tags got an "Existing Tags" list with a reuse rule,
+    categories got nothing, so every card invented one from scratch (owner,
+    2026-08-05 — a household-economics article landed in "Business").
+
+    Same privacy contract as `get_user_tags`, for the same reason: this list is
+    interpolated into every Gemini prompt, so categories that exist ONLY on
+    effectively-private cards are dropped. Ranked by usage, capped, ties broken
+    alphabetically. Returns `(tags, categories)`.
+
+    Deliberately one function rather than two: both come from the same full
+    collection read, and a separate `get_user_categories` would double the
+    Firestore cost of every save.
+    """
+    from search import is_effectively_private, private_collection_ids
+
+    db = get_db()
+    links_ref = db.collection('users').document(uid).collection('links')
+    docs = links_ref.get()
+
+    private_ids = private_collection_ids(uid)
+    tag_counts = {}
+    cat_counts = {}
+    for doc in docs:
+        data = doc.to_dict() or {}
+        if is_effectively_private(data, private_ids):
+            continue
+        link_tags = data.get('tags') or []
+        if isinstance(link_tags, list):
+            for tag in link_tags:
+                if isinstance(tag, str) and tag.strip():
+                    tag_counts[tag] = tag_counts.get(tag, 0) + 1
+        category = data.get('category')
+        if isinstance(category, str) and category.strip():
+            cat_counts[category.strip()] = cat_counts.get(category.strip(), 0) + 1
+
+    def _ranked(counts, cap):
+        return [k for k, _ in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:cap]]
+
+    return _ranked(tag_counts, MAX_PROMPT_TAGS), _ranked(cat_counts, MAX_PROMPT_CATEGORIES)
+
+
+def get_user_categories(uid: str) -> list:
+    """The user's category vocabulary alone. Prefer `get_user_vocabulary` when
+    the caller also needs tags — this re-scans the collection on its own."""
+    return get_user_vocabulary(uid)[1]
 
 
 def is_hebrew(text: str) -> bool:

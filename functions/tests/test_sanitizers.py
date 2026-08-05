@@ -16,12 +16,14 @@ from pathlib import Path
 import pytest
 
 _MAIN = Path(__file__).resolve().parent.parent / "main.py"
-_WANTED_FN = {"_sanitize_history", "_sanitize_tags", "_sanitize_hints"}
+_WANTED_FN = {"_sanitize_history", "_sanitize_tags", "_sanitize_hints", "_sanitize_categories"}
 _WANTED_CONST = {
     "MAX_HISTORY_ITEMS",
     "MAX_HISTORY_CONTENT_LENGTH",
     "MAX_TAGS",
     "MAX_TAG_LENGTH",
+    "MAX_CATEGORIES",
+    "MAX_CATEGORY_LENGTH",
     "MAX_HINT_TEXT_LENGTH",
     "MAX_HINT_TITLE_LENGTH",
     "MAX_HINT_TITLES",
@@ -52,6 +54,9 @@ MAX_HISTORY_CONTENT_LENGTH = _NS["MAX_HISTORY_CONTENT_LENGTH"]
 MAX_HINT_IDS = _NS["MAX_HINT_IDS"]
 MAX_TAGS = _NS["MAX_TAGS"]
 MAX_TAG_LENGTH = _NS["MAX_TAG_LENGTH"]
+_sanitize_categories = _NS["_sanitize_categories"]
+MAX_CATEGORIES = _NS["MAX_CATEGORIES"]
+MAX_CATEGORY_LENGTH = _NS["MAX_CATEGORY_LENGTH"]
 
 
 # ── _sanitize_history ─────────────────────────────────────────────────────
@@ -194,3 +199,37 @@ def test_hints_anchor_ids_caps():
     out = _sanitize_hints({"anchorIds": [f"id-{i}" for i in range(50)] + ["x" * 500]})
     assert len(out["anchorIds"]) == MAX_HINT_IDS
     assert all(len(s) <= 128 for s in out["anchorIds"])
+
+
+# ── _sanitize_categories ──────────────────────────────────────────────────
+#
+# The category twin of _sanitize_tags: client-supplied `existingCategories` is
+# concatenated into the Gemini prompt (SYSTEM_PROMPT rule 6, "reuse an existing
+# category"), so it gets the same count/length/type bounds.
+
+@pytest.mark.parametrize("bad", [None, "Business", 123, {"a": 1}])
+def test_categories_non_list_becomes_empty(bad):
+    assert _sanitize_categories(bad) == []
+
+
+def test_categories_pass_through_clean_values():
+    assert _sanitize_categories(["Society", "Tech"]) == ["Society", "Tech"]
+
+
+def test_categories_are_capped_by_count():
+    out = _sanitize_categories([f"c{i}" for i in range(MAX_CATEGORIES + 25)])
+    assert len(out) == MAX_CATEGORIES
+
+
+def test_categories_are_truncated_by_length():
+    out = _sanitize_categories(["x" * (MAX_CATEGORY_LENGTH + 50)])
+    assert out == ["x" * MAX_CATEGORY_LENGTH]
+
+
+def test_categories_drop_empties_and_whitespace_only():
+    assert _sanitize_categories(["Society", "", "   ", "Tech"]) == ["Society", "Tech"]
+
+
+def test_categories_coerce_non_strings():
+    """Mirrors _sanitize_tags: a stray non-string is coerced, not dropped."""
+    assert _sanitize_categories([123, "Tech"]) == ["123", "Tech"]

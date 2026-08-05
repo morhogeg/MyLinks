@@ -11,7 +11,7 @@ import {
 } from './primitives';
 
 export function MainView({
-    authUid, accountEmail, displayName, photoURL, providerLabel, settings, theme, setTheme,
+    authUid, accountEmail, displayName, photoURL, providerLabel, providerName, settings, theme, setTheme,
     togglePush, pushNote, aiConsentAt,
     privacyLockOn, onChangePin, onDisablePin,
     onReplayTour, go,
@@ -21,6 +21,8 @@ export function MainView({
     displayName: string | null;
     photoURL: string | null;
     providerLabel: string;
+    /** Bare provider name ("Google"), or null when it can't be named. */
+    providerName: string | null;
     settings: Settings;
     theme: 'light' | 'dark' | 'system';
     setTheme: (t: 'light' | 'dark' | 'system') => void;
@@ -44,7 +46,20 @@ export function MainView({
                         <ProfileAvatar email={accountEmail} name={displayName} photoURL={photoURL} size={44} />
                         <div className="flex-1 min-w-0 py-0.5">
                             <div className="text-[19px] font-semibold text-text truncate leading-tight">{displayName || accountEmail || 'Signed in'}</div>
-                            <div className="text-[13px] text-text-muted truncate mt-0.5">{providerLabel}{accountEmail ? ` · ${accountEmail}` : ''}</div>
+                            {/* Email FIRST, provider after. The old order was
+                                "Signed in with Google · morhogeg@g…" — a
+                                fixed-length, low-value prefix that pushed the one
+                                identifying string off the end on a phone, so the
+                                part you actually read was the part that got cut.
+                                Reversed, truncation eats the provider instead, and
+                                dropping the "Signed in with" preamble buys back the
+                                width it was spending. `providerName` keeps the full
+                                sentence for the a11y label and the Account screen. */}
+                            <div className="text-[13px] text-text-muted truncate mt-0.5">
+                                {accountEmail
+                                    ? (providerName ? `${accountEmail} · ${providerName}` : accountEmail)
+                                    : providerLabel}
+                            </div>
                         </div>
                         <Chevron />
                     </RowShell>
