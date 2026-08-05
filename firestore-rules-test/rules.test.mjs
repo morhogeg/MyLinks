@@ -298,9 +298,22 @@ test('owner cannot delete a synthesis (no client delete path exists)', async () 
 for (const col of ['shared_cards', 'shared_collections']) {
   const existing = col === 'shared_cards' ? 'card-share-1' : 'col-share-1';
 
-  test(`${col}: publicly readable, even logged out`, async () => {
+  test(`${col}: publicly readable BY ID, even logged out`, async () => {
     await assertSucceeds(getDoc(doc(anonDb(), col, existing)));
     await assertSucceeds(getDoc(doc(strangerDb(), col, existing)));
+  });
+
+  test(`${col}: but NOT enumerable — a list query is denied`, async () => {
+    // The rule is `allow get`, deliberately not `allow read` (which covers get
+    // AND list). Under `allow read: if true` anyone holding the public project
+    // id could dump every share doc every user ever published, without having a
+    // single one of the links — a share link fetches ONE doc by id. Nothing
+    // client-side lists these (or even reads them: /s and /c are rendered by the
+    // share_page function through the Admin SDK), so denying list costs nothing.
+    for (const db of [anonDb(), strangerDb(), ownerDb()]) {
+      await assertFails(getDocs(collection(db, col)));
+      await assertFails(getDocs(query(collection(db, col), limit(1))));
+    }
   });
 
   test(`${col}: NO client can write — not even the owner (Admin SDK only)`, async () => {

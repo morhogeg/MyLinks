@@ -19,3 +19,26 @@ Rules:
   `cd functions && python -m py_compile *.py`.
 - Theme: use the Tailwind token system (`text-text`, `bg-card`, `--accent-gradient`,
   `--ease-modal`), never hardcoded colors.
+
+## How to explain things (applies to every answer about this codebase)
+
+Write for a sharp colleague who doesn't live in this file. Not a tutorial, not a
+spec.
+
+- **Plain language, real names.** Keep the actual terms — `shared_cards`,
+  `owns(uid)`, a list query, build 1269 — but explain the *mechanism* in ordinary
+  words. Never let jargon stand in place of an explanation, and don't dumb the
+  nouns down either.
+- **Lead with the answer.** State what's true, then why. Skip the tour of how you
+  got there.
+- **Be concise.** No preamble, no restating the question, no recapping the plan.
+  If a sentence doesn't change what the reader does or believes, cut it.
+- **One analogy, only when the mechanism isn't obvious** (a filing cabinet, a
+  gate) — then drop it and go back to the real thing. Never stack analogies.
+- **Say the scope, including the negative.** "This does NOT affect private cards"
+  is often the most useful sentence in the answer.
+- **Keep verified and assumed visibly apart.** Say "verified", "not verified",
+  "couldn't test that here" — never blur the two, and never imply a check you
+  didn't run.
+- **Structure only when it earns its place.** A few short paragraphs usually beat
+  a nested outline. Bold the load-bearing clause, not every other phrase.

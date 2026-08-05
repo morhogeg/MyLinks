@@ -1219,6 +1219,35 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-04 — published shares are no longer ENUMERABLE (`read` → `get`), and
+  CLAUDE.md now pins an explanation style.** Owner asked the plain question
+  ("every user only sees his own cards, correct?"). Library answer: **yes** —
+  `users/{uid}` + every subcollection are gated on `authUids`/`owns(uid)`,
+  `REQUIRE_AUTH=true` derives the workspace from a verified token, the emulator
+  suite covers owner/stranger/anon, the rules deploy probes prod anonymously
+  (403), and a second real account on another phone saw none of the owner's
+  cards. **But the one exception had a hole:** `shared_cards` /
+  `shared_collections` carried `allow read: if true`, and in Firestore `read` =
+  get **+ list**. So anyone holding the (public, in-bundle) project id could
+  enumerate every share doc every user ever published — without holding any of
+  the links. No identity leaked (`ownerUid` moved to `shared_owners` in the July
+  PII fix), but the content did. The old test only asserted `getDoc` succeeds, so
+  it never probed a list. **Fix:** `allow get: if true; allow list: if false;` on
+  both, plus a test asserting the list is denied for anon/stranger/owner. **Zero
+  blast radius, verified by tracing consumers:** nothing client-side reads these
+  at all — `/s` and `/c` are rendered by the `share_page` Cloud Function via
+  Hosting rewrites (Admin SDK, bypasses rules), there is no `/s`/`/c` route in
+  the Next app, and `web/lib/share.ts` does no Firestore reads. `get` was left
+  open only for a future client-rendered share page. Note the same file already
+  reasoned about get-vs-list for `/users`; that thinking just hadn't reached
+  `shared_*`. **Verified here:** JS syntax, brace balance, `.locked` re-synced
+  with `firestore.rules`. **Not verified here:** the emulator suite — the JAR
+  download is proxy-blocked in the sandbox, so `rules-tests.yml` +
+  `deploy-rules.yml`'s gate prove it in CI before anything deploys.
+  Also: `CLAUDE.md` gained a **"How to explain things"** section (plain language
+  with real names, answer first, concise, one analogy only when the mechanism
+  isn't obvious, state the negative scope, keep verified and assumed apart) —
+  owner asked for that register to be the default for this codebase.
 - **2026-08-04 — Ask quota back to 100/month, ahead of inviting 4–5 friends as
   TestFlight INTERNAL testers.** Owner is sharing with close friends and does not
   want Beta App Review — internal testing needs none (up to 100 testers, builds
