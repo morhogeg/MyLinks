@@ -107,7 +107,21 @@ jobs:
           node-version: "20"
 
       - name: Install firebase-tools
-        run: npm i -g firebase-tools
+        run: |
+          # npm's registry 404s transiently: deploy-functions run #74
+          # (2026-08-05) died on a 404 for the firebase-tools tarball, and the
+          # SAME tarball served 200 a few minutes later — a blip, not a bad
+          # publish, so pinning a version would fix nothing and freeze us off
+          # latest. A one-shot install turns that blip into a failed deploy;
+          # retry with backoff instead. Mirrored in deploy-rules.yml and
+          # deploy-hosting.yml, which install the same way.
+          for attempt in 1 2 3 4; do
+            if npm i -g firebase-tools; then exit 0; fi
+            echo "::warning::firebase-tools install failed (attempt $attempt of 4) — retrying"
+            sleep $((attempt * 5))
+          done
+          echo "::error::firebase-tools install failed after 4 attempts — npm registry may be down."
+          exit 1
 
       # Write the service-account JSON to a temp file and point
       # GOOGLE_APPLICATION_CREDENTIALS at it so firebase-tools authenticates
