@@ -226,13 +226,15 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (2026-08-05): install build **1272** (supersedes 1270/1271)
+> ## 🚨 OWNER ACTION (2026-08-05): install build **1273** (supersedes 1270–1272)
 >
-> **1272** (run #272, sha `18175cd`) is the current build — gated, and the first
-> carrying the 2026-08-05 device-QA round: the favourite star (no chip when open,
-> a marker on starred grid cards), the toast that now names the ACTION rather
-> than the destination status, and the Settings row that shows the email instead
-> of truncating it. 1270 stays the fallback. The category fix from the same round
+> **1273** (run #273, sha `b41167b`) is the current build — gated, and the first
+> carrying the active-filter count badge on the header glyph. It also has the
+> whole 2026-08-05 device-QA round: the favourite star (no chip when open, a
+> marker on starred grid cards), the toast that names the ACTION rather than the
+> destination status, and the Settings row that shows the email instead of
+> truncating it. **Category Title Case is backend** (functions run #75) — already
+> live, no build needed. 1270 stays the fallback. The category fix from the same round
 > is BACKEND-only (functions run #73) — it is already live and needs no build,
 > but it only affects newly analysed cards; existing ones keep their category
 > until edited. The box below is kept for the 1266/1267 history, which still
@@ -1233,6 +1235,28 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-05 (ship) — round 3 is LIVE, after an npm outage ate the first
+  attempt.** Merge `b41167b`, then `1077c65` for the deploy fix. Green on the
+  retry: Deploy Cloud Functions **#75**, Deploy Firestore rules **#9**, Deploy
+  Firebase Hosting **#5**, Python tests **#88**, iOS → TestFlight **#273 →
+  build 1273**. `sweep_stuck_processing` (which carries the category migration)
+  and the new `force_category_migration` both deployed, so the backfill runs on
+  the next 5-minute tick.
+  **The failure worth remembering:** functions run **#74** died on
+  `npm error 404 ... firebase-tools-15.26.0.tgz`. It looked like a bad publish,
+  and the obvious fix was pinning to 15.25.1 — but checking first showed the
+  SAME tarball serving HTTP 200 minutes later, and so did 15.25.1. It was a
+  transient registry blip that recovered on its own, so a pin would have fixed
+  nothing and frozen the deploy off `latest` permanently. Real fix: `npm i -g
+  firebase-tools` was a one-shot, so a momentary npm hiccup failed a backend
+  deploy — it now **retries 4× with backoff** in all three workflows that install
+  it (functions, rules, hosting). Two process notes: the GitHub App gets **403 on
+  `rerun-failed-jobs`**, same as it does on workflow_dispatch, so a failed run
+  can only be re-driven by pushing; and `deploy-functions.yml` lists **itself** in
+  its paths filter, so the workflow fix re-ran the deploy it was fixing. Because
+  that retrigger commit touched only workflow files it carried no
+  `Deploy-Functions:` line, so the run deployed **all** functions — which also
+  cleared any main-vs-prod drift.
 - **2026-08-05 (device QA, round 3) — one spelling per category, and the header
   glyph finally admits when filters are on.**
   **(1) Categories are canonical Title Case.** The filter sheet listed
