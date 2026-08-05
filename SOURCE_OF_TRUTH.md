@@ -1233,6 +1233,55 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-05 (device QA, round 3) — one spelling per category, and the header
+  glyph finally admits when filters are on.**
+  **(1) Categories are canonical Title Case.** The filter sheet listed
+  `international relations 1` directly above `International Relations 1`, and
+  `sports 1` beside `Sports 14` — categories were stored exactly as written, so
+  case variants were separate categories with separate counts. Now: matching is
+  case-insensitive and the stored form is always canonical. `canonical_category`
+  (`link_service.py`) and `canonicalCategory` (`web/lib/category.ts`) are
+  deliberate **mirrors** — both sides write categories, the backend when analysis
+  produces one and the client when the user edits one, so a drift between them
+  would re-split what the other merged. `tests/test_category_case.py` reads the
+  TS source and asserts the two word lists match, the same trick
+  `test_web_client_hygiene.py` uses. A short **acronym list** keeps `tv series`
+  from becoming "Tv Series" (→ "TV Series"), and minor words stay lower unless
+  they lead, so `cost of living` → "Cost of Living". Normalised at the WRITE
+  boundary only — one place in the backend (`_build_link_data`) plus the client's
+  edit/save paths — which leaves all ~20 read sites (filters, Ask, digest, graph,
+  stats) correct for free, rather than case-folding each.
+  **The migration runs itself.** `run_category_migration` rides the existing
+  5-minute `sweep_stuck_processing` tick, guarded by ONE global marker doc
+  (`migrations/category_case_v1`) rather than a per-user flag — the steady state
+  is a single document read per tick instead of one per user, and a dedicated
+  schedule would be permanent infrastructure for a one-time fix. Idempotent,
+  skips cards already correct, records a `{canonical: [old spellings]}` audit
+  trail, and never raises so the janitor's real work is unaffected.
+  `force_category_migration` (admin-gated) exists for verifying immediately.
+  **Owner call taken:** derive the Title Case target rather than preferring an
+  existing well-cased spelling — for this data both give the same answer, and
+  deriving is predictable. `_CATEGORY_ACRONYMS` is the escape hatch.
+  **(2) The header glyph shows active FILTERS, not sort.** Asked whether the
+  selected sort should be a chip; the answer is no, and the distinction is
+  destructive vs non-destructive. Sort reorders and hides nothing — it explains
+  itself the moment you look at the feed — so Apple keeps it as a checkmark in
+  the menu (Files, Notes, Photos, Reminders). A FILTER hides cards, and content
+  that silently isn't there reads as a bug, which is why Mail fills its funnel
+  and names the active filter. So: the sliders glyph now carries a **count badge**
+  and goes full-strength when filters are on, and sort stays exactly where it is.
+  Extracted to `components/feed/DisplayGlyph.tsx` so its state is renderable in
+  isolation — it was inline JSX in `page.tsx` that no harness could reach.
+  **Two render findings, both caught by looking:** `text-accent` was invisible
+  as an "active" tint, because in this theme `--accent` is a neutral EMPHASIS
+  token (`#E9E9F2` dark / near-black light), not a hue — active now goes to
+  full-strength `text-text` and the badge carries the signal. And the badge at
+  `top-1 right-1` sat squarely on the sliders; pinned to `top-0 right-0` at 14px
+  it clips only the corner, the way an iOS badge does.
+  **Verified:** 622 backend tests (**+36** — canonicalisation, acronyms, minor
+  words, idempotency, the case-insensitive merge, the migration's bounds, and
+  the TS/Python parity check). `tsc` clean; lint 13 problems, **identical to
+  baseline**. Glyph render-verified light AND dark at 0/1/2/9/12 filters.
 - **2026-08-05 (ship) — round 2 is LIVE.** Merge `18175cd`. Deploy Cloud
   Functions **#73** green (`analyze_link`, `analyze_image`, `ask_brain`,
   `share_ingest`, `process_link_background` — scoped via the `Deploy-Functions:`

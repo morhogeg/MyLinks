@@ -89,7 +89,7 @@ const noop = () => { };
  * - Two card views (grid / list), plus review, ask, and collections modes
  * - Deep linking to specific links via URL params
  */
-function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onFeedLoadedChange, onReadyCaptureChange, onOpenDigestSettings, onHasCardsChange, libraryFacet, onLibraryFacetApplied, onBackToInsights, headerCommand, onCapture, onTabChange, onFullBleedChange, suppressProcessingId }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onFeedLoadedChange?: (loaded: boolean) => void; onReadyCaptureChange?: (at: number) => void; onOpenDigestSettings?: () => void; onHasCardsChange?: (hasCards: boolean) => void; libraryFacet?: import('@/lib/stats').LibraryFacetRequest | null; onLibraryFacetApplied?: () => void; onBackToInsights?: () => void; headerCommand?: { action: 'search' | 'sources' | 'display'; nonce: number } | null; onCapture?: () => void; onTabChange?: (tab: BottomTab) => void; onFullBleedChange?: (full: boolean) => void; suppressProcessingId?: string | null }) {
+function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onFeedLoadedChange, onReadyCaptureChange, onOpenDigestSettings, onHasCardsChange, onActiveFilterCountChange, libraryFacet, onLibraryFacetApplied, onBackToInsights, headerCommand, onCapture, onTabChange, onFullBleedChange, suppressProcessingId }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onFeedLoadedChange?: (loaded: boolean) => void; onReadyCaptureChange?: (at: number) => void; onOpenDigestSettings?: () => void; onHasCardsChange?: (hasCards: boolean) => void; onActiveFilterCountChange?: (n: number) => void; libraryFacet?: import('@/lib/stats').LibraryFacetRequest | null; onLibraryFacetApplied?: () => void; onBackToInsights?: () => void; headerCommand?: { action: 'search' | 'sources' | 'display'; nonce: number } | null; onCapture?: () => void; onTabChange?: (tab: BottomTab) => void; onFullBleedChange?: (full: boolean) => void; suppressProcessingId?: string | null }) {
     const searchParams = useSearchParams();
     const { uid } = useAuth();
     const toast = useToast();
@@ -394,6 +394,26 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         onHasCardsChange?.(links.length > 0);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [links.length > 0]);
+
+    // Lift the ACTIVE FILTER COUNT so the header glyph can show it.
+    //
+    // Sort deliberately does NOT feed this. Sort reorders and hides nothing —
+    // it explains itself the moment you look at the feed — so Apple keeps it in
+    // the menu with a checkmark and shows nothing persistent (Files, Notes,
+    // Photos, Reminders all do this). A FILTER hides cards, and missing content
+    // reads as a bug rather than a setting, which is why Mail surfaces an active
+    // filter and fills its funnel icon. This mirrors that: the four dimensions
+    // the Filters sheet owns, counted by individual selection so the number
+    // matches what the user ticked.
+    const activeFilterCount =
+        (filter !== 'all' ? 1 : 0)
+        + selectedCategory.size
+        + selectedTags.size
+        + selectedSources.size;
+
+    useEffect(() => {
+        onActiveFilterCountChange?.(activeFilterCount);
+    }, [activeFilterCount, onActiveFilterCountChange]);
 
     // Load collapsed state from localStorage
     useEffect(() => {
@@ -3078,14 +3098,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     );
 }
 
-export default function Feed({ onAskModeChange, onHideAddButton, onProcessingChange, onFeedLoadedChange, onReadyCaptureChange, onOpenDigestSettings, onHasCardsChange, libraryFacet, onLibraryFacetApplied, onBackToInsights, headerCommand, onCapture, onTabChange, onFullBleedChange, suppressProcessingId }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onFeedLoadedChange?: (loaded: boolean) => void; onReadyCaptureChange?: (at: number) => void; onOpenDigestSettings?: () => void; onHasCardsChange?: (hasCards: boolean) => void; libraryFacet?: import('@/lib/stats').LibraryFacetRequest | null; onLibraryFacetApplied?: () => void; onBackToInsights?: () => void; headerCommand?: { action: 'search' | 'sources' | 'display'; nonce: number } | null; onCapture?: () => void; onTabChange?: (tab: BottomTab) => void; onFullBleedChange?: (full: boolean) => void; suppressProcessingId?: string | null }) {
+export default function Feed({ onAskModeChange, onHideAddButton, onProcessingChange, onFeedLoadedChange, onReadyCaptureChange, onOpenDigestSettings, onHasCardsChange, onActiveFilterCountChange, libraryFacet, onLibraryFacetApplied, onBackToInsights, headerCommand, onCapture, onTabChange, onFullBleedChange, suppressProcessingId }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onFeedLoadedChange?: (loaded: boolean) => void; onReadyCaptureChange?: (at: number) => void; onOpenDigestSettings?: () => void; onHasCardsChange?: (hasCards: boolean) => void; onActiveFilterCountChange?: (n: number) => void; libraryFacet?: import('@/lib/stats').LibraryFacetRequest | null; onLibraryFacetApplied?: () => void; onBackToInsights?: () => void; headerCommand?: { action: 'search' | 'sources' | 'display'; nonce: number } | null; onCapture?: () => void; onTabChange?: (tab: BottomTab) => void; onFullBleedChange?: (full: boolean) => void; suppressProcessingId?: string | null }) {
     return (
         <Suspense fallback={
             <div className="flex items-center justify-center h-64">
                 <div className="w-8 h-8 border-2 border-text/20 border-t-text rounded-full animate-spin" />
             </div>
         }>
-            <FeedContent onAskModeChange={onAskModeChange} onHideAddButton={onHideAddButton} onProcessingChange={onProcessingChange} onFeedLoadedChange={onFeedLoadedChange} onReadyCaptureChange={onReadyCaptureChange} onOpenDigestSettings={onOpenDigestSettings} onHasCardsChange={onHasCardsChange} libraryFacet={libraryFacet} onLibraryFacetApplied={onLibraryFacetApplied} onBackToInsights={onBackToInsights} headerCommand={headerCommand} onCapture={onCapture} onTabChange={onTabChange} onFullBleedChange={onFullBleedChange} suppressProcessingId={suppressProcessingId} />
+            <FeedContent onAskModeChange={onAskModeChange} onHideAddButton={onHideAddButton} onProcessingChange={onProcessingChange} onFeedLoadedChange={onFeedLoadedChange} onReadyCaptureChange={onReadyCaptureChange} onOpenDigestSettings={onOpenDigestSettings} onHasCardsChange={onHasCardsChange} onActiveFilterCountChange={onActiveFilterCountChange} libraryFacet={libraryFacet} onLibraryFacetApplied={onLibraryFacetApplied} onBackToInsights={onBackToInsights} headerCommand={headerCommand} onCapture={onCapture} onTabChange={onTabChange} onFullBleedChange={onFullBleedChange} suppressProcessingId={suppressProcessingId} />
         </Suspense>
     );
 }

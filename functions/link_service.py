@@ -161,6 +161,156 @@ def save_link_to_firestore(uid: str, link_data: dict) -> str:
     return doc_ref.id
 
 
+# ── Category canonicalisation ────────────────────────────────────────────────
+#
+# ONE spelling per category, in Title Case. Categories used to be stored exactly
+# as the model or the user wrote them, so `sports` and `Sports` were two
+# categories with two counts and two chips in the filter sheet (owner,
+# 2026-08-05). Matching is case-insensitive now and the stored form is always
+# canonical, so a category can only exist once.
+#
+# MIRRORED IN `web/lib/category.ts` (canonicalCategory). Both sides write
+# categories — this one when analysis produces one, the client when the user
+# edits one — so they must agree or each would re-split what the other merged.
+# tests/test_category_case.py reads the TS file and asserts the two lists match.
+
+# Kept fully upper-case: title-casing alone gives "Tv Series", which reads as a
+# typo. Deliberately short — anything here overrides normal casing wherever it
+# appears, so only forms plausible as a category word belong.
+_CATEGORY_ACRONYMS = {
+    "AI", "API", "AR", "VR", "UI", "UX", "TV", "US", "UK", "EU", "DIY",
+    "F1", "NBA", "NFL", "PC", "IT", "HR",
+}
+
+# Kept lower-case unless they lead, so "cost of living" becomes "Cost of Living"
+# rather than the robotic "Cost Of Living".
+_CATEGORY_MINOR_WORDS = {
+    "a", "an", "and", "as", "at", "but", "by", "for", "from", "in", "nor",
+    "of", "on", "or", "the", "to", "vs", "with",
+}
+
+
+def category_key(category: str) -> str:
+    """The key two categories share when they differ only by case or spacing."""
+    return " ".join((category or "").split()).lower()
+
+
+def canonical_category(category: str) -> str:
+    """Canonical Title Case form. Empty input returns '' — callers own the
+    fallback ('General' on the write paths), so this never invents one."""
+    cleaned = " ".join((category or "").split())
+    if not cleaned:
+        return ""
+
+    out = []
+    for i, word in enumerate(cleaned.split(" ")):
+        bare = word.lower()
+        if bare.upper() in _CATEGORY_ACRONYMS:
+            out.append(bare.upper())
+        elif i > 0 and bare in _CATEGORY_MINOR_WORDS:
+            out.append(bare)
+        else:
+            # Hyphenated compounds capitalise each part ("Sci-Fi"); taking the
+            # rest from the lowered form makes "SPORTS" normalise like "sports".
+            out.append("-".join(p[:1].upper() + p[1:] for p in bare.split("-")))
+    return " ".join(out)
+
+
+# One-shot backfill id. Bumping it re-runs the migration for everybody, so
+# only bump it if the canonical form itself changes in a way that needs
+# re-applying — normal ACRONYMS edits do not (new saves pick them up, and
+# re-running would rewrite every card for a cosmetic tweak).
+CATEGORY_MIGRATION_ID = "category_case_v1"
+
+
+def migrate_user_categories(uid: str) -> dict:
+    """Canonicalise one workspace's categories, merging case-variants.
+
+    Groups the user's cards by `category_key`, so `sports` and `Sports` land in
+    the same bucket, then rewrites every card in a bucket to the canonical Title
+    Case spelling. Cards already canonical are left untouched, which makes this
+    idempotent and cheap to re-run.
+
+    Deliberately DERIVES the target rather than picking the best-looking
+    existing spelling: the owner asked for Title Case, and deriving is
+    predictable. Where a well-cased variant already exists (`International
+    Relations` beside `international relations`) the derived form equals it, so
+    nothing is renamed — and `_CATEGORY_ACRONYMS` is the escape hatch for
+    spellings plain title-casing would get wrong.
+    """
+    db = get_db()
+    links_ref = db.collection("users").document(uid).collection("links")
+    updated = 0
+    merged = {}
+
+    for doc in links_ref.stream():
+        current = (doc.to_dict() or {}).get("category")
+        if not isinstance(current, str) or not current.strip():
+            continue
+        target = canonical_category(current)
+        if not target or target == current:
+            continue
+        doc.reference.update({"category": target})
+        updated += 1
+        merged.setdefault(target, set()).add(current)
+
+    return {
+        "cardsUpdated": updated,
+        # {canonical: [old spellings folded into it]} — the audit trail for what
+        # this actually merged, so a surprising result is explainable later.
+        "merges": {k: sorted(v) for k, v in merged.items()},
+    }
+
+
+def run_category_migration() -> dict:
+    """Run `migrate_user_categories` for every workspace, exactly once.
+
+    Guarded by a single global marker doc rather than a per-user flag: the
+    scheduled caller fires every few minutes forever, and this way the steady
+    state costs ONE document read per tick instead of one per user. New
+    workspaces never need it — categories are canonicalised on write.
+
+    Never raises: this rides a scheduled job whose real work must not fail
+    because a backfill hiccuped. A per-user error is recorded and skipped, and
+    the marker is only set when the pass completes.
+    """
+    db = get_db()
+    marker = db.collection("migrations").document(CATEGORY_MIGRATION_ID)
+    try:
+        snap = marker.get()
+        if snap.exists and (snap.to_dict() or {}).get("done"):
+            return {"skipped": True}
+    except Exception as e:
+        logger.warning("Category migration marker unreadable (skipping): %s", e)
+        return {"skipped": True, "error": str(e)[:200]}
+
+    report = {"users": 0, "cardsUpdated": 0, "errors": []}
+    try:
+        for user_doc in db.collection("users").stream():
+            report["users"] += 1
+            try:
+                result = migrate_user_categories(user_doc.id)
+                report["cardsUpdated"] += result["cardsUpdated"]
+            except Exception as e:
+                # One broken workspace must not block the rest.
+                report["errors"].append(str(e)[:200])
+                logger.warning("Category migration failed for a workspace: %s", e)
+
+        marker.set({
+            "done": True,
+            "at": int(datetime.now(timezone.utc).timestamp() * 1000),
+            "cardsUpdated": report["cardsUpdated"],
+            "users": report["users"],
+        })
+        logger.info("Category migration complete: %s cards across %s workspaces",
+                    report["cardsUpdated"], report["users"])
+    except Exception as e:
+        # Marker stays unset, so the next tick retries.
+        logger.error("Category migration pass failed: %s", e)
+        report["errors"].append(str(e)[:200])
+    return report
+
+
 def get_user_tags(uid: str) -> list:
     """The user's tag vocabulary, for the "reuse these tags" half of the
     analysis prompt.
