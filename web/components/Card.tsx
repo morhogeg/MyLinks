@@ -482,6 +482,29 @@ function Card({
                                 <Lock className="w-3 h-3" />
                             </span>
                         )}
+                        {/* Favourite marker — shown ONLY when starred, deliberately.
+                            The star in the hover pill above is on every card, but the
+                            pill is hover-only, so on a phone a grid card gave no
+                            at-a-glance "you starred this" cue at all. An empty star on
+                            every card would buy that cue at the cost of another
+                            control on every tile, so this is the same trade ListCard
+                            already makes: present when starred, absent otherwise, and
+                            it un-stars on tap. No container — the solid yellow is the
+                            signal. Sits with the private lock because both are status
+                            markers; the source byline stays the identity. */}
+                        {link.status === 'favorite' && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onStatusChange(link.id, 'unread');
+                                }}
+                                aria-label="Remove from favorites"
+                                title="Remove from favorites"
+                                className="flex items-center justify-center w-6 h-6 rounded-full text-yellow-500 shrink-0"
+                            >
+                                <Star className="w-3.5 h-3.5 fill-yellow-500" />
+                            </button>
+                        )}
                         <SourceByline link={link} />
                     </div>
 

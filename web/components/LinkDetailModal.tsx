@@ -519,8 +519,15 @@ export default function LinkDetailModal({
                             onClick={() => onStatusChange(link.id, link.status === 'favorite' ? 'unread' : 'favorite')}
                             title={link.status === 'favorite' ? 'Remove from favorites' : 'Add to favorites'}
                             aria-label={link.status === 'favorite' ? 'Remove from favorites' : 'Add to favorites'}
+                            // No filled chip when active: a solid yellow star already
+                            // says "on" louder than any background could, and the
+                            // tinted square read as a stray highlight next to the
+                            // flat icons beside it. Matches ListCard's favorite
+                            // marker, which has never had a container. The reminder
+                            // button below KEEPS its blue chip — a bell has no fill
+                            // state, so there the background is the only signal.
                             className={`shrink-0 h-10 w-10 rounded-xl flex items-center justify-center transition-colors ${link.status === 'favorite'
-                                ? 'bg-yellow-500/10 text-yellow-500'
+                                ? 'text-yellow-500'
                                 : 'text-text-muted hover:text-yellow-500 hover:bg-card-hover'
                                 }`}
                         >

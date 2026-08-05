@@ -1229,6 +1229,29 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-05 (device QA) — the favourite star: no chip when open, and a
+  marker on starred grid cards.** Two owner items from an iPhone screenshot.
+  (1) **Open card**: the active star sat in a `bg-yellow-500/10` square that read
+  as a stray highlight beside the flat icons next to it. Dropped the background;
+  the star keeps `text-yellow-500` + `fill-current`, which already says "on"
+  louder than a chip can. The reminder button **keeps** its blue chip on purpose
+  — a bell has no fill state, so there the background is the only signal.
+  (2) **Grid card, closed**: a starred card showed nothing. The star that exists
+  in `Card.tsx` lives in the **hover pill**, and a phone has no hover, so the cue
+  was desktop-only. Now a filled yellow star renders in the meta row next to the
+  private lock — **only when starred**, never as an empty star on every card
+  (owner's call: an empty star on every tile is a control tax on every view for a
+  low-frequency action). It un-stars on tap. This is not a new pattern: it is
+  exactly what `ListCard.tsx` already does, comment and all, so grid and list now
+  agree instead of list being the only view that could show it.
+  **Render-verified** with a throwaway `app/dev-star` harness at 390px, light AND
+  dark, six fixtures (starred/not, Hebrew RTL, starred+private, long title):
+  star absent on unstarred, present and legible on both themes, sits correctly
+  beside the lock, and the LTR-pinned chrome row keeps the Hebrew title's own
+  direction. Harness, `.env.local` and the `PUBLIC_ROUTES` edit removed before
+  commit. `tsc` clean; lint 13 problems, **identical to baseline**.
+  **Not separately rendered:** the open-card toolbar — that change only deletes a
+  background class from a button whose size and centering are untouched.
 - **2026-08-04 (device QA, 4 UI fixes) — one of the four was a lie in the copy,
   one was a dead button, and the review-deck star needed a queue exception to
   work at all.** Owner ran the app on an iPhone and filed four items; all four
