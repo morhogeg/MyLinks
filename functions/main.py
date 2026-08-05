@@ -46,7 +46,7 @@ from log_safe import mask_uid
 from models import LinkStatus, ReminderStatus
 from ai_service import GeminiService, AnalysisError
 from link_service import (
-    save_link_to_firestore, get_user_tags, is_hebrew,
+    save_link_to_firestore, get_user_tags, get_user_vocabulary, is_hebrew,
     ensure_ingest_token, find_user_by_ingest_token, link_exists_for_url,
     pending_exists_for_url, find_data_uid_by_auth_uid, delete_user_data,
     create_workspace,
@@ -409,6 +409,11 @@ MAX_CONTEXT_IDS = 6
 MAX_CONTEXT_ID_LENGTH = 200
 MAX_TAGS = 50
 MAX_TAG_LENGTH = 60
+# Client-supplied `existingCategories` — the category twin of the tag caps
+# above. Mirrors link_service.MAX_PROMPT_CATEGORIES (the server-derived
+# list); keep the two in step so both paths feed the prompt the same shape.
+MAX_CATEGORIES = 20
+MAX_CATEGORY_LENGTH = 40
 
 # How many head-of-list cards ride into the Ask prompt WITH their deep content
 # (detailedSummary / recipe steps / video highlights), and how much of a long
@@ -555,6 +560,23 @@ def _sanitize_tags(tags) -> list:
     cleaned = []
     for tag in tags[:MAX_TAGS]:
         s = (tag if isinstance(tag, str) else str(tag)).strip()[:MAX_TAG_LENGTH]
+        if s:
+            cleaned.append(s)
+    return cleaned
+
+
+def _sanitize_categories(categories) -> list:
+    """Validate client-supplied existingCategories before they reach the prompt.
+
+    Exact twin of `_sanitize_tags`: the values are concatenated into the analysis
+    prompt, so cap the count and per-item length, coerce to str, drop empties,
+    and treat a non-list as absent. See SYSTEM_PROMPT rule 6 (category reuse).
+    """
+    if not isinstance(categories, list):
+        return []
+    cleaned = []
+    for c in categories[:MAX_CATEGORIES]:
+        s = (c if isinstance(c, str) else str(c)).strip()[:MAX_CATEGORY_LENGTH]
         if s:
             cleaned.append(s)
     return cleaned
@@ -747,7 +769,8 @@ def _fetch_post_images(image_urls: list) -> list:
     return images
 
 
-def _analyze_scraped(ai, scraped: dict, existing_tags: list, attempts: int = None):
+def _analyze_scraped(ai, scraped: dict, existing_tags: list, attempts: int = None,
+                     existing_categories: list = None):
     """Run the right analysis for scraped content.
 
     For YouTube, use Gemini native video ingestion; if that fails (private /
@@ -777,7 +800,8 @@ def _analyze_scraped(ai, scraped: dict, existing_tags: list, attempts: int = Non
                 f"{YOUTUBE_MAX_VIDEO_MINUTES}min) — using metadata-only card")
         elif watch_url:
             try:
-                analysis = ai.analyze_youtube(watch_url, existing_tags=existing_tags, **kw)
+                analysis = ai.analyze_youtube(watch_url, existing_tags=existing_tags,
+                                              existing_categories=existing_categories, **kw)
                 # The probed duration is ground truth; the model's is an estimate.
                 if isinstance(analysis, dict) and length_seconds:
                     analysis["videoDurationMinutes"] = max(1, (length_seconds + 59) // 60)
@@ -786,7 +810,8 @@ def _analyze_scraped(ai, scraped: dict, existing_tags: list, attempts: int = Non
                 logger.warning(f"Native YouTube analysis failed, using metadata-only fallback: {e}")
         # Fallback: analyze the lightweight oEmbed metadata text honestly.
         analysis = ai.analyze_text(scraped.get("text") or scraped.get("html", ""),
-                                   existing_tags=existing_tags, **kw)
+                                   existing_tags=existing_tags,
+                                   existing_categories=existing_categories, **kw)
         # The fallback model never saw the video, so its duration would be a
         # fabrication — use the probed one when we have it.
         if isinstance(analysis, dict) and length_seconds:
@@ -803,6 +828,7 @@ def _analyze_scraped(ai, scraped: dict, existing_tags: list, attempts: int = Non
         try:
             analysis = ai.analyze_text_with_images(
                 content_text, post_images, existing_tags=existing_tags,
+                existing_categories=existing_categories,
                 content_type=content_type,
                 # Instagram marks its cover as image-first (screenshot carrying the
                 # real text) → read at higher res + trust the image over the
@@ -823,7 +849,8 @@ def _analyze_scraped(ai, scraped: dict, existing_tags: list, attempts: int = Non
             logger.warning(f"Multimodal post analysis failed, using text-only fallback: {e}")
 
     analysis = ai.analyze_text(content_text,
-                               existing_tags=existing_tags, content_type=content_type, **kw)
+                               existing_tags=existing_tags, content_type=content_type,
+                               existing_categories=existing_categories, **kw)
     # Video posts (X / Instagram reels / LinkedIn / Facebook) have no embedded
     # photo to run vision on, but often expose a poster frame. Fetch that single
     # image purely to SHOW as the card banner — no model call — so they get a
@@ -1452,6 +1479,7 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
         url = data.get('url')
         text = data.get('text') or data.get('note')
         existing_tags = _sanitize_tags(data.get('existingTags'))
+        existing_categories = _sanitize_categories(data.get('existingCategories'))
 
         # NOTE PATH — a URL-less thought captured from the "Note" tab. Analyze the
         # text directly (no scraping) and return a first-class 'note' card. The
@@ -1478,7 +1506,8 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
             ai = GeminiService()
             # Synchronous path: cap Gemini at 2 attempts to stay under the 60s
             # function budget (report 3.6).
-            analysis = ai.analyze_text(note_text, existing_tags=existing_tags, attempts=2)
+            analysis = ai.analyze_text(note_text, existing_tags=existing_tags,
+                                       existing_categories=existing_categories, attempts=2)
 
             related_links = []
             if note_uid:
@@ -1544,7 +1573,8 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
         ai = GeminiService()
         content_type = scraped.get("content_type")
         # Synchronous path: 2 Gemini attempts (stay under the 60s budget, report 3.6).
-        analysis = _analyze_scraped(ai, scraped, existing_tags, attempts=2)
+        analysis = _analyze_scraped(ai, scraped, existing_tags, attempts=2,
+                                    existing_categories=existing_categories)
 
         # 3. Generate Embedding & Find Connections
         # Rich v2 recipe (see _embedding_text_from_analysis). Used here only as
@@ -2258,6 +2288,7 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
         image_url = data.get('imageUrl')
         image_b64 = data.get('imageBytes')
         existing_tags = _sanitize_tags(data.get('existingTags'))
+        existing_categories = _sanitize_categories(data.get('existingCategories'))
         # Identity: prefer the verified ID token; falls back to the body uid only
         # while REQUIRE_AUTH is off (see _authed_uid).
         uid, auth_err = _authed_uid(req, headers, data.get('uid'))
@@ -2324,7 +2355,8 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
         # 2. Analyze with AI
         ai = GeminiService()
         # Synchronous path: 2 Gemini attempts (stay under the 60s budget, report 3.6).
-        analysis = ai.analyze_image(image_bytes, mime_type, existing_tags=existing_tags, attempts=2)
+        analysis = ai.analyze_image(image_bytes, mime_type, existing_tags=existing_tags,
+                                    existing_categories=existing_categories, attempts=2)
 
         # 2b. Persist the image via the admin SDK (bypasses storage.rules, which
         # denies client writes). This is how screenshots are stored elsewhere
@@ -2530,7 +2562,9 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
             note_text = note_text[:MAX_NOTE_LENGTH]
             try:
                 ai = GeminiService()
-                analysis = ai.analyze_text(note_text, existing_tags=get_user_tags(uid))
+                note_tags, note_cats = get_user_vocabulary(uid)
+                analysis = ai.analyze_text(note_text, existing_tags=note_tags,
+                                           existing_categories=note_cats)
                 link_data = _note_link_data(analysis, note_text)
                 # A fresh note has no vector yet — flag it so sync_link_embedding
                 # (which fires on this create) generates one.
@@ -3366,7 +3400,7 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         ref.update({"status": "analyzing", "scrapedTitle": scraped.get("title", "")})
 
         db = get_db()
-        existing_tags = get_user_tags(uid)
+        existing_tags, existing_categories = get_user_vocabulary(uid)
         ai = GeminiService()
 
         _write_stage(card_ref, "analyzing")
@@ -3393,10 +3427,12 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
 
             log_to_firestore(task_id, "Starting AI image analysis")
             ref.update({"status": "analyzing_image", "storageUrl": public_url})
-            analysis = ai.analyze_image(image_bytes, mime_type, existing_tags=existing_tags)
+            analysis = ai.analyze_image(image_bytes, mime_type, existing_tags=existing_tags,
+                                        existing_categories=existing_categories)
         else:
             # Analyze with AI (YouTube → native video ingestion w/ fallback)
-            analysis = _analyze_scraped(ai, scraped, existing_tags)
+            analysis = _analyze_scraped(ai, scraped, existing_tags,
+                                        existing_categories=existing_categories)
 
         # Final Defensive check for analysis
         if not isinstance(analysis, dict):

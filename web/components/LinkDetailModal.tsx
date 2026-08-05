@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Link, LinkStatus, UserNote } from '@/lib/types';
+import { Link, StatusChangeHandler, UserNote } from '@/lib/types';
 import SourceByline from './SourceByline';
 import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, Check, Network, Play, Youtube, ImageOff, Image as ImageIcon, Layers, Share2, ChevronLeft, StickyNote, Waypoints } from 'lucide-react';
 import { getPlatform } from '@/lib/platform';
@@ -53,7 +53,7 @@ interface LinkDetailModalProps {
     onClose: () => void;            // dismiss the modal entirely (clears the back-stack)
     onBack?: () => void;           // step back to the previous card in the back-stack
     canGoBack?: boolean;           // true when there's a previous card to return to
-    onStatusChange: (id: string, status: LinkStatus) => void;
+    onStatusChange: StatusChangeHandler;
     onReadStatusChange: (id: string, isRead: boolean) => void;
     onUpdateTags: (id: string, tags: string[]) => void;
     onUpdateCategory: (id: string, category: string) => void;
@@ -516,7 +516,7 @@ export default function LinkDetailModal({
                             {link.isRead ? <Check className="w-[18px] h-[18px]" /> : <Circle className="w-[18px] h-[18px] opacity-50" />}
                         </button>
                         <button
-                            onClick={() => onStatusChange(link.id, link.status === 'favorite' ? 'unread' : 'favorite')}
+                            onClick={() => onStatusChange(link.id, link.status === 'favorite' ? 'unread' : 'favorite', { from: link.status })}
                             title={link.status === 'favorite' ? 'Remove from favorites' : 'Add to favorites'}
                             aria-label={link.status === 'favorite' ? 'Remove from favorites' : 'Add to favorites'}
                             // No filled chip when active: a solid yellow star already

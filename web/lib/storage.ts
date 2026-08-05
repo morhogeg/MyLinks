@@ -70,6 +70,30 @@ export async function getUserTags(uid: string): Promise<string[]> {
 }
 
 /**
+ * The workspace's existing category vocabulary, for the "reuse a category"
+ * half of the analysis prompt (functions SYSTEM_PROMPT rule 6).
+ *
+ * Categories used to drift because the model was never told which ones already
+ * existed — tags got a reuse list, categories got nothing, so a household
+ * economics article could land in "Business" while similar cards sat under
+ * "Society". Same window as getUserTags (the 300 most recent cards) so the two
+ * lists cost one read each and describe the same slice of the library.
+ */
+export async function getUserCategories(uid: string): Promise<string[]> {
+    const linksRef = collection(db, 'users', uid, 'links');
+    const q = query(linksRef, orderBy('createdAt', 'desc'), limit(300));
+    const snapshot = await getDocs(q);
+
+    const categories = new Set<string>();
+    snapshot.docs.forEach(doc => {
+        const c = doc.data().category;
+        if (typeof c === 'string' && c.trim()) categories.add(c.trim());
+    });
+
+    return Array.from(categories).sort();
+}
+
+/**
  * Return the id of an existing saved link with this exact URL, or null.
  *
  * Mirrors the iOS share path's dedup (functions/link_service.py
@@ -264,12 +288,14 @@ export async function updateNoteText(uid: string, id: string, text: string): Pro
 export async function enrichNoteCard(uid: string, cardId: string, text: string): Promise<void> {
     try {
         let existingTags: string[] = [];
+        let existingCategories: string[] = [];
         try { existingTags = await getUserTags(uid); } catch { /* optional */ }
+        try { existingCategories = await getUserCategories(uid); } catch { /* optional */ }
 
         const response = await fetchWithTimeout(apiUrl('/api/analyze'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()), ...(await authHeaders()) },
-            body: JSON.stringify({ text: text.trim(), existingTags, uid }),
+            body: JSON.stringify({ text: text.trim(), existingTags, existingCategories, uid }),
         });
         if (!response.ok) return; // e.g. the note branch isn't deployed — leave the note as-is.
 
@@ -311,16 +337,22 @@ export async function retryFailedLink(uid: string, link: Link): Promise<void> {
 
     try {
         let existingTags: string[] = [];
+        let existingCategories: string[] = [];
         try {
             existingTags = await getUserTags(uid);
         } catch {
             // Tag context is a non-critical optimization.
         }
+        try {
+            existingCategories = await getUserCategories(uid);
+        } catch {
+            // Category context is likewise best-effort.
+        }
 
         const response = await fetchWithTimeout(apiUrl('/api/analyze'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()), ...(await authHeaders()) },
-            body: JSON.stringify({ url: link.url, existingTags, uid }),
+            body: JSON.stringify({ url: link.url, existingTags, existingCategories, uid }),
         }, 60_000);
         const text = await response.text();
         let data: AnalyzeResponse;

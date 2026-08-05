@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { Link, LinkStatus, UserNote } from '@/lib/types';
+import { CaptureState, Link, LinkStatus, UserNote } from '@/lib/types';
 import { updateLinkStatus, updateLinkTags, updateLinkCategory, updateLinkTitle, updateLinkSummary, updateNoteText, updateLinkNotes, updateLinkReadStatus, retryFailedLink } from '@/lib/storage';
 import { newShareId, publishCard, removeLinkFromCollection } from '@/lib/collections';
 import { shareLink, shareUrlFor } from '@/lib/share';
@@ -15,19 +15,32 @@ import { useToast } from '@/components/Toast';
  * surface failures and confirm meaningful actions.
  */
 export function useLinkActions(uid: string | null | undefined, toast: ReturnType<typeof useToast>) {
-    const handleStatusChange = useCallback(async (id: string, status: LinkStatus, opts?: { silent?: boolean }) => {
+    const handleStatusChange = useCallback(async (
+        id: string,
+        status: LinkStatus,
+        opts?: { silent?: boolean; from?: CaptureState },
+    ) => {
         if (!uid) return;
         try {
             await updateLinkStatus(uid, id, status);
+            // Name the TRANSITION, not the destination. `unread` is where three
+            // different actions land — un-favourite, un-archive, and an explicit
+            // "mark as unread" — so keying the label off `status` alone made
+            // un-starring a card announce "Marked as unread" (owner, device QA
+            // 2026-08-05). `opts.from` is the status being left; callers that
+            // toggle a state OFF pass it, and the plain mark-as-unread path
+            // doesn't, which is exactly the case that keeps the old label.
+            //
             // silent: callers whose UI already confirms the action (the Review
             // deck's fling + session tallies) skip the success toast — stacked
             // per-swipe toasts covered the deck's action buttons. Errors always toast.
-            const labels: Record<string, string> = {
-                archived: 'Archived',
-                favorite: 'Added to favorites',
-                unread: 'Marked as unread',
-            };
-            if (!opts?.silent && labels[status]) toast.success(labels[status]);
+            const label =
+                status === 'favorite' ? 'Added to favorites'
+                    : status === 'archived' ? 'Archived'
+                        : opts?.from === 'favorite' ? 'Removed from favorites'
+                            : opts?.from === 'archived' ? 'Unarchived'
+                                : 'Marked as unread';
+            if (!opts?.silent) toast.success(label);
         } catch {
             toast.error("Couldn't update the link. Please try again.");
         }

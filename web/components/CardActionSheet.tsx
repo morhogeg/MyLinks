@@ -1,6 +1,6 @@
 'use client';
 
-import { Link, LinkStatus } from '@/lib/types';
+import { Link, StatusChangeHandler } from '@/lib/types';
 import { Archive, Star, Bell, Trash2, Circle, Check, X, ExternalLink, Layers, Share2, FolderMinus, Lock, ImageOff, Image as ImageIcon, Waypoints } from 'lucide-react';
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
@@ -14,7 +14,7 @@ interface CardActionSheetProps {
     link: Link;
     isOpen: boolean;
     onClose: () => void;
-    onStatusChange: (id: string, status: LinkStatus) => void;
+    onStatusChange: StatusChangeHandler;
     onReadStatusChange: (id: string, isRead: boolean) => void;
     onUpdateReminder: (link: Link) => void;
     onDelete: (id: string) => void;
@@ -125,14 +125,14 @@ export default function CardActionSheet({
             label: isFavorite ? 'Remove from favorites' : 'Add to favorites',
             icon: <Star className={`w-5 h-5 ${isFavorite ? 'fill-yellow-500 text-yellow-500' : ''}`} />,
             active: isFavorite,
-            onClick: () => onStatusChange(link.id, isFavorite ? 'unread' : 'favorite'),
+            onClick: () => onStatusChange(link.id, isFavorite ? 'unread' : 'favorite', { from: link.status }),
         },
         {
             key: 'archive',
             label: isArchived ? 'Unarchive' : 'Archive',
             icon: <Archive className="w-5 h-5" />,
             active: isArchived,
-            onClick: () => onStatusChange(link.id, isArchived ? 'unread' : 'archived'),
+            onClick: () => onStatusChange(link.id, isArchived ? 'unread' : 'archived', { from: link.status }),
         },
         {
             key: 'remind',

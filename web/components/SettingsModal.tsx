@@ -95,7 +95,11 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
         return () => { cancelled = true; };
     }, [isOpen, authUid]);
 
-    const providerLabel = (() => {
+    // The BARE provider name ("Google" / "Apple" / "email"), or null when it
+    // can't be named confidently. `providerLabel` is the sentence form derived
+    // from it, so the two can never disagree: the Settings row shows the bare
+    // name after the email (see MainView), the Account screen keeps the sentence.
+    const providerName = (() => {
         const NAMES: Record<string, string> = {
             'google.com': 'Google',
             'apple.com': 'Apple',
@@ -103,13 +107,13 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
         };
         // The token is authoritative about THIS session.
         const fromToken = NAMES[tokenProvider ?? ''];
-        if (fromToken) return `Signed in with ${fromToken}`;
+        if (fromToken) return fromToken;
         // Until it resolves: name a provider only when exactly one is linked.
         // With several linked, picking one is precisely what caused the bug.
         const linked = auth.currentUser?.providerData.map((p) => p.providerId) ?? [];
-        const only = linked.length === 1 ? NAMES[linked[0]] : undefined;
-        return only ? `Signed in with ${only}` : 'Signed in';
+        return (linked.length === 1 ? NAMES[linked[0]] : undefined) ?? null;
     })();
+    const providerLabel = providerName ? `Signed in with ${providerName}` : 'Signed in';
 
     // The settings-persistence brain: loaded settings, topic options, the
     // dirty-tracking baseline, and every mutation/persistence helper.
@@ -325,6 +329,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                                 displayName={displayName}
                                 photoURL={photoURL}
                                 providerLabel={providerLabel}
+                                providerName={providerName}
                                 settings={settings}
                                 theme={theme}
                                 setTheme={setTheme}

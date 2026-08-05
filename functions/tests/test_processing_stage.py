@@ -47,11 +47,16 @@ def _drive_url_pipeline(monkeypatch, *, stage_update_raises=False):
 
     monkeypatch.setattr(main, "get_db", lambda: db)
     monkeypatch.setattr(main, "log_to_firestore", lambda *a, **k: None)
+    # The processing path now derives tags AND categories from one scan
+    # (get_user_vocabulary) so the prompt can be told which categories already
+    # exist — see link_service. get_user_tags is kept stubbed for any caller
+    # that still uses it.
     monkeypatch.setattr(main, "get_user_tags", lambda uid: [])
+    monkeypatch.setattr(main, "get_user_vocabulary", lambda uid: ([], []))
     monkeypatch.setattr(main, "GeminiService", lambda: types.SimpleNamespace(
         embed_text=lambda text: None,  # None → skip the Vector store branch
     ))
-    monkeypatch.setattr(main, "_analyze_scraped", lambda ai, scraped, tags: {
+    monkeypatch.setattr(main, "_analyze_scraped", lambda ai, scraped, tags, **kw: {
         "title": "T", "summary": "S", "concepts": [], "tags": [], "category": "Tech",
     })
 
