@@ -170,8 +170,13 @@ function Header({ onGetStarted }: { onGetStarted?: () => void }) {
 
 function Hero({ onGetStarted }: { onGetStarted?: () => void }) {
     return (
-        <section className="mx-ground relative mx-auto flex min-h-[88vh] max-w-3xl flex-col justify-center px-6 py-20">
-            <div className="relative">
+        /* Fully CENTERED (owner call, round 6) — mark, headline, prose and CTA
+           on one axis. The left-set version read like a document; centred, it
+           reads like an announcement, and the CTA no longer trails a caption
+           ("Free to start · iPhone and web" was cut with it: a promise line
+           should not be footnoted). */
+        <section className="mx-ground relative mx-auto flex min-h-[88vh] max-w-3xl flex-col items-center justify-center px-6 py-20 text-center">
+            <div className="relative flex flex-col items-center">
                 {/* The mark assembling: the identity's stated sequence — the
                     brackets close, then the point lands, then the glow blooms.
                     Plays on load, not on scroll: it is the first thing on the
@@ -199,7 +204,7 @@ function Hero({ onGetStarted }: { onGetStarted?: () => void }) {
                 {/* `mx-in` is set unconditionally here — the hero is above the
                     fold, so waiting for an intersection callback would show a
                     blank frame first. */}
-                <div className="mx-in mt-10">
+                <div className="mx-in mt-10 flex flex-col items-center">
                     <h1
                         className="mx-rise text-4xl font-semibold tracking-tight text-text text-balance sm:text-6xl"
                         style={{ ['--i' as string]: 2 }}
@@ -213,7 +218,7 @@ function Hero({ onGetStarted }: { onGetStarted?: () => void }) {
                         page, and the drawn wordmark above is SVG path data, not
                         readable text. */}
                     <p
-                        className="mx-rise mt-6 text-lg leading-relaxed text-text text-pretty sm:text-2xl"
+                        className="mx-rise mt-6 max-w-2xl text-lg leading-relaxed text-text text-pretty sm:text-2xl"
                         style={{ ['--i' as string]: 3 }}
                     >
                         <span className="font-semibold">Machina</span> is one place that holds
@@ -231,14 +236,8 @@ function Hero({ onGetStarted }: { onGetStarted?: () => void }) {
                         an answer in plain language, with citations back to your own sources.
                     </p>
 
-                    <div
-                        className="mx-rise mt-10 flex flex-wrap items-center gap-4"
-                        style={{ ['--i' as string]: 5 }}
-                    >
+                    <div className="mx-rise mt-10" style={{ ['--i' as string]: 5 }}>
                         <GetStarted onGetStarted={onGetStarted} />
-                        <span className="text-[13px] text-text-muted">
-                            Free to start · iPhone and web
-                        </span>
                     </div>
                 </div>
             </div>
@@ -380,12 +379,11 @@ function Footer() {
                         support@mymachina.app
                     </a>
                 </nav>
-                {/* No personal name here (owner call, round 5) — the page speaks
-                    as the product. The App Store copyright FIELD keeps the legal
-                    name (docs/APP_STORE.md §2); that is a form, not a page. */}
-                <p className="mt-6 text-[13px] text-text-muted">
-                    © 2026 Machina — a personal knowledge base for the things you save.
-                </p>
+                {/* No personal name (round 5) and no self-description (round 6)
+                    — by the footer the page has explained itself five times.
+                    The App Store copyright FIELD keeps the legal name
+                    (docs/APP_STORE.md §2); that is a form, not a page. */}
+                <p className="mt-6 text-[13px] text-text-muted">© 2026 Machina</p>
             </div>
         </footer>
     );

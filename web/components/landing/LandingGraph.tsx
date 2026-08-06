@@ -154,27 +154,49 @@ export default function LandingGraph({ className = '' }: { className?: string })
             }
 
             // Labels in SCREEN space (constant size at any camera), stroked in
-            // the card color so they sit on edges without a plate, culled
-            // greedily on overlap — all three moves are the app's.
+            // the card color so they sit on edges without a plate, placed
+            // greedily by degree — the app's moves, plus two the landing scale
+            // demands (round 6, from a production frame where labels sat ON
+            // neighbouring discs): every candidate rect is ALSO tested against
+            // every node's screen circle, and a label that collides below its
+            // node retries ABOVE before being dropped. The app can afford
+            // label-vs-label tests only because its camera zooms; this one
+            // cannot.
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
             ctx.textAlign = 'center';
             ctx.textBaseline = 'top';
             ctx.font = '600 11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
             ctx.lineWidth = 3;
+            const discs = nodes.map((n) => ({
+                x: n.x * k + camX, y: n.y * k + camY, r: rOf(n.r) * k + 2,
+            }));
+            const hitsDisc = (r: { x1: number; y1: number; x2: number; y2: number }, skip: number) =>
+                discs.some((d, i) => {
+                    if (i === skip) return false;
+                    const nx = Math.max(r.x1, Math.min(d.x, r.x2));
+                    const ny = Math.max(r.y1, Math.min(d.y, r.y2));
+                    return (d.x - nx) ** 2 + (d.y - ny) ** 2 < d.r * d.r;
+                });
             const placed: { x1: number; y1: number; x2: number; y2: number }[] = [];
-            const byDegree = [...nodes].sort((a, b) => b.degree - a.degree);
-            for (const n of byDegree) {
-                const sx = n.x * k + camX;
-                const sy = n.y * k + camY + rOf(n.r) * k + 5;
+            const order = nodes.map((_, i) => i).sort((a, b) => nodes[b].degree - nodes[a].degree);
+            for (const i of order) {
+                const n = nodes[i];
+                const d = discs[i];
                 const tw = ctx.measureText(n.link.title).width;
-                const rect = { x1: sx - tw / 2 - 3, y1: sy - 2, x2: sx + tw / 2 + 3, y2: sy + 13 };
-                if (rect.x1 < 2 || rect.x2 > w - 2 || rect.y2 > h - 2) continue;
-                if (placed.some((r) => rect.x1 < r.x2 && rect.x2 > r.x1 && rect.y1 < r.y2 && rect.y2 > r.y1)) continue;
-                placed.push(rect);
-                ctx.strokeStyle = rgba(card, 0.7);
-                ctx.strokeText(n.link.title, sx, sy);
-                ctx.fillStyle = rgba(n.degree >= 3 ? text : textSecondary, 0.95);
-                ctx.fillText(n.link.title, sx, sy);
+                // Below the node first, above as the fallback.
+                const spots = [d.y + d.r + 4, d.y - d.r - 4 - 13];
+                for (const sy of spots) {
+                    const rect = { x1: d.x - tw / 2 - 3, y1: sy - 2, x2: d.x + tw / 2 + 3, y2: sy + 13 };
+                    if (rect.x1 < 2 || rect.x2 > w - 2 || rect.y1 < 2 || rect.y2 > h - 2) continue;
+                    if (placed.some((r) => rect.x1 < r.x2 && rect.x2 > r.x1 && rect.y1 < r.y2 && rect.y2 > r.y1)) continue;
+                    if (hitsDisc(rect, i)) continue;
+                    placed.push(rect);
+                    ctx.strokeStyle = rgba(card, 0.7);
+                    ctx.strokeText(n.link.title, d.x, sy);
+                    ctx.fillStyle = rgba(n.degree >= 3 ? text : textSecondary, 0.95);
+                    ctx.fillText(n.link.title, d.x, sy);
+                    break;
+                }
             }
         };
 

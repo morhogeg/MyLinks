@@ -304,19 +304,26 @@ type GraphSeed = {
     ties?: [string, number][];
 };
 
+/**
+ * Titles here are the graph's LABELS, and they are deliberately shorter than
+ * the shelf cards they correspond to (owner call, round 6: the full card
+ * titles — "Commute: 1 change, ~40 min" — read as clutter at constellation
+ * scale). The app has the same distinction in spirit: a canvas label is a
+ * handle, not a headline. Two or three words each, no punctuation.
+ */
 const GRAPH_SEEDS: GraphSeed[] = [
-    { id: 'lisbon', title: '36 hours in Lisbon', category: 'Travel', tags: ['lisbon', 'city break'], ties: [['pastel', 0.86], ['flights', 0.8]] },
-    { id: 'pastel', title: 'Pastelaria in Alfama', category: 'Travel', tags: ['lisbon', 'food'], ties: [['flights', 0.72]] },
-    { id: 'flights', title: 'Flights — landing Thu', category: 'Travel', tags: ['lisbon', 'dates'] },
-    { id: 'chicken', title: 'One-pan lemon chicken', category: 'Recipes', tags: ['weeknight', '35 min'], ties: [['noodles', 0.84], ['sourdough', 0.74]] },
-    { id: 'noodles', title: '15-minute sesame noodles', category: 'Recipes', tags: ['weeknight', '15 min'] },
-    { id: 'sourdough', title: 'Sourdough, no starter', category: 'Cooking', tags: ['bread', 'weekend'] },
-    { id: 'flat', title: 'Two-bed, balcony, north side', category: 'Home', tags: ['flat', 'shortlist'], ties: [['commute', 0.9]] },
-    { id: 'commute', title: 'Commute: 1 change, ~40 min', category: 'Home', tags: ['flat', 'commute'] },
-    { id: 'kettlebell', title: 'Kettlebell complex, 20 min', category: 'Fitness', tags: ['kettlebell', 'short session'] },
-    { id: 'tools', title: 'The case for boring tools', category: 'Ideas', tags: ['making', 'longevity'], ties: [['headphones', 0.68]] },
-    { id: 'night-market', title: 'How a night market feeds a city', category: 'Ideas', tags: ['cities', 'food'], ties: [['tools', 0.7], ['lisbon', 0.64]] },
-    { id: 'headphones', title: 'Headphones for an open office', category: 'Shopping', tags: ['audio', 'work'] },
+    { id: 'lisbon', title: 'Lisbon guide', category: 'Travel', tags: ['lisbon', 'city break'], ties: [['pastel', 0.86], ['flights', 0.8]] },
+    { id: 'pastel', title: 'Pastelaria', category: 'Travel', tags: ['lisbon', 'food'], ties: [['flights', 0.72]] },
+    { id: 'flights', title: 'Flights', category: 'Travel', tags: ['lisbon', 'dates'] },
+    { id: 'chicken', title: 'Lemon chicken', category: 'Recipes', tags: ['weeknight', '35 min'], ties: [['noodles', 0.84], ['sourdough', 0.74]] },
+    { id: 'noodles', title: 'Sesame noodles', category: 'Recipes', tags: ['weeknight', '15 min'] },
+    { id: 'sourdough', title: 'Sourdough', category: 'Cooking', tags: ['bread', 'weekend'] },
+    { id: 'flat', title: 'The flat', category: 'Home', tags: ['flat', 'shortlist'], ties: [['commute', 0.9]] },
+    { id: 'commute', title: 'The commute', category: 'Home', tags: ['flat', 'commute'] },
+    { id: 'kettlebell', title: 'Kettlebells', category: 'Fitness', tags: ['kettlebell', 'short session'] },
+    { id: 'tools', title: 'Boring tools', category: 'Ideas', tags: ['making', 'longevity'], ties: [['headphones', 0.68]] },
+    { id: 'night-market', title: 'Night markets', category: 'Ideas', tags: ['cities', 'food'], ties: [['tools', 0.7], ['lisbon', 0.64]] },
+    { id: 'headphones', title: 'Headphones', category: 'Shopping', tags: ['audio', 'work'] },
 ];
 
 /** `Link`-shaped, minimally: only the fields `buildGraphModel` and the draw
