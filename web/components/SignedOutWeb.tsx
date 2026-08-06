@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
+import { ArrowLeft } from 'lucide-react';
 import LoginScreen from '@/components/LoginScreen';
 
 /**
@@ -54,7 +55,24 @@ export default function SignedOutWeb({
     const [signingIn, setSigningIn] = useState(false);
 
     if (signingIn) {
-        return <LoginScreen onSignIn={onSignIn} showApple={showApple} />;
+        // The back affordance is OVERLAID here rather than added to
+        // LoginScreen: that component is shared with native and with the
+        // restricted/error states, none of which have a landing page to go
+        // back TO. Only this mount point does, so only this mount point
+        // draws the way back (owner call, round 6 — sign-in was a dead end).
+        return (
+            <div className="relative">
+                <button
+                    type="button"
+                    onClick={() => setSigningIn(false)}
+                    className="absolute left-6 top-8 z-10 flex items-center gap-1.5 text-sm font-medium text-text-secondary transition-colors hover:text-text"
+                >
+                    <ArrowLeft className="h-4 w-4" aria-hidden />
+                    Back
+                </button>
+                <LoginScreen onSignIn={onSignIn} showApple={showApple} />
+            </div>
+        );
     }
     return <LandingPage onGetStarted={() => setSigningIn(true)} />;
 }

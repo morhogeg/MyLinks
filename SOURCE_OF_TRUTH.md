@@ -1315,6 +1315,30 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-06 (round 6) — owner review of round 5, five calls, all shipped.**
+  **(1) Sign-in is no longer a dead end**: a quiet `← Back` overlays the
+  sign-in screen and returns to the landing. Overlaid in `SignedOutWeb`, NOT
+  added to `LoginScreen` — that component is shared with native and the
+  restricted/error states, none of which have a landing page to go back to.
+  **(2) The hero is fully centred** — mark, headline, prose, CTA on one axis;
+  the left-set version read like a document, centred it reads like an
+  announcement. **(3) "Free to start · iPhone and web" is cut** — a promise
+  line should not be footnoted. **(4) The graph labels are fixed twice over**:
+  the demo cards now carry short graph HANDLES ("Lisbon guide", "The flat",
+  "Sesame noodles") instead of full card titles — a canvas label is a handle,
+  not a headline — and the label pass now also collision-tests every candidate
+  against every node's screen disc, with an above-the-node fallback before a
+  label is dropped (a production frame had labels sitting ON neighbouring
+  discs; the app can afford label-vs-label only because its camera zooms).
+  **(5) The footer self-description is gone** — `© 2026 Machina`, nothing else;
+  by the footer the page has explained itself five times. ⚠️ That removed the
+  phrase "personal knowledge base" from the page — the hero's own sentence
+  carries the review requirement, and the suite's copy-check was updated
+  accordingly. Suites extended (Back-returns-to-landing, no CTA caption, no
+  footer self-description) — ALL PASS locally and on production after deploy.
+  No functions deploy, no TestFlight build; **1274 remains current.** Owner
+  steps 25a/25b still open.
+
 - **2026-08-06 (round 5) — owner review of round 4, five calls, all shipped.**
   **(1) The graph is now the app's graph, not a mockup.** The SVG constellation
   was rejected — rightly: a lookalike of the one feature D-2 calls uncopyable
