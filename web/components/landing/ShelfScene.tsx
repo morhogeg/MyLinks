@@ -71,7 +71,7 @@ export default function ShelfScene() {
                     className="mx-rise mt-3 text-3xl font-semibold tracking-tight text-text text-balance sm:text-4xl"
                     style={{ ['--i' as string]: 1 }}
                 >
-                    A trip, a grinder, a race, a thread.
+                    A dome, a typeface, an idea, a thread.
                 </h2>
                 <p
                     className="mx-rise mx-auto mt-5 max-w-xl text-[15px] leading-relaxed text-text-secondary text-pretty sm:text-base"

@@ -41,8 +41,9 @@ export default function ConnectScene() {
                         style={{ ['--i' as string]: 2 }}
                     >
                         Every save is compared against everything you already saved, the moment it
-                        lands — so the grinder in a screenshot ends up beside the video that dials
-                        it in, and a film about the fish market finds its way to your April trip.
+                        lands — so a screenshot of the Pantheon’s section ends up beside the article
+                        that explains what it shows, and a half-written note about a deck finds
+                        the two saves that answer it.
                     </p>
                     <p
                         className="mx-rise mt-4 text-[15px] leading-relaxed text-text-secondary text-pretty sm:text-base"
