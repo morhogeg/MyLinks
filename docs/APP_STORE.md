@@ -51,10 +51,19 @@ Notes for edge cases:
 | **Subtitle** | `Capture. Ask. Connect.` | 30 (22 used) |
 | ~~Tagline~~ | The product tagline `Everything you save, finally useful.` is **not** an App Store field — see the note under this table before pasting it anywhere. | — |
 | **Category** | Primary: **Productivity**. Secondary (optional): Utilities. | |
-| **Privacy Policy URL** | `https://my-links-sable.vercel.app/privacy` | |
-| **Support URL** | `https://my-links-sable.vercel.app` | |
-| **Marketing URL** (optional) | `https://my-links-sable.vercel.app` | |
+| **Privacy Policy URL** | `https://mymachina.app/privacy` | |
+| **Support URL** | `https://mymachina.app` | ⚠️ see note |
+| **Marketing URL** (optional) | `https://mymachina.app` | ⚠️ see note |
+| **Support email** | `support@mymachina.app` | forwards to the owner's Gmail |
 | **Copyright** | `© 2026 Mor Hogeg` | |
+
+⚠️ **The Support and Marketing URLs both point at the app root, which is
+currently the SIGN-IN SCREEN.** Apple expects a support page a signed-out
+reviewer can read, and Google's OAuth branding review already **rejected**
+`https://mymachina.app` on exactly this ground — *"your home page is behind a
+login page"* and *"does not explain the purpose of your app"* (2026-08-06). One
+public landing page fixes both reviews at once; until it exists, treat these two
+rows as provisional. `\/privacy` and `\/terms` are genuinely public and fine.
 
 ⚠️ **Do not put the tagline in the Subtitle field.** Machina's tagline is
 `Everything you save, finally useful.` (`docs/BRANDING.md` D-6) and it belongs on

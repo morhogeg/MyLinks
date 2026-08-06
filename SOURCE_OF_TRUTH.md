@@ -925,13 +925,38 @@ The multi-user auth work described below **was** fully written but not live:
     - Old links keep working — the Firebase host stays live and unchanged, so
       nothing already shared breaks. Do NOT retire it, and do NOT remove it from
       either authorized-domain list (it is the `authDomain`).
-    - Deferred, not blocking: point the App Store listing's marketing/support
-      URLs at the new domain (task 8) — `mymachina.app/privacy` and `/terms` are
-      live and already entered on the Google OAuth consent screen; decide on mail
-      (`hello@mymachina.app` — Cloudflare Email Routing forwards free but cannot
-      send; Google Workspace ≈$7/mo for real sending); and Google's **"Verify
-      branding"** review, which gates whether the custom logo shows on the
-      consent screen (the App *name* already shows). Nothing depends on it.
+    - **[x] Mail — DONE 2026-08-06.** Cloudflare **Email Routing** (free) on
+      `mymachina.app`: `hello@` and `support@` both forward to the owner's Gmail,
+      delivery owner-tested. Three `route{1,2,3}.mx.cloudflare.net` MX records
+      plus an SPF TXT, and Cloudflare **locks** them — unlock only to swap
+      providers. **Receive-only:** replies go out as the personal Gmail. Real
+      sending needs Google Workspace (≈$7/mo), which means *replacing* the MX
+      records — a swap, not an addition; never run both at once. (The destination
+      auto-verified with no confirmation email because it matches the Cloudflare
+      account's own address — that is expected, not a bug.)
+    - **[x] App Store URLs — updated in `docs/APP_STORE.md`** to the new domain,
+      plus a `support@mymachina.app` row. ⚠️ Both the Support and Marketing URLs
+      point at the app root, which is the **sign-in screen** — see task 25.
+
+25. **[ ] A public landing page at `mymachina.app` — now the highest-value item
+    the domain unblocks.** The root is the sign-in screen, so a signed-out
+    visitor learns nothing about the product. **Two separate reviews are already
+    blocked on this single gap:**
+    - **Google OAuth branding verification REJECTED it** (2026-08-06, owner
+      submitted): *"your home page is behind a login page"*, *"does not explain
+      the purpose of your app"*, and *"the app name Machina … does not match the
+      app name on your home page"* — three complaints, one cause. Its fourth,
+      *"the website is not registered to you"*, is separate and needs domain
+      ownership verified in **Google Search Console**. Do NOT resubmit before
+      the page exists; an unchanged resubmit just burns a review cycle. Nothing
+      depends on this review — it only gates whether the custom **logo** shows on
+      the consent screen; the app *name* already does.
+    - **App Review** expects a Support/Marketing URL a signed-out reviewer can
+      read (`docs/APP_STORE.md` §2 now carries a ⚠️ on both rows).
+    Content is already written and just needs a page to live on: the D-6 tagline,
+    the founder letter's fragmentation story, the launch film
+    (`marketing/launch-clip/`), and the D-7 hero. Lands on Vercel as a route, so
+    it also gives task 23's routing work its first real page.
 
 24. **[ ] Move `authDomain` to the brand domain (own change, own verify pass).**
     The Google sign-in popup's address bar still reads
@@ -1304,6 +1329,14 @@ exact-match, capped.
   Verified: 13 card shapes exercised (each platform, reserved X routes, junk
   names, screenshot/note, missing name, and an XSS attempt — which escapes
   correctly), plus a Playwright render of the full page.
+  **SHIPPED** — merge `d50f358`, functions run **#77** green (scoped
+  `Deploy-Functions: share_page`, correct here since nothing shared moved),
+  and **iOS build 1274** (run #274) archived, exported and uploaded to
+  TestFlight green. **1274 is the build that fixes share links on device** —
+  everything ≤1273 still emits the old host. Also this session: mail is live on
+  the domain (task 22), and Google's OAuth branding verification came back
+  **rejected** — which is what surfaced task **25**, the missing public landing
+  page, now the highest-value thing the domain unblocks.
 
 - **2026-08-06 — the share domain is `mymachina.app`; the "second brain" leak on
   shared links is closed in code.** Reported as *"when I share a card the link
