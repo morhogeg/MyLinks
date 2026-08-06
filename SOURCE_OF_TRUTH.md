@@ -1315,6 +1315,54 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-06 (round 5) — owner review of round 4, five calls, all shipped.**
+  **(1) The graph is now the app's graph, not a mockup.** The SVG constellation
+  was rejected — rightly: a lookalike of the one feature D-2 calls uncopyable
+  undermines the claim. `LandingGraph.tsx` runs the REAL pipeline over the demo
+  library: `buildGraphModel` (edges via the stored-AI-relations path — the demo
+  links carry `relatedLinks`, no embeddings, so the edge set is exactly what
+  `demoData.ts` writes), the real `tick` physics cooling to `ALPHA_MIN`, the
+  real `getCategoryColorStyle` hues, and a faithful port of the canvas draw
+  language (weight-driven edge alpha/width, offset radial node gradient,
+  hairline ring, screen-space labels with card-colored stroke + greedy overlap
+  culling). It assembles on scroll-into-view. Two stage adaptations, both
+  composition-only and commented: a screen-pixel FLOOR on node radius/edge
+  weight (the app views at k≈1; `spacingScale` spreads a small library so this
+  panel fits at k≈0.6, where real-size ink renders as specks — caught from a
+  rendered frame), and the island ring pulled 45% toward the centroid (the
+  builder's ring is sized for a full-screen canvas; anchors move, nodes
+  translate with them, then gravity/repulsion/springs run exactly as shipped).
+  The `kettlebell` card is seeded UNTIED on purpose: degree-0 nodes drop here
+  exactly as in the app, and a fake tie reads fine until someone asks why a
+  workout connects to noodles.
+  **(2) The capture scene cycles itself** — the three-tab segmented control was
+  repetition dressed as content (the pipeline is the same five steps; only the
+  second label changes). One demo now plays link → screenshot → video in a
+  loop, quiet indicators name the running kind, the copy still names all three
+  in prose. The landing `Segmented` was deleted (settings has its own).
+  **(3) Light theme is one click away**: the app's `ThemeToggle` sits in the
+  landing header — it works on the auth-free `/welcome` because `layout.tsx`
+  mounts `ThemeProvider` OUTSIDE the auth gate. Both themes re-verified; the
+  graph repaints on theme flip via a MutationObserver (colors are read per
+  draw).
+  **(4) The browser extension is off the page** — hero, capture copy, and the
+  Surfaces grid (now two cards): the phone and the web app are the story; the
+  extension earns its mention after install.
+  **(5) No personal name in the footer** — `© 2026 Machina`. The App Store
+  copyright FIELD keeps the legal name (`docs/APP_STORE.md` §2); that is a
+  form, not a page.
+  Also: Ask now demos itself — it advances to the next question after each
+  answer until the reader clicks, then hands the wheel over for good (same
+  alive-until-touched rule as capture).
+  Verified: suite updated for the new behaviour and ALL PASS — capture
+  auto-cycles (source line changes with no click), Ask auto-advances and yields
+  to a click, **the graph canvas is asserted painted by pixel-sampling**, the
+  theme toggle flips `<html>`, zero hits for `extension` and the personal name,
+  D-3/D-1 scans still 0, eight overflow widths, reduced-motion, native path
+  (LoginScreen, landing chunk never downloaded), both builds, separation intact.
+  **SHIPPED** — merge to `main`, Vercel auto-deploy. No functions deploy, no
+  TestFlight build; **1274 remains current.** Owner steps 25a/25b still open.
+
 - **2026-08-06 (round 4) — the landing page becomes the product demo.** Owner
   review of round 3: *"the homepage before sign in is not good enough"* — make it
   interactive and impressive. The page is now five built scenes instead of three

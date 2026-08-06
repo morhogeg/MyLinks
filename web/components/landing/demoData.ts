@@ -277,38 +277,67 @@ export const SHELF: DemoCard[] = [
 /* ------------------------------------------------- act five: the connections */
 
 /**
- * The graph beat: the same library, seen as what connects to what. The three
- * clusters are the categories above, and the cross-links are the ones a person
- * would actually recognise — the flat and the commute note, the trip and the
- * pastelaria. `docs/BRANDING.md` D-2 calls the knowledge graph the one beat a
- * competitor cannot copy, which is why it gets its own scene rather than a
- * bullet.
- */
-/**
- * Positions are percentages of a SQUARE panel, so they must use the full 0–100
- * of both axes — the first pass topped out at y=68 and left the bottom third of
- * the panel visibly empty.
+ * The graph scene's library — real `Link` objects, because the scene runs the
+ * REAL graph pipeline (`buildGraphModel` → `tick`), not a mockup. Owner call,
+ * 2026-08-06 round 5: "graph should be our own exact graph".
  *
- * The layout is three clusters, not a cloud: travel down the left, food through
- * the middle, home on the right. `chicken → flat` is the one edge that crosses
- * clusters, which is the whole idea — the connections you would not have filed
- * yourself.
+ * It is the SHELF, one entry per shelf card, so a reader who scans the shelf
+ * and then watches the constellation assemble sees the same twelve saves in
+ * both. Ties are `relatedLinks` — the stored-AI-relations path, the same one a
+ * real library's edges come from (these links carry no embeddings, so the
+ * pairwise pass contributes nothing, which keeps the edge set exactly what is
+ * written here). Similarity values sit in the real path's observed range;
+ * >0.82 renders as a `strong` edge.
+ *
+ * The one edge that matters most is `night-market ↔ lisbon`: a food-logistics
+ * video tied to a travel guide is a connection nobody would have filed, which
+ * is the section's entire claim. `kettlebell` is seeded but UNTIED on purpose:
+ * the builder drops degree-0 nodes exactly as it does in the app (a card with
+ * no qualifying tie is counted, not drawn), and the honest options were worse —
+ * a fake tie reads fine until someone asks why a workout connects to noodles.
  */
-export const GRAPH_NODES: { id: string; label: string; x: number; y: number }[] = [
-    { id: 'lisbon', label: 'Lisbon', x: 20, y: 24 },
-    { id: 'pastel', label: 'Pastelaria', x: 13, y: 58 },
-    { id: 'flights', label: 'Flights', x: 34, y: 84 },
-    { id: 'noodles', label: 'Sesame noodles', x: 56, y: 13 },
-    { id: 'chicken', label: 'Lemon chicken', x: 52, y: 50 },
-    { id: 'flat', label: 'Two-bed flat', x: 79, y: 31 },
-    { id: 'commute', label: 'Commute', x: 84, y: 73 },
+type GraphSeed = {
+    id: string;
+    title: string;
+    category: string;
+    tags: string[];
+    ties?: [string, number][];
+};
+
+const GRAPH_SEEDS: GraphSeed[] = [
+    { id: 'lisbon', title: '36 hours in Lisbon', category: 'Travel', tags: ['lisbon', 'city break'], ties: [['pastel', 0.86], ['flights', 0.8]] },
+    { id: 'pastel', title: 'Pastelaria in Alfama', category: 'Travel', tags: ['lisbon', 'food'], ties: [['flights', 0.72]] },
+    { id: 'flights', title: 'Flights — landing Thu', category: 'Travel', tags: ['lisbon', 'dates'] },
+    { id: 'chicken', title: 'One-pan lemon chicken', category: 'Recipes', tags: ['weeknight', '35 min'], ties: [['noodles', 0.84], ['sourdough', 0.74]] },
+    { id: 'noodles', title: '15-minute sesame noodles', category: 'Recipes', tags: ['weeknight', '15 min'] },
+    { id: 'sourdough', title: 'Sourdough, no starter', category: 'Cooking', tags: ['bread', 'weekend'] },
+    { id: 'flat', title: 'Two-bed, balcony, north side', category: 'Home', tags: ['flat', 'shortlist'], ties: [['commute', 0.9]] },
+    { id: 'commute', title: 'Commute: 1 change, ~40 min', category: 'Home', tags: ['flat', 'commute'] },
+    { id: 'kettlebell', title: 'Kettlebell complex, 20 min', category: 'Fitness', tags: ['kettlebell', 'short session'] },
+    { id: 'tools', title: 'The case for boring tools', category: 'Ideas', tags: ['making', 'longevity'], ties: [['headphones', 0.68]] },
+    { id: 'night-market', title: 'How a night market feeds a city', category: 'Ideas', tags: ['cities', 'food'], ties: [['tools', 0.7], ['lisbon', 0.64]] },
+    { id: 'headphones', title: 'Headphones for an open office', category: 'Shopping', tags: ['audio', 'work'] },
 ];
 
-export const GRAPH_EDGES: [string, string][] = [
-    ['lisbon', 'pastel'],
-    ['lisbon', 'flights'],
-    ['pastel', 'flights'],
-    ['flat', 'commute'],
-    ['noodles', 'chicken'],
-    ['chicken', 'flat'],
-];
+/** `Link`-shaped, minimally: only the fields `buildGraphModel` and the draw
+ *  pass read (id/title/category/status/relatedLinks). Typed as the app's real
+ *  `Link` so a model change that adds a required field breaks THIS file at
+ *  compile time instead of the scene at runtime. */
+export const GRAPH_LINKS: import('@/lib/types').Link[] = GRAPH_SEEDS.map((s) => ({
+    id: s.id,
+    url: `https://example.com/${s.id}`,
+    title: s.title,
+    summary: '',
+    tags: s.tags,
+    category: s.category,
+    status: 'unread' as const,
+    createdAt: 0,
+    metadata: { originalTitle: s.title, estimatedReadTime: 1 },
+    relatedLinks: (s.ties ?? []).map(([id, similarity]) => ({
+        id,
+        title: '',
+        reason: '',
+        similarity,
+        commonConcepts: [],
+    })),
+}));

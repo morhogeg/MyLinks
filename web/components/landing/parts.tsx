@@ -101,55 +101,6 @@ export function CardView({ card, compact = false, className = '' }: {
     );
 }
 
-/**
- * The segmented control the capture scene switches sources with.
- *
- * A real control, not a decorative one: it is a `radiogroup`, arrow keys move
- * between options, and the selected option is announced. The landing page is
- * the one surface guaranteed to be opened by people using a keyboard and a
- * screen reader to evaluate the product.
- */
-export function Segmented<T extends string>({ options, value, onChange, label }: {
-    options: { id: T; label: string }[];
-    value: T;
-    onChange: (id: T) => void;
-    label: string;
-}) {
-    const move = (dir: 1 | -1) => {
-        const i = options.findIndex((o) => o.id === value);
-        onChange(options[(i + dir + options.length) % options.length].id);
-    };
-    return (
-        <div
-            role="radiogroup"
-            aria-label={label}
-            className="inline-flex rounded-full border border-border-subtle bg-fill-subtle p-1"
-            onKeyDown={(e) => {
-                if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); move(1); }
-                if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); move(-1); }
-            }}
-        >
-            {options.map((o) => {
-                const on = o.id === value;
-                return (
-                    <button
-                        key={o.id}
-                        type="button"
-                        role="radio"
-                        aria-checked={on}
-                        tabIndex={on ? 0 : -1}
-                        onClick={() => onChange(o.id)}
-                        className={
-                            'rounded-full px-4 py-1.5 text-[13px] font-medium transition-colors duration-200 '
-                            + (on
-                                ? 'bg-accent text-accent-ink shadow-sm'
-                                : 'text-text-secondary hover:text-text')
-                        }
-                    >
-                        {o.label}
-                    </button>
-                );
-            })}
-        </div>
-    );
-}
+// (A Segmented control lived here until 2026-08-06 round 5 — the capture scene
+// now cycles its sources itself instead of asking the reader to. The settings
+// screens have their own `Segmented` in `settings/primitives.tsx`.)
