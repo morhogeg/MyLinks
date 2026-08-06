@@ -1315,6 +1315,46 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-06 (round 8) — "use the actual app": the landing now borrows the
+  app's own components.** Owner review of round 7, six calls.
+  **(1) The demo cards ARE the app's card** — `landing/parts.tsx CardView` now
+  reproduces `components/Card.tsx`'s anatomy at rest with the app's own
+  building blocks: the REAL `SourceByline` (YouTube channel, X @handle, IG
+  handle, Screenshot/Note icons — pixel-identical to the feed), the real
+  `getCategoryColorStyle` tinted category chip, the card's own shell/tag/Clock
+  classes. Interactive chrome (hover pill, action sheet, category editing) is
+  deliberately absent — the card at rest, not a dead-buttons mock. `DemoCard`
+  grew the Link-ish fields the byline reads.
+  **(2) The hero and Ask carry the app's LIVING mark** — `CitationMark`, the
+  exact component the Ask page mounts: hero at size 84 playing its `launch`
+  arrival into the `listening` breath with the identity glow; the Ask scene's
+  answer row wears it as the avatar, switching verbs the way Ask does
+  (`searching` while reading saves, `shaping` while streaming, `listening` at
+  rest). ⚠️ Wrapped in `landing/parts.tsx LiveMark`: `CitationMark` mints SVG
+  ids from a module counter, fine in the client-only app but a hydration
+  mismatch on the SSG `/welcome` — until mounted it renders the static locked
+  glyph in the same slot, then the living mark takes over one frame after
+  hydration with no visual jump.
+  **(3) Screenshot captures no longer say "Fetching the link"** — steps 0 AND 1
+  are source-specific ("Receiving the screenshot", "Fetching the video"). The
+  APP's own banner has the same wart (one `LINK_SCAN_STEPS` for every source);
+  flagged as a spawned background task, not fixed from the marketing page.
+  **(4) The library de-duplicated its themes** — round 7 had two food-flavoured
+  islands; the cooking cluster is now a **trail-50k** cluster (pacing guide,
+  shoe thread, taper video; Ask question to match) and Tsukiji is category
+  Film, so the graph reads TOKYO / ESPRESSO / TRAIL 50K. Shelf headline
+  updated with it ("A trip, a grinder, a race, a thread.").
+  **(5) The headline arrives a word at a time** — each word rises from its own
+  overflow clip after the mark's launch lands (`.mx-word-up`); real text nodes
+  throughout, and reduced-motion lands the line whole. Caught from a
+  screenshot: a trailing space INSIDE an inline-block is trimmed, which
+  rendered "Everythingyou save,finallyuseful." — the space now lives outside
+  the clip span.
+  Suites ALL PASS (the hydration mismatch was itself caught by the
+  no-console-errors check). **SHIPPED** — merge to `main`, Vercel auto-deploy,
+  verified on production. No functions deploy, no TestFlight build; **1274
+  remains current.** Owner steps 25a/25b still open.
+
 - **2026-08-06 (round 7) — owner review of round 6: six calls plus "gaps too
   big", all shipped.**
   **(1) The graph now looks like OURS, named by the pipeline itself.** The

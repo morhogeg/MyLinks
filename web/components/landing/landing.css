@@ -85,6 +85,38 @@
   animation: mx-pop 0.42s var(--ease-spring) calc(var(--i, 0) * var(--mx-step)) both;
 }
 
+/* ------------------------------------------------------- the hero headline */
+
+/*
+ * Word-by-word arrival for the tagline: each word sits in an overflow-clipped
+ * inline-block and rises out of it, left to right. The clip is what makes it
+ * read as TYPE ARRIVING rather than elements fading — the word appears from
+ * its own baseline, the way keynote titles do. Delay starts at 0.5s so the
+ * mark's launch (the app's own ~0.9s arrival) is clearly first and the words
+ * land as its consequence.
+ */
+@keyframes mx-word-up {
+  from {
+    transform: translateY(110%);
+  }
+
+  to {
+    transform: none;
+  }
+}
+
+.mx-clip {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+}
+
+.mx-word-up {
+  display: inline-block;
+  transform: translateY(110%);
+  animation: mx-word-up 0.7s var(--ease-modal) calc(0.5s + var(--i, 0) * 80ms) both;
+}
+
 /* ------------------------------------------------------------- the hero mark */
 
 /*
@@ -509,6 +541,12 @@
   .mx-shelf-track,
   .mx-sweep::after {
     animation: none !important;
+  }
+
+  /* The headline lands whole — the words hold their final frame. */
+  .mx-word-up {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
   }
 
   /* The shelf still needs to be readable when it isn't moving. */
