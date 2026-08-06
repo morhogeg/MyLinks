@@ -1367,11 +1367,21 @@ exact-match, capped.
   static export); rendered and eyeballed in **both themes** at desktop and 390px.
   Also added `.claude/launch.json` so the dev server is one `preview_start` away
   for the next render-verification pass.
-  **NOT SHIPPED YET — two owner steps, in this order:** (1) verify domain
-  ownership in **Google Search Console** (Google's fourth rejection reason, which
-  no page can fix), then (2) re-submit **"Verify branding"** — and not before
-  `https://mymachina.app` is confirmed live in a private window. See tasks
-  25a/25b.
+  **SHIPPED** — merge `2bc38b1` to `main`, Vercel auto-deploy, live ~60s later.
+  **No Cloud Functions run fired and none should have** (nothing under
+  `functions/**` changed), and **no TestFlight build was cut**: the landing page
+  is invisible inside the shell by design, so a new build would carry only the
+  71KB still and zero behaviour change. **1274 remains the current build.**
+  Verified on the live domain, not just locally: `https://mymachina.app/` returns
+  the landing page signed-out; `/welcome` serves the full prose in its no-JS HTML
+  (name, purpose, tagline and "personal knowledge base" all present); the D-3
+  word scan on the live HTML returns **0**; `media-src 'self'
+  https://cdn.mymachina.app` is on the live CSP header; and
+  `/film-still-fragmentation.jpg` serves 71328 bytes as `image/jpeg`.
+  **Two owner steps remain, in this order:** (1) verify domain ownership in
+  **Google Search Console** — Google's fourth rejection reason, which no page can
+  fix; then (2) re-submit **"Verify branding"**. Doing (2) first just brings the
+  fourth reason back on its own. See tasks 25a/25b.
 
 - **2026-08-06 (round 2) — the share page now looks like the app.** Owner review
   of the live page found three things, all fixed in one pass.
