@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowDown, Share2, Globe, Puzzle } from 'lucide-react';
+import { ArrowDown, Share2, Globe } from 'lucide-react';
 import { CitationGlyph, Wordmark } from '@/components/ui/Wordmark';
+import ThemeToggle from '@/components/ThemeToggle';
 import GatherScene from '@/components/landing/GatherScene';
 import CaptureScene from '@/components/landing/CaptureScene';
 import AskScene from '@/components/landing/AskScene';
@@ -151,9 +152,16 @@ function Header({ onGetStarted }: { onGetStarted?: () => void }) {
                 <CitationGlyph className="h-5 w-auto" />
                 <Wordmark className="h-[11px] w-auto" />
             </span>
-            {onGetStarted
-                ? <button type="button" onClick={onGetStarted} className={cls}>Sign in</button>
-                : <Link href="/" className={cls}>Sign in</Link>}
+            <span className="flex items-center gap-4">
+                {/* The app's own theme control. The page reads correctly in both
+                    themes (every colour is a token), so let a visitor see both —
+                    layout.tsx mounts ThemeProvider outside the auth gate, which
+                    is why this works on the auth-free /welcome route too. */}
+                <ThemeToggle />
+                {onGetStarted
+                    ? <button type="button" onClick={onGetStarted} className={cls}>Sign in</button>
+                    : <Link href="/" className={cls}>Sign in</Link>}
+            </span>
         </header>
     );
 }
@@ -247,6 +255,10 @@ function Hero({ onGetStarted }: { onGetStarted?: () => void }) {
 
 /* ------------------------------------------------------------------ surfaces */
 
+/** Two surfaces, not three — the browser extension was dropped from this page
+ *  by owner call (2026-08-06 round 5): the phone and the web app are the
+ *  product's story; the extension is a convenience that can earn its mention
+ *  after install, not on the home page. */
 const SURFACES = [
     {
         icon: Share2,
@@ -259,12 +271,6 @@ const SURFACES = [
         title: 'From your computer',
         body: 'The web app holds the same library — save from your phone in the morning, '
             + 'find it on your laptop that afternoon. Nothing to sync by hand.',
-    },
-    {
-        icon: Puzzle,
-        title: 'From the page you are on',
-        body: 'The browser extension saves what you are reading without leaving it, so the '
-            + 'tab you were about to keep open for a month can just be closed.',
     },
 ];
 
@@ -288,7 +294,7 @@ function Surfaces() {
                     Wherever you were when you found it.
                 </h2>
             </div>
-            <div className="mt-12 grid gap-4 md:grid-cols-3">
+            <div className="mx-auto mt-12 grid max-w-3xl gap-4 md:grid-cols-2">
                 {SURFACES.map((s, i) => (
                     <div
                         key={s.title}
@@ -374,8 +380,11 @@ function Footer() {
                         support@mymachina.app
                     </a>
                 </nav>
+                {/* No personal name here (owner call, round 5) — the page speaks
+                    as the product. The App Store copyright FIELD keeps the legal
+                    name (docs/APP_STORE.md §2); that is a form, not a page. */}
                 <p className="mt-6 text-[13px] text-text-muted">
-                    © 2026 Mor Hogeg. Machina is a personal knowledge base for the things you save.
+                    © 2026 Machina — a personal knowledge base for the things you save.
                 </p>
             </div>
         </footer>

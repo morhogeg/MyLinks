@@ -31,6 +31,11 @@ export default function AskScene() {
     const [ref, inView] = useInView<HTMLElement>();
     const [qIndex, setQIndex] = useState(0);
     const [runId, setRunId] = useState(0);
+    // True once the reader has picked a question themselves. Until then the
+    // scene demos itself, advancing to the next question after each answer —
+    // the same "alive until touched" rule the capture scene follows. The first
+    // click hands the wheel over for good.
+    const [interacted, setInteracted] = useState(false);
 
     const q = QUESTIONS[qIndex];
     const words = useMemo(() => q.a.split(' '), [q.a]);
@@ -92,6 +97,17 @@ export default function AskScene() {
 
     const complete = shown >= words.length;
 
+    // Self-demo: advance to the next question a beat after the citations land.
+    // Stops the moment the reader takes over, off-screen, or with motion off.
+    useEffect(() => {
+        if (!complete || interacted || !inView || prefersReducedMotion()) return;
+        const id = setTimeout(() => {
+            setQIndex((i) => (i + 1) % QUESTIONS.length);
+            setRunId((n) => n + 1);
+        }, 5600);
+        return () => clearTimeout(id);
+    }, [complete, interacted, inView]);
+
     return (
         <section ref={ref} aria-labelledby="mx-ask-title" className="mx-auto max-w-3xl px-6 py-20 sm:py-28">
             <div className="mx-auto max-w-2xl text-center">
@@ -119,7 +135,7 @@ export default function AskScene() {
                         <button
                             key={item.q}
                             type="button"
-                            onClick={() => { setQIndex(i); setRunId((n) => n + 1); }}
+                            onClick={() => { setInteracted(true); setQIndex(i); setRunId((n) => n + 1); }}
                             aria-pressed={i === qIndex}
                             className={
                                 'shrink-0 rounded-full border px-4 py-2 text-[13px] transition-colors duration-200 '
