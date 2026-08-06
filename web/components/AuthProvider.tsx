@@ -19,6 +19,7 @@ import {
     readLocalPushPrompt, writeLocalPushPrompt,
 } from '@/lib/push';
 import LoginScreen from '@/components/LoginScreen';
+import SignedOutWeb from '@/components/SignedOutWeb';
 import Onboarding from '@/components/Onboarding';
 import AIConsentNotice from '@/components/AIConsentNotice';
 
@@ -373,9 +374,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             );
         }
         if (gated && !authUid) {
+            // WEB gets the public landing page here, with sign-in one click
+            // behind it; NATIVE keeps going straight to LoginScreen.
+            //
+            // This branch is the ONLY thing that changed to give mymachina.app a
+            // marketing home page, and it is deliberately not a routing change:
+            // the iOS app is a Capacitor shell serving this same bundle from
+            // capacitor://localhost, so moving the app off `/` would have opened
+            // every iPhone onto marketing instead of their library. Gating on
+            // `native` here means the native path is untouched by construction —
+            // no route moved, and a signed-in user never reaches this branch on
+            // either platform.
             return (
                 <AuthContext.Provider value={value}>
-                    <LoginScreen onSignIn={signIn} showApple={!native || REQUIRE_AUTH} />
+                    {native ? (
+                        <LoginScreen onSignIn={signIn} showApple={REQUIRE_AUTH} />
+                    ) : (
+                        <SignedOutWeb onSignIn={signIn} showApple />
+                    )}
                 </AuthContext.Provider>
             );
         }
