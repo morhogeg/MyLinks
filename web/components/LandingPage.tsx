@@ -1,8 +1,15 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { ArrowDown, Share2, Globe, Puzzle } from 'lucide-react';
 import { CitationGlyph, Wordmark } from '@/components/ui/Wordmark';
+import GatherScene from '@/components/landing/GatherScene';
+import CaptureScene from '@/components/landing/CaptureScene';
+import AskScene from '@/components/landing/AskScene';
+import ConnectScene from '@/components/landing/ConnectScene';
+import ShelfScene from '@/components/landing/ShelfScene';
+import { useInView } from '@/components/landing/hooks';
+import '@/components/landing/landing.css';
 
 /**
  * The public landing page — what a SIGNED-OUT visitor to mymachina.app sees.
@@ -15,35 +22,45 @@ import { CitationGlyph, Wordmark } from '@/components/ui/Wordmark';
  * name on your home page" — and App Review expects a Support/Marketing URL a
  * signed-out reviewer can read (`docs/APP_STORE.md` §2).
  *
- * That review requirement is a CONTENT requirement, and it constrains the
- * design: reviewers read TEXT. The film is decoration on top of an argument
- * that has to survive with video disabled, blocked, or never hosted. Every
- * claim a reviewer needs — what the product is, who it is by, what it does with
- * your data, where the policy lives — is in prose, above the fold or one scroll
- * below it, and the product name appears as plain text (not only as the drawn
- * wordmark, which is SVG path data a name-matching check can't read).
+ * THE ONE RULE THAT SHAPES EVERYTHING HERE: **reviewers read text.** Every
+ * scene on this page is a demonstration wrapped around a paragraph, never
+ * instead of one. Turn off JavaScript, turn on reduce-motion, or read the
+ * prerendered HTML of `/welcome`, and the full argument is still there in
+ * prose — what the product is, who it is by, what it does with your data, and
+ * where the policy lives. The choreography is the reason someone keeps
+ * scrolling; the prose is the reason the page passes.
+ *
+ * THE ARC, and why it is in this order:
+ *   Hero      the promise + the plain sentence a reviewer needs in 20 seconds
+ *   Gather    the problem, scroll-driven — five silos collapsing into one mark
+ *   Capture   what happens to a save, run live on the REAL pipeline steps
+ *   Ask       the payoff, interactive — a cited answer from your own saves
+ *   Connect   the moat: edges drawing in, connections being found
+ *   Shelf     proof of the D-7 hero: one row, every platform, all of it here
+ *   Surfaces / Privacy / Close / Footer
+ * That is the launch film's own running order, and it is D-7's ordering too:
+ * gathering is the promise, recall is the payoff.
  *
  * COPY IS NOT FREELY EDITABLE. It is the positioning of record:
- *  - the h1 is the D-6 tagline VERBATIM (`docs/BRANDING.md`) — that exact string
- *    is tracked across six surfaces now, this being the sixth;
+ *  - the `<h1>` is the D-6 tagline VERBATIM (`docs/BRANDING.md`) — that exact
+ *    string is tracked across six surfaces, this being the sixth;
  *  - the hero is D-7's consolidated capture ("one place that holds everything
- *    you save"), NOT recall-first — recall is the payoff, further down;
+ *    you save"), NOT recall-first;
  *  - "You never remember where you saved it" is the launch film's act one and
- *    the founder letter's problem: fragmentation, NOT clutter.
+ *    the founder letter's problem: fragmentation, NOT clutter;
  *  - D-3 IS ABSOLUTE HERE: the words "second brain" and "ai" appear nowhere on
- *    this page, and this is the most visible surface in the product. The App
- *    Store description's "AI summaries, categories, and tags" bullet must be
- *    PARAPHRASED, never pasted.
+ *    this page or in any demo string it renders, and this is the most visible
+ *    surface in the product. The App Store description's "AI summaries,
+ *    categories, and tags" bullet must be PARAPHRASED, never pasted.
  *  - D-1: the name is "Machina", never "Machina AI".
  *
  * Rendered from two mount points, deliberately:
  *  - `/welcome` — a genuinely static public route (no AuthProvider at all, see
  *    `lib/publicRoutes.tsx`), so the prose is in the prerendered HTML for a
  *    crawler or a JS-less fetch, and there is one URL that is provably
- *    auth-free. `onGetStarted` is omitted there, so the CTA is a link to `/`.
- *  - `/` — via `AuthProvider`'s signed-out branch, WEB ONLY. Native never
- *    reaches it (see the comment at that call site), so the iOS shell still
- *    opens into the app.
+ *    auth-free. `onGetStarted` is omitted there, so the CTA links to `/`.
+ *  - `/` — via `AuthProvider`'s signed-out branch, WEB ONLY and lazily loaded,
+ *    so none of this rides in the iOS bundle. Native never reaches it.
  */
 export default function LandingPage({
     /** Web root only: reveal the real sign-in screen. Omitted on `/welcome`,
@@ -57,9 +74,11 @@ export default function LandingPage({
             <Header onGetStarted={onGetStarted} />
             <main>
                 <Hero onGetStarted={onGetStarted} />
-                <Problem />
-                <Film />
-                <What />
+                <GatherScene />
+                <CaptureScene />
+                <AskScene />
+                <ConnectScene />
+                <ShelfScene />
                 <Surfaces />
                 <Privacy />
                 <Close onGetStarted={onGetStarted} />
@@ -71,61 +90,48 @@ export default function LandingPage({
 
 /* ---------------------------------------------------------------- primitives */
 
-/** The one primary action on the page. A button when sign-in is reachable from
- *  this mount point, a link to the root when it isn't — same pixels either way,
- *  so the two mount points can't drift apart visually. */
-function GetStarted({
-    onGetStarted,
-    label = 'Get started',
-    className = '',
-}: {
+/** The one primary action on the page. A button where sign-in is reachable from
+ *  this mount point, a link to the root where it isn't — same pixels either way,
+ *  so the two mount points cannot drift apart visually. */
+function GetStarted({ onGetStarted, label = 'Get started', className = '' }: {
     onGetStarted?: () => void;
     label?: string;
     className?: string;
 }) {
     const cls =
-        'inline-flex items-center justify-center rounded-full bg-accent text-accent-ink ' +
-        'px-6 py-3 text-sm font-semibold shadow-sm shadow-accent/20 ' +
-        `hover:bg-accent-hover transition-colors ${className}`;
-    if (onGetStarted) {
-        return (
-            <button type="button" onClick={onGetStarted} className={cls}>
-                {label}
-            </button>
-        );
-    }
-    return (
-        <Link href="/" className={cls}>
-            {label}
-        </Link>
-    );
+        'inline-flex items-center justify-center rounded-full bg-accent px-6 py-3 text-sm '
+        + 'font-semibold text-accent-ink shadow-sm shadow-accent/20 transition-colors '
+        + `hover:bg-accent-hover ${className}`;
+    return onGetStarted
+        ? <button type="button" onClick={onGetStarted} className={cls}>{label}</button>
+        : <Link href="/" className={cls}>{label}</Link>;
 }
 
-/** A titled block of prose. `kicker` is the letterspaced label the film uses
- *  above its own act beats — the page borrows that rhythm so the two assets
- *  read as one piece. */
-function Section({
-    kicker,
-    title,
-    children,
-    id,
-}: {
+/** A prose section that arrives as one gesture when it scrolls into view. */
+function Section({ kicker, title, children, className = '' }: {
     kicker?: string;
     title: string;
     children: React.ReactNode;
-    id?: string;
+    className?: string;
 }) {
+    const [ref, seen] = useInView<HTMLElement>();
     return (
-        <section id={id} className="mx-auto max-w-3xl px-6 py-14 sm:py-20">
+        <section
+            ref={ref}
+            className={`mx-auto max-w-2xl px-6 py-20 text-center sm:py-28 ${seen ? 'mx-in' : ''} ${className}`}
+        >
             {kicker && (
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-text-muted">
+                <p className="mx-rise text-[11px] font-semibold uppercase tracking-[0.18em] text-text-muted">
                     {kicker}
                 </p>
             )}
-            <h2 className="mt-3 text-2xl sm:text-3xl font-semibold tracking-tight text-text text-balance">
+            <h2
+                className="mx-rise mt-3 text-3xl font-semibold tracking-tight text-text text-balance sm:text-4xl"
+                style={{ ['--i' as string]: 1 }}
+            >
                 {title}
             </h2>
-            <div className="mt-5 space-y-4 text-[15px] sm:text-base leading-relaxed text-text-secondary">
+            <div className="mt-5 space-y-4 text-[15px] leading-relaxed text-text-secondary text-pretty sm:text-base">
                 {children}
             </div>
         </section>
@@ -135,31 +141,19 @@ function Section({
 /* -------------------------------------------------------------------- header */
 
 function Header({ onGetStarted }: { onGetStarted?: () => void }) {
+    const cls = 'text-sm font-medium text-text-secondary transition-colors hover:text-text';
     return (
-        <header className="mx-auto max-w-3xl px-6 pt-8 flex items-center justify-between">
-            {/* The header lockup the app itself uses: the BARE citation mark
-                (a rounded container here reads as a shrunken app icon, not as
-                the brand mark) beside the drawn wordmark. */}
+        <header className="mx-auto flex max-w-6xl items-center justify-between px-6 pt-8">
+            {/* The header lockup the app itself uses: the BARE citation mark (a
+                rounded container here reads as a shrunken app icon, not as the
+                brand mark) beside the drawn wordmark. */}
             <span className="flex items-center gap-2 text-text">
                 <CitationGlyph className="h-5 w-auto" />
                 <Wordmark className="h-[11px] w-auto" />
             </span>
-            {onGetStarted ? (
-                <button
-                    type="button"
-                    onClick={onGetStarted}
-                    className="text-sm font-medium text-text-secondary hover:text-text transition-colors"
-                >
-                    Sign in
-                </button>
-            ) : (
-                <Link
-                    href="/"
-                    className="text-sm font-medium text-text-secondary hover:text-text transition-colors"
-                >
-                    Sign in
-                </Link>
-            )}
+            {onGetStarted
+                ? <button type="button" onClick={onGetStarted} className={cls}>Sign in</button>
+                : <Link href="/" className={cls}>Sign in</Link>}
         </header>
     );
 }
@@ -168,148 +162,148 @@ function Header({ onGetStarted }: { onGetStarted?: () => void }) {
 
 function Hero({ onGetStarted }: { onGetStarted?: () => void }) {
     return (
-        <section className="mx-auto max-w-3xl px-6 pt-16 pb-10 sm:pt-24 sm:pb-14">
-            <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight text-text text-balance">
-                Everything you save, finally useful.
-            </h1>
-
-            {/* The D-7 hero, in one sentence, with the product NAMED in plain
-                text — Google's third rejection reason was that the app name on
-                the consent screen didn't match the home page, and the drawn
-                wordmark above is SVG paths, not readable text. */}
-            <p className="mt-6 text-lg sm:text-xl leading-relaxed text-text text-pretty">
-                <span className="font-semibold">Machina</span> is one place that holds
-                everything you save — from every app you save it in.
-            </p>
-
-            <p className="mt-5 text-[15px] sm:text-base leading-relaxed text-text-secondary text-pretty">
-                Send a link, a screenshot or a video to Machina from anywhere. It reads
-                the page, watches the video, looks at the screenshot — and turns each
-                save into a clean card with a real summary, a category, tags, and
-                connections to things you saved before. Then you can ask your own saves
-                a question and get an answer in plain language, with citations back to
-                your own sources.
-            </p>
-
-            <div className="mt-9 flex flex-wrap items-center gap-3">
-                <GetStarted onGetStarted={onGetStarted} />
-                <span className="text-[13px] text-text-muted">
-                    Free to start · iPhone and web
+        <section className="mx-ground relative mx-auto flex min-h-[88vh] max-w-3xl flex-col justify-center px-6 py-20">
+            <div className="relative">
+                {/* The mark assembling: the identity's stated sequence — the
+                    brackets close, then the point lands, then the glow blooms.
+                    Plays on load, not on scroll: it is the first thing on the
+                    page and it is the app's own boot gesture, so arriving on
+                    mymachina.app feels like opening Machina. */}
+                <span className="relative inline-flex" aria-hidden>
+                    <span
+                        className="mx-halo absolute -inset-[55%] rounded-full"
+                        style={{
+                            background:
+                                'radial-gradient(closest-side, var(--accent-ring), transparent 72%)',
+                        }}
+                    />
+                    <svg
+                        viewBox="288 292 448 416"
+                        className="mx-glow-in relative h-14 w-auto text-text"
+                        fill="currentColor"
+                    >
+                        <path className="mx-bracket-l" d="M296 300 L396 300 L396 358 L354 358 L354 642 L396 642 L396 700 L296 700 Z" />
+                        <path className="mx-bracket-r" d="M728 300 L628 300 L628 358 L670 358 L670 642 L628 642 L628 700 L728 700 Z" />
+                        <circle className="mx-point" cx="512" cy="500" r="52" />
+                    </svg>
                 </span>
-            </div>
-        </section>
-    );
-}
 
-/* ------------------------------------------------------------------- problem */
+                {/* `mx-in` is set unconditionally here — the hero is above the
+                    fold, so waiting for an intersection callback would show a
+                    blank frame first. */}
+                <div className="mx-in mt-10">
+                    <h1
+                        className="mx-rise text-4xl font-semibold tracking-tight text-text text-balance sm:text-6xl"
+                        style={{ ['--i' as string]: 2 }}
+                    >
+                        Everything you save, finally useful.
+                    </h1>
 
-function Problem() {
-    return (
-        <Section kicker="The problem" title="You never remember where you saved it.">
-            <p>
-                A recipe goes into Instagram saves. A thread gets bookmarked on X. A
-                video lands in Watch Later, an article in a message to yourself, and one
-                more tab stays open on your phone for a month.
-            </p>
+                    {/* The D-7 hero in one sentence, with the product NAMED in
+                        plain text — Google's third rejection reason was that the
+                        app name on the consent screen didn't match the home
+                        page, and the drawn wordmark above is SVG path data, not
+                        readable text. */}
+                    <p
+                        className="mx-rise mt-6 text-lg leading-relaxed text-text text-pretty sm:text-2xl"
+                        style={{ ['--i' as string]: 3 }}
+                    >
+                        <span className="font-semibold">Machina</span> is one place that holds
+                        everything you save — from every app you save it in.
+                    </p>
 
-            {/* Act one of the launch film, as a still (frame 300 of the clean
-                cut, `marketing/launch-clip/`) — five silos with five counts, the
-                page's own argument drawn rather than described. A STILL, not the
-                film: it is 71KB, it is committed and same-origin, so it needs no
-                CDN, no CSP change and no owner step, and it is on the page from
-                the first ship. It carries the section on its own if the film is
-                never hosted. Bordered and inset rather than full-bleed because
-                the film is graded LIGHT and the app's default theme is dark — an
-                edge-to-edge white block reads as a blown-out hole in the page,
-                a framed one reads as a screenshot. */}
-            <figure className="!mt-8 overflow-hidden rounded-2xl border border-border-subtle bg-card p-2 shadow-[var(--shadow-card)]">
-                <img
-                    src="/film-still-fragmentation.jpg"
-                    alt="Five separate apps, each holding its own pile of saved things: Instagram 24, X 32, YouTube 15, WhatsApp 59, Safari 48."
-                    width={1600}
-                    height={900}
-                    loading="lazy"
-                    decoding="async"
-                    className="w-full rounded-xl"
-                />
-            </figure>
+                    <p
+                        className="mx-rise mt-5 max-w-xl text-[15px] leading-relaxed text-text-secondary text-pretty sm:text-base"
+                        style={{ ['--i' as string]: 4 }}
+                    >
+                        Send a link, a screenshot or a video to Machina from anywhere. It reads the
+                        page, watches the video, looks at the screenshot — and turns each save into
+                        a clean card with a real summary, a category, tags, and connections to
+                        things you saved before. Then you can ask your own saves a question and get
+                        an answer in plain language, with citations back to your own sources.
+                    </p>
 
-            <p>
-                Nothing is lost, exactly. But nothing is findable either, because
-                finding it means remembering which of five apps swallowed it. Saving was
-                never the hard part.
-            </p>
-        </Section>
-    );
-}
-
-/* ---------------------------------------------------------------------- what */
-
-/** One capability, stated as a plain claim with a plain explanation. Three of
- *  these carry the whole product — the order is the film's: capture, then what
- *  comes back, then the payoff. */
-function Capability({ title, children }: { title: string; children: React.ReactNode }) {
-    return (
-        <div className="rounded-2xl border border-border-subtle bg-card p-6 shadow-[var(--shadow-card)]">
-            <h3 className="text-base font-semibold text-text">{title}</h3>
-            <p className="mt-2.5 text-[15px] leading-relaxed text-text-secondary">
-                {children}
-            </p>
-        </div>
-    );
-}
-
-function What() {
-    return (
-        <section className="mx-auto max-w-3xl px-6 py-14 sm:py-20">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-text-muted">
-                What Machina does
-            </p>
-            <h2 className="mt-3 text-2xl sm:text-3xl font-semibold tracking-tight text-text text-balance">
-                One place to save it. One place to find it again.
-            </h2>
-
-            <div className="mt-8 grid gap-4 sm:grid-cols-3">
-                <Capability title="Capture from anywhere">
-                    Share into Machina from the iOS share sheet — Safari, YouTube, X,
-                    Instagram, anywhere — or add it from the web app or the browser
-                    extension on your computer. Links, screenshots, videos and notes all
-                    land in the same place.
-                </Capability>
-                <Capability title="Everything comes back understood">
-                    Each save returns as a card with a summary written in the language
-                    you read it in, a category, tags, and &ldquo;see also&rdquo; links to
-                    related saves. Search matches what you meant, not just the words you
-                    typed.
-                </Capability>
-                <Capability title="Ask, and get sources">
-                    Ask a question of your own saves — <em>what did I save about
-                    mortgage rates?</em> — and get an answer in plain language, with
-                    citations that jump back to the saves it came from.
-                </Capability>
+                    <div
+                        className="mx-rise mt-10 flex flex-wrap items-center gap-4"
+                        style={{ ['--i' as string]: 5 }}
+                    >
+                        <GetStarted onGetStarted={onGetStarted} />
+                        <span className="text-[13px] text-text-muted">
+                            Free to start · iPhone and web
+                        </span>
+                    </div>
+                </div>
             </div>
 
-            <p className="mt-8 text-[15px] sm:text-base leading-relaxed text-text-secondary text-pretty">
-                There is also a weekly write-up of the themes running through what you
-                saved, reminders that resurface something worth a second look, and
-                collections you can keep private or publish as a shareable page.
-            </p>
+            <span
+                aria-hidden
+                className="mx-cue absolute inset-x-0 bottom-8 mx-auto flex w-fit items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-text-muted"
+            >
+                <ArrowDown className="h-3.5 w-3.5" /> Scroll
+            </span>
         </section>
     );
 }
 
 /* ------------------------------------------------------------------ surfaces */
 
+const SURFACES = [
+    {
+        icon: Share2,
+        title: 'From your phone',
+        body: 'The iOS share sheet, from any app — Safari, YouTube, X, Instagram, Photos. '
+            + 'Two taps and it is saved, whether or not Machina is open.',
+    },
+    {
+        icon: Globe,
+        title: 'From your computer',
+        body: 'The web app holds the same library — save from your phone in the morning, '
+            + 'find it on your laptop that afternoon. Nothing to sync by hand.',
+    },
+    {
+        icon: Puzzle,
+        title: 'From the page you are on',
+        body: 'The browser extension saves what you are reading without leaving it, so the '
+            + 'tab you were about to keep open for a month can just be closed.',
+    },
+];
+
 function Surfaces() {
+    const [ref, seen] = useInView<HTMLElement>();
     return (
-        <Section kicker="Where it runs" title="On your phone, and on your computer.">
-            <p>
-                Machina is an iPhone app and a web app that share one library — save
-                from your phone, find it on your laptop. A browser extension saves the
-                page you are reading without leaving it, and an iOS share sheet
-                extension saves from any app on your phone in two taps.
-            </p>
-        </Section>
+        <section
+            ref={ref}
+            aria-labelledby="mx-surfaces-title"
+            className={`mx-auto max-w-5xl px-6 py-20 sm:py-28 ${seen ? 'mx-in' : ''}`}
+        >
+            <div className="mx-auto max-w-2xl text-center">
+                <p className="mx-rise text-[11px] font-semibold uppercase tracking-[0.18em] text-text-muted">
+                    Where it runs
+                </p>
+                <h2
+                    id="mx-surfaces-title"
+                    className="mx-rise mt-3 text-3xl font-semibold tracking-tight text-text text-balance sm:text-4xl"
+                    style={{ ['--i' as string]: 1 }}
+                >
+                    Wherever you were when you found it.
+                </h2>
+            </div>
+            <div className="mt-12 grid gap-4 md:grid-cols-3">
+                {SURFACES.map((s, i) => (
+                    <div
+                        key={s.title}
+                        className="mx-rise rounded-2xl border border-border-subtle bg-card p-6 shadow-[var(--shadow-card)]"
+                        style={{ ['--i' as string]: 2 + i }}
+                    >
+                        <span className="grid h-10 w-10 place-items-center rounded-xl bg-tile text-tile-ink">
+                            <s.icon className="h-5 w-5" aria-hidden />
+                        </span>
+                        <h3 className="mt-4 text-base font-semibold text-text">{s.title}</h3>
+                        <p className="mt-2 text-[15px] leading-relaxed text-text-secondary">{s.body}</p>
+                    </div>
+                ))}
+            </div>
+        </section>
     );
 }
 
@@ -319,21 +313,19 @@ function Privacy() {
     return (
         <Section kicker="Your data" title="Private by design.">
             <p>
-                No ads, no tracking, no data sold to anyone. What you save is yours: it
-                is never used to train anyone&rsquo;s models. Sign in with Apple or
-                Google, and delete your account — and everything in it — from Settings,
-                any time.
+                No ads, no tracking, no data sold to anyone. What you save is yours: it is
+                never used to train anyone&rsquo;s models. Sign in with Apple or Google, and
+                delete your account — and everything in it — from Settings, any time.
             </p>
-            <p className="text-[15px]">
+            <p>
                 The details are in the{' '}
-                <Link href="/privacy" className="text-text underline underline-offset-4 hover:text-accent transition-colors">
+                <Link href="/privacy" className="text-text underline underline-offset-4 transition-colors hover:text-accent">
                     privacy policy
                 </Link>{' '}
                 and the{' '}
-                <Link href="/terms" className="text-text underline underline-offset-4 hover:text-accent transition-colors">
+                <Link href="/terms" className="text-text underline underline-offset-4 transition-colors hover:text-accent">
                     terms of service
-                </Link>
-                .
+                </Link>.
             </p>
         </Section>
     );
@@ -342,17 +334,20 @@ function Privacy() {
 /* --------------------------------------------------------------------- close */
 
 function Close({ onGetStarted }: { onGetStarted?: () => void }) {
+    const [ref, seen] = useInView<HTMLElement>();
     return (
-        <section className="mx-auto max-w-3xl px-6 pb-20 pt-6">
-            <div className="rounded-3xl border border-border-subtle bg-card p-8 sm:p-10 text-center shadow-[var(--shadow-card)]">
-                <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight text-text text-balance">
+        <section
+            ref={ref}
+            className={`mx-auto max-w-3xl px-6 pb-24 pt-6 ${seen ? 'mx-in' : ''}`}
+        >
+            <div className="mx-rise rounded-3xl border border-border-subtle bg-card p-10 text-center shadow-[var(--shadow-card)] sm:p-14">
+                <h2 className="text-3xl font-semibold tracking-tight text-text text-balance sm:text-4xl">
                     Start with the last thing you saved.
                 </h2>
-                <p className="mx-auto mt-3 max-w-md text-[15px] leading-relaxed text-text-secondary text-pretty">
-                    Sign in with Apple or Google. Your library is empty for about a
-                    minute.
+                <p className="mx-auto mt-4 max-w-lg text-[15px] leading-relaxed text-text-secondary text-pretty sm:text-base">
+                    Sign in with Apple or Google. Your library is empty for about a minute.
                 </p>
-                <GetStarted onGetStarted={onGetStarted} className="mt-7" />
+                <GetStarted onGetStarted={onGetStarted} className="mt-8" />
             </div>
         </section>
     );
@@ -363,7 +358,7 @@ function Close({ onGetStarted }: { onGetStarted?: () => void }) {
 function Footer() {
     return (
         <footer className="border-t border-border-subtle">
-            <div className="mx-auto max-w-3xl px-6 py-10">
+            <div className="mx-auto max-w-6xl px-6 py-12">
                 <span className="flex items-center gap-2 text-text">
                     <CitationGlyph className="h-4 w-auto" />
                     <Wordmark className="h-[9px] w-auto" />
@@ -373,141 +368,16 @@ function Footer() {
                     Everything you save, finally useful.
                 </p>
                 <nav className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm text-text-secondary">
-                    <Link href="/privacy" className="hover:text-text transition-colors">
-                        Privacy
-                    </Link>
-                    <Link href="/terms" className="hover:text-text transition-colors">
-                        Terms
-                    </Link>
-                    <a
-                        href="mailto:support@mymachina.app"
-                        className="hover:text-text transition-colors"
-                    >
+                    <Link href="/privacy" className="transition-colors hover:text-text">Privacy</Link>
+                    <Link href="/terms" className="transition-colors hover:text-text">Terms</Link>
+                    <a href="mailto:support@mymachina.app" className="transition-colors hover:text-text">
                         support@mymachina.app
                     </a>
                 </nav>
                 <p className="mt-6 text-[13px] text-text-muted">
-                    © 2026 Mor Hogeg. Machina is a personal knowledge base for the things
-                    you save.
+                    © 2026 Mor Hogeg. Machina is a personal knowledge base for the things you save.
                 </p>
             </div>
         </footer>
-    );
-}
-
-/* ---------------------------------------------------------------------- film */
-
-/**
- * The launch film (`marketing/launch-clip/`), hosted OFF this origin.
- *
- * Hosting: the renders are 1080p MP4s and `out/` is gitignored — they are NOT
- * committed and must not be served off Vercel. They live on Cloudflare R2
- * (egress-free) behind `cdn.mymachina.app`, which is the ONE extra host in the
- * `media-src` directive added to `web/vercel.json`. A YouTube/Vimeo embed was
- * rejected: `frame-src` allows only google.com and *.firebaseapp.com, so an
- * embed is blocked outright, and widening `frame-src` to a video platform to
- * decorate a page is a bad trade against a CSP this tight.
- *
- * `NEXT_PUBLIC_FILM_BASE` is the switch. UNSET → this section renders NOTHING,
- * which is the whole point: the page's argument is prose, and it shipped and
- * unblocked both reviews before the film was ever uploaded. Set it (no trailing
- * slash) once the three files are on the bucket:
- *   machina-launch-clean.mp4           1920×1080, no score, no captions
- *   machina-launch-clean-vertical.mp4  1080×1920, same
- *   machina-launch.mp4                 the scored, captioned deliverable
- *
- * ⚠️ DO NOT SET IT WITHOUT READING THIS. The film's middle acts put the literal
- * string "AI" on screen, large: the Ask scene's question is "What have I been
- * saving about AI?" and the feed's top card is titled "The jobs AI actually
- * changes" with an `AI` category chip (verified by rendering frames 1400 and 960
- * of `MachinaLaunchClean`). It comes from the demo library's deliberate
- * AI/what-stays-human trio (`src/data/library.ts`), where it is a saved *topic*
- * rather than Machina describing itself — defensible inside the film, and a
- * different thing entirely on the product's most visible page, which
- * `docs/BRANDING.md` D-3 governs. That is an owner call, not a code change:
- * either accept it here, or re-render with a different demo topic. Until it is
- * called, this section stays dark and the act-one STILL above carries the film's
- * argument instead — that frame is clean.
- */
-const FILM_BASE = process.env.NEXT_PUBLIC_FILM_BASE ?? '';
-
-function Film() {
-    const videoRef = useRef<HTMLVideoElement>(null);
-    // Which cut is loaded. 'loop' = the clean cut, muted, autoplaying; 'full' =
-    // the scored, captioned deliverable with controls, after a click.
-    const [mode, setMode] = useState<'loop' | 'full'>('loop');
-    // Vertical for narrow viewports — resolved on mount rather than with a
-    // `<source media>` (unreliable across browsers) or two mounted <video>
-    // elements (both would fetch). null until measured, so nothing is fetched
-    // during the prerender or the first paint.
-    const [vertical, setVertical] = useState<boolean | null>(null);
-
-    useEffect(() => {
-        const mq = window.matchMedia('(max-width: 639px)');
-        const apply = () => setVertical(mq.matches);
-        apply();
-        mq.addEventListener('change', apply);
-        return () => mq.removeEventListener('change', apply);
-    }, []);
-
-    if (!FILM_BASE) return null;
-
-    const src =
-        mode === 'full'
-            ? `${FILM_BASE}/machina-launch.mp4`
-            : vertical
-              ? `${FILM_BASE}/machina-launch-clean-vertical.mp4`
-              : `${FILM_BASE}/machina-launch-clean.mp4`;
-
-    const playFull = () => {
-        setMode('full');
-        // The src swap is a React re-render; play once the new cut is loaded.
-        requestAnimationFrame(() => {
-            const v = videoRef.current;
-            if (!v) return;
-            v.muted = false;
-            v.currentTime = 0;
-            void v.play();
-        });
-    };
-
-    return (
-        <section className="mx-auto max-w-3xl px-6 py-14 sm:py-20">
-            <div className="overflow-hidden rounded-3xl border border-border-subtle bg-card shadow-[var(--shadow-card)]">
-                {vertical !== null && (
-                    <video
-                        ref={videoRef}
-                        key={src}
-                        src={src}
-                        poster="/film-still-fragmentation.jpg"
-                        className={`w-full ${vertical && mode === 'loop' ? 'aspect-[9/16]' : 'aspect-video'} object-cover`}
-                        // The loop cut is decoration: muted (the only way an
-                        // autoplay survives any browser's policy), inline so iOS
-                        // doesn't hijack it fullscreen, and chromeless. The full
-                        // cut is a deliberate play, so it gets controls.
-                        autoPlay={mode === 'loop'}
-                        loop={mode === 'loop'}
-                        muted={mode === 'loop'}
-                        playsInline
-                        controls={mode === 'full'}
-                        preload="metadata"
-                    />
-                )}
-            </div>
-            <div className="mt-4 flex flex-wrap items-baseline justify-between gap-3">
-                <p className="text-[13px] text-text-muted">
-                    Machina, in about a minute.
-                </p>
-                {mode === 'loop' && (
-                    <button
-                        type="button"
-                        onClick={playFull}
-                        className="text-sm font-medium text-text underline underline-offset-4 hover:text-accent transition-colors"
-                    >
-                        Watch with sound
-                    </button>
-                )}
-            </div>
-        </section>
     );
 }

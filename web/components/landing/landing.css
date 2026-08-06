@@ -1,0 +1,522 @@
+/*
+ * Landing-page motion system.
+ *
+ * Deliberately NOT in `globals.css`: that file is critical CSS for the app and
+ * for the iOS bundle, and none of this is used by either. It is imported by
+ * `LandingPage.tsx` alone, so it rides the landing chunk.
+ *
+ * House rules, same as everywhere else in the product:
+ *  - Colour comes from theme tokens only (`--text`, `--card`, `--accent`,
+ *    `--border`…). There is not one hardcoded hex in this file. The single
+ *    exception is `--mx-glow`, which is the identity's own porcelain glow value
+ *    (`globals.css` `--accent-ring`) referenced through the token.
+ *  - Everything animates `transform`, `opacity` and `filter` ONLY. No layout
+ *    properties, so nothing here can cause a reflow mid-scroll.
+ *  - `--ease-modal` is the product's one entrance curve and it is used for
+ *    every entrance here too, so the landing page moves like the app.
+ *  - Every animation collapses under `prefers-reduced-motion` at the bottom of
+ *    this file. That block is not optional decoration — the scroll-driven
+ *    scene is unusable with vestibular sensitivity without it.
+ *
+ * Naming: everything is prefixed `mx-` (machina landing) so nothing here can
+ * collide with a Tailwind utility or an app class.
+ */
+
+/* ------------------------------------------------------------------ tokens */
+
+:root {
+  /* The identity glow, reused rather than redefined. */
+  --mx-glow: var(--accent-ring);
+  /* One stagger step. Entrances multiply this by their index so a group reads
+     as one gesture rather than N separate animations. */
+  --mx-step: 70ms;
+}
+
+/* --------------------------------------------------------------- entrances */
+
+/*
+ * The house entrance: rise + fade, driven by an index so a stack of lines
+ * arrives as a wave. Set `--i` per element (`style={{'--i': 2}}`).
+ *
+ * `both` fill is required — these are triggered by adding `.mx-in` on a
+ * container when it enters the viewport, so the element must hold its `from`
+ * state for however long it sits below the fold.
+ */
+@keyframes mx-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.mx-rise {
+  opacity: 0;
+}
+
+.mx-in .mx-rise {
+  animation: mx-rise 0.8s var(--ease-modal) calc(var(--i, 0) * var(--mx-step)) both;
+}
+
+/* A shorter, tighter variant for small chrome (chips, marks) that should snap
+   in rather than glide. */
+@keyframes mx-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.mx-pop {
+  opacity: 0;
+}
+
+.mx-in .mx-pop,
+.mx-pop-now {
+  animation: mx-pop 0.42s var(--ease-spring) calc(var(--i, 0) * var(--mx-step)) both;
+}
+
+/* ------------------------------------------------------------- the hero mark */
+
+/*
+ * The Citation mark assembling. This is the identity's stated sequence (§04:
+ * "the arms join. The brackets close. The point lands.") and the same motion
+ * the boot screen plays — reproduced here rather than reused from the boot
+ * classes because the landing plays it at a different tempo and must be able to
+ * replay it, and coupling the two would mean a boot retune silently retimes the
+ * marketing page.
+ */
+@keyframes mx-bracket-l {
+  from {
+    opacity: 0;
+    transform: translateX(-120px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes mx-bracket-r {
+  from {
+    opacity: 0;
+    transform: translateX(120px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes mx-point {
+  from {
+    opacity: 0;
+    transform: scale(0);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes mx-glow-in {
+  from {
+    filter: drop-shadow(0 0 0 transparent);
+  }
+
+  to {
+    filter: drop-shadow(0 0 22px var(--mx-glow));
+  }
+}
+
+/* The waiting state breathes with LIGHT, never geometry — a scaling child
+   under a drop-shadow filter forces WebKit to re-rasterize the glow every
+   frame, which reads as the mark shaking. Same lesson as the boot screen. */
+@keyframes mx-halo {
+
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.mx-bracket-l {
+  animation: mx-bracket-l 0.72s var(--ease-modal) 0.1s both;
+}
+
+.mx-bracket-r {
+  animation: mx-bracket-r 0.72s var(--ease-modal) 0.1s both;
+}
+
+.mx-point {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: mx-point 0.4s var(--ease-spring) 0.62s both;
+}
+
+.mx-glow-in {
+  animation: mx-glow-in 0.8s ease-out 0.6s both;
+}
+
+.mx-halo {
+  animation: mx-halo 5s ease-in-out 1.4s infinite;
+}
+
+/* ------------------------------------------------- the gather scene (act one) */
+
+/*
+ * ONE element carries the whole scene's state: `.mx-stage` gets four unitless
+ * custom properties written by `useSceneProgress`, and every child derives its
+ * transform from them in `calc()`. That means one style write per frame for a
+ * scene with a dozen moving parts — and it means the scene can be inspected or
+ * driven by hand (set `--gather` on the stage in devtools and the silos move),
+ * which is how it was verified frame by frame.
+ *
+ *   --spread   0→1  the silos drift apart and dim (the loss)
+ *   --gather   0→1  they rush back and collapse into one point
+ *   --mark     0→1  the brackets close around it
+ *   --resolve  0→1  the closing line replaces the problem line
+ *
+ * Distances are in `vmin`, not px, so the composition reframes with the
+ * viewport instead of needing a mobile variant.
+ */
+.mx-stage {
+  --spread: 0;
+  --gather: 0;
+  --mark: 0;
+  --fade: 0;
+  --resolve: 0;
+  /* Field scale. The silo offsets in `demoData.ts` are tuned for a laptop; on a
+     phone the same ellipse pushes the outer cards past the edge, so the whole
+     field shrinks rather than carrying a second set of coordinates. */
+  --rs: 1;
+}
+
+@media (max-width: 639px) {
+  .mx-stage {
+    --rs: 0.7;
+  }
+}
+
+.mx-silo {
+  /* --sx / --sy are the silo's resting position, set per instance. They drift
+     22% further out on --spread, then all the way home on --gather. */
+  transform:
+    translate3d(
+      calc(var(--sx) * var(--rs) * (1 + 0.22 * var(--spread)) * (1 - var(--gather))),
+      calc(var(--sy) * var(--rs) * (1 + 0.22 * var(--spread)) * (1 - var(--gather))),
+      0)
+    scale(calc(1 - 0.72 * var(--gather)));
+  opacity: calc((1 - 0.45 * var(--spread)) * (1 - var(--gather)));
+  will-change: transform, opacity;
+}
+
+/* The piles going unreadable. Kept off small screens: a blur on five layered
+   cards is the one effect here expensive enough to matter on a phone GPU, and
+   at that size the dimming already carries the beat. */
+@media (min-width: 640px) and (prefers-reduced-motion: no-preference) {
+  .mx-silo {
+    filter: blur(calc(var(--spread) * 2.4px));
+  }
+}
+
+/* The mark the silos collapse INTO — it closes as they arrive. */
+.mx-stage-mark {
+  opacity: var(--mark);
+  transform: scale(calc(0.86 + 0.14 * var(--mark)));
+}
+
+.mx-stage-bracket-l {
+  transform: translateX(calc(-46px * (1 - var(--mark))));
+}
+
+.mx-stage-bracket-r {
+  transform: translateX(calc(46px * (1 - var(--mark))));
+}
+
+.mx-stage-point {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(var(--mark));
+}
+
+/*
+ * The two copy states HAND OFF; they do not cross-fade. `--fade` takes the
+ * problem line out and `--resolve` brings the closing line in, and their ranges
+ * do not touch (see the beat map in `hooks.ts`). A partial cross-fade of 48px
+ * display type reads as a rendering fault rather than a transition — the first
+ * pass had both lines legible on top of each other at the collapse frame. The
+ * gap between them is deliberate and is the scene's best moment: the mark,
+ * alone, with nothing else on the screen.
+ */
+.mx-copy-problem {
+  opacity: calc(1 - var(--fade));
+  transform: translate3d(0, calc(-16px * var(--fade)), 0);
+}
+
+.mx-copy-resolve {
+  opacity: var(--resolve);
+  transform: translate3d(0, calc(16px * (1 - var(--resolve))), 0);
+}
+
+/* ------------------------------------------------------------ the pipeline */
+
+/* A phase row lighting up as the pipeline reaches it. */
+@keyframes mx-phase-in {
+  from {
+    opacity: 0;
+    transform: translate3d(-8px, 0, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.mx-phase-active,
+.mx-phase-done {
+  animation: mx-phase-in 0.34s var(--ease-modal) both;
+}
+
+/* The scan line that rides the active phase — the app's own `scan-sweep`
+   gesture, restated at landing scale. */
+@keyframes mx-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(220%);
+  }
+}
+
+.mx-sweep::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 45%;
+  background: linear-gradient(90deg, transparent, var(--fill-strong), transparent);
+  animation: mx-sweep 1.5s ease-in-out infinite;
+}
+
+/* The finished card landing. Slightly springy — this is the payoff frame. */
+@keyframes mx-card-land {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 22px, 0) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.mx-card-land {
+  animation: mx-card-land 0.62s var(--ease-modal) both;
+}
+
+/* ----------------------------------------------------------------- the ask */
+
+/* The caret on the typed question. Opacity only — a width/visibility blink
+   repaints the text run beside it. */
+@keyframes mx-caret {
+
+  0%,
+  45% {
+    opacity: 1;
+  }
+
+  50%,
+  95% {
+    opacity: 0;
+  }
+}
+
+.mx-caret {
+  animation: mx-caret 1.06s steps(1, end) infinite;
+}
+
+/* Answer text arriving a word at a time. */
+@keyframes mx-word-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 5px, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.mx-word {
+  animation: mx-word-in 0.34s var(--ease-modal) both;
+}
+
+/* --------------------------------------------------------------- the shelf */
+
+/*
+ * The library shelf: one track duplicated end to end and translated by exactly
+ * -50%, so the seam lands on an identical frame and the loop is invisible.
+ * Duration is set per row so the two rows never sync into a visible beat.
+ */
+@keyframes mx-shelf {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.mx-shelf-track {
+  animation: mx-shelf var(--mx-shelf-dur, 64s) linear infinite;
+  will-change: transform;
+}
+
+.mx-shelf-reverse {
+  animation-direction: reverse;
+}
+
+/* Hovering the shelf holds it — a moving target you cannot read is a tease,
+   not a feature. Also pauses when anything inside takes keyboard focus. */
+.mx-shelf:hover .mx-shelf-track,
+.mx-shelf:focus-within .mx-shelf-track {
+  animation-play-state: paused;
+}
+
+/* Both shelf edges fade into the page rather than being clipped by a hard
+   rule, so the row reads as continuing past the viewport. */
+.mx-shelf-mask {
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+
+/* ------------------------------------------------------------- the connect */
+
+/* Edges drawing in — connections being FOUND, not a diagram being revealed.
+   Stroke length is set inline from the path's own measured length. */
+@keyframes mx-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.mx-in .mx-edge {
+  animation: mx-draw 1.1s var(--ease-modal) calc(0.2s + var(--i, 0) * 0.16s) both;
+}
+
+/* ------------------------------------------------------------------ ground */
+
+/*
+ * The hero ground: a wide, very low-contrast radial lift behind the type, so
+ * the page has depth without a hue. Built from `--text` at low alpha via
+ * color-mix, which means it inverts correctly with the theme for free —
+ * porcelain bloom on graphite, graphite bloom on porcelain.
+ */
+.mx-ground::before {
+  content: '';
+  position: absolute;
+  /*
+   * HORIZONTAL INSET MUST STAY 0. This was `-10%`, which pushed the bloom 10%
+   * past each edge of the hero — and because it is an absolutely-positioned
+   * child of an in-flow section rather than of a clipping container, that spill
+   * widened the DOCUMENT: on a 390px phone the page scrolled sideways by
+   * exactly 39px, caught by asserting `scrollWidth === clientWidth` rather than
+   * by looking at it. The gradient is centred at 50% and only 60% wide, so the
+   * spill was never visible in the first place.
+   */
+  inset: -20% 0 auto;
+  height: 130%;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 50% at 50% 30%,
+      color-mix(in oklab, var(--text) 7%, transparent),
+      transparent 70%);
+}
+
+/* The scroll cue: one slow, small fall. */
+@keyframes mx-cue {
+
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+
+  50% {
+    opacity: 0.75;
+    transform: translateY(6px);
+  }
+}
+
+.mx-cue {
+  animation: mx-cue 2.6s ease-in-out infinite;
+}
+
+/* --------------------------------------------------------- reduced motion */
+
+/*
+ * Collapse EVERYTHING. Entrances land on their final frame instantly, loops
+ * stop, and the scroll scene is pinned to its resolved state by
+ * `useSceneProgress`, which reads the same media query — so the silos sit
+ * gathered and the mark sits closed, with both copy states resolved.
+ *
+ * The rule is: with motion off, the page must still say the same thing. No
+ * meaning lives only in the movement.
+ */
+@media (prefers-reduced-motion: reduce) {
+
+  .mx-in .mx-rise,
+  .mx-in .mx-pop,
+  .mx-pop-now,
+  .mx-bracket-l,
+  .mx-bracket-r,
+  .mx-point,
+  .mx-glow-in,
+  .mx-card-land,
+  .mx-phase-active,
+  .mx-phase-done,
+  .mx-word,
+  .mx-in .mx-edge {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
+  .mx-halo,
+  .mx-caret,
+  .mx-cue,
+  .mx-shelf-track,
+  .mx-sweep::after {
+    animation: none !important;
+  }
+
+  /* The shelf still needs to be readable when it isn't moving. */
+  .mx-shelf-track {
+    transform: none !important;
+  }
+
+  .mx-silo {
+    filter: none !important;
+  }
+}

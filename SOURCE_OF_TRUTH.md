@@ -962,11 +962,17 @@ The multi-user auth work described below **was** fully written but not live:
       Do 25a first or the fourth reason simply comes back on its own. Nothing
       else depends on this review: it gates only whether the custom **logo**
       shows on the consent screen — the app *name* already does.
-    - **25c. [ ] The launch film is built into the page but switched OFF.** See
-      the §9 entry: the film renders the literal string "AI" on screen in its Ask
-      and feed scenes, which BRANDING **D-3** forbids on a user-visible surface.
-      That is an owner call (accept it, or re-render the demo library with a
-      different topic), not a code change. `NEXT_PUBLIC_FILM_BASE` is the switch.
+    - **25c. [ ] The launch film is NOT on the landing page, and is still
+      D-3-blocked from going on it.** The 2026-08-06 (round 4) rebuild replaced
+      the video plan with the scroll-driven `GatherScene` — act one rebuilt in
+      the DOM, which needs no CDN, no `media-src` widening and no owner upload,
+      and which the reader scrubs with their own scroll. The `media-src
+      cdn.mymachina.app` CSP entry and the committed poster still were removed
+      with it; both are one-liners to restore. **The blocker is unchanged:** the
+      film renders the literal string "AI" on screen in its Ask and feed scenes
+      (frames 1400 and 960 of `MachinaLaunchClean`), which BRANDING **D-3**
+      forbids on a user-visible surface. Owner call — accept it, or re-render
+      `marketing/launch-clip/src/data/library.ts` with a different demo topic.
 
 24. **[ ] Move `authDomain` to the brand domain (own change, own verify pass).**
     The Google sign-in popup's address bar still reads
@@ -1308,6 +1314,70 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-08-06 (round 4) — the landing page becomes the product demo.** Owner
+  review of round 3: *"the homepage before sign in is not good enough"* — make it
+  interactive and impressive. The page is now five built scenes instead of three
+  paragraphs and a still, in the film's own running order (`web/components/
+  landing/`, ~1.4k lines, all of it code-split — see below).
+  **The centrepiece is `GatherScene`, and it replaces the video plan.** Five
+  platform silos drift apart, dim and blur, then rush back and collapse into one
+  point the brackets close around — the launch film's act one and its turn,
+  rebuilt in the DOM and **scrubbed by the reader's own scroll**. Rebuilding beat
+  embedding on three counts: the film renders "AI" on screen (D-3, task 25c, and
+  the reason round 3 shipped it dark); a 1080p MP4 needs a CDN, a `media-src`
+  widening and an owner upload before anything renders; and a video cannot be
+  driven by the scroll, which is the only reason the beat lands — *the gathering
+  happens because they gathered it*. The `media-src cdn.mymachina.app` entry and
+  the poster JPEG were removed as dead weight; both are one-liners to restore.
+  **How it runs, because the shape is the performance story:** the tall section
+  provides scroll distance, the stage inside is `sticky`, and `useSceneProgress`
+  writes **five unitless custom properties** onto that ONE element per frame
+  (rAF-coalesced). Every moving part derives its transform from them in `calc()`
+  in `landing.css`. No child re-renders while you scroll — there is no React
+  state in the component at all — and the scene can be driven by hand from
+  devtools, which is how it was tuned frame by frame. Two beats are load-bearing
+  and both were found by rendering, not by reasoning: `--mark` must finish where
+  `--gather` finishes (a later range left the arrival at ~30% ink, murky grey at
+  the one frame that has to feel lit), and `--fade`/`--resolve` must **not**
+  overlap (a partial cross-fade of 48px display type reads as a rendering fault —
+  the first pass had both headlines legible on top of each other). The gap
+  between them is the scene's best frame: the mark, alone.
+  **The other four scenes.** `CaptureScene` runs the **real** pipeline —
+  `LINK_SCAN_STEPS` from `lib/scanPhases.ts`, the same array the in-app stepper
+  and the share-sheet banner read, with one label swapped per source ("Reading
+  the page" / "Looking at the screenshot" / "Watching the video") — behind a
+  keyboard-navigable segmented control, ending on the finished card. `AskScene`
+  types a chosen question, streams the answer and pops three citation chips.
+  `ConnectScene` draws graph edges in, staggered — connections being *found*, not
+  a diagram revealed. `ShelfScene` is two counter-scrolling rows of the library
+  that visibly mix every platform, paused on hover or focus.
+  **The demo library is written fresh** (`landing/demoData.ts`), NOT ported from
+  the film's, precisely because the film's is built around the AI/what-stays-human
+  trio. Every Ask answer is assemblable from the saves it cites, and every save it
+  cites appears on the shelf — an answer citing sources it could not have come
+  from would be the product lying in its own voice on its own home page.
+  **The review requirement still governs.** Every scene is a demonstration
+  wrapped around a paragraph, never instead of one; the Ask exchange is
+  `aria-hidden` with the full text beside it (otherwise a screen reader gets it
+  twice, a word at a time); and everything collapses under
+  `prefers-reduced-motion`, with the gather scene pinned to its resolved state.
+  **`LandingPage` is now lazily imported** by `SignedOutWeb` (`next/dynamic`,
+  `ssr: false`) so none of this rides in the iOS bundle.
+  **Verified by assertion, not by eye** (Playwright; the Browser pane cannot
+  window-scroll, see the memory note): no horizontal overflow at 320/375/390/414/
+  768/1024/1280/1920 — this caught **two real bugs**, a hero pseudo-element with
+  `inset: … -10%` that widened the document by exactly 39px on a phone, and a
+  grid item whose default `min-width: auto` refused to shrink below an unbreakable
+  URL; a D-3 word scan of the fully rendered text **after clicking through all
+  three capture sources and all three questions** (0 hits); the review-critical
+  copy present; reduced-motion landing on finished states; zero console errors;
+  and the native path — with `window.Capacitor` faked via a Proxy, because
+  @capacitor/core *mutates the global in place* rather than replacing it — showing
+  `LoginScreen`, no landing text, and **the landing chunk never downloaded**.
+  `tsc --noEmit` 0; both builds green; `out/index.html` still carries none of the
+  landing prose while `out/welcome.html` carries all of it (84KB).
+  Owner steps 25a/25b are unchanged and still open.
 
 - **2026-08-06 (round 3) — `mymachina.app` has a public home page (task 25).**
   The root was the sign-in screen; it is now a landing page for signed-out web

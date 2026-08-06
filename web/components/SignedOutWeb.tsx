@@ -1,8 +1,31 @@
 'use client';
 
 import { useState } from 'react';
-import LandingPage from '@/components/LandingPage';
+import dynamic from 'next/dynamic';
 import LoginScreen from '@/components/LoginScreen';
+
+/**
+ * The landing page is code-split, and that is not an optimisation detail.
+ *
+ * `SignedOutWeb` is reached from `AuthProvider`, which is in the app's main
+ * bundle — so a static `import` of `LandingPage` would pull every landing scene,
+ * its demo library and its motion CSS into the **iOS bundle**, for a page the
+ * native app is specifically written never to render. `next/dynamic` keeps the
+ * whole thing in its own chunk that only a signed-out web visitor ever fetches.
+ *
+ * `ssr: false` is correct rather than merely convenient: the scenes read
+ * `matchMedia` and measure scroll, so there is nothing useful to prerender at
+ * this mount point. The prerendered-prose requirement is met by `/welcome`,
+ * which imports `LandingPage` statically for exactly that reason.
+ *
+ * The fallback is the page's own ground rather than a spinner — the chunk is
+ * same-origin and small, and a flash of empty background reads as the page
+ * still painting, where a spinner reads as something being fetched.
+ */
+const LandingPage = dynamic(() => import('@/components/LandingPage'), {
+    ssr: false,
+    loading: () => <div className="min-h-screen bg-background" />,
+});
 
 /**
  * What a signed-out WEB visitor gets at the root: the public landing page
