@@ -64,6 +64,12 @@ jobs:
     env:
       # Live Firebase Hosting origin (rewrites /api/* to the Cloud Functions).
       API_BASE: https://secondbrain-app-94da2.web.app
+      # Public BRAND origin — every share link and policy link a user or an App
+      # Review reviewer sees. Deliberately NOT API_BASE: the Firebase project
+      # host reads `secondbrain-…`, which BRANDING D-3 keeps off user-visible
+      # surfaces. Vercel serves this domain and rewrites /s and /c back to the
+      # share_page function (web/vercel.json).
+      WEB_BASE: https://mymachina.app
       TEAM_ID: 8Y2M94RUHG
       BUNDLE_ID: com.morhogeg.machina
       # THE AUTH GATE, resolved once for both the guard step and the build step
@@ -155,7 +161,8 @@ jobs:
         working-directory: web
         env:
           NEXT_PUBLIC_API_BASE: ${{ env.API_BASE }}
-          NEXT_PUBLIC_SHARE_BASE: ${{ env.API_BASE }}
+          NEXT_PUBLIC_SHARE_BASE: ${{ env.WEB_BASE }}
+          NEXT_PUBLIC_POLICY_BASE: ${{ env.WEB_BASE }}
           NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
           NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
           NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}

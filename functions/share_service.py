@@ -22,7 +22,7 @@ there. Those endpoints are thin wrappers that handle CORS/auth and call into the
 render/logic helpers below.
 
 Dependency direction: this module imports only from `db` (get_db) and the
-standard library — it must NOT import `main` (that would be circular). `APP_URL`
+standard library — it must NOT import `main` (that would be circular). `WEB_URL`
 is read from the same environment variable `main.py` reads, so both resolve to
 an identical value.
 """
@@ -35,7 +35,13 @@ from datetime import datetime, timezone
 
 from db import get_db
 
-APP_URL = os.environ.get("APP_URL", "https://secondbrain-app-94da2.web.app")
+# Public BRAND origin. EVERY url in this module is user-visible — og:url, the
+# favicon, the brand header, "Open in Machina" — so it must read `mymachina.app`
+# and never the Firebase project host, whose name is exactly what BRANDING D-3
+# keeps off user-visible surfaces. Distinct from `main.APP_URL`, which stays the
+# API origin (the share-extension endpoint and the CORS allowlist) — moving that
+# would put a Vercel proxy hop in the share extension's critical path.
+WEB_URL = os.environ.get("WEB_URL", "https://mymachina.app")
 
 
 def _esc(value) -> str:
@@ -210,7 +216,7 @@ def _share_card_image(card: dict) -> str:
     # Image/screenshot cards store the (public) image itself as the url.
     if card.get("sourceType") == "image" and url.startswith("http"):
         return url
-    return f"{APP_URL}/icon-512.png"
+    return f"{WEB_URL}/icon-512.png"
 
 
 def _share_html_shell(*, title: str, description: str, image: str, url: str, body: str) -> str:
@@ -237,7 +243,7 @@ def _share_html_shell(*, title: str, description: str, image: str, url: str, bod
 <meta name="twitter:description" content="{d}">
 <meta name="twitter:image" content="{img}">
 <meta name="twitter:image:alt" content="{t}">
-<link rel="icon" href="{_esc(APP_URL)}/icon-192.png">
+<link rel="icon" href="{_esc(WEB_URL)}/icon-192.png">
 <style>
   :root {{ color-scheme: dark; }}
   * {{ box-sizing: border-box; }}
@@ -307,9 +313,9 @@ def _share_html_shell(*, title: str, description: str, image: str, url: str, bod
 </head>
 <body>
   <div class="wrap">
-    <div class="brand"><img src="{_esc(APP_URL)}/icon-192.png" alt="Machina"><span>Machina</span></div>
+    <div class="brand"><img src="{_esc(WEB_URL)}/icon-192.png" alt="Machina"><span>Machina</span></div>
     {body}
-    <div class="foot">Saved on <a href="{_esc(APP_URL)}">Machina</a> — your AI knowledge base.</div>
+    <div class="foot">Saved on <a href="{_esc(WEB_URL)}">Machina</a> — one place for everything you save.</div>
   </div>
 </body>
 </html>"""
@@ -346,7 +352,7 @@ def _render_shared_card(card: dict, share_url: str) -> str:
       {detail_html}
       {tags_html}
       <div class="actions">
-        <a class="btn btn-primary" href="{_esc(APP_URL)}">Open in Machina</a>
+        <a class="btn btn-primary" href="{_esc(WEB_URL)}">Open in Machina</a>
         {original_btn}
       </div>
     </div>"""
@@ -394,7 +400,7 @@ def _render_shared_collection(data: dict, share_url: str) -> str:
     description = data.get("description") or ""
     cards = data.get("cards") or []
     count = len(cards)
-    image = _share_card_image(cards[0]) if cards else f"{APP_URL}/icon-512.png"
+    image = _share_card_image(cards[0]) if cards else f"{WEB_URL}/icon-512.png"
 
     # Hero: a mosaic of up to 4 member thumbnails (skipped when none exist).
     thumbs = [t for t in (_card_thumb(c) for c in cards) if t][:4]
@@ -421,7 +427,7 @@ def _render_shared_collection(data: dict, share_url: str) -> str:
       {desc_html}
       {mosaic}
       {items}{overflow}
-      <div class="actions"><a class="btn btn-primary" href="{_esc(APP_URL)}">Open in Machina</a></div>
+      <div class="actions"><a class="btn btn-primary" href="{_esc(WEB_URL)}">Open in Machina</a></div>
     </div>"""
     og_desc = _md_to_plain(description) or f"A curated collection of {count} card{'s' if count != 1 else ''} on Machina — summaries, sources, and links."
     return _share_html_shell(
@@ -435,10 +441,10 @@ def _share_not_found_html() -> str:
       <h1>This page isn’t available</h1>
       <div class="summary">The shared card or collection may have been removed.</div>
       <div class="actions"><a class="btn btn-primary" href="%s">Open Machina</a></div>
-    </div>""" % _esc(APP_URL)
+    </div>""" % _esc(WEB_URL)
     return _share_html_shell(
         title="Not available", description="This shared page may have been removed.",
-        image=f"{APP_URL}/icon-512.png", url=APP_URL, body=body,
+        image=f"{WEB_URL}/icon-512.png", url=WEB_URL, body=body,
     )
 
 

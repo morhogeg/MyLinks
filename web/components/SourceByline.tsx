@@ -6,7 +6,7 @@ import { getPlatform, platformIcon, platformColor, xHandle, instagramHandle, lin
 /** Machina's own hosts — the ONLY place a "Machina" source name is legitimate
     (a card shared FROM Machina). Anywhere else it's a bad backend fallback that
     should defer to the real publisher host. */
-const MACHINA_HOSTS = new Set(['secondbrain-app-94da2.web.app', 'my-links-sable.vercel.app']);
+const MACHINA_HOSTS = new Set(['mymachina.app', 'secondbrain-app-94da2.web.app', 'my-links-sable.vercel.app']);
 
 /** The minimal slice of a card the byline reads. A full `Link` satisfies this,
     and so do denormalized card refs (e.g. digest rows) — one byline everywhere,

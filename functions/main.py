@@ -86,7 +86,17 @@ from share_service import (
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# API origin — the Firebase Hosting host whose rewrites reach these functions.
+# Used for the share-extension ingest endpoint and the CORS allowlist, both of
+# which are machine-to-machine, so the unbranded project host is fine here.
 APP_URL = os.environ.get("APP_URL", "https://secondbrain-app-94da2.web.app")
+
+# Public BRAND origin — the only one a person ever reads. Kept separate from
+# APP_URL on purpose: pointing the ingest endpoint at the brand domain would add
+# a Vercel proxy hop to the share extension's critical path for no gain, while
+# leaving user-visible links on APP_URL puts `secondbrain-…` in front of every
+# share recipient (BRANDING D-3). Mirrors `share_service.WEB_URL`.
+WEB_URL = os.environ.get("WEB_URL", "https://mymachina.app")
 
 # Comma-separated allowlist of origins permitted to call these endpoints.
 # Defaults to the app's own Firebase Hosting + firebaseapp.com origins, plus the
@@ -105,6 +115,9 @@ def _allowed_origins() -> list:
         return [o.strip() for o in raw.split(",") if o.strip()]
     return [
         APP_URL,
+        # The desktop web app is served from the brand domain, so its /api/*
+        # calls arrive with that Origin (Vercel forwards it through the rewrite).
+        WEB_URL,
         "https://secondbrain-app-94da2.firebaseapp.com",
         "capacitor://localhost",
         "ionic://localhost",
@@ -3242,7 +3255,8 @@ def share_page(req: https_fn.Request) -> https_fn.Response:
     try:
         share_id = (req.args.get("id") or "").strip()
         is_collection = "/c" in req.path
-        share_url = f"{APP_URL}{'/c' if is_collection else '/s'}?id={share_id}"
+        # og:url — read by every link preview, so it must be the brand domain.
+        share_url = f"{WEB_URL}{'/c' if is_collection else '/s'}?id={share_id}"
 
         if not share_id:
             return https_fn.Response(_share_not_found_html(), status=404, headers=html_headers)
