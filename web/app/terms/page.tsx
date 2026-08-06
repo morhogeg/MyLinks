@@ -126,8 +126,8 @@ export default function TermsPage() {
       <h2 className="mt-10 text-xl font-semibold text-text">12. Contact</h2>
       <p className="mt-4 leading-relaxed text-text-secondary">
         Questions about these terms:{" "}
-        <a href="mailto:morhogeg@gmail.com" className="text-accent hover:underline">
-          morhogeg@gmail.com
+        <a href="mailto:support@mymachina.app" className="text-accent hover:underline">
+          support@mymachina.app
         </a>
       </p>
 

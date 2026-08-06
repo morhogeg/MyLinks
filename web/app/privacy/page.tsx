@@ -118,8 +118,8 @@ export default function PrivacyPage() {
           controller for the personal data described here. For any privacy question or request,
           including the rights described in{" "}
           <a href="#rights" className="text-accent underline underline-offset-2">section 10</a>, contact{" "}
-          <a href="mailto:morhogeg@gmail.com" className="text-accent hover:underline">
-            morhogeg@gmail.com
+          <a href="mailto:support@mymachina.app" className="text-accent hover:underline">
+            support@mymachina.app
           </a>
           . This policy covers the Machina iOS app, the Machina web app, and the browser extension.
         </p>
@@ -383,8 +383,8 @@ export default function PrivacyPage() {
       <Section id="contact" n={14} title="Contact">
         <p className="mt-4 leading-relaxed text-text-secondary">
           Questions or requests about your data:{" "}
-          <a href="mailto:morhogeg@gmail.com" className="text-accent hover:underline">
-            morhogeg@gmail.com
+          <a href="mailto:support@mymachina.app" className="text-accent hover:underline">
+            support@mymachina.app
           </a>
         </p>
       </Section>

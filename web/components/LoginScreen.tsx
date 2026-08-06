@@ -53,8 +53,12 @@ export default function LoginScreen({
                 <h1 className="mt-6 text-text">
                     <Wordmark className="w-[190px] h-auto" />
                 </h1>
+                {/* The D-2 subtitle, verbatim. Read `Capture. Connect. Recall.`
+                    until 2026-08-06 — a stale variant that predated D-2 and put
+                    a second, contradictory tricolon in front of users on the
+                    first screen they ever see. One line, one order. */}
                 <p className="mt-1.5 text-[13px] font-medium text-text-muted tracking-wide">
-                    Capture. Connect. Recall.
+                    Capture. Ask. Connect.
                 </p>
 
                 {restricted ? (
