@@ -1315,6 +1315,41 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-06 (round 7) — owner review of round 6: six calls plus "gaps too
+  big", all shipped.**
+  **(1) The graph now looks like OURS, named by the pipeline itself.** The
+  landing graph gained the app's signature it was missing — island captions.
+  The demo links now carry `concepts` (`Tokyo` / `Espresso` / `Cooking`), so
+  `clusterLabel` names each island exactly as it names a real library's, and
+  the canvas draws TOKYO · ESPRESSO · COOKING in the app's uppercase caption
+  style, claiming space before node labels (same precedence as the app).
+  **(2) The demo library was rewritten** — owner: "more interesting examples,
+  these are very generic". It is now a curious person's month: an April trip to
+  Tokyo (bloom forecast, record-bar reel, Tsukiji documentary, ONE flight
+  note), a home-espresso rabbit hole (technique video, contrarian dose thread,
+  Flair 58 review, a screenshot of a grinder shortlist), weeknight cooking
+  (unchanged), and one save that connects to nothing (free-diving) — dropped by
+  the builder exactly as the app drops isolated cards. The two star edges are
+  `grinder-screenshot ↔ dial-in-video` and `Tsukiji ↔ trip`. Ask questions
+  rewritten to match (Tokyo / cook-tonight / espresso-project), every answer
+  still assemblable from its citations, every citation still on the shelf,
+  **exactly one note** on the shelf (also an owner call).
+  **(3) The hero sentence lost its sloppy tail** — "…from every app you save it
+  in" cut; the gather scene makes that point. **(4) The heavy hero paragraph is
+  now three staggered beats** — capture / understand / recall, one line each,
+  still plain prose in the markup for the reviews. **(5) The capture kind
+  labels are BUTTONS the cycle also drives** — labels that changed on their own
+  but ignored a tap read as broken; tapping runs that kind immediately and
+  stops the auto-cycle (same alive-until-touched rule as Ask; the suite's
+  `aria-pressed` selector had to be scoped to the Ask section after this).
+  **(6) Section rhythm tightened page-wide** (the mid-review "gaps between
+  sections are too big"): every scene dropped from `py-20 sm:py-28` to `py-14
+  sm:py-20`, plus the straggler paddings — about 40% less dead ground between
+  sections.
+  Suites updated for the new copy and ALL PASS. **SHIPPED** — merge to `main`,
+  Vercel auto-deploy, verified on production. No functions deploy, no
+  TestFlight build; **1274 remains current.** Owner steps 25a/25b still open.
+
 - **2026-08-06 (round 6) — owner review of round 5, five calls, all shipped.**
   **(1) Sign-in is no longer a dead end**: a quiet `← Back` overlays the
   sign-in screen and returns to the landing. Overlaid in `SignedOutWeb`, NOT

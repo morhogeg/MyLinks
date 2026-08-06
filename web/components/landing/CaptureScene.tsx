@@ -33,24 +33,28 @@ export default function CaptureScene() {
     // Bumped every cycle; keys the sequence timer AND the card's landing
     // animation, so each pass replays rather than swapping content in place.
     const [runId, setRunId] = useState(0);
+    // True once the reader picks a kind themselves — the first click stops the
+    // auto-cycle for good, same alive-until-touched rule as the Ask scene.
+    const [interacted, setInteracted] = useState(false);
 
     const source = CAPTURE_SOURCES[sourceIdx % CAPTURE_SOURCES.length];
     const step = useSequence(source.steps.length, 620, inView, runId);
     const done = step >= source.steps.length;
 
-    // The cycle: card lands → hold → next source runs. Stops with reduced
-    // motion (the finished frame is the content) and while off-screen.
+    // The cycle: card lands → hold → next source runs. Stops once the reader
+    // has taken over, with reduced motion (the finished frame is the content),
+    // and while off-screen.
     useEffect(() => {
-        if (!done || !inView || prefersReducedMotion()) return;
+        if (!done || !inView || interacted || prefersReducedMotion()) return;
         const id = setTimeout(() => {
             setSourceIdx((i) => (i + 1) % CAPTURE_SOURCES.length);
             setRunId((n) => n + 1);
         }, HOLD_MS);
         return () => clearTimeout(id);
-    }, [done, inView]);
+    }, [done, inView, interacted]);
 
     return (
-        <section ref={ref} aria-labelledby="mx-capture-title" className="mx-auto max-w-5xl px-6 py-20 sm:py-28">
+        <section ref={ref} aria-labelledby="mx-capture-title" className="mx-auto max-w-5xl px-6 py-14 sm:py-20">
             <div className="mx-auto max-w-2xl text-center">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-text-muted">
                     Capture
@@ -69,20 +73,44 @@ export default function CaptureScene() {
                 </p>
             </div>
 
-            {/* Which kind is currently running. Indicators, not buttons — the
-                cycle drives itself. */}
-            <div className="mt-9 flex items-center justify-center gap-5" aria-hidden>
-                {CAPTURE_SOURCES.map((s, i) => (
-                    <span
-                        key={s.id}
-                        className={
-                            'text-[12px] font-medium uppercase tracking-[0.14em] transition-colors duration-500 '
-                            + (i === sourceIdx % CAPTURE_SOURCES.length ? 'text-text' : 'text-text-muted/60')
-                        }
-                    >
-                        {s.tab}
-                    </span>
-                ))}
+            {/* The three kinds — BUTTONS that the cycle also drives (round 7:
+                labels that changed on their own but ignored a tap read as
+                broken). Tapping one runs that kind immediately and hands the
+                wheel to the reader; untouched, the scene keeps demoing itself.
+                The active one carries a dot so "which is playing" reads at a
+                glance rather than by contrast alone. */}
+            <div className="mt-8 flex items-center justify-center gap-2" role="group" aria-label="What you shared">
+                {CAPTURE_SOURCES.map((s, i) => {
+                    const active = i === sourceIdx % CAPTURE_SOURCES.length;
+                    return (
+                        <button
+                            key={s.id}
+                            type="button"
+                            aria-pressed={active}
+                            onClick={() => {
+                                setInteracted(true);
+                                setSourceIdx(i);
+                                setRunId((n) => n + 1);
+                            }}
+                            className={
+                                'flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-medium '
+                                + 'uppercase tracking-[0.12em] transition-colors duration-300 '
+                                + (active
+                                    ? 'bg-fill-subtle text-text'
+                                    : 'text-text-muted hover:text-text-secondary')
+                            }
+                        >
+                            <span
+                                aria-hidden
+                                className={
+                                    'h-1 w-1 rounded-full transition-opacity duration-300 '
+                                    + (active ? 'bg-text opacity-100' : 'opacity-0')
+                                }
+                            />
+                            {s.tab}
+                        </button>
+                    );
+                })}
             </div>
 
             {/* `items-center`: the pipeline card is fixed at five phases and the

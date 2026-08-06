@@ -119,7 +119,7 @@ function Section({ kicker, title, children, className = '' }: {
     return (
         <section
             ref={ref}
-            className={`mx-auto max-w-2xl px-6 py-20 text-center sm:py-28 ${seen ? 'mx-in' : ''} ${className}`}
+            className={`mx-auto max-w-2xl px-6 py-14 text-center sm:py-20 ${seen ? 'mx-in' : ''} ${className}`}
         >
             {kicker && (
                 <p className="mx-rise text-[11px] font-semibold uppercase tracking-[0.18em] text-text-muted">
@@ -216,27 +216,38 @@ function Hero({ onGetStarted }: { onGetStarted?: () => void }) {
                         plain text — Google's third rejection reason was that the
                         app name on the consent screen didn't match the home
                         page, and the drawn wordmark above is SVG path data, not
-                        readable text. */}
+                        readable text. The trailing "— from every app you save it
+                        in" was cut in round 7 (owner: sloppy); the gather scene
+                        below MAKES that point, it doesn't need footnoting. */}
                     <p
                         className="mx-rise mt-6 max-w-2xl text-lg leading-relaxed text-text text-pretty sm:text-2xl"
                         style={{ ['--i' as string]: 3 }}
                     >
                         <span className="font-semibold">Machina</span> is one place that holds
-                        everything you save — from every app you save it in.
+                        everything you save.
                     </p>
 
-                    <p
-                        className="mx-rise mt-5 max-w-xl text-[15px] leading-relaxed text-text-secondary text-pretty sm:text-base"
-                        style={{ ['--i' as string]: 4 }}
-                    >
-                        Send a link, a screenshot or a video to Machina from anywhere. It reads the
-                        page, watches the video, looks at the screenshot — and turns each save into
-                        a clean card with a real summary, a category, tags, and connections to
-                        things you saved before. Then you can ask your own saves a question and get
-                        an answer in plain language, with citations back to your own sources.
-                    </p>
+                    {/* The description, as three beats instead of one block
+                        (round 7 — the paragraph read heavy). Each line is one
+                        act of the product and arrives on its own step of the
+                        stagger, so the copy performs its own structure:
+                        capture, understand, recall. Still plain prose in the
+                        markup — this is the text the reviews read. */}
+                    <div className="mt-6 max-w-xl space-y-2.5 text-[15px] leading-relaxed text-text-secondary sm:text-base">
+                        <p className="mx-rise" style={{ ['--i' as string]: 4 }}>
+                            Send it a link, a screenshot, a video — from any app.
+                        </p>
+                        <p className="mx-rise" style={{ ['--i' as string]: 5 }}>
+                            Each one comes back as a card: a real summary, a category, tags, and
+                            connections to what you saved before.
+                        </p>
+                        <p className="mx-rise" style={{ ['--i' as string]: 6 }}>
+                            Then ask a question, and get an answer with citations — from your own
+                            saves.
+                        </p>
+                    </div>
 
-                    <div className="mx-rise mt-10" style={{ ['--i' as string]: 5 }}>
+                    <div className="mx-rise mt-10" style={{ ['--i' as string]: 7 }}>
                         <GetStarted onGetStarted={onGetStarted} />
                     </div>
                 </div>
@@ -279,7 +290,7 @@ function Surfaces() {
         <section
             ref={ref}
             aria-labelledby="mx-surfaces-title"
-            className={`mx-auto max-w-5xl px-6 py-20 sm:py-28 ${seen ? 'mx-in' : ''}`}
+            className={`mx-auto max-w-5xl px-6 py-14 sm:py-20 ${seen ? 'mx-in' : ''}`}
         >
             <div className="mx-auto max-w-2xl text-center">
                 <p className="mx-rise text-[11px] font-semibold uppercase tracking-[0.18em] text-text-muted">
@@ -293,7 +304,7 @@ function Surfaces() {
                     Wherever you were when you found it.
                 </h2>
             </div>
-            <div className="mx-auto mt-12 grid max-w-3xl gap-4 md:grid-cols-2">
+            <div className="mx-auto mt-10 grid max-w-3xl gap-4 md:grid-cols-2">
                 {SURFACES.map((s, i) => (
                     <div
                         key={s.title}
@@ -343,7 +354,7 @@ function Close({ onGetStarted }: { onGetStarted?: () => void }) {
     return (
         <section
             ref={ref}
-            className={`mx-auto max-w-3xl px-6 pb-24 pt-6 ${seen ? 'mx-in' : ''}`}
+            className={`mx-auto max-w-3xl px-6 pb-20 pt-4 ${seen ? 'mx-in' : ''}`}
         >
             <div className="mx-rise rounded-3xl border border-border-subtle bg-card p-10 text-center shadow-[var(--shadow-card)] sm:p-14">
                 <h2 className="text-3xl font-semibold tracking-tight text-text text-balance sm:text-4xl">
