@@ -1315,6 +1315,39 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-07 (round 11) — capture redesigned around ONE idea; copy audit.**
+  Owner review of round 10 ("this section is crucial — figure it out"), four
+  calls.
+  **(1) The three capture kinds are back, designed this time: one SUBJECT,
+  three SHAPES.** The window-scanner mock is gone. The three demo saves are no
+  longer three unrelated items — all three are the Roman-concrete thread (the
+  MIT article as the link, the annotated Pantheon section as the screenshot,
+  the dome documentary as the video). The shape changes; the thread doesn't —
+  which is the product's claim, and it makes the page one continuous story:
+  these captures are the island the graph assembles two scenes later. The
+  switcher is the APP'S OWN segmented control (container/radii/heights/active
+  treatment of `settings/primitives.tsx Segmented`) with icons and short
+  labels that hold one line on a phone. Untouched it cycles link → screenshot
+  → video; the first tap takes over (the page-wide rule).
+  **(2) The shelf marquee is back on touch** — the round-10 swipe-row reverted
+  by owner call; the drifting rows ARE the effect, on every device. A comment
+  in `landing.css` says not to reintroduce the override.
+  **(3) "Saving was never the hard part." no longer dangles** — the resolve
+  paragraph lands: "…Saving was never the hard part. Everything after it is —
+  and that is the half Machina does."
+  **(4) Page-wide copy audit:** hero step 2 no longer repeats the Capture
+  headline verbatim ("It comes back understood" appeared twice two screens
+  apart → "Every save, understood"); step 3 is "Ask your library"; the Ask
+  intro tightened (two em-dash asides in one sentence → one); the shelf body
+  tightened ("…searchable by what you meant — not just the words you happen to
+  remember"); a quiet one-line coda under the capture demo names the
+  one-subject idea.
+  Suites updated (cycle + segment-click checks restored, scan check dropped,
+  reduced-motion card is the link's) — ALL PASS locally and on production
+  after deploy; mobile verified: segmented fits one line, no overflow, marquee
+  runs on touch. **SHIPPED.** No functions deploy, no TestFlight build; **1274
+  remains current.** Owner steps 25a/25b still open.
+
 - **2026-08-07 (round 10) — a knowledge library, and the capture scene becomes
   the scanner.** Owner review of round 9, six calls.
   **(1+2) The demo library is rewritten a third time** — the espresso gear and

@@ -436,35 +436,9 @@
   animation-play-state: paused;
 }
 
-/*
- * TOUCH: the marquee becomes a real, swipeable row (owner, round 10). A
- * hover-pause is meaningless on a phone — the cards drifted past with no way
- * to hold or steer them. On any coarse-pointer device the animation is off,
- * the row scrolls natively, and the duplicate half of the track (marquee
- * scenery, aria-hidden) is removed so a swipe reaches the END of the library
- * instead of looping through a copy.
- */
-@media (hover: none) and (pointer: coarse) {
-  .mx-shelf {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-  }
-
-  .mx-shelf::-webkit-scrollbar {
-    display: none;
-  }
-
-  .mx-shelf-track {
-    animation: none !important;
-    transform: none !important;
-    width: max-content;
-  }
-
-  .mx-shelf-track>[aria-hidden] {
-    display: none;
-  }
-}
+/* (Round 10 briefly made the shelf a native swipe-row on touch; round 11
+   reverted it by owner call — the drifting marquee IS the effect, on every
+   device. Do not reintroduce a coarse-pointer override here.) */
 
 /* Both shelf edges fade into the page rather than being clipped by a hard
    rule, so the row reads as continuing past the viewport. */

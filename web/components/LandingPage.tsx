@@ -182,14 +182,17 @@ const HERO_STEPS: { icon: React.ReactNode; title: string; body: string }[] = [
         body: 'Send Machina a link, a screenshot, a video — from any app.',
     },
     {
+        // NOT "It comes back understood" — that line is the Capture section's
+        // headline, and a promise repeated verbatim two screens apart reads as
+        // a page running out of things to say.
         icon: <CitationGlyph className="h-5 w-auto" />,
-        title: 'It comes back understood',
-        body: 'Every save becomes a card — a real summary, a category, tags, connections.',
+        title: 'Every save, understood',
+        body: 'Each one becomes a card — a real summary, a category, tags, connections.',
     },
     {
         icon: <Quote className="h-5 w-5" aria-hidden />,
-        title: 'Ask your saves',
-        body: 'Questions get answers with citations — from your own library.',
+        title: 'Ask your library',
+        body: 'Plain-language answers, with citations back to your own saves.',
     },
 ];
 

@@ -70,13 +70,17 @@ export const SILOS: {
 /* ----------------------------------------------------- act two: the capture */
 
 /**
- * ONE capture demo now (round 10 — owner: three staged variants was more than
- * the point needed), and it is the SCREENSHOT, because that is the capture
- * with something to SHOW: the scan. The steps are the REAL pipeline
- * (`LINK_SCAN_STEPS`, the array the in-app stepper reads) with the two
- * source-specific labels swapped; the card it produces is the Pantheon
- * section from the shelf, so the capture feeds the library the rest of the
- * page runs on.
+ * THE CAPTURE DEMO: one SUBJECT, three SHAPES (round 11). The three kinds are
+ * back — a link, a screenshot, a video — but they are no longer three
+ * unrelated saves: all three are the Roman-concrete thread. The same curiosity
+ * arrives as an article, an annotated screenshot, and a documentary — which is
+ * the product's actual claim (the shape doesn't matter, the thread does), and
+ * it hands the page one continuous story: these captures are the island the
+ * graph assembles two scenes later, and the saves Ask cites in between.
+ *
+ * `steps` is the REAL pipeline (`LINK_SCAN_STEPS`, the array the in-app
+ * stepper reads) with the two source-specific labels swapped: what arrives,
+ * and how it is read.
  */
 function stepsFor(arriveLabel: string, readLabel: string): string[] {
     return LINK_SCAN_STEPS.map((s, i) =>
@@ -84,21 +88,70 @@ function stepsFor(arriveLabel: string, readLabel: string): string[] {
     );
 }
 
-export const CAPTURE_DEMO = {
-    handle: 'Screenshot · 6 Aug, 21:14',
-    steps: stepsFor('Receiving the screenshot', 'Looking at the screenshot'),
-    card: {
-        kind: 'shot',
-        sourceType: 'image',
-        title: 'Pantheon section, annotated',
-        summary:
-            'Load paths sketched over a scanned engraving: coffers cut dead weight, '
-            + 'and the aggregate grades lighter with every metre of height.',
-        category: 'Engineering',
-        tags: ['dome', 'structures', 'sketch'],
-        minutes: 1, ago: 'just now',
-    } satisfies DemoCard,
-};
+export interface CaptureSource {
+    id: 'link' | 'shot' | 'video';
+    tab: string;
+    handle: string;
+    steps: string[];
+    card: DemoCard;
+}
+
+export const CAPTURE_SOURCES: CaptureSource[] = [
+    {
+        id: 'link',
+        tab: 'Link',
+        handle: 'news.mit.edu/roman-concrete',
+        steps: stepsFor('Fetching the link', 'Reading the page'),
+        card: {
+            kind: 'web',
+            url: 'https://news.mit.edu/roman-concrete',
+            sourceName: 'MIT News',
+            title: 'Why Roman concrete heals itself',
+            summary:
+                'Lime clasts act as crack-healing reservoirs — the “flaw” was the '
+                + 'feature all along.',
+            category: 'Engineering',
+            tags: ['materials', 'antiquity'],
+            minutes: 6, ago: 'just now',
+        },
+    },
+    {
+        id: 'shot',
+        tab: 'Screenshot',
+        handle: 'Screenshot · 6 Aug, 21:14',
+        steps: stepsFor('Receiving the screenshot', 'Looking at the screenshot'),
+        card: {
+            kind: 'shot',
+            sourceType: 'image',
+            title: 'Pantheon section, annotated',
+            summary:
+                'Load paths sketched over a scanned engraving: coffers cut dead weight, '
+                + 'and the aggregate grades lighter with height.',
+            category: 'Engineering',
+            tags: ['dome', 'sketch'],
+            minutes: 1, ago: 'just now',
+        },
+    },
+    {
+        id: 'video',
+        tab: 'Video',
+        handle: 'youtube.com · The Pantheon’s impossible dome',
+        steps: stepsFor('Fetching the video', 'Watching the video'),
+        card: {
+            kind: 'youtube',
+            url: 'https://www.youtube.com/watch?v=demo1',
+            sourceType: 'youtube',
+            youtubeChannel: 'Brick & Arch',
+            title: 'The Pantheon’s impossible dome',
+            summary:
+                'Grading the aggregate lighter with height is what lets an unreinforced '
+                + 'dome stand for nineteen centuries.',
+            category: 'Engineering',
+            tags: ['dome', 'structures'],
+            minutes: 14, ago: 'just now',
+        },
+    },
+];
 
 /* ------------------------------------------------------ act three: the ask */
 
