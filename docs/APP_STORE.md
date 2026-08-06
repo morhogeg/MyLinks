@@ -52,18 +52,24 @@ Notes for edge cases:
 | ~~Tagline~~ | The product tagline `Everything you save, finally useful.` is **not** an App Store field — see the note under this table before pasting it anywhere. | — |
 | **Category** | Primary: **Productivity**. Secondary (optional): Utilities. | |
 | **Privacy Policy URL** | `https://mymachina.app/privacy` | |
-| **Support URL** | `https://mymachina.app` | ⚠️ see note |
-| **Marketing URL** (optional) | `https://mymachina.app` | ⚠️ see note |
+| **Support URL** | `https://mymachina.app` | public ✅ |
+| **Marketing URL** (optional) | `https://mymachina.app` | public ✅ |
 | **Support email** | `support@mymachina.app` | forwards to the owner's Gmail |
 | **Copyright** | `© 2026 Mor Hogeg` | |
 
-⚠️ **The Support and Marketing URLs both point at the app root, which is
-currently the SIGN-IN SCREEN.** Apple expects a support page a signed-out
-reviewer can read, and Google's OAuth branding review already **rejected**
-`https://mymachina.app` on exactly this ground — *"your home page is behind a
-login page"* and *"does not explain the purpose of your app"* (2026-08-06). One
-public landing page fixes both reviews at once; until it exists, treat these two
-rows as provisional. `\/privacy` and `\/terms` are genuinely public and fine.
+✅ **The root is a public landing page as of 2026-08-06** (task 25,
+`web/components/LandingPage.tsx`). Both rows above are final. A signed-out
+visitor to `https://mymachina.app` now gets the marketing page — what the
+product is, what it does, where it runs, what happens to their data, and links
+to the policy pages — with sign-in one click behind it. The app itself is
+unchanged and still lives at the same root for anyone signed in, and the iOS
+shell never sees the landing page at all.
+
+**`https://mymachina.app/welcome` is the same page as a fully static route** (no
+auth context, prose in the prerendered HTML). Prefer the bare root for these two
+fields — it is what Google's branding review checks — but `/welcome` is the URL
+to quote if a reviewer ever claims the home page needs JavaScript to read.
+`/privacy` and `/terms` remain genuinely public and unchanged.
 
 ⚠️ **Do not put the tagline in the Subtitle field.** Machina's tagline is
 `Everything you save, finally useful.` (`docs/BRANDING.md` D-6) and it belongs on

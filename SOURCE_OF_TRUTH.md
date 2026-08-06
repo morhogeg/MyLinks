@@ -936,27 +936,37 @@ The multi-user auth work described below **was** fully written but not live:
       account's own address — that is expected, not a bug.)
     - **[x] App Store URLs — updated in `docs/APP_STORE.md`** to the new domain,
       plus a `support@mymachina.app` row. ⚠️ Both the Support and Marketing URLs
-      point at the app root, which is the **sign-in screen** — see task 25.
+      point at the app root, which is now the **public landing page** — task 25
+      is DONE and both ⚠️ are cleared.
 
-25. **[ ] A public landing page at `mymachina.app` — now the highest-value item
-    the domain unblocks.** The root is the sign-in screen, so a signed-out
-    visitor learns nothing about the product. **Two separate reviews are already
-    blocked on this single gap:**
-    - **Google OAuth branding verification REJECTED it** (2026-08-06, owner
-      submitted): *"your home page is behind a login page"*, *"does not explain
-      the purpose of your app"*, and *"the app name Machina … does not match the
-      app name on your home page"* — three complaints, one cause. Its fourth,
-      *"the website is not registered to you"*, is separate and needs domain
-      ownership verified in **Google Search Console**. Do NOT resubmit before
-      the page exists; an unchanged resubmit just burns a review cycle. Nothing
-      depends on this review — it only gates whether the custom **logo** shows on
-      the consent screen; the app *name* already does.
-    - **App Review** expects a Support/Marketing URL a signed-out reviewer can
-      read (`docs/APP_STORE.md` §2 now carries a ⚠️ on both rows).
-    Content is already written and just needs a page to live on: the D-6 tagline,
-    the founder letter's fragmentation story, the launch film
-    (`marketing/launch-clip/`), and the D-7 hero. Lands on Vercel as a route, so
-    it also gives task 23's routing work its first real page.
+25. **[x] A public landing page at `mymachina.app` — DONE 2026-08-06.** The root
+    used to be the sign-in screen, so a signed-out visitor learned nothing about
+    the product, and **two separate reviews were blocked on that single gap**:
+    Google's OAuth branding verification rejected the domain (*"your home page is
+    behind a login page"*, *"does not explain the purpose of your app"*, *"the app
+    name Machina … does not match the app name on your home page"* — three
+    complaints, one cause), and App Review expects a Support/Marketing URL a
+    signed-out reviewer can read. Both are addressed; see the 2026-08-06 (round 3)
+    §9 entry for how, and `web/components/LandingPage.tsx` for the page. What is
+    **not** closed by it:
+    - **25a. [ ] OWNER: verify domain ownership in Google Search Console.**
+      Google's **fourth** rejection reason — *"the website is not registered to
+      you"* — is not a page problem and no code change touches it. Add
+      `mymachina.app` as a property in Search Console under the **same Google
+      account that owns the Cloud project**, verify by DNS TXT at Cloudflare
+      (the registrar is already there, so this is one record), then make sure
+      that account is listed as an owner of the OAuth project.
+    - **25b. [ ] OWNER: re-submit "Verify branding" — but only AFTER the page is
+      live.** Confirm `https://mymachina.app` shows the landing page signed-out
+      in a private window first. An unchanged resubmit burns a review cycle.
+      Do 25a first or the fourth reason simply comes back on its own. Nothing
+      else depends on this review: it gates only whether the custom **logo**
+      shows on the consent screen — the app *name* already does.
+    - **25c. [ ] The launch film is built into the page but switched OFF.** See
+      the §9 entry: the film renders the literal string "AI" on screen in its Ask
+      and feed scenes, which BRANDING **D-3** forbids on a user-visible surface.
+      That is an owner call (accept it, or re-render the demo library with a
+      different topic), not a code change. `NEXT_PUBLIC_FILM_BASE` is the switch.
 
 24. **[ ] Move `authDomain` to the brand domain (own change, own verify pass).**
     The Google sign-in popup's address bar still reads
@@ -1298,6 +1308,70 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-08-06 (round 3) — `mymachina.app` has a public home page (task 25).**
+  The root was the sign-in screen; it is now a landing page for signed-out web
+  visitors, and that one change answers three of Google's four branding-review
+  complaints and both of App Review's URL rows at once.
+  **The routing decision, and why it is not a routing change.** The iOS app is a
+  Capacitor shell serving this SAME bundle from `capacitor://localhost`, so
+  making `/` a marketing page would have opened every iPhone onto marketing
+  instead of the library. Nothing moved. The landing renders from **one branch**
+  — `AuthProvider`'s existing `gated && !authUid` case, the only place a
+  signed-out visitor has ever landed — now split on `native`: native keeps
+  `LoginScreen`, web gets `SignedOutWeb` (landing, with sign-in one click
+  behind it). A signed-in user never reaches that branch on either platform, so
+  the native path is untouched *by construction*. **Verified two ways, not
+  argued:** faking `window.Capacitor.isNativePlatform() → true` and re-mounting
+  the provider via a client-side nav sends the root straight to `LoginScreen`
+  with no landing page (with `REQUIRE_AUTH=true`, i.e. the production config);
+  and in the static export that iOS actually ships, `out/index.html` contains
+  **none** of the landing prose while `out/welcome.html` contains all of it.
+  **`/welcome` is the same page as a genuinely static route** — added to
+  `PUBLIC_ROUTES`, so it mounts with no auth context at all and the copy is in
+  the prerendered HTML. The root's markup is still the boot shell (it sits under
+  `AuthProvider`), so `/welcome` is the floor: the URL that is provably readable
+  with no auth call and no JavaScript. `/` stays canonical for both reviews.
+  **The copy is the positioning of record, not new writing:** the `<h1>` is the
+  D-6 tagline verbatim (this page is now the **sixth** tracked surface for that
+  string, and the only one that carries it twice — `docs/BRANDING.md` §5 updated
+  from five), the hero is D-7's consolidated capture rather than recall-first,
+  and "You never remember where you saved it" is the film's act one and the
+  founder letter's problem — fragmentation, not clutter. **D-3 is verified, not
+  asserted:** a case-insensitive standalone-word scan of the fully rendered
+  `/welcome` HTML returns zero hits for `ai` and `second brain`. The App Store
+  description's *"AI summaries, categories, and tags"* bullet was deliberately
+  paraphrased, never pasted.
+  **⚠️ The launch film is wired up but switched OFF, and this is the finding.**
+  Rendering frames of `MachinaLaunchClean` to pick a poster surfaced that the
+  film puts the literal string **"AI"** on screen, large, in two scenes: the Ask
+  question is *"What have I been saving about AI?"* (frame 1400) and the feed's
+  top card is *"The jobs AI actually changes"* with an `AI` category chip (frame
+  960). It comes from the demo library's deliberate AI/what-stays-human trio
+  (`src/data/library.ts`), where it is a saved *topic* rather than Machina
+  describing itself — defensible inside the film, a different thing on the
+  product's most visible page. **Owner call, not a code change** (task 25c).
+  Until it is called, `NEXT_PUBLIC_FILM_BASE` stays unset and the section renders
+  nothing. What DID ship is **act one as a still** — frame 300, the five silos
+  with their five counts, which is clean and is the section's whole argument:
+  71KB, committed at `web/public/film-still-fragmentation.jpg`, same-origin, so
+  it needs no CDN, no CSP change and no owner step. (It also rides into the iOS
+  bundle at 71KB for an asset native never shows — negligible, but that is why.)
+  **Film hosting, decided but not executed:** Cloudflare R2 behind
+  `cdn.mymachina.app`, which is the one host added to a new `media-src` directive
+  in `web/vercel.json`. A YouTube/Vimeo embed was rejected outright — `frame-src`
+  allows only google.com and `*.firebaseapp.com`, and widening it to a video
+  platform for decoration is a bad trade against a CSP this tight. `out/` is
+  gitignored and 1080p MP4s must not be served off Vercel.
+  Verified: `tsc --noEmit` exit 0; both builds green (Vercel mode and the iOS
+  static export); rendered and eyeballed in **both themes** at desktop and 390px.
+  Also added `.claude/launch.json` so the dev server is one `preview_start` away
+  for the next render-verification pass.
+  **NOT SHIPPED YET — two owner steps, in this order:** (1) verify domain
+  ownership in **Google Search Console** (Google's fourth rejection reason, which
+  no page can fix), then (2) re-submit **"Verify branding"** — and not before
+  `https://mymachina.app` is confirmed live in a private window. See tasks
+  25a/25b.
 
 - **2026-08-06 (round 2) — the share page now looks like the app.** Owner review
   of the live page found three things, all fixed in one pass.
