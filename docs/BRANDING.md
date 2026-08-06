@@ -101,7 +101,7 @@ It resolves **Q-1** (the AI-forward description string) and closes **A-3**.
 | Layer | Value | Field it lives in |
 |---|---|---|
 | **Tagline** (the promise) | `Everything you save, finally useful.` | web `<meta description>`, PWA manifest, public README, launch-film endcard, **the public share-page footer**, Product Hunt |
-| **App Store Subtitle** (the phases) | `Capture. Ask. Connect.` | App Store Connect — **unchanged** |
+| **App Store Subtitle** (the phases) | `Capture. Ask. Connect.` | App Store Connect, **and the sign-in screen** (`web/components/LoginScreen.tsx`, adopted 2026-08-06 — it had carried a stale `Capture. Connect. Recall.`) |
 
 **Why this line and not the two the owner already rejected.** The rejected
 subtitle candidates (`Save anything. It reads it.`, `Analyzed, organized,
