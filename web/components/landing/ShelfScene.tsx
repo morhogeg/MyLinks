@@ -71,13 +71,13 @@ export default function ShelfScene() {
                     className="mx-rise mt-3 text-3xl font-semibold tracking-tight text-text text-balance sm:text-4xl"
                     style={{ ['--i' as string]: 1 }}
                 >
-                    A recipe, a flat, a workout, a thread.
+                    A trip, a grinder, a race, a thread.
                 </h2>
                 <p
                     className="mx-rise mx-auto mt-5 max-w-xl text-[15px] leading-relaxed text-text-secondary text-pretty sm:text-base"
                     style={{ ['--i' as string]: 2 }}
                 >
-                    One week of saving produces things this different, and no single app holds
+                    One month of saving produces things this different, and no single app holds
                     them. Everything below came from a different place — and it all landed here,
                     summarized, categorized and searchable by what you meant rather than by the
                     words you happen to remember.

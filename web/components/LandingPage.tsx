@@ -10,6 +10,7 @@ import AskScene from '@/components/landing/AskScene';
 import ConnectScene from '@/components/landing/ConnectScene';
 import ShelfScene from '@/components/landing/ShelfScene';
 import { useInView } from '@/components/landing/hooks';
+import { LiveMark } from '@/components/landing/parts';
 import '@/components/landing/landing.css';
 
 /**
@@ -177,39 +178,48 @@ function Hero({ onGetStarted }: { onGetStarted?: () => void }) {
            should not be footnoted). */
         <section className="mx-ground relative mx-auto flex min-h-[88vh] max-w-3xl flex-col items-center justify-center px-6 py-20 text-center">
             <div className="relative flex flex-col items-center">
-                {/* The mark assembling: the identity's stated sequence — the
-                    brackets close, then the point lands, then the glow blooms.
-                    Plays on load, not on scroll: it is the first thing on the
-                    page and it is the app's own boot gesture, so arriving on
-                    mymachina.app feels like opening Machina. */}
+                {/* THE APP'S OWN LIVING MARK (owner call, round 8: the first
+                    frame should be genuinely impressive). This is
+                    `CitationMark` — the exact component the Ask page mounts as
+                    its hero — playing its `launch` arrival once and settling
+                    into the `listening` breath, with the identity glow. Not a
+                    re-animation of the logo; the logo, alive, at landing scale.
+                    A visitor who signs in meets this same mark waiting in Ask. */}
                 <span className="relative inline-flex" aria-hidden>
                     <span
-                        className="mx-halo absolute -inset-[55%] rounded-full"
+                        className="mx-halo absolute -inset-[85%] rounded-full"
                         style={{
                             background:
                                 'radial-gradient(closest-side, var(--accent-ring), transparent 72%)',
                         }}
                     />
-                    <svg
-                        viewBox="288 292 448 416"
-                        className="mx-glow-in relative h-14 w-auto text-text"
-                        fill="currentColor"
-                    >
-                        <path className="mx-bracket-l" d="M296 300 L396 300 L396 358 L354 358 L354 642 L396 642 L396 700 L296 700 Z" />
-                        <path className="mx-bracket-r" d="M728 300 L628 300 L628 358 L670 358 L670 642 L628 642 L628 700 L728 700 Z" />
-                        <circle className="mx-point" cx="512" cy="500" r="52" />
-                    </svg>
+                    <LiveMark state="listening" size={84} entry="launch" glow />
                 </span>
 
                 {/* `mx-in` is set unconditionally here — the hero is above the
                     fold, so waiting for an intersection callback would show a
                     blank frame first. */}
                 <div className="mx-in mt-10 flex flex-col items-center">
-                    <h1
-                        className="mx-rise text-4xl font-semibold tracking-tight text-text text-balance sm:text-6xl"
-                        style={{ ['--i' as string]: 2 }}
-                    >
-                        Everything you save, finally useful.
+                    {/* The tagline arrives a word at a time — each word rises out
+                        of its own clip (landing.css `.mx-word-up`), left to
+                        right, after the mark's launch has landed. Real text
+                        nodes throughout: the h1 reads as the full D-6 string to
+                        crawlers and screen readers regardless of the spans. */}
+                    {/* The inter-word space lives OUTSIDE the clip span — a
+                        trailing space inside an inline-block is trimmed, which
+                        rendered the headline as "Everythingyou save,finally…"
+                        (caught from a screenshot, round 8). */}
+                    <h1 className="text-4xl font-semibold tracking-tight text-text text-balance sm:text-6xl">
+                        {'Everything you save, finally useful.'.split(' ').map((w, i) => (
+                            <span key={i}>
+                                <span className="mx-clip">
+                                    <span className="mx-word-up" style={{ ['--i' as string]: i }}>
+                                        {w}
+                                    </span>
+                                </span>
+                                {' '}
+                            </span>
+                        ))}
                     </h1>
 
                     {/* The D-7 hero in one sentence, with the product NAMED in

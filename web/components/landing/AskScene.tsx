@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { QUESTIONS } from './demoData';
-import { KindMark } from './parts';
+import { KindMark, LiveMark } from './parts';
 import { useInView, prefersReducedMotion } from './hooks';
 
 /**
@@ -163,30 +163,39 @@ export default function AskScene() {
 
                     {/* Held at the tallest answer's height so switching to a
                         shorter question can't collapse the page under the
-                        reader's cursor mid-read. */}
-                    <div className="mt-6 min-h-[10rem]">
-                        {thinking && (
-                            <p className="flex items-center gap-2 text-[13px] text-text-muted">
-                                <span className="flex gap-1">
-                                    {[0, 1, 2].map((i) => (
-                                        <span
-                                            key={i}
-                                            className="h-1.5 w-1.5 rounded-full bg-text-muted animate-pulse-subtle"
-                                            style={{ animationDelay: `${i * 160}ms` }}
-                                        />
-                                    ))}
-                                </span>
-                                Reading your saves…
-                            </p>
-                        )}
+                        reader's cursor mid-read.
 
-                        {shown > 0 && (
-                            <p className="text-[15px] leading-relaxed text-text sm:text-base">
-                                {words.slice(0, shown).map((w, i) => (
-                                    <span key={i} className="mx-word">{w}{' '}</span>
-                                ))}
-                            </p>
-                        )}
+                        THE MARK IS THE APP'S OWN `CitationMark` (owner call,
+                        round 8: "the animated machina logo is needed, just like
+                        in our own ask page"): the same component Ask mounts,
+                        with the app's verb per phase — `searching` while it
+                        reads the saves, `shaping` while the answer streams,
+                        `listening` at rest. Not a re-animation; the component. */}
+                    <div className="mt-6 min-h-[10rem]">
+                        <div className="flex items-start gap-3">
+                            <span className="mt-0.5 shrink-0">
+                                <LiveMark
+                                    state={thinking ? 'searching' : shown > 0 && !complete ? 'shaping' : 'listening'}
+                                    size={24}
+                                    aria-label={thinking ? 'Machina is reading your saves' : 'Machina'}
+                                />
+                            </span>
+                            <div className="min-w-0 flex-1">
+                                {thinking && (
+                                    <p className="pt-1 text-[13px] text-text-muted">
+                                        Reading your saves…
+                                    </p>
+                                )}
+
+                                {shown > 0 && (
+                                    <p className="text-[15px] leading-relaxed text-text sm:text-base">
+                                        {words.slice(0, shown).map((w, i) => (
+                                            <span key={i} className="mx-word">{w}{' '}</span>
+                                        ))}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
 
                         {complete && (
                             <div key={`${qIndex}-${runId}`} className="mx-in mt-5 border-t border-border-subtle pt-4">
