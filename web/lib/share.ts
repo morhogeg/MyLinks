@@ -3,15 +3,21 @@
  *
  * The URL must be ABSOLUTE and point at the public web origin — inside the iOS
  * Capacitor shell window.location.origin is `capacitor://localhost`, which is
- * not shareable. So we build links from NEXT_PUBLIC_SHARE_BASE (the production
- * Firebase Hosting / Vercel domain), falling back to the known hosting origin.
+ * not shareable. So we build links from NEXT_PUBLIC_SHARE_BASE (the public brand
+ * domain), falling back to it directly.
+ *
+ * This is the BRAND domain, not the API origin — a recipient sees this string in
+ * every message, so it must read `mymachina.app`, never the Firebase project
+ * host (`secondbrain-app-94da2.web.app`), whose name contradicts BRANDING D-3.
+ * `/s` and `/c` reach the `share_page` function through the Vercel rewrites in
+ * `web/vercel.json`, so the brand domain serves them without the app moving.
  */
 
 import { isNativeApp } from './api';
 
 const SHARE_BASE =
     process.env.NEXT_PUBLIC_SHARE_BASE?.replace(/\/$/, '') ||
-    'https://secondbrain-app-94da2.web.app';
+    'https://mymachina.app';
 
 // Canonical native detection (see api.ts isNativeApp): the capacitor:// origin
 // or the runtime's own isNativePlatform() — NOT the mere presence of the
@@ -37,7 +43,7 @@ export function shareUrlFor(path: string): string {
  */
 const POLICY_BASE =
     process.env.NEXT_PUBLIC_POLICY_BASE?.replace(/\/$/, '') ||
-    'https://my-links-sable.vercel.app';
+    'https://mymachina.app';
 
 /** Href for a policy page: relative on the web, absolute (Vercel) on native. */
 export function policyUrl(path: string): string {

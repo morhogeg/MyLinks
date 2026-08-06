@@ -914,6 +914,42 @@ The multi-user auth work described below **was** fully written but not live:
     preferring the existing same-language vocabulary. See the 2026-07-28 §9
     entry.
 
+22. **[ ] Finish the `mymachina.app` cutover (owner console, ~20 min).** The code
+    half shipped 2026-08-06 (see §9); until these are done, **nothing serves from
+    the new domain** and share links built by a new build would 404. Order
+    matters — do 22a before shipping an iOS build, or that build's share links
+    point at a domain with no site behind it.
+    - **22a. Add `mymachina.app` to the Vercel project** (Settings → Domains) and
+      create the DNS records it prints, in Cloudflare. Set those records to
+      **DNS-only (grey cloud), not proxied** — Cloudflare proxying in front of
+      Vercel with the default SSL mode causes a redirect loop and can block
+      Vercel's cert issuance.
+    - **22b. Set `WEB_URL=https://mymachina.app` on the Cloud Functions** and
+      redeploy (or accept the code default, which is already that value — the env
+      var exists only so the domain can move without a code change). Until the
+      functions redeploy, the share page's own `og:url` and "Open in Machina"
+      links still point at the Firebase host.
+    - **22c. Add `mymachina.app` to Firebase Auth → Settings → Authorized
+      domains.** Sign-in from the new origin fails without it.
+    - **22d. Verify:** open `https://mymachina.app/s?id=<a real share id>` and
+      confirm the page renders and the preview card shows Machina; then share a
+      card from the app and check the link reads `mymachina.app`.
+    - Old links keep working — the Firebase host stays live and is unchanged, so
+      nothing already shared breaks. Do NOT retire it.
+    - Deferred, not blocking: point the App Store listing's marketing/support
+      URLs at the new domain (task 8), and decide on mail
+      (`hello@mymachina.app` — Cloudflare Email Routing forwards free but cannot
+      send; Google Workspace ≈$7/mo for real sending).
+
+23. **[ ] Give the app real routes (`/ask`, `/collections`, …).** The entire app
+    is ONE route: `web/app/page.tsx:149` holds a `feedTab` state
+    (`'home' | 'collections' | 'ask' | 'digest'`) and swaps what renders, so the
+    URL never leaves `/`. `mymachina.app/ask` 404s today. Worth doing for the
+    desktop version — bookmarkable views, a working browser back button, and real
+    pages for the marketing site to link into — but **invisible inside the iOS
+    shell**, where there is no address bar. Post-launch; it is a routing refactor,
+    not a rename.
+
 ### 🟢 P3 — product roadmap (post-launch)
 
 G0. **[x] Launch film built** *(2026-07-29 — `marketing/launch-clip/`, 67s
@@ -1234,6 +1270,51 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-08-06 — the share domain is `mymachina.app`; the "second brain" leak on
+  shared links is closed in code.** Reported as *"when I share a card the link
+  says second brain"*. It was never a string: the share text already said
+  `Saved on Machina` and the page already carried `og:site_name = Machina` — the
+  offender was the **host itself**, `secondbrain-app-94da2.web.app`, which comes
+  from the Firebase project ID and can never be renamed. So the only fix was a
+  real domain. Owner registered **`mymachina.app`** at Cloudflare Registrar
+  (`docs/BRANDING.md` **D-8** records why that name, and what was rejected —
+  including `machinaai.app`, which was available and would have re-broken D-1/D-3
+  with `ai` in place of `second brain`).
+  **The shape of the fix:** the app is split across two hosts — Vercel serves
+  Next.js, Firebase serves `/s` + `/c` (→ `share_page`) and every `/api/*`. So
+  `web/vercel.json` now rewrites `/s` and `/c` to the Firebase host, exactly like
+  the nine `/api/*` rewrites already there, and one brand domain covers both. A
+  Vercel rewrite is a server-side proxy, so link-preview crawlers still get the
+  Cloud Function's HTML with the OG tags intact.
+  **`APP_URL` was split in two** rather than repointed: `WEB_URL` (new, brand
+  domain) drives everything a person reads — `og:url`, the favicon, the brand
+  header, "Open in Machina" — while `APP_URL` stays the Firebase origin for the
+  share-extension ingest endpoint and the CORS allowlist. Repointing `APP_URL`
+  wholesale would have put a Vercel proxy hop in the share extension's critical
+  path for no gain. `WEB_URL` is also added to `_allowed_origins()`, since the
+  desktop app's `/api/*` calls now arrive with the brand Origin.
+  Also decoupled `NEXT_PUBLIC_SHARE_BASE` from `API_BASE` in both workflows and
+  `build-ios.sh` (they were the same value, which is what made the leak
+  structural), and `NEXT_PUBLIC_POLICY_BASE` now resolves to the brand domain too
+  — App Review's Privacy/Terms links were pointing at `my-links-sable.vercel.app`.
+  **Second D-3 leak found on the same page and fixed:** the share-page footer
+  read *"Saved on Machina — your **AI** knowledge base"*, i.e. `ai` on the most-
+  shared user-visible surface in the product. Now *"one place for everything you
+  save"*, which also matches the D-7 hero. Deliberately not the D-6 tagline
+  verbatim — that string is tracked across exactly four surfaces and adding a
+  fifth would widen every future tagline change.
+  Verified: `tsc --noEmit` exit 0, `py_compile` clean. **Not yet verified live** —
+  nothing renders from the new domain until the owner steps below are done.
+  **Two owner steps remain (task 22)**, plus `mymachina.app` needs adding to
+  Firebase Auth's authorized domains before anyone signs in from it.
+  Settled on the side: **`docs/BRANDING.md` Q-4 is closed by D-7** — the owner
+  named the hero as *"a place to save and hold all saves from everywhere"*
+  (consolidated capture), which is what the launch film and founder letter were
+  already saying; D-5's recall-first reading is superseded, and A-5's asset sweep
+  now has a target. Logged **task 23** for `/ask`-style routes: the whole app is
+  one route (`web/app/page.tsx:149`, `feedTab` state), so `mymachina.app/ask`
+  would 404 today.
 
 - **2026-08-05 (ship) — round 3 is LIVE, after an npm outage ate the first
   attempt.** Merge `b41167b`, then `1077c65` for the deploy fix. Green on the

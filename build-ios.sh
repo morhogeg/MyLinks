@@ -27,9 +27,12 @@ cd "$HERE/web"
 # Cloud Function (see firebase.json). Override with API_BASE=... if it moves.
 API_BASE="${API_BASE:-https://secondbrain-app-94da2.web.app}"
 
-# Public origin used to build shareable links (/c?id=, /s?id=). Must be the real
-# web origin — inside the app window.location is capacitor://localhost.
-SHARE_BASE="${SHARE_BASE:-$API_BASE}"
+# Public BRAND origin used to build shareable links (/c?id=, /s?id=) and the
+# policy links. Must be the real web origin — inside the app window.location is
+# capacitor://localhost. NOT API_BASE: recipients see this string, and the
+# Firebase project host reads `secondbrain-…` (BRANDING D-3). Vercel serves this
+# domain and rewrites /s and /c to share_page (web/vercel.json).
+SHARE_BASE="${SHARE_BASE:-https://mymachina.app}"
 
 COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
 echo "→ Building iOS bundle from commit ${COMMIT}"
@@ -43,7 +46,8 @@ echo "→ Installing web deps"
 npm install
 
 echo "→ Building Next.js static export (API base: $API_BASE)"
-NEXT_PUBLIC_API_BASE="$API_BASE" NEXT_PUBLIC_SHARE_BASE="$SHARE_BASE" npm run build
+NEXT_PUBLIC_API_BASE="$API_BASE" NEXT_PUBLIC_SHARE_BASE="$SHARE_BASE" \
+    NEXT_PUBLIC_POLICY_BASE="$SHARE_BASE" npm run build
 
 # Guard: the static export must have actually produced the bundle. If it didn't,
 # stop LOUDLY rather than syncing/archiving nothing new.

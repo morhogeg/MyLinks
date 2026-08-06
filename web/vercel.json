@@ -68,6 +68,14 @@
     {
       "source": "/api/client-error",
       "destination": "https://secondbrain-app-94da2.web.app/api/client-error"
+    },
+    {
+      "source": "/s",
+      "destination": "https://secondbrain-app-94da2.web.app/s"
+    },
+    {
+      "source": "/c",
+      "destination": "https://secondbrain-app-94da2.web.app/c"
     }
   ]
 }

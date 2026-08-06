@@ -207,6 +207,68 @@ question", the demo video's climax). If the hero is really capture-or-connect,
 that copy is selling the wrong thing. See Q-4 — this should be settled before
 launch week, not during it.
 
+**Superseded 2026-08-06 by D-7**, which settles Q-4 on **consolidated capture**.
+The table above is kept as the record of how the three artifacts drifted.
+
+---
+
+### D-7 · The hero is **one place that holds everything you save** (2026-08-06)
+
+**Closes Q-4.** Asked directly which of capture / connect / recall is the hero,
+the owner answered: *"the main thing as I see it is that it acts as a place to
+save and hold all saves from everywhere."* That is **consolidated capture** — the
+fragmentation story, not the retrieval story.
+
+This is not a new position, it is the one the *assets* were already telling. The
+launch film's act one is five platforms drifting apart and then gathering into a
+single point, and its stated problem is **fragmentation, not clutter** — *"you
+never remember where you saved it."* The founder letter says the same thing from
+the other side: *"saving was never the hard part; recalling it is how you learn
+it."* Read together: **gathering** is the promise, recall is the payoff.
+
+**What this changes.** D-5 named the Recall Engine as the hero on the strength of
+§1's positioning statement; that is now the *payoff*, not the lead. The §8 launch
+assets that open on Ask are aimed one step too far down the funnel — that is
+**A-5**'s sweep, and it now has a target to aim at.
+
+**What this does NOT change.** The D-6 tagline (`Everything you save, finally
+useful.`) was written to survive whichever way Q-4 landed, and it does — the
+first clause *is* consolidated capture. No tagline rework. D-2's subtitle already
+opens on `Capture`, so the storefront needs no change either.
+
+---
+
+### D-8 · The public domain is **`mymachina.app`** (2026-08-06)
+
+Registered at Cloudflare Registrar, owner's personal account.
+
+**The problem it fixes.** Share links read
+`https://secondbrain-app-94da2.web.app/s?id=…`, so every recipient of every
+shared card saw `secondbrain` — a **live D-3 violation on the most-shared surface
+in the product**, and unfixable in code: that host is derived from the Firebase
+*project ID*, which can never be renamed. The share text and OpenGraph tags were
+already clean (`Saved on Machina`, `og:site_name = Machina`); the domain was the
+only offender. Links now read `mymachina.app/s?id=…`.
+
+**Why this ending.** The bare `machina.<tld>` space is exhausted — `.com`,
+`.app`, `.io`, `.co`, `.ai`, `.dev` and `.link` are all taken, and what remains
+available is `.luxury` / `.travel` / `.guru`. Rejected on the way:
+- **`machinaai.app`** — available, and a direct D-1/D-3 violation. Would have
+  reproduced the exact bug being fixed, substituting `ai` for `second brain`.
+- **`my-machina.com`** — the hyphen reads as "the real name was taken" and is
+  lost entirely in speech.
+- **aftermarket `machina.*`** ($1,450–$59,995) — four figures on a name whose
+  trademark clearance (**A-1**) is still open.
+
+`my` fits D-7: the product is *your* consolidated library. `.app` is
+HSTS-preloaded (HTTPS enforced at the browser level), which is why the ending
+never went the way of `.xyz`/`.club`.
+
+**Registrar and mail are deliberately separate.** Cloudflare holds the domain;
+mail is whatever gets pointed at it later. Buying through the Google Workspace
+signup flow would have meant buying from Squarespace (which acquired Google
+Domains in 2023) at a markup, and coupling the domain to an email vendor.
+
 ---
 
 ## 2. Naming mechanics (read before touching a name string)
@@ -303,11 +365,12 @@ trademark.** See A-1.
 - **Q-2 · Does `Save & Recall` survive contact with real users?** Nothing has
   been tested. Apple's product-page optimization allows A/B testing the title and
   subtitle after launch — worth doing against the `Ask Your Saves` fallback.
-- **Q-4 · What is the hero — capture, connect, or recall?** See D-5: the
-  positioning statement, the storefront subtitle, and the owner's own stated
-  preference currently point at three different answers. Cheap to settle now, and
-  it determines whether the §8 launch copy is aimed correctly. **This is the
-  highest-value open marketing question in this file.**
+- ~~**Q-4 · What is the hero — capture, connect, or recall?**~~ **CLOSED
+  2026-08-06 by D-7: consolidated capture** — *"a place to save and hold all
+  saves from everywhere."* This is what the launch film and the founder letter
+  were already saying (fragmentation, not clutter); D-5's recall-first reading is
+  superseded. The follow-on work is **A-5**: the §8 assets still open on Ask,
+  which is now one step too far down the funnel.
 - ~~**Q-5 · The Product Hunt tagline contradicts our own copy.**~~ **CLOSED
   2026-08-02 by D-6.** §8 carried *"Ask your bookmarks anything"*, which called
   the product **bookmarks** (a self-description §8's own X-thread asset disowns —

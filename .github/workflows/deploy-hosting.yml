@@ -46,6 +46,8 @@ jobs:
       # The Hosting origin is its own API base — the rewrites above are what the
       # bundle calls. Matches API_BASE in ios-testflight.yml.
       API_BASE: https://secondbrain-app-94da2.web.app
+      # Public BRAND origin for share + policy links (see ios-testflight.yml).
+      WEB_BASE: https://mymachina.app
 
     steps:
       - uses: actions/checkout@v4
@@ -113,7 +115,8 @@ jobs:
         working-directory: web
         env:
           NEXT_PUBLIC_API_BASE: ${{ env.API_BASE }}
-          NEXT_PUBLIC_SHARE_BASE: ${{ env.API_BASE }}
+          NEXT_PUBLIC_SHARE_BASE: ${{ env.WEB_BASE }}
+          NEXT_PUBLIC_POLICY_BASE: ${{ env.WEB_BASE }}
           NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
           NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
           NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
