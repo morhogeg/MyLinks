@@ -149,28 +149,68 @@ export default function AskScene() {
                 </div>
             </div>
 
+            {/* THE CARD'S HEIGHT NEVER CHANGES (round 12 — the rotation was
+                reflowing the whole page under the reader). The trick is a
+                grid-stack SIZER: every question's FINISHED exchange — full
+                bubble, full answer, full citation rows — is rendered invisibly
+                into the same grid cell as the live performance, so the card is
+                always exactly as tall as its tallest possible state, at every
+                viewport, with nothing hardcoded. Rotation animates INSIDE a
+                box that never moves. */}
             <div className="mt-8 rounded-3xl border border-border-subtle bg-card p-6 shadow-[var(--shadow-card)] sm:p-8">
-                {/* The performance. Hidden from assistive tech — the real copy
-                    is the paragraph after it. */}
-                <div aria-hidden>
-                    <div className="flex justify-end">
-                        <p className="max-w-[85%] rounded-2xl rounded-br-md bg-accent px-4 py-2.5 text-left text-[14px] font-medium text-accent-ink">
-                            {q.q.slice(0, typed)}
-                            {typed < q.q.length && <span className="mx-caret">|</span>}
-                        </p>
-                    </div>
+                <div className="grid">
+                    {QUESTIONS.map((item) => (
+                        <div
+                            key={item.q}
+                            aria-hidden
+                            className="pointer-events-none invisible col-start-1 row-start-1"
+                        >
+                            <div className="flex justify-end">
+                                <p className="max-w-[85%] rounded-2xl rounded-br-md bg-accent px-4 py-2.5 text-left text-[14px] font-medium text-accent-ink">
+                                    {item.q}
+                                </p>
+                            </div>
+                            <div className="mt-6">
+                                <div className="flex items-start gap-3">
+                                    <span className="mt-0.5 h-6 w-6 shrink-0" />
+                                    <p className="min-w-0 flex-1 text-[15px] leading-relaxed sm:text-base">
+                                        {item.a}
+                                    </p>
+                                </div>
+                                <div className="mt-5 border-t border-transparent pt-4">
+                                    <p className="text-[11px] uppercase tracking-wider">From your saves</p>
+                                    <div className="mt-2.5 flex flex-wrap gap-2">
+                                        {item.citations.map((c, i) => (
+                                            <span
+                                                key={`${c.label}-${i}`}
+                                                className="inline-flex items-center gap-1.5 rounded-full border border-transparent px-3 py-1.5 text-[12px]"
+                                            >
+                                                <span className="h-3 w-3" />
+                                                {c.label}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
 
-                    {/* Held at the tallest answer's height so switching to a
-                        shorter question can't collapse the page under the
-                        reader's cursor mid-read.
+                    {/* The performance. Hidden from assistive tech — the real
+                        copy is the paragraph after it. */}
+                    <div aria-hidden className="col-start-1 row-start-1">
+                        <div className="flex justify-end">
+                            <p className="max-w-[85%] rounded-2xl rounded-br-md bg-accent px-4 py-2.5 text-left text-[14px] font-medium text-accent-ink">
+                                {q.q.slice(0, typed)}
+                                {typed < q.q.length && <span className="mx-caret">|</span>}
+                            </p>
+                        </div>
 
-                        THE MARK IS THE APP'S OWN `CitationMark` (owner call,
-                        round 8: "the animated machina logo is needed, just like
-                        in our own ask page"): the same component Ask mounts,
-                        with the app's verb per phase — `searching` while it
-                        reads the saves, `shaping` while the answer streams,
-                        `listening` at rest. Not a re-animation; the component. */}
-                    <div className="mt-6 min-h-[10rem]">
+                        {/* THE MARK IS THE APP'S OWN `CitationMark` (round 8):
+                            the same component Ask mounts, with the app's verb
+                            per phase — `searching` while it reads the saves,
+                            `shaping` while the answer streams, `listening` at
+                            rest. */}
+                        <div className="mt-6">
                         <div className="flex items-start gap-3">
                             <span className="mt-0.5 shrink-0">
                                 <LiveMark
@@ -215,6 +255,7 @@ export default function AskScene() {
                                 </div>
                             </div>
                         )}
+                        </div>
                     </div>
                 </div>
 

@@ -57,7 +57,7 @@ export default function ConnectScene() {
                 </div>
 
                 <div className="mx-rise rounded-3xl border border-border-subtle bg-card p-2 shadow-[var(--shadow-card)]" style={{ ['--i' as string]: 2 }}>
-                    <LandingGraph className="aspect-[5/4] w-full" />
+                    <LandingGraph className="aspect-square w-full md:aspect-[5/4]" />
                 </div>
             </div>
         </section>

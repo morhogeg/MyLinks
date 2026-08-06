@@ -97,7 +97,7 @@ export default function LandingGraph({ className = '' }: { className?: string })
                 maxX = Math.max(maxX, n.x + n.r);
                 maxY = Math.max(maxY, n.y + n.r);
             }
-            const pad = 44;
+            const pad = 36;
             const k = Math.min(
                 (w - pad * 2) / Math.max(1, maxX - minX),
                 (h - pad * 2) / Math.max(1, maxY - minY),
@@ -115,10 +115,10 @@ export default function LandingGraph({ className = '' }: { className?: string })
             // spreads a small library, so fitting eleven nodes into this panel
             // lands around k≈0.6 — at which the app's world-unit radii render as
             // specks and its hairline edges disappear (verified from a rendered
-            // frame, not guessed). Dividing by k floors node radius (~9px) and
+            // frame, not guessed). Dividing by k floors node radius (~8px) and
             // edge weight in SCREEN pixels while the simulation itself stays
             // untouched — geometry and motion are still the real thing.
-            const rOf = (r: number) => Math.max(r, 9 / k);
+            const rOf = (r: number) => Math.max(r, 8 / k);
 
             // Edges first, under the nodes — the app's alpha/width law, lifted
             // to stay visible at this camera distance.
@@ -214,18 +214,30 @@ export default function LandingGraph({ className = '' }: { className?: string })
                 const n = nodes[i];
                 const d = discs[i];
                 const tw = ctx.measureText(n.link.title).width;
-                // Below the node first, above as the fallback.
-                const spots = [d.y + d.r + 4, d.y - d.r - 4 - 13];
-                for (const sy of spots) {
-                    const rect = { x1: d.x - tw / 2 - 3, y1: sy - 2, x2: d.x + tw / 2 + 3, y2: sy + 13 };
+                // Candidate spots, in preference order: below, above, right,
+                // left — a tight island hangs its labels outward instead of
+                // dropping them (round 12: the Roman island lost half its
+                // labels on a phone-sized panel with below/above alone).
+                const spots: { x: number; y: number; align: CanvasTextAlign }[] = [
+                    { x: d.x, y: d.y + d.r + 4, align: 'center' },
+                    { x: d.x, y: d.y - d.r - 17, align: 'center' },
+                    { x: d.x + d.r + 6, y: d.y - 6, align: 'left' },
+                    { x: d.x - d.r - 6, y: d.y - 6, align: 'right' },
+                ];
+                for (const spot of spots) {
+                    const x1 = spot.align === 'center' ? spot.x - tw / 2 - 3
+                        : spot.align === 'left' ? spot.x - 3 : spot.x - tw - 3;
+                    const rect = { x1, y1: spot.y - 2, x2: x1 + tw + 6, y2: spot.y + 13 };
                     if (rect.x1 < 2 || rect.x2 > w - 2 || rect.y1 < 2 || rect.y2 > h - 2) continue;
                     if (placed.some((r) => rect.x1 < r.x2 && rect.x2 > r.x1 && rect.y1 < r.y2 && rect.y2 > r.y1)) continue;
                     if (hitsDisc(rect, i)) continue;
                     placed.push(rect);
+                    ctx.textAlign = spot.align;
                     ctx.strokeStyle = rgba(card, 0.7);
-                    ctx.strokeText(n.link.title, d.x, sy);
+                    ctx.strokeText(n.link.title, spot.x, spot.y);
                     ctx.fillStyle = rgba(n.degree >= 3 ? text : textSecondary, 0.95);
-                    ctx.fillText(n.link.title, d.x, sy);
+                    ctx.fillText(n.link.title, spot.x, spot.y);
+                    ctx.textAlign = 'center';
                     break;
                 }
             }
@@ -257,8 +269,8 @@ export default function LandingGraph({ className = '' }: { className?: string })
             const cx0 = model.nodes.reduce((s, n) => s + n.cx, 0) / model.nodes.length;
             const cy0 = model.nodes.reduce((s, n) => s + n.cy, 0) / model.nodes.length;
             for (const n of model.nodes) {
-                const nx = cx0 + (n.cx - cx0) * 0.55;
-                const ny = cy0 + (n.cy - cy0) * 0.55;
+                const nx = cx0 + (n.cx - cx0) * 0.75;
+                const ny = cy0 + (n.cy - cy0) * 0.75;
                 n.x += nx - n.cx;
                 n.y += ny - n.cy;
                 n.cx = nx;

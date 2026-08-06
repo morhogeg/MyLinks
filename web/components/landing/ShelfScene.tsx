@@ -15,7 +15,7 @@ function Row({ cards, seconds, reverse = false }: {
     const track = (
         <div className="flex shrink-0 gap-4 pr-4">
             {cards.map((c) => (
-                <div key={c.title} className="w-[17rem] shrink-0">
+                <div key={c.title} className="w-[14.5rem] shrink-0">
                     <CardView card={c} compact />
                 </div>
             ))}
@@ -77,10 +77,11 @@ export default function ShelfScene() {
                     className="mx-rise mx-auto mt-5 max-w-xl text-[15px] leading-relaxed text-text-secondary text-pretty sm:text-base"
                     style={{ ['--i' as string]: 2 }}
                 >
-                    One month of saving produces things this different, and no single app holds
-                    them. Everything below came from a different place — and it all landed here,
-                    summarized, categorized, and searchable by what you meant — not just the
-                    words you happen to remember.
+                    This is one person’s library, a few weeks in — pulled from the web, X,
+                    YouTube, Instagram, a screenshot, a note to self. No single app could
+                    hold saves this different. Machina holds all of them: every card
+                    summarized and categorized, and the whole shelf searchable by what you
+                    meant — not just the words you happen to remember.
                 </p>
             </div>
 

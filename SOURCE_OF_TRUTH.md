@@ -1315,6 +1315,36 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-07 (round 12) — device QA from the owner's phone: five fixes.**
+  **(1) The Ask card's height never changes.** Rotation was reflowing the whole
+  page. Fixed with a grid-stack SIZER: every question's FINISHED exchange (full
+  bubble, answer, citation rows) renders invisibly into the same grid cell as
+  the live performance, so the card is always exactly as tall as its tallest
+  possible state — every viewport, nothing hardcoded. Suite now asserts the
+  card's offsetHeight across a full rotation.
+  **(2) The graph got air, and side label slots.** The anchor tightening
+  relaxed 45% → 25%, fit padding 44 → 36, ink floor 9 → 8px — the constellation
+  reads zoomed out. Labels gained right/left candidate spots after below/above,
+  so a tight island hangs labels outward instead of dropping them (the Roman
+  island had lost half its labels on a phone panel). Mobile panel is now
+  square (`aspect-square md:aspect-[5/4]`). All four Roman labels verified
+  placed at 390 AND 1280.
+  **(3) The shelf zoomed out** — compact cards 17rem → 14.5rem, more of the
+  library in view.
+  **(4) The pipeline phases wear the app's orbs.** The plain circles are gone:
+  the ACTIVE phase plays the real `CitationMark` with the app's own phase→verb
+  map (`LINK_SCAN_ORBS` — working/searching/shaping/solving); done phases hold
+  the static glyph in full ink, pending in faint. One animated mark rides the
+  checklist the way it rides the app's stepper.
+  **(5) The shelf intro rewritten plainly** — "One month of saving produces
+  things this different…" confused the owner; now: "This is one person's
+  library, a few weeks in — pulled from the web, X, YouTube, Instagram, a
+  screenshot, a note to self. No single app could hold saves this different.
+  Machina holds all of them…"
+  Suites +1 (height stability) and ALL PASS locally and on production after
+  deploy. **SHIPPED.** No functions deploy, no TestFlight build; **1274
+  remains current.** Owner steps 25a/25b still open.
+
 - **2026-08-07 (round 11) — capture redesigned around ONE idea; copy audit.**
   Owner review of round 10 ("this section is crucial — figure it out"), four
   calls.

@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Check, Share, Link2, Image as ImageIcon, Play } from 'lucide-react';
+import { Share, Link2, Image as ImageIcon, Play } from 'lucide-react';
+import { LINK_SCAN_ORBS } from '@/lib/scanPhases';
+import { CitationGlyph } from '@/components/ui/Wordmark';
 import { CAPTURE_SOURCES } from './demoData';
-import { CardView } from './parts';
+import { CardView, LiveMark } from './parts';
 import { useInView, useSequence, prefersReducedMotion } from './hooks';
 
 /** How long the finished card holds before the next shape runs. */
@@ -143,17 +145,23 @@ export default function CaptureScene() {
                                         + (state === 'todo' ? 'opacity-40' : '')
                                     }
                                 >
-                                    <span
-                                        className={
-                                            'grid h-5 w-5 shrink-0 place-items-center rounded-full '
-                                            + (state === 'done'
-                                                ? 'bg-accent text-accent-ink'
-                                                : 'border border-border-strong')
-                                        }
-                                    >
-                                        {state === 'done' && <Check className="h-3 w-3" aria-hidden strokeWidth={3} />}
-                                        {state === 'active' && (
-                                            <span className="h-1.5 w-1.5 rounded-full bg-text animate-pulse-subtle" />
+                                    {/* THE APP'S ORB PER PHASE (round 12 — owner:
+                                        the plain circles were beneath the row).
+                                        `LINK_SCAN_ORBS` is the app's own
+                                        phase → verb map (working / searching /
+                                        shaping / solving), and the ACTIVE phase
+                                        plays it through the real CitationMark.
+                                        Done and pending phases hold the static
+                                        glyph — full ink behind you, faint ahead —
+                                        so one animated mark rides the checklist
+                                        the way it rides the app's own stepper. */}
+                                    <span className="grid h-5 w-6 shrink-0 place-items-center" aria-hidden>
+                                        {state === 'active' ? (
+                                            <LiveMark state={LINK_SCAN_ORBS[i]} size={20} />
+                                        ) : (
+                                            <CitationGlyph
+                                                className={`h-3.5 w-auto ${state === 'done' ? 'text-text' : 'text-text-muted/40'}`}
+                                            />
                                         )}
                                     </span>
                                     <span className="text-[13px] text-text">{label}</span>
