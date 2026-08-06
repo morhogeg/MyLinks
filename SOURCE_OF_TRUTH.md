@@ -914,32 +914,35 @@ The multi-user auth work described below **was** fully written but not live:
     preferring the existing same-language vocabulary. See the 2026-07-28 §9
     entry.
 
-22. **[ ] Finish the `mymachina.app` cutover (owner console, ~20 min).** The code
-    half shipped 2026-08-06 (see §9); until these are done, **nothing serves from
-    the new domain** and share links built by a new build would 404. Order
-    matters — do 22a before shipping an iOS build, or that build's share links
-    point at a domain with no site behind it.
-    - **22a. Add `mymachina.app` to the Vercel project** (Settings → Domains) and
-      create the DNS records it prints, in Cloudflare. Set those records to
-      **DNS-only (grey cloud), not proxied** — Cloudflare proxying in front of
-      Vercel with the default SSL mode causes a redirect loop and can block
-      Vercel's cert issuance.
-    - **22b. Set `WEB_URL=https://mymachina.app` on the Cloud Functions** and
-      redeploy (or accept the code default, which is already that value — the env
-      var exists only so the domain can move without a code change). Until the
-      functions redeploy, the share page's own `og:url` and "Open in Machina"
-      links still point at the Firebase host.
-    - **22c. Add `mymachina.app` to Firebase Auth → Settings → Authorized
-      domains.** Sign-in from the new origin fails without it.
-    - **22d. Verify:** open `https://mymachina.app/s?id=<a real share id>` and
-      confirm the page renders and the preview card shows Machina; then share a
-      card from the app and check the link reads `mymachina.app`.
-    - Old links keep working — the Firebase host stays live and is unchanged, so
-      nothing already shared breaks. Do NOT retire it.
+22. **[x] `mymachina.app` cutover — DONE 2026-08-06** (merge `05fe537`, functions
+    run #76). Web + backend are live on the brand domain and Google sign-in works
+    from it. Detail and the exact Cloudflare/Vercel/Firebase settings are in the
+    2026-08-06 §9 entry. What is **not** covered by it:
+    - **22a. [ ] Ship an iOS build.** `NEXT_PUBLIC_SHARE_BASE` is baked at build
+      time, so builds ≤ **1273** still emit `secondbrain-app-94da2.web.app/s?id=`.
+      **The phone — the surface the bug was reported from — is not fixed until a
+      new TestFlight build ships.** `git push -f origin main:trigger/testflight`.
+    - Old links keep working — the Firebase host stays live and unchanged, so
+      nothing already shared breaks. Do NOT retire it, and do NOT remove it from
+      either authorized-domain list (it is the `authDomain`).
     - Deferred, not blocking: point the App Store listing's marketing/support
-      URLs at the new domain (task 8), and decide on mail
+      URLs at the new domain (task 8) — `mymachina.app/privacy` and `/terms` are
+      live and already entered on the Google OAuth consent screen; decide on mail
       (`hello@mymachina.app` — Cloudflare Email Routing forwards free but cannot
-      send; Google Workspace ≈$7/mo for real sending).
+      send; Google Workspace ≈$7/mo for real sending); and Google's **"Verify
+      branding"** review, which gates whether the custom logo shows on the
+      consent screen (the App *name* already shows). Nothing depends on it.
+
+24. **[ ] Move `authDomain` to the brand domain (own change, own verify pass).**
+    The Google sign-in popup's address bar still reads
+    `secondbrain-app-94da2.firebaseapp.com` because `authDomain`
+    (`web/lib/firebase.ts:26`, from `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`) is still
+    the Firebase host. Fixing it means serving Firebase's auth handler from
+    `mymachina.app` — a Vercel rewrite of `/__/auth/*` to the Firebase host, the
+    same pattern as `/s`. **Deliberately not bundled with the 2026-08-06 domain
+    ship:** get this wrong and sign-in breaks for every user on every platform,
+    so it needs its own device verification. Cosmetic only — the consent screen's
+    text already says Machina.
 
 23. **[ ] Give the app real routes (`/ask`, `/collections`, …).** The entire app
     is ONE route: `web/app/page.tsx:149` holds a `feedTab` state
@@ -1304,10 +1307,37 @@ exact-match, capped.
   save"*, which also matches the D-7 hero. Deliberately not the D-6 tagline
   verbatim — that string is tracked across exactly four surfaces and adding a
   fifth would widen every future tagline change.
-  Verified: `tsc --noEmit` exit 0, `py_compile` clean. **Not yet verified live** —
-  nothing renders from the new domain until the owner steps below are done.
-  **Two owner steps remain (task 22)**, plus `mymachina.app` needs adding to
-  Firebase Auth's authorized domains before anyone signs in from it.
+  Verified: `tsc --noEmit` exit 0, `py_compile` clean.
+  **SHIPPED** — merge `05fe537` to `main`; Vercel auto-deploy; Cloud Functions
+  run **#76**. The functions deploy was deliberately left **unscoped (all)**
+  rather than `Deploy-Functions: share_page`: `main.py`'s `_allowed_origins()`
+  changed and is imported by every HTTP endpoint, so a partial deploy would have
+  left the rest rejecting CORS from the new origin.
+  **Owner console steps DONE this session** (device/browser-verified):
+  `mymachina.app` added to the Vercel project with a Cloudflare `CNAME @ →
+  b62645f73a7993cc.vercel-dns-017.com`, **proxy DNS-only** (the orange cloud
+  breaks Vercel — redirect loop + blocked cert issuance); the bare domain set as
+  Production with **no** apex→www redirect, since share links are built bare;
+  `mymachina.app` + `www.mymachina.app` added to **Firebase Auth → authorized
+  domains** (sign-in 403'd until this — the symptom was a bare *"Sign-in failed.
+  Please try again."*); and the **Google Cloud OAuth consent screen** given App
+  name `Machina`, the icon, and app-domain links on the new domain. `https://
+  mymachina.app` loads and Google sign-in works — both verified by the owner.
+  **Do NOT remove `secondbrain-app-94da2.firebaseapp.com` from either authorized-
+  domain list.** It is the `authDomain` (`web/lib/firebase.ts:26`) and therefore
+  the host that actually runs `/__/auth/handler`; deleting it kills sign-in
+  everywhere, including on iOS.
+  **Two things are knowingly NOT fixed by this ship:**
+  (a) **The iOS app still emits old share links.** `NEXT_PUBLIC_SHARE_BASE` is
+  baked in at build time, so every TestFlight build up to and including **1273**
+  keeps generating `secondbrain-app-94da2.web.app/s?id=…`. Only a **new build**
+  fixes the phone — that is the surface the bug was originally reported from.
+  (b) The Google sign-in popup's **address bar** still reads
+  `secondbrain-app-94da2.firebaseapp.com`, because `authDomain` is unchanged. The
+  consent screen's *text* now says Machina. Moving `authDomain` to the brand
+  domain needs Vercel to proxy `/__/auth/*` to the Firebase host (the same trick
+  as `/s`) and is its own change — a mistake there breaks sign-in for everyone,
+  so it was deliberately not bundled here. Logged as **task 24**.
   Settled on the side: **`docs/BRANDING.md` Q-4 is closed by D-7** — the owner
   named the hero as *"a place to save and hold all saves from everywhere"*
   (consolidated capture), which is what the launch film and founder letter were
