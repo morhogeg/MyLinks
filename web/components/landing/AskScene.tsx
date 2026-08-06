@@ -109,7 +109,7 @@ export default function AskScene() {
     }, [complete, interacted, inView]);
 
     return (
-        <section ref={ref} aria-labelledby="mx-ask-title" className="mx-auto max-w-3xl px-6 py-20 sm:py-28">
+        <section ref={ref} aria-labelledby="mx-ask-title" className="mx-auto max-w-3xl px-6 py-14 sm:py-20">
             <div className="mx-auto max-w-2xl text-center">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-text-muted">
                     Recall

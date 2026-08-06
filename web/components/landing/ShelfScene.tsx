@@ -60,7 +60,7 @@ export default function ShelfScene() {
         <section
             ref={ref}
             aria-labelledby="mx-shelf-title"
-            className={`py-20 sm:py-28 ${seen ? 'mx-in' : ''}`}
+            className={`py-14 sm:py-20 ${seen ? 'mx-in' : ''}`}
         >
             <div className="mx-auto max-w-3xl px-6 text-center">
                 <p className="mx-rise text-[11px] font-semibold uppercase tracking-[0.18em] text-text-muted">
@@ -84,7 +84,7 @@ export default function ShelfScene() {
                 </p>
             </div>
 
-            <div className="mt-12 space-y-4">
+            <div className="mt-10 space-y-4">
                 <Row cards={SHELF.slice(0, half)} seconds={68} />
                 <Row cards={SHELF.slice(half)} seconds={82} reverse />
             </div>

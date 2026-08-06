@@ -22,7 +22,7 @@ export default function ConnectScene() {
         <section
             ref={ref}
             aria-labelledby="mx-connect-title"
-            className={`mx-auto max-w-5xl px-6 py-20 sm:py-28 ${seen ? 'mx-in' : ''}`}
+            className={`mx-auto max-w-5xl px-6 py-14 sm:py-20 ${seen ? 'mx-in' : ''}`}
         >
             <div className="grid items-center gap-10 md:grid-cols-2 md:gap-14">
                 <div>
@@ -41,9 +41,8 @@ export default function ConnectScene() {
                         style={{ ['--i' as string]: 2 }}
                     >
                         Every save is compared against everything you already saved, the moment it
-                        lands — so the flat and the note about its commute end up linked without
-                        you filing either one, and the video about night markets finds its way to
-                        your Lisbon trip.
+                        lands — so the grinder in a screenshot ends up beside the video that dials
+                        it in, and a film about the fish market finds its way to your April trip.
                     </p>
                     <p
                         className="mx-rise mt-4 text-[15px] leading-relaxed text-text-secondary text-pretty sm:text-base"

@@ -10,19 +10,25 @@ import { LINK_SCAN_STEPS } from '@/lib/scanPhases';
  *    product. That is why this library is written fresh rather than ported from
  *    the launch film's `src/data/library.ts`: the film's demo week is built
  *    around an AI/what-stays-human trio, so its Ask scene reads "What have I
- *    been saving about AI?" and its feed's top card is "The jobs AI actually
- *    changes". Defensible in the film, where it is a saved TOPIC. Not here.
+ *    been saving about AI?". Defensible in the film, where it is a saved TOPIC.
+ *    Not here.
  *
- * 2. **Diversity is the argument, not decoration.** One life produces saves
- *    this different — a recipe, a trip, a flat, a workout, a gift, a thread —
- *    and no single app holds them. A library that were all articles would prove
- *    the opposite of the page's claim. This is the same call the film's round 13
- *    made for the same reason.
+ * 2. **Internal consistency is the difference between a demo and a mock-up.**
+ *    Every Ask answer is assemblable from the saves it cites, every cited save
+ *    is on the shelf, and the graph runs over these same cards. A visitor who
+ *    reads an answer and then scans the shelf finds the sources it named.
  *
- * The Ask answers below are genuinely assemblable from the saves they cite —
- * every fact in an answer appears in a cited card. An answer that cited saves
- * it couldn't have been built from would be a lie told in the product's own
- * voice, on its home page.
+ * THE LIBRARY ITSELF (rewritten round 7 — owner: "more interesting examples,
+ * these are very generic", "remove the notes examples, maybe leave one"): a
+ * curious person's month, three real threads —
+ *    an April trip to Tokyo   (a forecast, a reel, a documentary, ONE note)
+ *    a home-espresso rabbit hole (a technique video, a contrarian thread, a
+ *                              review, a screenshot of a shortlist)
+ *    weeknight cooking        (two fast recipes and one slow project)
+ * plus one save that connects to nothing yet (free-diving) — because real
+ * libraries have those, and the graph treats it exactly as the app would.
+ * Exactly ONE note-to-self remains, and it earns its place: its date is what
+ * two Ask answers hinge on.
  */
 
 /** How a save is displayed. Platform keys match `lib/platform.tsx`; the three
@@ -42,20 +48,12 @@ export interface DemoCard {
 
 /* ------------------------------------------------------- act one: the silos */
 
-/**
- * The five places a save disappears into. Counts are illustrative and read as a
- * life rather than a demo: the messages-to-yourself pile is always the biggest.
- *
- * The offsets are an ELLIPSE, wide and shallow, not a circle. The scene's copy
- * sits in the lower third of the stage, so the silo field has to stay in the
- * upper half or the piles land on the headline — which is exactly what the
- * first pass did. Wide-and-shallow also suits the shape of the viewport this is
- * usually read on. `landing.css` scales the whole field by `--rs` on small
- * screens rather than carrying a second set of numbers here.
- *
- * Units are `vmin` so the composition reframes with the viewport instead of
- * needing a separate mobile layout.
- */
+/** The five places a save disappears into. Counts are illustrative and read as
+ *  a life, not a demo: the messages-to-yourself pile is always the biggest.
+ *  Offsets are an ELLIPSE, wide and shallow — the scene's copy sits in the
+ *  lower third of the stage, so the field stays in the upper half. `vmin` so
+ *  the composition reframes with the viewport; `landing.css` scales the whole
+ *  field by `--rs` on small screens. */
 export const SILOS: {
     kind: DemoKind | 'whatsapp' | 'safari';
     label: string;
@@ -73,16 +71,14 @@ export const SILOS: {
 /* ----------------------------------------------------- act two: the capture */
 
 /**
- * The three capture paths, each with the pipeline it runs and the card it
- * produces.
+ * The three capture kinds, each with the pipeline it runs and the card it
+ * produces. The scene cycles them itself and the labels are also buttons.
  *
  * `steps` is `LINK_SCAN_STEPS` from `lib/scanPhases.ts` — the REAL pipeline the
- * app runs and the same array the in-app stepper and the share-sheet banner
- * read — with exactly one label swapped per source, because "Reading the page"
- * is not what happens to a video. That swap mirrors the hero's own sentence:
- * it reads the page, watches the video, looks at the screenshot. If the real
- * pipeline gains or loses a phase, this picks it up automatically; only the
- * swapped label is local.
+ * app runs, the same array the in-app stepper and the share-sheet banner read —
+ * with exactly one label swapped per source ("Reading the page" / "Looking at
+ * the screenshot" / "Watching the video"), mirroring the hero's own line. If
+ * the real pipeline gains or loses a phase, this picks it up automatically.
  */
 function stepsFor(readLabel: string): string[] {
     return LINK_SCAN_STEPS.map((s, i) => (i === 1 ? readLabel : s));
@@ -90,7 +86,6 @@ function stepsFor(readLabel: string): string[] {
 
 export interface CaptureSource {
     id: 'link' | 'shot' | 'video';
-    /** The segmented-control label. */
     tab: string;
     /** What the user shared, as the app would show it mid-capture. */
     handle: string;
@@ -123,12 +118,12 @@ export const CAPTURE_SOURCES: CaptureSource[] = [
         card: {
             kind: 'shot',
             source: 'Screenshot',
-            title: 'Kettlebell complex — 20 minutes, three rounds',
+            title: 'Grinder shortlist, two circled',
             summary:
-                'A saved training block: swing, clean, press, squat, held for three '
-                + 'rounds with 90 seconds between. Written for weeks with no gym time.',
-            category: 'Fitness',
-            tags: ['kettlebell', 'short session', 'strength'],
+                'Two finalists circled out of a comparison table, prices noted in the '
+                + 'margin. The cheaper one is the grinder your saved videos actually use.',
+            category: 'Coffee',
+            tags: ['espresso', 'gear', 'shortlist'],
         },
     },
     {
@@ -159,23 +154,22 @@ export interface DemoCitation {
 
 export interface DemoQuestion {
     q: string;
-    /** Split into words at render time; kept as prose so it stays readable and
-     *  editable here rather than as a pre-chopped array. */
     a: string;
     citations: DemoCitation[];
 }
 
 export const QUESTIONS: DemoQuestion[] = [
     {
-        q: 'What did I save about Lisbon?',
-        a: 'Three saves, and they point at the same neighbourhood. Your 36-hour guide '
-            + 'puts Alfama first for the morning light, the reel is a pastelaria two '
-            + 'streets below it, and the note to yourself has you landing Thursday — '
-            + 'which is the day the flea market runs.',
+        q: 'What did I save about Tokyo?',
+        a: 'Four saves, and they already plan the first morning. The forecast puts '
+            + 'west Tokyo first — Inokashira, not Ueno — and your note has you landing '
+            + 'April 3, three days ahead of peak bloom. The record bars are in Golden '
+            + 'Gai, and the fish-market film is the one to watch on the flight.',
         citations: [
-            { kind: 'x', label: '36 hours in Lisbon' },
-            { kind: 'instagram', label: 'Pastelaria in Alfama' },
-            { kind: 'note', label: 'Flights — landing Thu' },
+            { kind: 'web', label: 'Bloom forecast' },
+            { kind: 'note', label: 'Flights — land April 3' },
+            { kind: 'instagram', label: 'Record bars of Shinjuku' },
+            { kind: 'youtube', label: 'How Tsukiji feeds Tokyo' },
         ],
     },
     {
@@ -190,15 +184,15 @@ export const QUESTIONS: DemoQuestion[] = [
         ],
     },
     {
-        q: 'What was that flat near the park?',
-        a: 'Two-bed with a balcony on the north side of the park, saved three weeks '
-            + 'ago. You noted the commute as one change and about forty minutes. The '
-            + 'listing you saved the week before is on the same street and eight per '
-            + 'cent cheaper.',
+        q: 'Where did I leave the espresso project?',
+        a: 'Three saves deep. The video’s rule is to fix the dose before touching '
+            + 'anything else, the thread argues the 20-gram basket is marketing, and '
+            + 'your screenshot shortlist is down to two grinders — the cheaper one is '
+            + 'the one the video uses.',
         citations: [
-            { kind: 'web', label: 'Two-bed, balcony, north side' },
-            { kind: 'note', label: 'Commute: 1 change, ~40 min' },
-            { kind: 'web', label: 'Same street, listed earlier' },
+            { kind: 'youtube', label: 'Dialing in espresso' },
+            { kind: 'x', label: 'The 20-gram dose myth' },
+            { kind: 'shot', label: 'Grinder shortlist' },
         ],
     },
 ];
@@ -206,26 +200,51 @@ export const QUESTIONS: DemoQuestion[] = [
 /* ------------------------------------------------------ act four: the shelf */
 
 /**
- * The library, as a shelf. Everything the Ask answers cite appears here, so a
- * visitor who reads an answer and then scans the shelf finds the sources it
- * named — the page is internally consistent, which costs nothing and is the
- * difference between a demo and a mock-up.
+ * The library, as a shelf. Everything the Ask answers cite appears here, and
+ * everything here (minus the one untied save) appears in the graph. Exactly
+ * ONE note-to-self, by owner call — the shelf should read as things FOUND, not
+ * things typed.
  */
 export const SHELF: DemoCard[] = [
     {
-        kind: 'x', source: '@ondiscovery', title: '36 hours in Lisbon',
-        summary: 'Alfama at first light, the rest of the day downhill.',
-        category: 'Travel', tags: ['lisbon', 'city break'],
+        kind: 'web', source: 'japan-guide.com', title: 'Cherry blossom forecast, ward by ward',
+        summary: 'West Tokyo peaks first this year — the park you want is Inokashira, not Ueno.',
+        category: 'Travel', tags: ['tokyo', 'april'],
     },
     {
-        kind: 'instagram', source: '@pasteis.diary', title: 'Pastelaria in Alfama',
-        summary: 'Custard tarts two streets below the viewpoint.',
-        category: 'Travel', tags: ['lisbon', 'food'],
+        kind: 'instagram', source: '@goldengai.records', title: 'Record bars of Shinjuku',
+        summary: 'Six seats, one turntable, and no talking during side A.',
+        category: 'Travel', tags: ['tokyo', 'music'],
     },
     {
-        kind: 'note', source: 'Note to self', title: 'Flights — landing Thu',
-        summary: 'In Thursday 14:20, out Sunday night. Flea market is Thursday.',
-        category: 'Travel', tags: ['lisbon', 'dates'],
+        kind: 'youtube', source: 'Process X', title: 'How Tsukiji feeds Tokyo',
+        summary: 'Logistics, not romance: the supply chain behind the world’s fish market.',
+        category: 'Food', tags: ['tokyo', 'documentary'],
+    },
+    {
+        kind: 'note', source: 'Note to self', title: 'Flights — land April 3',
+        summary: 'In on the 3rd, out the 14th. Forecast peak bloom: the 6th.',
+        category: 'Travel', tags: ['tokyo', 'dates'],
+    },
+    {
+        kind: 'youtube', source: 'Pull & Pour', title: 'Dialing in espresso, honestly',
+        summary: 'Fix the dose before touching pressure — most sour shots are a scale problem.',
+        category: 'Coffee', tags: ['espresso', 'technique'],
+    },
+    {
+        kind: 'x', source: '@pressureprofile', title: 'The 20-gram dose myth',
+        summary: 'The “standard” basket is marketing; taste at 16 and work upward.',
+        category: 'Coffee', tags: ['espresso', 'dose'],
+    },
+    {
+        kind: 'web', source: 'thedailypull.com', title: 'Flair 58, six months in',
+        summary: 'A lever machine you service with an allen key — and shots to match.',
+        category: 'Coffee', tags: ['espresso', 'gear'],
+    },
+    {
+        kind: 'shot', source: 'Screenshot', title: 'Grinder shortlist, two circled',
+        summary: 'Two finalists, prices in the margin. The cheaper one is the pick in every video.',
+        category: 'Coffee', tags: ['espresso', 'gear'],
     },
     {
         kind: 'web', source: 'seriouseats.com', title: 'One-pan lemon chicken',
@@ -243,34 +262,9 @@ export const SHELF: DemoCard[] = [
         category: 'Cooking', tags: ['bread', 'weekend'],
     },
     {
-        kind: 'web', source: 'rightmove.co.uk', title: 'Two-bed, balcony, north side',
-        summary: 'Park-facing, second floor, available from the 12th.',
-        category: 'Home', tags: ['flat', 'shortlist'],
-    },
-    {
-        kind: 'note', source: 'Note to self', title: 'Commute: 1 change, ~40 min',
-        summary: 'Checked at 08:10 on a Tuesday, so it is the honest number.',
-        category: 'Home', tags: ['flat', 'commute'],
-    },
-    {
-        kind: 'shot', source: 'Screenshot', title: 'Kettlebell complex, 20 min',
-        summary: 'Swing, clean, press, squat. Three rounds, 90 seconds rest.',
-        category: 'Fitness', tags: ['kettlebell', 'short session'],
-    },
-    {
-        kind: 'x', source: '@quietcraft', title: 'The case for boring tools',
-        summary: 'Choose the thing that will still work in ten years.',
-        category: 'Ideas', tags: ['making', 'longevity'],
-    },
-    {
-        kind: 'youtube', source: 'Rest of World', title: 'How a night market feeds a city',
-        summary: 'Logistics, not romance: the supply chain behind the stalls.',
-        category: 'Ideas', tags: ['cities', 'food'],
-    },
-    {
-        kind: 'web', source: 'wirecutter.com', title: 'Headphones for an open office',
-        summary: 'The pick that is not the obvious one, and why.',
-        category: 'Shopping', tags: ['audio', 'work'],
+        kind: 'x', source: '@twominutewall', title: 'Free-diving’s two-minute wall',
+        summary: 'The wall is CO₂ panic, not oxygen — training is learning to relax through it.',
+        category: 'Ideas', tags: ['breath', 'focus'],
     },
 ];
 
@@ -278,58 +272,52 @@ export const SHELF: DemoCard[] = [
 
 /**
  * The graph scene's library — real `Link` objects, because the scene runs the
- * REAL graph pipeline (`buildGraphModel` → `tick`), not a mockup. Owner call,
- * 2026-08-06 round 5: "graph should be our own exact graph".
+ * REAL graph pipeline (`buildGraphModel` → `tick`), not a mockup.
  *
- * It is the SHELF, one entry per shelf card, so a reader who scans the shelf
- * and then watches the constellation assemble sees the same twelve saves in
- * both. Ties are `relatedLinks` — the stored-AI-relations path, the same one a
- * real library's edges come from (these links carry no embeddings, so the
- * pairwise pass contributes nothing, which keeps the edge set exactly what is
- * written here). Similarity values sit in the real path's observed range;
- * >0.82 renders as a `strong` edge.
+ * It is the SHELF, one seed per shelf card. Titles here are the graph's
+ * LABELS, deliberately shorter than the shelf titles (a canvas label is a
+ * handle, not a headline). Ties are `relatedLinks` — the stored-AI-relations
+ * path, the same one a real library's edges come from; these links carry no
+ * embeddings, so the edge set is exactly what is written here. `concepts`
+ * exist for one reason: `clusterLabel` names each island from them, so the
+ * canvas gets the app's own letterspaced captions — TOKYO, ESPRESSO, COOKING.
  *
- * The one edge that matters most is `night-market ↔ lisbon`: a food-logistics
- * video tied to a travel guide is a connection nobody would have filed, which
- * is the section's entire claim. `kettlebell` is seeded but UNTIED on purpose:
- * the builder drops degree-0 nodes exactly as it does in the app (a card with
- * no qualifying tie is counted, not drawn), and the honest options were worse —
- * a fake tie reads fine until someone asks why a workout connects to noodles.
+ * The two edges that matter most are `grinder ↔ dial-in` (a screenshot tied to
+ * the video that explains it) and `tsukiji ↔ bloom` (a documentary that found
+ * its way to a trip) — connections between things saved WEEKS apart from
+ * different apps, which is the section's whole claim. `freedive` is seeded but
+ * UNTIED on purpose: the builder drops degree-0 nodes exactly as the app does
+ * (a card with no qualifying tie is counted, not drawn), and a fake tie reads
+ * fine until someone asks what free-diving has to do with espresso.
  */
 type GraphSeed = {
     id: string;
     title: string;
     category: string;
     tags: string[];
+    concepts: string[];
     ties?: [string, number][];
 };
 
-/**
- * Titles here are the graph's LABELS, and they are deliberately shorter than
- * the shelf cards they correspond to (owner call, round 6: the full card
- * titles — "Commute: 1 change, ~40 min" — read as clutter at constellation
- * scale). The app has the same distinction in spirit: a canvas label is a
- * handle, not a headline. Two or three words each, no punctuation.
- */
 const GRAPH_SEEDS: GraphSeed[] = [
-    { id: 'lisbon', title: 'Lisbon guide', category: 'Travel', tags: ['lisbon', 'city break'], ties: [['pastel', 0.86], ['flights', 0.8]] },
-    { id: 'pastel', title: 'Pastelaria', category: 'Travel', tags: ['lisbon', 'food'], ties: [['flights', 0.72]] },
-    { id: 'flights', title: 'Flights', category: 'Travel', tags: ['lisbon', 'dates'] },
-    { id: 'chicken', title: 'Lemon chicken', category: 'Recipes', tags: ['weeknight', '35 min'], ties: [['noodles', 0.84], ['sourdough', 0.74]] },
-    { id: 'noodles', title: 'Sesame noodles', category: 'Recipes', tags: ['weeknight', '15 min'] },
-    { id: 'sourdough', title: 'Sourdough', category: 'Cooking', tags: ['bread', 'weekend'] },
-    { id: 'flat', title: 'The flat', category: 'Home', tags: ['flat', 'shortlist'], ties: [['commute', 0.9]] },
-    { id: 'commute', title: 'The commute', category: 'Home', tags: ['flat', 'commute'] },
-    { id: 'kettlebell', title: 'Kettlebells', category: 'Fitness', tags: ['kettlebell', 'short session'] },
-    { id: 'tools', title: 'Boring tools', category: 'Ideas', tags: ['making', 'longevity'], ties: [['headphones', 0.68]] },
-    { id: 'night-market', title: 'Night markets', category: 'Ideas', tags: ['cities', 'food'], ties: [['tools', 0.7], ['lisbon', 0.64]] },
-    { id: 'headphones', title: 'Headphones', category: 'Shopping', tags: ['audio', 'work'] },
+    { id: 'bloom', title: 'Bloom forecast', category: 'Travel', tags: ['tokyo', 'april'], concepts: ['Tokyo'], ties: [['flights', 0.82], ['records', 0.72]] },
+    { id: 'records', title: 'Record bars', category: 'Travel', tags: ['tokyo', 'music'], concepts: ['Tokyo'], ties: [['flights', 0.66]] },
+    { id: 'tsukiji', title: 'Tsukiji film', category: 'Food', tags: ['tokyo', 'documentary'], concepts: ['Tokyo'], ties: [['bloom', 0.74]] },
+    { id: 'flights', title: 'Flights', category: 'Travel', tags: ['tokyo', 'dates'], concepts: ['Tokyo'] },
+    { id: 'dialin', title: 'Dialing in', category: 'Coffee', tags: ['espresso', 'technique'], concepts: ['Espresso'], ties: [['grinder', 0.86], ['dose', 0.78]] },
+    { id: 'dose', title: 'Dose myth', category: 'Coffee', tags: ['espresso', 'dose'], concepts: ['Espresso'], ties: [['flair', 0.64]] },
+    { id: 'flair', title: 'Flair 58', category: 'Coffee', tags: ['espresso', 'gear'], concepts: ['Espresso'], ties: [['grinder', 0.7]] },
+    { id: 'grinder', title: 'Grinder shortlist', category: 'Coffee', tags: ['espresso', 'gear'], concepts: ['Espresso'] },
+    { id: 'chicken', title: 'Lemon chicken', category: 'Recipes', tags: ['weeknight', '35 min'], concepts: ['Cooking'], ties: [['noodles', 0.84], ['sourdough', 0.72]] },
+    { id: 'noodles', title: 'Sesame noodles', category: 'Recipes', tags: ['weeknight', '15 min'], concepts: ['Cooking'] },
+    { id: 'sourdough', title: 'Sourdough', category: 'Cooking', tags: ['bread', 'weekend'], concepts: ['Cooking'] },
+    { id: 'freedive', title: 'Free-diving', category: 'Ideas', tags: ['breath', 'focus'], concepts: ['Breath'] },
 ];
 
 /** `Link`-shaped, minimally: only the fields `buildGraphModel` and the draw
- *  pass read (id/title/category/status/relatedLinks). Typed as the app's real
- *  `Link` so a model change that adds a required field breaks THIS file at
- *  compile time instead of the scene at runtime. */
+ *  pass read. Typed as the app's real `Link` so a model change that adds a
+ *  required field breaks THIS file at compile time instead of the scene at
+ *  runtime. */
 export const GRAPH_LINKS: import('@/lib/types').Link[] = GRAPH_SEEDS.map((s) => ({
     id: s.id,
     url: `https://example.com/${s.id}`,
@@ -337,6 +325,7 @@ export const GRAPH_LINKS: import('@/lib/types').Link[] = GRAPH_SEEDS.map((s) => 
     summary: '',
     tags: s.tags,
     category: s.category,
+    concepts: s.concepts,
     status: 'unread' as const,
     createdAt: 0,
     metadata: { originalTitle: s.title, estimatedReadTime: 1 },

@@ -164,12 +164,44 @@ export default function LandingGraph({ className = '' }: { className?: string })
             // cannot.
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
             ctx.textAlign = 'center';
-            ctx.textBaseline = 'top';
-            ctx.font = '600 11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
             ctx.lineWidth = 3;
             const discs = nodes.map((n) => ({
                 x: n.x * k + camX, y: n.y * k + camY, r: rOf(n.r) * k + 2,
             }));
+
+            // Island captions FIRST — the app's signature: each named cluster
+            // gets its theme drawn above it, uppercase, in the secondary ink
+            // with the card-colored stroke. The names come from the model
+            // itself (`clusterLabel` over the demo links' concepts), so TOKYO /
+            // ESPRESSO / COOKING are the pipeline's own naming, not captions
+            // typed here. Their rects are claimed before node labels are laid
+            // out, same precedence as the app: a cluster's theme outranks a
+            // single card's title.
+            ctx.textBaseline = 'alphabetic';
+            ctx.font = '700 11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+            const placed: { x1: number; y1: number; x2: number; y2: number }[] = [];
+            for (const cluster of model.clusters) {
+                if (!cluster.label) continue;
+                let sumX = 0;
+                let minY = Infinity;
+                for (const i of cluster.nodeIndices) {
+                    sumX += discs[i].x;
+                    minY = Math.min(minY, discs[i].y - discs[i].r);
+                }
+                const label = cluster.label.toUpperCase();
+                const tw = ctx.measureText(label).width;
+                const rawX = sumX / cluster.nodeIndices.length;
+                const sx = Math.min(Math.max(rawX, tw / 2 + 8), w - tw / 2 - 8);
+                const sy = Math.max(minY - 12, 14);
+                ctx.strokeStyle = rgba(card, 0.7);
+                ctx.strokeText(label, sx, sy);
+                ctx.fillStyle = rgba(textSecondary, 0.8);
+                ctx.fillText(label, sx, sy);
+                placed.push({ x1: sx - tw / 2 - 4, y1: sy - 13, x2: sx + tw / 2 + 4, y2: sy + 3 });
+            }
+
+            ctx.textBaseline = 'top';
+            ctx.font = '600 11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
             const hitsDisc = (r: { x1: number; y1: number; x2: number; y2: number }, skip: number) =>
                 discs.some((d, i) => {
                     if (i === skip) return false;
@@ -177,7 +209,6 @@ export default function LandingGraph({ className = '' }: { className?: string })
                     const ny = Math.max(r.y1, Math.min(d.y, r.y2));
                     return (d.x - nx) ** 2 + (d.y - ny) ** 2 < d.r * d.r;
                 });
-            const placed: { x1: number; y1: number; x2: number; y2: number }[] = [];
             const order = nodes.map((_, i) => i).sort((a, b) => nodes[b].degree - nodes[a].degree);
             for (const i of order) {
                 const n = nodes[i];
