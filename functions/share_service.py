@@ -207,6 +207,201 @@ def _md_to_html(value) -> str:
     return "".join(html_parts)
 
 
+# ---------------------------------------------------------------------------
+# Source byline — a server-side port of `web/components/SourceByline.tsx`.
+#
+# The share page used to show an uppercase violet PILL of the raw `sourceName`,
+# which looked nothing like the card in the app and shouted a handle in caps.
+# The app's treatment is airy: the platform's mark in its brand colour, then the
+# name/handle in muted grey at normal weight — no pill, no border, no uppercase.
+#
+# Icon geometry is lucide-react v0.563.0's, copied from
+# `web/node_modules/lucide-react/dist/esm/icons/*.js` so the marks are identical
+# to the app's rather than redrawn by hand; the X mark is the repo's own
+# `XLogo` (`web/lib/platform.tsx`), since lucide still ships the old bird.
+# Brand colours are `PLATFORM_RGB` from the same file.
+#
+# This is a PORT, not a shared module — the functions runtime cannot import from
+# `web/`. If the byline rules change there, change them here too.
+# ---------------------------------------------------------------------------
+
+_ICON_STROKE = (
+    'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
+    'stroke-linecap="round" stroke-linejoin="round"'
+)
+
+_PLATFORM_ICONS = {
+    "youtube": (
+        "#FF0000",
+        f'<svg {_ICON_STROKE}><path d="M2.5 17a24.12 24.12 0 0 1 0-10 2 2 0 0 1 1.4-1.4 49.56 '
+        '49.56 0 0 1 16.2 0A2 2 0 0 1 21.5 7a24.12 24.12 0 0 1 0 10 2 2 0 0 1-1.4 1.4 49.55 '
+        '49.55 0 0 1-16.2 0A2 2 0 0 1 2.5 17"/><path d="m10 15 5-3-5-3z"/></svg>',
+    ),
+    "instagram": (
+        "#E1306C",
+        f'<svg {_ICON_STROKE}><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/>'
+        '<path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>'
+        '<line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg>',
+    ),
+    "linkedin": (
+        "#0A66C2",
+        f'<svg {_ICON_STROKE}><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 '
+        '2v7h-4v-7a6 6 0 0 1 6-6z"/><rect width="4" height="12" x="2" y="9"/>'
+        '<circle cx="4" cy="4" r="2"/></svg>',
+    ),
+    "facebook": (
+        "#1877F2",
+        f'<svg {_ICON_STROKE}><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 '
+        '0 1 1-1h3z"/></svg>',
+    ),
+    "github": (
+        "#8B949E",
+        f'<svg {_ICON_STROKE}><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27'
+        '-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 '
+        '1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17'
+        '.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>',
+    ),
+    # Solid-fill marks (no stroke): the repo's own X wordmark.
+    "x": (
+        "#BFC9D6",
+        '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 '
+        '8.26 8.502 11.24h-6.66l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 '
+        '6.231 5.45-6.231Zm-1.161 17.52h1.833L7.084 4.126H5.117l11.966 15.644Z"/></svg>',
+    ),
+}
+
+_ICON_IMAGE = (
+    f'<svg {_ICON_STROKE}><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/>'
+    '<circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>'
+)
+_ICON_NOTE = (
+    f'<svg {_ICON_STROKE}><path d="M21 9a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 15 '
+    '3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z"/>'
+    '<path d="M15 3v5a1 1 0 0 0 1 1h5"/></svg>'
+)
+
+# Machina's own hosts — the only place a "Machina" sourceName is legitimate.
+# Mirrors MACHINA_HOSTS in web/components/SourceByline.tsx.
+_MACHINA_HOSTS = {
+    "mymachina.app",
+    "www.mymachina.app",
+    "secondbrain-app-94da2.web.app",
+    "my-links-sable.vercel.app",
+}
+
+_X_RESERVED = {
+    "home", "explore", "notifications", "messages", "search", "settings",
+    "compose", "hashtag", "i", "intent", "login", "signup", "about",
+}
+
+
+def _host_of(url: str) -> str:
+    """Bare lowercase hostname, `www.` stripped. Empty string when unparseable."""
+    m = re.match(r"^https?://([^/?#]+)", (url or "").strip(), re.I)
+    if not m:
+        return ""
+    return m.group(1).split("@")[-1].split(":")[0].lstrip(".").lower().removeprefix("www.")
+
+
+def _platform_of(url: str) -> Optional[str]:
+    """Map a URL to a platform key. Mirrors `getPlatform` in platform.tsx."""
+    host = _host_of(url)
+    if not host:
+        return None
+
+    def is_(domain: str) -> bool:
+        return host == domain or host.endswith("." + domain)
+
+    if is_("youtube.com") or is_("youtu.be"):
+        return "youtube"
+    if is_("twitter.com") or is_("x.com"):
+        return "x"
+    if is_("instagram.com"):
+        return "instagram"
+    if is_("linkedin.com"):
+        return "linkedin"
+    if is_("facebook.com") or is_("fb.com") or is_("fb.watch"):
+        return "facebook"
+    if is_("github.com"):
+        return "github"
+    return None
+
+
+def _x_handle(url: str) -> Optional[str]:
+    """Author @handle from an X/Twitter post URL. Mirrors `xHandle`."""
+    if _platform_of(url) != "x":
+        return None
+    m = re.match(r"^https?://[^/]+/([^/?#]+)", (url or "").strip(), re.I)
+    if not m:
+        return None
+    handle = m.group(1).lstrip("@")
+    if handle.lower() in _X_RESERVED:
+        return None
+    return handle if re.fullmatch(r"[A-Za-z0-9_]{1,15}", handle) else None
+
+
+def _instagram_handle(source_name: str) -> Optional[str]:
+    """Bare IG handle from a stored `@handle` sourceName. Mirrors `instagramHandle`."""
+    m = re.fullmatch(r"@([A-Za-z0-9._]{1,30})", (source_name or "").strip())
+    return m.group(1) if m else None
+
+
+def _byline_html(icon_svg: str, color: str, text: str) -> str:
+    tinted = f' style="color:{color}"' if color else ""
+    label = f'<span class="src-name">{_esc(text)}</span>' if text else ""
+    return f'<div class="src"><span class="src-ico"{tinted}>{icon_svg}</span>{label}</div>'
+
+
+def _source_byline(card: dict) -> str:
+    """The card's source line, matching the app's `SourceByline`.
+
+    Order matters and follows the component exactly: YouTube channel, X handle,
+    LinkedIn, Facebook, Instagram handle, screenshot, note, then a plain
+    publisher name (which renders as bare text with no icon).
+    """
+    url = card.get("url") or ""
+    source_name = (card.get("sourceName") or "").strip()
+    source_type = card.get("sourceType") or ""
+    platform = _platform_of(url)
+
+    if platform == "youtube" or source_type == "youtube":
+        channel = ((card.get("metadata") or {}).get("youtubeChannel") or source_name).strip()
+        if channel:
+            color, svg = _PLATFORM_ICONS["youtube"]
+            return _byline_html(svg, color, channel)
+
+    if platform == "x":
+        handle = _x_handle(url)
+        if handle:
+            color, svg = _PLATFORM_ICONS["x"]
+            return _byline_html(svg, color, f"@{handle}")
+
+    if platform in ("linkedin", "facebook"):
+        color, svg = _PLATFORM_ICONS[platform]
+        junk = source_name.lower() in ("", platform, "none", "screenshot")
+        return _byline_html(svg, color, "" if junk else source_name)
+
+    if platform == "instagram":
+        handle = _instagram_handle(source_name)
+        color, svg = _PLATFORM_ICONS["instagram"]
+        return _byline_html(svg, color, f"@{handle}" if handle else "Instagram")
+
+    if source_type == "image":
+        return _byline_html(_ICON_IMAGE, "", "Screenshot")
+    if source_type == "note":
+        return _byline_html(_ICON_NOTE, "", "Note")
+
+    # Plain publisher: name only, no icon — but reject the junk fallbacks the
+    # app rejects, so an old bad card silently reads as its host instead.
+    rejected = (
+        not source_name
+        or source_name in ("Screenshot", "None")
+        or (re.search(r"machina", source_name, re.I) and _host_of(url) not in _MACHINA_HOSTS)
+    )
+    display = source_name if not rejected else (_host_of(url) or "")
+    return f'<div class="src"><span class="src-name">{_esc(display)}</span></div>' if display else ""
+
+
 def _share_card_image(card: dict) -> str:
     """Best preview image for a card; falls back to the Machina icon."""
     thumb = card.get("thumbnailUrl")
@@ -247,15 +442,23 @@ def _share_html_shell(*, title: str, description: str, image: str, url: str, bod
 <style>
   :root {{ color-scheme: dark; }}
   * {{ box-sizing: border-box; }}
-  body {{ margin:0; background:#070708; color:#ededed;
+  body {{ margin:0; background:#050505; color:#E5E5E5;
          font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
          line-height:1.6; }}
   .wrap {{ max-width:640px; margin:0 auto; padding:32px 20px 64px; }}
   .brand {{ display:flex; align-items:center; gap:10px; margin-bottom:28px; }}
   .brand img {{ width:32px; height:32px; border-radius:8px; }}
   .brand span {{ font-weight:600; letter-spacing:.2px; }}
+  /* Source byline — matches SourceByline.tsx: brand-coloured mark, muted name,
+     normal weight, no pill/border/uppercase. (`.badge` survives for the
+     collection kicker, which IS a label rather than a source.) */
+  .src {{ display:flex; align-items:center; gap:6px; margin-bottom:12px;
+         font-size:13px; color:#666666; min-width:0; }}
+  .src-ico {{ display:inline-flex; flex-shrink:0; }}
+  .src-ico svg {{ width:14px; height:14px; display:block; }}
+  .src-name {{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }}
   .badge {{ display:inline-block; font-size:12px; font-weight:700; letter-spacing:.6px;
-           text-transform:uppercase; color:#c4b5fd; background:rgba(139,92,246,.14);
+           text-transform:uppercase; color:#E9E9F2; background:rgba(233,233,242,.10);
            padding:5px 10px; border-radius:999px; margin-bottom:16px; }}
   h1 {{ font-size:26px; line-height:1.25; margin:0 0 16px; }}
   .hero {{ width:100%; border-radius:14px; margin:8px 0 22px; display:block; }}
@@ -276,16 +479,21 @@ def _share_html_shell(*, title: str, description: str, image: str, url: str, bod
              background:#161618; border:1px solid #262629; border-radius:6px; padding:1px 5px; }}
   .md blockquote {{ margin:12px 0; padding:4px 0 4px 14px; border-inline-start:3px solid #3a3a3f;
                    color:#a1a1aa; }}
-  .md a {{ color:#c4b5fd; }}
+  .md a {{ color:#E9E9F2; }}
   .tags {{ margin:22px 0 0; display:flex; flex-wrap:wrap; gap:8px; }}
   .tag {{ font-size:13px; color:#a1a1aa; background:#161618; border:1px solid #262629;
          padding:4px 10px; border-radius:999px; }}
   .actions {{ margin-top:32px; display:flex; flex-wrap:wrap; gap:12px; }}
   .btn {{ display:inline-block; padding:12px 20px; border-radius:12px; font-weight:600;
          text-decoration:none; font-size:15px; }}
-  .btn-primary {{ background:linear-gradient(135deg,#8b5cf6,#d946ef); color:#fff; }}
-  .btn-ghost {{ background:#161618; color:#ededed; border:1px solid #262629; }}
-  .card {{ background:#0e0e10; border:1px solid #1c1c1f; border-radius:18px; padding:24px; }}
+  /* Lumen: the primary CTA is the highest-contrast element on the page —
+     porcelain on graphite, not a hue. Values ported from web/app/globals.css
+     dark tokens (--accent-gradient / --accent-ink); this page is dark-only, so
+     it takes the dark side only. The old violet→magenta gradient predated the
+     identity and was the last place it survived. */
+  .btn-primary {{ background:linear-gradient(135deg,#FFFFFF,#CBD2E0); color:#101016; }}
+  .btn-ghost {{ background:#121212; color:#E5E5E5; border:1px solid rgba(255,255,255,.08); }}
+  .card {{ background:#121212; border:1px solid rgba(255,255,255,.05); border-radius:18px; padding:24px; }}
   /* Collection pages: thumbnail-mosaic hero + per-card rows. */
   .mosaic {{ display:grid; gap:2px; border-radius:14px; overflow:hidden; margin:8px 0 22px;
             aspect-ratio:2/1; }}
@@ -303,19 +511,19 @@ def _share_html_shell(*, title: str, description: str, image: str, url: str, bod
   .col-item .kicker {{ font-size:11px; font-weight:700; letter-spacing:.5px; text-transform:uppercase;
                       color:#8b8b93; margin:0 0 3px; }}
   .col-item h3 {{ margin:0 0 6px; font-size:18px; }}
-  .col-item h3 a {{ color:#ededed; text-decoration:none; }}
-  .col-item h3 a:hover {{ color:#c4b5fd; }}
+  .col-item h3 a {{ color:#E5E5E5; text-decoration:none; }}
+  .col-item h3 a:hover {{ color:#E9E9F2; }}
   .col-item p {{ margin:0; color:#a1a1aa; font-size:15px; }}
-  .col-item .visit {{ font-size:13px; color:#c4b5fd; text-decoration:none; }}
+  .col-item .visit {{ font-size:13px; color:#E9E9F2; text-decoration:none; }}
   .foot {{ margin-top:40px; font-size:13px; color:#71717a; text-align:center; }}
-  a {{ color:#c4b5fd; }}
+  a {{ color:#E9E9F2; }}
 </style>
 </head>
 <body>
   <div class="wrap">
     <div class="brand"><img src="{_esc(WEB_URL)}/icon-192.png" alt="Machina"><span>Machina</span></div>
     {body}
-    <div class="foot">Saved on <a href="{_esc(WEB_URL)}">Machina</a> — one place for everything you save.</div>
+    <div class="foot">Saved on <a href="{_esc(WEB_URL)}">Machina</a> — Everything you save, finally useful.</div>
   </div>
 </body>
 </html>"""
@@ -332,7 +540,7 @@ def _render_shared_card(card: dict, share_url: str) -> str:
 
     has_real_image = image and not image.endswith("/icon-512.png")
     hero = f'<img class="hero" src="{_esc(image)}" alt="">' if has_real_image else ""
-    badge = f'<div class="badge">{_esc(source)}</div>' if source else ""
+    badge = _source_byline(card)
     detail_html = f'<div class="detail md" dir="auto">{_md_to_html(detailed)}</div>' if detailed else ""
     tags_html = ""
     if tags:

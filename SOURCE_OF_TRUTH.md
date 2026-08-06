@@ -1274,6 +1274,37 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-06 (round 2) — the share page now looks like the app.** Owner review
+  of the live page found three things, all fixed in one pass.
+  **(1) The footer** now carries the D-6 tagline verbatim — *"Saved on Machina —
+  Everything you save, finally useful."* This makes the share page the **fifth**
+  tracked surface for that string; `docs/BRANDING.md` D-6 and its §5 tracking row
+  were updated from "four surfaces / four-file sweep" to five, so the next
+  tagline change doesn't silently miss this one.
+  **(2) The CTA was still pre-Lumen.** `.btn-primary` was a violet→magenta
+  gradient (`#8b5cf6`→`#d946ef`) — the old hue accent, and the last place it
+  survived anywhere in the product. It is now the dark `--accent-gradient`
+  (`#FFFFFF`→`#CBD2E0`) with `--accent-ink` (`#101016`) text, ported from
+  `web/app/globals.css`. Four more violet leaks went with it (`.badge`, `.md a`,
+  `.col-item .visit`, the bare `a` rule) plus `body`/`.card` aligned to
+  `--background`/`--card`. **`grep '#c4b5fd\|#8b5cf6\|#d946ef' functions/` is now
+  empty** — that is the check if the palette ever drifts back.
+  **(3) The source line was a shouty pill.** The page rendered raw `sourceName`
+  as an uppercase violet badge (`@EXPLAINING.ARCHITECTUREE`) where the app shows
+  a brand-coloured platform mark + muted name. `_source_byline()` is now a
+  **server-side port of `web/components/SourceByline.tsx`** — same branch order
+  (YouTube channel → X handle → LinkedIn → Facebook → IG handle → screenshot →
+  note → plain publisher), same junk-name rejection (`Screenshot`/`None`/a
+  "Machina" name on a non-Machina host falls back to the prettified host). Icon
+  geometry is **copied out of `web/node_modules/lucide-react` v0.563.0** rather
+  than redrawn, and the X mark is the repo's own `XLogo`, so the marks are
+  pixel-identical to the app's. ⚠️ **It is a PORT, not shared code** — the
+  functions runtime can't import from `web/`, so a byline rule changed in the
+  component must be changed in `share_service.py` too. Both files say so.
+  Verified: 13 card shapes exercised (each platform, reserved X routes, junk
+  names, screenshot/note, missing name, and an XSS attempt — which escapes
+  correctly), plus a Playwright render of the full page.
+
 - **2026-08-06 — the share domain is `mymachina.app`; the "second brain" leak on
   shared links is closed in code.** Reported as *"when I share a card the link
   says second brain"*. It was never a string: the share text already said

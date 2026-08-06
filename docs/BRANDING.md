@@ -100,7 +100,7 @@ It resolves **Q-1** (the AI-forward description string) and closes **A-3**.
 
 | Layer | Value | Field it lives in |
 |---|---|---|
-| **Tagline** (the promise) | `Everything you save, finally useful.` | web `<meta description>`, PWA manifest, public README, launch-film endcard, Product Hunt |
+| **Tagline** (the promise) | `Everything you save, finally useful.` | web `<meta description>`, PWA manifest, public README, launch-film endcard, **the public share-page footer**, Product Hunt |
 | **App Store Subtitle** (the phases) | `Capture. Ask. Connect.` | App Store Connect — **unchanged** |
 
 **Why this line and not the two the owner already rejected.** The rejected
@@ -319,7 +319,7 @@ duplicated here, so a change goes in ONE place):
 
 | Surface | Lives in |
 |---|---|
-| **Tagline** (D-6) — the ONE promise line | `web/app/layout.tsx` + `web/public/manifest.json` (`description`), `README.md` line 3, `marketing/launch-clip/src/scenes/Endcard.tsx` (footer), `SOURCE_OF_TRUTH.md` §8 (Product Hunt). Four surfaces, so a change is a four-file sweep — grep the exact string. |
+| **Tagline** (D-6) — the ONE promise line | `web/app/layout.tsx` + `web/public/manifest.json` (`description`), `README.md` line 3, `marketing/launch-clip/src/scenes/Endcard.tsx` (footer), `functions/share_service.py` (the public share-page footer, added 2026-08-06), `SOURCE_OF_TRUTH.md` §8 (Product Hunt). Five surfaces, so a change is a five-file sweep — grep the exact string. |
 | App Store Name, Subtitle, keywords, promo text, description | `docs/APP_STORE.md` §2 |
 | Growth strategy, channel sequence, launch assets (X thread, Show HN, Product Hunt) | `SOURCE_OF_TRUTH.md` §8 |
 | Positioning statement / product one-liner | `SOURCE_OF_TRUTH.md` §1 |
