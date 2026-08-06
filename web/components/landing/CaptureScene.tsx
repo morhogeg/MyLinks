@@ -2,56 +2,46 @@
 
 import { useEffect, useState } from 'react';
 import { Check, Share } from 'lucide-react';
-import { CAPTURE_SOURCES } from './demoData';
-import { CardView, KindMark } from './parts';
+import { CAPTURE_DEMO } from './demoData';
+import { CardView } from './parts';
 import { useInView, useSequence, prefersReducedMotion } from './hooks';
 
-/** How long the finished card holds before the next source starts. Long enough
- *  to read the summary, short enough that the scene never looks parked. */
-const HOLD_MS = 4200;
+/** How long the finished card holds before the demo replays. */
+const HOLD_MS = 6000;
 
 /**
- * What happens to a save — run live, continuously.
+ * What happens to a save — ONE demo now, and it is the screenshot (round 10;
+ * the owner's call, and the right one: three staged variants of the same five
+ * steps divided the value, and the screenshot is the capture with something to
+ * SHOW — the scan).
  *
- * ONE demo, cycling through the three source kinds on its own, instead of the
- * first pass's three-tab segmented control. Owner call (2026-08-06 round 5):
- * showing the full five-step pipeline three separate times was repetition
- * dressed as content — the pipeline is the same pipeline; only the second step
- * changes ("Reading the page" / "Looking at the screenshot" / "Watching the
- * video"). So the scene now plays link → screenshot → video in a loop, the
- * quiet source line above the checklist names which one is running, and nobody
- * has to click anything to learn that all three exist. The copy still names
- * all three outright, because reviewers read text, not choreography.
+ * The left panel is the screenshot itself as a little window, and while the
+ * pipeline runs it is being SCANNED: a light bar sweeps it using the app's own
+ * `animate-scan-sweep` keyframe — the exact gesture the app's analysis
+ * surfaces use, not a lookalike. When the steps complete, the scan stops and
+ * the finished card lands beside it: what went in, what came back.
  *
- * The checklist itself is still the REAL pipeline — `LINK_SCAN_STEPS` from
- * `lib/scanPhases.ts`, the same array the in-app stepper and the iOS
- * share-sheet banner read, one label swapped per source.
+ * The checklist stays the REAL pipeline — `LINK_SCAN_STEPS` with the two
+ * source-specific labels swapped ("Receiving the screenshot" / "Looking at the
+ * screenshot"). The copy still names all three capture kinds in prose, because
+ * reviewers read text; the demo shows one deeply instead of three shallowly.
  */
 export default function CaptureScene() {
     const [ref, inView] = useInView<HTMLElement>();
-    const [sourceIdx, setSourceIdx] = useState(0);
-    // Bumped every cycle; keys the sequence timer AND the card's landing
-    // animation, so each pass replays rather than swapping content in place.
+    // Keys the sequence timer AND the card's landing animation, so each replay
+    // runs the whole performance rather than swapping content in place.
     const [runId, setRunId] = useState(0);
-    // True once the reader picks a kind themselves — the first click stops the
-    // auto-cycle for good, same alive-until-touched rule as the Ask scene.
-    const [interacted, setInteracted] = useState(false);
 
-    const source = CAPTURE_SOURCES[sourceIdx % CAPTURE_SOURCES.length];
-    const step = useSequence(source.steps.length, 620, inView, runId);
-    const done = step >= source.steps.length;
+    const demo = CAPTURE_DEMO;
+    const step = useSequence(demo.steps.length, 620, inView, runId);
+    const done = step >= demo.steps.length;
 
-    // The cycle: card lands → hold → next source runs. Stops once the reader
-    // has taken over, with reduced motion (the finished frame is the content),
-    // and while off-screen.
+    // Card lands → hold → replay. Stops off-screen and with motion off.
     useEffect(() => {
-        if (!done || !inView || interacted || prefersReducedMotion()) return;
-        const id = setTimeout(() => {
-            setSourceIdx((i) => (i + 1) % CAPTURE_SOURCES.length);
-            setRunId((n) => n + 1);
-        }, HOLD_MS);
+        if (!done || !inView || prefersReducedMotion()) return;
+        const id = setTimeout(() => setRunId((n) => n + 1), HOLD_MS);
         return () => clearTimeout(id);
-    }, [done, inView, interacted]);
+    }, [done, inView]);
 
     return (
         <section ref={ref} aria-labelledby="mx-capture-title" className="mx-auto max-w-5xl px-6 py-14 sm:py-20">
@@ -65,61 +55,62 @@ export default function CaptureScene() {
                 >
                     Share it once. It comes back understood.
                 </h2>
+                {/* "…or from the web app on your computer" was backwards (owner,
+                    round 10) — you send things TO Machina, so the web app is a
+                    destination here, not a source. */}
                 <p className="mx-auto mt-5 max-w-xl text-[15px] leading-relaxed text-text-secondary text-pretty sm:text-base">
                     Send a link, a screenshot or a video to Machina — from any app on your
-                    phone, or from the web app on your computer. It reads the page, looks at
+                    phone, or dropped straight into the web app. It reads the page, looks at
                     the screenshot, watches the video, and turns each save into a card with a
                     real summary, a category, tags, and connections to what you saved before.
                 </p>
             </div>
 
-            {/* The three kinds — BUTTONS that the cycle also drives (round 7:
-                labels that changed on their own but ignored a tap read as
-                broken). Tapping one runs that kind immediately and hands the
-                wheel to the reader; untouched, the scene keeps demoing itself.
-                The active one carries a dot so "which is playing" reads at a
-                glance rather than by contrast alone. */}
-            <div className="mt-8 flex items-center justify-center gap-2" role="group" aria-label="What you shared">
-                {CAPTURE_SOURCES.map((s, i) => {
-                    const active = i === sourceIdx % CAPTURE_SOURCES.length;
-                    return (
-                        <button
-                            key={s.id}
-                            type="button"
-                            aria-pressed={active}
-                            onClick={() => {
-                                setInteracted(true);
-                                setSourceIdx(i);
-                                setRunId((n) => n + 1);
-                            }}
-                            className={
-                                'flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-medium '
-                                + 'uppercase tracking-[0.12em] transition-colors duration-300 '
-                                + (active
-                                    ? 'bg-fill-subtle text-text'
-                                    : 'text-text-muted hover:text-text-secondary')
-                            }
-                        >
-                            <span
-                                aria-hidden
-                                className={
-                                    'h-1 w-1 rounded-full transition-opacity duration-300 '
-                                    + (active ? 'bg-text opacity-100' : 'opacity-0')
-                                }
-                            />
-                            {s.tab}
-                        </button>
-                    );
-                })}
-            </div>
+            {/* items-center: the three panels differ in height, and centred they
+                read as one horizontal machine — in, work, out. */}
+            <div className="mt-10 grid gap-6 md:grid-cols-[1fr_1.15fr_1.15fr] md:items-center">
+                {/* IN: the screenshot, as a window being scanned. */}
+                <div aria-hidden className="relative mx-auto w-full max-w-[17rem] md:max-w-none">
+                    <div className="overflow-hidden rounded-2xl border border-border-strong bg-card shadow-[var(--shadow-card)]">
+                        {/* Window chrome. */}
+                        <div className="flex items-center gap-1.5 border-b border-border-subtle px-3 py-2.5">
+                            {[0, 1, 2].map((i) => (
+                                <span key={i} className="h-2 w-2 rounded-full bg-fill-strong" />
+                            ))}
+                            <span className="ms-2 text-[10px] uppercase tracking-wider text-text-muted">
+                                {demo.handle}
+                            </span>
+                        </div>
+                        {/* The "engraving": abstract sketch lines standing in for
+                            the annotated Pantheon section. */}
+                        <div className="relative h-44 p-4">
+                            <div className="absolute inset-x-8 top-5 h-16 rounded-t-full border-2 border-b-0 border-fill-strong" />
+                            <div className="absolute inset-x-12 top-9 h-12 rounded-t-full border-2 border-b-0 border-fill-subtle" />
+                            <div className="absolute inset-x-6 top-[5.25rem] space-y-2">
+                                <div className="h-1.5 w-3/4 rounded-full bg-fill-subtle" />
+                                <div className="h-1.5 w-1/2 rounded-full bg-fill-subtle" />
+                                <div className="h-1.5 w-2/3 rounded-full bg-fill-subtle" />
+                            </div>
+                            {/* THE SCAN — the app's own sweep keyframe, running
+                                only while the pipeline is. */}
+                            {!done && (
+                                <div className="pointer-events-none absolute inset-0 overflow-hidden">
+                                    <div
+                                        className="animate-scan-sweep absolute inset-x-0 top-0 h-10"
+                                        style={{
+                                            background:
+                                                'linear-gradient(180deg, transparent, var(--accent-ring), transparent)',
+                                        }}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
 
-            {/* `items-center`: the pipeline card is fixed at five phases and the
-                result card is shorter — top-aligned, the right column trailed a
-                void. Centred, the payoff sits opposite the work. */}
-            <div className="mt-8 grid gap-6 md:grid-cols-2 md:items-center">
-                {/* The work. `min-w-0` is load-bearing: a grid item defaults to
-                    `min-width: auto` and an unbreakable URL below would other-
-                    wise force horizontal page scroll at 320px. */}
+                {/* WORK: the real pipeline. `min-w-0` is load-bearing — a grid
+                    item defaults to min-width:auto and the handle line would
+                    otherwise force page scroll at 320px. */}
                 <div className="min-w-0 rounded-3xl border border-border-subtle bg-card p-6 shadow-[var(--shadow-card)]">
                     <div className="flex items-center gap-2 border-b border-border-subtle pb-4">
                         <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-fill-subtle">
@@ -130,13 +121,13 @@ export default function CaptureScene() {
                                 Shared to Machina
                             </span>
                             <span className="block truncate text-[13px] font-medium text-text">
-                                {source.handle}
+                                {demo.handle}
                             </span>
                         </span>
                     </div>
 
                     <ol className="mt-4 space-y-1">
-                        {source.steps.map((label, i) => {
+                        {demo.steps.map((label, i) => {
                             const state = done || i < step ? 'done' : i === step ? 'active' : 'todo';
                             return (
                                 <li
@@ -170,24 +161,18 @@ export default function CaptureScene() {
                     </ol>
 
                     <p className="sr-only" role="status">
-                        {done ? 'Save complete.' : `Step ${Math.max(1, step + 1)} of ${source.steps.length}: ${source.steps[Math.min(step, source.steps.length - 1)]}`}
+                        {done ? 'Save complete.' : `Step ${Math.max(1, step + 1)} of ${demo.steps.length}: ${demo.steps[Math.min(step, demo.steps.length - 1)]}`}
                     </p>
                 </div>
 
-                {/* What comes back. */}
+                {/* OUT: what comes back — the app's real card. */}
                 <div className="min-w-0 min-h-[15rem]">
                     {done ? (
                         <div key={runId} className="mx-card-land">
-                            <CardView card={source.card} />
-                            <p className="mt-4 flex items-center gap-1.5 text-[12px] text-text-muted">
-                                <KindMark kind={source.card.kind} className="h-3 w-3" />
-                                Saved · connected to 3 earlier saves
-                            </p>
+                            <CardView card={demo.card} />
                         </div>
                     ) : (
-                        /* The card's own skeleton at the card's proportions, so
-                           nothing jumps when the finished card replaces it. */
-                        <div className="rounded-2xl border border-border-subtle bg-card p-5 shadow-[var(--shadow-card)]">
+                        <div className="rounded-[20px] border border-border-subtle bg-card p-5 shadow-[var(--shadow-card)]">
                             <div className="h-3 w-24 rounded-full bg-fill-subtle" />
                             <div className="mt-4 h-4 w-3/4 rounded-full bg-fill-subtle" />
                             <div className="mt-3 space-y-2">

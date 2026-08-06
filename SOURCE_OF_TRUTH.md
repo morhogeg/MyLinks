@@ -1315,6 +1315,40 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-07 (round 10) — a knowledge library, and the capture scene becomes
+  the scanner.** Owner review of round 9, six calls.
+  **(1+2) The demo library is rewritten a third time** — the espresso gear and
+  the Tokyo trip both cut ("this is a knowledge app"). v4 is a curious mind's
+  month, three threads of actual knowledge from three fields: **Roman
+  concrete** (the self-healing article, the hot-mixing thread, the Pantheon
+  dome video, an annotated section screenshot), **typography** (serifs on
+  screens, a letterpress reel, the Swiss-grid video, and the ONE note — "Deck:
+  serif body, Swiss grid" — which is the save two others resolve into),
+  **attention** (variable reward, focus-as-environment, boredom-as-data).
+  Free-diving stays as the untied card. Graph captions are now ROMAN CONCRETE
+  / TYPOGRAPHY / ATTENTION; Ask questions rewritten; shelf headline now "A
+  dome, a typeface, an idea, a thread."
+  **(6) ONE capture demo, and it is the screenshot with the scan** — the
+  three-variant cycle (and its kind buttons, whose uppercase row was also the
+  round's mobile-layout complaint, call 3) is gone. The scene is now a
+  three-panel machine: the screenshot as a little window with the app's own
+  `animate-scan-sweep` bar sweeping it while the pipeline runs → the real
+  five-step checklist → the finished ENGINEERING card landing. The copy still
+  names all three kinds in prose.
+  **(4) "or from the web app on your computer" → "or dropped straight into the
+  web app"** — you send things TO Machina; the web app is a destination.
+  **(5) The shelf is swipeable on touch** — under `(hover: none) and (pointer:
+  coarse)` the marquee animation is off, the row scrolls natively with hidden
+  scrollbars, and the duplicate marquee half is removed so a swipe reaches the
+  END of the library instead of looping a copy. Desktop keeps the marquee with
+  hover-pause. (Verify caveat: a probe for the hidden duplicate must use
+  `:scope > [aria-hidden]` — a bare `[aria-hidden]` query matches the icons
+  inside the first copy.)
+  Suites updated (single-demo check replaces the cycle check; new
+  question/answer strings) and ALL PASS locally + on production after deploy.
+  **SHIPPED.** No functions deploy, no TestFlight build; **1274 remains
+  current.** Owner steps 25a/25b still open.
+
 - **2026-08-06 (round 9) — the hero becomes a keynote slide.** Owner review of
   round 8, three calls, all on the hero.
   **(1) "Machina is one place that holds everything you save." is CUT** — the
