@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowDown, Share2, Globe } from 'lucide-react';
+import { ArrowDown, Share2, Globe, ChevronRight, Quote } from 'lucide-react';
 import { CitationGlyph, Wordmark } from '@/components/ui/Wordmark';
 import ThemeToggle from '@/components/ThemeToggle';
 import GatherScene from '@/components/landing/GatherScene';
@@ -169,6 +169,30 @@ function Header({ onGetStarted }: { onGetStarted?: () => void }) {
 
 /* ---------------------------------------------------------------------- hero */
 
+/**
+ * The hero's three steps — save, understand, ask. The first one carries the
+ * product's NAME in plain text (the drawn wordmark in the header is SVG paths;
+ * Google's branding review reads text). The middle tile wears the brand glyph:
+ * the card IS the product, so the product's mark sits on that step.
+ */
+const HERO_STEPS: { icon: React.ReactNode; title: string; body: string }[] = [
+    {
+        icon: <Share2 className="h-5 w-5" aria-hidden />,
+        title: 'Save from anywhere',
+        body: 'Send Machina a link, a screenshot, a video — from any app.',
+    },
+    {
+        icon: <CitationGlyph className="h-5 w-auto" />,
+        title: 'It comes back understood',
+        body: 'Every save becomes a card — a real summary, a category, tags, connections.',
+    },
+    {
+        icon: <Quote className="h-5 w-5" aria-hidden />,
+        title: 'Ask your saves',
+        body: 'Questions get answers with citations — from your own library.',
+    },
+];
+
 function Hero({ onGetStarted }: { onGetStarted?: () => void }) {
     return (
         /* Fully CENTERED (owner call, round 6) — mark, headline, prose and CTA
@@ -200,64 +224,67 @@ function Hero({ onGetStarted }: { onGetStarted?: () => void }) {
                     fold, so waiting for an intersection callback would show a
                     blank frame first. */}
                 <div className="mx-in mt-10 flex flex-col items-center">
-                    {/* The tagline arrives a word at a time — each word rises out
-                        of its own clip (landing.css `.mx-word-up`), left to
-                        right, after the mark's launch has landed. Real text
-                        nodes throughout: the h1 reads as the full D-6 string to
-                        crawlers and screen readers regardless of the spans. */}
-                    {/* The inter-word space lives OUTSIDE the clip span — a
-                        trailing space inside an inline-block is trimmed, which
-                        rendered the headline as "Everythingyou save,finally…"
-                        (caught from a screenshot, round 8). */}
-                    <h1 className="text-4xl font-semibold tracking-tight text-text text-balance sm:text-6xl">
-                        {'Everything you save, finally useful.'.split(' ').map((w, i) => (
-                            <span key={i}>
-                                <span className="mx-clip">
-                                    <span className="mx-word-up" style={{ ['--i' as string]: i }}>
-                                        {w}
-                                    </span>
-                                </span>
-                                {' '}
+                    {/* THE TAGLINE OWNS ITS LINE BREAK (round 9): text-balance
+                        was splitting mid-phrase ("Everything you / save,
+                        finally useful.") — the line is a promise in two halves,
+                        so it breaks exactly at its comma, each half arriving as
+                        one clip-reveal phrase. The connecting sentence that
+                        used to follow ("Machina is one place that holds…") was
+                        cut as sloppy; the name moved into the first step below,
+                        which is where the plain-text NAME the branding review
+                        checks for now lives above the fold. Real text nodes
+                        throughout — the h1 still reads as the full D-6 string. */}
+                    <h1 className="text-[2.75rem] font-semibold leading-[1.06] tracking-tight text-text sm:text-7xl">
+                        <span className="mx-clip">
+                            <span className="mx-word-up" style={{ ['--i' as string]: 0 }}>
+                                Everything you save,
                             </span>
-                        ))}
+                        </span>
+                        <br />
+                        <span className="mx-clip">
+                            <span className="mx-word-up" style={{ ['--i' as string]: 3 }}>
+                                finally useful.
+                            </span>
+                        </span>
                     </h1>
 
-                    {/* The D-7 hero in one sentence, with the product NAMED in
-                        plain text — Google's third rejection reason was that the
-                        app name on the consent screen didn't match the home
-                        page, and the drawn wordmark above is SVG path data, not
-                        readable text. The trailing "— from every app you save it
-                        in" was cut in round 7 (owner: sloppy); the gather scene
-                        below MAKES that point, it doesn't need footnoting. */}
-                    <p
-                        className="mx-rise mt-6 max-w-2xl text-lg leading-relaxed text-text text-pretty sm:text-2xl"
-                        style={{ ['--i' as string]: 3 }}
-                    >
-                        <span className="font-semibold">Machina</span> is one place that holds
-                        everything you save.
-                    </p>
-
-                    {/* The description, as three beats instead of one block
-                        (round 7 — the paragraph read heavy). Each line is one
-                        act of the product and arrives on its own step of the
-                        stagger, so the copy performs its own structure:
-                        capture, understand, recall. Still plain prose in the
-                        markup — this is the text the reviews read. */}
-                    <div className="mt-6 max-w-xl space-y-2.5 text-[15px] leading-relaxed text-text-secondary sm:text-base">
-                        <p className="mx-rise" style={{ ['--i' as string]: 4 }}>
-                            Send it a link, a screenshot, a video — from any app.
-                        </p>
-                        <p className="mx-rise" style={{ ['--i' as string]: 5 }}>
-                            Each one comes back as a card: a real summary, a category, tags, and
-                            connections to what you saved before.
-                        </p>
-                        <p className="mx-rise" style={{ ['--i' as string]: 6 }}>
-                            Then ask a question, and get an answer with citations — from your own
-                            saves.
-                        </p>
+                    {/* The product, as three STEPS instead of three grey lines
+                        (round 9 — the prose stack read "way too plain"). Icon
+                        tiles carry the app's own visual language: the same
+                        `bg-tile` squares the Surfaces cards and Settings use,
+                        the middle one wearing the brand glyph itself. Quiet
+                        chevrons chain them on desktop, so capture → card → ask
+                        reads as one left-to-right flow; on phones they stack
+                        and the chevrons disappear. Still plain prose in the
+                        markup — this is the text the reviews read, and step one
+                        NAMES Machina in real text. */}
+                    <div className="mt-12 grid max-w-3xl grid-cols-1 gap-6 sm:grid-cols-[1fr_auto_1fr_auto_1fr] sm:items-start sm:gap-3">
+                        {HERO_STEPS.map((s, i) => (
+                            <div key={s.title} className="contents">
+                                {i > 0 && (
+                                    <ChevronRight
+                                        aria-hidden
+                                        className="mx-rise mt-9 hidden h-4 w-4 shrink-0 justify-self-center text-text-muted/50 sm:block"
+                                        style={{ ['--i' as string]: 6 + i }}
+                                    />
+                                )}
+                                <div
+                                    className="mx-rise flex flex-col items-center gap-3 px-2"
+                                    style={{ ['--i' as string]: 4 + i * 2 }}
+                                >
+                                    <span className="grid h-11 w-11 place-items-center rounded-2xl bg-tile text-tile-ink shadow-sm">
+                                        {s.icon}
+                                    </span>
+                                    <span className="text-[15px] font-semibold text-text">{s.title}</span>
+                                    <span className="max-w-[16rem] text-[13px] leading-relaxed text-text-secondary text-pretty">
+                                        {s.body}
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
                     </div>
 
-                    <div className="mx-rise mt-10" style={{ ['--i' as string]: 7 }}>
+                    <div className="mx-rise mt-12" style={{ ['--i' as string]: 11 }}>
                         <GetStarted onGetStarted={onGetStarted} />
                     </div>
                 </div>

@@ -1315,6 +1315,25 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-06 (round 9) — the hero becomes a keynote slide.** Owner review of
+  round 8, three calls, all on the hero.
+  **(1) "Machina is one place that holds everything you save." is CUT** — the
+  phrasing never earned its place. The plain-text NAME the branding review
+  checks for moved into step one below ("Send Machina a link…"), so it still
+  sits above the fold in real text; the suite's copy-check moved with it.
+  **(2) The tagline owns its line break** — `text-balance` was splitting
+  mid-phrase ("Everything you / save, finally useful."); it now breaks exactly
+  at its comma, one clip-reveal per half, at sm:text-7xl.
+  **(3) The three grey prose lines are now three STEPS** — icon tiles in the
+  app's own `bg-tile` language (the middle one wears the brand glyph — the card
+  IS the product), titles, one line each, chained by quiet chevrons on desktop
+  so capture → card → ask reads as one left-to-right flow; stacked with no
+  chevrons on phones. Still plain prose in the markup for the reviews.
+  Suites ALL PASS locally and on production after deploy (copy check updated to
+  "Send Machina a link"); mobile hero verified stacked with zero overflow.
+  **SHIPPED** — merge to `main`, Vercel auto-deploy. No functions deploy, no
+  TestFlight build; **1274 remains current.** Owner steps 25a/25b still open.
+
 - **2026-08-06 (round 8) — "use the actual app": the landing now borrows the
   app's own components.** Owner review of round 7, six calls.
   **(1) The demo cards ARE the app's card** — `landing/parts.tsx CardView` now
