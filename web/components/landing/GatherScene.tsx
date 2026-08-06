@@ -129,10 +129,15 @@ export default function GatherScene() {
                         <h2 className="mt-3 text-3xl font-semibold tracking-tight text-text text-balance sm:text-5xl">
                             One place. Everything you save.
                         </h2>
+                        {/* The founder letter's line, LANDED rather than left
+                            hanging (round 11 — "finishes abruptly"): the
+                            observation gets its consequence, and the consequence
+                            hands off to everything below it. */}
                         <p className="mx-auto mt-5 max-w-lg text-[15px] leading-relaxed text-text-secondary text-pretty sm:text-base">
-                            Nothing was lost — it was just scattered across five apps, and finding
-                            anything meant remembering which one swallowed it. Saving was never the
-                            hard part.
+                            Nothing was lost — it was scattered across five apps, and finding
+                            anything meant remembering which one swallowed it. Saving was never
+                            the hard part. Everything after it is — and that is the half Machina
+                            does.
                         </p>
                     </div>
                 </div>

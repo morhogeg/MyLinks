@@ -1,47 +1,60 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Check, Share } from 'lucide-react';
-import { CAPTURE_DEMO } from './demoData';
+import { Check, Share, Link2, Image as ImageIcon, Play } from 'lucide-react';
+import { CAPTURE_SOURCES } from './demoData';
 import { CardView } from './parts';
 import { useInView, useSequence, prefersReducedMotion } from './hooks';
 
-/** How long the finished card holds before the demo replays. */
-const HOLD_MS = 6000;
+/** How long the finished card holds before the next shape runs. */
+const HOLD_MS = 4200;
+
+const TAB_ICONS = {
+    link: <Link2 className="h-4 w-4" aria-hidden />,
+    shot: <ImageIcon className="h-4 w-4" aria-hidden />,
+    video: <Play className="h-4 w-4" aria-hidden />,
+} as const;
 
 /**
- * What happens to a save — ONE demo now, and it is the screenshot (round 10;
- * the owner's call, and the right one: three staged variants of the same five
- * steps divided the value, and the screenshot is the capture with something to
- * SHOW — the scan).
+ * Capture: one SUBJECT, three SHAPES.
  *
- * The left panel is the screenshot itself as a little window, and while the
- * pipeline runs it is being SCANNED: a light bar sweeps it using the app's own
- * `animate-scan-sweep` keyframe — the exact gesture the app's analysis
- * surfaces use, not a lookalike. When the steps complete, the scan stops and
- * the finished card lands beside it: what went in, what came back.
+ * The three kinds are back (round 11 — the single-scanner variant lost the
+ * section's point), but redesigned around one idea instead of three arranged
+ * options: every demo save is the SAME thread. The Roman-concrete article, the
+ * annotated Pantheon screenshot, the dome documentary — one curiosity arriving
+ * as a link, a screenshot, and a video. The shape changes; the thread doesn't.
+ * That is the product's claim, and it makes the whole page one story: these
+ * captures are the island the graph assembles two scenes later.
  *
- * The checklist stays the REAL pipeline — `LINK_SCAN_STEPS` with the two
- * source-specific labels swapped ("Receiving the screenshot" / "Looking at the
- * screenshot"). The copy still names all three capture kinds in prose, because
- * reviewers read text; the demo shows one deeply instead of three shallowly.
+ * The switcher is the APP'S OWN segmented control — the container, radii,
+ * heights and active treatment of `settings/primitives.tsx Segmented`,
+ * with icons so the three kinds read at a glance and short labels that hold
+ * one line on a phone (the round-7 uppercase pill row didn't). It looks
+ * tappable because it is the control the app uses for exactly this job.
+ *
+ * Untouched, the scene demos itself — link → screenshot → video on a loop;
+ * the first tap hands the wheel over for good (the page-wide rule).
  */
 export default function CaptureScene() {
     const [ref, inView] = useInView<HTMLElement>();
-    // Keys the sequence timer AND the card's landing animation, so each replay
-    // runs the whole performance rather than swapping content in place.
+    const [sourceIdx, setSourceIdx] = useState(0);
+    // Keys the sequence timer AND the card's landing animation, so each pass
+    // replays the performance rather than swapping content in place.
     const [runId, setRunId] = useState(0);
+    const [interacted, setInteracted] = useState(false);
 
-    const demo = CAPTURE_DEMO;
-    const step = useSequence(demo.steps.length, 620, inView, runId);
-    const done = step >= demo.steps.length;
+    const source = CAPTURE_SOURCES[sourceIdx % CAPTURE_SOURCES.length];
+    const step = useSequence(source.steps.length, 620, inView, runId);
+    const done = step >= source.steps.length;
 
-    // Card lands → hold → replay. Stops off-screen and with motion off.
     useEffect(() => {
-        if (!done || !inView || prefersReducedMotion()) return;
-        const id = setTimeout(() => setRunId((n) => n + 1), HOLD_MS);
+        if (!done || !inView || interacted || prefersReducedMotion()) return;
+        const id = setTimeout(() => {
+            setSourceIdx((i) => (i + 1) % CAPTURE_SOURCES.length);
+            setRunId((n) => n + 1);
+        }, HOLD_MS);
         return () => clearTimeout(id);
-    }, [done, inView]);
+    }, [done, inView, interacted]);
 
     return (
         <section ref={ref} aria-labelledby="mx-capture-title" className="mx-auto max-w-5xl px-6 py-14 sm:py-20">
@@ -55,61 +68,53 @@ export default function CaptureScene() {
                 >
                     Share it once. It comes back understood.
                 </h2>
-                {/* "…or from the web app on your computer" was backwards (owner,
-                    round 10) — you send things TO Machina, so the web app is a
-                    destination here, not a source. */}
                 <p className="mx-auto mt-5 max-w-xl text-[15px] leading-relaxed text-text-secondary text-pretty sm:text-base">
-                    Send a link, a screenshot or a video to Machina — from any app on your
-                    phone, or dropped straight into the web app. It reads the page, looks at
-                    the screenshot, watches the video, and turns each save into a card with a
-                    real summary, a category, tags, and connections to what you saved before.
+                    Send Machina a link, a screenshot or a video — from any app on your phone,
+                    or dropped straight into the web app. It reads pages, looks at screenshots,
+                    watches videos. Below, one thread arrives in all three shapes.
                 </p>
             </div>
 
-            {/* items-center: the three panels differ in height, and centred they
-                read as one horizontal machine — in, work, out. */}
-            <div className="mt-10 grid gap-6 md:grid-cols-[1fr_1.15fr_1.15fr] md:items-center">
-                {/* IN: the screenshot, as a window being scanned. */}
-                <div aria-hidden className="relative mx-auto w-full max-w-[17rem] md:max-w-none">
-                    <div className="overflow-hidden rounded-2xl border border-border-strong bg-card shadow-[var(--shadow-card)]">
-                        {/* Window chrome. */}
-                        <div className="flex items-center gap-1.5 border-b border-border-subtle px-3 py-2.5">
-                            {[0, 1, 2].map((i) => (
-                                <span key={i} className="h-2 w-2 rounded-full bg-fill-strong" />
-                            ))}
-                            <span className="ms-2 text-[10px] uppercase tracking-wider text-text-muted">
-                                {demo.handle}
-                            </span>
-                        </div>
-                        {/* The "engraving": abstract sketch lines standing in for
-                            the annotated Pantheon section. */}
-                        <div className="relative h-44 p-4">
-                            <div className="absolute inset-x-8 top-5 h-16 rounded-t-full border-2 border-b-0 border-fill-strong" />
-                            <div className="absolute inset-x-12 top-9 h-12 rounded-t-full border-2 border-b-0 border-fill-subtle" />
-                            <div className="absolute inset-x-6 top-[5.25rem] space-y-2">
-                                <div className="h-1.5 w-3/4 rounded-full bg-fill-subtle" />
-                                <div className="h-1.5 w-1/2 rounded-full bg-fill-subtle" />
-                                <div className="h-1.5 w-2/3 rounded-full bg-fill-subtle" />
-                            </div>
-                            {/* THE SCAN — the app's own sweep keyframe, running
-                                only while the pipeline is. */}
-                            {!done && (
-                                <div className="pointer-events-none absolute inset-0 overflow-hidden">
-                                    <div
-                                        className="animate-scan-sweep absolute inset-x-0 top-0 h-10"
-                                        style={{
-                                            background:
-                                                'linear-gradient(180deg, transparent, var(--accent-ring), transparent)',
-                                        }}
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
+            {/* The app's segmented control (settings/primitives.tsx), sized for
+                the section: same container, radii, heights, active treatment. */}
+            <div
+                role="group"
+                aria-label="What you shared"
+                className="mx-auto mt-8 flex w-full max-w-md items-center gap-1 rounded-2xl border border-border-subtle bg-card-hover p-1"
+            >
+                {CAPTURE_SOURCES.map((s, i) => {
+                    const active = i === sourceIdx % CAPTURE_SOURCES.length;
+                    return (
+                        <button
+                            key={s.id}
+                            type="button"
+                            aria-pressed={active}
+                            onClick={() => {
+                                setInteracted(true);
+                                setSourceIdx(i);
+                                setRunId((n) => n + 1);
+                            }}
+                            className={
+                                'inline-flex h-9 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-xl '
+                                + 'text-[13px] font-semibold transition-colors '
+                                + (active
+                                    ? 'bg-accent text-accent-ink shadow-sm'
+                                    : 'text-text-secondary hover:text-text')
+                            }
+                        >
+                            {TAB_ICONS[s.id]}
+                            {s.tab}
+                        </button>
+                    );
+                })}
+            </div>
 
-                {/* WORK: the real pipeline. `min-w-0` is load-bearing — a grid
-                    item defaults to min-width:auto and the handle line would
+            {/* items-center: the pipeline card is fixed at five phases and the
+                result card is shorter — centred, the payoff sits opposite the
+                work that produced it. */}
+            <div className="mt-8 grid gap-6 md:grid-cols-2 md:items-center">
+                {/* The work. `min-w-0` is load-bearing: a grid item defaults to
+                    `min-width: auto`, and the unbreakable handle line would
                     otherwise force page scroll at 320px. */}
                 <div className="min-w-0 rounded-3xl border border-border-subtle bg-card p-6 shadow-[var(--shadow-card)]">
                     <div className="flex items-center gap-2 border-b border-border-subtle pb-4">
@@ -121,13 +126,13 @@ export default function CaptureScene() {
                                 Shared to Machina
                             </span>
                             <span className="block truncate text-[13px] font-medium text-text">
-                                {demo.handle}
+                                {source.handle}
                             </span>
                         </span>
                     </div>
 
                     <ol className="mt-4 space-y-1">
-                        {demo.steps.map((label, i) => {
+                        {source.steps.map((label, i) => {
                             const state = done || i < step ? 'done' : i === step ? 'active' : 'todo';
                             return (
                                 <li
@@ -161,17 +166,19 @@ export default function CaptureScene() {
                     </ol>
 
                     <p className="sr-only" role="status">
-                        {done ? 'Save complete.' : `Step ${Math.max(1, step + 1)} of ${demo.steps.length}: ${demo.steps[Math.min(step, demo.steps.length - 1)]}`}
+                        {done ? 'Save complete.' : `Step ${Math.max(1, step + 1)} of ${source.steps.length}: ${source.steps[Math.min(step, source.steps.length - 1)]}`}
                     </p>
                 </div>
 
-                {/* OUT: what comes back — the app's real card. */}
+                {/* What comes back — the app's real card. */}
                 <div className="min-w-0 min-h-[15rem]">
                     {done ? (
                         <div key={runId} className="mx-card-land">
-                            <CardView card={demo.card} />
+                            <CardView card={source.card} />
                         </div>
                     ) : (
+                        /* The card's own skeleton at the card's proportions, so
+                           nothing jumps when the finished card replaces it. */
                         <div className="rounded-[20px] border border-border-subtle bg-card p-5 shadow-[var(--shadow-card)]">
                             <div className="h-3 w-24 rounded-full bg-fill-subtle" />
                             <div className="mt-4 h-4 w-3/4 rounded-full bg-fill-subtle" />
@@ -187,6 +194,11 @@ export default function CaptureScene() {
                     )}
                 </div>
             </div>
+
+            {/* The one-subject narrative, said out loud — quiet, under the demo. */}
+            <p className="mx-auto mt-6 max-w-md text-center text-[13px] leading-relaxed text-text-muted">
+                One thread, three shapes — watch the rest of the page put it to work.
+            </p>
         </section>
     );
 }

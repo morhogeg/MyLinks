@@ -79,7 +79,7 @@ export default function ShelfScene() {
                 >
                     One month of saving produces things this different, and no single app holds
                     them. Everything below came from a different place — and it all landed here,
-                    summarized, categorized and searchable by what you meant rather than by the
+                    summarized, categorized, and searchable by what you meant — not just the
                     words you happen to remember.
                 </p>
             </div>
