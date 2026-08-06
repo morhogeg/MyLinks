@@ -1377,6 +1377,15 @@ exact-match, capped.
   `LoginScreen`, no landing text, and **the landing chunk never downloaded**.
   `tsc --noEmit` 0; both builds green; `out/index.html` still carries none of the
   landing prose while `out/welcome.html` carries all of it (84KB).
+  **SHIPPED** — merge `865e892` to `main`, Vercel auto-deploy, live ~60s later.
+  No Cloud Functions run fired and none should have (nothing under `functions/**`
+  changed); **no TestFlight build was cut** — the landing page is invisible
+  inside the shell by design and is now provably not even downloaded there, so a
+  build would carry zero behaviour change. **1274 remains the current build.**
+  Both suites were then re-run **against `https://mymachina.app`**, not just
+  locally: all 24 assertions pass on production, including the eight
+  overflow widths, the D-3 scan after clicking through every interactive option,
+  and the native-path checks.
   Owner steps 25a/25b are unchanged and still open.
 
 - **2026-08-06 (round 3) — `mymachina.app` has a public home page (task 25).**
