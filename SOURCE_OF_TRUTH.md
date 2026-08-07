@@ -226,7 +226,14 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (2026-08-05): install build **1273** (supersedes 1270–1272)
+> ## 🚨 OWNER ACTION (updated 2026-08-07): install build **1276**
+>
+> **1276** (run #276, from the round-14 landing ship) is current: the first
+> build where a signed-out phone opens onto the landing page, carrying 1275's
+> meaning-search fix and everything below. The 2026-08-05 note for 1273 follows
+> unchanged for history.
+>
+> ## (superseded) OWNER ACTION (2026-08-05): install build **1273** (supersedes 1270–1272)
 >
 > **1273** (run #273, sha `b41167b`) is the current build — gated, and the first
 > carrying the active-filter count badge on the header glyph. It also has the
@@ -1341,10 +1348,12 @@ exact-match, capped.
   All suites (incl. drag pixel-check, shelf density, Ask height stability,
   inverted native checks) ALL PASS locally and on production. **SHIPPED** web
   via merge to `main`; **TestFlight build triggered** via
-  `git push -f origin main:trigger/testflight` — the resulting build
-  supersedes 1275 (shipped in parallel this same day — see the meaning-search
-  entry below) and is the FIRST build where a signed-out phone opens onto
-  the landing page. Owner steps 25a/25b still open.
+  `git push -f origin main:trigger/testflight` — run **#276 → build 1276**,
+  archived and uploaded GREEN. 1276 supersedes 1275 (shipped in parallel this
+  same day — see the meaning-search entry below) and is the FIRST build where
+  a signed-out phone opens onto the landing page. It also carries 1275's
+  meaning-search fix, since it builds the same merged main. Owner steps
+  25a/25b still open.
 
 - **2026-08-07 — MEANING SEARCH IS BACK IN THE SEARCH BAR (branch
   `claude/onboard-search-semantics-2aodzb`).** Owner, with screenshots: "Pasta"
