@@ -82,13 +82,73 @@ export function KindMark({ kind, className = 'w-3.5 h-3.5' }: {
     return <Icon className={`${className} text-text-muted`} aria-hidden />;
 }
 
-/** A saved card, exactly as the feed renders one at rest. */
-export function CardView({ card, compact = false, className = '' }: {
+/**
+ * A saved card, exactly as the feed renders one at rest.
+ *
+ * `dense` (round 13, the shelf) is the card at overview scale — the owner's
+ * "zoom out much more": every element of the anatomy survives (colored
+ * category chip, real byline, title, summary, tags, clock row), each a step
+ * smaller, so a shelf row fits twice the library and each card still reads.
+ */
+export function CardView({ card, compact = false, dense = false, className = '' }: {
     card: DemoCard;
     compact?: boolean;
+    dense?: boolean;
     className?: string;
 }) {
     const colorStyle = getCategoryColorStyle(card.category);
+    if (dense) {
+        return (
+            <article
+                className={
+                    'group surface-card bg-card rounded-2xl border border-border-subtle '
+                    + 'shadow-[var(--shadow-card)] overflow-hidden relative flex flex-col items-stretch h-full '
+                    + className
+                }
+            >
+                <div className="flex h-full flex-col space-y-2 p-3">
+                    <div dir="ltr" className="mb-0.5 flex h-5 w-full items-center justify-between gap-2">
+                        <span
+                            className="inline-block whitespace-nowrap rounded-md px-1.5 py-0.5 text-[8px] font-black uppercase tracking-widest"
+                            style={{ backgroundColor: colorStyle.backgroundColor, color: colorStyle.color }}
+                        >
+                            {card.category}
+                        </span>
+                        <span className="min-w-0 origin-right scale-90">
+                            <SourceByline
+                                link={{
+                                    url: card.url,
+                                    sourceName: card.sourceName,
+                                    sourceType: card.sourceType,
+                                    metadata: { youtubeChannel: card.youtubeChannel },
+                                }}
+                            />
+                        </span>
+                    </div>
+                    <h3 className="text-[13px] font-bold leading-snug text-text">{card.title}</h3>
+                    <p className="line-clamp-2 flex-grow text-[11px] leading-relaxed text-text-secondary">
+                        {card.summary}
+                    </p>
+                    <div className="flex items-center justify-between border-t border-border-subtle pt-2">
+                        <span className="flex min-w-0 gap-1">
+                            {card.tags.slice(0, 2).map((tag) => (
+                                <span
+                                    key={tag}
+                                    className="inline-flex items-center truncate rounded bg-fill-subtle px-1 py-0.5 text-[7px] font-black uppercase tracking-wider text-text-muted/60"
+                                >
+                                    {tag}
+                                </span>
+                            ))}
+                        </span>
+                        <span className="flex shrink-0 items-center gap-1 text-[9px] font-medium text-text-muted/60">
+                            <Clock className="h-2.5 w-2.5" />
+                            {card.minutes}m · {card.ago}
+                        </span>
+                    </div>
+                </div>
+            </article>
+        );
+    }
     return (
         <article
             className={
