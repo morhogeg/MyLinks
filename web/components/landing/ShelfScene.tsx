@@ -86,8 +86,8 @@ export default function ShelfScene() {
             </div>
 
             <div className="mt-10 space-y-4">
-                <Row cards={SHELF.slice(0, half)} seconds={68} />
-                <Row cards={SHELF.slice(half)} seconds={82} reverse />
+                <Row cards={SHELF.slice(0, half)} seconds={44} />
+                <Row cards={SHELF.slice(half)} seconds={54} reverse />
             </div>
         </section>
     );

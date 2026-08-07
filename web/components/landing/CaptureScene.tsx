@@ -203,10 +203,6 @@ export default function CaptureScene() {
                 </div>
             </div>
 
-            {/* The one-subject narrative, said out loud — quiet, under the demo. */}
-            <p className="mx-auto mt-6 max-w-md text-center text-[13px] leading-relaxed text-text-muted">
-                One thread, three shapes — watch the rest of the page put it to work.
-            </p>
         </section>
     );
 }

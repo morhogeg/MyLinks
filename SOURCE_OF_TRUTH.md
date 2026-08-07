@@ -1315,6 +1315,37 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-07 (round 14) — the landing becomes the signed-out state EVERYWHERE
+  — including the iOS app — plus five polish calls. TESTFLIGHT BUILD REQUIRED
+  AND TRIGGERED.**
+  **(6, the big one) `AuthProvider`'s signed-out branch no longer splits on
+  `native`**: every signed-out session — web root, fresh iPhone install, or a
+  user who just signed out — gets the landing page with LoginScreen one
+  Get-started tap away. Explicit owner call, reversing the round-3 guard
+  ("the page a user that signs out sees — both desktop and the iOS app").
+  `showApple` keeps LoginScreen's old per-platform expression. The routing
+  suite's native checks were INVERTED to match (landing at native root, chunk
+  legitimately in the iOS bundle now). ⚠️ The phone shows this only from the
+  NEXT TestFlight build — the trigger branch was pushed this session; check
+  the run number / build number in Actions.
+  **(2) The Ask question no longer types** — typed text inside a SENT bubble
+  was the wrong metaphor. It arrives as a sent message: the iMessage gesture,
+  a spring pop from the send corner with a blur that resolves as it lands
+  (`.mx-bubble-in`, `--ease-spring`), then the mark thinks, then the answer
+  streams. **(1) The "One thread, three shapes" coda is cut.** **(3) The shelf
+  runs faster** (68s/82s → 44s/54s per loop). **(4) The Close line rewritten**:
+  "Sign in with Apple or Google, send Machina your next find, and watch it
+  come back understood." **(5) The graph got a ground**: a soft radial bloom
+  over a fine dot lattice, both built from tokens (`--text` via color-mix,
+  `--border-strong` dots) so they invert with the theme and sit at hairline
+  contrast under the labels — verified in both themes.
+  All suites (incl. drag pixel-check, shelf density, Ask height stability,
+  inverted native checks) ALL PASS locally and on production. **SHIPPED** web
+  via merge to `main`; **TestFlight build triggered** via
+  `git push -f origin main:trigger/testflight` — the resulting build
+  supersedes 1274 and is the FIRST build where a signed-out phone opens onto
+  the landing page. Owner steps 25a/25b still open.
+
 - **2026-08-07 (round 13) — the graph becomes touchable; the shelf becomes an
   overview.** Owner device QA, five calls.
   **(1) The shelf zoomed WAY out** — a new `dense` CardView variant: the full

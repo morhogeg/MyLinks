@@ -374,24 +374,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             );
         }
         if (gated && !authUid) {
-            // WEB gets the public landing page here, with sign-in one click
-            // behind it; NATIVE keeps going straight to LoginScreen.
+            // EVERY signed-out visitor gets the public landing page, with
+            // sign-in one click behind it — web since 2026-08-06, native since
+            // round 14 by explicit owner call ("the page a user that signs out
+            // sees — both desktop and the iOS app"). A SIGNED-IN user never
+            // reaches this branch on either platform, so the app still opens
+            // straight into the library; the landing is only ever the
+            // signed-out state. Still not a routing change: `/` is both the
+            // landing (signed out) and the app (signed in).
             //
-            // This branch is the ONLY thing that changed to give mymachina.app a
-            // marketing home page, and it is deliberately not a routing change:
-            // the iOS app is a Capacitor shell serving this same bundle from
-            // capacitor://localhost, so moving the app off `/` would have opened
-            // every iPhone onto marketing instead of their library. Gating on
-            // `native` here means the native path is untouched by construction —
-            // no route moved, and a signed-in user never reaches this branch on
-            // either platform.
+            // Native nuance folded into SignedOutWeb's props: `showApple`
+            // mirrors LoginScreen's old per-platform rule (`!native ||
+            // REQUIRE_AUTH`), which today is `true` on both platforms — kept
+            // as the expression so a future flag change keeps working.
             return (
                 <AuthContext.Provider value={value}>
-                    {native ? (
-                        <LoginScreen onSignIn={signIn} showApple={REQUIRE_AUTH} />
-                    ) : (
-                        <SignedOutWeb onSignIn={signIn} showApple />
-                    )}
+                    <SignedOutWeb onSignIn={signIn} showApple={!native || REQUIRE_AUTH} />
                 </AuthContext.Provider>
             );
         }
