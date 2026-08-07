@@ -19,6 +19,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
 import { useLinks } from '@/lib/useLinks';
 import { useSearchLibrary } from '@/lib/useSearchLibrary';
+import { useSemanticSearch } from '@/lib/useSemanticSearch';
 import { useLinkActions } from '@/lib/useLinkActions';
 import { useFeedFilters, type FilterType, type SortType } from '@/lib/useFeedFilters';
 import { isPending, getTimestampNumber } from '@/lib/feedUtils';
@@ -136,6 +137,13 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // drives the "Searching your library…" hints so a fresh query never
     // flashes a premature "No matches".
     const searchingLibrary = isLoadingLibrary && !!searchQuery.trim();
+    // Meaning search (debounced server call) — ranked ids that widen the
+    // literal matches below every literal hit. Fails silent to literal-only.
+    const { semanticIds, semanticPending } = useSemanticSearch(uid, searchQuery);
+    // True while the meaning half is still due for the live query — with the
+    // library check above, it keeps a slow "Food" from flashing "No matches"
+    // before the semantic results land.
+    const searchingMeaning = semanticPending && !!searchQuery.trim();
     // Selection state + filter/sort pipeline + facet counts (R-3: useFeedFilters).
     const {
         filter, setFilter,
@@ -157,8 +165,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         matchingSources,
         matchingTags,
         reminderCount,
-    // LIVE query in — matching is instant per keystroke, no debounce anywhere.
-    } = useFeedFilters(visibleLinks, searchQuery, libraryLinks, privateCollectionIds);
+    // LIVE query in — literal matching is instant per keystroke; the semantic
+    // ids arrive debounced and append below the literal tiers.
+    } = useFeedFilters(visibleLinks, searchQuery, libraryLinks, privateCollectionIds, semanticIds);
     // Card action handlers that depend only on [uid, toast] (R-3: useLinkActions).
     const {
         handleStatusChange,
@@ -2596,11 +2605,12 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             // actual topic — the search case wins over the filter cases,
                             // and every FilterType has its own branch so a filtered view
                             // never falls through to the "empty account" pitch.
+                            const searchInFlight = searchingLibrary || searchingMeaning;
                             const empty = searchQuery
                                 ? {
-                                    Icon: Search, title: 'No matches',
-                                    body: searchingLibrary ? null
-                                        : 'Try different words — search looks in card titles, tags, and summaries.',
+                                    Icon: Search, title: searchInFlight ? 'Searching' : 'No matches',
+                                    body: searchInFlight ? null
+                                        : 'Try different words — search matches your cards by words and by meaning.',
                                 }
                                 : filter === 'reminders' ? {
                                     Icon: Bell, title: 'No reminders yet',
@@ -2651,10 +2661,12 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                 <empty.Icon className="w-7 h-7 text-accent" strokeWidth={1.75} />
                             </div>
                             <h3 className="text-base font-bold text-text">{empty.title}</h3>
-                            {searchingLibrary && (
+                            {(searchingLibrary || searchingMeaning) && (
                                 <div className="flex items-center justify-center gap-2 text-accent mt-2">
                                     <CitationMark state="searching" size={20} />
-                                    <span className="text-sm font-medium">Searching your library…</span>
+                                    <span className="text-sm font-medium">
+                                        {searchingLibrary ? 'Searching your library…' : 'Searching by meaning…'}
+                                    </span>
                                 </div>
                             )}
                             {empty.body && (
