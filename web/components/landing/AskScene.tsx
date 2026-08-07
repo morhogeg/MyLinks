@@ -40,9 +40,12 @@ export default function AskScene() {
     const q = QUESTIONS[qIndex];
     const words = useMemo(() => q.a.split(' '), [q.a]);
 
-    // Three counters drive the scene. Cheap: the question is one text node, and
+    // Three flags drive the scene. The question no longer TYPES (round 14 —
+    // typed text inside a SENT bubble was the wrong metaphor, and the effect
+    // read cheap): it arrives whole, as a sent message — the iMessage gesture,
+    // a spring pop from the send corner (`landing.css .mx-bubble-in`). Cheap:
     // the answer re-renders at most once per 46ms for one paragraph's length.
-    const [typed, setTyped] = useState(0);
+    const [sent, setSent] = useState(false);
     const [thinking, setThinking] = useState(false);
     const [shown, setShown] = useState(0);
 
@@ -57,26 +60,25 @@ export default function AskScene() {
         const clearAll = () => { cancels.current.forEach((c) => c()); cancels.current = []; };
         clearAll();
 
-        // Motion reduced: the answer is simply there. Nobody needs to watch a
-        // caret to understand what a cited answer is.
+        // Motion reduced: the answer is simply there.
         if (prefersReducedMotion()) {
-            setTyped(q.q.length);
+            setSent(true);
             setThinking(false);
             setShown(words.length);
             return;
         }
 
-        setTyped(0);
+        setSent(false);
         setThinking(false);
         setShown(0);
 
-        let i = 0;
-        const typeId = setInterval(() => {
-            i += 1;
-            setTyped(i);
-            if (i < q.q.length) return;
-            clearInterval(typeId);
-            setThinking(true);
+        // Send → think → stream: the bubble's spring is ~500ms, the mark takes
+        // over as it lands, and the answer starts once the pause has read as
+        // real work rather than a stutter.
+        const sendId = setTimeout(() => {
+            setSent(true);
+            const thinkId = setTimeout(() => setThinking(true), 450);
+            cancels.current.push(() => clearTimeout(thinkId));
             const waitId = setTimeout(() => {
                 setThinking(false);
                 let w = 0;
@@ -86,13 +88,13 @@ export default function AskScene() {
                     if (w >= words.length) clearInterval(streamId);
                 }, 46);
                 cancels.current.push(() => clearInterval(streamId));
-            }, 760);
+            }, 1350);
             cancels.current.push(() => clearTimeout(waitId));
-        }, 26);
-        cancels.current.push(() => clearInterval(typeId));
+        }, 250);
+        cancels.current.push(() => clearTimeout(sendId));
 
         return clearAll;
-        // `runId` is a dependency so Replay re-runs the identical sequence.
+        // `runId` is a dependency so a chip tap re-runs the identical sequence.
     }, [inView, qIndex, runId, q.q, words.length]);
 
     const complete = shown >= words.length;
@@ -199,10 +201,14 @@ export default function AskScene() {
                         copy is the paragraph after it. */}
                     <div aria-hidden className="col-start-1 row-start-1">
                         <div className="flex justify-end">
-                            <p className="max-w-[85%] rounded-2xl rounded-br-md bg-accent px-4 py-2.5 text-left text-[14px] font-medium text-accent-ink">
-                                {q.q.slice(0, typed)}
-                                {typed < q.q.length && <span className="mx-caret">|</span>}
-                            </p>
+                            {sent && (
+                                <p
+                                    key={`${qIndex}-${runId}`}
+                                    className="mx-bubble-in max-w-[85%] rounded-2xl rounded-br-md bg-accent px-4 py-2.5 text-left text-[14px] font-medium text-accent-ink"
+                                >
+                                    {q.q}
+                                </p>
+                            )}
                         </div>
 
                         {/* THE MARK IS THE APP'S OWN `CitationMark` (round 8):

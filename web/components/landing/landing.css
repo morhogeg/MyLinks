@@ -367,23 +367,33 @@
 
 /* ----------------------------------------------------------------- the ask */
 
-/* The caret on the typed question. Opacity only — a width/visibility blink
-   repaints the text run beside it. */
-@keyframes mx-caret {
-
-  0%,
-  45% {
-    opacity: 1;
+/*
+ * The sent bubble — the iMessage gesture (round 14, replacing a typed caret
+ * that put composing text inside a SENT bubble): the whole question springs in
+ * from the send corner, overshooting a touch on the app's own spring curve,
+ * with a blur that resolves as it lands. Transform/opacity/filter only.
+ */
+@keyframes mx-bubble-in {
+  from {
+    opacity: 0;
+    transform: translate3d(10px, 16px, 0) scale(0.82);
+    filter: blur(3px);
   }
 
-  50%,
-  95% {
-    opacity: 0;
+  60% {
+    filter: blur(0);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
   }
 }
 
-.mx-caret {
-  animation: mx-caret 1.06s steps(1, end) infinite;
+.mx-bubble-in {
+  transform-origin: bottom right;
+  animation: mx-bubble-in 0.55s var(--ease-spring) both;
 }
 
 /* Answer text arriving a word at a time. */
@@ -540,7 +550,6 @@
   }
 
   .mx-halo,
-  .mx-caret,
   .mx-cue,
   .mx-shelf-track,
   .mx-sweep::after {
@@ -548,7 +557,8 @@
   }
 
   /* The headline lands whole — the words hold their final frame. */
-  .mx-word-up {
+  .mx-word-up,
+  .mx-bubble-in {
     animation-duration: 0.01ms !important;
     animation-delay: 0ms !important;
   }

@@ -56,8 +56,28 @@ export default function ConnectScene() {
                     </p>
                 </div>
 
-                <div className="mx-rise rounded-3xl border border-border-subtle bg-card p-2 shadow-[var(--shadow-card)]" style={{ ['--i' as string]: 2 }}>
-                    <LandingGraph className="aspect-square w-full md:aspect-[5/4]" />
+                {/* The panel's ground (round 14): a quiet observatory rather
+                    than a flat card — a soft radial lift where the constellation
+                    hangs, over a fine dot lattice. Both layers are BUILT FROM
+                    TOKENS (`--text` via color-mix for the bloom, `--border-strong`
+                    for the dots), so they invert correctly with the theme and
+                    can never outshout the 11px labels — the dots sit at hairline
+                    contrast by construction. */}
+                <div
+                    className="mx-rise overflow-hidden rounded-3xl border border-border-subtle bg-card p-2 shadow-[var(--shadow-card)]"
+                    style={{ ['--i' as string]: 2 }}
+                >
+                    <div
+                        className="overflow-hidden rounded-2xl"
+                        style={{
+                            backgroundImage:
+                                'radial-gradient(85% 65% at 50% 32%, color-mix(in oklab, var(--text) 6%, transparent), transparent 72%), '
+                                + 'radial-gradient(circle at 1px 1px, var(--border-strong) 1px, transparent 1.4px)',
+                            backgroundSize: 'auto, 24px 24px',
+                        }}
+                    >
+                        <LandingGraph className="aspect-square w-full md:aspect-[5/4]" />
+                    </div>
                 </div>
             </div>
         </section>

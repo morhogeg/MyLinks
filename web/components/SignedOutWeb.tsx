@@ -6,13 +6,12 @@ import { ArrowLeft } from 'lucide-react';
 import LoginScreen from '@/components/LoginScreen';
 
 /**
- * The landing page is code-split, and that is not an optimisation detail.
- *
- * `SignedOutWeb` is reached from `AuthProvider`, which is in the app's main
- * bundle — so a static `import` of `LandingPage` would pull every landing scene,
- * its demo library and its motion CSS into the **iOS bundle**, for a page the
- * native app is specifically written never to render. `next/dynamic` keeps the
- * whole thing in its own chunk that only a signed-out web visitor ever fetches.
+ * The landing page is code-split so the app's MAIN bundle stays lean:
+ * `SignedOutWeb` is reached from `AuthProvider`, which every signed-in session
+ * loads — a static `import` of `LandingPage` would put every landing scene in
+ * that critical path. `next/dynamic` keeps it in its own chunk, fetched only
+ * when someone is actually signed out. (Since round 14 native renders the
+ * landing too, so the chunk legitimately rides in the iOS bundle now.)
  *
  * `ssr: false` is correct rather than merely convenient: the scenes read
  * `matchMedia` and measure scroll, so there is nothing useful to prerender at
@@ -41,9 +40,12 @@ const LandingPage = dynamic(() => import('@/components/LandingPage'), {
  * its body would sit above those returns and run on every render of the whole
  * app for a state only this screen uses.
  *
- * NATIVE NEVER MOUNTS THIS. The call site in `AuthProvider` gates it on
- * `!native`, so the Capacitor shell still shows `LoginScreen` and opens into
- * the app — see the comment there.
+ * Since round 14 (owner call) NATIVE mounts this too: a signed-out iPhone —
+ * fresh install, or just signed out — sees the same landing page as the web,
+ * with the same one-click path into LoginScreen. A signed-in user on either
+ * platform never sees it. The `next/dynamic` split below still matters on the
+ * web (the app's main bundle stays lean); on native the chunk loads from the
+ * local bundle, so the split costs nothing there.
  */
 export default function SignedOutWeb({
     onSignIn,

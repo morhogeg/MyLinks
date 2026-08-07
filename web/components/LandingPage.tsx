@@ -401,7 +401,8 @@ function Close({ onGetStarted }: { onGetStarted?: () => void }) {
                     Start with the last thing you saved.
                 </h2>
                 <p className="mx-auto mt-4 max-w-lg text-[15px] leading-relaxed text-text-secondary text-pretty sm:text-base">
-                    Sign in with Apple or Google. Your library is empty for about a minute.
+                    Sign in with Apple or Google, send Machina your next find, and watch it
+                    come back understood.
                 </p>
                 <GetStarted onGetStarted={onGetStarted} className="mt-8" />
             </div>
