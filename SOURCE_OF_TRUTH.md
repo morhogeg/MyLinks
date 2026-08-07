@@ -1344,7 +1344,10 @@ exact-match, capped.
   ids, literal behavior bit-identical when semantic is empty). NOT verified
   here: a live end-to-end call against production `/api/search` (no creds in
   this session) — owner QA on device: search "Food", expect the pasta card
-  after a short "Searching by meaning…" beat.
+  after a short "Searching by meaning…" beat. **Shipped:** merge `7e47b0f` →
+  Vercel (auto); iOS TestFlight run **#275 → build 1275** (in progress at
+  ship time; result noted below if red). No functions/hosting deploy
+  (backend + firebase.json untouched).
 - **2026-08-07 (round 13) — the graph becomes touchable; the shelf becomes an
   overview.** Owner device QA, five calls.
   **(1) The shelf zoomed WAY out** — a new `dense` CardView variant: the full
