@@ -1036,12 +1036,11 @@ G2. **[ ] Graph next levers (from the round-3 product pass):** (a) search/
     CoreGraphics, or deliberately leave it single-state (the sheet is short-lived
     and hands off to the in-app banner). Owner call; not blocking.
 
-19b. **[ ] Retire dead search backend (post search-rebuild 2026-07-17):** the
-    client no longer calls `search_links` / `search_links_http` (search is
-    fully client-side, `8e27c5c`). On the next backend-touching ship, delete
-    both callables + the `/api/search` rewrites (firebase.json, web/vercel.json)
-    — keep `search.py` itself (ask_brain imports its helpers) and the embedding
-    pipeline (Ask RAG + related links still use it).
+19b. **[x] ~~Retire dead search backend~~ — OBSOLETE, reversed 2026-08-07:**
+    the search bar calls `search_links_http` (`/api/search`) again — meaning
+    search is back in the bar (see the 2026-08-07 §9 entry). Do NOT delete the
+    search backend or the `/api/search` rewrites. (`search_links`, the
+    callable twin, is now the only caller-less piece; harmless to keep.)
 20. **[ ] M19 Shareable cited answers — FIRST POST-LAUNCH ITEM (re-ranked to the
     top of P3, 2026-07-10 product review).** Ask Machina is the hero; a shareable
     cited answer is its growth surface and every share is a public OG page
@@ -1315,6 +1314,37 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-07 — MEANING SEARCH IS BACK IN THE SEARCH BAR (branch
+  `claude/onboard-search-semantics-2aodzb`).** Owner, with screenshots: "Pasta"
+  finds the Spaghetti-al-limone card (literal tag hit) but "Food" returns
+  **No matches** — yet meaning search is promised in the launch video and on
+  the site. Root cause: the 2026-07-17 rebuild made search fully literal by
+  design; nothing in the bar ever consulted embeddings. Fix — a fused
+  two-layer bar, NOT a return to the old failure mode: the literal layer
+  (searchMatch.ts) is untouched and instant; NEW `web/lib/useSemanticSearch.ts`
+  debounces (400ms) the query to the still-deployed **`search_links_http`**
+  twin (`/api/search`, bearer + App Check, one code path for web AND the
+  Capacitor shell — the callable's CORS preflight fails from
+  `capacitor://localhost`), takes only the ranked card **ids**, caches per
+  normalized query, guards stale responses, and reports failures to
+  `client_errors` (`semantic-search` tag). `useFeedFilters` gained a
+  `semanticIds` param: semantic-only cards must pass the SAME pending/privacy/
+  facet gates as the window (ids grant nothing) and rank in a third tier —
+  literal title/tag > literal summary > meaning (server rank order) — so a
+  meaning hit can never outrank or displace a literal match, which is the
+  junk-wall failure that killed the 2026-07-16 hybrid. Server-side quality
+  gates (0.68 ceiling, cliff cut, 0.80 recall floor) already live; backend
+  untouched. Feed empty state never flashes "No matches" while the meaning
+  half is in flight ("Searching by meaning…", title "Searching"), and the
+  dead-end copy now says search matches "by words and by meaning". §4 item
+  19b (delete the search backend) is OBSOLETE — reversed. Verified: `tsc`
+  + eslint clean, `py_compile` clean (backend untouched), and a
+  react-dom/server harness asserted all four fusion invariants (tier order,
+  server-order within the meaning tier, privacy gating of server-returned
+  ids, literal behavior bit-identical when semantic is empty). NOT verified
+  here: a live end-to-end call against production `/api/search` (no creds in
+  this session) — owner QA on device: search "Food", expect the pasta card
+  after a short "Searching by meaning…" beat.
 - **2026-08-07 (round 12) — device QA from the owner's phone: five fixes.**
   **(1) The Ask card's height never changes.** Rotation was reflowing the whole
   page. Fixed with a grid-stack SIZER: every question's FINISHED exchange (full

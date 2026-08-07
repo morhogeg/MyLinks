@@ -24,6 +24,11 @@ export function useFeedFilters(
     searchLibrary: Link[],
     /** Ids of collections marked Private — their members INHERIT privacy (see below). */
     privateCollectionIds: Set<string>,
+    /** Meaning-search results (useSemanticSearch), in server rank order. They
+     *  widen the literal matches: a semantic-only card renders BELOW every
+     *  literal hit, and only if it survives the same privacy/pending/facet
+     *  gates — the ids alone grant nothing. */
+    semanticIds: string[] = [],
 ) {
     const [filter, setFilter] = useState<FilterType>('all');
     const [selectedCategory, setSelectedCategory] = useState<Set<string>>(new Set());
@@ -106,6 +111,16 @@ export function useFeedFilters(
         return m;
     }, [searchBase, queryTokens]);
 
+    // Server rank per meaning-search hit (0 = best). Only consulted while a
+    // query is live; an id that never made it into searchBase simply never
+    // renders (it failed the privacy/pending gate or the library fetch).
+    const semanticRank = useMemo(() => {
+        const m = new Map<string, number>();
+        if (queryTokens.length === 0) return m;
+        semanticIds.forEach((id, i) => m.set(id, i));
+        return m;
+    }, [semanticIds, queryTokens]);
+
     // 4. Hybrid Search Logic — memoized so a banner tick or any unrelated state
     // change (search typing, overlay toggles) doesn't re-run the 6-stage filter +
     // sort. Recomputes only when an input it actually reads changes.
@@ -145,18 +160,24 @@ export function useFeedFilters(
             return selectedSources.has(getSourceInfo(link).key);
         })
         .filter((link) => {
-            // Apply search: every query word in the title or the summary.
+            // Apply search: every query word in the title or the summary,
+            // OR a meaning-search hit (semantic widening, ranked last).
             if (queryTokens.length === 0) return true;
-            return searchMatches.has(link.id);
+            return searchMatches.has(link.id) || semanticRank.has(link.id);
         })
         .sort((a, b) => {
-            // While searching (under the default sort): title matches first,
-            // then summary matches, newest first within each tier. An explicit
-            // non-default sort wins outright.
+            // While searching (under the default sort), three tiers: literal
+            // title/tag matches, then literal summary matches (newest first
+            // within each), then meaning-only matches in server rank order —
+            // semantic results widen the list but never outrank a card that
+            // literally contains the query. An explicit non-default sort wins
+            // outright.
             if (queryTokens.length > 0 && sortBy === 'date-desc') {
-                const ta = searchMatches.get(a.id) ? 1 : 0;
-                const tb = searchMatches.get(b.id) ? 1 : 0;
+                const tier = (l: Link) => searchMatches.has(l.id) ? (searchMatches.get(l.id) ? 2 : 1) : 0;
+                const ta = tier(a);
+                const tb = tier(b);
                 if (ta !== tb) return tb - ta;
+                if (ta === 0) return (semanticRank.get(a.id) ?? 0) - (semanticRank.get(b.id) ?? 0);
                 return getTimestampNumber(b.createdAt) - getTimestampNumber(a.createdAt);
             }
 
@@ -178,7 +199,7 @@ export function useFeedFilters(
                     return 0;
             }
         }),
-        [searchBase, filter, selectedCategory, selectedTags, selectedCollections, selectedSources, queryTokens, searchMatches, sortBy]);
+        [searchBase, filter, selectedCategory, selectedTags, selectedCollections, selectedSources, queryTokens, searchMatches, semanticRank, sortBy]);
 
     // Faceted counts — the numbers update live as you tap. Each facet's counts are
     // computed against the OTHER facet's current selection (but never its own), so
