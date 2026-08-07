@@ -1,42 +1,33 @@
 'use client';
 
-import type { ReactNode } from 'react';
-import { X, Check, Filter, CheckSquare, SlidersHorizontal, StickyNote } from 'lucide-react';
+import { X, Check, Filter, CheckSquare, SlidersHorizontal } from 'lucide-react';
 import { useSheetDrag } from '@/lib/useSheetDrag';
 import type { SortType } from '@/lib/useFeedFilters';
 
 /**
- * Display Sheet (Mobile) — the header's ⋯ affordance, Files-app style: view
- * mode and sort as radio sections, then the low-frequency actions (the full
- * Filter panel, multi-select) as plain rows. Consolidating these here is what
- * lets the home screen run on a single line of chrome.
+ * Display Sheet (Mobile) — the header's sliders affordance, Files-app style:
+ * sort as a radio section, then the low-frequency actions (the full Filter
+ * panel, multi-select) as plain rows. The View section moved to its own
+ * header glyph + MobileViewSheet (2026-08-07): switching layouts is the
+ * higher-frequency act and earned the header slot Sources held.
  */
 export default function MobileDisplaySheet({
     isOpen,
     onClose,
-    viewModes,
-    viewMode,
-    setViewMode,
     sortOptions,
     sortBy,
     setSortBy,
     onOpenFilters,
     onSelectCards,
-    onOpenNotes,
 }: {
     isOpen: boolean;
     onClose: () => void;
-    viewModes: { key: string; label: string; icon: ReactNode; hint: string }[];
-    viewMode: string;
-    setViewMode: (v: string) => void;
     sortOptions: { value: string; label: string }[];
     sortBy: SortType;
     setSortBy: (v: SortType) => void;
-    /** Open the full Filters sheet (status / categories / tags). */
+    /** Open the full Filters sheet (status / categories / tags / sources). */
     onOpenFilters: () => void;
     onSelectCards: () => void;
-    /** Open the central My Notes view. */
-    onOpenNotes: () => void;
 }) {
     const { sheetRef, scrimRef, handleProps } = useSheetDrag({ onClose });
     if (!isOpen) return null;
@@ -70,39 +61,6 @@ export default function MobileDisplaySheet({
                             <X className="w-5 h-5" />
                         </button>
                     </div>
-                </div>
-
-                <label className={sectionLabel}>View</label>
-                <div role="radiogroup" aria-label="View mode" className="space-y-0.5 mb-4">
-                    {viewModes.map((vm) => {
-                        const active = viewMode === vm.key;
-                        return (
-                            <button
-                                key={vm.key}
-                                role="radio"
-                                aria-checked={active}
-                                onClick={() => { setViewMode(vm.key); onClose(); }}
-                                className={`${row} ${active ? 'bg-accent/10 text-text' : 'text-text-secondary hover:bg-card-hover'}`}
-                            >
-                                <span className={active ? 'text-accent' : 'text-text-muted'}>{vm.icon}</span>
-                                <span className="flex-1 font-medium">{vm.hint}</span>
-                                {active && <Check className="w-[18px] h-[18px] text-accent" strokeWidth={2.6} />}
-                            </button>
-                        );
-                    })}
-                    {/* My Notes — a first-class view alongside the layouts (device
-                        QA: the utility-row placement below was too buried). Routes
-                        through onOpenNotes so the full-library fetch fires. */}
-                    <button
-                        role="radio"
-                        aria-checked={viewMode === 'notes'}
-                        onClick={() => { onClose(); onOpenNotes(); }}
-                        className={`${row} ${viewMode === 'notes' ? 'bg-accent/10 text-text' : 'text-text-secondary hover:bg-card-hover'}`}
-                    >
-                        <span className={viewMode === 'notes' ? 'text-accent' : 'text-text-muted'}><StickyNote className="w-4 h-4" /></span>
-                        <span className="flex-1 font-medium">My notes</span>
-                        {viewMode === 'notes' && <Check className="w-[18px] h-[18px] text-accent" strokeWidth={2.6} />}
-                    </button>
                 </div>
 
                 <label className={sectionLabel}>Sort</label>
