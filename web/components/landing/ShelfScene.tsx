@@ -13,10 +13,10 @@ function Row({ cards, seconds, reverse = false }: {
     reverse?: boolean;
 }) {
     const track = (
-        <div className="flex shrink-0 gap-4 pr-4">
+        <div className="flex shrink-0 gap-3 pr-3">
             {cards.map((c) => (
-                <div key={c.title} className="w-[14.5rem] shrink-0">
-                    <CardView card={c} compact />
+                <div key={c.title} className="w-[10.5rem] shrink-0">
+                    <CardView card={c} dense />
                 </div>
             ))}
         </div>

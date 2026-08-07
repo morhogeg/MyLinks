@@ -51,6 +51,8 @@ export default function LandingGraph({ className = '' }: { className?: string })
         let raf = 0;
         let disposed = false;
         const alphaRef = { current: 1 };
+        const cam = { k: 1, x: 0, y: 0 };
+        const drag = { index: -1, pointerId: -1 };
 
         const readVar = (name: string, fallback: string) => {
             const v = getComputedStyle(document.documentElement).getPropertyValue(name);
@@ -98,12 +100,21 @@ export default function LandingGraph({ className = '' }: { className?: string })
                 maxY = Math.max(maxY, n.y + n.r);
             }
             const pad = 36;
-            const k = Math.min(
-                (w - pad * 2) / Math.max(1, maxX - minX),
-                (h - pad * 2) / Math.max(1, maxY - minY),
-            );
-            const camX = w / 2 - ((minX + maxX) / 2) * k;
-            const camY = h / 2 - ((minY + maxY) / 2) * k;
+            // The camera FREEZES while a finger holds a node — the fit is a
+            // function of the bounds, and re-fitting mid-drag slides the whole
+            // world under the pointer. It re-engages on release and eases the
+            // dragged layout back into frame.
+            if (drag.index < 0) {
+                cam.k = Math.min(
+                    (w - pad * 2) / Math.max(1, maxX - minX),
+                    (h - pad * 2) / Math.max(1, maxY - minY),
+                );
+                cam.x = w / 2 - ((minX + maxX) / 2) * cam.k;
+                cam.y = h / 2 - ((minY + maxY) / 2) * cam.k;
+            }
+            const k = cam.k;
+            const camX = cam.x;
+            const camY = cam.y;
 
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
             ctx.clearRect(0, 0, w, h);
@@ -251,7 +262,14 @@ export default function LandingGraph({ className = '' }: { className?: string })
             tick(model, alphaRef);
             tick(model, alphaRef);
             draw();
-            if (alphaRef.current > ALPHA_MIN) raf = requestAnimationFrame(loop);
+            if (alphaRef.current > ALPHA_MIN || drag.index >= 0) raf = requestAnimationFrame(loop);
+        };
+
+        /** (Re)start the settle loop — used by the drag handlers, which reheat
+         *  a cooled layout so the island answers the finger. */
+        const ensureLoop = () => {
+            cancelAnimationFrame(raf);
+            raf = requestAnimationFrame(loop);
         };
 
         const start = async () => {
@@ -298,6 +316,74 @@ export default function LandingGraph({ className = '' }: { className?: string })
         );
         io.observe(wrap);
 
+        // Drag — the app's gesture, on the app's mechanism: while grabbed, the
+        // node is PINNED (fx/fy, the same fields KnowledgeGraph's drag sets)
+        // and the simulation reheats, so the rest of the island follows on the
+        // real springs rather than being translated as pixels. Hit-testing is
+        // in screen space with a finger-sized slop.
+        const nodeAt = (sx: number, sy: number): number => {
+            if (!model) return -1;
+            let best = -1;
+            let bestD = Infinity;
+            for (let i = 0; i < model.nodes.length; i++) {
+                const n = model.nodes[i];
+                const dx = n.x * cam.k + cam.x - sx;
+                const dy = n.y * cam.k + cam.y - sy;
+                const rr = Math.max(n.r * cam.k, 8) + 14; // slop
+                const d2 = dx * dx + dy * dy;
+                if (d2 < rr * rr && d2 < bestD) { best = i; bestD = d2; }
+            }
+            return best;
+        };
+        const toWorld = (sx: number, sy: number) =>
+            ({ x: (sx - cam.x) / cam.k, y: (sy - cam.y) / cam.k });
+        const onPointerDown = (e: PointerEvent) => {
+            if (!model || prefersReducedMotion()) return;
+            const rect = canvas.getBoundingClientRect();
+            const i = nodeAt(e.clientX - rect.left, e.clientY - rect.top);
+            if (i < 0) return; // empty canvas: let the page scroll
+            drag.index = i;
+            drag.pointerId = e.pointerId;
+            canvas.setPointerCapture(e.pointerId);
+            e.preventDefault();
+            const wpt = toWorld(e.clientX - rect.left, e.clientY - rect.top);
+            model.nodes[i].fx = wpt.x;
+            model.nodes[i].fy = wpt.y;
+            alphaRef.current = Math.max(alphaRef.current, 0.35);
+            canvas.style.cursor = 'grabbing';
+            ensureLoop();
+        };
+        const onPointerMove = (e: PointerEvent) => {
+            if (!model) return;
+            const rect = canvas.getBoundingClientRect();
+            if (drag.index >= 0 && e.pointerId === drag.pointerId) {
+                const wpt = toWorld(e.clientX - rect.left, e.clientY - rect.top);
+                model.nodes[drag.index].fx = wpt.x;
+                model.nodes[drag.index].fy = wpt.y;
+                alphaRef.current = Math.max(alphaRef.current, 0.25);
+                return;
+            }
+            // Idle affordance (desktop): a grab cursor over any node.
+            canvas.style.cursor = nodeAt(e.clientX - rect.left, e.clientY - rect.top) >= 0 ? 'grab' : 'default';
+        };
+        const endDrag = (e: PointerEvent) => {
+            if (!model || drag.index < 0 || e.pointerId !== drag.pointerId) return;
+            model.nodes[drag.index].fx = null;
+            model.nodes[drag.index].fy = null;
+            drag.index = -1;
+            drag.pointerId = -1;
+            canvas.style.cursor = 'grab';
+            // A short re-settle eases the island — and the un-frozen camera —
+            // back into a fitted frame.
+            alphaRef.current = Math.max(alphaRef.current, 0.2);
+            ensureLoop();
+        };
+        canvas.style.touchAction = 'pan-y';
+        canvas.addEventListener('pointerdown', onPointerDown);
+        canvas.addEventListener('pointermove', onPointerMove);
+        canvas.addEventListener('pointerup', endDrag);
+        canvas.addEventListener('pointercancel', endDrag);
+
         // Theme flips repaint the settled canvas (colors are read per draw).
         const mo = new MutationObserver(() => draw());
         mo.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
@@ -310,6 +396,10 @@ export default function LandingGraph({ className = '' }: { className?: string })
             io.disconnect();
             mo.disconnect();
             ro.disconnect();
+            canvas.removeEventListener('pointerdown', onPointerDown);
+            canvas.removeEventListener('pointermove', onPointerMove);
+            canvas.removeEventListener('pointerup', endDrag);
+            canvas.removeEventListener('pointercancel', endDrag);
         };
     }, []);
 

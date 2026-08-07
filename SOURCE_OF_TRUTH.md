@@ -1315,6 +1315,29 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-07 (round 13) — the graph becomes touchable; the shelf becomes an
+  overview.** Owner device QA, five calls.
+  **(1) The shelf zoomed WAY out** — a new `dense` CardView variant: the full
+  card anatomy (colored category chip, real byline, title, summary, tags,
+  clock row), each element a step smaller, at 10.5rem wide — 8 cards per row
+  in view at 1280 (asserted, not eyeballed), still legible.
+  **(2) The graph is draggable, on the app's own mechanism**: pointer handlers
+  pin the grabbed node via the same `fx`/`fy` fields `KnowledgeGraph`'s drag
+  sets, reheat the simulation, and the island follows on the real springs.
+  The fit-camera FREEZES during a drag (re-fitting mid-gesture slides the
+  world under the finger) and eases back on release. `touch-action: pan-y`
+  keeps the page scrollable when the gesture starts on empty canvas; grabbing
+  a node captures the pointer. Verified by pixel-diff: a synthetic drag moves
+  ink at the grab point.
+  **(3+4+5) The resolve paragraph rewritten once more**: "swallowed" cut,
+  "the half Machina does" cut, and the ORGANIZATION value named outright —
+  "Gathered here, every save is summarized, categorized, tagged, and connected
+  to the rest of what you know. Saving was never the hard part. Everything
+  after it is what Machina is for."
+  Suites + the new drag pixel-check and shelf-density assert ALL PASS locally
+  and on production after deploy. **SHIPPED.** No functions deploy, no
+  TestFlight build; **1274 remains current.** Owner steps 25a/25b still open.
+
 - **2026-08-07 (round 12) — device QA from the owner's phone: five fixes.**
   **(1) The Ask card's height never changes.** Rotation was reflowing the whole
   page. Fixed with a grid-stack SIZER: every question's FINISHED exchange (full

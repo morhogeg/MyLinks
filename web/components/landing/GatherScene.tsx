@@ -129,15 +129,18 @@ export default function GatherScene() {
                         <h2 className="mt-3 text-3xl font-semibold tracking-tight text-text text-balance sm:text-5xl">
                             One place. Everything you save.
                         </h2>
-                        {/* The founder letter's line, LANDED rather than left
-                            hanging (round 11 — "finishes abruptly"): the
-                            observation gets its consequence, and the consequence
-                            hands off to everything below it. */}
+                        {/* The founder letter's line, landed (round 11) and
+                            re-worked (round 13): "swallowed" cut, "the half"
+                            cut, and the ORGANIZATION value named outright —
+                            gathering alone would just be a sixth pile; the
+                            summarize/categorize/tag/connect clause is what
+                            makes the one place useful. */}
                         <p className="mx-auto mt-5 max-w-lg text-[15px] leading-relaxed text-text-secondary text-pretty sm:text-base">
-                            Nothing was lost — it was scattered across five apps, and finding
-                            anything meant remembering which one swallowed it. Saving was never
-                            the hard part. Everything after it is — and that is the half Machina
-                            does.
+                            Nothing was lost — it was scattered across five apps, impossible to
+                            find when it mattered. Gathered here, every save is summarized,
+                            categorized, tagged, and connected to the rest of what you know.
+                            Saving was never the hard part. Everything after it is what Machina
+                            is for.
                         </p>
                     </div>
                 </div>
