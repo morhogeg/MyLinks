@@ -28,6 +28,7 @@ import PullRefreshSpinner from './feed/PullRefreshSpinner';
 import MobileFiltersSheet from './feed/MobileFiltersSheet';
 import MobileSortSheet from './feed/MobileSortSheet';
 import MobileDisplaySheet from './feed/MobileDisplaySheet';
+import MobileViewSheet from './feed/MobileViewSheet';
 import MobileSourcesSheet from './feed/MobileSourcesSheet';
 import BottomTabBar, { type BottomTab } from './BottomTabBar';
 import { useScrollAwayBar } from '@/lib/useScrollAwayBar';
@@ -90,7 +91,7 @@ const noop = () => { };
  * - Two card views (grid / list), plus review, ask, and collections modes
  * - Deep linking to specific links via URL params
  */
-function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onFeedLoadedChange, onReadyCaptureChange, onOpenDigestSettings, onHasCardsChange, onActiveFilterCountChange, libraryFacet, onLibraryFacetApplied, onBackToInsights, headerCommand, onCapture, onTabChange, onFullBleedChange, suppressProcessingId }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onFeedLoadedChange?: (loaded: boolean) => void; onReadyCaptureChange?: (at: number) => void; onOpenDigestSettings?: () => void; onHasCardsChange?: (hasCards: boolean) => void; onActiveFilterCountChange?: (n: number) => void; libraryFacet?: import('@/lib/stats').LibraryFacetRequest | null; onLibraryFacetApplied?: () => void; onBackToInsights?: () => void; headerCommand?: { action: 'search' | 'sources' | 'display'; nonce: number } | null; onCapture?: () => void; onTabChange?: (tab: BottomTab) => void; onFullBleedChange?: (full: boolean) => void; suppressProcessingId?: string | null }) {
+function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onFeedLoadedChange, onReadyCaptureChange, onOpenDigestSettings, onHasCardsChange, onActiveFilterCountChange, libraryFacet, onLibraryFacetApplied, onBackToInsights, headerCommand, onLibraryViewChange, onCapture, onTabChange, onFullBleedChange, suppressProcessingId }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onFeedLoadedChange?: (loaded: boolean) => void; onReadyCaptureChange?: (at: number) => void; onOpenDigestSettings?: () => void; onHasCardsChange?: (hasCards: boolean) => void; onActiveFilterCountChange?: (n: number) => void; libraryFacet?: import('@/lib/stats').LibraryFacetRequest | null; onLibraryFacetApplied?: () => void; onBackToInsights?: () => void; headerCommand?: { action: 'search' | 'sources' | 'view' | 'display'; nonce: number } | null; onLibraryViewChange?: (v: 'grid' | 'list' | 'review' | 'graph' | 'notes') => void; onCapture?: () => void; onTabChange?: (tab: BottomTab) => void; onFullBleedChange?: (full: boolean) => void; suppressProcessingId?: string | null }) {
     const searchParams = useSearchParams();
     const { uid } = useAuth();
     const toast = useToast();
@@ -279,6 +280,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // Mobile v4 chrome: the header ⋯ (view/sort/filter/select) and the
     // dedicated Sources sheet, both reachable from the page header's glyphs.
     const [isDisplayOpen, setIsDisplayOpen] = useState(false);
+    const [isViewOpen, setIsViewOpen] = useState(false);
     const [isSourcesOpen, setIsSourcesOpen] = useState(false);
     // Mobile: the search bar is collapsed to an icon; tapping it expands a large
     // search field in place, so the card grid gets the vertical space back.
@@ -586,7 +588,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // the gesture never fights a modal's own scrolling.
     const anyOverlayOpen =
         activeLinkId !== null || isTagExplorerOpen || isFiltersOpen || isSortOpen ||
-        isDisplayOpen || isSourcesOpen ||
+        isDisplayOpen || isViewOpen || isSourcesOpen ||
         reminderModalLink !== null || confirmDeleteId !== null || confirmBulkDelete ||
         addToCollectionLink !== null || collectionFormOpen || confirmDeleteCollection !== null ||
         manageCardsCollection !== null || shareCollection !== null || unlockPrompt !== null ||
@@ -1430,6 +1432,17 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // they drop to 0 and use the freed space; the transition matches the bar's.
     const overlayBottom = barHidden ? '0px' : 'calc(45px + max(calc(env(safe-area-inset-bottom) - 18px), 4px))';
 
+    // Report the current LIBRARY view up to the header so its view glyph can
+    // mirror it (grid icon in grid view, list icon in list view, …). Detail
+    // places (ask/collections/digest) don't report — the glyph keeps showing
+    // the layout you'd return to.
+    useEffect(() => {
+        if (viewMode === 'grid' || viewMode === 'list' || viewMode === 'review' || viewMode === 'graph' || viewMode === 'notes') {
+            onLibraryViewChange?.(viewMode);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [viewMode]);
+
     // Header glyphs (page.tsx) → feed actions. Same nonce-channel pattern as
     // libraryFacet: the page can't reach into this component's state, so it
     // hands down a command and we consume it here.
@@ -1437,6 +1450,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         if (!headerCommand) return;
         if (headerCommand.action === 'search') openSearch();
         else if (headerCommand.action === 'sources') setIsSourcesOpen(true);
+        else if (headerCommand.action === 'view') setIsViewOpen(true);
         else setIsDisplayOpen(true);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [headerCommand]);
@@ -2368,6 +2382,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                     statusOptions={statusOptions}
                     selectedSources={selectedSources}
                     setSelectedSources={setSelectedSources}
+                    onOpenSources={() => setIsSourcesOpen(true)}
                     activeMobileFilters={activeMobileFilters}
                     setSelectedTags={setSelectedTags}
                     categories={categories}
@@ -2389,23 +2404,31 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                     sortOptions={sortOptions}
                 />
 
-                {/* Display Sheet (Mobile) — header ⋯: view, sort, filter, select. */}
+                {/* Display Sheet (Mobile) — header sliders: sort, filter, select.
+                    (View graduated to its own header glyph + sheet, below.) */}
                 <MobileDisplaySheet
                     isOpen={isDisplayOpen}
                     onClose={() => setIsDisplayOpen(false)}
-                    viewModes={viewModes}
-                    viewMode={viewMode}
-                    setViewMode={(v) => setViewMode(v as typeof viewMode)}
                     sortOptions={sortOptions}
                     sortBy={sortBy}
                     setSortBy={setSortBy}
                     onOpenFilters={() => setIsFiltersOpen(true)}
                     onSelectCards={() => { setViewMode(lastLayout.current); setIsSelectionMode(true); }}
+                />
+
+                {/* View Sheet (Mobile) — the header's view glyph: layouts + My notes. */}
+                <MobileViewSheet
+                    isOpen={isViewOpen}
+                    onClose={() => setIsViewOpen(false)}
+                    viewModes={viewModes}
+                    viewMode={viewMode}
+                    setViewMode={(v) => setViewMode(v as typeof viewMode)}
                     onOpenNotes={() => openNotesView()}
                 />
 
                 {/* Sources Sheet — the dedicated publisher/channel browser (all
-                    breakpoints; sources moved OUT of the Filters sheet). */}
+                    breakpoints), reached from the Filters sheet's Sources row on
+                    mobile and the toolbar's Sources button on desktop. */}
                 <MobileSourcesSheet
                     isOpen={isSourcesOpen}
                     onClose={() => setIsSourcesOpen(false)}
@@ -3110,14 +3133,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     );
 }
 
-export default function Feed({ onAskModeChange, onHideAddButton, onProcessingChange, onFeedLoadedChange, onReadyCaptureChange, onOpenDigestSettings, onHasCardsChange, onActiveFilterCountChange, libraryFacet, onLibraryFacetApplied, onBackToInsights, headerCommand, onCapture, onTabChange, onFullBleedChange, suppressProcessingId }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onFeedLoadedChange?: (loaded: boolean) => void; onReadyCaptureChange?: (at: number) => void; onOpenDigestSettings?: () => void; onHasCardsChange?: (hasCards: boolean) => void; onActiveFilterCountChange?: (n: number) => void; libraryFacet?: import('@/lib/stats').LibraryFacetRequest | null; onLibraryFacetApplied?: () => void; onBackToInsights?: () => void; headerCommand?: { action: 'search' | 'sources' | 'display'; nonce: number } | null; onCapture?: () => void; onTabChange?: (tab: BottomTab) => void; onFullBleedChange?: (full: boolean) => void; suppressProcessingId?: string | null }) {
+export default function Feed({ onAskModeChange, onHideAddButton, onProcessingChange, onFeedLoadedChange, onReadyCaptureChange, onOpenDigestSettings, onHasCardsChange, onActiveFilterCountChange, libraryFacet, onLibraryFacetApplied, onBackToInsights, headerCommand, onLibraryViewChange, onCapture, onTabChange, onFullBleedChange, suppressProcessingId }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onFeedLoadedChange?: (loaded: boolean) => void; onReadyCaptureChange?: (at: number) => void; onOpenDigestSettings?: () => void; onHasCardsChange?: (hasCards: boolean) => void; onActiveFilterCountChange?: (n: number) => void; libraryFacet?: import('@/lib/stats').LibraryFacetRequest | null; onLibraryFacetApplied?: () => void; onBackToInsights?: () => void; headerCommand?: { action: 'search' | 'sources' | 'view' | 'display'; nonce: number } | null; onLibraryViewChange?: (v: 'grid' | 'list' | 'review' | 'graph' | 'notes') => void; onCapture?: () => void; onTabChange?: (tab: BottomTab) => void; onFullBleedChange?: (full: boolean) => void; suppressProcessingId?: string | null }) {
     return (
         <Suspense fallback={
             <div className="flex items-center justify-center h-64">
                 <div className="w-8 h-8 border-2 border-text/20 border-t-text rounded-full animate-spin" />
             </div>
         }>
-            <FeedContent onAskModeChange={onAskModeChange} onHideAddButton={onHideAddButton} onProcessingChange={onProcessingChange} onFeedLoadedChange={onFeedLoadedChange} onReadyCaptureChange={onReadyCaptureChange} onOpenDigestSettings={onOpenDigestSettings} onHasCardsChange={onHasCardsChange} onActiveFilterCountChange={onActiveFilterCountChange} libraryFacet={libraryFacet} onLibraryFacetApplied={onLibraryFacetApplied} onBackToInsights={onBackToInsights} headerCommand={headerCommand} onCapture={onCapture} onTabChange={onTabChange} onFullBleedChange={onFullBleedChange} suppressProcessingId={suppressProcessingId} />
+            <FeedContent onAskModeChange={onAskModeChange} onHideAddButton={onHideAddButton} onProcessingChange={onProcessingChange} onFeedLoadedChange={onFeedLoadedChange} onReadyCaptureChange={onReadyCaptureChange} onOpenDigestSettings={onOpenDigestSettings} onHasCardsChange={onHasCardsChange} onActiveFilterCountChange={onActiveFilterCountChange} libraryFacet={libraryFacet} onLibraryFacetApplied={onLibraryFacetApplied} onBackToInsights={onBackToInsights} headerCommand={headerCommand} onLibraryViewChange={onLibraryViewChange} onCapture={onCapture} onTabChange={onTabChange} onFullBleedChange={onFullBleedChange} suppressProcessingId={suppressProcessingId} />
         </Suspense>
     );
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
-import { X, Tag as TagIcon } from 'lucide-react';
+import { X, Tag as TagIcon, Globe, ChevronRight } from 'lucide-react';
 import Dropdown, { type DropdownOption } from '../Dropdown';
 import TagExplorer from '../TagExplorer';
 import { getCategoryColorStyle } from '@/lib/colors';
@@ -25,6 +25,7 @@ export default function MobileFiltersSheet({
     statusOptions,
     selectedSources,
     setSelectedSources,
+    onOpenSources,
     activeMobileFilters,
     setSelectedTags,
     categories,
@@ -43,10 +44,12 @@ export default function MobileFiltersSheet({
     setFilter: (filter: FilterType) => void;
     statusTriggerIcon: ReactNode;
     statusOptions: DropdownOption[];
-    /** Kept for the footer's "Clear all" — the sources UI itself moved to
-        MobileSourcesSheet. */
+    /** Drives the Sources row's count and the footer's "Clear all" — the
+        sources UI itself lives in MobileSourcesSheet, reached from the row. */
     selectedSources: Set<string>;
     setSelectedSources: Dispatch<SetStateAction<Set<string>>>;
+    /** Open the dedicated Sources sheet (closes this one first). */
+    onOpenSources: () => void;
     activeMobileFilters: number;
     setSelectedTags: Dispatch<SetStateAction<Set<string>>>;
     categories: string[];
@@ -99,6 +102,27 @@ export default function MobileFiltersSheet({
                             leadingIcon={statusTriggerIcon}
                             options={statusOptions}
                         />
+                    </div>
+
+                    {/* Sources — a filter dimension like categories/tags, but its
+                        picker (platform-grouped publisher list) is too rich to
+                        flatten into chips here, so a row hands off to the
+                        dedicated MobileSourcesSheet (2026-08-07: rejoined Filters
+                        when the header globe became the View glyph). */}
+                    <div>
+                        <label className="block text-[11px] font-bold uppercase tracking-wider text-text-muted mb-1.5">Sources</label>
+                        <button
+                            onClick={() => { onClose(); onOpenSources(); }}
+                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-card border border-border-subtle text-[15px] text-start transition-colors cursor-pointer hover:bg-card-hover"
+                        >
+                            <Globe className="w-[18px] h-[18px] text-text-muted" />
+                            <span className="flex-1 font-medium text-text-secondary">
+                                {selectedSources.size > 0
+                                    ? <>Sources <span className="text-accent">· {selectedSources.size} selected</span></>
+                                    : 'All sources'}
+                            </span>
+                            <ChevronRight className="w-4 h-4 text-text-muted" />
+                        </button>
                     </div>
 
                     {/* Categories — chips breathe directly on the sheet. */}
@@ -191,9 +215,6 @@ export default function MobileFiltersSheet({
                             </div>
                         </div>
                     )}
-
-                    {/* Sources moved OUT to their own dedicated sheet (the toolbar's
-                        globe / the header's globe glyph) — see MobileSourcesSheet. */}
 
                     {/* Footer */}
                     <div className="flex items-center gap-3 pt-1">

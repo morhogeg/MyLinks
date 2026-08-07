@@ -1346,6 +1346,28 @@ exact-match, capped.
   entry below) and is the FIRST build where a signed-out phone opens onto
   the landing page. Owner steps 25a/25b still open.
 
+- **2026-08-07 — Mobile header: the VIEW switcher takes the Sources slot;
+  Sources rejoins Filters (branch `claude/onboard-search-semantics-2aodzb`).**
+  Owner design call (screenshot round): "view selector is more important than
+  source" — agreed: view mode is how you look at the library and is
+  high-frequency, while Sources is a filter dimension like categories/tags
+  and sat oddly as a top-level header glyph. New arrangement, mobile chrome
+  only (desktop toolbar untouched): the header globe is now a **view glyph**
+  whose icon mirrors the active layout (grid/list/review/graph/notes —
+  `libraryView` state in `page.tsx`, reported up via Feed's new
+  `onLibraryViewChange`) and opens NEW `MobileViewSheet` (layouts + My notes,
+  headerCommand `'view'`); `MobileDisplaySheet` dropped its View section
+  (now Sort + Filter… + Select); `MobileFiltersSheet` gained a **Sources**
+  row (globe, active count, chevron) that sheet-swaps to the existing
+  `MobileSourcesSheet` — its platform grouping was too rich to flatten into
+  chips. Insights → source jumps route via `libraryFacet`, not the removed
+  header command, so they still work; `data-tour` markers are inert (nothing
+  queries them — verified). Verified: `tsc` + eslint clean; react-dom/server
+  harness rendered all three sheets (view radio + My notes, Display without
+  View, Filters with Sources row + count). Not render-verified in a browser;
+  owner QAs on device. Note: the desktop Filters modal also shows the
+  Sources row now (it's the same responsive sheet) alongside the toolbar's
+  Sources button — redundant but consistent; flag if unwanted.
 - **2026-08-07 — MEANING SEARCH IS BACK IN THE SEARCH BAR (branch
   `claude/onboard-search-semantics-2aodzb`).** Owner, with screenshots: "Pasta"
   finds the Spaghetti-al-limone card (literal tag hit) but "Food" returns

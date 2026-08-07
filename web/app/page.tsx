@@ -8,7 +8,7 @@ import AnalyzingBanner, { AnalyzingState } from "@/components/AnalyzingBanner";
 import SettingsModal from "@/components/SettingsModal";
 import ScrollToTop from "@/components/ScrollToTop";
 import OnboardingTour, { ONBOARDING_STORAGE_KEY } from "@/components/OnboardingTour";
-import { Settings, Search, Globe } from "lucide-react";
+import { Settings, Search, LayoutGrid, List, GalleryHorizontalEnd, Waypoints, StickyNote } from "lucide-react";
 import DisplayGlyph from "@/components/feed/DisplayGlyph";
 import ThemeToggle from "@/components/ThemeToggle";
 import { CitationGlyph, Wordmark } from "@/components/ui/Wordmark";
@@ -136,18 +136,21 @@ export default function Home() {
   // A tapped Insights row (category/tag/source): Settings closes and Feed
   // applies this as its active filter, then clears it via the callback.
   const [libraryFacet, setLibraryFacet] = useState<LibraryFacetRequest | null>(null);
-  // Mobile v4 chrome: the header's bare glyphs (search / sources / display)
+  // Mobile v4 chrome: the header's bare glyphs (search / view / display)
   // command the Feed via a nonce channel; the bottom bar's + bumps
   // captureSignal to pop AddLinkForm open. `feedTab` mirrors Feed's active
   // bottom tab so the glyphs only show on Home, where they apply.
-  const [headerCommand, setHeaderCommand] = useState<{ action: 'search' | 'sources' | 'display'; nonce: number } | null>(null);
+  const [headerCommand, setHeaderCommand] = useState<{ action: 'search' | 'sources' | 'view' | 'display'; nonce: number } | null>(null);
   // How many filters the feed currently has on. Drives the header glyph's
   // active state — Feed owns the filter state, so it reports the count up the
   // same way it reports onHasCardsChange.
   const [activeFilterCount, setActiveFilterCount] = useState(0);
+  // The feed's current library layout, reported up so the header's view
+  // glyph can mirror it (grid icon in grid view, list icon in list, …).
+  const [libraryView, setLibraryView] = useState<'grid' | 'list' | 'review' | 'graph' | 'notes'>('grid');
   const [captureSignal, setCaptureSignal] = useState(0);
   const [feedTab, setFeedTab] = useState<'home' | 'collections' | 'ask' | 'digest'>('home');
-  const sendHeaderCommand = (action: 'search' | 'sources' | 'display') =>
+  const sendHeaderCommand = (action: 'search' | 'sources' | 'view' | 'display') =>
     setHeaderCommand((prev) => ({ action, nonce: (prev?.nonce ?? 0) + 1 }));
   const [isAskMode, setIsAskMode] = useState(false);
   // Full-bleed modes (Ask + Review) drop main's bottom padding so the
@@ -272,8 +275,10 @@ export default function Home() {
           {/* Controls — one cohesive cluster */}
           <div className="flex items-center gap-2">
             {/* Mobile v4: the library's controls are BARE GLYPHS in this one
-                header line (Apple nav-bar grammar) — search, sources, and the
-                ⋯ display menu (view/sort/filter/select). Home tab only; the
+                header line (Apple nav-bar grammar) — search, the view
+                switcher, and the sliders display menu (sort/filter/select).
+                Sources lives inside Filters now (2026-08-07 owner call:
+                switching views outranks source filtering). Home tab only; the
                 other tabs bring their own subheaders. Desktop keeps its
                 toolbar, so these stay sm:hidden. */}
             {feedTab === 'home' && (
@@ -287,11 +292,17 @@ export default function Home() {
                   <Search className="w-[19px] h-[19px]" />
                 </button>
                 <button
-                  onClick={() => sendHeaderCommand('sources')}
-                  aria-label="Sources"
+                  data-tour="views"
+                  onClick={() => sendHeaderCommand('view')}
+                  aria-label="View — card, list, review, graph, notes"
                   className="h-10 w-10 flex items-center justify-center text-text-secondary hover:text-text active:text-text transition-colors"
                 >
-                  <Globe className="w-[19px] h-[19px]" />
+                  {/* The glyph IS the state: it wears the active layout's icon. */}
+                  {libraryView === 'list' ? <List className="w-[19px] h-[19px]" />
+                    : libraryView === 'review' ? <GalleryHorizontalEnd className="w-[19px] h-[19px]" />
+                    : libraryView === 'graph' ? <Waypoints className="w-[19px] h-[19px]" />
+                    : libraryView === 'notes' ? <StickyNote className="w-[19px] h-[19px]" />
+                    : <LayoutGrid className="w-[19px] h-[19px]" />}
                 </button>
                 <DisplayGlyph
                   activeFilterCount={activeFilterCount}
@@ -324,7 +335,7 @@ export default function Home() {
         {/* The feed is already live via onSnapshot, so a new save streams in on
             its own — no remount needed. (Previously keyed on refreshKey, which
             tore down listeners and wiped view/filter/search on every add.) */}
-        <Feed onAskModeChange={setIsAskMode} onHideAddButton={setHideAddButton} onProcessingChange={setProcessing} onFeedLoadedChange={setFeedLoaded} onReadyCaptureChange={setReadyCaptureAt} onOpenDigestSettings={() => { setSettingsSection('digest'); setIsSettingsOpen(true); }} onHasCardsChange={setHasCards} onActiveFilterCountChange={setActiveFilterCount} libraryFacet={libraryFacet} onLibraryFacetApplied={() => setLibraryFacet(null)} onBackToInsights={() => { setSettingsSection('stats'); setIsSettingsOpen(true); }} headerCommand={headerCommand} onCapture={() => setCaptureSignal((n) => n + 1)} onTabChange={setFeedTab} onFullBleedChange={setIsFullBleed} suppressProcessingId={dialogCardId} />
+        <Feed onAskModeChange={setIsAskMode} onHideAddButton={setHideAddButton} onProcessingChange={setProcessing} onFeedLoadedChange={setFeedLoaded} onReadyCaptureChange={setReadyCaptureAt} onOpenDigestSettings={() => { setSettingsSection('digest'); setIsSettingsOpen(true); }} onHasCardsChange={setHasCards} onActiveFilterCountChange={setActiveFilterCount} onLibraryViewChange={setLibraryView} libraryFacet={libraryFacet} onLibraryFacetApplied={() => setLibraryFacet(null)} onBackToInsights={() => { setSettingsSection('stats'); setIsSettingsOpen(true); }} headerCommand={headerCommand} onCapture={() => setCaptureSignal((n) => n + 1)} onTabChange={setFeedTab} onFullBleedChange={setIsFullBleed} suppressProcessingId={dialogCardId} />
       </main>
 
       {/* Add Link FAB — hidden in Ask & Collections (neither view captures links). */}
