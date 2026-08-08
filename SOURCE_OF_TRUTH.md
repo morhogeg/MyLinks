@@ -1407,8 +1407,9 @@ exact-match, capped.
   flow is unregressed. (The dev server does not hydrate in the sandbox, so the
   interaction checks required the production build.) Not QA'd on a device.
   **SHIPPED:** merge `e0cfdda` → `main` (Vercel auto); "Deploy Cloud Functions"
-  run **#79** scoped `Deploy-Functions: analyze_link,share_ingest`; **iOS run
-  #279 → TestFlight build 1279**. Owner step: install 1279 and QA the text
+  run **#79** scoped `Deploy-Functions: analyze_link,share_ingest` GREEN; **iOS
+  run #279 → TestFlight build 1279** archived + uploaded GREEN (gate verified
+  on, entitlements checked). Owner step: install 1279 and QA the text
   share on device (the Share Extension change can only be seen from a build).
 
 - **2026-08-08 — graph clusters stop mixing unrelated cards; meaning-search
