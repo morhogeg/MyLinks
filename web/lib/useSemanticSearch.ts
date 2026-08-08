@@ -32,7 +32,10 @@ import { reportError } from '@/lib/errorReporter';
  * to `client_errors` (`semantic-search` tag) so an outage leaves a trail.
  */
 
-const DEBOUNCE_MS = 400;
+// 400ms was pure dead time in front of a request that already takes a second or
+// more; 220ms still collapses a burst of keystrokes into one request while
+// shaving that wait off every search (owner QA: results felt 5-10s away).
+const DEBOUNCE_MS = 220;
 /** Skip one-letter queries: the literal layer already narrows per keystroke,
  *  and a single character carries no meaning to embed. */
 const MIN_QUERY_CHARS = 2;

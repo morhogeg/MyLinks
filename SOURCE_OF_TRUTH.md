@@ -1321,6 +1321,34 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-08 — graph clusters stop mixing unrelated cards; meaning-search
+  latency cut without paying for a warm instance.**
+  **(1) Cluster contamination was an EDGE problem, not a labeling one.** The
+  model attaches broad concepts ("ישראל", "מדיניות ציבורית") across unrelated
+  subjects, and `lib/graph.ts` formed a concept edge on any 2 shared concepts —
+  so a Hyundai GV60 review chained into a cluster of pay-gap / immigration /
+  enlistment cards (owner QA screenshot). Two rules now: concepts carried by
+  more than `max(4, min(30, 15% of the library))` cards are **generic** and no
+  longer count as shared signal (in both the pairwise and the big-library
+  inverted-index paths), and a concept-only edge is vetoed when both cards have
+  embeddings pointing clearly different ways (`CONCEPT_SIM_FLOOR = 0.55`).
+  Reproduced the exact failure in a scratch harness (8 policy cards + 1 car
+  card): before, one 9-card cluster including the car; after, the car is
+  isolated and the 8-card cluster is intact. AI `relatedLinks` edges untouched.
+  **(2) Search latency — free changes only** (no `min_instances`, explicit owner
+  call): the lexical half's 1000-card scan was streaming FULL documents,
+  dragging every card's embedding vector across the wire, so it now uses a
+  Firestore field projection (`SEARCH_SCAN_FIELDS`) — ask_brain still fetches
+  full documents, it grounds answers in the card body; the two retrieval halves
+  run **concurrently** in `perform_hybrid_search` (dedupe moved to the merge,
+  since a parallel scan can't be told what to skip); `perform_search_logic`'s
+  "does this library have embeddings?" probe (a serial round trip fetching 10
+  full docs) only runs now when `find_nearest` came back empty; client debounce
+  400 → 220ms. Cold starts (3–6s) remain the floor — a warm instance costs money
+  and was deliberately not taken. 622 backend tests green (4 hybrid tests
+  updated: they asserted the old `exclude_ids` plumbing), `tsc --noEmit` clean.
+  **Not measured on prod yet** — no timing was taken against the live endpoint.
+
 - **2026-08-07 (round 14) — the landing becomes the signed-out state EVERYWHERE
   — including the iOS app — plus five polish calls. TESTFLIGHT BUILD REQUIRED
   AND TRIGGERED.**
