@@ -153,6 +153,10 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     private var captureStartedAt: Date?
     private var isImageFlow = false
     private var isLinkFlow = false
+    /// Shared TEXT with no URL in it. It rides the SAME HUD as a link (the
+    /// linkPreview skeleton, the same ramp) but never claims to fetch or read a
+    /// page, because there is neither — see `phase(for:)` and `presentTextScan`.
+    private var isTextFlow = false
     private var finished = false
     private var resultShown = false
 
@@ -318,7 +322,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     private func writePendingShareHint() {
         guard let defaults = UserDefaults(suiteName: Self.appGroup) else { return }
         defaults.set(Date().timeIntervalSince1970, forKey: "pendingShareAt")
-        defaults.set(isImageFlow ? "image" : "link", forKey: "pendingShareKind")
+        defaults.set(isImageFlow ? "image" : isTextFlow ? "text" : "link", forKey: "pendingShareKind")
         // Hand off the EXACT percentage the HUD is showing right now, so an older
         // app build that can't read the start time still resumes near this value.
         defaults.set(Double(progress), forKey: "pendingShareProgress")
@@ -594,7 +598,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     private var sweepConfigured = false
 
     private func layoutSweepGradient() {
-        guard isImageFlow || isLinkFlow else { return }
+        guard isImageFlow || isLinkFlow || isTextFlow else { return }
         // The sweep band spans 20% of the preview height (matches h-1/5 in web).
         let bandHeight = max(previewView.bounds.height * 0.20, 1)
         let bandWidth = previewView.bounds.width
@@ -654,6 +658,16 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     /// different things at the same %. Images mirror ImageScanProgress.tsx.
     private func phase(for p: CGFloat) -> String {
         if p >= 100 { return "Done!" }
+        // Shared text: the same beats at the same thresholds, with copy that
+        // doesn't claim to fetch anything. TWIN: web/lib/scanPhases.ts
+        // TEXT_SCAN_STEPS — change one, change the other.
+        if isTextFlow {
+            if p >= 92 { return "Organizing & tagging…" }
+            if p >= 72 { return "Searching connections…" }
+            if p >= 50 { return "Writing a summary…" }
+            if p >= 25 { return "Reading your text…" }
+            return "Saving your text…"
+        }
         if isLinkFlow {
             if p >= 92 { return "Organizing & tagging…" }
             if p >= 72 { return "Searching connections…" }
@@ -670,7 +684,8 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     }
 
     /// Reveal the scan HUD and start the cosmetic progress animation. The caller
-    /// sets isImageFlow / isLinkFlow (and the matching preview) before calling.
+    /// sets isImageFlow / isLinkFlow / isTextFlow (and the matching preview)
+    /// before calling.
     private func beginScanAnimation() {
         card.isHidden = true
         scanContainer.isHidden = false
@@ -756,7 +771,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
             self.displayLink?.invalidate()
             self.displayLink = nil
             self.clearPendingShareHint()
-            if self.isImageFlow || self.isLinkFlow {
+            if self.isImageFlow || self.isLinkFlow || self.isTextFlow {
                 self.sweepView.isHidden = true
                 self.citationMark.settle()
                 self.percentLabel.alpha = 0
@@ -796,7 +811,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
             guard !self.resultShown else { return }
             self.resultShown = true
 
-            if self.isImageFlow || self.isLinkFlow {
+            if self.isImageFlow || self.isLinkFlow || self.isTextFlow {
                 if success {
                     // Save acknowledged — show the honest "saved, still analyzing"
                     // frame (bar stays mid-flight), then finish.
@@ -885,7 +900,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
                         self?.upload(payload: ["url": url.absoluteString])
                     }
                 } else if let s = item as? String {
-                    DispatchQueue.main.async { self?.presentLinkScan(urlString: s) }
+                    DispatchQueue.main.async { self?.presentSharedString(s) }
                     self?.upload(payload: ["url": s])
                 } else {
                     self?.showResult("Couldn't read the link", success: false)
@@ -896,7 +911,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
             let id = provider.hasItemConformingToTypeIdentifier(kPlainText) ? kPlainText : kText
             provider.loadItem(forTypeIdentifier: id, options: nil) { [weak self] item, _ in
                 if let s = item as? String {
-                    DispatchQueue.main.async { self?.presentLinkScan(urlString: s) }
+                    DispatchQueue.main.async { self?.presentSharedString(s) }
                     self?.upload(payload: ["text": s])
                 } else {
                     self?.showResult("Couldn't read the text", success: false)
@@ -909,7 +924,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
 
     /// Show the native scan animation, with the shared image behind the sweep.
     private func presentScan(with image: UIImage?) {
-        guard !isImageFlow, !isLinkFlow else { return }
+        guard !isImageFlow, !isLinkFlow, !isTextFlow else { return }
         isImageFlow = true
         if let image = image { imageView.image = image }
         citationMark.isHidden = false
@@ -922,10 +937,60 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         citationMark.start()
     }
 
+    /// Does this shared string carry a link the backend will actually go fetch?
+    ///
+    /// MUST mirror `_extract_url` in functions/main.py — a bare `https?://` match,
+    /// NOT NSDataDetector (which also matches "example.com" and would send the
+    /// HUD down the link story for something the backend saves as text). This one
+    /// predicate decides which flow the user watches, so the words on screen and
+    /// the card that lands can never tell different stories.
+    private static func containsHttpUrl(_ s: String) -> Bool {
+        s.range(of: "https?://[^\\s]+", options: [.regularExpression, .caseInsensitive]) != nil
+    }
+
+    /// Route a shared string to the flow that matches what will really happen to
+    /// it: a link is fetched and read, plain text is already in hand.
+    private func presentSharedString(_ s: String) {
+        if Self.containsHttpUrl(s) { presentLinkScan(urlString: s) } else { presentTextScan(s) }
+    }
+
+    /// Show the scan animation for shared TEXT — a paragraph with no link in it.
+    ///
+    /// Same HUD as the link flow (skeleton, sweep, mark, ramp), two honest
+    /// differences: the header reads "Saving text" beside a quote glyph instead of
+    /// a favicon and a hostname there is no host for, and the second line shows
+    /// the text's own opening words, so the user can see WHICH paragraph is being
+    /// saved. No favicon fetch — there is no site to fetch one from.
+    private func presentTextScan(_ text: String) {
+        guard !isImageFlow, !isLinkFlow, !isTextFlow else { return }
+        isTextFlow = true
+        let firstLine = text
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .split(separator: "\n")
+            .first
+            .map(String.init) ?? ""
+        hostLabel.text = firstLine.isEmpty
+            ? "Saving text…"
+            : (firstLine.count > 48 ? String(firstLine.prefix(48)) + "…" : firstLine)
+        faviconView.image = UIImage(systemName: "text.quote")
+        faviconView.tintColor = Lumen.textSecondary
+        imageView.isHidden = true
+        linkPreview.isHidden = false
+        dimView.backgroundColor = UIColor.black.withAlphaComponent(0.50)
+        citationMark.isHidden = false
+        // Same drop as the link flow — the status cluster clears the header row.
+        statusCenterY.constant = 12
+        beginScanAnimation()
+        view.setNeedsLayout()
+        view.layoutIfNeeded()
+        layoutSweepGradient()
+        citationMark.start()
+    }
+
     /// Show the native scan animation for a shared link/text: a faux page preview
     /// (favicon + host + skeleton) behind the sweep, mirroring LinkScanProgress.tsx.
     private func presentLinkScan(urlString: String?) {
-        guard !isImageFlow, !isLinkFlow else { return }
+        guard !isImageFlow, !isLinkFlow, !isTextFlow else { return }
         isLinkFlow = true
         let host = urlString.flatMap { Self.host(from: $0) }
         hostLabel.text = host ?? "Saving link…"

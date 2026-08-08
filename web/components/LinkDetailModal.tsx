@@ -18,6 +18,7 @@ import { getRelatedCards } from '@/lib/related';
 import { getNotes, makeNote, touchNote } from '@/lib/notes';
 import { hapticSuccess, hapticMedium } from '@/lib/haptics';
 import { isHttpUrl } from '@/lib/url';
+import CitationMark from './ui/CitationMark';
 
 // Sentinel `editingNoteId` for the composer when adding a brand-new note (as
 // opposed to editing an existing one, keyed by its real id).
@@ -62,6 +63,9 @@ interface LinkDetailModalProps {
     /** Edit a note card as one field — re-derives title/body from the text. */
     onUpdateNote?: (id: string, text: string) => void;
     onUpdateNotes?: (id: string, notes: UserNote[], removed?: boolean) => void;
+    /** Write Machina's summary of a text/note card, on demand (the mark under
+        the text). Resolves null on failure — the card is left untouched. */
+    onGenerateSummary?: (id: string, text: string) => Promise<{ aiSummary: string; aiDetailedSummary: string } | null>;
     onDelete: (id: string) => void;
     onUpdateReminder: (link: Link) => void;
     onOpenOtherLink?: (link: Link) => void;
@@ -101,6 +105,7 @@ export default function LinkDetailModal({
     onUpdateSummary,
     onUpdateNote,
     onUpdateNotes,
+    onGenerateSummary,
     onDelete,
     onUpdateReminder,
     onOpenOtherLink,
@@ -131,6 +136,12 @@ export default function LinkDetailModal({
     // draft text is held locally while writing, committed on Save/blur.
     const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
     const [noteDraft, setNoteDraft] = useState('');
+    // Machina's read of a text card: closed by default (the point of a text card
+    // is the text), opened by the mark. `summaryBusy` covers the one case that
+    // isn't instant — a card that has no stored summary yet, so the tap has to go
+    // write one. Both reset on card navigation below.
+    const [summaryOpen, setSummaryOpen] = useState(false);
+    const [summaryBusy, setSummaryBusy] = useState(false);
     const [imgFailed, setImgFailed] = useState(false);
     // Reset the broken-image fallback when navigating to a different card. Done
     // as a render-time state adjustment (React discards this pass and re-renders
@@ -146,6 +157,8 @@ export default function LinkDetailModal({
         setIsEditingSummary(false);
         setIsEditingNote(false);
         setEditingNoteId(null);
+        setSummaryOpen(false);
+        setSummaryBusy(false);
     }
 
     // A note card IS the user's own words — a single piece of writing, edited as
@@ -153,6 +166,14 @@ export default function LinkDetailModal({
     // text lives in `summary` for anything longer than a one-liner; a short note
     // is entirely its own title. Editing re-derives both and re-embeds.
     const isNote = link.sourceType === 'note';
+    // A TEXT card (shared paragraph) is a note card with a real heading: the AI
+    // wrote the title, the user's words are the body. So it is edited like a link
+    // — title pencil for the heading, body pencil for the text — NOT through the
+    // single-field note editor, which re-derives the title from the first line
+    // and would quietly delete the heading on the first edit. Everything else
+    // about it stays a note (byline, no source link, re-embed on edit).
+    const isTextCard = isNote && link.captureType === 'text';
+    const isSingleFieldNote = isNote && !isTextCard;
     const noteFullText = (link.summary && link.summary.trim()) ? link.summary : link.title;
     const startEditNoteCard = () => { setNoteTextDraft(noteFullText); setIsEditingNote(true); };
     const saveNoteCard = () => {
@@ -170,6 +191,33 @@ export default function LinkDetailModal({
         setIsEditingSummary(false);
         if (s !== (link.summary || '')) onUpdateSummary?.(link.id, s, isNote);
     };
+    // MACHINA'S READ — the summary as an OFFER on a text card, not its content.
+    //
+    // On an article the summary IS the card: it stands in for something you'd
+    // otherwise have to go open. On text the user deliberately kept, it isn't —
+    // the words are the thing, and replacing them with a paraphrase throws away
+    // the only copy. So the body stays verbatim and the summary sits behind the
+    // mark, one tap away. A share-sheet capture already carries one (the backend
+    // wrote `aiSummary` at capture time without displaying it), so that tap is
+    // instant; a note typed in the Note tab has none, so the first tap generates
+    // one and stores it — instant every time after.
+    const hasStoredSummary = !!(link.aiSummary?.trim() || link.aiDetailedSummary?.trim());
+    const canSummarize = isNote && !(isSingleFieldNote && isEditingNote)
+        && (hasStoredSummary || !!onGenerateSummary);
+    const toggleSummary = async () => {
+        if (summaryBusy) return;
+        if (summaryOpen) { setSummaryOpen(false); return; }
+        hapticMedium();
+        if (hasStoredSummary) { setSummaryOpen(true); return; }
+        if (!onGenerateSummary) return;
+        setSummaryBusy(true);
+        const res = await onGenerateSummary(link.id, noteFullText);
+        setSummaryBusy(false);
+        // Failure keeps the button exactly as it was (the handler toasts) — a
+        // dead network must not leave a permanently empty section on the card.
+        if (res) { setSummaryOpen(true); hapticSuccess(); }
+    };
+
     // The note composer: refs + a pointer-down intent flag so save-on-blur can
     // never fight an explicit Save/Cancel/Delete tap. On iOS a button tap often
     // reports a null blur relatedTarget, so we record intent on pointerdown
@@ -784,7 +832,7 @@ export default function LinkDetailModal({
                         })()}
                     </div>
 
-                    {isNote && isEditingNote ? (
+                    {isSingleFieldNote && isEditingNote ? (
                         // A note is ONE piece of writing — edited in a single field
                         // (title + body are re-derived on save), not a title box and a
                         // detached body pencil. This replaces the whole title+body area.
@@ -858,11 +906,11 @@ export default function LinkDetailModal({
                             className={`group/title font-bold text-2xl text-text leading-tight mb-4 ${isRtl ? 'text-right' : ''}`}
                         >
                             {link.title}
-                            {(isNote ? onUpdateNote : onUpdateTitle) && (
+                            {(isSingleFieldNote ? onUpdateNote : onUpdateTitle) && (
                                 <button
-                                    onClick={() => { if (isNote) startEditNoteCard(); else { setTitleDraft(link.title); setIsEditingTitle(true); } }}
-                                    aria-label={isNote ? 'Edit note' : 'Edit title'}
-                                    title={isNote ? 'Edit note' : 'Edit title'}
+                                    onClick={() => { if (isSingleFieldNote) startEditNoteCard(); else { setTitleDraft(link.title); setIsEditingTitle(true); } }}
+                                    aria-label={isSingleFieldNote ? 'Edit note' : 'Edit title'}
+                                    title={isSingleFieldNote ? 'Edit note' : 'Edit title'}
                                     className={`inline-flex items-center justify-center align-middle ms-2 w-7 h-7 rounded-lg text-text-muted hover:text-text hover:bg-fill-subtle focus:opacity-100 transition-colors ${isNote ? '' : 'opacity-0 group-hover/title:opacity-100 transition-opacity'}`}
                                 >
                                     <Pencil className="w-[18px] h-[18px]" />
@@ -883,7 +931,7 @@ export default function LinkDetailModal({
                             to strip, so we show it alone to avoid duplicating it.
                             While a note's single-field editor is open, its read-only
                             body is hidden so the text isn't shown twice. */}
-                        {!(isNote && isEditingNote) && (
+                        {!(isSingleFieldNote && isEditingNote) && (
                         <div className="mb-6">
                             {(() => {
                                 const detailed = link.detailedSummary || '';
@@ -936,8 +984,12 @@ export default function LinkDetailModal({
                                                         />
                                                         {/* Non-note summaries keep a quiet hover pencil to correct
                                                             AI output. Notes are edited via the single pencil on the
-                                                            title (the whole note is one field), so no body control. */}
-                                                        {!isNote && onUpdateSummary && (
+                                                            title (the whole note is one field), so no body control.
+                                                            A TEXT card gets neither: hover doesn't exist on a phone,
+                                                            and a pencil floating over the first line collides with
+                                                            the user's own words — it gets the labelled control below
+                                                            the text instead. */}
+                                                        {!isSingleFieldNote && !isTextCard && onUpdateSummary && (
                                                             <button
                                                                 onClick={startEditSummary}
                                                                 aria-label="Edit summary"
@@ -949,9 +1001,20 @@ export default function LinkDetailModal({
                                                         )}
                                                     </div>
                                                 )}
+                                                {/* A text card's body is the user's own words, so its edit
+                                                    affordance is named and always reachable — never a
+                                                    hover-only glyph sitting on top of the text. */}
+                                                {isTextCard && onUpdateSummary && (
+                                                    <button
+                                                        onClick={startEditSummary}
+                                                        className="mb-2 inline-flex items-center gap-1.5 text-xs font-bold text-text-muted/60 hover:text-accent transition-colors"
+                                                    >
+                                                        <Pencil className="w-3.5 h-3.5" /> Edit text
+                                                    </button>
+                                                )}
                                                 {/* Legacy prose-only cards hide the lead to avoid a
                                                     duplicate — still let the user correct the summary. */}
-                                                {!showLead && !isNote && onUpdateSummary && (
+                                                {!showLead && !isSingleFieldNote && onUpdateSummary && (
                                                     <button
                                                         onClick={startEditSummary}
                                                         className="mb-4 inline-flex items-center gap-1.5 text-xs font-bold text-text-muted/60 hover:text-accent transition-colors"
@@ -974,6 +1037,71 @@ export default function LinkDetailModal({
                         </div>
                         )}
 
+
+                        {/* MACHINA'S READ — a divided section under the user's own
+                            text. Closed, it's a single quiet row carrying the mark:
+                            an offer, weighted below the text it summarizes. Open, it
+                            reads like every other summary in the app (the same
+                            SimpleMarkdown prose), separated by its own rule so the
+                            AI's words can never be mistaken for the user's. */}
+                        {canSummarize && (
+                            <div className="mb-8 border-t border-border-subtle pt-6">
+                                {summaryOpen ? (
+                                    <>
+                                        <h3 className={`text-sm font-bold text-text-muted uppercase tracking-wider mb-3 flex items-center gap-2 ${isRtl ? 'flex-row-reverse' : ''}`}>
+                                            <CitationMark state="listening" size={16} className="text-accent shrink-0" />
+                                            <span className="flex-1">Machina&rsquo;s read</span>
+                                            <button
+                                                onClick={() => setSummaryOpen(false)}
+                                                className="text-xs font-bold text-text-muted/60 hover:text-text normal-case tracking-normal transition-colors"
+                                            >
+                                                Hide
+                                            </button>
+                                        </h3>
+                                        {(() => {
+                                            const detailed = link.aiDetailedSummary || '';
+                                            const headingIdx = detailed.indexOf('## ');
+                                            const detailBody = headingIdx >= 0 ? detailed.slice(headingIdx) : detailed;
+                                            return (
+                                                <>
+                                                    {link.aiSummary && (
+                                                        <SimpleMarkdown
+                                                            content={link.aiSummary}
+                                                            isRtl={isRtl}
+                                                            className={`reading-prose ${detailBody ? 'mb-6' : ''}`}
+                                                        />
+                                                    )}
+                                                    {detailBody && (
+                                                        <SimpleMarkdown content={detailBody} isRtl={isRtl} className="reading-prose" />
+                                                    )}
+                                                </>
+                                            );
+                                        })()}
+                                    </>
+                                ) : (
+                                    <button
+                                        onClick={toggleSummary}
+                                        disabled={summaryBusy}
+                                        aria-busy={summaryBusy}
+                                        className={`group/read w-full flex items-center gap-3 rounded-2xl border border-border-subtle bg-fill-subtle/60 hover:bg-fill-subtle px-4 py-3.5 transition-colors active:scale-[0.99] disabled:active:scale-100 ${isRtl ? 'flex-row-reverse text-right' : 'text-left'}`}
+                                    >
+                                        <CitationMark
+                                            state={summaryBusy ? 'shaping' : 'listening'}
+                                            size={22}
+                                            className="text-accent shrink-0"
+                                        />
+                                        <span className="min-w-0 flex-1">
+                                            <span className="block text-sm font-bold text-text">
+                                                {summaryBusy ? 'Reading your text…' : 'Summarize with Machina'}
+                                            </span>
+                                            <span className="block text-xs text-text-muted">
+                                                {summaryBusy ? 'One moment' : 'Your text stays exactly as you saved it'}
+                                            </span>
+                                        </span>
+                                    </button>
+                                )}
+                            </div>
+                        )}
 
                         <div className="flex flex-wrap items-center gap-4 text-sm text-text-muted mb-8">
                             <span className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-fill-subtle border border-border-subtle">

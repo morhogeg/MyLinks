@@ -179,6 +179,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         handleUpdateSummary,
         handleUpdateNote,
         handleUpdateNotes,
+        handleGenerateSummary,
         handleRetryProcessing,
         handleRemoveFromCollection,
         handleShareCard,
@@ -2969,6 +2970,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                     onUpdateSummary={handleUpdateSummary}
                     onUpdateNote={handleUpdateNote}
                     onUpdateNotes={handleUpdateNotes}
+                    onGenerateSummary={handleGenerateSummary}
                     onUpdateReminder={handleOpenReminderModal}
                     onDelete={handleDelete}
                     onOpenOtherLink={openRelatedLink}

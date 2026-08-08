@@ -23,6 +23,26 @@ export const LINK_SCAN_STEPS = [
 ] as const;
 
 /**
+ * The same five beats for a TEXT capture — a paragraph shared straight into
+ * Machina with no URL in it.
+ *
+ * Text shares used to ride LINK_SCAN_STEPS, so the share sheet announced
+ * "Fetching the link… / Reading the page…" over a paragraph with no link and no
+ * page (owner-reported 2026-08-08). Nothing is fetched and nothing is scraped
+ * here — the text is already in hand — so the copy says what is actually
+ * happening: it is being read, then filed. Note the summary beat is "Writing a
+ * summary", not "Writing the summary": on a text card the summary is an extra
+ * the reader can ask for, not the body of the card.
+ */
+export const TEXT_SCAN_STEPS = [
+    'Saving your text',
+    'Reading your text',
+    'Writing a summary',
+    'Searching connections',
+    'Organizing & tagging',
+] as const;
+
+/**
  * The Thinking Orb that rides each phase, positionally matched to
  * `LINK_SCAN_STEPS`. One verb → one orb, app-wide:
  *
@@ -95,4 +115,12 @@ export function stageProgress(stage: ProcessingStage | undefined): { step: numbe
 export function linkScanLabel(progress: number): string {
     if (progress >= 100) return 'Done!';
     return LINK_SCAN_STEPS[linkScanStepIndex(progress)];
+}
+
+/** Text-capture phase label for a 0–100 progress value. Same thresholds and the
+ *  same orbs as the link flow — only the words differ, because only the words
+ *  were ever wrong. */
+export function textScanLabel(progress: number): string {
+    if (progress >= 100) return 'Done!';
+    return TEXT_SCAN_STEPS[linkScanStepIndex(progress)];
 }

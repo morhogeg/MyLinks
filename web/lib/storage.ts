@@ -321,6 +321,49 @@ export async function enrichNoteCard(uid: string, cardId: string, text: string):
 }
 
 /**
+ * Machina's read of a text card, on demand.
+ *
+ * A verbatim card (shared text) keeps the user's words as its body, so the
+ * standard summary has nowhere to go in the normal layout — it waits behind the
+ * Machina mark in the detail view. A card captured from the share sheet already
+ * carries one (`aiSummary`, written at capture time by the backend); a note
+ * typed in the Note tab never had one generated, so the first tap produces it
+ * here and PERSISTS it, making every later open instant and free.
+ *
+ * Reuses the `/api/analyze` note branch — the same analysis the capture path
+ * runs — and stores only the two summary fields. The user's title, body, tags
+ * and category are never touched: asking for a summary must not rewrite the
+ * thing being summarized. Returns the summary pair, or null if the call failed
+ * (the caller shows an error and the card is unchanged).
+ */
+export async function generateCardSummary(
+    uid: string,
+    cardId: string,
+    text: string,
+): Promise<{ aiSummary: string; aiDetailedSummary: string } | null> {
+    const body = text.trim();
+    if (!body) return null;
+    try {
+        const response = await fetchWithTimeout(apiUrl('/api/analyze'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()), ...(await authHeaders()) },
+            body: JSON.stringify({ text: body, uid }),
+        });
+        if (!response.ok) return null;
+        const data = await response.json().catch(() => null);
+        const l = data?.link;
+        if (!data?.success || !l) return null;
+        const aiSummary: string = typeof l.summary === 'string' ? l.summary : '';
+        const aiDetailedSummary: string = typeof l.detailedSummary === 'string' ? l.detailedSummary : '';
+        if (!aiSummary && !aiDetailedSummary) return null;
+        await updateDoc(doc(db, 'users', uid, 'links', cardId), { aiSummary, aiDetailedSummary });
+        return { aiSummary, aiDetailedSummary };
+    } catch {
+        return null;
+    }
+}
+
+/**
  * Retry analysis for a `failed` capture card (M3).
  *
  * Re-runs the same synchronous analysis the Add-Link form uses, then updates the
