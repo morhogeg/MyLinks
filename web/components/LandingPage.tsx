@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { ArrowDown, Share2, Globe, ChevronRight, Quote } from 'lucide-react';
 import { CitationGlyph, Wordmark } from '@/components/ui/Wordmark';
@@ -11,6 +12,7 @@ import ConnectScene from '@/components/landing/ConnectScene';
 import ShelfScene from '@/components/landing/ShelfScene';
 import { useInView } from '@/components/landing/hooks';
 import { LiveMark } from '@/components/landing/parts';
+import { CINEMATIC_LANDING } from '@/components/landing/motion';
 import '@/components/landing/landing.css';
 
 /**
@@ -72,7 +74,10 @@ export default function LandingPage({
     onGetStarted?: () => void;
 }) {
     return (
-        <div className="min-h-screen bg-background text-text">
+        /* `mx-cine` is the cinematic layer's single mount point — every
+           advanced-motion rule in landing.css is scoped under it, so removing
+           the class (motion.ts) restores the classic page byte-for-byte. */
+        <div className={`min-h-screen bg-background text-text ${CINEMATIC_LANDING ? 'mx-cine' : ''}`}>
             <Header onGetStarted={onGetStarted} />
             <main>
                 <Hero onGetStarted={onGetStarted} />
@@ -101,7 +106,7 @@ function GetStarted({ onGetStarted, label = 'Get started', className = '' }: {
     className?: string;
 }) {
     const cls =
-        'inline-flex items-center justify-center rounded-full bg-accent px-6 py-3 text-sm '
+        'mx-cta inline-flex items-center justify-center rounded-full bg-accent px-6 py-3 text-sm '
         + 'font-semibold text-accent-ink shadow-sm shadow-accent/20 transition-colors '
         + `hover:bg-accent-hover ${className}`;
     return onGetStarted
@@ -145,7 +150,10 @@ function Section({ kicker, title, children, className = '' }: {
 function Header({ onGetStarted }: { onGetStarted?: () => void }) {
     const cls = 'text-sm font-medium text-text-secondary transition-colors hover:text-text';
     return (
-        <header className="mx-auto flex max-w-6xl items-center justify-between px-6 pt-8">
+        /* `mx-nav` is inert in the classic page; the cinematic layer turns it
+           into the sticky glass bar (landing.css) without moving any markup. */
+        <div className="mx-nav">
+            <header className="mx-auto flex max-w-6xl items-center justify-between px-6 pt-8">
             {/* The header lockup the app itself uses: the BARE citation mark (a
                 rounded container here reads as a shrunken app icon, not as the
                 brand mark) beside the drawn wordmark. */}
@@ -163,8 +171,56 @@ function Header({ onGetStarted }: { onGetStarted?: () => void }) {
                     ? <button type="button" onClick={onGetStarted} className={cls}>Sign in</button>
                     : <Link href="/" className={cls}>Sign in</Link>}
             </span>
-        </header>
+            </header>
+        </div>
     );
+}
+
+/**
+ * Pointer parallax for the hero (cinematic mode only). Writes two unitless
+ * CSS variables (`--mx-px`/`--mx-py`, each -0.5…0.5) onto the hero section as
+ * the pointer moves; `.mx-cine .mx-par` elements translate by those times
+ * their own `--par` depth. rAF-coalesced so a fast mouse costs one style
+ * write per frame; gated off entirely for touch, reduced motion, and the
+ * classic page — in all three cases the variables never exist and `mx-par`
+ * stays a no-op transform of 0.
+ */
+function useHeroParallax<T extends HTMLElement>() {
+    const ref = useRef<T>(null);
+    useEffect(() => {
+        if (!CINEMATIC_LANDING) return;
+        const el = ref.current;
+        if (!el || typeof window.matchMedia !== 'function') return;
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+        let raf = 0;
+        let px = 0;
+        let py = 0;
+        const onMove = (e: PointerEvent) => {
+            const r = el.getBoundingClientRect();
+            px = Math.min(0.5, Math.max(-0.5, (e.clientX - r.left) / r.width - 0.5));
+            py = Math.min(0.5, Math.max(-0.5, (e.clientY - r.top) / r.height - 0.5));
+            if (!raf) {
+                raf = requestAnimationFrame(() => {
+                    raf = 0;
+                    el.style.setProperty('--mx-px', px.toFixed(4));
+                    el.style.setProperty('--mx-py', py.toFixed(4));
+                });
+            }
+        };
+        const onLeave = () => {
+            el.style.setProperty('--mx-px', '0');
+            el.style.setProperty('--mx-py', '0');
+        };
+        el.addEventListener('pointermove', onMove);
+        el.addEventListener('pointerleave', onLeave);
+        return () => {
+            el.removeEventListener('pointermove', onMove);
+            el.removeEventListener('pointerleave', onLeave);
+            if (raf) cancelAnimationFrame(raf);
+        };
+    }, []);
+    return ref;
 }
 
 /* ---------------------------------------------------------------------- hero */
@@ -197,14 +253,20 @@ const HERO_STEPS: { icon: React.ReactNode; title: string; body: string }[] = [
 ];
 
 function Hero({ onGetStarted }: { onGetStarted?: () => void }) {
+    const parallaxRef = useHeroParallax<HTMLElement>();
     return (
         /* Fully CENTERED (owner call, round 6) — mark, headline, prose and CTA
            on one axis. The left-set version read like a document; centred, it
            reads like an announcement, and the CTA no longer trails a caption
            ("Free to start · iPhone and web" was cut with it: a promise line
            should not be footnoted). */
-        <section className="mx-ground relative mx-auto flex min-h-[88vh] max-w-3xl flex-col items-center justify-center px-6 py-20 text-center">
-            <div className="relative flex flex-col items-center">
+        <section
+            ref={parallaxRef}
+            className="mx-ground relative mx-auto flex min-h-[88vh] max-w-3xl flex-col items-center justify-center px-6 py-20 text-center"
+        >
+            {/* `mx-hero-stage`: the cinematic exit — this block scales/fades as
+                the hero scrolls away, keynote style. Inert on the classic page. */}
+            <div className="mx-hero-stage relative flex flex-col items-center">
                 {/* THE APP'S OWN LIVING MARK (owner call, round 8: the first
                     frame should be genuinely impressive). This is
                     `CitationMark` — the exact component the Ask page mounts as
@@ -212,7 +274,7 @@ function Hero({ onGetStarted }: { onGetStarted?: () => void }) {
                     into the `listening` breath, with the identity glow. Not a
                     re-animation of the logo; the logo, alive, at landing scale.
                     A visitor who signs in meets this same mark waiting in Ask. */}
-                <span className="relative inline-flex" aria-hidden>
+                <span className="mx-par relative inline-flex" style={{ ['--par' as string]: '14px' }} aria-hidden>
                     <span
                         className="mx-halo absolute -inset-[85%] rounded-full"
                         style={{
@@ -237,7 +299,7 @@ function Hero({ onGetStarted }: { onGetStarted?: () => void }) {
                         which is where the plain-text NAME the branding review
                         checks for now lives above the fold. Real text nodes
                         throughout — the h1 still reads as the full D-6 string. */}
-                    <h1 className="text-[2.75rem] font-semibold leading-[1.06] tracking-tight text-text sm:text-7xl">
+                    <h1 className="mx-par text-[2.75rem] font-semibold leading-[1.06] tracking-tight text-text sm:text-7xl" style={{ ['--par' as string]: '6px' }}>
                         <span className="mx-clip">
                             <span className="mx-word-up" style={{ ['--i' as string]: 0 }}>
                                 Everything you save,
@@ -348,7 +410,7 @@ function Surfaces() {
                 {SURFACES.map((s, i) => (
                     <div
                         key={s.title}
-                        className="mx-rise rounded-2xl border border-border-subtle bg-card p-6 shadow-[var(--shadow-card)]"
+                        className="mx-rise mx-vt rounded-2xl border border-border-subtle bg-card p-6 shadow-[var(--shadow-card)]"
                         style={{ ['--i' as string]: 2 + i }}
                     >
                         <span className="grid h-10 w-10 place-items-center rounded-xl bg-tile text-tile-ink">
@@ -396,7 +458,7 @@ function Close({ onGetStarted }: { onGetStarted?: () => void }) {
             ref={ref}
             className={`mx-auto max-w-3xl px-6 pb-20 pt-4 ${seen ? 'mx-in' : ''}`}
         >
-            <div className="mx-rise rounded-3xl border border-border-subtle bg-card p-10 text-center shadow-[var(--shadow-card)] sm:p-14">
+            <div className="mx-rise mx-vt rounded-3xl border border-border-subtle bg-card p-10 text-center shadow-[var(--shadow-card)] sm:p-14">
                 <h2 className="text-3xl font-semibold tracking-tight text-text text-balance sm:text-4xl">
                     Start with the last thing you saved.
                 </h2>

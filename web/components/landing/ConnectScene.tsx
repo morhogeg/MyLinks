@@ -63,21 +63,24 @@ export default function ConnectScene() {
                     for the dots), so they invert correctly with the theme and
                     can never outshout the 11px labels — the dots sit at hairline
                     contrast by construction. */}
+                {/* The ground lives on the OUTER card (owner call, round 15):
+                    it used to sit on an inner wrapper inside this card's `p-2`,
+                    which left an 8px ring of plain bg-card around the lattice —
+                    a white picture-frame nobody designed. One element now: the
+                    card IS the observatory, lattice to its own rounded edge.
+                    `mx-graph-ground` also lets the cinematic layer drift the
+                    lattice (landing.css) without reaching into inline styles. */}
                 <div
-                    className="mx-rise overflow-hidden rounded-3xl border border-border-subtle bg-card p-2 shadow-[var(--shadow-card)]"
-                    style={{ ['--i' as string]: 2 }}
+                    className="mx-rise mx-vt mx-graph-ground overflow-hidden rounded-3xl border border-border-subtle bg-card shadow-[var(--shadow-card)]"
+                    style={{
+                        ['--i' as string]: 2,
+                        backgroundImage:
+                            'radial-gradient(85% 65% at 50% 32%, color-mix(in oklab, var(--text) 6%, transparent), transparent 72%), '
+                            + 'radial-gradient(circle at 1px 1px, var(--border-strong) 1px, transparent 1.4px)',
+                        backgroundSize: 'auto, 24px 24px',
+                    }}
                 >
-                    <div
-                        className="overflow-hidden rounded-2xl"
-                        style={{
-                            backgroundImage:
-                                'radial-gradient(85% 65% at 50% 32%, color-mix(in oklab, var(--text) 6%, transparent), transparent 72%), '
-                                + 'radial-gradient(circle at 1px 1px, var(--border-strong) 1px, transparent 1.4px)',
-                            backgroundSize: 'auto, 24px 24px',
-                        }}
-                    >
-                        <LandingGraph className="aspect-square w-full md:aspect-[5/4]" />
-                    </div>
+                    <LandingGraph className="aspect-square w-full md:aspect-[5/4]" />
                 </div>
             </div>
         </section>

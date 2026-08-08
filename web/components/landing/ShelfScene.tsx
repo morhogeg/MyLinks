@@ -22,7 +22,7 @@ function Row({ cards, seconds, reverse = false }: {
         </div>
     );
     return (
-        <div className="mx-shelf mx-shelf-mask overflow-hidden">
+        <div className="mx-shelf mx-shelf-mask mx-tilt overflow-hidden">
             <div
                 className={`mx-shelf-track flex w-max ${reverse ? 'mx-shelf-reverse' : ''}`}
                 style={{ ['--mx-shelf-dur' as string]: `${seconds}s` }}

@@ -118,7 +118,7 @@ export default function CaptureScene() {
                 {/* The work. `min-w-0` is load-bearing: a grid item defaults to
                     `min-width: auto`, and the unbreakable handle line would
                     otherwise force page scroll at 320px. */}
-                <div className="min-w-0 rounded-3xl border border-border-subtle bg-card p-6 shadow-[var(--shadow-card)]">
+                <div className="mx-vt min-w-0 rounded-3xl border border-border-subtle bg-card p-6 shadow-[var(--shadow-card)]">
                     <div className="flex items-center gap-2 border-b border-border-subtle pb-4">
                         <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-fill-subtle">
                             <Share className="h-4 w-4 text-text-secondary" aria-hidden />

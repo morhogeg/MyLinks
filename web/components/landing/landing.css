@@ -572,3 +572,240 @@
     filter: none !important;
   }
 }
+
+/* ==========================================================================
+   THE CINEMATIC LAYER (`mx-cine`) — the all-out motion pass.
+
+   Every rule below is scoped under `.mx-cine`, which LandingPage mounts only
+   while `CINEMATIC_LANDING` (components/landing/motion.ts) is true. Flip that
+   boolean and this entire block is dead CSS: the page reverts to the classic
+   one-shot entrances above, byte-for-byte. Do not scope anything here more
+   loosely than `.mx-cine` — the revert guarantee is the scoping.
+
+   Three sublayers, each with its own degradation story:
+   1. Scroll-driven enter/exit (`mx-vt`, `mx-tilt`, hero exit) — behind
+      `@supports (animation-timeline: view())`. Chrome 115+/Safari 26 get the
+      Apple-page feel of panels that live on the scrollbar; everything else
+      keeps the classic IntersectionObserver entrances and loses nothing.
+   2. Pointer parallax (`mx-par`) — driven by `--mx-px/--mx-py`, which only
+      the hero's pointermove listener writes, and only on fine-pointer,
+      motion-tolerant devices. No variables → transform of 0 → no-op.
+   3. Ambient + hover life (glass header, CTA sheen, card lift, bloom breath,
+      lattice drift) — plain CSS, everywhere, collapsed by reduced motion.
+   ========================================================================== */
+
+/* --- 2: pointer parallax ------------------------------------------------- */
+
+.mx-cine .mx-par {
+  transform:
+    translate3d(
+      calc(var(--mx-px, 0) * var(--par, 8px)),
+      calc(var(--mx-py, 0) * var(--par, 8px)),
+      0);
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+/* --- 3: ambient + hover -------------------------------------------------- */
+
+/* The glass bar. Inert markup on the classic page; here it pins, blurs what
+   scrolls beneath it, and tightens its padding so it reads as chrome rather
+   than a parked heading. */
+.mx-cine .mx-nav {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: color-mix(in srgb, var(--background) 72%, transparent);
+  -webkit-backdrop-filter: saturate(1.5) blur(14px);
+  backdrop-filter: saturate(1.5) blur(14px);
+  border-bottom: 1px solid color-mix(in srgb, var(--border-subtle) 60%, transparent);
+}
+
+.mx-cine .mx-nav > header {
+  padding-top: 0.85rem;
+  padding-bottom: 0.85rem;
+}
+
+/* The hero bloom breathes — a very slow scale/drift on the existing ground
+   gradient, so the first frame feels lit rather than printed. */
+@keyframes mx-cine-bloom {
+
+  0%,
+  100% {
+    transform: translate3d(-1.5%, 0, 0) scale(1);
+  }
+
+  50% {
+    transform: translate3d(1.5%, 1%, 0) scale(1.07);
+  }
+}
+
+.mx-cine .mx-ground::before {
+  animation: mx-cine-bloom 16s ease-in-out infinite;
+}
+
+/* The graph observatory's dot lattice drifts one full 24px cell over 20s —
+   at hairline contrast this reads as air moving, not as an animation. Only
+   the second background layer (the lattice) pans; the bloom holds still. */
+@keyframes mx-cine-lattice {
+  from {
+    background-position: 0 0, 0 0;
+  }
+
+  to {
+    background-position: 0 0, 24px 24px;
+  }
+}
+
+.mx-cine .mx-graph-ground {
+  animation: mx-cine-lattice 20s linear infinite;
+}
+
+/* Hover life on every demo card surface: lift, deepen the shadow, and let a
+   sheen cross the CTA. Hover-capable pointers only — a phone never sees it. */
+@media (hover: hover) and (pointer: fine) {
+
+  .mx-cine .surface-card {
+    transition:
+      transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .mx-cine .surface-card:hover {
+    transform: translateY(-4px) scale(1.015);
+    box-shadow: var(--shadow-card-hover, var(--shadow-card));
+  }
+
+  .mx-cine .mx-cta {
+    position: relative;
+    overflow: hidden;
+    transition:
+      transform 0.3s var(--ease-spring),
+      background-color 0.2s ease;
+  }
+
+  .mx-cine .mx-cta:hover {
+    transform: scale(1.045);
+  }
+
+  .mx-cine .mx-cta::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(115deg,
+        transparent 32%,
+        color-mix(in oklab, var(--accent-ink) 16%, transparent) 50%,
+        transparent 68%);
+    transform: translateX(-130%);
+  }
+
+  .mx-cine .mx-cta:hover::after {
+    transition: transform 0.7s ease;
+    transform: translateX(130%);
+  }
+}
+
+/* --- 1: scroll-driven enter/exit ----------------------------------------- */
+
+@supports (animation-timeline: view()) {
+
+  /*
+   * Panels live on the scrollbar: they rise, sharpen and settle across the
+   * first stretch of their entry, driven by scroll position rather than a
+   * clock — scrub back up and they play in reverse, which is the whole
+   * "Apple page" feel. Where an element also carries `mx-rise`, this
+   * declaration wins (same specificity, later in the file) and replaces the
+   * one-shot entrance for exactly as long as `mx-cine` is mounted.
+   */
+  @keyframes mx-cine-enter {
+    from {
+      opacity: 0;
+      transform: translateY(48px) scale(0.96);
+      filter: blur(7px);
+    }
+
+    to {
+      opacity: 1;
+      transform: none;
+      filter: none;
+    }
+  }
+
+  .mx-cine .mx-vt {
+    animation: mx-cine-enter both var(--ease-modal);
+    animation-timeline: view();
+    animation-range: entry 0% cover 32%;
+  }
+
+  /* The shelf arrives as a surface: tilted away in perspective, straightening
+     as it crosses into view — the horizontal loop keeps running inside it the
+     whole time, so the rows feel like a conveyor coming level. */
+  @keyframes mx-cine-shelf {
+    from {
+      opacity: 0;
+      transform: perspective(1100px) rotateX(13deg) scale(0.96);
+    }
+
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .mx-cine .mx-tilt {
+    animation: mx-cine-shelf both var(--ease-modal);
+    animation-timeline: view();
+    animation-range: entry 0% cover 38%;
+  }
+
+  /* The hero's exit: as the visitor scrolls on, the whole stage recedes —
+     scales down, lifts, softens — instead of just sliding off. The section
+     (with the bloom) stays put; only the content recedes. */
+  @keyframes mx-cine-hero-exit {
+    to {
+      opacity: 0.12;
+      transform: translateY(-30px) scale(0.94);
+      filter: blur(6px);
+    }
+  }
+
+  .mx-cine .mx-hero-stage {
+    animation: mx-cine-hero-exit both linear;
+    animation-timeline: view();
+    animation-range: exit 10% exit 85%;
+  }
+}
+
+/* --- reduced motion: the cinematic layer collapses entirely --------------- */
+
+@media (prefers-reduced-motion: reduce) {
+
+  .mx-cine .mx-vt,
+  .mx-cine .mx-tilt,
+  .mx-cine .mx-hero-stage,
+  .mx-cine .mx-ground::before,
+  .mx-cine .mx-graph-ground,
+  .mx-cine .mx-cta::after {
+    animation: none !important;
+  }
+
+  /* Killing the scroll animation must not strand its targets on their base
+     frame: several carry `mx-rise` (base opacity 0) and would otherwise stay
+     invisible forever — caught by the reduced-motion sweep, not by eye. With
+     motion off they simply sit on their final frame. */
+  .mx-cine .mx-vt,
+  .mx-cine .mx-tilt,
+  .mx-cine .mx-hero-stage {
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+  }
+
+  .mx-cine .mx-par,
+  .mx-cine .surface-card,
+  .mx-cine .mx-cta {
+    transform: none !important;
+    transition: none !important;
+  }
+}

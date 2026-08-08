@@ -1354,6 +1354,38 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-08 — the graph ground reaches its card edge, and the landing gets a
+  CINEMATIC MODE behind a one-line kill switch.** Two owner asks. (1) **Graph
+  fix:** the observatory ground (dot lattice + radial bloom) sat on an inner
+  wrapper inside the card's `p-2`, leaving an 8px ring of plain bg-card around
+  it — a picture-frame nobody designed. The ground moved onto the outer card
+  itself (`mx-graph-ground` in ConnectScene); verified edge-to-edge in both
+  themes. This is a bug fix and survives the motion revert. (2) **Cinematic
+  landing** — "go all out, Apple style, easy to revert." The revert IS the
+  architecture: `web/components/landing/motion.ts` exports
+  `CINEMATIC_LANDING = true`; LandingPage mounts class `mx-cine` from it, and
+  EVERY new rule in landing.css is scoped under `.mx-cine`. **To revert: flip
+  that one boolean to `false` and ship** — no other file changes; proven by an
+  actual flag-off build (no cine class, static header, no parallax listener,
+  classic entrances back). What cinematic mode adds: scroll-DRIVEN panel
+  enter/exit via CSS `animation-timeline: view()` (panels rise/sharpen on the
+  scrollbar and scrub in reverse — behind `@supports`, so old browsers keep the
+  classic IntersectionObserver entrances), the hero stage receding
+  (scale/fade/blur) as you scroll past it, pointer parallax on the hero mark
+  and headline (`--mx-px/--mx-py` written by a rAF-coalesced listener, fine
+  pointers only), a sticky glass header (backdrop blur, tightened padding), the
+  shelf arriving as a perspective-tilted conveyor that comes level, hover
+  lift + sheen on cards and the CTA, a breathing hero bloom, and the graph
+  lattice drifting one 24px cell per 20s. Reviewer-reads-text rule untouched:
+  no copy or DOM differs between modes. Verified: no horizontal scroll at
+  390px, parallax vars respond, glass header pins with blur, shelf tilt
+  engages, hero exit scrubs (opacity 0.49 at 500px), and the reduced-motion
+  sweep — which CAUGHT a real bug (killing the scroll animation stranded
+  `mx-rise`+`mx-vt` elements at opacity 0; fixed with final-frame overrides) —
+  now passes with 0 stuck-hidden elements. `tsc` clean; only pre-existing
+  eslint errors. WEB ONLY — reaches the iOS signed-out screen on the next
+  TestFlight build.
+
 - **2026-08-08 — every em dash is out of the landing COPY.** Owner: the dashes
   "scream AI writing". Replaced all 21 in rendered landing copy
   (`LandingPage.tsx`, the five scenes, `demoData.ts`) — deliberately NOT with one

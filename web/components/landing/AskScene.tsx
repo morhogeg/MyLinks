@@ -159,7 +159,7 @@ export default function AskScene() {
                 always exactly as tall as its tallest possible state, at every
                 viewport, with nothing hardcoded. Rotation animates INSIDE a
                 box that never moves. */}
-            <div className="mt-8 rounded-3xl border border-border-subtle bg-card p-6 shadow-[var(--shadow-card)] sm:p-8">
+            <div className="mx-vt mt-8 rounded-3xl border border-border-subtle bg-card p-6 shadow-[var(--shadow-card)] sm:p-8">
                 <div className="grid">
                     {QUESTIONS.map((item) => (
                         <div
