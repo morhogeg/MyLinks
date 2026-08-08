@@ -226,9 +226,17 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-08-08): install build **1278**
+> ## 🚨 OWNER ACTION (updated 2026-08-08): install build **1279**
 >
-> **1278** (run #278, merge `03591a5`) is current: it carries the graph-cluster
+> **1279** (run #279, merge `e0cfdda`) is current: it is the first build where a
+> shared PARAGRAPH is treated as text rather than a link — honest capture copy
+> ("Saving your text… / Reading your text…"), the text kept verbatim as the card
+> body under an AI heading, and the summary behind the Machina mark. Everything
+> in 1278 rides along (it builds the same merged main). QA on device: share a
+> paragraph with no URL in it and confirm the HUD never says "Fetching the link",
+> then open the card and check the words are exactly what you sent.
+>
+> **(superseded) 1278** (run #278, merge `03591a5`): it carries the graph-cluster
 > contamination fix (broad concepts like "ישראל" no longer chain unrelated cards
 > into one cluster) and the client half of the meaning-search speed-up. The
 > backend half is already live (functions deploy 31229096352) and needs no build.
@@ -1095,6 +1103,18 @@ G2. **[ ] Graph next levers (from the round-3 product pass):** (a) search/
 
 ### ✅ Done — verified against code (do not redo)
 
+- **Shared text is a text card, not a link (2026-08-08, merge `e0cfdda`,
+  build 1279):** a paragraph shared with no URL gets its own Share-Extension
+  flow and copy (`isTextFlow`, `TEXT_SCAN_STEPS`, `AnalyzingBanner` kind
+  `'text'`, App Group `pendingShareKind: "text"`); the backend keeps the text
+  VERBATIM as the card body (`_note_link_data(verbatim=True)` — `summary` holds
+  the untouched text, the model supplies only the `title` heading) and parks its
+  summary in `aiSummary`/`aiDetailedSummary`; the detail view offers it behind
+  the Citation mark ("Machina's read", generated on demand via
+  `generateCardSummary` for cards that lack one); `captureType: 'text'` makes
+  `SourceByline` read "Text". A text card edits like a link (title pencil +
+  "Edit text"), not through the single-field note editor. Does NOT change the
+  plus-button Note tab, link/image/video summarization, or existing note cards.
 - **iOS push notifications + in-app Digest section (2026-07-06):** FCM/APNs push
   for reminders + curated digests (`functions/push_service.py`, token endpoints
   `/api/register-device-token` + `/api/unregister-device-token`, channel wiring in
@@ -1386,6 +1406,10 @@ exact-match, capped.
   note's single-field editor — confirming the reveal fires and the typed-note
   flow is unregressed. (The dev server does not hydrate in the sandbox, so the
   interaction checks required the production build.) Not QA'd on a device.
+  **SHIPPED:** merge `e0cfdda` → `main` (Vercel auto); "Deploy Cloud Functions"
+  run **#79** scoped `Deploy-Functions: analyze_link,share_ingest`; **iOS run
+  #279 → TestFlight build 1279**. Owner step: install 1279 and QA the text
+  share on device (the Share Extension change can only be seen from a build).
 
 - **2026-08-08 — graph clusters stop mixing unrelated cards; meaning-search
   latency cut without paying for a warm instance.** SHIPPED: merge `03591a5`
