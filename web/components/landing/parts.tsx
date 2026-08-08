@@ -114,8 +114,14 @@ export function CardView({ card, compact = false, dense = false, className = '' 
                         >
                             {card.category}
                         </span>
+                        {/* Glyph only for sources that have one: this card is
+                            168px wide and the category chip takes half of it, so
+                            a handle truncated to "@…" said nothing. A plain
+                            publisher (MIT News) has no glyph and keeps its name,
+                            which is the whole byline. */}
                         <span className="min-w-0 origin-right scale-90">
                             <SourceByline
+                                hideLabel
                                 link={{
                                     url: card.url,
                                     sourceName: card.sourceName,
@@ -129,18 +135,26 @@ export function CardView({ card, compact = false, dense = false, className = '' 
                     <p className="line-clamp-2 flex-grow text-[11px] leading-relaxed text-text-secondary">
                         {card.summary}
                     </p>
-                    <div className="flex items-center justify-between border-t border-border-subtle pt-2">
-                        <span className="flex min-w-0 gap-1">
+                    {/* Tags get their OWN line, exactly as they do on the full
+                        card. Side by side with the clock they had ~70px to share
+                        in a 168px card, so every chip clipped mid-word
+                        ("materials" → "MATERI", and even "dome" lost its last
+                        letter) — a fragment reads as a rendering bug, not as a
+                        tag. Stacked, both chips fit whole with room to spare.
+                        `shrink-0` is the guarantee: chips size to their text and
+                        the row can never squeeze them again. */}
+                    <div className="space-y-1.5 border-t border-border-subtle pt-2">
+                        <div className="flex gap-1 overflow-hidden">
                             {card.tags.slice(0, 2).map((tag) => (
                                 <span
                                     key={tag}
-                                    className="inline-flex items-center truncate rounded bg-fill-subtle px-1 py-0.5 text-[7px] font-black uppercase tracking-wider text-text-muted/60"
+                                    className="inline-flex shrink-0 items-center whitespace-nowrap rounded bg-fill-subtle px-1 py-0.5 text-[7px] font-black uppercase tracking-wider text-text-muted/60"
                                 >
                                     {tag}
                                 </span>
                             ))}
-                        </span>
-                        <span className="flex shrink-0 items-center gap-1 text-[9px] font-medium text-text-muted/60">
+                        </div>
+                        <span className="flex items-center gap-1 text-[9px] font-medium text-text-muted/60">
                             <Clock className="h-2.5 w-2.5" />
                             {card.minutes}m · {card.ago}
                         </span>

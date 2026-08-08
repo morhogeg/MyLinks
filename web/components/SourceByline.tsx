@@ -36,6 +36,7 @@ export default function SourceByline({
     link,
     size = 'sm',
     showIcon = true,
+    hideLabel = false,
 }: {
     link: SourceBylineLink;
     /** sm = cards (12px text, 3.5 icon); md = detail modal (14px, 4 icon). */
@@ -44,10 +45,25 @@ export default function SourceByline({
      *  citation chip puts it in a leading slot beside the title), so the same
      *  logo never appears twice in one row. */
     showIcon?: boolean;
+    /** Drop the label and let the mark speak, for slots too narrow to hold both
+     *  (the landing's 168px shelf card, where "ENGINEERING" alone eats half the
+     *  header row and the byline truncated to a useless "@…"). Applies ONLY to
+     *  sources that HAVE a glyph — a plain publisher is nothing but its name, so
+     *  it keeps the name and ignores this. */
+    hideLabel?: boolean;
 }) {
     const iconCls = size === 'md' ? 'w-4 h-4' : 'w-3.5 h-3.5';
     const icon = (node: React.ReactNode) => (showIcon ? node : null);
-    const wrap = `flex items-center gap-1.5 min-w-0 ${size === 'md' ? 'text-sm' : 'text-xs'} text-text-muted whitespace-nowrap max-w-[240px]`;
+    /** The label for a source that also has a glyph — dropped when `hideLabel`
+     *  and the glyph is actually being drawn (never leave a byline with nothing
+     *  in it). */
+    const label = (node: React.ReactNode) => (hideLabel && showIcon ? null : node);
+    // `min-w-0` lets the byline shrink inside a flex row; without it the
+    // nowrap content sets a floor and the byline pushes OUT of a narrow card
+    // (the landing's 168px shelf card clipped "Screenshot" to "Screens" at the
+    // card edge). The label spans below all carry `nameCls` (truncate) so what
+    // shrinking produces is a proper ellipsis, never a severed word.
+    const wrap = `flex items-center gap-1.5 min-w-0 shrink ${size === 'md' ? 'text-sm' : 'text-xs'} text-text-muted whitespace-nowrap max-w-[240px]`;
     const nameCls = 'truncate';
 
     const platform = getPlatform(link.url);
@@ -66,7 +82,7 @@ export default function SourceByline({
         return (
             <span dir="ltr" className={wrap} title={youtubeChannel}>
                 {icon(<Youtube className={`${iconCls} text-red-500 shrink-0`} />)}
-                <span className={nameCls}>{youtubeChannel}</span>
+                {label(<span className={nameCls}>{youtubeChannel}</span>)}
             </span>
         );
     }
@@ -74,7 +90,7 @@ export default function SourceByline({
         return (
             <span dir="ltr" className={wrap} title={`@${xAuthor}`}>
                 {icon(<span className="shrink-0 inline-flex" style={{ color: platformColor('x') }}>{platformIcon('x', iconCls)}</span>)}
-                <span className={nameCls}>@{xAuthor}</span>
+                {label(<span className={nameCls}>@{xAuthor}</span>)}
             </span>
         );
     }
@@ -82,7 +98,7 @@ export default function SourceByline({
         return (
             <span dir="auto" className={wrap} title={linkedInAuthor || 'LinkedIn'} aria-label={linkedInAuthor || 'LinkedIn'}>
                 {icon(<span className="shrink-0 inline-flex" style={{ color: platformColor('linkedin') }}>{platformIcon('linkedin', iconCls)}</span>)}
-                {linkedInAuthor && <span className={nameCls}>{linkedInAuthor}</span>}
+                {label(linkedInAuthor && <span className={nameCls}>{linkedInAuthor}</span>)}
             </span>
         );
     }
@@ -90,7 +106,7 @@ export default function SourceByline({
         return (
             <span dir="auto" className={wrap} title={fbAuthor || 'Facebook'} aria-label={fbAuthor || 'Facebook'}>
                 {icon(<span className="shrink-0 inline-flex" style={{ color: platformColor('facebook') }}>{platformIcon('facebook', iconCls)}</span>)}
-                {fbAuthor && <span className={nameCls}>{fbAuthor}</span>}
+                {label(fbAuthor && <span className={nameCls}>{fbAuthor}</span>)}
             </span>
         );
     }
@@ -98,7 +114,7 @@ export default function SourceByline({
         return (
             <span dir="ltr" className={wrap} title={`@${igAuthor}`}>
                 {icon(<span className="shrink-0 inline-flex" style={{ color: platformColor('instagram') }}>{platformIcon('instagram', iconCls)}</span>)}
-                <span className={nameCls}>@{igAuthor}</span>
+                {label(<span className={nameCls}>@{igAuthor}</span>)}
             </span>
         );
     }
@@ -106,7 +122,7 @@ export default function SourceByline({
         return (
             <span className={wrap} title="Screenshot">
                 {icon(<ImageIcon className={`${iconCls} shrink-0`} />)}
-                <span>Screenshot</span>
+                {label(<span className={nameCls}>Screenshot</span>)}
             </span>
         );
     }
@@ -121,7 +137,7 @@ export default function SourceByline({
                 {icon(isText
                     ? <Quote className={`${iconCls} shrink-0`} />
                     : <StickyNote className={`${iconCls} shrink-0`} />)}
-                <span>{isText ? 'Text' : 'Note'}</span>
+                {label(<span className={nameCls}>{isText ? 'Text' : 'Note'}</span>)}
             </span>
         );
     }

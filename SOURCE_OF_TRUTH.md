@@ -1354,6 +1354,28 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-08 — landing shelf: tag chips no longer clip mid-word.** Owner
+  screenshot: the "your library" shelf rendered "MATERI", "ANTIQU", "BOREDO" —
+  tags severed mid-word. Measured in a real browser rather than eyeballed:
+  **every one of the 72 dense chips was clipped**, even four-letter "dome" (33px
+  of text in a 23px box). Cause: the dense card's footer put tags and the clock
+  on ONE row inside a 168px card — 144px of content box, of which the
+  (`shrink-0`) clock took ~70px, leaving ~35px per chip. Two whole chips plus the
+  clock need ~184px, so no amount of squeezing ever fit. Fix: tags get their own
+  line above the clock, exactly as the full-size card already does, and chips are
+  `shrink-0 whitespace-nowrap` so the row can never compress them again. Same
+  measurement caught a SECOND cut-off on the same cards: the "Screenshot" byline
+  OVERFLOWED the card (186px of content in a 166px box) and got sheared to
+  "Screens" at the card edge — `SourceByline`'s image/note labels lacked the
+  `truncate` its publisher branch has, and its wrapper couldn't shrink. Both
+  fixed, plus a new `hideLabel` prop the landing's dense card uses to show the
+  platform GLYPH alone (a byline truncated to "@…" carries nothing; a plain
+  publisher like "MIT News" has no glyph, so it ignores the prop and keeps its
+  name). Verified in a production build: 0/72 chips clipped and 0/24 cards
+  overflowing, in BOTH themes, with card heights unchanged. Note the pre-existing
+  `react-hooks/set-state-in-effect` eslint error in `landing/parts.tsx`
+  (`LiveMark`) — confirmed present before this change, left alone.
+
 - **2026-08-08 — SHARED TEXT IS NO LONGER TREATED AS A LINK: verbatim body, AI
   heading, summary on demand. TESTFLIGHT BUILD REQUIRED.** Owner, with
   screenshots: pasting a Claude paragraph into the share sheet showed "Saving
