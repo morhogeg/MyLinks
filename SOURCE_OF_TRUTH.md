@@ -226,9 +226,22 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-08-07): install build **1276**
+> ## 🚨 OWNER ACTION (updated 2026-08-08): install build **1278**
 >
-> **1276** (run #276, from the round-14 landing ship) is current: the first
+> **1278** (run #278, merge `03591a5`) is current: it carries the graph-cluster
+> contamination fix (broad concepts like "ישראל" no longer chain unrelated cards
+> into one cluster) and the client half of the meaning-search speed-up. The
+> backend half is already live (functions deploy 31229096352) and needs no build.
+> **Open decision, deliberately not taken:** search's remaining floor is the
+> Cloud Function cold start (3–6s on the first query after idle). The fix is
+> `min_instances=1` on `search_links_http` — it costs money, so it was left out
+> on the owner's "free version" call. If the FIRST search of a session still
+> feels slow but later ones don't, that's the cold start, and this is the lever.
+> 1276 stays the fallback.
+>
+> ## (superseded) OWNER ACTION (2026-08-07): install build **1276**
+>
+> **1276** (run #276, from the round-14 landing ship) was current before 1278: the first
 > build where a signed-out phone opens onto the landing page, carrying 1275's
 > meaning-search fix and everything below. The 2026-08-05 note for 1273 follows
 > unchanged for history.
@@ -1322,7 +1335,13 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 
 - **2026-08-08 — graph clusters stop mixing unrelated cards; meaning-search
-  latency cut without paying for a warm instance.**
+  latency cut without paying for a warm instance.** SHIPPED: merge `03591a5`
+  (branch commit `de3538e`) → Vercel; "Deploy Cloud Functions" run 31229096352
+  green (ALL functions — `search.py` is shared, so the deploy was deliberately
+  left unscoped); Python tests green; **iOS run #278 → TestFlight build 1278**
+  green. Owner follow-up: confirm on device that (a) the GV60 card is no longer
+  inside the pay-gap cluster and (b) meaning search feels faster — the latency
+  work was never timed against prod (see below).
   **(1) Cluster contamination was an EDGE problem, not a labeling one.** The
   model attaches broad concepts ("ישראל", "מדיניות ציבורית") across unrelated
   subjects, and `lib/graph.ts` formed a concept edge on any 2 shared concepts —
