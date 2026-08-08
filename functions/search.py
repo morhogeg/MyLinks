@@ -8,6 +8,7 @@ import re
 import json
 import logging
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional, Any
 from firebase_functions import firestore_fn, https_fn
 from firebase_admin import firestore
@@ -305,9 +306,21 @@ def normalize_card_for_search(data: dict, doc_id: str) -> dict:
 # cap remain reachable via the vector half.
 KEYWORD_SCAN_CAP = 1000
 
+# Field projection for the SEARCH-BAR lexical half. Streaming whole documents
+# drags the 3072-float `embedding_vector` of every scanned card across the wire
+# — megabytes per query, and the dominant cost of a 5-10s search (owner QA,
+# 2026-08-07). The search bar only needs what scores the card (keyword_match_score),
+# ranks it (rerank_candidates) and identifies it, so it asks Firestore for
+# exactly those fields. NOT used by ask_brain, which grounds its answer in the
+# full card body and must keep fetching complete documents.
+SEARCH_SCAN_FIELDS = [
+    "title", "summary", "tags", "concepts", "sourceName", "category",
+    "userNote", "userNotes", "createdAt", "status",
+]
+
 
 def keyword_scan_cards(uid: str, query_text: str, exclude_ids: set = None,
-                       limit: int = 10) -> List[dict]:
+                       limit: int = 10, fields: List[str] = None) -> List[dict]:
     """Lexical retrieval over the newest KEYWORD_SCAN_CAP cards.
 
     The client's own keyword filter only sees the loaded feed window (newest
@@ -328,6 +341,9 @@ def keyword_scan_cards(uid: str, query_text: str, exclude_ids: set = None,
     query = links_ref.order_by(
         "createdAt", direction=gc_firestore.Query.DESCENDING
     ).limit(KEYWORD_SCAN_CAP)
+    if fields:
+        # Projection (see SEARCH_SCAN_FIELDS) — same rows, a fraction of the bytes.
+        query = query.select(fields)
 
     scored = []
     for doc in query.stream():
@@ -1139,6 +1155,13 @@ def perform_search_logic(uid: str, query_text: str, limit: int = 10) -> List[dic
     db = get_db()
     links_ref = db.collection("users").document(uid).collection("links")
 
+    # NOTE (latency): the "has this library any embeddings at all?" probe used to
+    # run HERE, before every search — an extra serial Firestore round trip that
+    # streamed 10 FULL documents (each carrying its embedding vector) on the hot
+    # path. It only ever exists to log a helpful warning, so it now runs BELOW,
+    # and only when find_nearest actually came back empty. Same return value ([]),
+    # same log, one fewer round trip on every real query.
+    #
     # Does this library have ANY embedded docs to search? Sampling a SINGLE
     # arbitrary doc (the old `limit(1)`) was a correctness bug: if that one doc
     # happened to lack `embedding_vector` (still processing, failed, or flagged
@@ -1149,14 +1172,6 @@ def perform_search_logic(uid: str, query_text: str, limit: int = 10) -> List[dic
     # `order_by('embedding_vector')` or a `where('embedding_vector', '!=', None)`
     # would each require a scalar index the field doesn't have (it only has the
     # vectorConfig index used by find_nearest), whereas a small scan does not.
-    sample_docs = list(links_ref.limit(10).stream())
-    has_any_embeddings = any("embedding_vector" in d.to_dict() for d in sample_docs)
-
-    if not has_any_embeddings:
-        logger.warning(f"No embeddings found for user {mask_uid(uid)}. Use Settings → Connections → Rebuild (or the backfill_related_links admin endpoint) to generate embeddings for existing links.")
-        # Don't fail the search, just return empty results with a helpful message
-        return []
-
     try:
         vector_query = links_ref.find_nearest(
             vector_field="embedding_vector",
@@ -1174,6 +1189,13 @@ def perform_search_logic(uid: str, query_text: str, limit: int = 10) -> List[dic
 
     links = [normalize_card_for_search(doc.to_dict(), doc.id) for doc in results]
 
+    if not links:
+        # Empty is ambiguous: nothing near the query, or nothing embedded at all.
+        # Only now is the probe worth a round trip (see the note above).
+        sample_docs = list(links_ref.limit(10).stream())
+        if not any("embedding_vector" in d.to_dict() for d in sample_docs):
+            logger.warning(f"No embeddings found for user {mask_uid(uid)}. Use Settings → Connections → Rebuild (or the backfill_related_links admin endpoint) to generate embeddings for existing links.")
+
     logger.info(f"Found {len(links)} results.")
     return links
 
@@ -1185,9 +1207,10 @@ def perform_hybrid_search(uid: str, query_text: str, limit: int = 20) -> List[di
 
       1. Vector search DEEP (top-30), then `apply_distance_threshold` so
          nearest-neighbour padding never masquerades as results.
-      2. `keyword_scan_cards` over the newest 1000 — literal matches the vector
-         rank buried (or that live beyond the client's loaded feed window,
-         which the client's own keyword filter can't see).
+      2. `keyword_scan_cards` over the newest 1000 (field-projected, and run in
+         parallel with 1) — literal matches the vector rank buried (or that live
+         beyond the client's loaded feed window, which the client's own keyword
+         filter can't see).
       3. Merge (vector order first, keyword extras deduped after) and
          `rerank_candidates` — vector rank leads, literal overlap boosts,
          recency tiebreaks — down to `limit`.
@@ -1197,13 +1220,28 @@ def perform_hybrid_search(uid: str, query_text: str, limit: int = 20) -> List[di
     the unambiguous config error (no API key) propagates, so the client can
     show its "not configured" notice.
     """
-    vector_results: List[dict] = []
-    try:
-        vector_results = perform_search_logic(uid, query_text, limit=30)
-    except Exception as e:
-        if "SEMANTIC_SEARCH_NOT_CONFIGURED" in str(e):
-            raise
-        logger.error(f"Hybrid search: vector half failed, degrading to keyword-only: {e}")
+    # The two halves are independent (the keyword scan's `exclude_ids` was only
+    # ever a dedupe convenience — the merge below dedupes anyway), so they run
+    # CONCURRENTLY: the query embedding + vector search no longer sit in front of
+    # the 1000-card lexical scan. Wall clock is the slower half, not their sum.
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        vector_future = pool.submit(perform_search_logic, uid, query_text, 30)
+        keyword_future = pool.submit(
+            keyword_scan_cards, uid, query_text, None, 10, SEARCH_SCAN_FIELDS)
+
+        vector_results: List[dict] = []
+        try:
+            vector_results = vector_future.result()
+        except Exception as e:
+            if "SEMANTIC_SEARCH_NOT_CONFIGURED" in str(e):
+                raise
+            logger.error(f"Hybrid search: vector half failed, degrading to keyword-only: {e}")
+
+        try:
+            keyword_hits = keyword_future.result()
+        except Exception as e:
+            logger.error(f"Hybrid search: keyword scan failed: {e}")
+            keyword_hits = []
 
     vector_results = apply_distance_threshold(vector_results)
     # Then trim at the per-query relevance cliff — the absolute gate bounds
@@ -1211,14 +1249,8 @@ def perform_hybrid_search(uid: str, query_text: str, limit: int = 20) -> List[di
     # behind the actual matches (owner-reported precision failure).
     vector_results = cut_at_distance_cliff(vector_results)
 
-    try:
-        have = {r.get("id") for r in vector_results}
-        keyword_hits = keyword_scan_cards(uid, query_text, exclude_ids=have, limit=10)
-    except Exception as e:
-        logger.error(f"Hybrid search: keyword scan failed: {e}")
-        keyword_hits = []
-
-    merged = vector_results + keyword_hits
+    have = {r.get("id") for r in vector_results}
+    merged = vector_results + [k for k in keyword_hits if k.get("id") not in have]
     ranked = rerank_candidates(query_text, merged, top_k=limit)
     # The distance served its purpose (threshold + rank) — don't leak internals.
     for r in ranked:

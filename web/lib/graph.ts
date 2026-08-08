@@ -99,6 +99,30 @@ const MAX_LIVE_EDGES_PER_NODE = 5;
 // Rows of the pairwise loop per event-loop yield.
 const CHUNK_ROWS = 24;
 
+// A concept-only edge (shared vocabulary, no qualifying embedding match) is
+// only trusted when the two cards' embeddings still point roughly the same way.
+// Well below SEMANTIC_ASSIST_MIN on purpose — this is a veto on the clearly
+// unrelated, not a second similarity bar.
+const CONCEPT_SIM_FLOOR = 0.55;
+
+/**
+ * Concepts too widespread in this library to prove two cards are related.
+ *
+ * The model attaches broad labels ("Israel", "Economic Policy", "Analysis") to
+ * cards across unrelated subjects, so counting them as shared signal chains a
+ * Hyundai review into a cluster about pay gaps and enlistment figures (owner
+ * QA, 2026-08-07). A concept carried by a large share of the library — or by
+ * more than a flat ceiling of cards — is vocabulary, not a tie.
+ */
+function genericConcepts(sets: Set<string>[], poolSize: number): Set<string> {
+    const df = new Map<string, number>();
+    for (const s of sets) for (const c of s) df.set(c, (df.get(c) ?? 0) + 1);
+    const ceiling = Math.max(4, Math.min(30, Math.ceil(poolSize * 0.15)));
+    const generic = new Set<string>();
+    for (const [c, n] of df) if (n > ceiling) generic.add(c);
+    return generic;
+}
+
 const pairKey = (i: number, j: number) => (i < j ? `${i}|${j}` : `${j}|${i}`);
 
 /** Deterministic per-id jitter so the layout is stable across rebuilds. */
@@ -175,6 +199,7 @@ export async function buildGraphModel(
             return out;
         });
         const concepts = pool.map((l) => new Set((l.concepts ?? []).map((c) => c.toLowerCase()).filter(Boolean)));
+        const generic = genericConcepts(concepts, pool.length);
 
         for (let i = 0; i < pool.length; i++) {
             if (signal?.cancelled) return null;
@@ -185,17 +210,25 @@ export async function buildGraphModel(
             for (let j = i + 1; j < pool.length; j++) {
                 if (kept.has(pairKey(i, j))) continue;
 
+                // Only SPECIFIC concepts corroborate a tie — a concept the whole
+                // library carries ("Israel", "Analysis") says nothing about
+                // whether these two cards belong together.
                 let shared = 0;
-                if (ci.size) for (const c of concepts[j]) if (ci.has(c)) shared++;
+                if (ci.size) for (const c of concepts[j]) if (ci.has(c) && !generic.has(c)) shared++;
 
                 const vj = vectors[j];
+                const haveVectors = !!(vi && vj && vi.length === vj.length);
                 let sim = 0;
-                if (vi && vj && vi.length === vj.length) {
-                    for (let k = 0; k < vi.length; k++) sim += vi[k] * vj[k];
+                if (haveVectors) {
+                    for (let k = 0; k < vi!.length; k++) sim += vi![k] * vj![k];
                 }
 
                 const semantic = sim >= SEMANTIC_MIN || (sim >= SEMANTIC_ASSIST_MIN && shared >= 1);
-                const conceptual = shared >= 2;
+                // A concept-only edge must not contradict the embeddings: when
+                // both cards have vectors, shared vocabulary alone is not enough
+                // if the texts are plainly about different things (a car review
+                // landing inside a pay-gap cluster — owner QA, 2026-08-07).
+                const conceptual = shared >= 2 && (!haveVectors || sim >= CONCEPT_SIM_FLOOR);
                 if (!semantic && !conceptual) continue;
 
                 liveCandidates.push({
@@ -219,8 +252,9 @@ export async function buildGraphModel(
             }
         });
         const sharedCount = new Map<string, number>();
+        const broad = Math.max(4, Math.min(30, Math.ceil(pool.length * 0.15)));
         for (const members of byConcept.values()) {
-            if (members.length < 2 || members.length > 30) continue; // broad concepts connect nothing specific
+            if (members.length < 2 || members.length > broad) continue; // broad concepts connect nothing specific
             for (let a = 0; a < members.length; a++) {
                 for (let b = a + 1; b < members.length; b++) {
                     const key = pairKey(members[a], members[b]);

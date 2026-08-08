@@ -328,16 +328,21 @@ def test_hybrid_merges_vector_and_keyword_deduped(monkeypatch):
     ])
     captured = {}
 
-    def fake_scan(uid, q, exclude_ids=None, limit=10):
-        captured["exclude"] = exclude_ids
-        return [{"id": "k1", "title": "improve sleep", "createdAt": 5}]
+    def fake_scan(uid, q, exclude_ids=None, limit=10, fields=None):
+        captured["fields"] = fields
+        # A hit the vector half already returned: the halves now run in
+        # parallel, so the scan cannot be told what to skip and the merge is
+        # what must keep "v1" from appearing twice.
+        return [{"id": "k1", "title": "improve sleep", "createdAt": 5},
+                {"id": "v1", "title": "improve sleep", "createdAt": 6}]
 
     monkeypatch.setattr(search_mod, "keyword_scan_cards", fake_scan)
     out = perform_hybrid_search("u", "improve sleep", limit=10)
     ids = [c["id"] for c in out]
-    # Vector ids are excluded from the scan; the keyword hit joins the ranking
-    # (and its literal title match lifts it), and no distances leak out.
-    assert captured["exclude"] == {"v1", "v2"}
+    # The keyword hit joins the ranking (its literal title match lifts it), the
+    # duplicate collapses, the scan is field-projected, and no distances leak.
+    assert captured["fields"] == search_mod.SEARCH_SCAN_FIELDS
+    assert ids.count("v1") == 1
     assert set(ids) == {"v1", "v2", "k1"}
     assert all("vector_distance" not in c for c in out)
 
@@ -347,7 +352,7 @@ def test_hybrid_degrades_to_keyword_only_on_vector_failure(monkeypatch):
         raise Exception("VECTOR_SEARCH_ERROR: index rebuilding")
     monkeypatch.setattr(search_mod, "perform_search_logic", boom)
     monkeypatch.setattr(search_mod, "keyword_scan_cards",
-                        lambda uid, q, exclude_ids=None, limit=10: [
+                        lambda uid, q, exclude_ids=None, limit=10, fields=None: [
                             {"id": "k1", "title": "muffins", "createdAt": 5}])
     out = perform_hybrid_search("u", "muffins", limit=10)
     assert [c["id"] for c in out] == ["k1"]  # search bar never blanks
@@ -363,23 +368,20 @@ def test_hybrid_propagates_config_error(monkeypatch):
         perform_hybrid_search("u", "q", limit=10)
 
 
-def test_hybrid_thresholds_before_keyword_exclusion(monkeypatch):
+def test_hybrid_gated_vector_hit_can_return_as_a_literal_match(monkeypatch):
     # A truly-unrelated vector hit (beyond even the recall floor's hard
-    # ceiling) is dropped by the gate, so the keyword scan may re-find it as a
-    # REAL literal match rather than it surviving as noise.
+    # ceiling) is dropped by the gate — and because dedupe happens against the
+    # GATED set, the keyword scan can still bring it back as a REAL literal
+    # match rather than it surviving as vector noise.
     monkeypatch.setattr(search_mod, "perform_search_logic", lambda uid, q, limit: [
         _vres("close", 0.30), _vres("far", 0.85),
     ])
-    captured = {}
-
-    def fake_scan(uid, q, exclude_ids=None, limit=10):
-        captured["exclude"] = exclude_ids
-        return []
-
-    monkeypatch.setattr(search_mod, "keyword_scan_cards", fake_scan)
-    out = perform_hybrid_search("u", "q", limit=10)
-    assert captured["exclude"] == {"close"}
-    assert [c["id"] for c in out] == ["close"]
+    monkeypatch.setattr(search_mod, "keyword_scan_cards",
+                        lambda uid, q, exclude_ids=None, limit=10, fields=None: [
+                            {"id": "far", "title": "q", "createdAt": 5}])
+    out = [c["id"] for c in perform_hybrid_search("u", "q", limit=10)]
+    assert set(out) == {"close", "far"}
+    assert out.count("far") == 1
 
 
 # ── Timestamp-shape robustness (the 2026-07-16 search-outage regression) ────
@@ -423,7 +425,7 @@ def test_hybrid_survives_mixed_timestamps_end_to_end(monkeypatch):
         {"id": "v1", "title": "x", "vector_distance": 0.3, "createdAt": 1_752_600_000_000},
     ])
     monkeypatch.setattr(search_mod, "keyword_scan_cards",
-                        lambda uid, q, exclude_ids=None, limit=10: [
+                        lambda uid, q, exclude_ids=None, limit=10, fields=None: [
                             {"id": "k1", "title": "muffins", "createdAt": "2026-07-01T10:00:00Z"}])
     out = perform_hybrid_search("u", "muffins", limit=10)
     assert {c["id"] for c in out} == {"v1", "k1"}
@@ -480,6 +482,6 @@ def test_hybrid_applies_cliff_to_vector_results(monkeypatch):
         _vres("junk1", 0.62), _vres("junk2", 0.64),
     ])
     monkeypatch.setattr(search_mod, "keyword_scan_cards",
-                        lambda uid, q, exclude_ids=None, limit=10: [])
+                        lambda uid, q, exclude_ids=None, limit=10, fields=None: [])
     out = [c["id"] for c in perform_hybrid_search("u", "muffins", limit=20)]
     assert out == ["m1", "m2"]  # the junk tail never reaches the client
