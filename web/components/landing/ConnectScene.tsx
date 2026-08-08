@@ -41,7 +41,7 @@ export default function ConnectScene() {
                         style={{ ['--i' as string]: 2 }}
                     >
                         Every save is compared against everything you already saved, the moment it
-                        lands — so a screenshot of the Pantheon’s section ends up beside the article
+                        lands, so a screenshot of the Pantheon’s section ends up beside the article
                         that explains what it shows, and a half-written note about a deck finds
                         the two saves that answer it.
                     </p>
@@ -51,7 +51,7 @@ export default function ConnectScene() {
                     >
                         You never have to build the structure. It is the part nobody keeps up
                         with, and it is the part that makes a save worth having months later.
-                        This is the same graph the app draws — assembling itself from the saves
+                        This is the same graph the app draws, assembling itself from the saves
                         on this page.
                     </p>
                 </div>

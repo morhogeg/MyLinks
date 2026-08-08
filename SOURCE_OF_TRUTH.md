@@ -1354,6 +1354,26 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-08 — every em dash is out of the landing COPY.** Owner: the dashes
+  "scream AI writing". Replaced all 21 in rendered landing copy
+  (`LandingPage.tsx`, the five scenes, `demoData.ts`) — deliberately NOT with one
+  substitute character, since a page of identical replacements is its own tell.
+  Each was rewritten for what the sentence was doing: a colon where a list or
+  restatement follows ("Each one becomes a card: a real summary, a category…"),
+  a full stop where two ideas deserved separating ("Nothing was lost. It was
+  scattered across five apps"), commas for genuine asides ("from what you saved,
+  not the open web, with citations"), parentheses once ("body text in a screen
+  serif (the essay's whole case)"), and plain deletion where the dash was doing
+  nothing ("a link, a screenshot or a video from any app"). Also split the shelf
+  paragraph's new colon into a full stop so it didn't sit two colons deep in one
+  breath. **Scope: rendered copy only.** Code comments across the landing (~100
+  more em dashes) are untouched — they are house style and not the page.
+  Verified by walking the built page's text nodes in a browser after scrolling
+  every scene into view: **0 em dashes rendered**, 0 en dashes anywhere in those
+  files, `tsc` clean. Pre-existing `react-hooks/set-state-in-effect` eslint
+  errors in `AskScene.tsx` and `landing/parts.tsx` confirmed present before this
+  change and left alone.
+
 - **2026-08-08 — landing shelf: tag chips no longer clip mid-word.** Owner
   screenshot: the "your library" shelf rendered "MATERI", "ANTIQU", "BOREDO" —
   tags severed mid-word. Measured in a real browser rather than eyeballed:

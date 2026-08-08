@@ -123,8 +123,8 @@ export default function AskScene() {
                     Ask your own saves. Get sources.
                 </h2>
                 <p className="mx-auto mt-5 max-w-xl text-[15px] leading-relaxed text-text-secondary text-pretty sm:text-base">
-                    Ask in plain language. Machina answers from what you saved — not the open
-                    web — with citations that jump straight back to the source. Try one:
+                    Ask in plain language. Machina answers from what you saved, not the open
+                    web, with citations that jump straight back to the source. Try one:
                 </p>
             </div>
 

@@ -108,7 +108,7 @@ export const CAPTURE_SOURCES: CaptureSource[] = [
             sourceName: 'MIT News',
             title: 'Why Roman concrete heals itself',
             summary:
-                'Lime clasts act as crack-healing reservoirs — the “flaw” was the '
+                'Lime clasts act as crack-healing reservoirs: the “flaw” was the '
                 + 'feature all along.',
             category: 'Engineering',
             tags: ['materials', 'antiquity'],
@@ -184,7 +184,7 @@ export const QUESTIONS: DemoQuestion[] = [
     {
         q: 'What should the deck look like?',
         a: 'Your note already decided, and two saves back it: body text in a screen '
-            + 'serif — the essay’s whole case — on the three-column grid from the '
+            + 'serif (the essay’s whole case) on the three-column grid from the '
             + 'Swiss poster video. The letterpress reel is the mood board, not the '
             + 'spec.',
         citations: [
@@ -199,7 +199,7 @@ export const QUESTIONS: DemoQuestion[] = [
         a: 'Three saves, three angles on one itch. The essay traces variable reward '
             + 'back a century before slot machines, the thread reframes focus as an '
             + 'environment you design once, and the boredom video argues the wandering '
-            + 'is your mind consolidating — the itch is the signal, not the noise.',
+            + 'is your mind consolidating. The itch is the signal, not the noise.',
         citations: [
             { kind: 'web', label: 'The oldest trick in attention' },
             { kind: 'x', label: 'Focus is an environment' },
@@ -218,13 +218,13 @@ export const SHELF: DemoCard[] = [
     {
         kind: 'web', url: 'https://news.mit.edu/roman-concrete', sourceName: 'MIT News',
         title: 'Why Roman concrete heals itself',
-        summary: 'Lime clasts act as crack-healing reservoirs — the “flaw” was the feature all along.',
+        summary: 'Lime clasts act as crack-healing reservoirs: the “flaw” was the feature all along.',
         category: 'Engineering', tags: ['materials', 'antiquity'], minutes: 6, ago: '2d ago',
     },
     {
         kind: 'x', url: 'https://x.com/materialnotes/status/1',
         title: 'Hot mixing, the missing step',
-        summary: 'Quicklime mixed hot, not slaked — the chemistry nobody copied for centuries.',
+        summary: 'Quicklime mixed hot, not slaked. The chemistry nobody copied for centuries.',
         category: 'Engineering', tags: ['materials', 'chemistry'], minutes: 2, ago: '2d ago',
     },
     {
@@ -243,7 +243,7 @@ export const SHELF: DemoCard[] = [
     {
         kind: 'web', url: 'https://practicaltype.net/serifs-on-screens', sourceName: 'Practical Type',
         title: 'Why serifs survived the screen',
-        summary: 'Hinting died and retina won — the case for serifs at body sizes again.',
+        summary: 'Hinting died and retina won: the case for serifs at body sizes again.',
         category: 'Design', tags: ['type', 'screens'], minutes: 8, ago: '3d ago',
     },
     {
@@ -268,26 +268,26 @@ export const SHELF: DemoCard[] = [
     {
         kind: 'web', url: 'https://quietreview.org/attention-trick', sourceName: 'Quiet Review',
         title: 'The oldest trick in attention',
-        summary: 'Slot machines didn’t invent variable reward — newspapers did, a century earlier.',
+        summary: 'Slot machines didn’t invent variable reward. Newspapers did, a century earlier.',
         category: 'Ideas', tags: ['attention', 'history'], minutes: 9, ago: '4d ago',
     },
     {
         kind: 'x', url: 'https://x.com/stillnessforms/status/2',
         title: 'Focus is an environment',
-        summary: 'Not willpower — a room you design once and get to reuse every day.',
+        summary: 'Not willpower, but a room you design once and get to reuse every day.',
         category: 'Ideas', tags: ['focus', 'practice'], minutes: 2, ago: '6d ago',
     },
     {
         kind: 'youtube', url: 'https://www.youtube.com/watch?v=demo4', sourceType: 'youtube',
         youtubeChannel: 'Slow Lane',
         title: 'Boredom is data',
-        summary: 'Mind-wandering is consolidation — the itch to reach for the phone is the signal.',
+        summary: 'Mind-wandering is consolidation, and the itch to reach for the phone is the signal.',
         category: 'Ideas', tags: ['boredom', 'mind'], minutes: 11, ago: '1w ago',
     },
     {
         kind: 'x', url: 'https://x.com/twominutewall/status/3',
         title: 'Free-diving’s two-minute wall',
-        summary: 'The wall is CO₂ panic, not oxygen — training is learning to relax through it.',
+        summary: 'The wall is CO₂ panic, not oxygen. Training is learning to relax through it.',
         category: 'Body', tags: ['breath', 'focus'], minutes: 2, ago: '3w ago',
     },
 ];

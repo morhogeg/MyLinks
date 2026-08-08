@@ -136,7 +136,7 @@ export default function GatherScene() {
                             summarize/categorize/tag/connect clause is what
                             makes the one place useful. */}
                         <p className="mx-auto mt-5 max-w-lg text-[15px] leading-relaxed text-text-secondary text-pretty sm:text-base">
-                            Nothing was lost — it was scattered across five apps, impossible to
+                            Nothing was lost. It was scattered across five apps, impossible to
                             find when it mattered. Gathered here, every save is summarized,
                             categorized, tagged, and connected to the rest of what you know.
                             Saving was never the hard part. Everything after it is what Machina

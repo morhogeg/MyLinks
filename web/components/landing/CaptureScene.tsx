@@ -71,7 +71,7 @@ export default function CaptureScene() {
                     Share it once. It comes back understood.
                 </h2>
                 <p className="mx-auto mt-5 max-w-xl text-[15px] leading-relaxed text-text-secondary text-pretty sm:text-base">
-                    Send Machina a link, a screenshot or a video — from any app on your phone,
+                    Send Machina a link, a screenshot or a video from any app on your phone,
                     or dropped straight into the web app. It reads pages, looks at screenshots,
                     watches videos. Below, one thread arrives in all three shapes.
                 </p>

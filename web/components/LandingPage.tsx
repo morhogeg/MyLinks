@@ -179,7 +179,7 @@ const HERO_STEPS: { icon: React.ReactNode; title: string; body: string }[] = [
     {
         icon: <Share2 className="h-5 w-5" aria-hidden />,
         title: 'Save from anywhere',
-        body: 'Send Machina a link, a screenshot, a video — from any app.',
+        body: 'Send Machina a link, a screenshot or a video from any app.',
     },
     {
         // NOT "It comes back understood" — that line is the Capture section's
@@ -187,7 +187,7 @@ const HERO_STEPS: { icon: React.ReactNode; title: string; body: string }[] = [
         // a page running out of things to say.
         icon: <CitationGlyph className="h-5 w-auto" />,
         title: 'Every save, understood',
-        body: 'Each one becomes a card — a real summary, a category, tags, connections.',
+        body: 'Each one becomes a card: a real summary, a category, tags, connections.',
     },
     {
         icon: <Quote className="h-5 w-5" aria-hidden />,
@@ -313,13 +313,13 @@ const SURFACES = [
     {
         icon: Share2,
         title: 'From your phone',
-        body: 'The iOS share sheet, from any app — Safari, YouTube, X, Instagram, Photos. '
+        body: 'The iOS share sheet, from any app. Safari, YouTube, X, Instagram, Photos. '
             + 'Two taps and it is saved, whether or not Machina is open.',
     },
     {
         icon: Globe,
         title: 'From your computer',
-        body: 'The web app holds the same library — save from your phone in the morning, '
+        body: 'The web app holds the same library. Save from your phone in the morning, '
             + 'find it on your laptop that afternoon. Nothing to sync by hand.',
     },
 ];
@@ -371,7 +371,7 @@ function Privacy() {
             <p>
                 No ads, no tracking, no data sold to anyone. What you save is yours: it is
                 never used to train anyone&rsquo;s models. Sign in with Apple or Google, and
-                delete your account — and everything in it — from Settings, any time.
+                delete your account and everything in it from Settings, any time.
             </p>
             <p>
                 The details are in the{' '}
