@@ -129,6 +129,17 @@ export interface Link {
   // (a 'note' is a URL-less thought captured directly — it has no `url`).
   sourceType?: string;
   sourceName?: string;
+  // 'text' marks a note card whose body is the user's OWN verbatim words, sent
+  // in from the share sheet / extension rather than typed in the Note tab. Such
+  // a card is never paraphrased: `summary` holds the text exactly as shared, the
+  // AI contributes only the `title` heading, and its standard summary waits in
+  // `aiSummary`/`aiDetailedSummary` until the reader taps the Machina mark.
+  captureType?: 'text';
+  // Machina's read of a verbatim card — generated but deliberately not shown
+  // until asked for. Absent on a card whose summary has never been requested
+  // (e.g. a note typed in the Note tab), in which case the mark generates one.
+  aiSummary?: string;
+  aiDetailedSummary?: string;
   // Backend writes a float score here; some legacy docs stored a string label.
   confidence?: string | number;
   keyEntities?: string[];

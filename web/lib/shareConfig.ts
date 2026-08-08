@@ -17,7 +17,7 @@ interface ShareConfigPlugin {
 const ShareConfigNative = registerPlugin<ShareConfigPlugin>('ShareConfig');
 
 /** Kind hint for the optimistic share banner, normalized to AnalyzingState. */
-export type PendingShareKind = 'link' | 'image' | 'video';
+export type PendingShareKind = 'link' | 'image' | 'video' | 'text';
 
 export interface PendingShare {
     pending: boolean;
@@ -45,7 +45,10 @@ export async function consumePendingShare(): Promise<PendingShare> {
         const res = await ShareConfigNative.consumePendingShare();
         if (!res?.pending) return { pending: false, kind: 'link', ageMs: 0 };
         const kind: PendingShareKind =
-            res.kind === 'image' ? 'image' : res.kind === 'video' ? 'video' : 'link';
+            res.kind === 'image' ? 'image'
+                : res.kind === 'video' ? 'video'
+                    : res.kind === 'text' ? 'text'
+                        : 'link';
         const progress = typeof res.progress === 'number' && res.progress > 0 ? res.progress : undefined;
         const startedAt = typeof res.startedAt === 'number' && res.startedAt > 0 ? res.startedAt : undefined;
         const now = Date.now();

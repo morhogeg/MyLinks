@@ -4,14 +4,15 @@ import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import type { OrbState } from '@/components/ui/CitationMark';
 import OrbStatus from '@/components/ui/OrbStatus';
-import { linkScanLabel, linkScanOrb, LINK_SCAN_STEPS, LINK_SCAN_ORBS } from '@/lib/scanPhases';
+import { linkScanLabel, linkScanOrb, textScanLabel, LINK_SCAN_STEPS, TEXT_SCAN_STEPS, LINK_SCAN_ORBS } from '@/lib/scanPhases';
 
 export interface AnalyzingState {
     active: boolean;
     /** 0–100. */
     progress: number;
-    /** What's being analyzed, for the label. */
-    kind: 'link' | 'image' | 'video';
+    /** What's being analyzed, for the label. 'text' is a shared paragraph with
+        no URL — it must never be narrated as a link being fetched. */
+    kind: 'link' | 'image' | 'video' | 'text';
     /** For a LINK capture, the backend `processingStage`'s step (0..4) when
         present — pins the label to the real milestone instead of deriving it from
         the % (which the time-ramp can push ahead). Absent → derive from progress. */
@@ -40,6 +41,14 @@ function phaseStatus(
         if (pct >= 72) return { label: 'Writing the summary…', orb: 'shaping' };
         if (pct >= 40) return { label: 'Understanding the video…', orb: 'solving' };
         return { label: 'Watching the video…', orb: 'searching' };
+    }
+    // Shared text: the same beats and the same orbs as a link, with copy that
+    // doesn't claim to be fetching anything (shared source: TEXT_SCAN_STEPS).
+    if (kind === 'text') {
+        if (stageStep != null && TEXT_SCAN_STEPS[stageStep]) {
+            return { label: TEXT_SCAN_STEPS[stageStep] + '…', orb: LINK_SCAN_ORBS[stageStep] };
+        }
+        return { label: textScanLabel(pct) + '…', orb: linkScanOrb(pct) };
     }
     // link / web article — mirror the in-dialog stepper exactly (shared source).
     // Pin to the backend stage when reported; else derive the phase from the %.

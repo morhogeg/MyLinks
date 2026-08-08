@@ -1334,6 +1334,59 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-08 — SHARED TEXT IS NO LONGER TREATED AS A LINK: verbatim body, AI
+  heading, summary on demand. TESTFLIGHT BUILD REQUIRED.** Owner, with
+  screenshots: pasting a Claude paragraph into the share sheet showed "Saving
+  link… / Fetching the link… / Reading the page…" for something that is not a
+  link, and the card that landed was a *paraphrase* — the words themselves were
+  gone. Three fixes, one idea: **on text the user kept, the words ARE the card.**
+  (1) **Copy.** The Share Extension gained a third flow, `isTextFlow`, beside
+  link and image: shared text with no `https?://` in it now reads "Saving your
+  text… / Reading your text… / Writing a summary…" over a quote glyph and the
+  text's own first line instead of a favicon and a hostname there is no host
+  for. The link/text decision is a bare `https?://` regex that MIRRORS
+  `_extract_url` in main.py deliberately — NOT NSDataDetector, which matches
+  "example.com" and would have sent the HUD down the link story for something
+  the backend saves as text. TWIN copy lives in `web/lib/scanPhases.ts`
+  (`TEXT_SCAN_STEPS`) and `AnalyzingBanner`'s new `'text'` kind, carried across
+  the App Group as `pendingShareKind: "text"`.
+  (2) **Verbatim.** `_note_link_data(..., verbatim=True)` (the `share_ingest`
+  no-URL path) now stores the text UNTOUCHED in `summary` — the field every note
+  surface already renders as the body, so search, Ask, editing and the embedding
+  all operate on the real words — uses the AI only for the `title` heading, and
+  parks its summary in NEW `aiSummary`/`aiDetailedSummary`, written but not
+  displayed. Nothing is discarded and nothing is silently substituted. **This
+  does NOT change the plus-button Note tab** (`createNoteCard`), which already
+  kept text verbatim, and does NOT touch link/image/video cards, which are still
+  summarized — an article is worth paraphrasing precisely because the card
+  stands in for something you'd have to go open.
+  (3) **The summary as an offer.** A divided "Machina's read" section under the
+  body: closed it's one quiet row carrying the Citation mark ("Summarize with
+  Machina / Your text stays exactly as you saved it"), open it reads like every
+  other summary in the app. A share-sheet card reveals its stored `aiSummary`
+  instantly and for free; a card without one (a typed note, or text saved before
+  today) generates on first tap via `generateCardSummary` → the `/api/analyze`
+  note branch → persisted, so it's instant every time after. Failure keeps the
+  button and toasts — never an empty section.
+  (4) **Tagging** is the byline, NOT a real tag: `captureType: 'text'` makes
+  `SourceByline` read "Text" with a quote mark instead of "Note" with the sticky
+  note. A genuine tag would pollute the user's own tag space for a distinction
+  the app already knows structurally.
+  (5) Knock-on: a text card is **edited like a link** (title pencil for the
+  heading, a labelled "Edit text" control for the body) rather than through the
+  single-field note editor, which re-derives the title from the first line and
+  would have deleted the AI heading on the first edit. Both affordances are
+  always visible, never hover-only — a phone has no hover.
+  ⚠️ **Existing note cards are unaffected and keep their current bodies** — the
+  verbatim path only applies to text saved from today forward; older shared text
+  was never stored and cannot be recovered.
+  Verified: `tsc` clean, `py_compile` clean, eslint no new warnings, and a
+  production `next build` + `next start` render harness screenshotted the text
+  card and the typed-note card in BOTH themes — collapsed, expanded, and the
+  note's single-field editor — confirming the reveal fires and the typed-note
+  flow is unregressed. (The dev server does not hydrate in the sandbox, so the
+  interaction checks required the production build.) Not QA'd on a device.
+
 - **2026-08-08 — graph clusters stop mixing unrelated cards; meaning-search
   latency cut without paying for a warm instance.** SHIPPED: merge `03591a5`
   (branch commit `de3538e`) → Vercel; "Deploy Cloud Functions" run 31229096352

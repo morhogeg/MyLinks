@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { CaptureState, Link, LinkStatus, UserNote } from '@/lib/types';
-import { updateLinkStatus, updateLinkTags, updateLinkCategory, updateLinkTitle, updateLinkSummary, updateNoteText, updateLinkNotes, updateLinkReadStatus, retryFailedLink } from '@/lib/storage';
+import { updateLinkStatus, updateLinkTags, updateLinkCategory, updateLinkTitle, updateLinkSummary, updateNoteText, updateLinkNotes, updateLinkReadStatus, retryFailedLink, generateCardSummary } from '@/lib/storage';
 import { newShareId, publishCard, removeLinkFromCollection } from '@/lib/collections';
 import { shareLink, shareUrlFor } from '@/lib/share';
 import { useToast } from '@/components/Toast';
@@ -119,6 +119,19 @@ export function useLinkActions(uid: string | null | undefined, toast: ReturnType
         }
     }, [uid, toast]);
 
+    // Machina's read of a text/note card, produced only when the reader asks for
+    // it (the mark under the text). A card captured from the share sheet already
+    // has one stored, so the modal reveals that without calling this at all; this
+    // covers the cards that never had one — notes typed in the Note tab, and any
+    // text saved before the summary was stored. Returns null on failure and the
+    // caller keeps the button, so a dead network costs the user nothing.
+    const handleGenerateSummary = useCallback(async (id: string, text: string) => {
+        if (!uid) return null;
+        const result = await generateCardSummary(uid, id, text);
+        if (!result) toast.error("Couldn't write a summary. Please try again.");
+        return result;
+    }, [uid, toast]);
+
     // Retry analysis for a failed capture card (M3). Optimistically flips the card
     // back to `processing` and re-runs analysis in place; on failure it returns to
     // a `failed` card so nothing is ever lost.
@@ -195,6 +208,7 @@ export function useLinkActions(uid: string | null | undefined, toast: ReturnType
         handleUpdateSummary,
         handleUpdateNote,
         handleUpdateNotes,
+        handleGenerateSummary,
         handleRetryProcessing,
         handleRemoveFromCollection,
         handleShareCard,

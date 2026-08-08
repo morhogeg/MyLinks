@@ -1,6 +1,6 @@
 'use client';
 
-import { Youtube, Image as ImageIcon, StickyNote } from 'lucide-react';
+import { Youtube, Image as ImageIcon, StickyNote, Quote } from 'lucide-react';
 import { getPlatform, platformIcon, platformColor, xHandle, instagramHandle, linkedinDisplayName, prettyHost } from '@/lib/platform';
 
 /** Machina's own hosts — the ONLY place a "Machina" source name is legitimate
@@ -15,6 +15,8 @@ export interface SourceBylineLink {
     url?: string;
     sourceName?: string;
     sourceType?: string;
+    /** 'text' = a note card whose body is verbatim shared text (see Link). */
+    captureType?: string;
     metadata?: { youtubeChannel?: string };
 }
 
@@ -109,10 +111,17 @@ export default function SourceByline({
         );
     }
     if (link.sourceType === 'note') {
+        // Shared text and a typed note are both note cards, but they are not the
+        // same object and the reader can tell them apart at a glance: a note is
+        // something you wrote, text is something you kept. The quote mark says
+        // "these are someone else's words, held verbatim".
+        const isText = link.captureType === 'text';
         return (
-            <span className={wrap} title="Note">
-                {icon(<StickyNote className={`${iconCls} shrink-0`} />)}
-                <span>Note</span>
+            <span className={wrap} title={isText ? 'Text' : 'Note'}>
+                {icon(isText
+                    ? <Quote className={`${iconCls} shrink-0`} />
+                    : <StickyNote className={`${iconCls} shrink-0`} />)}
+                <span>{isText ? 'Text' : 'Note'}</span>
             </span>
         );
     }

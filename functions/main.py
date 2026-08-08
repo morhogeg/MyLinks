@@ -1186,20 +1186,39 @@ def _first_line(text: str, limit: int = 120) -> str:
 NOTE_SOURCE_TYPE = "note"
 MAX_NOTE_LENGTH = 30000
 
+# Shared TEXT (a paragraph sent in from the iOS share sheet or the extension) is
+# a note whose words are the POINT. `captureType: 'text'` marks those cards so
+# the byline reads "Text" rather than "Note" and the frontend knows the body is
+# the user's own verbatim text, not AI prose.
+TEXT_CAPTURE_TYPE = "text"
 
-def _note_link_data(analysis: dict, text: str, *, related_links=_OMIT) -> dict:
+
+def _note_link_data(analysis: dict, text: str, *, related_links=_OMIT,
+                    verbatim: bool = False) -> dict:
     """Build a link document for a URL-less text note (a first-class 'note' card).
 
     Reuses the shared builder but pins the note-specific shape: empty url (no
     source to open), sourceType 'note', sourceName 'Note', and a title that
     falls back to the note's first line when the model returns none. Read time is
-    estimated from the note text itself since there is no scraped article."""
+    estimated from the note text itself since there is no scraped article.
+
+    **`verbatim=True` (shared text) inverts what the body is.** An article or a
+    video is worth paraphrasing because the card stands in for something you'd
+    have to go open; a paragraph the user deliberately kept is not — replacing it
+    with a summary destroys the only copy of the thing they saved. So a verbatim
+    card stores the text UNTOUCHED in `summary` (the field every note surface
+    already renders as the note's body, so search, Ask, editing and the embedding
+    all keep working on the real words), keeps the AI only for the `title`
+    heading, and parks the AI's summary in `aiSummary`/`aiDetailedSummary` —
+    written but NOT displayed until the user taps the Machina mark on the card.
+    Nothing is thrown away and nothing is silently substituted.
+    """
     title = analysis.get("title") or _first_line(text) or "Note"
-    return _build_link_data(
+    data = _build_link_data(
         url="",
         title=title,
-        summary=analysis.get("summary", ""),
-        detailed_summary=analysis.get("detailedSummary", ""),
+        summary=text if verbatim else analysis.get("summary", ""),
+        detailed_summary="" if verbatim else analysis.get("detailedSummary", ""),
         source_type=NOTE_SOURCE_TYPE,
         source_name=analysis.get("sourceName") or "Note",
         original_title=_first_line(text),
@@ -1209,6 +1228,14 @@ def _note_link_data(analysis: dict, text: str, *, related_links=_OMIT) -> dict:
         confidence=0.8,
         key_entities=[],
     )
+    if verbatim:
+        data["captureType"] = TEXT_CAPTURE_TYPE
+        data["sourceName"] = "Text"
+        # Held back, not lost: the standard summary the rest of the app produces,
+        # revealed on demand by the Machina mark instead of replacing the text.
+        data["aiSummary"] = analysis.get("summary", "")
+        data["aiDetailedSummary"] = analysis.get("detailedSummary", "")
+    return data
 
 
 def _embedding_text_from_analysis(analysis: dict) -> str:
@@ -2582,7 +2609,10 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                 note_tags, note_cats = get_user_vocabulary(uid)
                 analysis = ai.analyze_text(note_text, existing_tags=note_tags,
                                            existing_categories=note_cats)
-                link_data = _note_link_data(analysis, note_text)
+                # verbatim: shared text is kept as the user sent it (see
+                # _note_link_data) — the AI supplies the heading and a summary
+                # that waits behind the Machina mark, never the body.
+                link_data = _note_link_data(analysis, note_text, verbatim=True)
                 # A fresh note has no vector yet — flag it so sync_link_embedding
                 # (which fires on this create) generates one.
                 link_data["needsEmbedding"] = True
