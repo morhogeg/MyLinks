@@ -1354,6 +1354,27 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-08 — landing round 16: the capture stepper becomes the app's own,
+  plus three copy/motion refinements.** (1) The CaptureScene pipeline was a
+  landing-only variant (pill highlight on the active row, static glyphs for
+  done/pending, a sweep line) — owner: it must read EXACTLY like the app.
+  Ported verbatim from `LinkScanProgress`: done = accent Check fading in,
+  active = the CitationMark playing that phase's orb beside a bold label,
+  pending = hollow dot + muted text; the pill, sweep and opacity-40 treatments
+  are gone. Verified by tracing the live DOM through two full cycles
+  (C/A/o per row: `Aoooo → CAooo → … → CCCCA → CCCCC → hold → restart`) and
+  screenshotting a mixed frame — indistinguishable from the app dialog.
+  (2) "Below, one thread arrives in all three shapes" (opaque) → "Watch the
+  same save land as each one below." (3) The glass bar no longer slides out
+  -100% (read as yanked): it DISSOLVES — 0.8s opacity fade with a 14px drift
+  and pointer-events off — while the return stays quick (0.45s), so reaching
+  for Sign in feels instant and losing the bar feels like nothing.
+  (4) Shelf paragraph: "No single app could hold saves this different" was a
+  false claim (any app can hold them — they'd just be scattered); now "Saves
+  this different usually end up in five different places. Here they sit side
+  by side:…". Verified in a production build at 430px: no horizontal scroll,
+  old lines absent, new lines rendered. WEB ONLY.
+
 - **2026-08-08 — landing round 15: five owner calls from phone QA of cinematic
   mode.** (1) The two "Where it runs" surfaces lost their card containers —
   every other explanation on the page is open prose, and boxing just these two

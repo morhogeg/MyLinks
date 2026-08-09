@@ -627,16 +627,25 @@
 }
 
 /* Scrolling down retires the bar; any scroll up brings it back (the app's own
-   mobile-chrome manner — useHideOnScroll toggles the class by direction). */
+   mobile-chrome manner — useHideOnScroll toggles the class by direction).
+   Round 16, owner: the full -100% slide read as the bar being YANKED. It now
+   dissolves — a long, gentle opacity fade with only a small upward drift, so
+   losing it is something you notice after the fact rather than an event. The
+   return is quicker than the exit on purpose: reaching for Sign in should
+   feel instant, letting go should feel like nothing. */
 .mx-cine .mx-nav {
   transition:
-    transform 0.4s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.3s ease;
+    transform 0.5s cubic-bezier(0.33, 1, 0.68, 1),
+    opacity 0.45s ease;
 }
 
 .mx-cine .mx-nav.mx-nav-hidden {
-  transform: translateY(-100%);
+  transform: translateY(-14px);
   opacity: 0;
+  pointer-events: none;
+  transition:
+    transform 0.9s ease,
+    opacity 0.8s ease;
 }
 
 /* The hero bloom breathes — a very slow scale/drift on the existing ground

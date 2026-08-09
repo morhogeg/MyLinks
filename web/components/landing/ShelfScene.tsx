@@ -78,10 +78,10 @@ export default function ShelfScene() {
                     style={{ ['--i' as string]: 2 }}
                 >
                     This is one person’s library, a few weeks in. Pulled from the web, X,
-                    YouTube, Instagram, a screenshot, a note to self. No single app could
-                    hold saves this different. Machina holds all of them: every card
-                    summarized and categorized, and the whole shelf searchable by what you
-                    meant, not just the words you happen to remember.
+                    YouTube, Instagram, a screenshot, a note to self. Saves this different
+                    usually end up in five different places. Here they sit side by side:
+                    every card summarized and categorized, and the whole shelf searchable
+                    by what you meant, not just the words you happen to remember.
                 </p>
             </div>
 

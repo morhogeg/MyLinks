@@ -1,9 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Share, Link2, Image as ImageIcon, Play } from 'lucide-react';
+import { Share, Link2, Image as ImageIcon, Play, Check } from 'lucide-react';
 import { LINK_SCAN_ORBS } from '@/lib/scanPhases';
-import { CitationGlyph } from '@/components/ui/Wordmark';
 import { CAPTURE_SOURCES } from './demoData';
 import { CardView, LiveMark } from './parts';
 import { useInView, useSequence, prefersReducedMotion } from './hooks';
@@ -73,7 +72,7 @@ export default function CaptureScene() {
                 <p className="mx-auto mt-5 max-w-xl text-[15px] leading-relaxed text-text-secondary text-pretty sm:text-base">
                     Send Machina a link, a screenshot or a video from any app on your phone,
                     or dropped straight into the web app. It reads pages, looks at screenshots,
-                    watches videos. Below, one thread arrives in all three shapes.
+                    watches videos. Watch the same save land as each one below.
                 </p>
             </div>
 
@@ -133,41 +132,39 @@ export default function CaptureScene() {
                         </span>
                     </div>
 
-                    <ol className="mt-4 space-y-1">
+                    {/* THE APP'S OWN STEPPER, verbatim (round 16 — owner: the
+                        landing's variant had drifted; it must read exactly like
+                        the share-sheet dialog). Ported from LinkScanProgress:
+                        done = accent check fading in, active = the CitationMark
+                        playing that phase's orb beside a bold label, pending =
+                        a hollow dot and muted text. No pill background, no
+                        sweep line — those were this page's inventions, and
+                        anyone who has saved once has seen the real thing. */}
+                    <ol className="mt-4 flex flex-col">
                         {source.steps.map((label, i) => {
-                            const state = done || i < step ? 'done' : i === step ? 'active' : 'todo';
+                            const state = done || i < step ? 'done' : i === step ? 'active' : 'pending';
                             return (
-                                <li
-                                    key={label}
-                                    className={
-                                        'flex items-center gap-3 rounded-xl px-2 py-2.5 transition-colors duration-300 '
-                                        + (state === 'active' ? 'bg-fill-subtle ' : '')
-                                        + (state === 'todo' ? 'opacity-40' : '')
-                                    }
-                                >
-                                    {/* THE APP'S ORB PER PHASE (round 12 — owner:
-                                        the plain circles were beneath the row).
-                                        `LINK_SCAN_ORBS` is the app's own
-                                        phase → verb map (working / searching /
-                                        shaping / solving), and the ACTIVE phase
-                                        plays it through the real CitationMark.
-                                        Done and pending phases hold the static
-                                        glyph — full ink behind you, faint ahead —
-                                        so one animated mark rides the checklist
-                                        the way it rides the app's own stepper. */}
-                                    <span className="grid h-5 w-6 shrink-0 place-items-center" aria-hidden>
+                                <li key={label} className="flex items-center gap-3 py-1.5">
+                                    <span className="relative grid h-5 w-5 shrink-0 place-items-center" aria-hidden>
                                         {state === 'active' ? (
                                             <LiveMark state={LINK_SCAN_ORBS[i]} size={20} />
+                                        ) : state === 'done' ? (
+                                            <Check className="h-[15px] w-[15px] animate-fade-in text-accent" strokeWidth={3} />
                                         ) : (
-                                            <CitationGlyph
-                                                className={`h-3.5 w-auto ${state === 'done' ? 'text-text' : 'text-text-muted/40'}`}
-                                            />
+                                            <span className="h-[15px] w-[15px] rounded-full border-[1.5px] border-border-strong" />
                                         )}
                                     </span>
-                                    <span className="text-[13px] text-text">{label}</span>
-                                    {state === 'active' && (
-                                        <span className="mx-sweep relative ml-auto h-px w-16 overflow-hidden rounded-full bg-fill-subtle" />
-                                    )}
+                                    <span
+                                        className={`text-sm ${
+                                            state === 'active'
+                                                ? 'font-semibold text-text'
+                                                : state === 'done'
+                                                    ? 'text-text-secondary'
+                                                    : 'text-text-muted'
+                                        }`}
+                                    >
+                                        {label}
+                                    </span>
                                 </li>
                             );
                         })}
