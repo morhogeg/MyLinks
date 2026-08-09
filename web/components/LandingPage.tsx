@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { ArrowDown, Share2, Globe, ChevronRight, Quote } from 'lucide-react';
+import { Share2, Globe, ChevronRight, Quote } from 'lucide-react';
 import { CitationGlyph, Wordmark } from '@/components/ui/Wordmark';
 import ThemeToggle from '@/components/ThemeToggle';
 import GatherScene from '@/components/landing/GatherScene';
@@ -149,10 +149,11 @@ function Section({ kicker, title, children, className = '' }: {
 
 function Header({ onGetStarted }: { onGetStarted?: () => void }) {
     const cls = 'text-sm font-medium text-text-secondary transition-colors hover:text-text';
+    const navRef = useHideOnScroll<HTMLDivElement>();
     return (
         /* `mx-nav` is inert in the classic page; the cinematic layer turns it
            into the sticky glass bar (landing.css) without moving any markup. */
-        <div className="mx-nav">
+        <div ref={navRef} className="mx-nav">
             <header className="mx-auto flex max-w-6xl items-center justify-between px-6 pt-8">
             {/* The header lockup the app itself uses: the BARE citation mark (a
                 rounded container here reads as a shrunken app icon, not as the
@@ -217,6 +218,41 @@ function useHeroParallax<T extends HTMLElement>() {
         return () => {
             el.removeEventListener('pointermove', onMove);
             el.removeEventListener('pointerleave', onLeave);
+            if (raf) cancelAnimationFrame(raf);
+        };
+    }, []);
+    return ref;
+}
+
+/**
+ * The glass bar retires while you read (cinematic mode) — scroll down and it
+ * slides away, scroll up at all and it returns, the same manner as the app's
+ * own mobile chrome. Direction is what matters, not position, so a long page
+ * never strands the visitor without Sign in: any upward nudge brings it back.
+ * The first ~120px are exempt so it never flickers at the top. Classic mode
+ * never attaches the listener — there the header isn't sticky to begin with.
+ */
+function useHideOnScroll<T extends HTMLElement>() {
+    const ref = useRef<T>(null);
+    useEffect(() => {
+        if (!CINEMATIC_LANDING) return;
+        const el = ref.current;
+        if (!el) return;
+        let lastY = window.scrollY;
+        let raf = 0;
+        const onScroll = () => {
+            if (raf) return;
+            raf = requestAnimationFrame(() => {
+                raf = 0;
+                const y = window.scrollY;
+                const goingDown = y > lastY;
+                lastY = y;
+                el.classList.toggle('mx-nav-hidden', goingDown && y > 120);
+            });
+        };
+        window.addEventListener('scroll', onScroll, { passive: true });
+        return () => {
+            window.removeEventListener('scroll', onScroll);
             if (raf) cancelAnimationFrame(raf);
         };
     }, []);
@@ -355,12 +391,6 @@ function Hero({ onGetStarted }: { onGetStarted?: () => void }) {
                 </div>
             </div>
 
-            <span
-                aria-hidden
-                className="mx-cue absolute inset-x-0 bottom-8 mx-auto flex w-fit items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-text-muted"
-            >
-                <ArrowDown className="h-3.5 w-3.5" /> Scroll
-            </span>
         </section>
     );
 }
@@ -406,18 +436,23 @@ function Surfaces() {
                     Wherever you were when you found it.
                 </h2>
             </div>
-            <div className="mx-auto mt-10 grid max-w-3xl gap-4 md:grid-cols-2">
+            {/* Plain blocks, not cards (owner call, round 15): every other
+                explanation on this page is open prose, and boxing just these
+                two made them read as UI instead of information. Same icon tile
+                + title + body, now centred and container-free like the hero's
+                three steps. */}
+            <div className="mx-auto mt-12 grid max-w-3xl gap-10 md:grid-cols-2 md:gap-8">
                 {SURFACES.map((s, i) => (
                     <div
                         key={s.title}
-                        className="mx-rise mx-vt rounded-2xl border border-border-subtle bg-card p-6 shadow-[var(--shadow-card)]"
+                        className="mx-rise mx-vt flex flex-col items-center text-center"
                         style={{ ['--i' as string]: 2 + i }}
                     >
-                        <span className="grid h-10 w-10 place-items-center rounded-xl bg-tile text-tile-ink">
+                        <span className="grid h-11 w-11 place-items-center rounded-2xl bg-tile text-tile-ink shadow-sm">
                             <s.icon className="h-5 w-5" aria-hidden />
                         </span>
                         <h3 className="mt-4 text-base font-semibold text-text">{s.title}</h3>
-                        <p className="mt-2 text-[15px] leading-relaxed text-text-secondary">{s.body}</p>
+                        <p className="mt-2 max-w-[22rem] text-[15px] leading-relaxed text-text-secondary text-pretty">{s.body}</p>
                     </div>
                 ))}
             </div>
@@ -435,16 +470,10 @@ function Privacy() {
                 never used to train anyone&rsquo;s models. Sign in with Apple or Google, and
                 delete your account and everything in it from Settings, any time.
             </p>
-            <p>
-                The details are in the{' '}
-                <Link href="/privacy" className="text-text underline underline-offset-4 transition-colors hover:text-accent">
-                    privacy policy
-                </Link>{' '}
-                and the{' '}
-                <Link href="/terms" className="text-text underline underline-offset-4 transition-colors hover:text-accent">
-                    terms of service
-                </Link>.
-            </p>
+            {/* No "the details are in…" paragraph (owner call, round 15): a
+                promise followed by a pointer to the fine print reads like a
+                disclaimer. The privacy-policy and terms links App Review needs
+                stay one scroll away in the footer nav. */}
         </Section>
     );
 }

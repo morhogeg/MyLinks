@@ -1354,6 +1354,25 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-08 — landing round 15: five owner calls from phone QA of cinematic
+  mode.** (1) The two "Where it runs" surfaces lost their card containers —
+  every other explanation on the page is open prose, and boxing just these two
+  made them read as UI instead of information; now icon tile + title + body,
+  centred like the hero steps. (2) The glass header now RETIRES on scroll down
+  and returns on any scroll up (`useHideOnScroll`, direction-based with a
+  120px top exemption — the app's own mobile-chrome manner); cinematic mode
+  only, since the classic header was never sticky. (3) The "details are in the
+  privacy policy…" paragraph is cut — a promise followed by fine print read as
+  a disclaimer; the Privacy/Terms links App Review needs remain in the footer
+  nav (verified still present). (4) The scroll cue (arrow + "SCROLL") is gone,
+  and its `mx-cue` class has no remaining users. (5) The gather opener
+  reworded: "Nothing was lost." → "You never lost any of it." — second person,
+  matching the page's voice. Verified in a production build at 390/430px: no
+  horizontal scroll, cue gone, details paragraph gone with footer links
+  intact, new opener rendered, surfaces border/bg-free, and the nav
+  hide/show cycle exercised (visible at top → hidden after scrolling down →
+  back after scrolling up). WEB ONLY, same as the rest of the landing work.
+
 - **2026-08-08 — the graph ground reaches its card edge, and the landing gets a
   CINEMATIC MODE behind a one-line kill switch.** Two owner asks. (1) **Graph
   fix:** the observatory ground (dot lattice + radial bloom) sat on an inner
