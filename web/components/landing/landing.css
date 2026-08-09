@@ -781,22 +781,9 @@
     animation-range: entry 0% cover 38%;
   }
 
-  /* The hero's exit: as the visitor scrolls on, the whole stage recedes —
-     scales down, lifts, softens — instead of just sliding off. The section
-     (with the bloom) stays put; only the content recedes. */
-  @keyframes mx-cine-hero-exit {
-    to {
-      opacity: 0.12;
-      transform: translateY(-30px) scale(0.94);
-      filter: blur(6px);
-    }
-  }
-
-  .mx-cine .mx-hero-stage {
-    animation: mx-cine-hero-exit both linear;
-    animation-timeline: view();
-    animation-range: exit 10% exit 85%;
-  }
+  /* No hero exit effect: it blurred/faded the first section while the
+     visitor was still reading it on a phone (owner call, round 17) — the
+     hero scrolls away like ordinary content. */
 }
 
 /* --- reduced motion: the cinematic layer collapses entirely --------------- */
@@ -805,7 +792,6 @@
 
   .mx-cine .mx-vt,
   .mx-cine .mx-tilt,
-  .mx-cine .mx-hero-stage,
   .mx-cine .mx-ground::before,
   .mx-cine .mx-graph-ground,
   .mx-cine .mx-cta::after {
@@ -817,8 +803,7 @@
      invisible forever — caught by the reduced-motion sweep, not by eye. With
      motion off they simply sit on their final frame. */
   .mx-cine .mx-vt,
-  .mx-cine .mx-tilt,
-  .mx-cine .mx-hero-stage {
+  .mx-cine .mx-tilt {
     opacity: 1 !important;
     transform: none !important;
     filter: none !important;

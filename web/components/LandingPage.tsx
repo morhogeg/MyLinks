@@ -300,9 +300,7 @@ function Hero({ onGetStarted }: { onGetStarted?: () => void }) {
             ref={parallaxRef}
             className="mx-ground relative mx-auto flex min-h-[88vh] max-w-3xl flex-col items-center justify-center px-6 py-20 text-center"
         >
-            {/* `mx-hero-stage`: the cinematic exit — this block scales/fades as
-                the hero scrolls away, keynote style. Inert on the classic page. */}
-            <div className="mx-hero-stage relative flex flex-col items-center">
+            <div className="relative flex flex-col items-center">
                 {/* THE APP'S OWN LIVING MARK (owner call, round 8: the first
                     frame should be genuinely impressive). This is
                     `CitationMark` — the exact component the Ask page mounts as
