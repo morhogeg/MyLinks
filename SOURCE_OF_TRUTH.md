@@ -1361,11 +1361,13 @@ exact-match, capped.
   (live %, unfilled bar, settled mark) already existed; the COPY still led
   with "Saved to Machina ✓" and a jargon hint ("Analyzing — progress continues
   in Machina"). Rewritten so the same line that carries the ✓ names the work
-  still running: phase **"Saved ✓ · Making your card"**, hint **"Safe to
-  close. The card finishes on its own in Machina."** (A first draft ended the
-  hint "ready in about 20 seconds"; owner caught that an ETA we can't
-  guarantee — cold starts, slow pages — is the original lie in smaller print,
-  so the hint promises the mechanism, not a number.)
+  still running: phase **"Saved ✓ · Making your card"**, hint **"The card
+  finishes on its own in Machina."** (Two owner catches shaped the hint: a
+  first draft promised "ready in about 20 seconds" — an ETA cold starts and
+  slow pages can't guarantee, the original lie in smaller print; a second
+  draft opened "Safe to close" — redundant, since the mid-flight hint under
+  the bar already says "You can close this" the whole time. The terminal
+  hint now carries only the one NEW fact: the handoff.)
   The generic (non-HUD) success path and the SHARE_EXTENSION.md diagram use
   the same string. Deliberately NOT done, per the session's verdict: holding
   the share sheet open until analysis hits 100% — iOS kills lingering
