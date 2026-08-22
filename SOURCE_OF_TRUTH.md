@@ -1394,6 +1394,32 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-22 — Related cards stop inventing connections; stale ones heal
+  themselves.** Owner ask (with screenshot): a robot-vacuum review card listed
+  Claude-benchmarking / AI-coding-agents cards as related, on reasons like
+  "both emphasize standardized benchmarking" — forced abstractions. Root
+  cause, all in `functions/graph_service.py`: `find_nearest` returned the 10
+  nearest neighbours with **no distance cutoff** (in a diverse library that's
+  just "whatever exists"), the verification prompt rewarded finding
+  connections, and a missing LLM score was gifted `similarity: 0.8`. Fixed
+  three ways: candidates past a cosine-distance ceiling (`RELATED_DISTANCE_CEILING`,
+  default 0.60 — tighter than search's 0.68 on purpose: precision over recall,
+  and empty is a valid answer) never reach the LLM; the prompt is now an
+  adversarial gatekeeper that explicitly rejects shared-format/abstract-theme
+  ties ("both are reviews", "both use benchmarks") and demands a shared
+  topic/entity; relations missing a score or under `RELATED_SIMILARITY_FLOOR`
+  (0.75) are dropped. **Existing libraries migrate automatically**: new
+  `GRAPH_VERSION = 2` + `ensureGraphVersion()` in `web/lib/rebuildConnections.ts`
+  (called from `app/page.tsx` 4s after boot) reads `graphVersion` off the user
+  doc and, when stale, silently force-re-runs the `rebuild_connections` relate
+  phase in the background, then stamps the doc — the stamp is written only
+  after success, so an interrupted run retries next open. One user-doc read
+  per open once migrated. Does NOT touch the client's live-match pass
+  (`lib/related.ts` pass 3) — its thresholds were already deliberate. Verified:
+  `tsc --noEmit` clean, `py_compile *.py` clean. NOT verified here: a live
+  relate run against real Gemini (no prod creds in this env). Needs a
+  functions deploy + Vercel to take effect.
+
 - **2026-08-22 — Insights gets the app's identity colors. SHIPPED (merge
   `153b43d` → Vercel + TestFlight run #283 = build 1283).** Owner ask:
   the Insights screen was all single-hue accent — give it pops of color, "like
