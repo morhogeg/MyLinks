@@ -226,9 +226,21 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-08-22): install build **1283**
+> ## 🚨 OWNER ACTION (updated 2026-08-22): fix the APNs key, and install build **1284**
 >
-> **1283** (run #283, merge `153b43d`) is current: everything in 1281/1282 plus
+> **FIRST — the push fix (console, ~5 min, no build):** the on-device test on
+> 1284 confirmed `ThirdPartyAuthError` — the APNs key in Firebase → Cloud
+> Messaging does not authenticate for the app, so NO push has ever delivered.
+> Create/verify an APNs key under team **8Y2M94RUHG** at developer.apple.com →
+> Keys, then in Firebase (`secondbrain-app-94da2` → Project settings → Cloud
+> Messaging → `com.morhogeg.machina`) delete the stored APNs key and upload
+> the .p8 with its exact Key ID + Team ID. Re-tap Settings → "Send a test
+> notification" to verify. Full steps in the 2026-08-22 §9 entry.
+>
+> **1284** (run #284, merge `84370d7`) is current: everything in 1283 plus the
+> test button relaying FCM's error name — the build that caught the above.
+>
+> **(superseded) 1283** (run #283, merge `153b43d`): everything in 1281/1282 plus
 > the colorful Insights screen — category bars and tag pills in Settings →
 > Insights now wear each category/tag's app-wide identity color (same hash as
 > cards, filters, the graph). QA on device: open Settings → Insights and check
@@ -1397,6 +1409,26 @@ exact-match, capped.
   colors are inline rgb from the established mapping (works in both themes),
   not new hardcodes. Verified: `tsc --noEmit` clean. NOT verified here: a
   visual render (no device); QA by opening Settings → Insights.
+
+- **2026-08-22 — 🎯 PUSH ROOT CAUSE CONFIRMED ON DEVICE: `ThirdPartyAuthError`
+  — the APNs key in Firebase → Cloud Messaging does not authenticate for this
+  app. ⛔ OWNER CONSOLE FIX, no code or build needed.** The owner ran the
+  test button on build 1284 and the note named it. This means pushes have
+  NEVER delivered — the .p8 recorded as uploaded 2026-07-07 was never valid
+  for the app (wrong Key ID, wrong Team ID, a different Apple account's key,
+  or since revoked). Everything else is device-proven good: token
+  registration, `fcmTokens`, the endpoints, hosting, FCM reachability. **The
+  fix (owner, ~5 min):** (1) developer.apple.com → Certificates, Identifiers
+  & Profiles → **Keys** → create a new key with **APNs enabled** (or verify
+  the existing one is not revoked); download the .p8, note the **Key ID**,
+  and confirm the account's **Team ID is 8Y2M94RUHG** — it must be the same
+  team that signs the app. (2) Firebase console → `secondbrain-app-94da2` →
+  Project settings → **Cloud Messaging** → Apple app `com.morhogeg.machina`
+  → DELETE the existing APNs auth key → upload the .p8 with that exact Key
+  ID + Team ID. (3) Re-tap Settings → "Send a test notification" — no
+  deploy, no build; the change is entirely between Firebase and Apple. If
+  the test then reports "sent" and a notification appears, the whole digest/
+  reminder push path is live end-to-end for the first time.
 
 - **2026-08-22 — push root cause narrowed ON DEVICE: registration works,
   Apple/FCM rejects the send. Error-name passthrough shipped (merge
