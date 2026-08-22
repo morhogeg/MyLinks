@@ -1378,9 +1378,11 @@ exact-match, capped.
   WITH item X" grouping rule, cover EVERY item in order, and these bullets are
   exempt from the 120–220-word cap like Ingredients/Steps. Verified: 625/625
   offline tests pass (3 new JSON-LD tests in `test_linkedin_author.py`),
-  `py_compile` clean. NOT verified here: a live LinkedIn fetch (cloud egress
-  blocks it) — QA by re-saving the Ryan Holiday post after the functions
-  deploy. Existing cards keep their old summaries unless re-saved.
+  `py_compile` clean. Shipped via deploy-functions run #80 (unscoped —
+  shared modules), merge `b247650`. **Owner device-verified same day:** the
+  Ryan Holiday post re-saved with the full post covered, per-book bullets,
+  and the byline present. Existing cards keep their old summaries unless
+  re-saved.
 
 - **2026-08-08 — landing round 16: the capture stepper becomes the app's own,
   plus three copy/motion refinements.** (1) The CaptureScene pipeline was a
