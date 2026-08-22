@@ -1398,6 +1398,29 @@ exact-match, capped.
   not new hardcodes. Verified: `tsc --noEmit` clean. NOT verified here: a
   visual render (no device); QA by opening Settings → Insights.
 
+- **2026-08-22 — push root cause narrowed ON DEVICE: registration works,
+  Apple/FCM rejects the send. Error-name passthrough shipped (merge
+  `84370d7` → next TestFlight build + scoped functions redeploy).** Owner ran
+  the new test button twice. Round 1 (8:12): "could not be reached (network)"
+  — tapped inside the 2-minute gap before hosting run #8 landed the
+  `/api/send-test-push` rewrite (run #7 raced the function's creation; the
+  race is now documented in deploy-hosting.yml — functions first, then
+  hosting, when a rewrite references a NEW function). Round 2: **"send failed
+  for all 1 registered device"** — the decisive result. The flow re-registers
+  a FRESH token seconds before sending, so registration + the token endpoints
+  + hosting all work and `fcmTokens` is populated; FCM/APNs is rejecting the
+  send itself. That also proved the round-1 copy wrong ("stale tokens —
+  toggle to re-register" — a fresh token is never stale; owner toggled, and it
+  did nothing, as it had to). Shipped: `send_push` returns the failure CLASS
+  NAMES (never tokens) in `errors`, the test endpoint relays them, and the
+  Settings note maps them to the real fix — `ThirdPartyAuthError` = APNs key
+  in Firebase → Cloud Messaging doesn't match the app (console fix),
+  `SenderIdMismatchError` = build's Firebase config wrong, `UnregisteredError`
+  = build/environment mismatch. Next owner QA: tap the test button on the
+  next build; the note now names the culprit. Suspicion to check first if it
+  says ThirdPartyAuthError: the APNs key/config in the Firebase console
+  (uploaded 2026-07-07, §9) vs the current bundle.
+
 - **2026-08-22 — push notifications: the silent chain gets honest copy and an
   on-device self-test. SHIPPED (merge `8aa1da4` → build 1281, functions run
   #81, hosting run #7).** Owner: digests/syntheses render in-app but no push
