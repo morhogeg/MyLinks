@@ -1367,7 +1367,11 @@ exact-match, capped.
   slow pages can't guarantee, the original lie in smaller print; a second
   draft opened "Safe to close" — redundant, since the mid-flight hint under
   the bar already says "You can close this" the whole time. The terminal
-  hint now carries only the one NEW fact: the handoff.)
+  hint now carries only the one NEW fact: the handoff.) Same session, from an
+  owner screenshot of the live HUD: every em dash in the extension's RENDERED
+  strings is out (mid-flight hint, dedupe hint, the neutral/timeout and error
+  messages), rewritten by sentence role exactly as the landing purge was.
+  Code comments untouched, as before.
   The generic (non-HUD) success path and the SHARE_EXTENSION.md diagram use
   the same string. Deliberately NOT done, per the session's verdict: holding
   the share sheet open until analysis hits 100% — iOS kills lingering

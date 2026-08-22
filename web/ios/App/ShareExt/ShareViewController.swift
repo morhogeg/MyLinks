@@ -434,7 +434,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         barFill.translatesAutoresizingMaskIntoConstraints = false
         barTrack.addSubview(barFill)
 
-        hintLabel.text = "You can close this — we’ll keep analyzing in the background."
+        hintLabel.text = "You can close this. We’ll keep working in the background."
         hintLabel.font = .systemFont(ofSize: 11, weight: .regular)
         hintLabel.textColor = Lumen.textMuted
         hintLabel.textAlignment = .center
@@ -781,7 +781,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
                 // is carried by the full track + the ✓, not by a hue.
                 self.barFillWidth.constant = self.barTrack.bounds.width
                 self.phaseLabel.text = "Already in your library"
-                self.hintLabel.text = "This one is saved in Machina — no new card was added."
+                self.hintLabel.text = "This one is saved in Machina, so no new card was added."
                 UIView.animate(withDuration: 0.2) { self.barTrack.layoutIfNeeded() }
             } else {
                 self.card.isHidden = false
@@ -834,7 +834,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
                         // Neutral terminal state: the save may still be finishing on
                         // the background session. Keep the card up with the ✕ close
                         // affordance instead of auto-dismissing, and never a check.
-                        self.hintLabel.text = "The save is still finishing — you can close this."
+                        self.hintLabel.text = "The save is still finishing. You can close this."
                     } else {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { self.finish() }
                     }
@@ -1206,7 +1206,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         // upload is still in flight — so we show a NEUTRAL terminal state (never a
         // green check) with the ✕ escape hatch, not a false "Saved ✓".
         DispatchQueue.main.asyncAfter(deadline: .now() + 26) { [weak self] in
-            self?.showResult("Still saving — open Machina to confirm", success: false, neutral: true)
+            self?.showResult("Still saving. Open Machina to confirm", success: false, neutral: true)
         }
 
         let task = session.uploadTask(with: req, fromFile: tmpURL)
@@ -1226,9 +1226,9 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
             // neutral "still saving" state so a slow-but-successful save is never
             // shown as a false failure. Other errors are genuine and terminal.
             if (error as NSError).code == NSURLErrorTimedOut {
-                showResult("Still saving — open Machina to confirm", success: false, neutral: true)
+                showResult("Still saving. Open Machina to confirm", success: false, neutral: true)
             } else {
-                showResult("Network error — try again", success: false)
+                showResult("Network error. Try again", success: false)
             }
         } else {
             let code = (task.response as? HTTPURLResponse)?.statusCode ?? 0
@@ -1242,7 +1242,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
                     showResult("Saved ✓ · Making your card", success: true)
                 }
             } else if code == 403 || code == 401 {
-                showResult("Auth failed — reopen Machina", success: false)
+                showResult("Auth failed. Reopen Machina to sign in", success: false)
             } else {
                 showResult("Couldn't save (\(code))", success: false)
             }
