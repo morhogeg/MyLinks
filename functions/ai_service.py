@@ -175,6 +175,26 @@ _COMPLETE_TAIL = ('.', '!', '?', '…', ':', ';', ')', ']', '"', "'", '”', '�
                   '״', '׳', '*', '`', '~')
 
 
+# Owner: em dashes "scream AI writing" — banned from every rendered surface
+# (landing 2026-08-08, app copy 2026-08-22). The prompts now forbid them in
+# output too, and this is the code backstop for when the rule is ignored
+# (as the tag-language rule was, f3055f8). Digit–digit stays a range ("3–5"
+# → "3-5"); any other dash becomes a comma break, the most neutral seam.
+_PROSE_FIELDS = ("title", "summary", "detailedSummary", "actionableTakeaway",
+                 "narrative", "standoutReason", "openQuestion", "answer")
+
+
+def _strip_output_dashes(data: dict) -> dict:
+    def clean(t: str) -> str:
+        t = re.sub(r'(?<=\d)\s*[—–]\s*(?=\d)', '-', t)
+        return re.sub(r'\s*[—–]\s*', ', ', t)
+    for f in _PROSE_FIELDS:
+        v = data.get(f)
+        if isinstance(v, str) and ('—' in v or '–' in v):
+            data[f] = clean(v)
+    return data
+
+
 def _text_cut_off(text) -> bool:
     """True when a prose field looks truncated mid-generation.
 
@@ -329,6 +349,7 @@ Requirements for the analysis:
 
 CRITICAL RULES:
 - Be a neutral reporter, not a reviewer. Report WHAT is said, not HOW WELL it is said.
+- **NO EM DASHES**: Never use an em dash (—) or en dash (–) in any output field, in any language. Punctuate with what the sentence actually needs instead: a period between two ideas, a colon before a list or restatement, a comma for an aside, parentheses for an insertion. A plain hyphen inside a word ("state-of-the-art") is fine.
 - Avoid subjective phrases like: "offers valuable insights", "provides a comprehensive overview", "explores interesting ideas", "is a must-read", "excellently explains".
 - Use factual language: "The research shows...", "Key topics include...", or simply state the claim itself.
 - **NEVER WRITE "THE AUTHOR" (or "the writer", "the poster", "the speaker", "the piece", "the post argues") — anywhere, in any language.** Attributing to an anonymous "author" is filler that pushes the actual claim into a subordinate clause. State the claim DIRECTLY as the content's own assertion (BAD: "The author observes that many modern cities have lost a sense of place." GOOD: "Many modern cities have lost their sense of place."). When the content names a real person, publication, or study, name THEM instead ("Kahneman argues…", "The NYT piece reports…"); attribution by name is welcome, attribution to a placeholder is not. Same rule for every bullet under "Key Points".
@@ -593,6 +614,7 @@ Rules:
 - Questions about recent saves ("this week", "latest", "recap") → judge by each source's saved: date against today's date; only present sources actually in that window as recent, and mention when each was saved.
 - Don't announce a count of items (e.g. "three sources") — just give the list. If you do state a number, it MUST exactly match the number of items you list.
 - CRITICAL — match the user's language: write your ENTIRE answer in the same language as the User question, NOT the language of the sources. Judge the question's language from the user's OWN words, IGNORING any quoted card titles inside it — 'Give me more detail on "<Hebrew title>"' is an ENGLISH question and must be answered entirely in English (you may quote the title itself as-is). If the question is in English, answer in English even when every source is in Hebrew; if the question is in Hebrew, answer in Hebrew. The sources' language must not influence your answer's language.{language_override}
+- NO EM DASHES: never use an em dash (—) or en dash (–) anywhere in the answer, in any language. Punctuate with what the sentence needs instead: a period, a colon, a comma, or parentheses. A plain hyphen inside a word is fine.
 - Only cite sources you actually used. NEVER write a source's id (the bracketed token) in the answer text itself — ids are machine references the reader can't use; refer to sources by their titles. Citations belong ONLY in the citation field/marker.{continuation}
 
 Saved sources:
@@ -813,6 +835,7 @@ class GeminiService:
                     data = data[0]
 
                 if isinstance(data, dict):
+                    data = _strip_output_dashes(data)
                     # Early-stopped generation: valid JSON whose summary trails
                     # off mid-word. Spend a remaining attempt on a clean take,
                     # but NEVER fail the save over it — if retries stay cut off
@@ -1768,6 +1791,7 @@ Rules:
 - Pick ONE standout card (the most noteworthy save) and say in one sentence why.
 - End with ONE genuine open question the week's reading raises — something worth carrying into next week.
 - Warm and human, but never sycophantic or salesy. No "amazing", "incredible", "must-read".
+- Never use an em dash (—) or en dash (–) anywhere, in any language: punctuate with a period, colon, comma, or parentheses instead.
 - Match the user's language: if most cards are in Hebrew, write the recap in Hebrew; otherwise English.
 - Every id you reference MUST be one of the ids shown in brackets below. Never invent ids.
 

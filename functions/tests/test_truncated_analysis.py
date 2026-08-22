@@ -112,3 +112,32 @@ def test_clean_first_attempt_is_not_retried():
     data = svc._generate_json(["prompt"], "test", attempts=2)
     assert data["detailedSummary"] == "- הכל תקין."
     assert svc.client.models.calls == 1
+
+
+# ── _strip_output_dashes (em dashes banned from AI output, 2026-08-22) ───────
+
+from ai_service import _strip_output_dashes
+
+
+def test_em_dash_becomes_comma_break():
+    d = _strip_output_dashes({"summary": "The plan is simple — save everything."})
+    assert d["summary"] == "The plan is simple, save everything."
+
+
+def test_numeric_range_keeps_a_hyphen():
+    d = _strip_output_dashes({"summary": "The study ran 3–5 weeks."})
+    assert d["summary"] == "The study ran 3-5 weeks."
+
+
+def test_hebrew_dash_and_untouched_fields():
+    d = _strip_output_dashes({
+        "detailedSummary": "המהלך נועד לחזק את הנגב — ולסייע לרופאים.",
+        "tags": ["a—b"],  # not a prose field: untouched
+    })
+    assert d["detailedSummary"] == "המהלך נועד לחזק את הנגב, ולסייע לרופאים."
+    assert d["tags"] == ["a—b"]
+
+
+def test_clean_text_unchanged():
+    d = {"summary": "No dashes here. A well-known hyphen stays."}
+    assert _strip_output_dashes(dict(d)) == d

@@ -1463,7 +1463,19 @@ exact-match, capped.
   shows 0 rendered em dashes remaining; `tsc --noEmit` clean; extension JS
   passes `node --check`, manifest still valid JSON. Legal pages ship with
   Vercel; app copy needs the next TestFlight build; the extension is
-  side-loaded, so its copy updates whenever it's next packaged.
+  side-loaded, so its copy updates whenever it's next packaged. **Follow-up
+  (same day, owner: "do it for the other capture channels as well"):** the
+  link/note channels' UI copy was already dash-free (the dialog is shared;
+  scan steps and the iOS share HUD never had any), so the remaining dash
+  source in those channels is the AI OUTPUT itself. The ban now covers it:
+  a NO EM DASHES rule in the analysis SYSTEM_PROMPT (inherited by the video
+  prompt), the Ask answer rules, and the weekly-synthesis prompt, plus a
+  code backstop (`_strip_output_dashes` in `_generate_json`, the same
+  pattern the tag-language rule needed): digit–digit dashes become hyphens
+  ("3–5" → "3-5"), any other em/en dash becomes a comma break, applied to
+  the prose fields only. Streamed Ask answers rely on the prompt rule alone
+  (they bypass `_generate_json`). 4 new tests; 639/639 pass. BACKEND —
+  ships with the next functions deploy.
 
 - **2026-08-22 — compact card stops re-splitting the model's own paragraphs;
   abbreviation handling is by SHAPE, not a list. SHIPPED (merge `7d7073e` → Vercel + TestFlight **build 1282**, run #282; carries 1281's push-diagnostics content).** Owner,
