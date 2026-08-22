@@ -226,7 +226,7 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-08-22): fix the APNs key, and install build **1284**
+> ## 🚨 OWNER ACTION (updated 2026-08-22): fix the APNs key, and install build **1285**
 >
 > **FIRST — the push fix (console, ~5 min, no build):** the on-device test on
 > 1284 confirmed `ThirdPartyAuthError` — the APNs key in Firebase → Cloud
@@ -237,7 +237,12 @@ The multi-user auth work described below **was** fully written but not live:
 > the .p8 with its exact Key ID + Team ID. Re-tap Settings → "Send a test
 > notification" to verify. Full steps in the 2026-08-22 §9 entry.
 >
-> **1284** (run #284, merge `84370d7`) is current: everything in 1283 plus the
+> **1285** (run #285, merge `3c27bf2`) is current: everything in 1284 plus the
+> related-cards precision fix and the silent graph re-migration (open the app
+> once and forced connections recompute themselves — QA: open the vacuum-review
+> card a few minutes after first launch and check the AI-model cards are gone).
+>
+> **(superseded) 1284** (run #284, merge `84370d7`): everything in 1283 plus the
 > test button relaying FCM's error name — the build that caught the above.
 >
 > **(superseded) 1283** (run #283, merge `153b43d`): everything in 1281/1282 plus
@@ -1395,7 +1400,9 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 
 - **2026-08-22 — Related cards stop inventing connections; stale ones heal
-  themselves.** Owner ask (with screenshot): a robot-vacuum review card listed
+  themselves. SHIPPED (merge `3c27bf2` → Vercel + functions deploy run #84
+  scoped to `analyze_link,process_link_background,rebuild_connections,backfill_related_links`
+  + TestFlight run #285 = build 1285).** Owner ask (with screenshot): a robot-vacuum review card listed
   Claude-benchmarking / AI-coding-agents cards as related, on reasons like
   "both emphasize standardized benchmarking" — forced abstractions. Root
   cause, all in `functions/graph_service.py`: `find_nearest` returned the 10
