@@ -78,11 +78,16 @@ function splitSentences(text: string): string[] {
 
         if (ch === '.') {
             const before = text.slice(Math.max(0, start), i);
-            const lastWord = (before.match(/([\p{L}\p{N}.]+)$/u)?.[1] ?? '').toLowerCase();
+            const rawWord = before.match(/([\p{L}\p{N}.]+)$/u)?.[1] ?? '';
+            const lastWord = rawWord.toLowerCase();
             // 3.5 — a decimal, not a full stop.
             if (/\d$/.test(before) && /^\d/.test(text.slice(end + 1).trimStart())) { i = end; continue; }
             // "J." — an initial.
             if (/^\p{L}$/u.test(lastWord)) { i = end; continue; }
+            // A short CAPITALIZED token is a title/abbreviation by shape
+            // (St. / Rep. / Gen. / U.S.) — the open class no list can cover
+            // ("Rep." slipped past the card splitter's list, 2026-08-22).
+            if (/^\p{Lu}[\p{L}.]{0,3}$/u.test(rawWord)) { i = end; continue; }
             if (ABBREVIATIONS.has(lastWord.replace(/\.$/, ''))) { i = end; continue; }
         }
 

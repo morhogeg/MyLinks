@@ -1400,6 +1400,27 @@ exact-match, capped.
   a real push arriving (needs the device). Owner QA: install 1281, Settings →
   Send a test notification, read the note.
 
+- **2026-08-22 — compact card stops re-splitting the model's own paragraphs;
+  abbreviation handling is by SHAPE, not a list. WEB + TESTFLIGHT.** Owner,
+  with screenshots: the closed card severed "against Rep. Ralph Norman." after
+  "Rep.", stranding the name in its own paragraph. Root cause was structural,
+  not a missing list entry: `SimpleMarkdown`'s compact splitter tokenizes
+  content into lines BEFORE splitting, so its "no line breaks in this text"
+  guard was vacuously true and it re-split every single-sentence paragraph the
+  model had already isolated. Now the sentence splitter runs ONLY when the
+  whole summary is one unbroken block (the legacy shape it was written for) —
+  a model-structured summary renders exactly as laid out, which fixes existing
+  cards at render time with no re-save. In the legacy fallback the enumerated
+  title list is GONE (owner: "we can't think of every known abbreviation"):
+  a fragment ending in a short capitalized token (the open class — St., Rep.,
+  Gen., U.S.), a dotted form (e.g., i.e.), or one of the few closed lowercase
+  abbreviations (vs., etc.) is re-joined by shape. `answerLayout`'s sentence
+  splitter gained the same capitalized-shape guard. Note: `Intl.Segmenter`
+  ('sentence') was tried and REJECTED — V8 ships no CLDR suppression data, so
+  it too breaks after "Rep." (verified in node 22). Verified: regex exercised
+  both directions in node (12 abbreviation shapes re-join; normal short-word
+  endings incl. Hebrew still split), `tsc --noEmit` clean.
+
 - **2026-08-22 — the share HUD's terminal frame stops saying a bare "Saved".
   SHIPPED as TestFlight build 1280 (run #280, merge `1071f43`).** Owner,
   recurring complaint: sharing from Safari
@@ -1428,6 +1449,27 @@ exact-match, capped.
   card truly lands. Copy-only Swift change — could not be compile-verified in
   this Linux session (no Xcode); the strings replace existing literals in
   `completeScanSuccess`, `showResult` and the HUD setup.
+
+- **2026-08-22 — screenshot cards: high vision resolution + a truncation
+  backstop for early-stopped generations. BACKEND ONLY.** Owner, with
+  screenshots: a plus-button save of a dense Hebrew Facebook-post screenshot
+  produced a thin card whose last Key Points bullet ended mid-word ("מנכ") —
+  valid JSON, so nothing downstream noticed, and the fragment was stored.
+  Two fixes in `ai_service.py`. (1) `analyze_image` (the direct screenshot
+  path — plus-button AND share-sheet images both funnel through it) now sets
+  `MEDIA_RESOLUTION_HIGH` explicitly instead of trusting the SDK default —
+  the Instagram path already learned low resolution misreads dense
+  Hebrew/RTL — and its prompt now demands coverage of the ENTIRE screenshot
+  text, first line to last. (2) `_generate_json` gained `_text_cut_off` /
+  `_analysis_cut_off`: a parsed analysis whose `summary`/`detailedSummary`
+  trails off on a bare letter or an unclosed `**` is treated as an
+  early-stopped generation — a remaining attempt is spent on a clean take,
+  and if every attempt (or the retry's transport) fails, the FULLEST
+  fragment is returned so a save never breaks over the check. Non-analysis
+  schemas lack those fields and are untouched. Verified: 635/635 offline
+  tests (10 new in `test_truncated_analysis.py`, incl. a fake-client retry
+  harness), `py_compile` clean. NOT verified here: a live Gemini call —
+  QA by re-saving the screenshot after the functions deploy.
 
 - **2026-08-22 — LinkedIn cards: full post text + real author byline, and
   list-shaped posts summarize per item. BACKEND ONLY.** Owner, with screenshots:
