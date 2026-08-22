@@ -126,7 +126,10 @@ export default function SimpleMarkdown({ content, className = '', isCompact = fa
             // Brigid's butter" broke here — owner card, 2026-07-28), or one that
             // leaves a **bold span** open — splitting inside it orphans the
             // markers and they render as literal asterisks in both halves.
-            const ABBREV_END = /\b(?:St|Dr|Mr|Mrs|Ms|Prof|Sr|Jr|vs|No|approx|e\.g|i\.e|etc)\.$/i;
+            // Includes political/military titles: "Rep. Ralph Norman" broke
+            // after "Rep." (owner card, 2026-08-22), stranding the name in its
+            // own paragraph.
+            const ABBREV_END = /\b(?:St|Dr|Mr|Mrs|Ms|Prof|Sr|Jr|vs|No|approx|e\.g|i\.e|etc|Rep|Sen|Gov|Gen|Col|Lt|Sgt|Capt|Rev|Hon|Adm|Maj|Pres|Sec)\.$/i;
             const sentences = raw.reduce((acc: string[], part) => {
                 const prev = acc[acc.length - 1];
                 const openBold = prev !== undefined && (prev.split('**').length - 1) % 2 === 1;

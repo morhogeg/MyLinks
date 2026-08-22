@@ -43,6 +43,11 @@ const STRUCTURED_LINE = /^\s*(?:[-*+•]\s|\d+[.)]\s|#{1,6}\s|>\s|```|\|)/;
 const ABBREVIATIONS = new Set([
     'e.g', 'i.e', 'etc', 'vs', 'mr', 'mrs', 'ms', 'dr', 'prof', 'st', 'no',
     'fig', 'approx', 'est', 'inc', 'ltd', 'co', 'jr', 'sr', 'u.s', 'u.k',
+    // Political/military titles — "Rep. Ralph Norman" must not split ("Rep."
+    // stranded a name on a card, 2026-08-22; same list as SimpleMarkdown's
+    // ABBREV_END guard).
+    'rep', 'sen', 'gov', 'gen', 'col', 'lt', 'sgt', 'capt', 'rev', 'hon',
+    'adm', 'maj', 'pres', 'sec',
 ]);
 
 /**
