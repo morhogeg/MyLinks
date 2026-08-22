@@ -1354,6 +1354,34 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-22 — LinkedIn cards: full post text + real author byline, and
+  list-shaped posts summarize per item. BACKEND ONLY.** Owner, with screenshots:
+  a Ryan Holiday book-recommendation post produced a thin summary whose bullets
+  scattered (the **Gregory Hays** translation advice landed four bullets after
+  *Meditations*), died mid-post (Frankl and Montaigne never appeared), and the
+  card had NO author byline. Two root causes, both fixed. (1) **Scraper**
+  (`_scrape_linkedin_url`): it read only `og:description` — LinkedIn's
+  truncated teaser — so the model literally never saw the second half of the
+  post. It now parses the page's **JSON-LD** (`articleBody` = the FULL post,
+  `author.name` = the real display name, which also covers company pages),
+  keeps the longest of ld+json/og:description/`<p>` text, sets `truncated`
+  when only the ellipsis teaser survived, uses the post-redirect final URL for
+  the slug fallback (covers `lnkd.in` short links, now routed to the LinkedIn
+  scraper, and authwall redirects), prefixes the body with "LINKEDIN POST BY
+  <name>" so summaries can attribute claims by name, and on scrape failure
+  returns the honest `[no text content available]` placeholder plus the
+  slug-derived author instead of empty everything. (2) **Prompt**
+  (`ai_service.py` §4 detailedSummary): new **LISTS / ROUNDUPS** rule — when
+  content enumerates distinct items (books, tools, tips…), one bullet PER item
+  opening with its bolded name and carrying everything said about it
+  (edition/translation advice included), a hard "a detail about item X appears
+  WITH item X" grouping rule, cover EVERY item in order, and these bullets are
+  exempt from the 120–220-word cap like Ingredients/Steps. Verified: 625/625
+  offline tests pass (3 new JSON-LD tests in `test_linkedin_author.py`),
+  `py_compile` clean. NOT verified here: a live LinkedIn fetch (cloud egress
+  blocks it) — QA by re-saving the Ryan Holiday post after the functions
+  deploy. Existing cards keep their old summaries unless re-saved.
+
 - **2026-08-08 — landing round 16: the capture stepper becomes the app's own,
   plus three copy/motion refinements.** (1) The CaptureScene pipeline was a
   landing-only variant (pill highlight on the active row, static glyphs for

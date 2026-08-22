@@ -232,8 +232,10 @@ def scrape_url(url: str, message_body: Optional[str] = None) -> dict:
         if _host_is('youtube.com', 'youtu.be'):
             return _scrape_youtube_url(url, message_body=message_body)
 
-        # Special handling for LinkedIn URLs (capture the post author's name)
-        if _host_is('linkedin.com'):
+        # Special handling for LinkedIn URLs (capture the post author's name).
+        # lnkd.in is LinkedIn's own shortener — safe_get follows the redirect
+        # and the scraper reads the final URL for the author slug.
+        if _host_is('linkedin.com', 'lnkd.in'):
             return _scrape_linkedin_url(url)
 
         # Special handling for Facebook URLs (full caption, not just og intro)
@@ -464,8 +466,53 @@ def _extract_linkedin_author(html: str, url: str = '') -> Optional[str]:
     return linkedin_author_from_url(url) if url else None
 
 
+def _linkedin_ldjson_fields(html: str) -> tuple:
+    """(author_name, article_body) from a LinkedIn page's JSON-LD, else Nones.
+
+    Logged-out LinkedIn post pages embed a `<script type="application/ld+json">`
+    block whose `articleBody` carries the FULL post text (og:description is a
+    truncated teaser) and whose `author.name` is the poster's real display name
+    — including for company pages, which the "<Author> on LinkedIn:" og:title
+    path never covers. Best-effort: any parse failure returns (None, None) and
+    the caller falls back to the meta/slug paths.
+    """
+    import json
+    author = body = None
+    for m in re.finditer(
+            r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
+            html, re.I | re.S):
+        try:
+            data = json.loads(m.group(1))
+        except Exception:
+            continue
+        for obj in (data if isinstance(data, list) else [data]):
+            if not isinstance(obj, dict):
+                continue
+            if not body:
+                b = obj.get('articleBody') or obj.get('text')
+                if isinstance(b, str) and b.strip():
+                    body = b.strip()
+            if not author:
+                a = obj.get('author')
+                if isinstance(a, list) and a:
+                    a = a[0]
+                if isinstance(a, dict):
+                    name = a.get('name')
+                    if isinstance(name, str) and 1 < len(name.strip()) <= 60:
+                        author = name.strip()
+        if author and body:
+            break
+    return author, body
+
+
 def _scrape_linkedin_url(url: str) -> dict:
-    """Scrape a LinkedIn URL and capture the author's display name."""
+    """Scrape a LinkedIn URL and capture the author's display name.
+
+    Body preference order: JSON-LD `articleBody` (the FULL post), then the
+    longest of og:description / meta description / `<p>` text. When the best we
+    got is the og:description teaser (ends in an ellipsis), `truncated` is set
+    so downstream knows the model saw a fragment, not the post.
+    """
     logger.info(f"Analyzing LinkedIn URL: {url}")
     headers = {
         "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1"
@@ -473,6 +520,10 @@ def _scrape_linkedin_url(url: str) -> dict:
     try:
         response = safe_get(url, headers=headers, timeout=10)
         html = response.text
+        # The FINAL url (post-redirect): lnkd.in short links and feed/update
+        # forms redirect to the canonical /posts/<authorSlug>_… URL, which is
+        # what the slug fallback can actually read an author from.
+        final_url = str(response.url or url)
 
         from bs4 import BeautifulSoup
         import html as html_lib
@@ -480,19 +531,41 @@ def _scrape_linkedin_url(url: str) -> dict:
 
         title = soup.title.string.strip() if soup.title and soup.title.string else ""
 
-        text_parts = []
-        og_desc = re.search(r'<meta[^>]+property=["\']og:description["\'][^>]+content=["\']([^"\']*)', html, re.I)
-        if og_desc:
-            text_parts.append(html_lib.unescape(og_desc.group(1)))
-        for p in soup.find_all('p'):
-            text_parts.append(p.get_text().strip())
-        text = " ".join([t for t in text_parts if t])[:5000]
+        ld_author, ld_body = _linkedin_ldjson_fields(html)
+
+        def _meta(*names):
+            for name in names:
+                m = re.search(
+                    r'<meta[^>]+(?:property|name)=["\']' + re.escape(name)
+                    + r'["\'][^>]+content=["\']([^"\']*)', html, re.I)
+                if m:
+                    return html_lib.unescape(m.group(1)).strip()
+            return ""
+
+        og_desc = _meta('og:description', 'twitter:description', 'description')
+        p_text = " ".join(t for t in (p.get_text().strip() for p in soup.find_all('p')) if t)
+
+        # Longest real candidate wins — ld+json articleBody is the whole post,
+        # og:description a teaser, <p> text usually authwall boilerplate.
+        candidates = [c for c in (ld_body, og_desc, p_text) if c]
+        body = max(candidates, key=len)[:8000] if candidates else ""
+        truncated = (bool(body) and body == og_desc
+                     and body.rstrip().endswith(("...", "…")))
+
+        source_name = (ld_author
+                       or _extract_linkedin_author(html, final_url)
+                       or (linkedin_author_from_url(url) if final_url != url else None))
+
+        # Name the poster IN the text so the analysis can attribute claims to
+        # them ("Ryan Holiday recommends…") instead of an anonymous post.
+        text = f"LINKEDIN POST BY {source_name}:\n\n{body}" if source_name and body else body
 
         return {
             "html": html,
             "title": title,
             "text": text or html[:5000],
-            "source_name": _extract_linkedin_author(html, url),
+            "truncated": truncated,
+            "source_name": source_name,
             # Poster ONLY for actual VIDEO posts: LinkedIn serves a generic
             # "Posted on LinkedIn" branding og:image even for plain TEXT posts, so
             # we can't blindly trust og:image. Gating on og:type=video / og:video
@@ -501,7 +574,11 @@ def _scrape_linkedin_url(url: str) -> dict:
         }
     except Exception as e:
         logger.error(f"LinkedIn scrape error for {url}: {e}")
-        return {"html": "", "title": "", "text": ""}
+        # Honest placeholder (grounding rule → "could not be retrieved" card,
+        # never a fabricated summary), but keep the slug author: who posted is
+        # still knowable from the URL even when the page won't load.
+        return {"html": "", "title": "", "text": "[no text content available]",
+                "source_name": linkedin_author_from_url(url), "truncated": True}
 
 
 def _scrape_twitter_url(url: str) -> dict:
