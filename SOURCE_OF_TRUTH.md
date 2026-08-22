@@ -1375,6 +1375,21 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-22 — Insights gets the app's identity colors. WEB.** Owner ask:
+  the Insights screen was all single-hue accent — give it pops of color, "like
+  each category has on the app". Scoped per the session verdict: the
+  **category bars** now wear each category's app-wide identity color
+  (`getCategoryColorStyle` in `lib/colors.ts` — the same name-hash cards,
+  filters, the graph, and digests use), each on a matching light track with a
+  small color dot by the label; the **Top tags pills** are colored the same way
+  (a tag keeps one color everywhere); the "Other (N more)" aggregate stays
+  accent since it has no identity. Deliberately NOT colored: stat tiles, the
+  weekly chart, and Top sources — there, length carries the magnitude and
+  color would add noise. All in `web/components/settings/StatsView.tsx`;
+  colors are inline rgb from the established mapping (works in both themes),
+  not new hardcodes. Verified: `tsc --noEmit` clean. NOT verified here: a
+  visual render (no device); QA by opening Settings → Insights.
+
 - **2026-08-22 — push notifications: the silent chain gets honest copy and an
   on-device self-test. SHIPPED (merge `8aa1da4` → build 1281, functions run
   #81, hosting run #7).** Owner: digests/syntheses render in-app but no push
