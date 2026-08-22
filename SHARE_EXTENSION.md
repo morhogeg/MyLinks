@@ -14,7 +14,7 @@ Share sheet ──▶ ShareExt (separate process)
                    │                                   │ link/text → queue url
                    │                                   │ image    → store + queue (isImage)
                    ▼                                   ▼
-            "Saved to Machina ✓"            process_link_background → card in feed
+            "Saved ✓ · Making your card"    process_link_background → card in feed
 ```
 
 ### Pieces

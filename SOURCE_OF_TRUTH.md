@@ -226,9 +226,18 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-08-08): install build **1279**
+> ## 🚨 OWNER ACTION (updated 2026-08-22): install build **1280**
 >
-> **1279** (run #279, merge `e0cfdda`) is current: it is the first build where a
+> **1280** (run #280, merge `1071f43`) is current: the share sheet's terminal
+> frame no longer says a bare "Saved" while the backend is still analysing. It
+> now reads **"Saved ✓ · Making your card"** over the still-mid-flight %, with
+> **"The card finishes on its own in Machina."** underneath, and no em dash
+> survives in any rendered extension string. QA on device: share an article from
+> Safari, watch the final frame, then open Machina immediately — the in-app
+> banner should continue the SAME ramp rather than contradicting a "done" claim.
+> Everything in 1279 rides along. 1279 stays the fallback.
+>
+> **(superseded) 1279** (run #279, merge `e0cfdda`): the first build where a
 > shared PARAGRAPH is treated as text rather than a link — honest capture copy
 > ("Saving your text… / Reading your text…"), the text kept verbatim as the card
 > body under an AI heading, and the summary behind the Machina mark. Everything
@@ -1353,6 +1362,35 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-08-22 — the share HUD's terminal frame stops saying a bare "Saved".
+  SHIPPED as TestFlight build 1280 (run #280, merge `1071f43`).** Owner,
+  recurring complaint: sharing from Safari
+  showed "Saved" but opening Machina right away met a card at ~19% — the word
+  promised done while analysis had ~15–20s left. The honest terminal frame
+  (live %, unfilled bar, settled mark) already existed; the COPY still led
+  with "Saved to Machina ✓" and a jargon hint ("Analyzing — progress continues
+  in Machina"). Rewritten so the same line that carries the ✓ names the work
+  still running: phase **"Saved ✓ · Making your card"**, hint **"The card
+  finishes on its own in Machina."** (Two owner catches shaped the hint: a
+  first draft promised "ready in about 20 seconds" — an ETA cold starts and
+  slow pages can't guarantee, the original lie in smaller print; a second
+  draft opened "Safe to close" — redundant, since the mid-flight hint under
+  the bar already says "You can close this" the whole time. The terminal
+  hint now carries only the one NEW fact: the handoff.) The generic (non-HUD)
+  success path and the SHARE_EXTENSION.md diagram use the same string.
+  Same session, from an owner screenshot of the live HUD: every em dash in the
+  extension's RENDERED strings is out (mid-flight hint, dedupe hint, the
+  neutral/timeout and error messages), rewritten by sentence role exactly as
+  the landing purge was — code comments untouched, as before. The mid-flight
+  hint also names the product rather than "we": **"You can close this. Machina
+  keeps working in the background."** Deliberately NOT done, per the session's
+  verdict: holding the share sheet open until analysis hits 100% — iOS kills
+  lingering extensions and it would trap the user in the sheet; and no change
+  to the in-app AnalyzingBanner's "Saved to Machina", which only fires when the
+  card truly lands. Copy-only Swift change — could not be compile-verified in
+  this Linux session (no Xcode); the strings replace existing literals in
+  `completeScanSuccess`, `showResult` and the HUD setup.
 
 - **2026-08-22 — LinkedIn cards: full post text + real author byline, and
   list-shaped posts summarize per item. BACKEND ONLY.** Owner, with screenshots:
