@@ -733,7 +733,8 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     /// backend keeps working ~15–20s more, so the in-app banner resumes from this
     /// exact %. The visual grammar must therefore read "saved, still analyzing",
     /// never "everything finished":
-    ///   - the ✓ attaches to the SAVE ("Saved to Machina ✓"), not a full-screen glyph;
+    ///   - the ✓ attaches to the SAVE ("Saved ✓ · Making your card"), not a
+    ///     full-screen glyph, and the same line names the work still running;
     ///   - the % counter stays on the live curve value, so the frame reads mid-flight;
     ///   - the bar KEEPS its live curve width in the accent colour — never full.
     /// Auto-dismiss timing is unchanged: the host share sheet is never held open for
@@ -752,8 +753,8 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
             // leave the bar at its accent curve width — do NOT fill it.
             self.percentLabel.alpha = 1
             self.checkLabel.alpha = 0
-            self.phaseLabel.text = "Saved to Machina ✓"
-            self.hintLabel.text = "Analyzing — progress continues in Machina"
+            self.phaseLabel.text = "Saved ✓ · Making your card"
+            self.hintLabel.text = "Safe to close. The card finishes on its own in Machina, ready in about 20 seconds."
             // Hand the app EXACTLY this % (the hint carries progress + start
             // clock) so its loader continues the ramp instead of restarting.
             self.writePendingShareHint()
@@ -1238,7 +1239,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
                 if (body?["duplicate"] as? Bool) == true {
                     showDuplicateResult()
                 } else {
-                    showResult("Saved to Machina ✓", success: true)
+                    showResult("Saved ✓ · Making your card", success: true)
                 }
             } else if code == 403 || code == 401 {
                 showResult("Auth failed — reopen Machina", success: false)

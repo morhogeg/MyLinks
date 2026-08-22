@@ -1354,6 +1354,24 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-22 — the share HUD's terminal frame stops saying a bare "Saved".
+  TESTFLIGHT BUILD REQUIRED.** Owner, recurring complaint: sharing from Safari
+  showed "Saved" but opening Machina right away met a card at ~19% — the word
+  promised done while analysis had ~15–20s left. The honest terminal frame
+  (live %, unfilled bar, settled mark) already existed; the COPY still led
+  with "Saved to Machina ✓" and a jargon hint ("Analyzing — progress continues
+  in Machina"). Rewritten so the same line that carries the ✓ names the work
+  still running: phase **"Saved ✓ · Making your card"**, hint **"Safe to
+  close. The card finishes on its own in Machina, ready in about 20 seconds."**
+  The generic (non-HUD) success path and the SHARE_EXTENSION.md diagram use
+  the same string. Deliberately NOT done, per the session's verdict: holding
+  the share sheet open until analysis hits 100% — iOS kills lingering
+  extensions and it would trap the user in the sheet; and no change to the
+  in-app AnalyzingBanner's "Saved to Machina", which only fires when the card
+  truly lands. Copy-only Swift change — could not be compile-verified in this
+  Linux session (no Xcode); the strings replace existing literals in
+  `completeScanSuccess` and `showResult`.
+
 - **2026-08-08 — landing round 16: the capture stepper becomes the app's own,
   plus three copy/motion refinements.** (1) The CaptureScene pipeline was a
   landing-only variant (pill highlight on the active row, static glyphs for
