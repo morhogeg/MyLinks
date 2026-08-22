@@ -1392,6 +1392,27 @@ exact-match, capped.
   this Linux session (no Xcode); the strings replace existing literals in
   `completeScanSuccess`, `showResult` and the HUD setup.
 
+- **2026-08-22 — screenshot cards: high vision resolution + a truncation
+  backstop for early-stopped generations. BACKEND ONLY.** Owner, with
+  screenshots: a plus-button save of a dense Hebrew Facebook-post screenshot
+  produced a thin card whose last Key Points bullet ended mid-word ("מנכ") —
+  valid JSON, so nothing downstream noticed, and the fragment was stored.
+  Two fixes in `ai_service.py`. (1) `analyze_image` (the direct screenshot
+  path — plus-button AND share-sheet images both funnel through it) now sets
+  `MEDIA_RESOLUTION_HIGH` explicitly instead of trusting the SDK default —
+  the Instagram path already learned low resolution misreads dense
+  Hebrew/RTL — and its prompt now demands coverage of the ENTIRE screenshot
+  text, first line to last. (2) `_generate_json` gained `_text_cut_off` /
+  `_analysis_cut_off`: a parsed analysis whose `summary`/`detailedSummary`
+  trails off on a bare letter or an unclosed `**` is treated as an
+  early-stopped generation — a remaining attempt is spent on a clean take,
+  and if every attempt (or the retry's transport) fails, the FULLEST
+  fragment is returned so a save never breaks over the check. Non-analysis
+  schemas lack those fields and are untouched. Verified: 635/635 offline
+  tests (10 new in `test_truncated_analysis.py`, incl. a fake-client retry
+  harness), `py_compile` clean. NOT verified here: a live Gemini call —
+  QA by re-saving the screenshot after the functions deploy.
+
 - **2026-08-22 — LinkedIn cards: full post text + real author byline, and
   list-shaped posts summarize per item. BACKEND ONLY.** Owner, with screenshots:
   a Ryan Holiday book-recommendation post produced a thin summary whose bullets

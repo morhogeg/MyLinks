@@ -166,6 +166,43 @@ def _response_text(response) -> str:
         return ""
 
 
+# A generation that stops early is NOT a transport error: the JSON closes
+# cleanly and parses, but a summary field ends mid-word ("…מנכ") — prod
+# 2026-08-22, a dense Hebrew screenshot card whose last bullet was cut off.
+# These helpers detect that shape so _generate_json can spend a remaining
+# attempt on it instead of persisting the fragment.
+_COMPLETE_TAIL = ('.', '!', '?', '…', ':', ';', ')', ']', '"', "'", '”', '’',
+                  '״', '׳', '*', '`', '~')
+
+
+def _text_cut_off(text) -> bool:
+    """True when a prose field looks truncated mid-generation.
+
+    Two signals, both conservative: an odd number of ``**`` markers (an opened
+    bold that never closes), or a final character that is neither punctuation
+    nor a closing marker — the prompt requires every sentence and bullet to end
+    with a period, so trailing off on a bare letter/digit is the truncation
+    signature, not a style choice.
+    """
+    if not isinstance(text, str):
+        return False
+    t = text.rstrip()
+    if not t:
+        return False
+    if t.count('**') % 2 == 1:
+        return True
+    return not t.endswith(_COMPLETE_TAIL)
+
+
+def _analysis_cut_off(data: dict) -> bool:
+    """True when an analysis dict's summary/detailedSummary looks truncated.
+
+    Only these two prose fields are checked, so non-analysis schemas (which
+    lack them) pass through untouched.
+    """
+    return any(_text_cut_off(data.get(f)) for f in ("summary", "detailedSummary"))
+
+
 # How many times _generate_json attempts a Gemini call before giving up.
 _MAX_GENERATE_ATTEMPTS = 3
 # Attempts for embed_text (embeddings are non-critical — see embed_text).
@@ -745,6 +782,9 @@ class GeminiService:
             config.update(config_extra)
 
         last_error = None
+        # Best truncated-looking result seen so far: a fragment is still better
+        # than failing the save if every attempt comes back cut off.
+        truncated_best = None
         for attempt in range(attempts):
             try:
                 response = self.client.models.generate_content(
@@ -773,6 +813,24 @@ class GeminiService:
                     data = data[0]
 
                 if isinstance(data, dict):
+                    # Early-stopped generation: valid JSON whose summary trails
+                    # off mid-word. Spend a remaining attempt on a clean take,
+                    # but NEVER fail the save over it — if retries stay cut off
+                    # (or none remain), the fullest fragment is returned below.
+                    if _analysis_cut_off(data):
+                        if (truncated_best is None
+                                or len(str(data.get("detailedSummary") or ""))
+                                > len(str(truncated_best.get("detailedSummary") or ""))):
+                            truncated_best = data
+                        if attempt < attempts - 1:
+                            logger.warning(
+                                f"Gemini {what} attempt {attempt + 1} looks "
+                                "truncated mid-sentence — retrying")
+                            continue
+                        logger.warning(
+                            f"Gemini {what}: all attempts look truncated — "
+                            "keeping the fullest one")
+                        return truncated_best
                     return data
                 raise AnalysisError("Gemini returned an unexpected JSON shape")
             except Exception as e:
@@ -784,6 +842,13 @@ class GeminiService:
                     time.sleep(_retry_delay(attempt))
                     continue
                 break
+
+        # A truncated result in hand beats raising: the retry it triggered may
+        # have died on a transport error, but the fragment is still a card.
+        if truncated_best is not None:
+            logger.warning(f"Gemini {what}: returning truncated result after "
+                           f"a failed retry ({last_error})")
+            return truncated_best
 
         logger.error(f"Gemini {what} failed after retries: {last_error}")
         # Preserve an empty/blocked-generation signal through the wrap so the RAG
@@ -1023,6 +1088,7 @@ Content to analyze:
 Based on the image provided, extract the text and analyze it according to the instructions above.
 If the image contains a tweet or social media post, extract the content as if it were the text.
 If the image is an article, extract the headline and body.
+COVER THE WHOLE IMAGE: a screenshot of a post or article is the user's saved copy of that content, so the analysis must span its ENTIRE text — from the first line to the last, including quotes and statements near the bottom. Do not stop after the opening paragraphs; a summary that covers only the top of the screenshot is an incomplete summary.
 Work only from what is legible: keep the subject at the level the image states it (a country stays a country, a category stays a category), and where the text is unclear or cropped, leave it out rather than guessing a place, name, brand, or date."""
 
         from google.genai import types
@@ -1031,8 +1097,13 @@ Work only from what is legible: keep the subject at the level the image states i
             types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
             prompt,
         ]
+        # HIGH, explicitly: a deliberate single-image save is the one path where
+        # the image IS the content, and dense text screenshots (esp. Hebrew/RTL)
+        # need the resolution — the SDK default is not a documented contract, and
+        # the Instagram path already learned that low resolution misreads them.
         return self._enforce_tag_language(
-            self._generate_json(contents, "image analysis", attempts=attempts))
+            self._generate_json(contents, "image analysis", attempts=attempts,
+                                config_extra={"media_resolution": "MEDIA_RESOLUTION_HIGH"}))
 
     def _probe_prompt_blocked(self, prompt: str) -> bool:
         """Ask Gemini's filter whether it ACCEPTS a prompt, without paying for
