@@ -1446,6 +1446,25 @@ exact-match, capped.
   a real push arriving (needs the device). Owner QA: install 1281, Settings →
   Send a test notification, read the note.
 
+- **2026-08-22 — every em dash is out of the APP'S rendered copy (capture
+  dialog, toasts, empty states, onboarding, settings, aria-labels, legal
+  pages, browser extension). WEB + TESTFLIGHT.** Owner, from the capture
+  dialog screenshot: "fix copy here across the board, remove em dashes"
+  (wording kept unless the dash removal demanded a change). ~120 dashes
+  replaced across 40+ files, each rewritten for what its sentence was doing
+  (period, colon, comma, parentheses, or a `·` separator in titles/chips),
+  deliberately NOT one uniform substitute — same rule as the 2026-08-08
+  landing sweep. Two deliberate keeps: the "— Mor" signature in the
+  founder's note (letter convention, not prose) and the timestamp-parser
+  regex. Code comments untouched (house style). The only wording changes:
+  Card.tsx's redundant "Retry to try again" became "retry", and the privacy
+  page's "section 14 — we answer" became two sentences. Verified: a
+  comment-filtered sweep of web/components, web/lib, web/app and extension/
+  shows 0 rendered em dashes remaining; `tsc --noEmit` clean; extension JS
+  passes `node --check`, manifest still valid JSON. Legal pages ship with
+  Vercel; app copy needs the next TestFlight build; the extension is
+  side-loaded, so its copy updates whenever it's next packaged.
+
 - **2026-08-22 — compact card stops re-splitting the model's own paragraphs;
   abbreviation handling is by SHAPE, not a list. SHIPPED (merge `7d7073e` → Vercel + TestFlight **build 1282**, run #282; carries 1281's push-diagnostics content).** Owner,
   with screenshots: the closed card severed "against Rep. Ralph Norman." after

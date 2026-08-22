@@ -261,8 +261,8 @@ export default function CollectionsGallery({
                     </span>
                     <h3 className="text-base font-bold text-text">Group your saves into collections</h3>
                     <p className="mt-1.5 max-w-xs text-sm text-text-muted leading-relaxed">
-                        A collection is a curated set of cards — a research topic, a reading list,
-                        a trip plan — that you can browse in one place and share as a beautiful public page.
+                        A collection is a curated set of cards (a research topic, a reading list,
+                        a trip plan) that you can browse in one place and share as a beautiful public page.
                     </p>
                     {onCreate && (
                         <button

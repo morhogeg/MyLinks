@@ -106,7 +106,7 @@ async function saveAndReport({ url, note, label }) {
 
   if (!url || !/^https?:\/\//i.test(url)) {
     await badgeError();
-    notify("Can't save this page", "Only http(s) pages can be saved — not browser or store pages.");
+    notify("Can't save this page", "Only http(s) pages can be saved, not browser or store pages.");
     return { ok: false, status: 0, error: "bad-url" };
   }
 
@@ -125,13 +125,13 @@ async function saveAndReport({ url, note, label }) {
     } else {
       await badgeSaved();
       const extra = note ? " (with your selection)" : "";
-      notify("Saved to Machina ✓", `${name}${extra} — analyzing now, it'll appear in your app shortly.`);
+      notify("Saved to Machina ✓", `${name}${extra}. Analyzing now, it'll appear in your app shortly.`);
     }
   } else {
     await badgeError();
     const reason =
-      result.status === 403 ? "Invalid token — check it in settings." :
-      result.status === 401 ? "No token sent — check it in settings." :
+      result.status === 403 ? "Invalid token. Check it in settings." :
+      result.status === 401 ? "No token sent. Check it in settings." :
       "Couldn't reach Machina. Check your connection.";
     notify("Couldn't save", reason);
   }
@@ -229,9 +229,9 @@ async function validateToken() {
     return { ok: false, reason: "network", message: "Could not reach the server. Check the backend URL." };
   }
 
-  if (res.status === 400) return { ok: true, message: "Connected — your token works." };
+  if (res.status === 400) return { ok: true, message: "Connected. Your token works." };
   if (res.status === 401) return { ok: false, reason: "missing", message: "Server didn't see the token." };
-  if (res.status === 403) return { ok: false, reason: "invalid", message: "Invalid token — double-check it." };
+  if (res.status === 403) return { ok: false, reason: "invalid", message: "Invalid token. Double-check it." };
   return { ok: false, reason: "unexpected", message: `Unexpected response (${res.status}).` };
 }
 

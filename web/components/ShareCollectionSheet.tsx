@@ -97,7 +97,7 @@ export default function ShareCollectionSheet({
         setBusy('unpublish');
         try {
             await unpublishCollection(uid, collection);
-            toast.success('Sharing turned off — the public page is gone');
+            toast.success('Sharing turned off. The public page is gone.');
         } catch {
             toast.error("Couldn't stop sharing. Please try again.");
         } finally {
@@ -118,7 +118,7 @@ export default function ShareCollectionSheet({
 
     const doShare = async () => {
         if (!url) return;
-        const outcome = await shareLink(url, collection.name, `${collection.name} — a collection on Machina`);
+        const outcome = await shareLink(url, collection.name, `${collection.name}, a collection on Machina`);
         if (outcome === 'copied') toast.success('Share link copied to clipboard');
         else if (outcome === 'failed') toast.error("Couldn't open the share sheet.");
     };
@@ -186,7 +186,7 @@ export default function ShareCollectionSheet({
                     {!isPublic ? (
                         <>
                             <p className="text-sm text-text-muted leading-relaxed">
-                                Sharing creates a page with a snapshot of these {count === 1 ? 'card' : `${count} cards`} —
+                                Sharing creates a page with a snapshot of these {count === 1 ? 'card' : `${count} cards`}:
                                 titles, summaries, and sources. Anyone with the link can view it; nothing
                                 identifies you, and your library stays private.
                             </p>
@@ -199,7 +199,7 @@ export default function ShareCollectionSheet({
                                 {busy === 'publish' ? 'Creating…' : 'Create share link'}
                             </button>
                             {count === 0 && (
-                                <p className="text-xs text-text-muted text-center">Add a card first — an empty collection has nothing to show.</p>
+                                <p className="text-xs text-text-muted text-center">Add a card first. An empty collection has nothing to show.</p>
                             )}
                         </>
                     ) : (

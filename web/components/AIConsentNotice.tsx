@@ -71,7 +71,7 @@ export default function AIConsentNotice({ onAccept }: { onAccept: () => void }) 
                     onClick={onAccept}
                     className="mt-8 w-full"
                 >
-                    I understand — continue
+                    I understand, continue
                 </Button>
                 <p className="mt-3 text-[12px] text-text-muted text-center leading-relaxed">
                     By continuing, you agree to this processing. Details in our{' '}

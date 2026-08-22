@@ -294,7 +294,7 @@ export default function Home() {
                 <button
                   data-tour="views"
                   onClick={() => sendHeaderCommand('view')}
-                  aria-label="View — card, list, review, graph, notes"
+                  aria-label="View: card, list, review, graph, notes"
                   className="h-10 w-10 flex items-center justify-center text-text-secondary hover:text-text active:text-text transition-colors"
                 >
                   {/* The glyph IS the state: it wears the active layout's icon. */}

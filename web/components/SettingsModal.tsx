@@ -446,7 +446,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                                     className="mr-auto inline-flex items-center gap-1.5 text-sm text-red-400 hover:text-red-300 transition-colors cursor-pointer"
                                 >
                                     <RefreshCw className="w-4 h-4" />
-                                    Couldn&apos;t load settings — retry
+                                    Couldn&apos;t load settings. Retry.
                                 </button>
                             )}
                             {showBack && (

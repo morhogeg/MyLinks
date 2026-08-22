@@ -67,7 +67,7 @@ function WeeklyChart({ stats, grown }: { stats: LibraryStats; grown: boolean }) 
         <div className="rounded-[14px] border border-border-subtle bg-card px-4 pt-4 pb-3">
             <div className="flex items-end gap-[6px] h-16">
                 {stats.weeks.map((w, i) => (
-                    <div key={w.start} className="flex-1 max-w-[24px] mx-auto flex flex-col justify-end h-full" title={`Week of ${fmt(w.start)} — ${w.count} save${w.count === 1 ? '' : 's'}`}>
+                    <div key={w.start} className="flex-1 max-w-[24px] mx-auto flex flex-col justify-end h-full" title={`Week of ${fmt(w.start)}: ${w.count} save${w.count === 1 ? '' : 's'}`}>
                         <div
                             className={`w-full rounded-t-[4px] ${GROW} ${w.count === 0 ? 'bg-border-subtle' : i === last ? 'bg-[image:var(--accent-gradient)]' : 'bg-accent'}`}
                             style={{
@@ -139,7 +139,7 @@ function CategoryBars({ stats, grown, onOpen }: { stats: LibraryStats; grown: bo
                         </div>
                     </>
                 );
-                const title = `${row.name} — ${Math.round((row.count / stats.total) * 100)}% of your library`;
+                const title = `${row.name}: ${Math.round((row.count / stats.total) * 100)}% of your library`;
                 return tappable ? (
                     <button
                         key={row.name}
@@ -273,7 +273,7 @@ export function StatsView({ uid, onOpenFacet, restoreScroll }: {
                     className="mt-2 inline-flex items-center gap-1.5 text-sm text-red-400 hover:text-red-300 transition-colors cursor-pointer"
                 >
                     <RefreshCw className="w-4 h-4" />
-                    Couldn&apos;t load your stats — retry
+                    Couldn&apos;t load your stats. Retry.
                 </button>
             </>
         );
@@ -297,7 +297,7 @@ export function StatsView({ uid, onOpenFacet, restoreScroll }: {
                         <BarChart3 className="w-6 h-6" />
                     </span>
                     <p className="text-[14px] text-text-muted leading-snug max-w-[240px]">
-                        Nothing to chart yet — save a few links and this becomes your library&apos;s birds-eye view.
+                        Nothing to chart yet. Save a few links and this becomes your library&apos;s birds-eye view.
                     </p>
                 </div>
             </>

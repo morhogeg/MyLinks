@@ -22,9 +22,9 @@ export const EXAMPLE_CARD: ExampleCard = {
     url: 'https://en.wikipedia.org/wiki/Spaced_repetition',
     title: 'Spaced Repetition: Why Spacing Beats Cramming',
     summary:
-        'Reviewing material at gradually widening intervals cements it in long-term memory far better than cramming — the science behind flashcard apps and durable learning.',
+        'Reviewing material at gradually widening intervals cements it in long-term memory far better than cramming: the science behind flashcard apps and durable learning.',
     detailedSummary:
-        "Spaced repetition schedules each review for the moment you're about to forget something, forcing an effortful recall that strengthens the memory a little more every time. It builds on Hermann Ebbinghaus's \"forgetting curve\" and was refined by systems like the Leitner box and SuperMemo. The practical payoff: to remember something for years, don't study it harder — study it later, and then later again. Minutes of well-timed practice beat hours of passive re-reading.",
+        "Spaced repetition schedules each review for the moment you're about to forget something, forcing an effortful recall that strengthens the memory a little more every time. It builds on Hermann Ebbinghaus's \"forgetting curve\" and was refined by systems like the Leitner box and SuperMemo. The practical payoff: to remember something for years, don't study it harder, study it later, and then later again. Minutes of well-timed practice beat hours of passive re-reading.",
     category: 'Learning',
     tags: ['memory', 'learning', 'productivity'],
     status: 'unread',

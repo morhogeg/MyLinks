@@ -48,7 +48,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
                 </h1>
                 <p className="mt-2 text-sm text-text-secondary text-center leading-relaxed">
                     {native
-                        ? 'Machina captures straight from the iOS share sheet. Here’s the one-time setup — it takes 20 seconds.'
+                        ? 'Machina captures straight from the iOS share sheet. Here’s the one-time setup. It takes 20 seconds.'
                         : 'Machina lives in your browser toolbar. Here’s how to clip your first page.'}
                 </p>
 
@@ -73,7 +73,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
                                 n={3}
                                 icon={<Sparkles className="w-[18px] h-[18px]" />}
                                 title="Pick Machina to save"
-                                body="Choose Machina — it reads the page, writes a clean summary, and files it for you."
+                                body="Choose Machina. It reads the page, writes a clean summary, and files it for you."
                             />
                         </>
                     ) : (
@@ -82,7 +82,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
                                 n={1}
                                 icon={<Puzzle className="w-[18px] h-[18px]" />}
                                 title="Add the browser extension"
-                                body="Get the Machina extension for Chrome, Edge, or Brave — it lives right in your toolbar."
+                                body="Get the Machina extension for Chrome, Edge, or Brave. It lives right in your toolbar."
                             />
                             <StepRow
                                 n={2}
@@ -94,7 +94,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
                                 n={3}
                                 icon={<Sparkles className="w-[18px] h-[18px]" />}
                                 title="Machina does the rest"
-                                body="It reads the page, writes a clean summary, and auto-files it — no folders to manage."
+                                body="It reads the page, writes a clean summary, and auto-files it. No folders to manage."
                             />
                         </>
                     )}
@@ -106,7 +106,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
                     onClick={onDone}
                     className="mt-8 w-full"
                 >
-                    {native ? 'Got it — let’s go' : 'Start saving'}
+                    {native ? 'Got it, let’s go' : 'Start saving'}
                     <ArrowRight className="w-4 h-4 rtl:-scale-x-100" />
                 </Button>
                 <p className="mt-3 text-[12px] text-text-muted text-center">

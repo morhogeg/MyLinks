@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import LandingPage from "@/components/LandingPage";
 
 export const metadata: Metadata = {
-  title: "Machina — Everything you save, finally useful.",
+  title: "Machina: Everything you save, finally useful.",
   description:
-    "Machina is one place that holds everything you save — links, screenshots and videos from every app. It reads each save, summarizes it, files it, and lets you ask your own library a question and get an answer with sources.",
+    "Machina is one place that holds everything you save: links, screenshots and videos from every app. It reads each save, summarizes it, files it, and lets you ask your own library a question and get an answer with sources.",
 };
 
 /**

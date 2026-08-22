@@ -79,7 +79,7 @@ const fetchWithTimeout = async (input: string, init: RequestInit) => {
             // HONEST copy: the synchronous save did NOT complete — nothing was
             // persisted and nothing will appear in the feed. Tell the truth and
             // invite a retry (the URL stays in the field, so retry is one tap).
-            throw saveError('That took too long, so nothing was saved. Your link is still here — tap Save to try again.', 'timeout');
+            throw saveError('That took too long, so nothing was saved. Your link is still here. Tap Save to try again.', 'timeout');
         }
         throw err;
     } finally {
@@ -284,7 +284,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
         }
         if (linkCard.status === 'failed') {
             // The card survives as a retryable `failed` card in the feed.
-            toast.error("Saved your link, but analysis couldn't finish — tap the card to retry.");
+            toast.error("Saved your link, but analysis couldn't finish. Tap the card to retry.");
             resetLinkSession();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -371,7 +371,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                 const existingId = await findLinkIdByUrl(uid, formattedUrl);
                 if (existingId) {
                     trackSaveFailed('duplicate');
-                    toast.info("You already saved this — opening it now.");
+                    toast.info("You already saved this. Opening it now.");
                     setUrl('');
                     setError(null);
                     setIsExpanded(false);
@@ -455,7 +455,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                 setLinkCard(null);
                 lastLinkPct.current = 0;
                 trackSaveFailed('network');
-                toast.error("Saved your link, but analysis couldn't start — tap the card to retry.");
+                toast.error("Saved your link, but analysis couldn't start. Tap the card to retry.");
                 setUrl('');
                 setIsExpanded(false);
                 setIsLoading(false);
@@ -487,7 +487,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                 // itself is worth confirming — hence the buzz and a toast that
                 // says exactly what happened: captured now, analysing still.
                 hapticSuccess();
-                toast.success('Saved — analyzing in the background');
+                toast.success('Saved. Analyzing in the background.');
                 setUrl('');
                 setIsExpanded(false);
                 setIsLoading(false);
@@ -704,7 +704,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                                 Add to Machina
                             </h3>
                             <p className="text-sm text-text-secondary">
-                                Capture a link, image, or your own note — Machina reads, summarizes, and files it.
+                                Capture a link, image, or your own note. Machina reads, summarizes, and files it.
                             </p>
                         </div>
 
@@ -791,7 +791,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                                         id="note"
                                         value={note}
                                         onChange={(e) => setNote(e.target.value)}
-                                        placeholder="Write a thought, an idea, a quote — Machina summarizes and files it."
+                                        placeholder="Write a thought, an idea, a quote. Machina summarizes and files it."
                                         rows={5}
                                         className="w-full h-[170px] px-4 py-3 bg-background border border-border-subtle rounded-xl text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50 text-base resize-none"
                                         disabled={isLoading}

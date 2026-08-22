@@ -154,7 +154,7 @@ function StructuredCardMock() {
                 </div>
                 <p className="text-[13px] font-bold text-text leading-tight">The science of deep focus</p>
                 <p className="text-[11px] text-text-secondary leading-relaxed">
-                    Sustained attention is a trainable skill — short, undistracted blocks beat long fractured ones.
+                    Sustained attention is a trainable skill: short, undistracted blocks beat long fractured ones.
                 </p>
                 {/* Auto tags — the card's real chip style */}
                 <div className="flex flex-wrap gap-1.5 pt-0.5">
@@ -293,29 +293,29 @@ function buildSteps(native: boolean): Step[] {
             eyebrow: 'Capture',
             title: 'Save anything, from anywhere',
             body: native
-                ? 'Links, screenshots, images, or a quick note — share them to Machina from any app, or capture right here. No copy-paste, no switching apps.'
-                : 'Links, images, or a quick note — clip any page with the Machina button in your browser, or capture right here. No copy-paste, no switching tabs.',
+                ? 'Links, screenshots, images, or a quick note: share them to Machina from any app, or capture right here. No copy-paste, no switching apps.'
+                : 'Links, images, or a quick note: clip any page with the Machina button in your browser, or capture right here. No copy-paste, no switching tabs.',
             visual: <CaptureMock native={native} />,
         },
         {
             icon: <CitationGlyph className="w-4 h-auto" />,
             eyebrow: 'Understand',
             title: 'Every save gets understood',
-            body: 'Machina reads the whole thing and files a clean card — a summary, smart tags, and connections to everything related you’ve saved.',
+            body: 'Machina reads the whole thing and files a clean card: a summary, smart tags, and connections to everything related you’ve saved.',
             visual: <StructuredCardMock />,
         },
         {
             icon: <MessageCircleQuestion className="w-4 h-4" />,
             eyebrow: 'Recall',
             title: 'Ask your own knowledge',
-            body: 'Ask in plain words and get a real answer — drawn only from what you’ve saved, with citations back to the exact source.',
+            body: 'Ask in plain words and get a real answer, drawn only from what you’ve saved, with citations back to the exact source.',
             visual: <AskMock />,
         },
         {
             icon: <Layers className="w-4 h-4" />,
             eyebrow: 'Organize',
             title: 'Collect what belongs together',
-            body: 'Group saves into collections for every project or theme — and put the personal ones behind a PIN, visible only to you.',
+            body: 'Group saves into collections for every project or theme, and put the personal ones behind a PIN, visible only to you.',
             visual: <CollectionsMock />,
         },
         {
@@ -330,8 +330,8 @@ function buildSteps(native: boolean): Step[] {
             eyebrow: 'You’re set',
             title: 'Your Machina is ready',
             body: native
-                ? 'Capture from any app, and every save is read, tagged, and connected — ready to answer your questions with citations, and to resurface when it matters. Save your first thing to see it work.'
-                : 'Clip from any page, and every save is read, tagged, and connected — ready to answer your questions with citations, and to resurface when it matters. Save your first thing to see it work.',
+                ? 'Capture from any app, and every save is read, tagged, and connected, ready to answer your questions with citations, and to resurface when it matters. Save your first thing to see it work.'
+                : 'Clip from any page, and every save is read, tagged, and connected, ready to answer your questions with citations, and to resurface when it matters. Save your first thing to see it work.',
             visual: <ReadyMock />,
         },
     ];

@@ -23,7 +23,7 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
             <div className="w-full max-w-md rounded-2xl border border-border-subtle bg-card shadow-2xl p-8 text-center">
                 <h1 className="text-xl font-bold text-text">Something went wrong</h1>
                 <p className="mt-2 text-sm text-text-secondary leading-relaxed">
-                    An unexpected error interrupted Machina. Your saved cards are safe — try again.
+                    An unexpected error interrupted Machina. Your saved cards are safe. Try again.
                 </p>
                 <button
                     onClick={() => reset()}

@@ -198,7 +198,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
             // Hard invariant: a reminder can NEVER be created in the past.
             if (!fireAt || fireAt <= Date.now()) {
                 hapticWarning();
-                toast.error('Please pick a time in the future — that moment has already passed.');
+                toast.error('Please pick a time in the future. That moment has already passed.');
                 setSaving(false);
                 return;
             }
@@ -387,7 +387,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                                         {customTs === null
                                             ? 'Pick a date to continue.'
                                             : customInPast
-                                                ? 'That moment has already passed — pick a future time.'
+                                                ? 'That moment has already passed. Pick a future time.'
                                                 : `Will remind you ${fmtDayTime(new Date(customTs))}.`}
                                     </p>
                                 </div>

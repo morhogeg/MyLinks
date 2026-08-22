@@ -88,7 +88,7 @@ async function saveThisPage() {
   } else if (resp.status === 403) {
     setStatus("Invalid token.", "err");
   } else {
-    setStatus("Couldn't save — check your token/connection.", "err");
+    setStatus("Couldn't save. Check your token/connection.", "err");
   }
 }
 
