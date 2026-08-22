@@ -3,14 +3,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { RefreshCw, BarChart3 } from 'lucide-react';
 import { loadStats, LibraryStats, LibraryFacetRequest } from '@/lib/stats';
+import { getCategoryColorStyle } from '@/lib/colors';
 import { track } from '@/lib/analytics';
 import { LargeTitle, SectionHeader, Footnote, List, RowShell, RowText, Chevron } from './primitives';
 
 /**
  * Settings → Insights: a birds-eye view of the library, computed entirely
- * on-device (see lib/stats.ts). Single-hue accent marks throughout — length
- * carries the magnitude, so no categorical palette is needed; all text stays
- * in text tokens. Marks grow in on mount (700ms, --ease-modal, staggered);
+ * on-device (see lib/stats.ts). Magnitude marks (tiles, weekly chart, sources)
+ * stay single-hue accent — there, length carries the meaning. Category bars and
+ * tag pills wear the app-wide identity colors (`getCategoryColorStyle`), so a
+ * category or tag is the same color here as on its cards, in filters, and in
+ * the graph. Marks grow in on mount (700ms, --ease-modal, staggered);
  * `motion-reduce:transition-none` respects reduced-motion.
  */
 
@@ -85,11 +88,12 @@ function WeeklyChart({ stats, grown }: { stats: LibraryStats; grown: boolean }) 
     );
 }
 
-/** Horizontal magnitude bars: label + count in text tokens, an accent bar on a
-    light accent track underneath. Widths are relative to the biggest category
-    and grow in from zero on mount. Real categories are tappable — they open
-    the library filtered to that category ("Other" is an aggregate, so it
-    isn't). */
+/** Horizontal magnitude bars: label + count in text tokens, each bar in its
+    category's app-wide identity color (same hash as cards/filters/graph) on a
+    matching light track, with a color dot by the label. The "Other" aggregate
+    has no identity, so it stays accent. Widths are relative to the biggest
+    category and grow in from zero on mount. Real categories are tappable —
+    they open the library filtered to that category ("Other" isn't). */
 function CategoryBars({ stats, grown, onOpen }: { stats: LibraryStats; grown: boolean; onOpen?: (category: string) => void }) {
     const shown = stats.categories.slice(0, MAX_CATEGORY_ROWS);
     const rest = stats.categories.slice(MAX_CATEGORY_ROWS);
@@ -101,19 +105,32 @@ function CategoryBars({ stats, grown, onOpen }: { stats: LibraryStats; grown: bo
         <div className="rounded-[14px] border border-border-subtle bg-card px-4 py-3.5 space-y-3">
             {rows.map((row, i) => {
                 const tappable = onOpen && !('aggregate' in row);
+                const colorStyle = 'aggregate' in row ? null : getCategoryColorStyle(row.name);
                 const inner = (
                     <>
                         <div className="flex items-baseline justify-between gap-3 mb-1">
-                            <span className="text-[13.5px] text-text truncate">{row.name}</span>
+                            <span className="text-[13.5px] text-text truncate inline-flex items-baseline gap-1.5 min-w-0">
+                                {colorStyle && (
+                                    <span
+                                        className="w-[7px] h-[7px] rounded-full shrink-0 self-center"
+                                        style={{ backgroundColor: colorStyle.color }}
+                                    />
+                                )}
+                                <span className="truncate">{row.name}</span>
+                            </span>
                             <span className="text-[13px] text-text-muted tabular-nums shrink-0 inline-flex items-center gap-1">
                                 {row.count.toLocaleString()}
                                 {tappable && <Chevron />}
                             </span>
                         </div>
-                        <div className="h-2 rounded-full bg-accent/10 overflow-hidden">
+                        <div
+                            className={`h-2 rounded-full overflow-hidden ${colorStyle ? '' : 'bg-accent/10'}`}
+                            style={colorStyle ? { backgroundColor: colorStyle.backgroundColor } : undefined}
+                        >
                             <div
-                                className={`h-full rounded-full bg-accent ${GROW}`}
+                                className={`h-full rounded-full ${GROW} ${colorStyle ? '' : 'bg-accent'}`}
                                 style={{
+                                    ...(colorStyle ? { backgroundColor: colorStyle.color } : null),
                                     width: grown ? `${(row.count / max) * 100}%` : '0%',
                                     transitionTimingFunction: GROW_EASE,
                                     transitionDelay: `${i * 40}ms`,
@@ -142,28 +159,38 @@ function CategoryBars({ stats, grown, onOpen }: { stats: LibraryStats; grown: bo
     );
 }
 
-function CountPills({ items, onOpen }: { items: { name: string; count: number }[]; onOpen?: (name: string) => void }) {
-    const cls = 'inline-flex items-center gap-1.5 px-3 h-8 rounded-full bg-card border border-border-subtle text-[12.5px] font-medium text-text-secondary';
+/** `colored` gives each pill its name's app-wide identity color (tags keep the
+    same hash-color they'd get as a category chip); without it, pills stay in
+    the neutral card treatment (used for the capture mix, which has no
+    identity colors elsewhere). */
+function CountPills({ items, onOpen, colored }: { items: { name: string; count: number }[]; onOpen?: (name: string) => void; colored?: boolean }) {
+    const cls = 'inline-flex items-center gap-1.5 px-3 h-8 rounded-full border text-[12.5px] font-medium';
     return (
         <div className="flex flex-wrap gap-2">
-            {items.map((t) =>
-                onOpen ? (
+            {items.map((t) => {
+                const colorStyle = colored ? getCategoryColorStyle(t.name) : null;
+                const style = colorStyle
+                    ? { backgroundColor: colorStyle.backgroundColor, borderColor: colorStyle.borderColor, color: colorStyle.color }
+                    : undefined;
+                const toneCls = colorStyle ? '' : 'bg-card border-border-subtle text-text-secondary';
+                return onOpen ? (
                     <button
                         key={t.name}
                         onClick={() => onOpen(t.name)}
                         title={`Show cards tagged ${t.name}`}
-                        className={`${cls} hover:text-text hover:border-accent/40 transition-colors cursor-pointer`}
+                        style={style}
+                        className={`${cls} ${toneCls} ${colorStyle ? 'hover:brightness-110' : 'hover:text-text hover:border-accent/40'} transition-all cursor-pointer`}
                     >
                         {t.name}
-                        <span className="text-text-muted tabular-nums">{t.count.toLocaleString()}</span>
+                        <span className={`tabular-nums ${colorStyle ? 'opacity-70' : 'text-text-muted'}`}>{t.count.toLocaleString()}</span>
                     </button>
                 ) : (
-                    <span key={t.name} className={cls}>
+                    <span key={t.name} style={style} className={`${cls} ${toneCls}`}>
                         {t.name}
-                        <span className="text-text-muted tabular-nums">{t.count.toLocaleString()}</span>
+                        <span className={`tabular-nums ${colorStyle ? 'opacity-70' : 'text-text-muted'}`}>{t.count.toLocaleString()}</span>
                     </span>
-                ),
-            )}
+                );
+            })}
         </div>
     );
 }
@@ -329,6 +356,7 @@ export function StatsView({ uid, onOpenFacet, restoreScroll }: {
                     <SectionHeader>Top tags</SectionHeader>
                     <CountPills
                         items={stats.topTags}
+                        colored
                         onOpen={onOpenFacet && ((tag) => openFacet({ kind: 'tag', value: tag }))}
                     />
                 </>
