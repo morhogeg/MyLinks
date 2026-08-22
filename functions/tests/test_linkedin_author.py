@@ -119,6 +119,41 @@ def test_returns_none_rather_than_post_text_when_no_slug():
     assert scraper._extract_linkedin_author(html, "") is None
 
 
+# ── scraper._linkedin_ldjson_fields ──────────────────────────────────────────
+
+_LDJSON_PAGE = (
+    '<html><head><title>x</title>'
+    '<script type="application/ld+json">'
+    '{"@type": "DiscussionForumPosting", '
+    '"author": {"@type": "Person", "name": "Ryan Holiday"}, '
+    '"articleBody": "Meditations is perhaps the only document of its kind. '
+    'Make sure you pick up the Gregory Hays translation. '
+    'Letters from a Stoic by Seneca. Essays by Montaigne."}'
+    '</script></head></html>'
+)
+
+
+def test_ldjson_yields_author_and_full_body():
+    """Reported 2026-08-22: a Ryan Holiday post card had no byline and a summary
+    that died mid-post. og:description is a teaser; the full text and the real
+    author name live in the page's JSON-LD."""
+    author, body = scraper._linkedin_ldjson_fields(_LDJSON_PAGE)
+    assert author == "Ryan Holiday"
+    assert "Montaigne" in body  # content from the END of the post survived
+
+
+def test_ldjson_tolerates_garbage():
+    html = '<script type="application/ld+json">{not json</script>'
+    assert scraper._linkedin_ldjson_fields(html) == (None, None)
+
+
+def test_ldjson_ignores_sentence_length_author():
+    html = ('<script type="application/ld+json">'
+            '{"author": {"name": "' + 'x' * 80 + '"}}</script>')
+    author, _ = scraper._linkedin_ldjson_fields(html)
+    assert author is None
+
+
 # ── main._pick_source_name ───────────────────────────────────────────────────
 
 def test_linkedin_never_takes_the_model_guess():
