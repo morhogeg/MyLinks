@@ -434,7 +434,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         barFill.translatesAutoresizingMaskIntoConstraints = false
         barTrack.addSubview(barFill)
 
-        hintLabel.text = "You can close this. We’ll keep working in the background."
+        hintLabel.text = "You can close this. Machina keeps working in the background."
         hintLabel.font = .systemFont(ofSize: 11, weight: .regular)
         hintLabel.textColor = Lumen.textMuted
         hintLabel.textAlignment = .center
