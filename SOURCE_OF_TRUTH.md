@@ -226,7 +226,14 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-08-22): fix the APNs key, and install build **1285**
+> ## 🚨 OWNER ACTION (updated 2026-08-22): fix the APNs key, and install build **1286**
+>
+> **1286** (run #286, merge `d8d2117`) is current: everything in 1285 plus the
+> Insights facet edge-swipe — after tapping a category/tag/source in Insights,
+> the iOS swipe-back gesture now returns to Insights, same as the chip. QA:
+> Insights → tap a category → edge-swipe → should land back in Insights at
+> your scroll position. 1285 stays the fallback. The APNs step below is
+> unchanged and still pending.
 >
 > **FIRST — the push fix (console, ~5 min, no build):** the on-device test on
 > 1284 confirmed `ThirdPartyAuthError` — the APNs key in Firebase → Cloud
@@ -237,7 +244,7 @@ The multi-user auth work described below **was** fully written but not live:
 > the .p8 with its exact Key ID + Team ID. Re-tap Settings → "Send a test
 > notification" to verify. Full steps in the 2026-08-22 §9 entry.
 >
-> **1285** (run #285, merge `3c27bf2`) is current: everything in 1284 plus the
+> **(superseded) 1285** (run #285, merge `3c27bf2`): everything in 1284 plus the
 > related-cards precision fix and the silent graph re-migration (open the app
 > once and forced connections recompute themselves — QA: open the vacuum-review
 > card a few minutes after first launch and check the AI-model cards are gone).
@@ -1427,8 +1434,23 @@ exact-match, capped.
   relate run against real Gemini (no prod creds in this env). Needs a
   functions deploy + Vercel to take effect.
 
+- **2026-08-22 — Insights facet view: edge swipe goes back to Insights.
+  SHIPPED (merge `d8d2117` → Vercel + TestFlight run #286 = build 1286).**
+  Owner, from device QA of 1283: tapping a category in Insights lands in the
+  facet-scoped library with the "Back to Insights" chip, but the iOS
+  edge-swipe-back gesture did nothing there — the feed's back handler
+  (`handleEdgeBack`, Feed.tsx) never enabled in grid view. The swipe now
+  fires exactly what the chip does (clear the facet, reopen Settings →
+  Insights, restore scroll), gated on the SAME `insightsBackVisible`
+  condition — so the moment the user changes any filter/search the chip and
+  the swipe target dissolve together and back falls to normal behavior.
+  Scope: this does NOT enable edge-swipe in the plain unfiltered grid, and
+  overlays still own the gesture (`anyOverlayOpen` stand-down unchanged).
+  Verified: `tsc --noEmit` clean. NOT verified here: the gesture on device.
+
 - **2026-08-22 — Insights gets the app's identity colors. SHIPPED (merge
-  `153b43d` → Vercel + TestFlight run #283 = build 1283).** Owner ask:
+  `153b43d` → Vercel + TestFlight run #283 = build 1283, device-QA'd by the
+  owner: looks great).** Owner ask:
   the Insights screen was all single-hue accent — give it pops of color, "like
   each category has on the app". Scoped per the session verdict: the
   **category bars** now wear each category's app-wide identity color
