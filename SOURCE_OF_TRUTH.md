@@ -226,9 +226,16 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-08-22): install build **1281**
+> ## 🚨 OWNER ACTION (updated 2026-08-22): install build **1283**
 >
-> **1281** (run #281, merge `8aa1da4`) is current: everything in 1280 plus the
+> **1283** (run #283, merge `153b43d`) is current: everything in 1281/1282 plus
+> the colorful Insights screen — category bars and tag pills in Settings →
+> Insights now wear each category/tag's app-wide identity color (same hash as
+> cards, filters, the graph). QA on device: open Settings → Insights and check
+> the Categories bars carry the same colors their chips do on cards, in both
+> light and dark. 1281 stays the fallback.
+>
+> **(superseded) 1281** (run #281, merge `8aa1da4`): everything in 1280 plus the
 > push-notification diagnostics. Settings → Notifications gains a **"Send a
 > test notification"** row (visible when the toggle is on) that re-registers
 > the device token and fires a real push through FCM/APNs, and the note under
@@ -1375,7 +1382,8 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-08-22 — Insights gets the app's identity colors. WEB.** Owner ask:
+- **2026-08-22 — Insights gets the app's identity colors. SHIPPED (merge
+  `153b43d` → Vercel + TestFlight run #283 = build 1283).** Owner ask:
   the Insights screen was all single-hue accent — give it pops of color, "like
   each category has on the app". Scoped per the session verdict: the
   **category bars** now wear each category's app-wide identity color
