@@ -225,6 +225,8 @@ export interface TestPushResult {
     failed?: number;
     /** Backend's reason when nothing was attempted (e.g. 'no_tokens'). */
     skipped?: string | null;
+    /** FCM error names for the first few failed sends (never tokens). */
+    errors?: string[];
     /** Transport-level failure reaching the endpoint at all. */
     error?: string;
 }

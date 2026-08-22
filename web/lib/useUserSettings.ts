@@ -291,7 +291,19 @@ export function useUserSettings(uid: string) {
             } else if ((test.sent ?? 0) > 0) {
                 setPushNote(`Test sent to ${test.tokens} device${test.tokens === 1 ? '' : 's'} — it should appear on your lock screen now. If nothing arrives, the block is between Apple and this phone (Focus mode, notification style, or the APNs setup).`);
             } else {
-                setPushNote(`The send failed for all ${test.tokens} registered device${test.tokens === 1 ? '' : 's'} — the stored tokens are stale. Toggle push off and on to re-register.`);
+                // The token was registered FRESH seconds ago (registerPush above),
+                // so an all-failed send is never staleness — it's FCM/APNs
+                // rejecting the send. Name the error and its actual fix.
+                const err = test.errors?.[0];
+                if (err === 'ThirdPartyAuthError' || err === 'InvalidCredentialError') {
+                    setPushNote(`Apple rejected the send (${err}): the APNs key in Firebase → Cloud Messaging doesn't match this app. That's a Firebase-console fix, not a phone setting.`);
+                } else if (err === 'SenderIdMismatchError') {
+                    setPushNote(`The send was refused (${err}): this build's Firebase config doesn't match the project sending the push.`);
+                } else if (err === 'UnregisteredError') {
+                    setPushNote(`Apple says this device's token is not valid for this app (${err}) — usually a mismatch between the build and the push environment.`);
+                } else {
+                    setPushNote(`The send failed for the freshly registered token${err ? ` (${err})` : ''}. This is on the sending side, not this phone.`);
+                }
             }
         } finally {
             setPushBusy(false);
