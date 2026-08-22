@@ -1363,6 +1363,27 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-22 — compact card stops re-splitting the model's own paragraphs;
+  abbreviation handling is by SHAPE, not a list. WEB + TESTFLIGHT.** Owner,
+  with screenshots: the closed card severed "against Rep. Ralph Norman." after
+  "Rep.", stranding the name in its own paragraph. Root cause was structural,
+  not a missing list entry: `SimpleMarkdown`'s compact splitter tokenizes
+  content into lines BEFORE splitting, so its "no line breaks in this text"
+  guard was vacuously true and it re-split every single-sentence paragraph the
+  model had already isolated. Now the sentence splitter runs ONLY when the
+  whole summary is one unbroken block (the legacy shape it was written for) —
+  a model-structured summary renders exactly as laid out, which fixes existing
+  cards at render time with no re-save. In the legacy fallback the enumerated
+  title list is GONE (owner: "we can't think of every known abbreviation"):
+  a fragment ending in a short capitalized token (the open class — St., Rep.,
+  Gen., U.S.), a dotted form (e.g., i.e.), or one of the few closed lowercase
+  abbreviations (vs., etc.) is re-joined by shape. `answerLayout`'s sentence
+  splitter gained the same capitalized-shape guard. Note: `Intl.Segmenter`
+  ('sentence') was tried and REJECTED — V8 ships no CLDR suppression data, so
+  it too breaks after "Rep." (verified in node 22). Verified: regex exercised
+  both directions in node (12 abbreviation shapes re-join; normal short-word
+  endings incl. Hebrew still split), `tsc --noEmit` clean.
+
 - **2026-08-22 — the share HUD's terminal frame stops saying a bare "Saved".
   SHIPPED as TestFlight build 1280 (run #280, merge `1071f43`).** Owner,
   recurring complaint: sharing from Safari
