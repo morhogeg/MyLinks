@@ -1,5 +1,6 @@
 import logging
 import json
+import os
 from typing import List, Dict, Optional
 from firebase_admin import firestore
 # DistanceMeasure is NOT re-exported by firebase_admin.firestore on the pinned
@@ -13,6 +14,25 @@ from ai_service import GeminiService, GEMINI_ANALYSIS_MODEL, embedding_needs_rep
 from log_safe import mask_uid
 
 logger = logging.getLogger(__name__)
+
+# ── Relatedness quality gates ────────────────────────────────────────────────
+# find_nearest always returns the `limit` nearest neighbours no matter how far
+# away they are: in a small or topically diverse library, the "nearest" cards
+# to a robot-vacuum review are whatever exists — AI-model notes included. The
+# LLM verifier then dutifully abstracts until any two cards match ("both
+# emphasize standardized benchmarking"). Two gates kill that failure mode:
+#
+#  1. DISTANCE CEILING — a candidate the LLM never sees can't be force-fitted.
+#    Cosine distance for gemini-embedding-001: same-topic cards land well under
+#    ~0.55, unrelated text drifts toward ~0.7+ (see search.py's gate, which is
+#    deliberately LOOSER — search wants recall, relatedness wants precision).
+#    No recall floor here: an empty "Related cards" section is the correct
+#    answer for a card the library has nothing about.
+#  2. SIMILARITY FLOOR — the LLM must commit to a similarity score, and weak
+#    ones are dropped. No default is gifted when the model omits the score.
+_RELATED_DISTANCE_CEILING = float(os.environ.get("RELATED_DISTANCE_CEILING", "0.60"))
+_RELATED_SIMILARITY_FLOOR = float(os.environ.get("RELATED_SIMILARITY_FLOOR", "0.75"))
+
 
 class GraphService:
     def __init__(self, db):
@@ -44,16 +64,29 @@ class GraphService:
                 vector_field="embedding_vector",
                 query_vector=Vector(embedding),
                 distance_measure=DistanceMeasure.COSINE,
-                limit=10
+                limit=10,
+                distance_result_field="vector_distance"
             )
-            
+
             candidates = vector_query.get()
-            
-            # Filter out the current link itself (if it was already saved)
+
+            # Filter out the current link itself (if it was already saved), then
+            # gate on real closeness: a candidate past the ceiling is not about
+            # the same thing, and handing it to the LLM anyway is how forced
+            # connections get invented. A missing distance fails open (kept).
             candidates = [doc for doc in candidates if doc.id != new_link_id]
-            
+            near = []
+            for doc in candidates:
+                dist = (doc.to_dict() or {}).get("vector_distance")
+                if isinstance(dist, (int, float)) and dist > _RELATED_DISTANCE_CEILING:
+                    continue
+                near.append(doc)
+            if len(near) < len(candidates):
+                logger.info(f"Distance gate dropped {len(candidates) - len(near)}/{len(candidates)} candidates")
+            candidates = near
+
             if not candidates:
-                logger.info("No vector candidates found")
+                logger.info("No vector candidates within relatedness distance")
                 return []
 
             # 2. LLM Verification
@@ -80,21 +113,28 @@ class GraphService:
                 title, summary, new_concepts, candidate_context
             )
             
-            # 3. Format result
+            # 3. Format result — and hold the LLM to its own scores. A relation
+            # without a similarity, or one under the floor, is the model hedging
+            # ("technically both involve reviews…"); those are exactly the ties
+            # the card must NOT show. No connections is a valid outcome.
             results = []
             for rel in relations:
                 target_id = rel.get("id")
-                if target_id in valid_candidates_map:
-                    target_data = valid_candidates_map[target_id]
-                    # Build the related-link dict written to the card's relatedLinks.
-                    results.append({
-                        "id": target_id,
-                        "title": target_data.get("title"),
-                        "reason": rel.get("reason"),
-                        "similarity": rel.get("similarity", 0.8), # Default if LLM doesn't give score
-                        "commonConcepts": rel.get("commonConcepts", [])
-                    })
-            
+                if target_id not in valid_candidates_map:
+                    continue
+                sim = rel.get("similarity")
+                if not isinstance(sim, (int, float)) or sim < _RELATED_SIMILARITY_FLOOR:
+                    continue
+                target_data = valid_candidates_map[target_id]
+                # Build the related-link dict written to the card's relatedLinks.
+                results.append({
+                    "id": target_id,
+                    "title": target_data.get("title"),
+                    "reason": rel.get("reason"),
+                    "similarity": sim,
+                    "commonConcepts": rel.get("commonConcepts", [])
+                })
+
             return results
 
         except Exception as e:
@@ -291,35 +331,48 @@ class GraphService:
         if not candidates:
             return []
 
-        prompt = f"""You are a "Knowledge Graph" assistant.
-Your task is to identify meaningful connections between a NEW NOTE and EXISTING NOTES.
+        prompt = f"""You are the skeptical gatekeeper of a personal knowledge graph.
+Your job is to REJECT weak connections between a NEW NOTE and EXISTING NOTES.
+A user tapping a related card expects "more on the same thing" — not a clever
+abstraction. An empty result is a good result; a forced connection erodes trust
+in every real one.
 
 NEW NOTE:
 Title: {title}
 Summary: {summary}
 Concepts: {', '.join(concepts)}
 
-EXISTING CANDIDATES (retrieved via vector search):
+EXISTING CANDIDATES (retrieved via vector search — proximity does NOT mean related):
 {json.dumps(candidates, indent=2)}
 
-INSTRUCTIONS:
-1. Analyze the semantic relationship between the NEW NOTE and each CANDIDATE.
-2. Select ONLY candidates that have a strong, meaningful connection (shared philosophy, opposing region, supporting evidence, etc.).
-3. Ignore superficial connections (e.g. just sharing the word "software").
-4. For each match, provide a "reason" (1 short sentence explaining the connection).
-5. Identify "commonConcepts" (overlap).
+A REAL connection requires at least one of:
+- Same specific topic or domain (two notes about robot vacuums; two notes about LLM coding agents).
+- Same specific entity: product, person, company, place, event, technology.
+- One note directly extends, supports, contradicts, or answers the other.
 
-OUTPUT FORMAT:
-Return a JSON list of objects:
+NEVER connect on:
+- Shared methodology or format: "both are reviews", "both use benchmarks/rankings/metrics", "both evaluate products", "both are guides". A vacuum review and an AI-model benchmark share a FORMAT, not a topic — that is NOT a connection.
+- Abstract themes you had to zoom out to find: "both involve technology", "both discuss performance", "both emphasize objective evaluation", "both explore trade-offs".
+- A single generic word or concept in common ("software", "tech", "product").
+
+Test each candidate: would the reason still hold if you swapped in a random note
+of the same format? If yes, it describes the format, not a relationship — reject.
+When in doubt, EXCLUDE. Expect to reject most or all candidates.
+
+For each SURVIVING candidate give:
+- "reason": one short, concrete sentence naming the shared topic/entity — never the shared format.
+- "similarity": your honest 0-1 confidence that a user would agree these belong together. Below 0.75 means you should have rejected it.
+- "commonConcepts": the specific overlapping concepts.
+
+OUTPUT FORMAT — a JSON list, [] when nothing genuinely relates:
 [
   {{
     "id": "candidate_id",
-    "reason": "Both discuss the impact of compounding, one in finance and one in habits.",
+    "reason": "Both compare flagship robot vacuums on suction and navigation.",
     "similarity": 0.9,
-    "commonConcepts": ["Compounding"]
+    "commonConcepts": ["robot vacuums"]
   }}
 ]
-If no strong connections, return [].
 """
         
         try:

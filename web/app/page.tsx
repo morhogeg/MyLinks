@@ -15,6 +15,7 @@ import { CitationGlyph, Wordmark } from "@/components/ui/Wordmark";
 import { IconButton } from "@/components/ui/Button";
 import { useHeaderFade } from "@/lib/useHeaderFade";
 import { useSharedCaptureBanner } from "@/lib/useSharedCaptureBanner";
+import { ensureGraphVersion } from "@/lib/rebuildConnections";
 import type { LibraryFacetRequest } from "@/lib/stats";
 
 /** Pick the banner to show: prefer an active source in priority order, else the
@@ -224,6 +225,17 @@ export default function Home() {
     const timer = setTimeout(() => setIsTourOpen(true), 600);
     return () => clearTimeout(timer);
   }, [loading, uid, isAskMode, hideAddButton, hasCards]);
+
+  // Connections stay honest on their own: once signed in, check whether this
+  // library's `relatedLinks` predate the current graph logic and, if so,
+  // recompute them silently in the background (see ensureGraphVersion). The
+  // delay keeps the boot exit + first grid paint clear of the extra network
+  // work; the check itself is one user-doc read when already up to date.
+  useEffect(() => {
+    if (loading || !uid) return;
+    const t = setTimeout(() => ensureGraphVersion(uid), 4000);
+    return () => clearTimeout(t);
+  }, [loading, uid]);
 
   const replayTour = () => {
     setIsSettingsOpen(false);
