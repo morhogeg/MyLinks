@@ -226,9 +226,21 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-08-22): install build **1280**
+> ## 🚨 OWNER ACTION (updated 2026-08-22): install build **1281**
 >
-> **1280** (run #280, merge `1071f43`) is current: the share sheet's terminal
+> **1281** (run #281, merge `8aa1da4`) is current: everything in 1280 plus the
+> push-notification diagnostics. Settings → Notifications gains a **"Send a
+> test notification"** row (visible when the toggle is on) that re-registers
+> the device token and fires a real push through FCM/APNs, and the note under
+> it names the exact link that failed — no registered device, stale tokens,
+> unreachable backend, or delivery blocked on the phone itself. The toggle's
+> failure copy now separates "iOS permission denied" from "token upload
+> failed" instead of blaming iOS for both. QA on device: install 1281, open
+> Settings, tap the test row, and read the note — it answers why digests
+> never arrive as push. Requires functions deploy run #81 + hosting run #7
+> (the /api/send-test-push rewrite), both from the same merge.
+>
+> **(superseded) 1280** (run #280, merge `1071f43`): the share sheet's terminal
 > frame no longer says a bare "Saved" while the backend is still analysing. It
 > now reads **"Saved ✓ · Making your card"** over the still-mid-flight %, with
 > **"The card finishes on its own in Machina."** underneath, and no em dash
@@ -1362,6 +1374,31 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-08-22 — push notifications: the silent chain gets honest copy and an
+  on-device self-test. SHIPPED (merge `8aa1da4` → build 1281, functions run
+  #81, hosting run #7).** Owner: digests/syntheses render in-app but no push
+  ever arrives, with the Notifications toggle ON. Diagnosis: the pipeline is
+  sound end-to-end (scheduler → `is_due` → `send_push` → FCM/APNs, key
+  uploaded 2026-07-07) EXCEPT that both senders hard-gate on
+  `users/{uid}.fcmTokens`, and token registration had two silent failure
+  modes: `togglePush` treated a failed token POST as an iOS-permission denial
+  (sending the user to iOS Settings for a backend fault — `registerPush`
+  returned one boolean), and `refreshPushRegistration` discarded the result
+  entirely. Also, `_device_token_request` (main.py) is stricter than every
+  sibling endpoint (bearer + `authUids` resolution, no fallback) — a 401/403
+  there registered nothing, silently. Shipped: (1) `registerPush` returns
+  registered / permission-denied / registration-failed and the toggle + nudge
+  name the real failure; (2) NEW **Settings → "Send a test notification"**
+  (native, toggle on): re-registers the token then `send_test_push_http`
+  (new, `/api/send-test-push`, bearer-authed, device_token rate bucket) fires
+  a real push and relays send_push's {tokens, sent, failed, skipped} so the
+  note names the broken link; (3) the weekly synthesis logs its no-token skip
+  like the curated digest already did. NOT root-caused yet by design: whether
+  the owner's `fcmTokens` is actually empty needs the on-device test (no
+  Firestore creds in this session). `tsc` + `py_compile` green. NOT verified:
+  a real push arriving (needs the device). Owner QA: install 1281, Settings →
+  Send a test notification, read the note.
 
 - **2026-08-22 — the share HUD's terminal frame stops saying a bare "Saved".
   SHIPPED as TestFlight build 1280 (run #280, merge `1071f43`).** Owner,
