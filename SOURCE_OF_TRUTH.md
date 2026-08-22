@@ -1362,7 +1362,10 @@ exact-match, capped.
   with "Saved to Machina ✓" and a jargon hint ("Analyzing — progress continues
   in Machina"). Rewritten so the same line that carries the ✓ names the work
   still running: phase **"Saved ✓ · Making your card"**, hint **"Safe to
-  close. The card finishes on its own in Machina, ready in about 20 seconds."**
+  close. The card finishes on its own in Machina."** (A first draft ended the
+  hint "ready in about 20 seconds"; owner caught that an ETA we can't
+  guarantee — cold starts, slow pages — is the original lie in smaller print,
+  so the hint promises the mechanism, not a number.)
   The generic (non-HUD) success path and the SHARE_EXTENSION.md diagram use
   the same string. Deliberately NOT done, per the session's verdict: holding
   the share sheet open until analysis hits 100% — iOS kills lingering

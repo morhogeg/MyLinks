@@ -754,7 +754,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
             self.percentLabel.alpha = 1
             self.checkLabel.alpha = 0
             self.phaseLabel.text = "Saved ✓ · Making your card"
-            self.hintLabel.text = "Safe to close. The card finishes on its own in Machina, ready in about 20 seconds."
+            self.hintLabel.text = "Safe to close. The card finishes on its own in Machina."
             // Hand the app EXACTLY this % (the hint carries progress + start
             // clock) so its loader continues the ramp instead of restarting.
             self.writePendingShareHint()
