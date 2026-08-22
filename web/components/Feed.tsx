@@ -1492,9 +1492,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         if (viewMode === 'collection') closeCollectionToGallery();
         else if (viewMode === 'digestDetail') closeDigestToList();
         else if (viewMode === 'notes') closeNotesView();
+        // Library scoped to an untouched Insights facet: the swipe mirrors the
+        // visible "Back to Insights" chip, restoring the library and reopening
+        // Insights. The moment the user changes anything the chip (and this
+        // branch's condition) dissolve together, so they never disagree.
+        else if (insightsBackVisible) backToInsights();
         else setViewMode(lastLayout.current);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [viewMode, notesFromInsights]);
+    }, [viewMode, notesFromInsights, insightsBackVisible]);
     // Stand down while ANY overlay/modal is open — the top-most surface (e.g.
     // an open card's LinkDetailModal) owns the edge swipe; every enabled
     // useEdgeSwipeBack instance fires on the same gesture, so without this a
@@ -1503,7 +1508,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     useEdgeSwipeBack(
         handleEdgeBack,
         isMobileView && !anyOverlayOpen
-        && (viewMode === 'digest' || viewMode === 'collections' || viewMode === 'collection' || viewMode === 'digestDetail' || viewMode === 'notes'),
+        && (viewMode === 'digest' || viewMode === 'collections' || viewMode === 'collection' || viewMode === 'digestDetail' || viewMode === 'notes'
+            || insightsBackVisible),
     );
 
     // If the open collection is deleted out from under the detail view (e.g. from
