@@ -226,9 +226,18 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-08-08): install build **1279**
+> ## 🚨 OWNER ACTION (updated 2026-08-22): install build **1280**
 >
-> **1279** (run #279, merge `e0cfdda`) is current: it is the first build where a
+> **1280** (run #280, merge `1071f43`) is current: the share sheet's terminal
+> frame no longer says a bare "Saved" while the backend is still analysing. It
+> now reads **"Saved ✓ · Making your card"** over the still-mid-flight %, with
+> **"The card finishes on its own in Machina."** underneath, and no em dash
+> survives in any rendered extension string. QA on device: share an article from
+> Safari, watch the final frame, then open Machina immediately — the in-app
+> banner should continue the SAME ramp rather than contradicting a "done" claim.
+> Everything in 1279 rides along. 1279 stays the fallback.
+>
+> **(superseded) 1279** (run #279, merge `e0cfdda`): the first build where a
 > shared PARAGRAPH is treated as text rather than a link — honest capture copy
 > ("Saving your text… / Reading your text…"), the text kept verbatim as the card
 > body under an AI heading, and the summary behind the Machina mark. Everything
@@ -1355,7 +1364,8 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 
 - **2026-08-22 — the share HUD's terminal frame stops saying a bare "Saved".
-  TESTFLIGHT BUILD REQUIRED.** Owner, recurring complaint: sharing from Safari
+  SHIPPED as TestFlight build 1280 (run #280, merge `1071f43`).** Owner,
+  recurring complaint: sharing from Safari
   showed "Saved" but opening Machina right away met a card at ~19% — the word
   promised done while analysis had ~15–20s left. The honest terminal frame
   (live %, unfilled bar, settled mark) already existed; the COPY still led
