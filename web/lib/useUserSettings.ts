@@ -3,8 +3,7 @@
 import { useState, useCallback } from 'react';
 import type { User, DigestChannel, DigestMode, ReminderChannel } from '@/lib/types';
 import { updateUserSettings, getUserSettings, getLinksFromFirestore } from '@/lib/storage';
-import { registerPush, unregisterPush } from '@/lib/push';
-import { isNativeApp } from '@/lib/api';
+import { registerPush, sendTestPush, unregisterPush } from '@/lib/push';
 import { useToast } from '@/components/Toast';
 
 // Mirrors DEFAULT_USER_SETTINGS in functions/link_service.py — keep in sync.
@@ -242,17 +241,58 @@ export function useUserSettings(uid: string) {
         setPushBusy(true);
         setPushNote(null);
         try {
-            const granted = await registerPush();
-            if (!granted && isNativeApp()) {
+            const result = await registerPush();
+            // Two distinct failures, two distinct fixes — naming the wrong one
+            // sends the user to iOS Settings for a backend fault (or vice versa)
+            // and the trail dead-ends.
+            if (result === 'permission-denied') {
                 setPushNote('Notifications are turned off for Machina — allow them in iOS Settings, then flip this on again.');
                 return;
             }
+            if (result === 'registration-failed') {
+                setPushNote('iOS allowed notifications, but registering this device with Machina failed. Check your connection and flip this on again.');
+                return;
+            }
+            if (result === 'unavailable') return;
             setSettings((p) => ({
                 ...p,
                 push_enabled: true,
                 reminders_channel: withPush(p.reminders_channel, true),
                 digest_channels: withPush(p.digest_channels, true),
             }));
+        } finally {
+            setPushBusy(false);
+        }
+    };
+
+    // Diagnostic: re-register this device's token, then have the backend send a
+    // real push through FCM/APNs. The note names the exact link that failed —
+    // the one chain with two silent failure modes gets a loud self-test.
+    const sendTestNotification = async () => {
+        if (pushBusy) return;
+        setPushBusy(true);
+        setPushNote(null);
+        try {
+            const reg = await registerPush();
+            if (reg === 'unavailable') return;
+            if (reg === 'permission-denied') {
+                setPushNote('Notifications are turned off for Machina in iOS Settings — allow them there first.');
+                return;
+            }
+            if (reg === 'registration-failed') {
+                setPushNote('Could not register this device with Machina — the token upload failed. Check your connection and try again.');
+                return;
+            }
+            const test = await sendTestPush();
+            if (!test.ok) {
+                setPushNote(`Machina could not be reached to send the test (${test.error ?? 'unknown error'}).`);
+            } else if (test.skipped === 'no_tokens' || !test.tokens) {
+                setPushNote('The backend has no registered device for this account — registration is not reaching the server.');
+            } else if ((test.sent ?? 0) > 0) {
+                setPushNote(`Test sent to ${test.tokens} device${test.tokens === 1 ? '' : 's'} — it should appear on your lock screen now. If nothing arrives, the block is between Apple and this phone (Focus mode, notification style, or the APNs setup).`);
+            } else {
+                setPushNote(`The send failed for all ${test.tokens} registered device${test.tokens === 1 ? '' : 's'} — the stored tokens are stale. Toggle push off and on to re-register.`);
+            }
         } finally {
             setPushBusy(false);
         }
@@ -281,6 +321,8 @@ export function useUserSettings(uid: string) {
         loadSettings,
         loadDigestExtras,
         togglePush,
+        sendTestNotification,
+        pushBusy,
         pushNote,
         toggleTopic,
     };

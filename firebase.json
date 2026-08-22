@@ -74,6 +74,10 @@
         "function": "unregister_device_token_http"
       },
       {
+        "source": "/api/send-test-push",
+        "function": "send_test_push_http"
+      },
+      {
         "source": "/api/client-error",
         "function": "client_error_http"
       },

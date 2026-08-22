@@ -3068,6 +3068,56 @@ def unregister_device_token_http(req: https_fn.Request) -> https_fn.Response:
     )
 
 
+@https_fn.on_request(max_instances=2)
+def send_test_push_http(req: https_fn.Request) -> https_fn.Response:
+    """Send the verified caller a real push RIGHT NOW, and report what happened.
+
+    Diagnostic for the one chain whose failures are otherwise silent: the
+    response relays send_push's summary ({sent, failed, pruned, skipped,
+    tokens}) so the client can name the broken link — no registered token,
+    stale tokens, or an FCM-side failure — instead of showing nothing.
+    Bearer-authed and rate-limited like the token endpoints; sends only to the
+    caller's own workspace, so it can't be aimed at anyone else.
+    """
+    if req.method == 'OPTIONS':
+        return _cors_preflight(req)
+    headers = _cors_headers(req)
+    if req.method != 'POST':
+        return _error_response("Method not allowed", 405, headers)
+
+    rl = _rate_limited("device_token", _rate_limit_identity(req), headers)
+    if rl:
+        return rl
+
+    decoded = _verify_bearer(req)
+    if not decoded:
+        return _error_response("User must be signed in", 401, headers)
+    uid = find_data_uid_by_auth_uid(decoded.get("uid"))
+    if not uid:
+        return _error_response("No workspace linked to this account", 403, headers)
+
+    try:
+        snap = get_db().collection("users").document(uid).get()
+        tokens = [
+            t for t in ((snap.to_dict() or {}).get("fcmTokens") or [])
+            if isinstance(t, str) and t
+        ]
+        from push_service import send_push
+        result = send_push(
+            uid,
+            "Machina test notification",
+            "Push is working — digests and reminders will arrive like this.",
+            {"view": "digest"},
+        )
+        result["tokens"] = len(tokens)
+        return https_fn.Response(
+            json.dumps(result),
+            status=200, headers=headers, mimetype='application/json',
+        )
+    except Exception as e:
+        return _server_error(headers, e, "Test push failed")
+
+
 # How long a client_error_reports record lives. Same policy as server_errors.
 _CLIENT_ERROR_TTL_DAYS = 14
 # Whole-body cap. A report is a message + stack + a few short fields; anything

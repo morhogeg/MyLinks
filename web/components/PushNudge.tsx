@@ -37,13 +37,17 @@ export default function PushNudge({ uid, onDone }: { uid: string; onDone: () => 
         hapticLight();
         setBusy(true);
         try {
-            const granted = await registerPush();
-            if (granted) {
+            const result = await registerPush();
+            if (result === 'registered') {
                 // Push is the only reminder channel now — turn it on and record
                 // that reminders should arrive here (folds out any legacy value).
                 updateUserSettings(uid, { push_enabled: true, reminders_channel: ['push'] })
                     .catch(() => {});
                 toast.success('Notifications on — reminders and digests will arrive here.');
+            } else if (result === 'registration-failed') {
+                // iOS said yes but the token never reached Machina — say so,
+                // instead of implying the user declined.
+                toast.error('Could not register this device — try again from Settings.');
             } else {
                 toast.info('You can turn notifications on anytime in Settings.');
             }
