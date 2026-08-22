@@ -1447,7 +1447,7 @@ exact-match, capped.
   Send a test notification, read the note.
 
 - **2026-08-22 — compact card stops re-splitting the model's own paragraphs;
-  abbreviation handling is by SHAPE, not a list. WEB + TESTFLIGHT.** Owner,
+  abbreviation handling is by SHAPE, not a list. SHIPPED (merge `7d7073e` → Vercel + TestFlight **build 1282**, run #282; carries 1281's push-diagnostics content).** Owner,
   with screenshots: the closed card severed "against Rep. Ralph Norman." after
   "Rep.", stranding the name in its own paragraph. Root cause was structural,
   not a missing list entry: `SimpleMarkdown`'s compact splitter tokenizes
@@ -1497,7 +1497,7 @@ exact-match, capped.
   `completeScanSuccess`, `showResult` and the HUD setup.
 
 - **2026-08-22 — screenshot cards: high vision resolution + a truncation
-  backstop for early-stopped generations. BACKEND ONLY.** Owner, with
+  backstop for early-stopped generations. SHIPPED (same merge `7d7073e`, functions run #82, unscoped).** Owner, with
   screenshots: a plus-button save of a dense Hebrew Facebook-post screenshot
   produced a thin card whose last Key Points bullet ended mid-word ("מנכ") —
   valid JSON, so nothing downstream noticed, and the fragment was stored.
