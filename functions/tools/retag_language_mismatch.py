@@ -30,8 +30,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from google import genai  # noqa: E402
 from google.cloud import firestore  # noqa: E402
 
+from ai_service import GEMINI_ANALYSIS_MODEL  # noqa: E402
+
 PROJECT = "secondbrain-app-94da2"
-RETAG_MODEL = "gemini-2.5-flash"
+# Re-tag on the SAME model that analysed the cards in the first place — this
+# script rewrites fields Gemini authored, so a different tier would give the
+# repaired cards a different voice from every card around them. Imported, not
+# copied: ai_service is the one place the model id lives.
+RETAG_MODEL = GEMINI_ANALYSIS_MODEL
 
 _RETAG_PROMPT = """The item below is saved in a personal knowledge library. Its tags are in the
 wrong language: tags must be written in the SAME language as the item itself.

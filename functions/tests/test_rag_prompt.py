@@ -17,6 +17,7 @@ from ai_service import (
     GeminiService,
     GEMINI_ASK_MODEL,
     GEMINI_ANALYSIS_MODEL,
+    GEMINI_FALLBACK_MODEL,
 )
 
 
@@ -314,11 +315,11 @@ class _EmptyThenRealModels:
         return iter(_FakeChunk(p) for p in self._pieces)
 
 
-def test_stream_empty_answer_falls_back_to_analysis_model():
+def test_stream_empty_answer_falls_back_to_fallback_model():
     models = _EmptyThenRealModels(["Real answer.\n", "[[CITED: id1]]"])
     svc = _svc_with_models(models)
     text, cited, ungrounded = _drain(svc.answer_from_context_stream("q?", _CARDS))
-    assert models.requested == [GEMINI_ASK_MODEL, GEMINI_ANALYSIS_MODEL]
+    assert models.requested == [GEMINI_ASK_MODEL, GEMINI_FALLBACK_MODEL]
     assert "Real answer." in text
     assert cited == ["id1"]
     assert ungrounded is False
@@ -340,10 +341,10 @@ def test_stream_empty_on_both_models_raises():
     svc = _svc_with_models(models)
     with pytest.raises(AnalysisError):
         _drain(svc.answer_from_context_stream("q?", _CARDS))
-    # ASK (verbatim) → ANALYSIS (verbatim) → ANALYSIS (paraphrase-safe) →
+    # ASK (verbatim) → FALLBACK (verbatim) → ANALYSIS (paraphrase-safe) →
     # ANALYSIS (headline-only) before giving up.
     assert models.requested == [
-        GEMINI_ASK_MODEL, GEMINI_ANALYSIS_MODEL,
+        GEMINI_ASK_MODEL, GEMINI_FALLBACK_MODEL,
         GEMINI_ANALYSIS_MODEL, GEMINI_ANALYSIS_MODEL]
 
 
@@ -405,7 +406,7 @@ def test_stream_empty_verbatim_then_paraphrase_recovers():
     svc = _svc_with_models(models)
     text, cited, ungrounded = _drain(svc.answer_from_context_stream("q?", _CARDS))
     assert models.requested == [
-        GEMINI_ASK_MODEL, GEMINI_ANALYSIS_MODEL, GEMINI_ANALYSIS_MODEL]
+        GEMINI_ASK_MODEL, GEMINI_FALLBACK_MODEL, GEMINI_ANALYSIS_MODEL]
     assert "Paraphrased answer." in text
     assert cited == ["id1"]
     # The recovering attempt used the paraphrase framing, not the verbatim one.
@@ -489,18 +490,18 @@ def test_answer_retry_exception_still_flags_ungrounded():
     assert svc._calls["n"] == 3
 
 
-# ── _answer_json: ask-tier model falls back to the proven analysis tier ────
+# ── _answer_json: the ask model falls back to a DIFFERENT model ───────────
 
-def test_answer_falls_back_to_analysis_model_when_ask_model_fails():
+def test_answer_falls_back_to_fallback_model_when_ask_model_fails():
     from ai_service import AnalysisError
     svc = _svc_with_json_responses([
         AnalysisError("ask model unavailable"),          # GEMINI_ASK_MODEL
-        {"answer": "Recovered.", "citedIds": ["id1"]},   # GEMINI_ANALYSIS_MODEL
+        {"answer": "Recovered.", "citedIds": ["id1"]},   # GEMINI_FALLBACK_MODEL
     ])
     out = svc.answer_from_context("q?", _CARDS)
     assert out == {"answer": "Recovered.", "citedIds": ["id1"], "ungrounded": False,
                    "droppedCardIds": [], "filteredCards": []}
-    assert svc._calls["models"] == [GEMINI_ASK_MODEL, GEMINI_ANALYSIS_MODEL]
+    assert svc._calls["models"] == [GEMINI_ASK_MODEL, GEMINI_FALLBACK_MODEL]
 
 
 def test_buffered_empty_generation_retries_paraphrase_safe():
@@ -731,7 +732,7 @@ def test_answer_raises_when_both_models_fail():
     ])
     with pytest.raises(AnalysisError):
         svc.answer_from_context("q?", _CARDS)
-    assert svc._calls["models"] == [GEMINI_ASK_MODEL, GEMINI_ANALYSIS_MODEL]
+    assert svc._calls["models"] == [GEMINI_ASK_MODEL, GEMINI_FALLBACK_MODEL]
 
 
 def test_answer_empty_library_is_not_ungrounded():
@@ -850,9 +851,9 @@ def _svc_with_models(models_obj):
 
 def test_stream_falls_back_when_first_attempt_fails_before_output():
     """A transport failure on the first stream attempt (before any output)
-    retries on the next ladder attempt instead of failing the ask. (The ask
-    and analysis tiers share a model id since 2026-07-24, so the fake fails
-    by call order, not by model name.)"""
+    retries on the next ladder attempt instead of failing the ask. (The fake
+    fails by call order, not by model name — the ask and analysis tiers share
+    a model id, so only the fallback rung is distinguishable by name.)"""
     class _FailFirstThenReal:
         def __init__(self, pieces):
             self._pieces = pieces
@@ -867,7 +868,7 @@ def test_stream_falls_back_when_first_attempt_fails_before_output():
     models = _FailFirstThenReal(["Answer body.\n", "[[CITED: id1]]"])
     svc = _svc_with_models(models)
     text, cited, ungrounded = _drain(svc.answer_from_context_stream("q?", _CARDS))
-    assert models.requested == [GEMINI_ASK_MODEL, GEMINI_ANALYSIS_MODEL]
+    assert models.requested == [GEMINI_ASK_MODEL, GEMINI_FALLBACK_MODEL]
     assert "Answer body." in text
     assert "[[CITED:" not in text
     assert cited == ["id1"]
@@ -878,14 +879,15 @@ def test_stream_raises_when_both_models_fail():
     import pytest
     from ai_service import AnalysisError
     models = _SelectiveFailModels(
-        [], bad_models={GEMINI_ASK_MODEL, GEMINI_ANALYSIS_MODEL})
+        [], bad_models={GEMINI_ASK_MODEL, GEMINI_FALLBACK_MODEL,
+                        GEMINI_ANALYSIS_MODEL})
     svc = _svc_with_models(models)
     with pytest.raises(AnalysisError):
         _drain(svc.answer_from_context_stream("q?", _CARDS))
-    # Every attempt errors before output: ASK, then ANALYSIS three times
-    # (verbatim + paraphrase-safe + headline-only) before the failure surfaces.
+    # Every attempt errors before output: ASK, then the FALLBACK model on the
+    # verbatim prompt, then ANALYSIS twice (paraphrase-safe + headline-only).
     assert models.requested == [
-        GEMINI_ASK_MODEL, GEMINI_ANALYSIS_MODEL,
+        GEMINI_ASK_MODEL, GEMINI_FALLBACK_MODEL,
         GEMINI_ANALYSIS_MODEL, GEMINI_ANALYSIS_MODEL]
 
 
@@ -909,13 +911,14 @@ def test_stream_empty_library_not_flagged():
     assert "couldn't find anything" in text.lower()
 
 
-# ── RAG answer paths use the higher-tier ASK model, not analysis flash-lite ──
+# ── RAG answer paths use the ASK model; the fallback rung is a distinct id ──
 
 def test_buffered_answer_uses_ask_model_on_both_passes():
     from ai_service import GEMINI_ASK_MODEL, GEMINI_ANALYSIS_MODEL
-    # 2026-07-24: the "tier up" id gemini-3.1-flash proved to be a 404 in
-    # production (CI ask-debug probes) — the ask tier is pinned back to the
-    # proven analysis model until a real higher-tier id is verified.
+    # Owner decision 2026-08-23: every AI surface runs gemini-3.1-flash-lite,
+    # so the ask tier and the analysis tier are the same id on purpose. (It
+    # first became so on 2026-07-24, when the "tier up" id gemini-3.1-flash
+    # proved to be a 404 in production — CI ask-debug probes.)
     assert GEMINI_ASK_MODEL == GEMINI_ANALYSIS_MODEL
     # First pass uncited → forces the strict re-ask; BOTH calls must use ASK model.
     svc = _svc_with_json_responses([
@@ -924,6 +927,21 @@ def test_buffered_answer_uses_ask_model_on_both_passes():
     ])
     svc.answer_from_context("q?", _CARDS)
     assert svc._calls["models"] == [GEMINI_ASK_MODEL, GEMINI_ASK_MODEL]
+
+
+def test_fallback_model_is_a_different_id_from_the_ask_model():
+    """The fallback rung only earns its API call if it runs a DIFFERENT model.
+
+    This is the regression that hid for two months: when the dead higher tier
+    was pinned back to flash-lite on 2026-07-24, the rung beneath it still
+    pointed at GEMINI_ANALYSIS_MODEL — the same id — so every "fallback" was a
+    byte-identical retry of the call that had just failed, and the log line
+    named the failed model as its own rescuer. If a future change makes these
+    two ids equal again, delete the rung rather than let this test be edited
+    away.
+    """
+    from ai_service import GEMINI_ASK_MODEL, GEMINI_FALLBACK_MODEL
+    assert GEMINI_FALLBACK_MODEL != GEMINI_ASK_MODEL
 
 
 def test_stream_answer_uses_ask_model():

@@ -45,13 +45,27 @@ def embedding_needs_repair(raw) -> bool:
 # Single source of truth for the analysis/generation model. Flows to text
 # analysis, image vision, and graph_service. Change here to swap tiers everywhere.
 GEMINI_ANALYSIS_MODEL = "gemini-3.1-flash-lite"
-# The ASK (RAG) answer model. Was "gemini-3.1-flash" (a tier above flash-lite)
-# from 2026-07-11 — but CI filter probes (ask-debug run #1, 2026-07-24) proved
-# that id 404s: "models/gemini-3.1-flash is not found for API version v1beta,
-# or is not supported for generateContent". Every ask burned a 404 + fallback.
-# Pinned back to the production-proven analysis tier until a REAL higher-tier
-# id is verified against ListModels (owner decision; do not guess an id here).
+# The ASK (RAG) answer model. Deliberately the SAME id as the analysis tier:
+# every AI surface in the app runs on gemini-3.1-flash-lite (owner decision,
+# 2026-08-23). It stays its own constant because this is the seam a different
+# ask tier would be dropped into — do not collapse it into the line above.
+# History: it pointed at "gemini-3.1-flash" (a tier up) from 2026-07-11, but CI
+# filter probes (ask-debug run #1, 2026-07-24) proved that id 404s — "models/
+# gemini-3.1-flash is not found for API version v1beta, or is not supported for
+# generateContent" — so every ask burned a 404 plus a fallback for two months.
 GEMINI_ASK_MODEL = "gemini-3.1-flash-lite"
+# The Ask FALLBACK, used only when a GEMINI_ASK_MODEL call fails outright. It
+# must be a DIFFERENT id from the primary: from 2026-07-24, when the dead
+# higher tier was pinned back to flash-lite, the rung underneath it still said
+# GEMINI_ANALYSIS_MODEL — the same model — so the "fallback" was a byte-
+# identical retry that burned a second call and wrote a log line naming the
+# model that had just failed as the one rescuing it.
+# ⚠️ Any id here MUST be verified against ListModels AND a real generateContent
+# call before it lands; "gemini-3.1-flash" looked plausible and was dead.
+# gemini-3.5-flash-lite was verified 2026-08-23 on the project's own key:
+# listed with generateContent support, and HTTP 200 on Ask's exact call shape
+# (response_schema + the BLOCK_NONE safety settings below).
+GEMINI_FALLBACK_MODEL = "gemini-3.5-flash-lite"
 EMBEDDING_MODEL = "models/gemini-embedding-001"
 EMBEDDING_DIMENSIONS = 768
 
@@ -800,9 +814,10 @@ class GeminiService:
 
         config_extra lets callers add generation options (e.g. media_resolution
         for video) without changing the base structured-output config. `model`
-        overrides the model for this call only (the RAG answer paths pass the
-        higher-tier GEMINI_ASK_MODEL); it defaults to self.model
-        (GEMINI_ANALYSIS_MODEL) for every analysis/vision/synthesis call.
+        overrides the model for this call only (the RAG answer paths pass
+        GEMINI_ASK_MODEL, then GEMINI_FALLBACK_MODEL if that fails); it
+        defaults to self.model (GEMINI_ANALYSIS_MODEL) for every
+        analysis/vision/synthesis call.
         """
         attempts = max(1, attempts)
         if not self.client:
@@ -1353,13 +1368,14 @@ Work only from what is legible: keep the subject at the level the image states i
     def _answer_json(self, prompt: str, what: str, attempts: int) -> dict:
         """One grounded-answer generation call, with a model fallback.
 
-        Tries the higher-tier GEMINI_ASK_MODEL first; if that call fails
-        outright (after _generate_json's own transient retries), re-runs the
-        SAME prompt on GEMINI_ANALYSIS_MODEL — the tier every save/analysis
-        call already exercises in production. The ask tier is the ONLY place
-        the higher model id is used, so a bad/unavailable model there must
-        degrade Ask to the proven tier, not hard-fail every question with an
-        opaque 500. Raises AnalysisError only when BOTH models fail.
+        Tries GEMINI_ASK_MODEL first; if that call fails outright (after
+        _generate_json's own transient retries), re-runs the SAME prompt on
+        GEMINI_FALLBACK_MODEL — a different model generation, so a per-model
+        outage, quota wall or bad rollout degrades Ask to a working model
+        instead of hard-failing every question with an opaque 500. The two ids
+        must stay different for this rung to be worth its call; see the
+        constants at the top of this module. Raises AnalysisError only when
+        BOTH models fail.
         """
         cfg = {"response_schema": BrainAnswer, "safety_settings": _ASK_SAFETY_SETTINGS}
         try:
@@ -1372,16 +1388,16 @@ Work only from what is legible: keep the subject at the level the image states i
                 # caller retry with reduced context instead.
                 raise
             logger.error("Ask model %s failed for %s — falling back to %s: %s",
-                         GEMINI_ASK_MODEL, what, GEMINI_ANALYSIS_MODEL, e)
+                         GEMINI_ASK_MODEL, what, GEMINI_FALLBACK_MODEL, e)
             return self._generate_json([prompt], f"{what} (fallback model)",
                                        config_extra=cfg,
-                                       model=GEMINI_ANALYSIS_MODEL, attempts=attempts)
+                                       model=GEMINI_FALLBACK_MODEL, attempts=attempts)
         except AnalysisError as e:
             logger.error("Ask model %s failed for %s — falling back to %s: %s",
-                         GEMINI_ASK_MODEL, what, GEMINI_ANALYSIS_MODEL, e)
+                         GEMINI_ASK_MODEL, what, GEMINI_FALLBACK_MODEL, e)
             return self._generate_json([prompt], f"{what} (fallback model)",
                                        config_extra=cfg,
-                                       model=GEMINI_ANALYSIS_MODEL, attempts=attempts)
+                                       model=GEMINI_FALLBACK_MODEL, attempts=attempts)
 
     def answer_from_context(self, question: str, cards: list, history: list = None,
                             attempts: int = _MAX_GENERATE_ATTEMPTS,
@@ -1666,13 +1682,16 @@ Work only from what is legible: keep the subject at the level the image states i
         # consumer yet (text held in the tail buffer is fine; it was never
         # surfaced). After the first emitted token a restart would duplicate
         # prose, so mid-stream failures still raise. Mirrors the buffered path:
-        # ask tier → proven analysis tier (transport failures), then a
+        # ask tier → fallback tier (transport failures: a DIFFERENT model, so
+        # this rung can actually rescue the ones above it), then a
         # paraphrase-safe retry (RECITATION/output blocks), then headline-only
         # context (input blocks — a blocked PROMPT fast-fails with an empty
-        # stream, so walking the list costs little latency).
+        # stream, so walking the list costs little latency). The last two rungs
+        # stay on the primary tier on purpose: what changes there is the
+        # PROMPT, not the model, and the primary is the production-proven one.
         attempts = [
             (GEMINI_ASK_MODEL, verbatim_prompt),
-            (GEMINI_ANALYSIS_MODEL, verbatim_prompt),
+            (GEMINI_FALLBACK_MODEL, verbatim_prompt),
             (GEMINI_ANALYSIS_MODEL, paraphrase_prompt),
             (GEMINI_ANALYSIS_MODEL, headline_prompt),
         ]

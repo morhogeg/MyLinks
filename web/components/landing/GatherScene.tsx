@@ -135,7 +135,18 @@ export default function GatherScene() {
                             gathering alone would just be a sixth pile; the
                             summarize/categorize/tag/connect clause is what
                             makes the one place useful. */}
+                        {/* Round 17: the two lead sentences exist for Google's
+                            OAuth branding review, which rejected the page for
+                            not explaining the app's purpose. Everything else
+                            here is narrative; nothing on the page said the
+                            plain "Machina is a ___ that ___". Kept in the
+                            page's voice, and D-3 clean (the category noun is
+                            "personal knowledge base", never "second brain"). */}
                         <p className="mx-auto mt-5 max-w-lg text-[15px] leading-relaxed text-text-secondary text-pretty sm:text-base">
+                            Machina is a personal knowledge base: send it a link, a screenshot
+                            or a video from any app, and it saves, summarizes and organizes it
+                            for you. Months later, the thing you half remember is one question
+                            away, answered from your own saves with the sources it came from.
                             You never lost any of it. It was scattered across five apps,
                             impossible to find when it mattered. Gathered here, every save is summarized,
                             categorized, tagged, and connected to the rest of what you know.
