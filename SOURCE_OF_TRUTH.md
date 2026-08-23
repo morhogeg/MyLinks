@@ -671,8 +671,36 @@ The multi-user auth work described below **was** fully written but not live:
     AddLinkForm on iPhone SE); pull-to-refresh vs edge-swipe conflicts; failed
     card → Retry; Apple + Google sign-in; account deletion end-to-end.
 
-8a. **[ ] Trademark clearance for the name "Machina"** *(new 2026-07-27, from the
-    rename — `docs/BRANDING.md` A-1/C-1).* Bare **`Machina` is already taken on
+8a. **[~] Trademark clearance for the name "Machina" — SEARCH RUN 2026-08-23,
+    one real finding; the remaining step is the owner's decision (or a 1-hour
+    attorney consult).** Findings recorded in `docs/BRANDING.md` C-2 (WIPO
+    Global Brand Database, 508 hits scanned; US detail pulled from TSDR):
+    - **The finding that matters: US reg 6278707, "MACHINA" (word mark),
+      Ionic Security Inc., classes 9 + 35 + 42, REGISTERED Feb 2021, live.**
+      Goods are entirely encryption/data-security software (encryption,
+      key management, access control, SaaS security) — same word, same
+      classes, materially different goods from a personal knowledge base.
+      Material caveat: the Sec. 8 maintenance filing is due Feb 23, 2027;
+      the USPTO courtesy reminder went out Feb 2026 and NOTHING has been
+      filed. Ionic was absorbed by Twilio and the product was sunset, so
+      decent odds the mark lapses in 2027 — but it is live today.
+    - **Israel reg 334914, "MACHINA", Metro Motor (motorcycle importer),
+      classes 6/9/12/18/25, registered 2021.** The class bundle is motorcycle
+      gear (class 9 covers protective helmets); no class 42. Goods text
+      unverified — the ILPO site was down during the search. Low risk for a
+      software app. (Also IL 335802, class 28 toys — irrelevant.)
+    - **The App Store incumbent (Philip Gebben) has NO US registration** —
+      the docs' bet confirmed.
+    - Others: ProFrac (cl 37, fracking), Beeson (35/37/39), Machina Skin
+      (ended), Machina Wearable (ended), EU Media Point 9/16/35/41 (EUTM,
+      relevant only to a future EU push).
+    NOT legal advice; the search is the free 80%. Owner options: (a) 1-hour
+    trademark-attorney read on Ionic's mark before submission (safest), or
+    (b) proceed accepting moderate risk — goods differ materially, the mark
+    is likely lapsing, and the practical exposure of USING a name (vs
+    registering it) against a sunset enterprise product is low.
+    *(Original item, kept for context — new 2026-07-27, from the
+    rename — `docs/BRANDING.md` A-1/C-1.)* Bare **`Machina` is already taken on
     the App Store** by an *adjacent* app (Philip Gebben, Utilities, "Opening up
     Creativity", screenshots referencing "Knowledge & Inspiration" and "Machina
     Studio uses AI…"). App Store *listing* name uniqueness is handled — the

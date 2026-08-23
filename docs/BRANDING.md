@@ -353,6 +353,31 @@ trademark.** See A-1.
 
 ---
 
+### C-2 · Trademark search results for "MACHINA" (run 2026-08-23)
+
+Searched WIPO Global Brand Database (covers USPTO + Israel; 508 "contains
+machina" records scanned), US detail verified against TSDR. **Not legal
+advice.**
+
+| Register | Mark | Owner | Classes | Status | Risk read |
+|---|---|---|---|---|---|
+| **US 6278707** | MACHINA | Ionic Security Inc. (→ Twilio) | **9, 35, 42** | **Registered, live** (Feb 2021) | **The one that matters.** Identical word, same classes — but goods are entirely encryption/data-security software. Sec. 8 due **Feb 23, 2027**, reminder emailed Feb 2026, nothing filed; product sunset after the Twilio acquisition, so it may lapse. |
+| IL 334914 | MACHINA | Metro Motor (motorcycle importer) | 6, 9, 12, 18, 25 | Registered (2021) | Class bundle = motorcycle gear (cl 9 covers helmets); no 42. Low risk. Goods text unverified — ILPO site was down. |
+| IL 335802 | MACHINA | Trendy Toys | 28 | Registered (2021) | Toys. Irrelevant. |
+| EU 005125364 | machina | Media Point Group | 9, 16, 35, 41 | Registered (2007) | EUTM only — matters if an EU push ever happens. |
+| US (various) | MACHINA | ProFrac (37), Beeson (35/37/39), Machina Skin (ended), Machina Wearable (ended) | — | — | Unrelated goods or dead. |
+
+**The App Store incumbent (Philip Gebben) holds no US registration** — A-1's
+"individual dev, low odds of a mark" bet is confirmed.
+
+**Decision left open (A-1):** (a) a 1-hour trademark-attorney read on the
+Ionic mark before App Store submission — the safest close; or (b) proceed,
+accepting moderate risk: the goods differ materially (knowledge base vs
+enterprise encryption), the mark is plausibly lapsing in 2027, and using a
+name is lower-exposure than registering one against a sunset product.
+Re-check TSDR reg 6278707 after Feb 2027 — if no Sec. 8 was filed, the
+finding dissolves.
+
 ## 4. Open questions
 
 - ~~**Q-1 · Is the tagline still too AI-forward?**~~ **CLOSED 2026-08-02 by D-6.**
@@ -389,7 +414,7 @@ trademark.** See A-1.
 
 | # | Item | Owner | Blocks | Status |
 |---|---|---|---|---|
-| **A-1** | **Trademark search for "Machina"** (USPTO + Israel TM register, classes 9 and 42) before App Store submission. The incumbent being an individual indie developer suggests low odds of a registered mark, but this is the one finding that could veto D-1/D-2. | Owner | App Store submission | ☐ open |
+| **A-1** | **Trademark search for "Machina"** — ☑ **search RUN 2026-08-23, findings in C-2.** One live identical mark in US cl 9/42 (Ionic Security, likely lapsing 2027, different goods). Remaining: the owner's call — attorney hour or accept the risk. | Owner | App Store submission | ◐ decision |
 | **A-2** | Enter the D-2 Name/Subtitle and the D-3 keywords into App Store Connect. Values are in `docs/APP_STORE.md` §2. | Owner | §4 task 8 | ☐ open |
 | ~~**A-3**~~ | ~~Decide Q-1 (the AI-powered tagline).~~ **DONE 2026-08-02** — D-6 settled it; landed in `layout.tsx`, `manifest.json`, `README.md` (which also cleared a D-3 `ai` violation) and the §8 Product Hunt slot. The launch film's endcard already carried the line. | — | — | ☑ done |
 | **A-5** | **Re-check every §8 launch asset against D-1/D-2/D-3 and Q-4** before launch week: no "Machina AI" anywhere, no "bookmarks" as a self-description (Q-5), and a hero consistent with whatever Q-4 settles on. The assets were written when the app was still called Machina AI. | Owner / next session | Launch week | ☐ open |
