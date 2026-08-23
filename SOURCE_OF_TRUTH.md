@@ -226,9 +226,17 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-08-23): fix the APNs key, and install build **1289**
+> ## 🚨 OWNER ACTION (updated 2026-08-23): fix the APNs key, and install build **1290**
 >
-> **1289** (run #289, merge `8714cdd`) is current: everything in 1288 plus the
+> **1290** (run #290, merge `127a5b1`) is current: everything in 1289 plus the
+> related-cards RTL fix — a Hebrew reason naming an English concept ("נוגע גם
+> ב־Accountability") no longer renders scrambled with the maqaf stranded at
+> the far left. QA: open a Hebrew card whose related list carries an English
+> concept name and check the reason reads right-to-left with ‎ב־‎ attached to
+> the English word. 1289 stays the fallback. The APNs step below is unchanged
+> and still pending.
+>
+> **(superseded) 1289** (run #289, merge `8714cdd`): everything in 1288 plus the
 > tour mocks corrected to the real product — the card mock's invented "3
 > related saves" footer replaced by the real read-time + age row, and the
 > Connect step's graph redrawn in the graph view's own vocabulary (category
@@ -1482,6 +1490,25 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-08-23 — related-card reasons: direction by FIRST strong char, not
+  letter count. SHIPPED (merge `127a5b1` → Vercel + TestFlight run #290 =
+  build 1290).** Owner, with a screenshot: a Hebrew reason naming an English
+  concept — "נוגע גם ב־Accountability" — rendered scrambled in the open
+  card's Related list, maqaf stranded far left, looking like a missing space.
+  Root cause: `LinkDetailModal` picked the reason's direction with
+  `getDominantDirection` (letter COUNT), and "Accountability" (14 Latin
+  letters) outvoted the Hebrew (8), forcing an LTR base on a Hebrew
+  sentence — the bidi algorithm then detached the trailing maqaf. Fix: the
+  reason `<p>` now uses `dir="auto"` + `text-start` (first-strong direction),
+  exactly what the graph panel's neighbor reasons already used, which is why
+  the graph never had the bug. Titles keep the dominant heuristic (the
+  2026-07-28 fix is preserved: an English reason under a Hebrew title still
+  goes LTR because it *starts* in English). No string/template change —
+  "ב־X" with no space is correct Hebrew typography once the base direction
+  is right; both the live templates (lib/related.ts, lib/graph.ts) and the
+  backend's stored LLM reasons render through the same fixed element.
+  Verified: `tsc --noEmit` clean. NOT verified here: on-device rendering.
 
 - **2026-08-23 — tour mocks corrected to the real product. SHIPPED (merge
   `8714cdd` → Vercel + TestFlight run #289 = build 1289; no functions change).**
