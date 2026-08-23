@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, type ComponentProps } from 'react';
-import { Globe, Image as ImageIcon, StickyNote, Compass, Clock } from 'lucide-react';
+import { Globe, Image as ImageIcon, StickyNote, Clock } from 'lucide-react';
 import SourceByline from '@/components/SourceByline';
 import CitationMark from '@/components/ui/CitationMark';
 import { CitationGlyph } from '@/components/ui/Wordmark';
@@ -62,7 +62,7 @@ const PLATFORM_KINDS = new Set<PlatformKey>(['instagram', 'x', 'youtube', 'linke
  *  by the citation chips and the silo cards, not by CardView (SourceByline
  *  draws its own marks there). */
 export function KindMark({ kind, className = 'w-3.5 h-3.5' }: {
-    kind: DemoKind | 'linkedin' | 'safari';
+    kind: DemoKind | 'linkedin';
     className?: string;
 }) {
     if (PLATFORM_KINDS.has(kind as PlatformKey)) {
@@ -76,8 +76,7 @@ export function KindMark({ kind, className = 'w-3.5 h-3.5' }: {
     const Icon =
         kind === 'shot' ? ImageIcon
             : kind === 'note' ? StickyNote
-                : kind === 'safari' ? Compass
-                    : Globe;
+                : Globe;
     return <Icon className={`${className} text-text-muted`} aria-hidden />;
 }
 
