@@ -671,9 +671,15 @@ The multi-user auth work described below **was** fully written but not live:
     AddLinkForm on iPhone SE); pull-to-refresh vs edge-swipe conflicts; failed
     card → Retry; Apple + Google sign-in; account deletion end-to-end.
 
-8a. **[~] Trademark clearance for the name "Machina" — SEARCH RUN 2026-08-23,
-    one real finding; the remaining step is the owner's decision (or a 1-hour
-    attorney consult).** Findings recorded in `docs/BRANDING.md` C-2 (WIPO
+8a. **[x] Trademark clearance — CLOSED 2026-08-23 by owner decision.** Search
+    run same day; the owner reviewed the one live conflict (US 6278707, Ionic
+    Security, encryption software) and accepted the risk: "it's fine, it's
+    just an iOS app." Reasoning that supports the call: goods differ
+    materially, the mark's Sec. 8 was never filed (due Feb 2027, product
+    sunset at Twilio), and using a name is lower-exposure than registering
+    one. **Tickler: re-check TSDR reg 6278707 after Feb 23, 2027** — if no
+    Sec. 8 appeared, the conflict is gone for good. Findings preserved in
+    `docs/BRANDING.md` C-2. *(Search detail, kept:)* Findings recorded in `docs/BRANDING.md` C-2 (WIPO
     Global Brand Database, 508 hits scanned; US detail pulled from TSDR):
     - **The finding that matters: US reg 6278707, "MACHINA" (word mark),
       Ionic Security Inc., classes 9 + 35 + 42, REGISTERED Feb 2021, live.**

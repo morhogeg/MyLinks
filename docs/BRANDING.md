@@ -414,7 +414,7 @@ finding dissolves.
 
 | # | Item | Owner | Blocks | Status |
 |---|---|---|---|---|
-| **A-1** | **Trademark search for "Machina"** — ☑ **search RUN 2026-08-23, findings in C-2.** One live identical mark in US cl 9/42 (Ionic Security, likely lapsing 2027, different goods). Remaining: the owner's call — attorney hour or accept the risk. | Owner | App Store submission | ◐ decision |
+| **A-1** | **Trademark search for "Machina"** — ☑ **CLOSED 2026-08-23.** Search run (findings in C-2); owner reviewed the one live conflict (Ionic Security, US cl 9/42, likely lapsing 2027) and accepted the risk. Tickler: re-check TSDR 6278707 after Feb 2027. | Owner | — | ☑ done |
 | **A-2** | Enter the D-2 Name/Subtitle and the D-3 keywords into App Store Connect. Values are in `docs/APP_STORE.md` §2. | Owner | §4 task 8 | ☐ open |
 | ~~**A-3**~~ | ~~Decide Q-1 (the AI-powered tagline).~~ **DONE 2026-08-02** — D-6 settled it; landed in `layout.tsx`, `manifest.json`, `README.md` (which also cleared a D-3 `ai` violation) and the §8 Product Hunt slot. The launch film's endcard already carried the line. | — | — | ☑ done |
 | **A-5** | **Re-check every §8 launch asset against D-1/D-2/D-3 and Q-4** before launch week: no "Machina AI" anywhere, no "bookmarks" as a self-description (Q-5), and a hero consistent with whatever Q-4 settles on. The assets were written when the app was still called Machina AI. | Owner / next session | Launch week | ☐ open |
