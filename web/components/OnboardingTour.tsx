@@ -27,6 +27,7 @@ import {
     StickyNote,
 } from 'lucide-react';
 import { CitationGlyph } from './ui/Wordmark';
+import { getCategoryColorStyle } from '@/lib/colors';
 import { isNativeApp } from '@/lib/api';
 import { hapticSelection, hapticLight } from '@/lib/haptics';
 import { useVisualViewport } from '@/lib/useVisualViewport';
@@ -165,14 +166,13 @@ function StructuredCardMock() {
                         </span>
                     ))}
                 </div>
-                {/* Footer: read time + connections */}
-                <div className="flex items-center justify-between pt-2 border-t border-border-subtle">
-                    <span className="inline-flex items-center gap-1 text-[10px] font-medium text-text-muted/60">
+                {/* Footer — the REAL card's metadata row: read time + age,
+                    quiet and start-aligned, exactly as Card.tsx renders it. */}
+                <div className="flex items-center gap-3 pt-1 text-[10px] font-medium text-text-muted/60">
+                    <span className="inline-flex items-center gap-1">
                         <Clock className="w-3 h-3" /> 4m
                     </span>
-                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-accent">
-                        <Link2 className="w-3 h-3" /> 3 related saves
-                    </span>
+                    <span>2d ago</span>
                 </div>
             </div>
         </div>
@@ -215,65 +215,86 @@ function AskMock() {
     );
 }
 
-/** A miniature of the REAL graph view — a focused node, its lit neighbourhood,
-    and a couple of dim strangers, so "connected map" is shown, not told. */
+/** A miniature of the REAL graph view, in its exact visual vocabulary
+    (KnowledgeGraph.tsx): nodes wear their category's app-wide identity color
+    (same `getCategoryColorStyle` hash as cards and filters), sized by how
+    connected they are; the focused node carries a soft halo in its own color;
+    lit edges blend both endpoint colors; strangers are dimmed; and the header
+    speaks the graph's own stats line ("N connected cards · N connections"). */
 function GraphMock() {
-    // Positions in % of the canvas. Focus at center; three lit neighbours;
-    // two dim, unconnected nodes so the neighbourhood visibly stands out.
-    const focus = { x: 50, y: 42 };
-    const linked = [
-        { x: 17, y: 20, label: 'Morning routines' },
-        { x: 82, y: 26, label: 'Sleep quality' },
-        { x: 28, y: 76, label: 'Attention span' },
-    ];
-    const dim = [
-        { x: 79, y: 74 },
-        { x: 62, y: 12 },
-    ];
+    const alpha = (rgb: string, a: number) => rgb.replace('rgb(', 'rgba(').replace(')', `, ${a})`);
+    const nodes = [
+        { x: 50, y: 42, size: 20, label: 'Deep focus', category: 'Productivity', focus: true },
+        { x: 16, y: 22, size: 13, label: 'Morning routines', category: 'Health' },
+        { x: 84, y: 26, size: 13, label: 'Sleep quality', category: 'Health' },
+        { x: 27, y: 76, size: 13, label: 'Attention span', category: 'Science' },
+        // Dim strangers — their own little island, outside the lit neighbourhood.
+        { x: 78, y: 74, size: 10, category: 'Food', dim: true },
+        { x: 64, y: 88, size: 8, category: 'Food', dim: true },
+    ] as Array<{ x: number; y: number; size: number; label?: string; category: string; focus?: boolean; dim?: boolean }>;
+    const edges: Array<[number, number, boolean]> = [[0, 1, true], [0, 2, true], [0, 3, true], [4, 5, false]];
     return (
-        <div className="relative w-full h-44 rounded-2xl bg-card border border-border-subtle shadow-xl overflow-hidden" aria-hidden>
-            {/* Edges — accent for the lit neighbourhood. */}
-            <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-                {linked.map((n) => (
-                    <line
-                        key={n.label}
-                        x1={focus.x} y1={focus.y} x2={n.x} y2={n.y}
-                        stroke="currentColor" strokeWidth="0.7"
-                        className="text-accent/50"
-                    />
-                ))}
-            </svg>
-            {/* Dim strangers — small, label-less, clearly outside the neighbourhood. */}
-            {dim.map((n, i) => (
-                <span
-                    key={i}
-                    className="absolute w-2 h-2 rounded-full bg-fill-subtle border border-border-subtle -translate-x-1/2 -translate-y-1/2"
-                    style={{ left: `${n.x}%`, top: `${n.y}%` }}
-                />
-            ))}
-            {/* Lit neighbours */}
-            {linked.map((n) => (
-                <div
-                    key={n.label}
-                    className="absolute flex flex-col items-center -translate-x-1/2 -translate-y-1/2"
-                    style={{ left: `${n.x}%`, top: `${n.y}%` }}
-                >
-                    <span className="w-3 h-3 rounded-full bg-accent/80 ring-2 ring-accent/25" />
-                    <span className="mt-1 text-[8.5px] font-semibold text-text-secondary whitespace-nowrap">{n.label}</span>
-                </div>
-            ))}
-            {/* Focused node */}
-            <div
-                className="absolute flex flex-col items-center -translate-x-1/2 -translate-y-1/2"
-                style={{ left: `${focus.x}%`, top: `${focus.y}%` }}
-            >
-                <span className="w-5 h-5 rounded-full bg-[image:var(--accent-gradient)] ring-2 ring-accent shadow-lg shadow-accent/30" />
-                <span className="mt-1 text-[9.5px] font-bold text-text whitespace-nowrap">Deep focus</span>
+        <div className="w-full rounded-2xl bg-card border border-border-subtle shadow-xl p-3" aria-hidden>
+            {/* The graph view's stats header */}
+            <p className="mb-1 text-[10px] font-medium text-text-secondary tabular-nums">
+                4 connected cards <span className="text-text-muted">·</span> 3 connections
+            </p>
+            <div className="relative w-full h-40">
+                {/* Edges — lit ones blend both endpoint colors, like the canvas. */}
+                <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                    <defs>
+                        {edges.filter(([, , lit]) => lit).map(([a, b], i) => (
+                            <linearGradient
+                                key={i}
+                                id={`tour-edge-${i}`}
+                                gradientUnits="userSpaceOnUse"
+                                x1={nodes[a].x} y1={nodes[a].y} x2={nodes[b].x} y2={nodes[b].y}
+                            >
+                                <stop offset="0%" stopColor={getCategoryColorStyle(nodes[a].category).color} />
+                                <stop offset="100%" stopColor={getCategoryColorStyle(nodes[b].category).color} />
+                            </linearGradient>
+                        ))}
+                    </defs>
+                    {edges.map(([a, b, lit], i) => (
+                        <line
+                            key={`${a}-${b}`}
+                            x1={nodes[a].x} y1={nodes[a].y} x2={nodes[b].x} y2={nodes[b].y}
+                            stroke={lit ? `url(#tour-edge-${i})` : 'currentColor'}
+                            strokeWidth={lit ? 0.8 : 0.5}
+                            strokeOpacity={lit ? 0.75 : 0.2}
+                            className="text-text-muted"
+                        />
+                    ))}
+                </svg>
+                {/* Nodes — category-colored discs, hairline ring, halo on focus. */}
+                {nodes.map((n) => {
+                    const color = getCategoryColorStyle(n.category).color;
+                    return (
+                        <div
+                            key={`${n.x}-${n.y}`}
+                            className={`absolute flex flex-col items-center -translate-x-1/2 -translate-y-1/2 ${n.dim ? 'opacity-40' : ''}`}
+                            style={{ left: `${n.x}%`, top: `${n.y}%` }}
+                        >
+                            <span
+                                className="rounded-full"
+                                style={{
+                                    width: n.size,
+                                    height: n.size,
+                                    background: `radial-gradient(circle at 35% 35%, ${alpha(color, 0.95)}, ${alpha(color, 0.65)})`,
+                                    boxShadow: n.focus
+                                        ? `0 0 0 1.5px ${alpha(color, 0.95)}, 0 0 18px 3px ${alpha(color, 0.35)}`
+                                        : `0 0 0 1px ${alpha(color, 0.35)}`,
+                                }}
+                            />
+                            {n.label && (
+                                <span className={`mt-1 text-[9px] whitespace-nowrap ${n.focus ? 'font-bold text-text' : 'font-semibold text-text-secondary'}`}>
+                                    {n.label}
+                                </span>
+                            )}
+                        </div>
+                    );
+                })}
             </div>
-            {/* The graph view's vocabulary: the focused card's connection count. */}
-            <span className="absolute bottom-2 inset-x-0 mx-auto w-fit px-2.5 py-1 rounded-full bg-fill-subtle text-[9px] font-semibold text-text-secondary">
-                Connections · 3
-            </span>
         </div>
     );
 }
