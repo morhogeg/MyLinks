@@ -1277,9 +1277,13 @@ export default function LinkDetailModal({
                                         // sentence — they can be in different languages (a Hebrew card
                                         // related to an English one gets an English "why"), and forcing
                                         // the title's direction onto an English reason rendered it
-                                        // backwards, period on the left (owner, 2026-07-28).
+                                        // backwards, period on the left (owner, 2026-07-28). The reason
+                                        // uses dir="auto" (first-strong), NOT the dominant-letter count:
+                                        // a Hebrew sentence naming a long English concept ("נוגע גם
+                                        // ב־Accountability") has more Latin letters than Hebrew ones,
+                                        // and a dominant-LTR base stranded the maqaf at the far left,
+                                        // fused against nothing (owner, 2026-08-22).
                                         const relRtl = getDominantDirection(rel.title, isRtl ? 'rtl' : 'ltr') === 'rtl';
-                                        const reasonRtl = getDominantDirection(reason, relRtl ? 'rtl' : 'ltr') === 'rtl';
                                         return (
                                         <div
                                             key={rel.id}
@@ -1300,8 +1304,8 @@ export default function LinkDetailModal({
                                                 )}
                                             </div>
                                             <p
-                                                dir={reasonRtl ? "rtl" : "ltr"}
-                                                className={`text-xs text-text-muted mt-1.5 font-normal italic ${reasonRtl ? 'text-right' : ''}`}
+                                                dir="auto"
+                                                className="text-xs text-text-muted mt-1.5 font-normal italic text-start"
                                             >
                                                 {reason}
                                             </p>
