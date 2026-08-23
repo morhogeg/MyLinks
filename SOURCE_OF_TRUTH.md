@@ -1476,6 +1476,24 @@ exact-match, capped.
   any live Gemini call, real streamed ask, or on-device banner wording
   (no prod creds / device in this env).
 
+- **2026-08-23 — the tour stops promising a browser button. SHIPPED (merge
+  `1638b92` → Vercel; no functions change, no TestFlight build).** Owner spotted
+  it in the first-run tour: the web variant of the Capture step said users could
+  "clip any page with the Machina button in your browser". There is no browser
+  extension shipping, and the step's **puzzle-piece icon** made the same promise
+  visually. Both replaced in `web/components/OnboardingTour.tsx`: the copy now
+  describes what web capture actually does today — paste a URL, add a
+  screenshot, or write a note via **+** — and the icon is a `Plus`. The
+  **native branch is deliberately untouched** (sharing from any app is real), so
+  on device the tour renders identically; that is why NO TestFlight build was
+  cut for this and 1285 stays current. Verified: `tsc --noEmit` clean. NOT
+  verified here: a visual render.
+  **Left open (deliberate, not a regression):** the Capture step's illustration
+  is a mock **iOS share sheet** (Messages/Mail/Saved tiles) in BOTH branches, so
+  desktop web still depicts a phone interaction the web user can't perform. It
+  makes no browser-button claim, so it was out of scope for this fix — worth a
+  pass if the web tour should be fully honest.
+
 - **2026-08-22 — Related cards stop inventing connections; stale ones heal
   themselves. SHIPPED (merge `3c27bf2` → Vercel + functions deploy run #84
   scoped to `analyze_link,process_link_background,rebuild_connections,backfill_related_links`
