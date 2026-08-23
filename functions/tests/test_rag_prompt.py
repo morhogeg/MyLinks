@@ -915,7 +915,7 @@ def test_stream_empty_library_not_flagged():
 
 def test_buffered_answer_uses_ask_model_on_both_passes():
     from ai_service import GEMINI_ASK_MODEL, GEMINI_ANALYSIS_MODEL
-    # Owner decision 2026-08-21: every AI surface runs gemini-3.1-flash-lite,
+    # Owner decision 2026-08-23: every AI surface runs gemini-3.1-flash-lite,
     # so the ask tier and the analysis tier are the same id on purpose. (It
     # first became so on 2026-07-24, when the "tier up" id gemini-3.1-flash
     # proved to be a 404 in production — CI ask-debug probes.)

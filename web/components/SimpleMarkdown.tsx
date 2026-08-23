@@ -112,8 +112,15 @@ export default function SimpleMarkdown({ content, className = '', isCompact = fa
         // Regular paragraph
         flushList();
 
-        // If compact mode and text looks like multiple sentences without breaks, split them
-        if (isCompact && trimmed.includes('. ') && !trimmed.includes('\n')) {
+        // Compact-mode fallback for LEGACY single-block summaries only: if the
+        // model separated its sentences with line breaks anywhere in the
+        // content, that layout is authoritative and each line renders as-is —
+        // re-splitting a line the model already isolated is how "Rep. Ralph
+        // Norman" got severed after "Rep." (owner card, 2026-08-22; the old
+        // per-line `!trimmed.includes('\n')` check was vacuous, since lines
+        // are split on '\n' above). Only a summary that is ONE unbroken block
+        // gets sentence-split for scannability.
+        if (isCompact && !content.trim().includes('\n') && trimmed.includes('. ')) {
             // Split by period + space, but keep the period
             const raw = trimmed.split(/(\. )/g).reduce((acc: string[], part, i, arr) => {
                 if (i % 2 === 0) {
@@ -122,11 +129,17 @@ export default function SimpleMarkdown({ content, className = '', isCompact = fa
                 }
                 return acc;
             }, []);
-            // Re-join false splits: a fragment ending in an abbreviation ("St.
-            // Brigid's butter" broke here — owner card, 2026-07-28), or one that
-            // leaves a **bold span** open — splitting inside it orphans the
-            // markers and they render as literal asterisks in both halves.
-            const ABBREV_END = /\b(?:St|Dr|Mr|Mrs|Ms|Prof|Sr|Jr|vs|No|approx|e\.g|i\.e|etc)\.$/i;
+            // Re-join false splits — by SHAPE, not an enumerated title list
+            // (a list can never be complete: "Rep." slipped past one,
+            // 2026-08-22, as "St." had on 2026-07-28). A fragment ending in
+            // (a) a short CAPITALIZED token (≤4 chars: St. / Rep. / Gen. /
+            // U.S. — the open class of titles), (b) a dotted form (e.g. /
+            // i.e.), or (c) one of the few closed lowercase abbreviations is
+            // treated as mid-sentence: a missed split costs one longer
+            // paragraph, a wrong one severs a name. Also re-join when a
+            // **bold span** is left open — splitting inside it orphans the
+            // markers as literal asterisks in both halves.
+            const ABBREV_END = /(?:^|\s)(?:\p{Lu}[\p{L}.]{0,3}|(?:\p{L}\.)+\p{L}|vs|etc|no|ca|cf|approx|est|incl)\.$/u;
             const sentences = raw.reduce((acc: string[], part) => {
                 const prev = acc[acc.length - 1];
                 const openBold = prev !== undefined && (prev.split('**').length - 1) % 2 === 1;

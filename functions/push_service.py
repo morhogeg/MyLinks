@@ -84,19 +84,29 @@ def send_push(uid: str, title: str, body: str, data: Optional[dict] = None) -> d
     except Exception as e:
         logger.error(f"Push send failed for user (tokens={len(tokens)}): {e}")
         result["skipped"] = "send_failed"
+        result["errors"] = [type(e).__name__]
         return result
 
     dead = []
+    # Error NAMES (never tokens) of the first few failures, so a diagnostic
+    # caller can say WHY a send failed — 'ThirdPartyAuthError' is an APNs-key
+    # problem, 'UnregisteredError' a dead/mismatched token, 'SenderIdMismatchError'
+    # a wrong Firebase config in the app. Without this, every failure collapses
+    # into an unactionable count.
+    result["errors"] = []
     for token, resp in zip(tokens, batch.responses):
         if resp.success:
             result["sent"] += 1
             continue
         result["failed"] += 1
-        if _is_dead_token(resp.exception):
+        exc = resp.exception
+        if len(result["errors"]) < 3:
+            result["errors"].append(type(exc).__name__ if exc else "UnknownError")
+        if _is_dead_token(exc):
             dead.append(token)
         else:
             logger.warning(
-                f"Push to {_mask_token(token)} failed (transient): {resp.exception}"
+                f"Push to {_mask_token(token)} failed (transient): {exc}"
             )
 
     if dead:

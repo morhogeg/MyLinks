@@ -226,9 +226,61 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-08-08): install build **1279**
+> ## 🚨 OWNER ACTION (updated 2026-08-22): fix the APNs key, and install build **1286**
 >
-> **1279** (run #279, merge `e0cfdda`) is current: it is the first build where a
+> **1286** (run #286, merge `d8d2117`) is current: everything in 1285 plus the
+> Insights facet edge-swipe — after tapping a category/tag/source in Insights,
+> the iOS swipe-back gesture now returns to Insights, same as the chip. QA:
+> Insights → tap a category → edge-swipe → should land back in Insights at
+> your scroll position. 1285 stays the fallback. The APNs step below is
+> unchanged and still pending.
+>
+> **FIRST — the push fix (console, ~5 min, no build):** the on-device test on
+> 1284 confirmed `ThirdPartyAuthError` — the APNs key in Firebase → Cloud
+> Messaging does not authenticate for the app, so NO push has ever delivered.
+> Create/verify an APNs key under team **8Y2M94RUHG** at developer.apple.com →
+> Keys, then in Firebase (`secondbrain-app-94da2` → Project settings → Cloud
+> Messaging → `com.morhogeg.machina`) delete the stored APNs key and upload
+> the .p8 with its exact Key ID + Team ID. Re-tap Settings → "Send a test
+> notification" to verify. Full steps in the 2026-08-22 §9 entry.
+>
+> **(superseded) 1285** (run #285, merge `3c27bf2`): everything in 1284 plus the
+> related-cards precision fix and the silent graph re-migration (open the app
+> once and forced connections recompute themselves — QA: open the vacuum-review
+> card a few minutes after first launch and check the AI-model cards are gone).
+>
+> **(superseded) 1284** (run #284, merge `84370d7`): everything in 1283 plus the
+> test button relaying FCM's error name — the build that caught the above.
+>
+> **(superseded) 1283** (run #283, merge `153b43d`): everything in 1281/1282 plus
+> the colorful Insights screen — category bars and tag pills in Settings →
+> Insights now wear each category/tag's app-wide identity color (same hash as
+> cards, filters, the graph). QA on device: open Settings → Insights and check
+> the Categories bars carry the same colors their chips do on cards, in both
+> light and dark. 1281 stays the fallback.
+>
+> **(superseded) 1281** (run #281, merge `8aa1da4`): everything in 1280 plus the
+> push-notification diagnostics. Settings → Notifications gains a **"Send a
+> test notification"** row (visible when the toggle is on) that re-registers
+> the device token and fires a real push through FCM/APNs, and the note under
+> it names the exact link that failed — no registered device, stale tokens,
+> unreachable backend, or delivery blocked on the phone itself. The toggle's
+> failure copy now separates "iOS permission denied" from "token upload
+> failed" instead of blaming iOS for both. QA on device: install 1281, open
+> Settings, tap the test row, and read the note — it answers why digests
+> never arrive as push. Requires functions deploy run #81 + hosting run #7
+> (the /api/send-test-push rewrite), both from the same merge.
+>
+> **(superseded) 1280** (run #280, merge `1071f43`): the share sheet's terminal
+> frame no longer says a bare "Saved" while the backend is still analysing. It
+> now reads **"Saved ✓ · Making your card"** over the still-mid-flight %, with
+> **"The card finishes on its own in Machina."** underneath, and no em dash
+> survives in any rendered extension string. QA on device: share an article from
+> Safari, watch the final frame, then open Machina immediately — the in-app
+> banner should continue the SAME ramp rather than contradicting a "done" claim.
+> Everything in 1279 rides along. 1279 stays the fallback.
+>
+> **(superseded) 1279** (run #279, merge `e0cfdda`): the first build where a
 > shared PARAGRAPH is treated as text rather than a link — honest capture copy
 > ("Saving your text… / Reading your text…"), the text kept verbatim as the card
 > body under an AI heading, and the summary behind the Machina mark. Everything
@@ -317,7 +369,7 @@ The multi-user auth work described below **was** fully written but not live:
 >    2026-08-04, back to 100. The **GCP budget alert is now the top item here**:
 >    the Gemini spend cap is a kill-switch, not a monitor, and it takes the owner
 >    down with everyone else. ✅ **The budget alert was SET at ₪50 on
-    2026-08-21** — what is left under this heading is the two key rotations
+    2026-08-23** — what is left under this heading is the two key rotations
     plus PITR/backups and the uptime check.
 > 6. **Unverified, close before launch** — **4b** (a weekly synthesis has still
 >    never been proven to generate end-to-end), **4c**, **21**.
@@ -655,16 +707,17 @@ The multi-user auth work described below **was** fully written but not live:
     (`157c11d`) landed *after* build 1219 was cut, so it has never been in a
     TestFlight build. It rides the next iOS build and needs one look on a
     home-indicator iPhone — see the 2026-07-27 §9 entry.
-11a2. **[ ] Image-mode scan phases drift between the app and the Share
-    Extension** (found 2026-07-27). Thresholds match (95/80/60/45) but the
-    wording does not: Swift says "Understanding content… / Reading text… /
-    Scanning image…", `AnalyzingBanner.tsx`'s inline table says "Understanding
-    the content… / Reading the text… / Scanning the image…". Link phases ARE in
-    sync because they share `scanPhases.ts`; image phases have no shared twin.
-    Fix by adding `IMAGE_SCAN_STEPS` to `web/lib/scanPhases.ts` and having both
-    surfaces read it, the way `LINK_SCAN_STEPS` already works. Cosmetic, and
-    only visible to someone comparing the two screens — but it is exactly the
-    kind of drift the shared-constants pattern exists to prevent.
+11a2. **[x] Image-mode scan phases drift between the app and the Share
+    Extension** (found 2026-07-27). **DONE 2026-08-23** — `IMAGE_SCAN_STEPS` +
+    `imageScanLabel`/`imageScanOrb` added to `web/lib/scanPhases.ts` (Swift's
+    device-QA'd wording: "Uploading / Scanning image / Reading text /
+    Understanding content / Organizing & tagging / Finishing up", thresholds
+    20/45/60/80/95); `AnalyzingBanner.tsx` and `ImageScanProgress.tsx` both
+    read it now, so the banner's drifted third wording ("Scanning the
+    image…") is gone. The Swift copy in
+    `web/ios/App/ShareExt/ShareViewController.swift` already matched
+    word-for-word, so NO Swift change was needed — its comment now names
+    `IMAGE_SCAN_STEPS` as its twin. See the 2026-08-23 §9 entry.
 11a3. **[ ] Em dashes read as AI-written — 92 left across 34 files** (owner call
     2026-07-27, after the founder's note was de-em-dashed: "it's the most basic
     trademark of AI writing, and not in a good way"). Only `StoryView` was
@@ -813,7 +866,7 @@ The multi-user auth work described below **was** fully written but not live:
     buckets fail closed, scheduler scans reworked (reminders via a bounded
     collection-group query + new composite index; digests 15-min cadence,
     field-masked scan), `task_logs` pruning + TTL-ready `expireAt`.
-    **✅ GCP budget alert SET by the owner 2026-08-21 at ₪50** — the early
+    **✅ GCP budget alert SET by the owner 2026-08-23 at ₪50** — the early
     warning now fires before the spend cap's kill-switch does, which was the
     whole point of the item; it is off the launch gate. **Remaining
     ⛔ OWNER:** Firestore PITR/backups, uptime check — the
@@ -990,7 +1043,7 @@ The multi-user auth work described below **was** fully written but not live:
       (the registrar is already there, so this is one record), then make sure
       that account is listed as an owner of the OAuth project.
     - **25b. [ ] OWNER: re-submit "Verify branding" — but only AFTER the page is
-      live.** **Status 2026-08-21:** three of the four reasons are cleared;
+      live.** **Status 2026-08-23:** three of the four reasons are cleared;
       only *"does not explain the purpose"* remained, and the copy fix for it
       is on `claude/app-store-launch-checklist-8c22a8` awaiting a ship. ⚠️ The
       home-page URL must be **`https://mymachina.app/welcome`**, not the root —
@@ -1022,7 +1075,7 @@ The multi-user auth work described below **was** fully written but not live:
     same pattern as `/s`. **Deliberately not bundled with the 2026-08-06 domain
     ship:** get this wrong and sign-in breaks for every user on every platform,
     so it needs its own device verification. ⚠️ **The "cosmetic only" claim that
-    used to end this item was WRONG — corrected 2026-08-21 from an owner
+    used to end this item was WRONG — corrected 2026-08-23 from an owner
     screenshot.** The Google account chooser reads *"to continue to
     **secondbrain-app-94da2.firebaseapp.com**"*, not "Machina": with the OAuth
     branding unset/unverified, Google falls back to the redirect host, which is
@@ -1372,7 +1425,7 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-08-21 — the OAuth branding rejection, diagnosed and fixed at the source.**
+- **2026-08-23 — the OAuth branding rejection, diagnosed and fixed at the source.**
   Owner screenshot: the Google account chooser reads *"to continue to
   secondbrain-app-94da2.firebaseapp.com"*. Cause: branding verification is
   REJECTED, so Google ignores the configured app name (which is correctly
@@ -1404,7 +1457,7 @@ exact-match, capped.
   from ~5 to 9 lines wants one look on device. WEB ONLY — Vercel, no iOS build.
 
 
-- **2026-08-21 — one model everywhere, and the Ask fallback becomes a real
+- **2026-08-23 — one model everywhere, and the Ask fallback becomes a real
   fallback.** Owner question: which Gemini model runs the app? Answer, verified
   by grep across the whole repo: **`gemini-3.1-flash-lite` for every generative
   surface** — analysis, vision, graph, synthesis, and Ask (buffered *and*
@@ -1429,6 +1482,290 @@ exact-match, capped.
   the real venv. **BACKEND ONLY — needs a functions deploy, no iOS build.**
   Also this session: the owner set the **GCP budget alert at ₪50** (task 19,
   launch-gate item 5) — off the list.
+
+- **2026-08-23 — AI-quality hardening pass: every AI surface audited for the
+  last two weeks' bug classes; 7 holes fixed, 31 tests added (635 → 666).**
+  Audit-then-fix across ai_service/graph_service/digest_service/link_service/
+  search/scraper/models + the client AI surfaces. **Fixed (backend):** (1) the
+  truncation guard `_analysis_cut_off` now also flags a PRESENT-but-empty
+  `summary` and a truncated LAST element of `tags`/`concepts`/`videoHighlights`
+  (unclosed `**`, trailing hyphen/maqaf/comma — structured output writes fields
+  in schema order, so an early stop can land in a list after the prose and
+  still close the JSON); deliberately NOT flagged: a bare short word ("מנכ") as
+  a final tag/concept — indistinguishable from a legitimate term, so it stays
+  a documented gap rather than a retry-loop risk. Hebrew geresh/gershayim
+  terminators verified accepted. (2) `analyze_text_with_images` is now
+  script-aware: Hebrew in the post context + a text-carrying image flag
+  (`image_is_primary` or `image_text_dense`) escalates vision to
+  MEDIA_RESOLUTION_HIGH (the analyze_image lesson); Latin posts keep
+  MEDIUM/LOW for cost, and resolution is only ever raised. (3) the STREAMING
+  ask path now scrubs in-context card ids out of the emitted prose (including
+  ids split across chunk boundaries, via the marker tail-buffer) — the
+  buffered path had `_strip_inline_ids` since 2026-07-28, the streamed one had
+  nothing. (4) `_enforce_tag_language` also drops a tag that merely repeats
+  the category ("recipe" on a Recipe card, case-insensitive). (5) the weekly
+  synthesis prompt gets the related-cards posture: a theme must be a real
+  throughline, never a shared format, and "one theme, or none" is licensed as
+  a valid answer. (6) `backfill_batch`/`backfill_related_links` count a
+  permanently text-less card as `skipped`, not `failed` — `failed` now means
+  "retry could help". **Fixed (client):** (7) `ensureGraphVersion` no longer
+  stamps `graphVersion` after a PARTIALLY failed run (`failed > 0` → retry
+  next open, exactly like an interrupted run — depends on fix 6, or a
+  text-less card would block the stamp forever); and backlog **11a2** done:
+  `IMAGE_SCAN_STEPS` in `scanPhases.ts`, banner + ImageScanProgress read it,
+  Swift already matched (no Swift change needed). **Verified clean, hunted,
+  no defect found:** silent-default scores (the graph similarity floor is now
+  test-locked incl. "missing score is dropped, not defaulted"; `confidence:
+  0.8/0.9` in main.py is a hardcoded legacy card field, not an LLM answer —
+  nothing ranks on it); digest curation is deterministic (no LLM
+  topic-grouping prompt exists); Ask citations can't reference a card
+  retrieval didn't return (`_valid_cited_ids` filters against the supplied
+  set); verbatim text cards are never rewritten by any pipeline step (guard
+  runs on the model dict before the verbatim substitution — now test-locked);
+  both sentence splitters carry the single-block guard + shape-based
+  abbreviation handling, and a node-level regex check confirmed Hebrew
+  short-word endings still split. **Judgment calls, deliberately not decided
+  here:** a bare-word mid-cut in a final tag/concept/title is undetectable;
+  a hallucinated id the model invents in prose (not one we supplied) is
+  indistinguishable from prose and survives `_strip_inline_ids`;
+  `find_related_links` still swallows exceptions into an empty-but-"successful"
+  `relatedLinks: []` (deliberate for the save pipeline — a failed relate must
+  not fail a capture — but during a forced migration it records emptiness as
+  done; heals only on the next force run); `detailedSummary` shorter than
+  `summary` is not enforced; there is no user-initiated Settings → Rebuild
+  (the 4s-boot trigger is the only caller, module-guarded), so the feared
+  concurrent-rebuild race has no second party today. Verified: 666/666
+  offline tests, `py_compile` clean, `tsc --noEmit` clean. NOT verified:
+  any live Gemini call, real streamed ask, or on-device banner wording
+  (no prod creds / device in this env).
+
+- **2026-08-22 — Related cards stop inventing connections; stale ones heal
+  themselves. SHIPPED (merge `3c27bf2` → Vercel + functions deploy run #84
+  scoped to `analyze_link,process_link_background,rebuild_connections,backfill_related_links`
+  + TestFlight run #285 = build 1285).** Owner ask (with screenshot): a robot-vacuum review card listed
+  Claude-benchmarking / AI-coding-agents cards as related, on reasons like
+  "both emphasize standardized benchmarking" — forced abstractions. Root
+  cause, all in `functions/graph_service.py`: `find_nearest` returned the 10
+  nearest neighbours with **no distance cutoff** (in a diverse library that's
+  just "whatever exists"), the verification prompt rewarded finding
+  connections, and a missing LLM score was gifted `similarity: 0.8`. Fixed
+  three ways: candidates past a cosine-distance ceiling (`RELATED_DISTANCE_CEILING`,
+  default 0.60 — tighter than search's 0.68 on purpose: precision over recall,
+  and empty is a valid answer) never reach the LLM; the prompt is now an
+  adversarial gatekeeper that explicitly rejects shared-format/abstract-theme
+  ties ("both are reviews", "both use benchmarks") and demands a shared
+  topic/entity; relations missing a score or under `RELATED_SIMILARITY_FLOOR`
+  (0.75) are dropped. **Existing libraries migrate automatically**: new
+  `GRAPH_VERSION = 2` + `ensureGraphVersion()` in `web/lib/rebuildConnections.ts`
+  (called from `app/page.tsx` 4s after boot) reads `graphVersion` off the user
+  doc and, when stale, silently force-re-runs the `rebuild_connections` relate
+  phase in the background, then stamps the doc — the stamp is written only
+  after success, so an interrupted run retries next open. One user-doc read
+  per open once migrated. Does NOT touch the client's live-match pass
+  (`lib/related.ts` pass 3) — its thresholds were already deliberate. Verified:
+  `tsc --noEmit` clean, `py_compile *.py` clean. NOT verified here: a live
+  relate run against real Gemini (no prod creds in this env). Needs a
+  functions deploy + Vercel to take effect.
+
+- **2026-08-22 — Insights facet view: edge swipe goes back to Insights.
+  SHIPPED (merge `d8d2117` → Vercel + TestFlight run #286 = build 1286).**
+  Owner, from device QA of 1283: tapping a category in Insights lands in the
+  facet-scoped library with the "Back to Insights" chip, but the iOS
+  edge-swipe-back gesture did nothing there — the feed's back handler
+  (`handleEdgeBack`, Feed.tsx) never enabled in grid view. The swipe now
+  fires exactly what the chip does (clear the facet, reopen Settings →
+  Insights, restore scroll), gated on the SAME `insightsBackVisible`
+  condition — so the moment the user changes any filter/search the chip and
+  the swipe target dissolve together and back falls to normal behavior.
+  Scope: this does NOT enable edge-swipe in the plain unfiltered grid, and
+  overlays still own the gesture (`anyOverlayOpen` stand-down unchanged).
+  Verified: `tsc --noEmit` clean. NOT verified here: the gesture on device.
+
+- **2026-08-22 — Insights gets the app's identity colors. SHIPPED (merge
+  `153b43d` → Vercel + TestFlight run #283 = build 1283, device-QA'd by the
+  owner: looks great).** Owner ask:
+  the Insights screen was all single-hue accent — give it pops of color, "like
+  each category has on the app". Scoped per the session verdict: the
+  **category bars** now wear each category's app-wide identity color
+  (`getCategoryColorStyle` in `lib/colors.ts` — the same name-hash cards,
+  filters, the graph, and digests use), each on a matching light track with a
+  small color dot by the label; the **Top tags pills** are colored the same way
+  (a tag keeps one color everywhere); the "Other (N more)" aggregate stays
+  accent since it has no identity. Deliberately NOT colored: stat tiles, the
+  weekly chart, and Top sources — there, length carries the magnitude and
+  color would add noise. All in `web/components/settings/StatsView.tsx`;
+  colors are inline rgb from the established mapping (works in both themes),
+  not new hardcodes. Verified: `tsc --noEmit` clean. NOT verified here: a
+  visual render (no device); QA by opening Settings → Insights.
+
+- **2026-08-22 — 🎯 PUSH ROOT CAUSE CONFIRMED ON DEVICE: `ThirdPartyAuthError`
+  — the APNs key in Firebase → Cloud Messaging does not authenticate for this
+  app. ⛔ OWNER CONSOLE FIX, no code or build needed.** The owner ran the
+  test button on build 1284 and the note named it. This means pushes have
+  NEVER delivered — the .p8 recorded as uploaded 2026-07-07 was never valid
+  for the app (wrong Key ID, wrong Team ID, a different Apple account's key,
+  or since revoked). Everything else is device-proven good: token
+  registration, `fcmTokens`, the endpoints, hosting, FCM reachability. **The
+  fix (owner, ~5 min):** (1) developer.apple.com → Certificates, Identifiers
+  & Profiles → **Keys** → create a new key with **APNs enabled** (or verify
+  the existing one is not revoked); download the .p8, note the **Key ID**,
+  and confirm the account's **Team ID is 8Y2M94RUHG** — it must be the same
+  team that signs the app. (2) Firebase console → `secondbrain-app-94da2` →
+  Project settings → **Cloud Messaging** → Apple app `com.morhogeg.machina`
+  → DELETE the existing APNs auth key → upload the .p8 with that exact Key
+  ID + Team ID. (3) Re-tap Settings → "Send a test notification" — no
+  deploy, no build; the change is entirely between Firebase and Apple. If
+  the test then reports "sent" and a notification appears, the whole digest/
+  reminder push path is live end-to-end for the first time.
+
+- **2026-08-22 — push root cause narrowed ON DEVICE: registration works,
+  Apple/FCM rejects the send. Error-name passthrough shipped (merge
+  `84370d7` → next TestFlight build + scoped functions redeploy).** Owner ran
+  the new test button twice. Round 1 (8:12): "could not be reached (network)"
+  — tapped inside the 2-minute gap before hosting run #8 landed the
+  `/api/send-test-push` rewrite (run #7 raced the function's creation; the
+  race is now documented in deploy-hosting.yml — functions first, then
+  hosting, when a rewrite references a NEW function). Round 2: **"send failed
+  for all 1 registered device"** — the decisive result. The flow re-registers
+  a FRESH token seconds before sending, so registration + the token endpoints
+  + hosting all work and `fcmTokens` is populated; FCM/APNs is rejecting the
+  send itself. That also proved the round-1 copy wrong ("stale tokens —
+  toggle to re-register" — a fresh token is never stale; owner toggled, and it
+  did nothing, as it had to). Shipped: `send_push` returns the failure CLASS
+  NAMES (never tokens) in `errors`, the test endpoint relays them, and the
+  Settings note maps them to the real fix — `ThirdPartyAuthError` = APNs key
+  in Firebase → Cloud Messaging doesn't match the app (console fix),
+  `SenderIdMismatchError` = build's Firebase config wrong, `UnregisteredError`
+  = build/environment mismatch. Next owner QA: tap the test button on the
+  next build; the note now names the culprit. Suspicion to check first if it
+  says ThirdPartyAuthError: the APNs key/config in the Firebase console
+  (uploaded 2026-07-07, §9) vs the current bundle.
+
+- **2026-08-22 — push notifications: the silent chain gets honest copy and an
+  on-device self-test. SHIPPED (merge `8aa1da4` → build 1281, functions run
+  #81, hosting run #7).** Owner: digests/syntheses render in-app but no push
+  ever arrives, with the Notifications toggle ON. Diagnosis: the pipeline is
+  sound end-to-end (scheduler → `is_due` → `send_push` → FCM/APNs, key
+  uploaded 2026-07-07) EXCEPT that both senders hard-gate on
+  `users/{uid}.fcmTokens`, and token registration had two silent failure
+  modes: `togglePush` treated a failed token POST as an iOS-permission denial
+  (sending the user to iOS Settings for a backend fault — `registerPush`
+  returned one boolean), and `refreshPushRegistration` discarded the result
+  entirely. Also, `_device_token_request` (main.py) is stricter than every
+  sibling endpoint (bearer + `authUids` resolution, no fallback) — a 401/403
+  there registered nothing, silently. Shipped: (1) `registerPush` returns
+  registered / permission-denied / registration-failed and the toggle + nudge
+  name the real failure; (2) NEW **Settings → "Send a test notification"**
+  (native, toggle on): re-registers the token then `send_test_push_http`
+  (new, `/api/send-test-push`, bearer-authed, device_token rate bucket) fires
+  a real push and relays send_push's {tokens, sent, failed, skipped} so the
+  note names the broken link; (3) the weekly synthesis logs its no-token skip
+  like the curated digest already did. NOT root-caused yet by design: whether
+  the owner's `fcmTokens` is actually empty needs the on-device test (no
+  Firestore creds in this session). `tsc` + `py_compile` green. NOT verified:
+  a real push arriving (needs the device). Owner QA: install 1281, Settings →
+  Send a test notification, read the note.
+
+- **2026-08-22 — compact card stops re-splitting the model's own paragraphs;
+  abbreviation handling is by SHAPE, not a list. SHIPPED (merge `7d7073e` → Vercel + TestFlight **build 1282**, run #282; carries 1281's push-diagnostics content).** Owner,
+  with screenshots: the closed card severed "against Rep. Ralph Norman." after
+  "Rep.", stranding the name in its own paragraph. Root cause was structural,
+  not a missing list entry: `SimpleMarkdown`'s compact splitter tokenizes
+  content into lines BEFORE splitting, so its "no line breaks in this text"
+  guard was vacuously true and it re-split every single-sentence paragraph the
+  model had already isolated. Now the sentence splitter runs ONLY when the
+  whole summary is one unbroken block (the legacy shape it was written for) —
+  a model-structured summary renders exactly as laid out, which fixes existing
+  cards at render time with no re-save. In the legacy fallback the enumerated
+  title list is GONE (owner: "we can't think of every known abbreviation"):
+  a fragment ending in a short capitalized token (the open class — St., Rep.,
+  Gen., U.S.), a dotted form (e.g., i.e.), or one of the few closed lowercase
+  abbreviations (vs., etc.) is re-joined by shape. `answerLayout`'s sentence
+  splitter gained the same capitalized-shape guard. Note: `Intl.Segmenter`
+  ('sentence') was tried and REJECTED — V8 ships no CLDR suppression data, so
+  it too breaks after "Rep." (verified in node 22). Verified: regex exercised
+  both directions in node (12 abbreviation shapes re-join; normal short-word
+  endings incl. Hebrew still split), `tsc --noEmit` clean.
+
+- **2026-08-22 — the share HUD's terminal frame stops saying a bare "Saved".
+  SHIPPED as TestFlight build 1280 (run #280, merge `1071f43`).** Owner,
+  recurring complaint: sharing from Safari
+  showed "Saved" but opening Machina right away met a card at ~19% — the word
+  promised done while analysis had ~15–20s left. The honest terminal frame
+  (live %, unfilled bar, settled mark) already existed; the COPY still led
+  with "Saved to Machina ✓" and a jargon hint ("Analyzing — progress continues
+  in Machina"). Rewritten so the same line that carries the ✓ names the work
+  still running: phase **"Saved ✓ · Making your card"**, hint **"The card
+  finishes on its own in Machina."** (Two owner catches shaped the hint: a
+  first draft promised "ready in about 20 seconds" — an ETA cold starts and
+  slow pages can't guarantee, the original lie in smaller print; a second
+  draft opened "Safe to close" — redundant, since the mid-flight hint under
+  the bar already says "You can close this" the whole time. The terminal
+  hint now carries only the one NEW fact: the handoff.) The generic (non-HUD)
+  success path and the SHARE_EXTENSION.md diagram use the same string.
+  Same session, from an owner screenshot of the live HUD: every em dash in the
+  extension's RENDERED strings is out (mid-flight hint, dedupe hint, the
+  neutral/timeout and error messages), rewritten by sentence role exactly as
+  the landing purge was — code comments untouched, as before. The mid-flight
+  hint also names the product rather than "we": **"You can close this. Machina
+  keeps working in the background."** Deliberately NOT done, per the session's
+  verdict: holding the share sheet open until analysis hits 100% — iOS kills
+  lingering extensions and it would trap the user in the sheet; and no change
+  to the in-app AnalyzingBanner's "Saved to Machina", which only fires when the
+  card truly lands. Copy-only Swift change — could not be compile-verified in
+  this Linux session (no Xcode); the strings replace existing literals in
+  `completeScanSuccess`, `showResult` and the HUD setup.
+
+- **2026-08-22 — screenshot cards: high vision resolution + a truncation
+  backstop for early-stopped generations. SHIPPED (same merge `7d7073e`, functions run #82, unscoped).** Owner, with
+  screenshots: a plus-button save of a dense Hebrew Facebook-post screenshot
+  produced a thin card whose last Key Points bullet ended mid-word ("מנכ") —
+  valid JSON, so nothing downstream noticed, and the fragment was stored.
+  Two fixes in `ai_service.py`. (1) `analyze_image` (the direct screenshot
+  path — plus-button AND share-sheet images both funnel through it) now sets
+  `MEDIA_RESOLUTION_HIGH` explicitly instead of trusting the SDK default —
+  the Instagram path already learned low resolution misreads dense
+  Hebrew/RTL — and its prompt now demands coverage of the ENTIRE screenshot
+  text, first line to last. (2) `_generate_json` gained `_text_cut_off` /
+  `_analysis_cut_off`: a parsed analysis whose `summary`/`detailedSummary`
+  trails off on a bare letter or an unclosed `**` is treated as an
+  early-stopped generation — a remaining attempt is spent on a clean take,
+  and if every attempt (or the retry's transport) fails, the FULLEST
+  fragment is returned so a save never breaks over the check. Non-analysis
+  schemas lack those fields and are untouched. Verified: 635/635 offline
+  tests (10 new in `test_truncated_analysis.py`, incl. a fake-client retry
+  harness), `py_compile` clean. NOT verified here: a live Gemini call —
+  QA by re-saving the screenshot after the functions deploy.
+
+- **2026-08-22 — LinkedIn cards: full post text + real author byline, and
+  list-shaped posts summarize per item. BACKEND ONLY.** Owner, with screenshots:
+  a Ryan Holiday book-recommendation post produced a thin summary whose bullets
+  scattered (the **Gregory Hays** translation advice landed four bullets after
+  *Meditations*), died mid-post (Frankl and Montaigne never appeared), and the
+  card had NO author byline. Two root causes, both fixed. (1) **Scraper**
+  (`_scrape_linkedin_url`): it read only `og:description` — LinkedIn's
+  truncated teaser — so the model literally never saw the second half of the
+  post. It now parses the page's **JSON-LD** (`articleBody` = the FULL post,
+  `author.name` = the real display name, which also covers company pages),
+  keeps the longest of ld+json/og:description/`<p>` text, sets `truncated`
+  when only the ellipsis teaser survived, uses the post-redirect final URL for
+  the slug fallback (covers `lnkd.in` short links, now routed to the LinkedIn
+  scraper, and authwall redirects), prefixes the body with "LINKEDIN POST BY
+  <name>" so summaries can attribute claims by name, and on scrape failure
+  returns the honest `[no text content available]` placeholder plus the
+  slug-derived author instead of empty everything. (2) **Prompt**
+  (`ai_service.py` §4 detailedSummary): new **LISTS / ROUNDUPS** rule — when
+  content enumerates distinct items (books, tools, tips…), one bullet PER item
+  opening with its bolded name and carrying everything said about it
+  (edition/translation advice included), a hard "a detail about item X appears
+  WITH item X" grouping rule, cover EVERY item in order, and these bullets are
+  exempt from the 120–220-word cap like Ingredients/Steps. Verified: 625/625
+  offline tests pass (3 new JSON-LD tests in `test_linkedin_author.py`),
+  `py_compile` clean. Shipped via deploy-functions run #80 (unscoped —
+  shared modules), merge `b247650`. **Owner device-verified same day:** the
+  Ryan Holiday post re-saved with the full post covered, per-book bullets,
+  and the byline present. Existing cards keep their old summaries unless
+  re-saved.
 
 - **2026-08-08 — landing round 16: the capture stepper becomes the app's own,
   plus three copy/motion refinements.** (1) The CaptureScene pipeline was a

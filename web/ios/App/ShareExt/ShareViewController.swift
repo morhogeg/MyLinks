@@ -434,7 +434,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         barFill.translatesAutoresizingMaskIntoConstraints = false
         barTrack.addSubview(barFill)
 
-        hintLabel.text = "You can close this — we’ll keep analyzing in the background."
+        hintLabel.text = "You can close this. Machina keeps working in the background."
         hintLabel.font = .systemFont(ofSize: 11, weight: .regular)
         hintLabel.textColor = Lumen.textMuted
         hintLabel.textAlignment = .center
@@ -655,7 +655,9 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     /// Phase label from progress. For links this MUST match the shared web phase
     /// source (web/lib/scanPhases.ts → LINK_SCAN_STEPS, used by LinkScanProgress
     /// and AnalyzingBanner) so the share sheet and the in-app loader never say
-    /// different things at the same %. Images mirror ImageScanProgress.tsx.
+    /// different things at the same %. Images are the TWIN of
+    /// web/lib/scanPhases.ts → IMAGE_SCAN_STEPS (same labels, same 20/45/60/80/95
+    /// thresholds) — change one, change the other.
     private func phase(for p: CGFloat) -> String {
         if p >= 100 { return "Done!" }
         // Shared text: the same beats at the same thresholds, with copy that
@@ -733,7 +735,8 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     /// backend keeps working ~15–20s more, so the in-app banner resumes from this
     /// exact %. The visual grammar must therefore read "saved, still analyzing",
     /// never "everything finished":
-    ///   - the ✓ attaches to the SAVE ("Saved to Machina ✓"), not a full-screen glyph;
+    ///   - the ✓ attaches to the SAVE ("Saved ✓ · Making your card"), not a
+    ///     full-screen glyph, and the same line names the work still running;
     ///   - the % counter stays on the live curve value, so the frame reads mid-flight;
     ///   - the bar KEEPS its live curve width in the accent colour — never full.
     /// Auto-dismiss timing is unchanged: the host share sheet is never held open for
@@ -752,8 +755,8 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
             // leave the bar at its accent curve width — do NOT fill it.
             self.percentLabel.alpha = 1
             self.checkLabel.alpha = 0
-            self.phaseLabel.text = "Saved to Machina ✓"
-            self.hintLabel.text = "Analyzing — progress continues in Machina"
+            self.phaseLabel.text = "Saved ✓ · Making your card"
+            self.hintLabel.text = "The card finishes on its own in Machina."
             // Hand the app EXACTLY this % (the hint carries progress + start
             // clock) so its loader continues the ramp instead of restarting.
             self.writePendingShareHint()
@@ -780,7 +783,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
                 // is carried by the full track + the ✓, not by a hue.
                 self.barFillWidth.constant = self.barTrack.bounds.width
                 self.phaseLabel.text = "Already in your library"
-                self.hintLabel.text = "This one is saved in Machina — no new card was added."
+                self.hintLabel.text = "This one is saved in Machina, so no new card was added."
                 UIView.animate(withDuration: 0.2) { self.barTrack.layoutIfNeeded() }
             } else {
                 self.card.isHidden = false
@@ -833,7 +836,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
                         // Neutral terminal state: the save may still be finishing on
                         // the background session. Keep the card up with the ✕ close
                         // affordance instead of auto-dismissing, and never a check.
-                        self.hintLabel.text = "The save is still finishing — you can close this."
+                        self.hintLabel.text = "The save is still finishing. You can close this."
                     } else {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { self.finish() }
                     }
@@ -1205,7 +1208,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         // upload is still in flight — so we show a NEUTRAL terminal state (never a
         // green check) with the ✕ escape hatch, not a false "Saved ✓".
         DispatchQueue.main.asyncAfter(deadline: .now() + 26) { [weak self] in
-            self?.showResult("Still saving — open Machina to confirm", success: false, neutral: true)
+            self?.showResult("Still saving. Open Machina to confirm", success: false, neutral: true)
         }
 
         let task = session.uploadTask(with: req, fromFile: tmpURL)
@@ -1225,9 +1228,9 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
             // neutral "still saving" state so a slow-but-successful save is never
             // shown as a false failure. Other errors are genuine and terminal.
             if (error as NSError).code == NSURLErrorTimedOut {
-                showResult("Still saving — open Machina to confirm", success: false, neutral: true)
+                showResult("Still saving. Open Machina to confirm", success: false, neutral: true)
             } else {
-                showResult("Network error — try again", success: false)
+                showResult("Network error. Try again", success: false)
             }
         } else {
             let code = (task.response as? HTTPURLResponse)?.statusCode ?? 0
@@ -1238,10 +1241,10 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
                 if (body?["duplicate"] as? Bool) == true {
                     showDuplicateResult()
                 } else {
-                    showResult("Saved to Machina ✓", success: true)
+                    showResult("Saved ✓ · Making your card", success: true)
                 }
             } else if code == 403 || code == 401 {
-                showResult("Auth failed — reopen Machina", success: false)
+                showResult("Auth failed. Reopen Machina to sign in", success: false)
             } else {
                 showResult("Couldn't save (\(code))", success: false)
             }

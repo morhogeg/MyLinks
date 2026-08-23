@@ -1,6 +1,11 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Deploy Firebase Hosting.
 #
+# Re-run note (2026-08-22): a hosting deploy that references a NEW function
+# races the functions deploy from the same push — deploy order is functions
+# first, then hosting. Editing this file re-triggers the deploy (path filter
+# includes the workflow itself).
+#
 # WHY THIS EXISTS: Firebase Hosting is NOT a user-facing surface — the iPhone
 # PWA is retired, desktop web is Vercel, iOS is the native app. But the Hosting
 # ORIGIN still serves two things the product depends on, both configured in

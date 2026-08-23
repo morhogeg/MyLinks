@@ -121,7 +121,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
         settings, setSettings, loadError,
         categoryTopics, tagTopics, topicQuery, setTopicQuery,
         savePreferences, loadSettings, loadDigestExtras,
-        togglePush, pushNote, toggleTopic,
+        togglePush, sendTestNotification, pushBusy, pushNote, toggleTopic,
     } = useUserSettings(uid);
 
     // Navigation stack; the last entry is the visible screen.
@@ -334,6 +334,8 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                                 theme={theme}
                                 setTheme={setTheme}
                                 togglePush={togglePush}
+                                sendTestNotification={sendTestNotification}
+                                pushBusy={pushBusy}
                                 pushNote={pushNote}
                                 aiConsentAt={aiConsentAt}
                                 privacyLockOn={hasPin}

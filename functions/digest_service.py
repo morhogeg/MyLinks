@@ -404,6 +404,10 @@ def build_and_send_synthesis(uid: str, user_data: dict, links: List[dict], force
     result["channels"].append("in_app")
 
     # Push (native iOS)
+    if "push" in channels and not user_data.get("fcmTokens"):
+        # Same visibility the curated path has — a missing token is the one
+        # failure the user can never see from the app.
+        logger.info(f"Synthesis: user {mask_uid(uid)} has push channel but no device tokens")
     if "push" in channels and user_data.get("fcmTokens"):
         from push_service import send_push  # lazy: keeps cold starts light
         try:

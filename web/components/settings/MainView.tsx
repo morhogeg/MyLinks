@@ -1,7 +1,8 @@
 'use client';
 
-import { Bell, Sun, Moon, Monitor, Clock, Compass, Lock, BarChart3, Heart } from 'lucide-react';
+import { Bell, BellRing, Sun, Moon, Monitor, Clock, Compass, Lock, BarChart3, Heart } from 'lucide-react';
 import { policyUrl, openExternal } from '@/lib/share';
+import { isNativeApp } from '@/lib/api';
 import ProfileAvatar from '../ProfileAvatar';
 import DataExport from './DataExport';
 import type { Settings, View } from './types';
@@ -12,7 +13,7 @@ import {
 
 export function MainView({
     authUid, accountEmail, displayName, photoURL, providerLabel, providerName, settings, theme, setTheme,
-    togglePush, pushNote, aiConsentAt,
+    togglePush, sendTestNotification, pushBusy, pushNote, aiConsentAt,
     privacyLockOn, onChangePin, onDisablePin,
     onReplayTour, go,
 }: {
@@ -27,6 +28,8 @@ export function MainView({
     theme: 'light' | 'dark' | 'system';
     setTheme: (t: 'light' | 'dark' | 'system') => void;
     togglePush: () => void;
+    sendTestNotification: () => void;
+    pushBusy: boolean;
     pushNote: string | null;
     aiConsentAt: number | null;
     /** True when the private-collections PIN is set (null while loading). */
@@ -94,6 +97,14 @@ export function MainView({
                     <RowText title="Push notifications" />
                     <Toggle on={settings.push_enabled} onChange={togglePush} />
                 </RowShell>
+                {settings.push_enabled && isNativeApp() && (
+                    <NavRow
+                        tile={<BellRing className="w-[17px] h-[17px]" />}
+                        title="Send a test notification"
+                        value={pushBusy ? 'Sending…' : undefined}
+                        onClick={sendTestNotification}
+                    />
+                )}
                 <NavRow tile={<Clock className="w-[17px] h-[17px]" />} title="Reminders & Digest" value={remindersOrDigest ? 'On' : 'Off'} onClick={() => go('resurfacing')} />
             </List>
             {pushNote && <p className="text-[12px] text-amber-500 leading-snug px-2 pt-1.5">{pushNote}</p>}

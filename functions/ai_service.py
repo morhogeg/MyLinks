@@ -47,7 +47,7 @@ def embedding_needs_repair(raw) -> bool:
 GEMINI_ANALYSIS_MODEL = "gemini-3.1-flash-lite"
 # The ASK (RAG) answer model. Deliberately the SAME id as the analysis tier:
 # every AI surface in the app runs on gemini-3.1-flash-lite (owner decision,
-# 2026-08-21). It stays its own constant because this is the seam a different
+# 2026-08-23). It stays its own constant because this is the seam a different
 # ask tier would be dropped into — do not collapse it into the line above.
 # History: it pointed at "gemini-3.1-flash" (a tier up) from 2026-07-11, but CI
 # filter probes (ask-debug run #1, 2026-07-24) proved that id 404s — "models/
@@ -62,7 +62,7 @@ GEMINI_ASK_MODEL = "gemini-3.1-flash-lite"
 # model that had just failed as the one rescuing it.
 # ⚠️ Any id here MUST be verified against ListModels AND a real generateContent
 # call before it lands; "gemini-3.1-flash" looked plausible and was dead.
-# gemini-3.5-flash-lite was verified 2026-08-21 on the project's own key:
+# gemini-3.5-flash-lite was verified 2026-08-23 on the project's own key:
 # listed with generateContent support, and HTTP 200 on Ask's exact call shape
 # (response_schema + the BLOCK_NONE safety settings below).
 GEMINI_FALLBACK_MODEL = "gemini-3.5-flash-lite"
@@ -180,6 +180,83 @@ def _response_text(response) -> str:
         return ""
 
 
+# A generation that stops early is NOT a transport error: the JSON closes
+# cleanly and parses, but a summary field ends mid-word ("…מנכ") — prod
+# 2026-08-22, a dense Hebrew screenshot card whose last bullet was cut off.
+# These helpers detect that shape so _generate_json can spend a remaining
+# attempt on it instead of persisting the fragment.
+_COMPLETE_TAIL = ('.', '!', '?', '…', ':', ';', ')', ']', '"', "'", '”', '’',
+                  '״', '׳', '*', '`', '~')
+
+
+def _text_cut_off(text) -> bool:
+    """True when a prose field looks truncated mid-generation.
+
+    Two signals, both conservative: an odd number of ``**`` markers (an opened
+    bold that never closes), or a final character that is neither punctuation
+    nor a closing marker — the prompt requires every sentence and bullet to end
+    with a period, so trailing off on a bare letter/digit is the truncation
+    signature, not a style choice.
+    """
+    if not isinstance(text, str):
+        return False
+    t = text.rstrip()
+    if not t:
+        return False
+    if t.count('**') % 2 == 1:
+        return True
+    return not t.endswith(_COMPLETE_TAIL)
+
+
+# Analysis list fields checked for a truncated LAST element. Structured output
+# writes fields in schema order, so an early stop can land inside whichever
+# list it was emitting (tags/concepts/videoHighlights come after the prose) —
+# and the model still closes the JSON, so the fragment parses fine.
+_ANALYSIS_LIST_FIELDS = ("tags", "concepts", "videoHighlights")
+
+
+def _list_tail_cut_off(items) -> bool:
+    """True when a list field's LAST element carries an unambiguous truncation
+    signature: an unclosed ``**`` bold, or a trailing connector/separator
+    (hyphen, Hebrew maqaf, comma) that no complete item ends on.
+
+    Deliberately NARROWER than _text_cut_off: tags and concepts are short noun
+    phrases with no required terminal punctuation, so "ends on a bare letter"
+    is their normal shape, not a truncation signal — a mid-word cut like a bare
+    "מנכ" as the final concept is indistinguishable from a legitimate short
+    term and is accepted rather than risking a retry loop on valid output.
+    """
+    if not isinstance(items, list) or not items:
+        return False
+    last = items[-1]
+    if not isinstance(last, str):
+        return False
+    t = last.rstrip()
+    if not t:
+        return False
+    if t.count('**') % 2 == 1:
+        return True
+    return t.endswith(('-', '–', '־', ',', '،', ';'))
+
+
+def _analysis_cut_off(data: dict) -> bool:
+    """True when an analysis dict looks truncated mid-generation.
+
+    Checks the two prose fields (summary/detailedSummary) with the full
+    truncation heuristic, flags a PRESENT-but-empty summary (the degenerate
+    cousin: valid JSON, no content — a card with a blank summary is junk), and
+    checks the list fields' last element for high-confidence signatures only
+    (see _list_tail_cut_off). Non-analysis schemas (BrainAnswer,
+    WeeklySynthesis) lack every checked field and pass through untouched.
+    """
+    if any(_text_cut_off(data.get(f)) for f in ("summary", "detailedSummary")):
+        return True
+    s = data.get("summary")
+    if isinstance(s, str) and not s.strip():
+        return True
+    return any(_list_tail_cut_off(data.get(f)) for f in _ANALYSIS_LIST_FIELDS)
+
+
 # How many times _generate_json attempts a Gemini call before giving up.
 _MAX_GENERATE_ATTEMPTS = 3
 # Attempts for embed_text (embeddings are non-critical — see embed_text).
@@ -271,11 +348,12 @@ Requirements for the analysis:
    - **HEADING LANGUAGE**: Write every section heading in the SAME language as the content (e.g. "## Key Points" in English, "## נקודות עיקריות" in Hebrew, "## Puntos Clave" in Spanish). Never mix an English heading over non-English bullets.
    - Use the "Key Points" heading as the first subheading, followed by bullet points (use - for bullets).
    - Each bullet should be a factual statement from the content.
-   - Include 3-6 bullet points covering the main arguments or information.
+   - Include 3-6 bullet points covering the main arguments or information (for list/roundup content, one bullet PER ITEM — see LISTS / ROUNDUPS below — even when that exceeds 6).
    - **NO CLOSING SECTION**: Do NOT add a "Conclusions", "Summary", "Takeaways", "In summary" or similarly-named section (in any language) after the bullets. The write-up ENDS on its last key point — a closing section only restates what the reader just read.
    - **SCANNABILITY**: Use **bolding** (double asterisks) for the key terms, names, dates, and numbers in the bullets — the same way the short summary does — so the reader can scan the write-up.
    - Keep the tone neutral and professional throughout.
    - Total length: 120-220 words. It must go DEEPER than the summary and stand on its own as a complete account. Avoid word-for-word repetition of the summary, but NEVER omit a key fact just because the summary already mentioned it — completeness beats non-overlap.
+   - **LISTS / ROUNDUPS (multi-item content)**: When the content enumerates distinct items — books, tools, apps, films, people, tips, predictions — do NOT flatten it into disconnected observations. Give EACH item its own bullet that opens with the item's **bolded name** and carries EVERYTHING the content says about that item: what it is, its core claim, why it is recommended, and any edition/translation/version/pricing/caveat advice the content attaches to it. **A detail about item X must appear WITH item X, never as a separate bullet floating elsewhere** (BAD: a "the **Gregory Hays** translation is recommended" bullet four bullets after the *Meditations* bullet; GOOD: the *Meditations* bullet itself ends "…recommends the **Gregory Hays** translation for its modern, accessible language."). Cover EVERY item the content names, in the content's own order — dropping the later items of a list is an incomplete summary, not a concise one. These per-item bullets are EXEMPT from the total-length cap, like Ingredients/Steps.
    - **RECIPES / HOW-TOS**: When the content is a recipe or a step-by-step tutorial, capture the actual procedure so it can be followed later without reopening the source: add an "## Ingredients" section (the complete list, quantities included, as given) for recipes, and a "## Steps" section with the COMPLETE numbered instructions in order (headings translated into the content's language). These two sections are EXEMPT from the total-length cap — never compress steps into a description of what they achieve. If the source shows no explicit ingredients/steps (e.g. a bare photo caption), do NOT invent them.
 
 5. sourceName: Extract the name of the source or publisher (e.g., CNN, The New York Times, X, Reddit, Wikipedia, YouTube, TikTok).
@@ -759,6 +837,9 @@ class GeminiService:
             config.update(config_extra)
 
         last_error = None
+        # Best truncated-looking result seen so far: a fragment is still better
+        # than failing the save if every attempt comes back cut off.
+        truncated_best = None
         for attempt in range(attempts):
             try:
                 response = self.client.models.generate_content(
@@ -787,6 +868,24 @@ class GeminiService:
                     data = data[0]
 
                 if isinstance(data, dict):
+                    # Early-stopped generation: valid JSON whose summary trails
+                    # off mid-word. Spend a remaining attempt on a clean take,
+                    # but NEVER fail the save over it — if retries stay cut off
+                    # (or none remain), the fullest fragment is returned below.
+                    if _analysis_cut_off(data):
+                        if (truncated_best is None
+                                or len(str(data.get("detailedSummary") or ""))
+                                > len(str(truncated_best.get("detailedSummary") or ""))):
+                            truncated_best = data
+                        if attempt < attempts - 1:
+                            logger.warning(
+                                f"Gemini {what} attempt {attempt + 1} looks "
+                                "truncated mid-sentence — retrying")
+                            continue
+                        logger.warning(
+                            f"Gemini {what}: all attempts look truncated — "
+                            "keeping the fullest one")
+                        return truncated_best
                     return data
                 raise AnalysisError("Gemini returned an unexpected JSON shape")
             except Exception as e:
@@ -798,6 +897,13 @@ class GeminiService:
                     time.sleep(_retry_delay(attempt))
                     continue
                 break
+
+        # A truncated result in hand beats raising: the retry it triggered may
+        # have died on a transport error, but the fragment is still a card.
+        if truncated_best is not None:
+            logger.warning(f"Gemini {what}: returning truncated result after "
+                           f"a failed retry ({last_error})")
+            return truncated_best
 
         logger.error(f"Gemini {what} failed after retries: {last_error}")
         # Preserve an empty/blocked-generation signal through the wrap so the RAG
@@ -820,21 +926,34 @@ class GeminiService:
         real bilingual split — Hebrew content keeps only Hebrew-script tags,
         any other KNOWN language drops Hebrew-script tags, and an unreported
         language leaves the tags untouched (never guess the direction).
+
+        Also drops a tag that merely REPEATS the category ("recipe" on a
+        "Recipe" card, case-insensitive) — the prompt already says a tag like
+        that adds nothing over the category, and the same lesson applies:
+        instruction-following can't be trusted, so it's enforced after parsing.
         """
         tags = data.get("tags") if isinstance(data, dict) else None
-        lang = (data.get("language") or "").lower() if isinstance(data, dict) else ""
-        if not isinstance(tags, list) or not tags or not lang:
+        if not isinstance(tags, list) or not tags:
             return data
-        has_hebrew = re.compile("[\\u0590-\\u05FF]").search
-        if lang == "he":
-            kept = [t for t in tags if isinstance(t, str) and has_hebrew(t)]
-        else:
-            kept = [t for t in tags if isinstance(t, str) and not has_hebrew(t)]
-        if len(kept) != len(tags):
-            logger.info(
-                f"Dropped {len(tags) - len(kept)} wrong-language tag(s) for lang={lang}"
-            )
-            data["tags"] = kept
+        lang = (data.get("language") or "").lower()
+        if lang:
+            has_hebrew = re.compile("[\\u0590-\\u05FF]").search
+            if lang == "he":
+                kept = [t for t in tags if isinstance(t, str) and has_hebrew(t)]
+            else:
+                kept = [t for t in tags if isinstance(t, str) and not has_hebrew(t)]
+            if len(kept) != len(tags):
+                logger.info(
+                    f"Dropped {len(tags) - len(kept)} wrong-language tag(s) for lang={lang}"
+                )
+                data["tags"] = tags = kept
+        category = str(data.get("category") or "").strip().casefold()
+        if category:
+            kept = [t for t in tags
+                    if not (isinstance(t, str) and t.strip().casefold() == category)]
+            if len(kept) != len(tags):
+                logger.info("Dropped tag duplicating the category")
+                data["tags"] = kept
         return data
 
     @staticmethod
@@ -931,6 +1050,14 @@ class GeminiService:
         summarized as one of its CITIES. Legibility is the real fix there; the
         "do not narrow" prompt rules are the backstop for when it still slips.
 
+        SCRIPT-AWARE BUMP (2026-08-23): when the image likely carries text
+        (either flag above) AND the post context contains Hebrew script, the
+        resolution is raised to HIGH — the same lesson analyze_image already
+        applied: dense Hebrew/RTL text needs the extra resolution, and a
+        misread there fabricates specifics. Latin-script posts keep MEDIUM
+        (adequate, and the cost difference is real); resolution is only ever
+        raised by this check, never lowered.
+
         Raises AnalysisError on failure so the caller can fall back to text-only.
         """
         from google.genai import types
@@ -942,6 +1069,14 @@ class GeminiService:
             if existing_tags else ""
         )
         cats_context = self._categories_context(existing_categories)
+
+        # Script signal for the resolution choice: any Hebrew in the post's own
+        # words means the attached screenshot is very likely Hebrew too (the
+        # scraped caption/teaser shares the post's language). A pure-Latin post
+        # can still attach a Hebrew screenshot — undetectable before vision
+        # runs — so this raises resolution where the signal exists and the
+        # prompt's "read only what is legible" rules remain the backstop.
+        context_hebrew = bool(re.search("[\\u0590-\\u05FF]", clean_text))
 
         if image_is_primary:
             image_guidance = f"""The content below is an IMAGE-FIRST social post: {len(images)} image(s) from the
@@ -956,7 +1091,8 @@ own knowledge. Preserve the real outcome and tense: if the text describes a
 decision already made or an action already taken, report it as done — do NOT
 re-frame a resolved decision as an open question. The scraped caption is often
 just a teaser; when it conflicts with the image, trust the image."""
-            media_resolution = "MEDIA_RESOLUTION_MEDIUM"
+            media_resolution = ("MEDIA_RESOLUTION_HIGH" if context_hebrew
+                                else "MEDIA_RESOLUTION_MEDIUM")
         else:
             image_guidance = f"""The content below is a social post, and {len(images)} image(s) attached to that
 post are provided alongside it. Treat the images as part of the content: read any
@@ -969,8 +1105,12 @@ or partly unreadable, stay with what the post itself says instead of filling the
 gap with a place, name, or date from your own knowledge."""
             # Thin words + photos ⇒ the image is carrying the post, so pay for the
             # resolution that can actually read it. Guidance stays text-primary.
-            media_resolution = ("MEDIA_RESOLUTION_MEDIUM" if image_text_dense
-                                else "MEDIA_RESOLUTION_LOW")
+            # Hebrew context escalates one further to HIGH (see docstring).
+            if image_text_dense:
+                media_resolution = ("MEDIA_RESOLUTION_HIGH" if context_hebrew
+                                    else "MEDIA_RESOLUTION_MEDIUM")
+            else:
+                media_resolution = "MEDIA_RESOLUTION_LOW"
 
         prompt = f"""{SYSTEM_PROMPT}{tags_context}{cats_context}
 
@@ -1037,6 +1177,7 @@ Content to analyze:
 Based on the image provided, extract the text and analyze it according to the instructions above.
 If the image contains a tweet or social media post, extract the content as if it were the text.
 If the image is an article, extract the headline and body.
+COVER THE WHOLE IMAGE: a screenshot of a post or article is the user's saved copy of that content, so the analysis must span its ENTIRE text — from the first line to the last, including quotes and statements near the bottom. Do not stop after the opening paragraphs; a summary that covers only the top of the screenshot is an incomplete summary.
 Work only from what is legible: keep the subject at the level the image states it (a country stays a country, a category stays a category), and where the text is unclear or cropped, leave it out rather than guessing a place, name, brand, or date."""
 
         from google.genai import types
@@ -1045,8 +1186,13 @@ Work only from what is legible: keep the subject at the level the image states i
             types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
             prompt,
         ]
+        # HIGH, explicitly: a deliberate single-image save is the one path where
+        # the image IS the content, and dense text screenshots (esp. Hebrew/RTL)
+        # need the resolution — the SDK default is not a documented contract, and
+        # the Instagram path already learned that low resolution misreads them.
         return self._enforce_tag_language(
-            self._generate_json(contents, "image analysis", attempts=attempts))
+            self._generate_json(contents, "image analysis", attempts=attempts,
+                                config_extra={"media_resolution": "MEDIA_RESOLUTION_HIGH"}))
 
     def _probe_prompt_blocked(self, prompt: str) -> bool:
         """Ask Gemini's filter whether it ACCEPTS a prompt, without paying for
@@ -1491,19 +1637,46 @@ Work only from what is legible: keep the subject at the level the image states i
         # of the "[[CITED: ...]]" marker so it is never streamed as visible text.
         # We keep at least the marker's full prefix length buffered at all times.
         MARKER = "[[CITED:"
+        # Exact ids of the in-context cards. The buffered path scrubs these out
+        # of the answer prose (_strip_inline_ids) — the streaming path must do
+        # the same, or "(fb9QaKk…, F7wwq0P…)" reaches the user token-by-token
+        # (the 2026-07-28 report's shape). The withheld-tail logic also holds
+        # back any suffix that could be the START of an id, so an id split
+        # across chunks is still caught whole before emission.
+        inline_ids = [str(c.get("id")) for c in cards if c.get("id")]
+        # Held-back shapes: the marker, a bare id, and an id right behind an
+        # opening bracket — holding "(id…" keeps the bracket in the buffer so
+        # the empty "()" husk the scrub leaves can be tidied before emission.
+        hold_tokens = [MARKER] + inline_ids + [
+            b + i for b in ("(", "[") for i in inline_ids]
+
+        def _scrub_ids(buf: str) -> str:
+            """Remove complete in-context ids (and the empty ()/[] husks they
+            leave behind) from not-yet-emitted text. Mirrors _strip_inline_ids;
+            only exact supplied ids are touched, never prose."""
+            if not any(i in buf for i in inline_ids):
+                return buf
+            for i in inline_ids:
+                buf = buf.replace(i, "")
+            return re.sub(r"[(\[（]\s*[,;·\s]*[)\]）]", "", buf)
 
         def _safe_emit_point(buf: str) -> int:
             """Return how many leading chars of `buf` are safe to emit now —
-            i.e. cannot be part of an as-yet-incomplete marker at the tail."""
+            i.e. cannot be part of an as-yet-incomplete marker (or in-context
+            card id) at the tail."""
             # If the marker is fully present, caller handles it separately.
             idx = buf.find(MARKER)
             if idx != -1:
                 return idx
-            # Otherwise withhold any suffix that could be the start of the marker.
-            for keep in range(min(len(MARKER) - 1, len(buf)), 0, -1):
-                if buf.endswith(MARKER[:keep]):
-                    return len(buf) - keep
-            return len(buf)
+            # Otherwise withhold any suffix that could be the start of the
+            # marker or of a card id still arriving in the next chunk.
+            hold = 0
+            for token in hold_tokens:
+                for keep in range(min(len(token) - 1, len(buf)), 0, -1):
+                    if buf.endswith(token[:keep]):
+                        hold = max(hold, keep)
+                        break
+            return len(buf) - hold
 
         # Ordered attempts, each tried ONLY while nothing has been yielded to the
         # consumer yet (text held in the tail buffer is fine; it was never
@@ -1562,7 +1735,10 @@ Work only from what is legible: keep the subject at the level the image states i
                     if marker_seen:
                         # Past the marker — accumulate into full_text only, emit nothing.
                         continue
-                    buffer += piece
+                    # Scrub complete in-context ids BEFORE deciding what to emit
+                    # (full_text above keeps the raw stream — the citation
+                    # marker is parsed from it, so scrubbing here can't touch it).
+                    buffer = _scrub_ids(buffer + piece)
                     marker_idx = buffer.find(MARKER)
                     if marker_idx != -1:
                         # Emit everything before the marker, then stop emitting.
@@ -1712,6 +1888,7 @@ Rules:
 - Ground everything ONLY in the saved cards below. Do NOT invent facts, statistics, or claims that aren't in a card's title/summary, and never name a place, company, brand, or date a card doesn't — keep each subject at the level the card states it.
 - Write the narrative as 2-4 short paragraphs that connect the week's saves into a story: what themes emerged, how ideas related or tensioned, what the arc of the week was. Be specific — name the actual ideas, not "you read some interesting things."
 - Identify 2-4 themes. Each theme references the ids of the cards that fed it.
+- A theme must be a REAL throughline — a shared topic, question, or entity — never a shared format ("both are articles", "both are reviews") or an abstraction you had to zoom out to find ("both involve technology"). If the week's saves genuinely don't cohere, say so honestly in the narrative and return only the themes that are real: one theme, or none, is a valid answer; a forced connection is not.
 - Pick ONE standout card (the most noteworthy save) and say in one sentence why.
 - End with ONE genuine open question the week's reading raises — something worth carrying into next week.
 - Warm and human, but never sycophantic or salesy. No "amazing", "incredible", "must-read".

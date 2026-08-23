@@ -180,23 +180,79 @@ export async function refreshPushRegistration(): Promise<void> {
 }
 
 /**
+ * How a registerPush attempt ended. The two failure modes need DIFFERENT
+ * user guidance — 'permission-denied' is fixed in iOS Settings, while
+ * 'registration-failed' means iOS said yes but the token never reached the
+ * backend (network, auth, or server fault) and retrying in-app is the fix.
+ * Collapsing them into one boolean made the Settings toggle blame iOS for
+ * backend failures, an un-followable dead end.
+ */
+export type PushRegisterResult =
+    | 'registered'
+    | 'permission-denied'
+    | 'registration-failed'
+    | 'unavailable';
+
+/**
  * Request notification permission (MUST be called from a user gesture — iOS
  * shows the OS prompt at most once) and, on grant, register this device's FCM
- * token with the backend. Returns true when push is active.
+ * token with the backend.
  */
-export async function registerPush(): Promise<boolean> {
-    if (!isNativeApp()) return false;
+export async function registerPush(): Promise<PushRegisterResult> {
+    if (!isNativeApp()) return 'unavailable';
     try {
         const { FirebaseMessaging } = await import('@capacitor-firebase/messaging');
         const { receive } = await FirebaseMessaging.requestPermissions();
-        if (receive !== 'granted') return false;
+        if (receive !== 'granted') return 'permission-denied';
         const { token } = await FirebaseMessaging.getToken();
-        if (!token) return false;
+        if (!token) return 'registration-failed';
         rememberToken(token);
-        return await postToken('/api/register-device-token', token);
+        return (await postToken('/api/register-device-token', token))
+            ? 'registered'
+            : 'registration-failed';
     } catch (e) {
         console.warn('Push registration failed:', e);
-        return false;
+        return 'registration-failed';
+    }
+}
+
+/** Outcome of a test push, relayed from the backend's send_push summary. */
+export interface TestPushResult {
+    ok: boolean;
+    /** Device tokens on the workspace when the send ran. */
+    tokens?: number;
+    sent?: number;
+    failed?: number;
+    /** Backend's reason when nothing was attempted (e.g. 'no_tokens'). */
+    skipped?: string | null;
+    /** FCM error names for the first few failed sends (never tokens). */
+    errors?: string[];
+    /** Transport-level failure reaching the endpoint at all. */
+    error?: string;
+}
+
+/**
+ * Ask the backend to send this workspace a real push RIGHT NOW, exercising
+ * the whole chain (stored token → FCM → APNs → this device). Diagnostic:
+ * the result names the failing link instead of leaving silence.
+ */
+export async function sendTestPush(): Promise<TestPushResult> {
+    try {
+        const res = await fetchWithTimeout(apiUrl('/api/send-test-push'), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(await authHeaders()),
+                ...(await appCheckHeaders()),
+            },
+            body: '{}',
+        });
+        if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
+        const body = await res.json();
+        return { ok: true, ...body };
+    } catch (e) {
+        console.warn('Test push failed:', e);
+        return { ok: false, error: 'network' };
     }
 }
 
