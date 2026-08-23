@@ -2,6 +2,7 @@
 
 import { CheckCircle2 } from 'lucide-react';
 import CitationMark, { OrbState } from '@/components/ui/CitationMark';
+import { imageScanLabel, imageScanOrb } from '@/lib/scanPhases';
 
 interface ImageScanProgressProps {
     /** Data URL of the image being analyzed. */
@@ -11,24 +12,17 @@ interface ImageScanProgressProps {
 }
 
 /** The mark's motion for a phase — same verb→motion table the link scan rides
- *  (lib/scanPhases.ts), so a photo save looks like every other save: reading is
- *  a sweep, understanding is a ratchet, writing the card is a hold. */
+ *  (lib/scanPhases.ts IMAGE_SCAN_ORBS), so a photo save looks like every other
+ *  save: reading is a sweep, understanding is a ratchet, filing is a hold. */
 function orbFor(progress: number): OrbState {
-    if (progress >= 80) return 'solving';    // Organizing & tagging
-    if (progress >= 60) return 'shaping';    // Understanding / writing it up
-    if (progress >= 20) return 'searching';  // Scanning the image, reading text
-    return 'working';                        // Uploading
+    return imageScanOrb(progress);
 }
 
-// Phase label derived purely from progress, so this component stays stateless.
+// Phase label from the shared source (IMAGE_SCAN_STEPS) — the same beats the
+// AnalyzingBanner and the iOS share sheet narrate, so the three can't drift.
 function phaseFor(progress: number): string {
-    if (progress >= 100) return 'Done!';
-    if (progress >= 95) return 'Finishing up…';
-    if (progress >= 80) return 'Organizing & tagging…';
-    if (progress >= 60) return 'Understanding content…';
-    if (progress >= 45) return 'Reading text…';
-    if (progress >= 20) return 'Scanning image…';
-    return 'Uploading…';
+    const label = imageScanLabel(progress);
+    return label === 'Done!' ? label : label + '…';
 }
 
 /**

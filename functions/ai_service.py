@@ -194,13 +194,53 @@ def _text_cut_off(text) -> bool:
     return not t.endswith(_COMPLETE_TAIL)
 
 
-def _analysis_cut_off(data: dict) -> bool:
-    """True when an analysis dict's summary/detailedSummary looks truncated.
+# Analysis list fields checked for a truncated LAST element. Structured output
+# writes fields in schema order, so an early stop can land inside whichever
+# list it was emitting (tags/concepts/videoHighlights come after the prose) —
+# and the model still closes the JSON, so the fragment parses fine.
+_ANALYSIS_LIST_FIELDS = ("tags", "concepts", "videoHighlights")
 
-    Only these two prose fields are checked, so non-analysis schemas (which
-    lack them) pass through untouched.
+
+def _list_tail_cut_off(items) -> bool:
+    """True when a list field's LAST element carries an unambiguous truncation
+    signature: an unclosed ``**`` bold, or a trailing connector/separator
+    (hyphen, Hebrew maqaf, comma) that no complete item ends on.
+
+    Deliberately NARROWER than _text_cut_off: tags and concepts are short noun
+    phrases with no required terminal punctuation, so "ends on a bare letter"
+    is their normal shape, not a truncation signal — a mid-word cut like a bare
+    "מנכ" as the final concept is indistinguishable from a legitimate short
+    term and is accepted rather than risking a retry loop on valid output.
     """
-    return any(_text_cut_off(data.get(f)) for f in ("summary", "detailedSummary"))
+    if not isinstance(items, list) or not items:
+        return False
+    last = items[-1]
+    if not isinstance(last, str):
+        return False
+    t = last.rstrip()
+    if not t:
+        return False
+    if t.count('**') % 2 == 1:
+        return True
+    return t.endswith(('-', '–', '־', ',', '،', ';'))
+
+
+def _analysis_cut_off(data: dict) -> bool:
+    """True when an analysis dict looks truncated mid-generation.
+
+    Checks the two prose fields (summary/detailedSummary) with the full
+    truncation heuristic, flags a PRESENT-but-empty summary (the degenerate
+    cousin: valid JSON, no content — a card with a blank summary is junk), and
+    checks the list fields' last element for high-confidence signatures only
+    (see _list_tail_cut_off). Non-analysis schemas (BrainAnswer,
+    WeeklySynthesis) lack every checked field and pass through untouched.
+    """
+    if any(_text_cut_off(data.get(f)) for f in ("summary", "detailedSummary")):
+        return True
+    s = data.get("summary")
+    if isinstance(s, str) and not s.strip():
+        return True
+    return any(_list_tail_cut_off(data.get(f)) for f in _ANALYSIS_LIST_FIELDS)
 
 
 # How many times _generate_json attempts a Gemini call before giving up.
@@ -871,21 +911,34 @@ class GeminiService:
         real bilingual split — Hebrew content keeps only Hebrew-script tags,
         any other KNOWN language drops Hebrew-script tags, and an unreported
         language leaves the tags untouched (never guess the direction).
+
+        Also drops a tag that merely REPEATS the category ("recipe" on a
+        "Recipe" card, case-insensitive) — the prompt already says a tag like
+        that adds nothing over the category, and the same lesson applies:
+        instruction-following can't be trusted, so it's enforced after parsing.
         """
         tags = data.get("tags") if isinstance(data, dict) else None
-        lang = (data.get("language") or "").lower() if isinstance(data, dict) else ""
-        if not isinstance(tags, list) or not tags or not lang:
+        if not isinstance(tags, list) or not tags:
             return data
-        has_hebrew = re.compile("[\\u0590-\\u05FF]").search
-        if lang == "he":
-            kept = [t for t in tags if isinstance(t, str) and has_hebrew(t)]
-        else:
-            kept = [t for t in tags if isinstance(t, str) and not has_hebrew(t)]
-        if len(kept) != len(tags):
-            logger.info(
-                f"Dropped {len(tags) - len(kept)} wrong-language tag(s) for lang={lang}"
-            )
-            data["tags"] = kept
+        lang = (data.get("language") or "").lower()
+        if lang:
+            has_hebrew = re.compile("[\\u0590-\\u05FF]").search
+            if lang == "he":
+                kept = [t for t in tags if isinstance(t, str) and has_hebrew(t)]
+            else:
+                kept = [t for t in tags if isinstance(t, str) and not has_hebrew(t)]
+            if len(kept) != len(tags):
+                logger.info(
+                    f"Dropped {len(tags) - len(kept)} wrong-language tag(s) for lang={lang}"
+                )
+                data["tags"] = tags = kept
+        category = str(data.get("category") or "").strip().casefold()
+        if category:
+            kept = [t for t in tags
+                    if not (isinstance(t, str) and t.strip().casefold() == category)]
+            if len(kept) != len(tags):
+                logger.info("Dropped tag duplicating the category")
+                data["tags"] = kept
         return data
 
     @staticmethod
@@ -982,6 +1035,14 @@ class GeminiService:
         summarized as one of its CITIES. Legibility is the real fix there; the
         "do not narrow" prompt rules are the backstop for when it still slips.
 
+        SCRIPT-AWARE BUMP (2026-08-23): when the image likely carries text
+        (either flag above) AND the post context contains Hebrew script, the
+        resolution is raised to HIGH — the same lesson analyze_image already
+        applied: dense Hebrew/RTL text needs the extra resolution, and a
+        misread there fabricates specifics. Latin-script posts keep MEDIUM
+        (adequate, and the cost difference is real); resolution is only ever
+        raised by this check, never lowered.
+
         Raises AnalysisError on failure so the caller can fall back to text-only.
         """
         from google.genai import types
@@ -993,6 +1054,14 @@ class GeminiService:
             if existing_tags else ""
         )
         cats_context = self._categories_context(existing_categories)
+
+        # Script signal for the resolution choice: any Hebrew in the post's own
+        # words means the attached screenshot is very likely Hebrew too (the
+        # scraped caption/teaser shares the post's language). A pure-Latin post
+        # can still attach a Hebrew screenshot — undetectable before vision
+        # runs — so this raises resolution where the signal exists and the
+        # prompt's "read only what is legible" rules remain the backstop.
+        context_hebrew = bool(re.search("[\\u0590-\\u05FF]", clean_text))
 
         if image_is_primary:
             image_guidance = f"""The content below is an IMAGE-FIRST social post: {len(images)} image(s) from the
@@ -1007,7 +1076,8 @@ own knowledge. Preserve the real outcome and tense: if the text describes a
 decision already made or an action already taken, report it as done — do NOT
 re-frame a resolved decision as an open question. The scraped caption is often
 just a teaser; when it conflicts with the image, trust the image."""
-            media_resolution = "MEDIA_RESOLUTION_MEDIUM"
+            media_resolution = ("MEDIA_RESOLUTION_HIGH" if context_hebrew
+                                else "MEDIA_RESOLUTION_MEDIUM")
         else:
             image_guidance = f"""The content below is a social post, and {len(images)} image(s) attached to that
 post are provided alongside it. Treat the images as part of the content: read any
@@ -1020,8 +1090,12 @@ or partly unreadable, stay with what the post itself says instead of filling the
 gap with a place, name, or date from your own knowledge."""
             # Thin words + photos ⇒ the image is carrying the post, so pay for the
             # resolution that can actually read it. Guidance stays text-primary.
-            media_resolution = ("MEDIA_RESOLUTION_MEDIUM" if image_text_dense
-                                else "MEDIA_RESOLUTION_LOW")
+            # Hebrew context escalates one further to HIGH (see docstring).
+            if image_text_dense:
+                media_resolution = ("MEDIA_RESOLUTION_HIGH" if context_hebrew
+                                    else "MEDIA_RESOLUTION_MEDIUM")
+            else:
+                media_resolution = "MEDIA_RESOLUTION_LOW"
 
         prompt = f"""{SYSTEM_PROMPT}{tags_context}{cats_context}
 
@@ -1547,19 +1621,46 @@ Work only from what is legible: keep the subject at the level the image states i
         # of the "[[CITED: ...]]" marker so it is never streamed as visible text.
         # We keep at least the marker's full prefix length buffered at all times.
         MARKER = "[[CITED:"
+        # Exact ids of the in-context cards. The buffered path scrubs these out
+        # of the answer prose (_strip_inline_ids) — the streaming path must do
+        # the same, or "(fb9QaKk…, F7wwq0P…)" reaches the user token-by-token
+        # (the 2026-07-28 report's shape). The withheld-tail logic also holds
+        # back any suffix that could be the START of an id, so an id split
+        # across chunks is still caught whole before emission.
+        inline_ids = [str(c.get("id")) for c in cards if c.get("id")]
+        # Held-back shapes: the marker, a bare id, and an id right behind an
+        # opening bracket — holding "(id…" keeps the bracket in the buffer so
+        # the empty "()" husk the scrub leaves can be tidied before emission.
+        hold_tokens = [MARKER] + inline_ids + [
+            b + i for b in ("(", "[") for i in inline_ids]
+
+        def _scrub_ids(buf: str) -> str:
+            """Remove complete in-context ids (and the empty ()/[] husks they
+            leave behind) from not-yet-emitted text. Mirrors _strip_inline_ids;
+            only exact supplied ids are touched, never prose."""
+            if not any(i in buf for i in inline_ids):
+                return buf
+            for i in inline_ids:
+                buf = buf.replace(i, "")
+            return re.sub(r"[(\[（]\s*[,;·\s]*[)\]）]", "", buf)
 
         def _safe_emit_point(buf: str) -> int:
             """Return how many leading chars of `buf` are safe to emit now —
-            i.e. cannot be part of an as-yet-incomplete marker at the tail."""
+            i.e. cannot be part of an as-yet-incomplete marker (or in-context
+            card id) at the tail."""
             # If the marker is fully present, caller handles it separately.
             idx = buf.find(MARKER)
             if idx != -1:
                 return idx
-            # Otherwise withhold any suffix that could be the start of the marker.
-            for keep in range(min(len(MARKER) - 1, len(buf)), 0, -1):
-                if buf.endswith(MARKER[:keep]):
-                    return len(buf) - keep
-            return len(buf)
+            # Otherwise withhold any suffix that could be the start of the
+            # marker or of a card id still arriving in the next chunk.
+            hold = 0
+            for token in hold_tokens:
+                for keep in range(min(len(token) - 1, len(buf)), 0, -1):
+                    if buf.endswith(token[:keep]):
+                        hold = max(hold, keep)
+                        break
+            return len(buf) - hold
 
         # Ordered attempts, each tried ONLY while nothing has been yielded to the
         # consumer yet (text held in the tail buffer is fine; it was never
@@ -1615,7 +1716,10 @@ Work only from what is legible: keep the subject at the level the image states i
                     if marker_seen:
                         # Past the marker — accumulate into full_text only, emit nothing.
                         continue
-                    buffer += piece
+                    # Scrub complete in-context ids BEFORE deciding what to emit
+                    # (full_text above keeps the raw stream — the citation
+                    # marker is parsed from it, so scrubbing here can't touch it).
+                    buffer = _scrub_ids(buffer + piece)
                     marker_idx = buffer.find(MARKER)
                     if marker_idx != -1:
                         # Emit everything before the marker, then stop emitting.
@@ -1765,6 +1869,7 @@ Rules:
 - Ground everything ONLY in the saved cards below. Do NOT invent facts, statistics, or claims that aren't in a card's title/summary, and never name a place, company, brand, or date a card doesn't — keep each subject at the level the card states it.
 - Write the narrative as 2-4 short paragraphs that connect the week's saves into a story: what themes emerged, how ideas related or tensioned, what the arc of the week was. Be specific — name the actual ideas, not "you read some interesting things."
 - Identify 2-4 themes. Each theme references the ids of the cards that fed it.
+- A theme must be a REAL throughline — a shared topic, question, or entity — never a shared format ("both are articles", "both are reviews") or an abstraction you had to zoom out to find ("both involve technology"). If the week's saves genuinely don't cohere, say so honestly in the narrative and return only the themes that are real: one theme, or none, is a valid answer; a forced connection is not.
 - Pick ONE standout card (the most noteworthy save) and say in one sentence why.
 - End with ONE genuine open question the week's reading raises — something worth carrying into next week.
 - Warm and human, but never sycophantic or salesy. No "amazing", "incredible", "must-read".

@@ -163,3 +163,36 @@ def test_system_prompt_carries_the_reuse_and_subject_rules():
     # The specific misfire that prompted this: an economic angle pulling an
     # everyday-life subject into Business.
     assert "CHOOSE BY SUBJECT, NOT BY ANGLE" in src
+
+
+# ── tags must not just repeat the category (code backstop, 2026-08-23) ───────
+
+def test_tag_duplicating_the_category_is_dropped():
+    from ai_service import GeminiService
+    data = {"language": "en", "category": "Recipe",
+            "tags": ["recipe", "pasta", "italian cuisine"]}
+    out = GeminiService._enforce_tag_language(data)
+    assert out["tags"] == ["pasta", "italian cuisine"]
+
+
+def test_category_dedupe_is_case_insensitive_and_keeps_real_tags():
+    from ai_service import GeminiService
+    data = {"language": "en", "category": "Finance",
+            "tags": ["FINANCE", "index funds"]}
+    out = GeminiService._enforce_tag_language(data)
+    assert out["tags"] == ["index funds"]
+
+
+def test_category_dedupe_runs_even_without_a_reported_language():
+    from ai_service import GeminiService
+    data = {"category": "Health", "tags": ["health", "sleep"]}
+    out = GeminiService._enforce_tag_language(data)
+    assert out["tags"] == ["sleep"]
+
+
+def test_language_enforcement_behaviour_is_unchanged():
+    from ai_service import GeminiService
+    data = {"language": "he", "category": "Food",
+            "tags": ["פסטה", "recipes", "מטבח איטלקי"]}
+    out = GeminiService._enforce_tag_language(data)
+    assert out["tags"] == ["פסטה", "מטבח איטלקי"]

@@ -705,16 +705,17 @@ The multi-user auth work described below **was** fully written but not live:
     (`157c11d`) landed *after* build 1219 was cut, so it has never been in a
     TestFlight build. It rides the next iOS build and needs one look on a
     home-indicator iPhone — see the 2026-07-27 §9 entry.
-11a2. **[ ] Image-mode scan phases drift between the app and the Share
-    Extension** (found 2026-07-27). Thresholds match (95/80/60/45) but the
-    wording does not: Swift says "Understanding content… / Reading text… /
-    Scanning image…", `AnalyzingBanner.tsx`'s inline table says "Understanding
-    the content… / Reading the text… / Scanning the image…". Link phases ARE in
-    sync because they share `scanPhases.ts`; image phases have no shared twin.
-    Fix by adding `IMAGE_SCAN_STEPS` to `web/lib/scanPhases.ts` and having both
-    surfaces read it, the way `LINK_SCAN_STEPS` already works. Cosmetic, and
-    only visible to someone comparing the two screens — but it is exactly the
-    kind of drift the shared-constants pattern exists to prevent.
+11a2. **[x] Image-mode scan phases drift between the app and the Share
+    Extension** (found 2026-07-27). **DONE 2026-08-23** — `IMAGE_SCAN_STEPS` +
+    `imageScanLabel`/`imageScanOrb` added to `web/lib/scanPhases.ts` (Swift's
+    device-QA'd wording: "Uploading / Scanning image / Reading text /
+    Understanding content / Organizing & tagging / Finishing up", thresholds
+    20/45/60/80/95); `AnalyzingBanner.tsx` and `ImageScanProgress.tsx` both
+    read it now, so the banner's drifted third wording ("Scanning the
+    image…") is gone. The Swift copy in
+    `web/ios/App/ShareExt/ShareViewController.swift` already matched
+    word-for-word, so NO Swift change was needed — its comment now names
+    `IMAGE_SCAN_STEPS` as its twin. See the 2026-08-23 §9 entry.
 11a3. **[ ] Em dashes read as AI-written — 92 left across 34 files** (owner call
     2026-07-27, after the founder's note was de-em-dashed: "it's the most basic
     trademark of AI writing, and not in a good way"). Only `StoryView` was
@@ -1405,6 +1406,62 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-08-23 — AI-quality hardening pass: every AI surface audited for the
+  last two weeks' bug classes; 7 holes fixed, 31 tests added (635 → 666).**
+  Audit-then-fix across ai_service/graph_service/digest_service/link_service/
+  search/scraper/models + the client AI surfaces. **Fixed (backend):** (1) the
+  truncation guard `_analysis_cut_off` now also flags a PRESENT-but-empty
+  `summary` and a truncated LAST element of `tags`/`concepts`/`videoHighlights`
+  (unclosed `**`, trailing hyphen/maqaf/comma — structured output writes fields
+  in schema order, so an early stop can land in a list after the prose and
+  still close the JSON); deliberately NOT flagged: a bare short word ("מנכ") as
+  a final tag/concept — indistinguishable from a legitimate term, so it stays
+  a documented gap rather than a retry-loop risk. Hebrew geresh/gershayim
+  terminators verified accepted. (2) `analyze_text_with_images` is now
+  script-aware: Hebrew in the post context + a text-carrying image flag
+  (`image_is_primary` or `image_text_dense`) escalates vision to
+  MEDIA_RESOLUTION_HIGH (the analyze_image lesson); Latin posts keep
+  MEDIUM/LOW for cost, and resolution is only ever raised. (3) the STREAMING
+  ask path now scrubs in-context card ids out of the emitted prose (including
+  ids split across chunk boundaries, via the marker tail-buffer) — the
+  buffered path had `_strip_inline_ids` since 2026-07-28, the streamed one had
+  nothing. (4) `_enforce_tag_language` also drops a tag that merely repeats
+  the category ("recipe" on a Recipe card, case-insensitive). (5) the weekly
+  synthesis prompt gets the related-cards posture: a theme must be a real
+  throughline, never a shared format, and "one theme, or none" is licensed as
+  a valid answer. (6) `backfill_batch`/`backfill_related_links` count a
+  permanently text-less card as `skipped`, not `failed` — `failed` now means
+  "retry could help". **Fixed (client):** (7) `ensureGraphVersion` no longer
+  stamps `graphVersion` after a PARTIALLY failed run (`failed > 0` → retry
+  next open, exactly like an interrupted run — depends on fix 6, or a
+  text-less card would block the stamp forever); and backlog **11a2** done:
+  `IMAGE_SCAN_STEPS` in `scanPhases.ts`, banner + ImageScanProgress read it,
+  Swift already matched (no Swift change needed). **Verified clean, hunted,
+  no defect found:** silent-default scores (the graph similarity floor is now
+  test-locked incl. "missing score is dropped, not defaulted"; `confidence:
+  0.8/0.9` in main.py is a hardcoded legacy card field, not an LLM answer —
+  nothing ranks on it); digest curation is deterministic (no LLM
+  topic-grouping prompt exists); Ask citations can't reference a card
+  retrieval didn't return (`_valid_cited_ids` filters against the supplied
+  set); verbatim text cards are never rewritten by any pipeline step (guard
+  runs on the model dict before the verbatim substitution — now test-locked);
+  both sentence splitters carry the single-block guard + shape-based
+  abbreviation handling, and a node-level regex check confirmed Hebrew
+  short-word endings still split. **Judgment calls, deliberately not decided
+  here:** a bare-word mid-cut in a final tag/concept/title is undetectable;
+  a hallucinated id the model invents in prose (not one we supplied) is
+  indistinguishable from prose and survives `_strip_inline_ids`;
+  `find_related_links` still swallows exceptions into an empty-but-"successful"
+  `relatedLinks: []` (deliberate for the save pipeline — a failed relate must
+  not fail a capture — but during a forced migration it records emptiness as
+  done; heals only on the next force run); `detailedSummary` shorter than
+  `summary` is not enforced; there is no user-initiated Settings → Rebuild
+  (the 4s-boot trigger is the only caller, module-guarded), so the feared
+  concurrent-rebuild race has no second party today. Verified: 666/666
+  offline tests, `py_compile` clean, `tsc --noEmit` clean. NOT verified:
+  any live Gemini call, real streamed ask, or on-device banner wording
+  (no prod creds / device in this env).
 
 - **2026-08-22 — Related cards stop inventing connections; stale ones heal
   themselves. SHIPPED (merge `3c27bf2` → Vercel + functions deploy run #84

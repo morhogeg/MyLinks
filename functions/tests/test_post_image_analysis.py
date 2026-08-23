@@ -354,3 +354,52 @@ def test_image_is_primary_switches_resolution_and_prompt():
     svc.analyze_text_with_images("body", [(b"x", "image/jpeg")], image_is_primary=False)
     assert captured["media_resolution"] == "MEDIA_RESOLUTION_LOW"
     assert "AUTHORITATIVE" not in captured["prompt"]
+
+
+# ── script-aware media resolution (2026-08-23) ───────────────────────────────
+# analyze_image already learned the dense-Hebrew lesson (HIGH); the text+image
+# path must not misread the same screenshot just because it arrived attached to
+# a post. Hebrew in the post context raises the text-carrying cases to HIGH;
+# Latin posts keep the cheaper MEDIUM/LOW tiers; resolution is only ever raised.
+
+def _resolution_capturing_service():
+    from ai_service import GeminiService
+    svc = GeminiService.__new__(GeminiService)
+    captured = {}
+
+    def fake_generate_json(contents, what, config_extra=None, model=None, attempts=3):
+        captured["media_resolution"] = (config_extra or {}).get("media_resolution")
+        return {"summary": "ok"}
+
+    svc._generate_json = fake_generate_json
+    return svc, captured
+
+
+def test_hebrew_primary_image_post_runs_at_high_resolution():
+    svc, captured = _resolution_capturing_service()
+    svc.analyze_text_with_images("כל הטרנד הזה של יפן", [(b"x", "image/jpeg")],
+                                 image_is_primary=True)
+    assert captured["media_resolution"] == "MEDIA_RESOLUTION_HIGH"
+
+
+def test_hebrew_dense_image_post_runs_at_high_resolution():
+    svc, captured = _resolution_capturing_service()
+    svc.analyze_text_with_images("טקסט קצר", [(b"x", "image/jpeg")],
+                                 image_text_dense=True)
+    assert captured["media_resolution"] == "MEDIA_RESOLUTION_HIGH"
+
+
+def test_latin_dense_image_post_stays_medium():
+    svc, captured = _resolution_capturing_service()
+    svc.analyze_text_with_images("thin caption", [(b"x", "image/jpeg")],
+                                 image_text_dense=True)
+    assert captured["media_resolution"] == "MEDIA_RESOLUTION_MEDIUM"
+
+
+def test_hebrew_text_primary_post_without_dense_flag_stays_low():
+    # The image is believed to ILLUSTRATE a wordy Hebrew post — no text-carrying
+    # signal, so no resolution spend: the bump keys on the flags, not the script
+    # alone.
+    svc, captured = _resolution_capturing_service()
+    svc.analyze_text_with_images("פוסט ארוך ומפורט " * 20, [(b"x", "image/jpeg")])
+    assert captured["media_resolution"] == "MEDIA_RESOLUTION_LOW"
