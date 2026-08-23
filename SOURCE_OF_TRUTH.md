@@ -1045,7 +1045,10 @@ The multi-user auth work described below **was** fully written but not live:
     - **25b. [ ] OWNER: re-submit "Verify branding" — but only AFTER the page is
       live.** **Status 2026-08-23:** three of the four reasons are cleared;
       only *"does not explain the purpose"* remained, and the copy fix for it
-      is on `claude/app-store-launch-checklist-8c22a8` awaiting a ship. ⚠️ The
+      is **LIVE** on `mymachina.app/welcome` (merge `cd231d7`, then `006f222`
+      splitting it into definition + narrative beats after owner QA showed a
+      text wall). **All four reasons are now addressed — click "I have fixed
+      the issues".** ⚠️ The
       home-page URL must be **`https://mymachina.app/welcome`**, not the root —
       the root serves 33 characters without JS (the app shell), which is what
       produced the "behind a login page" / "does not explain the purpose"
@@ -1455,6 +1458,12 @@ exact-match, capped.
   D-3 words. **NOT verified here:** the scroll-driven cross-fade in motion —
   the Browser pane cannot window-scroll (known quirk), so the paragraph growing
   from ~5 to 9 lines wants one look on device. WEB ONLY — Vercel, no iOS build.
+  **SHIPPED same day:** landing copy live (merge `cd231d7`); owner QA flagged
+  the merged paragraph as a text wall, split into definition + narrative beats
+  (4+5 lines desktop, 5+6 mobile, merge `006f222`, live-verified by a
+  new-copy-only marker). Model change deployed green — **deploy-functions run
+  32628745452** (`Deploy-Functions: ask_brain`). No TestFlight build: backend
+  needs none, and the landing page is a signed-out-only surface.
 
 
 - **2026-08-23 — one model everywhere, and the Ask fallback becomes a real
