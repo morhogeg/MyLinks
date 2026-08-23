@@ -226,9 +226,19 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-08-22): fix the APNs key, and install build **1286**
+> ## 🚨 OWNER ACTION (updated 2026-08-23): fix the APNs key, and install build **1287**
 >
-> **1286** (run #286, merge `d8d2117`) is current: everything in 1285 plus the
+> **1287** (run #287, merge `4cdae48`) is current: everything in 1286 plus the
+> AI-quality hardening pass — unified image scan-phase wording (the banner now
+> matches the share sheet word-for-word) and the honest graph-migration stamp.
+> Backend half (truncation guard on list fields, Hebrew-aware vision
+> resolution, streamed-ask id scrub, synthesis prompt posture) is functions
+> run #85, no build needed. QA: share a dense Hebrew screenshot post and check
+> the card's key points end complete; save a photo and watch the banner say
+> "Scanning image…" (not "Scanning the image…"). 1286 stays the fallback.
+> The APNs step below is unchanged and still pending.
+>
+> **(superseded) 1286** (run #286, merge `d8d2117`): everything in 1285 plus the
 > Insights facet edge-swipe — after tapping a category/tag/source in Insights,
 > the iOS swipe-back gesture now returns to Insights, same as the chip. QA:
 > Insights → tap a category → edge-swipe → should land back in Insights at
@@ -1408,7 +1418,10 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 
 - **2026-08-23 — AI-quality hardening pass: every AI surface audited for the
-  last two weeks' bug classes; 7 holes fixed, 31 tests added (635 → 666).**
+  last two weeks' bug classes; 7 holes fixed, 31 tests added (635 → 666).
+  SHIPPED (merge `4cdae48` → Vercel + functions deploy run #85, scoped
+  `Deploy-Functions: all` because `ai_service.py` is imported by every AI
+  function + TestFlight run #287 = build 1287).**
   Audit-then-fix across ai_service/graph_service/digest_service/link_service/
   search/scraper/models + the client AI surfaces. **Fixed (backend):** (1) the
   truncation guard `_analysis_cut_off` now also flags a PRESENT-but-empty
