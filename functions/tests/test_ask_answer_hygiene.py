@@ -56,3 +56,85 @@ def test_prompt_demands_structured_long_answers():
     assert "FORMATTING of the answer text" in ai_service._CITED_JSON_SUFFIX
     assert "FORMATTING of the answer text" in ai_service._CITED_JSON_STRICT_SUFFIX
     assert "FORMATTING of the answer text" in ai_service._CITED_JSON_PARAPHRASE_SUFFIX
+
+
+# ── the STREAMING path must scrub inline ids too (2026-08-23) ────────────────
+# The buffered path runs _strip_inline_ids on the finished answer; the streaming
+# path emits token-by-token, so without an in-stream scrub the same
+# "(fb9QaKk…, F7wwq0P…)" garbage reaches the user — including ids split across
+# chunk boundaries. These tests drive answer_from_context_stream with a fake
+# stream and assert the emitted prose never contains a supplied id.
+
+FULL_CARDS = [
+    {"id": "fb9QaKkmjNvk4ueKybSv", "title": "Sanctions explainer", "summary": "s1"},
+    {"id": "F7wwq0PWJh3cpyMaCbBt", "title": "Oil markets", "summary": "s2"},
+]
+
+
+def _stream_service(chunks):
+    svc = ai_service.GeminiService.__new__(ai_service.GeminiService)
+
+    class _Chunk:
+        def __init__(self, t):
+            self.text = t
+
+    class _Models:
+        def generate_content_stream(self, **kwargs):
+            return iter([_Chunk(t) for t in chunks])
+
+    class _Client:
+        pass
+
+    svc.client = _Client()
+    svc.client.models = _Models()
+    return svc
+
+
+def _run_stream(chunks, cards=FULL_CARDS):
+    events = list(_stream_service(chunks).answer_from_context_stream("q", cards))
+    prose = "".join(t for kind, t in events if kind == "token")
+    cited = next((v for kind, v in events if kind == "citedIds"), None)
+    return prose, cited, events
+
+
+def test_stream_scrubs_inline_ids_even_across_chunk_boundaries():
+    prose, cited, _ = _run_stream([
+        "Oil sanctions were renewed (fb9QaKkmjN",
+        "vk4ueKybSv, F7wwq0PWJh3cpyMaCbBt). More detail follows.",
+        "\n[[CITED: fb9QaKkmjNvk4ueKybSv]]",
+    ])
+    for c in FULL_CARDS:
+        assert c["id"] not in prose
+    assert "()" not in prose and "( , )" not in prose
+    assert "More detail follows." in prose
+    assert cited == ["fb9QaKkmjNvk4ueKybSv"]
+
+
+def test_stream_scrubs_bare_mid_prose_id():
+    prose, cited, _ = _run_stream([
+        "See fb9QaKkmjNvk4ueKybSv for the sanctions timeline.",
+        "\n[[CITED: fb9QaKkmjNvk4ueKybSv, F7wwq0PWJh3cpyMaCbBt]]",
+    ])
+    assert "fb9QaKkmjNvk4ueKybSv" not in prose
+    assert "sanctions timeline" in prose
+    assert cited == ["fb9QaKkmjNvk4ueKybSv", "F7wwq0PWJh3cpyMaCbBt"]
+
+
+def test_stream_without_ids_or_marker_flushes_everything_and_flags_ungrounded():
+    prose, cited, events = _run_stream([
+        "A perfectly ordinary answer ",
+        "with (parentheses like these) intact.",
+    ])
+    assert prose == "A perfectly ordinary answer with (parentheses like these) intact."
+    assert cited == []
+    assert ("ungrounded", True) in events
+
+
+def test_stream_marker_is_never_emitted_as_prose():
+    prose, cited, _ = _run_stream([
+        "Answer text.",
+        "\n[[CITED: F7wwq0PWJh3cpyMaCbBt]]",
+    ])
+    assert "[[CITED" not in prose
+    assert prose.strip() == "Answer text."
+    assert cited == ["F7wwq0PWJh3cpyMaCbBt"]

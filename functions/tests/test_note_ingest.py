@@ -77,3 +77,33 @@ def test_note_tolerates_missing_actionable_takeaway():
     # must still produce a valid card, with takeaway defaulting to None.
     data = main._note_link_data(_analysis(), "body")
     assert data["metadata"]["actionableTakeaway"] is None
+
+
+# ── verbatim text cards: the user's words are NEVER rewritten ────────────────
+# A shared paragraph stores the user's text UNTOUCHED in `summary`; the AI take
+# is parked in aiSummary/aiDetailedSummary. No pipeline step — including the
+# truncation backstop, which retries model output that "looks cut off" — may
+# ever touch the verbatim body: user text legitimately ends mid-thought.
+
+def test_verbatim_body_is_stored_byte_identical_even_when_it_looks_cut_off():
+    # Ends on a bare letter mid-word — exactly the shape the truncation guard
+    # flags on MODEL output. On user text it must be preserved as-is.
+    text = "רשמתי לעצמי את ההתחלה של מחשבה על מנכ"
+    data = main._note_link_data(_analysis(), text, verbatim=True)
+    assert data["summary"] == text
+    assert data["detailedSummary"] == ""
+    assert data["aiSummary"] == "The gist of the note."
+    assert data["captureType"] == "text"
+
+
+def test_truncation_guard_only_sees_model_output_not_user_text():
+    # _analysis_cut_off runs inside _generate_json on the MODEL's dict, before
+    # _note_link_data ever substitutes the verbatim body — so a cut-off-looking
+    # user text must not be what the guard evaluates. Locked structurally: the
+    # verbatim substitution happens in _note_link_data, and the guard's input
+    # (the analysis dict) is complete here, so no retry would fire.
+    from ai_service import _analysis_cut_off
+    analysis = _analysis(detailedSummary="## Key Points\n- something complete.")
+    assert not _analysis_cut_off(analysis)
+    data = main._note_link_data(analysis, "user text that ends mid-wor", verbatim=True)
+    assert data["summary"].endswith("mid-wor")

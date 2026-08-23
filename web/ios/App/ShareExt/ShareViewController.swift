@@ -655,7 +655,9 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     /// Phase label from progress. For links this MUST match the shared web phase
     /// source (web/lib/scanPhases.ts → LINK_SCAN_STEPS, used by LinkScanProgress
     /// and AnalyzingBanner) so the share sheet and the in-app loader never say
-    /// different things at the same %. Images mirror ImageScanProgress.tsx.
+    /// different things at the same %. Images are the TWIN of
+    /// web/lib/scanPhases.ts → IMAGE_SCAN_STEPS (same labels, same 20/45/60/80/95
+    /// thresholds) — change one, change the other.
     private func phase(for p: CGFloat) -> String {
         if p >= 100 { return "Done!" }
         // Shared text: the same beats at the same thresholds, with copy that

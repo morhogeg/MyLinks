@@ -193,7 +193,8 @@ class GraphService:
                 continue
             text = f"{d.get('title', '')}\n{d.get('summary', '')}".strip()
             if not text:
-                failed += 1
+                # Permanent state, not a retryable failure (see backfill_batch).
+                skipped += 1
                 continue
             emb = embeddings.get(doc.id)
             if emb is None:
@@ -280,7 +281,11 @@ class GraphService:
                 skipped += 1
                 continue
             if not text:
-                failed += 1
+                # No title/summary → nothing to embed or relate, ever. That is
+                # the card's permanent correct state, not a failure: `failed`
+                # must mean "retry could help" (the client re-runs the graph
+                # migration until a pass finishes with failed == 0).
+                skipped += 1
                 continue
             emb = None
             raw = d.get('embedding_vector')

@@ -65,3 +65,52 @@ def test_language_handling_is_untouched():
     assert "Write the title in the SAME language as the input content." in p
     assert "Write the summary in the SAME language as the input content." in p
     assert "The category MUST ALWAYS be in English" in p
+
+
+# ── "reward for finding something" prompts (2026-08-23 audit) ────────────────
+# The related-cards prompt had to be rewritten into an adversarial gatekeeper
+# where EMPTY is a valid answer. These contracts pin that posture — on the
+# graph verifier and on the weekly synthesis's theme-finding — so a wording
+# edit can't silently drift either back into rewarding forced abstractions.
+
+def test_graph_verifier_prompt_stays_an_adversarial_gatekeeper():
+    from types import SimpleNamespace
+    from graph_service import GraphService
+
+    svc = GraphService.__new__(GraphService)
+    captured = {}
+
+    class _Models:
+        def generate_content(self, model=None, contents=None, config=None):
+            captured["prompt"] = contents
+            return SimpleNamespace(text="[]")
+
+    svc.ai = SimpleNamespace(client=SimpleNamespace(models=_Models()))
+    svc._verify_relationships_with_llm("T", "S", [], [{"id": "a"}])
+    p = captured["prompt"]
+    assert "skeptical gatekeeper" in p
+    assert "An empty result is a good result" in p
+    assert "NEVER connect on" in p
+    assert "both use benchmarks" in p  # the concrete forced-abstraction example
+    assert "When in doubt, EXCLUDE" in p
+
+
+def test_synthesis_prompt_licenses_an_honest_no_theme_answer():
+    import ai_service
+
+    svc = ai_service.GeminiService.__new__(ai_service.GeminiService)
+    svc.client = object()
+    captured = {}
+
+    def fake_generate_json(contents, what, config_extra=None, model=None, attempts=3):
+        captured["prompt"] = contents[0]
+        return {"title": "T", "narrative": "n", "themes": []}
+
+    svc._generate_json = fake_generate_json
+    svc.synthesize_week([{"id": "a", "title": "Card", "summary": "s"}])
+    p = captured["prompt"]
+    # A theme must be a real throughline, never a shared format or a zoomed-out
+    # abstraction — and fewer (or zero) themes is an allowed, honest outcome.
+    assert "never a shared format" in p
+    assert "one theme, or none, is a valid answer" in p
+    assert "a forced connection is not" in p

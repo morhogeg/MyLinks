@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import type { OrbState } from '@/components/ui/CitationMark';
 import OrbStatus from '@/components/ui/OrbStatus';
-import { linkScanLabel, linkScanOrb, textScanLabel, LINK_SCAN_STEPS, TEXT_SCAN_STEPS, LINK_SCAN_ORBS } from '@/lib/scanPhases';
+import { imageScanLabel, imageScanOrb, linkScanLabel, linkScanOrb, textScanLabel, LINK_SCAN_STEPS, TEXT_SCAN_STEPS, LINK_SCAN_ORBS } from '@/lib/scanPhases';
 
 export interface AnalyzingState {
     active: boolean;
@@ -29,12 +29,11 @@ function phaseStatus(
     pct: number,
     stageStep?: number,
 ): { label: string; orb: OrbState } {
+    // Image capture: shared source (IMAGE_SCAN_STEPS) — the same beats the
+    // in-dialog ImageScanProgress and the iOS share sheet narrate, so the
+    // banner can never drift into a third wording again.
     if (kind === 'image') {
-        if (pct >= 95) return { label: 'Finishing up…', orb: 'shaping' };
-        if (pct >= 80) return { label: 'Organizing & tagging…', orb: 'solving' };
-        if (pct >= 60) return { label: 'Understanding the content…', orb: 'solving' };
-        if (pct >= 45) return { label: 'Reading the text…', orb: 'searching' };
-        return { label: 'Scanning the image…', orb: 'searching' };
+        return { label: imageScanLabel(pct) + '…', orb: imageScanOrb(pct) };
     }
     if (kind === 'video') {
         if (pct >= 92) return { label: 'Organizing & tagging…', orb: 'solving' };

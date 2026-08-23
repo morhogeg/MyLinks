@@ -112,3 +112,76 @@ def test_clean_first_attempt_is_not_retried():
     data = svc._generate_json(["prompt"], "test", attempts=2)
     assert data["detailedSummary"] == "- הכל תקין."
     assert svc.client.models.calls == 1
+
+
+# ── list-field tails (tags/concepts/videoHighlights) ─────────────────────────
+# Structured output writes fields in schema order, so an early stop can land in
+# whichever LIST the model was emitting (concepts/videoHighlights come after
+# the prose) and still close the JSON. Only unambiguous signatures flag —
+# tags/concepts are short noun phrases with no terminal punctuation, so a bare
+# short word is their NORMAL shape.
+
+from ai_service import _list_tail_cut_off
+
+
+def test_unclosed_bold_in_last_list_item_is_flagged():
+    assert _list_tail_cut_off(["**Marcus Aurelius** wrote it", "**Senec"])
+
+
+def test_trailing_connector_in_last_list_item_is_flagged():
+    assert _list_tail_cut_off(["robot vacuums", "self-"])
+    assert _list_tail_cut_off(["בריאות", "מנכ־"])   # Hebrew maqaf mid-compound
+    assert _list_tail_cut_off(["one", "two,"])      # cut between items
+
+
+def test_bare_short_words_in_lists_are_accepted():
+    # A mid-word cut like a bare "מנכ" is indistinguishable from a legitimate
+    # short term — accepted by design (documented judgment call), never a
+    # retry-loop trigger on valid output.
+    assert not _list_tail_cut_off(["spaced repetition", "מנכ"])
+    assert not _list_tail_cut_off(["vitamin d"])
+    assert not _list_tail_cut_off([])
+    assert not _list_tail_cut_off(None)
+    assert not _list_tail_cut_off(["ok", 42])
+
+
+def test_video_highlight_without_period_is_not_flagged():
+    # Highlights are "M:SS — description" with no required terminator.
+    assert not _analysis_cut_off({
+        "summary": "Fine.",
+        "videoHighlights": ["2:15 — Explains the 2-minute rule"]})
+
+
+def test_truncated_last_concept_flags_the_analysis():
+    assert _analysis_cut_off({"summary": "Fine.", "concepts": ["Stoicism", "**Netw"]})
+
+
+def test_hebrew_terminators_still_accepted():
+    # Geresh / gershayim are legitimate Hebrew line enders — whitelist, not cut.
+    assert not _text_cut_off("קטע שמסתיים בציטוט ׳כך׳")
+    assert not _text_cut_off('ראשי תיבות בסוף שורה: צה"ל.')
+
+
+# ── present-but-empty summary (valid JSON, no content) ───────────────────────
+
+def test_empty_summary_is_flagged():
+    assert _analysis_cut_off({"summary": "", "detailedSummary": "Fine."})
+    assert _analysis_cut_off({"summary": "   ", "detailedSummary": "Fine."})
+
+
+def test_non_analysis_schemas_still_pass_untouched():
+    # BrainAnswer / WeeklySynthesis shapes carry none of the checked fields.
+    assert not _analysis_cut_off({"answer": "whatever with no period", "citedIds": []})
+    assert not _analysis_cut_off({
+        "title": "A week of systems thinking",
+        "narrative": "Two paragraphs",
+        "themes": [{"title": "T", "insight": "cut mid", "cardIds": ["x"]}],
+    })
+
+
+def test_empty_summary_attempt_is_retried():
+    _EMPTY = '{"summary": "", "detailedSummary": "- fine."}'
+    svc = _service_with([_EMPTY, _CLEAN])
+    data = svc._generate_json(["prompt"], "test", attempts=2)
+    assert data["detailedSummary"] == "- הכל תקין."
+    assert svc.client.models.calls == 2

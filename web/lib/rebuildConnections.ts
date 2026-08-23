@@ -99,6 +99,15 @@ export function ensureGraphVersion(uid: string): void {
         const current = (snap.data()?.graphVersion as number | undefined) ?? 1;
         if (current >= GRAPH_VERSION) return;
         const { updated, failed } = await rebuildConnections(uid, undefined, { force: true });
+        // A partially failed run must not stamp: `failed` counts cards whose
+        // recompute genuinely errored (embed/LLM/write — the backend counts
+        // permanently text-less cards as skipped, not failed), so those cards
+        // still carry the OLD graph's connections. Leaving the stamp unwritten
+        // makes the next open retry, exactly like an interrupted run.
+        if (failed > 0) {
+            console.warn(`Graph migration incomplete: ${updated} recomputed, ${failed} failed — will retry next open`);
+            return;
+        }
         // The user doc always exists (created server-side by claim_workspace),
         // and rules deny client-side creates — update, like updateUserSettings.
         await updateDoc(userRef, { graphVersion: GRAPH_VERSION });
