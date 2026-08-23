@@ -21,6 +21,8 @@ import {
     MoreHorizontal,
     Layers,
     Lock,
+    Search,
+    Waypoints,
     Image as ImageIcon,
     StickyNote,
 } from 'lucide-react';
@@ -213,6 +215,102 @@ function AskMock() {
     );
 }
 
+/** A miniature of the REAL graph view — a focused node, its lit neighbourhood,
+    and a couple of dim strangers, so "connected map" is shown, not told. */
+function GraphMock() {
+    // Positions in % of the canvas. Focus at center; three lit neighbours;
+    // two dim, unconnected nodes so the neighbourhood visibly stands out.
+    const focus = { x: 50, y: 42 };
+    const linked = [
+        { x: 17, y: 20, label: 'Morning routines' },
+        { x: 82, y: 26, label: 'Sleep quality' },
+        { x: 28, y: 76, label: 'Attention span' },
+    ];
+    const dim = [
+        { x: 79, y: 74 },
+        { x: 62, y: 12 },
+    ];
+    return (
+        <div className="relative w-full h-44 rounded-2xl bg-card border border-border-subtle shadow-xl overflow-hidden" aria-hidden>
+            {/* Edges — accent for the lit neighbourhood. */}
+            <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                {linked.map((n) => (
+                    <line
+                        key={n.label}
+                        x1={focus.x} y1={focus.y} x2={n.x} y2={n.y}
+                        stroke="currentColor" strokeWidth="0.7"
+                        className="text-accent/50"
+                    />
+                ))}
+            </svg>
+            {/* Dim strangers — small, label-less, clearly outside the neighbourhood. */}
+            {dim.map((n, i) => (
+                <span
+                    key={i}
+                    className="absolute w-2 h-2 rounded-full bg-fill-subtle border border-border-subtle -translate-x-1/2 -translate-y-1/2"
+                    style={{ left: `${n.x}%`, top: `${n.y}%` }}
+                />
+            ))}
+            {/* Lit neighbours */}
+            {linked.map((n) => (
+                <div
+                    key={n.label}
+                    className="absolute flex flex-col items-center -translate-x-1/2 -translate-y-1/2"
+                    style={{ left: `${n.x}%`, top: `${n.y}%` }}
+                >
+                    <span className="w-3 h-3 rounded-full bg-accent/80 ring-2 ring-accent/25" />
+                    <span className="mt-1 text-[8.5px] font-semibold text-text-secondary whitespace-nowrap">{n.label}</span>
+                </div>
+            ))}
+            {/* Focused node */}
+            <div
+                className="absolute flex flex-col items-center -translate-x-1/2 -translate-y-1/2"
+                style={{ left: `${focus.x}%`, top: `${focus.y}%` }}
+            >
+                <span className="w-5 h-5 rounded-full bg-[image:var(--accent-gradient)] ring-2 ring-accent shadow-lg shadow-accent/30" />
+                <span className="mt-1 text-[9.5px] font-bold text-text whitespace-nowrap">Deep focus</span>
+            </div>
+            {/* The graph view's vocabulary: the focused card's connection count. */}
+            <span className="absolute bottom-2 inset-x-0 mx-auto w-fit px-2.5 py-1 rounded-full bg-fill-subtle text-[9px] font-semibold text-text-secondary">
+                Connections · 3
+            </span>
+        </div>
+    );
+}
+
+/** Meaning search — a plain-words query finding a card that shares none of its
+    words, with the runner-up ranked below it. */
+function SearchMock() {
+    return (
+        <div className="w-full rounded-2xl bg-card border border-border-subtle shadow-xl p-3.5 flex flex-col gap-2.5" aria-hidden>
+            {/* Search field carrying a how-you-remember-it query */}
+            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-background border border-border-subtle">
+                <Search className="w-3.5 h-3.5 text-text-muted shrink-0" />
+                <span className="text-[11.5px] text-text truncate">that video about waking up early</span>
+            </div>
+            {/* Top result — zero shared words with the query */}
+            <div className="flex items-center gap-2.5 rounded-xl bg-fill-subtle px-2.5 py-2">
+                <span className="w-8 h-8 rounded-lg bg-[image:var(--accent-gradient)] opacity-80 shrink-0" />
+                <span className="min-w-0 flex-1 flex flex-col">
+                    <span className="text-[11px] font-semibold text-text truncate">Morning routines that stick</span>
+                    <span className="text-[9.5px] text-text-muted truncate">youtube.com · 12m</span>
+                </span>
+                <span className="shrink-0 text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-accent/12 text-accent">
+                    Meaning
+                </span>
+            </div>
+            {/* Runner-up, dimmer */}
+            <div className="flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 opacity-60">
+                <span className="w-8 h-8 rounded-lg bg-fill-subtle shrink-0" />
+                <span className="min-w-0 flex flex-col">
+                    <span className="text-[11px] font-semibold text-text truncate">The science of deep focus</span>
+                    <span className="text-[9.5px] text-text-muted truncate">nature.com · 4m</span>
+                </span>
+            </div>
+        </div>
+    );
+}
+
 /** A mini collections shelf — one shared-feeling stack, one PIN-locked. */
 function CollectionsMock() {
     return (
@@ -288,20 +386,27 @@ function ReadyMock() {
 function buildSteps(native: boolean): Step[] {
     return [
         {
-            icon: native ? <Share className="w-4 h-4" /> : <Plus className="w-4 h-4" />,
+            icon: <Share className="w-4 h-4" />,
             eyebrow: 'Capture',
             title: 'Save anything, from anywhere',
             body: native
                 ? 'Links, screenshots, images, or a quick note — share them to Machina from any app, or capture right here. No copy-paste, no switching apps.'
-                : 'Links, images, or a quick note — paste a URL, add a screenshot, or jot a thought. Tap + and it lands here as a card, whatever it started as.',
+                : 'Share to Machina from any app on your phone — or capture right here with +: paste a link, add a screenshot, jot a thought. Every save lands as a card.',
             visual: <CaptureMock native={native} />,
         },
         {
             icon: <CitationGlyph className="w-4 h-auto" />,
             eyebrow: 'Understand',
             title: 'Every save gets understood',
-            body: 'Machina reads the whole thing and files a clean card — a summary, smart tags, and connections to everything related you’ve saved.',
+            body: 'Machina reads the whole thing — article, video, screenshot, or note — and files a clean card: a summary, key points, smart tags, and a category. No manual filing.',
             visual: <StructuredCardMock />,
+        },
+        {
+            icon: <Waypoints className="w-4 h-4" />,
+            eyebrow: 'Connect',
+            title: 'Your saves find each other',
+            body: 'Each new save is matched against everything you’ve kept — truly related cards appear on the card itself, and the graph shows your library as one connected map.',
+            visual: <GraphMock />,
         },
         {
             icon: <MessageCircleQuestion className="w-4 h-4" />,
@@ -309,6 +414,13 @@ function buildSteps(native: boolean): Step[] {
             title: 'Ask your own knowledge',
             body: 'Ask in plain words and get a real answer — drawn only from what you’ve saved, with citations back to the exact source.',
             visual: <AskMock />,
+        },
+        {
+            icon: <Search className="w-4 h-4" />,
+            eyebrow: 'Find',
+            title: 'Search the way you remember',
+            body: 'Type what you remember, not the exact words — “that video about waking up early” finds the morning-routine talk. In English or Hebrew, however you saved it.',
+            visual: <SearchMock />,
         },
         {
             icon: <Layers className="w-4 h-4" />,
@@ -328,9 +440,7 @@ function buildSteps(native: boolean): Step[] {
             icon: <CitationGlyph className="w-4 h-auto" />,
             eyebrow: 'You’re set',
             title: 'Your Machina is ready',
-            body: native
-                ? 'Capture from any app, and every save is read, tagged, and connected — ready to answer your questions with citations, and to resurface when it matters. Save your first thing to see it work.'
-                : 'Clip from any page, and every save is read, tagged, and connected — ready to answer your questions with citations, and to resurface when it matters. Save your first thing to see it work.',
+            body: 'Save from any app or right here, and every save is read, tagged, and connected — ready to answer your questions with citations, and to resurface when it matters. Save your first thing to see it work.',
             visual: <ReadyMock />,
         },
     ];
