@@ -226,11 +226,18 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-08-23): fix the APNs key, and install build **1288**
+> ## 🚨 OWNER ACTION (updated 2026-08-23): fix the APNs key, and install build **1289**
 >
-> **1288** (run #288, merge `b58da13`) is current: everything in 1287 plus the
-> rebuilt 8-step first-run tour (Connect/graph + Find/meaning-search steps,
-> honest capture copy on web). QA: Settings → "Take the tour again".
+> **1289** (run #289, merge `8714cdd`) is current: everything in 1288 plus the
+> tour mocks corrected to the real product — the card mock's invented "3
+> related saves" footer replaced by the real read-time + age row, and the
+> Connect step's graph redrawn in the graph view's own vocabulary (category
+> identity colors, focus halo, gradient edges, the stats line). QA: Settings →
+> "Take the tour again".
+>
+> **(superseded) 1288** (run #288, merge `b58da13`): the rebuilt 8-step
+> first-run tour (Connect/graph + Find/meaning-search steps, honest capture
+> copy on web).
 >
 > **(superseded) 1287** (run #287, merge `4cdae48`): everything in 1286 plus the
 > AI-quality hardening pass — unified image scan-phase wording (the banner now
@@ -1441,6 +1448,21 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-08-23 — tour mocks corrected to the real product. SHIPPED (merge
+  `8714cdd` → Vercel + TestFlight run #289 = build 1289; no functions change).**
+  Owner QA on 1288's tour: the card mock's footer claimed "3 related saves" —
+  a row no real card has — and the Connect step's graph was accent-only dots,
+  nothing like the graph view. Both fixed in `OnboardingTour.tsx`:
+  `StructuredCardMock` now ends on the real metadata row (Clock read-time +
+  "2d ago", start-aligned, as `Card.tsx` renders it); `GraphMock` is redrawn in
+  `KnowledgeGraph.tsx`'s exact vocabulary — nodes colored by
+  `getCategoryColorStyle` (the same app-wide category hash), lit-top radial
+  bodies with hairline rings, a soft halo on the focused node, lit edges as
+  gradients blending both endpoint colors, a dimmed stranger island, and the
+  graph's real stats header ("4 connected cards · 3 connections") instead of
+  an invented pill. Verified: `tsc --noEmit` clean. NOT verified here: visual
+  render — QA via Settings → "Take the tour again".
 
 - **2026-08-23 — the first-run tour rebuilt: 8 steps, every key feature, and
   the share-from-any-app story back on web. SHIPPED (merge `b58da13` → Vercel +
