@@ -1464,6 +1464,19 @@ exact-match, capped.
   new-copy-only marker). Model change deployed green — **deploy-functions run
   32628745452** (`Deploy-Functions: ask_brain`). No TestFlight build: backend
   needs none, and the landing page is a signed-out-only surface.
+  **Round 17c, same day, two owner calls from Safari QA:** (1) the
+  founder-letter paragraph read as pattern writing (both hinge sentences were
+  negation-then-reveal constructions) — CUT whole, replaced by the resolve
+  **tally**: the five silo piles re-counted as scroll-dealt chips summing to
+  "178 saves. One library." (scrubbed by --resolve, no React state, hover-lift
+  on pointer devices; the Google-required definition sentence stays as the one
+  line of prose). (2) Owner screenshot showed silo cards covering the problem
+  headline on a wide-but-short window — the field now shrinks and lifts via
+  height bands (≤950px / ≤800px, and a phone-origin notch). Verified by
+  forced-state measurement at 1280×720/1280×880/375×812: clearances all
+  positive, chips 1 row desktop / 2 phone. Merge `8e2cd72`. ⚠️ The
+  scroll-scrubbed chip arrival is measured, not watched (pane can't
+  window-scroll) — wants one device look.
 
 
 - **2026-08-23 — one model everywhere, and the Ask fallback becomes a real
