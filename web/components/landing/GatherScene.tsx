@@ -31,7 +31,6 @@ import { useSceneProgress } from './hooks';
 /* The chip row wraps on a phone; the two long silo labels get short forms so
    five chips read as one line of objects, not two lines of prose. */
 const TALLY_LABELS: Record<string, string> = {
-    'Messages to self': 'Messages',
     'Open tabs': 'Tabs',
 };
 const TALLY_TOTAL = SILOS.reduce((n, s) => n + s.count, 0);
@@ -128,8 +127,8 @@ export default function GatherScene() {
                         </h2>
                         <p className="mx-auto mt-5 max-w-lg text-[15px] leading-relaxed text-text-secondary text-pretty sm:text-base">
                             A recipe goes into Instagram saves. A thread gets bookmarked on X. A
-                            video lands in Watch Later, an article in a message to yourself, and
-                            one more tab stays open on your phone for a month.
+                            video lands in Watch Later, a post gets saved on LinkedIn, and one
+                            more tab stays open on your phone for a month.
                         </p>
                     </div>
 
