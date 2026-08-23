@@ -226,9 +226,13 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-08-23): fix the APNs key, and install build **1287**
+> ## 🚨 OWNER ACTION (updated 2026-08-23): fix the APNs key, and install build **1288**
 >
-> **1287** (run #287, merge `4cdae48`) is current: everything in 1286 plus the
+> **1288** (run #288, merge `b58da13`) is current: everything in 1287 plus the
+> rebuilt 8-step first-run tour (Connect/graph + Find/meaning-search steps,
+> honest capture copy on web). QA: Settings → "Take the tour again".
+>
+> **(superseded) 1287** (run #287, merge `4cdae48`): everything in 1286 plus the
 > AI-quality hardening pass — unified image scan-phase wording (the banner now
 > matches the share sheet word-for-word) and the honest graph-migration stamp.
 > Backend half (truncation guard on list fields, Hebrew-aware vision
@@ -1437,6 +1441,27 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-08-23 — the first-run tour rebuilt: 8 steps, every key feature, and
+  the share-from-any-app story back on web. SHIPPED (merge `b58da13` → Vercel +
+  TestFlight run #288 = build 1288; no functions change).** Owner QA on the
+  earlier tour fix: dropping the browser-button promise had over-corrected —
+  web stopped mentioning the phone share sheet at all, while the step's
+  illustration still depicted it, and the final step's web copy said "Clip from
+  any page" (the same dead extension promise, reworded). Review also found two
+  marquee features with no step: the knowledge graph and meaning search. All in
+  `web/components/OnboardingTour.tsx`: the web Capture body now tells both
+  halves (share from any app on your phone, or capture here with +), the final
+  step shares one honest body across surfaces, and two new steps landed —
+  **Connect** (new `GraphMock`: focused node, lit neighbourhood, dim strangers,
+  the graph view's "Connections · 3" pill) and **Find** (new `SearchMock`: a
+  plain-words query, "that video about waking up early", resolving to a card
+  sharing none of its words, with a Meaning badge; EN/HE named in copy). The
+  Understand step hands its connections clause to Connect and now names the
+  content types. Arc: Capture, Understand, Connect, Recall, Find, Organize,
+  Resurface, You're set. Both new mocks are pure theme-token UI (both themes,
+  no bitmaps). Verified: `tsc --noEmit` clean. NOT verified here: a visual
+  render — QA via Settings → "Take the tour again" on web and on 1288.
 
 - **2026-08-23 — the OAuth branding rejection, diagnosed and fixed at the source.**
   Owner screenshot: the Google account chooser reads *"to continue to
