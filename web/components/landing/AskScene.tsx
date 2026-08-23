@@ -130,8 +130,13 @@ export default function AskScene() {
 
             {/* The question picker. A horizontal rail on phones, so three whole
                 questions stay readable instead of wrapping into six lines. */}
-            <div className="-mx-6 mt-8 overflow-x-auto px-6 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                <div className="flex justify-start gap-2 sm:justify-center">
+            <div className="-mx-6 mt-8 overflow-x-auto px-6 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:-mx-16">
+                {/* w-max + mx-auto, NOT justify-center: centering inside an
+                    overflow-x container clips both ends of the row when the
+                    pills outgrow it (owner caught the cut sides). w-max sizes
+                    the row to its content, mx-auto centers it while it fits,
+                    and when it overflows it scrolls from a clean left edge. */}
+                <div className="mx-auto flex w-max gap-2">
                     {QUESTIONS.map((item, i) => (
                         <button
                             key={item.q}
