@@ -316,7 +316,9 @@ The multi-user auth work described below **was** fully written but not live:
 >    uptime check). ~~drop `MONTHLY_ASK_QUOTA` off its 1000 dev value~~ — done
 >    2026-08-04, back to 100. The **GCP budget alert is now the top item here**:
 >    the Gemini spend cap is a kill-switch, not a monitor, and it takes the owner
->    down with everyone else.
+>    down with everyone else. ✅ **The budget alert was SET at ₪50 on
+    2026-08-21** — what is left under this heading is the two key rotations
+    plus PITR/backups and the uptime check.
 > 6. **Unverified, close before launch** — **4b** (a weekly synthesis has still
 >    never been proven to generate end-to-end), **4c**, **21**.
 > 7. **Marketing coherence** — BRANDING **Q-4** (the hero is still contested three
@@ -810,8 +812,11 @@ The multi-user auth work described below **was** fully written but not live:
     on failed analyses), plus `max_instances` caps on every function, paid rate
     buckets fail closed, scheduler scans reworked (reminders via a bounded
     collection-group query + new composite index; digests 15-min cadence,
-    field-masked scan), `task_logs` pruning + TTL-ready `expireAt`. **Remaining
-    ⛔ OWNER:** GCP budget alerts, Firestore PITR/backups, uptime check — the
+    field-masked scan), `task_logs` pruning + TTL-ready `expireAt`.
+    **✅ GCP budget alert SET by the owner 2026-08-21 at ₪50** — the early
+    warning now fires before the spend cap's kill-switch does, which was the
+    whole point of the item; it is off the launch gate. **Remaining
+    ⛔ OWNER:** Firestore PITR/backups, uptime check — the
     ordered runbook is `docs/PRODUCTION_READINESS_2026-07-14.md` §4.
     ~~Email digest provider decision~~ **DECIDED
     2026-07-10: the email channel was CUT** (SendGrid was never configured; push
@@ -985,7 +990,13 @@ The multi-user auth work described below **was** fully written but not live:
       (the registrar is already there, so this is one record), then make sure
       that account is listed as an owner of the OAuth project.
     - **25b. [ ] OWNER: re-submit "Verify branding" — but only AFTER the page is
-      live.** Confirm `https://mymachina.app` shows the landing page signed-out
+      live.** **Status 2026-08-21:** three of the four reasons are cleared;
+      only *"does not explain the purpose"* remained, and the copy fix for it
+      is on `claude/app-store-launch-checklist-8c22a8` awaiting a ship. ⚠️ The
+      home-page URL must be **`https://mymachina.app/welcome`**, not the root —
+      the root serves 33 characters without JS (the app shell), which is what
+      produced the "behind a login page" / "does not explain the purpose"
+      reasons in the first place. Confirm `https://mymachina.app` shows the landing page signed-out
       in a private window first. An unchanged resubmit burns a review cycle.
       Do 25a first or the fourth reason simply comes back on its own. Nothing
       else depends on this review: it gates only whether the custom **logo**
@@ -1010,8 +1021,15 @@ The multi-user auth work described below **was** fully written but not live:
     `mymachina.app` — a Vercel rewrite of `/__/auth/*` to the Firebase host, the
     same pattern as `/s`. **Deliberately not bundled with the 2026-08-06 domain
     ship:** get this wrong and sign-in breaks for every user on every platform,
-    so it needs its own device verification. Cosmetic only — the consent screen's
-    text already says Machina.
+    so it needs its own device verification. ⚠️ **The "cosmetic only" claim that
+    used to end this item was WRONG — corrected 2026-08-21 from an owner
+    screenshot.** The Google account chooser reads *"to continue to
+    **secondbrain-app-94da2.firebaseapp.com**"*, not "Machina": with the OAuth
+    branding unset/unverified, Google falls back to the redirect host, which is
+    the `authDomain`. So the project id is user-visible at the single moment a
+    new user decides whether to trust the app. Fix order: **OAuth consent-screen
+    App name first** (free, minutes, likely sufficient on its own), then 25a/25b
+    if it still shows a host, and only then this item for the address bar.
 
 23. **[ ] Give the app real routes (`/ask`, `/collections`, …).** The entire app
     is ONE route: `web/app/page.tsx:149` holds a `feedTab` state
@@ -1353,6 +1371,64 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-08-21 — the OAuth branding rejection, diagnosed and fixed at the source.**
+  Owner screenshot: the Google account chooser reads *"to continue to
+  secondbrain-app-94da2.firebaseapp.com"*. Cause: branding verification is
+  REJECTED, so Google ignores the configured app name (which is correctly
+  `Machina`) and falls back to the redirect host. Task 24's "cosmetic only —
+  the consent screen already says Machina" was therefore **wrong**, and is
+  corrected in place. Owner cleared three of the four rejection reasons this
+  session (domain ownership via Search Console, plus repointing the home-page
+  URL); the fourth, *"your home page does not explain the purpose of your
+  app"*, was still live. Two findings from reading the LIVE page as a crawler:
+  (1) **`https://mymachina.app/` serves 33 characters without JS** —
+  "Machina Machina Starting Machina…", the app shell — so a JS-less reviewer
+  sees a splash screen, not a home page; `/welcome` serves the full 8,587
+  characters and is the correct home-page URL. (2) The page never said the
+  plain **"Machina is a ___ that ___"** — every line is narrative or tagline,
+  which is exactly the complaint. Fixed by leading the GatherScene resolve
+  paragraph with two sentences naming the category ("a personal knowledge
+  base", D-3 clean) and the payoff, owner-reviewed; the owner rejected a first
+  draft that explained what Google sign-in accesses, on the grounds that the
+  section is about value, not sign-in mechanics — and the data explanation
+  already lives at `/privacy`, linked in the footer. **Also fixed a live bug
+  found on the way:** the capture stepper shipped `Step 1 of 5: undefined` in
+  its `role="status"` sr-only line — `Math.min(step, len-1)` never clamped the
+  lower bound, so the pre-animation `step = -1` indexed off the array; screen
+  readers announced "undefined" and crawlers read it. Verified: `tsc` exit 0;
+  the new copy renders with no horizontal scroll at 1280px and 375px (12 lines,
+  293px of an 812px viewport on mobile); zero occurrences of "undefined"; no
+  D-3 words. **NOT verified here:** the scroll-driven cross-fade in motion —
+  the Browser pane cannot window-scroll (known quirk), so the paragraph growing
+  from ~5 to 9 lines wants one look on device. WEB ONLY — Vercel, no iOS build.
+
+
+- **2026-08-21 — one model everywhere, and the Ask fallback becomes a real
+  fallback.** Owner question: which Gemini model runs the app? Answer, verified
+  by grep across the whole repo: **`gemini-3.1-flash-lite` for every generative
+  surface** — analysis, vision, graph, synthesis, and Ask (buffered *and*
+  streaming) — plus `gemini-embedding-001` for vectors. Nothing at runtime
+  needed changing; two things around it did. (1) **The Ask fallback rung was
+  dead weight.** Since 2026-07-24, when the 404-ing `gemini-3.1-flash` tier was
+  pinned back to flash-lite, the rung beneath it still read
+  `GEMINI_ANALYSIS_MODEL` — the same id — so every "fallback" re-ran the call
+  that had just failed and logged the failed model as its own rescuer. New
+  `GEMINI_FALLBACK_MODEL = "gemini-3.5-flash-lite"` (owner-supplied id) now
+  backs both ask paths; the paraphrase and headline-only rungs stay on the
+  primary tier because what changes there is the PROMPT, not the model.
+  **The id was verified before it landed** — the exact check missing in July:
+  present in ListModels with `generateContent` support, and HTTP 200 on Ask's
+  real call shape (`response_schema` + the BLOCK_NONE safety settings) against
+  the project's own key. A new test pins `FALLBACK != ASK` so the rung cannot
+  silently rot back into a duplicate retry. (2) `tools/retag_language_mismatch.py`
+  (launch task 21) hardcoded `gemini-2.5-flash` — it now imports
+  `GEMINI_ANALYSIS_MODEL`, so the cleanup rewrites tags on the same model that
+  wrote the cards. Verified: `py_compile` clean, 623/623 tests pass (the 7 that
+  asserted the old ladder were updated, not deleted), both constants resolve in
+  the real venv. **BACKEND ONLY — needs a functions deploy, no iOS build.**
+  Also this session: the owner set the **GCP budget alert at ₪50** (task 19,
+  launch-gate item 5) — off the list.
 
 - **2026-08-08 — landing round 16: the capture stepper becomes the app's own,
   plus three copy/motion refinements.** (1) The CaptureScene pipeline was a

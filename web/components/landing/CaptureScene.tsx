@@ -171,7 +171,7 @@ export default function CaptureScene() {
                     </ol>
 
                     <p className="sr-only" role="status">
-                        {done ? 'Save complete.' : `Step ${Math.max(1, step + 1)} of ${source.steps.length}: ${source.steps[Math.min(step, source.steps.length - 1)]}`}
+                        {done ? 'Save complete.' : `Step ${Math.max(1, step + 1)} of ${source.steps.length}: ${source.steps[Math.min(Math.max(step, 0), source.steps.length - 1)]}`}
                     </p>
                 </div>
 
