@@ -28,11 +28,6 @@ import { useSceneProgress } from './hooks';
  * only the gesture is lost. Both headings and both paragraphs are real text in
  * the markup either way, which is what the review requirement actually needs.
  */
-/* The chip row wraps on a phone; the two long silo labels get short forms so
-   five chips read as one line of objects, not two lines of prose. */
-const TALLY_LABELS: Record<string, string> = {
-    'Open tabs': 'Tabs',
-};
 const TALLY_TOTAL = SILOS.reduce((n, s) => n + s.count, 0);
 
 export default function GatherScene() {
@@ -126,9 +121,9 @@ export default function GatherScene() {
                             You never remember where you saved it.
                         </h2>
                         <p className="mx-auto mt-5 max-w-lg text-[15px] leading-relaxed text-text-secondary text-pretty sm:text-base">
-                            A recipe goes into Instagram saves. A thread gets bookmarked on X. A
-                            video lands in Watch Later, a post gets saved on LinkedIn, and one
-                            more tab stays open on your phone for a month.
+                            A recipe goes into Instagram saves. A thread gets bookmarked on X.
+                            A video lands in Watch Later, and a post disappears into your
+                            LinkedIn saves.
                         </p>
                     </div>
 
@@ -166,11 +161,17 @@ export default function GatherScene() {
                                     className="mx-tally-chip"
                                     style={{ ['--ti' as string]: 0.12 + i * 0.13 }}
                                 >
-                                    <span className="mx-tally-face flex items-center gap-1 rounded-full border border-border-subtle bg-card px-2 py-0.5 shadow-[var(--shadow-card)] sm:gap-1.5 sm:px-2.5 sm:py-1">
-                                        <KindMark kind={s.kind} className="h-3 w-3 shrink-0" />
-                                        <span className="text-[10px] font-medium text-text sm:text-[11px]">
-                                            {TALLY_LABELS[s.label] ?? s.label}
-                                        </span>
+                                    {/* Icon-only (owner call, round 17e): every
+                                        pile is a recognizable brand mark now, so
+                                        the names were repetition — X's worst of
+                                        all, an X glyph labelled "X". The name
+                                        stays for screen readers. */}
+                                    <span
+                                        className="mx-tally-face flex items-center gap-1.5 rounded-full border border-border-subtle bg-card px-2.5 py-1 shadow-[var(--shadow-card)]"
+                                        title={s.label}
+                                    >
+                                        <KindMark kind={s.kind} className="h-4 w-4 shrink-0" />
+                                        <span className="sr-only">{s.label}</span>
                                         <span className="rounded-full bg-fill-subtle px-1.5 text-[10px] tabular-nums text-text-secondary">
                                             {s.count}
                                         </span>
