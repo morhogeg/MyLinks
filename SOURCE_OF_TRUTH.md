@@ -1537,7 +1537,13 @@ exact-match, capped.
   great!!"):** LinkedIn replaces the Messages-to-self pile — one SILOS entry
   drives the problem card, the gather, and the tally chip together; the sum
   recomputes to 145; "Open tabs" kept (its paragraph line is the most
-  relatable beat). Merge `255af7e`, live-verified.
+  relatable beat). Merge `255af7e`, live-verified. **Round 17e reversed that
+  keep:** owner cut Open tabs from the whole scene (card, gather, chip,
+  paragraph line — four piles now, diamond field, LinkedIn bottom-center) and
+  the chips went **icon-only** (every pile is a brand mark, so labels were
+  repetition — X's glyph was labelled "X"; names stay sr-only + tooltip).
+  Sum recomputes to 97. Merge `8d126cb`, verified at 375px: four chips in one
+  row, counts as the only visible chip text.
 
 
 - **2026-08-23 — one model everywhere, and the Ask fallback becomes a real
