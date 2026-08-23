@@ -395,6 +395,19 @@ The multi-user auth work described below **was** fully written but not live:
 > 3. **App Store Connect data entry** — tasks **8**, **9** + BRANDING **A-2**/
 >    **A-4**: nutrition label, metadata, 6 screenshots (shoot post-rename), demo
 >    account (**now creatable — it was blocked on the cutover**) + review notes.
+>    **The copy half is now done and compliance-checked** (2026-08-23,
+>    `docs/APP_STORE.md` **§2.1**): every field re-counted, keywords taken from
+>    94 to a full 100, third-party marks and the unshippable browser extension
+>    removed from the description, and the guideline checks (2.3.1/2.3.7/2.3.10,
+>    4.8, 5.1.1(v), age rating, export compliance) recorded with evidence. **Two
+>    hard blockers left that are not copy:** the §3 demo account is still
+>    `REVIEWER_EMAIL_TBD` (App Review rejects an account-gated app without
+>    working credentials) and the screenshots are unshot. ⚠️ **And one trap:**
+>    the storefront now promises *"never used to train anyone's models"*, which
+>    is only true on the paid Gemini tier — the pending key rotation (task 5)
+>    **must mint into project `gen-lang-client-0057642876`** or that sentence
+>    becomes a misrepresentation on the App Store, `/privacy` and the landing
+>    page simultaneously.
 > 4. **On-device sweep** — task **11**, plus the Settings "Done" safe-area fix,
 >    which has still never been in a TestFlight build (see item 11a1).
 > 5. **Cost/key hygiene** — tasks **5** (rotate the Gemini key *into the paid
@@ -1576,6 +1589,38 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-08-23 — App Store copy reviewed against Apple's actual requirements.
+  DOCS ONLY — no app code, nothing to deploy.** Follow-on to the same day's A-5
+  sweep. Every field was re-counted from the strings as written rather than
+  trusted: Name 22/30, Subtitle 22/30, promo 143/170, description 1402/4000 all
+  fine, but **the keywords field was 94/100 while the doc claimed 98** — six
+  idle characters, and the rule text underneath claimed `research` and `links`
+  had been "bought" when neither was in the field. Since Apple only forms search
+  phrases from tokens actually present, **"save links" — the product's most
+  obvious query — was never being formed**; `links` is now in and the field is a
+  full 100/100. Copy fixes: the share-sheet bullet named **YouTube and X**
+  (guideline 2.3.7, third-party marks) and now reads "Safari, or any app with a
+  Share button", which is broader and true; "the part that feels like magic" and
+  "Semantic search" (cliché, jargon) are gone. Verified with evidence rather
+  than asserted: **age rating 4+** holds because saved links open in Safari via
+  `window.open` (`web/lib/share.ts:56`) — there is no in-app browser;
+  **export compliance** is already declared (`Info.plist:52`,
+  `ITSAppUsesNonExemptEncryption=false`, correct for HTTPS-only); **4.8** and
+  **5.1.1(v)** are satisfied in the shipped build. Recorded as **§2.1** in
+  `docs/APP_STORE.md` so it is auditable at submission. ⚠️ **The one finding
+  that can turn good copy into a misrepresentation:** the description's
+  *"never used to train anyone's models"* is true only on the paid Gemini tier,
+  and the guarantee is **per Cloud project** — so the pending key rotation
+  (§4 task 5) has to mint into `gen-lang-client-0057642876` or the claim breaks
+  on three surfaces at once. Also flagged: the listing is **English-only while
+  the app is fully bilingual**, and each localization gets its own 100-char
+  keyword field, so a Hebrew listing is purely additive ASO — a draft
+  (name/subtitle/keywords/promo) is in §2.1 for the owner, who is the native
+  speaker, to correct. **NOT verified here:** no code changed, nothing was
+  type-checked or rendered. **Still owner-only:** the §3 demo account
+  (`REVIEWER_EMAIL_TBD` — a hard submission blocker), the App Review contact
+  fields, and the screenshots (A-4).
 
 - **2026-08-23 — the launch-copy sweep (BRANDING A-5), and the tagline held.
   DOCS + README ONLY — no app code, nothing to deploy.** Owner asked whether

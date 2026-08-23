@@ -88,18 +88,25 @@ the subtitle?" is the obvious question, and the answer is not obvious.
 **Keywords** (comma-separated, no spaces after commas):
 
 ```
-second brain,read later,bookmarks,ai summary,knowledge base,notes,pkm,summarize,organize,video
+second brain,read later,bookmarks,ai summary,knowledge base,notes,pkm,summarize,organize,links,video
 ```
 
-98/100 chars. Rules that shaped this list:
+**100/100 chars** — recounted 2026-08-23; the doc had claimed 98 and the field
+was actually 94, so six characters were sitting unused. Rules that shaped this
+list:
 
 - **Never repeat a word already in the Name or Subtitle** — Apple indexes those
   fields and builds search phrases by combining tokens across all of them. The
   name supplies `machina`, `save`, `recall`; the subtitle supplies `capture`,
   `ask`, `connect`. That is why `save links` and `recall` were dropped from
   this field (they were here when the name was `Machina AI`) — `save` + `links`
-  still forms the phrase for free. The reclaimed characters bought `summarize`,
-  `organize`, `research`, and `links`.
+  still forms the phrase for free — **except it did not**, which the 2026-08-23
+  recount caught: Apple builds phrases from tokens that are *present* in some
+  field, and `links` was in none of them, so "save links" was never being
+  formed. `links` is now in the field — that is exactly what the six unused
+  characters bought, and `video` keeps its slot. `research` is named in this
+  rule as having been bought and never was: it is not in the field, and at
+  100/100 there is no longer room for it.
 - **The subtitle must not repeat `save` or `recall`.** Both are Name tokens, and
   a token indexed twice buys nothing while costing subtitle characters. This is
   why the subtitle opens on `Capture` rather than the more obvious `Save`, and
@@ -123,21 +130,21 @@ second brain,read later,bookmarks,ai summary,knowledge base,notes,pkm,summarize,
 > looks at the screenshot — and turns each save into a clean card with a real
 > summary, category, tags, and connections to things you saved before.
 >
-> Then comes the part that feels like magic: ask your saves a question.
-> "What did I save about mortgage rates?" Machina answers in plain language,
-> with citations that jump back to your own sources.
+> And because it read all of it, you can just ask. "What did I save about
+> mortgage rates?" Machina answers in plain language, with citations that jump
+> back to your own sources.
 >
 > CAPTURE FROM ANYWHERE
-> • iOS share sheet — save from Safari, YouTube, X, anywhere
+> • iOS share sheet — save from Safari, or any app with a Share button
 > • Web app on your computer — paste a link, drop in a screenshot, jot a note
 >
 > UNDERSTAND WHAT YOU SAVED
 > • A real summary, a category, and tags on every save — written, not scraped
 > • "See also" connections between related saves
-> • Semantic search that finds meaning, not just keywords
+> • Search that finds what you meant, not just the words you typed
 >
 > COME BACK TO IT
-> • Ask Machina — cited answers from your own knowledge
+> • Ask Machina — questions answered from your own saves, with citations
 > • Weekly synthesis — themes and standouts from your week's saves
 > • Reminders and digests, on your schedule
 > • Collections you can keep private or publish as a shareable page
@@ -173,6 +180,80 @@ before editing it:**
 no sexual content, no profanity, no horror, no gambling/contests, no drugs, no
 unrestricted web access — Machina renders extracted article text, not a general
 browser, and no user-to-user interaction). Result: **4+**.
+
+### 2.1 Compliance check — run 2026-08-23 (copy + metadata only)
+
+Every field re-counted from the strings actually written above, not from the
+numbers this doc used to claim (two of which were wrong — see the keyword rule).
+
+| Field | Limit | Used | |
+|---|---|---|---|
+| Name `Machina: Save & Recall` | 30 | 22 | ✅ |
+| Subtitle `Capture. Ask. Connect.` | 30 | 22 | ✅ |
+| Keywords | 100 | **100** | ✅ (was 94 — six characters were idle) |
+| Promotional text | 170 | 143 | ✅ |
+| Description | 4000 | 1402 | ✅ — deliberately short; length is not a ranking signal (only the keywords field is indexed), and the first ~3 lines are all most people read before "more" |
+
+**Guideline checks — verified against the copy as written:**
+
+- **2.3.1 / 2.3.12 (accurate metadata).** Every feature named in the description
+  ships: share sheet, web capture, summary/category/tags, "See also", meaning
+  search, Ask with citations, weekly synthesis, reminders + digests, public
+  collections. The **browser extension was removed** from the capture list on
+  2026-08-23 — it installs load-unpacked only, so promising it here was a claim
+  a reviewer could test and fail.
+- **2.3.7 (third-party trademarks).** The share-sheet bullet named `YouTube` and
+  `X`; both are gone. It now reads "Safari, or any app with a Share button" —
+  Safari is Apple's own, the claim is broader and true, and no other company's
+  mark appears in any field. The keywords field carries no competitor names.
+- **2.3.10 (references to other platforms).** No Android, no Google Play, no
+  "also available on…". The web app is named, which is not a *mobile* platform
+  and is standard.
+- **4.8 (Sign in with Apple).** Third-party sign-in is offered (Google), so
+  Sign in with Apple is mandatory — it ships, and the description names both.
+- **5.1.1(v) (account deletion).** In-app deletion exists (Settings → Delete
+  account) and the description says so.
+- **5.1.1 / privacy claims.** *"your content is never used to train anyone's
+  models"* is **substantiated, not aspirational**: the Gemini Developer API's
+  terms split by tier, and the owner confirmed **paid tier** (Tier 1, project
+  `gen-lang-client-0057642876`, real daily spend) — see the 2026-08 §9 entry in
+  `SOURCE_OF_TRUTH.md`. ⚠️ **The guarantee is per Cloud project**, so the
+  pending Gemini key rotation (§4 task 5) must mint into **that same project**
+  or this sentence silently becomes false on the storefront, in `/privacy`, and
+  on the landing page. That is the one open item that could turn good copy into
+  a misrepresentation.
+- **Age rating 4+ — "unrestricted web access: No" is defensible.** Verified in
+  code: opening a saved link calls `window.open(url, '_blank')`, which on the
+  native shell hands off to **Safari** (`web/lib/share.ts:56`). There is no
+  in-app browser, and the reading view renders extracted text, not live pages.
+- **Export compliance.** `ITSAppUsesNonExemptEncryption = false` is already in
+  `web/ios/App/App/Info.plist:52` — correct for an HTTPS-only app, and it is
+  what stops App Store Connect asking at every upload.
+
+**Open, and owner-only:**
+
+1. **The demo account in §3 is still `REVIEWER_EMAIL_TBD` / `PASSWORD_TBD`.**
+   This is a hard submission blocker — App Review rejects an account-gated app
+   with no working credentials. It is creatable now (the cutover is done).
+2. **App Review contact** (first/last name, phone, email) on the version page —
+   not tracked anywhere in this doc; fill it at submission.
+3. **Hebrew localization of the listing — the largest remaining ASO gap.** The
+   app is fully bilingual and RTL-hardened, but the listing is English-only, so
+   Hebrew queries index nothing. App Store Connect gives each localization its
+   **own 100-character keyword field**, so this is purely additive — it cannot
+   cost the English ranking. Draft below; **the owner is the native speaker and
+   should treat this as a starting point, not finished copy.**
+
+   | Field | Draft (he) |
+   |---|---|
+   | Name | `Machina — שמירה ושליפה` |
+   | Subtitle | `לשמור. לשאול. לחבר.` |
+   | Keywords | `מוח שני,סימניות,לקרוא אחר כך,בסיס ידע,סיכום,פתקים,ארגון,קישורים,מאמרים,שמירה` |
+   | Promo | `מקום אחד לכל מה ששמרת — קישורים, צילומי מסך וסרטונים, מכל אפליקציה. Machina קוראת את הכול, כדי שתמצא הכול אחר כך פשוט בשאלה.` |
+
+   Note the D-3 rule still applies per-language: `מוח שני` ("second brain") is
+   in the **keywords field only** and must not reach the Hebrew subtitle,
+   promo text, or description.
 
 ## 3. App Review notes (paste into "Notes" on the version page)
 
