@@ -54,7 +54,7 @@ export interface DemoCard {
  *  Offsets are a wide shallow ellipse in `vmin`; `landing.css` scales the
  *  field by `--rs` on small screens. */
 export const SILOS: {
-    kind: DemoKind | 'whatsapp' | 'safari';
+    kind: DemoKind | 'linkedin' | 'safari';
     label: string;
     count: number;
     x: string;
@@ -63,7 +63,7 @@ export const SILOS: {
     { kind: 'instagram', label: 'Instagram', count: 24, x: '-33vmin', y: '-11vmin' },
     { kind: 'x', label: 'X', count: 32, x: '-3vmin', y: '-19vmin' },
     { kind: 'youtube', label: 'YouTube', count: 15, x: '32vmin', y: '-9vmin' },
-    { kind: 'whatsapp', label: 'Messages to self', count: 59, x: '-23vmin', y: '13vmin' },
+    { kind: 'linkedin', label: 'LinkedIn', count: 26, x: '-23vmin', y: '13vmin' },
     { kind: 'safari', label: 'Open tabs', count: 48, x: '25vmin', y: '16vmin' },
 ];
 

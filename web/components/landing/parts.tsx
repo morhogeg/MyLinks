@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, type ComponentProps } from 'react';
-import { Globe, Image as ImageIcon, StickyNote, MessageCircle, Compass, Clock } from 'lucide-react';
+import { Globe, Image as ImageIcon, StickyNote, Compass, Clock } from 'lucide-react';
 import SourceByline from '@/components/SourceByline';
 import CitationMark from '@/components/ui/CitationMark';
 import { CitationGlyph } from '@/components/ui/Wordmark';
@@ -56,16 +56,16 @@ export function LiveMark({ size = 24, className = '', ...rest }: ComponentProps<
  * weight on a marketing page. This is the card at rest, exactly as it looks.
  */
 
-const PLATFORM_KINDS = new Set<DemoKind>(['instagram', 'x', 'youtube']);
+const PLATFORM_KINDS = new Set<PlatformKey>(['instagram', 'x', 'youtube', 'linkedin']);
 
 /** The mark for a save's origin, tinted with that platform's own colour. Used
  *  by the citation chips and the silo cards, not by CardView (SourceByline
  *  draws its own marks there). */
 export function KindMark({ kind, className = 'w-3.5 h-3.5' }: {
-    kind: DemoKind | 'whatsapp' | 'safari';
+    kind: DemoKind | 'linkedin' | 'safari';
     className?: string;
 }) {
-    if (PLATFORM_KINDS.has(kind as DemoKind)) {
+    if (PLATFORM_KINDS.has(kind as PlatformKey)) {
         const key = kind as PlatformKey;
         return (
             <span style={{ color: platformColor(key) }} className="inline-flex">
@@ -76,9 +76,8 @@ export function KindMark({ kind, className = 'w-3.5 h-3.5' }: {
     const Icon =
         kind === 'shot' ? ImageIcon
             : kind === 'note' ? StickyNote
-                : kind === 'whatsapp' ? MessageCircle
-                    : kind === 'safari' ? Compass
-                        : Globe;
+                : kind === 'safari' ? Compass
+                    : Globe;
     return <Icon className={`${className} text-text-muted`} aria-hidden />;
 }
 
