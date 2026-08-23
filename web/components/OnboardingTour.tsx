@@ -8,7 +8,6 @@ import {
     ArrowUp,
     Plus,
     Share,
-    Puzzle,
     Link2,
     MessageCircleQuestion,
     Bell,
@@ -83,7 +82,7 @@ function ShareTile({ icon, label }: { icon: ReactNode; label: string }) {
     );
 }
 
-/** iOS share-sheet row (native) / browser-clipper (web) — Machina highlighted. */
+/** iOS share-sheet row (native) / in-app capture (web) — Machina highlighted. */
 function CaptureMock({ native }: { native: boolean }) {
     return (
         <div className="w-full rounded-2xl bg-card border border-border-subtle shadow-xl p-4" aria-hidden>
@@ -289,12 +288,12 @@ function ReadyMock() {
 function buildSteps(native: boolean): Step[] {
     return [
         {
-            icon: native ? <Share className="w-4 h-4" /> : <Puzzle className="w-4 h-4" />,
+            icon: native ? <Share className="w-4 h-4" /> : <Plus className="w-4 h-4" />,
             eyebrow: 'Capture',
             title: 'Save anything, from anywhere',
             body: native
                 ? 'Links, screenshots, images, or a quick note — share them to Machina from any app, or capture right here. No copy-paste, no switching apps.'
-                : 'Links, images, or a quick note — clip any page with the Machina button in your browser, or capture right here. No copy-paste, no switching tabs.',
+                : 'Links, images, or a quick note — paste a URL, add a screenshot, or jot a thought. Tap + and it lands here as a card, whatever it started as.',
             visual: <CaptureMock native={native} />,
         },
         {
