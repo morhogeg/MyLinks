@@ -2,10 +2,13 @@
 
 **Everything you save, finally useful.**
 
-Machina captures links and images from wherever you find them, reads and
-analyzes them with AI, and turns the pile into a knowledge base you can actually
-query. The hero is the **Recall Engine**: ask a question in plain language and get
-a cited answer drawn from your own saves.
+You save things in a dozen different places — Instagram saves, X bookmarks,
+Watch Later, LinkedIn, a tab you meant to come back to — and then you never
+remember where you put it. **Machina is one place that holds everything you
+save**, and it actually reads what lands there: every save becomes a card with a
+real summary, a category, tags, and connections to what you saved before.
+
+Because it read them, you can ask.
 
 > "What did I save about mortgage rates?" → a written answer, with the exact cards
 > it came from.
@@ -18,11 +21,13 @@ a cited answer drawn from your own saves.
 
 - **iOS share sheet** — a native Share Extension saves links, text, and images
   straight into your library from any app.
-- **In-app add** — paste a URL or upload an image (screenshots included — the AI
-  reads them).
+- **In-app add** — paste a URL or upload an image (screenshots included — it
+  reads those too).
 - **Browser extension** — one-click capture from Chrome, Edge, and Brave, plus a
   Safari build via a native wrapper. It's a thin client that POSTs to the same
-  ingest endpoint the share sheet uses.
+  ingest endpoint the share sheet uses. **Not published to any web store** — it
+  installs load-unpacked (`extension/README.md`), so it is not a surface user-facing
+  launch copy may promise.
 
 Everything lands on the same backend, which scrapes the content, analyzes it, and
 syncs the finished card back to your feed in real time.
@@ -44,7 +49,7 @@ syncs the finished card back to your feed in real time.
 - **Curated digests** — a scheduled, hand-picked batch of cards in six modes
   (smart mix, surprise, by topic, backlog, favorites, rediscover), delivered via
   push or email on your schedule.
-- **Weekly synthesis** — an AI-written recap of the week's saves: themes, a
+- **Weekly synthesis** — a written recap of the week's saves: themes, a
   standout, an open question, all cited back to your content.
 - **Collections + public share pages** — group cards and publish server-rendered,
   OG-tagged pages to share a set or a single card.

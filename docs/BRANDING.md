@@ -417,7 +417,9 @@ finding dissolves.
 | **A-1** | **Trademark search for "Machina"** — ☑ **CLOSED 2026-08-23.** Search run (findings in C-2); owner reviewed the one live conflict (Ionic Security, US cl 9/42, likely lapsing 2027) and accepted the risk. Tickler: re-check TSDR 6278707 after Feb 2027. | Owner | — | ☑ done |
 | **A-2** | Enter the D-2 Name/Subtitle and the D-3 keywords into App Store Connect. Values are in `docs/APP_STORE.md` §2. | Owner | §4 task 8 | ☐ open |
 | ~~**A-3**~~ | ~~Decide Q-1 (the AI-powered tagline).~~ **DONE 2026-08-02** — D-6 settled it; landed in `layout.tsx`, `manifest.json`, `README.md` (which also cleared a D-3 `ai` violation) and the §8 Product Hunt slot. The launch film's endcard already carried the line. | — | — | ☑ done |
-| **A-5** | **Re-check every §8 launch asset against D-1/D-2/D-3 and Q-4** before launch week: no "Machina AI" anywhere, no "bookmarks" as a self-description (Q-5), and a hero consistent with whatever Q-4 settles on. The assets were written when the app was still called Machina AI. | Owner / next session | Launch week | ☐ open |
+| **A-5** | **Re-check every §8 launch asset against D-1/D-2/D-3 and Q-4.** ☑ **CLOSED 2026-08-23** — swept, and it reached wider than §8: the public `README.md` lead and the App Store description/promo text were violating too. What changed and what was found is the §6 entry below. **Copy only** — the screenshots it depends on are still A-4. | Owner / next session | Launch week | ☑ done |
+| **A-6** | **Reserve the X handle** (`@machina_app` or nearest) — free, and defensive against squatting on a launched app's name. **Do NOT open the channel** until there is a commitment to post 2–3×/week; a build-in-public account that starts on launch day is worse than none. Reasoning and the pre-launch work order in `SOURCE_OF_TRUTH.md` §8 (2026-08-23 sequencing note). | Owner | — | ☐ open |
+| **A-7** | **Put an App Store badge + a beta/waitlist link on `mymachina.app`.** The launch film and every asset above end on a CTA that currently has nowhere to go. Blocks the film being useful at all. | Owner / next session | Launch week | ☐ open |
 | **A-4** | Rebuild any store/marketing screenshot that shows the old "Machina AI" label. The §4 task 9 shot-list has not been shot yet, so this is a "shoot it right", not a redo. | Owner | §4 task 9 | ☐ open |
 
 ---
@@ -426,6 +428,51 @@ finding dissolves.
 
 > Newest first. One entry per conversation; conclusions belong in §1–§5, this is
 > the narrative of how they were reached.
+
+- **2026-08-23 — the tagline holds, and A-5's sweep ran (and found more than
+  §8).** Owner asked two things: is `Everything you save, finally useful.` still
+  the right line, and should the app have an X account. **The tagline stays** —
+  the critique recorded, since it will come back: it makes a promise instead of
+  narrating a mechanism (which is why it beat the two rejected candidates), and
+  its first clause is D-7's hero, but its **last word is its weakest**, which
+  matters because D-2's own reasoning says the final position carries the weight.
+  "Useful" is abstract where the film's best beat is concrete (five piles
+  becoming one library), so `finally together` / `finally in one place` would
+  name the gathering — at the cost of the breadth that let this line survive a
+  three-way hero fight it was written before. **Not reopened**, on switching cost:
+  it is live on six surfaces including the film endcard and the share-page footer.
+  Parked as a post-launch product-page A/B alongside **Q-2**.
+  **On X:** advice was reserve-the-handle-now, open-the-channel-later (**A-6**),
+  on the grounds that the compounding assets for a solo founder are the App Store
+  page and the product's own share pages, not a feed. Owner has not decided; the
+  work order is in §8.
+  **The sweep (A-5) then ran, and the assets were not the only offenders:**
+  - **`README.md` — two live violations**, on the most public non-app surface
+    there is. Its lead said *"reads and analyzes them with AI"* (**D-3**) and
+    *"The hero is the **Recall Engine**"* (**D-7**, verbatim the position D-7
+    superseded). A-3 had claimed the README was cleared; it was cleared in the
+    tagline slot only. Rewritten to open on the fragmentation problem and the
+    one-place promise, with Ask arriving after ("Because it read them, you can
+    ask"). The tech-stack table keeps the word Gemini — that is engineering
+    documentation, not a claim about what the product is, and D-3 governs
+    marketing surfaces.
+  - **App Store description — `AI` twice**, in the summaries bullet and in the
+    privacy promise. Both paraphrased; the privacy line now reads *"train
+    anyone's models"*, matching `LandingPage.tsx`, which is the stronger claim
+    anyway because it covers Google as well as us. Its opening also moved from
+    clutter (*"never look at them again"*) to fragmentation.
+  - **The browser extension was being promised on the storefront and in the X
+    CTA**, and it installs load-unpacked only — no web-store listing exists. That
+    is a claim an App Store reviewer can test. Removed from both; the README
+    bullet now says so explicitly, so the next session cannot re-promise it by
+    accident.
+  - **§8's assets were reordered, not just scrubbed**: the thread now opens on
+    "I could never remember where I'd saved anything", Ask moved from post 1 to
+    post 4 and arrives as the consequence of the reading, and the Product Hunt
+    first comment — which had been a described sketch that "still leads on Ask" —
+    was written out properly. `SOURCE_OF_TRUTH.md` §1's positioning statement was
+    the root of the drift (it still named the Recall Engine as hero) and was
+    corrected at the source.
 
 - **2026-08-02 — The app gets a tagline, and it is the owner's line.** Owner
   proposed **"Everything you save, finally useful."** while asking what was left

@@ -35,10 +35,15 @@ extension) → Python Cloud Function scrapes + Gemini analyzes → a structured 
 feed with semantic search, RAG chat ("Ask Machina"), spaced-repetition reminders,
 curated digests, weekly AI synthesis, and collections.
 
-**Positioning (from the product review):** the hero is the **Recall Engine** —
-"ask your own knowledge and get a cited answer" — backed by the widest capture
-surface in the category and a knowledge graph computed on every save. The path to
-"Apple would ship this" is subtraction, trust, and focus — not more features.
+**Positioning:** the hero is **one place that holds everything you save**
+(`docs/BRANDING.md` **D-7**, 2026-08-06) — the fragmentation story, *"you never
+remember where you saved it"*. The **Recall Engine** ("ask your own knowledge and
+get a cited answer") is the **payoff, not the lead**; the knowledge graph
+computed on every save is the moat. ~~The hero is the Recall Engine~~ — that was
+this paragraph until 2026-08-23, taken from the product review and superseded by
+D-7 (via D-5); it is the sentence every §8 asset was drifting toward, which is
+why the drift is corrected here at the source. The path to "Apple would ship
+this" is subtraction, trust, and focus — not more features.
 
 **Product grade trajectory:** review scored it ~7.5/10 (2026-07-01). Phase 1
 (trust + name) and Phase 2 (reveal the magic + cut sprawl) of the product spec are
@@ -402,9 +407,18 @@ The multi-user auth work described below **was** fully written but not live:
     plus PITR/backups and the uptime check.
 > 6. **Unverified, close before launch** — **4b** (a weekly synthesis has still
 >    never been proven to generate end-to-end), **4c**, **21**.
-> 7. **Marketing coherence** — BRANDING **Q-4** (the hero is still contested three
->    ways) and **A-5** (every §8 asset leads on Ask). ~~Q-1/Q-5, the tagline~~ —
->    **closed 2026-08-02 by D-6**, see §9.
+> 7. **Marketing coherence** — ~~BRANDING **Q-4** (the hero is still contested
+>    three ways) and **A-5** (every §8 asset leads on Ask)~~ — **Q-4 closed
+>    2026-08-06 by D-7** (the hero is consolidated capture); **A-5 closed
+>    2026-08-23**, the copy sweep is done (§8 assets, the App Store
+>    description/promo, the public README, and §1's positioning statement, which
+>    was the root of the drift). ~~Q-1/Q-5, the tagline~~ — **closed 2026-08-02
+>    by D-6**, see §9. **What is left here is not copy:** BRANDING **A-4** (the
+>    six store screenshots, still unshot — the highest-converting asset that
+>    exists and it needs a device), **A-7** (an App Store badge / beta link on
+>    `mymachina.app`, so the launch film's CTA has a destination), and **A-6**
+>    (reserve the X handle). Order and reasoning: §8's 2026-08-23 sequencing
+>    note.
 >
 > Explicitly NOT gates: 11a2 (scan-phase wording drift), 11a3 (em dashes), 11d
 > (`next` upgrade / CSP), 12 (ingest-token Keychain).
@@ -1392,9 +1406,11 @@ posted to X + r/PKMS + r/ObsidianMD-adjacent communities and Hacker News "Show
 HN" — beta feedback doubles as testimonials. (3) **Launch week:** Product Hunt
 launch (Tuesday–Thursday), a Show HN, an X thread, and a 30-second screen-recorded
 demo (share → analyzed card → ask → cited answer) reused everywhere including
-TikTok/Reels/Shorts — short-form screen demos of "I asked my bookmarks a question
-and it answered with sources" are exactly what performs organically in the
-productivity niche. (4) **Ongoing:** App Store Optimization — the exact Name /
+TikTok/Reels/Shorts — short-form screen demos of "everything I save from five
+different apps lands in one place, and it read all of it" are exactly what
+performs organically in the productivity niche (the framing here said *"I asked
+my bookmarks a question"* until the 2026-08-23 sweep, which is both Q-5 and one
+step past the D-7 hero). (4) **Ongoing:** App Store Optimization — the exact Name /
 Subtitle / keywords live in `docs/APP_STORE.md` §2 and the reasoning behind them
 in `docs/BRANDING.md` (title `Machina: Save & Recall`, subtitle
 `Capture. Ask. Connect.`; **"second brain" and "ai" are keywords-field-only —
@@ -1404,54 +1420,124 @@ markets itself if you publish what it produces. Success metric for month one:
 1,000 installs, 20% week-2 retention, 50 organic shares — retention gates any
 paid spend.
 
-**Launch assets — first set (ready to adapt):**
+**Sequencing note — 2026-08-23, advice recorded, owner has not decided.** Asked
+whether the app should have an X account, the read given was: **reserve the
+handle now** (free, and squatting on a launched app's name is real), but do not
+*open* the channel until there is a commitment to post weekly — a build-in-public
+account that goes live on launch day with four posts is worse than no account,
+and step (1) above assumed a months-long cadence that has not started. The
+higher-leverage claim: for a solo founder the compounding assets are the **App
+Store product page** and the share pages the product already emits
+(`mymachina.app/s?id=…`), so the order of work before launch week is
+**(a)** the six App Store screenshots (§4 task 9 / BRANDING A-4 — still unshot,
+and the single highest-converting asset that exists), **(b)** an App Store badge
+and a beta/waitlist link on `mymachina.app` so the launch film has somewhere to
+send people, **(c)** 9:16 cuts of the launch film at 6–15s for Reels/TikTok/
+Shorts (the 67s film is a hero piece, not a feed unit — the gather beat is the
+best standalone cut), and only then **(d)** X. Product Hunt and Show HN should
+not be scheduled until the store page is live, since both funnel into it.
 
-*Announcement thread (X), post 1:*
-> I kept saving links I never looked at again. Bookmarks, WhatsApp self-messages,
-> screenshots — a graveyard.
->
-> So I built Machina: share anything to it, AI reads it, and later you just *ask*.
-> "What did I save about mortgage rates?" → answer, with sources.
->
-> Out now on iOS 🧵
+**Launch assets — SWEPT 2026-08-23 against D-1/D-3/D-6/D-7 (BRANDING A-5).**
+Every asset below now opens on **the gathering** (D-7: *one place that holds
+everything you save*) and lets **Ask arrive as the payoff**, which is the order
+the launch film and the landing page already use. Before editing any of them,
+the four rules they obey: no `AI` and no `second brain` anywhere in the copy
+(**D-3**); never call the product *bookmarks* (**Q-5** — the word may name the
+place a save is stranded, never Machina); the name is `Machina`, never
+`Machina AI` (**D-1**); and **do not promise the browser extension** — it is
+load-unpacked only, with no web-store listing (§4).
 
-*Post 2:*
-> Every save gets: a real summary, category, tags, and — the part I love —
-> connections. "3 things you saved connect to Network Effects."
+*Announcement thread (X), post 1 — the problem is fragmentation, not clutter:*
+> I could never remember where I'd saved anything.
+>
+> The recipe was in Instagram saves. The thread was in X bookmarks. The talk was
+> in Watch Later. The good post was somewhere in LinkedIn.
+>
+> So I built one place that holds all of it — and actually reads what lands
+> there. 🧵
+
+*Post 2 (what a save becomes):*
+> Share anything to Machina from any app — a link, a video, a screenshot. It
+> reads the page, watches the video, looks at the screenshot.
+>
+> What comes back is a card: a real summary, a category, tags.
+> [screenshot: a finished card]
+
+*Post 3 (the moat — Connect):*
+> The part I didn't expect to love: it tells you when two things you saved months
+> apart are about the same idea.
+>
+> "3 things you saved connect to Network Effects."
 >
 > It's not a bookmark manager. It's memory. [screenshot: connection insight]
 
-*Post 3:*
+*Post 4 (Ask — the payoff, deliberately not the lead):*
+> And because it read all of it, you can just ask.
+>
+> "What did I save about mortgage rates?" → a plain-language answer, with
+> citations that jump back to your own saves.
+>
+> [screenshot: Ask with citation chips]
+
+*Post 5 (the weekly beat):*
 > Sunday it sends a synthesis of your week's saves — themes, one standout, an
 > open question. Written from YOUR content, cited back to it.
 >
 > This is the screenshot I keep sending friends: [screenshot: weekly synthesis]
 
-*Post 4 (CTA):*
-> Free on the App Store. Save from the share sheet or your browser.
-> Ask it anything you've saved.
+*Post 6 (CTA):*
+> Free on the App Store. Save from your phone's share sheet, or from the web app
+> on your computer.
 >
-> [App Store link] — reply with what you'd ask your bookmarks 👇
+> Everything you save, finally useful.
+> [App Store link] — reply with what you'd ask your saves 👇
 
 *Show HN:*
-> **Show HN: Machina — save links from anywhere, then ask them questions (RAG
-> over your own saves)** — iOS app + web. Native share extension → Gemini
-> analysis → embeddings in Firestore → cited answers. Built solo; the interesting
-> parts were making the share extension never lie about saving, and a knowledge
-> graph computed on every save. Happy to answer questions on the stack.
+> **Show HN: Machina — one place for everything you save, that actually reads
+> it** — iOS app + web. I kept saving things into five different apps and never
+> remembering which one had the thing. Machina takes a share from any app,
+> scrapes/watches/OCRs it, and turns it into a card with a summary, tags, and
+> computed links to earlier saves — then answers questions over the whole library
+> with citations. Native share extension → Gemini analysis → embeddings in
+> Firestore. Built solo; the interesting parts were making the share extension
+> never lie about saving, and computing the knowledge graph on every save. Happy
+> to answer questions on the stack.
+>
+> *(HN is the one audience where naming the machinery helps rather than dates the
+> product — D-3 governs the storefront and the website, not a stack description
+> written for people who want the stack. The title still leads on the gathering.)*
 
 *Product Hunt:* tagline "**Everything you save, finally useful.**" — the product
 tagline (`docs/BRANDING.md` D-6), adopted here 2026-08-02, replacing
 ~~"Ask your bookmarks anything"~~ which called the product *bookmarks* (a label
-the X-thread asset above explicitly disowns) and led on Ask (open question Q-4).
-First comment covers the origin story (WhatsApp self-messages), the capture
-surface, and the free tier — note that comment still leads on Ask, and rides
-BRANDING **A-5**'s pre-launch-week sweep of every asset on this page.
+the X-thread asset above explicitly disowns) and led on Ask (Q-4, since closed by
+D-7). **First comment — written out 2026-08-23, replacing the Ask-led sketch:**
+
+> Hi PH 👋 I built Machina because I kept saving things and then losing them.
+> The recipe went into Instagram saves, the thread into X bookmarks, the talk
+> into Watch Later — and when I actually needed one of them, I had no idea which
+> app I'd put it in.
+>
+> Machina is one place that holds all of it. Share anything to it from any app
+> and it reads what you sent — the page, the video, the screenshot — and gives
+> you back a card with a real summary, a category, tags, and the connections to
+> things you saved months ago.
+>
+> Because it read everything, you can also just ask: "what did I save about
+> mortgage rates?" gets a written answer with citations back to your own cards.
+> On Sundays it writes up the week's saves — themes, a standout, an open
+> question.
+>
+> It's free on iOS and the web. No ads, no tracking, and nothing you save is used
+> to train anyone's models. I'd genuinely love to know where *your* saves go to
+> die — reply and tell me which app is the worst offender.
 
 *App Store subtitle/promo:* subtitle is `Capture. Ask. Connect.`
 (`docs/APP_STORE.md` §2; reasoning in `docs/BRANDING.md` D-2 — it opens on
-capture and ends on the knowledge graph on purpose) / promo text: "Machina reads everything you save — links, screenshots, videos — and
-answers questions from it, with sources."
+capture and ends on the knowledge graph on purpose) / promo text (swept
+2026-08-23 to lead on the gathering): "One place for everything you save —
+links, screenshots, videos, from any app. Machina reads all of it, so you can
+find it later by just asking."
 
 *Launch film (BUILT 2026-07-29):* `marketing/launch-clip/` — a 67s,
 1920×1080 film rendered from code (Remotion for picture, a dependency-free Node
@@ -1490,6 +1576,37 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-08-23 — the launch-copy sweep (BRANDING A-5), and the tagline held.
+  DOCS + README ONLY — no app code, nothing to deploy.** Owner asked whether
+  `Everything you save, finally useful.` is the right slogan and whether the app
+  needs an X account, then asked for the copy sweep. **Tagline stays** (the
+  critique is recorded in BRANDING §6 for when it comes back: strong promise,
+  correct hero in its first clause, but "useful" is the vaguest word in the line
+  and it sits in the position D-2's own reasoning says carries the weight —
+  parked as a post-launch A/B with Q-2). **On X:** reserve the handle, don't open
+  the channel until there's a weekly cadence (A-6); the pre-launch work order now
+  lives in §8. **The sweep reached wider than §8, which is the finding:** the
+  public `README.md` lead was still saying *"analyzes them with AI"* (D-3) and
+  *"the hero is the Recall Engine"* (the exact position D-7 superseded), and the
+  App Store description carried `AI` twice — in the summaries bullet and in the
+  *"never used to train AI models"* privacy promise, now *"train anyone's
+  models"* to match `LandingPage.tsx`. **Also caught: the browser extension was
+  being promised on the App Store and in the X CTA, and it has no web-store
+  listing — it installs load-unpacked only**, so that was a claim a reviewer
+  could test; removed from both, and the README bullet now states it so nobody
+  re-promises it. §8's thread was re-ordered rather than just scrubbed (opens on
+  "I could never remember where I'd saved anything"; Ask moved from post 1 to
+  post 4 and arrives as the consequence of the reading; the Product Hunt first
+  comment, previously a sketch described as still leading on Ask, is written
+  out), and §1's positioning statement — the root of the whole drift, still
+  naming the Recall Engine as hero — was corrected at the source. Verified: full
+  repo re-grep clean (no `Machina AI`, no `second brain`, no `ai` on any
+  marketing surface; the remaining hits are dated audit docs, code comments and
+  the keywords field, all deliberate per BRANDING §2). **NOT verified here:** no
+  code changed, so nothing was type-checked or rendered — this is copy. **Still
+  open and owner-only:** A-4 (the six store screenshots), A-7 (App Store badge /
+  beta link on the landing page), A-6 (the X handle).
 
 - **2026-08-23 — related-card reasons: direction by FIRST strong char, not
   letter count. SHIPPED (merge `127a5b1` → Vercel + TestFlight run #290 =

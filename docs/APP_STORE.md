@@ -82,8 +82,8 @@ the subtitle?" is the obvious question, and the answer is not obvious.
 
 **Promotional text** (170 chars, editable without review):
 
-> Machina reads everything you save — links, screenshots, videos — and answers
-> questions from it, with sources.
+> One place for everything you save — links, screenshots, videos, from any app.
+> Machina reads all of it, so you can find it later by just asking.
 
 **Keywords** (comma-separated, no spaces after commas):
 
@@ -115,8 +115,9 @@ second brain,read later,bookmarks,ai summary,knowledge base,notes,pkm,summarize,
 
 **Description:**
 
-> You save links, screenshots, and videos everywhere — then never look at them
-> again. Machina fixes the second half.
+> You save links, screenshots, and videos across a dozen different apps — then
+> never remember where you put them. Machina is the one place that holds all of
+> it.
 >
 > Share anything to Machina from any app. It reads the page, watches the video,
 > looks at the screenshot — and turns each save into a clean card with a real
@@ -128,10 +129,10 @@ second brain,read later,bookmarks,ai summary,knowledge base,notes,pkm,summarize,
 >
 > CAPTURE FROM ANYWHERE
 > • iOS share sheet — save from Safari, YouTube, X, anywhere
-> • Web app and browser extension on your computer
+> • Web app on your computer — paste a link, drop in a screenshot, jot a note
 >
 > UNDERSTAND WHAT YOU SAVED
-> • AI summaries, categories, and tags on every save
+> • A real summary, a category, and tags on every save — written, not scraped
 > • "See also" connections between related saves
 > • Semantic search that finds meaning, not just keywords
 >
@@ -142,8 +143,31 @@ second brain,read later,bookmarks,ai summary,knowledge base,notes,pkm,summarize,
 > • Collections you can keep private or publish as a shareable page
 >
 > Private by design: no ads, no tracking, and your content is never used to
-> train AI models. Sign in with Apple or Google. Delete your account — and all
+> train anyone's models. Sign in with Apple or Google. Delete your account — and all
 > your data — anytime, right from Settings.
+
+**Rules this description obeys (swept 2026-08-23 under BRANDING A-5) — read
+before editing it:**
+
+- **It opens on fragmentation, not clutter.** "…across a dozen different apps —
+  then never remember where you put them" is `BRANDING` **D-7**'s hero
+  (*one place that holds everything you save*) and the launch film's act one.
+  The previous opening — *"then never look at them again"* — was a clutter
+  story, which is the recall problem, one step further down the funnel.
+- **The word `AI` does not appear, anywhere.** D-3 restricts `ai` and
+  `second brain` to the invisible keywords field. Two occurrences were removed
+  here: the summaries bullet (now describes the output, not the machine) and
+  the training-data promise (now *"train anyone's models"*, matching
+  `web/components/LandingPage.tsx`, which is the strongest phrasing anyway —
+  it covers Google as well as us).
+- **The browser extension is NOT promised.** It exists but installs
+  load-unpacked only — there is no Chrome Web Store listing (§4 backlog). An
+  App Store description that offers a browser extension is a claim a reviewer
+  can test and a user can be disappointed by, so the capture list stops at the
+  share sheet and the web app. Put it back the day the store listing is live.
+- **The promotional text leads on the gathering too**, and it is the only field
+  here editable without a review round — so it is the cheapest place to test
+  positioning after launch (Q-2).
 
 **Age rating questionnaire:** answer **None/No to everything** (no violence,
 no sexual content, no profanity, no horror, no gambling/contests, no drugs, no
