@@ -1533,7 +1533,11 @@ exact-match, capped.
   forced-state measurement at 1280×720/1280×880/375×812: clearances all
   positive, chips 1 row desktop / 2 phone. Merge `8e2cd72`. ⚠️ The
   scroll-scrubbed chip arrival is measured, not watched (pane can't
-  window-scroll) — wants one device look.
+  window-scroll) — wants one device look. **Round 17d (owner: "this is
+  great!!"):** LinkedIn replaces the Messages-to-self pile — one SILOS entry
+  drives the problem card, the gather, and the tally chip together; the sum
+  recomputes to 145; "Open tabs" kept (its paragraph line is the most
+  relatable beat). Merge `255af7e`, live-verified.
 
 
 - **2026-08-23 — one model everywhere, and the Ask fallback becomes a real
