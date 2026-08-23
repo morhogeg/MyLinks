@@ -28,6 +28,14 @@ import { useSceneProgress } from './hooks';
  * only the gesture is lost. Both headings and both paragraphs are real text in
  * the markup either way, which is what the review requirement actually needs.
  */
+/* The chip row wraps on a phone; the two long silo labels get short forms so
+   five chips read as one line of objects, not two lines of prose. */
+const TALLY_LABELS: Record<string, string> = {
+    'Messages to self': 'Messages',
+    'Open tabs': 'Tabs',
+};
+const TALLY_TOTAL = SILOS.reduce((n, s) => n + s.count, 0);
+
 export default function GatherScene() {
     const sectionRef = useRef<HTMLElement>(null);
     const stageRef = useRef<HTMLDivElement>(null);
@@ -56,7 +64,7 @@ export default function GatherScene() {
                   * Everything the silos do now happens above the words.
                   */}
                 <div className="pointer-events-none absolute inset-0" aria-hidden>
-                    <div className="absolute left-1/2 top-[38%]">
+                    <div className="mx-field-origin absolute left-1/2 top-[38%]">
                         {SILOS.map((s) => (
                             <div
                                 key={s.label}
@@ -104,8 +112,11 @@ export default function GatherScene() {
                     and a reviewer regardless of where the scroll happens to be —
                     which is the whole reason this scene is allowed to exist on a
                     page two reviews depend on. */}
-                <div className="absolute inset-x-0 bottom-[9vh] mx-auto grid max-w-2xl place-items-center px-6 text-center">
-                    <div className="mx-copy-problem col-start-1 row-start-1">
+                <div className="mx-copy-zone absolute inset-x-0 bottom-[9vh] mx-auto grid max-w-2xl place-items-center px-6 text-center">
+                    {/* pointer-events-none: this block is pure text, and once
+                        it fades the resolve state's tally chips underneath must
+                        take the hover/tap. */}
+                    <div className="mx-copy-problem pointer-events-none col-start-1 row-start-1">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-text-muted">
                             The problem
                         </p>
@@ -129,37 +140,50 @@ export default function GatherScene() {
                         <h2 className="mt-3 text-3xl font-semibold tracking-tight text-text text-balance sm:text-5xl">
                             One place. Everything you save.
                         </h2>
-                        {/* The founder letter's line, landed (round 11) and
-                            re-worked (round 13): "swallowed" cut, "the half"
-                            cut, and the ORGANIZATION value named outright —
-                            gathering alone would just be a sixth pile; the
-                            summarize/categorize/tag/connect clause is what
-                            makes the one place useful. */}
-                        {/* Round 17: the two lead sentences exist for Google's
-                            OAuth branding review, which rejected the page for
-                            not explaining the app's purpose. Everything else
-                            here is narrative; nothing on the page said the
-                            plain "Machina is a ___ that ___". Kept in the
-                            page's voice, and D-3 clean (the category noun is
-                            "personal knowledge base", never "second brain"). */}
-                        {/* Two paragraphs, not one (owner call, round 17b):
-                            merged they read as a wall, and the definition
-                            sentence duplicated the organization clause the
-                            narrative already carries. P1 = the definition
-                            (Google's ask), P2 = the founder-letter narrative,
-                            each at the page's usual 3-5 line weight. */}
+                        {/* One sentence of prose, then the receipt. The
+                            sentence is the definition Google's OAuth branding
+                            review required ("does not explain the purpose") —
+                            it must stay real text in the markup. The
+                            founder-letter paragraph that used to follow it was
+                            cut whole (owner call, round 17c): both of its
+                            hinge sentences leaned on the same
+                            negation-then-reveal construction, and its content
+                            already lives in the hero triptych and the shelf.
+                            In its place, the argument is made with the scene's
+                            own objects: the five piles from the problem state,
+                            re-counted as one line. Each chip arrives on its
+                            own slice of --resolve, so the reader's scroll
+                            deals them out; the sum lands last. */}
                         <p className="mx-auto mt-5 max-w-lg text-[15px] leading-relaxed text-text-secondary text-pretty sm:text-base">
                             Machina is a personal knowledge base: send it a link, a screenshot
                             or a video from any app, and months later the thing you half
                             remember is one question away, answered from your own saves with
                             the sources it came from.
                         </p>
-                        <p className="mx-auto mt-4 max-w-lg text-[15px] leading-relaxed text-text-secondary text-pretty sm:text-base">
-                            You never lost any of it. It was scattered across five apps,
-                            impossible to find when it mattered. Gathered here, every save is summarized,
-                            categorized, tagged, and connected to the rest of what you know.
-                            Saving was never the hard part. Everything after it is what Machina
-                            is for.
+                        <ul className="mt-4 flex flex-wrap items-center justify-center gap-1.5 sm:mt-6 sm:gap-2">
+                            {SILOS.map((s, i) => (
+                                <li
+                                    key={s.label}
+                                    className="mx-tally-chip"
+                                    style={{ ['--ti' as string]: 0.12 + i * 0.13 }}
+                                >
+                                    <span className="mx-tally-face flex items-center gap-1 rounded-full border border-border-subtle bg-card px-2 py-0.5 shadow-[var(--shadow-card)] sm:gap-1.5 sm:px-2.5 sm:py-1">
+                                        <KindMark kind={s.kind} className="h-3 w-3 shrink-0" />
+                                        <span className="text-[10px] font-medium text-text sm:text-[11px]">
+                                            {TALLY_LABELS[s.label] ?? s.label}
+                                        </span>
+                                        <span className="rounded-full bg-fill-subtle px-1.5 text-[10px] tabular-nums text-text-secondary">
+                                            {s.count}
+                                        </span>
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
+                        <p
+                            className="mx-tally-sum mt-3 text-sm font-semibold text-text sm:mt-4 sm:text-base"
+                            style={{ ['--ti' as string]: 0.82 }}
+                        >
+                            {TALLY_TOTAL} saves. One library.
                         </p>
                     </div>
                 </div>
