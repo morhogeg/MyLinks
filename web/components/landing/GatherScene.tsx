@@ -142,11 +142,19 @@ export default function GatherScene() {
                             plain "Machina is a ___ that ___". Kept in the
                             page's voice, and D-3 clean (the category noun is
                             "personal knowledge base", never "second brain"). */}
+                        {/* Two paragraphs, not one (owner call, round 17b):
+                            merged they read as a wall, and the definition
+                            sentence duplicated the organization clause the
+                            narrative already carries. P1 = the definition
+                            (Google's ask), P2 = the founder-letter narrative,
+                            each at the page's usual 3-5 line weight. */}
                         <p className="mx-auto mt-5 max-w-lg text-[15px] leading-relaxed text-text-secondary text-pretty sm:text-base">
                             Machina is a personal knowledge base: send it a link, a screenshot
-                            or a video from any app, and it saves, summarizes and organizes it
-                            for you. Months later, the thing you half remember is one question
-                            away, answered from your own saves with the sources it came from.
+                            or a video from any app, and months later the thing you half
+                            remember is one question away, answered from your own saves with
+                            the sources it came from.
+                        </p>
+                        <p className="mx-auto mt-4 max-w-lg text-[15px] leading-relaxed text-text-secondary text-pretty sm:text-base">
                             You never lost any of it. It was scattered across five apps,
                             impossible to find when it mattered. Gathered here, every save is summarized,
                             categorized, tagged, and connected to the rest of what you know.
