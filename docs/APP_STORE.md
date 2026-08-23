@@ -3,7 +3,7 @@
 > Reference doc for filling out App Store Connect (§4 tasks 8–9 in
 > `SOURCE_OF_TRUTH.md`). Everything here was written against the actual
 > codebase on 2026-07-03. Legal pages are live at
-> https://my-links-sable.vercel.app/privacy and …/terms (public — they bypass
+> https://mymachina.app/privacy and …/terms (public — they bypass
 > the sign-in gate).
 
 ---
@@ -173,7 +173,7 @@ browser, and no user-to-user interaction). Result: **4+**.
 >
 > • AI disclosure: on first run the app shows a consent notice explaining that
 > saved content and questions are processed by Google Gemini. This is also
-> covered in our privacy policy (https://my-links-sable.vercel.app/privacy).
+> covered in our privacy policy (https://mymachina.app/privacy).
 >
 > • To test capture, use the share sheet: open any page in Safari → Share →
 > Machina → the card appears in the feed within ~15 seconds.
