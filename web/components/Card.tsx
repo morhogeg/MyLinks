@@ -3,7 +3,7 @@
 
 
 import { Link, StatusChangeHandler } from '@/lib/types';
-import { Archive, Star, Clock, Trash2, Bell, Pencil, Circle, Check, MoreHorizontal, ExternalLink, Layers, Share2, RotateCcw, AlertTriangle, StickyNote, Lock, ImageOff, Image as ImageIcon } from 'lucide-react';
+import { Archive, Star, Clock, Trash2, Bell, Pencil, Circle, Check, MoreHorizontal, ExternalLink, Layers, Share2, RotateCcw, AlertTriangle, StickyNote, Lock, ImageOff, Image as ImageIcon, Images } from 'lucide-react';
 import { useState, memo } from 'react';
 import SourceByline from './SourceByline';
 import { cardThumbnailUrl } from '@/lib/cardThumbnail';
@@ -187,8 +187,9 @@ function Card({
                     <div className="flex items-center gap-2 pt-2 mt-auto border-t border-border-subtle">
                         {/* Same http(s)-only rule as the ready card's toolbar link
                             below — a stored javascript:/data: value must never
-                            become clickable, not even on the placeholder. */}
-                        {isHttpUrl(link.url) ? (
+                            become clickable, not even on the placeholder. A
+                            multi-image placeholder has no url yet — no empty row. */}
+                        {!link.url ? null : isHttpUrl(link.url) ? (
                             <a
                                 href={link.url}
                                 target="_blank"
@@ -281,6 +282,14 @@ function Card({
                         className="w-full h-full object-cover object-top transition-transform duration-300 [@media(hover:hover)]:group-hover:scale-[1.03]"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+                    {/* Multi-screenshot card: the banner is image 1 of the set —
+                        signal there are more, same chip treatment as the video
+                        duration badge above. */}
+                    {(link.imageUrls?.length ?? 0) > 1 && (
+                        <span className="absolute bottom-2 end-2 inline-flex items-center gap-1 text-[10px] font-bold text-white bg-black/75 px-1.5 py-0.5 rounded-md tracking-wide">
+                            <Images className="w-3 h-3" /> 1/{link.imageUrls!.length}
+                        </span>
+                    )}
                 </div>
             )}
             {/* Hover action pill — pinned to the TOP of the card in ALL cases

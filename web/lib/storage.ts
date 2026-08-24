@@ -164,6 +164,31 @@ export async function createProcessingPlaceholder(uid: string, url: string): Pro
 }
 
 /**
+ * Placeholder card for a MULTI-IMAGE capture (2+ screenshots → one card). Same
+ * durable pattern as createProcessingPlaceholder: the card exists in the feed
+ * the instant capture starts, and process_link_background flips this same doc
+ * to ready/failed via the cardId passed through /api/share.
+ */
+export async function createImagePlaceholder(uid: string, count: number): Promise<string> {
+    const linksRef = collection(db, 'users', uid, 'links');
+    const now = Date.now();
+    const ref = await addDoc(linksRef, {
+        url: '',
+        title: `Reading ${count} screenshots…`,
+        summary: '',
+        tags: [],
+        category: '',
+        status: 'processing',
+        sourceType: 'image',
+        isRead: false,
+        createdAt: now,
+        processingStartedAt: now,
+        metadata: { originalTitle: '', estimatedReadTime: 0 },
+    });
+    return ref.id;
+}
+
+/**
  * Flip a capture card to a retryable `failed` state — used when the durable web
  * enqueue can't be reached, so the placeholder never rots as an eternal spinner.
  * The existing Retry flow (`retryFailedLink`) re-runs analysis on this same card.
@@ -378,6 +403,40 @@ export async function retryFailedLink(uid: string, link: Link): Promise<void> {
     // began so the server-side janitor ages the card out from *now* (not its
     // original createdAt) if this attempt dies before completing.
     await updateDoc(linkRef, { status: 'processing', error: null, processingStartedAt: Date.now() });
+
+    // MULTI-IMAGE card: its images are already in Storage, so retry re-enqueues
+    // the ordered set through /api/share (imageUrls path) into the same
+    // background pipeline, targeting this same card via cardId. The synchronous
+    // /api/analyze below only knows single URLs — it would silently analyze the
+    // first image as a web page and drop the rest.
+    if (link.sourceType === 'image' && (link.imageUrls?.length ?? 0) > 1) {
+        try {
+            const response = await fetchWithTimeout(apiUrl('/api/share'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()), ...(await authHeaders()) },
+                body: JSON.stringify({ imageUrls: link.imageUrls, cardId: link.id, uid }),
+            }, 30_000);
+            const text = await response.text();
+            let data: { success?: boolean; error?: string };
+            try { data = JSON.parse(text); } catch { data = {}; }
+            if (!response.ok || !data.success) {
+                throw new Error(data?.error || 'Could not restart analysis. Please try again.');
+            }
+            // Queued — the background worker flips this card to ready/failed.
+            return;
+        } catch (err) {
+            try {
+                await updateDoc(linkRef, {
+                    status: 'failed',
+                    error: err instanceof Error ? err.message.slice(0, 300) : 'Retry failed',
+                    failedAt: Date.now(),
+                });
+            } catch {
+                // Best-effort — the janitor ages out a stuck `processing` card.
+            }
+            throw err;
+        }
+    }
 
     try {
         let existingTags: string[] = [];

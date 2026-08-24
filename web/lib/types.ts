@@ -106,6 +106,13 @@ export interface Link {
   // User chose to hide this card's thumbnail banner (⋯ → Hide image), turning it
   // into a plain text card. Per-card, reversible via "Show image".
   hideThumbnail?: boolean;
+  // Multi-screenshot card (sourceType 'image' only): the ORDERED set of images
+  // this one card was built from — e.g. the slides of a screenshotted carousel.
+  // Additive: `url` is always the FIRST image, so every single-image reader
+  // (cardThumbnailUrl, byline, stats) stays correct without checking this; only
+  // the gallery surfaces (detail view, banner count) read it. Absent (or length
+  // 1) on ordinary single-screenshot cards.
+  imageUrls?: string[];
   createdAt: number | string; // Handle both Unix timestamp and ISO string
   // When the current processing attempt began (epoch ms). Stamped on the
   // placeholder card by the backend (share path) and createProcessingPlaceholder

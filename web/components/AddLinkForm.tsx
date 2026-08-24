@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, FormEvent } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Link, Plus, X, Upload, Loader2, Image as ImageIcon, StickyNote } from 'lucide-react';
 import { doc, onSnapshot } from 'firebase/firestore';
-import { saveLink, getUserTags, findLinkIdByUrl, createProcessingPlaceholder, markLinkFailed, createNoteCard, enrichNoteCard } from '@/lib/storage';
+import { saveLink, getUserTags, findLinkIdByUrl, createProcessingPlaceholder, createImagePlaceholder, markLinkFailed, createNoteCard, enrichNoteCard } from '@/lib/storage';
 import { appCheckHeaders, db } from '@/lib/firebase';
 import { authHeaders } from '@/lib/auth';
 import { progressFor } from '@/lib/shareProgress';
@@ -61,6 +61,10 @@ const youTubeId = (input: string): string | null => {
 // message instead of an indefinite spinner.
 const ANALYZE_TIMEOUT_MS = 60_000;
 
+// Multi-screenshot cards: how many ordered images may become ONE card. Mirrors
+// the backend's MAX_CARD_IMAGES — keep the two in step.
+const MAX_IMAGES = 5;
+
 // A save can fail for a few distinct reasons; we surface an honest message to
 // the user AND record a short, fixed failure category for analytics (never the
 // raw error text). `category` rides on the Error so the catch block can read it.
@@ -98,8 +102,11 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
     const [url, setUrl] = useState('');
     const [note, setNote] = useState('');
     const [activeTab, setActiveTab] = useState<'link' | 'image' | 'note'>('link');
-    const [imageFile, setImageFile] = useState<File | null>(null);
-    const [imagePreview, setImagePreview] = useState<string | null>(null);
+    // Image capture: an ORDERED list of up to MAX_IMAGES screenshots that become
+    // ONE card. One image keeps today's fast sync path; 2+ go through the
+    // background pipeline. The strip below is the ordering answer — the order is
+    // visible and editable (drag to reorder), never whatever the OS handed back.
+    const [images, setImages] = useState<{ id: string; file: File; preview: string }[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isExpanded, setIsExpanded] = useState(false);
@@ -316,6 +323,84 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
         setIsExpanded(false);
     };
 
+    // ── Image strip: add / remove / drag-to-reorder ──────────────────────────
+    // Previews are object URLs — revoked on remove/clear/unmount so a long
+    // session doesn't leak blobs.
+    const stripRef = useRef<HTMLDivElement>(null);
+    const [dragId, setDragId] = useState<string | null>(null);
+    const imagesRef = useRef(images);
+    imagesRef.current = images;
+    useEffect(() => () => {
+        imagesRef.current.forEach((im) => URL.revokeObjectURL(im.preview));
+    }, []);
+
+    const addImageFiles = (files: FileList | null) => {
+        if (!files || files.length === 0) return;
+        setImages((prev) => {
+            const room = MAX_IMAGES - prev.length;
+            const picked = Array.from(files).slice(0, Math.max(0, room));
+            if (files.length > room) {
+                toast.info(`Up to ${MAX_IMAGES} images per card — kept the first ${room === 0 ? 0 : room}.`);
+            }
+            const added = picked.map((file) => ({
+                id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                file,
+                preview: URL.createObjectURL(file),
+            }));
+            return [...prev, ...added];
+        });
+    };
+
+    const removeImage = (id: string) => {
+        setImages((prev) => {
+            const gone = prev.find((im) => im.id === id);
+            if (gone) URL.revokeObjectURL(gone.preview);
+            return prev.filter((im) => im.id !== id);
+        });
+    };
+
+    const clearImages = () => {
+        setImages((prev) => {
+            prev.forEach((im) => URL.revokeObjectURL(im.preview));
+            return [];
+        });
+    };
+
+    // Drag-to-reorder: pointer-based so it works identically for touch and
+    // mouse. The grid is a single row of MAX_IMAGES equal columns, so the
+    // target slot is pure x-position math; the array reorders LIVE under the
+    // finger (tiles are keyed by id, so React moves the nodes and pointer
+    // capture keeps the events flowing to the grabbed tile).
+    const slotFromX = (clientX: number) => {
+        const el = stripRef.current;
+        if (!el) return -1;
+        const rect = el.getBoundingClientRect();
+        const slot = Math.floor(((clientX - rect.left) / rect.width) * MAX_IMAGES);
+        return Math.max(0, Math.min(imagesRef.current.length - 1, slot));
+    };
+
+    const onTilePointerDown = (e: React.PointerEvent, id: string) => {
+        if (isLoading || images.length < 2) return;
+        e.currentTarget.setPointerCapture(e.pointerId);
+        setDragId(id);
+    };
+
+    const onTilePointerMove = (e: React.PointerEvent) => {
+        if (!dragId) return;
+        const to = slotFromX(e.clientX);
+        if (to < 0) return;
+        setImages((prev) => {
+            const from = prev.findIndex((im) => im.id === dragId);
+            if (from === -1 || from === to) return prev;
+            const next = [...prev];
+            const [moved] = next.splice(from, 1);
+            next.splice(to, 0, moved);
+            return next;
+        });
+    };
+
+    const endImageDrag = () => setDragId(null);
+
     // In-dialog ramp for the processing link: max(time-ramp, stage floor),
     // monotonic. Step is pinned to the backend stage when present; otherwise
     // LinkScanProgress derives it from the %. On done the bar completes to 100.
@@ -352,7 +437,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
 
         const formattedUrl = formatUrl(url);
 
-        if ((activeTab === 'link' && !formattedUrl) || (activeTab === 'image' && !imageFile) || (activeTab === 'note' && !note.trim()) || isLoading) {
+        if ((activeTab === 'link' && !formattedUrl) || (activeTab === 'image' && images.length === 0) || (activeTab === 'note' && !note.trim()) || isLoading) {
             return;
         }
 
@@ -555,11 +640,67 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
 
             let data;
 
+            if (images.length >= 2) {
+                // MULTI-IMAGE MODE — the ordered set becomes ONE card via the
+                // background pipeline (4-5 dense screenshots at high resolution
+                // don't fit the sync endpoint's budget; single images below keep
+                // the fast path). Durable: a `processing` placeholder card first,
+                // then compress each image IN THE CONFIRMED ORDER and hand the
+                // set to /api/share, which stores them and enqueues one job that
+                // flips this same card to ready/failed.
+                const payload: { data: string; mimeType: string }[] = [];
+                for (const im of images) {
+                    const compressed = await compressImage(im.file);
+                    payload.push({ data: compressed.base64, mimeType: compressed.mimeType });
+                }
+                setProgress((p) => Math.max(p, 45));
+
+                let cardId: string;
+                try {
+                    cardId = await createImagePlaceholder(uid, images.length);
+                } catch (writeErr) {
+                    throw saveError(`Could not save to Machina: ${writeErr instanceof Error ? writeErr.message : String(writeErr)}`, 'save_failed');
+                }
+
+                try {
+                    const response = await fetchWithTimeout(apiUrl('/api/share'), {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()), ...(await authHeaders()) },
+                        body: JSON.stringify({ images: payload, cardId, uid }),
+                    });
+                    await parseResponse(response);
+                } catch (err) {
+                    // Enqueue failed — flip the placeholder to a retryable failed
+                    // card (never a stuck spinner), then surface the error.
+                    try {
+                        await markLinkFailed(uid, cardId, err instanceof Error ? err.message : String(err));
+                    } catch {
+                        // Best-effort; the processing janitor ages it out otherwise.
+                    }
+                    if (err instanceof Error && 'category' in err) throw err;
+                    throw saveError(err instanceof Error ? err.message : `Network error: ${String(err)}`, 'network');
+                }
+
+                // Queued durably — the honest success moment. Close now; the
+                // feed's processing card + pill carry the rest, exactly like a
+                // share-sheet capture.
+                trackSaveSucceeded('web_form');
+                trackFirstSave();
+                setProgress(100);
+                await new Promise((r) => setTimeout(r, 400));
+                clearImages();
+                setIsExpanded(false);
+                hapticSuccess();
+                toast.success('Saved — reading your screenshots in the background');
+                onLinkAdded();
+                return;
+            }
+
             {
                 // IMAGE MODE — compress client-side, then send the inline bytes to
                 // the backend, which both analyzes AND stores the image (via the
                 // admin SDK, bypassing storage.rules that block client writes).
-                const compressed = await compressImage(imageFile!);
+                const compressed = await compressImage(images[0].file);
                 // Real milestone: the image is compressed and on its way — push
                 // past the "scanning" phase into "reading text".
                 setProgress((p) => Math.max(p, 45));
@@ -621,8 +762,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
 
             setUrl('');
             setNote('');
-            setImageFile(null);
-            setImagePreview(null);
+            clearImages();
             setIsExpanded(false);
             hapticSuccess(); // the save landed — a satisfying success buzz on device
             toast.success('Saved to Machina');
@@ -798,53 +938,93 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                                         autoFocus
                                     />
                                 )
-                            ) : isLoading && imagePreview ? (
-                                <ImageScanProgress imageSrc={imagePreview} progress={progress} />
+                            ) : isLoading && images.length > 0 ? (
+                                <ImageScanProgress imageSrc={images[0].preview} progress={progress} />
                             ) : (
                                 <div className="relative">
                                     <input
                                         type="file"
                                         accept="image/*"
+                                        multiple
                                         onChange={(e) => {
-                                            const file = e.target.files?.[0];
-                                            if (file) {
-                                                setImageFile(file);
-                                                const reader = new FileReader();
-                                                reader.onloadend = () => {
-                                                    setImagePreview(reader.result as string);
-                                                };
-                                                reader.readAsDataURL(file);
-                                            }
+                                            addImageFiles(e.target.files);
+                                            // Reset so re-picking the same file fires onChange again.
+                                            e.target.value = '';
                                         }}
                                         className="hidden"
                                         id="image-upload"
                                         disabled={isLoading}
                                     />
-                                    <label
-                                        htmlFor="image-upload"
-                                        className={`w-full h-[170px] rounded-xl border-2 border-dashed border-border-strong flex flex-col items-center justify-center cursor-pointer transition-all hover:border-accent/50 hover:bg-fill-subtle ${imagePreview ? 'p-0 border-none overflow-hidden' : 'p-8'
-                                            }`}
-                                    >
-                                        {imagePreview ? (
-                                            <div className="relative w-full h-full group">
-                                                <img
-                                                    src={imagePreview}
-                                                    alt="Preview"
-                                                    className="w-full h-full object-cover"
-                                                />
-                                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                    <p className="text-white font-medium">Change Image</p>
-                                                </div>
+                                    {images.length > 0 ? (
+                                        /* Thumbnail strip: ONE row of equal tiles in the
+                                           order the card will read them. The order is
+                                           visible and editable here — number badges +
+                                           drag to reorder — instead of trusting whatever
+                                           order the OS handed the files back in. */
+                                        <div className="flex flex-col justify-center gap-3">
+                                            <div ref={stripRef} className="grid grid-cols-5 gap-2">
+                                                {images.map((im, i) => (
+                                                    <div
+                                                        key={im.id}
+                                                        onPointerDown={(e) => onTilePointerDown(e, im.id)}
+                                                        onPointerMove={onTilePointerMove}
+                                                        onPointerUp={endImageDrag}
+                                                        onPointerCancel={endImageDrag}
+                                                        className={`relative aspect-[3/4] rounded-xl overflow-hidden border select-none touch-none transition-all duration-200 ${dragId === im.id
+                                                            ? 'border-transparent ring-2 ring-accent scale-105 shadow-xl z-10'
+                                                            : 'border-border-subtle'
+                                                            } ${images.length > 1 ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                                                    >
+                                                        <img
+                                                            src={im.preview}
+                                                            alt={`Image ${i + 1}`}
+                                                            draggable={false}
+                                                            className="w-full h-full object-cover pointer-events-none"
+                                                        />
+                                                        {images.length > 1 && (
+                                                            <span className="absolute bottom-1 start-1 min-w-4 h-4 px-1 rounded-full bg-black/65 text-white text-[9px] font-bold flex items-center justify-center pointer-events-none">
+                                                                {i + 1}
+                                                            </span>
+                                                        )}
+                                                        <button
+                                                            type="button"
+                                                            aria-label={`Remove image ${i + 1}`}
+                                                            onPointerDown={(e) => e.stopPropagation()}
+                                                            onClick={() => removeImage(im.id)}
+                                                            className="absolute top-1 end-1 w-5 h-5 rounded-full bg-black/65 text-white flex items-center justify-center hover:bg-black/85 active:scale-90 transition-all"
+                                                        >
+                                                            <X className="w-3 h-3" />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                                {images.length < MAX_IMAGES && (
+                                                    <label
+                                                        htmlFor="image-upload"
+                                                        aria-label="Add another image"
+                                                        className="aspect-[3/4] rounded-xl border-2 border-dashed border-border-strong flex items-center justify-center cursor-pointer text-text-muted transition-all hover:border-accent/50 hover:text-accent hover:bg-fill-subtle"
+                                                    >
+                                                        <Plus className="w-4 h-4" />
+                                                    </label>
+                                                )}
                                             </div>
-                                        ) : (
-                                            <>
-                                                <div className="w-12 h-12 rounded-full bg-fill-subtle flex items-center justify-center mb-3">
-                                                    <Upload className="w-6 h-6 text-accent" />
-                                                </div>
-                                                <p className="text-text font-medium text-sm">Tap to add an image</p>
-                                            </>
-                                        )}
-                                    </label>
+                                            <p className="text-[11px] text-text-muted text-center leading-snug">
+                                                {images.length === 1
+                                                    ? `Add up to ${MAX_IMAGES} screenshots of one post — they become a single card`
+                                                    : 'Screens of one post, read in this order — drag to reorder'}
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <label
+                                            htmlFor="image-upload"
+                                            className="w-full h-[170px] rounded-xl border-2 border-dashed border-border-strong flex flex-col items-center justify-center cursor-pointer transition-all hover:border-accent/50 hover:bg-fill-subtle p-8"
+                                        >
+                                            <div className="w-12 h-12 rounded-full bg-fill-subtle flex items-center justify-center mb-3">
+                                                <Upload className="w-6 h-6 text-accent" />
+                                            </div>
+                                            <p className="text-text font-medium text-sm">Tap to add images</p>
+                                            <p className="text-text-muted text-xs mt-1">Up to {MAX_IMAGES} screenshots become one card</p>
+                                        </label>
+                                    )}
                                 </div>
                             )}
                             </div>
@@ -854,7 +1034,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                             {!isLoading && (
                                 <button
                                     type="submit"
-                                    disabled={activeTab === 'link' ? !url.trim() : activeTab === 'note' ? !note.trim() : !imageFile}
+                                    disabled={activeTab === 'link' ? !url.trim() : activeTab === 'note' ? !note.trim() : images.length === 0}
                                     className="w-full py-4 bg-accent text-accent-ink font-bold rounded-xl hover:bg-accent-hover active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-accent/20"
                                 >
                                     Save

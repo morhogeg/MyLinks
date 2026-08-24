@@ -351,6 +351,11 @@ MAX_IMAGE_BYTES = 5 * 1024 * 1024  # 5 MB
 # allocation up to Cloud Run's body limit before the post-decode size check).
 # The +1024 slack covers data-URI prefixes and base64 padding/whitespace.
 MAX_IMAGE_B64_CHARS = (MAX_IMAGE_BYTES * 4) // 3 + 1024
+# Multi-screenshot cards: how many ordered images may make up ONE card (e.g. the
+# slides of a screenshotted carousel). 5 covers the bulk of real text carousels;
+# a request above the cap is REJECTED with a clear message, never silently
+# trimmed — silent truncation is the exact failure this feature exists to kill.
+MAX_CARD_IMAGES = 5
 
 
 # Per-bucket rate limits: (max_requests, window_seconds, fail_open). The analyze
@@ -2529,6 +2534,118 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
             if auth_err:
                 return auth_err
 
+        # MULTI-IMAGE path (web capture): up to MAX_CARD_IMAGES ordered
+        # screenshots that become ONE card (e.g. a screenshotted carousel). Two
+        # request shapes, both writing ONE queue doc and charging ONE save unit:
+        #   images:    [{data: <b64>, mimeType}, ...] — inline bytes, stored here
+        #              in list order (the order the user confirmed in the picker)
+        #   imageUrls: [<storage url>, ...] — images ALREADY in our Storage; the
+        #              retry path re-enqueues a failed multi-image card this way
+        images_in = data.get('images')
+        image_urls_in = data.get('imageUrls')
+        if isinstance(images_in, list) and images_in:
+            if len(images_in) > MAX_CARD_IMAGES:
+                return _error_response(f"Up to {MAX_CARD_IMAGES} images per card", 400, headers)
+            import base64, uuid
+            decoded = []
+            for entry in images_in:
+                if not isinstance(entry, dict):
+                    return _error_response("Invalid image data", 400, headers)
+                b64 = entry.get('data') or ''
+                if isinstance(b64, str) and ',' in b64 and b64.strip().startswith('data:'):
+                    b64 = b64.split(',', 1)[1]
+                # Reject by encoded length before decoding (see MAX_IMAGE_B64_CHARS).
+                if not b64 or not isinstance(b64, str) or len(b64) > MAX_IMAGE_B64_CHARS:
+                    return _error_response("Image is too large", 413, headers)
+                try:
+                    img_bytes = base64.b64decode(b64)
+                except Exception:
+                    return _error_response("Invalid image data", 400, headers)
+                if not img_bytes:
+                    return _error_response("Invalid image data", 400, headers)
+                if len(img_bytes) > MAX_IMAGE_BYTES:
+                    return _error_response("Image is too large", 413, headers)
+                decoded.append((img_bytes, entry.get('mimeType') or 'image/jpeg'))
+
+            # ONE save unit for the whole set — a multi-screenshot card is one save.
+            q = _quota_blocked(uid, "saves", headers)
+            if q:
+                return q
+
+            stored_urls = []
+            try:
+                for img_bytes, mime in decoded:
+                    ext = 'png' if 'png' in mime else 'jpg'
+                    stored_urls.append(_store_image(
+                        f"screenshots/{uid}/{uuid.uuid4().hex}.{ext}", img_bytes, mime))
+            except Exception as e:
+                logger.error(f"Multi-image store failed: {e}", exc_info=True)
+                refund_quota(uid, "saves")
+                return _server_error(headers, e)
+
+            process_ref = get_db().collection('pending_processing').document()
+            queue_doc = {
+                "uid": uid,
+                "url": stored_urls[0],
+                "imageUrls": stored_urls,
+                "isImage": True,
+                "mimeType": decoded[0][1],
+                "source": "web" if data.get('cardId') else "share",
+                "body": data.get('note', ''),
+                "createdAt": datetime.now(timezone.utc).isoformat(),
+                "status": "queued",
+                "attempts": 0,
+            }
+            if data.get('cardId'):
+                queue_doc["cardId"] = data.get('cardId')
+            process_ref.set(queue_doc)
+            logger.info(f"Share ingest queued {len(stored_urls)}-image card for {_mask_uid(uid)}")
+            return https_fn.Response(
+                json.dumps({"success": True, "queued": True, "id": process_ref.id,
+                            "image": True, "count": len(stored_urls)}),
+                status=200, headers=headers, mimetype='application/json'
+            )
+
+        if isinstance(image_urls_in, list) and image_urls_in:
+            # Re-enqueue of ALREADY-STORED images (multi-image retry). Only our
+            # own Storage objects under the CALLER's screenshots/ prefix are
+            # accepted — never an arbitrary URL. The worker's safe_get is the
+            # SSRF backstop; this prefix check is the front gate.
+            if len(image_urls_in) > MAX_CARD_IMAGES:
+                return _error_response(f"Up to {MAX_CARD_IMAGES} images per card", 400, headers)
+            from urllib.parse import quote
+            bucket_name = storage.bucket().name
+            required_prefix = (f"https://firebasestorage.googleapis.com/v0/b/{bucket_name}/o/"
+                               + quote(f"screenshots/{uid}/", safe=""))
+            for u in image_urls_in:
+                if not isinstance(u, str) or len(u) > MAX_URL_LENGTH or not u.startswith(required_prefix):
+                    return _error_response("Invalid image URL", 400, headers)
+            q = _quota_blocked(uid, "saves", headers)
+            if q:
+                return q
+            process_ref = get_db().collection('pending_processing').document()
+            queue_doc = {
+                "uid": uid,
+                "url": image_urls_in[0],
+                "imageUrls": list(image_urls_in),
+                "isImage": True,
+                "mimeType": data.get('mimeType', 'image/jpeg'),
+                "source": "web",
+                "body": data.get('note', ''),
+                "createdAt": datetime.now(timezone.utc).isoformat(),
+                "status": "queued",
+                "attempts": 0,
+            }
+            if data.get('cardId'):
+                queue_doc["cardId"] = data.get('cardId')
+            process_ref.set(queue_doc)
+            logger.info(f"Share ingest re-queued {len(image_urls_in)}-image card for {_mask_uid(uid)}")
+            return https_fn.Response(
+                json.dumps({"success": True, "queued": True, "id": process_ref.id,
+                            "image": True, "count": len(image_urls_in)}),
+                status=200, headers=headers, mimetype='application/json'
+            )
+
         # Image share path: the native Share Extension can send a raw image
         # (base64) when the user shares a photo/screenshot rather than a link.
         # Store it, then queue an image job — the background pipeline already
@@ -3504,29 +3621,51 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         _write_stage(card_ref, "analyzing")
 
         if is_image:
-            log_to_firestore(task_id, f"Downloading image bytes from: {url}")
-            ref.update({"status": "downloading_image"})
-
             # Route through scraper.safe_get (SSRF guard + per-redirect
             # re-validation): the pending_processing queue doc is attacker-
             # influenceable, so a hostile imageUrl must not be able to make us
             # fetch an internal/metadata endpoint. Normal share-ingest images are
             # public Firebase Storage URLs, which pass the guard fine.
             from scraper import safe_get
-            img_response = safe_get(url, timeout=30)
-            img_response.raise_for_status()
-            image_bytes = img_response.content
 
-            # Upload to Firebase Storage
-            log_to_firestore(task_id, "Uploading image to Firebase Storage")
-            public_url = _store_image(f"screenshots/{uid}/{task_id}.jpg", image_bytes, mime_type)
+            queued_image_urls = data.get("imageUrls") if isinstance(data.get("imageUrls"), list) else None
+            if queued_image_urls and len(queued_image_urls) > 1:
+                # MULTI-IMAGE card: ordered screenshots of ONE post, already in
+                # our Storage (share_ingest stored them in the user's confirmed
+                # order). Fetch each back — through the same SSRF guard, per URL
+                # — and analyze the whole set as one document.
+                image_urls = queued_image_urls[:MAX_CARD_IMAGES]
+                log_to_firestore(task_id, f"Downloading {len(image_urls)} images")
+                ref.update({"status": "downloading_image"})
+                image_parts = []
+                for img_url in image_urls:
+                    img_response = safe_get(img_url, timeout=30)
+                    img_response.raise_for_status()
+                    part_mime = img_response.headers.get('Content-Type') or 'image/jpeg'
+                    image_parts.append((img_response.content, part_mime))
 
-            url = public_url
+                url = image_urls[0]
+                log_to_firestore(task_id, f"Starting AI analysis of {len(image_parts)} images")
+                ref.update({"status": "analyzing_image", "storageUrl": url})
+                analysis = ai.analyze_images(image_parts, existing_tags=existing_tags,
+                                             existing_categories=existing_categories)
+            else:
+                log_to_firestore(task_id, f"Downloading image bytes from: {url}")
+                ref.update({"status": "downloading_image"})
+                img_response = safe_get(url, timeout=30)
+                img_response.raise_for_status()
+                image_bytes = img_response.content
 
-            log_to_firestore(task_id, "Starting AI image analysis")
-            ref.update({"status": "analyzing_image", "storageUrl": public_url})
-            analysis = ai.analyze_image(image_bytes, mime_type, existing_tags=existing_tags,
-                                        existing_categories=existing_categories)
+                # Upload to Firebase Storage
+                log_to_firestore(task_id, "Uploading image to Firebase Storage")
+                public_url = _store_image(f"screenshots/{uid}/{task_id}.jpg", image_bytes, mime_type)
+
+                url = public_url
+
+                log_to_firestore(task_id, "Starting AI image analysis")
+                ref.update({"status": "analyzing_image", "storageUrl": public_url})
+                analysis = ai.analyze_image(image_bytes, mime_type, existing_tags=existing_tags,
+                                            existing_categories=existing_categories)
         else:
             # Analyze with AI (YouTube → native video ingestion w/ fallback)
             analysis = _analyze_scraped(ai, scraped, existing_tags,
@@ -3592,6 +3731,13 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             analysis=analysis,
             related_links=related_links,
         )
+
+        # Multi-image card: the ordered set behind it. `url` stays the FIRST
+        # image (set above), so every existing reader — cardThumbnailUrl, the
+        # byline, stats, the Ask citation chip — is already correct; imageUrls
+        # is the additive field only the gallery surfaces read.
+        if is_image and isinstance(data.get("imageUrls"), list) and len(data["imageUrls"]) > 1:
+            link_data["imageUrls"] = data["imageUrls"][:MAX_CARD_IMAGES]
 
         # Embedding: only store a real Vector. If the embed failed (None), omit
         # the field and flag the card so a backfill repairs it later — never
@@ -3660,6 +3806,10 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
                 "estimatedReadTime": 0
             }
         }
+        # A failed multi-image card keeps its ordered set so Retry can re-enqueue
+        # ALL the images (via share_ingest's imageUrls path), not just the first.
+        if is_image and isinstance(data.get("imageUrls"), list) and len(data["imageUrls"]) > 1:
+            failed_data["imageUrls"] = data["imageUrls"][:MAX_CARD_IMAGES]
         try:
             if card_ref is not None:
                 card_ref.set(failed_data)

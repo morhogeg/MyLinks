@@ -1163,33 +1163,59 @@ Content to analyze:
 
     def analyze_image(self, image_bytes: bytes, mime_type: str, existing_tags: list = None,
                       attempts: int = _MAX_GENERATE_ATTEMPTS, existing_categories: list = None) -> dict:
-        """Analyze image content using Gemini vision. Raises AnalysisError on failure.
+        """Analyze a single image. Thin wrapper over analyze_images — one call
+        site for the screenshot prompt/resolution rules, single or multi."""
+        return self.analyze_images([(image_bytes, mime_type)], existing_tags=existing_tags,
+                                   attempts=attempts, existing_categories=existing_categories)
 
-        `attempts` is threaded to _generate_json (synchronous callers pass 2)."""
+    def analyze_images(self, images: list, existing_tags: list = None,
+                       attempts: int = _MAX_GENERATE_ATTEMPTS, existing_categories: list = None) -> dict:
+        """Analyze ONE piece of content spread across ordered screenshot images.
+
+        `images` is a list of (image_bytes, mime_type) tuples in READING ORDER —
+        e.g. the slides of an Instagram carousel the user screenshotted. The
+        parts are appended in list order and Gemini reads them in that order, so
+        ordering is data we control, not something the model infers.
+
+        Raises AnalysisError on failure."""
         tags_context = (
             f"\n\nExisting Tags in Brain (Reuse ONLY those in the content's language):\n{', '.join(existing_tags)}"
             if existing_tags else ""
         )
         cats_context = self._categories_context(existing_categories)
 
+        n = len(images)
+        if n > 1:
+            multi_guidance = f"""The {n} images provided are ORDERED screenshots of ONE single post — e.g. the
+slides of a carousel, in reading order (image 1 is the first slide, image {n} the
+last). They are NOT separate items: treat them as one continuous document whose
+text runs from the first image to the last, and produce ONE analysis that spans
+all of them in sequence. The argument may build across slides — the conclusion
+often sits in the final image, so a summary drawn only from the first image(s)
+is an incomplete summary.
+"""
+        else:
+            multi_guidance = ""
+
         prompt = f"""{SYSTEM_PROMPT}{tags_context}{cats_context}
 
-Based on the image provided, extract the text and analyze it according to the instructions above.
+{multi_guidance}Based on the image{'s' if n > 1 else ''} provided, extract the text and analyze it according to the instructions above.
 If the image contains a tweet or social media post, extract the content as if it were the text.
 If the image is an article, extract the headline and body.
-COVER THE WHOLE IMAGE: a screenshot of a post or article is the user's saved copy of that content, so the analysis must span its ENTIRE text — from the first line to the last, including quotes and statements near the bottom. Do not stop after the opening paragraphs; a summary that covers only the top of the screenshot is an incomplete summary.
+COVER THE WHOLE IMAGE{'S' if n > 1 else ''}: a screenshot of a post or article is the user's saved copy of that content, so the analysis must span its ENTIRE text — from the first line to the last, including quotes and statements near the bottom. Do not stop after the opening paragraphs; a summary that covers only the top of the screenshot is an incomplete summary.
 Work only from what is legible: keep the subject at the level the image states it (a country stays a country, a category stays a category), and where the text is unclear or cropped, leave it out rather than guessing a place, name, brand, or date."""
 
         from google.genai import types
 
-        contents = [
-            types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
-            prompt,
-        ]
-        # HIGH, explicitly: a deliberate single-image save is the one path where
-        # the image IS the content, and dense text screenshots (esp. Hebrew/RTL)
-        # need the resolution — the SDK default is not a documented contract, and
-        # the Instagram path already learned that low resolution misreads them.
+        contents = [types.Part.from_bytes(data=img_bytes, mime_type=mime)
+                    for img_bytes, mime in images]
+        contents.append(prompt)
+        # HIGH, explicitly and UNCONDITIONALLY — for every part. A deliberate
+        # screenshot save is the one path where the image IS the content, and
+        # dense text screenshots (esp. Hebrew/RTL) need the resolution — the SDK
+        # default is not a documented contract, and the Instagram path already
+        # learned that low resolution misreads them. Do NOT borrow
+        # analyze_text_with_images' script-conditional heuristic here.
         return self._enforce_tag_language(
             self._generate_json(contents, "image analysis", attempts=attempts,
                                 config_extra={"media_resolution": "MEDIA_RESOLUTION_HIGH"}))

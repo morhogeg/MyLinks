@@ -1203,6 +1203,20 @@ G2. **[ ] Graph next levers (from the round-3 product pass):** (a) search/
     (reuse M12 machinery scoped to a cluster's cards). Build in this order —
     each is independent.
 
+G3. **[ ] iOS share extension: multi-screenshot cards (deferred half of the
+    2026-08-24 feature).** The web/plus-button path now builds ONE card from up
+    to 5 ordered screenshots (`MAX_CARD_IMAGES`), but the share extension still
+    takes only the FIRST attachment (`firstProvider()`,
+    `ShareViewController.swift:~1065`) — sharing 3 screenshots makes 1 card and
+    silently drops 2. The backend is ready (`share_ingest` accepts an ordered
+    `images:[{data,mimeType}]` list; one queue doc, one save unit). Blockers
+    that deferred it: the order iOS hands attachments over is UNVERIFIED on
+    device, and the share sheet has no confirm step to correct it in — so
+    fixing `firstProvider()` alone risks shipping "wrong order, no way to fix
+    it", the exact failure the confirm-strip on web exists to prevent. Needs a
+    device test of NSItemProvider order first, then either trust-it-or a
+    minimal reorder UI in the sheet.
+
 18c. **[ ] Native share-extension indicator: per-phase states.** Web maps every
     capture phase to its own motion (`LINK_SCAN_ORBS` in `web/lib/scanPhases.ts` —
     fetch=`working`, read=`searching`, write=`shaping`, connect=`searching`,
@@ -1504,6 +1518,42 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-08-24 — multi-screenshot cards: up to 5 ordered screenshots become ONE
+  card (web capture). BUILT, not yet shipped.** The carousel use case: 3-4
+  screenshotted slides of one Instagram post used to mean 3 fragments or 1 card
+  that silently ignored the rest. Data model is ADDITIVE, no migration:
+  `imageUrls?: string[]` on Link with `url` staying the FIRST image, so every
+  existing reader (cardThumbnailUrl, byline, stats, Ask chips) was already
+  correct. Backend: `ai_service.analyze_images` — one `types.Part` per image in
+  list order (ordering is data we control), prompt says they're ordered slides
+  of ONE post, `MEDIA_RESOLUTION_HIGH` unconditionally per part (deliberately
+  NOT the text-path's Hebrew-conditional heuristic — the RTL constraint);
+  `analyze_image` is now a thin wrapper over it. `share_ingest` gained two
+  shapes, both ONE queue doc + ONE save unit: `images:[{data,mimeType}]`
+  (inline b64, stored in order, cap `MAX_CARD_IMAGES`=5, per-image 5 MB kept,
+  over-cap REJECTED with a message, never trimmed silently) and
+  `imageUrls:[...]` (already-stored; the retry path — front-gated to the
+  caller's own `screenshots/{uid}/` Storage prefix, worker's `safe_get` per URL
+  stays the SSRF backstop). `process_link_background` fetches each back through
+  `safe_get` and analyzes the set as one document; a FAILED card keeps its
+  `imageUrls` so Retry re-enqueues ALL images (`retryFailedLink` routes
+  multi-image cards to `/api/share`, not the single-URL `/api/analyze`).
+  Latency: multi goes background (placeholder card via
+  `createImagePlaceholder` → pill), 4-5 dense HIGH-res screenshots don't fit
+  the sync 60s budget; SINGLE-image saves keep today's fast sync path
+  untouched. Capture UI (`AddLinkForm`): picker is `multiple`, tiles render in
+  ONE 5-column row (aspect 3:4, number badges, per-tile remove ×, dashed +
+  tile) with pointer-based drag-to-reorder that works for touch and mouse alike
+  — the strip IS the ordering answer, visible and editable instead of trusting
+  OS file order. Rendering: feed banner shows image 1 with an `Images` "1/N"
+  chip (same treatment as the video duration badge); the open card shows the
+  whole set in order, each image keeping zoom-to-open, broken images failing
+  per-URL without blanking neighbours. Verified: `tsc --noEmit` clean,
+  `py_compile` clean. NOT verified: runtime flow (no Firebase in sandbox).
+  Deferred to §4 G3: the iOS share extension still takes only the first
+  attachment — attachment order unverified on device and no confirm step to
+  correct it in.
 
 - **2026-08-24 — tour: every em dash out of rendered copy, and the Recall step
   gets the frame its neighbours have. SHIPPED (merge `a62d989` → Vercel +
