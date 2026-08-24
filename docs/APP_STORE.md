@@ -244,24 +244,65 @@ numbers this doc used to claim (two of which were wrong — see the keyword rule
    cost the English ranking. Draft below; **the owner is the native speaker and
    should treat this as a starting point, not finished copy.**
 
-   | Field | Draft (he) |
-   |---|---|
-   | Name | `Machina — שמירה ושליפה` |
-   | Subtitle | `לשמור. לשאול. לחבר.` |
-   | Keywords | `מוח שני,סימניות,לקרוא אחר כך,בסיס ידע,סיכום,פתקים,ארגון,קישורים,מאמרים,שמירה` |
-   | Promo | `מקום אחד לכל מה ששמרת — קישורים, צילומי מסך וסרטונים, מכל אפליקציה. Machina קוראת את הכול, כדי שתמצא הכול אחר כך פשוט בשאלה.` |
+   | Field | Draft (he) | Used |
+   |---|---|---|
+   | Name | `Machina: שמירה ושליפה` | 21/30 |
+   | Subtitle | `לאסוף. לשאול. לחבר.` | 19/30 |
+   | Keywords | `מוח שני,סימניות,לקרוא אחר כך,בסיס ידע,סיכום,פתקים,ארגון,קישורים,מאמרים,ניהול ידע,בינה מלאכותית,סרטון` | **100/100** |
+   | Promo | `מקום אחד לכל מה ששמרת — קישורים, צילומי מסך וסרטונים, מכל אפליקציה. Machina קוראת הכול, כדי שאחר כך אפשר יהיה פשוט לשאול.` | 121/170 |
 
-   Note the D-3 rule still applies per-language: `מוח שני` ("second brain") is
-   in the **keywords field only** and must not reach the Hebrew subtitle,
-   promo text, or description.
+   **Why the subtitle is `לאסוף` and not `לשמור`.** The obvious translation of
+   `Capture. Ask. Connect.` is `לשמור. לשאול. לחבר.` — and it is wrong for the
+   same reason D-2 rejected `Save` in the English subtitle: the Name already
+   spends the ש.מ.ר root (`שמירה`), and Apple indexes a token once. `לאסוף`
+   ("to gather") costs nothing, collides with nothing, and it names **D-7's
+   hero directly** — the gathering — which the English subtitle can only imply.
+   The Hebrew line is arguably the better of the two.
+
+   **Two things only a native speaker can settle**, and they are why this is a
+   draft:
+   1. **Grammatical gender.** `Machina קוראת` treats the brand as feminine
+      (agreeing with `אפליקציה`). Masculine is equally defensible for a brand
+      name. The promo text above is written to avoid second-person gender
+      entirely (`אפשר יהיה פשוט לשאול` rather than `שתוכל לשאול`), which is
+      worth preserving in any rewrite.
+   2. **The colon in a bidi Name.** `Machina: שמירה ושליפה` puts a Latin run,
+      a colon, then an RTL run — exactly the shape that produced the stranded
+      maqaf bug in the app (§9, 2026-08-23). It should render fine because the
+      colon attaches to the Latin run, but **eyeball it in App Store Connect's
+      own preview before saving**, and fall back to an em dash if it looks
+      wrong.
+
+   D-3 applies per-language: `מוח שני` ("second brain") and `בינה מלאכותית`
+   ("AI") are in the **keywords field only** and must never reach the Hebrew
+   subtitle, promo text, or description.
+
+   **Not drafted:** the Hebrew **description**. It is the one long-form field
+   and it should be written, not translated — ask for it when the rest of this
+   table is settled.
 
 ## 3. App Review notes (paste into "Notes" on the version page)
 
 > **Demo account** (Sign in with Apple/Google cannot be shared, so use this
 > reviewer account):
 > Email: `REVIEWER_EMAIL_TBD` Password: `PASSWORD_TBD`
-> ⚠️ Fill these in after the auth cutover: create a fresh Google account (or an
-> email+password test account if enabled) reserved for review. Note that ANY
+> ⚠️ Fill these in after the auth cutover: create a fresh Google account
+> reserved for review.
+>
+> 🚫 **Do NOT use `support@mymachina.app` here** (asked and answered
+> 2026-08-23). Two independent reasons, either one sufficient: (1) **it is not
+> a login.** It is a Cloudflare Email Routing forwarder — receive-only, no
+> mailbox, no password — and this app offers only Google and Apple OAuth
+> (`web/lib/auth.ts`; there is no email+password path), so there is nothing a
+> reviewer could sign in with. (2) Even if it were made one, it is the address
+> printed on the landing page, `/privacy` and `/terms`, and review credentials
+> get pasted into a form and reused across submissions — a public support
+> address should not be a credential. **Use a dedicated throwaway Google
+> account** (e.g. `machina.review@…`) that exists for this and nothing else.
+> `support@mymachina.app` is correct where it already is: the **Support email**
+> field in §2, and the App Review *contact* email if you want it (it lands in
+> the same Gmail either way — note only that replies leave as the personal
+> Gmail, since the routing is receive-only). Note that ANY
 > fresh sign-in auto-creates a new, empty workspace with a one-screen welcome —
 > the reviewer does not need pre-provisioned data, but pre-seeding the demo
 > account with a few saved cards will demo Ask/synthesis better.

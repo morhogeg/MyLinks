@@ -1590,6 +1590,32 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-23 — Hebrew listing draft revised, and the reviewer-account email
+  settled. DOCS ONLY.** Owner asked to see the Hebrew metadata and whether
+  `support@mymachina.app` should be the demo-account login. **No, and it cannot
+  be:** it is a Cloudflare Email Routing forwarder — receive-only, no mailbox,
+  no password (§4 task 24's mail entry) — and the app offers only Google/Apple
+  OAuth (`web/lib/auth.ts`, no email+password path), so there is nothing a
+  reviewer could sign in with; separately, it is the address printed on the
+  landing page, `/privacy` and `/terms`, and review credentials get pasted into
+  a form and reused, so a public support address should never be one. A
+  dedicated throwaway Google account is the answer. `support@` stays correct as
+  the **Support email** field and is fine as the App Review contact — with the
+  known wrinkle that replies leave as the owner's personal Gmail, since the
+  routing is receive-only. **The Hebrew draft got one real fix:** the obvious
+  subtitle `לשמור. לשאול. לחבר.` repeats the ש.מ.ר root the Name already spends
+  (`שמירה`) — the exact token waste D-2 avoided in English by choosing `Capture`
+  over `Save`. Now `לאסוף. לשאול. לחבר.` ("gather. ask. connect."), which
+  collides with nothing and names **D-7's hero outright**, something the English
+  subtitle can only imply. Hebrew keywords rebuilt to a full **100/100**
+  (`שמירה` dropped as a Name-token collision; `ניהול ידע`, `בינה מלאכותית` and
+  `סרטון` added — D-3 applies per language, so the Hebrew for "second brain" and
+  "AI" stay keywords-only). Flagged for the native speaker: brand gender
+  agreement (`Machina קוראת`), and that the Name puts a Latin run + colon + an
+  RTL run — the same bidi shape behind the stranded-maqaf bug — so it wants one
+  look in App Store Connect's preview. **NOT drafted:** the Hebrew description,
+  which should be written rather than translated.
+
 - **2026-08-23 — App Store copy reviewed against Apple's actual requirements.
   DOCS ONLY — no app code, nothing to deploy.** Follow-on to the same day's A-5
   sweep. Every field was re-counted from the strings as written rather than
