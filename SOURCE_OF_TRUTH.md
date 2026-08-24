@@ -1529,6 +1529,22 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-24 — multi-screenshot round 2 from owner device QA (works on
+  device; three fixes). BUILT, not yet shipped.** (1) **Reorder feedback**: the
+  live tile swap was easy to miss, so the drag now speaks — a light buzz on
+  pickup, a selection tick every time the dragged tile crosses a slot (the iOS
+  picker detent feel), a light buzz on drop (`hapticLight`/`hapticSelection`
+  in `AddLinkForm`). (2) **Open card gallery is a CAROUSEL, not a stack**: one
+  image with the rest a flick away — horizontal scroll-snap, a "2/4" counter
+  chip, iOS-style dots in a blurred pill, pinned `dir="ltr"` so slide 1 starts
+  visible and the flick direction is identical on Hebrew cards; zoom-to-open
+  and per-URL broken-image handling preserved; slide position resets when
+  navigating to a related card. (3) **Em-dash purge in the capture dialog**:
+  every rendered string in `AddLinkForm` (subtitle, note placeholder, strip
+  captions, all its toasts/errors) rewritten by sentence role, same method as
+  the tour purge; code comments keep theirs. Verified: `tsc --noEmit` clean.
+  NOT verified: on-device feel of the haptic cadence and the snap physics.
+
 - **2026-08-24 — WhatsApp/messenger link previews for shared cards. BUILT, not
   yet shipped.** Owner, with a WhatsApp screenshot: sharing a card showed only
   the bare `mymachina.app/s?id=…` link, no preview card. The OG tags were
