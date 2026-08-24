@@ -53,12 +53,12 @@ export default function LoginScreen({
                 <h1 className="mt-6 text-text">
                     <Wordmark className="w-[190px] h-auto" />
                 </h1>
-                {/* The D-2 subtitle, verbatim. Read `Capture. Connect. Recall.`
-                    until 2026-08-06 — a stale variant that predated D-2 and put
-                    a second, contradictory tricolon in front of users on the
-                    first screen they ever see. One line, one order. */}
+                {/* The D-6 tagline, verbatim — the ONE promise line (owner call,
+                    2026-08-24; carried the D-2 subtitle before that). The
+                    sign-in screen now says what the product does for you, not
+                    its phases; the tricolon stays App Store-only. */}
                 <p className="mt-1.5 text-[13px] font-medium text-text-muted tracking-wide">
-                    Capture. Ask. Connect.
+                    Everything you save, finally useful.
                 </p>
 
                 {restricted ? (

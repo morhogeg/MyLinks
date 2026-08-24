@@ -1578,6 +1578,15 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-24 — sign-in screen carries the D-6 tagline. BUILT, not yet
+  shipped.** Owner call: the sign-in subtitle switches from the D-2 tricolon
+  ("Capture. Ask. Connect.") to the D-6 tagline ("Everything you save, finally
+  useful.") — which every other brand surface (landing `<h1>`, meta
+  description, share-page footer) already carries, so this UNIFIES the line
+  rather than forking it; the tricolon is now App Store-only.
+  `docs/BRANDING.md` D-6 tables updated in the same commit (the tagline sweep
+  is now seven files, LoginScreen included). Verified: `tsc --noEmit` clean.
+
 - **2026-08-24 — Google OAuth branding verification PASSED (owner console
   work; docs-only session update, no deploy).** Owner screenshot of the Google
   account chooser: *"to continue to **Machina**"* with the custom Machina logo
