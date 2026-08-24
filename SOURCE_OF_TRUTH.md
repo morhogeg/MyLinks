@@ -226,9 +226,20 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-08-24): fix the APNs key, and install build **1294**
+> ## 🚨 OWNER ACTION (updated 2026-08-24): fix the APNs key, and install build **1295**
 >
-> **1294** (run #294, merge `11978d4`) is current: everything in 1293 plus the
+> **1295** (run #295, merge `31b582f`) is current: everything in 1294 plus the
+> honesty round on multi-image saves. The pill can no longer say "Done!" while
+> the card says "Saving" (the queued-capture 100% snap is gone; the pill now
+> ends only when the card actually resolves), an active pill at the ramp
+> ceiling reads "Wrapping up" instead of "Done!…", the scanner dialogs lost
+> their em dashes, and the feed banner falls back through a multi-screenshot
+> card's whole image set instead of showing the OS broken-image glyph. QA:
+> save 3-4 screenshots and watch the pill track the card honestly to "Saved
+> to Machina"; check the finished card's banner shows a real image. 1294
+> stays the fallback. The APNs step below is unchanged and still pending.
+>
+> **(superseded) 1294** (run #294, merge `11978d4`): everything in 1293 plus the
 > multi-screenshot QA round (drag-to-reorder now ticks haptically per slot;
 > the open card shows its screenshots as a swipe carousel with counter + dots
 > instead of a vertical stack; the capture dialog's copy lost its em dashes)
@@ -1539,8 +1550,9 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-08-24 — multi-screenshot round 3 from owner QA on build 1294. BUILT,
-  not yet shipped.** Four findings. (1+2, one root) **The pill said "Done!…
+- **2026-08-24 — multi-screenshot round 3 from owner QA on build 1294.
+  SHIPPED (merge `31b582f` → Vercel + TestFlight run #295 = build 1295; no
+  functions change).** Four findings. (1+2, one root) **The pill said "Done!…
   100%" while the card still said "Saving…"**: the multi-image submit snapped
   its optimistic progress to 100 on the ENQUEUE ack — the same dishonest
   finish the video path was cured of on 2026-08-01. The 100-frame is removed:
