@@ -226,9 +226,16 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-08-23): fix the APNs key, and install build **1290**
+> ## 🚨 OWNER ACTION (updated 2026-08-24): fix the APNs key, and install build **1291**
 >
-> **1290** (run #290, merge `127a5b1`) is current: everything in 1289 plus the
+> **1291** (run #291, merge `c14eb02`) is current: everything in 1290 plus the
+> card category editor fix — tapping a category chip on a feed card no longer
+> opens a field that covers the source name. QA: tap a card's category chip,
+> confirm the field is chip-sized, the source byline steps aside while you
+> type, and it returns when you commit or cancel. 1290 stays the fallback.
+> The APNs step below is unchanged and still pending.
+>
+> **(superseded) 1290** (run #290, merge `127a5b1`): everything in 1289 plus the
 > related-cards RTL fix — a Hebrew reason naming an English concept ("נוגע גם
 > ב־Accountability") no longer renders scrambled with the maqaf stranded at
 > the far left. QA: open a Hebrew card whose related list carries an English
@@ -1490,6 +1497,30 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-08-24 — the card's category editor stops sitting on top of the source
+  byline. SHIPPED (merge `c14eb02` → Vercel + TestFlight run #291 = build
+  1291).** Owner, iOS QA with screenshots: tapping a category chip on a feed
+  card opened a text field that covered the source name ("Israel Bar Ass…").
+  Two faults, one symptom, both in `Card.tsx`'s header row. (1) `CategoryInput`
+  carries no font size of its own — `LinkDetailModal` passes one, the card
+  passed nothing, so the field inherited the card's ~16px body text at
+  `font-black tracking-widest` and rendered several times chip size. (2) The
+  field's wrapper is `relative inline-block` with no `min-w-0`, so it would
+  not shrink and overflowed into the source's column rather than compressing
+  (the source, which DOES have `min-w-0`, truncated and the field sat over
+  it). Fixed by sizing the field like the chip it replaces (`w-40
+  text-[10px]`, a bounded width that cannot overflow) and hiding the
+  source/status cluster outright while editing, per the owner's own
+  suggestion — one phone-width row cannot hold both, and the byline is chrome
+  the editor can borrow; it returns the moment editing ends. Also fixed in
+  passing: the category column no longer fades under `group-hover` while
+  editing, which on desktop made the field vanish under the cursor. Note for
+  next time: `CategoryInput`'s base class carries `px-2 py-0.5`, so a caller
+  passing conflicting padding relies on stylesheet order, not class order —
+  the card deliberately overrides size only. NOT changed: the detail modal's
+  editor, which already passes its own size. Verified: `tsc --noEmit` clean.
+  NOT verified here: on-device rendering.
 
 - **2026-08-23 — related-card reasons: direction by FIRST strong char, not
   letter count. SHIPPED (merge `127a5b1` → Vercel + TestFlight run #290 =
