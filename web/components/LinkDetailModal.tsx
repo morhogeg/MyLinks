@@ -145,6 +145,15 @@ export default function LinkDetailModal({
     // Broken-image fallbacks, keyed by URL — a multi-screenshot card renders a
     // gallery, and one dead image must not blank its healthy neighbours.
     const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
+    // Multi-screenshot carousel: which slide is in view (drives the counter +
+    // dots). The container itself owns the position via scroll-snap.
+    const [galleryIndex, setGalleryIndex] = useState(0);
+    const galleryRef = useRef<HTMLDivElement>(null);
+    // The carousel element survives navigating card → related card, so put it
+    // back on slide 1 when the card changes (the index state resets alongside).
+    useEffect(() => {
+        galleryRef.current?.scrollTo({ left: 0 });
+    }, [link.id]);
     // Reset the broken-image fallback when navigating to a different card. Done
     // as a render-time state adjustment (React discards this pass and re-renders
     // synchronously) rather than in an effect, avoiding a set-state-in-effect
@@ -153,6 +162,7 @@ export default function LinkDetailModal({
     if (imgLinkId !== link.id) {
         setImgLinkId(link.id);
         setFailedImages({});
+        setGalleryIndex(0);
         // Abandon any in-progress edit when navigating to another card so a draft
         // never leaks onto the wrong card.
         setIsEditingTitle(false);
@@ -685,40 +695,68 @@ export default function LinkDetailModal({
                     dir="auto"
                 >
                     {/* Content Section — screenshot/image source. A multi-screenshot
-                        card renders its FULL ordered set here (the feed banner shows
-                        only image 1 with a count); each image keeps the same
-                        zoom-to-open behavior, and one broken image never hides its
-                        neighbours. */}
-                    {link.sourceType === 'image' && (
-                        galleryUrls.some((u) => !failedImages[u]) ? (
-                            <div className="mb-6 space-y-3">
-                                {galleryUrls.map((u, i) => failedImages[u] ? null : (
-                                    <div key={u} className="rounded-2xl overflow-hidden border border-border-subtle bg-card-hover group/img relative">
-                                        <img
-                                            src={u}
-                                            alt={galleryUrls.length > 1 ? `Screenshot ${i + 1} of ${galleryUrls.length}` : 'Source screenshot'}
-                                            onError={() => setFailedImages((prev) => ({ ...prev, [u]: true }))}
-                                            className="w-full h-auto max-h-[400px] object-contain cursor-zoom-in transition-transform duration-500 group-hover/img:scale-105"
-                                            onClick={() => {
-                                                // Guard the scheme (never open a stored javascript:/data: URL)
-                                                // and pass noopener so the opened page can't reach window.opener.
-                                                if (isHttpUrl(u)) {
-                                                    window.open(u, '_blank', 'noopener,noreferrer');
-                                                }
-                                            }}
-                                        />
-                                        {galleryUrls.length > 1 && (
-                                            <span className="absolute top-2 end-2 text-[10px] font-bold text-white bg-black/60 px-2 py-0.5 rounded-full pointer-events-none">
-                                                {i + 1}/{galleryUrls.length}
-                                            </span>
-                                        )}
-                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-                                            <span className="text-white text-xs font-bold px-3 py-1.5 bg-black/60 rounded-full backdrop-blur-md border border-white/20">
-                                                Click to View Original
-                                            </span>
+                        card shows ONE image with the rest a flick away — a
+                        horizontal snap carousel (counter + dots), the same gesture
+                        as the Instagram post it usually came from. Pinned LTR so
+                        slide 1 starts visible and the flick direction is identical
+                        on Hebrew cards. Each image keeps zoom-to-open, and one
+                        broken image never hides its neighbours. */}
+                    {link.sourceType === 'image' && (() => {
+                        const slides = galleryUrls.filter((u) => !failedImages[u]);
+                        const slideIndex = Math.min(galleryIndex, slides.length - 1);
+                        return slides.length > 0 ? (
+                            <div dir="ltr" className="relative mb-6 rounded-2xl overflow-hidden border border-border-subtle bg-card-hover">
+                                <div
+                                    ref={galleryRef}
+                                    onScroll={() => {
+                                        const el = galleryRef.current;
+                                        if (!el) return;
+                                        const idx = Math.round(el.scrollLeft / Math.max(1, el.clientWidth));
+                                        setGalleryIndex((prev) => (prev === idx ? prev : idx));
+                                    }}
+                                    className="flex overflow-x-auto snap-x snap-mandatory [&::-webkit-scrollbar]:hidden"
+                                    style={{ scrollbarWidth: 'none' }}
+                                >
+                                    {slides.map((u, i) => (
+                                        <div key={u} className="w-full shrink-0 snap-center flex items-center justify-center group/img relative">
+                                            <img
+                                                src={u}
+                                                alt={slides.length > 1 ? `Screenshot ${i + 1} of ${slides.length}` : 'Source screenshot'}
+                                                onError={() => setFailedImages((prev) => ({ ...prev, [u]: true }))}
+                                                className="w-full h-auto max-h-[400px] object-contain cursor-zoom-in"
+                                                onClick={() => {
+                                                    // Guard the scheme (never open a stored javascript:/data: URL)
+                                                    // and pass noopener so the opened page can't reach window.opener.
+                                                    if (isHttpUrl(u)) {
+                                                        window.open(u, '_blank', 'noopener,noreferrer');
+                                                    }
+                                                }}
+                                            />
+                                            <div className="absolute inset-0 bg-black/40 opacity-0 [@media(hover:hover)]:group-hover/img:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                                                <span className="text-white text-xs font-bold px-3 py-1.5 bg-black/60 rounded-full backdrop-blur-md border border-white/20">
+                                                    Click to View Original
+                                                </span>
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    ))}
+                                </div>
+                                {slides.length > 1 && (
+                                    <>
+                                        <span className="absolute top-2 end-2 text-[10px] font-bold text-white bg-black/60 px-2 py-0.5 rounded-full pointer-events-none">
+                                            {slideIndex + 1}/{slides.length}
+                                        </span>
+                                        <div className="absolute bottom-2 inset-x-0 flex justify-center pointer-events-none">
+                                            <div className="flex items-center gap-1.5 bg-black/35 backdrop-blur-md px-2 py-1 rounded-full">
+                                                {slides.map((u, i) => (
+                                                    <span
+                                                        key={u}
+                                                        className={`w-1.5 h-1.5 rounded-full transition-colors duration-200 ${i === slideIndex ? 'bg-white' : 'bg-white/40'}`}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         ) : (
                             <div className="mb-6 rounded-2xl border border-dashed border-border-subtle bg-card-hover/50 px-4 py-8 flex flex-col items-center justify-center gap-2 text-center">
@@ -728,8 +766,8 @@ export default function LinkDetailModal({
                                     The original image isn&apos;t stored for this item. The summary below is still available.
                                 </p>
                             </div>
-                        )
-                    )}
+                        );
+                    })()}
 
                     {/* Social-post cover (X / Instagram): the image we read for the
                         summary. Non-video, non-screenshot cards only — the youtube

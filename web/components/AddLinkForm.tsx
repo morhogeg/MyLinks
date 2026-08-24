@@ -16,7 +16,7 @@ import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
 import { compressImage } from '@/lib/image';
-import { hapticSuccess } from '@/lib/haptics';
+import { hapticSuccess, hapticLight, hapticSelection } from '@/lib/haptics';
 import ImageScanProgress from '@/components/ImageScanProgress';
 import VideoScanProgress from '@/components/VideoScanProgress';
 import LinkScanProgress from '@/components/LinkScanProgress';
@@ -83,7 +83,7 @@ const fetchWithTimeout = async (input: string, init: RequestInit) => {
             // HONEST copy: the synchronous save did NOT complete — nothing was
             // persisted and nothing will appear in the feed. Tell the truth and
             // invite a retry (the URL stays in the field, so retry is one tap).
-            throw saveError('That took too long, so nothing was saved. Your link is still here — tap Save to try again.', 'timeout');
+            throw saveError('That took too long, so nothing was saved. Your link is still here: tap Save to try again.', 'timeout');
         }
         throw err;
     } finally {
@@ -291,7 +291,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
         }
         if (linkCard.status === 'failed') {
             // The card survives as a retryable `failed` card in the feed.
-            toast.error("Saved your link, but analysis couldn't finish — tap the card to retry.");
+            toast.error("Saved your link, but analysis couldn't finish. Tap the card to retry.");
             resetLinkSession();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -340,7 +340,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
             const room = MAX_IMAGES - prev.length;
             const picked = Array.from(files).slice(0, Math.max(0, room));
             if (files.length > room) {
-                toast.info(`Up to ${MAX_IMAGES} images per card — kept the first ${room === 0 ? 0 : room}.`);
+                toast.info(`Up to ${MAX_IMAGES} images per card. Kept the first ${room === 0 ? 0 : room}.`);
             }
             const added = picked.map((file) => ({
                 id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -382,6 +382,9 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
     const onTilePointerDown = (e: React.PointerEvent, id: string) => {
         if (isLoading || images.length < 2) return;
         e.currentTarget.setPointerCapture(e.pointerId);
+        // Pickup buzz: the tile is "lifted" (it also rings + scales) so the user
+        // knows the drag has started before they move a millimeter.
+        hapticLight();
         setDragId(id);
     };
 
@@ -389,17 +392,26 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
         if (!dragId) return;
         const to = slotFromX(e.clientX);
         if (to < 0) return;
+        const from = imagesRef.current.findIndex((im) => im.id === dragId);
+        if (from === -1 || from === to) return;
+        // The reorder is otherwise easy to miss (tiles swap under the finger),
+        // so every crossed slot ticks — the same detent feel as an iOS picker.
+        hapticSelection();
         setImages((prev) => {
-            const from = prev.findIndex((im) => im.id === dragId);
-            if (from === -1 || from === to) return prev;
+            const prevFrom = prev.findIndex((im) => im.id === dragId);
+            if (prevFrom === -1 || prevFrom === to) return prev;
             const next = [...prev];
-            const [moved] = next.splice(from, 1);
+            const [moved] = next.splice(prevFrom, 1);
             next.splice(to, 0, moved);
             return next;
         });
     };
 
-    const endImageDrag = () => setDragId(null);
+    const endImageDrag = () => {
+        // Drop buzz: confirms the new order is committed.
+        if (dragId) hapticLight();
+        setDragId(null);
+    };
 
     // In-dialog ramp for the processing link: max(time-ramp, stage floor),
     // monotonic. Step is pinned to the backend stage when present; otherwise
@@ -456,7 +468,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                 const existingId = await findLinkIdByUrl(uid, formattedUrl);
                 if (existingId) {
                     trackSaveFailed('duplicate');
-                    toast.info("You already saved this — opening it now.");
+                    toast.info("You already saved this. Opening it now.");
                     setUrl('');
                     setError(null);
                     setIsExpanded(false);
@@ -540,7 +552,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                 setLinkCard(null);
                 lastLinkPct.current = 0;
                 trackSaveFailed('network');
-                toast.error("Saved your link, but analysis couldn't start — tap the card to retry.");
+                toast.error("Saved your link, but analysis couldn't start. Tap the card to retry.");
                 setUrl('');
                 setIsExpanded(false);
                 setIsLoading(false);
@@ -572,7 +584,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                 // itself is worth confirming — hence the buzz and a toast that
                 // says exactly what happened: captured now, analysing still.
                 hapticSuccess();
-                toast.success('Saved — analyzing in the background');
+                toast.success('Saved. Analyzing in the background.');
                 setUrl('');
                 setIsExpanded(false);
                 setIsLoading(false);
@@ -691,7 +703,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                 clearImages();
                 setIsExpanded(false);
                 hapticSuccess();
-                toast.success('Saved — reading your screenshots in the background');
+                toast.success('Saved. Reading your screenshots in the background.');
                 onLinkAdded();
                 return;
             }
@@ -844,7 +856,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                                 Add to Machina
                             </h3>
                             <p className="text-sm text-text-secondary">
-                                Capture a link, image, or your own note — Machina reads, summarizes, and files it.
+                                Capture a link, image, or your own note. Machina reads, summarizes, and files it.
                             </p>
                         </div>
 
@@ -931,7 +943,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                                         id="note"
                                         value={note}
                                         onChange={(e) => setNote(e.target.value)}
-                                        placeholder="Write a thought, an idea, a quote — Machina summarizes and files it."
+                                        placeholder="Write a thought, an idea, a quote. Machina summarizes and files it."
                                         rows={5}
                                         className="w-full h-[170px] px-4 py-3 bg-background border border-border-subtle rounded-xl text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50 text-base resize-none"
                                         disabled={isLoading}
@@ -1009,8 +1021,8 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                                             </div>
                                             <p className="text-[11px] text-text-muted text-center leading-snug">
                                                 {images.length === 1
-                                                    ? `Add up to ${MAX_IMAGES} screenshots of one post — they become a single card`
-                                                    : 'Screens of one post, read in this order — drag to reorder'}
+                                                    ? `Add up to ${MAX_IMAGES} screenshots of one post. They become a single card.`
+                                                    : 'Screens of one post, read in this order. Drag to reorder.'}
                                             </p>
                                         </div>
                                     ) : (

@@ -30,10 +30,13 @@ an identical value.
 import os
 import re
 import html as _html
+import logging
 from typing import Optional
 from datetime import datetime, timezone
 
 from db import get_db
+
+logger = logging.getLogger("share_service")
 
 # Public BRAND origin. EVERY url in this module is user-visible — og:url, the
 # favicon, the brand header, "Open in Machina" — so it must read `mymachina.app`
@@ -414,10 +417,22 @@ def _share_card_image(card: dict) -> str:
     return f"{WEB_URL}/icon-512.png"
 
 
-def _share_html_shell(*, title: str, description: str, image: str, url: str, body: str) -> str:
-    """Wrap rendered body in a full HTML doc with OpenGraph + Twitter cards."""
+def _share_html_shell(*, title: str, description: str, image: str, url: str, body: str,
+                      image_width: Optional[int] = None, image_height: Optional[int] = None,
+                      image_type: Optional[str] = None) -> str:
+    """Wrap rendered body in a full HTML doc with OpenGraph + Twitter cards.
+
+    Declare og:image dimensions/type whenever known — WhatsApp in particular
+    often renders NO preview on the first share of a page whose image carries
+    no declared size."""
     t, d = _esc(title), _esc(description)
     img, u = _esc(image), _esc(url)
+    img_meta = ""
+    if image_width and image_height:
+        img_meta += (f'\n<meta property="og:image:width" content="{int(image_width)}">'
+                     f'\n<meta property="og:image:height" content="{int(image_height)}">')
+    if image_type:
+        img_meta += f'\n<meta property="og:image:type" content="{_esc(image_type)}">'
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -430,7 +445,7 @@ def _share_html_shell(*, title: str, description: str, image: str, url: str, bod
 <meta property="og:title" content="{t}">
 <meta property="og:description" content="{d}">
 <meta property="og:image" content="{img}">
-<meta property="og:image:secure_url" content="{img}">
+<meta property="og:image:secure_url" content="{img}">{img_meta}
 <meta property="og:image:alt" content="{t}">
 <meta property="og:url" content="{u}">
 <meta name="twitter:card" content="summary_large_image">
@@ -529,7 +544,18 @@ def _share_html_shell(*, title: str, description: str, image: str, url: str, bod
 </html>"""
 
 
-def _render_shared_card(card: dict, share_url: str) -> str:
+def _og_image_meta(og_preview, fallback_image: str):
+    """(image, width, height, type) for the shell — the stored preview copy
+    when the publish generated one, else the raw fallback (dims only for the
+    one image whose size we know statically, the 512px brand icon)."""
+    if isinstance(og_preview, dict) and str(og_preview.get("url", "")).startswith("http"):
+        return og_preview["url"], og_preview.get("width"), og_preview.get("height"), "image/jpeg"
+    if fallback_image.endswith("/icon-512.png"):
+        return fallback_image, 512, 512, "image/png"
+    return fallback_image, None, None, None
+
+
+def _render_shared_card(card: dict, share_url: str, og_preview: Optional[dict] = None) -> str:
     title = card.get("title") or "Shared card"
     summary = card.get("summary") or ""
     detailed = card.get("detailedSummary") or ""
@@ -564,10 +590,12 @@ def _render_shared_card(card: dict, share_url: str) -> str:
         {original_btn}
       </div>
     </div>"""
+    og_image, og_w, og_h, og_type = _og_image_meta(og_preview, image)
     return _share_html_shell(
         title=title,
         description=_md_to_plain(summary or detailed) or "Shared from Machina",
-        image=image, url=share_url, body=body,
+        image=og_image, url=share_url, body=body,
+        image_width=og_w, image_height=og_h, image_type=og_type,
     )
 
 
@@ -575,6 +603,100 @@ def _card_thumb(card: dict) -> Optional[str]:
     """A card's real preview image, or None (no icon fallback here)."""
     img = _share_card_image(card)
     return img if img and not img.endswith("/icon-512.png") else None
+
+
+# ── Link-preview (og:image) copy ─────────────────────────────────────────────
+# WhatsApp (and other messengers) silently DROP og:image when the file is too
+# heavy (~300 KB is the safe ceiling — a stored screenshot easily exceeds it)
+# or when no dimensions are declared, and the share then degrades to a bare
+# link with no card at all. So publishing generates a dedicated small JPEG copy
+# of the card's image and records its exact pixel size; the share page declares
+# them via og:image:width/height/type. Best-effort everywhere: a share must
+# never fail to publish because its preview couldn't be built.
+_OG_PREVIEW_MAX_EDGE = 1000
+_OG_PREVIEW_MAX_BYTES = 280 * 1024
+_OG_SOURCE_MAX_BYTES = 10 * 1024 * 1024
+
+
+def _downscale_og_preview(image_bytes: bytes):
+    """(jpeg_bytes, width, height) under the messenger budget, or None."""
+    import io
+    from PIL import Image
+    try:
+        img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    except Exception:
+        return None
+    long_edge = max(img.size)
+    if long_edge > _OG_PREVIEW_MAX_EDGE:
+        scale = _OG_PREVIEW_MAX_EDGE / long_edge
+        img = img.resize(
+            (max(1, round(img.width * scale)), max(1, round(img.height * scale))),
+            Image.LANCZOS,
+        )
+    for quality in (80, 70, 60, 50):
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=quality, optimize=True)
+        if buf.tell() <= _OG_PREVIEW_MAX_BYTES:
+            return buf.getvalue(), img.width, img.height
+    # Even q50 is over budget (an extreme edge) — halve the pixels and accept.
+    img = img.resize((max(1, img.width // 2), max(1, img.height // 2)), Image.LANCZOS)
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=60, optimize=True)
+    return buf.getvalue(), img.width, img.height
+
+
+def _delete_share_previews(share_id: str) -> None:
+    """Best-effort: remove the stored preview copies for one share."""
+    try:
+        from firebase_admin import storage as fb_storage
+        bucket = fb_storage.bucket()
+        for blob in bucket.list_blobs(prefix=f"share_previews/{share_id}/"):
+            blob.delete()
+    except Exception:
+        pass
+
+
+def _generate_og_preview(share_type: str, doc: dict, share_id: str) -> Optional[dict]:
+    """{url, width, height} for the share's link preview, or None.
+
+    The source image is fetched back through scraper.safe_get — the payload is
+    client-supplied, so its URLs must pass the same SSRF guard as any queue-doc
+    URL. The copy is stored under a fresh token per publish, so a republish
+    changes the og:image URL and busts crawler-side image caches. The blob path
+    embeds only the share id — never the owner's uid — because og:image is
+    world-visible.
+    """
+    if share_type == "card":
+        src = _card_thumb(doc.get("card") or {})
+    else:
+        src = next((t for t in (_card_thumb(c) for c in (doc.get("cards") or [])) if t), None)
+    if not src or not isinstance(src, str) or not src.startswith("http"):
+        return None
+
+    from scraper import safe_get
+    resp = safe_get(src, timeout=15)
+    resp.raise_for_status()
+    content = resp.content
+    if not content or len(content) > _OG_SOURCE_MAX_BYTES:
+        return None
+    scaled = _downscale_og_preview(content)
+    if not scaled:
+        return None
+    jpeg, width, height = scaled
+
+    import uuid
+    from urllib.parse import quote
+    from firebase_admin import storage as fb_storage
+    _delete_share_previews(share_id)  # a republish replaces, never accumulates
+    bucket = fb_storage.bucket()
+    blob_path = f"share_previews/{share_id}/{uuid.uuid4().hex[:12]}.jpg"
+    blob = bucket.blob(blob_path)
+    token = uuid.uuid4().hex
+    blob.metadata = {"firebaseStorageDownloadTokens": token}
+    blob.upload_from_string(jpeg, content_type="image/jpeg")
+    url = (f"https://firebasestorage.googleapis.com/v0/b/{bucket.name}/o/"
+           f"{quote(blob_path, safe='')}?alt=media&token={token}")
+    return {"url": url, "width": width, "height": height}
 
 
 def _render_collection_item(card: dict) -> str:
@@ -638,9 +760,11 @@ def _render_shared_collection(data: dict, share_url: str) -> str:
       <div class="actions"><a class="btn btn-primary" href="{_esc(WEB_URL)}">Open in Machina</a></div>
     </div>"""
     og_desc = _md_to_plain(description) or f"A curated collection of {count} card{'s' if count != 1 else ''} on Machina — summaries, sources, and links."
+    og_image, og_w, og_h, og_type = _og_image_meta(data.get("ogPreview"), image)
     return _share_html_shell(
         title=name, description=og_desc,
-        image=image, url=share_url, body=body,
+        image=og_image, url=share_url, body=body,
+        image_width=og_w, image_height=og_h, image_type=og_type,
     )
 
 
@@ -706,6 +830,17 @@ def _publish_share_logic(uid: str, share_type: str, share_id: str, payload: dict
     doc["shareId"] = share_id
     doc["publishedAt"] = now_ms
 
+    # Link-preview image for messengers (see _generate_og_preview). Best-effort:
+    # publishing must never fail because the preview couldn't be built, and an
+    # imageless card simply shares without one (the page falls back to the icon).
+    doc.pop("ogPreview", None)  # server-generated only — never trust a client copy
+    try:
+        preview = _generate_og_preview(share_type, doc, share_id)
+        if preview:
+            doc["ogPreview"] = preview
+    except Exception as e:
+        logger.warning(f"og preview generation failed for {share_id}: {e}")
+
     db.collection(public_coll).document(share_id).set(doc)
     db.collection("shared_owners").document(share_id).set({
         "ownerUid": uid, "type": share_type, "publishedAt": now_ms,
@@ -728,4 +863,5 @@ def _unpublish_share_logic(uid: str, share_type: str, share_id: str) -> dict:
 
     db.collection(public_coll).document(share_id).delete()
     db.collection("shared_owners").document(share_id).delete()
+    _delete_share_previews(share_id)
     return {"success": True}

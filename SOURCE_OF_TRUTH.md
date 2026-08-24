@@ -1529,6 +1529,52 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-24 — multi-screenshot round 2 from owner device QA (works on
+  device; three fixes). BUILT, not yet shipped.** (1) **Reorder feedback**: the
+  live tile swap was easy to miss, so the drag now speaks — a light buzz on
+  pickup, a selection tick every time the dragged tile crosses a slot (the iOS
+  picker detent feel), a light buzz on drop (`hapticLight`/`hapticSelection`
+  in `AddLinkForm`). (2) **Open card gallery is a CAROUSEL, not a stack**: one
+  image with the rest a flick away — horizontal scroll-snap, a "2/4" counter
+  chip, iOS-style dots in a blurred pill, pinned `dir="ltr"` so slide 1 starts
+  visible and the flick direction is identical on Hebrew cards; zoom-to-open
+  and per-URL broken-image handling preserved; slide position resets when
+  navigating to a related card. (3) **Em-dash purge in the capture dialog**:
+  every rendered string in `AddLinkForm` (subtitle, note placeholder, strip
+  captions, all its toasts/errors) rewritten by sentence role, same method as
+  the tour purge; code comments keep theirs. Verified: `tsc --noEmit` clean.
+  NOT verified: on-device feel of the haptic cadence and the snap physics.
+
+- **2026-08-24 — WhatsApp/messenger link previews for shared cards. BUILT, not
+  yet shipped.** Owner, with a WhatsApp screenshot: sharing a card showed only
+  the bare `mymachina.app/s?id=…` link, no preview card. The OG tags were
+  already there — the two classic WhatsApp killers were not: **no
+  `og:image:width/height/type`** (WhatsApp often renders NOTHING on a first
+  share of an undeclared-size image) and **the raw stored screenshot as
+  `og:image`** (WhatsApp silently drops images past ~300 KB, which downgrades
+  the whole message to a bare link). Fix, all in `share_service.py` +
+  `share_page`: `_publish_share_logic` now generates a dedicated preview at
+  publish time — `_generate_og_preview` fetches the card's image back through
+  `scraper.safe_get` (payload is client-supplied → same SSRF gate as queue
+  docs), downscales to ≤1000 px / ≤280 KB JPEG (`_downscale_og_preview`,
+  quality ladder 80→50 then pixel-halve), stores it at
+  `share_previews/{shareId}/` (share id only in the path, never the uid — the
+  URL is world-visible) with a fresh token per publish so republishes bust
+  crawler image caches, and writes `ogPreview {url,width,height}` into the
+  share doc (server-generated only; a client-sent copy is stripped). The share
+  page emits `og:image:width/height/type` from it; the 512px icon fallback
+  gets static dims; a legacy share with no preview keeps today's behavior.
+  Unpublish deletes the stored previews. Also fixed in passing: the share
+  page's not-found response was CDN-cacheable for 5 min — but the share sheet
+  opens BEFORE the publish lands, so a fast crawler could poison the CDN with
+  a 404 the human recipient then saw; not-found is now `no-store`. Verified:
+  `py_compile` clean + a stubbed-db smoke test (meta emission for
+  preview/icon/legacy paths; 3000×2000 PNG → 1000×667 JPEG under budget).
+  NOT verified: a live WhatsApp crawl (egress-blocked sandbox). NOTE for QA:
+  WhatsApp caches previews per-URL for days — after shipping, test by SHARING
+  THE CARD AGAIN (each share publishes a fresh shareId/URL), not by re-sending
+  the old link.
+
 - **2026-08-24 — multi-screenshot cards: up to 5 ordered screenshots become ONE
   card (web capture). SHIPPED (merge `25894ea` → Vercel + functions run #87
   covering `share_ingest`/`process_link_background`/`analyze_image` +

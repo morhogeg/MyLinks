@@ -3449,6 +3449,14 @@ def share_page(req: https_fn.Request) -> https_fn.Response:
         # Let CDNs/crawlers cache briefly; cards are immutable snapshots.
         "Cache-Control": "public, max-age=300, s-maxage=600",
     }
+    # Not-found must NEVER be CDN-cached: the share flow opens the OS share
+    # sheet while the publish is still in flight, so a link-preview crawler can
+    # legitimately arrive seconds before the snapshot exists — a cached 404
+    # would then serve "not found" to the human recipient too.
+    nf_headers = {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "no-store",
+    }
     try:
         share_id = (req.args.get("id") or "").strip()
         is_collection = "/c" in req.path
@@ -3456,24 +3464,25 @@ def share_page(req: https_fn.Request) -> https_fn.Response:
         share_url = f"{WEB_URL}{'/c' if is_collection else '/s'}?id={share_id}"
 
         if not share_id:
-            return https_fn.Response(_share_not_found_html(), status=404, headers=html_headers)
+            return https_fn.Response(_share_not_found_html(), status=404, headers=nf_headers)
 
         db = get_db()
         collection = "shared_collections" if is_collection else "shared_cards"
         snap = db.collection(collection).document(share_id).get()
         if not snap.exists:
-            return https_fn.Response(_share_not_found_html(), status=404, headers=html_headers)
+            return https_fn.Response(_share_not_found_html(), status=404, headers=nf_headers)
 
         data = snap.to_dict() or {}
         if is_collection:
             html_out = _render_shared_collection(data, share_url)
         else:
-            html_out = _render_shared_card(data.get("card", {}) or {}, share_url)
+            html_out = _render_shared_card(data.get("card", {}) or {}, share_url,
+                                           og_preview=data.get("ogPreview"))
         return https_fn.Response(html_out, status=200, headers=html_headers)
 
     except Exception as e:
         logger.error(f"share_page failed: {e}", exc_info=True)
-        return https_fn.Response(_share_not_found_html(), status=200, headers=html_headers)
+        return https_fn.Response(_share_not_found_html(), status=200, headers=nf_headers)
 
 
 # ─────────────────────────────────────────────
