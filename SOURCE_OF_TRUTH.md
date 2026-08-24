@@ -226,9 +226,19 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-08-24): fix the APNs key, and install build **1293**
+> ## 🚨 OWNER ACTION (updated 2026-08-24): fix the APNs key, and install build **1294**
 >
-> **1293** (run #293, merge `25894ea`) is current: everything in 1292 plus
+> **1294** (run #294, merge `11978d4`) is current: everything in 1293 plus the
+> multi-screenshot QA round (drag-to-reorder now ticks haptically per slot;
+> the open card shows its screenshots as a swipe carousel with counter + dots
+> instead of a vertical stack; the capture dialog's copy lost its em dashes)
+> and, server-side, WhatsApp link previews for shared cards. QA: reorder the
+> strip and feel the detents; open a multi-screenshot card and flick through
+> the slides; SHARE A CARD FRESH to WhatsApp (a re-sent old link stays
+> cached by WhatsApp for days) and check the rich preview renders. 1293
+> stays the fallback. The APNs step below is unchanged and still pending.
+>
+> **(superseded) 1293** (run #293, merge `25894ea`): everything in 1292 plus
 > multi-screenshot cards — the + button's Image tab takes up to 5 screenshots
 > that become ONE card (drag-to-reorder strip in the confirm step; feed banner
 > shows image 1 with a "1/N" chip; the open card shows the whole set in
@@ -1530,7 +1540,8 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 
 - **2026-08-24 — multi-screenshot round 2 from owner device QA (works on
-  device; three fixes). BUILT, not yet shipped.** (1) **Reorder feedback**: the
+  device; three fixes). SHIPPED (merge `11978d4` → Vercel + TestFlight run
+  #294 = build 1294).** (1) **Reorder feedback**: the
   live tile swap was easy to miss, so the drag now speaks — a light buzz on
   pickup, a selection tick every time the dragged tile crosses a slot (the iOS
   picker detent feel), a light buzz on drop (`hapticLight`/`hapticSelection`
@@ -1545,8 +1556,9 @@ exact-match, capped.
   the tour purge; code comments keep theirs. Verified: `tsc --noEmit` clean.
   NOT verified: on-device feel of the haptic cadence and the snap physics.
 
-- **2026-08-24 — WhatsApp/messenger link previews for shared cards. BUILT, not
-  yet shipped.** Owner, with a WhatsApp screenshot: sharing a card showed only
+- **2026-08-24 — WhatsApp/messenger link previews for shared cards. SHIPPED
+  (merge `11978d4` → functions run #88 covering
+  `publish_share_http`/`unpublish_share_http`/`share_page`).** Owner, with a WhatsApp screenshot: sharing a card showed only
   the bare `mymachina.app/s?id=…` link, no preview card. The OG tags were
   already there — the two classic WhatsApp killers were not: **no
   `og:image:width/height/type`** (WhatsApp often renders NOTHING on a first
