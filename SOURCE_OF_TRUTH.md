@@ -237,7 +237,7 @@ The multi-user auth work described below **was** fully written but not live:
 > domains, then the Vercel env flip). QA: sign-in screen shows the tagline.
 > 1295 stays the fallback. The APNs step below is unchanged and still pending.
 >
-> **(superseded) 1295** (run #295, merge `31b582f`) is current: everything in 1294 plus the
+> **(superseded) 1295** (run #295, merge `31b582f`): everything in 1294 plus the
 > honesty round on multi-image saves. The pill can no longer say "Done!" while
 > the card says "Saving" (the queued-capture 100% snap is gone; the pill now
 > ends only when the card actually resolves), an active pill at the ramp
