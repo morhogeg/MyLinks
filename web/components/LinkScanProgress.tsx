@@ -106,7 +106,7 @@ export default function LinkScanProgress({ url, progress, activeStep }: LinkScan
                 dialog (not the app). */}
             {!done && (
                 <p className="text-xs text-text-muted text-center">
-                    You can close this window — Machina keeps working in the background.
+                    You can close this window. Machina keeps working in the background.
                 </p>
             )}
         </div>
