@@ -1143,15 +1143,22 @@ The multi-user auth work described below **was** fully written but not live:
     signed-out reviewer can read. Both are addressed; see the 2026-08-06 (round 3)
     §9 entry for how, and `web/components/LandingPage.tsx` for the page. What is
     **not** closed by it:
-    - **25a. [ ] OWNER: verify domain ownership in Google Search Console.**
+    - **25a. [x] OWNER: verify domain ownership in Google Search Console —
+      DONE (confirmed 2026-08-24; see 25b).**
       Google's **fourth** rejection reason — *"the website is not registered to
       you"* — is not a page problem and no code change touches it. Add
       `mymachina.app` as a property in Search Console under the **same Google
       account that owns the Cloud project**, verify by DNS TXT at Cloudflare
       (the registrar is already there, so this is one record), then make sure
       that account is listed as an owner of the OAuth project.
-    - **25b. [ ] OWNER: re-submit "Verify branding" — but only AFTER the page is
-      live.** **Status 2026-08-23:** three of the four reasons are cleared;
+    - **25b. [x] OWNER: re-submit "Verify branding" — DONE, VERIFIED PASSED
+      2026-08-24.** Owner screenshot of the Google account chooser: it now
+      reads *"to continue to **Machina**"* AND renders the custom Machina
+      logo — and the logo only shows after Google approves the branding
+      verification, so this is proof of approval, not just of the app name.
+      The "Developer Information" popover shows *App name: Machina, Support
+      email: morhogeg@gmail.com* — swapping that to `support@mymachina.app`
+      is the new 25d below. Original steps kept for history: **Status 2026-08-23:** three of the four reasons are cleared;
       only *"does not explain the purpose"* remained, and the copy fix for it
       is **LIVE** on `mymachina.app/welcome` (merge `cd231d7`, then `006f222`
       splitting it into definition + narrative beats after owner QA showed a
@@ -1165,6 +1172,23 @@ The multi-user auth work described below **was** fully written but not live:
       Do 25a first or the fourth reason simply comes back on its own. Nothing
       else depends on this review: it gates only whether the custom **logo**
       shows on the consent screen — the app *name* already does.
+    - **25d. [ ] OWNER: consent-screen support email → `support@mymachina.app`.**
+      The "User support email" dropdown (Cloud console → Google Auth Platform →
+      Branding) only offers the signed-in account's own email or a **Google
+      Group the account manages** — a Cloudflare routing alias is neither, so
+      `support@mymachina.app` cannot be typed in directly. The free path:
+      (1) sign up **Cloud Identity Free** for `mymachina.app` at
+      admin.google.com using the SAME Google account that owns the Cloud
+      project, verifying the domain by DNS TXT at Cloudflare (one record, same
+      pattern as the Search Console TXT); (2) in the Admin console create a
+      Google **Group** `support@mymachina.app` and add `morhogeg@gmail.com` as
+      its **owner**; (3) back in Branding, pick it from the dropdown (may take
+      a while to appear) and save. **Do NOT touch the MX records** — mail to
+      `support@` keeps flowing through Cloudflare to Gmail exactly as today
+      (§4 task 26); the group exists only as the selectable identity. Caveat:
+      any Branding edit can trigger a quick re-review — verification just
+      passed, so expect at worst a short re-check, and don't bundle other
+      branding changes into the same save.
     - **25c. [ ] The launch film is NOT on the landing page, and is still
       D-3-blocked from going on it.** The 2026-08-06 (round 4) rebuild replaced
       the video plan with the scroll-driven `GatherScene` — act one rebuilt in
@@ -1194,6 +1218,10 @@ The multi-user auth work described below **was** fully written but not live:
     new user decides whether to trust the app. Fix order: **OAuth consent-screen
     App name first** (free, minutes, likely sufficient on its own), then 25a/25b
     if it still shows a host, and only then this item for the address bar.
+    **RESOLVED IN PART 2026-08-24:** 25a/25b landed and the chooser now reads
+    "to continue to Machina" with the logo (owner screenshot) — the project id
+    is gone from the trust moment. What this item still covers is ONLY the
+    popup's address bar, which is genuinely cosmetic now; unchanged priority.
 
 23. **[ ] Give the app real routes (`/ask`, `/collections`, …).** The entire app
     is ONE route: `web/app/page.tsx:149` holds a `feedTab` state
@@ -1549,6 +1577,22 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-08-24 — Google OAuth branding verification PASSED (owner console
+  work; docs-only session update, no deploy).** Owner screenshot of the Google
+  account chooser: *"to continue to **Machina**"* with the custom Machina logo
+  rendered — the logo only shows after Google approves branding verification,
+  so 25a (Search Console domain ownership) and 25b (the "Verify branding"
+  resubmit, all four rejection reasons addressed) are DONE and checked off in
+  §4. Item 24 (`authDomain` on the brand domain) narrows back to the popup
+  address bar only — the project id no longer appears at the trust moment.
+  NEW owner step 25d: the chooser's Developer Information still lists
+  `morhogeg@gmail.com` as the support email; swapping it to
+  `support@mymachina.app` requires a Google-recognized identity (Cloud
+  Identity Free on the domain + a Google Group the owner account manages —
+  full recipe in 25d), because the Branding dropdown only accepts the
+  account's own email or a managed group, never a Cloudflare alias. MX stays
+  Cloudflare throughout.
 
 - **2026-08-24 — multi-screenshot round 3 from owner QA on build 1294.
   SHIPPED (merge `31b582f` → Vercel + TestFlight run #295 = build 1295; no
