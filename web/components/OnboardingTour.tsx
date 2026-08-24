@@ -156,7 +156,7 @@ function StructuredCardMock() {
                 </div>
                 <p className="text-[13px] font-bold text-text leading-tight">The science of deep focus</p>
                 <p className="text-[11px] text-text-secondary leading-relaxed">
-                    Sustained attention is a trainable skill — short, undistracted blocks beat long fractured ones.
+                    Sustained attention is a trainable skill. Short, undistracted blocks beat long fractured ones.
                 </p>
                 {/* Auto tags — the card's real chip style */}
                 <div className="flex flex-wrap gap-1.5 pt-0.5">
@@ -185,17 +185,22 @@ function StructuredCardMock() {
     composer pill. */
 function AskMock() {
     return (
-        <div className="w-full flex flex-col gap-3" aria-hidden>
+        // Same framed card every other step's mock uses. Without it the parts
+        // floated straight on the page background and the step didn't read as
+        // "here is a piece of the app" like its neighbours did (owner, iOS QA
+        // 2026-08-24). Inner surfaces drop to fill/background tones so they
+        // still separate from the frame instead of sitting card-on-card.
+        <div className="w-full rounded-2xl bg-card border border-border-subtle shadow-xl p-3.5 flex flex-col gap-3" aria-hidden>
             {/* Question — the real user pill */}
             <div className="self-end max-w-[80%] px-3.5 py-2 rounded-2xl rounded-br-md bg-accent text-accent-ink">
                 <p className="text-[12px] leading-relaxed">What have I saved about staying focused?</p>
             </div>
             {/* Answer — plain text on the page, exactly like the real Ask */}
-            <p className="px-1 text-[12.5px] text-text leading-relaxed">
+            <p className="px-0.5 text-[12.5px] text-text leading-relaxed">
                 Your saves point to one habit: protect short, single-task blocks and remove ambient distractions.
             </p>
             {/* Citation — the real source chip: bracket-glyph tile, source, title */}
-            <div className="self-start flex items-center gap-2.5 max-w-full ps-2.5 pe-3.5 py-2 rounded-xl bg-card border border-border-subtle shadow-sm">
+            <div className="self-start flex items-center gap-2.5 max-w-full ps-2.5 pe-3.5 py-2 rounded-xl bg-fill-subtle">
                 <span className="shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-lg bg-accent/10 text-accent">
                     <CitationGlyph className="w-3.5 h-auto" />
                 </span>
@@ -205,7 +210,7 @@ function AskMock() {
                 </span>
             </div>
             {/* Composer — grounds the scene as the real Ask screen */}
-            <div className="flex items-center gap-2 p-2 mt-1 rounded-2xl bg-card border border-border-subtle shadow-sm">
+            <div className="flex items-center gap-2 p-2 mt-1 rounded-2xl bg-background border border-border-subtle">
                 <span className="flex-1 px-2 text-[11.5px] text-text-muted truncate">Ask about anything you’ve saved…</span>
                 <span className="shrink-0 w-7 h-7 rounded-full bg-accent text-accent-ink flex items-center justify-center">
                     <ArrowUp className="w-3.5 h-3.5" />
@@ -411,43 +416,43 @@ function buildSteps(native: boolean): Step[] {
             eyebrow: 'Capture',
             title: 'Save anything, from anywhere',
             body: native
-                ? 'Links, screenshots, images, or a quick note — share them to Machina from any app, or capture right here. No copy-paste, no switching apps.'
-                : 'Share to Machina from any app on your phone — or capture right here with +: paste a link, add a screenshot, jot a thought. Every save lands as a card.',
+                ? 'Links, screenshots, images, or a quick note. Share them to Machina from any app, or capture right here. No copy-paste, no switching apps.'
+                : 'Share to Machina from any app on your phone, or capture right here with +: paste a link, add a screenshot, jot a thought. Every save lands as a card.',
             visual: <CaptureMock native={native} />,
         },
         {
             icon: <CitationGlyph className="w-4 h-auto" />,
             eyebrow: 'Understand',
             title: 'Every save gets understood',
-            body: 'Machina reads the whole thing — article, video, screenshot, or note — and files a clean card: a summary, key points, smart tags, and a category. No manual filing.',
+            body: 'Machina reads every article, video, screenshot, and note in full, then files a clean card: a summary, key points, smart tags, and a category. No manual filing.',
             visual: <StructuredCardMock />,
         },
         {
             icon: <Waypoints className="w-4 h-4" />,
             eyebrow: 'Connect',
             title: 'Your saves find each other',
-            body: 'Each new save is matched against everything you’ve kept — truly related cards appear on the card itself, and the graph shows your library as one connected map.',
+            body: 'Each new save is matched against everything you’ve kept. Truly related cards appear on the card itself, and the graph shows your library as one connected map.',
             visual: <GraphMock />,
         },
         {
             icon: <MessageCircleQuestion className="w-4 h-4" />,
             eyebrow: 'Recall',
             title: 'Ask your own knowledge',
-            body: 'Ask in plain words and get a real answer — drawn only from what you’ve saved, with citations back to the exact source.',
+            body: 'Ask in plain words and get a real answer, drawn only from what you’ve saved, with citations back to the exact source.',
             visual: <AskMock />,
         },
         {
             icon: <Search className="w-4 h-4" />,
             eyebrow: 'Find',
             title: 'Search the way you remember',
-            body: 'Type what you remember, not the exact words — “that video about waking up early” finds the morning-routine talk. In English or Hebrew, however you saved it.',
+            body: 'Type what you remember, not the exact words: “that video about waking up early” finds the morning-routine talk. In English or Hebrew, however you saved it.',
             visual: <SearchMock />,
         },
         {
             icon: <Layers className="w-4 h-4" />,
             eyebrow: 'Organize',
             title: 'Collect what belongs together',
-            body: 'Group saves into collections for every project or theme — and put the personal ones behind a PIN, visible only to you.',
+            body: 'Group saves into collections for every project or theme, and put the personal ones behind a PIN, visible only to you.',
             visual: <CollectionsMock />,
         },
         {
@@ -461,7 +466,7 @@ function buildSteps(native: boolean): Step[] {
             icon: <CitationGlyph className="w-4 h-auto" />,
             eyebrow: 'You’re set',
             title: 'Your Machina is ready',
-            body: 'Save from any app or right here, and every save is read, tagged, and connected — ready to answer your questions with citations, and to resurface when it matters. Save your first thing to see it work.',
+            body: 'Save from any app or right here, and every save is read, tagged, and connected, ready to answer your questions with citations and to resurface when it matters. Save your first thing to see it work.',
             visual: <ReadyMock />,
         },
     ];
