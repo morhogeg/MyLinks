@@ -142,7 +142,9 @@ export default function LinkDetailModal({
     // write one. Both reset on card navigation below.
     const [summaryOpen, setSummaryOpen] = useState(false);
     const [summaryBusy, setSummaryBusy] = useState(false);
-    const [imgFailed, setImgFailed] = useState(false);
+    // Broken-image fallbacks, keyed by URL — a multi-screenshot card renders a
+    // gallery, and one dead image must not blank its healthy neighbours.
+    const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
     // Reset the broken-image fallback when navigating to a different card. Done
     // as a render-time state adjustment (React discards this pass and re-renders
     // synchronously) rather than in an effect, avoiding a set-state-in-effect
@@ -150,7 +152,7 @@ export default function LinkDetailModal({
     const [imgLinkId, setImgLinkId] = useState(link.id);
     if (imgLinkId !== link.id) {
         setImgLinkId(link.id);
-        setImgFailed(false);
+        setFailedImages({});
         // Abandon any in-progress edit when navigating to another card so a draft
         // never leaks onto the wrong card.
         setIsEditingTitle(false);
@@ -312,7 +314,10 @@ export default function LinkDetailModal({
     };
     const startAddNote = () => { setNoteDraft(''); noteActionRef.current = null; setEditingNoteId(NEW_NOTE_ID); };
     const startEditNote = (n: UserNote) => { setNoteDraft(n.text); noteActionRef.current = null; setEditingNoteId(n.id); };
-    const hasValidImage = isHttpUrl(link.url);
+    // The ordered image set behind a screenshot card: the multi-image array when
+    // present, else the single stored image. Scheme-guarded — a stored
+    // javascript:/data: value must never render or open.
+    const galleryUrls = (link.imageUrls?.length ? link.imageUrls : [link.url]).filter((u): u is string => isHttpUrl(u));
 
     // Scroll back to the top when the card changes. Opening a related card reuses
     // this same scroll container, so without this it would open scrolled down to
@@ -679,28 +684,41 @@ export default function LinkDetailModal({
                     className="flex-1 overflow-y-auto pt-4 px-4 pb-4 sm:px-6 sm:pb-6 md:px-8 md:pb-8 scrollbar-soft"
                     dir="auto"
                 >
-                    {/* Content Section — screenshot/image source */}
+                    {/* Content Section — screenshot/image source. A multi-screenshot
+                        card renders its FULL ordered set here (the feed banner shows
+                        only image 1 with a count); each image keeps the same
+                        zoom-to-open behavior, and one broken image never hides its
+                        neighbours. */}
                     {link.sourceType === 'image' && (
-                        hasValidImage && !imgFailed ? (
-                            <div className="mb-6 rounded-2xl overflow-hidden border border-border-subtle bg-card-hover group/img relative">
-                                <img
-                                    src={link.url}
-                                    alt="Source screenshot"
-                                    onError={() => setImgFailed(true)}
-                                    className="w-full h-auto max-h-[400px] object-contain cursor-zoom-in transition-transform duration-500 group-hover/img:scale-105"
-                                    onClick={() => {
-                                        // Guard the scheme (never open a stored javascript:/data: URL)
-                                        // and pass noopener so the opened page can't reach window.opener.
-                                        if (isHttpUrl(link.url)) {
-                                            window.open(link.url, '_blank', 'noopener,noreferrer');
-                                        }
-                                    }}
-                                />
-                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-                                    <span className="text-white text-xs font-bold px-3 py-1.5 bg-black/60 rounded-full backdrop-blur-md border border-white/20">
-                                        Click to View Original
-                                    </span>
-                                </div>
+                        galleryUrls.some((u) => !failedImages[u]) ? (
+                            <div className="mb-6 space-y-3">
+                                {galleryUrls.map((u, i) => failedImages[u] ? null : (
+                                    <div key={u} className="rounded-2xl overflow-hidden border border-border-subtle bg-card-hover group/img relative">
+                                        <img
+                                            src={u}
+                                            alt={galleryUrls.length > 1 ? `Screenshot ${i + 1} of ${galleryUrls.length}` : 'Source screenshot'}
+                                            onError={() => setFailedImages((prev) => ({ ...prev, [u]: true }))}
+                                            className="w-full h-auto max-h-[400px] object-contain cursor-zoom-in transition-transform duration-500 group-hover/img:scale-105"
+                                            onClick={() => {
+                                                // Guard the scheme (never open a stored javascript:/data: URL)
+                                                // and pass noopener so the opened page can't reach window.opener.
+                                                if (isHttpUrl(u)) {
+                                                    window.open(u, '_blank', 'noopener,noreferrer');
+                                                }
+                                            }}
+                                        />
+                                        {galleryUrls.length > 1 && (
+                                            <span className="absolute top-2 end-2 text-[10px] font-bold text-white bg-black/60 px-2 py-0.5 rounded-full pointer-events-none">
+                                                {i + 1}/{galleryUrls.length}
+                                            </span>
+                                        )}
+                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                                            <span className="text-white text-xs font-bold px-3 py-1.5 bg-black/60 rounded-full backdrop-blur-md border border-white/20">
+                                                Click to View Original
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         ) : (
                             <div className="mb-6 rounded-2xl border border-dashed border-border-subtle bg-card-hover/50 px-4 py-8 flex flex-col items-center justify-center gap-2 text-center">
