@@ -24,6 +24,14 @@ export interface AnalyzingState {
  * (LinkScanProgress / ImageScanProgress / VideoScanProgress) so the banner reads
  * as genuinely working through stages, not a static "Analyzing".
  */
+/** Ellipsize a phase label — except the terminal 'Done!' beat, which must never
+    render as "Done!…" on a still-ACTIVE banner (owner-reported, build 1294). An
+    active banner at the ramp ceiling is still working, so say so; the real
+    finish is the `done` frame's "Saved to Machina". */
+function working(label: string): string {
+    return (label === 'Done!' ? 'Wrapping up' : label) + '…';
+}
+
 function phaseStatus(
     kind: AnalyzingState['kind'],
     pct: number,
@@ -33,7 +41,7 @@ function phaseStatus(
     // in-dialog ImageScanProgress and the iOS share sheet narrate, so the
     // banner can never drift into a third wording again.
     if (kind === 'image') {
-        return { label: imageScanLabel(pct) + '…', orb: imageScanOrb(pct) };
+        return { label: working(imageScanLabel(pct)), orb: imageScanOrb(pct) };
     }
     if (kind === 'video') {
         if (pct >= 92) return { label: 'Organizing & tagging…', orb: 'solving' };
@@ -45,16 +53,16 @@ function phaseStatus(
     // doesn't claim to be fetching anything (shared source: TEXT_SCAN_STEPS).
     if (kind === 'text') {
         if (stageStep != null && TEXT_SCAN_STEPS[stageStep]) {
-            return { label: TEXT_SCAN_STEPS[stageStep] + '…', orb: LINK_SCAN_ORBS[stageStep] };
+            return { label: working(TEXT_SCAN_STEPS[stageStep]), orb: LINK_SCAN_ORBS[stageStep] };
         }
-        return { label: textScanLabel(pct) + '…', orb: linkScanOrb(pct) };
+        return { label: working(textScanLabel(pct)), orb: linkScanOrb(pct) };
     }
     // link / web article — mirror the in-dialog stepper exactly (shared source).
     // Pin to the backend stage when reported; else derive the phase from the %.
     if (stageStep != null && LINK_SCAN_STEPS[stageStep]) {
-        return { label: LINK_SCAN_STEPS[stageStep] + '…', orb: LINK_SCAN_ORBS[stageStep] };
+        return { label: working(LINK_SCAN_STEPS[stageStep]), orb: LINK_SCAN_ORBS[stageStep] };
     }
-    return { label: linkScanLabel(pct) + '…', orb: linkScanOrb(pct) };
+    return { label: working(linkScanLabel(pct)), orb: linkScanOrb(pct) };
 }
 
 /**

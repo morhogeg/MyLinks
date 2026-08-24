@@ -693,13 +693,15 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                     throw saveError(err instanceof Error ? err.message : `Network error: ${String(err)}`, 'network');
                 }
 
-                // Queued durably — the honest success moment. Close now; the
-                // feed's processing card + pill carry the rest, exactly like a
-                // share-sheet capture.
+                // Queued durably — the honest success moment for the CAPTURE,
+                // not the analysis. Deliberately NO progress-100 frame here: the
+                // ack only means the set was queued, and snapping the banner to
+                // "Done" while the card still reads "Saving" is the exact
+                // dishonest finish the video path was cured of (2026-08-01).
+                // Close now; the feed's processing card + Firestore pill carry
+                // the real ramp until the card actually resolves.
                 trackSaveSucceeded('web_form');
                 trackFirstSave();
-                setProgress(100);
-                await new Promise((r) => setTimeout(r, 400));
                 clearImages();
                 setIsExpanded(false);
                 hapticSuccess();

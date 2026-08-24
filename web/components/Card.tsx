@@ -94,6 +94,22 @@ function Card({
     const enterDelay = `${Math.min(index, 10) * 16}ms`;
     // Screenshot captures have no scraped thumbnail — their own url IS the image.
     const thumbnailUrl = cardThumbnailUrl(link);
+    // Banner resilience for screenshot cards: if the first image fails to load,
+    // step through the rest of the set (a multi-screenshot card has up to 5)
+    // instead of leaving the OS broken-image glyph in the banner; when every
+    // candidate fails the banner is dropped and the card reads as text. The
+    // ref-attach check covers an image that failed BEFORE hydration, which never
+    // delivers an onError (the PosterImage lesson).
+    const bannerCandidates =
+        link.sourceType === 'image'
+            ? Array.from(new Set([link.url, ...(link.imageUrls ?? [])])).filter((u) => isHttpUrl(u))
+            : thumbnailUrl ? [thumbnailUrl] : [];
+    const [bannerIdx, setBannerIdx] = useState(0);
+    const bannerSrc = bannerCandidates[bannerIdx] ?? null;
+    const bannerFailed = () => setBannerIdx((i) => i + 1);
+    const bannerRef = (el: HTMLImageElement | null) => {
+        if (el && el.complete && el.naturalWidth === 0) bannerFailed();
+    };
 
     // The source byline (branded platforms, screenshot/note, or plain publisher)
     // is one shared component now — see SourceByline. Do NOT reintroduce a
@@ -273,12 +289,15 @@ function Card({
                 and screenshots put the headline / subject. Video posters are excluded
                 here — they use the banner above. A screenshot's image is its own
                 `url`, not a scraped thumbnail — see `cardThumbnailUrl`. */}
-            {!link.hideThumbnail && link.sourceType !== 'youtube' && !link.metadata?.thumbnailIsVideo && thumbnailUrl && (
+            {!link.hideThumbnail && link.sourceType !== 'youtube' && !link.metadata?.thumbnailIsVideo && thumbnailUrl && bannerSrc && (
                 <div className="relative w-full h-28 sm:h-32 bg-black/40 overflow-hidden">
                     <img
-                        src={thumbnailUrl}
+                        key={bannerSrc}
+                        ref={bannerRef}
+                        src={bannerSrc}
                         alt=""
                         loading="lazy"
+                        onError={bannerFailed}
                         className="w-full h-full object-cover object-top transition-transform duration-300 [@media(hover:hover)]:group-hover:scale-[1.03]"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />

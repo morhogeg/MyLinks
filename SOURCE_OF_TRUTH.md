@@ -1529,6 +1529,33 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-24 — multi-screenshot round 3 from owner QA on build 1294. BUILT,
+  not yet shipped.** Four findings. (1+2, one root) **The pill said "Done!…
+  100%" while the card still said "Saving…"**: the multi-image submit snapped
+  its optimistic progress to 100 on the ENQUEUE ack — the same dishonest
+  finish the video path was cured of on 2026-08-01. The 100-frame is removed:
+  the dialog closes on ack and `pickBanner` hands the pill to the
+  Firestore-driven ramp (the placeholder card is already `processing`), which
+  ends only when the card actually resolves. The "Done!…" string itself was
+  `AnalyzingBanner.phaseStatus` blindly appending "…" to `imageScanLabel(100)`
+  = "Done!"; all five label sites now go through `working()`, which renders an
+  at-ceiling ACTIVE banner as "Wrapping up…" — "Saved to Machina" (the `done`
+  frame) is the only finish copy. (3) **Em dashes in the scanner dialogs**:
+  the footer lines of ImageScanProgress/LinkScanProgress/VideoScanProgress
+  ("You can close this window — …") rewritten as sentences. (4) **Feed banner
+  showed the OS broken-image glyph** on the fresh multi-screenshot card: the
+  banner `<img>` had NO error handling. It now steps through the card's whole
+  image set (url, then imageUrls) and drops the banner if every candidate
+  fails, with a ref-attach `naturalWidth` check for pre-hydration failures
+  (the PosterImage lesson). ROOT CAUSE OF THE FAILED LOAD ITSELF NOT
+  ESTABLISHED: the multi path stores via the same `_store_image` +
+  `screenshots/{uid}/` mechanics as single screenshots (which render), and the
+  worker demonstrably downloaded those exact URLs for analysis — suspect a
+  transient client-side load failure (the QA screenshot shows degraded
+  cellular). If it recurs THROUGH the fallback, check whether the open card's
+  carousel renders ANY slide — that distinguishes broken URLs from a broken
+  banner. Verified: `tsc --noEmit` clean. NOT verified: on device.
+
 - **2026-08-24 — multi-screenshot round 2 from owner device QA (works on
   device; three fixes). BUILT, not yet shipped.** (1) **Reorder feedback**: the
   live tile swap was easy to miss, so the drag now speaks — a light buzz on

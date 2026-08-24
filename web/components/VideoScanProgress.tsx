@@ -92,7 +92,7 @@ export default function VideoScanProgress({ thumbnailSrc, progress }: VideoScanP
                 app suspends the WebView and loses the save. */}
             {!done && (
                 <p className="text-xs text-text-muted text-center">
-                    This takes about a minute — you can close this window, Machina keeps working in the background.
+                    This takes about a minute. You can close this window and Machina keeps working in the background.
                 </p>
             )}
         </div>
