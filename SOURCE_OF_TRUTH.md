@@ -1201,7 +1201,42 @@ The multi-user auth work described below **was** fully written but not live:
       forbids on a user-visible surface. Owner call — accept it, or re-render
       `marketing/launch-clip/src/data/library.ts` with a different demo topic.
 
-24. **[ ] Move `authDomain` to the brand domain (own change, own verify pass).**
+24. **[~] Move `authDomain` to the brand domain — PROXY PLUMBING SHIPPED,
+    cutover is now an env flip gated on three console steps (2026-08-24).**
+    What shipped (inert until the flip): `web/vercel.json` rewrites
+    `/__/:path*` to the Firebase host, so `mymachina.app/__/auth/handler` (and
+    the handler's own `/__/firebase/init.json` fetch) serve Firebase's auth
+    pages through the brand domain; the global CSP `frame-src` gained `'self'
+    https://mymachina.app` (the SDK embeds `/__/auth/iframe` from the
+    authDomain), and a `/__/(.*)` header rule overrides the global
+    `X-Frame-Options: DENY` / `frame-ancestors 'none'` (which would have
+    blocked that iframe) with `frame-ancestors 'self' https://mymachina.app
+    https://my-links-sable.vercel.app`. KEY de-risk, verified in code: **native
+    iOS sign-in never touches authDomain** — `web/lib/auth.ts` drives the
+    native plugin + `signInWithCredential`; only the WEB popup/redirect flow
+    uses the handler, so the flip cannot break the app. **OWNER cutover
+    checklist, in order:**
+    (a) Google Cloud console → APIs & Services → Credentials → the Firebase
+        web OAuth client → add `https://mymachina.app/__/auth/handler` to
+        Authorized redirect URIs and `https://mymachina.app` to Authorized
+        JavaScript origins.
+    (b) Apple Developer → Identifiers → the Sign in with Apple **Services ID**
+        (web) → add `https://mymachina.app/__/auth/handler` to its Return
+        URLs. Skipping this breaks WEB Apple sign-in the moment you flip.
+    (c) Firebase console → Authentication → Settings → Authorized domains →
+        confirm `mymachina.app` is listed (it should be — sign-in FROM that
+        domain already works).
+    (d) Only then: Vercel → Project → Environment Variables →
+        `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` = `mymachina.app` → redeploy.
+        Verify in a private window on mymachina.app: Google sign-in AND Apple
+        sign-in, then the same from `my-links-sable.vercel.app`. Rollback =
+        revert the env var + redeploy (instant, no code).
+    (e) Optional, cosmetic consistency: update the GitHub secret
+        `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` for iOS builds — the native flow
+        ignores it, so this can wait.
+    Original item kept below for history.
+
+24-old. **[x] superseded by the staged plan above.**
     The Google sign-in popup's address bar still reads
     `secondbrain-app-94da2.firebaseapp.com` because `authDomain`
     (`web/lib/firebase.ts:26`, from `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`) is still
@@ -1577,6 +1612,21 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-08-24 — authDomain-to-brand-domain plumbing (§4 item 24). BUILT, not
+  yet shipped.** The Google sign-in popup's address bar still reads the
+  project host because `authDomain` is the Firebase host. Built the safe half:
+  a Vercel rewrite proxies `/__/:path*` to
+  `secondbrain-app-94da2.firebaseapp.com` so the auth handler serves from
+  `mymachina.app`, plus the CSP/X-Frame-Options carve-outs the handler's
+  iframe needs (details + full OWNER cutover checklist rewritten into §4 item
+  24). ALL INERT until the owner completes three console steps (OAuth client
+  redirect URI, Apple Services ID return URL, Firebase authorized domains)
+  and flips `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` to `mymachina.app` in Vercel —
+  an env change with instant rollback. Verified in code: native iOS sign-in
+  uses the native plugin + `signInWithCredential` and never touches
+  authDomain, so the flip can only affect web. NOT verified: the proxied
+  handler end-to-end (needs the deploy + console steps).
 
 - **2026-08-24 — sign-in screen carries the D-6 tagline. BUILT, not yet
   shipped.** Owner call: the sign-in subtitle switches from the D-2 tricolon
