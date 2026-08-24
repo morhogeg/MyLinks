@@ -226,9 +226,19 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-08-24): fix the APNs key, and install build **1292**
+> ## 🚨 OWNER ACTION (updated 2026-08-24): fix the APNs key, and install build **1293**
 >
-> **1292** (run #292, merge `a62d989`) is current: everything in 1291 plus two
+> **1293** (run #293, merge `25894ea`) is current: everything in 1292 plus
+> multi-screenshot cards — the + button's Image tab takes up to 5 screenshots
+> that become ONE card (drag-to-reorder strip in the confirm step; feed banner
+> shows image 1 with a "1/N" chip; the open card shows the whole set in
+> order). QA: pick 3-4 screenshots of one Hebrew carousel, reorder one tile,
+> save, and check the finished card's summary spans the LAST slide, the strip
+> order matches the gallery order, and a single-image save still lands fast on
+> the sync path. 1292 stays the fallback. The APNs step below is unchanged and
+> still pending.
+>
+> **(superseded) 1292** (run #292, merge `a62d989`): everything in 1291 plus two
 > tour fixes: no em dash survives in any rendered tour string, and the Recall
 > step's Ask mock now sits in the same framed card every other step uses. QA:
 > Settings → "Take the tour again", read all 8 steps for stray em dashes and
@@ -1520,7 +1530,9 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 
 - **2026-08-24 — multi-screenshot cards: up to 5 ordered screenshots become ONE
-  card (web capture). BUILT, not yet shipped.** The carousel use case: 3-4
+  card (web capture). SHIPPED (merge `25894ea` → Vercel + functions run #87
+  covering `share_ingest`/`process_link_background`/`analyze_image` +
+  TestFlight run #293 = build 1293).** The carousel use case: 3-4
   screenshotted slides of one Instagram post used to mean 3 fragments or 1 card
   that silently ignored the rest. Data model is ADDITIVE, no migration:
   `imageUrls?: string[]` on Link with `url` staying the FIRST image, so every
