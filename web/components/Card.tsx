@@ -417,8 +417,10 @@ function Card({
                     ⋯ hopping sides card-by-card), while the title/summary below
                     keep their bidirectional flow. */}
                 <div dir="ltr" className="relative flex items-center justify-between w-full h-7 mb-1">
-                    {/* Category Section (Start) - Fades out on hover */}
-                    <div className="flex items-center min-w-0 z-10 transition-opacity duration-200 group-hover:opacity-0">
+                    {/* Category Section (Start) - Fades out on hover, EXCEPT while
+                        the category is being edited: the hover actions must never
+                        fade out the field the user is typing in. */}
+                    <div className={`flex items-center min-w-0 z-10 transition-opacity duration-200 ${isEditingCategory ? '' : 'group-hover:opacity-0'}`}>
                         {(() => {
                             const colorStyle = getCategoryColorStyle(link.category);
                             return (
@@ -434,6 +436,7 @@ function Card({
                                                 }
                                             }}
                                             onCancel={() => setIsEditingCategory(false)}
+                                            className="w-40 text-[10px]"
                                         />
                                     ) : (
                                         <>
@@ -470,8 +473,13 @@ function Card({
 
                     {/* Source Tag (End) - Fades out on hover. YouTube and X use the
                         branded byline style right here in place of the muted chip;
-                        every other source keeps the muted uppercase chip. */}
-                    <div className="flex items-center gap-1.5 min-w-0 z-10 ms-auto transition-opacity duration-200 group-hover:opacity-0">
+                        every other source keeps the muted uppercase chip.
+                        Hidden outright while the category is being edited: this row
+                        is one line on a phone, and the editor (a text field plus its
+                        suggestion list) needs the whole of it — the byline sat under
+                        the field otherwise (owner, iOS QA 2026-08-24). It comes back
+                        the moment editing ends. */}
+                    <div className={`flex items-center gap-1.5 min-w-0 z-10 ms-auto transition-opacity duration-200 group-hover:opacity-0 ${isEditingCategory ? 'hidden' : ''}`}>
                         {/* Private marker — icon only, matching the collection tiles. */}
                         {link.isPrivate && (
                             <span
