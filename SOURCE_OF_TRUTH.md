@@ -226,9 +226,16 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-08-24): fix the APNs key, and install build **1291**
+> ## 🚨 OWNER ACTION (updated 2026-08-24): fix the APNs key, and install build **1292**
 >
-> **1291** (run #291, merge `c14eb02`) is current: everything in 1290 plus the
+> **1292** (run #292, merge `a62d989`) is current: everything in 1291 plus two
+> tour fixes: no em dash survives in any rendered tour string, and the Recall
+> step's Ask mock now sits in the same framed card every other step uses. QA:
+> Settings → "Take the tour again", read all 8 steps for stray em dashes and
+> check step 4 reads as a framed piece of the app. 1291 stays the fallback.
+> The APNs step below is unchanged and still pending.
+>
+> **(superseded) 1291** (run #291, merge `c14eb02`): everything in 1290 plus the
 > card category editor fix — tapping a category chip on a feed card no longer
 > opens a field that covers the source name. QA: tap a card's category chip,
 > confirm the field is chip-sized, the source byline steps aside while you
@@ -1497,6 +1504,31 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-08-24 — tour: every em dash out of rendered copy, and the Recall step
+  gets the frame its neighbours have. SHIPPED (merge `a62d989` → Vercel +
+  TestFlight run #292 = build 1292).** Owner, iOS QA, on the em dashes: "this
+  is the 500th time I asked for this." Nine rendered strings in
+  `OnboardingTour.tsx` carried one (seven step bodies incl. both Capture
+  variants, plus the mock card's summary line). Rewritten by SENTENCE ROLE, not
+  by swapping in another mark, the same way the landing and share-extension
+  purges were done: the parenthetical PAIR in Understand became a plain clause
+  ("reads every article, video, screenshot, and note in full, then files…"),
+  appositives became full stops, the example query in Find took a colon, and
+  Capture's list became its own sentence. Verified programmatically (comments
+  stripped, then scanned): ZERO em dashes outside code comments. Code comments
+  keep theirs, as in every prior purge. Second fix: `AskMock` was the ONLY step
+  mock with no container — a bare `flex flex-col gap-3`, so its parts floated
+  on the page background while all seven neighbours read as a framed piece of
+  the app (`w-full rounded-2xl bg-card border border-border-subtle shadow-xl
+  p-3.5`). It now uses that same frame, with its citation chip dropped to
+  `bg-fill-subtle` and its composer to `bg-background` so they still separate
+  instead of sitting card-on-card, matching how `SearchMock` treats its inner
+  surfaces. Verified: `tsc --noEmit` clean. NOT verified here: on-device
+  rendering. NOT done, worth considering: there is no automated guard against
+  em dashes re-entering rendered strings — a repo-wide check (a script in
+  `web/package.json` or a CI step scanning JSX/TS string literals and Swift
+  `.strings`) is the only thing that would end the recurrence for good.
 
 - **2026-08-24 — the card's category editor stops sitting on top of the source
   byline. SHIPPED (merge `c14eb02` → Vercel + TestFlight run #291 = build
