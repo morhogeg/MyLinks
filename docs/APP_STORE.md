@@ -84,23 +84,30 @@ listing carries it without the Subtitle paying for it.
 
 **Promotional text** (170 chars, editable without review):
 
-> Save from any app. Machina summarizes every save, links related ones, answers
-> your questions by quoting them, and writes a weekly summary of what you saved.
+> Everything you save, finally useful. Save links, screenshots and videos from
+> any app. Machina summarizes and connects them, then answers questions by
+> quoting your saves.
 
-156/170 chars. Two owner rejections got here (2026-08-25), and both notes are
-worth keeping because they are the same note:
+169/170 chars. Three owner rounds got here (2026-08-25); the notes are kept
+because each one is a rule, not a preference:
 
-1. It covered only capture and Ask. **This field carries the whole product.**
-2. Every verb had to be an OUTCOME, not a process. "reads" says what the
-   machine does; **"summarizes"** says what you get. "with sources" made the
-   reader guess; **"quoting them"** does not. "recaps your week" made them
-   guess again; **"writes a weekly summary of what you saved"** does not.
+1. **It must carry the whole product**, not just the demo.
+2. **Every verb is an OUTCOME, not a process.** "reads" says what the machine
+   does; "summarizes" says what you get. "with sources" made the reader guess;
+   "quoting your saves" does not. Not "quoting them" either: *them* can point
+   back at the connections rather than the saves.
+3. **The opening is settled and pinned** (owner, round 3): the tagline plus
+   "Save links, screenshots and videos from any app." The concrete formats are
+   doing real work there, and "from any app" is the share sheet, web and
+   extension in three words.
 
-**The tagline is deliberately NOT here.** It costs 36 characters, and those 36
-are exactly what buys "a weekly summary of what you saved" instead of the vague
-"weekly recap" it forced. It opens the description instead, one line below on
-the same storefront screen, where it costs nothing. Clarity beat brand
-placement in this field; do not put it back without re-reading this note.
+⚠️ **The arithmetic that constrains any future edit.** The pinned opening is 86
+characters, leaving 84 for the tail, and four beats do not fit in 84. The
+**weekly synthesis is what drops**: summarize, connect and answer-with-
+citations are the core loop, and the synthesis is the fourth thing a user meets
+(it is covered in the description under COME BACK TO IT). To put the weekly
+back in this field, the opening has to shorten. That is the whole trade; do not
+rediscover it from scratch.
 
 **Keywords** (comma-separated, no spaces after commas):
 
