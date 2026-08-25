@@ -85,9 +85,9 @@ listing carries it without the Subtitle paying for it.
 **Promotional text** (170 chars, editable without review):
 
 > Everything you save, finally useful. Save links, screenshots and videos from
-> any app. Machina summarizes and connects them, then answers whatever you ask.
+> any app. Machina summarizes and connects them. Then ask your library anything.
 
-154/170 chars. Four owner rounds got here (2026-08-25). The rules that survived:
+155/170 chars. Four owner rounds got here (2026-08-25). The rules that survived:
 
 1. **Carry the whole product**, not just the demo.
 2. **Verbs are outcomes, not processes.** "reads" is what the machine does;
@@ -98,8 +98,13 @@ listing carries it without the Subtitle paying for it.
 4. **This field is a hook, not a spec.** An earlier tail spelled out the
    citation mechanic ("by quoting your saves") and read as sloppy for exactly
    that reason: it made one sentence do the description's job. "answers
-   whatever you ask" is a confident claim, and §2's description explains the
-   citations properly a few lines below.
+   whatever you ask" replaced it, and was itself replaced (round 5) for being
+   the sentence every AI app writes: it described a generic chatbot and hid the
+   only thing that makes this one different.
+5. **The close names the moat.** "Then ask your library anything." The full
+   stop matters as much as the words: it makes the ending its own statement
+   instead of the third item trailing off a list. "Your library" is the point,
+   because the answers come from the user's own material, not the internet.
 
 The weekly synthesis is not in this field. It does not fit alongside the pinned
 opening, and it is the fourth thing a user meets; the description carries it
