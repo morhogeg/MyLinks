@@ -1692,8 +1692,12 @@ exact-match, capped.
 
 - **2026-08-25 — 🎯 PUSH WORKS, FOR THE FIRST TIME EVER. Root cause was a
   SANDBOX-SCOPED APNs key, not a bad credential. Plus: synthesis proven
-  end-to-end, its prompt fixed, delivery timing fixed, 4c closed.** (branch
-  `claude/launch-blockers-checklist-9fvmt5`; NOT yet merged or deployed.)
+  end-to-end, its prompt fixed, delivery timing fixed, 4c closed. SHIPPED
+  (merge `61cd96c` → Vercel + functions run #89 **unscoped/all**, which also
+  deploys `firestore:indexes` for the new `reminderStatus` override + iOS run
+  #298 = **build 1298**).** The functions deploy is deliberately unscoped:
+  `ai_service.py` and `models.py` are imported by every analysis path, and
+  `send_digests` needs its new cron registered with Cloud Scheduler.
   Owner screenshot of developer.apple.com showed key `2M646V3GV9` as **"Team
   Scoped (All Sandbox topics)"** — development-only, so it could never
   authenticate against production APNs, which is what a TestFlight build's
