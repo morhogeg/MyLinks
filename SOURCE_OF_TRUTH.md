@@ -458,9 +458,11 @@ The multi-user auth work described below **was** fully written but not live:
 >    account (**now creatable — it was blocked on the cutover**) + review notes.
 > 4. **On-device sweep** — task **11**, plus the Settings "Done" safe-area fix,
 >    which has still never been in a TestFlight build (see item 11a1).
-> 5. **Cost/key hygiene** — tasks **5** (rotate the Gemini key *into the paid
->    project*, rotate the ASC `.p8`) and **19** (GCP budget alert, PITR/backups,
->    uptime check). ~~drop `MONTHLY_ASK_QUOTA` off its 1000 dev value~~ — done
+> 5. **Cost/key hygiene** — 🚨 **TOP ITEM IS NOW 5b: raise the Gemini spend cap
+>    to ₪500. It binds at ~70 users and takes the whole app down when it does**
+>    (costed 2026-08-25; five minutes in AI Studio). Then tasks **5** (rotate
+>    the Gemini key *into the paid project*, rotate the ASC `.p8`) and **19**
+>    (GCP budget alert, PITR/backups, uptime check). ~~drop `MONTHLY_ASK_QUOTA` off its 1000 dev value~~ — done
 >    2026-08-04, back to 100. The **GCP budget alert is now the top item here**:
 >    the Gemini spend cap is a kill-switch, not a monitor, and it takes the owner
 >    down with everyone else. ✅ **The budget alert was SET at ₪50 on
@@ -703,13 +705,34 @@ The multi-user auth work described below **was** fully written but not live:
    *that* project. A key from an unbilled project silently reverts every save
    to the unpaid terms, under which Google trains on user content — with no
    runtime signal, since the API and the code are identical either way.
-5b. **[x] Gemini monthly spend cap — RAISED TO 50 BY THE OWNER 2026-07-28.**
-   The kill-switch risk below is resolved for now: at §7's $1.30–2.00/mo per
-   heavy user that is roughly a 10x headroom increase, so it no longer binds at
-   two users. **Still do task 19's GCP budget alert** — the point of that item
-   stands: a spend cap is a kill-switch, not a monitor, and you want warning
-   before you hit it, not an outage. Re-check the headroom before any real
-   cohort. Original finding, kept for the reasoning:
+5b. **[ ] 🚨 RAISE THE GEMINI SPEND CAP TO ₪500 BEFORE ANY DOWNLOADS — it
+   binds at ~70 users (costed 2026-08-25). REOPENED.** ₪50 is ≈$13. A
+   realistic user costs ≈$0.20/mo in Gemini (every AI surface runs on
+   `gemini-3.1-flash-lite`: a save ≈$0.002–0.005, an Ask ≈$0.003, a synthesis
+   ≈$0.003), so the cap is exhausted at **65–70 active users** — plausibly the
+   first week of real downloads, and long before the 200 the owner asked about.
+   Hitting it is not a bill, it is an **outage**: Gemini 429s for everyone
+   until the 1st, with no fallback to free quota, and every new user who
+   installs during that window sees a product that does not work.
+   **Set the cap ABOVE the worst case so the per-user quotas always fire
+   first**: 200 users × the 150-save/100-ask ceiling ≈ $130/mo, so **₪500
+   (~$135)**. Keep the ₪50 budget *alert* exactly where it is — that is the
+   early warning, and it then reports growth rather than an outage.
+   Full costing (2026-08-25): **200 users ≈ $50/mo realistic** ($20 light,
+   $150 if every account maxed its quota — a real ceiling, since the quotas
+   bound it). **1000 users ≈ $250/mo realistic**, break-even at ~83 paying
+   subs (8.3%) on $3.99 monthly after Apple's 15% *Small Business Program*
+   rate — which requires enrolling, it is not automatic; at the default 30% it
+   is ~100 subs. Annual at $29 nets $2.05/mo equivalent, pushing break-even to
+   ~11%. Typical freemium conversion is 1–5%, so 8–11% is ambitious, not
+   normal: expect to run $100–170/mo in the red at 1000 users pre-monetization.
+   Infra is a rounding error at both scales; Gemini is 75–85% of the bill.
+   *(Superseded note, 2026-07-28, kept for the reasoning:)* the cap was raised
+   from ₪5 to ₪50, which was ~10x headroom against §7's $1.30–2.00/mo heavy
+   user and "no longer binds at two users" — true then, and it is exactly the
+   "re-check the headroom before any real cohort" clause below that has now
+   come due. **Task 19's GCP budget alert is DONE** (₪50, 2026-08-23).
+   Original finding, kept for the reasoning:
    ~~Gemini monthly spend cap is ₪5.00 — raise it before any cohort wider
    than the owner (found 2026-07-27, privacy audit).~~ AI Studio showed the cap
    at ₪5.00/mo with ₪1.49 used by a single user. §7 puts one heavy user at
@@ -1715,6 +1738,18 @@ exact-match, capped.
   per-ISO-week idempotency means the next natural one is Monday).
   **Deferred, owner declined for now:** the Gemini + App Store Connect key
   rotations (§4 task 5) and the prod tag-language cleanup (§4 task 21).
+  **Costing done (see 5b, REOPENED as a launch blocker):** every AI surface is
+  on `gemini-3.1-flash-lite`, so 200 users ≈ **$50/mo** realistic and ≈$150 even
+  if every account maxed its quota; 1000 users ≈ **$250/mo**. Infra is a
+  rounding error (the new 5-min digest cadence crosses Firestore's free read
+  tier at ~170 users and costs ~$0.14/mo). **The finding that matters: the ₪50
+  Gemini cap binds at ~70 users and is a kill switch, not a bill** — raise it
+  to ₪500 before pushing for downloads, keep the ₪50 alert as the warning.
+  Break-even at 1000 users is ~83 subs (8.3%) at $3.99 monthly on Apple's 15%
+  Small Business rate, which must be applied for; ~100 subs at 30%, ~11% if
+  most subscribers take the $29 annual. Against a 1–5% typical freemium
+  conversion that is ambitious, so expect a $100–170/mo deficit at 1000 users
+  pre-monetization. Cost is genuinely not the constraint at launch scale.
   **Open question raised and not taken:** a "Send one now" button for the
   digest/synthesis. `send_digest_now` already exists with a `force=True` path
   that bypasses both gates and still pushes, but it has NO UI anywhere and, as
