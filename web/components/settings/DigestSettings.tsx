@@ -26,7 +26,11 @@ export const COUNT_OPTIONS = [3, 5, 7, 10];
 
 // Wheel-picker columns (Schedule). Hour index 0 = "12" (12 AM / 12 PM).
 export const HOURS12 = Array.from({ length: 12 }, (_, i) => (i === 0 ? '12' : String(i)));
-export const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
+// 5-minute increments, matching the send_digests cron grid (*/5). Offering
+// minute precision the scheduler cannot honour is what made a 16:10 digest
+// arrive at 16:21 and read as broken. Every value here is a real tick.
+export const MINUTE_STEP = 5;
+export const MINUTES = Array.from({ length: 60 / MINUTE_STEP }, (_, i) => String(i * MINUTE_STEP).padStart(2, '0'));
 export const AMPM = ['AM', 'PM'];
 
 // "4:24 PM" / "9:00 AM" — 12-hour local formatting for the digest summary.
@@ -239,6 +243,7 @@ export function ScheduleView({ settings, setSettings }: { settings: Settings; se
     const weekly = settings.digest_frequency === 'weekly';
     const hourIdx = settings.digest_hour % 12;         // 0 => "12"
     const ampmIdx = settings.digest_hour < 12 ? 0 : 1;
+    const minuteIdx = Math.min(60 / MINUTE_STEP - 1, Math.round(settings.digest_minute / MINUTE_STEP));
     const commitTime = (h12: number, minute: number, pm: number) => {
         const hour = (h12 % 12) + (pm === 1 ? 12 : 0);
         setSettings((p) => ({ ...p, digest_hour: hour, digest_minute: minute }));
@@ -269,12 +274,12 @@ export function ScheduleView({ settings, setSettings }: { settings: Settings; se
                             className="flex-[1.7]"
                         />
                     )}
-                    <Wheel items={HOURS12} index={hourIdx} onChange={(i) => commitTime(i, settings.digest_minute, ampmIdx)} className="flex-1" />
-                    <Wheel items={MINUTES} index={settings.digest_minute} onChange={(i) => commitTime(hourIdx, i, ampmIdx)} className="flex-1" />
-                    <Wheel items={AMPM} index={ampmIdx} onChange={(i) => commitTime(hourIdx, settings.digest_minute, i)} className="flex-1" />
+                    <Wheel items={HOURS12} index={hourIdx} onChange={(i) => commitTime(i, minuteIdx * MINUTE_STEP, ampmIdx)} className="flex-1" />
+                    <Wheel items={MINUTES} index={minuteIdx} onChange={(i) => commitTime(hourIdx, i * MINUTE_STEP, ampmIdx)} className="flex-1" />
+                    <Wheel items={AMPM} index={ampmIdx} onChange={(i) => commitTime(hourIdx, minuteIdx * MINUTE_STEP, i)} className="flex-1" />
                 </div>
             </div>
-            <Footnote>Your digest arrives around this time. Delivery may vary by a few minutes.</Footnote>
+            <Footnote>Your digest arrives at this time.</Footnote>
         </>
     );
 }

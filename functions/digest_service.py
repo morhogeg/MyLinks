@@ -50,7 +50,7 @@ CANDIDATE_LIMIT = 500
 # also the worst-case delivery latency and the width of the is_due match window.
 # MUST stay in sync with the cron in send_digests. Smaller = tighter to the
 # chosen minute but proportionally more scheduler invocations (cost).
-DIGEST_CADENCE_MINUTES = 15
+DIGEST_CADENCE_MINUTES = 5
 
 VALID_MODES = {"smart", "topic", "rediscover", "synthesis"}
 
