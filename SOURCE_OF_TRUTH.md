@@ -226,7 +226,25 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-08-24): fix the APNs key, and install build **1297**
+> ## 🚨 OWNER ACTION (updated 2026-08-25): install build **1298**, and RAISE THE GEMINI CAP
+>
+> **1298** (run #298, merge `61cd96c`) is current. **Push notifications work
+> for the first time** (the APNs key was sandbox-scoped, not miscredentialed —
+> see the 2026-08-25 §9 entry), the Schedule picker moves to 5-minute
+> increments, and digest/synthesis delivery now lands ON the chosen minute
+> (`send_digests` runs clock-anchored `*/5 * * * *` instead of the
+> deploy-anchored `every 15 minutes`). Backend rides functions run #89
+> (unscoped): the new synthesis title rules and the `reminderStatus`
+> COLLECTION_GROUP index ship with it and need no build. **QA:** Settings →
+> Reminders & Digest → the minute wheel should offer only :00/:05/:10/…, and a
+> digest set for a time should arrive at it, not 11 minutes later. 1297 stays
+> the fallback.
+>
+> ⛔ **Before pushing for downloads: raise the Gemini spend cap to ₪500**
+> (§4 item 5b, REOPENED). At ₪50 it is exhausted at ~70 active users, and it
+> is a kill switch — every AI surface dies for everyone until the 1st.
+>
+> ## (superseded) OWNER ACTION (2026-08-24): install build **1297**
 >
 > **1297** (run #297, merge `0dd970e`) is current: everything in 1296 plus
 > desktop navigation for the multi-screenshot carousel — hover-revealed
