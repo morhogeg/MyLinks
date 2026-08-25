@@ -226,9 +226,18 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-08-24): fix the APNs key, and install build **1295**
+> ## 🚨 OWNER ACTION (updated 2026-08-24): fix the APNs key, and install build **1296**
 >
-> **1295** (run #295, merge `31b582f`) is current: everything in 1294 plus the
+> **1296** (run #296, merge `b40511b`) is current: everything in 1295 plus the
+> sign-in screen's subtitle is now the D-6 tagline ("Everything you save,
+> finally useful."). Also live on web (not in the app): the `/__/auth/*`
+> proxy — `https://mymachina.app/__/auth/handler` should now load Firebase's
+> handler page (verify in a browser); the authDomain CUTOVER waits on the §4
+> item-24 owner checklist (OAuth redirect URI, Apple return URL, authorized
+> domains, then the Vercel env flip). QA: sign-in screen shows the tagline.
+> 1295 stays the fallback. The APNs step below is unchanged and still pending.
+>
+> **(superseded) 1295** (run #295, merge `31b582f`): everything in 1294 plus the
 > honesty round on multi-image saves. The pill can no longer say "Done!" while
 > the card says "Saving" (the queued-capture 100% snap is gone; the pill now
 > ends only when the card actually resolves), an active pill at the ramp
@@ -1613,8 +1622,25 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-08-24 — authDomain-to-brand-domain plumbing (§4 item 24). BUILT, not
-  yet shipped.** The Google sign-in popup's address bar still reads the
+- **2026-08-24 — multi-screenshot carousel gets DESKTOP navigation. BUILT, not
+  yet shipped.** Owner, desktop web: a card with 4 screenshots showed slide 1
+  and nothing could reach the rest. Root cause: the carousel shipped in round 2
+  is a horizontal scroll-snap container, which a touch swipe (or a trackpad's
+  two-finger scroll) drives natively — but **a mouse cannot scroll a container
+  sideways**, and the dots were decorative `<span>`s. Three routes added in
+  `LinkDetailModal`, all driving one `goToSlide(i)` that scrolls the container
+  (so they never fight a user's own swipe, and `galleryIndex` keeps following
+  `onScroll`): (1) prev/next chevron buttons, `[@media(hover:hover)]`-only and
+  revealed on gallery hover — a phone has the swipe and doesn't need chrome
+  over the image — each hiding at its end of the set; (2) the dots are now
+  real `<button>`s that jump to their slide (the always-visible affordance);
+  (3) the scroll container is focusable when there are 2+ slides and handles
+  Left/Right arrow keys. Verified: `tsc --noEmit` clean. NOT verified: hover
+  reveal + smooth-scroll feel in a real desktop browser.
+
+- **2026-08-24 — authDomain-to-brand-domain plumbing (§4 item 24). SHIPPED
+  (merge `b40511b` → Vercel; rides TestFlight run #296 = build 1296 though
+  native never uses it).** The Google sign-in popup's address bar still reads the
   project host because `authDomain` is the Firebase host. Built the safe half:
   a Vercel rewrite proxies `/__/:path*` to
   `secondbrain-app-94da2.firebaseapp.com` so the auth handler serves from
@@ -1628,8 +1654,8 @@ exact-match, capped.
   authDomain, so the flip can only affect web. NOT verified: the proxied
   handler end-to-end (needs the deploy + console steps).
 
-- **2026-08-24 — sign-in screen carries the D-6 tagline. BUILT, not yet
-  shipped.** Owner call: the sign-in subtitle switches from the D-2 tricolon
+- **2026-08-24 — sign-in screen carries the D-6 tagline. SHIPPED (merge
+  `b40511b` → Vercel + TestFlight run #296 = build 1296).** Owner call: the sign-in subtitle switches from the D-2 tricolon
   ("Capture. Ask. Connect.") to the D-6 tagline ("Everything you save, finally
   useful.") — which every other brand surface (landing `<h1>`, meta
   description, share-page footer) already carries, so this UNIFIES the line
