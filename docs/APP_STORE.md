@@ -84,11 +84,12 @@ listing carries it without the Subtitle paying for it.
 
 **Promotional text** (170 chars, editable without review):
 
-> Everything you save, finally useful. Save links, screenshots and videos from
-> any app. Machina summarizes and connects them into a library you can ask
-> anything.
+> Everything you save, finally useful. Save links, screenshots, and videos from
+> any app. Machina summarizes and connects each one, so you can ask about
+> anything you saved.
 
-159/170 chars. Four owner rounds got here (2026-08-25). The rules that survived:
+169/170 chars. **OWNER-APPROVED 2026-08-25**, after seven rounds. The rules
+that survived, each earned by a rejection:
 
 1. **Carry the whole product**, not just the demo.
 2. **Verbs are outcomes, not processes.** "reads" is what the machine does;
@@ -102,8 +103,19 @@ listing carries it without the Subtitle paying for it.
    whatever you ask" replaced it, and was itself replaced (round 5) for being
    the sentence every AI app writes: it described a generic chatbot and hid the
    only thing that makes this one different.
-5. **The close names the moat**, and **"into" welds it to the middle** (round
-   6). "Your library" is the point: the answers come from the user's own
+5. **No personification, and the close names the moat.** A library is a
+   collection, not something that answers you: "a library you can ask anything"
+   was rejected on exactly that (round 7), and it is worth remembering that the
+   phrase is common in AI note apps, which is why it sounded fine to everyone
+   who follows the category and odd to everyone who does not. Machina is the
+   implied listener now, which is a thing people really do ask, and "anything
+   you saved" keeps the moat: the answers come from the user's own material.
+   Grammar note, the reason the sentence reads clean: "summarizes and connects
+   each one" needs no preposition, so both verbs share one object with nothing
+   to trip over. The earlier "summarizes and connects them INTO a library" made
+   a single prepositional phrase serve both verbs, and you do not summarize
+   something *into* a thing.
+6. **"so" does the welding** (round 6). "Your library" is the point: the answers come from the user's own
    material, not the internet. But an earlier close, "Machina summarizes and
    connects them. Then ask your library anything.", put a full stop between the
    two halves, and the full stop severed the causal link, leaving three claims
