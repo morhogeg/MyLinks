@@ -85,29 +85,26 @@ listing carries it without the Subtitle paying for it.
 **Promotional text** (170 chars, editable without review):
 
 > Everything you save, finally useful. Save links, screenshots and videos from
-> any app. Machina summarizes and connects them, then answers questions by
-> quoting your saves.
+> any app. Machina summarizes and connects them, then answers whatever you ask.
 
-169/170 chars. Three owner rounds got here (2026-08-25); the notes are kept
-because each one is a rule, not a preference:
+154/170 chars. Four owner rounds got here (2026-08-25). The rules that survived:
 
-1. **It must carry the whole product**, not just the demo.
-2. **Every verb is an OUTCOME, not a process.** "reads" says what the machine
-   does; "summarizes" says what you get. "with sources" made the reader guess;
-   "quoting your saves" does not. Not "quoting them" either: *them* can point
-   back at the connections rather than the saves.
-3. **The opening is settled and pinned** (owner, round 3): the tagline plus
-   "Save links, screenshots and videos from any app." The concrete formats are
-   doing real work there, and "from any app" is the share sheet, web and
-   extension in three words.
+1. **Carry the whole product**, not just the demo.
+2. **Verbs are outcomes, not processes.** "reads" is what the machine does;
+   "summarizes" is what you get.
+3. **The opening is pinned**: the tagline plus "Save links, screenshots and
+   videos from any app." The concrete formats do real work, and "from any app"
+   is every capture surface in three words.
+4. **This field is a hook, not a spec.** An earlier tail spelled out the
+   citation mechanic ("by quoting your saves") and read as sloppy for exactly
+   that reason: it made one sentence do the description's job. "answers
+   whatever you ask" is a confident claim, and §2's description explains the
+   citations properly a few lines below.
 
-⚠️ **The arithmetic that constrains any future edit.** The pinned opening is 86
-characters, leaving 84 for the tail, and four beats do not fit in 84. The
-**weekly synthesis is what drops**: summarize, connect and answer-with-
-citations are the core loop, and the synthesis is the fourth thing a user meets
-(it is covered in the description under COME BACK TO IT). To put the weekly
-back in this field, the opening has to shorten. That is the whole trade; do not
-rediscover it from scratch.
+The weekly synthesis is not in this field. It does not fit alongside the pinned
+opening, and it is the fourth thing a user meets; the description carries it
+under COME BACK TO IT. There are now 16 characters of slack, but spending them
+on a fourth beat is what made the previous three drafts read as a list.
 
 **Keywords** (comma-separated, no spaces after commas):
 
