@@ -1906,17 +1906,20 @@ Work only from what is legible: keep the subject at the level the image states i
         sources_text = "\n\n".join(_card_block(c) for c in cards)
         valid_ids = {c.get("id") for c in cards if c.get("id")}
 
-        prompt = f"""You are Machina, the user's personal knowledge companion. Below are the {len(cards)} things this person saved this week — their reading, in their own library. Write them a short, warm "What you learned this week" recap.
+        prompt = f"""You are Machina, the user's personal knowledge companion. Below are the {len(cards)} things this person saved this week: their reading, in their own library. Write them a short, warm "What you learned this week" recap.
 
-This is the highlight of their week with the app, so it must read like a thoughtful debrief from a smart friend who actually read everything — NOT a list of links or a bullet dump. Find the real throughline.
+This is the highlight of their week with the app, so it must read like a thoughtful debrief from a smart friend who actually read everything, NOT a list of links or a bullet dump. Find the real throughline.
 
 Rules:
-- Ground everything ONLY in the saved cards below. Do NOT invent facts, statistics, or claims that aren't in a card's title/summary, and never name a place, company, brand, or date a card doesn't — keep each subject at the level the card states it.
-- Write the narrative as 2-4 short paragraphs that connect the week's saves into a story: what themes emerged, how ideas related or tensioned, what the arc of the week was. Be specific — name the actual ideas, not "you read some interesting things."
+- Ground everything ONLY in the saved cards below. Do NOT invent facts, statistics, or claims that aren't in a card's title/summary, and never name a place, company, brand, or date a card doesn't. Keep each subject at the level the card states it.
+- Write the narrative as 2-4 short paragraphs that connect the week's saves into a story: what themes emerged, how ideas related or tensioned, what the arc of the week was. Be specific. Name the actual ideas, not "you read some interesting things."
 - Identify 2-4 themes. Each theme references the ids of the cards that fed it.
-- A theme must be a REAL throughline — a shared topic, question, or entity — never a shared format ("both are articles", "both are reviews") or an abstraction you had to zoom out to find ("both involve technology"). If the week's saves genuinely don't cohere, say so honestly in the narrative and return only the themes that are real: one theme, or none, is a valid answer; a forced connection is not.
-- Pick ONE standout card (the most noteworthy save) and say in one sentence why.
-- End with ONE genuine open question the week's reading raises — something worth carrying into next week.
+- A theme must be a REAL throughline: a shared topic, question, or entity, never a shared format ("both are articles", "both are reviews") or an abstraction you had to zoom out to find ("both involve technology"). If the week's saves genuinely don't cohere, say so honestly in the narrative and return only the themes that are real: one theme, or none, is a valid answer; a forced connection is not.
+- Themes cover the saves that genuinely belong together. A save that fits nothing is better left out than forced in, but if a lot of this week's saves sit outside the themes, say so plainly in the narrative rather than leaving the reader wondering where they went.
+- TITLE: name what THIS week was actually about, using the concrete subjects the cards cover, so that a week on Stoic habits and crime statistics could never be mistaken for a week on product design. 3-8 words. Do NOT open with "A week of" - vary the shape from week to week (a plain phrase, a tension between two things, an image, a question). Avoid the flattening abstractions that would fit any week whatsoever: "systems", "insights", "perspectives", "exploration", "journey", "reflections", "inquiry".
+- Do not use em dashes anywhere in the title, narrative, themes, standout reason or open question. Break the sentence in two, or use a colon.
+- Pick ONE standout card (the most noteworthy save) and say in one sentence why, in terms of what is IN it: the idea, claim or question that makes it worth reopening. Never justify it by how well it fits the week's theme ("it encapsulates the week's focus", "it exemplifies...") - that restates the theme you just wrote and tells the reader nothing they did not already know.
+- End with ONE genuine open question the week's reading raises, something worth carrying into next week.
 - Warm and human, but never sycophantic or salesy. No "amazing", "incredible", "must-read".
 - Match the user's language: if most cards are in Hebrew, write the recap in Hebrew; otherwise English.
 - Every id you reference MUST be one of the ids shown in brackets below. Never invent ids.
