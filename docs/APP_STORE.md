@@ -146,8 +146,9 @@ second brain,read later,bookmarks,ai summary,knowledge base,notes,pkm,summarize,
 > Then you can ask. "What did I save about mortgage rates?" Machina answers in plain language and cites the exact saves it used, so one tap takes you back to the source.
 >
 > CAPTURE FROM ANYWHERE
-> • iOS share sheet: save from Safari, YouTube, X, anywhere
-> • Web app and browser extension on your computer
+> • Save from Safari, YouTube, X, or any other app: tap Share, pick Machina
+> • Screenshots and photos, up to five at once as a single card
+> • Or paste a link and write your own note, right in the app
 >
 > UNDERSTAND WHAT YOU SAVED
 > • A real summary, category and tags on every save
@@ -161,6 +162,12 @@ second brain,read later,bookmarks,ai summary,knowledge base,notes,pkm,summarize,
 > • Collections you can keep private or publish as a page
 >
 > Private by design. No ads, no tracking, and your content is never used to train AI models. Delete your account and everything in it at any time, from Settings.
+
+Two owner rules for this section (2026-08-25), both about audience:
+**never "share sheet"** (our word, not a user's; say "tap Share"), and
+**never the web app or browser extension.** This is an iOS listing: naming
+other surfaces invites the reader to wonder whether they need them. The website
+is where those belong.
 
 The tagline deliberately does NOT open this. It leads the promotional text,
 which renders immediately above the description on the same storefront screen,
