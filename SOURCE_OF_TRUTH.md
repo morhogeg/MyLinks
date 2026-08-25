@@ -226,9 +226,17 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-08-24): fix the APNs key, and install build **1296**
+> ## 🚨 OWNER ACTION (updated 2026-08-24): fix the APNs key, and install build **1297**
 >
-> **1296** (run #296, merge `b40511b`) is current: everything in 1295 plus the
+> **1297** (run #297, merge `0dd970e`) is current: everything in 1296 plus
+> desktop navigation for the multi-screenshot carousel — hover-revealed
+> prev/next arrows, dots promoted to real buttons that jump to a slide, and
+> Left/Right arrow-key support. Desktop-only in effect (the arrows are
+> pointer-device-only); the phone keeps its swipe unchanged. QA is on DESKTOP
+> web: open a card with 3+ screenshots and reach slide 4 with a mouse. 1296
+> stays the fallback. The APNs step below is unchanged and still pending.
+>
+> **(superseded) 1296** (run #296, merge `b40511b`): everything in 1295 plus the
 > sign-in screen's subtitle is now the D-6 tagline ("Everything you save,
 > finally useful."). Also live on web (not in the app): the `/__/auth/*`
 > proxy — `https://mymachina.app/__/auth/handler` should now load Firebase's
@@ -1758,6 +1766,22 @@ exact-match, capped.
   rounds today each cost hours of waiting that this button would have answered
   in one tap. Also noted: `force_send_digests`'s docstring claims it "ignores
   nothing-due skips" but it just calls the same `is_due`-gated sweep.
+- **2026-08-24 — multi-screenshot carousel gets DESKTOP navigation. SHIPPED
+  (merge `0dd970e` → Vercel + TestFlight run #297 = build 1297; no functions
+  change).** Owner, desktop web: a card with 4 screenshots showed slide 1
+  and nothing could reach the rest. Root cause: the carousel shipped in round 2
+  is a horizontal scroll-snap container, which a touch swipe (or a trackpad's
+  two-finger scroll) drives natively — but **a mouse cannot scroll a container
+  sideways**, and the dots were decorative `<span>`s. Three routes added in
+  `LinkDetailModal`, all driving one `goToSlide(i)` that scrolls the container
+  (so they never fight a user's own swipe, and `galleryIndex` keeps following
+  `onScroll`): (1) prev/next chevron buttons, `[@media(hover:hover)]`-only and
+  revealed on gallery hover — a phone has the swipe and doesn't need chrome
+  over the image — each hiding at its end of the set; (2) the dots are now
+  real `<button>`s that jump to their slide (the always-visible affordance);
+  (3) the scroll container is focusable when there are 2+ slides and handles
+  Left/Right arrow keys. Verified: `tsc --noEmit` clean. NOT verified: hover
+  reveal + smooth-scroll feel in a real desktop browser.
 
 - **2026-08-24 — authDomain-to-brand-domain plumbing (§4 item 24). SHIPPED
   (merge `b40511b` → Vercel; rides TestFlight run #296 = build 1296 though
