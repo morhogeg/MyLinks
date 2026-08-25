@@ -100,7 +100,7 @@ It resolves **Q-1** (the AI-forward description string) and closes **A-3**.
 
 | Layer | Value | Field it lives in |
 |---|---|---|
-| **Tagline** (the promise) | `Everything you save, finally useful.` | web `<meta description>`, PWA manifest, public README, launch-film endcard, **the public share-page footer**, Product Hunt, **and the sign-in screen** (`web/components/LoginScreen.tsx`, owner call 2026-08-24 — it carried the subtitle 2026-08-06→08-24, and a stale `Capture. Connect. Recall.` before that) |
+| **Tagline** (the promise) | `Everything you save, finally useful.` | web `<meta description>`, PWA manifest, public README, launch-film endcard, **the public share-page footer**, Product Hunt, **and the sign-in screen** (`web/components/LoginScreen.tsx`, owner call 2026-08-24 — it carried the subtitle 2026-08-06→08-24, and a stale `Capture. Connect. Recall.` before that), **and the App Store promotional text** (`docs/APP_STORE.md` §2, owner call 2026-08-25 — it leads that field, which is how the listing carries the tagline without the 30-char Subtitle paying for it) |
 | **App Store Subtitle** (the phases) | `Capture. Ask. Connect.` | App Store Connect only |
 
 **Why this line and not the two the owner already rejected.** The rejected
@@ -319,7 +319,7 @@ duplicated here, so a change goes in ONE place):
 
 | Surface | Lives in |
 |---|---|
-| **Tagline** (D-6) — the ONE promise line | `web/app/layout.tsx` + `web/public/manifest.json` (`description`), `README.md` line 3, `marketing/launch-clip/src/scenes/Endcard.tsx` (footer), `functions/share_service.py` (the public share-page footer, added 2026-08-06), `web/components/LandingPage.tsx` (the public landing page — the `<h1>` **and** the footer, added 2026-08-06), `SOURCE_OF_TRUTH.md` §8 (Product Hunt), `web/components/LoginScreen.tsx` (the sign-in subtitle line, owner call 2026-08-24). Seven surfaces, so a change is a seven-file sweep — grep the exact string. The landing page is the one that says it TWICE and the one that says it loudest: it is the `<h1>` of the product's public home page. |
+| **Tagline** (D-6) — the ONE promise line | `web/app/layout.tsx` + `web/public/manifest.json` (`description`), `README.md` line 3, `marketing/launch-clip/src/scenes/Endcard.tsx` (footer), `functions/share_service.py` (the public share-page footer, added 2026-08-06), `web/components/LandingPage.tsx` (the public landing page — the `<h1>` **and** the footer, added 2026-08-06), `SOURCE_OF_TRUTH.md` §8 (Product Hunt), `web/components/LoginScreen.tsx` (the sign-in subtitle line, owner call 2026-08-24), `docs/APP_STORE.md` §2 (the App Store promotional text, owner call 2026-08-25). Eight surfaces, so a change is an eight-file sweep — grep the exact string. Note the App Store one is DOC-only until it is typed into Connect by hand; the store field is not deployed from this repo. The landing page is the one that says it TWICE and the one that says it loudest: it is the `<h1>` of the product's public home page. |
 | App Store Name, Subtitle, keywords, promo text, description | `docs/APP_STORE.md` §2 |
 | Growth strategy, channel sequence, launch assets (X thread, Show HN, Product Hunt) | `SOURCE_OF_TRUTH.md` §8 |
 | Positioning statement / product one-liner | `SOURCE_OF_TRUTH.md` §1 |

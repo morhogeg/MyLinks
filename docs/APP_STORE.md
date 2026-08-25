@@ -72,18 +72,35 @@ to quote if a reviewer ever claims the home page needs JavaScript to read.
 `/privacy` and `/terms` remain genuinely public and unchanged.
 
 ⚠️ **Do not put the tagline in the Subtitle field.** Machina's tagline is
-`Everything you save, finally useful.` (`docs/BRANDING.md` D-6) and it belongs on
-the web, the README, the film endcard and Product Hunt — **not here.** Two
+`Everything you save, finally useful.` (`docs/BRANDING.md` D-6). In this listing
+it belongs in the **promotional text** (drafted below), not in the Subtitle. Two
 reasons, either one fatal: it is **36 characters** against a 30-character field
 with no cut that survives, and it re-spends **`save`**, already a Name token, so
 the index gains nothing while the field loses characters. `Capture. Ask.
 Connect.` stays. This note exists because "the app has a tagline, why isn't it
-the subtitle?" is the obvious question, and the answer is not obvious.
+the subtitle?" is the obvious question, and the answer is not obvious. Asked and
+answered again 2026-08-25; the tagline now leads the promotional text so the
+listing carries it without the Subtitle paying for it.
 
 **Promotional text** (170 chars, editable without review):
 
-> Machina reads everything you save — links, screenshots, videos — and answers
-> questions from it, with sources.
+> Everything you save, finally useful. Machina reads your links, screenshots
+> and videos, then answers questions from them, with sources you can jump back
+> to.
+
+155/170 chars. **This is where the D-6 tagline lives in the listing** (owner
+call 2026-08-25), and it is the answer to "why isn't the tagline the
+subtitle?". It cannot be the Subtitle: the line is **35 characters** against a
+30-character field, and it re-spends `save`, already a Name token, so the index
+gains nothing (see the ⚠️ note above the keywords). Promotional text has none
+of those constraints — 170 characters, no search index, editable without a
+review cycle, and it renders directly under the subtitle in the listing. So the
+brand line still greets a visitor to the store page; it just is not spending
+the one field that doubles as an ASO slot.
+
+Also note the em dashes are gone from this field. The rest of the store copy
+should follow (`SOURCE_OF_TRUTH.md` §4 item 11a3): App Store text is read by
+exactly the audience most primed to notice AI-written prose.
 
 **Keywords** (comma-separated, no spaces after commas):
 
