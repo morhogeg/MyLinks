@@ -226,9 +226,17 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-08-24): fix the APNs key, and install build **1296**
+> ## 🚨 OWNER ACTION (updated 2026-08-24): fix the APNs key, and install build **1297**
 >
-> **1296** (run #296, merge `b40511b`) is current: everything in 1295 plus the
+> **1297** (run #297, merge `0dd970e`) is current: everything in 1296 plus
+> desktop navigation for the multi-screenshot carousel — hover-revealed
+> prev/next arrows, dots promoted to real buttons that jump to a slide, and
+> Left/Right arrow-key support. Desktop-only in effect (the arrows are
+> pointer-device-only); the phone keeps its swipe unchanged. QA is on DESKTOP
+> web: open a card with 3+ screenshots and reach slide 4 with a mouse. 1296
+> stays the fallback. The APNs step below is unchanged and still pending.
+>
+> **(superseded) 1296** (run #296, merge `b40511b`): everything in 1295 plus the
 > sign-in screen's subtitle is now the D-6 tagline ("Everything you save,
 > finally useful."). Also live on web (not in the app): the `/__/auth/*`
 > proxy — `https://mymachina.app/__/auth/handler` should now load Firebase's
@@ -1622,8 +1630,9 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-08-24 — multi-screenshot carousel gets DESKTOP navigation. BUILT, not
-  yet shipped.** Owner, desktop web: a card with 4 screenshots showed slide 1
+- **2026-08-24 — multi-screenshot carousel gets DESKTOP navigation. SHIPPED
+  (merge `0dd970e` → Vercel + TestFlight run #297 = build 1297; no functions
+  change).** Owner, desktop web: a card with 4 screenshots showed slide 1
   and nothing could reach the rest. Root cause: the carousel shipped in round 2
   is a horizontal scroll-snap container, which a touch swipe (or a trackpad's
   two-finger scroll) drives natively — but **a mouse cannot scroll a container
