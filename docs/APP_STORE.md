@@ -84,33 +84,23 @@ listing carries it without the Subtitle paying for it.
 
 **Promotional text** (170 chars, editable without review):
 
-> Everything you save, finally useful. Save links, screenshots and videos from
-> any app. Machina reads and connects them, answers questions with sources,
-> recaps your week.
+> Save from any app. Machina summarizes every save, links related ones, answers
+> your questions by quoting them, and writes a weekly summary of what you saved.
 
-168/170 chars. Owner rejected an earlier draft (2026-08-25) for covering only
-capture and Ask: **this field has to carry the whole product, not the demo.**
-Five beats in 26 words, in the order a user meets them: the tagline, capture
-breadth (the formats AND "from any app", which is the share sheet, web and
-extension in three words), the analysis, Ask with citations, and the weekly
-synthesis. Only Collections is left out, deliberately: it is the least
-differentiating pillar and the one a new user reaches last, and §2's
-description covers it under COME BACK TO IT.
+156/170 chars. Two owner rejections got here (2026-08-25), and both notes are
+worth keeping because they are the same note:
 
-⚠️ At 168/170 there is no slack. Any edit needs a cut first, so do not "just
-add" a word in Connect. **This is where the D-6 tagline lives in the listing** (owner
-call 2026-08-25), and it is the answer to "why isn't the tagline the
-subtitle?". It cannot be the Subtitle: the line is **35 characters** against a
-30-character field, and it re-spends `save`, already a Name token, so the index
-gains nothing (see the ⚠️ note above the keywords). Promotional text has none
-of those constraints — 170 characters, no search index, editable without a
-review cycle, and it renders directly under the subtitle in the listing. So the
-brand line still greets a visitor to the store page; it just is not spending
-the one field that doubles as an ASO slot.
+1. It covered only capture and Ask. **This field carries the whole product.**
+2. Every verb had to be an OUTCOME, not a process. "reads" says what the
+   machine does; **"summarizes"** says what you get. "with sources" made the
+   reader guess; **"quoting them"** does not. "recaps your week" made them
+   guess again; **"writes a weekly summary of what you saved"** does not.
 
-Also note the em dashes are gone from this field. The rest of the store copy
-should follow (`SOURCE_OF_TRUTH.md` §4 item 11a3): App Store text is read by
-exactly the audience most primed to notice AI-written prose.
+**The tagline is deliberately NOT here.** It costs 36 characters, and those 36
+are exactly what buys "a weekly summary of what you saved" instead of the vague
+"weekly recap" it forced. It opens the description instead, one line below on
+the same storefront screen, where it costs nothing. Clarity beat brand
+placement in this field; do not put it back without re-reading this note.
 
 **Keywords** (comma-separated, no spaces after commas):
 
@@ -142,35 +132,48 @@ second brain,read later,bookmarks,ai summary,knowledge base,notes,pkm,summarize,
 
 **Description:**
 
-> You save links, screenshots, and videos everywhere — then never look at them
-> again. Machina fixes the second half.
+> Everything you save, finally useful.
 >
-> Share anything to Machina from any app. It reads the page, watches the video,
-> looks at the screenshot — and turns each save into a clean card with a real
-> summary, category, tags, and connections to things you saved before.
+> You save things all day. Links, screenshots, videos, half-read articles. Then you never open them again. Machina changes that.
 >
-> Then comes the part that feels like magic: ask your saves a question.
-> "What did I save about mortgage rates?" Machina answers in plain language,
-> with citations that jump back to your own sources.
+> Share anything to Machina from any app. It reads the page, watches the video, reads the text in your screenshot. Each save comes back as a clean card with a real summary, a category, tags, and links to the things you already saved on the same subject.
+>
+> Then you can ask. "What did I save about mortgage rates?" Machina answers in plain language and cites the exact saves it used, so one tap takes you back to the source.
 >
 > CAPTURE FROM ANYWHERE
-> • iOS share sheet — save from Safari, YouTube, X, anywhere
+> • iOS share sheet: save from Safari, YouTube, X, anywhere
 > • Web app and browser extension on your computer
 >
 > UNDERSTAND WHAT YOU SAVED
-> • AI summaries, categories, and tags on every save
+> • A real summary, category and tags on every save
 > • "See also" connections between related saves
-> • Semantic search that finds meaning, not just keywords
+> • Search that finds meaning, not just matching words
 >
 > COME BACK TO IT
-> • Ask Machina — cited answers from your own knowledge
-> • Weekly synthesis — themes and standouts from your week's saves
+> • Ask Machina: cited answers from your own library
+> • Weekly synthesis: the themes and standouts from your week
 > • Reminders and digests, on your schedule
-> • Collections you can keep private or publish as a shareable page
+> • Collections you can keep private or publish as a page
 >
-> Private by design: no ads, no tracking, and your content is never used to
-> train AI models. Sign in with Apple or Google. Delete your account — and all
-> your data — anytime, right from Settings.
+> Private by design. No ads, no tracking, and your content is never used to train AI models. Delete your account and everything in it at any time, from Settings.
+
+Rewritten 2026-08-25 on owner review of the previous draft. What was wrong, so
+it is not reintroduced:
+- **Nine em dashes.** Gone, and none belongs here. This is the single surface
+  read by the audience most primed to spot AI-written copy (`SOURCE_OF_TRUTH.md`
+  §4 item 11a3). Colons and full stops do the same work.
+- **"Machina fixes the second half"** was a riddle. It asked the reader to work
+  out which half, above the fold, where App Store truncates. Replaced with a
+  plain claim, "Machina makes them useful", which also echoes the D-6 tagline.
+- **"Sign in with Apple or Google"** was cut. Nobody chooses an app for its auth
+  providers, and it spent the closing line, which should carry trust instead.
+  (It stays in the §3 review notes, where the reviewer genuinely needs it.)
+- **"the part that feels like magic"** was cut as marketing filler.
+- Privacy stays and leads the close: no ads, no tracking, never used to train
+  models, and deletion. Those are real differentiators.
+
+The first three lines are what shows before "more" on the storefront, so the
+problem, the promise and the product all land above the fold.
 
 **Age rating questionnaire:** answer **None/No to everything** (no violence,
 no sexual content, no profanity, no horror, no gambling/contests, no drugs, no
