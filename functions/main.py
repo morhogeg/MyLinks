@@ -4077,7 +4077,13 @@ def force_check_reminders(req: https_fn.Request) -> https_fn.Response:
 # (it grows linearly with user count); delivery lands within one tick of the
 # chosen digest_hour:digest_minute, and the daily 20h / weekly 6d dup-guard
 # prevents double-sends.
-@scheduler_fn.on_schedule(schedule="every 15 minutes", max_instances=1)
+# UNIX-CRON, deliberately, not "every 5 minutes": the App Engine syntax
+# anchors the tick to DEPLOY time, so ticks landed at arbitrary offsets
+# (:06/:21/:36/:51 in prod) and a user-chosen minute could never line up
+# with them. Unix-cron is anchored to the clock, so the grid matches the
+# Schedule picker's 5-minute increments and delivery lands ON the chosen
+# minute. MUST stay in sync with digest_service.DIGEST_CADENCE_MINUTES.
+@scheduler_fn.on_schedule(schedule="*/5 * * * *", max_instances=1)
 def send_digests(event: scheduler_fn.ScheduledEvent) -> None:
     """Every 15 min: deliver curated digests to users whose schedule is due now."""
     from digest_service import run_digest_check

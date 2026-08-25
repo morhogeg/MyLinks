@@ -84,7 +84,7 @@ class WeeklySynthesis(BaseModel):
     to the sources. Schema-constrained so the model returns valid, escaped JSON
     even with quotes/newlines (matches the BrainAnswer approach for Hebrew etc.).
     """
-    title: str = Field(description="A warm, specific title for the week, e.g. 'A week of systems thinking'")
+    title: str = Field(description="A short, specific title naming what THIS week was actually about, in the concrete subjects the cards cover. Never opens with 'A week of'. NOTE: any example here becomes a template the model copies week after week, so this description deliberately carries none.")
     narrative: str = Field(description="2-4 short paragraphs (markdown) that tie the week's saves together into a story — the throughline, not a bullet dump")
     themes: List[SynthesisTheme] = Field(default_factory=list, description="2-4 themes that ran through the week's saves")
     standoutCardId: Optional[str] = Field(None, description="Id of the single most noteworthy card this week")
