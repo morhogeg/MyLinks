@@ -139,8 +139,6 @@ second brain,read later,bookmarks,ai summary,knowledge base,notes,pkm,summarize,
 
 **Description:**
 
-> Everything you save, finally useful.
->
 > You save things all day. Links, screenshots, videos, half-read articles. Then you never open them again. Machina changes that.
 >
 > Share anything to Machina from any app. It reads the page, watches the video, reads the text in your screenshot. Each save comes back as a clean card with a real summary, a category, tags, and links to the things you already saved on the same subject.
@@ -163,6 +161,12 @@ second brain,read later,bookmarks,ai summary,knowledge base,notes,pkm,summarize,
 > • Collections you can keep private or publish as a page
 >
 > Private by design. No ads, no tracking, and your content is never used to train AI models. Delete your account and everything in it at any time, from Settings.
+
+The tagline deliberately does NOT open this. It leads the promotional text,
+which renders immediately above the description on the same storefront screen,
+so opening here too would print the same sentence twice, back to back. This
+opening is the problem statement instead, which is what the tagline needs in
+front of it to land.
 
 Rewritten 2026-08-25 on owner review of the previous draft. What was wrong, so
 it is not reintroduced:
