@@ -85,9 +85,10 @@ listing carries it without the Subtitle paying for it.
 **Promotional text** (170 chars, editable without review):
 
 > Everything you save, finally useful. Save links, screenshots and videos from
-> any app. Machina summarizes and connects them. Then ask your library anything.
+> any app. Machina summarizes and connects them into a library you can ask
+> anything.
 
-155/170 chars. Four owner rounds got here (2026-08-25). The rules that survived:
+159/170 chars. Four owner rounds got here (2026-08-25). The rules that survived:
 
 1. **Carry the whole product**, not just the demo.
 2. **Verbs are outcomes, not processes.** "reads" is what the machine does;
@@ -101,10 +102,14 @@ listing carries it without the Subtitle paying for it.
    whatever you ask" replaced it, and was itself replaced (round 5) for being
    the sentence every AI app writes: it described a generic chatbot and hid the
    only thing that makes this one different.
-5. **The close names the moat.** "Then ask your library anything." The full
-   stop matters as much as the words: it makes the ending its own statement
-   instead of the third item trailing off a list. "Your library" is the point,
-   because the answers come from the user's own material, not the internet.
+5. **The close names the moat**, and **"into" welds it to the middle** (round
+   6). "Your library" is the point: the answers come from the user's own
+   material, not the internet. But an earlier close, "Machina summarizes and
+   connects them. Then ask your library anything.", put a full stop between the
+   two halves, and the full stop severed the causal link, leaving three claims
+   standing next to each other. "into a library you can ask anything" makes the
+   summarizing and connecting the process that BUILDS the library, and the
+   library the thing you question: one movement from save to answer.
 
 The weekly synthesis is not in this field. It does not fit alongside the pinned
 opening, and it is the fourth thing a user meets; the description carries it
