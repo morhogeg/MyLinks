@@ -318,14 +318,26 @@ The multi-user auth work described below **was** fully written but not live:
 > your scroll position. 1285 stays the fallback. The APNs step below is
 > unchanged and still pending.
 >
-> **FIRST — the push fix (console, ~5 min, no build):** the on-device test on
-> 1284 confirmed `ThirdPartyAuthError` — the APNs key in Firebase → Cloud
-> Messaging does not authenticate for the app, so NO push has ever delivered.
-> Create/verify an APNs key under team **8Y2M94RUHG** at developer.apple.com →
-> Keys, then in Firebase (`secondbrain-app-94da2` → Project settings → Cloud
-> Messaging → `com.morhogeg.machina`) delete the stored APNs key and upload
-> the .p8 with its exact Key ID + Team ID. Re-tap Settings → "Send a test
-> notification" to verify. Full steps in the 2026-08-22 §9 entry.
+> ## ✅ PUSH IS FIXED — 2026-08-25. Notifications work for the first time.
+>
+> **Root cause: the APNs key was SANDBOX-SCOPED.** Key `2M646V3GV9` ("Machina
+> APNs Key", created 2026-07-07) was listed at developer.apple.com as **"Team
+> Scoped (All Sandbox topics)"** — a development-only key, which cannot
+> authenticate against Apple's production push server. TestFlight builds are
+> production builds (CI asserts `aps-environment=production` and refuses to
+> upload otherwise), so their device tokens are production tokens, and every
+> send was rejected with `ThirdPartyAuthError`. Fix: mint a NEW key with
+> **Environment: Sandbox & Production** (Keys → + → tick APNs → **Configure**,
+> the step that is easy to miss), upload it to Firebase
+> (`secondbrain-app-94da2` → Project settings → Cloud Messaging →
+> `com.morhogeg.machina`), delete the old one. Verified same day: test push,
+> card reminders, AND the weekly synthesis push all arrive on device.
+>
+> ⚠️ **The instruction this box used to carry was wrong** — it said to delete
+> and re-upload the key with its Key ID and Team ID, which would have
+> reproduced the identical failure with the identical sandbox key. Scope, not
+> credentials, was the defect. If push ever breaks again, check the key's
+> **environment column** before touching anything else.
 >
 > **(superseded) 1285** (run #285, merge `3c27bf2`): everything in 1284 plus the
 > related-cards precision fix and the silent graph re-migration (open the app
@@ -454,8 +466,12 @@ The multi-user auth work described below **was** fully written but not live:
 >    down with everyone else. ✅ **The budget alert was SET at ₪50 on
     2026-08-23** — what is left under this heading is the two key rotations
     plus PITR/backups and the uptime check.
-> 6. **Unverified, close before launch** — **4b** (a weekly synthesis has still
->    never been proven to generate end-to-end), **4c**, **21**.
+> 6. **Unverified, close before launch** — ~~**4b** (a weekly synthesis has still
+>    never been proven to generate end-to-end)~~ **✅ DONE 2026-08-25, and its
+>    premise was wrong: five weekly syntheses had already generated; only the
+>    push was broken.** ~~**4c**~~ **✅ DONE 2026-08-25** (one real index hit,
+>    fixed). Remaining under this heading: **21** (prod tag-language cleanup).
+>    Push notifications as a whole are now device-verified for the first time.
 > 7. **Marketing coherence** — BRANDING **Q-4** (the hero is still contested three
 >    ways) and **A-5** (every §8 asset leads on Ask). ~~Q-1/Q-5, the tagline~~ —
 >    **closed 2026-08-02 by D-6**, see §9.
@@ -614,21 +630,42 @@ The multi-user auth work described below **was** fully written but not live:
    - `/api/analyze` 60s timeout — confirmed moot (2026-07-11 weaknesses sprint):
      web saves enqueue via `/api/share` into `process_link_background` (300s);
      `/api/analyze` serves only Retry / image / Note (all short).
-   4b. **[ ] Prove synthesis end-to-end (owner-gated):** deploy is live but no
-   synthesis has ever generated. Owner set style=Weekly synthesis on device
-   2026-07-28 (legacy slot) — the daily-3AM legacy path should generate the
-   first one overnight 2026-07-29; after that, the redesigned settings
-   (2026-07-28, build 1229) migrate it to the independent `synthesis_enabled`
-   toggle firing on `synthesis_day` (default Sun). **Check the feed/Digest tab
-   on 2026-07-29** — if nothing rendered, debug via functions logs
-   (`send_digests`) or force via `send_digest_now` `{mode:'synthesis'}` with
-   the workspace uid. A green deploy is not evidence the feature works.
-   4c. **[ ] Audit remaining collection-group queries in `functions/` for the
-   COLLECTION_GROUP index-scope trap** that broke `sweep_stuck_processing`
-   every 5 min in prod (2026-07-28 §9): default single-field indexes are
-   COLLECTION-scope only; each `db.collection_group(...)` filter field needs a
-   fieldOverride (or composite) at COLLECTION_GROUP scope in
-   firestore.indexes.json.
+   4b. **[x] Prove synthesis end-to-end — ✅ DONE, DEVICE-VERIFIED 2026-08-25.**
+   Push received on the lock screen ("Your weekly synthesis of 14 cards is
+   ready"), content read and reviewed. ⚠️ **This item's premise was WRONG and is
+   corrected here:** it claimed "no synthesis has ever generated". In fact the
+   Digest tab holds **five consecutive weekly syntheses** going back to
+   Jul 27–Aug 2, one per ISO week with no gap — the feature has worked since
+   the 2026-07-28 deploy lit it up. What had never happened was the **push**,
+   blocked by the sandbox-scoped APNs key (see the 2026-08-25 §9 entry), and
+   because the in-app write is the primary surface and silent, nobody noticed
+   the feature was already shipping. Generalisable error: "I have never seen
+   it" was recorded as "it has never happened", when the only channel that
+   would have surfaced it was itself broken.
+   Delivery latency, also fixed 2026-08-25: a 16:10 synthesis arrived 16:21
+   because `send_digests` used the deploy-anchored `every 15 minutes`. It is
+   now clock-anchored unix-cron `*/5 * * * *` with a matching 5-minute picker
+   grid, so delivery lands on the chosen minute.
+   4c. **[x] Audit remaining collection-group queries for the COLLECTION_GROUP
+   index-scope trap — DONE 2026-08-25, one real hit found and fixed.** The trap
+   (which broke `sweep_stuck_processing` every 5 min in prod, 2026-07-28 §9):
+   default single-field indexes are COLLECTION-scope only, so each
+   `db.collection_group(...)` filter field needs a fieldOverride (or composite)
+   at COLLECTION_GROUP scope in firestore.indexes.json. All three sites audited:
+   - `main.py` janitor (`status == processing`) — covered by the `status`
+     fieldOverride. This is the one that already broke and was fixed.
+   - `reminder_service.py:265` hot path (`reminderStatus` + `nextReminderAt`)
+     — covered by the COLLECTION_GROUP composite.
+   - `reminder_service.py:495` `coerce_pending_reminder_times`
+     (`reminderStatus == 'pending'` **alone**) — **NOT covered.** A bare
+     single-field equality at collection-group scope needs a single-field
+     COLLECTION_GROUP index; the composite cannot serve it. Fixed by adding a
+     `reminderStatus` fieldOverride mirroring `status` (the three COLLECTION
+     entries restate Firestore's automatic indexing, which declaring an
+     override otherwise replaces). Low severity — the query is admin-only
+     (`force_check_reminders?coerce=1`) so nothing broke in normal operation,
+     but it would have failed exactly when reached for. Ships on the next
+     functions deploy (`deploy-functions.yml` runs `--only firestore:indexes`).
 5. **[ ] Security config + key hygiene.** `ADMIN_TOKEN` and `OWNER_EMAIL` are
    **set and deployed** (2026-08-02, with the task-2 cutover). Still open:
    **rotate the Gemini key** (was pasted in chat 2026-06-23) and the **App Store
@@ -1621,6 +1658,71 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-08-25 — 🎯 PUSH WORKS, FOR THE FIRST TIME EVER. Root cause was a
+  SANDBOX-SCOPED APNs key, not a bad credential. Plus: synthesis proven
+  end-to-end, its prompt fixed, delivery timing fixed, 4c closed.** (branch
+  `claude/launch-blockers-checklist-9fvmt5`; NOT yet merged or deployed.)
+  Owner screenshot of developer.apple.com showed key `2M646V3GV9` as **"Team
+  Scoped (All Sandbox topics)"** — development-only, so it could never
+  authenticate against production APNs, which is what a TestFlight build's
+  tokens require (CI already asserts `aps-environment=production`). A new
+  Sandbox **& Production** key fixed it in minutes. The standing instruction in
+  §4 said to re-upload the same key with its Key ID and Team ID, which would
+  have reproduced the failure exactly; it is corrected in place. **This one key
+  had been hiding three features at once**: test pushes, card reminders, and
+  the weekly synthesis.
+  **The synthesis was never broken.** §4 item 4b claimed no synthesis had ever
+  generated; the Digest tab in fact holds five consecutive weeks going back to
+  Jul 27–Aug 2. The in-app write is the primary surface and it had been working
+  since the 2026-07-28 deploy — the only channel that would have announced it
+  was the broken one. Corrected in 4b.
+  **Delivery timing (`fc11084`).** A 16:10 synthesis arrived at 16:21. The
+  cause was not a slow tick but a misaligned one: `every 15 minutes` is App
+  Engine syntax, which Firebase anchors to DEPLOY time (prod ticks landed at
+  :06/:21/:36/:51), so a user-chosen minute could never coincide with one.
+  `send_digests` now uses clock-anchored unix-cron `*/5 * * * *`,
+  `DIGEST_CADENCE_MINUTES` is 5 to match, and the Schedule picker offers only
+  5-minute values so every selectable time is a real tick. Legacy off-grid
+  minutes snap clamped (`:58`→`:55`, never wrapping to `:00`, which would move
+  delivery an hour earlier). Unix-cron in UTC is DST-immune while the local
+  window stays computed from the user's `timezone`, and a 5-minute UTC grid
+  maps onto a 5-minute local grid in every timezone including :30/:45 offsets.
+  Cost: 96→288 ticks/day, inside Firestore's 50k reads/day free quota to ~170
+  users and a few dollars a month at 1000; no extra Gemini calls, since a tick
+  only spends when someone is due.
+  **Synthesis prompt (`ba6f3bc`).** Five syntheses in a row opened with "A week
+  of" and three named "systems". Cause: the `WeeklySynthesis` schema's title
+  field carried `e.g. 'A week of systems thinking'`, and Gemini reads
+  structured-output field descriptions as instructions — the model was handed
+  the template. The prompt itself said nothing about titles at all. Removed the
+  example (with a note on why none belongs there), added real title rules
+  (concrete subjects, 3-8 words, never "A week of", banned flattening
+  abstractions), forbade the circular standout reason ("it encapsulates the
+  week's focus" restates the theme and tells the reader nothing), required the
+  narrative to acknowledge saves left outside the themes, and banned em dashes
+  in the output — de-em-dashing the prompt's own instruction text so the
+  strongest style signal agrees with the rule (feeds 11a3). Prompt and schema
+  description text only: no shape, parsing or rendering change.
+  **4c closed.** Audited all three `collection_group` queries;
+  `coerce_pending_reminder_times` (`reminderStatus == 'pending'` alone) was the
+  one real hit and now has a fieldOverride. Detail in 4c.
+  Verified: `tsc --noEmit` clean, `py_compile` clean, 21 collectable tests
+  pass; the rest of the suite cannot collect in the cloud sandbox (missing
+  `google.cloud.firestore_v1`) and fails identically without these changes.
+  **NOT verified:** anything requiring a deploy — the new cron's first live
+  tick, the index build, and a synthesis generated under the new prompt (the
+  per-ISO-week idempotency means the next natural one is Monday).
+  **Deferred, owner declined for now:** the Gemini + App Store Connect key
+  rotations (§4 task 5) and the prod tag-language cleanup (§4 task 21).
+  **Open question raised and not taken:** a "Send one now" button for the
+  digest/synthesis. `send_digest_now` already exists with a `force=True` path
+  that bypasses both gates and still pushes, but it has NO UI anywhere and, as
+  a Firebase callable, would fail CORS from the native WebView (the
+  `claim_workspace` bug) — it needs an HTTP twin. Three separate debugging
+  rounds today each cost hours of waiting that this button would have answered
+  in one tap. Also noted: `force_send_digests`'s docstring claims it "ignores
+  nothing-due skips" but it just calls the same `is_due`-gated sweep.
 
 - **2026-08-24 — authDomain-to-brand-domain plumbing (§4 item 24). SHIPPED
   (merge `b40511b` → Vercel; rides TestFlight run #296 = build 1296 though
