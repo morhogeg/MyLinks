@@ -84,11 +84,21 @@ listing carries it without the Subtitle paying for it.
 
 **Promotional text** (170 chars, editable without review):
 
-> Everything you save, finally useful. Machina reads your links, screenshots
-> and videos, then answers questions from them, with sources you can jump back
-> to.
+> Everything you save, finally useful. Save links, screenshots and videos from
+> any app. Machina reads and connects them, answers questions with sources,
+> recaps your week.
 
-155/170 chars. **This is where the D-6 tagline lives in the listing** (owner
+168/170 chars. Owner rejected an earlier draft (2026-08-25) for covering only
+capture and Ask: **this field has to carry the whole product, not the demo.**
+Five beats in 26 words, in the order a user meets them: the tagline, capture
+breadth (the formats AND "from any app", which is the share sheet, web and
+extension in three words), the analysis, Ask with citations, and the weekly
+synthesis. Only Collections is left out, deliberately: it is the least
+differentiating pillar and the one a new user reaches last, and §2's
+description covers it under COME BACK TO IT.
+
+⚠️ At 168/170 there is no slack. Any edit needs a cut first, so do not "just
+add" a word in Connect. **This is where the D-6 tagline lives in the listing** (owner
 call 2026-08-25), and it is the answer to "why isn't the tagline the
 subtitle?". It cannot be the Subtitle: the line is **35 characters** against a
 30-character field, and it re-spends `save`, already a Name token, so the index
