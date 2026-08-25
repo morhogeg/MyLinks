@@ -1622,6 +1622,22 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-24 — multi-screenshot carousel gets DESKTOP navigation. BUILT, not
+  yet shipped.** Owner, desktop web: a card with 4 screenshots showed slide 1
+  and nothing could reach the rest. Root cause: the carousel shipped in round 2
+  is a horizontal scroll-snap container, which a touch swipe (or a trackpad's
+  two-finger scroll) drives natively — but **a mouse cannot scroll a container
+  sideways**, and the dots were decorative `<span>`s. Three routes added in
+  `LinkDetailModal`, all driving one `goToSlide(i)` that scrolls the container
+  (so they never fight a user's own swipe, and `galleryIndex` keeps following
+  `onScroll`): (1) prev/next chevron buttons, `[@media(hover:hover)]`-only and
+  revealed on gallery hover — a phone has the swipe and doesn't need chrome
+  over the image — each hiding at its end of the set; (2) the dots are now
+  real `<button>`s that jump to their slide (the always-visible affordance);
+  (3) the scroll container is focusable when there are 2+ slides and handles
+  Left/Right arrow keys. Verified: `tsc --noEmit` clean. NOT verified: hover
+  reveal + smooth-scroll feel in a real desktop browser.
+
 - **2026-08-24 — authDomain-to-brand-domain plumbing (§4 item 24). SHIPPED
   (merge `b40511b` → Vercel; rides TestFlight run #296 = build 1296 though
   native never uses it).** The Google sign-in popup's address bar still reads the

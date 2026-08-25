@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, StatusChangeHandler, UserNote } from '@/lib/types';
 import SourceByline from './SourceByline';
-import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, Check, Network, Play, Youtube, ImageOff, Image as ImageIcon, Layers, Share2, ChevronLeft, StickyNote, Waypoints } from 'lucide-react';
+import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, Check, Network, Play, Youtube, ImageOff, Image as ImageIcon, Layers, Share2, ChevronLeft, ChevronRight, StickyNote, Waypoints } from 'lucide-react';
 import { getPlatform } from '@/lib/platform';
 import SimpleMarkdown from './SimpleMarkdown';
 import PosterImage from './ui/PosterImage';
@@ -154,6 +154,17 @@ export default function LinkDetailModal({
     useEffect(() => {
         galleryRef.current?.scrollTo({ left: 0 });
     }, [link.id]);
+    // Scroll the carousel to a slide by index. The container is the only owner
+    // of position (scroll-snap); `galleryIndex` follows via onScroll, so this
+    // never fights the user's own swipe. DESKTOP is why this exists: a mouse
+    // cannot swipe horizontally, so arrows/dots/keys drive the same scroll.
+    const goToSlide = (i: number) => {
+        const el = galleryRef.current;
+        if (!el) return;
+        const max = Math.max(0, Math.round(el.scrollWidth / Math.max(1, el.clientWidth)) - 1);
+        const target = Math.max(0, Math.min(i, max));
+        el.scrollTo({ left: target * el.clientWidth, behavior: 'smooth' });
+    };
     // Reset the broken-image fallback when navigating to a different card. Done
     // as a render-time state adjustment (React discards this pass and re-renders
     // synchronously) rather than in an effect, avoiding a set-state-in-effect
@@ -705,7 +716,7 @@ export default function LinkDetailModal({
                         const slides = galleryUrls.filter((u) => !failedImages[u]);
                         const slideIndex = Math.min(galleryIndex, slides.length - 1);
                         return slides.length > 0 ? (
-                            <div dir="ltr" className="relative mb-6 rounded-2xl overflow-hidden border border-border-subtle bg-card-hover">
+                            <div dir="ltr" className="group/gallery relative mb-6 rounded-2xl overflow-hidden border border-border-subtle bg-card-hover">
                                 <div
                                     ref={galleryRef}
                                     onScroll={() => {
@@ -714,7 +725,18 @@ export default function LinkDetailModal({
                                         const idx = Math.round(el.scrollLeft / Math.max(1, el.clientWidth));
                                         setGalleryIndex((prev) => (prev === idx ? prev : idx));
                                     }}
-                                    className="flex overflow-x-auto snap-x snap-mandatory [&::-webkit-scrollbar]:hidden"
+                                    // Keyboard parity with the arrows (and the only route for
+                                    // someone not using a pointer). Focusable only when there IS
+                                    // more than one slide, so a single screenshot adds no stop.
+                                    tabIndex={slides.length > 1 ? 0 : undefined}
+                                    role={slides.length > 1 ? 'group' : undefined}
+                                    aria-label={slides.length > 1 ? `Screenshots, ${slides.length} images` : undefined}
+                                    onKeyDown={(e) => {
+                                        if (slides.length < 2) return;
+                                        if (e.key === 'ArrowRight') { e.preventDefault(); goToSlide(slideIndex + 1); }
+                                        if (e.key === 'ArrowLeft') { e.preventDefault(); goToSlide(slideIndex - 1); }
+                                    }}
+                                    className="flex overflow-x-auto snap-x snap-mandatory outline-none [&::-webkit-scrollbar]:hidden"
                                     style={{ scrollbarWidth: 'none' }}
                                 >
                                     {slides.map((u, i) => (
@@ -742,16 +764,49 @@ export default function LinkDetailModal({
                                 </div>
                                 {slides.length > 1 && (
                                     <>
-                                        <span className="absolute top-2 end-2 text-[10px] font-bold text-white bg-black/60 px-2 py-0.5 rounded-full pointer-events-none">
+                                        <span className="absolute top-2 end-2 text-[10px] font-bold text-white bg-black/60 px-2 py-0.5 rounded-full pointer-events-none z-10">
                                             {slideIndex + 1}/{slides.length}
                                         </span>
-                                        <div className="absolute bottom-2 inset-x-0 flex justify-center pointer-events-none">
-                                            <div className="flex items-center gap-1.5 bg-black/35 backdrop-blur-md px-2 py-1 rounded-full">
+                                        {/* DESKTOP navigation. A mouse cannot swipe a scroll
+                                            container sideways, so without these the other
+                                            slides were unreachable on desktop (owner, 2026-08-24).
+                                            Hover-revealed on pointer devices only — a phone has
+                                            the swipe and doesn't need chrome over the image —
+                                            and each arrow hides at its end of the set. */}
+                                        <button
+                                            type="button"
+                                            aria-label="Previous screenshot"
+                                            onClick={(e) => { e.stopPropagation(); goToSlide(slideIndex - 1); }}
+                                            className={`hidden [@media(hover:hover)]:flex absolute start-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-md border border-white/15 opacity-0 group-hover/gallery:opacity-100 focus-visible:opacity-100 hover:bg-black/75 active:scale-95 transition-all ${slideIndex === 0 ? 'pointer-events-none !opacity-0' : ''}`}
+                                        >
+                                            <ChevronLeft className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            aria-label="Next screenshot"
+                                            onClick={(e) => { e.stopPropagation(); goToSlide(slideIndex + 1); }}
+                                            className={`hidden [@media(hover:hover)]:flex absolute end-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-md border border-white/15 opacity-0 group-hover/gallery:opacity-100 focus-visible:opacity-100 hover:bg-black/75 active:scale-95 transition-all ${slideIndex === slides.length - 1 ? 'pointer-events-none !opacity-0' : ''}`}
+                                        >
+                                            <ChevronRight className="w-4 h-4" />
+                                        </button>
+                                        {/* Dots are real controls, not decoration: tapping one
+                                            jumps to that slide (the second desktop route, and
+                                            the only always-visible one). */}
+                                        <div className="absolute bottom-2 inset-x-0 flex justify-center z-10">
+                                            <div className="flex items-center gap-1 bg-black/35 backdrop-blur-md px-1.5 py-1 rounded-full">
                                                 {slides.map((u, i) => (
-                                                    <span
+                                                    <button
                                                         key={u}
-                                                        className={`w-1.5 h-1.5 rounded-full transition-colors duration-200 ${i === slideIndex ? 'bg-white' : 'bg-white/40'}`}
-                                                    />
+                                                        type="button"
+                                                        aria-label={`Screenshot ${i + 1}`}
+                                                        aria-current={i === slideIndex}
+                                                        onClick={(e) => { e.stopPropagation(); goToSlide(i); }}
+                                                        className="p-1 -m-0.5 flex items-center justify-center"
+                                                    >
+                                                        <span
+                                                            className={`block w-1.5 h-1.5 rounded-full transition-colors duration-200 ${i === slideIndex ? 'bg-white' : 'bg-white/40'}`}
+                                                        />
+                                                    </button>
                                                 ))}
                                             </div>
                                         </div>
