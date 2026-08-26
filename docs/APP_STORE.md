@@ -131,18 +131,24 @@ on a fourth beat is what made the previous three drafts read as a list.
 **Keywords** (comma-separated, no spaces after commas):
 
 ```
-second brain,read later,bookmarks,ai summary,knowledge base,notes,pkm,summarize,organize,video
+second brain,read later,bookmarks,ai summary,knowledge base,notes,pkm,links,organize,video,research
 ```
 
-98/100 chars. Rules that shaped this list:
+99/100 chars. Revised 2026-08-26 (owner-approved): the previous list claimed
+`save links` formed across fields for free, but `links` appeared in **no**
+field (not Name, Subtitle, or keywords), so the phrase could never form.
+`summarize` was dropped to pay for it — its stem is already carried by
+`summary` inside `ai summary` — and the remaining room restored `research`,
+which the rationale below had always claimed was bought. Rules that shaped
+this list:
 
 - **Never repeat a word already in the Name or Subtitle** — Apple indexes those
   fields and builds search phrases by combining tokens across all of them. The
   name supplies `machina`, `save`, `recall`; the subtitle supplies `capture`,
   `ask`, `connect`. That is why `save links` and `recall` were dropped from
-  this field (they were here when the name was `Machina AI`) — `save` + `links`
-  still forms the phrase for free. The reclaimed characters bought `summarize`,
-  `organize`, `research`, and `links`.
+  this field (they were here when the name was `Machina AI`) — with `links` in
+  this field and `save` in the Name, the `save links` phrase forms across
+  fields. The reclaimed characters bought `links`, `organize`, and `research`.
 - **The subtitle must not repeat `save` or `recall`.** Both are Name tokens, and
   a token indexed twice buys nothing while costing subtitle characters. This is
   why the subtitle opens on `Capture` rather than the more obvious `Save`, and
@@ -160,7 +166,7 @@ second brain,read later,bookmarks,ai summary,knowledge base,notes,pkm,summarize,
 
 > You save things all day. Links, screenshots, videos, articles you meant to finish. Then you never open them again. Machina changes that.
 >
-> Share anything to Machina from any app. It reads the page, watches the video, reads the text in your screenshot. Each save comes back as a clean card with a real summary, a category, tags, and links to the things you already saved on the same subject.
+> Share anything to Machina from any app. It reads the page, watches the video, and pulls the text from your screenshot. Each save comes back as a clean card with a real summary, a category, tags, and connections to the things you already saved on the same subject.
 >
 > Then ask about anything you saved. Machina answers in plain language and cites the exact saves it used, so one tap takes you back to the source.
 >
@@ -170,7 +176,7 @@ second brain,read later,bookmarks,ai summary,knowledge base,notes,pkm,summarize,
 > • Or paste a link and write your own note, right in the app
 >
 > UNDERSTAND WHAT YOU SAVED
-> • A real summary, category and tags on every save
+> • A real summary, category, and tags on every save
 > • "See also" connections between related saves
 > • Search that finds meaning, not just matching words
 >
@@ -212,6 +218,14 @@ it is not reintroduced:
 The first three lines are what shows before "more" on the storefront, so the
 problem, the promise and the product all land above the fold.
 
+Three surgical touch-ups 2026-08-26 (owner-approved), nothing structural:
+the double "reads" in paragraph two became "reads … and pulls the text from"
+(three abilities should feel distinct, not flattened by one repeated verb);
+"links to the things you already saved" became "connections to the things"
+(in an app whose content type IS links, "links to" momentarily reads as URLs —
+"connections" is also the word the See-also bullet already uses); and the
+UNDERSTAND bullet gained the serial comma the rest of the document uses.
+
 **Age rating questionnaire:** answer **None/No to everything** (no violence,
 no sexual content, no profanity, no horror, no gambling/contests, no drugs, no
 unrestricted web access — Machina renders extracted article text, not a general
@@ -230,9 +244,9 @@ browser, and no user-to-user interaction). Result: **4+**.
 >
 > Suggested wording for the notes field:
 >
-> "Machina is a personal knowledge base: save links/images from the iOS share
-> sheet, AI analyzes them, and you can ask questions answered from your own
-> saves.
+> "Machina is a personal knowledge base: save links and images from the iOS
+> share sheet, AI analyzes them, and you can ask questions answered from your
+> own saves.
 >
 > • Sign-in: Google and Sign in with Apple are both supported. Signing in with
 > any new account automatically creates a fresh workspace — no invitation or
@@ -252,6 +266,12 @@ browser, and no user-to-user interaction). Result: **4+**.
 (Keep the AI-consent sentence in sync with §4 task 6 — the consent screen must
 actually be in the submitted build.)
 
+**"Share sheet" deliberately stays in this section** (decided 2026-08-26). The
+§2 ban on the phrase is about audience: users don't say "share sheet", but the
+App Review reader is an Apple employee and it is their own precise terminology —
+"tap Share" would be *less* clear here. Same text rule, two audiences, opposite
+calls.
+
 ## 4. Screenshot shot-list (6.9" iPhone required; reuse for 6.5")
 
 Take on an iPhone Pro Max simulator/device, dark theme (the app's signature
@@ -265,18 +285,33 @@ clean (9:41, full battery). Order matters — the first two sell the app.
    save, understood."
 2. **Ask Machina with a cited answer** — a question like "what did I save
    about mortgage rates?" with the streamed answer and 2–3 citation chips
-   visible. Caption: "Ask your saves anything."
+   visible. Caption: "Ask about anything you saved."
 3. **Card detail with See also** — LinkDetailModal open on a rich card:
    summary, tags, category, and the "See also" related-links section showing
-   2–3 connections. Caption: "Every save gets connected."
+   2–3 connections. Caption: "Every save, connected."
 4. **Share-sheet capture** — Safari open on a real article with the iOS share
    sheet up and Machina selected (or the ShareExt confirmation HUD). Caption:
    "Save from anywhere in two taps."
 5. **Weekly synthesis** — the synthesis card open: themes of the week, the
-   standout save, the open question. Caption: "Your week, synthesized."
+   standout save, the open question. Caption: "What your week added up to."
 6. **Collections** — collections gallery with 3–4 named collections with
    cover images; optionally one shown as a public share page. Caption:
    "Curate it. Share it (or don't)."
+
+Captions revised 2026-08-26 (owner-approved) — this set had never had a review
+round (written 2026-07-03, before the rename and the 08-25 copy rules), and two
+captions broke rules the other fields had already earned. Caption 2 ("Ask your
+saves anything") personified exactly the way "a library you can ask anything"
+was rejected in the promotional text — saves don't listen; the replacement is
+lifted verbatim from the approved promo close, so the storefront says it once
+in prose and once over the proof. Caption 5's "synthesized" was our word, not
+a user's (same class of error as "share sheet" in §2); the replacement says
+the outcome and lets the shot demonstrate the mechanism. Caption 3 tightened
+to pick up caption 1's comma rhythm so the set reads as a set. Captions 1, 4,
+and 6 stand: 1's tagline echo is deliberate branding (the promo text sits on
+the same screen), 4 is the only caption with a number on the shot where the
+number is the point, and 6's parenthetical is the listing's one moment of
+personality, carrying the privacy promise.
 
 iPad: not planned — `TARGETED_DEVICE_FAMILY` is already `1` (iPhone-only) in all
 build configs, so no iPad screenshots are needed.

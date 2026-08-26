@@ -1708,6 +1708,27 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-26 — App Store metadata copy pass (§4 tasks 8–9), doc-only, all
+  owner-approved in chat before writing.** Full expert review of every
+  Connect field in `docs/APP_STORE.md` §2–§4. **The finding that matters:
+  the keyword list had a functional bug** — its own rationale claimed `save
+  links` formed across fields for free, but `links` existed in NO field, so
+  the phrase could never form. Fixed by dropping `summarize` (stem already
+  carried by `summary` in `ai summary`) and adding `links` + `research`
+  (99/100). Name, subtitle, and the owner-approved promotional text stand
+  untouched. Description: three surgical fixes (double "reads" → "reads …
+  and pulls the text from"; "links to the things" → "connections to the
+  things", avoiding the URL misread in an app whose content type is links;
+  one serial comma). Screenshot captions — the one set that had never had a
+  review round — revised: caption 2 "Ask your saves anything" personified
+  the way the rejected promo close did, replaced with "Ask about anything
+  you saved" (verbatim from the approved promo); caption 5 "Your week,
+  synthesized" used our word, replaced with "What your week added up to";
+  caption 3 tightened to "Every save, connected." Review notes: "share
+  sheet" deliberately KEPT there (Apple-reviewer audience, their own
+  terminology — decision recorded in the doc), "links/images" slash
+  de-spec'd. Owner steps in §5 of the doc unchanged: credentials, Connect
+  data entry, screenshots.
 - **2026-08-25 — 🎯 PUSH WORKS, FOR THE FIRST TIME EVER. Root cause was a
   SANDBOX-SCOPED APNs key, not a bad credential. Plus: synthesis proven
   end-to-end, its prompt fixed, delivery timing fixed, 4c closed. SHIPPED
