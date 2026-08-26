@@ -69,6 +69,17 @@ GEMINI_FALLBACK_MODEL = "gemini-3.5-flash-lite"
 EMBEDDING_MODEL = "models/gemini-embedding-001"
 EMBEDDING_DIMENSIONS = 768
 
+# Hard wall-clock ceiling for ONE Gemini HTTP call (milliseconds), applied at
+# the client so it covers every surface — analysis, vision, video, Ask, and
+# embeddings. Without it google-genai's httpx transport waits FOREVER on a
+# hung connection: the background pipeline then rode the hang to the platform
+# kill (2026-08-26, demo-account cards stranded at `processing` with no FAILED
+# state and no error log). 90s is comfortably above the slowest legitimate call
+# on record (~1 min video analysis) and keeps the worst RETRIED case inside
+# process_link_background's budget, so the except that writes the retryable
+# FAILED card always gets to run. Override via GEMINI_CALL_TIMEOUT_MS.
+GEMINI_CALL_TIMEOUT_MS = int(os.environ.get("GEMINI_CALL_TIMEOUT_MS", "90000") or 90000)
+
 # Safety thresholds for the ASK (RAG) calls only. Ask answers questions about
 # the user's OWN saved content, so the configurable harm categories are set to
 # BLOCK_NONE — Gemini's safety filter false-positives on innocuous non-English
@@ -796,7 +807,10 @@ class GeminiService:
         if not self.api_key:
             logger.critical("GEMINI_API_KEY is empty")
 
-        self.client = genai.Client(api_key=self.api_key) if self.api_key else None
+        self.client = genai.Client(
+            api_key=self.api_key,
+            http_options={"timeout": GEMINI_CALL_TIMEOUT_MS},
+        ) if self.api_key else None
         self.model = GEMINI_ANALYSIS_MODEL
 
     def _generate_json(self, contents: list, what: str, config_extra: dict = None,

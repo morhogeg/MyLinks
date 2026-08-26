@@ -33,6 +33,14 @@ import { claimCardCapture, finishCardCapture, isCardCaptureFinished } from './ca
     see lib/shareProgress.) */
 const cardStartOf = (l: Link) => cardStartMs(l);
 
+/** A `processing` card older than this is a DEAD capture, not a live one — the
+    backend janitor fails cards out at 15 min, so anything past 20 min means the
+    janitor hasn't caught it yet (or can't). Don't ride the banner on it: an
+    eternal 92% pill over a card that will never resolve reads as the app being
+    broken (2026-08-26 demo-account stall). The card itself stays visible in the
+    feed until the janitor flips it to a retryable failed state. */
+const STALE_CAPTURE_MS = 20 * 60_000;
+
 export function useProcessingBanner(links: Link[], suppressId?: string | null): AnalyzingState | null {
     const firstSeen = useRef<Map<string, number>>(new Map());
     // Cards currently in `status: 'processing'` (id → start clock), so the effect
@@ -53,7 +61,7 @@ export function useProcessingBanner(links: Link[], suppressId?: string | null): 
     // filtered list) so that hiding a card behind `suppressId` is never mistaken
     // for it having resolved.
     const rawProcessing = links.filter((l) => l.status === 'processing');
-    // Two display filters:
+    // Three display filters:
     //  · suppressId — the card currently owned by the "+" dialog's in-dialog
     //    stepper. That surface is already showing it, so the pill must not double
     //    it (which read as a restart at hand-off). When the dialog closes,
@@ -64,9 +72,14 @@ export function useProcessingBanner(links: Link[], suppressId?: string | null): 
     //    streamed in; without this the card's arrival replayed the whole ramp).
     //    A genuinely new capture has its own entry and is untouched. See
     //    captureLifecycle.
-    const processing = rawProcessing.filter(
-        (l) => l.id !== suppressId && !isCardCaptureFinished(l.id, cardStartOf(l)),
-    );
+    //  · STALENESS — drop captures past STALE_CAPTURE_MS (a card with no usable
+    //    clock is kept; firstSeen below ages it from when we first saw it).
+    const staleClock = now || Date.now();
+    const processing = rawProcessing.filter((l) => {
+        if (l.id === suppressId || isCardCaptureFinished(l.id, cardStartOf(l))) return false;
+        const start = cardStartOf(l) ?? firstSeen.current.get(l.id);
+        return start == null || staleClock - start < STALE_CAPTURE_MS;
+    });
     const active = processing.length > 0;
 
     // A stable key for "the set of processing cards" so the bookkeeping effect
