@@ -101,8 +101,12 @@ export default function LoginScreen({
                     </>
                 ) : (
                     <>
+                        {/* Must read right for BOTH arrivals: first-timers coming
+                            from the landing's "Get started" (their account is
+                            created on first Continue — OAuth has no separate
+                            sign-up) and returning users from "Sign in". */}
                         <p className="mt-8 text-sm text-text-secondary">
-                            Sign in to access your Machina.
+                            Sign in or create your Machina.
                         </p>
                         {showApple && (
                             <button
