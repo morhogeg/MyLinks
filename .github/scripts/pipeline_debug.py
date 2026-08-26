@@ -301,32 +301,80 @@ def main():
         '"process-link-background" OR "sweep-stuck-processing" OR '
         '"send-digests" OR "check-reminders" OR "sync-link-embedding" OR "analyze-link")'
     )
-    entries = []
-    try:
-        body = {"resourceNames": [f"projects/{PROJECT}"], "filter": log_filter,
-                "orderBy": "timestamp desc", "pageSize": 60}
+    def fetch_logs(filt, page_size=60):
+        body = {"resourceNames": [f"projects/{PROJECT}"], "filter": filt,
+                "orderBy": "timestamp desc", "pageSize": page_size}
         r = sess.post("https://logging.googleapis.com/v2/entries:list",
                       json=body, timeout=45)
         r.raise_for_status()
+        out = []
         for e in r.json().get("entries", []):
             svc = ((e.get("resource") or {}).get("labels") or {}).get("service_name")
             msg = e.get("textPayload")
             if msg is None and isinstance(e.get("jsonPayload"), dict):
                 msg = e["jsonPayload"].get("message") or json.dumps(e["jsonPayload"])
-            entries.append({"ts": e.get("timestamp"), "service": svc,
-                            "severity": e.get("severity"), "message": msg})
-        print(f"entries={len(entries)}")
-        seen_msgs = set()
+            hr = e.get("httpRequest") or {}
+            out.append({
+                "ts": e.get("timestamp"), "service": svc,
+                "severity": e.get("severity"),
+                "log": (e.get("logName") or "").split("/")[-1],
+                "status": hr.get("status"),
+                "url": hr.get("requestUrl"),
+                "ua": hr.get("userAgent"),
+                "latency": hr.get("latency"),
+                "message": msg,
+            })
+        return out
+
+    entries = []
+    try:
+        entries = fetch_logs(log_filter)
+        by_svc = {}
         for e in entries:
-            key = (e["service"], str(e["message"])[:80])
-            if key in seen_msgs:
-                continue
-            seen_msgs.add(key)
-            print(f"  {e['ts']} [{e['service']}] {e['severity']}: {redact(str(e['message']))[:260]}")
+            by_svc.setdefault(e["service"], []).append(e)
+        print(f"entries={len(entries)} services={ {k: len(v) for k, v in by_svc.items()} }")
+        for svc, es in by_svc.items():
+            print(f"  --- {svc} ({len(es)} errors) ---")
+            for e in es[:6]:
+                path = ""
+                if e["url"]:
+                    path = "/" + "/".join((e["url"].split("/", 3)[3:] or [""]))[:60]
+                print(f"    {e['ts']} {e['log']} http={e['status']} lat={e['latency']} "
+                      f"ua={(e['ua'] or '')[:40]!r} path={path!r} msg={redact(str(e['message']))[:180]}")
     except Exception as e:
         entries.append({"error": f"{type(e).__name__}: {e}"})
         print(f"  entries.list FAILED: {type(e).__name__}: {redact(str(e))[:300]}")
     report["error_logs"] = entries
+
+    # Any sign of life at all on process-link-background (any severity)?
+    section("PROCESS-LINK-BACKGROUND: ALL LOGS, LAST 48H")
+    try:
+        since2 = (datetime.now(timezone.utc) - timedelta(hours=48)).isoformat()
+        plb = fetch_logs(
+            f'timestamp >= "{since2}" AND resource.type = "cloud_run_revision" AND '
+            'resource.labels.service_name = "process-link-background"', 40)
+        print(f"entries={len(plb)}")
+        for e in plb[:20]:
+            print(f"  {e['ts']} {e['severity']} {e['log']} http={e['status']} "
+                  f"msg={redact(str(e['message']))[:160]}")
+        report["plb_logs"] = plb
+    except Exception as e:
+        print(f"  FAILED: {type(e).__name__}: {redact(str(e))[:200]}")
+
+    # Container stderr of the failing scheduled services — the crash trace.
+    section("SWEEP/DIGESTS STDERR, LAST 48H")
+    try:
+        stderr_logs = fetch_logs(
+            f'timestamp >= "{since2}" AND resource.type = "cloud_run_revision" AND '
+            'resource.labels.service_name = ("sweep-stuck-processing" OR "send-digests") AND '
+            'logName = ("projects/' + PROJECT + '/logs/run.googleapis.com%2Fstderr" OR '
+            '"projects/' + PROJECT + '/logs/run.googleapis.com%2Fvarlog%2Fsystem")', 40)
+        print(f"entries={len(stderr_logs)}")
+        for e in stderr_logs[:25]:
+            print(f"  {e['ts']} [{e['service']}] {e['severity']}: {redact(str(e['message']))[:220]}")
+        report["stderr_logs"] = stderr_logs
+    except Exception as e:
+        print(f"  FAILED: {type(e).__name__}: {redact(str(e))[:200]}")
 
     json.dump(report, open("pipeline-debug-report.json", "w"),
               indent=2, ensure_ascii=False, default=str)
