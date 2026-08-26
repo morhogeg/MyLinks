@@ -226,7 +226,18 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-08-25): install build **1298**, and RAISE THE GEMINI CAP
+> ## 🚨 OWNER ACTION (updated 2026-08-26): install build **1308** for the demo seeding, and RAISE THE GEMINI CAP
+>
+> **1308** (run #308, merge `8763ac1`) carries the analysis-stall fix (§9
+> 2026-08-26 round 14): Gemini call timeouts + the 540s trigger budget are
+> backend (already live via functions run #91), and 1308 adds the client-side
+> stale-banner cutoff. After functions #91, the 5-minute janitor also clears
+> the demo account's stuck skeletons (→ retryable failed cards) and the
+> orphaned queue docs that were silently blocking re-saves of those URLs.
+> Seed the demo workspace (docs/APP_STORE.md §4) on 1308. The ⛔ Gemini cap
+> item below still stands.
+>
+> ## (superseded) OWNER ACTION (updated 2026-08-25): install build **1298**, and RAISE THE GEMINI CAP
 >
 > **1298** (run #298, merge `61cd96c`) is current. **Push notifications work
 > for the first time** (the APNs key was sandbox-scoped, not miscredentialed —
@@ -1744,7 +1755,9 @@ exact-match, capped.
   `sweep_stuck_processing` (or hit `force_sweep_stuck_processing` with the
   admin key) — it will flip the stuck skeletons to retryable failed cards AND
   clear the orphaned queue docs; then tap Retry per card or re-share the
-  links.**
+  links.** Shipped: merge `8763ac1` → Vercel; functions run **#91** (all,
+  green); TestFlight run #308 = build **1308** (green) — seed the demo
+  workspace on 1308, which also carries the banner cutoff.
 - **2026-08-26 (round 13) — 🔴 OPEN, HANDED TO NEXT SESSION: analysis
   pipeline stalls for the demo account (cards stuck "SAVING…", progress pill
   frozen at 92%); in-app add fails too.** State when this session ended: the
