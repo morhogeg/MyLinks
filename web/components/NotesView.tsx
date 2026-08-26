@@ -133,11 +133,11 @@ export default function NotesView({
                         </span>
                         {groups.length === 0 ? (
                             <p className="text-[14px] text-text-muted leading-snug max-w-[260px]">
-                                No notes yet — open any card and tap “Add a note”. Everything you write collects here.
+                                No notes yet. Open any card and tap “Add a note”. Everything you write collects here.
                             </p>
                         ) : (
                             <p className="text-[14px] text-text-muted leading-snug max-w-[260px]">
-                                No notes match — search looks in note text and card titles.
+                                No notes match. Search looks in note text and card titles.
                             </p>
                         )}
                     </div>
@@ -154,7 +154,7 @@ export default function NotesView({
                                 onClick={() => onOpenCard(link)}
                                 role="button"
                                 tabIndex={0}
-                                aria-label={`${link.title} — ${notes.length === 1 ? 'one note' : `${notes.length} notes`}`}
+                                aria-label={`${link.title}: ${notes.length === 1 ? 'one note' : `${notes.length} notes`}`}
                                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenCard(link); } }}
                                 style={{ ['--enter-delay' as string]: `${Math.min(index, 12) * 14}ms` }}
                                 className="group surface-card animate-card-enter rounded-[20px] border border-border-subtle bg-card shadow-[var(--shadow-card)] overflow-hidden cursor-pointer transition-all duration-150 [@media(hover:hover)]:hover:border-accent/40 [@media(hover:hover)]:hover:shadow-[var(--shadow-card-hover)] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"

@@ -135,7 +135,7 @@ function CopyButton({ text, sources }: { text: string; sources?: ChatSource[] })
             let full = text;
             if (sources && sources.length > 0) {
                 full += '\n\nSources:\n' + sources
-                    .map(s => (s.url ? `- ${s.title} — ${s.url}` : `- ${s.title}`))
+                    .map(s => (s.url ? `- ${s.title} - ${s.url}` : `- ${s.title}`))
                     .join('\n');
             }
             await navigator.clipboard.writeText(full);
@@ -1252,8 +1252,8 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                                 it the number understates the real library, so go count-free
                                 rather than state a wrong figure. */}
                             {totalLinks >= 150
-                                ? <>Answers come only from what you&apos;ve saved — with sources you can open.</>
-                                : <>Answers come only from your {totalLinks} {totalLinks === 1 ? 'save' : 'saves'} — with sources you can open.</>}
+                                ? <>Answers come only from what you&apos;ve saved, with sources you can open.</>
+                                : <>Answers come only from your {totalLinks} {totalLinks === 1 ? 'save' : 'saves'}, with sources you can open.</>}
                         </p>
                         <div className="flex flex-wrap items-center justify-center gap-2 max-w-xl">
                             {suggestions.map(s => (
@@ -1347,7 +1347,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                                     {m.role === 'assistant' && !m.error && m.ungrounded && (
                                         <div className="mt-2.5 flex items-start gap-2 max-w-full px-3 py-2 rounded-xl bg-card border border-border-subtle text-text-muted text-[12px] leading-snug">
                                             <TriangleAlert className="w-3.5 h-3.5 mt-px shrink-0" />
-                                            <span>Machina couldn&apos;t tie this answer to your saves — treat it with extra caution.</span>
+                                            <span>Machina couldn&apos;t tie this answer to your saves. Treat it with extra caution.</span>
                                         </div>
                                     )}
 
@@ -1511,7 +1511,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                             }}
                             className="flex-1 min-w-0 text-start text-[13px] text-text truncate cursor-pointer hover:underline underline-offset-2"
                         >
-                            Just saved: <span dir="auto" className="font-medium">{freshCard.title}</span> — ask about it
+                            Just saved: <span dir="auto" className="font-medium">{freshCard.title}</span>. Ask about it
                         </button>
                         <button
                             onClick={() => setFreshCard(null)}

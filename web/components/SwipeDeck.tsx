@@ -404,7 +404,7 @@ export default function SwipeDeck({
                     </p>
                 ) : (
                     <p className="text-sm text-text-muted max-w-xs">
-                        Nothing to review right now — new saves show up here.
+                        Nothing to review right now. New saves show up here.
                     </p>
                 )}
                 <div className="flex items-center gap-3 mt-1">
@@ -543,7 +543,7 @@ function DeckAction({ children, onClick, label, hint, disabled, buttonClassName 
             >
                 {hint}
             </span>
-            <DeckButton title={`${label} — ${hint}`} onClick={onClick} disabled={disabled} className={buttonClassName}>
+            <DeckButton title={`${label}: ${hint}`} onClick={onClick} disabled={disabled} className={buttonClassName}>
                 {children}
             </DeckButton>
             <span className={`text-[10px] font-bold uppercase tracking-wide whitespace-nowrap ${disabled ? 'text-text-muted/40' : 'text-text-muted'}`}>

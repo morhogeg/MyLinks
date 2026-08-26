@@ -190,7 +190,7 @@ function Card({
 
                     {failed ? (
                         <p className="text-sm text-text-secondary flex-grow">
-                            Your link is safe — the AI analysis didn’t finish. Retry to try again, or open the original.
+                            Your link is safe: the AI analysis didn’t finish. Retry to try again, or open the original.
                         </p>
                     ) : (
                         <div className="space-y-2 flex-grow">

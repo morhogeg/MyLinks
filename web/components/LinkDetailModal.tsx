@@ -30,7 +30,7 @@ const NEW_NOTE_ID = '__new_note__';
  * leading timestamp is present so the entry still renders as plain text.
  */
 function parseHighlight(entry: string): { seconds: number | null; label: string } {
-    const match = entry.match(/^\s*(\d{1,2}):(\d{2})(?::(\d{2}))?\s*[—\-–:]*\s*(.*)$/);
+    const match = entry.match(/^\s*(\d{1,2}):(\d{2})(?::(\d{2}))?\s*[—\-–:]*\s*(.*)$/); // emdash-ok: parses timestamps in EXISTING cards (old prompt emitted "M:SS — text")
     if (!match) return { seconds: null, label: entry.trim() };
     const [, a, b, c, rest] = match;
     const seconds = c

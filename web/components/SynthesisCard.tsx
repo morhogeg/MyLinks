@@ -172,7 +172,7 @@ export default function SynthesisCard({
                             <button
                                 onClick={handleDismiss}
                                 aria-label="Dismiss weekly recap"
-                                title="Hide from the feed — it stays in your Digest"
+                                title="Hide from the feed (it stays in your Digest)"
                                 className="w-9 h-9 flex items-center justify-center rounded-lg text-text-muted hover:text-text hover:bg-card-hover transition-colors"
                             >
                                 <X className="w-4 h-4" />
@@ -353,7 +353,7 @@ export default function SynthesisCard({
                                     </div>
                                 ) : !composing && (
                                     <p className="mt-2 text-[14px] leading-relaxed text-text-muted">
-                                        Nothing yet — jot down what you want to carry forward from this week.
+                                        Nothing yet. Jot down what you want to carry forward from this week.
                                     </p>
                                 )}
                             </section>

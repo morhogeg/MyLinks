@@ -936,7 +936,7 @@ export default function KnowledgeGraph({
                         like a stray bullet. */}
                     <p className="flex-1 min-w-0 text-text">
                         {`“${unmappedCard}” isn’t on the map yet`}
-                        <span className="text-text-muted"> — no connections to other cards</span>
+                        <span className="text-text-muted"> · no connections to other cards</span>
                     </p>
                     <button
                         onClick={() => {

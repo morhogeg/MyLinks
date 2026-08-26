@@ -30,7 +30,7 @@ export default function DisplayGlyph({
             data-tour="views"
             onClick={onClick}
             aria-label={active
-                ? `View, sort, and filter options — ${activeFilterCount} ${activeFilterCount === 1 ? 'filter' : 'filters'} active`
+                ? `View, sort, and filter options: ${activeFilterCount} ${activeFilterCount === 1 ? 'filter' : 'filters'} active`
                 : 'View, sort, and filter options'}
             // Active goes to FULL-strength text, not `text-accent`: in this theme
             // --accent is a neutral emphasis token (#E9E9F2 dark / near-black

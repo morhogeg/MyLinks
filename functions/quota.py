@@ -40,7 +40,7 @@ _QUOTA_KINDS = {
     "saves": {
         "env": "MONTHLY_SAVE_QUOTA",
         "default": 150,
-        "message": "Monthly save limit reached — resets on the 1st.",
+        "message": "Monthly save limit reached. Resets on the 1st.",
     },
     "asks": {
         "env": "MONTHLY_ASK_QUOTA",
@@ -65,7 +65,7 @@ _QUOTA_KINDS = {
         # everybody, owner included. This ceiling exists so the friendly failure
         # always happens first.
         "default": 100,
-        "message": "Monthly question limit reached — resets on the 1st.",
+        "message": "Monthly question limit reached. Resets on the 1st.",
     },
 }
 

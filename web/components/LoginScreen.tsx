@@ -74,7 +74,7 @@ export default function LoginScreen({
                                     {email ? <span className="font-semibold">{email}</span> : 'this account'}.
                                 </p>
                                 <p className="mt-1 text-[13px] text-text-muted">
-                                    This is usually temporary — please try again.
+                                    This is usually temporary. Please try again.
                                 </p>
                                 {detail && (
                                     <p className="mt-2 text-[11px] font-mono text-text-muted/70 break-all">

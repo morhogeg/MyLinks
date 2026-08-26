@@ -178,7 +178,7 @@ export default function DataExport() {
             track('export_used', { count: links.length });
             toast.success(`Exported ${links.length} card${links.length === 1 ? '' : 's'}.`);
         } catch {
-            toast.error('Export failed — please try again.');
+            toast.error('Export failed. Please try again.');
         } finally {
             setBusy(false);
         }

@@ -27,7 +27,7 @@ export default function ThemeToggle() {
         <button
             onClick={toggleTheme}
             className="h-9 w-9 rounded-full bg-card border border-border-subtle text-text-secondary hover:text-text hover:bg-card-hover transition-colors flex items-center justify-center cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-            title={`Theme: ${theme} — tap for ${next}`}
+            title={`Theme: ${theme}. Tap for ${next}`}
             aria-label={`Theme: ${theme}. Switch to ${next}`}
         >
             {theme === 'dark' ? (

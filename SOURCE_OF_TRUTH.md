@@ -1708,6 +1708,26 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-27 — EM DASHES REMOVED APP-WIDE + A BUILD TRIPWIRE SO THEY CANNOT
+  RETURN (owner, final warning, from the Settings screen).** Full sweep with a
+  comment-aware scanner: **79 user-facing em dashes fixed** across 30 web
+  files — every component string, toast, aria-label, tooltip, the Settings
+  Gemini/consent + export notes (the screenshot), the privacy policy, terms,
+  and /welcome metadata (page titles now use "·"/":"). The one legitimate
+  survivor is LinkDetailModal's timestamp-parsing regex (reads em dashes out
+  of EXISTING cards), tagged `emdash-ok`. The founder signature in StoryView
+  became an en dash ("– Mor"). **Backend/AI (the deeper source):** the video
+  prompt literally mandated "M:SS — description" highlights — now "M:SS - ";
+  the ANALYSIS prompts had NO em dash output ban at all (only synthesis got
+  one 08-25) — both the card-analysis style rules and the Ask answer rules
+  now ban em dashes in any output language; quota 429 copy de-dashed.
+  **The tripwire: `web/scripts/check-em-dash.mjs`, wired as npm `prebuild`**,
+  scans components/app/lib/ShareExt for em dashes outside comments (respects
+  `emdash-ok` markers) and FAILS the build — so Vercel and the TestFlight
+  workflow both refuse to ship a new violation instead of the owner finding
+  it on device. Verified: guard clean, `tsc` clean, `py_compile` clean.
+  Existing cards keep their old em dashes (server-written content); a re-save
+  or the prod tag-cleanup pass (§4 task 21 family) would refresh them.
 - **2026-08-26 (round 13) — 🔴 OPEN, HANDED TO NEXT SESSION: analysis
   pipeline stalls for the demo account (cards stuck "SAVING…", progress pill
   frozen at 92%); in-app add fails too.** State when this session ended: the

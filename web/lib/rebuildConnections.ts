@@ -105,7 +105,7 @@ export function ensureGraphVersion(uid: string): void {
         // still carry the OLD graph's connections. Leaving the stamp unwritten
         // makes the next open retry, exactly like an interrupted run.
         if (failed > 0) {
-            console.warn(`Graph migration incomplete: ${updated} recomputed, ${failed} failed — will retry next open`);
+            console.warn(`Graph migration incomplete: ${updated} recomputed, ${failed} failed. Will retry next open`);
             return;
         }
         // The user doc always exists (created server-side by claim_workspace),

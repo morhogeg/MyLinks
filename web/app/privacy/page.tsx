@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — Machina",
+  title: "Privacy Policy · Machina",
   description: "How Machina collects, uses, and protects your data.",
 };
 
@@ -67,7 +67,7 @@ export default function PrivacyPage() {
         Machina (&ldquo;we&rdquo;) is a personal knowledge base: you save
         links, text, and images, and Machina analyzes them with AI so you can search them and ask
         questions about them later. Doing that means handling things you wrote and things you chose
-        to keep, so this policy is specific rather than general — it names the companies involved
+        to keep, so this policy is specific rather than general: it names the companies involved
         and lists what each feature actually sends them.
       </p>
 
@@ -91,7 +91,7 @@ export default function PrivacyPage() {
             content to train or improve Google&rsquo;s models.
           </Point>
           <Point title="Google is never told who you are.">
-            No name, email, phone number, or IP address goes with those requests — they come from
+            No name, email, phone number, or IP address goes with those requests; they come from
             our servers, not from your device.
           </Point>
           <Point title="Private cards stay out of the AI entirely.">
@@ -152,7 +152,7 @@ export default function PrivacyPage() {
           <li>
             <span className="text-text">Product usage and diagnostics.</span>{" "}
             To understand which features are used and to catch crashes, Machina records a small
-            number of first-party, content-free events — that the app was opened, that a save, ask,
+            number of first-party, content-free events: that the app was opened, that a save, ask,
             or export happened, or that an error occurred, with its message and stack trace. These
             live in your own workspace in our own database. They never include the content of your
             saves, your titles, addresses, questions, tags, or email, and no third-party analytics
@@ -174,7 +174,7 @@ export default function PrivacyPage() {
           summaries, categories, tags, and connections; semantic search; answering your questions
           with citations to your own saves; and sending the reminders and digests you switch on. We
           do not use your data for advertising and we do not sell it. Your content is not used to
-          train AI models — not by us, and not by Google, as described in{" "}
+          train AI models: not by us, and not by Google, as described in{" "}
           <a href="#gemini" className="text-accent underline underline-offset-2">section 4</a>.
         </p>
         <p className="mt-4 leading-relaxed text-text-secondary">
@@ -197,7 +197,7 @@ export default function PrivacyPage() {
           <li>
             <span className="text-text">Saving a link.</span>{" "}
             The text of the page we fetched, up to 30,000 characters, and your list of existing tags
-            so the new card can reuse them. The link&rsquo;s full address is not sent — only the
+            so the new card can reuse them. The link&rsquo;s full address is not sent, only the
             site&rsquo;s name.
           </li>
           <li>
@@ -221,7 +221,7 @@ export default function PrivacyPage() {
           <li>
             <span className="text-text">Asking a question.</span>{" "}
             Your question, the last few messages of that conversation, and up to 20 of your saved
-            cards — their titles, summaries, details, and{" "}
+            cards: their titles, summaries, details, and{" "}
             <span className="text-text">any notes you wrote on them</span>.
           </li>
           <li>
@@ -235,7 +235,7 @@ export default function PrivacyPage() {
           sent: your name, email address, phone
           number, sign-in token, IP address, or any other account identifier. These requests are
           made by Machina&rsquo;s servers rather than by your device, and every Machina user shares
-          a single API key — so Google cannot tell one user&rsquo;s requests from another&rsquo;s,
+          a single API key, so Google cannot tell one user&rsquo;s requests from another&rsquo;s,
           let alone connect them to you. What the content itself reveals is a separate matter: a
           note that names its author is still words in a request, and no technical measure changes
           that.
@@ -256,7 +256,7 @@ export default function PrivacyPage() {
 
       <Section id="private" n={5} title="Private cards">
         <p className="mt-4 leading-relaxed text-text-secondary">
-          A card you mark private — on its own, or by placing it in a private collection — is
+          A card you mark private (on its own, or by placing it in a private collection) is
           excluded from Ask, from digests, and from the weekly synthesis, and its tags are left out
           of the tag list described in{" "}
           <a href="#gemini" className="text-accent underline underline-offset-2">section 4</a>. Once a card is
@@ -264,7 +264,7 @@ export default function PrivacyPage() {
         </p>
         <p className="mt-4 leading-relaxed text-text-secondary">
           Two limits on that are worth stating plainly. First, a card is analyzed at the moment you
-          save it — that analysis is what produces its summary and tags — so its content did reach
+          save it (that analysis is what produces its summary and tags), so its content did reach
           Gemini then; marking it private afterwards stops all future processing but cannot undo the
           original request. Second, the optional PIN is a lock on the screen of this device, not
           encryption: private cards are stored the same way as everything else in your workspace.
@@ -297,14 +297,14 @@ export default function PrivacyPage() {
 
       <Section id="storage" n={7} title="Where your data is stored">
         <p className="mt-4 leading-relaxed text-text-secondary">
-          Your workspace is stored in Google Firebase — Cloud Firestore, Cloud Storage, and Cloud
-          Functions — in the United States (region us-central1). The web app is served by Vercel.
+          Your workspace is stored in Google Firebase (Cloud Firestore, Cloud Storage, and Cloud
+          Functions) in the United States (region us-central1). The web app is served by Vercel.
           All traffic between your device, our servers, and our providers uses HTTPS/TLS.
         </p>
         <p className="mt-4 leading-relaxed text-text-secondary">
           If you use Machina from outside the United States, your data is transferred there and
-          processed there. Where such a transfer is restricted by the law of your country — for
-          example within the European Economic Area, the United Kingdom, or Switzerland — it relies
+          processed there. Where such a transfer is restricted by the law of your country (for
+          example within the European Economic Area, the United Kingdom, or Switzerland), it relies
           on the safeguards our providers offer for international transfers, including the European
           Commission&rsquo;s Standard Contractual Clauses.
         </p>
@@ -315,7 +315,7 @@ export default function PrivacyPage() {
           Sharing is off by default and nothing you save is public unless you choose to publish it.
           If you explicitly publish a card or a collection as a public Machina page, a snapshot of
           that content becomes visible to anyone holding the link, until you unpublish or delete it.
-          Deleting your account does not automatically retract share pages you published earlier —
+          Deleting your account does not automatically retract share pages you published earlier;
           unpublish them first, or contact us and we will remove them for you.
         </p>
       </Section>
@@ -328,7 +328,7 @@ export default function PrivacyPage() {
         </p>
         <p className="mt-4 leading-relaxed text-text-secondary">
           You can delete your account from Settings at any time, without asking us. Doing so
-          permanently removes your workspace — saved items, chats, and collections — along with your
+          permanently removes your workspace (saved items, chats, and collections) along with your
           uploaded images and your sign-in record. You can also email us and we will delete the
           account for you. Deletion is not reversible, so export first if you want a copy.
         </p>
@@ -337,7 +337,7 @@ export default function PrivacyPage() {
       <Section id="rights" n={10} title="Your rights">
         <p className="mt-4 leading-relaxed text-text-secondary">
           You can read, edit, and delete everything you have saved directly in the app, and export
-          all of it from Settings as a JSON backup plus a readable Markdown file — no request to us
+          all of it from Settings as a JSON backup plus a readable Markdown file, no request to us
           required.
         </p>
         <p className="mt-4 leading-relaxed text-text-secondary">
@@ -345,8 +345,8 @@ export default function PrivacyPage() {
           correct it, delete it, receive a portable copy, restrict or object to certain processing,
           and withdraw consent you previously gave. To exercise any of these, email us at the
           address in{" "}
-          <a href="#contact" className="text-accent underline underline-offset-2">section 14</a>{" "}
-          — we
+          <a href="#contact" className="text-accent underline underline-offset-2">section 14</a>.
+          We
           answer every request, and we will not treat you differently for making one. If you are in
           the European Economic Area or the United Kingdom, you also have the right to complain to
           your local data-protection authority.
@@ -357,7 +357,7 @@ export default function PrivacyPage() {
         <p className="mt-4 leading-relaxed text-text-secondary">
           All data is transmitted over HTTPS/TLS. Access to your workspace requires your signed-in
           account, requests to our backend are verified server-side rather than trusted from the
-          app, and AI provider API keys exist only on our servers — never in the app or the browser
+          app, and AI provider API keys exist only on our servers, never in the app or the browser
           bundle. No system is perfectly secure, but we keep the attack surface deliberately small:
           no third-party SDKs beyond the providers listed in{" "}
           <a href="#processors" className="text-accent underline underline-offset-2">section 6</a>.
