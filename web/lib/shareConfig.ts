@@ -143,6 +143,23 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * Throws if the callable fails or returns nothing usable.
  */
 export async function fetchShareConfig(uid: string): Promise<{ endpoint: string; token: string }> {
+    // Native uses the HTTP twin, NOT the callable: the callable transport's
+    // CORS preflight is rejected from capacitor://localhost (same reason
+    // claim_workspace has a twin), which left a client-created workspace's
+    // share sheet with no way to get its first token. Web keeps the callable.
+    if (isNativeIos()) {
+        const { fetchWithTimeout } = await import('./api');
+        const { authHeaders } = await import('./auth');
+        const res = await fetchWithTimeout(apiUrl('/api/share-config'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+            body: '{}',
+        });
+        if (!res.ok) throw new Error(`share-config HTTP ${res.status}`);
+        const body = (await res.json()) as { endpoint?: string; token?: string };
+        if (!body.endpoint || !body.token) throw new Error('No ingest token available');
+        return { endpoint: body.endpoint, token: body.token };
+    }
     const { httpsCallable } = await import('firebase/functions');
     const { functions } = await import('./firebase');
     const getShareConfig = httpsCallable<

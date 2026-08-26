@@ -1708,6 +1708,27 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-26 (round 12) — share sheet 429 on the demo account: the S-12
+  "likely-affected" chain is now PROVEN and fixed, plus the ingest-token
+  provisioning gap closed.** Owner's first real share-sheet saves on the demo
+  account returned "Couldn't save (429)". Cause: the ShareExt carries no
+  bearer, so share_ingest's pre-body gate keyed it `ip:<last XFF hop>` — and
+  through the Hosting rewrite that hop is the PROXY's egress IP, one 120/hr
+  bucket shared by every share-sheet user (exactly what the S-12 note said
+  could not be verified from the sandbox; the owner's QA + demo seeding
+  tripped it). Fixes: (1) share_ingest pre-body gate now keys on a sha256
+  hash of the presented X-Ingest-Token (per-device ceiling; token validated
+  immediately after, share-uid still caps the workspace; IP stays the key
+  for token-less callers). (2) NEW `get_share_config_http` twin +
+  `/api/share-config` rewrite + native `fetchShareConfig` uses it — a
+  workspace created by round 7's client-side fallback has no ingestToken,
+  and the callable fallback could never run from capacitor://localhost, so
+  the share sheet had no way to get its first token. (3) ShareExt shows
+  "Too many saves right now" for 429 instead of a bare code. **Owner unblock
+  NOW: Firebase console → Firestore → `rate_limits` → delete the docs whose
+  id starts with `share:` (instant), or wait for the 1h window to roll.**
+  Verified: py_compile + tsc clean. Watch: hosting deploy may race the new
+  function (run #7 precedent) — re-trigger if red.
 - **2026-08-26 (round 11) — "Try it with an example" REMOVED entirely (owner:
   "it's pointless").** The seeded-example feature is gone: the empty-state
   button, `handleSeedExample`, the `seedingExample` latch + its round-10
