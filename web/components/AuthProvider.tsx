@@ -104,6 +104,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [displayName, setDisplayName] = useState<string | null>(null);
     const [photoURL, setPhotoURL] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
+    // Why the last resolution failed, for the restricted screen's diagnostic
+    // line. On a device there is no console, so without this the real error
+    // (an HTTP status, a timeout, a rules rejection) is unrecoverable from a
+    // user's screenshot.
+    const [restrictedDetail, setRestrictedDetail] = useState<string | null>(null);
     // Signed in, but no workspace could be resolved or created (edge case —
     // post-cutover this only happens when workspace creation failed).
     const [restricted, setRestricted] = useState(false);
@@ -285,6 +290,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 if (cancelled) return;
                 if (dataDoc) {
                     setRestricted(false);
+                    setRestrictedDetail(null);
                     setUid(dataDoc.id);
                     attachUserDoc(dataDoc.id, dataDoc.data);
                     reconcileAiConsent(dataDoc.id, dataDoc.data);
@@ -298,12 +304,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     );
                 } else {
                     setRestricted(true);
+                    setRestrictedDetail(lastResolveDetail);
                     setUid(null);
                 }
             } catch (err) {
                 console.error('Failed to resolve user workspace:', err);
                 reportError(err, 'auth-resolve-workspace');
-                if (!cancelled) { setRestricted(true); setUid(null); }
+                if (!cancelled) {
+                    setRestricted(true);
+                    setRestrictedDetail(err instanceof Error ? err.message : String(err));
+                    setUid(null);
+                }
             } finally {
                 if (!cancelled) setLoading(false);
             }
@@ -361,6 +372,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 <AuthContext.Provider value={value}>
                     <LoginScreen
                         restricted
+                        detail={restrictedDetail}
                         email={email}
                         onSignIn={signIn}
                         onSignOut={signOut}
@@ -425,6 +437,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 /** Shape returned by both the claim callable and its HTTP twin. */
 type ClaimResult = { uid: string | null; created?: boolean };
 
+/**
+ * Why the last resolveDataDoc() returned null, for the restricted screen's
+ * diagnostic line. Module-scoped rather than threaded through the return type
+ * because resolveDataDoc's null contract is load-bearing in two effects.
+ */
+let lastResolveDetail: string | null = null;
+
 /** Web path: the Firebase callable (works from a real browser origin). */
 async function claimWorkspaceCallable(): Promise<ClaimResult> {
     const claim = httpsCallable<Record<string, never>, ClaimResult>(functions, 'claim_workspace');
@@ -441,18 +460,31 @@ async function claimWorkspaceCallable(): Promise<ClaimResult> {
  * function's rewrite; a 401 with no linked workspace is treated as "declined".
  */
 async function claimWorkspaceHttp(): Promise<ClaimResult> {
-    const res = await fetchWithTimeout(apiUrl('/api/claim-workspace'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-        body: '{}',
-    });
-    if (!res.ok) {
-        // Backend rejected the caller (e.g. unverified token) — surface as a
-        // failed claim so the caller shows the restricted screen, same as a
-        // callable throw.
-        throw new Error(`claim-workspace HTTP ${res.status}`);
+    const attempt = async (): Promise<ClaimResult> => {
+        const res = await fetchWithTimeout(apiUrl('/api/claim-workspace'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+            body: '{}',
+        }, 60_000);
+        if (!res.ok) {
+            // Backend rejected the caller (e.g. unverified token) — surface as a
+            // failed claim so the caller shows the restricted screen, same as a
+            // callable throw.
+            throw new Error(`claim-workspace HTTP ${res.status}`);
+        }
+        return (await res.json()) as ClaimResult;
+    };
+    // 60s timeout + one retry: this endpoint is only ever called by a
+    // brand-new account's FIRST sign-in, so it is the coldest function in the
+    // codebase — main.py imports the whole backend, and a cold start on top
+    // of a fresh TLS handshake can blow the default 30s budget. A 4xx is the
+    // backend answering; retrying it would return the same answer.
+    try {
+        return await attempt();
+    } catch (e) {
+        if (e instanceof Error && /HTTP 4\d\d/.test(e.message)) throw e;
+        return await attempt();
     }
-    return (await res.json()) as ClaimResult;
 }
 
 /**
@@ -492,6 +524,7 @@ async function resolveDataDoc(
     //    via Authorization: Bearer — the same pattern every other /api/* call
     //    uses. Web keeps the callable (works fine there). Same underlying logic
     //    server-side, so behavior matches exactly.
+    lastResolveDetail = null;
     try {
         const claimed = isNativeApp()
             ? await claimWorkspaceHttp()
@@ -502,8 +535,13 @@ async function resolveDataDoc(
             return { id: claimedUid, data: fresh.data() ?? {}, created: claimed?.created === true };
         }
         // Backend ran and declined (pre-cutover non-owner) → restricted.
+        lastResolveDetail = 'workspace claim declined by backend';
         return null;
     } catch (e) {
+        // Swallowed on purpose (the soft-mode fallback below may still
+        // resolve), but KEPT for the restricted screen: on a device there is
+        // no console, and this message is the only trace of what failed.
+        lastResolveDetail = e instanceof Error ? e.message : String(e);
         console.warn('Workspace claim unavailable:', e);
     }
 

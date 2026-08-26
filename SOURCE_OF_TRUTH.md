@@ -1708,6 +1708,35 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-26 (round 6) — 🔴 OPEN BUG: brand-new account hit the restricted
+  screen on native (demo account blocked); diagnostics + hardening shipped,
+  root cause NOT yet identified.** Owner created `machinareviewer@gmail.com`
+  (App Review demo account, §4 task 9) and its first sign-in on TestFlight
+  build 1300 landed on "We couldn't finish setting up a workspace". This is
+  the native claim leg (`claimWorkspaceHttp` → `/api/claim-workspace` →
+  `claim_workspace_http`), which only a brand-new account's FIRST native
+  sign-in ever exercises — the 2026-08-02 fresh-account verification was on
+  Chrome (web = callable leg), so this leg was likely never device-tested.
+  Ruled out from the repo: the rewrite is live (hosting run #8, 08-22), the
+  function is deployed (functions run #89 "all", 08-25), CORS allowlists
+  `capacitor://localhost` with Authorization allowed, `_claim_workspace_logic`
+  creates workspaces when REQUIRE_AUTH is on, and the locked rules permit the
+  pre-claim `authUids array-contains` query for any signed-in caller. NOT
+  visible from the sandbox: prod function logs and `client_error_reports`
+  (the restricted screen DID post the real error there via
+  `/api/client-error` — the owner can read that collection in the Firebase
+  console for the actual failure). Shipped meanwhile: (1) the restricted
+  screen now prints the underlying error in a small mono line
+  (`LoginScreen` `detail` prop; `resolveDataDoc` used to swallow it into a
+  console nobody can see on device), (2) the claim call gets a 60s timeout +
+  one retry — it is the coldest endpoint in the codebase (whole-backend
+  import, called at most once per account ever) and a cold start could blow
+  the old 30s budget, which fits "usually temporary" exactly. **Owner
+  workaround, works today: sign the demo account in ONCE on desktop web
+  (mymachina.app) — the web callable leg creates the workspace, after which
+  the iPhone resolves it via the linked-doc query.** Next session: get the
+  real error string (screenshot of the new diagnostic line on the next
+  build, or `client_error_reports` in the console) and root-cause.
 - **2026-08-26 (round 5) — signed-out landing page cut off under the iOS
   status bar: FIXED.** Owner screenshot (TestFlight, signed out): the landing
   header (wordmark + Sign in) collided with the clock/status bar. Cause: the
