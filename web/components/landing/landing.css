@@ -700,7 +700,10 @@
 }
 
 .mx-cine .mx-nav > header {
-  padding-top: 0.85rem;
+  /* The stuck bar pins at top: 0, which on a notched iPhone is UNDER the
+     status bar — the safe-area inset must live inside the bar's own padding
+     (a body inset only offsets the resting position, not the stuck one). */
+  padding-top: calc(0.85rem + env(safe-area-inset-top));
   padding-bottom: 0.85rem;
 }
 

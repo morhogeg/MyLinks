@@ -154,7 +154,11 @@ function Header({ onGetStarted }: { onGetStarted?: () => void }) {
         /* `mx-nav` is inert in the classic page; the cinematic layer turns it
            into the sticky glass bar (landing.css) without moving any markup. */
         <div ref={navRef} className="mx-nav">
-            <header className="mx-auto flex max-w-6xl items-center justify-between px-6 pt-8">
+            {/* The top safe-area inset is padded HERE, not on the body —
+                globals.css deliberately leaves the top inset to whoever owns
+                the top of the screen (see the note there). env() is 0 in any
+                desktop browser, so this is inert on the web. */}
+            <header className="mx-auto flex max-w-6xl items-center justify-between px-6 pt-[calc(2rem+env(safe-area-inset-top))]">
             {/* The header lockup the app itself uses: the BARE citation mark (a
                 rounded container here reads as a shrunken app icon, not as the
                 brand mark) beside the drawn wordmark. */}
