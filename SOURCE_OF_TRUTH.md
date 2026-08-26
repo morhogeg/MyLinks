@@ -1719,6 +1719,49 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-26 (round 15) — THE REAL ROOT CAUSE, proven from production logs
+  and FIXED: every backend Firestore call from containers built since deploy
+  #89 failed `400 Invalid database id %28default%29` (a double-URL-encoded
+  database id from a poisoned pip dependency layer).** Round 14's timeout
+  theory was wrong — the owner's "not the ₪50" was right, and so was the
+  code's misdirection: with the sandbox network blocked from everything but
+  GitHub, a temporary **pipeline-debug CI harness**
+  (`.github/workflows/pipeline-debug.yml` + `.github/scripts/`, ask-debug
+  pattern, trigger branch `trigger/pipeline-debug`) used the repo secrets to
+  read prod Firestore, Gemini, Cloud Run logs, Eventarc, and Scheduler. What
+  it proved, in order: Gemini fully healthy on the prod key (models.list +
+  the exact analyze call + embeddings all OK — the ₪50 cap was NEVER
+  involved); `process_link_background` hadn't logged since Aug 24 while
+  today's queue docs sat `queued` for hours; Scheduler showed
+  `sweep_stuck_processing`/`send_digests` failing every tick (code 13);
+  and Cloud Run stderr held the verbatim smoking gun — the trigger RAN
+  (Eventarc delivered, http 200) and then `Failed to log to Firestore: 400
+  Invalid database id %28default%29` → `Background processing error: 400…`
+  → `Failed to write FAILED card record: 400…`. One defect explains the
+  whole day: stalled skeletons (all trigger writes dead, so no card, no
+  error, no log), the dead janitor (why nothing ever flipped to failed),
+  round 12's demo-account "Too many requests" on retry (the FAIL-CLOSED
+  rate limiter turning its own broken Firestore check into a 429 — the
+  buckets were nearly empty), and likely round 6's claim failure too. Why
+  redeploys didn't heal it: top-level requirements are pinned but
+  transitives are not, deploy #89 (Aug 25) resolved a broken transitive
+  google-stack set, and later builds reused the cached pip layer since the
+  requirements hash never changed. **Fix (`ca0942c`, functions run #92,
+  green): a transitive-pin block in `functions/requirements.txt`** pinning
+  google-cloud-firestore/api-core/grpcio/protobuf/proto-plus/
+  googleapis-common-protos to the exact set the harness PROVED working
+  against prod through `functions/db.py` on Python 3.13 (bisect run #5, all
+  probes OK) — which also busts the stale build cache. Rebuilt revisions
+  rolled out 14:21Z; no post-rollout errors at last check. Round 14's
+  timeout/janitor/queue-sweep hardening stays — it is what turned an
+  invisible stall into a diagnosable failure. NOT a code bug in the
+  analysis stage; nothing account-specific — the demo account was simply
+  the first to save after the poisoned build. **Owner: save a link — it
+  should just work; the janitor also unblocks re-saving the previously
+  stuck URLs. Keep the pipeline-debug harness until the demo seeding
+  completes, then delete the workflow + trigger branch.** Lesson for §2
+  gotchas: "deploy green" ≠ "runtime healthy" — the pip layer is part of
+  prod state, and only requirements.txt changes rebuild it.
 - **2026-08-26 (round 14) — the round-13 analysis stall: strand-class root
   cause fixed (no timeout anywhere on Gemini HTTP calls) + the dedup-poisoning
   second bug, all four fixes shipped.** What the code proved: the share-path
