@@ -1708,6 +1708,21 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-26 (round 9) — push "Turn on" failure fixed on three fronts
+  (owner hit "Could not register this device" on the new demo account, which
+  ALSO confirms round 7 worked: the demo account signed in and saved a
+  card).** (1) Root-cause fix for the likely failure: FCM `getToken` races
+  the APNs token right after the permission grant — `registerPush` now
+  retries getToken up to 3× with backoff and retries the backend token
+  upload once. (2) `capacitor-native-settings@8.2.0` added (npm-only; CI's
+  `npx cap sync ios` wires the native side) and `openNotificationSettings()`
+  opens the app's page in iOS Settings; both the PushNudge and the Settings
+  toggle now take the user THERE on permission-denied instead of describing
+  the trip (the OS prompt shows once per install, so Settings is the only
+  path after a decline). (3) All user-facing em dashes in the push copy
+  removed (PushNudge toast/body + 6 pushNote strings in useUserSettings).
+  `tsc` clean. NOT verified on device: the retry against a real APNs race
+  and the Settings deep-link need the next build.
 - **2026-08-26 (round 8) — Sparkles glyph retired app-wide; onboarding em
   dashes removed (owner, from the first-run screen).** Every lucide
   `Sparkles` (10 files: Onboarding, AskBrain answer chip, AIConsentNotice,
