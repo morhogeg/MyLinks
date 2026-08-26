@@ -1708,6 +1708,23 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-26 (round 5) — signed-out landing page cut off under the iOS
+  status bar: FIXED.** Owner screenshot (TestFlight, signed out): the landing
+  header (wordmark + Sign in) collided with the clock/status bar. Cause: the
+  top safe-area inset is deliberately NOT on the body (globals.css note — the
+  top-of-screen owner pads it), but the landing `Header` used plain `pt-8`,
+  the cinematic glass bar (`.mx-cine .mx-nav > header`) pinned at `top: 0`
+  with `0.85rem` padding, and SignedOutWeb's Back overlay sat at `top-8` —
+  none padded `env(safe-area-inset-top)`. Three one-line fixes: header
+  `pt-[calc(2rem+env(safe-area-inset-top))]` (`LandingPage.tsx`), glass bar
+  `calc(0.85rem + env(safe-area-inset-top))` (`landing.css`), Back overlay
+  `top-[calc(2rem+env(safe-area-inset-top))]` (`SignedOutWeb.tsx`). env() is
+  0 on desktop, so the web is untouched. Also confirmed from code for the
+  owner: native showing the landing when signed out is INTENTIONAL
+  (`AuthProvider.tsx` — "native since round 14 by explicit owner call").
+  Verified: `tsc --noEmit` clean. NOT verified: on-device — needs the next
+  TestFlight build; the shot-4 share-sheet screenshot is unaffected but any
+  signed-out frame should wait for this build.
 - **2026-08-26 (round 4, parallel session) — Login copy: "Sign in or create
   your Machina" (commit `f3130e9`, merged `2320b18`).** Owner asked whether
   the sign-in screen needs a sign-up option. Verified answer: no — auth is

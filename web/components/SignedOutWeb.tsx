@@ -67,7 +67,7 @@ export default function SignedOutWeb({
                 <button
                     type="button"
                     onClick={() => setSigningIn(false)}
-                    className="absolute left-6 top-8 z-10 flex items-center gap-1.5 text-sm font-medium text-text-secondary transition-colors hover:text-text"
+                    className="absolute left-6 top-[calc(2rem+env(safe-area-inset-top))] z-10 flex items-center gap-1.5 text-sm font-medium text-text-secondary transition-colors hover:text-text"
                 >
                     <ArrowLeft className="h-4 w-4" aria-hidden />
                     Back
