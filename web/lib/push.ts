@@ -204,15 +204,48 @@ export async function registerPush(): Promise<PushRegisterResult> {
         const { FirebaseMessaging } = await import('@capacitor-firebase/messaging');
         const { receive } = await FirebaseMessaging.requestPermissions();
         if (receive !== 'granted') return 'permission-denied';
-        const { token } = await FirebaseMessaging.getToken();
+        // FCM's getToken depends on the APNs token, which arrives ASYNC after
+        // the permission grant — the very first call right after "Allow" can
+        // throw ("no APNS token yet"). Retry briefly instead of failing at the
+        // one moment the user is most engaged.
+        let token: string | null | undefined = null;
+        for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+                ({ token } = await FirebaseMessaging.getToken());
+            } catch (e) {
+                if (attempt === 2) throw e;
+            }
+            if (token) break;
+            await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+        }
         if (!token) return 'registration-failed';
         rememberToken(token);
+        if (await postToken('/api/register-device-token', token)) return 'registered';
+        // One transient network blip shouldn't burn the moment either.
         return (await postToken('/api/register-device-token', token))
             ? 'registered'
             : 'registration-failed';
     } catch (e) {
         console.warn('Push registration failed:', e);
         return 'registration-failed';
+    }
+}
+
+/**
+ * Open this app's page in the iOS Settings app — where its notification
+ * switches live. The OS permission prompt shows ONCE per install; after a
+ * decline, Settings is the only way to turn notifications on, so the UI
+ * takes the user there instead of describing the journey.
+ */
+export async function openNotificationSettings(): Promise<boolean> {
+    if (!isNativeApp()) return false;
+    try {
+        const { NativeSettings, IOSSettings } = await import('capacitor-native-settings');
+        await NativeSettings.openIOS({ option: IOSSettings.App });
+        return true;
+    } catch (e) {
+        console.warn('Could not open iOS Settings:', e);
+        return false;
     }
 }
 

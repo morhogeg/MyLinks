@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { BellRing, X } from 'lucide-react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { registerPush, writeLocalPushPrompt } from '@/lib/push';
+import { registerPush, openNotificationSettings, writeLocalPushPrompt } from '@/lib/push';
 import { updateUserSettings } from '@/lib/storage';
 import { hapticLight, hapticMedium } from '@/lib/haptics';
 import { useToast } from './Toast';
@@ -43,11 +43,17 @@ export default function PushNudge({ uid, onDone }: { uid: string; onDone: () => 
                 // that reminders should arrive here (folds out any legacy value).
                 updateUserSettings(uid, { push_enabled: true, reminders_channel: ['push'] })
                     .catch(() => {});
-                toast.success('Notifications on — reminders and digests will arrive here.');
+                toast.success('Notifications on. Reminders and digests will arrive here.');
+            } else if (result === 'permission-denied') {
+                // The OS prompt was declined (now or on a previous run). iOS
+                // shows that dialog once per install, so the only way forward
+                // is the Settings app — take the user there directly.
+                toast.info('Allow notifications for Machina in Settings.');
+                openNotificationSettings();
             } else if (result === 'registration-failed') {
                 // iOS said yes but the token never reached Machina — say so,
                 // instead of implying the user declined.
-                toast.error('Could not register this device — try again from Settings.');
+                toast.error('Could not register this device. Try again from Settings.');
             } else {
                 toast.info('You can turn notifications on anytime in Settings.');
             }
@@ -66,7 +72,7 @@ export default function PushNudge({ uid, onDone }: { uid: string; onDone: () => 
                 <div className="flex-grow min-w-0">
                     <div className="text-[15px] font-bold text-text">Never miss a revisit</div>
                     <div className="text-[13px] text-text-secondary leading-snug">
-                        Get reminders and digests as notifications — you can change this in Settings.
+                        Get reminders and digests as notifications. You can change this in Settings.
                     </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">

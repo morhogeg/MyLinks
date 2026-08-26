@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react';
 import type { User, DigestChannel, DigestMode, ReminderChannel } from '@/lib/types';
 import { updateUserSettings, getUserSettings, getLinksFromFirestore } from '@/lib/storage';
-import { registerPush, sendTestPush, unregisterPush } from '@/lib/push';
+import { registerPush, openNotificationSettings, sendTestPush, unregisterPush } from '@/lib/push';
 import { useToast } from '@/components/Toast';
 
 // Mirrors DEFAULT_USER_SETTINGS in functions/link_service.py — keep in sync.
@@ -246,7 +246,10 @@ export function useUserSettings(uid: string) {
             // sends the user to iOS Settings for a backend fault (or vice versa)
             // and the trail dead-ends.
             if (result === 'permission-denied') {
-                setPushNote('Notifications are turned off for Machina — allow them in iOS Settings, then flip this on again.');
+                setPushNote('Notifications are turned off for Machina. Allow them in iOS Settings, then flip this on again.');
+                // The OS prompt only shows once per install, so take the user
+                // straight to the Settings app instead of describing the trip.
+                openNotificationSettings();
                 return;
             }
             if (result === 'registration-failed') {
@@ -276,20 +279,20 @@ export function useUserSettings(uid: string) {
             const reg = await registerPush();
             if (reg === 'unavailable') return;
             if (reg === 'permission-denied') {
-                setPushNote('Notifications are turned off for Machina in iOS Settings — allow them there first.');
+                setPushNote('Notifications are turned off for Machina in iOS Settings. Allow them there first.');
                 return;
             }
             if (reg === 'registration-failed') {
-                setPushNote('Could not register this device with Machina — the token upload failed. Check your connection and try again.');
+                setPushNote('Could not register this device with Machina: the token upload failed. Check your connection and try again.');
                 return;
             }
             const test = await sendTestPush();
             if (!test.ok) {
                 setPushNote(`Machina could not be reached to send the test (${test.error ?? 'unknown error'}).`);
             } else if (test.skipped === 'no_tokens' || !test.tokens) {
-                setPushNote('The backend has no registered device for this account — registration is not reaching the server.');
+                setPushNote('The backend has no registered device for this account. Registration is not reaching the server.');
             } else if ((test.sent ?? 0) > 0) {
-                setPushNote(`Test sent to ${test.tokens} device${test.tokens === 1 ? '' : 's'} — it should appear on your lock screen now. If nothing arrives, the block is between Apple and this phone (Focus mode, notification style, or the APNs setup).`);
+                setPushNote(`Test sent to ${test.tokens} device${test.tokens === 1 ? '' : 's'}. It should appear on your lock screen now. If nothing arrives, the block is between Apple and this phone (Focus mode, notification style, or the APNs setup).`);
             } else {
                 // The token was registered FRESH seconds ago (registerPush above),
                 // so an all-failed send is never staleness — it's FCM/APNs
@@ -300,7 +303,7 @@ export function useUserSettings(uid: string) {
                 } else if (err === 'SenderIdMismatchError') {
                     setPushNote(`The send was refused (${err}): this build's Firebase config doesn't match the project sending the push.`);
                 } else if (err === 'UnregisteredError') {
-                    setPushNote(`Apple says this device's token is not valid for this app (${err}) — usually a mismatch between the build and the push environment.`);
+                    setPushNote(`Apple says this device's token is not valid for this app (${err}). Usually a mismatch between the build and the push environment.`);
                 } else {
                     setPushNote(`The send failed for the freshly registered token${err ? ` (${err})` : ''}. This is on the sending side, not this phone.`);
                 }
