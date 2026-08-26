@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Collection, Link } from '@/lib/types';
-import { Check, X, Layers, FolderPlus, Sparkles } from 'lucide-react';
+import { Check, X, Layers, FolderPlus } from 'lucide-react';
+import { CitationGlyph } from '@/components/ui/Wordmark';
 import { getColorStyleByKey } from '@/lib/colors';
 import {
     addLinkToCollection,
@@ -179,7 +180,7 @@ export default function AddToCollectionSheet({
                     {suggested.length > 0 && (
                         <>
                             <p className="flex items-center gap-1.5 px-5 pt-2.5 pb-1 text-[11px] font-bold uppercase tracking-wider text-accent">
-                                <Sparkles className="w-3 h-3" /> Suggested
+                                <CitationGlyph className="w-3 h-3" /> Suggested
                             </p>
                             {suggested.map((c) => (
                                 <CollectionRow key={c.id} collection={c} isMember={memberIds.has(c.id)} onToggle={toggle} />

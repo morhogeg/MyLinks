@@ -1,7 +1,8 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { Sparkles, ShieldCheck, UserX } from 'lucide-react';
+import { ShieldCheck, UserX } from 'lucide-react';
+import { CitationGlyph } from '@/components/ui/Wordmark';
 import { Button } from '@/components/ui/Button';
 import { policyUrl, openExternal } from '@/lib/share';
 import { isNativeApp } from '@/lib/api';
@@ -47,7 +48,7 @@ export default function AIConsentNotice({ onAccept }: { onAccept: () => void }) 
 
                 <div className="mt-8 w-full flex flex-col gap-3">
                     <InfoRow
-                        icon={<Sparkles className="w-[18px] h-[18px]" />}
+                        icon={<CitationGlyph className="w-[18px] h-[18px]" />}
                         title="Analyzed by Google Gemini"
                         body="Links, page text, images, and the questions you ask are sent to Google Gemini, Google's AI service, to create your summaries, tags, and answers."
                     />
