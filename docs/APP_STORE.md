@@ -48,7 +48,7 @@ Notes for edge cases:
 | Field | Value | Limit |
 |---|---|---|
 | **Name** | `Machina: Save & Recall` | 30 (22 used) |
-| **Subtitle** | `Capture. Ask. Connect.` | 30 (22 used) |
+| **Subtitle** | `Never lose another great find` | 30 (29 used) |
 | ~~Tagline~~ | The product tagline `Everything you save, finally useful.` is **not** an App Store field — see the note under this table before pasting it anywhere. | — |
 | **Category** | Primary: **Productivity**. Secondary (optional): Utilities. | |
 | **Privacy Policy URL** | `https://mymachina.app/privacy` | |
@@ -76,11 +76,31 @@ to quote if a reviewer ever claims the home page needs JavaScript to read.
 it belongs in the **promotional text** (drafted below), not in the Subtitle. Two
 reasons, either one fatal: it is **36 characters** against a 30-character field
 with no cut that survives, and it re-spends **`save`**, already a Name token, so
-the index gains nothing while the field loses characters. `Capture. Ask.
-Connect.` stays. This note exists because "the app has a tagline, why isn't it
-the subtitle?" is the obvious question, and the answer is not obvious. Asked and
-answered again 2026-08-25; the tagline now leads the promotional text so the
-listing carries it without the Subtitle paying for it.
+the index gains nothing while the field loses characters. This note exists
+because "the app has a tagline, why isn't it the subtitle?" is the obvious
+question, and the answer is not obvious. Asked and answered again 2026-08-25;
+the tagline now leads the promotional text so the listing carries it without
+the Subtitle paying for it.
+
+**Subtitle replaced 2026-08-26 (owner-approved): `Capture. Ask. Connect.` →
+`Never lose another great find`.** The old line was correctly engineered but
+generic — three verbs any productivity app could claim — and 2026 ASO guidance
+is unambiguous that the subtitle is a conversion field first, index field
+second. The new line is the owner's origin story ("saved countless things,
+scattered, never used again") as a spoken sentence: "another" implies the past
+losses without spending a word looking backward, and the line ends on "find",
+the word with the image in it. Rejected on the way, so they are not re-pitched:
+"Answers from your own library" (owner: Ask is a feature, not the point — the
+core value is one place + saves made useful), "One place. Summarized. Sorted."
+and "All in one place, summarized" (fragments / unsophisticated), "Your memory
+for everything" (owner preferred the loss-aversion direction), "Never lose it.
+Actually use it." (fragments leaning on an unnamed "it"), "Never lose what's
+worth keeping" (elegant but abstract, and "keeping" is a near-synonym of a Name
+token doing no index work). **Index cost, accepted knowingly:** `capture`,
+`ask`, and `connect` leave the index, and `ask` now appears in NO field (it was
+dropped from keywords when the old subtitle supplied it — low-volume, accepted;
+re-add to keywords only if search data ever says otherwise). Gained: `never`,
+`lose`, `another`, `great`, `find` — `lose` and `find` are the useful ones.
 
 **Promotional text** (170 chars, editable without review):
 
@@ -144,16 +164,18 @@ this list:
 
 - **Never repeat a word already in the Name or Subtitle** — Apple indexes those
   fields and builds search phrases by combining tokens across all of them. The
-  name supplies `machina`, `save`, `recall`; the subtitle supplies `capture`,
-  `ask`, `connect`. That is why `save links` and `recall` were dropped from
+  name supplies `machina`, `save`, `recall`; the subtitle supplies `never`,
+  `lose`, `another`, `great`, `find`. That is why `save links` and `recall` were dropped from
   this field (they were here when the name was `Machina AI`) — with `links` in
   this field and `save` in the Name, the `save links` phrase forms across
   fields. The reclaimed characters bought `links`, `organize`, and `research`.
 - **The subtitle must not repeat `save` or `recall`.** Both are Name tokens, and
   a token indexed twice buys nothing while costing subtitle characters. This is
-  why the subtitle opens on `Capture` rather than the more obvious `Save`, and
-  why `ask` was dropped from this keyword list once the subtitle started
-  supplying it.
+  why every "your saves, summarized"-shaped candidate was disqualified during
+  the 2026-08-26 subtitle replacement before taste even entered. Note: `ask`
+  was dropped from this keyword list when the old subtitle supplied it, and the
+  new subtitle does not — `ask` is currently in no field (accepted, low-volume;
+  see the subtitle-replacement note above).
 - **`ai` must live here now.** It used to be indexed via the old `Machina AI`
   name; with "AI" out of the name it is carried by the `ai summary` token.
 - **`second brain` stays in this field and nowhere else.** It is the
@@ -293,7 +315,7 @@ clean (9:41, full battery). Order matters — the first two sell the app.
    sheet up and Machina selected (or the ShareExt confirmation HUD). Caption:
    "Save from anywhere in two taps."
 5. **Weekly synthesis** — the synthesis card open: themes of the week, the
-   standout save, the open question. Caption: "What your week added up to."
+   standout save, the open question. Caption: "Your week, in one card."
 6. **Collections** — collections gallery with 3–4 named collections with
    cover images; optionally one shown as a public share page. Caption:
    "Curate it. Share it (or don't)."
@@ -306,7 +328,14 @@ was rejected in the promotional text — saves don't listen; the replacement is
 lifted verbatim from the approved promo close, so the storefront says it once
 in prose and once over the proof. Caption 5's "synthesized" was our word, not
 a user's (same class of error as "share sheet" in §2); the replacement says
-the outcome and lets the shot demonstrate the mechanism. Caption 3 tightened
+the outcome and lets the shot demonstrate the mechanism. (Caption 5 refined
+again later the same day, "What your week added up to." → "Your week, in one
+card." — quieter than the rest of the set, replaced with something concrete
+that the shot proves instantly, and it completes the comma rhythm shared by
+captions 1, 3, and 5. Note the description's "Weekly synthesis:" bullet
+deliberately KEEPS the word the captions dropped — it is the literal on-screen
+label, `Feed.tsx` / `DigestView.tsx`, so the description teaches the UI's own
+word while captions describe outcomes.) Caption 3 tightened
 to pick up caption 1's comma rhythm so the set reads as a set. Captions 1, 4,
 and 6 stand: 1's tagline echo is deliberate branding (the promo text sits on
 the same screen), 4 is the only caption with a number on the shot where the
