@@ -58,7 +58,7 @@ export function StoryView() {
                 <p>
                     Thanks for being here.
                 </p>
-                <p className="text-text font-medium">— Mor</p>
+                <p className="text-text font-medium">– Mor</p>
             </div>
         </div>
     );

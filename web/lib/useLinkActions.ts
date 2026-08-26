@@ -189,7 +189,7 @@ export function useLinkActions(uid: string | null | undefined, toast: ReturnType
             // Sheet opened instantly; the publish is racing the user. Warn only
             // if it loses (otherwise the shared link would 404).
             publishPromise.catch(() =>
-                toast.error("The share link may not work — please try sharing again.")
+                toast.error("The share link may not work. Please try sharing again.")
             );
         } else {
             // 'failed' (couldn't even copy) or 'cancelled': swallow the publish

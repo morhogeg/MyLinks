@@ -116,9 +116,9 @@ export default function PinLockModal({
             if (step === 'verify') {
                 if (mode === 'unlock') {
                     if (await attemptUnlock(pin)) return finish();
-                    return fail('Wrong PIN — try again.');
+                    return fail('Wrong PIN. Try again.');
                 }
-                if (!(await verifyPin(pin))) return fail('Wrong PIN — try again.');
+                if (!(await verifyPin(pin))) return fail('Wrong PIN. Try again.');
                 if (mode === 'disable') {
                     await disablePin(uid);
                     return finish();
@@ -140,7 +140,7 @@ export default function PinLockModal({
             if (pin !== firstPin) {
                 setStep('create');
                 setFirstPin('');
-                return fail("PINs didn't match — choose one again.");
+                return fail("PINs didn't match. Choose one again.");
             }
             await setPin(uid, pin);
             finish();
@@ -231,7 +231,7 @@ export default function PinLockModal({
                             value={value}
                             disabled={busy}
                             onChange={(e) => handleChange(e.target.value)}
-                            aria-label={`${STEP_TITLE[step]} — ${PIN_LENGTH} digits`}
+                            aria-label={`${STEP_TITLE[step]}: ${PIN_LENGTH} digits`}
                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                         />
                     </div>

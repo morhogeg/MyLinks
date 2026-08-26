@@ -65,7 +65,7 @@ export function ResurfacingView({
                     <NavRow title="Pacing" value={cadenceLabel} onClick={() => go('cadence')} />
                 )}
             </List>
-            <Footnote>Tap the bell on any card and Machina brings it back — tomorrow, then after a week, then a month. Pacing controls how densely those nudges arrive.</Footnote>
+            <Footnote>Tap the bell on any card and Machina brings it back: tomorrow, then after a week, then a month. Pacing controls how densely those nudges arrive.</Footnote>
 
             <SectionHeader>Curated digest</SectionHeader>
             <List tight>
@@ -97,7 +97,7 @@ export function ResurfacingView({
                     <NavRow title="Delivery day" value={DAY_NAMES[settings.synthesis_day] ?? 'Sunday'} onClick={() => go('synthesisDay')} />
                 )}
             </List>
-            <Footnote>Ties the week&apos;s saves into a short story — themes, a standout, and an open question. Lands in your feed and Digest tab{settings.synthesis_enabled ? ` every ${DAY_NAMES[settings.synthesis_day] ?? 'Sunday'}` : ''}.</Footnote>
+            <Footnote>Ties the week&apos;s saves into a short story: themes, a standout, and an open question. Lands in your feed and Digest tab{settings.synthesis_enabled ? ` every ${DAY_NAMES[settings.synthesis_day] ?? 'Sunday'}` : ''}.</Footnote>
 
             <Footnote>In-app and push delivery are always on. Push is toggled on the main screen.</Footnote>
         </>
@@ -117,7 +117,7 @@ function SkipEmptyLabel() {
             </div>
             {open && (
                 <p className="text-[12.5px] text-text-muted mt-1.5 leading-snug max-w-[30ch] animate-in fade-in slide-in-from-top-1 duration-200">
-                    When there&apos;s nothing new worth surfacing, no digest is sent — so you never get an empty notification.
+                    When there&apos;s nothing new worth surfacing, no digest is sent, so you never get an empty notification.
                 </p>
             )}
         </>

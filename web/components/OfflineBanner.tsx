@@ -45,7 +45,7 @@ export default function OfflineBanner() {
         >
             <div className="flex items-center justify-center gap-2 px-4 py-2 text-[13px] font-medium text-text">
                 <WifiOff className="w-4 h-4 text-text-secondary shrink-0" />
-                <span>You&rsquo;re offline — changes will sync when you reconnect</span>
+                <span>You&rsquo;re offline. Changes will sync when you reconnect</span>
             </div>
         </div>
     );

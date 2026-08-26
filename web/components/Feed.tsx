@@ -1178,7 +1178,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         try {
             await updateDoc(doc(db, 'users', uid, 'links', link.id), { isPrivate });
             toast.success(isPrivate
-                ? 'Moved to Private — find it under Show → Private'
+                ? 'Moved to Private. Find it under Show → Private'
                 : 'Removed from Private');
         } catch {
             toast.error("Couldn't update the card. Please try again.");
@@ -1945,7 +1945,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             and Tags. Sources graduated to their own control (globe, next). */}
                         <button
                             onClick={() => setIsFiltersOpen(true)}
-                            aria-label="Filters — status, categories, tags"
+                            aria-label="Filters: status, categories, tags"
                             title="Filters"
                             className={`${ctrlBase} px-3.5 border relative ${activeMobileFilters > 0
                                 ? 'bg-accent text-accent-ink border-accent shadow-sm'
@@ -2617,11 +2617,11 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                 ? {
                                     Icon: Search, title: searchInFlight ? 'Searching' : 'No matches',
                                     body: searchInFlight ? null
-                                        : 'Try different words — search matches your cards by words and by meaning.',
+                                        : 'Try different words. Search matches your cards by words and by meaning.',
                                 }
                                 : filter === 'reminders' ? {
                                     Icon: Bell, title: 'No reminders yet',
-                                    body: 'Tap the bell on any card — Smart review brings it back tomorrow, then after a week and a month.',
+                                    body: 'Tap the bell on any card. Smart review brings it back tomorrow, then after a week and a month.',
                                 }
                                 : filter === 'favorite' ? {
                                     Icon: Star, title: 'No favorites yet',
@@ -2648,7 +2648,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                 }
                                 : selectedCategory.size > 0 ? {
                                     Icon: LayoutGrid, title: `Nothing in ${Array.from(selectedCategory).join(', ')}`,
-                                    body: 'Machina files new saves automatically — try another category for now.',
+                                    body: 'Machina files new saves automatically. Try another category for now.',
                                 }
                                 : selectedTags.size > 0 ? {
                                     Icon: TagIcon, title: 'No cards with these tags',

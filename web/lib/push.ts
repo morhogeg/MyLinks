@@ -143,7 +143,7 @@ export async function initPushListeners(): Promise<void> {
 
         // Foreground pushes get no OS banner — surface an in-app toast instead.
         await FirebaseMessaging.addListener('notificationReceived', ({ notification }) => {
-            const message = [notification?.title, notification?.body].filter(Boolean).join(' — ');
+            const message = [notification?.title, notification?.body].filter(Boolean).join(' · ');
             if (message) {
                 window.dispatchEvent(new CustomEvent(PUSH_FOREGROUND_EVENT, { detail: { message } }));
             }
