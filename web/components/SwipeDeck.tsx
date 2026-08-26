@@ -7,7 +7,8 @@ import SourceByline from './SourceByline';
 import SimpleMarkdown from './SimpleMarkdown';
 import { hasHebrew } from '@/lib/rtl';
 import { hapticLight } from '@/lib/haptics';
-import { Check, Archive, Bell, RotateCcw, Sparkles, Info, X, Star } from 'lucide-react';
+import { Check, Archive, Bell, RotateCcw, Info, X, Star } from 'lucide-react';
+import { CitationGlyph } from '@/components/ui/Wordmark';
 import { REVIEW_SESSION_SIZE, isOpen, reviewSessionQueue } from '@/lib/reviewQueue';
 
 type SwipeDir = 'left' | 'right' | 'up';
@@ -388,7 +389,7 @@ export default function SwipeDeck({
         return (
             <div className="flex flex-col items-center justify-center text-center py-16 gap-4">
                 <div className="w-14 h-14 rounded-2xl bg-accent/10 flex items-center justify-center">
-                    <Sparkles className="w-7 h-7 text-accent" strokeWidth={1.75} />
+                    <CitationGlyph className="w-7 h-7 text-accent" />
                 </div>
                 <h3 className="text-lg font-bold text-text">{acted > 0 ? 'Session complete' : 'All caught up'}</h3>
                 {acted > 0 ? (

@@ -3,7 +3,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from '@/lib/types';
-import { X, Sparkles, Calendar, CalendarClock, Clock, BellOff, Loader2, Check, ChevronDown } from 'lucide-react';
+import { X, Calendar, CalendarClock, Clock, BellOff, Loader2, Check, ChevronDown } from 'lucide-react';
+import { CitationGlyph } from '@/components/ui/Wordmark';
 import { updateLinkReminder } from '@/lib/storage';
 import { isNativeApp } from '@/lib/api';
 import { trackReminderSet } from '@/lib/analytics';
@@ -334,7 +335,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                     <div role="radiogroup" aria-label="When to remind" className="divide-y divide-border-subtle">
                         <OptionRow
                             id="smart"
-                            icon={<Sparkles className="w-5 h-5" />}
+                            icon={<CitationGlyph className="w-5 h-5" />}
                             label="Smart review"
                             caption="Tomorrow · then 1 week & 1 month"
                         />

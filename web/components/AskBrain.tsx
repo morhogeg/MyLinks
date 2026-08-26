@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { ArrowUp, Plus, MessagesSquare, Copy, Check, TriangleAlert, Sparkles, RefreshCw, Square, RotateCcw, ArrowDown, X, ChevronLeft, Waypoints, Image as ImageIcon, StickyNote } from 'lucide-react';
+import { ArrowUp, Plus, MessagesSquare, Copy, Check, TriangleAlert, RefreshCw, Square, RotateCcw, ArrowDown, X, ChevronLeft, Waypoints, Image as ImageIcon, StickyNote } from 'lucide-react';
 import type { OrbState } from '@/components/ui/CitationMark';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -1499,7 +1499,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
             {freshCard && !isEmpty && (
                 <div className="shrink-0 w-full max-w-2xl mx-auto px-3 sm:px-0 pb-1.5 animate-fade-in">
                     <div className="flex items-center gap-2 ps-3 pe-1.5 py-1.5 rounded-xl bg-accent/10 border border-accent/25">
-                        <Sparkles className="w-3.5 h-3.5 text-accent shrink-0" />
+                        <CitationGlyph className="w-3.5 h-3.5 text-accent shrink-0" />
                         <button
                             dir="auto"
                             onClick={() => {

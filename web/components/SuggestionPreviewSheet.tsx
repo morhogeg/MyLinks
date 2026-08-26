@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from '@/lib/types';
-import { Sparkles, X, Plus } from 'lucide-react';
+import { X, Plus } from 'lucide-react';
+import { CitationGlyph } from '@/components/ui/Wordmark';
 import { CollectionSuggestion } from '@/lib/collectionSuggest';
 import SourceByline from '@/components/SourceByline';
 import { getDirection } from '@/lib/rtl';
@@ -114,7 +115,7 @@ export default function SuggestionPreviewSheet({
 
                     <div className="flex items-center gap-3 px-5 pt-2 pb-3 border-b border-border-subtle">
                         <span className="flex items-center justify-center w-7 h-7 rounded-full bg-accent/10 shrink-0">
-                            <Sparkles className="w-3.5 h-3.5 text-accent" />
+                            <CitationGlyph className="w-3.5 h-3.5 text-accent" />
                         </span>
                         <div className="flex-1 min-w-0" dir={nameDir}>
                             <p className="text-[11px] font-bold uppercase tracking-wider text-accent">Suggested</p>

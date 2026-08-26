@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Collection, Link } from '@/lib/types';
-import { MoreHorizontal, Pencil, Share2, Trash2, Globe, LayoutGrid, Sparkles, Plus, X, Layers, Lock } from 'lucide-react';
+import { MoreHorizontal, Pencil, Share2, Trash2, Globe, LayoutGrid, Plus, X, Layers, Lock } from 'lucide-react';
+import { CitationGlyph } from '@/components/ui/Wordmark';
 import { getColorStyleByKey } from '@/lib/colors';
 import { isShareStale } from '@/lib/collections';
 import { CollectionSuggestion } from '@/lib/collectionSuggest';
@@ -218,12 +219,12 @@ export default function CollectionsGallery({
                             </div>
                         ) : (
                             <span className="absolute inset-0 flex items-center justify-center">
-                                <Sparkles className="w-6 h-6 text-accent/40" />
+                                <CitationGlyph className="w-6 h-6 text-accent/40" />
                             </span>
                         )}
                         {s.thumbnails.length > 0 && <div className="absolute inset-0 bg-gradient-to-t from-card/90 to-transparent" />}
                         <span className="absolute top-2 start-2 flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-accent/85 text-[9px] font-bold uppercase tracking-wide text-accent-ink">
-                            <Sparkles className="w-2.5 h-2.5" /> Suggested
+                            <CitationGlyph className="w-2.5 h-2.5" /> Suggested
                         </span>
                         {onDismissSuggestion && (
                             <button

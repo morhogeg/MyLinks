@@ -1708,6 +1708,17 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-26 (round 8) — Sparkles glyph retired app-wide; onboarding em
+  dashes removed (owner, from the first-run screen).** Every lucide
+  `Sparkles` (10 files: Onboarding, AskBrain answer chip, AIConsentNotice,
+  ReminderModal smart option, DigestSettings smart mix, SwipeDeck,
+  CollectionsGallery suggested/empty, AddToCollectionSheet suggested chip,
+  SuggestionPreviewSheet) replaced with the `CitationGlyph` brand mark at
+  the same size/color classes — same move as the 08-01 ImageScanProgress
+  swap, now completed everywhere. All five user-facing em dashes in
+  `Onboarding.tsx` removed per 11a3 (both native and extension paths, and
+  the CTA is now "Got it, let's go"); comment-text em dashes left alone.
+  `tsc --noEmit` clean; zero `Sparkles` references remain in web/.
 - **2026-08-26 (round 7) — SIGN-UP MADE STRUCTURALLY UNABLE TO DEAD-END
   (launch blocker from round 6).** Root cause still not directly observable
   from the sandbox, but the infrastructure was PROVEN live from CI logs:

@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { DigestMode } from '@/lib/types';
-import { Sparkles, Check, Tag, History, Search, Info } from 'lucide-react';
+import { Check, Tag, History, Search, Info } from 'lucide-react';
+import { CitationGlyph } from '@/components/ui/Wordmark';
 import { X } from 'lucide-react';
 import type { Settings, SetSettings, View } from './types';
 import {
@@ -15,7 +16,7 @@ import {
 // BATCHES of saved cards — the weekly synthesis is a different artifact (an
 // AI-written recap) and lives under its own section/toggle, not here.
 export const DIGEST_MODES: { value: DigestMode; label: string; icon: ReactNode; note: string }[] = [
-    { value: 'smart', label: 'Smart mix', icon: <Sparkles className="w-[18px] h-[18px]" />, note: 'A balanced blend of your backlog and older gems worth a second look.' },
+    { value: 'smart', label: 'Smart mix', icon: <CitationGlyph className="w-[18px] h-[18px]" />, note: 'A balanced blend of your backlog and older gems worth a second look.' },
     { value: 'rediscover', label: 'Rediscover', icon: <History className="w-[18px] h-[18px]" />, note: 'Resurface older saves you haven\'t opened in a while.' },
     { value: 'topic', label: 'By topic', icon: <Tag className="w-[18px] h-[18px]" />, note: 'Only cards from a category or tag you choose.' },
 ];
