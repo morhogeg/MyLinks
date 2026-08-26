@@ -189,9 +189,21 @@ function Card({
                     </h3>
 
                     {failed ? (
-                        <p className="text-sm text-text-secondary flex-grow">
-                            Your link is safe — the AI analysis didn’t finish. Retry to try again, or open the original.
-                        </p>
+                        <div className="flex-grow space-y-2">
+                            <p className="text-sm text-text-secondary">
+                                Your link is safe — the AI analysis didn’t finish. Retry to try again, or open the original.
+                            </p>
+                            {/* The backend writes the real failure into `error`
+                                (process_link_background's except / the janitor).
+                                Surface it — same move as LoginScreen's `detail`
+                                line — so a failure names its cause instead of
+                                needing a console dig (2026-08-26 stall). */}
+                            {link.error ? (
+                                <p dir="ltr" className="text-[10px] font-mono text-text-muted/70 break-words line-clamp-3">
+                                    {link.error}
+                                </p>
+                            ) : null}
+                        </div>
                     ) : (
                         <div className="space-y-2 flex-grow">
                             <div className="h-3 w-full bg-fill-subtle rounded animate-pulse" />
