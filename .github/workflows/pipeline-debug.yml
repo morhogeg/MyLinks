@@ -56,33 +56,16 @@ jobs:
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$creds"
           echo "GOOGLE_APPLICATION_CREDENTIALS=$creds" >> "$GITHUB_ENV"
 
-      # Root cause found on run 4: every Firestore call from containers built
-      # since Aug 25 fails `400 Invalid database id %28default%29`. Top-level
-      # deps are pinned but transitives are not, so bisect: reproduce with the
-      # exact functions/requirements.txt resolution through the exact prod code
-      # path (functions/db.py -> firebase_admin), then try candidate pins.
-      - name: Dependency bisect
-        run: |
-          probe() {
-            name=$1; shift
-            echo "----- venv $name: extra pins: $* -----"
-            python -m venv "/tmp/v-$name"
-            if ! "/tmp/v-$name/bin/pip" install -q -r functions/requirements.txt "$@"; then
-              echo "  pip install FAILED for $name"
-              return 0
-            fi
-            "/tmp/v-$name/bin/pip" freeze | grep -Ei 'google-cloud-firestore|google-api-core|grpcio|protobuf|proto-plus|firebase|googleapis-common' | sed 's/^/    /'
-            "/tmp/v-$name/bin/python" .github/scripts/firestore_repro.py direct || true
-            "/tmp/v-$name/bin/python" .github/scripts/firestore_repro.py admin || true
-            FIREBASE_CONFIG='{"projectId":"secondbrain-app-94da2","storageBucket":"secondbrain-app-94da2.firebasestorage.app"}' \
-              GCLOUD_PROJECT=secondbrain-app-94da2 \
-              "/tmp/v-$name/bin/python" .github/scripts/firestore_repro.py admin-env || true
-          }
-          probe prod
-          probe pin-firestore "google-cloud-firestore<2.29"
-          probe pin-apicore "google-api-core<2.30"
-          probe pin-protobuf "protobuf<7"
-          probe pin-grpcio "grpcio<1.80"
+      # Root cause found on run 4 (`400 Invalid database id %28default%29`, a
+      # poisoned pip layer in containers built since Aug 25); the fix is the
+      # transitive-pin block in functions/requirements.txt, deployed by
+      # functions run #92. This step now verifies prod recovery: scheduler
+      # last-attempt statuses should be clean and the janitor should have
+      # pruned the stale queue docs.
+      - name: Run pipeline debug probes
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python .github/scripts/pipeline_debug.py
 
       - name: Upload report artifact
         if: always()
