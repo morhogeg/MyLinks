@@ -21,3 +21,24 @@ flask==3.1.3
 # storing them (post thumbnails are the only image-processing use).
 # Pillow>=11.0.0,<12.0
 Pillow==11.3.0
+
+# ── Transitive pins: 2026-08-26 Firestore outage (§9 round 15) ────────────────
+# Exception to the "top-level only" rule above, deliberately. Containers built
+# from the 2026-08-25 deploy (#89) resolved a transitive google-stack set whose
+# firebase_admin→Firestore path sends the database id double-URL-encoded —
+# every Admin-SDK call failed `400 Invalid database id %28default%29`, which
+# killed process_link_background, the janitor, digests, AND made the
+# fail-closed rate limiter 429 every paid endpoint. Later deploys reused the
+# cached pip layer (requirements.txt hash unchanged), so redeploys did not
+# heal it. These pins are the exact set proven working against production
+# through functions/db.py on Python 3.13 (pipeline-debug run #5, all probes
+# OK), and changing this file busts the stale build cache. Keep them until a
+# deliberate re-pin, and re-verify with .github/scripts/firestore_repro.py
+# before changing any of them.
+google-cloud-firestore==2.29.0
+google-api-core==2.34.0
+grpcio==1.83.0
+grpcio-status==1.83.0
+protobuf==7.36.0
+proto-plus==1.28.4
+googleapis-common-protos==1.75.2
