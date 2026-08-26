@@ -1708,6 +1708,22 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-26 (round 2) — SUBTITLE REPLACED + caption 5 refined (§4 tasks
+  8–9), doc-only, owner-approved in chat.** Subtitle: `Capture. Ask. Connect.`
+  → **`Never lose another great find`** (29/30). The owner rejected an
+  Ask-led candidate ("Answers from your own library") with a positioning
+  correction now on record: the core value is (a) one place for everything
+  and (b) saves summarized and categorized — Ask is a feature, not the point.
+  Several rounds later the loss-aversion direction won; full candidate
+  graveyard + accepted index cost (`ask` now in NO field) documented in
+  `docs/APP_STORE.md` §2. Caption 5: "What your week added up to." → "Your
+  week, in one card." A proposed rewording of the description's "Weekly
+  synthesis" bullet was DROPPED on evidence: the phrase is the literal UI
+  label (`Feed.tsx:1578`, `DigestView.tsx:141`), so the description keeps it.
+  2026 ASO research (Phiture, ASOMobile, Screenhance) noted for the owner's
+  screenshot session: captions top-stacked above the frame, screenshot 1
+  carries ~60% of the conversion decision, static beats video for
+  productivity, Hebrew localization is cheap upside. Owner §5 steps unchanged.
 - **2026-08-26 — App Store metadata copy pass (§4 tasks 8–9), doc-only, all
   owner-approved in chat before writing.** Full expert review of every
   Connect field in `docs/APP_STORE.md` §2–§4. **The finding that matters:
