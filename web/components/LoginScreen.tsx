@@ -14,6 +14,7 @@ export default function LoginScreen({
     onSignOut,
     onRetry,
     restricted = false,
+    detail,
     email,
     showApple = true,
 }: {
@@ -22,6 +23,9 @@ export default function LoginScreen({
     /** Re-run workspace resolution (restricted variant, post-cutover only). */
     onRetry?: () => void;
     restricted?: boolean;
+    /** What actually failed (restricted variant) — the only trace of the
+        underlying error a user's screenshot can carry. */
+    detail?: string | null;
     email?: string | null;
     /** Show "Continue with Apple". Hidden pre-cutover when the Apple provider
         may not be configured yet. */
@@ -72,6 +76,11 @@ export default function LoginScreen({
                                 <p className="mt-1 text-[13px] text-text-muted">
                                     This is usually temporary — please try again.
                                 </p>
+                                {detail && (
+                                    <p className="mt-2 text-[11px] font-mono text-text-muted/70 break-all">
+                                        {detail}
+                                    </p>
+                                )}
                                 <button
                                     onClick={onRetry}
                                     className="mt-6 w-full inline-flex items-center justify-center gap-2 rounded-full bg-accent text-accent-ink px-5 py-2.5 text-sm font-semibold shadow-sm shadow-accent/20 hover:bg-accent-hover transition-colors"
