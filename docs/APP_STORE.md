@@ -342,6 +342,43 @@ the same screen), 4 is the only caption with a number on the shot where the
 number is the point, and 6's parenthetical is the listing's one moment of
 personality, carrying the privacy promise.
 
+### Seed library for the demo workspace (compiled 2026-08-26, links verified)
+
+Built as one believable person — planning a Japan trip, serious about sleep and
+longevity, following AI — so the three graph clusters connect *through* the
+persona and See-also chips look intelligent rather than random. 10 sources
+below; the owner adds 2 finds from X (one to Japan, one to AI, **saved as
+screenshots** so the feed has screenshot cards).
+
+**Sleep & longevity (4):**
+1. YT — Sleep Toolkit, Huberman Lab #84: https://www.youtube.com/watch?v=h2aWYjSA1Jc
+   (covers jet lag → bridges to the Japan cluster)
+2. YT — Sleep Is Your Superpower, Matt Walker, TED: https://www.youtube.com/watch?v=5MuIMqhT8DM
+3. Article — Exercising for Longevity (zone 2/zone 5), Peter Attia: https://peterattiamd.com/exercising-for-longevity/
+4. Article — Toolkit for Sleep, Huberman newsletter: https://www.hubermanlab.com/newsletter/toolkit-for-sleep
+   (same author as #1, different format — guaranteed See-also pair for shot 3)
+
+**Japan trip (3):**
+5. YT — How to TRAVEL Japan! Perfect 2-week itinerary: https://www.youtube.com/watch?v=B0RveC40uS8
+6. Article — 2 Week Japan Itinerary: The Grand Tour, Inside Kyoto: https://www.insidekyoto.com/2-week-japan-itinerary-the-grand-tour
+   (same route as #5 from a different source — guaranteed connection)
+7. Article — The Essentials: Where We Eat in Tokyo, Culinary Backstreets: https://culinarybackstreets.com/stories/tokyo/the-essentials-where-we-eat-in-tokyo-japan
+   (prettiest article card; save late so it sits high in the masonry)
+
+**Making sense of AI (3):**
+8. YT — Intro to Large Language Models, Andrej Karpathy: https://www.youtube.com/watch?v=zjkBMFhNj_g
+9. Article — An Opinionated Guide to Which AI to Use, Ethan Mollick (Jul 2026): https://www.oneusefulthing.org/p/an-opinionated-guide-to-which-ai-b22
+   (fresh date → the feed doesn't read as a museum)
+10. Article — AI Drug Discovery Is Reshaping Longevity Medicine, MedCity News: https://medcitynews.com/2026/04/ai-drug-discovery-is-reshaping-longevity-medicine-is-your-practice-ready/
+    (deliberate bridge card: AI cluster, connects into Attia/longevity — gives
+    the graph a visible edge BETWEEN clusters)
+
+Staging notes: save the best-looking cards last (Japan video, Culinary
+Backstreets, TED) so they top the masonry feed for shot 1. The three subjects
+are the three named collections for shot 6; "Japan 2026" is the natural public
+page. Strong Ask questions for shot 2: "What did I save about beating jet lag?"
+(cross-cluster citations) or "What should I eat in Tokyo?".
+
 iPad: not planned — `TARGETED_DEVICE_FAMILY` is already `1` (iPhone-only) in all
 build configs, so no iPad screenshots are needed.
 
@@ -349,7 +386,8 @@ build configs, so no iPad screenshots are needed.
 
 - [ ] Fill the App Privacy declarations in Connect per §1.
 - [ ] Enter metadata per §2 (after the auth cutover, when the store build exists).
-- [ ] Create + seed the reviewer demo account; fill credentials into §3.
+- [ ] Create + seed the reviewer demo account (seed library in §4); fill
+      credentials into §3.
 - [ ] Take the 6 screenshots per §4.
 - [x] `TARGETED_DEVICE_FAMILY = 1` (iPhone-only) — already set in all build configs.
 - [ ] Verify the AI-consent screen (§4 task 6) is in the submitted build before
