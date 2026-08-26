@@ -158,11 +158,11 @@ second brain,read later,bookmarks,ai summary,knowledge base,notes,pkm,summarize,
 
 **Description:**
 
-> You save things all day. Links, screenshots, videos, half-read articles. Then you never open them again. Machina changes that.
+> You save things all day. Links, screenshots, videos, articles you meant to finish. Then you never open them again. Machina changes that.
 >
 > Share anything to Machina from any app. It reads the page, watches the video, reads the text in your screenshot. Each save comes back as a clean card with a real summary, a category, tags, and links to the things you already saved on the same subject.
 >
-> Then you can ask. "What did I save about mortgage rates?" Machina answers in plain language and cites the exact saves it used, so one tap takes you back to the source.
+> Then ask about anything you saved. Machina answers in plain language and cites the exact saves it used, so one tap takes you back to the source.
 >
 > CAPTURE FROM ANYWHERE
 > • Save from Safari, YouTube, X, or any other app: tap Share, pick Machina
