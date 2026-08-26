@@ -1708,6 +1708,15 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-26 (round 10) — empty-state "Adding…" latch released (owner:
+  deleting the seeded example card left the Try-an-example button frozen).**
+  `handleSeedExample` deliberately left `seedingExample` true on success (the
+  arriving card unmounts the empty state), which was correct until the
+  example card was DELETED: the empty state remounted with the button stuck
+  spinning until an app restart. A small effect now resets the latch once
+  `links.length > 0`, so a re-emptied feed gets a fresh working button
+  (re-tapping re-seeds; the example card's fixed id makes that an overwrite,
+  not a dupe). Also de-em-dashed the empty-state body copy. `tsc` clean.
 - **2026-08-26 (round 9) — push "Turn on" failure fixed on three fronts
   (owner hit "Could not register this device" on the new demo account, which
   ALSO confirms round 7 worked: the demo account signed in and saved a

@@ -321,7 +321,13 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         }
         // On success we deliberately leave seedingExample true: the card arriving
         // flips the feed out of the empty state, so this button unmounts anyway.
+        // The effect below releases the latch once the card lands — without it,
+        // DELETING the example card remounted this empty state with the button
+        // stuck on "Adding…" forever (owner hit exactly that).
     }, [uid, seedingExample, toast]);
+    useEffect(() => {
+        if (seedingExample && links.length > 0) setSeedingExample(false);
+    }, [seedingExample, links.length]);
 
     // Collections (the `collections` state itself is declared above the filter
     // pipeline — see the privacy-vault block near useLinks).
@@ -2683,7 +2689,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                 }
                                 : {
                                     Icon: Inbox, title: 'Your Machina is empty',
-                                    body: 'Save your first link with the + button — Machina reads it, tags it, and files it for you.',
+                                    body: 'Save your first link with the + button. Machina reads it, tags it, and files it for you.',
                                 };
                             return (
                         <div className="text-center py-16 px-6 animate-fade-in">
