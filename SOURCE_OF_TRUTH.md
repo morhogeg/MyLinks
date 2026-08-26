@@ -1708,6 +1708,35 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-26 (round 7) — SIGN-UP MADE STRUCTURALLY UNABLE TO DEAD-END
+  (launch blocker from round 6).** Root cause still not directly observable
+  from the sandbox, but the infrastructure was PROVEN live from CI logs:
+  functions run #89's log shows `claim_workspace_http` deployed with its own
+  Cloud Run URL, and hosting run #8's deployed commit (`45100c8`) carries the
+  `/api/claim-workspace` rewrite — so the failure is inside the request, not
+  missing deployment. Fix is defense in depth, so no single transport can
+  block sign-up: (1) `resolveDataDoc` now tries BOTH claim transports on both
+  platforms (native: HTTP twin → callable; web: callable → HTTP twin); a
+  transport that ANSWERS is final, a transport that ERRORS falls through.
+  (2) If both error, post-cutover, the client CREATES its own workspace
+  through the Firestore SDK (`createWorkspaceClientSide`) — the transport the
+  native shell exercises constantly. Enabled by a new rules clause on
+  `/users/{uid}` (both `firestore.rules` and `.locked`, kept identical):
+  `allow create` ONLY when the doc id == the caller's auth uid AND authUids
+  == [caller] — can't touch other ids, can't take over existing docs (that's
+  an update, rejected for non-linked writers), can't seed foreign accounts.
+  The old rules file literally reserved this path ("if a future new-user
+  onboarding creates the doc client-side… this needs a matching allow
+  create"). Client-created docs lack `settings` (client defaults cover it —
+  `useUserSettings` `??`-falls-back per field) and `ingestToken`
+  (`get_share_config` mints lazily). 5 new emulator tests in
+  `firestore-rules-test/rules.test.mjs` (own-doc create succeeds; other id /
+  foreign or extra authUids / missing authUids / existing-doc takeover / anon
+  all fail). Emulator can't run in the sandbox (JAR download blocked) —
+  `deploy-rules.yml` runs the suite in CI and BLOCKS the deploy if red, so
+  the rules ship only proven. `tsc --noEmit` clean. Demo account: sign out
+  and back in on the new build (or the desktop-web workaround from round 6)
+  — with three independent paths, one of them lands the workspace.
 - **2026-08-26 (round 6) — 🔴 OPEN BUG: brand-new account hit the restricted
   screen on native (demo account blocked); diagnostics + hardening shipped,
   root cause NOT yet identified.** Owner created `machinareviewer@gmail.com`

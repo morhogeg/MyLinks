@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import {
-    collection, query, getDocs, limit, where, doc, getDoc, updateDoc, arrayUnion,
+    collection, query, getDocs, limit, where, doc, getDoc, setDoc, updateDoc, arrayUnion,
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '@/lib/firebase';
@@ -286,7 +286,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setPhotoURL(user.photoURL);
             setLoading(true);
             try {
-                const dataDoc = await resolveDataDoc(user.uid);
+                const dataDoc = await resolveDataDoc(user.uid, user.email);
                 if (cancelled) return;
                 if (dataDoc) {
                     setRestricted(false);
@@ -497,8 +497,34 @@ async function claimWorkspaceHttp(): Promise<ClaimResult> {
  *    Returns null only if no workspace could be resolved, claimed, or created
  *    (caller shows the restricted screen).
  */
+/**
+ * Last-resort workspace creation, entirely client-side: write the user's own
+ * doc through the Firestore SDK — the one transport PROVEN on native every
+ * day (the whole app runs on it). Allowed by the locked rules' create clause:
+ * only the caller's own doc id, linked to exactly the caller. Mirrors
+ * link_service.create_workspace minus the server-only extras: `settings`
+ * falls back to client defaults (useUserSettings), and the ingest token is
+ * minted lazily by get_share_config on first share-config fetch.
+ */
+async function createWorkspaceClientSide(
+    authUid: string,
+    email: string | null,
+): Promise<{ id: string; data: Record<string, unknown>; created: boolean }> {
+    const payload: Record<string, unknown> = {
+        authUids: [authUid],
+        createdAt: Date.now(),
+        onboarded: false,
+        ...(email ? { email } : {}),
+    };
+    // No merge: this must be a CREATE. If the doc exists and this account is
+    // not linked, the update rule rejects it — restricted is then correct.
+    await setDoc(doc(db, 'users', authUid), payload);
+    return { id: authUid, data: payload, created: true };
+}
+
 async function resolveDataDoc(
     authUid: string,
+    email: string | null = null,
 ): Promise<{ id: string; data: Record<string, unknown>; created?: boolean } | null> {
     // 1. Already linked.
     const linked = await getDocs(
@@ -525,24 +551,47 @@ async function resolveDataDoc(
     //    uses. Web keeps the callable (works fine there). Same underlying logic
     //    server-side, so behavior matches exactly.
     lastResolveDetail = null;
-    try {
-        const claimed = isNativeApp()
-            ? await claimWorkspaceHttp()
-            : await claimWorkspaceCallable();
-        const claimedUid = claimed?.uid;
+    let claimed: ClaimResult | null = null;
+    const transports: Array<[string, () => Promise<ClaimResult>]> = isNativeApp()
+        ? [['http', claimWorkspaceHttp], ['callable', claimWorkspaceCallable]]
+        : [['callable', claimWorkspaceCallable], ['http', claimWorkspaceHttp]];
+    // Sign-up must not dead-end on any single transport: try the platform's
+    // primary claim path, then the other one. A transport error falls through
+    // to the next; a transport that ANSWERS (even uid: null) is final — the
+    // backend spoke, and asking again over another wire gets the same answer.
+    for (const [name, transport] of transports) {
+        try {
+            claimed = await transport();
+            break;
+        } catch (e) {
+            // KEPT for the restricted screen: on a device there is no console,
+            // and this message is the only trace of what failed.
+            lastResolveDetail = `${name}: ${e instanceof Error ? e.message : String(e)}`;
+            console.warn(`Workspace claim via ${name} failed:`, e);
+        }
+    }
+    if (claimed) {
+        const claimedUid = claimed.uid;
         if (claimedUid) {
             const fresh = await getDoc(doc(db, 'users', claimedUid));
-            return { id: claimedUid, data: fresh.data() ?? {}, created: claimed?.created === true };
+            return { id: claimedUid, data: fresh.data() ?? {}, created: claimed.created === true };
         }
         // Backend ran and declined (pre-cutover non-owner) → restricted.
         lastResolveDetail = 'workspace claim declined by backend';
         return null;
-    } catch (e) {
-        // Swallowed on purpose (the soft-mode fallback below may still
-        // resolve), but KEPT for the restricted screen: on a device there is
-        // no console, and this message is the only trace of what failed.
-        lastResolveDetail = e instanceof Error ? e.message : String(e);
-        console.warn('Workspace claim unavailable:', e);
+    }
+    // Both claim transports errored (never answered). Post-cutover, fall back
+    // to creating the workspace client-side — the Firestore SDK is the one
+    // transport the native shell exercises constantly, so sign-up cannot be
+    // taken down by the HTTP/callable path alone. Pre-cutover this is skipped
+    // (the open-rules legacy claim below is the correct fallback there).
+    if (REQUIRE_AUTH) {
+        try {
+            return await createWorkspaceClientSide(authUid, email);
+        } catch (e) {
+            lastResolveDetail += ` | self-serve: ${e instanceof Error ? e.message : String(e)}`;
+            console.warn('Client-side workspace creation failed:', e);
+        }
     }
 
     // 3. Soft-mode fallback: if the callable isn't deployed yet (pre-cutover),

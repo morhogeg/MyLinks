@@ -51,10 +51,19 @@ service cloud.firestore {
       // account can be touched, and only linked accounts can grow `authUids`.
       allow update: if isSignedIn() && request.auth.uid in resource.data.authUids;
 
-      // User docs are created and deleted ONLY server-side (claim_workspace /
-      // delete_account, Admin SDK). If a future new-user onboarding creates the
-      // doc client-side instead, this needs a matching `allow create`.
-      allow create, delete: if false;
+      // Self-serve workspace creation — the client-side fallback when both
+      // claim transports fail (AuthProvider.createWorkspaceClientSide,
+      // 2026-08-26): a signed-in account may create ONLY its own doc, keyed
+      // by its own auth uid and linked to exactly itself at birth. It cannot
+      // touch any other doc id (== uid check), cannot claim a legacy doc
+      // (create fails on an existing doc; the update rule then rejects a
+      // non-linked writer), and cannot seed another account into authUids.
+      allow create: if isSignedIn()
+        && request.auth.uid == uid
+        && request.resource.data.authUids == [request.auth.uid];
+
+      // Deletion stays server-side only (delete_account, Admin SDK).
+      allow delete: if false;
 
       match /links/{linkId} {
         allow read, write: if owns(uid);
