@@ -5,6 +5,9 @@
 # races the functions deploy from the same push — deploy order is functions
 # first, then hosting. Editing this file re-triggers the deploy (path filter
 # includes the workflow itself).
+# Re-triggered 2026-08-26: run #9 raced get_share_config_http exactly this
+# way; functions run #90 is green, this edit lands the /api/share-config
+# rewrite against the now-existing service.
 #
 # WHY THIS EXISTS: Firebase Hosting is NOT a user-facing surface — the iPhone
 # PWA is retired, desktop web is Vercel, iOS is the native app. But the Hosting
