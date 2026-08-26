@@ -1003,7 +1003,13 @@ class EmbeddingService:
         self.client = None
         if self.api_key:
             try:
-                self.client = genai.Client(api_key=self.api_key)
+                # Same hard per-call timeout as GeminiService — a hung embedding
+                # call must fail, not ride the function to its kill (2026-08-26).
+                from ai_service import GEMINI_CALL_TIMEOUT_MS
+                self.client = genai.Client(
+                    api_key=self.api_key,
+                    http_options={"timeout": GEMINI_CALL_TIMEOUT_MS},
+                )
             except Exception as e:
                 logger.error(f"Failed to initialize Gemini client: {e}")
         else:

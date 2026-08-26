@@ -3577,7 +3577,13 @@ def _capture_placeholder_title(url: str, is_image: bool) -> str:
 @firestore_fn.on_document_created(
     document="pending_processing/{doc_id}",
     memory=1024,
-    timeout_sec=300,
+    # Must exceed the worst INTERNAL worst case (scrape + 3 capped Gemini
+    # attempts + 2 capped embed attempts ≈ 8–9 min of pure timeouts — see
+    # GEMINI_CALL_TIMEOUT_MS) so the except below always runs and writes the
+    # retryable FAILED card. At 300s the platform killed the function first and
+    # the placeholder stranded at `processing` with no error anywhere
+    # (2026-08-26 demo-account stall).
+    timeout_sec=540,
     max_instances=10,
 )
 def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnapshot]) -> None:
@@ -3966,6 +3972,28 @@ def run_processing_janitor() -> dict:
             logger.error(f"Janitor failed to update {doc.id}: {e}")
             report["errors"].append(f"{doc.id}: {e}")
 
+    # Stale pending_processing queue docs. A hard-killed job (timeout/OOM) never
+    # reaches the trigger's cleanup `ref.delete()`, so its queue doc lives
+    # forever — and `pending_exists_for_url` then reports every future save of
+    # that URL as a duplicate: share_ingest acks "duplicate", no new card ever
+    # appears, and the user cannot re-save the link at all (2026-08-26
+    # demo-account stall, second-order bug). The card janitor above owns the
+    # VISIBLE card; deleting the aged queue doc only unblocks re-saves.
+    # `createdAt` is written as an ISO-8601 UTC string (_pending_url_doc), which
+    # sorts lexicographically, so a string range query is correct.
+    report["queue_pruned"] = 0
+    try:
+        cutoff_iso = datetime.fromtimestamp(cutoff / 1000, tz=timezone.utc).isoformat()
+        stale_jobs = db.collection("pending_processing").where(
+            filter=FieldFilter("createdAt", "<", cutoff_iso)
+        ).limit(200).stream()
+        for doc in stale_jobs:
+            doc.reference.delete()
+            report["queue_pruned"] += 1
+    except Exception as e:
+        logger.error(f"pending_processing prune failed: {e}")
+        report["errors"].append(f"pending_processing: {e}")
+
     # Bounded task_logs pruning (report 3.7). task_logs is a TOP-LEVEL collection
     # of heartbeat docs written by log_to_firestore. New docs carry a Timestamp
     # `expireAt` (TTL-policy compatible); pre-existing docs only have the ISO-8601
@@ -4039,7 +4067,7 @@ def run_processing_janitor() -> dict:
         logger.error(f"server_errors prune failed: {e}")
         report["errors"].append(f"server_errors: {e}")
 
-    if report["failed_out"] or report["logs_pruned"] or report["server_errors_pruned"]:
+    if report["failed_out"] or report["queue_pruned"] or report["logs_pruned"] or report["server_errors_pruned"]:
         logger.info(f"Processing janitor: {report}")
     return report
 

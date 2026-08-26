@@ -1708,6 +1708,43 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-26 (round 14) — the round-13 analysis stall: strand-class root
+  cause fixed (no timeout anywhere on Gemini HTTP calls) + the dedup-poisoning
+  second bug, all four fixes shipped.** What the code proved: the share-path
+  placeholder card is written by `process_link_background` ITSELF, so the
+  owner's "SAVING…" skeletons mean the trigger fired and then died WITHOUT
+  reaching its own except — a hard kill, not an error (an errored analysis
+  writes a retryable FAILED card in seconds; a billing-capped key 429s, burns
+  3 fast retries, and ALSO lands on FAILED — neither matches "frozen
+  forever"). The one failure that does match: `genai.Client` was built with
+  NO http timeout, so a hung Gemini connection blocked until the platform
+  killed the function at 300s — and the function's own pathological worst case
+  exceeded its 300s budget, so the FAILED handler could never run. Both save
+  paths converge on this trigger (in-app "+" goes durable via `/api/share`
+  since Weakness #5), so one fault explains both symptoms; the `analyze`
+  buckets were confirmed a NON-suspect for the stall (the trigger never calls
+  `_rate_limited`; they gate only the sync `/api/analyze`, and 12 seeds/hr sit
+  well under 30). Fixes: (1) `GEMINI_CALL_TIMEOUT_MS` (90s default, env-
+  overridable) on BOTH `genai.Client`s (ai_service + search.EmbeddingService)
+  — SDK-verified that HttpOptions.timeout is milliseconds→httpx seconds;
+  (2) trigger `timeout_sec` 300→540 so the worst retried-timeout case still
+  reaches the except that writes the FAILED card; (3) the janitor now also
+  prunes `pending_processing` queue docs older than the 15-min cutoff — a
+  hard-killed job's orphaned queue doc made `pending_exists_for_url` report
+  every future save of that URL as a "duplicate" forever, which is why
+  re-sharing the stuck links silently did nothing; (4) `useProcessingBanner`
+  drops captures older than 20 min, so the pill can never again sit frozen at
+  92% over a dead card. Verified: 667/667 backend tests pass, `py_compile` +
+  `tsc --noEmit` clean. NOT verifiable from the sandbox: prod logs (the
+  actual hang's identity — Gemini endpoint vs egress) and Google AI
+  billing/quota state. **Owner steps: (a) still check the Google AI billing
+  page — a tripped ₪50 cap would now surface as fast FAILED cards with real
+  error strings instead of a stall, but it must be raised before seeding
+  continues (§4 item 5b); (b) after the functions deploy, wait ≤5 min for
+  `sweep_stuck_processing` (or hit `force_sweep_stuck_processing` with the
+  admin key) — it will flip the stuck skeletons to retryable failed cards AND
+  clear the orphaned queue docs; then tap Retry per card or re-share the
+  links.**
 - **2026-08-26 (round 13) — 🔴 OPEN, HANDED TO NEXT SESSION: analysis
   pipeline stalls for the demo account (cards stuck "SAVING…", progress pill
   frozen at 92%); in-app add fails too.** State when this session ended: the
