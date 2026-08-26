@@ -139,9 +139,49 @@ test('unauthenticated cannot read or write the owner doc', async () => {
   await assertFails(updateDoc(doc(anonDb(), 'users', OWNER_DOC), { timezone: 'x' }));
 });
 
-test('client cannot create or delete user docs (server-side only)', async () => {
+// Self-serve creation (2026-08-26): the client-side fallback in
+// AuthProvider.createWorkspaceClientSide — a signed-in account may create
+// exactly ONE doc: its own, keyed by its auth uid, linked to itself alone.
+test('new account CAN create its own workspace doc (self-serve fallback)', async () => {
+  await assertSucceeds(
+    setDoc(doc(strangerDb(), 'users', STRANGER_AUTH), {
+      authUids: [STRANGER_AUTH], createdAt: 1, onboarded: false,
+    }),
+  );
+});
+
+test('self-serve create is denied for any other doc id', async () => {
   await assertFails(
-    setDoc(doc(strangerDb(), 'users', 'new-user'), { authUids: [STRANGER_AUTH] }),
+    setDoc(doc(strangerDb(), 'users', 'some-other-id'), { authUids: [STRANGER_AUTH] }),
+  );
+});
+
+test('self-serve create cannot seed extra or foreign accounts into authUids', async () => {
+  await assertFails(
+    setDoc(doc(strangerDb(), 'users', STRANGER_AUTH), {
+      authUids: [STRANGER_AUTH, OWNER_AUTH],
+    }),
+  );
+  await assertFails(
+    setDoc(doc(strangerDb(), 'users', STRANGER_AUTH), { authUids: [OWNER_AUTH] }),
+  );
+  await assertFails(
+    setDoc(doc(strangerDb(), 'users', STRANGER_AUTH), { createdAt: 1 }),
+  );
+});
+
+test('self-serve create cannot take over an EXISTING doc (bare setDoc = update there)', async () => {
+  // OWNER_DOC exists and STRANGER_AUTH is not linked — the write is an update
+  // under rules, and the update rule rejects a non-linked writer. (The id
+  // check would also fail it, belt and braces.)
+  await assertFails(
+    setDoc(doc(strangerDb(), 'users', OWNER_DOC), { authUids: [STRANGER_AUTH] }),
+  );
+});
+
+test('anon cannot self-serve create; nobody can delete user docs', async () => {
+  await assertFails(
+    setDoc(doc(anonDb(), 'users', 'anon-id'), { authUids: ['anon-id'] }),
   );
   await assertFails(deleteDoc(doc(ownerDb(), 'users', OWNER_DOC)));
 });
