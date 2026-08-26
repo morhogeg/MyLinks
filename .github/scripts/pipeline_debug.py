@@ -211,6 +211,82 @@ def main():
             print(f"  FAILED: {type(e).__name__}: {redact(str(e))[:160]}")
     report["scrape_probes"] = scrape_results
 
+    # 8. Infrastructure state — is the pipeline's plumbing alive? The newest
+    #    task_log being days old + queue docs sitting `queued` for hours says
+    #    process_link_background never FIRES, so inspect the GCF v2 function
+    #    states, the Eventarc triggers behind Firestore/scheduled functions,
+    #    and the Cloud Scheduler jobs (state + last attempt result).
+    section("CLOUD FUNCTIONS v2 STATE")
+    import google.auth
+    from google.auth.transport.requests import AuthorizedSession
+
+    creds, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+    sess = AuthorizedSession(creds)
+
+    infra = {"functions": [], "eventarc": [], "scheduler": []}
+    try:
+        r = sess.get(
+            f"https://cloudfunctions.googleapis.com/v2/projects/{PROJECT}/locations/-/functions",
+            timeout=30)
+        r.raise_for_status()
+        for f in r.json().get("functions", []):
+            name = f.get("name", "").split("/")[-1]
+            et = f.get("eventTrigger") or {}
+            row = {
+                "name": name,
+                "state": f.get("state"),
+                "updateTime": f.get("updateTime"),
+                "eventType": et.get("eventType"),
+                "trigger": et.get("trigger"),
+                "stateMessages": f.get("stateMessages"),
+            }
+            infra["functions"].append(row)
+            flag = "" if f.get("state") == "ACTIVE" else "  <-- NOT ACTIVE"
+            if et or f.get("state") != "ACTIVE":
+                print(f"  {name}: state={f.get('state')} event={et.get('eventType')}{flag}")
+                if f.get("stateMessages"):
+                    print(f"    stateMessages: {json.dumps(f.get('stateMessages'))[:300]}")
+    except Exception as e:
+        infra["functions_error"] = f"{type(e).__name__}: {e}"
+        print(f"  functions.list FAILED: {type(e).__name__}: {redact(str(e))[:200]}")
+
+    section("EVENTARC TRIGGERS")
+    for loc in ("us-central1", "nam5", "eur3"):
+        try:
+            r = sess.get(
+                f"https://eventarc.googleapis.com/v1/projects/{PROJECT}/locations/{loc}/triggers",
+                timeout=30)
+            if r.status_code == 200:
+                for t in r.json().get("triggers", []):
+                    row = {"location": loc, "name": t.get("name", "").split("/")[-1],
+                           "conditions": t.get("conditions"), "updateTime": t.get("updateTime")}
+                    infra["eventarc"].append(row)
+                    print(f"  [{loc}] {row['name']} conditions={json.dumps(t.get('conditions'))[:200]}")
+            else:
+                print(f"  [{loc}] list -> HTTP {r.status_code}")
+        except Exception as e:
+            print(f"  [{loc}] FAILED: {type(e).__name__}: {redact(str(e))[:120]}")
+
+    section("CLOUD SCHEDULER JOBS")
+    for loc in ("us-central1",):
+        try:
+            r = sess.get(
+                f"https://cloudscheduler.googleapis.com/v1/projects/{PROJECT}/locations/{loc}/jobs",
+                timeout=30)
+            r.raise_for_status()
+            for j in r.json().get("jobs", []):
+                row = {"name": j.get("name", "").split("/")[-1], "state": j.get("state"),
+                       "schedule": j.get("schedule"),
+                       "lastAttemptTime": j.get("lastAttemptTime"),
+                       "status": j.get("status")}
+                infra["scheduler"].append(row)
+                print(f"  {row['name']}: state={row['state']} sched={row['schedule']!r} "
+                      f"lastAttempt={row['lastAttemptTime']} status={json.dumps(row['status'])[:120]}")
+        except Exception as e:
+            infra["scheduler_error"] = f"{type(e).__name__}: {e}"
+            print(f"  scheduler.list FAILED: {type(e).__name__}: {redact(str(e))[:200]}")
+    report["infra"] = infra
+
     json.dump(report, open("pipeline-debug-report.json", "w"),
               indent=2, ensure_ascii=False, default=str)
     print("\nreport written: pipeline-debug-report.json")
@@ -218,3 +294,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+"""
+"""
