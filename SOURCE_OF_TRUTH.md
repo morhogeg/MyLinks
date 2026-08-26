@@ -1741,6 +1741,30 @@ exact-match, capped.
   guard clean, `tsc` clean, `py_compile` clean. Existing cards keep their old
   em dashes (server-written content); a re-save or the prod tag-cleanup pass
   (§4 task 21 family) would refresh them.
+- **2026-08-26 (round 16) — recurrence guards for the round-15 outage class,
+  shipped and verified (owner-approved: "Go").** Owner confirmed the pipeline
+  works; three guards now ensure a silent async-backend death can never again
+  hide behind a green deploy (commit `8cbb47c`, functions run #93):
+  (1) **Post-deploy end-to-end canary** — every functions deploy now queues a
+  real link (`https://mymachina.app/`) for a dedicated `ci-canary` workspace
+  and requires `process_link_background` to resolve it inside the freshly
+  deployed containers (Firestore + Eventarc + scrape + Gemini + embedding)
+  before the run may pass; a dead pipeline turns the deploy red in minutes
+  and GitHub emails the owner. First live run: deploy #93's canary resolved
+  in **17s**. Cost: one flash-lite call per deploy.
+  (2) **Daily health check** (`pipeline-health.yml`, cron 05:10 UTC; manual
+  fire = push to `trigger/pipeline-health`) — scheduler jobs must be green,
+  no `pending_processing` doc older than the 15-min janitor cutoff, no card
+  stuck in `processing` over 30 min; any violation fails the run (=email).
+  Run #1 green against live prod. Guards the time BETWEEN deploys.
+  (3) **Honest fail-closed limiter** — a limiter backend error now raises
+  `RateLimitBackendError` and the endpoint answers **503 "temporarily
+  unavailable"** (recorded to `server_errors`) instead of the round-12
+  red-herring 429; the request is still refused so the cost ceiling holds.
+  668/668 backend tests (incl. a new fail-closed test). All free: GitHub
+  Actions on a public repo + a handful of Firestore reads. The
+  pipeline-debug harness stays as the named diagnostic tool for a red
+  canary/health run.
 - **2026-08-26 (round 15) — THE REAL ROOT CAUSE, proven from production logs
   and FIXED: every backend Firestore call from containers built since deploy
   #89 failed `400 Invalid database id %28default%29` (a double-URL-encoded
