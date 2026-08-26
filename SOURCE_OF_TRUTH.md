@@ -1708,7 +1708,22 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-08-26 (round 2) — SUBTITLE REPLACED + caption 5 refined (§4 tasks
+- **2026-08-26 (round 3) — Login copy: "Sign in or create your Machina"
+  (commit `f3130e9`, merged `2320b18`).** Owner asked whether the sign-in
+  screen needs a sign-up option. Verified answer: no — auth is OAuth-only
+  (`web/lib/auth.ts`), so "Continue with Apple/Google" creates the account
+  on first tap; a separate sign-up screen would duplicate the same two
+  buttons. What DID need fixing was the copy: "Sign in to access your
+  Machina" read existing-users-only to a first-timer arriving from the
+  landing's "Get started". `LoginScreen.tsx` line changed to "Sign in or
+  create your Machina." with an in-code comment explaining both arrival
+  paths; the component is shared with native, so web + iOS both get it in
+  one edit. Restricted/error variant untouched. Verified: `tsc --noEmit`
+  clean, rendered in dev (emulator mode). Shipped: Vercel (push `2320b18`)
+  + TestFlight run #299 → build **1299**. Note for future sessions: the
+  `restricted` provisioning gate is what actually decides whether a
+  brand-new account gets a workspace — the login screen was never the
+  blocker.
   8–9), doc-only, owner-approved in chat.** Subtitle: `Capture. Ask. Connect.`
   → **`Never lose another great find`** (29/30). The owner rejected an
   Ask-led candidate ("Answers from your own library") with a positioning
