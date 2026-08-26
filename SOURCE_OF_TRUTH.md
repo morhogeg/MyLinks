@@ -1708,6 +1708,30 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-26 (round 13) — 🔴 OPEN, HANDED TO NEXT SESSION: analysis
+  pipeline stalls for the demo account (cards stuck "SAVING…", progress pill
+  frozen at 92%); in-app add fails too.** State when this session ended: the
+  round-12 429 fix WORKS — ShareExt saves now reach `share_ingest` and write
+  placeholder cards (owner screenshot: alaxon.co.il + ynet.co.il placeholders
+  in the feed). But `process_link_background` (the
+  `on_document_created(pending_processing)` trigger, main.py:3577) never
+  resolves them, and the in-app "+" add fails as well, so the fault is in the
+  analysis stage, not capture. All three round-12 deploys verified green
+  (functions #90, hosting #10 after the predicted race re-trigger, iOS #307 =
+  build 1307). Suspects for next session, in order: (1) **Gemini API failing
+  for this project** — the ₪50 billing cap is a documented kill switch (§9
+  08-25 costing: "binds at ~70 users"); a day of heavy owner QA + demo
+  seeding could plausibly trip a spend alert/limit, and it would explain BOTH
+  symptoms at once; check functions logs for `process_link_background` /
+  `analyze_link` errors and the Google AI billing page. (2) `analyze-uid` /
+  `analyze` rate buckets (30/hr, fail-CLOSED) — the demo account's seeding
+  burst + retries could exceed 30 analyses/hr; check `rate_limits` docs for
+  `analyze*` keys. (3) A pending_processing doc-shape or error loop —
+  `sweep_stuck_processing` runs on schedule and `force_sweep_stuck_processing`
+  (HTTP) can retry stuck jobs on demand. The two Hebrew URLs are likely
+  COINCIDENCE, not cause (Hebrew analysis is battle-tested per §9 July logs),
+  but keep it in mind. NOT this session's code: nothing in today's diffs
+  touches the analysis stage.
 - **2026-08-26 (round 12) — share sheet 429 on the demo account: the S-12
   "likely-affected" chain is now PROVEN and fixed, plus the ingest-token
   provisioning gap closed.** Owner's first real share-sheet saves on the demo
