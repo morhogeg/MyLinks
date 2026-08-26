@@ -1708,6 +1708,13 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-26 (round 11) — "Try it with an example" REMOVED entirely (owner:
+  "it's pointless").** The seeded-example feature is gone: the empty-state
+  button, `handleSeedExample`, the `seedingExample` latch + its round-10
+  release effect, and `web/lib/exampleCard.ts` (deleted; only Feed used it).
+  The empty state now teaches the + button alone. Round 10's latch fix is
+  moot but its lesson stands in the log. `tsc` clean, unused imports pruned
+  (`saveLink`, `CitationGlyph` from Feed).
 - **2026-08-26 (round 10) — empty-state "Adding…" latch released (owner:
   deleting the seeded example card left the Try-an-example button frozen).**
   `handleSeedExample` deliberately left `seedingExample` true on success (the
