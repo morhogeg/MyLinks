@@ -54,6 +54,10 @@
         "function": "claim_workspace_http"
       },
       {
+        "source": "/api/share-config",
+        "function": "get_share_config_http"
+      },
+      {
         "source": "/api/delete-account",
         "function": "delete_account_http"
       },

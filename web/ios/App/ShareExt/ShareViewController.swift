@@ -1245,6 +1245,9 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
                 }
             } else if code == 403 || code == 401 {
                 showResult("Auth failed. Reopen Machina to sign in", success: false)
+            } else if code == 429 {
+                // Rate limited — the save is refused for now, not broken.
+                showResult("Too many saves right now. Try again in a few minutes", success: false)
             } else {
                 showResult("Couldn't save (\(code))", success: false)
             }

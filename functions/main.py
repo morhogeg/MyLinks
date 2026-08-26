@@ -16,6 +16,7 @@ import os
 import re
 import json
 import hmac
+import hashlib
 import html as _html
 import logging
 import requests
@@ -2505,7 +2506,21 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
 
     headers = _cors_headers(req)
 
-    rl = _rate_limited("share", _rate_limit_identity(req), headers)
+    # Pre-body gate identity. The share-extension path carries no bearer, and
+    # through the Hosting rewrite the last X-Forwarded-For hop is the PROXY's
+    # egress IP — one bucket silently shared by every share-sheet user (S-12
+    # flagged this chain as likely-affected; proven 2026-08-26 when a brand-new
+    # account's first shares 429'd). When the caller presents an ingest token,
+    # key the gate on a HASH of it (it's a secret; never a Firestore doc id in
+    # the clear) so each device gets its own ceiling. The token is validated
+    # immediately below, and the share-uid bucket still caps the resolved
+    # workspace, so an invalid token buys nothing but its own private bucket.
+    _pre_tok = req.headers.get('X-Ingest-Token') or ''
+    _pre_identity = (
+        f"tok:{hashlib.sha256(_pre_tok.encode()).hexdigest()[:16]}"
+        if _pre_tok else _rate_limit_identity(req)
+    )
+    rl = _rate_limited("share", _pre_identity, headers)
     if rl:
         return rl
 
@@ -2807,6 +2822,41 @@ def get_share_config(req: https_fn.CallableRequest) -> dict:
         "endpoint": f"{APP_URL}/api/share",
         "token": token
     }
+
+
+@https_fn.on_request()
+def get_share_config_http(req: https_fn.Request) -> https_fn.Response:
+    """HTTP twin of `get_share_config`, for the native iOS shell.
+
+    Same reason claim_workspace / delete_account have twins: the callable
+    transport's CORS preflight is rejected from `capacitor://localhost`, so
+    the ShareExt token bridge's callable fallback could never run on device.
+    That gap became real 2026-08-26: a workspace created by the client-side
+    fallback (AuthProvider.createWorkspaceClientSide) has no ingestToken yet,
+    and without this twin the share sheet had no way to get one. Verifies the
+    caller via Authorization: Bearer; no body needed.
+    """
+    if req.method == 'OPTIONS':
+        return _cors_preflight(req)
+
+    headers = _cors_headers(req)
+
+    decoded = _verify_bearer(req)
+    if not decoded:
+        return _error_response("User must be signed in", 401, headers)
+
+    uid = find_data_uid_by_auth_uid(decoded.get("uid"))
+    if not uid:
+        return _error_response("No workspace for this account", 403, headers)
+
+    try:
+        token = ensure_ingest_token(uid)
+        return https_fn.Response(
+            json.dumps({"endpoint": f"{APP_URL}/api/share", "token": token}),
+            status=200, headers=headers, mimetype='application/json',
+        )
+    except Exception as e:
+        return _server_error(headers, e, "Share config failed")
 
 
 @https_fn.on_call()
