@@ -1708,6 +1708,14 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-26 (round 3) — demo-workspace seed library compiled into
+  `docs/APP_STORE.md` §4 (task 9).** 10 verified sources (4 YouTube + 6
+  articles) across 3 persona-connected subjects (sleep/longevity, Japan trip,
+  AI), with a deliberate cross-cluster bridge card (AI drug discovery →
+  longevity) so the graph shows an edge between clusters; owner adds 2 X
+  finds saved as screenshots. Staging notes (save order for the masonry,
+  Ask demo questions, collections mapping) recorded next to the shot list.
+  Doc-only.
 - **2026-08-26 (round 2) — SUBTITLE REPLACED + caption 5 refined (§4 tasks
   8–9), doc-only, owner-approved in chat.** Subtitle: `Capture. Ask. Connect.`
   → **`Never lose another great find`** (29/30). The owner rejected an
