@@ -10,8 +10,7 @@ import { platformIcon, platformColor, type PlatformKey } from '@/lib/platform';
 import DigestView from './DigestView';
 import DigestCard from './DigestCard';
 import Dropdown from './Dropdown';
-import { deleteLink, updateLinkReminder, markLinkReviewed, saveLink, toLink } from '@/lib/storage';
-import { EXAMPLE_CARD } from '@/lib/exampleCard';
+import { deleteLink, updateLinkReminder, markLinkReviewed, toLink } from '@/lib/storage';
 import { track } from '@/lib/analytics';
 import { collection, onSnapshot, doc, getDoc, updateDoc, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -36,7 +35,6 @@ import MobileTagExplorerDrawer from './feed/MobileTagExplorerDrawer';
 import Card from './Card';
 import ListCard from './ListCard';
 import CitationMark from './ui/CitationMark';
-import { CitationGlyph } from './ui/Wordmark';
 import Masonry from './Masonry';
 import ReminderModal from './ReminderModal';
 import SwipeDeck from './SwipeDeck';
@@ -301,33 +299,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     const [unlockPrompt, setUnlockPrompt] = useState<(() => void) | null>(null);
     // First-time PIN setup triggered by "Make private"; holds the pending action.
     const [pinSetupAction, setPinSetupAction] = useState<(() => void) | null>(null);
-
-    // One-tap "Try it with an example" on a brand-new empty feed: seed a real,
-    // hand-crafted card so Ask / search / Collections have something to work
-    // against in the first minute. Written through the normal saveLink path (not
-    // the analyze pipeline) so it's instant and offline-safe; the backend embeds
-    // it via the needsEmbedding flag. Guarded so a double-tap can't seed twice.
-    const [seedingExample, setSeedingExample] = useState(false);
-    const handleSeedExample = useCallback(async () => {
-        if (!uid || seedingExample) return;
-        setSeedingExample(true);
-        try {
-            await saveLink(uid, EXAMPLE_CARD);
-            track('example_card_seeded');
-            // The feed is live via onSnapshot, so the card streams in on its own.
-        } catch {
-            toast.error('Could not add the example. Please try again.');
-            setSeedingExample(false);
-        }
-        // On success we deliberately leave seedingExample true: the card arriving
-        // flips the feed out of the empty state, so this button unmounts anyway.
-        // The effect below releases the latch once the card lands — without it,
-        // DELETING the example card remounted this empty state with the button
-        // stuck on "Adding…" forever (owner hit exactly that).
-    }, [uid, seedingExample, toast]);
-    useEffect(() => {
-        if (seedingExample && links.length > 0) setSeedingExample(false);
-    }, [seedingExample, links.length]);
 
     // Collections (the `collections` state itself is declared above the filter
     // pipeline — see the privacy-vault block near useLinks).
@@ -2707,37 +2678,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             )}
                             {empty.body && (
                                 <p className="mt-1.5 max-w-xs mx-auto text-sm text-text-muted leading-relaxed">{empty.body}</p>
-                            )}
-                            {/* Brand-new, genuinely empty account (no query, no
-                                filters): offer a one-tap seeded example so Ask /
-                                search / Collections demo against something real
-                                in the first minute — instead of a dead end. */}
-                            {links.length === 0 && filter === 'all' && !searchQuery &&
-                                selectedCategory.size === 0 && selectedTags.size === 0 &&
-                                selectedSources.size === 0 && selectedCollections.size === 0 && (
-                                <button
-                                    onClick={handleSeedExample}
-                                    disabled={seedingExample}
-                                    className="mt-5 inline-flex items-center gap-2 px-4 h-11 rounded-full bg-accent text-accent-ink text-sm font-bold shadow-sm shadow-accent/20 hover:bg-accent-hover active:scale-95 transition-all disabled:opacity-60 disabled:pointer-events-none"
-                                >
-                                    {seedingExample ? (
-                                        <>
-                                            <div className="w-4 h-4 border-2 border-accent-ink/30 border-t-accent-ink rounded-full animate-spin" />
-                                            Adding…
-                                        </>
-                                    ) : (
-                                        <>
-                                            {/* Our mark, not a generic AI sparkle:
-                                                this is Machina offering to show
-                                                itself, and the sparkle read as
-                                                stock chrome (owner). w-4/h-auto
-                                                keeps the glyph's 448:416 ratio,
-                                                matching every other inline use. */}
-                                            <CitationGlyph className="w-4 h-auto" />
-                                            Try it with an example
-                                        </>
-                                    )}
-                                </button>
                             )}
                             {(selectedTags.size > 0 || selectedSources.size > 0 || selectedCategory.size > 0 || selectedCollections.size > 0 || searchQuery) && (
                                 <button
