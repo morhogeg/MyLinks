@@ -1,0 +1,70 @@
+# TEMPORARY debug harness for the 2026-08-26 analysis-pipeline stall.
+#
+# The cloud session can reach nothing but GitHub; this runner holds the repo
+# secrets (GEMINI_API_KEY + FIREBASE_SERVICE_ACCOUNT) and open network, so it
+# reads the failed cards' real error strings, the task_logs trail, queue/
+# limiter/quota state, and probes Gemini + the scraper on the production
+# config. Same pattern as ask-debug.yml (2026-07-24 incident).
+#
+# Public repo ⇒ logs print structural findings only; full detail goes to the
+# auth-gated `pipeline-debug-report` artifact.
+#
+# Trigger: push to `trigger/pipeline-debug`.
+# DELETE this workflow once the incident is resolved.
+
+name: Pipeline Debug
+
+on:
+  push:
+    branches: [trigger/pipeline-debug]
+
+concurrency:
+  group: pipeline-debug
+  cancel-in-progress: true
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check required secrets
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ] || [ -z "$GEMINI_API_KEY" ]; then
+            echo "::error::Missing FIREBASE_SERVICE_ACCOUNT or GEMINI_API_KEY secret."
+            exit 1
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install deps
+        run: pip install firebase-admin==6.9.0 google-genai==1.75.0 pydantic==2.13.4 requests beautifulsoup4
+
+      - name: Write service account credentials
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          creds="$RUNNER_TEMP/firebase-sa.json"
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$creds"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$creds" >> "$GITHUB_ENV"
+
+      - name: Run pipeline debug probes
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python .github/scripts/pipeline_debug.py
+
+      - name: Upload report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-debug-report
+          path: pipeline-debug-report.json
+          retention-days: 3
