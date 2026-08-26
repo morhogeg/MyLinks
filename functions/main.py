@@ -71,7 +71,7 @@ from search import (
     resolve_followup, conversation_language,
     pin_cards_by_ids, cards_by_ids,
 )
-from rate_limit import check_rate_limit, client_ip
+from rate_limit import check_rate_limit, client_ip, RateLimitBackendError
 # Monthly per-user soft quotas (report 3.2). Imports only db + stdlib (no cycle).
 from quota import check_and_increment_quota, refund_quota, quota_message
 # Public share-page subsystem (renderers + publish/unpublish logic). The three
@@ -647,7 +647,19 @@ def _rate_limited(bucket: str, identity: str, headers: dict = None):
     _RATE_LIMITS row — no parallel fail-closed set to keep in sync (report 3.5).
     """
     limit, window, fail_open = _RATE_LIMITS[bucket]
-    if not check_rate_limit(f"{bucket}:{identity}", limit, window, fail_open=fail_open):
+    try:
+        allowed = check_rate_limit(f"{bucket}:{identity}", limit, window, fail_open=fail_open)
+    except RateLimitBackendError as e:
+        # The limiter's OWN Firestore check failed — still refuse (fail-closed
+        # buckets keep their cost ceiling) but say the truth: 503, not 429.
+        # During the 2026-08-26 outage the old 429 sent the investigation
+        # chasing rate limits while the database was down (§9 round 15).
+        logger.error("Rate limiter backend error on bucket %s", bucket)
+        _record_server_error("rate_limiter", e)
+        return _error_response(
+            "Service temporarily unavailable. Please try again in a minute.",
+            503, headers)
+    if not allowed:
         # Log the bucket only — the identity is an IP or workspace uid (PII).
         logger.warning("Rate limit exceeded: %s", bucket)
         return _error_response("Too many requests. Please slow down.", 429, headers)

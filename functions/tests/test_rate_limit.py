@@ -124,6 +124,20 @@ def test_fails_open_on_backend_error(monkeypatch):
     assert rate_limit.check_rate_limit("k", 1, 60) is True
 
 
+def test_fail_closed_backend_error_raises_not_429(monkeypatch):
+    def boom():
+        raise RuntimeError("firestore down")
+
+    monkeypatch.setattr(rate_limit, "get_db", boom)
+    # Fail-closed buckets still refuse the request on a backend error, but by
+    # RAISING so the endpoint can answer an honest 503 — never by returning
+    # False, which reads as "over the limit" and misled the 2026-08-26 outage
+    # investigation into chasing rate limits (§9 round 15).
+    import pytest
+    with pytest.raises(rate_limit.RateLimitBackendError):
+        rate_limit.check_rate_limit("k", 1, 60, fail_open=False)
+
+
 # ── client_ip ─────────────────────────────────────────────────────────────
 
 class FakeReq:

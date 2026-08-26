@@ -219,3 +219,18 @@ jobs:
             sleep 60
             firebase deploy --only "$ONLY" --project "$FIREBASE_PROJECT" --non-interactive --force
           fi
+
+      # End-to-end canary (§9 round 15/16): "deploy green" only proves the
+      # deployment succeeded — the 2026-08-26 outage shipped containers whose
+      # every Firestore call failed while this workflow stayed green for two
+      # days. Queue one real link for a dedicated canary workspace and require
+      # process_link_background to resolve it inside the freshly deployed
+      # containers (Firestore + Eventarc + scrape + Gemini + embedding). A dead
+      # pipeline turns THIS run red within minutes, and GitHub emails the owner.
+      # Cost: one flash-lite call per deploy.
+      - name: Pipeline canary (end-to-end)
+        run: |
+          venv=canary-venv
+          python3.13 -m venv "$venv"
+          "$venv/bin/pip" install -q google-cloud-firestore
+          "$venv/bin/python" .github/scripts/deploy_canary.py

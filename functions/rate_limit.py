@@ -22,6 +22,18 @@ logger = logging.getLogger(__name__)
 _COLLECTION = "rate_limits"
 
 
+class RateLimitBackendError(Exception):
+    """The limiter's own Firestore check failed — NOT an exceeded limit.
+
+    Raised only for fail-CLOSED buckets, so callers can refuse the request
+    (the cost ceiling holds) while telling the truth: a 503 "temporarily
+    unavailable", never a 429 "too many requests". During the 2026-08-26
+    Firestore outage the old behavior (returning False) made every paid
+    endpoint report rate limiting while the real failure was a dead database,
+    which sent the whole investigation down the wrong path (§9 round 15).
+    """
+
+
 def _safe_key(key: str) -> str:
     # Firestore document IDs can't contain '/' and have a length cap.
     return key.replace("/", "_")[:1400]
@@ -35,9 +47,10 @@ def check_rate_limit(key: str, limit: int, window_seconds: int,
     - `fail_open=True` (default) returns True — a transient Firestore problem
       degrades to "no rate limiting" rather than taking the endpoint down. Use
       for cheap / IP-only buckets where an outage is harmless.
-    - `fail_open=False` returns False (rate-limited) — use for PAID buckets
-      (analyze/ask/search/share/publish) so a Firestore outage can't strip the
-      last cost ceiling and let unbounded paid work through (report 3.5).
+    - `fail_open=False` raises RateLimitBackendError — the request is still
+      refused for PAID buckets (analyze/ask/search/share/publish) so an outage
+      can't strip the last cost ceiling (report 3.5), but the caller can
+      surface an honest 503 instead of a misleading 429.
     """
     try:
         db = get_db()
@@ -68,7 +81,9 @@ def check_rate_limit(key: str, limit: int, window_seconds: int,
     except Exception as e:
         logger.error("Rate limit check failed (%s): %s",
                      "failing open" if fail_open else "failing closed", e)
-        return fail_open
+        if fail_open:
+            return True
+        raise RateLimitBackendError(str(e)) from e
 
 
 def client_ip(req) -> str:

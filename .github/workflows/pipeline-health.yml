@@ -1,0 +1,62 @@
+# Daily production health check for the analysis pipeline (§9 round 16).
+#
+# The post-deploy canary in deploy-functions.yml guards deploy moments; this
+# guards the time BETWEEN deploys. It asserts scheduler jobs are green, no
+# queue doc has outlived the janitor's cutoff, and no card is stuck in
+# `processing`. A violation fails the run, and GitHub emails the owner about
+# failed scheduled runs — that email IS the alert channel (free, no new
+# services).
+#
+# Manual run: push to `trigger/pipeline-health` (the dispatch API 403s for
+# cloud sessions; push is the control channel, same as trigger/testflight).
+
+name: Pipeline Health
+
+on:
+  schedule:
+    # Daily 05:10 UTC (08:10 Israel Daylight Time) — before the owner's day
+    # starts, so a red pipeline is in their inbox with the morning coffee.
+    - cron: "10 5 * * *"
+  workflow_dispatch:
+  push:
+    branches: [trigger/pipeline-health]
+
+concurrency:
+  group: pipeline-health
+  cancel-in-progress: true
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check required secrets
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "::error::Missing repo secret FIREBASE_SERVICE_ACCOUNT."
+            exit 1
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install deps
+        run: pip install -q google-cloud-firestore google-auth requests
+
+      - name: Write service account credentials
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          creds="$RUNNER_TEMP/firebase-sa.json"
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$creds"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$creds" >> "$GITHUB_ENV"
+
+      - name: Run health checks
+        run: python .github/scripts/pipeline_health.py
