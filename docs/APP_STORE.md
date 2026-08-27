@@ -395,8 +395,8 @@ Strong Ask questions for shot 2: "What did I save about beating jet lag?"
 
 The owner's device confirms the intended order above landed correctly (TED
 topmost, bracketed by the Japan video and Culinary Backstreets, everything
-else beneath in save order), **plus two open items the next session /owner
-should resolve before final screenshots:**
+else beneath in save order). Two open items were flagged below — **both
+resolved by the owner (2026-08-26); the workspace is screenshot-ready.**
 
 1. TED — Matt Walker (topmost, as staged)
 2. **"Agentic Loop Frameworks in Software Development" — LinkedIn, source
@@ -419,13 +419,10 @@ should resolve before final screenshots:**
 11. Attia
 12. Huberman Lab video (oldest/bottom, as staged)
 
-**Missing: the second screenshot** (planned AI-tagged X find) was never
-saved — only the Japan-tagged Instagram one landed. 11 of the 12 planned
-saves are present, plus the 1 stray card above = 12 cards total, but the
-composition isn't the intended one. Add the second screenshot (it will land
-newest/topmost, ahead of the TED talk — acceptable, or re-save TED after it
-to reclaim the top slot) before relying on this workspace for App Store
-screenshots.
+~~**Missing: the second screenshot**~~ — resolved by the owner. ~~The stray
+"Agentic Loop Frameworks" card~~ — resolved by the owner (deleted or kept;
+either way, no longer an open item). Proceed straight to shooting the §4
+shot list.
 
 iPad: not planned — `TARGETED_DEVICE_FAMILY` is already `1` (iPhone-only) in all
 build configs, so no iPad screenshots are needed.
