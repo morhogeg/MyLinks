@@ -354,30 +354,78 @@ screenshots** so the feed has screenshot cards).
 1. YT — Sleep Toolkit, Huberman Lab #84: https://www.youtube.com/watch?v=h2aWYjSA1Jc
    (covers jet lag → bridges to the Japan cluster)
 2. YT — Sleep Is Your Superpower, Matt Walker, TED: https://www.youtube.com/watch?v=5MuIMqhT8DM
+   (save LAST of the three "top of masonry" cards, see staging notes)
 3. Article — Exercising for Longevity (zone 2/zone 5), Peter Attia: https://peterattiamd.com/exercising-for-longevity/
-4. Article — Toolkit for Sleep, Huberman newsletter: https://www.hubermanlab.com/newsletter/toolkit-for-sleep
-   (same author as #1, different format — guaranteed See-also pair for shot 3)
+4. ~~Article — Toolkit for Sleep, Huberman newsletter~~ **REPLACED 2026-08-26**
+   (round-16 follow-up) — same-author pairing with #1 read as one blogger's
+   ecosystem rather than independent corroboration. Swapped for
+   **Harvard Health — "The 5 Pillars of Longevity"**:
+   https://www.health.harvard.edu/healthy-aging-and-longevity/the-5-pillars-of-longevity-movement-nutrition-sleep-stress-reduction-and-social-connection
+   (device-saved card title reads **"Pathways to Longevity"** — Machina's own
+   AI-generated title, not the source's; expected, titles are never verbatim)
 
 **Japan trip (3):**
 5. YT — How to TRAVEL Japan! Perfect 2-week itinerary: https://www.youtube.com/watch?v=B0RveC40uS8
+   (device-saved card title: "How to Plan the Perfect Trip to Japan" /
+   Rhett and Claire — save LAST, see staging notes)
 6. Article — 2 Week Japan Itinerary: The Grand Tour, Inside Kyoto: https://www.insidekyoto.com/2-week-japan-itinerary-the-grand-tour
    (same route as #5 from a different source — guaranteed connection)
 7. Article — The Essentials: Where We Eat in Tokyo, Culinary Backstreets: https://culinarybackstreets.com/stories/tokyo/the-essentials-where-we-eat-in-tokyo-japan
-   (prettiest article card; save late so it sits high in the masonry)
+   (device-saved title: "Culinary Experiences in Tokyo" — save LAST, see
+   staging notes)
 
 **Making sense of AI (3):**
 8. YT — Intro to Large Language Models, Andrej Karpathy: https://www.youtube.com/watch?v=zjkBMFhNj_g
+   (device-saved title: "The busy person's intro to LLMs")
 9. Article — An Opinionated Guide to Which AI to Use, Ethan Mollick (Jul 2026): https://www.oneusefulthing.org/p/an-opinionated-guide-to-which-ai-b22
-   (fresh date → the feed doesn't read as a museum)
+   (device-saved title: "Using AI Agentic Systems for Productivity" — fresh
+   date → the feed doesn't read as a museum)
 10. Article — AI Drug Discovery Is Reshaping Longevity Medicine, MedCity News: https://medcitynews.com/2026/04/ai-drug-discovery-is-reshaping-longevity-medicine-is-your-practice-ready/
     (deliberate bridge card: AI cluster, connects into Attia/longevity — gives
     the graph a visible edge BETWEEN clusters)
 
-Staging notes: save the best-looking cards last (Japan video, Culinary
-Backstreets, TED) so they top the masonry feed for shot 1. The three subjects
-are the three named collections for shot 6; "Japan 2026" is the natural public
-page. Strong Ask questions for shot 2: "What did I save about beating jet lag?"
+Staging notes: save the best-looking cards LAST (Japan video #5, Culinary
+Backstreets #7, TED #2 — in that order) so they top the masonry feed for shot
+1, with the TED talk ending up newest/topmost. The three subjects are the
+three named collections for shot 6; "Japan 2026" is the natural public page.
+Strong Ask questions for shot 2: "What did I save about beating jet lag?"
 (cross-cluster citations) or "What should I eat in Tokyo?".
+
+#### Actual seeded order (device-verified 2026-08-26, newest → oldest / top → bottom of feed)
+
+The owner's device confirms the intended order above landed correctly (TED
+topmost, bracketed by the Japan video and Culinary Backstreets, everything
+else beneath in save order), **plus two open items the next session /owner
+should resolve before final screenshots:**
+
+1. TED — Matt Walker (topmost, as staged)
+2. **"Agentic Loop Frameworks in Software Development" — LinkedIn, source
+   "Claude", TECH.** NOT part of this seed library — a stray card (unclear
+   origin, possibly a leftover test save). Sits between the TED talk and the
+   Japan video, so it does not block the "TED on top" staging goal, but it
+   is off-persona (LinkedIn as a source type, and "agentic loop frameworks"
+   as a topic don't fit a sleep/Japan/AI-curious persona) and may confuse the
+   See-also graph as an unconnected node. **Decide: delete it, or keep it —
+   owner's call**, not re-touched by this session.
+3. Japan video (Rhett and Claire)
+4. Culinary Backstreets
+5. Instagram screenshot (@thechaosdiaries) — Japan-tagged, fulfills ONE of
+   the two planned screenshot saves.
+6. MedCity News
+7. Mollick (oneusefulthing.org)
+8. Karpathy
+9. Inside Kyoto
+10. Harvard Health ("Pathways to Longevity")
+11. Attia
+12. Huberman Lab video (oldest/bottom, as staged)
+
+**Missing: the second screenshot** (planned AI-tagged X find) was never
+saved — only the Japan-tagged Instagram one landed. 11 of the 12 planned
+saves are present, plus the 1 stray card above = 12 cards total, but the
+composition isn't the intended one. Add the second screenshot (it will land
+newest/topmost, ahead of the TED talk — acceptable, or re-save TED after it
+to reclaim the top slot) before relying on this workspace for App Store
+screenshots.
 
 iPad: not planned — `TARGETED_DEVICE_FAMILY` is already `1` (iPhone-only) in all
 build configs, so no iPad screenshots are needed.
