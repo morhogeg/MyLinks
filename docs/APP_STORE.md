@@ -209,7 +209,7 @@ this list:
 > CAPTURE FROM ANYWHERE
 > • Save from Safari, YouTube, X, or any other app: tap Share, pick Machina
 > • Screenshots and photos, up to five at once as a single card
-> • Or paste a link and write your own note, right in the app
+> • Paste a link, or write a note and save it as its own card
 >
 > UNDERSTAND WHAT YOU SAVED
 > • A real summary, category, and tags on every save
@@ -219,10 +219,28 @@ this list:
 > COME BACK TO IT
 > • Ask Machina: cited answers from your own library
 > • Weekly synthesis: the themes and standouts from your week
+> • Add your own notes to any card, as many as you need
 > • Reminders and digests, on your schedule
 > • Collections you can keep private or publish as a page
 >
 > Private by design. No ads, no tracking, and your content is never used to train AI models. Delete your account and everything in it at any time, from Settings.
+
+**Notes split into two bullets 2026-08-26 (owner-caught).** The old capture
+line, "Or paste a link and write your own note, right in the app", implied
+notes exist only as an appendix to a pasted link. Both halves were wrong about
+the product, which has TWO distinct note features:
+1. **A note as its own card** — the "Note" tab in the + dialog
+   (`storage.createNoteCard`, backend `analyze_link` note path) captures a
+   URL-less thought and analyzes it into a first-class card, peer to links and
+   images. That belongs under CAPTURE, which now reads "Paste a link, or write
+   a note and save it as its own card".
+2. **Personal notes on ANY card** — `link.userNotes` (an array, so many notes
+   per card, each timestamped; see `web/lib/notes.ts` and the My Notes view),
+   available on every save regardless of type. That is a come-back-to-it act,
+   so it earns its own bullet under COME BACK TO IT.
+The two are told apart by "as its own card" vs "to any card"; the product
+calls both of them "notes", which is exactly why the single old bullet read as
+one feature.
 
 Two owner rules for this section (2026-08-25), both about audience:
 **never "share sheet"** (our word, not a user's; say "tap Share"), and
