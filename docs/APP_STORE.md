@@ -17,8 +17,11 @@ Top-level answers:
   shared with data brokers):** → **NO.** There are no ads, no analytics SDKs,
   no data sale. Never check "used for tracking" on any item below.
 
-Declare exactly these data types. For every one: **Collection purpose = App
-Functionality** only; **Used for Tracking = No**.
+Declare exactly these **7 data types** (across 5 categories — Connect counts
+the types, not the categories, so "7 data types" on the summary screen is the
+correct total). For every one: **Used for Tracking = No** and **Linked to
+user = Yes**. Purpose is **App Functionality** for all of them EXCEPT Product
+Interaction, which is **Analytics** — see the two rows flagged below.
 
 | Connect data type | Collected? | Linked to user? | Why (justification you can defend) |
 |---|---|---|---|
@@ -27,9 +30,20 @@ Functionality** only; **Used for Tracking = No**.
 | **Identifiers → User ID** | Yes | Yes | Firebase Auth UID + workspace ID key all user data (`users/{uid}`). |
 | **User Content → Photos or Videos** | Yes | Yes | Images/screenshots the user explicitly shares into the app (share sheet or in-app add); stored in Cloud Storage, analyzed by Gemini vision. No photo-library access — only items the user hands to the app. |
 | **User Content → Other User-Generated Content** | Yes | Yes | Saved URLs, extracted page text, notes/tags/collections, and Ask Machina questions + chat history. Sent server-side to Google Gemini for analysis. |
-| **Usage Data** (product interaction, advertising data…) | **No** | — | No analytics or telemetry SDK exists in the app. |
-| **Diagnostics** (crash data, performance) | **No** | — | No Crashlytics/Sentry or equivalent is integrated. |
+| **Usage Data → Product Interaction** | **Yes** | Yes | ⚠️ CORRECTED 2026-08-26 (was wrongly "No"). `web/lib/analytics.ts` writes first-party, content-free events (app opened, save/ask/export happened) to `users/{uid}/analytics_events`. **Purpose = Analytics**, NOT App Functionality — the app behaves identically if every write fails, so it enables no user-facing feature. |
+| **Diagnostics → Crash Data** | **Yes** | Yes | ⚠️ CORRECTED 2026-08-26 (was wrongly "No"). `web/lib/errorReporter.ts` writes uncaught error messages + stack traces to `users/{uid}/client_errors` (and `/api/client-error` when no workspace resolves). Purpose = App Functionality — Apple lists "diagnosing bugs and troubleshooting" under it. |
+| **Usage Data — all other subtypes** / **Diagnostics — performance, other** | No | — | Not collected. |
 | **Location / Contacts / Health / Financial / Browsing history / Search history** | **No** | — | Never requested or collected. (In-app search queries stay in the session; Ask questions are declared under User Content above.) |
+
+**Why the two corrections (2026-08-26).** Both original rows reasoned about
+THIRD-PARTY SDKs ("no Crashlytics/Sentry", "no analytics SDK"), but Apple's
+question is whether the data is collected at all — self-hosted collection into
+your own Firestore counts, and both pipes are keyed by uid so both are
+"linked". Declaring "No" on data the app demonstrably collects is the class of
+inaccuracy that gets a label rejected or an app pulled later. Neither costs
+anything to declare honestly: no tracking, no third parties, no data sale.
+`web/app/privacy/page.tsx` already documents both pipes ("Product usage and
+diagnostics" bullet + §9 retention), so policy, label, and code now agree.
 
 Notes for edge cases:
 
@@ -429,11 +443,31 @@ build configs, so no iPad screenshots are needed.
 
 ## 5. Remaining manual steps (owner)
 
-- [ ] Fill the App Privacy declarations in Connect per §1.
-- [ ] Enter metadata per §2 (after the auth cutover, when the store build exists).
-- [ ] Create + seed the reviewer demo account (seed library in §4); fill
-      credentials into §3.
+- [x] **Fill the App Privacy declarations in Connect per §1** — DONE and
+      **published** 2026-08-26. Verified on the Product Page Preview: 7 data
+      types, all under "Data Linked to You", and NO "Data Used to Track You"
+      section. Includes the two corrected rows (Product Interaction, Crash
+      Data). The label publishes independently of any build, so it is already
+      live on the product page.
+- [x] **Seed the reviewer demo account** (`machinareviewer@gmail.com`) —
+      workspace seeded 2026-08-26 per the §4 seed library; owner resolved the
+      stray card + missing screenshot. **Credentials are still NOT in §3** —
+      see the next item.
+- [ ] **Fill the demo-account credentials into §3** (still literal
+      `REVIEWER_EMAIL_TBD` / `PASSWORD_TBD`). ⚠️ Auth is OAuth-only, so there
+      is no password to hand Apple for a 2FA-protected Google account. Decide
+      between: (a) make the demo account's Google sign-in usable from a cold
+      device by a reviewer, or (b) rely on §3's existing "any fresh sign-in
+      auto-creates a workspace" wording and state that no demo account is
+      needed. (a) is better — it is the only path where the reviewer sees a
+      populated Ask/synthesis demo. Whichever is chosen, TEST IT on a device
+      that has never signed into that account.
+- [ ] Enter metadata per §2 (all copy is final and owner-approved — pure
+      transcription into Connect).
 - [ ] Take the 6 screenshots per §4.
 - [x] `TARGETED_DEVICE_FAMILY = 1` (iPhone-only) — already set in all build configs.
 - [ ] Verify the AI-consent screen (§4 task 6) is in the submitted build before
-      using the review-notes wording above.
+      using the review-notes wording above. ⚠️ §3's notes PROMISE Apple this
+      screen exists on first run — if it is not in the submitted build, the
+      review notes are untrue. Delete the app, reinstall from TestFlight, sign
+      in fresh, and confirm the notice appears.
