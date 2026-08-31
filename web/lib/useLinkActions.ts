@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { CaptureState, Link, LinkStatus, UserNote } from '@/lib/types';
-import { updateLinkStatus, updateLinkTags, updateLinkCategory, updateLinkTitle, updateLinkSummary, updateNoteText, updateLinkNotes, updateLinkReadStatus, retryFailedLink, generateCardSummary } from '@/lib/storage';
+import { updateLinkStatus, updateLinkTags, updateLinkCategory, updateLinkTitle, updateLinkSummary, updateNoteText, updateLinkNotes, updateLinkReadStatus, retryFailedLink, generateCardSummary, enrichNoteCard } from '@/lib/storage';
 import { newShareId, publishCard, removeLinkFromCollection } from '@/lib/collections';
 import { shareLink, shareUrlFor } from '@/lib/share';
 import { useToast } from '@/components/Toast';
@@ -94,11 +94,15 @@ export function useLinkActions(uid: string | null | undefined, toast: ReturnType
     }, [uid, toast]);
 
     // A note card is edited as ONE field (see updateNoteText) — re-derives
-    // title/body from the single text and re-embeds.
+    // title/body from the single text and re-embeds. The edit reset the title
+    // to the first line, so refresh the AI heading in the background the same
+    // way capture does (titleOnly: an edit must not clobber tags/category the
+    // user curated since capture).
     const handleUpdateNote = useCallback(async (id: string, text: string) => {
         if (!uid) return;
         try {
             await updateNoteText(uid, id, text);
+            void enrichNoteCard(uid, id, text, { titleOnly: true });
         } catch {
             toast.error("Couldn't save your note. Please try again.");
         }

@@ -1741,6 +1741,31 @@ exact-match, capped.
   guard clean, `tsc` clean, `py_compile` clean. Existing cards keep their old
   em dashes (server-written content); a re-save or the prod tag-cleanup pass
   (§4 task 21 family) would refresh them.
+- **2026-08-26 (round 17) — Note cards: AI heading for long-form notes,
+  honest expander for a saved "Machina's read" (owner device QA, 3 fixes,
+  web-only).** (1) An in-app Note's title was the truncated first sentence —
+  a DOCUMENTED decision ("never let the model rewrite the title") that the
+  share-sheet text path had already outgrown (it writes an AI heading over a
+  verbatim body since 08-08). Reconciled instead of reversed:
+  `enrichNoteCard` now applies the backend's AI title (the note branch always
+  returned it; the client discarded it) ONLY for long-form notes whose full
+  text lives verbatim in the body — a short one-liner IS its own title and
+  stays untouched — and only while the card still wears the auto-derived
+  first-line title (getDoc guard), so a manually edited title is never
+  clobbered. Editing a note re-derives the first-line title, so
+  `handleUpdateNote` now re-runs enrich with a new `titleOnly` flag
+  (refreshes the heading without touching tags/category the user curated).
+  (2) A card with a STORED `aiSummary` used to re-show the "Summarize with
+  Machina" CTA when collapsed — tapping it opened the saved read instantly,
+  but the affordance implied re-doing paid work. The collapsed row now reads
+  "Machina's read · Saved with this card. Tap to view" with a chevron-down;
+  the generate-CTA appears only when no read exists. (3) The open section's
+  "Hide" text button became a chevron-up on a full-width tappable header
+  row, so open/closed read as two states of one control. `tsc` clean; no
+  backend change, no new Gemini spend (the enrich call already ran and
+  already returned the title; the one addition is a titleOnly enrich per
+  note EDIT, which spends one analyze call + one monthly save unit — rare
+  and accepted).
 - **2026-08-26 (round 16) — recurrence guards for the round-15 outage class,
   shipped and verified (owner-approved: "Go").** Owner confirmed the pipeline
   works; three guards now ensure a silent async-backend death can never again

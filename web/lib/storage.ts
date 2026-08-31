@@ -303,20 +303,33 @@ export async function updateNoteText(uid: string, id: string, text: string): Pro
 /**
  * Best-effort AI *organization* for a note card created by `createNoteCard`.
  *
- * A note is the user's own words, so we deliberately DON'T let the model rewrite
- * the title or body — we only fold in tags, a category, and concepts so the note
- * files and surfaces like everything else (and, for a short note whose text
- * lives in the title, overwriting the title would lose it). Sends the raw text
- * to the `/api/analyze` note branch and patches only those organizational
- * fields. Never throws: if the branch isn't deployed or the call fails, the note
- * simply stays untagged — still saved, still searchable, still the user's words.
+ * The note's BODY is the user's own words and is never touched. The TITLE
+ * depends on the note's shape (owner call, 2026-08-26 — this also matches the
+ * share-sheet text path, where the backend already writes an AI heading over a
+ * verbatim body):
+ *   - A short one-liner IS its own title (splitNoteText left the body empty),
+ *     so retitling it would orphan the user's actual words — leave it alone.
+ *   - A long-form note keeps its full text verbatim in the body, so the
+ *     first-line title is just a bad LABEL ("the first sentence, truncated").
+ *     Replace it with the model's heading — but only while the card still
+ *     wears the auto-derived title, so a title the user edited by hand in the
+ *     race window is never clobbered.
+ * Beyond the title we fold in tags, a category, and concepts so the note files
+ * and surfaces like everything else. `titleOnly` is the note-EDIT path: a text
+ * edit re-derives the first-line title (updateNoteText), so it refreshes the
+ * heading the same way without touching tags/category the user may have
+ * curated since. Never throws: if the call fails, the note simply stays as
+ * written — still saved, still searchable, still the user's words.
  */
-export async function enrichNoteCard(uid: string, cardId: string, text: string): Promise<void> {
+export async function enrichNoteCard(uid: string, cardId: string, text: string,
+    opts: { titleOnly?: boolean } = {}): Promise<void> {
     try {
         let existingTags: string[] = [];
         let existingCategories: string[] = [];
-        try { existingTags = await getUserTags(uid); } catch { /* optional */ }
-        try { existingCategories = await getUserCategories(uid); } catch { /* optional */ }
+        if (!opts.titleOnly) {
+            try { existingTags = await getUserTags(uid); } catch { /* optional */ }
+            try { existingCategories = await getUserCategories(uid); } catch { /* optional */ }
+        }
 
         const response = await fetchWithTimeout(apiUrl('/api/analyze'), {
             method: 'POST',
@@ -329,14 +342,28 @@ export async function enrichNoteCard(uid: string, cardId: string, text: string):
         const l = data?.link;
         if (!data?.success || !l) return;
 
-        // Organizational fields only — never title/summary (the user's words stay
-        // verbatim). concepts/relatedLinks power the knowledge graph; tags/category
-        // power filtering.
         const patch: Record<string, unknown> = {};
-        if (Array.isArray(l.tags) && l.tags.length) patch.tags = l.tags;
-        if (l.category) patch.category = canonicalCategory(l.category) || 'General';
-        if (Array.isArray(l.concepts) && l.concepts.length) patch.concepts = l.concepts;
-        if (Array.isArray(l.relatedLinks) && l.relatedLinks.length) patch.relatedLinks = l.relatedLinks;
+        if (!opts.titleOnly) {
+            // Organizational fields — concepts/relatedLinks power the knowledge
+            // graph; tags/category power filtering.
+            if (Array.isArray(l.tags) && l.tags.length) patch.tags = l.tags;
+            if (l.category) patch.category = canonicalCategory(l.category) || 'General';
+            if (Array.isArray(l.concepts) && l.concepts.length) patch.concepts = l.concepts;
+            if (Array.isArray(l.relatedLinks) && l.relatedLinks.length) patch.relatedLinks = l.relatedLinks;
+        }
+
+        // AI heading for LONG-FORM notes only (see the doc comment above). The
+        // getDoc guard makes the overwrite conditional on the card still wearing
+        // the auto-derived title.
+        const { title: derivedTitle, summary: derivedSummary } = splitNoteText(text);
+        const aiTitle = typeof l.title === 'string' ? l.title.trim() : '';
+        if (derivedSummary && aiTitle && aiTitle !== derivedTitle) {
+            const snap = await getDoc(doc(db, 'users', uid, 'links', cardId));
+            if (snap.exists() && snap.data()?.title === derivedTitle) {
+                patch.title = aiTitle;
+            }
+        }
+
         if (Object.keys(patch).length) {
             await updateDoc(doc(db, 'users', uid, 'links', cardId), patch);
         }
