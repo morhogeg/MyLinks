@@ -1737,6 +1737,10 @@ exact-match, capped.
   object URLs). Verified: `tsc --noEmit` clean, em-dash guard clean. NOT
   verified on device — needs a TestFlight build; the same bug reproduces on
   desktop web Safari (live FileList), so the Vercel deploy matters too.
+  SHIPPED: merge `6fd5c96` → Vercel + TestFlight run #310 = **build 1310**
+  (no backend change — functions untouched). Owner: on 1310, + → Image →
+  "Tap to add images" should open the picker and picked photos should
+  appear as tiles; that tap-through is the one remaining device check.
 - **2026-08-27 — EM DASHES REMOVED APP-WIDE + A BUILD TRIPWIRE SO THEY CANNOT
   RETURN (owner, final warning, from the Settings screen).** Full sweep with a
   comment-aware scanner: **79 user-facing em dashes fixed** across 30 web
