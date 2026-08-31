@@ -336,19 +336,24 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
 
     const addImageFiles = (files: FileList | null) => {
         if (!files || files.length === 0) return;
-        setImages((prev) => {
-            const room = MAX_IMAGES - prev.length;
-            const picked = Array.from(files).slice(0, Math.max(0, room));
-            if (files.length > room) {
-                toast.info(`Up to ${MAX_IMAGES} images per card. Kept the first ${room === 0 ? 0 : room}.`);
-            }
-            const added = picked.map((file) => ({
-                id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-                file,
-                preview: URL.createObjectURL(file),
-            }));
-            return [...prev, ...added];
-        });
+        // Read the FileList NOW, synchronously: the input's onChange resets
+        // `value` right after this call, and a FileList is LIVE (WebKit
+        // empties it on reset) — so a setImages updater, which React runs
+        // after the handler returns, would see zero files. Same reason the
+        // toast and object-URL creation stay OUT of the updater: it must be
+        // pure (StrictMode runs it twice).
+        const incoming = Array.from(files);
+        const room = Math.max(0, MAX_IMAGES - imagesRef.current.length);
+        if (incoming.length > room) {
+            toast.info(`Up to ${MAX_IMAGES} images per card. Kept the first ${room}.`);
+        }
+        const added = incoming.slice(0, room).map((file) => ({
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            file,
+            preview: URL.createObjectURL(file),
+        }));
+        if (added.length === 0) return;
+        setImages((prev) => [...prev, ...added]);
     };
 
     const removeImage = (id: string) => {
