@@ -1763,7 +1763,7 @@ exact-match, capped.
   guard clean, `tsc` clean, `py_compile` clean. Existing cards keep their old
   em dashes (server-written content); a re-save or the prod tag-cleanup pass
   (§4 task 21 family) would refresh them.
-- **2026-08-26 (round 17) — Note cards: AI heading for long-form notes,
+- **2026-08-31 (round 17) — Note cards: AI heading for long-form notes,
   honest expander for a saved "Machina's read" (owner device QA, 3 fixes,
   web-only).** (1) An in-app Note's title was the truncated first sentence —
   a DOCUMENTED decision ("never let the model rewrite the title") that the
