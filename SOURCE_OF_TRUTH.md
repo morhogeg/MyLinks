@@ -1719,6 +1719,28 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-08-30 — in-app image add FIXED: picking photos silently did nothing
+  (owner, device: "adding an image from within the app doesn't do anything;
+  share sheet works fine").** Root cause was in the multi-screenshot rewrite
+  (2026-08-25, build 1293 — whose runtime flow was logged NOT verified):
+  the file input's `onChange` calls `addImageFiles(e.target.files)` and then
+  resets `e.target.value = ''` so re-picking the same file re-fires. But
+  `addImageFiles` only read the files INSIDE the `setImages(prev => …)`
+  updater, which React runs after the handler returns — and a `FileList` is
+  live (WebKit empties it on reset), so the updater mapped over zero files:
+  no tiles, no toast, no error. The pre-rewrite code read
+  `e.target.files[0]` synchronously, which is why single-image add used to
+  work; the share sheet is the separate native path and was never affected.
+  Fix (`AddLinkForm.tsx`): snapshot `Array.from(files)` synchronously, and
+  move the over-cap toast + `URL.createObjectURL` out of the updater (it
+  must be pure — StrictMode runs it twice, which would double-toast and leak
+  object URLs). Verified: `tsc --noEmit` clean, em-dash guard clean. NOT
+  verified on device — needs a TestFlight build; the same bug reproduces on
+  desktop web Safari (live FileList), so the Vercel deploy matters too.
+  SHIPPED: merge `6fd5c96` → Vercel + TestFlight run #310 = **build 1310**
+  (no backend change — functions untouched). Owner: on 1310, + → Image →
+  "Tap to add images" should open the picker and picked photos should
+  appear as tiles; that tap-through is the one remaining device check.
 - **2026-08-27 — EM DASHES REMOVED APP-WIDE + A BUILD TRIPWIRE SO THEY CANNOT
   RETURN (owner, final warning, from the Settings screen).** Full sweep with a
   comment-aware scanner: **79 user-facing em dashes fixed** across 30 web
