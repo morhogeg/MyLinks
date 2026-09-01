@@ -1307,11 +1307,22 @@ The multi-user auth work described below **was** fully written but not live:
       forbids on a user-visible surface. Owner call — accept it, or re-render
       `marketing/launch-clip/src/data/library.ts` with a different demo topic.
 
-24. **[~] Move `authDomain` to the brand domain — PROXY PLUMBING SHIPPED,
-    cutover is now an env flip gated on three console steps (2026-08-24).
-    ⚠️ ESCALATED TO FUNCTIONAL 2026-09-01: Safari desktop cannot sign in at
-    all until this flips (popup blocked + cross-site redirect silently fails;
-    see §9 2026-09-01 entry). Do the owner checklist below.**
+24. **[x] Move `authDomain` to the brand domain — ✅ CUTOVER DONE 2026-09-01,
+    owner-verified in a private Safari window (Google + flow works
+    perfectly).** Owner completed the full checklist: Google OAuth client
+    (redirect URI + JS origin), Apple Services ID `com.morhogeg.machina.web`
+    Return URL, and recreated the Vercel env var
+    `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=mymachina.app` (type Config,
+    Production; the old Secret-type var was deleted — Preview may lack it,
+    which only affects preview deploys' redirect fallback) + redeploy.
+    `authDomain` is now `mymachina.app`; the popup reads mymachina.app (the
+    "Second Brain"/project-id title is gone) and Safari's redirect fallback
+    is same-site and works. Do NOT remove the firebaseapp.com entries from
+    Google/Apple/Firebase consoles — rollback = revert the env var.
+    History below.
+    ⚠️ ESCALATED TO FUNCTIONAL 2026-09-01: Safari desktop could not sign in
+    until this flipped (popup blocked + cross-site redirect silently fails;
+    see §9 2026-09-01 entry).
     What shipped (inert until the flip): `web/vercel.json` rewrites
     `/__/:path*` to the Firebase host, so `mymachina.app/__/auth/handler` (and
     the handler's own `/__/firebase/init.json` fetch) serve Firebase's auth
@@ -1721,6 +1732,16 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-09-01 (later) — item-24 authDomain cutover EXECUTED and verified.**
+  Same session as the entry below: owner ran the full checklist live (Google
+  OAuth client redirect URI + JS origin; Apple Services ID
+  `com.morhogeg.machina.web` Return URL `https://mymachina.app/__/auth/handler`;
+  Vercel env `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=mymachina.app` — recreated as
+  type Config/Production after deleting the old write-only Secret — then
+  redeploy). Owner verified in a private Safari window: sign-in "works
+  perfectly". §4 item 24 checked off. Note: the env var may not exist for the
+  Preview environment; only affects preview deploys' redirect fallback.
 
 - **2026-09-01 — Safari desktop web sign-in broken (owner repro): popup
   blocked → redirect fallback boomerangs back signed-out. Root cause is §4
