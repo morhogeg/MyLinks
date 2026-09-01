@@ -41,8 +41,12 @@ export default function LoginScreen({
             await onSignIn(provider);
             // On the popup path the auth listener takes over from here. On the
             // redirect path the browser navigates away before this resolves.
-        } catch {
-            setError('Sign-in failed. Please try again.');
+        } catch (err) {
+            setError(
+                (err as Error)?.name === 'PopupBlockedError'
+                    ? 'Your browser blocked the sign-in window. Allow pop-ups for this site, then try again.'
+                    : 'Sign-in failed. Please try again.',
+            );
             setBusy(null);
         }
     };

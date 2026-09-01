@@ -49,19 +49,52 @@ function popupUnsupported(code: string): boolean {
     );
 }
 
+/** Thrown when the popup was blocked AND the redirect fallback cannot work
+    here — the caller should tell the user to allow pop-ups. */
+export class PopupBlockedError extends Error {
+    constructor() { super('Sign-in pop-up was blocked'); this.name = 'PopupBlockedError'; }
+}
+
+/**
+ * Whether a full-page `signInWithRedirect` can actually complete on this page.
+ * Since Safari 16.1 (and progressively other browsers), the redirect flow
+ * silently fails when `authDomain` is a different site from the page: the
+ * browser partitions the storage the auth handler uses to hand the result
+ * back, so the user picks an account, returns, and getRedirectResult() finds
+ * nothing. Redirect is only trustworthy when the auth handler is same-site
+ * with the app (post item-24 authDomain cutover).
+ */
+function redirectCanWork(): boolean {
+    if (typeof window === 'undefined') return false;
+    const authDomain = auth.config.authDomain ?? '';
+    const host = window.location.hostname;
+    return host === authDomain || host.endsWith(`.${authDomain}`);
+}
+
+async function popupWithFallback(
+    provider: GoogleAuthProvider | OAuthProvider,
+): Promise<void> {
+    try {
+        await signInWithPopup(auth, provider, browserPopupRedirectResolver);
+    } catch (err) {
+        const code = (err as { code?: string })?.code ?? '';
+        if (!popupUnsupported(code)) throw err;
+        if (redirectCanWork()) {
+            await signInWithRedirect(auth, provider, browserPopupRedirectResolver);
+            return;
+        }
+        // Redirect would boomerang back signed-out — don't send the user on
+        // that trip. If the browser blocked the window, say so; a popup the
+        // user closed themselves keeps the generic error.
+        if (code === 'auth/popup-blocked') throw new PopupBlockedError();
+        throw err;
+    }
+}
+
 // ── Web flows (popup, with redirect fallback) ────────────────────────────────
 
 async function signInWithGoogleWeb(): Promise<void> {
-    try {
-        await signInWithPopup(auth, googleProvider, browserPopupRedirectResolver);
-    } catch (err) {
-        const code = (err as { code?: string })?.code ?? '';
-        if (popupUnsupported(code)) {
-            await signInWithRedirect(auth, googleProvider, browserPopupRedirectResolver);
-            return;
-        }
-        throw err;
-    }
+    await popupWithFallback(googleProvider);
 }
 
 function appleProvider(): OAuthProvider {
@@ -72,17 +105,7 @@ function appleProvider(): OAuthProvider {
 }
 
 async function signInWithAppleWeb(): Promise<void> {
-    const provider = appleProvider();
-    try {
-        await signInWithPopup(auth, provider, browserPopupRedirectResolver);
-    } catch (err) {
-        const code = (err as { code?: string })?.code ?? '';
-        if (popupUnsupported(code)) {
-            await signInWithRedirect(auth, provider, browserPopupRedirectResolver);
-            return;
-        }
-        throw err;
-    }
+    await popupWithFallback(appleProvider());
 }
 
 // ── Native flows (Capacitor plugin → JS SDK credential bridge) ────────────────
