@@ -96,3 +96,35 @@ def test_happy_path_runs_hybrid_search(monkeypatch):
     assert captured["args"] == ("user1", "dogs", 5)
     payload = json.loads(resp.body)
     assert [c["id"] for c in payload["links"]] == ["a", "b"]
+
+
+# ── Warmup ping (cold-start absorber) ───────────────────────────────────────
+# The client fires {warmup: true} when the search bar opens; the handler must
+# answer 204 BEFORE auth/App Check (reaching the handler is the whole point)
+# and must never run the search pipeline.
+
+def test_warmup_returns_204_without_auth(monkeypatch):
+    monkeypatch.setattr(main, "perform_hybrid_search",
+                        lambda *a, **k: pytest.fail("warmup ran the search"))
+    resp = main.search_links_http(_Req(json_body={"warmup": True}))
+    assert resp.status == 204
+
+
+def test_warmup_uses_its_own_rate_bucket(monkeypatch):
+    seen = []
+
+    def fake_rate_limited(bucket, identity, headers=None):
+        seen.append(bucket)
+        return None
+
+    monkeypatch.setattr(main, "_rate_limited", fake_rate_limited)
+    resp = main.search_links_http(_Req(json_body={"warmup": True}))
+    assert resp.status == 204
+    assert seen == ["search-warm"]  # never the real "search" bucket
+
+
+def test_warmup_false_is_a_normal_request(monkeypatch):
+    # An explicit warmup: false (or absent) flows into the ordinary pipeline —
+    # here that means the empty-query rejection, not a 204.
+    resp = main.search_links_http(_Req(json_body={"warmup": False, "query": "  ", "uid": "u"}))
+    assert resp.status == 400

@@ -44,6 +44,32 @@ const RESULT_LIMIT = 20;
 const MAX_QUERY_CHARS = 500;
 const CACHE_CAP = 50;
 
+/** Re-warm at most this often: an instance stays warm ~15 min, so pings inside
+ *  that window buy nothing. */
+const WARMUP_INTERVAL_MS = 10 * 60_000;
+let lastWarmupAt = 0;
+
+/**
+ * Fire-and-forget cold-start absorber. Called the moment the search UI opens
+ * (and on the first keystroke, for icon-less entry): the search backend is a
+ * scale-to-zero function whose cold start (3-6s of module import + Firebase
+ * init) otherwise lands in front of the FIRST query. A `{warmup: true}` body
+ * makes the server answer 204 before auth/App Check — reaching the handler IS
+ * the work — so the boot happens while the user is still typing. Deliberately
+ * no auth/App Check headers: computing them would delay the ping, and the
+ * endpoint does nothing with them. Failures are irrelevant by design.
+ */
+export function warmSearchBackend(): void {
+    const now = Date.now();
+    if (now - lastWarmupAt < WARMUP_INTERVAL_MS) return;
+    lastWarmupAt = now;
+    fetchWithTimeout(apiUrl('/api/search'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ warmup: true }),
+    }, 10_000).catch(() => { /* a failed warmup just means a normal cold search */ });
+}
+
 interface SemanticSearchState {
     /** Card ids in server rank order — [] until a response lands for the CURRENT query. */
     semanticIds: string[];

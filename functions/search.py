@@ -26,6 +26,28 @@ from rate_limit import check_rate_limit
 logger = logging.getLogger(__name__)
 
 
+# ── Shared Gemini clients (one per api-key+timeout, per instance) ───────────
+# Building a genai.Client per request pays connection/TLS setup to the Gemini
+# API on EVERY search — twice, in fact (embed client + judge client), ~0.2-0.5s
+# of pure overhead on the warm path. Instances are single-tenant processes and
+# the client is thread-safe, so cache them for the instance's lifetime.
+_GENAI_CLIENTS: dict = {}
+
+
+def _get_genai_client(timeout_ms: int):
+    """The cached genai.Client for this timeout, or None without an API key.
+    A benign race can build two — last write wins, both work."""
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        return None
+    key = (api_key, timeout_ms)
+    client = _GENAI_CLIENTS.get(key)
+    if client is None:
+        client = genai.Client(api_key=api_key, http_options={"timeout": timeout_ms})
+        _GENAI_CLIENTS[key] = client
+    return client
+
+
 # ── Embedding text recipe ──────────────────────────────────────────────────
 # Bump this whenever `build_embedding_text` changes what goes INTO the vector.
 # Every card stamps the version it was embedded under (`embeddingVersion`); the
@@ -282,6 +304,108 @@ def cut_at_distance_cliff(results: List[dict], min_keep: int = 2,
             cut = i
             break
     return list(results)[:cut]
+
+
+# ── LLM relevance judge (search-bar precision) ──────────────────────────────
+# Distance thresholds can't separate "about the query's topic" from "same broad
+# theme" — for a Hebrew query every distance compresses into the 0.55-0.70 band,
+# so the ceiling/margin/cliff gates passed a wall of unrelated cards behind the
+# one real hit (owner report 2026-09-01, query "דעה על פרוגרס"). The judge is
+# scale-free and language-aware: one flash-lite call sees the query plus each
+# candidate's title/summary/tags and keeps only genuine topical matches. It
+# FILTERS, never reorders — vector order is a strong prior and keeping it means
+# a hallucinated ranking can't demote the true top hit. Latency is ~free in the
+# typical case: the call is issued the moment the vector half resolves, while
+# the (usually slower) 1000-card keyword scan is still streaming. The distance
+# gates below stay as the fail-open fallback when the judge errors or times out.
+_JUDGE_MAX_CANDIDATES = 20
+_JUDGE_SUMMARY_CHARS = 240
+# Own hard timeout, far below ai_service's 90s analysis budget — a hung judge
+# must degrade to the distance gates, not stall the search bar.
+_JUDGE_TIMEOUT_MS = int(os.environ.get("SEARCH_JUDGE_TIMEOUT_MS", "6000") or 6000)
+
+
+def build_judge_prompt(query_text: str, candidates: List[dict]) -> str:
+    """The relevance-filter prompt: query + numbered candidate digests. Pure."""
+    lines = []
+    for i, c in enumerate(candidates, start=1):
+        title = str(c.get("title") or "").strip()
+        summary = str(c.get("summary") or "").strip()[:_JUDGE_SUMMARY_CHARS]
+        tags = ", ".join(str(t) for t in (c.get("tags") or []) if t)
+        entry = f"{i}. {title}"
+        if summary:
+            entry += f" — {summary}"
+        if tags:
+            entry += f" [tags: {tags}]"
+        lines.append(entry)
+    return (
+        "You are a strict search-relevance filter for a personal knowledge "
+        "base.\n"
+        f"Query: {query_text}\n\n"
+        "Saved cards:\n" + "\n".join(lines) + "\n\n"
+        "Which cards are genuinely about what the query asks for? A card must "
+        "match the query's TOPIC — sharing a broad theme, category, or vibe is "
+        "not enough. The query and a card may be in different languages (e.g. "
+        "Hebrew and English) — a real cross-language match counts the same. "
+        "Keep a borderline-but-plausible match; drop a merely adjacent card. "
+        "It is normal for only one card — or none — to match.\n"
+        'Answer with ONLY a JSON array of the matching card numbers, e.g. '
+        "[1, 4]. No other text."
+    )
+
+
+def parse_judge_selection(text, n: int) -> Optional[List[int]]:
+    """0-based candidate indices from the judge's reply.
+
+    Defensive on purpose (model output): tolerates code fences and prose around
+    the array, drops non-numbers, out-of-range and duplicate entries. Returns
+    None when no array can be read at all — the caller treats that as "judge
+    unavailable" and falls back, whereas a real `[]` is a verdict (nothing
+    relevant) and is honored. Pure."""
+    if not isinstance(text, str):
+        return None
+    m = re.search(r"\[[^\[\]]*\]", text)
+    if not m:
+        return None
+    try:
+        arr = json.loads(m.group(0))
+    except Exception:
+        return None
+    if not isinstance(arr, list):
+        return None
+    out, seen = [], set()
+    for v in arr:
+        if isinstance(v, bool) or not isinstance(v, (int, float)):
+            continue
+        i = int(v) - 1  # prompt numbers candidates from 1
+        if 0 <= i < n and i not in seen:
+            seen.add(i)
+            out.append(i)
+    return out
+
+
+def judge_relevance(query_text: str, candidates: List[dict]) -> Optional[List[dict]]:
+    """The candidates the judge kept, in their original (vector) order.
+
+    Returns None when the judge can't serve — no API key, call failure, or an
+    unparseable reply — so the caller can fall back to the distance gates.
+    Raises nothing on the network path by design of the caller's try/except."""
+    if not candidates:
+        return []
+    client = _get_genai_client(_JUDGE_TIMEOUT_MS)
+    if client is None:
+        return None
+    from ai_service import GEMINI_ANALYSIS_MODEL
+    result = client.models.generate_content(
+        model=GEMINI_ANALYSIS_MODEL,
+        contents=build_judge_prompt(query_text, candidates),
+        config={"temperature": 0, "response_mime_type": "application/json"},
+    )
+    kept = parse_judge_selection(getattr(result, "text", None), len(candidates))
+    if kept is None:
+        logger.warning("Search judge reply unparseable — falling back to distance gates")
+        return None
+    return [candidates[i] for i in sorted(kept)]
 
 
 def normalize_card_for_search(data: dict, doc_id: str) -> dict:
@@ -1005,11 +1129,10 @@ class EmbeddingService:
             try:
                 # Same hard per-call timeout as GeminiService — a hung embedding
                 # call must fail, not ride the function to its kill (2026-08-26).
+                # Cached per instance (_get_genai_client): a fresh client per
+                # request paid TLS setup on every single search.
                 from ai_service import GEMINI_CALL_TIMEOUT_MS
-                self.client = genai.Client(
-                    api_key=self.api_key,
-                    http_options={"timeout": GEMINI_CALL_TIMEOUT_MS},
-                )
+                self.client = _get_genai_client(GEMINI_CALL_TIMEOUT_MS)
             except Exception as e:
                 logger.error(f"Failed to initialize Gemini client: {e}")
         else:
@@ -1211,15 +1334,23 @@ def perform_hybrid_search(uid: str, query_text: str, limit: int = 20) -> List[di
 
     This is what the home search bar (web callable + native HTTP twin) serves:
 
-      1. Vector search DEEP (top-30), then `apply_distance_threshold` so
-         nearest-neighbour padding never masquerades as results.
+      1. Vector search DEEP (top-30), loosely pre-cut (hard ceiling only), then
+         the LLM relevance JUDGE keeps only candidates genuinely about the
+         query's topic — the precision mechanism the fixed distance thresholds
+         could never be (see the judge block above).
       2. `keyword_scan_cards` over the newest 1000 (field-projected, and run in
          parallel with 1) — literal matches the vector rank buried (or that live
          beyond the client's loaded feed window, which the client's own keyword
          filter can't see).
-      3. Merge (vector order first, keyword extras deduped after) and
-         `rerank_candidates` — vector rank leads, literal overlap boosts,
-         recency tiebreaks — down to `limit`.
+      3. Merge: judged vector hits (vector order) first, keyword extras deduped
+         after, down to `limit`. No rerank blend on this path — the judge
+         already decided relevance, and the client re-tiers literal matches
+         above meaning hits anyway.
+
+    FALLBACK: when the judge can't serve (no key, call failure, unparseable
+    reply), the pre-judge pipeline runs unchanged — `apply_distance_threshold`
+    + `cut_at_distance_cliff` + `rerank_candidates` — so search degrades to
+    exactly the previous behavior, never to nothing.
 
     Degrades instead of failing: if the vector half errors transiently, the
     lexical half still serves (an outage must not blank the search bar). Only
@@ -1243,21 +1374,44 @@ def perform_hybrid_search(uid: str, query_text: str, limit: int = 20) -> List[di
                 raise
             logger.error(f"Hybrid search: vector half failed, degrading to keyword-only: {e}")
 
+        # The judge rides the keyword scan's tail: the vector half usually
+        # resolves first, so the LLM call runs while the 1000-card scan is
+        # still streaming — precision costs ~no wall clock in the typical
+        # case. Candidates are only loosely pre-cut (hard ceiling, cap) so a
+        # cross-language match at a large distance still reaches the judge.
+        judged: Optional[List[dict]] = None
+        candidates = [
+            r for r in vector_results
+            if not isinstance(r.get("vector_distance"), (int, float))
+            or r["vector_distance"] <= _DISTANCE_HARD_CEILING
+        ][:_JUDGE_MAX_CANDIDATES]
+        if candidates:
+            try:
+                judged = judge_relevance(query_text, candidates)
+            except Exception as e:
+                logger.error(f"Hybrid search: relevance judge failed, using distance gates: {e}")
+
         try:
             keyword_hits = keyword_future.result()
         except Exception as e:
             logger.error(f"Hybrid search: keyword scan failed: {e}")
             keyword_hits = []
 
-    vector_results = apply_distance_threshold(vector_results)
-    # Then trim at the per-query relevance cliff — the absolute gate bounds
-    # worst-case junk, the cliff removes the "wall of loosely-related cards"
-    # behind the actual matches (owner-reported precision failure).
-    vector_results = cut_at_distance_cliff(vector_results)
+    if judged is not None:
+        # Judge path: its verdict IS the precision gate — an empty verdict is
+        # an honest "nothing about this topic", not a failure.
+        have = {r.get("id") for r in judged}
+        ranked = (judged + [k for k in keyword_hits if k.get("id") not in have])[:limit]
+    else:
+        # Legacy distance-gate path, byte-for-byte the pre-judge behavior.
+        vector_results = apply_distance_threshold(vector_results)
+        # The absolute gate bounds worst-case junk, the cliff removes the "wall
+        # of loosely-related cards" behind the actual matches.
+        vector_results = cut_at_distance_cliff(vector_results)
 
-    have = {r.get("id") for r in vector_results}
-    merged = vector_results + [k for k in keyword_hits if k.get("id") not in have]
-    ranked = rerank_candidates(query_text, merged, top_k=limit)
+        have = {r.get("id") for r in vector_results}
+        merged = vector_results + [k for k in keyword_hits if k.get("id") not in have]
+        ranked = rerank_candidates(query_text, merged, top_k=limit)
     # The distance served its purpose (threshold + rank) — don't leak internals.
     for r in ranked:
         r.pop("vector_distance", None)

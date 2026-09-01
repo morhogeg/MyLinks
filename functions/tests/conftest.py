@@ -79,6 +79,18 @@ def _install_fakes():
         bvq = _ensure_pkg("google.cloud.firestore_v1.base_vector_query")
         bvq.DistanceMeasure = types.SimpleNamespace(COSINE="COSINE", EUCLIDEAN="EUCLIDEAN")
 
+    # google.cloud.firestore_v1.base_query.FieldFilter (search.py / reminder_service
+    # `where` filters). Must carry its three fields — the fake query doubles in
+    # tests read filter.field_path/op_string/value to apply the filter.
+    if not _real_import("google.cloud.firestore_v1.base_query"):
+        bq = _ensure_pkg("google.cloud.firestore_v1.base_query")
+
+        class FieldFilter:
+            def __init__(self, field_path, op_string, value):
+                self.field_path, self.op_string, self.value = field_path, op_string, value
+
+        bq.FieldFilter = FieldFilter
+
     # google.genai  (ai_service: `from google import genai`)
     if not _real_import("google.genai"):
         genai = _ensure_pkg("google.genai")

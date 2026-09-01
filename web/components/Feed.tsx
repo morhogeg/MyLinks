@@ -18,7 +18,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
 import { useLinks } from '@/lib/useLinks';
 import { useSearchLibrary } from '@/lib/useSearchLibrary';
-import { useSemanticSearch } from '@/lib/useSemanticSearch';
+import { useSemanticSearch, warmSearchBackend } from '@/lib/useSemanticSearch';
 import { useLinkActions } from '@/lib/useLinkActions';
 import { useFeedFilters, type FilterType, type SortType } from '@/lib/useFeedFilters';
 import { isPending, getTimestampNumber } from '@/lib/feedUtils';
@@ -124,12 +124,13 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // opened/typed, so matches reach cards older than the loaded feed window.
     const { libraryLinks, isLoadingLibrary, ensureLibrary } = useSearchLibrary(uid);
     // Open the search field (icon tap). Prefetches the library so full-history
-    // matches are usually ready by the time the user finishes typing.
-    const openSearch = useCallback(() => { ensureLibrary(); setSearchOpen(true); }, [ensureLibrary]);
+    // matches are usually ready by the time the user finishes typing, and warms
+    // the search function so its cold start runs during typing, not after it.
+    const openSearch = useCallback(() => { ensureLibrary(); warmSearchBackend(); setSearchOpen(true); }, [ensureLibrary]);
     // Every keystroke routes through here so the library fetch can't be missed
     // (e.g. a query arriving without the icon tap).
     const updateSearchQuery = useCallback((value: string) => {
-        if (value.trim()) ensureLibrary();
+        if (value.trim()) { ensureLibrary(); warmSearchBackend(); }
         setSearchQuery(value);
     }, [ensureLibrary]);
     // True while the library fetch is still in flight for an active query —
@@ -2612,12 +2613,24 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             // actual topic — the search case wins over the filter cases,
                             // and every FilterType has its own branch so a filtered view
                             // never falls through to the "empty account" pitch.
-                            const searchInFlight = searchingLibrary || searchingMeaning;
+                            // An in-flight search is a transient beat, not a dead
+                            // end: one quiet line — no icon tile, no heading, no
+                            // Clear CTA (the bar's own × already clears). The full
+                            // empty state below is for SETTLED states only.
+                            if (searchQuery && (searchingLibrary || searchingMeaning)) {
+                                return (
+                                    <div className="flex items-center justify-center gap-2 py-24 px-6 animate-fade-in">
+                                        <span className="text-accent"><CitationMark state="searching" size={18} /></span>
+                                        <span className="text-sm font-medium text-text-muted">
+                                            {searchingLibrary ? 'Searching your library…' : 'Searching by meaning…'}
+                                        </span>
+                                    </div>
+                                );
+                            }
                             const empty = searchQuery
                                 ? {
-                                    Icon: Search, title: searchInFlight ? 'Searching' : 'No matches',
-                                    body: searchInFlight ? null
-                                        : 'Try different words. Search matches your cards by words and by meaning.',
+                                    Icon: Search, title: 'No matches',
+                                    body: 'Try different words. Search matches your cards by words and by meaning.',
                                 }
                                 : filter === 'reminders' ? {
                                     Icon: Bell, title: 'No reminders yet',
@@ -2668,14 +2681,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                 <empty.Icon className="w-7 h-7 text-accent" strokeWidth={1.75} />
                             </div>
                             <h3 className="text-base font-bold text-text">{empty.title}</h3>
-                            {(searchingLibrary || searchingMeaning) && (
-                                <div className="flex items-center justify-center gap-2 text-accent mt-2">
-                                    <CitationMark state="searching" size={20} />
-                                    <span className="text-sm font-medium">
-                                        {searchingLibrary ? 'Searching your library…' : 'Searching by meaning…'}
-                                    </span>
-                                </div>
-                            )}
                             {empty.body && (
                                 <p className="mt-1.5 max-w-xs mx-auto text-sm text-text-muted leading-relaxed">{empty.body}</p>
                             )}

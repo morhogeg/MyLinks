@@ -323,6 +323,7 @@ def test_normalize_leaves_ms_created_at_alone():
 # ── perform_hybrid_search: fusion + degradation (halves stubbed) ────────────
 
 def test_hybrid_merges_vector_and_keyword_deduped(monkeypatch):
+    monkeypatch.setattr(search_mod, "judge_relevance", lambda q, c: None)
     monkeypatch.setattr(search_mod, "perform_search_logic", lambda uid, q, limit: [
         _vres("v1", 0.30), _vres("v2", 0.35),
     ])
@@ -369,6 +370,7 @@ def test_hybrid_propagates_config_error(monkeypatch):
 
 
 def test_hybrid_gated_vector_hit_can_return_as_a_literal_match(monkeypatch):
+    monkeypatch.setattr(search_mod, "judge_relevance", lambda q, c: None)
     # A truly-unrelated vector hit (beyond even the recall floor's hard
     # ceiling) is dropped by the gate — and because dedupe happens against the
     # GATED set, the keyword scan can still bring it back as a REAL literal
@@ -421,6 +423,7 @@ def test_normalize_converts_string_and_seconds_created_at():
 
 
 def test_hybrid_survives_mixed_timestamps_end_to_end(monkeypatch):
+    monkeypatch.setattr(search_mod, "judge_relevance", lambda q, c: None)
     monkeypatch.setattr(search_mod, "perform_search_logic", lambda uid, q, limit: [
         {"id": "v1", "title": "x", "vector_distance": 0.3, "createdAt": 1_752_600_000_000},
     ])
@@ -477,6 +480,7 @@ def test_cliff_short_list_untouched():
 
 
 def test_hybrid_applies_cliff_to_vector_results(monkeypatch):
+    monkeypatch.setattr(search_mod, "judge_relevance", lambda q, c: None)
     monkeypatch.setattr(search_mod, "perform_search_logic", lambda uid, q, limit: [
         _vres("m1", 0.45), _vres("m2", 0.48),
         _vres("junk1", 0.62), _vres("junk2", 0.64),
@@ -485,3 +489,152 @@ def test_hybrid_applies_cliff_to_vector_results(monkeypatch):
                         lambda uid, q, exclude_ids=None, limit=10, fields=None: [])
     out = [c["id"] for c in perform_hybrid_search("u", "muffins", limit=20)]
     assert out == ["m1", "m2"]  # the junk tail never reaches the client
+
+
+# ── LLM relevance judge: parsing, prompt, and the judged hybrid path ────────
+# The judge FILTERS the vector candidates (never reorders — vector order is the
+# prior); when it can't serve, perform_hybrid_search must degrade to exactly
+# the legacy distance-gate pipeline (the tests above pin that path explicitly).
+
+from search import build_judge_prompt, parse_judge_selection, judge_relevance
+
+
+def test_judge_prompt_numbers_candidates_and_carries_query():
+    prompt = build_judge_prompt("דעה על פרוגרס", [
+        {"title": "A card", "summary": "about progress", "tags": ["society"]},
+        {"title": "B card"},
+    ])
+    assert "דעה על פרוגרס" in prompt
+    assert "1. A card — about progress [tags: society]" in prompt
+    assert "2. B card" in prompt
+    assert "JSON array" in prompt
+
+
+def test_judge_prompt_truncates_long_summaries():
+    prompt = build_judge_prompt("q", [{"title": "T", "summary": "x" * 5000}])
+    assert len(prompt) < 2000
+
+
+def test_parse_judge_selection_plain_array():
+    assert parse_judge_selection("[1, 3]", 5) == [0, 2]
+
+
+def test_parse_judge_selection_tolerates_fences_and_prose():
+    assert parse_judge_selection("Sure! ```json\n[2]\n```", 3) == [1]
+
+
+def test_parse_judge_selection_empty_array_is_a_verdict():
+    # [] = "nothing relevant" — honored, NOT treated as a parse failure.
+    assert parse_judge_selection("[]", 5) == []
+
+
+def test_parse_judge_selection_drops_junk_and_dupes():
+    assert parse_judge_selection('[1, 1, "x", 99, 0, true, 2]', 3) == [0, 1]
+
+
+def test_parse_judge_selection_unparseable_is_none():
+    assert parse_judge_selection("no array here", 3) is None
+    assert parse_judge_selection(None, 3) is None
+    assert parse_judge_selection('{"a": 1}', 3) is None
+
+
+def test_judge_relevance_none_without_api_key(monkeypatch):
+    # No key → "judge unavailable" (None), never a crash or a fake verdict.
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    assert judge_relevance("q", [{"id": "a", "title": "t"}]) is None
+
+
+def test_judge_relevance_empty_candidates_short_circuits():
+    assert judge_relevance("q", []) == []
+
+
+def test_hybrid_judge_filters_the_junk_wall(monkeypatch):
+    # The owner-reported failure: one real hit + a wall of loosely-related
+    # cards whose distances rise smoothly (no cliff, all under the ceiling).
+    # The judge keeps only the real hit; the wall never reaches the client.
+    monkeypatch.setattr(search_mod, "perform_search_logic", lambda uid, q, limit: [
+        _vres("hit", 0.55)] + [_vres(f"junk{i}", 0.58 + i * 0.01) for i in range(9)])
+    monkeypatch.setattr(search_mod, "keyword_scan_cards",
+                        lambda uid, q, exclude_ids=None, limit=10, fields=None: [])
+    monkeypatch.setattr(search_mod, "judge_relevance",
+                        lambda q, cands: [c for c in cands if c["id"] == "hit"])
+    out = [c["id"] for c in perform_hybrid_search("u", "דעה על פרוגרס", limit=20)]
+    assert out == ["hit"]
+
+
+def test_hybrid_judge_empty_verdict_is_honest_no_matches(monkeypatch):
+    monkeypatch.setattr(search_mod, "perform_search_logic", lambda uid, q, limit: [
+        _vres("a", 0.60), _vres("b", 0.62)])
+    monkeypatch.setattr(search_mod, "keyword_scan_cards",
+                        lambda uid, q, exclude_ids=None, limit=10, fields=None: [
+                            {"id": "k1", "title": "literal hit", "createdAt": 1}])
+    monkeypatch.setattr(search_mod, "judge_relevance", lambda q, cands: [])
+    # Nothing topical → only the literal keyword hit survives.
+    out = [c["id"] for c in perform_hybrid_search("u", "q", limit=20)]
+    assert out == ["k1"]
+
+
+def test_hybrid_judge_keeps_vector_order_and_appends_keyword_extras(monkeypatch):
+    monkeypatch.setattr(search_mod, "perform_search_logic", lambda uid, q, limit: [
+        _vres("v1", 0.40), _vres("v2", 0.45), _vres("v3", 0.50)])
+    monkeypatch.setattr(search_mod, "keyword_scan_cards",
+                        lambda uid, q, exclude_ids=None, limit=10, fields=None: [
+                            {"id": "v1", "title": "dupe", "createdAt": 1},
+                            {"id": "k1", "title": "extra", "createdAt": 1}])
+    monkeypatch.setattr(search_mod, "judge_relevance",
+                        lambda q, cands: [c for c in cands if c["id"] in ("v1", "v3")])
+    out = [c["id"] for c in perform_hybrid_search("u", "q", limit=20)]
+    assert out == ["v1", "v3", "k1"]  # vector order kept, dupe collapsed
+    # No internals leak on the judge path either.
+    assert all("vector_distance" not in c
+               for c in perform_hybrid_search("u", "q", limit=20))
+
+
+def test_hybrid_judge_failure_falls_back_to_distance_gates(monkeypatch):
+    # Judge raises → the legacy pipeline (threshold + cliff + rerank) serves.
+    monkeypatch.setattr(search_mod, "perform_search_logic", lambda uid, q, limit: [
+        _vres("m1", 0.45), _vres("m2", 0.48),
+        _vres("junk1", 0.62), _vres("junk2", 0.64)])
+    monkeypatch.setattr(search_mod, "keyword_scan_cards",
+                        lambda uid, q, exclude_ids=None, limit=10, fields=None: [])
+    def boom(q, cands):
+        raise Exception("judge timeout")
+    monkeypatch.setattr(search_mod, "judge_relevance", boom)
+    out = [c["id"] for c in perform_hybrid_search("u", "muffins", limit=20)]
+    assert out == ["m1", "m2"]  # the cliff still cuts the tail
+
+
+def test_hybrid_judge_precut_caps_and_respects_hard_ceiling(monkeypatch):
+    # Candidates past the hard ceiling (or the cap) never reach the judge.
+    seen = {}
+    monkeypatch.setattr(search_mod, "perform_search_logic", lambda uid, q, limit: [
+        _vres(f"v{i}", 0.40 + i * 0.01) for i in range(25)] + [_vres("far", 0.95)])
+    monkeypatch.setattr(search_mod, "keyword_scan_cards",
+                        lambda uid, q, exclude_ids=None, limit=10, fields=None: [])
+    def spy(q, cands):
+        seen["ids"] = [c["id"] for c in cands]
+        return list(cands)
+    monkeypatch.setattr(search_mod, "judge_relevance", spy)
+    perform_hybrid_search("u", "q", limit=30)
+    assert len(seen["ids"]) == search_mod._JUDGE_MAX_CANDIDATES
+    assert "far" not in seen["ids"]
+
+
+# ── Cached Gemini clients (per-instance reuse) ──────────────────────────────
+# A fresh genai.Client per request paid TLS setup on every warm search (twice:
+# embed + judge). The cache must hand back the SAME client for the same
+# key+timeout, distinct clients per timeout, and None without a key.
+
+def test_genai_client_is_cached_per_timeout(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    search_mod._GENAI_CLIENTS.clear()
+    a = search_mod._get_genai_client(1000)
+    assert a is search_mod._get_genai_client(1000)      # reused
+    assert search_mod._get_genai_client(2000) is not a  # timeout gets its own
+    search_mod._GENAI_CLIENTS.clear()
+
+
+def test_genai_client_none_without_key(monkeypatch):
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    search_mod._GENAI_CLIENTS.clear()
+    assert search_mod._get_genai_client(1000) is None

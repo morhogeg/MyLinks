@@ -1731,6 +1731,58 @@ exact-match, capped.
   mark on the left, chevron on the right, on Hebrew cards too. Scope: this
   control only; the card's body text, chips, and time-ago microcopy keep
   their per-language behavior. `LinkDetailModal.tsx` only; `tsc` clean.
+- **2026-09-01 (same session, round 2) — SEARCH LATENCY: warmup ping + cached
+  Gemini clients (owner: "lower the search time, keep the quality").** Two
+  free changes, zero retrieval/quality impact: **(1) Cold-start absorber** —
+  the client fires a fire-and-forget `{warmup: true}` POST to `/api/search`
+  the moment the search bar opens (and on first keystroke for icon-less
+  entry; `warmSearchBackend()` in `useSemanticSearch.ts`, re-armed at most
+  every 10 min), and `search_links_http` answers it 204 BEFORE auth/App
+  Check — reaching the handler IS the work — on its own `search-warm` rate
+  bucket (120/hr/IP, fail closed) so pings never eat search quota. The 3-6s
+  cold start now runs while the user types instead of in front of the first
+  query; this buys most of the `min_instances` benefit (owner-declined cost)
+  for ~free invocations. **(2) Per-instance Gemini client cache**
+  (`_get_genai_client` in `search.py`, keyed api-key+timeout): the embed
+  path and the judge each built a fresh `genai.Client` per request — two TLS
+  setups (~0.2-0.5s combined) on every warm search, now paid once per
+  instance. Verified: 598 backend tests green (5 new: warmup 204 without
+  auth, own bucket, warmup:false passthrough, client cache reuse/none),
+  `tsc --noEmit` clean, em-dash guard clean. NOT verified: prod timing (no
+  creds from cloud sessions) — owner QA: first search of a session should
+  feel close to a warm one. Expected: warm ~0.2-0.5s faster; first search
+  ~2-4s faster whenever typing time absorbs the boot.
+- **2026-09-01 — MEANING SEARCH GETS AN LLM RELEVANCE JUDGE; the junk wall
+  behind the one real hit is gone (owner, device screenshots: Hebrew query
+  "דעה על פרוגרס" — first result correct, then ~7 unrelated cards).** Root
+  cause: precision was structurally beyond the distance gates — for a Hebrew
+  query every cosine distance compresses into the 0.55-0.70 band, so the 0.68
+  ceiling passed the wall, the cliff cut needs a >=0.05 jump a smooth tail
+  never shows, and the recall floor made the top 3 un-droppable. Fix
+  (`functions/search.py`): after the vector half resolves, ONE
+  `gemini-3.1-flash-lite` call (`judge_relevance`, temperature 0, JSON
+  response, own 6s timeout — `SEARCH_JUDGE_TIMEOUT_MS`) sees the query + each
+  candidate's title/summary/tags and returns which cards are genuinely about
+  the query's TOPIC. The judge FILTERS, never reorders (vector order is the
+  prior, so it can't demote the true top hit); an empty verdict is an honest
+  "no matches". Latency ≈ free: the call is issued inside the ThreadPool
+  window while the (usually slower) 1000-card keyword scan is still
+  streaming, and the judge path skips `rerank_candidates` entirely. The old
+  gates (`apply_distance_threshold` + `cut_at_distance_cliff` + rerank) are
+  now the FAIL-OPEN FALLBACK only (no key / call failure / unparseable
+  reply). Ask retrieval (`ask_brain`) untouched — it has its own path.
+  **Also: the in-flight search screen decluttered** (owner: "a lot of clutter
+  in graphics when searching") — while a search is pending, `Feed.tsx` shows
+  one quiet line (mark + "Searching by meaning…") instead of the full empty
+  state (icon tile + "Searching" heading + Clear-search button); the full
+  "No matches" state is for settled results only. Verified: 593 backend
+  tests green (16 new: prompt/parse/judge path/fallback/precut; legacy
+  hybrid tests pinned to the fallback path; conftest gained a
+  `FieldFilter` fake carrying field_path/op_string/value so the suite runs
+  offline), `tsc --noEmit` clean. NOT verified: a live judged search against
+  prod (no creds here) — owner QA: re-run the Hebrew query, expect the one
+  correct card and no wall. Cost: +1 flash-lite call per meaning search
+  (debounced + client-cached; cents/month at current volume).
 - **2026-08-30 — in-app image add FIXED: picking photos silently did nothing
   (owner, device: "adding an image from within the app doesn't do anything;
   share sheet works fine").** Root cause was in the multi-screenshot rewrite
