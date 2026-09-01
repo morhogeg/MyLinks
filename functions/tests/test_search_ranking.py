@@ -505,7 +505,7 @@ def test_judge_prompt_numbers_candidates_and_carries_query():
         {"title": "B card"},
     ])
     assert "דעה על פרוגרס" in prompt
-    assert "1. A card — about progress [tags: society]" in prompt
+    assert "1. A card - about progress [tags: society]" in prompt
     assert "2. B card" in prompt
     assert "JSON array" in prompt
 
@@ -567,10 +567,10 @@ def test_hybrid_judge_empty_verdict_is_honest_no_matches(monkeypatch):
         _vres("a", 0.60), _vres("b", 0.62)])
     monkeypatch.setattr(search_mod, "keyword_scan_cards",
                         lambda uid, q, exclude_ids=None, limit=10, fields=None: [
-                            {"id": "k1", "title": "literal hit", "createdAt": 1}])
+                            {"id": "k1", "title": "muffins recipe", "createdAt": 1}])
     monkeypatch.setattr(search_mod, "judge_relevance", lambda q, cands: [])
-    # Nothing topical → only the literal keyword hit survives.
-    out = [c["id"] for c in perform_hybrid_search("u", "q", limit=20)]
+    # Nothing topical → only the strong (title-hit) keyword match survives.
+    out = [c["id"] for c in perform_hybrid_search("u", "muffins", limit=20)]
     assert out == ["k1"]
 
 
@@ -580,14 +580,14 @@ def test_hybrid_judge_keeps_vector_order_and_appends_keyword_extras(monkeypatch)
     monkeypatch.setattr(search_mod, "keyword_scan_cards",
                         lambda uid, q, exclude_ids=None, limit=10, fields=None: [
                             {"id": "v1", "title": "dupe", "createdAt": 1},
-                            {"id": "k1", "title": "extra", "createdAt": 1}])
+                            {"id": "k1", "title": "sleep hygiene", "createdAt": 1}])
     monkeypatch.setattr(search_mod, "judge_relevance",
                         lambda q, cands: [c for c in cands if c["id"] in ("v1", "v3")])
-    out = [c["id"] for c in perform_hybrid_search("u", "q", limit=20)]
+    out = [c["id"] for c in perform_hybrid_search("u", "sleep", limit=20)]
     assert out == ["v1", "v3", "k1"]  # vector order kept, dupe collapsed
     # No internals leak on the judge path either.
     assert all("vector_distance" not in c
-               for c in perform_hybrid_search("u", "q", limit=20))
+               for c in perform_hybrid_search("u", "sleep", limit=20))
 
 
 def test_hybrid_judge_failure_falls_back_to_distance_gates(monkeypatch):
@@ -638,3 +638,37 @@ def test_genai_client_none_without_key(monkeypatch):
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     search_mod._GENAI_CLIENTS.clear()
     assert search_mod._get_genai_client(1000) is None
+
+
+def test_hybrid_judge_path_drops_weak_substring_extras(monkeypatch):
+    # Owner round 2 ("Cognitive function"): keyword_match_score matches by
+    # SUBSTRING, so "function" hit "functions" in tech summaries and a wall of
+    # score-1 body matches rode in behind the judged results. On the judge
+    # path an extra needs a title hit (or multi-token match); a single generic
+    # body substring is dropped.
+    monkeypatch.setattr(search_mod, "perform_search_logic", lambda uid, q, limit: [
+        _vres("hit", 0.45)])
+    monkeypatch.setattr(search_mod, "keyword_scan_cards",
+                        lambda uid, q, exclude_ids=None, limit=10, fields=None: [
+                            {"id": "weak", "title": "Agentic loops",
+                             "summary": "software functions explained", "createdAt": 1},
+                            {"id": "strong", "title": "Cognitive function and sleep",
+                             "createdAt": 1}])
+    monkeypatch.setattr(search_mod, "judge_relevance", lambda q, cands: list(cands))
+    out = [c["id"] for c in perform_hybrid_search("u", "cognitive function", limit=20)]
+    assert "weak" not in out
+    assert out == ["hit", "strong"]
+
+
+def test_hybrid_fallback_path_keeps_all_keyword_extras(monkeypatch):
+    # The legacy path is byte-for-byte the pre-judge behavior: extras are not
+    # score-filtered there (rerank orders them instead).
+    monkeypatch.setattr(search_mod, "judge_relevance", lambda q, c: None)
+    monkeypatch.setattr(search_mod, "perform_search_logic", lambda uid, q, limit: [
+        _vres("v1", 0.45)])
+    monkeypatch.setattr(search_mod, "keyword_scan_cards",
+                        lambda uid, q, exclude_ids=None, limit=10, fields=None: [
+                            {"id": "weak", "title": "other",
+                             "summary": "software functions explained", "createdAt": 1}])
+    out = [c["id"] for c in perform_hybrid_search("u", "cognitive function", limit=20)]
+    assert set(out) == {"v1", "weak"}
