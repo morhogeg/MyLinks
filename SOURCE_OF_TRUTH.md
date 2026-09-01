@@ -1308,7 +1308,10 @@ The multi-user auth work described below **was** fully written but not live:
       `marketing/launch-clip/src/data/library.ts` with a different demo topic.
 
 24. **[~] Move `authDomain` to the brand domain — PROXY PLUMBING SHIPPED,
-    cutover is now an env flip gated on three console steps (2026-08-24).**
+    cutover is now an env flip gated on three console steps (2026-08-24).
+    ⚠️ ESCALATED TO FUNCTIONAL 2026-09-01: Safari desktop cannot sign in at
+    all until this flips (popup blocked + cross-site redirect silently fails;
+    see §9 2026-09-01 entry). Do the owner checklist below.**
     What shipped (inert until the flip): `web/vercel.json` rewrites
     `/__/:path*` to the Firebase host, so `mymachina.app/__/auth/handler` (and
     the handler's own `/__/firebase/init.json` fetch) serve Firebase's auth
@@ -1718,6 +1721,22 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-09-01 — Safari desktop web sign-in broken (owner repro): popup
+  blocked → redirect fallback boomerangs back signed-out. Root cause is §4
+  item 24 — `authDomain` is still `secondbrain-app-94da2.firebaseapp.com`,
+  and since Safari 16.1 `signInWithRedirect` silently fails when the
+  authDomain is cross-site (partitioned storage; getRedirectResult finds
+  nothing). This also explains the "Second Brain" title on the popup window.
+  Item 24 is therefore FUNCTIONAL, not cosmetic. Code shipped:
+  `web/lib/auth.ts` now falls back to redirect only when the authDomain is
+  same-site with the page (`redirectCanWork()`); otherwise a blocked popup
+  throws `PopupBlockedError` and `LoginScreen` shows "Your browser blocked
+  the sign-in window. Allow pop-ups for this site, then try again." instead
+  of the silent boomerang. DEFERRED OWNER STEPS: the item-24 cutover
+  checklist (a)–(d) — after the env flip, Safari's redirect fallback works
+  and the popup reads mymachina.app. Verified: tsc clean. NOT verified:
+  Safari on-device (owner to retest after deploy, and again after the flip).
 
 - **2026-09-01 (round 20) — Machina's-read control back to English, hard LTR
   (owner, from build 1313 on-device: "Bring back English for all summarize
