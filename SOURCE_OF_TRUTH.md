@@ -1719,6 +1719,18 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-01 (round 20) — Machina's-read control back to English, hard LTR
+  (owner, from build 1313 on-device: "Bring back English for all summarize
+  with Machina - just do it left to right - I don't want localization").**
+  Reverts round 19's call: the control is product brand chrome, not card
+  content, so it does NOT follow card language. All five strings restored to
+  English ("Machina's read", "Summarize with Machina", "Your text stays
+  exactly as you saved it", "Reading your text…", "One moment") and the three
+  control buttons (open header, collapsed stored-read row, generate CTA) lost
+  their `isRtl` `flex-row-reverse`/`text-right` branches — always `text-left`,
+  mark on the left, chevron on the right, on Hebrew cards too. Scope: this
+  control only; the card's body text, chips, and time-ago microcopy keep
+  their per-language behavior. `LinkDetailModal.tsx` only; `tsc` clean.
 - **2026-08-30 — in-app image add FIXED: picking photos silently did nothing
   (owner, device: "adding an image from within the app doesn't do anything;
   share sheet works fine").** Root cause was in the multi-screenshot rewrite
