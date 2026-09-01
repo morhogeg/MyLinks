@@ -18,7 +18,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
 import { useLinks } from '@/lib/useLinks';
 import { useSearchLibrary } from '@/lib/useSearchLibrary';
-import { useSemanticSearch } from '@/lib/useSemanticSearch';
+import { useSemanticSearch, warmSearchBackend } from '@/lib/useSemanticSearch';
 import { useLinkActions } from '@/lib/useLinkActions';
 import { useFeedFilters, type FilterType, type SortType } from '@/lib/useFeedFilters';
 import { isPending, getTimestampNumber } from '@/lib/feedUtils';
@@ -124,12 +124,13 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // opened/typed, so matches reach cards older than the loaded feed window.
     const { libraryLinks, isLoadingLibrary, ensureLibrary } = useSearchLibrary(uid);
     // Open the search field (icon tap). Prefetches the library so full-history
-    // matches are usually ready by the time the user finishes typing.
-    const openSearch = useCallback(() => { ensureLibrary(); setSearchOpen(true); }, [ensureLibrary]);
+    // matches are usually ready by the time the user finishes typing, and warms
+    // the search function so its cold start runs during typing, not after it.
+    const openSearch = useCallback(() => { ensureLibrary(); warmSearchBackend(); setSearchOpen(true); }, [ensureLibrary]);
     // Every keystroke routes through here so the library fetch can't be missed
     // (e.g. a query arriving without the icon tap).
     const updateSearchQuery = useCallback((value: string) => {
-        if (value.trim()) ensureLibrary();
+        if (value.trim()) { ensureLibrary(); warmSearchBackend(); }
         setSearchQuery(value);
     }, [ensureLibrary]);
     // True while the library fetch is still in flight for an active query —

@@ -26,6 +26,28 @@ from rate_limit import check_rate_limit
 logger = logging.getLogger(__name__)
 
 
+# ── Shared Gemini clients (one per api-key+timeout, per instance) ───────────
+# Building a genai.Client per request pays connection/TLS setup to the Gemini
+# API on EVERY search — twice, in fact (embed client + judge client), ~0.2-0.5s
+# of pure overhead on the warm path. Instances are single-tenant processes and
+# the client is thread-safe, so cache them for the instance's lifetime.
+_GENAI_CLIENTS: dict = {}
+
+
+def _get_genai_client(timeout_ms: int):
+    """The cached genai.Client for this timeout, or None without an API key.
+    A benign race can build two — last write wins, both work."""
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        return None
+    key = (api_key, timeout_ms)
+    client = _GENAI_CLIENTS.get(key)
+    if client is None:
+        client = genai.Client(api_key=api_key, http_options={"timeout": timeout_ms})
+        _GENAI_CLIENTS[key] = client
+    return client
+
+
 # ── Embedding text recipe ──────────────────────────────────────────────────
 # Bump this whenever `build_embedding_text` changes what goes INTO the vector.
 # Every card stamps the version it was embedded under (`embeddingVersion`); the
@@ -370,11 +392,10 @@ def judge_relevance(query_text: str, candidates: List[dict]) -> Optional[List[di
     Raises nothing on the network path by design of the caller's try/except."""
     if not candidates:
         return []
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
+    client = _get_genai_client(_JUDGE_TIMEOUT_MS)
+    if client is None:
         return None
     from ai_service import GEMINI_ANALYSIS_MODEL
-    client = genai.Client(api_key=api_key, http_options={"timeout": _JUDGE_TIMEOUT_MS})
     result = client.models.generate_content(
         model=GEMINI_ANALYSIS_MODEL,
         contents=build_judge_prompt(query_text, candidates),
@@ -1108,11 +1129,10 @@ class EmbeddingService:
             try:
                 # Same hard per-call timeout as GeminiService — a hung embedding
                 # call must fail, not ride the function to its kill (2026-08-26).
+                # Cached per instance (_get_genai_client): a fresh client per
+                # request paid TLS setup on every single search.
                 from ai_service import GEMINI_CALL_TIMEOUT_MS
-                self.client = genai.Client(
-                    api_key=self.api_key,
-                    http_options={"timeout": GEMINI_CALL_TIMEOUT_MS},
-                )
+                self.client = _get_genai_client(GEMINI_CALL_TIMEOUT_MS)
             except Exception as e:
                 logger.error(f"Failed to initialize Gemini client: {e}")
         else:

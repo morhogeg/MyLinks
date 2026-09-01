@@ -618,3 +618,23 @@ def test_hybrid_judge_precut_caps_and_respects_hard_ceiling(monkeypatch):
     perform_hybrid_search("u", "q", limit=30)
     assert len(seen["ids"]) == search_mod._JUDGE_MAX_CANDIDATES
     assert "far" not in seen["ids"]
+
+
+# ── Cached Gemini clients (per-instance reuse) ──────────────────────────────
+# A fresh genai.Client per request paid TLS setup on every warm search (twice:
+# embed + judge). The cache must hand back the SAME client for the same
+# key+timeout, distinct clients per timeout, and None without a key.
+
+def test_genai_client_is_cached_per_timeout(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    search_mod._GENAI_CLIENTS.clear()
+    a = search_mod._get_genai_client(1000)
+    assert a is search_mod._get_genai_client(1000)      # reused
+    assert search_mod._get_genai_client(2000) is not a  # timeout gets its own
+    search_mod._GENAI_CLIENTS.clear()
+
+
+def test_genai_client_none_without_key(monkeypatch):
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    search_mod._GENAI_CLIENTS.clear()
+    assert search_mod._get_genai_client(1000) is None

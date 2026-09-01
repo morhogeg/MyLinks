@@ -409,6 +409,11 @@ _RATE_LIMITS = {
     # query has a small cost).
     "search": (120, 3600, False),
     "search-uid": (120, 3600, False),
+    # Warmup pings (search_links_http `{warmup: true}`): fired when the search
+    # bar OPENS so the cold start runs while the user types. A no-op 204 —
+    # costs an invocation, nothing else — on its OWN bucket so pings never eat
+    # real search quota. Per-IP, fail closed (public unauthenticated surface).
+    "search-warm": (120, 3600, False),
     # Unauthenticated crash reports (client_error_http). Per-IP only — a caller
     # with no workspace has no uid to bucket on — and fail CLOSED, because this
     # is a public write surface. The client already caps itself at 20 reports
@@ -2278,6 +2283,18 @@ def search_links_http(req: https_fn.Request) -> https_fn.Response:
         return _cors_preflight(req)
 
     headers = _cors_headers(req)
+
+    # Warmup ping — the client fires this the moment the search bar OPENS, so
+    # the cold start (module import, Firebase init) runs while the user is
+    # still typing instead of in front of the first real query. Deliberately
+    # BEFORE auth and App Check: it does no work, reads no data, and answers
+    # 204 — the whole point is that reaching this line is the work. Own rate
+    # bucket so pings never consume real search quota.
+    if (req.get_json(silent=True) or {}).get('warmup'):
+        rl = _rate_limited("search-warm", _rate_limit_identity(req), headers)
+        if rl:
+            return rl
+        return https_fn.Response('', status=204, headers=headers)
 
     rl = _rate_limited("search", _rate_limit_identity(req), headers)
     if rl:
