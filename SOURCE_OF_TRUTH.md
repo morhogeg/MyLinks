@@ -1731,7 +1731,28 @@ exact-match, capped.
   mark on the left, chevron on the right, on Hebrew cards too. Scope: this
   control only; the card's body text, chips, and time-ago microcopy keep
   their per-language behavior. `LinkDetailModal.tsx` only; `tsc` clean.
-- **2026-09-01 (same session, round 2) — SEARCH LATENCY: warmup ping + cached
+- **2026-09-01 (same session, round 3) — JUDGE TIGHTENED after device QA
+  (owner, query "Cognitive function": top results right, then a tail of
+  AI/tech cards).** Three causes, all fixed in `functions/search.py`:
+  **(1) Prompt too lenient** — "keep borderline-but-plausible" let same-FIELD
+  cards through (every health card for a health query); now strict: sharing
+  a broad field/category is explicitly NOT a match, expect to drop most,
+  empty is normal. **(2) Un-judged keyword extras** — `keyword_match_score`
+  matches by SUBSTRING, so "function" hit "functions" in tech summaries and
+  score-1 body matches rode in behind the judged results; on the judge path
+  extras now need score >= 2 (title hit or multi-token), fallback path
+  unchanged. **(3) Hebrew blank risk** — the judge call passed no safety
+  settings, and Gemini false-positive-blocks on innocuous non-English
+  content (documented ai_service evidence, 2026-07-24); the candidate list
+  carries Hebrew cards on every query, so a block blanked the judge →
+  silent fallback to the wall. Judge now uses `_ASK_SAFETY_SETTINGS`
+  (BLOCK_NONE) like every Ask call, logs "kept X/Y" on success, and a judge
+  exception is recorded to `server_errors` (`search_judge`) so degradation
+  is visible. 600 backend tests green. Backend-only — no TestFlight needed;
+  rounds 1-2 confirmed shipped: deploy-functions run #95 green (incl.
+  canary), TestFlight run #315 = build 1315 uploaded. Owner QA: re-run
+  "Cognitive function" — expect the sleep/cognition cards without the
+  AI/tech tail. warmup ping + cached
   Gemini clients (owner: "lower the search time, keep the quality").** Two
   free changes, zero retrieval/quality impact: **(1) Cold-start absorber** —
   the client fires a fire-and-forget `{warmup: true}` POST to `/api/search`

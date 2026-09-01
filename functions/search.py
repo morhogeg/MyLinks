@@ -334,21 +334,26 @@ def build_judge_prompt(query_text: str, candidates: List[dict]) -> str:
         tags = ", ".join(str(t) for t in (c.get("tags") or []) if t)
         entry = f"{i}. {title}"
         if summary:
-            entry += f" — {summary}"
+            entry += f" - {summary}"
         if tags:
             entry += f" [tags: {tags}]"
         lines.append(entry)
+    # Deliberately STRICT (owner round 2, query "Cognitive function": a lenient
+    # "keep borderline matches" wording let same-field cards through — every
+    # health card, every AI card). The junk wall is same-field, so the prompt
+    # names that failure and normalizes small/empty answers.
     return (
-        "You are a strict search-relevance filter for a personal knowledge "
-        "base.\n"
-        f"Query: {query_text}\n\n"
-        "Saved cards:\n" + "\n".join(lines) + "\n\n"
-        "Which cards are genuinely about what the query asks for? A card must "
-        "match the query's TOPIC — sharing a broad theme, category, or vibe is "
-        "not enough. The query and a card may be in different languages (e.g. "
-        "Hebrew and English) — a real cross-language match counts the same. "
-        "Keep a borderline-but-plausible match; drop a merely adjacent card. "
-        "It is normal for only one card — or none — to match.\n"
+        "You filter search results for a personal knowledge base.\n"
+        f"The user searched for: {query_text}\n\n"
+        "Candidate cards (nearest-neighbour retrieval output - typically only "
+        "a few are real matches):\n" + "\n".join(lines) + "\n\n"
+        "Keep ONLY cards whose content is actually about the query's specific "
+        "topic - a card this exact search is looking for. Sharing a broad "
+        "field or category with the query (both health-related, both about "
+        "AI/tech) is NOT a match; neither is one overlapping word used in a "
+        "different sense. The query and a card may be in different languages "
+        "- a genuine cross-language match counts the same. Expect to drop "
+        "most candidates; keeping one card - or none - is a normal answer.\n"
         'Answer with ONLY a JSON array of the matching card numbers, e.g. '
         "[1, 4]. No other text."
     )
@@ -395,16 +400,27 @@ def judge_relevance(query_text: str, candidates: List[dict]) -> Optional[List[di
     client = _get_genai_client(_JUDGE_TIMEOUT_MS)
     if client is None:
         return None
-    from ai_service import GEMINI_ANALYSIS_MODEL
+    # BLOCK_NONE safety settings, same as every Ask call: Gemini's filter
+    # false-positives on innocuous non-English content (documented in
+    # ai_service), and the candidate list carries the user's Hebrew cards on
+    # EVERY query — without this the judge silently blanks and search falls
+    # back to the distance-gate wall, which is exactly the bug being fixed.
+    from ai_service import GEMINI_ANALYSIS_MODEL, _ASK_SAFETY_SETTINGS
     result = client.models.generate_content(
         model=GEMINI_ANALYSIS_MODEL,
         contents=build_judge_prompt(query_text, candidates),
-        config={"temperature": 0, "response_mime_type": "application/json"},
+        config={"temperature": 0, "response_mime_type": "application/json",
+                "safety_settings": _ASK_SAFETY_SETTINGS},
     )
-    kept = parse_judge_selection(getattr(result, "text", None), len(candidates))
+    text = getattr(result, "text", None)
+    if not text:
+        logger.warning("Search judge returned empty (blocked?) — falling back to distance gates")
+        return None
+    kept = parse_judge_selection(text, len(candidates))
     if kept is None:
         logger.warning("Search judge reply unparseable — falling back to distance gates")
         return None
+    logger.info(f"Search judge kept {len(kept)}/{len(candidates)} candidates")
     return [candidates[i] for i in sorted(kept)]
 
 
@@ -1390,6 +1406,14 @@ def perform_hybrid_search(uid: str, query_text: str, limit: int = 20) -> List[di
                 judged = judge_relevance(query_text, candidates)
             except Exception as e:
                 logger.error(f"Hybrid search: relevance judge failed, using distance gates: {e}")
+                # Durable trail (lazy import — main imports this module at load
+                # time): a failing judge silently degrades search precision to
+                # the distance-gate wall, which is invisible without a record.
+                try:
+                    from main import _record_server_error
+                    _record_server_error("search_judge", e, uid=uid)
+                except Exception:
+                    pass
 
         try:
             keyword_hits = keyword_future.result()
@@ -1399,9 +1423,18 @@ def perform_hybrid_search(uid: str, query_text: str, limit: int = 20) -> List[di
 
     if judged is not None:
         # Judge path: its verdict IS the precision gate — an empty verdict is
-        # an honest "nothing about this topic", not a failure.
+        # an honest "nothing about this topic", not a failure. Keyword extras
+        # must clear a bar too (owner round 2): keyword_match_score matches by
+        # SUBSTRING, so "function" hit "functions" in every tech summary and a
+        # wall of score-1 body matches rode in un-judged behind the judged
+        # results. A title hit (scores 2+1) or a multi-token match keeps its
+        # seat; a single generic body-substring does not. The client's own
+        # literal layer still surfaces in-window literal matches regardless.
+        q_tokens = keyword_query_tokens(query_text)
         have = {r.get("id") for r in judged}
-        ranked = (judged + [k for k in keyword_hits if k.get("id") not in have])[:limit]
+        strong_extras = [k for k in keyword_hits if k.get("id") not in have
+                         and keyword_match_score(k, q_tokens) >= 2]
+        ranked = (judged + strong_extras)[:limit]
     else:
         # Legacy distance-gate path, byte-for-byte the pre-judge behavior.
         vector_results = apply_distance_threshold(vector_results)
