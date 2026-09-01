@@ -50,7 +50,7 @@ field, which ranks nearly as well and is invisible to users.
 | Layer | Value | Why it can be this |
 |---|---|---|
 | **Home-screen / in-app display name** (`CFBundleDisplayName`) | `Machina` | Apple does **not** require this to be unique. This is the layer the owner cared about most, and it gets the pure brand. |
-| **App Store listing Name** (App Store Connect) | `Machina: Save & Recall` | Apple **does** require this to be globally unique, and bare `Machina` is taken — see C-1. |
+| **App Store listing Name** (App Store Connect) | `Machina: Save & Recall` → **`Machina: Save, Ask & Recall`** (D-2a, 2026-09-01) | Apple **does** require this to be globally unique, and bare `Machina` is taken — see C-1. |
 | **App Store Subtitle** | `Capture. Ask. Connect.` | Three distinct phases, ending on the differentiator. |
 
 **Forced by C-1** (below), not chosen freely — but it is also the better title on
@@ -90,6 +90,27 @@ plainness.
   could live with it, but it leads with recall (the feature they are *least*
   excited to lead with) and carries almost no search volume. Keep as the fallback
   if `Save & Recall` ever tests badly.
+
+### D-2a · The listing name gains its third ability: **"Machina: Save, Ask & Recall"** (2026-09-01)
+
+**Decision.** The App Store Connect **Name** field is now
+**`Machina: Save, Ask & Recall`** (27/30 chars). Supersedes D-2's name value
+only — the two-layer structure, the bare-`Machina` display name, and every
+other D-2 rationale stand unchanged. Entered in App Store Connect by the owner
+2026-09-01.
+
+**Why.** The owner, still unsatisfied with `Save & Recall` (Q-2), settled on
+the pattern category leaders use — the brand plus its abilities, as in
+"Notion: Notes, Docs, Tasks" and "Spotify: Music & Podcasts". `Save & Recall`
+named the bookends but omitted **Ask**, which is Machina's most differentiating
+ability; the three-verb form names all three phases (capture it, question it,
+find it again). Comma + ampersand, not the tagline's period cadence: the Name
+is a category description, not a slogan.
+
+**Index effect, all upside:** `ask` had been in **no** field since the
+2026-08-26 subtitle replacement dropped it (see `docs/APP_STORE.md` §2) — the
+Name now carries it at the strongest index weight, for free. `save` and
+`recall` were already Name tokens; keywords and Subtitle need no rebalancing.
 
 ### D-6 · The product tagline is **"Everything you save, finally useful."** (2026-08-02)
 
@@ -279,7 +300,7 @@ Domains in 2023) at a markup, and coupling the domain to an email vendor.
 |---|---|---|
 | `Machina` | Everything a user reads: app label, tab title, in-app copy, legal pages, extension, marketing prose. | — |
 | `MACHINA` | The letterspaced wordmark only (splash, boot screen, header lockup). | Body copy. |
-| `Machina: Save & Recall` | The App Store Connect **Name** field, and nowhere else. | In-app, or in prose — it is a storefront string, not the brand. |
+| `Machina: Save, Ask & Recall` | The App Store Connect **Name** field, and nowhere else (D-2a). | In-app, or in prose — it is a storefront string, not the brand. |
 | ~~`Machina AI`~~ | **Retired 2026-07-27.** | Anywhere. |
 
 **Where the name is stored** (the full set, so a future rename misses nothing):
@@ -387,8 +408,9 @@ finding dissolves.
   candidate answer recorded here (reuse the subtitle) was **not** taken: a
   storefront subtitle is a tricolon of phases and a web-tab description wants a
   promise, so they are deliberately two different lines telling one story.
-- **Q-2 · Does `Save & Recall` survive contact with real users?** Nothing has
-  been tested. Apple's product-page optimization allows A/B testing the title and
+- **Q-2 · Does the listing name survive contact with real users?** Now applies
+  to `Save, Ask & Recall` (D-2a replaced `Save & Recall` on 2026-09-01, still
+  untested). Apple's product-page optimization allows A/B testing the title and
   subtitle after launch — worth doing against the `Ask Your Saves` fallback.
 - ~~**Q-4 · What is the hero — capture, connect, or recall?**~~ **CLOSED
   2026-08-06 by D-7: consolidated capture** — *"a place to save and hold all

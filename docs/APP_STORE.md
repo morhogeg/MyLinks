@@ -61,7 +61,7 @@ Notes for edge cases:
 
 | Field | Value | Limit |
 |---|---|---|
-| **Name** | `Machina: Save & Recall` | 30 (22 used) |
+| **Name** | `Machina: Save, Ask & Recall` (D-2a, 2026-09-01 — entered in ASC) | 30 (27 used) |
 | **Subtitle** | `Never lose another great find` | 30 (29 used) |
 | ~~Tagline~~ | The product tagline `Everything you save, finally useful.` is **not** an App Store field — see the note under this table before pasting it anywhere. | — |
 | **Category** | Primary: **Productivity**. Secondary (optional): Utilities. | |
@@ -111,9 +111,11 @@ for everything" (owner preferred the loss-aversion direction), "Never lose it.
 Actually use it." (fragments leaning on an unnamed "it"), "Never lose what's
 worth keeping" (elegant but abstract, and "keeping" is a near-synonym of a Name
 token doing no index work). **Index cost, accepted knowingly:** `capture`,
-`ask`, and `connect` leave the index, and `ask` now appears in NO field (it was
-dropped from keywords when the old subtitle supplied it — low-volume, accepted;
-re-add to keywords only if search data ever says otherwise). Gained: `never`,
+`ask`, and `connect` leave the index, and `ask` briefly appeared in NO field (it
+was dropped from keywords when the old subtitle supplied it — low-volume,
+accepted at the time; **resolved 2026-09-01: the D-2a Name
+`Machina: Save, Ask & Recall` now carries `ask` at Name weight**, so do NOT
+re-add it to keywords). Gained: `never`,
 `lose`, `another`, `great`, `find` — `lose` and `find` are the useful ones.
 
 **Promotional text** (170 chars, editable without review):
@@ -183,13 +185,13 @@ this list:
   this field (they were here when the name was `Machina AI`) — with `links` in
   this field and `save` in the Name, the `save links` phrase forms across
   fields. The reclaimed characters bought `links`, `organize`, and `research`.
-- **The subtitle must not repeat `save` or `recall`.** Both are Name tokens, and
-  a token indexed twice buys nothing while costing subtitle characters. This is
-  why every "your saves, summarized"-shaped candidate was disqualified during
-  the 2026-08-26 subtitle replacement before taste even entered. Note: `ask`
-  was dropped from this keyword list when the old subtitle supplied it, and the
-  new subtitle does not — `ask` is currently in no field (accepted, low-volume;
-  see the subtitle-replacement note above).
+- **The subtitle and keywords must not repeat `save`, `ask`, or `recall`.** All
+  three are Name tokens (D-2a, 2026-09-01), and a token indexed twice buys
+  nothing while costing characters. This is why every "your saves,
+  summarized"-shaped candidate was disqualified during the 2026-08-26 subtitle
+  replacement before taste even entered. `ask` was field-less between the
+  2026-08-26 subtitle replacement and the 2026-09-01 rename; the Name now
+  carries it.
 - **`ai` must live here now.** It used to be indexed via the old `Machina AI`
   name; with "AI" out of the name it is carried by the `ai summary` token.
 - **`second brain` stays in this field and nowhere else.** It is the
