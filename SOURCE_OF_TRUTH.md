@@ -1763,6 +1763,16 @@ exact-match, capped.
   guard clean, `tsc` clean, `py_compile` clean. Existing cards keep their old
   em dashes (server-written content); a re-save or the prod tag-cleanup pass
   (§4 task 21 family) would refresh them.
+- **2026-09-01 (round 19) — the Machina's-read control speaks the card's
+  language (owner, from build 1312 on a Hebrew note: an English "Summarize
+  with Machina" row inside an RTL layout read as broken alignment).** Chose
+  localization over forcing LTR — the app already does per-card-language
+  microcopy (the "דק' קריאה" chips, time-ago strings), so the CTA
+  ("סכם עם Machina" / "הטקסט שלך נשאר בדיוק כמו ששמרת אותו", busy
+  "קורא את הטקסט שלך… / עוד רגע") and both Machina's-read header states
+  ("הקריאה של Machina") now follow `isRtl`, keeping the existing
+  flex-row-reverse layout which is CORRECT once the words are Hebrew.
+  English cards unchanged. `LinkDetailModal.tsx` only; `tsc` clean.
 - **2026-09-01 (round 18) — the stored "Machina's read" collapsed row goes
   FLAT (owner design call from build-1311 QA).** Round 17 reused the
   generate-CTA's boxed container for the stored-read expander, which fixed

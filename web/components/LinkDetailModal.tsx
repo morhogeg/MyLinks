@@ -1169,7 +1169,10 @@ export default function LinkDetailModal({
                                             className={`w-full text-sm font-bold text-text-muted uppercase tracking-wider mb-3 flex items-center gap-2 hover:text-text transition-colors ${isRtl ? 'flex-row-reverse text-right' : 'text-left'}`}
                                         >
                                             <CitationMark state="listening" size={16} className="text-accent shrink-0" />
-                                            <span className="flex-1">Machina&rsquo;s read</span>
+                                            {/* Card-language microcopy, same pattern as the meta
+                                                chips ("דק' קריאה") — an English row on a Hebrew
+                                                card read as broken RTL (owner, build 1312). */}
+                                            <span className="flex-1">{isRtl ? 'הקריאה של Machina' : 'Machina’s read'}</span>
                                             <ChevronUp className="w-4 h-4 shrink-0 text-text-muted/60" />
                                         </button>
                                         {(() => {
@@ -1207,7 +1210,7 @@ export default function LinkDetailModal({
                                         className={`w-full text-sm font-bold text-text-muted uppercase tracking-wider flex items-center gap-2 hover:text-text transition-colors ${isRtl ? 'flex-row-reverse text-right' : 'text-left'}`}
                                     >
                                         <CitationMark state="listening" size={16} className="text-accent shrink-0" />
-                                        <span className="flex-1">Machina&rsquo;s read</span>
+                                        <span className="flex-1">{isRtl ? 'הקריאה של Machina' : 'Machina’s read'}</span>
                                         <ChevronDown className="w-4 h-4 shrink-0 text-text-muted/60" />
                                     </button>
                                 ) : (
@@ -1225,10 +1228,14 @@ export default function LinkDetailModal({
                                         />
                                         <span className="min-w-0 flex-1">
                                             <span className="block text-sm font-bold text-text">
-                                                {summaryBusy ? 'Reading your text…' : 'Summarize with Machina'}
+                                                {summaryBusy
+                                                    ? (isRtl ? 'קורא את הטקסט שלך…' : 'Reading your text…')
+                                                    : (isRtl ? 'סכם עם Machina' : 'Summarize with Machina')}
                                             </span>
                                             <span className="block text-xs text-text-muted">
-                                                {summaryBusy ? 'One moment' : 'Your text stays exactly as you saved it'}
+                                                {summaryBusy
+                                                    ? (isRtl ? 'עוד רגע' : 'One moment')
+                                                    : (isRtl ? 'הטקסט שלך נשאר בדיוק כמו ששמרת אותו' : 'Your text stays exactly as you saved it')}
                                             </span>
                                         </span>
                                     </button>
