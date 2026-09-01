@@ -1763,6 +1763,18 @@ exact-match, capped.
   guard clean, `tsc` clean, `py_compile` clean. Existing cards keep their old
   em dashes (server-written content); a re-save or the prod tag-cleanup pass
   (§4 task 21 family) would refresh them.
+- **2026-09-01 (round 18) — the stored "Machina's read" collapsed row goes
+  FLAT (owner design call from build-1311 QA).** Round 17 reused the
+  generate-CTA's boxed container for the stored-read expander, which fixed
+  the wording lie but kept a shape lie: a saved read rendered as a second
+  card competing with the user's own text, and expanding morphed a boxed row
+  into the open state's flat header. Now the collapsed stored state IS the
+  open header — same flat row (CitationMark 16 + "Machina's read" in the
+  small uppercase muted style + chevron), with only the chevron flipping
+  between states — and the subtitle ("Saved with this card. Tap to view")
+  is gone; the chevron says it. Button chrome is reserved for the one state
+  that performs paid work, the "Summarize with Machina" CTA on a card with
+  no stored read. `LinkDetailModal.tsx` only; `tsc` clean.
 - **2026-08-31 (round 17) — Note cards: AI heading for long-form notes,
   honest expander for a saved "Machina's read" (owner device QA, 3 fixes,
   web-only).** (1) An in-app Note's title was the truncated first sentence —

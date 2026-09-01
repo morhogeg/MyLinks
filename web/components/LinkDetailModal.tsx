@@ -1192,6 +1192,24 @@ export default function LinkDetailModal({
                                             );
                                         })()}
                                     </>
+                                ) : hasStoredSummary ? (
+                                    /* A STORED read is a disclosure, not an offer: the same flat
+                                       header row as the open state with only the chevron flipped,
+                                       so expand/collapse reads as one control changing state
+                                       (owner design call, 2026-09-01 — the earlier boxed row made
+                                       the saved read look like a second card competing with the
+                                       user's own text). Button chrome is reserved for the
+                                       generate-CTA below, the one state that performs paid work. */
+                                    <button
+                                        onClick={toggleSummary}
+                                        aria-label="Expand Machina's read"
+                                        aria-expanded="false"
+                                        className={`w-full text-sm font-bold text-text-muted uppercase tracking-wider flex items-center gap-2 hover:text-text transition-colors ${isRtl ? 'flex-row-reverse text-right' : 'text-left'}`}
+                                    >
+                                        <CitationMark state="listening" size={16} className="text-accent shrink-0" />
+                                        <span className="flex-1">Machina&rsquo;s read</span>
+                                        <ChevronDown className="w-4 h-4 shrink-0 text-text-muted/60" />
+                                    </button>
                                 ) : (
                                     <button
                                         onClick={toggleSummary}
@@ -1205,30 +1223,14 @@ export default function LinkDetailModal({
                                             size={22}
                                             className="text-accent shrink-0"
                                         />
-                                        {/* A stored summary is an EXPANDER (chevron, "tap to
-                                            read"), not a generate-CTA — showing "Summarize with
-                                            Machina" again implied re-doing paid work when the
-                                            read is already saved on the card (owner-reported,
-                                            2026-08-26). Only a card with no stored read offers
-                                            to create one. */}
-                                        {hasStoredSummary ? (
-                                            <>
-                                                <span className="min-w-0 flex-1">
-                                                    <span className="block text-sm font-bold text-text">Machina&rsquo;s read</span>
-                                                    <span className="block text-xs text-text-muted">Saved with this card. Tap to view</span>
-                                                </span>
-                                                <ChevronDown className="w-4 h-4 shrink-0 text-text-muted/60" />
-                                            </>
-                                        ) : (
-                                            <span className="min-w-0 flex-1">
-                                                <span className="block text-sm font-bold text-text">
-                                                    {summaryBusy ? 'Reading your text…' : 'Summarize with Machina'}
-                                                </span>
-                                                <span className="block text-xs text-text-muted">
-                                                    {summaryBusy ? 'One moment' : 'Your text stays exactly as you saved it'}
-                                                </span>
+                                        <span className="min-w-0 flex-1">
+                                            <span className="block text-sm font-bold text-text">
+                                                {summaryBusy ? 'Reading your text…' : 'Summarize with Machina'}
                                             </span>
-                                        )}
+                                            <span className="block text-xs text-text-muted">
+                                                {summaryBusy ? 'One moment' : 'Your text stays exactly as you saved it'}
+                                            </span>
+                                        </span>
                                     </button>
                                 )}
                             </div>
