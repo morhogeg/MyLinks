@@ -2612,12 +2612,24 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             // actual topic — the search case wins over the filter cases,
                             // and every FilterType has its own branch so a filtered view
                             // never falls through to the "empty account" pitch.
-                            const searchInFlight = searchingLibrary || searchingMeaning;
+                            // An in-flight search is a transient beat, not a dead
+                            // end: one quiet line — no icon tile, no heading, no
+                            // Clear CTA (the bar's own × already clears). The full
+                            // empty state below is for SETTLED states only.
+                            if (searchQuery && (searchingLibrary || searchingMeaning)) {
+                                return (
+                                    <div className="flex items-center justify-center gap-2 py-24 px-6 animate-fade-in">
+                                        <span className="text-accent"><CitationMark state="searching" size={18} /></span>
+                                        <span className="text-sm font-medium text-text-muted">
+                                            {searchingLibrary ? 'Searching your library…' : 'Searching by meaning…'}
+                                        </span>
+                                    </div>
+                                );
+                            }
                             const empty = searchQuery
                                 ? {
-                                    Icon: Search, title: searchInFlight ? 'Searching' : 'No matches',
-                                    body: searchInFlight ? null
-                                        : 'Try different words. Search matches your cards by words and by meaning.',
+                                    Icon: Search, title: 'No matches',
+                                    body: 'Try different words. Search matches your cards by words and by meaning.',
                                 }
                                 : filter === 'reminders' ? {
                                     Icon: Bell, title: 'No reminders yet',
@@ -2668,14 +2680,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                 <empty.Icon className="w-7 h-7 text-accent" strokeWidth={1.75} />
                             </div>
                             <h3 className="text-base font-bold text-text">{empty.title}</h3>
-                            {(searchingLibrary || searchingMeaning) && (
-                                <div className="flex items-center justify-center gap-2 text-accent mt-2">
-                                    <CitationMark state="searching" size={20} />
-                                    <span className="text-sm font-medium">
-                                        {searchingLibrary ? 'Searching your library…' : 'Searching by meaning…'}
-                                    </span>
-                                </div>
-                            )}
                             {empty.body && (
                                 <p className="mt-1.5 max-w-xs mx-auto text-sm text-text-muted leading-relaxed">{empty.body}</p>
                             )}
