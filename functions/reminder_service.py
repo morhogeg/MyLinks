@@ -394,7 +394,7 @@ def run_reminder_check() -> dict:
 
                 pushed = False
                 if wants_push:
-                    push_title = "🧠 זמן לחזור אל" if is_he else "🧠 Time to revisit"
+                    push_title = "זמן לחזור אל" if is_he else "Time to revisit"
                     push_body = title if not category else f"{title} · {category}"
                     push_result = send_push(uid, push_title, push_body, {"linkId": link_id})
                     pushed = bool(push_result.get("sent"))

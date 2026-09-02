@@ -648,7 +648,7 @@ def build_and_send_digest(uid: str, user_data: dict, force: bool = False) -> dic
             try:
                 push_result = send_push(
                     uid,
-                    f"🧠 Your {period} Brew",
+                    f"Your {period} Brew",
                     f"{len(cards)} new card{'s' if len(cards) != 1 else ''} to revisit",
                     {"view": "digest"},
                 )
