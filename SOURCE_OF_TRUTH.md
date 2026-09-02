@@ -901,6 +901,55 @@ The multi-user auth work described below **was** fully written but not live:
     listing name, a different primary category (Productivity vs Utilities), and a
     completely different mark/palette.
 
+26. **[ ] Machina Pro (entitlements, trial, paywall) — CODE DONE 2026-09-02 on
+    branch `claude/machina-pro-entitlements`, NOT merged, NOT shipped.** One
+    plan, "Machina Pro" (monthly $7.99 / annual $49.99, prices live in App
+    Store Connect + RevenueCat, never in code). Free: 100 saves + 20 asks a
+    month, locked synthesis teaser, no curated digests, metadata-only YouTube
+    cards. Pro: unlimited (abuse ceiling 1000), full synthesis, digests, video
+    ingestion. Every pre-launch workspace gets a 365-day founders grant; every
+    new workspace gets Pro free for 14 days (server-side reverse trial from
+    `createdAt`, no card, no StoreKit). Source of truth is functions-only
+    `entitlements/{uid}` (`functions/entitlement.py`); capture is never gated
+    (a free 429 carries `upgrade: true` and the client opens the paywall).
+    Code: `functions/entitlement.py`, plan-aware `quota.py`,
+    `GET /api/entitlement`, `POST /api/entitlement/sync`,
+    `revenuecat_webhook`, `trial_nudges` (6-hourly), synthesis vault in
+    `digest_service.py`, rules + emulator cases for `entitlements` and
+    `synthesis_vault`; web `lib/entitlement.ts`, `lib/purchases.ts`
+    (`@revenuecat/purchases-capacitor` 13.x, native-only via `isNativeApp()`),
+    `EntitlementProvider`, `Paywall.tsx`, `ui/ProBadge.tsx`, the Ask meter,
+    locked `SynthesisCard`, Settings plan row, digest-row gating, one welcome
+    line. Merging also requires a Hosting redeploy (two new `/api/*` rewrites
+    in `firebase.json`; deploy-hosting.yml fires on that path) and the
+    functions deploy carries the new composite index. **OWNER CHECKLIST (the
+    parts no session can do):**
+    - [ ] RevenueCat: create the project + iOS app (bundle
+      `com.morhogeg.machina`); copy the **public iOS SDK key** and a **v1
+      REST secret key**; set the webhook URL to the deployed
+      `revenuecat_webhook` function URL with an Authorization header value
+      of your choosing (any long random string).
+    - [ ] App Store Connect: sign the **Paid Apps agreement**; create
+      subscription group **`Machina Pro`** with products
+      `com.morhogeg.machina.pro.monthly` ($7.99) and
+      `com.morhogeg.machina.pro.annual` ($49.99). Do **NOT** configure an
+      introductory free trial in Connect: the 14-day trial is server-side.
+      Enroll in the **Small Business Program** (15% commission).
+    - [ ] RevenueCat: attach both products to entitlement **`pro`** and
+      offering **`default`** (packages `$rc_annual`, `$rc_monthly`).
+    - [ ] GitHub secrets: `NEXT_PUBLIC_REVENUECAT_IOS_KEY` (public key, baked
+      into TestFlight builds), `REVENUECAT_SECRET_KEY` (REST secret, written
+      to `functions/.env` by deploy-functions), `REVENUECAT_WEBHOOK_AUTH`
+      (the Authorization value from the first step).
+    - [ ] Submit the two IAP products for review **together with the first
+      binary that contains the paywall** (Apple reviews them as a set).
+    - [ ] Merge the branch, then a TestFlight build with the key set, then
+      sandbox-test purchase + restore + the "Manage subscription" link.
+    Until the keys exist the branch degrades gracefully: trials, founder
+    grants, quota gating and the locked synthesis all work; `/api/entitlement/sync`
+    answers 503, the webhook refuses, and the paywall says subscriptions
+    aren't available in this build.
+
 ### 🟡 P2 — security/cost hardening & honest product surface
 
 11a1. **[x] Owner QA on build 1219 — ✅ ALL CONFIRMED ON DEVICE 2026-07-27.**
@@ -1733,6 +1782,38 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-02 — Machina Pro: entitlements, 14-day reverse trial, quota
+  gating, paywall (branch `claude/machina-pro-entitlements`, NOT merged).**
+  Pricing model as decided (§4 item 26; §7 rewrite owned by a parallel
+  session). Backend: `functions/entitlement.py` (functions-only
+  `entitlements/{uid}`; founders 365d for pre-`PRO_LAUNCH_AT` workspaces,
+  14d trial from `createdAt` so a reinstall can't reset it; RevenueCat REST
+  sync; synthesis vault + restore; trial-nudge sweep), `quota.py` per-plan
+  limits (`FREE_*`/`PRO_*` env, `MONTHLY_*` = free aliases; 100/20 free,
+  1000/1000 pro) with a 429 body carrying `upgrade/kind/used/limit`,
+  `_quota_blocked` resolves the plan, `GET /api/entitlement`,
+  `POST /api/entitlement/sync` (503 without the secret), `revenuecat_webhook`
+  (constant-time Authorization check, re-syncs from REST, never trusts event
+  dates), `trial_nudges` (`0 */6 * * *`), YouTube ingestion Pro-only with
+  `proFeature: 'youtube'` on the card, curated digests skip for free, free
+  synthesis written locked (title + one-sentence teaser) with the full doc in
+  `synthesis_vault/{uid}__{week}`. Rules deny `entitlements` and
+  `synthesis_vault` (both rule files) with emulator cases; composite index
+  `(source, trialEndsAt)`; Hosting + Vercel rewrites; workflow secrets.
+  Frontend: `lib/entitlement.ts`, `lib/purchases.ts`, `EntitlementProvider`
+  (mounted inside `AuthProvider`, refreshes on foreground), `Paywall.tsx`
+  (sheet primitives, annual preselected with a computed "Save N%" chip,
+  Restore + Terms + Privacy, web says "Subscribe in the Machina app on
+  iPhone"), `ProBadge`, Ask meter + 429 paywall, save-path 429 paywall,
+  locked `SynthesisCard`, Settings "Plan" row + Manage subscription, digest
+  rows gated, one trial line on the welcome screen, `paywall_*` analytics.
+  `@revenuecat/purchases-capacitor@13.4.2` added and `cap sync` committed.
+  **Verified:** pytest 708 passed (offline harness, new `test_entitlement.py`),
+  `py_compile` clean, `tsc` clean, eslint clean on touched files, em-dash
+  gate clean, `npm run build` static export passes. **NOT verified:** the
+  Firestore rules emulator suite (the emulator JAR download is blocked in
+  the cloud session; `rules-tests.yml` runs it on merge), anything on device
+  or against RevenueCat/StoreKit (no keys exist yet), the webhook end to end.
 - **2026-09-01 (later) — item-24 authDomain cutover EXECUTED and verified.**
   Same session as the entry below: owner ran the full checklist live (Google
   OAuth client redirect URI + JS origin; Apple Services ID
