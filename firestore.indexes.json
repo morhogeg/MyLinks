@@ -43,6 +43,20 @@
             ]
         },
         {
+            "collectionGroup": "entitlements",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "source",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "trialEndsAt",
+                    "order": "ASCENDING"
+                }
+            ]
+        },
+        {
             "collectionGroup": "links",
             "queryScope": "COLLECTION",
             "fields": [

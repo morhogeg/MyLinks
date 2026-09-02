@@ -6,7 +6,8 @@
 //   - syntheses / digests: client READ-ONLY (written by Cloud Functions via Admin SDK)
 //   - synthesisNotes: the user's own notes on a week — full owner read/write
 //   - shared_cards / shared_collections: public read, owner-only write
-//   - rate_limits / pending_processing / task_logs: never client-accessible
+//   - rate_limits / pending_processing / task_logs / usage_quotas /
+//     entitlements / synthesis_vault: never client-accessible
 //
 // Run: npm test   (see README.md)
 
@@ -406,7 +407,7 @@ test('shared_owners: denied for owner, stranger, and anon (read and write)', asy
 // thing keeping its rate limit and field truncation meaningful is that clients
 // cannot reach the collection directly. Reads stay denied because the records
 // carry an auth uid and an IP.
-for (const col of ['rate_limits', 'pending_processing', 'task_logs', 'usage_quotas', 'server_errors', 'client_error_reports']) {
+for (const col of ['rate_limits', 'pending_processing', 'task_logs', 'usage_quotas', 'server_errors', 'client_error_reports', 'entitlements', 'synthesis_vault']) {
   test(`${col}: denied for owner, stranger, and anon`, async () => {
     await assertFails(getDoc(doc(ownerDb(), col, 'x')));
     await assertFails(setDoc(doc(ownerDb(), col, 'x'), { a: 1 }));

@@ -83,7 +83,8 @@ def seen(monkeypatch):
     monkeypatch.setattr(main, "check_rate_limit", lambda *a, **k: True)
     monkeypatch.setattr(main, "REQUIRE_AUTH", False)
     monkeypatch.setattr(main, "APPCHECK_ENFORCE", False)
-    monkeypatch.setattr(main, "check_and_increment_quota", lambda *a, **k: (True, 1))
+    monkeypatch.setattr(main, "plan_for", lambda uid: "pro")
+    monkeypatch.setattr(main, "meter_quota", lambda *a, **k: {"ok": True, "remaining": 1, "used": 1, "limit": 2, "plan": "pro"})
 
     def fake_search(uid, query_text, limit=30):
         calls["search"].append(query_text)
