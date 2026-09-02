@@ -1577,7 +1577,7 @@ they are a focused week once
 the auth build is green. Realistic sequence: CI plugin fix → cutover → consent
 screen + policy URLs → device pass (§4 task 11) → submit.
 
-## 7. Episode 2 — Cost, API keys, and the user journey
+## 7. Episode 2 — Cost, pricing, and the user journey (pricing model REVISED 2026-09-02)
 
 **Do not ask users for an API key.** BYO-key is the single worst option for this
 product: it filters the audience down to developers, adds a brutal first-run
@@ -1599,24 +1599,96 @@ is. The real protections are already designed: verified auth on every paid
 endpoint (task 2), App Check enforcement, and per-uid rate limits (task 13) — plus
 GCP budget alerts (task 19) so a surprise never compounds.
 
-**Recommended course: launch free with invisible guardrails, monetize with a
-simple subscription only after retention proves itself.** Concretely: (1) at
-launch, everything free with generous soft caps enforced server-side (e.g. ~150
-saves and ~100 asks/month — above what an engaged user hits, so nobody ever sees
-the limit in month one); (2) when there's evidence people return (the weekly
-synthesis and digest are the retention signals to watch), introduce **Machina
-Pro** via Apple In-App Purchase at ~$3.99/month or $29/year — unlimited saves and
-asks, weekly synthesis, voice ask when it ships, priority analysis — keeping the
-free tier genuinely useful (the free tier IS the marketing); (3) never gate
-capture — a save that bounces off a paywall destroys the "I can trust this caught
-it" promise the whole product stands on; gate the expensive *intelligence*
-(unlimited Ask, synthesis) instead. Use Apple IAP/StoreKit rather than external
-purchase links at this scale: the 15% small-business rate costs less than the
-conversion you'd lose sending iOS users to a web checkout, and it keeps review
-friction near zero. On the user's side of the ledger the journey is: install →
-sign in with Apple → consent to AI processing → save two things from the share
-sheet → magic, with zero setup and zero payment wall — convenience first, and the
-costs it creates for you are cents, bounded, and observable.
+### 7.1 The pricing model (decided 2026-09-02, supersedes the $3.99 plan)
+
+**Why the old plan was wrong.** The apps Machina sits next to on the App Store
+all charge $8–13/month in 2026: mymind $7.99/$12.99 (no free tier), Readwise
+Reader $9.99–12.99 (30-day trial only), Recall $10 (free tier capped at 10 AI
+summaries/mo), Fabric $6–16. RevenueCat's 2026 State of Subscription Apps adds
+three facts that shape the design: hard paywalls convert ~5x better than freemium
+(10.7% vs 2.1% median download-to-paid by day 35), AI apps earn 41% more per
+payer but churn 30% faster, and trials of 17+ days convert far better than 3-day
+ones. $3.99 left money on the table and "free at launch, monetize later" would
+have taught us nothing about willingness to pay while creating a cohort to
+grandfather.
+
+**Price: one plan, Machina Pro, $7.99/month or $49.99/year.** Annual is the one
+we push — preselected on the paywall at "Save 48%". Net after Apple's Small
+Business Program rate (15%, requires enrolling): $6.79 / $42.49. Per-user Gemini
+cost is ≈$0.20/mo realistic, so margin is not the question; annual exists to
+carry people through the months their library is still building (the AI-churn
+problem). No second tier, no lifetime plan (a lifetime buyer costs Gemini
+forever), no BYO key. The only discount worth running: a launch-week "Founder"
+annual at $39.99 capped at the first 200 buyers — optional.
+
+**Model: free tier + 14-day reverse trial, no card.** Every new workspace gets
+Pro on day one for 14 days (server-side, no StoreKit involvement), then drops to
+free. A hard paywall at install would show a price before the library has
+anything in it; the magic only appears after a few saves and the first Sunday
+synthesis, and 14 days guarantees two syntheses land during the trial. Capture
+is **never** gated — a save that bounces off a paywall destroys the "I can trust
+this caught it" promise the whole product stands on. Workspaces that existed
+before the feature shipped (owner + TestFlight friends) get a 365-day founders
+grant so nobody who helped test hits a wall.
+
+| Surface | Free | Pro |
+|---|---|---|
+| Capture from anywhere + analysis on save (summary, tags, connections) | 100 saves/month | Unlimited (abuse ceiling 1000) |
+| Meaning search, collections, share pages, reminders, multi-screenshot | Yes | Yes |
+| Ask Machina | 20 questions/month | Unlimited (abuse ceiling 1000) |
+| Weekly synthesis | Locked teaser (title + first line) | Full |
+| Curated digests | No (Pro badge in settings) | Yes |
+| YouTube video ingestion | No (metadata-only card) | Yes |
+| Voice ask, export (when built) | No | Yes |
+
+Share pages stay free because they are the marketing. YouTube goes to Pro because
+it is the one real cost outlier. The 20-question free cap is deliberate: enough to
+feel the recall engine, low enough that a weekly user hits it.
+
+**New-user journey.** Install → sign in with Apple/Google → AI consent → one
+line on the welcome screen ("Pro is free for your first 14 days. Nothing to
+cancel.") → tour → first two saves from the share sheet. A small Pro badge on the
+synthesis card teaches what is trial-only while people enjoy it. Day 12: one push
++ in-app card ("Your Pro trial ends Sunday. You saved 31 things and asked 14
+questions."). Day 14: quietly drop to free; Ask shows an "18 of 20 left" meter,
+the synthesis card blurs below its first line with an Unlock button. Day 44 on
+free: one App Store promotional offer (annual at 30% off), once.
+
+**Mechanics (built in the `claude/machina-pro-entitlements` branch, §4 item
+26).** RevenueCat (`@revenuecat/purchases-capacitor`, free below $2.5k MTR) for
+receipts, restores, and remote-configurable prices; entitlement id `pro`,
+offering `default`, products `com.morhogeg.machina.pro.annual` /
+`.monthly`. RevenueCat app-user-id = the **Firebase Auth uid** (never the
+phone-number workspace uid). Source of truth is a functions-only Firestore
+`entitlements/{workspaceUid}` doc (plan/source/proUntil/trialEndsAt), written by
+the RevenueCat webhook + a post-purchase `/api/entitlement/sync`, read by
+`quota.py` (plan-aware limits) and by the client via `/api/entitlement`. A
+locked synthesis keeps its full body in functions-only `synthesis_vault` and is
+restored on upgrade. Web shows "Subscribe in the Machina app on iPhone" — no web
+checkout at this scale (the 15% rate costs less than the conversion lost
+sending iOS users to a web checkout, and it keeps review friction near zero).
+
+**What it earns (estimates, not verified for this product).** Reverse-trial
+apps typically land between the two RevenueCat medians; at 4% of installs
+paying and a blended net of ≈$4.50/mo per payer:
+
+| Installs (cumulative) | Payers | Revenue/mo | Gemini/mo | Net |
+|---|---|---|---|---|
+| 1,000 | 40 | ~$180 | ~$50 | +$130 |
+| 5,000 | 200 | ~$900 | ~$150 | +$750 |
+| 20,000 | 800 | ~$3,600 | ~$500 | +$3,100 |
+
+Sources: mymind pricing (access.mymind.com/pricing), Readwise Reader pricing
+2026 (gleamr.io), Recall pricing (recall.it/pricing), Fabric (recurdash.com),
+RevenueCat State of Subscription Apps 2026, Airbridge "Hard paywall vs freemium
+2026".
+
+*(Superseded 2026-09-02, kept for the reasoning:)* ~~launch free with invisible
+guardrails (~150 saves / ~100 asks soft caps), then introduce Machina Pro at
+~$3.99/month or $29/year once retention proves itself; gate the expensive
+intelligence, never capture; Apple IAP over external purchase links.~~ The
+capture-never-gated and IAP-over-web-checkout rules survive unchanged; the
+price and the "later" did not.
 
 ## 8. Episode 3 — Marketing plan (≈$0 budget) + launch assets
 
@@ -1732,6 +1804,27 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-09-02 — PRICING MODEL DECIDED (§7.1) + Machina Pro build session
+  spawned.** Owner asked whether the app is launch-ready and what it earns, then
+  approved a rethought pricing model after a market pass (mymind/Readwise/
+  Recall/Fabric all $8–13/mo; RevenueCat 2026: hard paywall 10.7% vs freemium
+  2.1%, AI apps churn 30% faster, 17+ day trials convert best). Decision: one
+  plan, **Machina Pro $7.99/mo or $49.99/yr**, **14-day reverse trial** (server
+  side, no card), free tier = 100 saves + 20 asks/mo + locked synthesis teaser,
+  Pro = unlimited Ask, synthesis, curated digests, YouTube ingestion; capture
+  never gated; founders get 365 days. §7 rewritten (old $3.99 plan struck
+  through, kept for reasoning). The code (entitlements doc, plan-aware
+  `quota.py`, RevenueCat webhook + sync, paywall sheet, ProBadge, Ask meter,
+  locked SynthesisCard, trial-nudge scheduler, rules + tests) is being built in
+  a separate session on branch `claude/machina-pro-entitlements`, which adds
+  §4 item 26 + its own §9 entry and the owner checklist (RevenueCat project,
+  App Store Connect subscription group + 2 products, 3 GitHub secrets, Small
+  Business Program enrollment). Launch-readiness verdict recorded: code side is
+  ready; what remains is owner work — raise the Gemini cap to ₪500 (5b), solve
+  the OAuth-only reviewer sign-in (docs/APP_STORE.md §5), enter metadata + 6
+  screenshots, confirm the consent screen on a fresh install, rotate the Gemini
+  key (paid project) + ASC `.p8`. Docs only this session; nothing deployed.
 
 - **2026-09-01 (later) — item-24 authDomain cutover EXECUTED and verified.**
   Same session as the entry below: owner ran the full checklist live (Google
