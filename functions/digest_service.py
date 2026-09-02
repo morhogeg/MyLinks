@@ -33,6 +33,7 @@ from typing import Optional, List
 from google.cloud import firestore
 
 from db import get_db
+from entitlement import is_pro
 from log_safe import mask_uid
 
 logger = logging.getLogger(__name__)
@@ -296,13 +297,59 @@ def _card_index(cards: List[dict]) -> dict:
     return {c["id"]: c for c in cards if c.get("id")}
 
 
-def _write_inapp_synthesis(uid: str, synth: dict, cards: List[dict], week_id: str) -> bool:
+def synthesis_teaser(narrative: str, max_len: int = 160) -> str:
+    """The first sentence of the narrative, for the locked (free-plan) card.
+
+    One sentence is the whole point: enough to show the recap is real and
+    about THIS week, not enough to read it. Falls back to a hard cut when the
+    opening sentence runs long."""
+    text = " ".join((narrative or "").split())
+    if not text:
+        return ""
+    for sep in (". ", "! ", "? "):
+        idx = text.find(sep)
+        if 0 < idx < max_len:
+            return text[: idx + 1]
+    if len(text) <= max_len:
+        return text
+    cut = text[:max_len].rsplit(" ", 1)[0]
+    return cut.rstrip(",;:") + "..."
+
+
+def locked_synthesis_doc(full: dict) -> dict:
+    """The user-visible shape of a synthesis a free workspace may not read yet:
+    title + one-line teaser + counts, `locked: True`, and NO narrative, themes,
+    standout or question. The full doc goes to the vault (entitlement.py)."""
+    return {
+        "weekId": full.get("weekId"),
+        "title": full.get("title"),
+        "teaser": synthesis_teaser(full.get("narrative") or ""),
+        "locked": True,
+        "narrative": "",
+        "themes": [],
+        "standoutCardId": None,
+        "standoutReason": "",
+        "openQuestion": "",
+        "cards": [],
+        "cardCount": full.get("cardCount", 0),
+        "createdAt": full.get("createdAt"),
+    }
+
+
+def _write_inapp_synthesis(uid: str, synth: dict, cards: List[dict], week_id: str,
+                           pro: bool = True) -> bool:
     """Persist the synthesis as an in-app "special card" the feed surfaces (M12).
 
     Stored at users/{uid}/syntheses/{week_id} (one per ISO week, so a re-run
     within the same week overwrites rather than duplicates). We denormalize the
     referenced cards' id+title+category so the card renders even if a source is
     later deleted — the feed still deep-links by id when the card exists.
+
+    Machina Pro: a free workspace (`pro=False`) gets the LOCKED shape here
+    (title + teaser) and the full payload is stashed in the functions-only
+    synthesis_vault, from which going Pro restores it in place. Generation
+    still happens for everyone: it costs a fraction of a cent and the teaser
+    is the upgrade moment.
 
     Returns True on a successful write, False if it failed — the caller gates
     `sent`/`lastDigestSentAt` on this so a swallowed write error isn't reported
@@ -337,6 +384,13 @@ def _write_inapp_synthesis(uid: str, synth: dict, cards: List[dict], week_id: st
         "createdAt": int(datetime.now(timezone.utc).timestamp() * 1000),
     }
     try:
+        if not pro:
+            from entitlement import stash_synthesis  # lazy: keeps cold starts light
+            # Vault first: if the visible write fails after this, the next run
+            # regenerates anyway; if the vault write fails, the user must not
+            # be shown a teaser whose body nobody can ever unlock.
+            stash_synthesis(uid, week_id, doc)
+            doc = locked_synthesis_doc(doc)
         get_db().collection("users").document(uid).collection("syntheses").document(week_id).set(doc)
         return True
     except Exception as e:
@@ -395,10 +449,14 @@ def build_and_send_synthesis(uid: str, user_data: dict, links: List[dict], force
 
     result["card_count"] = len(cards)
 
+    # Machina Pro: free workspaces get the locked teaser (see _write_inapp_synthesis).
+    pro = is_pro(uid)
+    result["locked"] = not pro
+
     # Primary surface: write the in-app special card. If this fails, the
     # synthesis wasn't delivered — don't report it sent or stamp the send time
     # (that would suppress the next retry). Mirrors build_and_send_digest.
-    if not _write_inapp_synthesis(uid, synth, cards, week_id):
+    if not _write_inapp_synthesis(uid, synth, cards, week_id, pro=pro):
         result["skipped"] = "write_failed"
         return result
     result["channels"].append("in_app")
@@ -411,10 +469,16 @@ def build_and_send_synthesis(uid: str, user_data: dict, links: List[dict], force
     if "push" in channels and user_data.get("fcmTokens"):
         from push_service import send_push  # lazy: keeps cold starts light
         try:
+            # A locked recap must not promise a body the tap can't show.
+            push_body = (
+                f"Your weekly synthesis of {len(cards)} cards is ready. Unlock it with Machina Pro."
+                if not pro else
+                f"Your weekly synthesis of {len(cards)} cards is ready"
+            )
             push_result = send_push(
                 uid,
                 synth.get("title") or "What you learned this week",
-                f"Your weekly synthesis of {len(cards)} cards is ready",
+                push_body,
                 {"view": "digest"},
             )
             if push_result.get("sent"):
@@ -542,6 +606,14 @@ def build_and_send_digest(uid: str, user_data: dict, force: bool = False) -> dic
     # it recaps the week's saves instead of curating a set of cards.
     if mode == "synthesis":
         return build_and_send_synthesis(uid, user_data, links, force=force)
+
+    # Curated digests are Pro-only (Machina Pro). Checked after the synthesis
+    # branch on purpose: the synthesis path has its own locked-teaser handling.
+    # Info, not warning: a free user with the toggle on is expected, not wrong.
+    if not is_pro(uid):
+        logger.info(f"Digest: skipping curated digest for free workspace {mask_uid(uid)} (Pro feature)")
+        result["skipped"] = "pro_required"
+        return result
 
     cards = curate(links, mode, count, topics)
 

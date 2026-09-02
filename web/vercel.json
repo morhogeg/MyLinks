@@ -83,6 +83,14 @@
       "destination": "https://secondbrain-app-94da2.web.app/api/client-error"
     },
     {
+      "source": "/api/entitlement",
+      "destination": "https://secondbrain-app-94da2.web.app/api/entitlement"
+    },
+    {
+      "source": "/api/entitlement/sync",
+      "destination": "https://secondbrain-app-94da2.web.app/api/entitlement/sync"
+    },
+    {
       "source": "/__/:path*",
       "destination": "https://secondbrain-app-94da2.firebaseapp.com/__/:path*"
     },

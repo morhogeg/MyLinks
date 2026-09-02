@@ -144,6 +144,8 @@ jobs:
           OWNER_EMAIL: ${{ secrets.OWNER_EMAIL }}
           APPCHECK_ENFORCE: ${{ secrets.APPCHECK_ENFORCE }}
           REQUIRE_AUTH: ${{ secrets.REQUIRE_AUTH }}
+          REVENUECAT_SECRET_KEY: ${{ secrets.REVENUECAT_SECRET_KEY }}
+          REVENUECAT_WEBHOOK_AUTH: ${{ secrets.REVENUECAT_WEBHOOK_AUTH }}
         run: |
           # Read secrets ONLY from the exported env vars above — never interpolate
           # ${{ secrets.X }} into the script body, or a secret containing shell
@@ -163,6 +165,15 @@ jobs:
           fi
           if [ -n "$REQUIRE_AUTH" ]; then
             echo "REQUIRE_AUTH=${REQUIRE_AUTH}" >> "$env_file"
+          fi
+          # Machina Pro (SOURCE_OF_TRUTH §4 item 26). Both optional: with
+          # neither set, /api/entitlement/sync answers 503 and the webhook
+          # refuses, while trials/founder grants and quota gating still work.
+          if [ -n "$REVENUECAT_SECRET_KEY" ]; then
+            echo "REVENUECAT_SECRET_KEY=${REVENUECAT_SECRET_KEY}" >> "$env_file"
+          fi
+          if [ -n "$REVENUECAT_WEBHOOK_AUTH" ]; then
+            echo "REVENUECAT_WEBHOOK_AUTH=${REVENUECAT_WEBHOOK_AUTH}" >> "$env_file"
           fi
 
       # firebase-tools runs the Python functions codebase inside functions/venv.

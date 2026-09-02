@@ -173,6 +173,7 @@ def test_synthesis_force_bypasses_week_dedupe(monkeypatch):
 def test_daily_digest_id_uses_local_day(monkeypatch):
     rec = RecordingDB()
     monkeypatch.setattr(ds, "get_db", lambda: rec)
+    monkeypatch.setattr(ds, "is_pro", lambda uid: True)
     monkeypatch.setattr(ds, "fetch_candidate_links", lambda uid: _recent_cards())
 
     # Pin the user's LOCAL "now" to 23:30 on the 21st. If the id were built from
@@ -193,3 +194,74 @@ def test_daily_digest_id_uses_local_day(monkeypatch):
     assert captured["tz"] == "America/Los_Angeles"
     assert res.get("digest_id") == "2026-07-21"
     assert "2026-07-21" in rec.written
+
+
+# ── Machina Pro: curated digests are Pro-only; synthesis locks for free ────
+
+def test_curated_digest_skipped_for_free_workspace(monkeypatch):
+    rec = RecordingDB()
+    monkeypatch.setattr(ds, "get_db", lambda: rec)
+    monkeypatch.setattr(ds, "is_pro", lambda uid: False)
+    monkeypatch.setattr(ds, "fetch_candidate_links", lambda uid: _recent_cards())
+
+    res = ds.build_and_send_digest(
+        "u1", {"settings": {"digest_mode": "smart", "digest_frequency": "daily"}}, force=True,
+    )
+    assert res["sent"] is False
+    assert res["skipped"] == "pro_required"
+    assert rec.written == {}
+
+
+def test_synthesis_for_free_workspace_is_locked_teaser_and_vaulted(monkeypatch):
+    import ai_service
+
+    rec = RecordingDB()
+    vault = {}
+    monkeypatch.setattr(ds, "get_db", lambda: rec)
+    monkeypatch.setattr(ds, "is_pro", lambda uid: False)
+    monkeypatch.setattr(ai_service, "GeminiService", lambda: type("G", (), {
+        "synthesize_week": lambda self, c: {
+            "title": "Three threads", "narrative": "You kept circling one idea. Then two more joined it.",
+            "themes": [{"title": "T", "insight": "i", "cardIds": ["c0"]}], "openQuestion": "Why?",
+        }})())
+    import entitlement
+    monkeypatch.setattr(entitlement, "stash_synthesis", lambda uid, wk, doc: vault.__setitem__(wk, doc))
+
+    res = ds.build_and_send_synthesis("u1", {"settings": {}}, _recent_cards(), force=True)
+
+    assert res["sent"] is True and res["locked"] is True
+    (week_id, visible), = rec.written.items()
+    assert visible["locked"] is True
+    assert visible["title"] == "Three threads"
+    assert visible["teaser"] == "You kept circling one idea."
+    # Nothing readable leaks past the teaser.
+    assert visible["narrative"] == "" and visible["themes"] == [] and visible["openQuestion"] == ""
+    assert visible["cards"] == []
+    # The full payload waits in the vault under the same week.
+    assert vault[week_id]["narrative"].startswith("You kept circling")
+    assert vault[week_id]["themes"][0]["cardIds"] == ["c0"]
+
+
+def test_synthesis_for_pro_workspace_is_written_in_full(monkeypatch):
+    import ai_service
+
+    rec = RecordingDB()
+    monkeypatch.setattr(ds, "get_db", lambda: rec)
+    monkeypatch.setattr(ds, "is_pro", lambda uid: True)
+    monkeypatch.setattr(ai_service, "GeminiService", lambda: type("G", (), {
+        "synthesize_week": lambda self, c: {"title": "T", "narrative": "Full text."}})())
+
+    res = ds.build_and_send_synthesis("u1", {"settings": {}}, _recent_cards(), force=True)
+    assert res["locked"] is False
+    (_, visible), = rec.written.items()
+    assert "locked" not in visible
+    assert visible["narrative"] == "Full text."
+
+
+def test_synthesis_teaser_is_one_sentence():
+    assert ds.synthesis_teaser("First. Second.") == "First."
+    assert ds.synthesis_teaser("No terminal punctuation here") == "No terminal punctuation here"
+    long = "word " * 60
+    t = ds.synthesis_teaser(long)
+    assert len(t) <= 164 and t.endswith("...")
+    assert ds.synthesis_teaser("") == ""

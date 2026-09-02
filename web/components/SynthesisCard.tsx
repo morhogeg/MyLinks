@@ -7,6 +7,10 @@ import { WeeklySynthesis, UserNote } from '@/lib/types';
 import { synthesisWeekLabel } from '@/lib/synthesis';
 import { makeNote, touchNote } from '@/lib/notes';
 import { hapticLight, hapticMedium } from '@/lib/haptics';
+import { Lock } from 'lucide-react';
+import ProBadge from '@/components/ui/ProBadge';
+import { Button } from '@/components/ui/Button';
+import { requestPaywall } from '@/lib/entitlement';
 
 /**
  * The weekly "What you learned" synthesis (M12), in two modes.
@@ -55,9 +59,13 @@ export default function SynthesisCard({
     const [composing, setComposing] = useState(false);
     const [draft, setDraft] = useState('');
 
-    const cardById = new Map(synthesis.cards.map((c) => [c.id, c]));
+    // Machina Pro: a free workspace's recap arrives locked (title + one-line
+    // teaser, nothing else). The body area then shows the teaser over a
+    // blurred stand-in with the unlock button; the notes section is kept.
+    const locked = synthesis.locked === true;
+    const cardById = new Map((synthesis.cards ?? []).map((c) => [c.id, c]));
     const standout = synthesis.standoutCardId ? cardById.get(synthesis.standoutCardId) : undefined;
-    const paragraphs = synthesis.narrative.split('\n').map((p) => p.trim()).filter(Boolean);
+    const paragraphs = (synthesis.narrative ?? '').split('\n').map((p) => p.trim()).filter(Boolean);
     const weekLabel = synthesisWeekLabel(synthesis);
     const savesLabel = `${synthesis.cardCount} ${synthesis.cardCount === 1 ? 'save' : 'saves'}`;
 
@@ -192,6 +200,40 @@ export default function SynthesisCard({
                     style={alwaysOpen ? undefined : { animation: 'slide-up 0.3s var(--ease-modal)' }}
                 >
                     <div className="mx-auto w-full max-w-[68ch]">
+                        {locked && (
+                            <div className="relative">
+                                {synthesis.teaser && (
+                                    <p dir="auto" className="text-[16px] leading-[1.7] text-text">
+                                        {synthesis.teaser}
+                                    </p>
+                                )}
+                                {/* Blurred stand-in for the body: fixed bars, no real
+                                    text behind the blur, so nothing can be read
+                                    through it or lifted out of the DOM. */}
+                                <div aria-hidden className="mt-4 flex flex-col gap-2.5 select-none pointer-events-none blur-[6px] opacity-70">
+                                    {[92, 88, 96, 60, 0, 84, 90, 52].map((w, i) => (
+                                        w === 0
+                                            ? <div key={i} className="h-3" />
+                                            : <div key={i} className="h-3.5 rounded-full bg-text-muted/40" style={{ width: `${w}%` }} />
+                                    ))}
+                                </div>
+                                <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-2 pb-2 pt-10 bg-gradient-to-t from-card via-card/95 to-transparent">
+                                    <div className="flex flex-wrap items-center justify-center gap-2 text-center text-[12.5px] text-text-secondary">
+                                        <Lock className="w-3.5 h-3.5" />
+                                        The full recap, themes, and standout are part of Machina Pro
+                                        <ProBadge />
+                                    </div>
+                                    <Button
+                                        variant="primary"
+                                        radius="full"
+                                        onClick={() => { hapticLight(); requestPaywall('synthesis'); }}
+                                    >
+                                        Unlock with Pro
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Narrative. The opening paragraph is the lead — a
                             notch larger, so the piece has a way in. */}
                         {paragraphs.map((p, i) => (
@@ -208,7 +250,7 @@ export default function SynthesisCard({
                             </p>
                         ))}
 
-                        {synthesis.themes.map((theme, i) => (
+                        {(synthesis.themes ?? []).map((theme, i) => (
                             <section key={i} className="mt-8 pt-6 border-t border-border-subtle first:border-t-0">
                                 <h3 dir="auto" className="text-[17px] font-bold text-text leading-snug tracking-[-0.01em]">
                                     {theme.title}

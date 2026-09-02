@@ -73,7 +73,11 @@ from search import (
 )
 from rate_limit import check_rate_limit, client_ip, RateLimitBackendError
 # Monthly per-user soft quotas (report 3.2). Imports only db + stdlib (no cycle).
-from quota import check_and_increment_quota, refund_quota, quota_message
+from quota import meter as meter_quota, refund_quota, quota_message
+from entitlement import (
+    plan_for, entitlement_summary, sync_from_revenuecat, resolve_workspace_for_app_user,
+    rc_configured, RevenueCatError, run_trial_nudges,
+)
 # Public share-page subsystem (renderers + publish/unpublish logic). The three
 # HTTP endpoints (publish_share_http, unpublish_share_http, share_page) stay in
 # this file — Firebase discovers deployables by scanning main.py — and call into
@@ -403,6 +407,10 @@ _RATE_LIMITS = {
     # a world-readable collection → fail CLOSED.
     "publish-ip": (60, 3600, False),
     "device_token": (30, 3600, True),
+    # Entitlement reads (plan + quota meter) fire on launch, foreground, and
+    # after each ask; the sync endpoint only after a purchase/restore. Cheap
+    # Firestore reads, so fail open.
+    "entitlement": (240, 3600, True),
     # Home search bar (native HTTP twin). Debounced client-side, but a user can
     # still fire many queries in a session, so keep the ceilings generous. Mirror
     # the IP + uid double-bucket the paid endpoints use (an embedding call per
@@ -676,22 +684,40 @@ def _rate_limited(bucket: str, identity: str, headers: dict = None):
 # blocking large-doc spam / storage abuse. Over-cap → 413.
 MAX_PUBLISH_BYTES = 200 * 1024
 
-def _quota_blocked(uid: str, kind: str, headers: dict = None):
+def _quota_blocked(uid: str, kind: str, headers: dict = None, plan: str = None):
     """Meter one `kind` unit against `uid`'s monthly quota; 429 Response if over.
 
+    Plan-aware (Machina Pro): the limit is the workspace's plan's, resolved
+    here from the entitlement doc unless the caller already has it (`plan`).
     Soft cap (report 3.2): a None uid (pre-cutover soft auth, nothing to meter)
-    or any Firestore error fails OPEN inside check_and_increment_quota, so this
-    only ever blocks a real, over-limit workspace — the rate limiter (fail-closed)
-    and max_instances are the hard backstops. Increments the counter as a side
+    or any Firestore error fails OPEN inside quota.meter, so this only ever
+    blocks a real, over-limit workspace — the rate limiter (fail-closed) and
+    max_instances are the hard backstops. Increments the counter as a side
     effect when the call is allowed, so callers invoke it exactly once, before
     the paid work / enqueue.
+
+    The 429 body carries `upgrade`/`kind`/`used`/`limit` next to `error` so the
+    client can open the paywall (free plan) instead of a plain error toast.
     """
     if not uid:
         return None
-    ok, _ = check_and_increment_quota(uid, kind)
-    if not ok:
-        logger.warning("Monthly quota exceeded (kind=%s)", kind)
-        return _error_response(quota_message(kind), 429, headers)
+    if plan is None:
+        plan = plan_for(uid)
+    r = meter_quota(uid, kind, plan=plan)
+    if not r["ok"]:
+        logger.warning("Monthly quota exceeded (kind=%s plan=%s)", kind, plan)
+        body = {
+            "success": False,
+            "error": quota_message(kind, plan, r["limit"]),
+            "upgrade": plan != "pro",
+            "kind": kind,
+            "used": r["used"],
+            "limit": r["limit"],
+        }
+        return https_fn.Response(
+            json.dumps(body), status=429, headers=headers or _cors_headers(),
+            mimetype='application/json',
+        )
     return None
 
 
@@ -807,12 +833,16 @@ def _fetch_post_images(image_urls: list) -> list:
 
 
 def _analyze_scraped(ai, scraped: dict, existing_tags: list, attempts: int = None,
-                     existing_categories: list = None):
+                     existing_categories: list = None, pro: bool = True):
     """Run the right analysis for scraped content.
 
     For YouTube, use Gemini native video ingestion; if that fails (private /
     unlisted / over-quota / region-blocked), fall back to an honest
-    metadata-only text analysis rather than fabricating a summary.
+    metadata-only text analysis rather than fabricating a summary. Video
+    ingestion is a Machina Pro feature: a free workspace (`pro=False`) gets the
+    same metadata-only card without the model ever watching the video. The
+    caller stamps `proFeature: 'youtube'` on the link doc so the client can say
+    so in one line; the decision itself stays here, next to the cost.
 
     When the scraped post carries embedded images (e.g. photos on an X post),
     fetch them and run a single multimodal analysis so the card reflects what the
@@ -835,6 +865,8 @@ def _analyze_scraped(ai, scraped: dict, existing_tags: list, attempts: int = Non
             logger.warning(
                 f"YouTube video over duration cap ({length_seconds}s > "
                 f"{YOUTUBE_MAX_VIDEO_MINUTES}min) — using metadata-only card")
+        elif not pro:
+            logger.info("YouTube video ingestion skipped for a free workspace (Pro feature); metadata-only card")
         elif watch_url:
             try:
                 analysis = ai.analyze_youtube(watch_url, existing_tags=existing_tags,
@@ -1623,10 +1655,14 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
             # the rare double-charge; the failed original now REFUNDS its unit (see
             # the 5xx handler below), so most retries follow a refund and net to one
             # charge anyway.
-            q = _quota_blocked(uid, "saves", headers)
+            plan = plan_for(uid)
+            q = _quota_blocked(uid, "saves", headers, plan=plan)
             if q:
                 return q
             charged = (uid, "saves")
+        else:
+            plan = "free"
+        pro = plan == "pro"
 
         logger.info(f"Analyzing URL synchronously: {url}")
 
@@ -1641,7 +1677,7 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
         content_type = scraped.get("content_type")
         # Synchronous path: 2 Gemini attempts (stay under the 60s budget, report 3.6).
         analysis = _analyze_scraped(ai, scraped, existing_tags, attempts=2,
-                                    existing_categories=existing_categories)
+                                    existing_categories=existing_categories, pro=pro)
 
         # 3. Generate Embedding & Find Connections
         # Rich v2 recipe (see _embedding_text_from_analysis). Used here only as
@@ -1699,6 +1735,8 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
         # videos get the same rich metadata (channel, thumbnail, highlights).
         if is_youtube:
             _apply_youtube_metadata(link_data, yt_meta, analysis, estimated_time)
+            if not pro:
+                link_data["proFeature"] = "youtube"
         else:
             # X/Instagram photo posts: show the cover image we read for vision.
             _apply_post_thumbnail(link_data, scraped, uid)
@@ -3314,6 +3352,150 @@ def send_test_push_http(req: https_fn.Request) -> https_fn.Response:
         return _server_error(headers, e, "Test push failed")
 
 
+# ─────────────────────────────────────────────
+# Machina Pro: entitlements + RevenueCat
+# ─────────────────────────────────────────────
+#
+# Plain HTTP endpoints for the same reason as the device-token twins: the
+# native shell (where purchases happen) can't clear a callable's CORS
+# preflight from `capacitor://localhost`. The workspace uid is derived from the
+# verified ID token; the RevenueCat app user id is the Firebase Auth uid (never
+# the workspace uid, which is a phone number for the legacy workspace).
+
+
+def _entitlement_caller(req, headers):
+    """(uid, auth_uid, None) for the verified caller, or (None, None, error)."""
+    rl = _rate_limited("entitlement", _rate_limit_identity(req), headers)
+    if rl:
+        return None, None, rl
+    decoded = _verify_bearer(req)
+    if not decoded:
+        return None, None, _error_response("User must be signed in", 401, headers)
+    auth_uid = decoded.get("uid")
+    uid = find_data_uid_by_auth_uid(auth_uid)
+    if not uid:
+        return None, None, _error_response("No workspace linked to this account", 403, headers)
+    return uid, auth_uid, None
+
+
+@https_fn.on_request()
+def entitlement_http(req: https_fn.Request) -> https_fn.Response:
+    """GET /api/entitlement: the caller's plan, grant dates, and this month's
+    quota usage. Lazily creates the founder/trial grant on first call."""
+    if req.method == 'OPTIONS':
+        return _cors_preflight(req)
+    headers = _cors_headers(req)
+    uid, _auth_uid, err = _entitlement_caller(req, headers)
+    if err:
+        return err
+    try:
+        return https_fn.Response(
+            json.dumps(entitlement_summary(uid)),
+            status=200, headers=headers, mimetype='application/json',
+        )
+    except Exception as e:
+        return _server_error(headers, e, "Entitlement lookup failed")
+
+
+@https_fn.on_request()
+def entitlement_sync_http(req: https_fn.Request) -> https_fn.Response:
+    """POST /api/entitlement/sync: re-read the caller's subscription from
+    RevenueCat right after a purchase or restore, and rewrite the entitlement.
+
+    The client's own copy of the receipt is never trusted; the server asks
+    RevenueCat. 503 when the secret key is not configured yet, so a build that
+    ships before the owner-side setup fails loudly instead of silently free."""
+    if req.method == 'OPTIONS':
+        return _cors_preflight(req)
+    headers = _cors_headers(req)
+    if req.method != 'POST':
+        return _error_response("Method not allowed", 405, headers)
+    uid, auth_uid, err = _entitlement_caller(req, headers)
+    if err:
+        return err
+    if not rc_configured():
+        return _error_response(
+            "Subscriptions are not set up on the server yet (REVENUECAT_SECRET_KEY missing)",
+            503, headers)
+    try:
+        sync_from_revenuecat(uid, auth_uid)
+        return https_fn.Response(
+            json.dumps(entitlement_summary(uid)),
+            status=200, headers=headers, mimetype='application/json',
+        )
+    except RevenueCatError as e:
+        logger.warning("RevenueCat sync failed for %s: %s", _mask_uid(uid), e)
+        return _error_response("Could not reach the subscription service. Please try again.", 503, headers)
+    except Exception as e:
+        return _server_error(headers, e, "Entitlement sync failed")
+
+
+# RevenueCat event types that change whether the `pro` entitlement is active.
+# Anything else (TEST, TRANSFER, SUBSCRIBER_ALIAS, …) is acknowledged and ignored.
+_RC_EVENTS = frozenset((
+    "INITIAL_PURCHASE", "RENEWAL", "PRODUCT_CHANGE", "CANCELLATION",
+    "EXPIRATION", "BILLING_ISSUE", "UNCANCELLATION",
+))
+
+
+@https_fn.on_request(max_instances=2)
+def revenuecat_webhook(req: https_fn.Request) -> https_fn.Response:
+    """POST target for RevenueCat's webhook (no user auth).
+
+    Authenticates by comparing the `Authorization` header with
+    REVENUECAT_WEBHOOK_AUTH (constant-time); 401 otherwise, 503 while the
+    secret is unset so the owner sees a misconfiguration rather than a silent
+    200. The event body is trusted only for WHICH user changed: dates come from
+    a fresh REST lookup (sync_from_revenuecat). Always 200 once handled, so
+    RevenueCat doesn't retry a user we simply don't know."""
+    if req.method != 'POST':
+        return _error_response("Method not allowed", 405)
+    expected = (os.environ.get("REVENUECAT_WEBHOOK_AUTH") or "").strip()
+    if not expected:
+        logger.warning("revenuecat_webhook called but REVENUECAT_WEBHOOK_AUTH is unset")
+        return _error_response("Webhook not configured", 503)
+    provided = (req.headers.get("Authorization") or "").strip()
+    if not hmac.compare_digest(provided, expected):
+        logger.warning("revenuecat_webhook: bad Authorization header")
+        return _error_response("Unauthorized", 401)
+    if not rc_configured():
+        return _error_response("REVENUECAT_SECRET_KEY is not set", 503)
+
+    body = req.get_json(silent=True) or {}
+    event = body.get("event") if isinstance(body, dict) else None
+    if not isinstance(event, dict):
+        return _error_response("Invalid event body", 400)
+    etype = str(event.get("type") or "")
+    if etype not in _RC_EVENTS:
+        logger.info("revenuecat_webhook: ignoring event type %s", etype or "?")
+        return https_fn.Response(json.dumps({"ok": True, "ignored": etype}), status=200,
+                                 mimetype='application/json')
+
+    app_user_id = event.get("app_user_id") or event.get("original_app_user_id")
+    aliases = event.get("aliases") or []
+    try:
+        uid = resolve_workspace_for_app_user(app_user_id, aliases)
+    except Exception as e:
+        logger.error("revenuecat_webhook: workspace resolve failed: %s", e)
+        return _error_response("Lookup failed", 500)
+    if not uid:
+        # Not an error worth retrying: the account may have been deleted.
+        logger.info("revenuecat_webhook: %s for an unknown app user", etype)
+        return https_fn.Response(json.dumps({"ok": True, "unknown_user": True}), status=200,
+                                 mimetype='application/json')
+    try:
+        doc = sync_from_revenuecat(uid, app_user_id)
+    except RevenueCatError as e:
+        # 5xx makes RevenueCat retry with backoff, which is what we want here.
+        logger.warning("revenuecat_webhook: sync failed for %s: %s", _mask_uid(uid), e)
+        return _error_response("Subscription service unavailable", 502)
+    except Exception as e:
+        return _server_error(None, e, "Webhook processing failed")
+    logger.info("revenuecat_webhook: %s handled for %s (plan=%s)", etype, _mask_uid(uid), doc.get("plan"))
+    return https_fn.Response(json.dumps({"ok": True, "plan": doc.get("plan")}), status=200,
+                             mimetype='application/json')
+
+
 # How long a client_error_reports record lives. Same policy as server_errors.
 _CLIENT_ERROR_TTL_DAYS = 14
 # Whole-body cap. A report is a message + stack + a few short fields; anything
@@ -3683,6 +3865,8 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
 
     analysis = {}
     scraped = {"html": "", "title": "", "text": ""}
+    # Assumed Pro until the video path reads the plan; only YouTube cares.
+    pro = True
 
     try:
         # Mark the queue doc as in-flight. Kept inside the try so that if this
@@ -3761,9 +3945,12 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
                 analysis = ai.analyze_image(image_bytes, mime_type, existing_tags=existing_tags,
                                             existing_categories=existing_categories)
         else:
-            # Analyze with AI (YouTube → native video ingestion w/ fallback)
+            # Analyze with AI (YouTube → native video ingestion w/ fallback).
+            # The plan is read here, once per capture, and only for videos: it
+            # is the one content type whose analysis is Pro-gated.
+            pro = plan_for(uid) == "pro" if scraped.get("content_type") == "youtube" else True
             analysis = _analyze_scraped(ai, scraped, existing_tags,
-                                        existing_categories=existing_categories)
+                                        existing_categories=existing_categories, pro=pro)
 
         # Final Defensive check for analysis
         if not isinstance(analysis, dict):
@@ -3847,6 +4034,8 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         # Add YouTube-specific metadata
         if is_youtube:
             _apply_youtube_metadata(link_data, yt_meta, analysis, estimated_time)
+            if not pro:
+                link_data["proFeature"] = "youtube"
         elif not is_image:
             # X/Instagram photo posts: show the cover image we read for vision.
             # task_id keys the blob so a retry reuses the same path (idempotent).
@@ -4195,6 +4384,29 @@ def send_digests(event: scheduler_fn.ScheduledEvent) -> None:
     """Every 15 min: deliver curated digests to users whose schedule is due now."""
     from digest_service import run_digest_check
     run_digest_check()
+
+
+# Trial nudge: one push, 48h before a reverse trial ends (entitlement.py).
+# Six-hourly is plenty: the window is two days wide and the doc is stamped
+# (nudgedAt) so nobody is pinged twice.
+@scheduler_fn.on_schedule(schedule="0 */6 * * *", max_instances=1)
+def trial_nudges(event: scheduler_fn.ScheduledEvent) -> None:
+    """Every 6h: warn trials that end within 48h (Machina Pro)."""
+    run_trial_nudges()
+
+
+@https_fn.on_request(max_instances=1)
+def force_trial_nudges(req: https_fn.Request) -> https_fn.Response:
+    """Manual trigger for the trial-nudge sweep (admin-gated)."""
+    guard = _require_admin(req)
+    if guard:
+        return guard
+    try:
+        report = run_trial_nudges()
+        return https_fn.Response(json.dumps(report, indent=2), status=200, mimetype="application/json")
+    except Exception as e:
+        logger.error(f"Manual trial nudge trigger failed: {e}")
+        return https_fn.Response(f"Error: {e}", status=500)
 
 
 @https_fn.on_request(max_instances=1)

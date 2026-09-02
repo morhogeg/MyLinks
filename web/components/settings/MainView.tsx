@@ -1,10 +1,11 @@
 'use client';
 
-import { Bell, BellRing, Sun, Moon, Monitor, Clock, Compass, Lock, BarChart3, Heart } from 'lucide-react';
+import { Bell, BellRing, Sun, Moon, Monitor, Clock, Compass, Lock, BarChart3, Heart, Crown } from 'lucide-react';
 import { policyUrl, openExternal } from '@/lib/share';
 import { isNativeApp } from '@/lib/api';
 import ProfileAvatar from '../ProfileAvatar';
 import DataExport from './DataExport';
+import { useEntitlement } from '@/components/EntitlementProvider';
 import type { Settings, View } from './types';
 import {
     SectionHeader, Footnote, List, RowShell, RowText, Chevron,
@@ -40,6 +41,19 @@ export function MainView({
     go: (v: View) => void;
 }) {
     const remindersOrDigest = settings.reminders_enabled || settings.digest_enabled;
+    // Machina Pro row: one line of truth about the plan, and the way to change it.
+    const ent = useEntitlement();
+    const proValue = !ent.loaded
+        ? undefined
+        : ent.isTrial
+            ? `trial, ${ent.daysLeft ?? 0} ${ent.daysLeft === 1 ? 'day' : 'days'} left`
+            : ent.isPro && ent.source === 'founder'
+                ? 'founding member'
+                : ent.isPro
+                    ? 'active'
+                    : undefined;
+    const proTitle = ent.loaded && !ent.isPro ? 'Upgrade to Pro' : 'Machina Pro';
+    const manageSubscription = () => openExternal('https://apps.apple.com/account/subscriptions');
     return (
         <>
             {/* Account (web only — native has no signed-in user) */}
@@ -67,6 +81,26 @@ export function MainView({
                         <Chevron />
                     </RowShell>
                 </List>
+            )}
+
+            {authUid && (
+                <>
+                    <SectionHeader>Plan</SectionHeader>
+                    <List>
+                        <NavRow
+                            tile={<Crown className="w-[16px] h-[16px]" />}
+                            title={proTitle}
+                            value={proValue}
+                            onClick={() => ent.openPaywall('settings')}
+                        />
+                        {ent.isPro && ent.source === 'revenuecat' && (
+                            <ExternalRow title="Manage subscription" onClick={manageSubscription} />
+                        )}
+                    </List>
+                    {ent.loaded && !ent.isPro && (
+                        <Footnote>Unlimited saves and questions, the full weekly synthesis, curated digests, and video transcripts.</Footnote>
+                    )}
+                </>
             )}
 
             <SectionHeader first={!authUid}>Appearance</SectionHeader>
