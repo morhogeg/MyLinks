@@ -226,7 +226,21 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-08-26): install build **1308** for the demo seeding, and RAISE THE GEMINI CAP
+> ## 🚨 OWNER ACTION (updated 2026-09-02): install build **1316** (Machina Pro), then the §4 item 26 checklist
+>
+> **1316** (run #316, merge `87a1d3b`) carries Machina Pro. What you will see
+> on device with NO RevenueCat keys yet: Settings shows a "Plan" row reading
+> "Machina Pro · founding member" (every pre-launch workspace has a 365-day
+> founders grant), the paywall opens from that row and says subscriptions
+> aren't available in this build, Ask shows no meter (you are Pro), nothing
+> is gated. A brand-new account gets "trial, 14 days left" and one welcome
+> line. To make the paywall real: the RevenueCat + App Store Connect +
+> GitHub-secrets checklist under §4 item 26, then a functions push and a
+> new TestFlight build. Hosting run #11 raced the new functions; PR #19
+> re-fires it (native `/api/entitlement` 404s until that run is green, which
+> the client treats as "plan not loaded", so nothing breaks).
+>
+> ## (superseded) OWNER ACTION (updated 2026-08-26): install build **1308** for the demo seeding, and RAISE THE GEMINI CAP
 >
 > **1308** (run #308, merge `8763ac1`) carries the analysis-stall fix (§9
 > 2026-08-26 round 14): Gemini call timeouts + the 540s trigger budget are
@@ -1796,7 +1810,7 @@ exact-match, capped.
   green (the emulator suite the session could not run locally), Deploy
   Firestore rules #11 green (entitlements + synthesis_vault denied live),
   Deploy Cloud Functions #97 green (indexes + whole codebase + canary; the
-  five new functions exist), TestFlight run #316 = build 1316 (result recorded at the end of this entry).
+  five new functions exist), TestFlight run #316 = build 1316, green (archived, entitlements verified, uploaded 10:38 UTC; the RevenueCat Swift package compiled in CI on the first try).
   Deploy Firebase Hosting #11 FAILED on the known race (the
   /api/entitlement rewrites referenced functions run #97 was still
   creating, same as run #9 on 2026-08-26); re-triggered by the
