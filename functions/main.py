@@ -3340,7 +3340,7 @@ def send_test_push_http(req: https_fn.Request) -> https_fn.Response:
         result = send_push(
             uid,
             "Machina test notification",
-            "Push is working — digests and reminders will arrive like this.",
+            "Push is working. Digests and reminders will arrive like this.",
             {"view": "digest"},
         )
         result["tokens"] = len(tokens)
