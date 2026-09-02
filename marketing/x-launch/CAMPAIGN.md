@@ -157,8 +157,17 @@ on launch day, when replies need all the attention.
 
 Format: ID, day, weekday, then the post. IDs are internal (T1 to T30; the
 launch thread is T1.1 to T1.5). Threads are shown one tweet per block.
-Under each post: the asset it ships with, and the reply that goes underneath it
-(the reply is where the link lives). Character counts were checked by script;
+
+Under each post, two lines:
+
+- **Attach** is the one image or clip you attach to the tweet when you post
+  it. Every tweet has exactly one; the numbered list of all of them is in §6.
+- **First comment** is a short second post you write yourself, from the
+  Machina account, as the first comment under your own tweet, right after it
+  goes up. It is where the App Store link lives (X shows posts with an
+  outbound link to fewer people, so the link goes one tap down) and where the
+  obvious follow-up question gets answered before anyone asks it. "First
+  comment: none" means post the tweet with its attachment and nothing else. Character counts were checked by script;
 every tweet is under 280.
 
 ### Week 1: Launch. One beat of the argument per day.
@@ -195,11 +204,11 @@ Everything you save, finally useful.
 apps.apple.com/[fill]
 ```
 
-- **Asset:** tweet 1 carries the launch film's 20-second social cut (cold open,
+- **Attach:** tweet 1 carries the launch film's 20-second social cut (cold open,
   five platforms gathering, share sheet, card). Tweets 2 to 4 each carry one
   still from the same film: the card, the graph, the Ask answer with three
   citation chips. Tweet 5 carries the App Store badge on the light endcard.
-- **Reply, from the account, under tweet 5:** `Web: mymachina.app`
+- **First comment, under T1.5:** `Web: mymachina.app`
 - **Same day, elsewhere:** Product Hunt goes live at 12:01 AM PT with the
   tagline `Everything you save, finally useful.`; LinkedIn gets the post 1
   text as a single post with the film; the TestFlight testers get an email
@@ -217,9 +226,9 @@ Saving was never the hard part. Finding it again is.
 Machina is one place for all of it, from every app. Free on iPhone and web.
 ```
 
-- **Asset:** the film's act-one still: five platform panels drifting apart,
+- **Attach:** the film's act-one still: five platform panels drifting apart,
   bleaching into the paper.
-- **Reply:** `Free on iPhone and web: apps.apple.com/[fill]`
+- **First comment:** `Free on iPhone and web: apps.apple.com/[fill]`
 
 #### T3 · Day 3 · Thursday · capture, shown not told
 
@@ -231,10 +240,10 @@ Share. Tap Machina. Done.
 Machina holds everything you save, from any app, and the card finishes on its own, even if you never open the app that day.
 ```
 
-- **Asset:** a 12-second device recording: Instagram post, share sheet, the
+- **Attach:** a 12-second device recording: Instagram post, share sheet, the
   Machina extension's five-phase checklist, "Saved to Machina", then the card
   in the feed. Real device, real post, no cuts.
-- **Reply:** `Works from Safari, YouTube, X, Photos, WhatsApp, anywhere with a share button.`
+- **First comment:** `Works from Safari, YouTube, X, Photos, WhatsApp, anywhere with a share button.`
 
 #### T4 · Day 4 · Friday · anatomy of a card
 
@@ -250,9 +259,9 @@ Three related saves, found on their own.
 Nothing here was typed by a person.
 ```
 
-- **Asset:** one annotated card screenshot, six thin callout lines, in the app's
+- **Attach:** one annotated card screenshot, six thin callout lines, in the app's
   own type. This image gets reused on Product Hunt and the App Store listing.
-- **Reply:** none. Let the image do the work.
+- **First comment:** none. Let the image do the work.
 
 #### T5 · Day 6 · Sunday · the Sunday ritual
 
@@ -264,9 +273,9 @@ The themes. One standout. One open question you did not know you were circling.
 Written only from your own saves, and cited back to them. Free on iPhone and web.
 ```
 
-- **Asset:** a weekly synthesis screenshot from a real library, with permission.
+- **Attach:** a weekly synthesis screenshot from a real library, with permission.
   `[fill]`
-- **Reply:** `It arrives as a notification at the time you choose. Settings, Reminders and Digest.`
+- **First comment:** `It arrives as a notification at the time you choose. Settings, Reminders and Digest.`
 
 #### T6 · Day 7 · Monday · the payoff
 
@@ -278,9 +287,9 @@ If they are in Machina, ask. It answers from your own saves, nothing else, and c
 Tap a citation and you are there.
 ```
 
-- **Asset:** a 15-second clip: the question typed, the answer streaming in, a
+- **Attach:** a 15-second clip: the question typed, the answer streaming in, a
   citation chip tapped, the source card opening.
-- **Reply:** `Ask does not search the web. If it is not in your library, it says so.`
+- **First comment:** `Ask does not search the web. If it is not in your library, it says so.`
 
 #### T7 · Day 8 · Tuesday · week one
 
@@ -294,8 +303,8 @@ One library holds all of that, from every app, read and filed on its own.
 What did you save first?
 ```
 
-- **Asset:** a 3x2 grid of six real cards (blurred where needed), one screenshot.
-- **Reply:** `Thank you for a week one. Link, for anyone arriving late: apps.apple.com/[fill]`
+- **Attach:** a 3x2 grid of six real cards (blurred where needed), one screenshot.
+- **First comment:** `Thank you for a week one. Link, for anyone arriving late: apps.apple.com/[fill]`
 - **Note:** the examples must be real and specific (a sourdough schedule, a talk
   on Rust, an apartment listing, a thread on salary negotiation, a wine label
   is the register). If permission is thin, use your own library's first five
@@ -316,9 +325,9 @@ Share from Safari. Machina reads the full page, not the preview card, and writes
 Long or short, English or Hebrew, it gets read in full. One place for everything you save.
 ```
 
-- **Asset:** split image: the Safari page on the left, the finished card on the
+- **Attach:** split image: the Safari page on the left, the finished card on the
   right, same headline visible in both.
-- **Reply:** `Also from a laptop: paste a link into mymachina.app, or use the browser extension.`
+- **First comment:** `Also from a laptop: paste a link into mymachina.app, or use the browser extension.`
 
 #### T9 · Day 10 · Thursday · Save from anywhere, 2/3: the video
 
@@ -330,9 +339,9 @@ Share a YouTube link. Machina watches the whole thing and gives you the summary,
 A forty-minute talk, read in the time it took to save it.
 ```
 
-- **Asset:** card screenshot with the video highlights visible, timestamps
+- **Attach:** card screenshot with the video highlights visible, timestamps
   showing (`12:40 · the two-minute rule`, or whatever the real card says).
-- **Reply:** none.
+- **First comment:** none.
 
 #### T10 · Day 11 · Friday · Save from anywhere, 3/3: the screenshots
 
@@ -344,9 +353,9 @@ A carousel you do not want to lose? Take up to five screenshots and share them t
 They become one card, in order, read as one piece. The text inside the images is read too.
 ```
 
-- **Asset:** a 10-second clip: five screenshots selected in Photos, shared, the
+- **Attach:** a 10-second clip: five screenshots selected in Photos, shared, the
   card appearing with the "1/5" chip, a swipe through the carousel.
-- **Reply:** `Screenshots are how most people actually save. Machina treats them as first-class.`
+- **First comment:** `Screenshots are how most people actually save. Machina treats them as first-class.`
 
 #### T11 · Day 13 · Sunday · it comes back to you
 
@@ -358,9 +367,9 @@ Machina, one place for everything you save, also brings things back: a daily dig
 At the time you choose. To the minute.
 ```
 
-- **Asset:** a lock-screen notification screenshot: `Reminder: revisit "The
+- **Attach:** a lock-screen notification screenshot: `Reminder: revisit "The
   science of deep focus"` (or the real one).
-- **Reply:** `Reminders are spaced: a save comes back a few times, further apart each time, until it sticks.`
+- **First comment:** `Reminders are spaced: a save comes back a few times, further apart each time, until it sticks.`
 
 ### Week 3: What a card knows. A three-day series, then the Sunday.
 
@@ -374,10 +383,10 @@ Not the first paragraph. Not the site's description. Machina reads the whole pie
 A note of your own? Your words stay exactly as you wrote them. Machina's read waits behind the mark.
 ```
 
-- **Asset:** two cards side by side: an article card with summary and key
+- **Attach:** two cards side by side: an article card with summary and key
   points, and a note card showing the verbatim body with "Machina's read"
   collapsed under the citation mark.
-- **Reply:** none.
+- **First comment:** none.
 
 #### T13 · Day 16 · Wednesday · What a card knows, 2/3: the filing
 
@@ -391,8 +400,8 @@ Insights shows where your attention actually went this month.
 You never make a folder.
 ```
 
-- **Asset:** the Insights screen, category bars in their identity colors.
-- **Reply:** `Tags and category are editable with a tap. Machina files; you can always refile.`
+- **Attach:** the Insights screen, category bars in their identity colors.
+- **First comment:** `Tags and category are editable with a tap. Machina files; you can always refile.`
 
 #### T14 · Day 17 · Thursday · What a card knows, 3/3: the connections
 
@@ -406,9 +415,9 @@ When a card lands, Machina matches it against everything you have kept.
 Related cards appear on the card itself. Open the graph and your library is one map.
 ```
 
-- **Asset:** a 12-second clip: a card's related-saves row, then the graph view
+- **Attach:** a 12-second clip: a card's related-saves row, then the graph view
   with a cluster highlighted.
-- **Reply:** `This is the part a folder can never do. Folders hold. Machina notices.`
+- **First comment:** `This is the part a folder can never do. Folders hold. Machina notices.`
 
 #### T15 · Day 19 · Saturday · search the way you remember
 
@@ -420,8 +429,8 @@ Type what you remember, not the exact words.
 Machina searches everything you saved by meaning, in English or Hebrew, however you saved it.
 ```
 
-- **Asset:** a 6-second clip: the query typed, one card returned.
-- **Reply:** none.
+- **Attach:** a 6-second clip: the query typed, one card returned.
+- **First comment:** none.
 
 #### T16 · Day 20 · Sunday · a real synthesis
 
@@ -433,9 +442,9 @@ Three themes. One standout. One open question. Written every Sunday from that pe
 Nobody else's week looks like this one.
 ```
 
-- **Asset:** the full synthesis screenshot. `[fill]` Use a tester's library or
+- **Attach:** the full synthesis screenshot. `[fill]` Use a tester's library or
   your own; blur nothing, or pick a week that needs no blurring.
-- **Reply:** `Machina writes it every Sunday. You choose the hour.`
+- **First comment:** `Machina writes it every Sunday. You choose the hour.`
 
 ### Week 4: Ask. A three-day series, then the community.
 
@@ -449,9 +458,9 @@ Machina holds everything you save. Ask it a question and it does not search the 
 The answer is yours because the sources are.
 ```
 
-- **Asset:** the Ask screen with a question and a short answer, citation chips
+- **Attach:** the Ask screen with a question and a short answer, citation chips
   visible.
-- **Reply:** none.
+- **First comment:** none.
 
 #### T18 · Day 23 · Wednesday · Ask, 2/3: the citation
 
@@ -463,8 +472,8 @@ Every line of an answer carries one. Tap it and the exact save opens, at the pas
 No trust required. Check it.
 ```
 
-- **Asset:** a 10-second clip: citation tapped, source card opens.
-- **Reply:** none.
+- **Attach:** a 10-second clip: citation tapped, source card opens.
+- **First comment:** none.
 
 #### T19 · Day 24 · Thursday · Ask, 3/3: the honest no
 
@@ -478,9 +487,9 @@ Ask about something you never saved, and Machina says so:
 An answer that admits the gap beats one that sounds right.
 ```
 
-- **Asset:** a screenshot of exactly that reply. The quote is the product's real
+- **Attach:** a screenshot of exactly that reply. The quote is the product's real
   string; do not paraphrase it.
-- **Reply:** `The "yet" is the point. Save something about it and ask again.`
+- **First comment:** `The "yet" is the point. Save something about it and ask again.`
 
 #### T20 · Day 26 · Saturday · collections
 
@@ -490,8 +499,8 @@ Collections in Machina, for what belongs together.
 A trip. A renovation. A course. Group your saves by project, and put the personal ones behind a PIN, visible only to you.
 ```
 
-- **Asset:** the Collections screen with one PIN-locked collection visible.
-- **Reply:** none.
+- **Attach:** the Collections screen with one PIN-locked collection visible.
+- **First comment:** none.
 
 #### T21 · Day 27 · Sunday · the community ask (text only)
 
@@ -503,8 +512,8 @@ Machina answers questions from everything you have saved, with a citation on eve
 Reply with the question. Next Sunday: the best ones, and the answers Machina gave, from real libraries, with permission.
 ```
 
-- **Asset:** none. This post is a conversation.
-- **Reply:** none. Reply to every answer instead, within the hour.
+- **Attach:** none. This post is a conversation.
+- **First comment:** none. Reply to every answer instead, within the hour.
 - **Follow-through:** the best replies feed T26.
 
 ### Week 5: Trust. A three-day series, then Hebrew, then the month.
@@ -519,8 +528,8 @@ Your library is yours. No ads. No tracking. Nothing sold.
 Export everything, any time. Delete your account from inside the app, and it is gone.
 ```
 
-- **Asset:** the Settings screen showing Export and Delete account.
-- **Reply:** `Full policy, in plain language: mymachina.app/privacy`
+- **Attach:** the Settings screen showing Export and Delete account.
+- **First comment:** `Full policy, in plain language: mymachina.app/privacy`
 
 #### T23 · Day 30 · Wednesday · Trust, 2/3: free
 
@@ -532,8 +541,8 @@ Saving is never behind a paywall. A save that bounces off a payment screen break
 Machina is free to start. Capture stays free.
 ```
 
-- **Asset:** the share sheet's "Saved to Machina" frame.
-- **Reply:** none.
+- **Attach:** the share sheet's "Saved to Machina" frame.
+- **First comment:** none.
 - **Note:** "Capture stays free" is a public commitment. It is the §7 decision
   (never gate capture; gate the expensive intelligence later). Confirm it is
   still the plan before this posts.
@@ -548,8 +557,8 @@ The web app holds the same library as your phone. Save from your phone in the mo
 mymachina.app
 ```
 
-- **Asset:** phone and laptop side by side, same card on both.
-- **Reply:** none.
+- **Attach:** phone and laptop side by side, same card on both.
+- **First comment:** none.
 
 #### T25 · Day 33 · Saturday · Hebrew
 
@@ -561,8 +570,8 @@ Save a Hebrew article and the card is in Hebrew, right to left, with the right t
 A mixed library is fine. Most libraries are.
 ```
 
-- **Asset:** a Hebrew card next to an English card in the same feed.
-- **Reply:** none.
+- **Attach:** a Hebrew card next to an English card in the same feed.
+- **First comment:** none.
 
 #### T26 · Day 34 · Sunday · what Machina learned this month
 
@@ -576,8 +585,8 @@ Your questions from last Sunday, asked against real libraries:
 Every answer came from someone's own saves. Nothing from the web.
 ```
 
-- **Asset:** three Ask screenshots stacked, one image.
-- **Reply:** `This becomes a monthly post. First Sunday of every month.`
+- **Attach:** three Ask screenshots stacked, one image.
+- **First comment:** `This becomes a monthly post. First Sunday of every month.`
 - **Note:** this is the D-4 "monthly public post generated from the synthesis
   feature". Its recurrence is the campaign's first standing series.
 
@@ -593,8 +602,8 @@ The summary, the key points, the source. Nothing of yours you did not choose to 
 Send the card, not the link. The person gets the point before they get the page.
 ```
 
-- **Asset:** a shared card's public page as it renders in a WhatsApp preview.
-- **Reply:** `A shared page looks like this: mymachina.app/s/[fill: a real shared card]`
+- **Attach:** a shared card's public page as it renders in a WhatsApp preview.
+- **First comment:** `A shared page looks like this: mymachina.app/s/[fill: a real shared card]`
 
 #### T28 · Day 37 · Wednesday · the belief (text only)
 
@@ -606,8 +615,8 @@ Recalling it is how you learn it.
 Machina, one place for everything you save, exists for the second half.
 ```
 
-- **Asset:** none. Three lines, the whole product.
-- **Reply:** none.
+- **Attach:** none. Three lines, the whole product.
+- **First comment:** none.
 
 #### T29 · Day 39 · Friday · thirty days
 
@@ -623,8 +632,8 @@ What should Machina do next? Reply, and it goes on the list.
 apps.apple.com/[fill]
 ```
 
-- **Asset:** a single clean image with the three numbers in the app's type.
-- **Reply:** none. Reply to every suggestion.
+- **Attach:** a single clean image with the three numbers in the app's type.
+- **First comment:** none. Reply to every suggestion.
 - **Note:** the numbers come from the first-party analytics events
   (`analytics_events`) and the workspace count. Round down. If a number is
   embarrassing, post the others and leave it out; never inflate.
@@ -643,9 +652,9 @@ Free on iPhone and web.
 apps.apple.com/[fill]
 ```
 
-- **Asset:** the launch film's endcard, App Store badge added above the rule
+- **Attach:** the launch film's endcard, App Store badge added above the rule
   (not replacing the tagline line).
-- **Reply:** `Web: mymachina.app · Questions: support@mymachina.app`
+- **First comment:** `Web: mymachina.app · Questions: support@mymachina.app`
 - **After this post:** the account moves to the standing cadence in §7.
 
 ---
@@ -684,11 +693,11 @@ rhythm. By week three a follower knows Sunday means synthesis.
 
 ---
 
-## 6. Asset checklist
+## 6. Attachment checklist
 
 Render before Day 1, in this order. Names are suggestions; keep them.
 
-| # | Asset | Used by |
+| # | Attachment | Used by |
 |---|---|---|
 | A1 | Launch film, 20s social cut, square and vertical, captions burned in (from `marketing/launch-clip`, clean composition) | T1 |
 | A2 | Film stills: five platforms drifting; five gathering; the card; the graph; Ask with three citation chips; endcard | T1, 2, 30, header |
