@@ -236,9 +236,8 @@ The multi-user auth work described below **was** fully written but not live:
 > is gated. A brand-new account gets "trial, 14 days left" and one welcome
 > line. To make the paywall real: the RevenueCat + App Store Connect +
 > GitHub-secrets checklist under §4 item 26, then a functions push and a
-> new TestFlight build. Hosting run #11 raced the new functions; PR #19
-> re-fires it (native `/api/entitlement` 404s until that run is green, which
-> the client treats as "plan not loaded", so nothing breaks).
+> new TestFlight build. (Hosting run #11 raced the new functions; the PR #19
+> re-fire, run #12, is green, so `/api/entitlement` is live for the app.)
 >
 > ## (superseded) OWNER ACTION (updated 2026-08-26): install build **1308** for the demo seeding, and RAISE THE GEMINI CAP
 >
@@ -1814,10 +1813,10 @@ exact-match, capped.
   Deploy Firebase Hosting #11 FAILED on the known race (the
   /api/entitlement rewrites referenced functions run #97 was still
   creating, same as run #9 on 2026-08-26); re-triggered by the
-  deploy-hosting.yml comment edit in the docs commit that follows this
-  entry. Native calls to /api/entitlement return 404 until that hosting
-  run is green; the client treats that as "not loaded" (no Pro chrome, no
-  gate), so nothing breaks in the meantime. Desktop web: Vercel auto-deploy
+  deploy-hosting.yml comment edit in PR #19 (merge `57b07fc`): hosting run
+  #12 green at 10:41 UTC, rewrites verified, so the native app reaches
+  /api/entitlement. (In the eleven minutes between, the client saw 404 and
+  treated it as "plan not loaded": no Pro chrome, no gate, nothing broke.) Desktop web: Vercel auto-deploy
   from the merge. Live effect today: every existing workspace is a founder
   (Pro for 365 days), every new workspace gets the 14-day trial, so nobody
   is gated; the paywall opens but says subscriptions aren't available in
