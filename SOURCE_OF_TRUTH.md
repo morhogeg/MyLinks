@@ -1648,7 +1648,20 @@ paid spend.
 
 **Launch assets — first set (ready to adapt):**
 
-*Announcement thread (X), post 1:*
+*X launch campaign (BUILT 2026-09-02):* `marketing/x-launch/CAMPAIGN.md` is the
+full 30-post, six-week plan for the `@mymachina` account — Day 1 = App Store
+launch day (a Tuesday, 9:00 AM ET), brand voice, English only, four three-day
+feature series (Save from anywhere / What a card knows / Ask / Trust) with
+Sundays reserved for synthesis-shaped posts, account setup (handle, bio,
+header, pinned post, create the account 3+ weeks early but post nothing before
+Day 1), an asset checklist, engagement rules, the standing cadence after post
+30, the Product Hunt / Show HN / LinkedIn / Reddit / short-form / press reuse
+plan, and a claims register verified against the code. It is D-7-compliant
+(hero = one place that holds everything you save; Ask is week 4) and
+**supersedes the four-post announcement thread below** for X; the thread
+stays as history and as the Product Hunt first-comment source.
+
+*Announcement thread (X), post 1 (superseded for X by the campaign above):*
 > I kept saving links I never looked at again. Bookmarks, WhatsApp self-messages,
 > screenshots — a graveyard.
 >
@@ -1732,6 +1745,26 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-09-02 — X launch campaign written: `marketing/x-launch/CAMPAIGN.md`
+  (owner: "first 30 tweets, a real arc, Apple-grade").** Owner decisions taken
+  in-session: Day 1 is App Store launch day (not a pre-launch build-in-public
+  run), brand voice rather than first-person founder, English only, "AI" allowed
+  sparingly as plumbing. The document: 30 posts across six weeks with day
+  numbers and posting times; week 1 = one beat of the argument per day; weeks
+  2-5 each carry a numbered three-day series (capture formats, what a card
+  knows, Ask, trust) with Sundays for synthesis posts; week 6 = sharing, the
+  belief line, the 30-day numbers, the close. Also: handle `@mymachina`
+  (fallbacks `@machinaapp`, `@getmachina`), bio/header/pinned, the Day-1
+  preconditions (Ready for Sale on a non-dev phone, Gemini cap raised, PH
+  scheduled, assets rendered), a 26-item asset checklist, engagement rules, the
+  post-30 cadence, non-X reuse (PH, Show HN, LinkedIn, Reddit, short-form,
+  tester email, App Store featuring, press), and a claims register. Verified by
+  script: every tweet ≤280 chars, zero em dashes, no "Machina AI"/"second
+  brain"/"bookmarks"/"AI-powered" in any post; the honest-no string quoted in
+  post 19 is the exact `ai_service.py` string. §8 now points at it and marks the
+  old four-post thread as superseded for X. NOT done: screenshots/clips (the
+  `[fill]` slots), and BRANDING A-5 stays open for the PH first comment.
 
 - **2026-09-01 (later) — item-24 authDomain cutover EXECUTED and verified.**
   Same session as the entry below: owner ran the full checklist live (Google
