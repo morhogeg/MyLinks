@@ -7,6 +7,8 @@ import { Check, Tag, History, Search, Info } from 'lucide-react';
 import { CitationGlyph } from '@/components/ui/Wordmark';
 import { X } from 'lucide-react';
 import type { Settings, SetSettings, View } from './types';
+import ProBadge from '@/components/ui/ProBadge';
+import { useEntitlement } from '@/components/EntitlementProvider';
 import {
     LargeTitle, SectionHeader, Footnote, List, RowShell, RowText,
     NavRow, Toggle, Segmented, TopicGroup, TopicPill, Wheel,
@@ -51,6 +53,11 @@ export function ResurfacingView({
     scheduleValue: string;
     go: (v: View) => void;
 }) {
+    // Curated digests are Pro-only: the rows stay visible (with the badge) and
+    // a free user's tap opens the paywall instead of the setting. The server
+    // skips delivery for free workspaces regardless of the stored toggle.
+    const { isPro, loaded, openPaywall } = useEntitlement();
+    const gated = loaded && !isPro;
     return (
         <>
             <LargeTitle>Reminders &amp; Digest</LargeTitle>
@@ -69,14 +76,20 @@ export function ResurfacingView({
 
             <SectionHeader>Curated digest</SectionHeader>
             <List tight>
-                <RowShell>
-                    <RowText title="Curated digest" sub="A hand-picked batch of your saved cards" />
-                    <Toggle on={settings.digest_enabled} onChange={() => setSettings((p) => ({ ...p, digest_enabled: !p.digest_enabled }))} />
+                <RowShell onClick={gated ? () => openPaywall('digest') : undefined}>
+                    <div className="flex-1 min-w-0 py-[11px]">
+                        <div className="flex items-center gap-2 text-[16px] text-text tracking-[-0.01em] leading-tight">
+                            Curated digest
+                            {gated && <ProBadge />}
+                        </div>
+                        <div className="text-[12.5px] text-text-muted mt-1 leading-snug">A hand-picked batch of your saved cards</div>
+                    </div>
+                    <Toggle on={settings.digest_enabled && !gated} onChange={gated ? () => openPaywall('digest') : () => setSettings((p) => ({ ...p, digest_enabled: !p.digest_enabled }))} />
                 </RowShell>
-                {settings.digest_enabled && <NavRow title="Style" value={modeLabel} onClick={() => go('style')} />}
-                {settings.digest_enabled && <NavRow title="Schedule" value={scheduleValue} onClick={() => go('schedule')} />}
-                {settings.digest_enabled && <NavRow title="Cards per digest" value={String(settings.digest_count)} onClick={() => go('cards')} />}
-                {settings.digest_enabled && (
+                {settings.digest_enabled && !gated && <NavRow title="Style" value={modeLabel} onClick={() => go('style')} />}
+                {settings.digest_enabled && !gated && <NavRow title="Schedule" value={scheduleValue} onClick={() => go('schedule')} />}
+                {settings.digest_enabled && !gated && <NavRow title="Cards per digest" value={String(settings.digest_count)} onClick={() => go('cards')} />}
+                {settings.digest_enabled && !gated && (
                     <RowShell>
                         <div className="flex-1 min-w-0 py-[11px]">
                             <SkipEmptyLabel />
@@ -85,7 +98,7 @@ export function ResurfacingView({
                     </RowShell>
                 )}
             </List>
-            <Footnote>Machina picks the cards; you choose the style and when they arrive.</Footnote>
+            <Footnote>{gated ? 'Part of Machina Pro. Tap the row to see what Pro includes.' : 'Machina picks the cards; you choose the style and when they arrive.'}</Footnote>
 
             <SectionHeader>Weekly synthesis</SectionHeader>
             <List tight>

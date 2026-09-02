@@ -5,6 +5,7 @@ import { Share, MoreHorizontal, Puzzle, MousePointerClick, ArrowRight } from 'lu
 import { Button } from '@/components/ui/Button';
 import { CitationGlyph } from '@/components/ui/Wordmark';
 import { isNativeApp } from '@/lib/api';
+import { useEntitlement } from '@/components/EntitlementProvider';
 
 /**
  * First-run welcome — shown exactly once, right after a fresh workspace is
@@ -28,6 +29,9 @@ import { isNativeApp } from '@/lib/api';
  */
 export default function Onboarding({ onDone }: { onDone: () => void }) {
     const native = isNativeApp();
+    // One line, only for a reverse trial (never for founders or subscribers),
+    // and deliberately not a paywall step: the tour has one job.
+    const { isTrial } = useEntitlement();
 
     return (
         <div
@@ -113,6 +117,11 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
                 <p className="mt-3 text-[12px] text-text-muted text-center">
                     You can revisit all of this any time from Settings.
                 </p>
+                {isTrial && (
+                    <p className="mt-1.5 text-[12px] text-text-muted text-center">
+                        Pro is free for your first 14 days. Nothing to cancel.
+                    </p>
+                )}
             </div>
         </div>
     );

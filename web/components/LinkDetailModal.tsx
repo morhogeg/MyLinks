@@ -19,6 +19,8 @@ import { getNotes, makeNote, touchNote } from '@/lib/notes';
 import { hapticSuccess, hapticMedium } from '@/lib/haptics';
 import { isHttpUrl } from '@/lib/url';
 import CitationMark from './ui/CitationMark';
+import ProBadge from './ui/ProBadge';
+import { requestPaywall } from '@/lib/entitlement';
 
 // Sentinel `editingNoteId` for the composer when adding a brand-new note (as
 // opposed to editing an existing one, keyed by its real id).
@@ -856,6 +858,21 @@ export default function LinkDetailModal({
                                     <Youtube className="w-3.5 h-3.5" /> Watch on YouTube
                                 </span>
                             </button>
+                            )}
+
+                            {/* Free plan: the video was not watched (metadata-only
+                                card). One honest line, and the way to change it. */}
+                            {link.proFeature === 'youtube' && (
+                                <button
+                                    onClick={() => requestPaywall('youtube')}
+                                    className="w-full flex items-center gap-2.5 rounded-2xl border border-border-strong bg-fill-subtle px-4 py-3 text-start hover:bg-card-hover transition-colors cursor-pointer"
+                                >
+                                    <ProBadge />
+                                    <span className="flex-1 min-w-0 text-[13px] text-text-secondary leading-snug">
+                                        Video transcripts are a Pro feature. This card was filed from the video’s title and description.
+                                    </span>
+                                    <ChevronRight className="w-4 h-4 shrink-0 text-text-muted" />
+                                </button>
                             )}
 
                             {!!link.metadata.videoHighlights?.length && (

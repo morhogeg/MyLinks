@@ -135,6 +135,10 @@ export interface Link {
   // AI Analysis metadata. sourceType is 'web' | 'youtube' | 'image' | 'note'
   // (a 'note' is a URL-less thought captured directly — it has no `url`).
   sourceType?: string;
+  // Machina Pro: set by the backend when a feature was withheld on the free
+  // plan while saving this card ('youtube' = the video was NOT watched; the
+  // card is metadata-only). The client shows a one-line note.
+  proFeature?: 'youtube';
   sourceName?: string;
   // 'text' marks a note card whose body is the user's OWN verbatim words, sent
   // in from the share sheet / extension rather than typed in the Note tab. Such
@@ -305,6 +309,11 @@ export interface WeeklySynthesis {
   cards: SynthesisCardRef[]; // all cards referenced across themes + standout
   cardCount: number;         // total saves in the synthesized week
   createdAt: number;         // Unix ms
+  // Machina Pro: a free workspace gets the recap LOCKED (title + one-line
+  // teaser, empty narrative/themes). The full doc is restored in place when
+  // the plan becomes Pro (functions/entitlement.py restore_vaulted_syntheses).
+  locked?: boolean;
+  teaser?: string;
 }
 
 // ── Curated digest (in-app Digest section) ───────────────────────────────────

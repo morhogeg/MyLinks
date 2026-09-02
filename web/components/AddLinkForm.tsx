@@ -17,6 +17,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
 import { compressImage } from '@/lib/image';
 import { hapticSuccess, hapticLight, hapticSelection } from '@/lib/haptics';
+import { offerUpgradeFor } from '@/lib/entitlement';
 import ImageScanProgress from '@/components/ImageScanProgress';
 import VideoScanProgress from '@/components/VideoScanProgress';
 import LinkScanProgress from '@/components/LinkScanProgress';
@@ -444,6 +445,9 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
             throw saveError('The analysis service returned an unexpected response. Please try again.', 'analyze_failed');
         }
         if (!response.ok || !data.success) {
+            // Free plan's monthly save wall: open the paywall, then fail the
+            // save with the server's own copy (the card still turns retryable).
+            if (response.status === 429) offerUpgradeFor(data);
             throw saveError(data?.error || 'Failed to analyze. Please try again.', 'analyze_failed');
         }
         return data;
@@ -541,6 +545,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                 let resData: { success?: boolean; error?: string };
                 try { resData = JSON.parse(text); } catch { resData = {}; }
                 if (!response.ok || !resData.success) {
+                    if (response.status === 429) offerUpgradeFor(resData);
                     throw new Error(resData?.error || 'Could not start analysis. Please try again.');
                 }
             } catch (enqueueErr) {
