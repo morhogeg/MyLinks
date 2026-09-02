@@ -22,6 +22,7 @@ import LoginScreen from '@/components/LoginScreen';
 import SignedOutWeb from '@/components/SignedOutWeb';
 import Onboarding from '@/components/Onboarding';
 import AIConsentNotice from '@/components/AIConsentNotice';
+import { EntitlementProvider } from '@/components/EntitlementProvider';
 
 /** localStorage fallback for onboarding dismissal (user doc is the primary
     record — this only covers a failed `onboarded: true` write). */
@@ -423,15 +424,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (gated && !loading && uid && needsOnboarding) {
-        // Fresh workspace: one welcome screen before the app.
+        // Fresh workspace: one welcome screen before the app. Inside the
+        // entitlement provider so the welcome can mention the Pro trial.
         return (
             <AuthContext.Provider value={value}>
-                <Onboarding onDone={finishOnboarding} />
+                <EntitlementProvider>
+                    <Onboarding onDone={finishOnboarding} />
+                </EntitlementProvider>
             </AuthContext.Provider>
         );
     }
 
-    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+    // Machina Pro plan + the single mounted paywall live just inside the auth
+    // context: they need the resolved workspace uid and the auth uid, and
+    // nothing above this point (sign-in, consent) can show a paywall.
+    return (
+        <AuthContext.Provider value={value}>
+            <EntitlementProvider>{children}</EntitlementProvider>
+        </AuthContext.Provider>
+    );
 }
 
 /** Shape returned by both the claim callable and its HTTP twin. */

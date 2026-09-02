@@ -213,14 +213,71 @@ def test_recent_months_wraps_year_boundary():
     assert quota._recent_months("2026-07") == {"2026-07", "2026-06"}
 
 
+def _clear_quota_env(monkeypatch):
+    for name in ("MONTHLY_SAVE_QUOTA", "MONTHLY_ASK_QUOTA", "FREE_SAVE_QUOTA",
+                 "FREE_ASK_QUOTA", "PRO_SAVE_QUOTA", "PRO_ASK_QUOTA"):
+        monkeypatch.delenv(name, raising=False)
+
+
 def test_limit_for_defaults(monkeypatch):
-    monkeypatch.delenv("MONTHLY_SAVE_QUOTA", raising=False)
-    monkeypatch.delenv("MONTHLY_ASK_QUOTA", raising=False)
+    _clear_quota_env(monkeypatch)
+    # Machina Pro (2026-09-02): the free tier's published caps, and the Pro
+    # abuse ceilings. `_limit_for` without a plan is the FREE limit.
+    assert quota._limit_for("saves") == 100
+    assert quota._limit_for("asks") == 20
+    assert quota._limit_for("saves", "pro") == 1000
+    assert quota._limit_for("asks", "pro") == 1000
+
+
+def test_limit_for_plan_env_names(monkeypatch):
+    """FREE_*/PRO_* override per plan; the legacy MONTHLY_* alias still means
+    the free value, and the explicit FREE_* name wins over the alias."""
+    _clear_quota_env(monkeypatch)
+    monkeypatch.setenv("MONTHLY_SAVE_QUOTA", "150")
     assert quota._limit_for("saves") == 150
-    # Back to 100 for the first outside testers (2026-08-04) — see quota.py for
-    # why, and why the 1000 it replaced was right only while the owner was the
-    # sole user AND the QA tester.
-    assert quota._limit_for("asks") == 100
+    assert quota._limit_for("saves", "pro") == 1000
+    monkeypatch.setenv("FREE_SAVE_QUOTA", "7")
+    assert quota._limit_for("saves") == 7
+    monkeypatch.setenv("PRO_ASK_QUOTA", "0")
+    assert quota._limit_for("asks", "pro") == 0
+    assert quota._limit_for("asks", "free") == 20
+
+
+def test_meter_reports_used_and_limit_for_the_429_body(monkeypatch):
+    store = {"value": {"2026-07": {"saves": 3}}}
+    _install_fake_db(monkeypatch, store)
+    _pin_month(monkeypatch)
+    _clear_quota_env(monkeypatch)
+    monkeypatch.setenv("FREE_SAVE_QUOTA", "3")
+
+    blocked = quota.meter("u1", "saves", plan="free")
+    assert blocked["ok"] is False
+    assert (blocked["used"], blocked["limit"], blocked["plan"]) == (3, 3, "free")
+    assert store["value"]["2026-07"]["saves"] == 3  # not incremented
+
+    # Same counter, Pro plan: the ceiling is the Pro one, so it goes through.
+    allowed = quota.meter("u1", "saves", plan="pro")
+    assert allowed["ok"] is True
+    assert allowed["used"] == 4 and allowed["limit"] == 1000
+
+
+def test_quota_message_free_carries_upgrade_hint_pro_does_not():
+    free = quota.quota_message("asks", "free", 20)
+    assert "20" in free and "Machina Pro" in free
+    pro = quota.quota_message("asks", "pro")
+    assert "Machina Pro" not in pro
+    # Build tripwire: the client renders this verbatim.
+    for kind in ("saves", "asks"):
+        for plan in ("free", "pro"):
+            assert "\u2014" not in quota.quota_message(kind, plan, 5)
+
+
+def test_quota_usage_reads_current_month_only(monkeypatch):
+    store = {"value": {"2026-06": {"saves": 9}, "2026-07": {"saves": 3, "asks": "2"}}}
+    _install_fake_db(monkeypatch, store)
+    _pin_month(monkeypatch)
+    assert quota.quota_usage("u1") == {"saves": 3, "asks": 2}
+    assert quota.quota_usage(None) == {"saves": 0, "asks": 0}
 
 
 def test_env_still_overrides_the_ask_default(monkeypatch):
@@ -287,6 +344,8 @@ def test_refund_noop_when_metering_disabled(monkeypatch):
     _install_fake_db_for_refund(monkeypatch, store)
     _pin_month(monkeypatch)
     monkeypatch.setenv("MONTHLY_SAVE_QUOTA", "0")  # disabled → nothing was charged
+    # Refunds don't know the plan, so "disabled" means disabled on EVERY plan.
+    monkeypatch.setenv("PRO_SAVE_QUOTA", "0")
 
     quota.refund_quota("u1", "saves")
     assert store["value"]["2026-07"]["saves"] == 3  # untouched

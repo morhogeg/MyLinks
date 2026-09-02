@@ -170,6 +170,10 @@ jobs:
           NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
           NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
           NEXT_PUBLIC_RECAPTCHA_SITE_KEY: ${{ secrets.NEXT_PUBLIC_RECAPTCHA_SITE_KEY }}
+          # RevenueCat PUBLIC iOS SDK key (Machina Pro paywall). Optional until
+          # the owner creates the RevenueCat app: an empty value makes every
+          # purchase call resolve to "unavailable" and the paywall explains it.
+          NEXT_PUBLIC_REVENUECAT_IOS_KEY: ${{ secrets.NEXT_PUBLIC_REVENUECAT_IOS_KEY }}
           # Resolved at the job level and asserted by the guard step above, so
           # the value that gets baked in is the value that was checked.
           NEXT_PUBLIC_REQUIRE_AUTH: ${{ env.REQUIRE_AUTH_VALUE }}

@@ -2,6 +2,7 @@ import { collection, addDoc, updateDoc, deleteDoc, deleteField, doc, query, wher
 import { db, appCheckHeaders } from './firebase';
 import { authHeaders } from './auth';
 import { apiUrl, fetchWithTimeout } from './api';
+import { offerUpgradeFor } from './entitlement';
 
 import { AnalyzeResponse, Link, LinkMetadata, LinkStatus, User, UserNote } from './types';
 import { canonicalCategory } from './category';
@@ -447,6 +448,7 @@ export async function retryFailedLink(uid: string, link: Link): Promise<void> {
             let data: { success?: boolean; error?: string };
             try { data = JSON.parse(text); } catch { data = {}; }
             if (!response.ok || !data.success) {
+                if (response.status === 429) offerUpgradeFor(data);
                 throw new Error(data?.error || 'Could not restart analysis. Please try again.');
             }
             // Queued — the background worker flips this card to ready/failed.
@@ -492,6 +494,7 @@ export async function retryFailedLink(uid: string, link: Link): Promise<void> {
             throw new Error('The analysis service returned an unexpected response.');
         }
         if (!response.ok || !data.success || !data.link) {
+            if (response.status === 429) offerUpgradeFor(data);
             throw new Error(data?.error || 'Analysis failed. Please try again.');
         }
 

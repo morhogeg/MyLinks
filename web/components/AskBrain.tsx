@@ -29,6 +29,8 @@ import { CitationGlyph } from './ui/Wordmark';
 import OrbStatus from './ui/OrbStatus';
 import SidebarIcon from './ui/SidebarIcon';
 import { lockBodyScroll, unlockBodyScroll } from '@/lib/useScrollLock';
+import { useEntitlement } from '@/components/EntitlementProvider';
+import { isUpgradeHint, meterLabel } from '@/lib/entitlement';
 
 /** A usable source name, or null for placeholders the backend stores. */
 function meaningfulName(name?: string | null): string | null {
@@ -303,6 +305,9 @@ interface AskBrainProps {
 const HISTORY_COLLAPSE_KEY = 'askbrain:histcollapsed';
 
 export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackToGraph, overlayOpen = false, links, initialAsk, onOpenGraphFocus, openChatId }: AskBrainProps) {
+    // Machina Pro: the monthly Ask meter for free workspaces, and the paywall
+    // a free-plan 429 opens instead of a plain error bubble.
+    const { isPro, quotas, loaded: entitlementLoaded, refresh: refreshEntitlement, openPaywall } = useEntitlement();
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
     const [isThinking, setIsThinking] = useState(false);
@@ -1059,12 +1064,26 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                 };
                 trackFirstAsk();
                 if (data.ungrounded) trackAskNoCitations();
+                if (!isPro) void refreshEntitlement();
                 if (isStale()) { commitDetached([...withUser, answer]); return; }
                 setMessages(prev => [...prev, answer]);
                 hapticLight();
                 // Buffered path (native): the whole answer just landed at once —
                 // show it from the top, question first.
                 pinQuestionToTop(questionIdx);
+            } else if (res.status === 429 && isUpgradeHint(data)) {
+                // Free plan's monthly wall: the offer, not an error. The
+                // question stays in the thread as a short, honest bubble so
+                // the conversation still reads straight after upgrading.
+                const wallAnswer: ChatMessage = {
+                    role: 'assistant',
+                    content: data.error || 'You’ve used this month’s free questions.',
+                    error: true,
+                };
+                void refreshEntitlement();
+                if (isStale()) { commitDetached([...withUser, wallAnswer]); return; }
+                setMessages(prev => [...prev, wallAnswer]);
+                openPaywall('asks');
             } else {
                 const errAnswer: ChatMessage = {
                     role: 'assistant',
@@ -1526,6 +1545,18 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
 
             {/* Composer */}
             <div className="shrink-0 w-full max-w-2xl mx-auto px-3 sm:px-0 pt-2 sm:pt-0 pb-3 sm:pb-0" style={isMobile ? { paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' } : undefined}>
+                {/* Free plan: the monthly meter, one quiet line above the
+                    composer. Hidden for Pro and until the plan has loaded, so
+                    it never flashes a number that is about to be wrong. */}
+                {entitlementLoaded && !isPro && meterLabel('asks', quotas.asks) && (
+                    <button
+                        onClick={() => openPaywall('asks')}
+                        className="mb-1.5 ms-1 text-[12px] text-text-muted hover:text-text transition-colors cursor-pointer"
+                    >
+                        {meterLabel('asks', quotas.asks)}
+                        <span className="text-text-muted/70"> · Go unlimited with Pro</span>
+                    </button>
+                )}
                 <div className="flex items-end gap-2 p-2 rounded-2xl bg-card border border-border-subtle shadow-[var(--shadow-card)] focus-within:border-accent/50 transition-colors">
                     <textarea
                         ref={textareaRef}

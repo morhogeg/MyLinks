@@ -86,6 +86,14 @@
         "function": "client_error_http"
       },
       {
+        "source": "/api/entitlement",
+        "function": "entitlement_http"
+      },
+      {
+        "source": "/api/entitlement/sync",
+        "function": "entitlement_sync_http"
+      },
+      {
         "source": "/s",
         "function": "share_page"
       },

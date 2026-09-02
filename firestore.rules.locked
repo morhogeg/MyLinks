@@ -183,6 +183,21 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // entitlements: only Cloud Functions (admin SDK) — the Machina Pro plan
+    // per workspace (see entitlement.py). Never client-readable or -writable:
+    // the plan is served by /api/entitlement, and a client that could write
+    // here could grant itself Pro.
+    match /entitlements/{docId} {
+      allow read, write: if false;
+    }
+
+    // synthesis_vault: only Cloud Functions (admin SDK) — the full weekly
+    // synthesis a free workspace is shown only a teaser of. Client-readable
+    // would BE the paywall bypass.
+    match /synthesis_vault/{docId} {
+      allow read, write: if false;
+    }
+
     // server_errors: only Cloud Functions (admin SDK) — durable 5xx records
     // (see main.py _record_server_error). They can carry a workspace uid, so
     // never client-readable; surfaced only via the admin debug_status endpoint.
