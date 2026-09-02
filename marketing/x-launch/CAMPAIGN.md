@@ -1,6 +1,6 @@
 # Machina on X: the first 30 posts
 
-> The launch campaign for the `@mymachina` account. Day 1 is App Store launch
+> The launch campaign for the `@machinaapp` account. Day 1 is App Store launch
 > day. Six weeks, 30 posts, four feature series, one story. Brand voice, English
 > only. Every product claim below was checked against the shipped code on
 > 2026-09-02; the few that need a live screenshot or a real number are marked
@@ -93,18 +93,20 @@ link in the body itself: the launch post, the 30-day post, and the close.
 
 ## 2. Before Day 1: the account
 
-**Handle: `@mymachina`.** It matches the domain, so the app, the site, and the
-account are one name, spoken and typed. `@machina` belongs to someone else and
-sits next to the App Store incumbent's namespace. Fallbacks, in order:
-`@machinaapp`, `@getmachina`. Check availability before anything else; if all
-three are gone, take `@mymachina_app` and stop looking.
+**Handle: `@machinaapp`** (registered by the owner, 2026-09-02). The name people
+see on every post is the display name, `Machina`; the handle is the address.
+Because the handle and the domain differ, the bio carries `mymachina.app` so
+the two names meet in one place. If `@machinaapp` is ever free, register and
+park it from a second address so the two names cannot end up split between
+the brand and a stranger; a handle can be switched later without losing
+followers.
 
 **Profile.**
 
 | Field | Value |
 |---|---|
 | Display name | `Machina` |
-| Bio (160 chars max) | `Everything you save, finally useful. One place for everything you save, from any app. Read, filed, connected, and ready when you ask. Free on iPhone and web.` |
+| Bio (160 chars max) | `Everything you save, finally useful. One place for everything you save, from any app. Read, filed, connected, and ready when you ask. mymachina.app` |
 | Website | `mymachina.app` |
 | Location | leave blank |
 | Profile picture | the app icon (the citation mark on the graphite ground), exported at 400x400 |
@@ -654,7 +656,7 @@ apps.apple.com/[fill]
 
 - **Attach:** the launch film's endcard, App Store badge added above the rule
   (not replacing the tagline line).
-- **First comment:** `Web: mymachina.app · Questions: support@mymachina.app`
+- **First comment:** `Web: mymachina.app · Questions: support@machinaapp.app`
 - **After this post:** the account moves to the standing cadence in §7.
 
 ---
