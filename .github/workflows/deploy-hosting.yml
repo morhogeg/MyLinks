@@ -8,6 +8,9 @@
 # Re-triggered 2026-08-26: run #9 raced get_share_config_http exactly this
 # way; functions run #90 is green, this edit lands the /api/share-config
 # rewrite against the now-existing service.
+# Re-triggered 2026-09-02: run #11 raced entitlement_http /
+# entitlement_sync_http the same way (Machina Pro merge); functions run #97
+# carries them, this edit lands the two /api/entitlement rewrites.
 #
 # WHY THIS EXISTS: Firebase Hosting is NOT a user-facing surface — the iPhone
 # PWA is retired, desktop web is Vercel, iOS is the native app. But the Hosting
