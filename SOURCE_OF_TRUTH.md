@@ -1873,6 +1873,18 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-02 (later) — push notifications lose the brain emoji (owner, from
+  a lock-screen screenshot of "🧠 Your Daily Brew").** `digest_service.py`
+  digest push title is now plain "Your Daily/Weekly Brew" and
+  `reminder_service.py`'s reminder title is "Time to revisit" / "זמן לחזור אל";
+  the Settings test push body lost its em dash while there. The synthesis and
+  trial-nudge pushes never had one. Scoped functions deploy:
+  `send_digests,force_send_digests,send_digest_now,check_reminders,
+  force_check_reminders,send_test_push_http`. Same merge lands the §7.1 pricing
+  rationale (the model the Pro build implements). Verified: py_compile, 708
+  pytest in a scratch venv. Not verified: a real push on device after deploy
+  (next digest/reminder will show it).
+
 - **2026-09-02 — Machina Pro: entitlements, 14-day reverse trial, quota
   gating, paywall. SHIPPED (owner said "ship"): PR #18 merged as `87a1d3b`
   via the GitHub MCP (the session's local `git merge`/`push main` were
