@@ -150,6 +150,18 @@ export function useFeedFilters(
         return m;
     }, [semanticIds, queryTokens]);
 
+    // The cards meaning search found that the literal matcher did NOT — the
+    // "By meaning" half of the results. Only derivable here: useSemanticSearch
+    // knows the server's ids, but whether a card ALSO contains the query's
+    // words is the literal pass above. Feed renders these below a divider and
+    // marks each one, so a card that shares no word with the query never looks
+    // like an unexplained result.
+    const semanticOnlyIds = useMemo(() => {
+        const s = new Set<string>();
+        semanticRank.forEach((_, id) => { if (!searchMatches.has(id)) s.add(id); });
+        return s;
+    }, [semanticRank, searchMatches]);
+
     // 4. Hybrid Search Logic — memoized so a banner tick or any unrelated state
     // change (search typing, overlay toggles) doesn't re-run the 6-stage filter +
     // sort. Recomputes only when an input it actually reads changes.
@@ -401,6 +413,7 @@ export function useFeedFilters(
         handleToggleSourceKeys,
         matchingSources,
         matchingTags,
+        semanticOnlyIds,
         reminderCount,
     };
 }

@@ -52,6 +52,10 @@ interface CardProps {
     onToggleThumbnail?: (link: Link) => void;
     /** ⋯ → See in graph: open the Graph focused on this card. */
     onOpenInGraph?: (link: Link) => void;
+    /** Search only: this card was found by MEANING, not by any word in the
+     *  query. Renders the small "Meaning" chip in the chrome row so a result
+     *  that shares no word with what was typed explains itself. */
+    isMeaningMatch?: boolean;
 }
 
 /**
@@ -80,6 +84,7 @@ function Card({
     onRetry,
     onToggleThumbnail,
     onOpenInGraph,
+    isMeaningMatch = false,
 }: CardProps) {
     const isRtl = link.language === 'he' || hasHebrew(link.title) || hasHebrew(link.summary);
     const [isEditingCategory, setIsEditingCategory] = useState(false);
@@ -520,6 +525,17 @@ function Card({
                         the field otherwise (owner, iOS QA 2026-08-24). It comes back
                         the moment editing ends. */}
                     <div className={`flex items-center gap-1.5 min-w-0 z-10 ms-auto transition-opacity duration-200 group-hover:opacity-0 ${isEditingCategory ? 'hidden' : ''}`}>
+                        {/* Meaning marker — search only. This card matched the
+                            query's SENSE, not its words, so it sits under the
+                            "By meaning" divider and says so on its face. */}
+                        {isMeaningMatch && (
+                            <span
+                                title="Found by meaning, not by matching words"
+                                className="shrink-0 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-accent/12 text-accent"
+                            >
+                                Meaning
+                            </span>
+                        )}
                         {/* Private marker — icon only, matching the collection tiles. */}
                         {link.isPrivate && (
                             <span

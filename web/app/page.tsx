@@ -8,7 +8,7 @@ import AnalyzingBanner, { AnalyzingState } from "@/components/AnalyzingBanner";
 import SettingsModal from "@/components/SettingsModal";
 import ScrollToTop from "@/components/ScrollToTop";
 import OnboardingTour, { ONBOARDING_STORAGE_KEY } from "@/components/OnboardingTour";
-import { Settings, Search, LayoutGrid, List, GalleryHorizontalEnd, Waypoints, StickyNote } from "lucide-react";
+import { Settings, LayoutGrid, List, GalleryHorizontalEnd, Waypoints, StickyNote } from "lucide-react";
 import DisplayGlyph from "@/components/feed/DisplayGlyph";
 import ThemeToggle from "@/components/ThemeToggle";
 import { CitationGlyph, Wordmark } from "@/components/ui/Wordmark";
@@ -287,22 +287,16 @@ export default function Home() {
           {/* Controls — one cohesive cluster */}
           <div className="flex items-center gap-2">
             {/* Mobile v4: the library's controls are BARE GLYPHS in this one
-                header line (Apple nav-bar grammar) — search, the view
-                switcher, and the sliders display menu (sort/filter/select).
+                header line (Apple nav-bar grammar) — the view switcher and the
+                sliders display menu (sort/filter/select). SEARCH left this row
+                (2026-09-03): recall is what the app is for, so it is a standing
+                field under the header rather than a glyph that opens one.
                 Sources lives inside Filters now (2026-08-07 owner call:
                 switching views outranks source filtering). Home tab only; the
                 other tabs bring their own subheaders. Desktop keeps its
                 toolbar, so these stay sm:hidden. */}
             {feedTab === 'home' && (
               <div className="flex sm:hidden items-center">
-                <button
-                  data-tour="search"
-                  onClick={() => sendHeaderCommand('search')}
-                  aria-label="Search"
-                  className="h-10 w-10 flex items-center justify-center text-text-secondary hover:text-text active:text-text transition-colors"
-                >
-                  <Search className="w-[19px] h-[19px]" />
-                </button>
                 <button
                   data-tour="views"
                   onClick={() => sendHeaderCommand('view')}

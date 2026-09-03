@@ -22,7 +22,12 @@ import { reportError } from '@/lib/errorReporter';
  * render from live client `Link` objects and pass through the exact same
  * pending/privacy/facet gates as every other card. useFeedFilters appends
  * semantic-only matches BELOW every literal hit — meaning search widens
- * results, it can never outrank or displace an exact word match.
+ * results, it can never outrank or displace an exact word match. WHICH of these
+ * ids are semantic-ONLY is decided there too (`semanticOnlyIds`), not here:
+ * this hook knows what the server returned, but "does the card also contain the
+ * query's words" is the literal pass. Feed puts that set behind a "By meaning"
+ * divider and marks each card, so a hit sharing no word with the query reads as
+ * deliberate rather than as noise.
  *
  * The HTTP twin (not the `search_links` callable) serves BOTH web and native:
  * the callable's CORS preflight is rejected from the Capacitor
