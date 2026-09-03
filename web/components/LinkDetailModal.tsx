@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, StatusChangeHandler, UserNote } from '@/lib/types';
 import SourceByline from './SourceByline';
-import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, Check, Network, Play, Youtube, ImageOff, Image as ImageIcon, Layers, Share2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, StickyNote, Waypoints } from 'lucide-react';
+import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, Check, Network, Play, Youtube, ImageOff, Image as ImageIcon, Layers, Share2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, StickyNote, Waypoints, EyeOff } from 'lucide-react';
 import { getPlatform } from '@/lib/platform';
 import SimpleMarkdown from './SimpleMarkdown';
 import PosterImage from './ui/PosterImage';
@@ -21,10 +21,16 @@ import { isHttpUrl } from '@/lib/url';
 import CitationMark from './ui/CitationMark';
 import ProBadge from './ui/ProBadge';
 import { requestPaywall } from '@/lib/entitlement';
+import { isNativeApp } from '@/lib/api';
 
 // Sentinel `editingNoteId` for the composer when adding a brand-new note (as
 // opposed to editing an existing one, keyed by its real id).
 const NEW_NOTE_ID = '__new_note__';
+
+// How long a card has to stay open before opening it counts as reading it. Long
+// enough that a mis-tap the user immediately backs out of doesn't mark anything,
+// short enough that a real read is always caught. A scroll marks it sooner.
+const AUTO_READ_MS = 1500;
 
 /**
  * Split a "M:SS — description" (or "H:MM:SS …") video highlight into its
@@ -88,6 +94,71 @@ interface LinkDetailModalProps {
         the Graph this card sent the user to, so "Back to card" lands on the
         exact spot the "See in graph" button was tapped from, not the top. */
     scrollToRelated?: boolean;
+}
+
+/**
+ * PARTIAL CAPTURE, SAID ON THE CARD (PM-1C).
+ *
+ * One quiet line under the summary lead, on the cards whose page the scraper
+ * could only partly read (a login wall, a social-preview teaser, a PDF). It is
+ * deliberately NOT prose inside the summary: the model's writing stays the
+ * model's writing, and this sits beside it as chrome the card owns.
+ *
+ * The line follows the CARD's language, not the app's, like every other piece
+ * of card content in this view. On the native app it also offers "How", which
+ * expands the three share-sheet steps in place, because a screenshot is the one
+ * fix the user can actually apply and it isn't obvious.
+ */
+function PartialCaptureNote({
+    reason,
+    isRtl,
+    className = '',
+}: {
+    reason?: 'login_wall' | 'teaser' | 'pdf' | 'truncated';
+    isRtl: boolean;
+    className?: string;
+}) {
+    const [howOpen, setHowOpen] = useState(false);
+    const native = isNativeApp();
+    const isPdf = reason === 'pdf';
+    const line = isPdf
+        ? (isRtl
+            ? 'לא הצלחנו לקרוא את קובץ ה-PDF. שתפו צילום מסך שלו כדי לקבל כרטיס מלא.'
+            : 'Machina couldn’t read this PDF. Share a screenshot of it for the full card.')
+        : (isRtl
+            ? 'לא הצלחנו לקרוא את הפוסט במלואו. שתפו צילום מסך שלו כדי לקבל כרטיס מלא.'
+            : 'Machina couldn’t read the full post. Share a screenshot of it for the full card.');
+    const steps = isRtl
+        ? ['צלמו מסך של הפוסט.', 'פתחו את תפריט השיתוף ובחרו ב-Machina.', 'נקרא את צילום המסך וניצור ממנו כרטיס מלא.']
+        : ['Take a screenshot of the post.', 'Open the share sheet and choose Machina.', 'Machina reads the screenshot and files a full card.'];
+
+    return (
+        <div className={className} dir={isRtl ? 'rtl' : 'ltr'}>
+            <p className="flex items-start gap-2 text-[13px] leading-relaxed text-text-muted">
+                <EyeOff className="w-3.5 h-3.5 mt-[3px] shrink-0" aria-hidden="true" />
+                <span className="min-w-0">
+                    {line}
+                    {native && (
+                        <button
+                            onClick={() => setHowOpen((v) => !v)}
+                            aria-expanded={howOpen}
+                            aria-label={isRtl ? 'איך לשתף צילום מסך' : 'How to share a screenshot'}
+                            className="ms-1.5 align-baseline font-semibold text-accent hover:text-accent-hover transition-colors"
+                        >
+                            {isRtl ? 'איך' : 'How'}
+                        </button>
+                    )}
+                </span>
+            </p>
+            {native && howOpen && (
+                <ol className="mt-2 ms-[22px] space-y-1 text-[13px] leading-relaxed text-text-muted list-decimal list-inside">
+                    {steps.map((step) => (
+                        <li key={step}>{step}</li>
+                    ))}
+                </ol>
+            )}
+        </div>
+    );
 }
 
 export default function LinkDetailModal({
@@ -414,6 +485,43 @@ export default function LinkDetailModal({
         };
     }, [isOpen]);
 
+    // OPENING A CARD MARKS IT READ (PM-1B).
+    //
+    // Read used to flip only on an explicit tap, which meant the Unread filter
+    // kept showing cards the user had already sat and read. Now the open view
+    // itself is the signal: once the card has been open long enough to have been
+    // looked at (AUTO_READ_MS), or the moment the reader scrolls it, we write
+    // isRead once, silently. No toast: the user did not ask for a state change,
+    // they asked to read, so announcing it would be chatter.
+    //
+    // Rules that keep it honest:
+    //   - never write for a card that is already read (no redundant writes),
+    //   - never write for a processing/failed capture (there is nothing to read
+    //     yet, and the card is about to be replaced by the real one),
+    //   - one write per card per open session (`autoReadIds`), so an explicit
+    //     "Mark as unread" from the toolbar STICKS while the card is still open.
+    // Reopening the card later marks it read again, which is the rule doing what
+    // it says rather than a bug.
+    const autoReadIds = useRef<Set<string>>(new Set());
+    useEffect(() => {
+        if (!isOpen || link.isRead) return;
+        if (link.status === 'processing' || link.status === 'failed') return;
+        const id = link.id;
+        if (autoReadIds.current.has(id)) return;
+        const markRead = () => {
+            if (autoReadIds.current.has(id)) return;
+            autoReadIds.current.add(id);
+            onReadStatusChange(id, true);
+        };
+        const timer = setTimeout(markRead, AUTO_READ_MS);
+        const el = scrollRef.current;
+        el?.addEventListener('scroll', markRead, { passive: true });
+        return () => {
+            clearTimeout(timer);
+            el?.removeEventListener('scroll', markRead);
+        };
+    }, [isOpen, link.id, link.isRead, link.status, onReadStatusChange]);
+
     // A11y: Escape closes the topmost open layer first — the distraction-free
     // reader, an inline category edit, or the add-tag input — otherwise it
     // dismisses the whole modal (same as the X / backdrop). Desktop-web win;
@@ -438,6 +546,15 @@ export default function LinkDetailModal({
     if (!isOpen) return null;
 
     const isRtl = link.language === 'he' || hasHebrew(link.title) || hasHebrew(link.summary) || (link.detailedSummary ? hasHebrew(link.detailedSummary) : false);
+
+    // Partial capture (PM-1C): the backend flagged this card's page as only
+    // partly read. The sourceType check is belt and braces — the flag is only
+    // ever written on the scraped web path — but the line must NEVER appear on a
+    // screenshot, a note, or a text card (both of those are sourceType 'note'),
+    // where "couldn't read the full post" is nonsense: nothing was scraped.
+    const isPartialCapture = link.captureQuality === 'partial'
+        && link.sourceType !== 'image'
+        && !isNote;
 
     // Live related cards: stored AI relations merged with fresh embedding /
     // concept matches (see lib/related.ts). Computed here, below the isOpen
@@ -1151,6 +1268,16 @@ export default function LinkDetailModal({
                                                     </button>
                                                 )}
                                             </>
+                                        )}
+                                        {/* Directly under the lead, above the deeper
+                                            sections: the first thing you read is the
+                                            summary, the second is how complete it is. */}
+                                        {isPartialCapture && (
+                                            <PartialCaptureNote
+                                                reason={link.captureReason}
+                                                isRtl={isRtl}
+                                                className={detailBody ? 'mb-6' : ''}
+                                            />
                                         )}
                                         {detailBody && (
                                             <SimpleMarkdown

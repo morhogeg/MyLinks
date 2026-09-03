@@ -514,6 +514,11 @@ export async function retryFailedLink(uid: string, link: Link): Promise<void> {
             },
             sourceType: l.sourceType || 'web',
             sourceName: l.sourceName ?? null,
+            // Capture honesty (PM-1C). Written on EVERY retry, null included: a
+            // retry that finally reads the page in full has to clear the flag,
+            // or the card would keep apologizing for a read that now succeeded.
+            captureQuality: l.captureQuality ?? null,
+            captureReason: l.captureReason ?? null,
             // Intentionally NOT writing embedding_vector here. The API no longer
             // returns it, and a client write would store it as a plain array
             // (invisible to vector search). The `sync_link_embedding` Firestore

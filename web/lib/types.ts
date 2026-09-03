@@ -139,6 +139,17 @@ export interface Link {
   // plan while saving this card ('youtube' = the video was NOT watched; the
   // card is metadata-only). The client shows a one-line note.
   proFeature?: 'youtube';
+  // Capture honesty (PM-1C): the backend sets this when the scraper could only
+  // read PART of the page behind this card (a login wall, a social preview
+  // teaser, a PDF). Absent means the content was read in full, so absence is
+  // the normal case and old cards are NOT retroactively labelled. Never set on
+  // notes, text cards, images or YouTube videos, which are not scraped.
+  captureQuality?: 'partial';
+  // Why the read came up short. Machine values only, mapped to copy in the UI:
+  // 'login_wall' (gated, nothing readable), 'teaser' (only the social preview
+  // text), 'pdf' (a document the HTML scraper can't read), 'truncated'
+  // (partial, unclassified).
+  captureReason?: 'login_wall' | 'teaser' | 'pdf' | 'truncated';
   sourceName?: string;
   // 'text' marks a note card whose body is the user's OWN verbatim words, sent
   // in from the share sheet / extension rather than typed in the Note tab. Such

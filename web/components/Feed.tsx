@@ -2646,14 +2646,15 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                 }
                                 : filter === 'unread' ? {
                                     Icon: CheckCircle2, title: 'All caught up',
-                                    body: 'Every save has been read. New links land here first.',
+                                    body: 'You have opened everything you saved. New links land here first.',
                                 }
                                 : filter === 'read' ? {
                                     Icon: BookOpenCheck, title: 'Nothing read yet',
-                                    // Read is an EXPLICIT action (⋯ → Mark as read /
-                                    // the check on a card) — opening a card never sets
-                                    // it (lib/useLinkActions.ts). Don't promise otherwise.
-                                    body: 'Cards you mark as read collect here.',
+                                    // Opening a card marks it read (PM-1B, the
+                                    // auto-read effect in LinkDetailModal), and the
+                                    // check on a card / ⋯ still sets it by hand.
+                                    // Say both, in that order.
+                                    body: 'Cards collect here once you open them, or mark them read yourself.',
                                 }
                                 : filter === 'private' ? {
                                     Icon: Lock, title: 'No private cards',
