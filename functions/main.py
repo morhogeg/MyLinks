@@ -1321,6 +1321,26 @@ def _card_source_name(c: dict):
     return meta.get("youtubeChannel") or c.get("sourceName")
 
 
+def _card_takeaway(c: dict) -> str:
+    """The card's actionable takeaway, trimmed, or "" when it has none.
+
+    Reads BOTH shapes and prefers the top-level key, matching the web reader in
+    `web/lib/takeaway.ts`. What every save path actually WRITES today is
+    `metadata.actionableTakeaway` (one builder: `_build_link_data`), so on a real
+    stored card it is the nested read that finds it — ask_brain's slimmer read
+    only the top-level key, which nothing writes, so no card's takeaway had ever
+    reached the Ask prompt. Old documents are not migrated; reading both shapes
+    is the whole fix. A blank or non-string value counts as absent rather than
+    reaching the model as junk.
+    """
+    meta = c.get("metadata")
+    nested = meta.get("actionableTakeaway") if isinstance(meta, dict) else None
+    for value in (c.get("actionableTakeaway"), nested):
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
+
+
 @https_fn.on_request(max_instances=1)
 def backfill_youtube_channels(req: https_fn.Request) -> https_fn.Response:
     """One-off repair: set metadata.youtubeChannel (and sourceName) from YouTube
@@ -2138,7 +2158,7 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
                 detail = (c.get("detailedSummary") or "").strip()
                 if detail:
                     s["detailedSummary"] = detail[:ASK_DETAIL_MAX_CHARS]
-                takeaway = (c.get("actionableTakeaway") or "").strip()
+                takeaway = _card_takeaway(c)
                 if takeaway:
                     s["actionableTakeaway"] = takeaway[:600]
                 recipe = c.get("recipe")

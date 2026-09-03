@@ -11,6 +11,7 @@ import { isNativeApp } from '@/lib/api';
 import { track } from '@/lib/analytics';
 import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
+import { getActionableTakeaway } from '@/lib/takeaway';
 import { List, RowShell, RowText } from './primitives';
 
 /**
@@ -112,6 +113,14 @@ function buildMarkdown(
         if (typeof d.summary === 'string' && d.summary) {
             lines.push('');
             lines.push(mdEscape(d.summary));
+        }
+        // The card's one concrete action, when the analysis found one. It is
+        // part of what Machina produced for this card, so an export that ships
+        // the summary without it would hand back less than the app holds.
+        const takeaway = getActionableTakeaway(d);
+        if (takeaway) {
+            lines.push('');
+            lines.push(`**Do this:** ${mdEscape(takeaway)}`);
         }
         lines.push('');
         lines.push('---');

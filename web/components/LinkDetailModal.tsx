@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, StatusChangeHandler, UserNote } from '@/lib/types';
 import SourceByline from './SourceByline';
-import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, Check, Network, Play, Youtube, ImageOff, Image as ImageIcon, Layers, Share2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, StickyNote, Waypoints } from 'lucide-react';
+import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, CircleCheck, Check, Network, Play, Youtube, ImageOff, Image as ImageIcon, Layers, Share2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, StickyNote, Waypoints } from 'lucide-react';
 import { getPlatform } from '@/lib/platform';
 import SimpleMarkdown from './SimpleMarkdown';
 import PosterImage from './ui/PosterImage';
@@ -21,6 +21,7 @@ import { isHttpUrl } from '@/lib/url';
 import CitationMark from './ui/CitationMark';
 import ProBadge from './ui/ProBadge';
 import { requestPaywall } from '@/lib/entitlement';
+import { getActionableTakeaway } from '@/lib/takeaway';
 
 // Sentinel `editingNoteId` for the composer when adding a brand-new note (as
 // opposed to editing an existing one, keyed by its real id).
@@ -1165,6 +1166,40 @@ export default function LinkDetailModal({
                         </div>
                         )}
 
+                        {/* DO THIS — the one concrete action this card supports.
+                            The analysis writes a takeaway only when the content
+                            genuinely carries one, so most cards render nothing here
+                            (see lib/takeaway). It sits at the END of the summary,
+                            because it is the last thing the summary has to say —
+                            and it is deliberately QUIET: a label and one line of
+                            body text at the summary's own type scale, never a
+                            callout box competing with the card. An answer card is
+                            already an answer to the user's own question, so it
+                            never gets one. */}
+                        {(() => {
+                            const takeaway = getActionableTakeaway(link);
+                            // Saved Ask answers are marked captureType 'answer'.
+                            // Compared as a plain string so the guard holds whether
+                            // or not that value is in the union yet.
+                            const isAnswerCard = String(link.captureType) === 'answer';
+                            if (!takeaway || isAnswerCard) return null;
+                            return (
+                                <div className="mb-6" dir={isRtl ? 'rtl' : 'ltr'}>
+                                    {/* Same label treatment as Machina's read below, so
+                                        the two read as sibling sections rather than two
+                                        unrelated inventions. Hebrew skips the uppercase
+                                        (a no-op) and the wide tracking (which only makes
+                                        Hebrew look loose). */}
+                                    <div className={`flex items-center gap-2 mb-2 text-sm font-bold text-text-muted ${isRtl ? '' : 'uppercase tracking-wider'}`}>
+                                        <CircleCheck className="w-4 h-4 shrink-0 text-accent" />
+                                        <span>{isRtl ? 'לעשות' : 'Do this'}</span>
+                                    </div>
+                                    <p className={`reading-prose text-text-secondary leading-relaxed ${isRtl ? 'text-right' : 'text-left'}`}>
+                                        {takeaway}
+                                    </p>
+                                </div>
+                            );
+                        })()}
 
                         {/* MACHINA'S READ — a divided section under the user's own
                             text. Closed, it's a single quiet row carrying the mark:
