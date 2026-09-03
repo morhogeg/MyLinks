@@ -31,14 +31,26 @@ export interface Entitlement {
     plan: Plan;
     source: EntitlementSource;
     proUntil: number | null;
+    /** When the trial ends. Null on a trial whose clock has not started yet. */
     trialEndsAt: number | null;
-    quotas: { saves: QuotaMeter; asks: QuotaMeter };
+    /**
+     * When the library reached `trialAnchorCards` cards and the 14 days began.
+     * Null means the trial is granted but not yet running: the user is Pro, and
+     * the countdown has not started.
+     */
+    trialAnchorAt: number | null;
+    /** How many cards start the trial clock (the server owns the number). */
+    trialAnchorCards: number;
+    quotas: { saves: QuotaMeter; asks: QuotaMeter; imports: QuotaMeter };
 }
+
+/** Every metered kind. `imports` is a lifetime allowance, the others monthly. */
+export type QuotaKind = 'saves' | 'asks' | 'imports';
 
 /** The shape a quota 429 carries (functions/main.py _quota_blocked). */
 export interface UpgradeHint {
     upgrade: true;
-    kind: 'saves' | 'asks';
+    kind: QuotaKind;
     used: number;
     limit: number;
     error?: string;
@@ -49,7 +61,13 @@ const FREE_ENTITLEMENT: Entitlement = {
     source: null,
     proUntil: null,
     trialEndsAt: null,
-    quotas: { saves: { used: 0, limit: 0 }, asks: { used: 0, limit: 0 } },
+    trialAnchorAt: null,
+    trialAnchorCards: 10,
+    quotas: {
+        saves: { used: 0, limit: 0 },
+        asks: { used: 0, limit: 0 },
+        imports: { used: 0, limit: 0 },
+    },
 };
 
 function num(v: unknown): number {
@@ -75,7 +93,11 @@ export function parseEntitlement(raw: unknown): Entitlement {
         source: source === 'trial' || source === 'founder' || source === 'revenuecat' ? source : null,
         proUntil: numOrNull(r.proUntil),
         trialEndsAt: numOrNull(r.trialEndsAt),
-        quotas: { saves: meter('saves'), asks: meter('asks') },
+        trialAnchorAt: numOrNull(r.trialAnchorAt),
+        // A server that predates the anchor rule sends no number; the copy that
+        // reads it says "10 things", so that is the fallback.
+        trialAnchorCards: numOrNull(r.trialAnchorCards) ?? FREE_ENTITLEMENT.trialAnchorCards,
+        quotas: { saves: meter('saves'), asks: meter('asks'), imports: meter('imports') },
     };
 }
 
@@ -119,7 +141,8 @@ export async function syncEntitlement(): Promise<Entitlement> {
 export function isUpgradeHint(data: unknown): data is UpgradeHint {
     if (!data || typeof data !== 'object') return false;
     const d = data as Record<string, unknown>;
-    return d.upgrade === true && (d.kind === 'saves' || d.kind === 'asks');
+    return d.upgrade === true
+        && (d.kind === 'saves' || d.kind === 'asks' || d.kind === 'imports');
 }
 
 /** Whole days until `ts`, floored at 0; null when there is no date. */
@@ -129,9 +152,10 @@ export function daysUntil(ts: number | null, now = Date.now()): number | null {
 }
 
 /** "18 of 20 questions left this month", or null when unmetered. */
-export function meterLabel(kind: 'saves' | 'asks', m: QuotaMeter): string | null {
+export function meterLabel(kind: QuotaKind, m: QuotaMeter): string | null {
     if (!m.limit) return null;
     const left = Math.max(0, m.limit - m.used);
+    if (kind === 'imports') return `${left} of ${m.limit} imported links left`;
     const noun = kind === 'asks' ? 'questions' : 'saves';
     return `${left} of ${m.limit} ${noun} left this month`;
 }
@@ -145,7 +169,7 @@ export function meterLabel(kind: 'saves' | 'asks', m: QuotaMeter): string | null
 
 export const PAYWALL_EVENT = 'machina:paywall';
 
-export type PaywallReason = 'saves' | 'asks' | 'synthesis' | 'digest' | 'youtube' | 'settings' | 'manual';
+export type PaywallReason = QuotaKind | 'synthesis' | 'digest' | 'youtube' | 'settings' | 'manual';
 
 /** Ask the mounted paywall to open. Safe to call anywhere, including SSR (no-op). */
 export function requestPaywall(reason: PaywallReason = 'manual'): void {

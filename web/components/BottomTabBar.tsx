@@ -1,6 +1,6 @@
 'use client';
 
-import { Home, Layers, Plus, MessagesSquare, Newspaper } from 'lucide-react';
+import { Home, Layers, Plus, MessagesSquare, CalendarCheck } from 'lucide-react';
 import { hapticLight, hapticMedium } from '@/lib/haptics';
 
 export type BottomTab = 'home' | 'collections' | 'ask' | 'digest';
@@ -8,7 +8,11 @@ export type BottomTab = 'home' | 'collections' | 'ask' | 'digest';
 /**
  * The native-app bottom tab bar (phones only — desktop keeps the toolbar
  * chips). Five slots: Home, Collections, a center Capture action (replaces the
- * mobile FAB), Ask, and Digest.
+ * mobile FAB), Ask, and Today.
+ *
+ * The Today tab's key stays `'digest'`: it is the id in the push payload
+ * ({"view": "digest"}) that a tapped notification deep-links through, so
+ * renaming it would break every notification already sitting on a lock screen.
  *
  * Scroll-away is CONTROLLED via the `hidden` prop (see useScrollAwayBar), so the
  * bar and the tab overlays react to the same signal — the bar slides down while
@@ -31,7 +35,7 @@ export default function BottomTabBar({
         { key: 'home', label: 'Home', icon: <Home className="w-[20px] h-[20px]" /> },
         { key: 'collections', label: 'Collections', icon: <Layers className="w-[20px] h-[20px]" />, tour: 'collections' },
         { key: 'ask', label: 'Ask', icon: <MessagesSquare className="w-[20px] h-[20px]" />, tour: 'ask' },
-        { key: 'digest', label: 'Digest', icon: <Newspaper className="w-[20px] h-[20px]" /> },
+        { key: 'digest', label: 'Today', icon: <CalendarCheck className="w-[20px] h-[20px]" /> },
     ];
 
     return (
@@ -63,7 +67,7 @@ export default function BottomTabBar({
                 {tabs.slice(0, 2).map((t) => <TabButton key={t.key} tab={t} active={active === t.key} onSelect={onSelect} />)}
                 {/* Center capture — the app's core act. CONTAINED within the bar
                     (no upward overhang): a raised button poked above the bar and
-                    got clipped by the full-screen Collections/Digest overlays and
+                    got clipped by the full-screen Collections/Today overlays and
                     left a sliver when the bar slid away. A shadow gives it depth
                     instead of an offset, so it still reads as the hero action. */}
                 <button

@@ -9,6 +9,35 @@ export type FilterType = 'all' | 'unread' | 'read' | 'archived' | 'favorite' | '
 export type SortType = 'date-desc' | 'date-asc' | 'title-asc' | 'category';
 
 /**
+ * ARCHIVE MEANS ARCHIVED (PM-1A) — is this view one that shows archived cards?
+ *
+ * The Review deck promises "File it away, out of your feed", so an archived card
+ * leaves the default feed and the read-state views that are just slices of it.
+ * It is NOT deleted, so it still surfaces in exactly three places, each of them
+ * an explicit request for it:
+ *
+ *   - the Archived show-filter, the drawer the user filed it into;
+ *   - SEARCH, under any filter. Someone typing a word is looking for the card,
+ *     not for the feed, and a search that hides what you saved would be a worse
+ *     lie than the one this fixes. Archived hits are NOT labelled, they simply
+ *     appear;
+ *   - the Reminders view, for a card that still carries a pending reminder. The
+ *     bell is a later, explicit "bring this back" and it outranks the earlier
+ *     archive. Cancelling the reminder returns the card to hiding.
+ *
+ * The Private filter is its own vault view rather than a slice of the feed, so
+ * it keeps showing everything in the vault, archived included.
+ *
+ * Deliberately unchanged elsewhere: collections read their own complete member
+ * set (useCollectionLinks), Insights counts the whole library, Ask and the
+ * knowledge graph answer from the whole library, and the Review deck plus the
+ * digest already excluded archived cards.
+ */
+function showsArchived(filter: FilterType, searching: boolean): boolean {
+    return searching || filter === 'archived' || filter === 'private' || filter === 'reminders';
+}
+
+/**
  * Feed selection state + the memoized filter/sort pipeline and facet counts,
  * extracted verbatim from Feed (R-3). Owns filter/category/tags/collections/
  * sources/sort selection; consumes the live links plus the LIVE search query
@@ -121,12 +150,27 @@ export function useFeedFilters(
         return m;
     }, [semanticIds, queryTokens]);
 
+    // The cards meaning search found that the literal matcher did NOT — the
+    // "By meaning" half of the results. Only derivable here: useSemanticSearch
+    // knows the server's ids, but whether a card ALSO contains the query's
+    // words is the literal pass above. Feed renders these below a divider and
+    // marks each one, so a card that shares no word with the query never looks
+    // like an unexplained result.
+    const semanticOnlyIds = useMemo(() => {
+        const s = new Set<string>();
+        semanticRank.forEach((_, id) => { if (!searchMatches.has(id)) s.add(id); });
+        return s;
+    }, [semanticRank, searchMatches]);
+
     // 4. Hybrid Search Logic — memoized so a banner tick or any unrelated state
     // change (search typing, overlay toggles) doesn't re-run the 6-stage filter +
     // sort. Recomputes only when an input it actually reads changes.
     const filteredLinks = useMemo(() => searchBase
         .filter((link) => {
-            // Apply status filters ('private' already picked its base list above)
+            // Apply status filters ('private' already picked its base list above).
+            // Every branch that isn't explicitly asking for archived cards drops
+            // them first — see showsArchived / the contentLinks comment.
+            if (!showsArchived(filter, queryTokens.length > 0) && link.status === 'archived') return false;
             if (filter === 'private') return true;
             if (filter === 'reminders') return link.reminderStatus === 'pending';
             if (filter === 'unread') return !link.isRead;
@@ -201,6 +245,17 @@ export function useFeedFilters(
         }),
         [searchBase, filter, selectedCategory, selectedTags, selectedCollections, selectedSources, queryTokens, searchMatches, semanticRank, sortBy]);
 
+    // Facet base: the chips and their counts describe the cards the CURRENT view
+    // can actually show, so "Tech (12)" can never resolve to 9 cards because
+    // three of them are archived. In a view that shows archived cards, the base
+    // is the whole content set again.
+    const facetLinks = useMemo(
+        () => showsArchived(filter, queryTokens.length > 0)
+            ? contentLinks
+            : contentLinks.filter((l) => l.status !== 'archived'),
+        [contentLinks, filter, queryTokens]
+    );
+
     // Faceted counts — the numbers update live as you tap. Each facet's counts are
     // computed against the OTHER facet's current selection (but never its own), so
     // picking the "Tech" category instantly drops a non-overlapping tag like
@@ -209,39 +264,39 @@ export function useFeedFilters(
     // recomputes only when the library or the relevant selection changes.
     const categoryCounts = useMemo(() => {
         const forCounts = selectedTags.size === 0
-            ? contentLinks
-            : contentLinks.filter(link => link.tags.some(tag => Array.from(selectedTags).some(s => tag === s || tag.startsWith(`${s}/`))));
+            ? facetLinks
+            : facetLinks.filter(link => link.tags.some(tag => Array.from(selectedTags).some(s => tag === s || tag.startsWith(`${s}/`))));
         return forCounts.reduce((acc, link) => {
             acc[link.category] = (acc[link.category] || 0) + 1;
             return acc;
         }, {} as Record<string, number>);
-    }, [contentLinks, selectedTags]);
+    }, [facetLinks, selectedTags]);
 
-    // Category chips stay derived from the whole library so they never vanish —
+    // Category chips stay derived from the whole facet base so they never vanish —
     // they just read 0 when nothing matches the current tag selection.
     const categories = useMemo(
-        () => Array.from(new Set(contentLinks.map(l => l.category).filter(Boolean)))
+        () => Array.from(new Set(facetLinks.map(l => l.category).filter(Boolean)))
             // Case-insensitive A–Z so chips read in a predictable order regardless
             // of how a category happens to be capitalized.
             .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' })),
-        [contentLinks]
+        [facetLinks]
     );
 
     const tagCounts = useMemo(() => {
         const forCounts = selectedCategory.size === 0
-            ? contentLinks
-            : contentLinks.filter(link => selectedCategory.has(link.category));
+            ? facetLinks
+            : facetLinks.filter(link => selectedCategory.has(link.category));
         return forCounts.reduce((acc, link) => {
             link.tags.forEach(tag => {
                 acc[tag] = (acc[tag] || 0) + 1;
             });
             return acc;
         }, {} as Record<string, number>);
-    }, [contentLinks, selectedCategory]);
+    }, [facetLinks, selectedCategory]);
 
     const allTags = useMemo(
-        () => Array.from(new Set(contentLinks.flatMap(l => l.tags))).sort(),
-        [contentLinks]
+        () => Array.from(new Set(facetLinks.flatMap(l => l.tags))).sort(),
+        [facetLinks]
     );
 
     const handleToggleTag = useCallback((tag: string) => {
@@ -255,7 +310,7 @@ export function useFeedFilters(
 
     // Source (publisher/site) facet — every distinct source in the library, ranked
     // by count. Drives the Sources submenu and the search "Sources" suggestions.
-    const sourceFacets = useMemo(() => buildSourceFacets(contentLinks), [contentLinks]);
+    const sourceFacets = useMemo(() => buildSourceFacets(facetLinks), [facetLinks]);
     const sourceLabelByKey = useMemo(() => {
         const m = new Map<string, string>();
         sourceFacets.forEach(s => m.set(s.key, s.label));
@@ -331,6 +386,9 @@ export function useFeedFilters(
             .slice(0, 8);
     }, [searchQuery, allTags, tagCounts]);
 
+    // Counted over contentLinks, NOT facetLinks: the Reminders view deliberately
+    // shows archived cards that still carry a pending reminder, so its badge has
+    // to count them or the number would undershoot what the view opens with.
     const reminderCount = useMemo(
         () => contentLinks.filter(l => l.reminderStatus === 'pending').length,
         [contentLinks]
@@ -355,6 +413,7 @@ export function useFeedFilters(
         handleToggleSourceKeys,
         matchingSources,
         matchingTags,
+        semanticOnlyIds,
         reminderCount,
     };
 }

@@ -19,6 +19,7 @@ import { useToast } from '@/components/Toast';
 import { useLinks } from '@/lib/useLinks';
 import { useSearchLibrary } from '@/lib/useSearchLibrary';
 import { useSemanticSearch, warmSearchBackend } from '@/lib/useSemanticSearch';
+import { looksLikeQuestion } from '@/lib/searchIntent';
 import { useLinkActions } from '@/lib/useLinkActions';
 import { useFeedFilters, type FilterType, type SortType } from '@/lib/useFeedFilters';
 import { isPending, getTimestampNumber } from '@/lib/feedUtils';
@@ -35,6 +36,7 @@ import MobileTagExplorerDrawer from './feed/MobileTagExplorerDrawer';
 import Card from './Card';
 import ListCard from './ListCard';
 import CitationMark from './ui/CitationMark';
+import { CitationGlyph } from './ui/Wordmark';
 import Masonry from './Masonry';
 import ReminderModal from './ReminderModal';
 import SwipeDeck from './SwipeDeck';
@@ -54,12 +56,13 @@ import NotesView from './NotesView';
 import KnowledgeGraph from './KnowledgeGraph';
 import { getNoteGroups } from '@/lib/notes';
 import LoadMoreSentinel from './feed/LoadMoreSentinel';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, Share2, Globe, Plus, Pencil, Newspaper, Lock, BookOpenCheck, ChevronLeft, BarChart3, StickyNote, Waypoints } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, Share2, Globe, Plus, Pencil, Newspaper, CalendarCheck, Lock, BookOpenCheck, ChevronLeft, BarChart3, StickyNote, Waypoints } from 'lucide-react';
 import { usePullToRefresh } from '@/lib/usePullToRefresh';
 import { useProcessingBanner } from '@/lib/useProcessingBanner';
 import { cardStartMs } from '@/lib/shareProgress';
 import { subscribeSyntheses, subscribeSynthesisNotes, saveSynthesisNotes } from '@/lib/synthesis';
-import { subscribeDigests, deleteDigest } from '@/lib/digest';
+import { subscribeDigests, deleteDigest, TODAY_REVIEW_SIZE } from '@/lib/digest';
+import { reviewSessionQueue } from '@/lib/reviewQueue';
 import { PUSH_INTENT_EVENT, PUSH_FOREGROUND_EVENT, consumePendingPushIntent, readLocalPushPrompt, type PushIntent } from '@/lib/push';
 import { isNativeApp } from '@/lib/api';
 import { reportError } from '@/lib/errorReporter';
@@ -117,16 +120,29 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         return links.filter((l) => !isEffectivelyPrivateCard(l));
     }, [links, vaultLocked, isEffectivelyPrivateCard]);
     const [searchQuery, setSearchQuery] = useState('');
-    // Search field open state (icon → expanded input, both breakpoints).
-    // Declared here so opening search prefetches the library below.
-    const [searchOpen, setSearchOpen] = useState(false);
+    // The search field is the front door of Home: it is always on screen, so
+    // there is no open/closed state left to keep — only whether it holds the
+    // caret, which is what brings the Done affordance in beside it.
+    const [searchFocused, setSearchFocused] = useState(false);
+    // The two rendered fields (phone row / desktop toolbar). Only one is mounted
+    // at a breakpoint, so anything that wants the caret focuses whichever exists.
+    const mobileSearchRef = useRef<HTMLInputElement>(null);
+    const desktopSearchRef = useRef<HTMLInputElement>(null);
     // Full-library snapshot for search — fetched once when search is first
-    // opened/typed, so matches reach cards older than the loaded feed window.
+    // focused/typed, so matches reach cards older than the loaded feed window.
     const { libraryLinks, isLoadingLibrary, ensureLibrary } = useSearchLibrary(uid);
-    // Open the search field (icon tap). Prefetches the library so full-history
-    // matches are usually ready by the time the user finishes typing, and warms
+    // Focus IS the moment search opens now. Prefetch the library so full-history
+    // matches are usually ready by the time the user finishes typing, and warm
     // the search function so its cold start runs during typing, not after it.
-    const openSearch = useCallback(() => { ensureLibrary(); warmSearchBackend(); setSearchOpen(true); }, [ensureLibrary]);
+    // (warmSearchBackend re-arms at most every 10 min, so re-focusing is free.)
+    const handleSearchFocus = useCallback(() => {
+        setSearchFocused(true);
+        ensureLibrary();
+        warmSearchBackend();
+    }, [ensureLibrary]);
+    const focusSearchField = useCallback(() => {
+        (mobileSearchRef.current ?? desktopSearchRef.current)?.focus();
+    }, []);
     // Every keystroke routes through here so the library fetch can't be missed
     // (e.g. a query arriving without the icon tap).
     const updateSearchQuery = useCallback((value: string) => {
@@ -164,10 +180,41 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         handleToggleSourceKeys,
         matchingSources,
         matchingTags,
+        semanticOnlyIds,
         reminderCount,
     // LIVE query in — literal matching is instant per keystroke; the semantic
     // ids arrive debounced and append below the literal tiers.
     } = useFeedFilters(visibleLinks, searchQuery, libraryLinks, privateCollectionIds, semanticIds);
+    // A query that reads like a QUESTION earns one offer above the results:
+    // hand the same words to Ask, which answers in a cited paragraph instead of
+    // a grid. Null on an empty library — there is nothing to answer from — and
+    // it is only ever an offer: the results still render underneath.
+    const askableQuestion = useMemo(() => {
+        const q = searchQuery.trim();
+        if (!q || visibleLinks.length === 0) return null;
+        return looksLikeQuestion(q) ? q : null;
+    }, [searchQuery, visibleLinks.length]);
+    // Where the literal hits end and the meaning-only hits begin. useFeedFilters
+    // sorts literal matches first and meaning-only ones last, so the boundary is
+    // one index — but ONLY under the default sort, the only one that tiers by
+    // match kind. -1 means no divider: no query, an explicit sort, or one of the
+    // two groups is empty (a divider over nothing is noise).
+    const meaningSplit = useMemo(() => {
+        if (!searchQuery.trim() || sortBy !== 'date-desc' || semanticOnlyIds.size === 0) return -1;
+        const i = filteredLinks.findIndex((l) => semanticOnlyIds.has(l.id));
+        return i > 0 ? i : -1;
+    }, [searchQuery, sortBy, semanticOnlyIds, filteredLinks]);
+    // The divider itself — same quiet section-label grammar as the search
+    // typeahead's Sources/Tags/Cards rows, with the mark that already stands for
+    // meaning search ("Searching by meaning…"). The rule is a flex child, so it
+    // fills whichever side the label doesn't.
+    const meaningDivider = (
+        <div key="by-meaning" className="flex items-center gap-2 mt-6 mb-3">
+            <CitationGlyph className="w-3 h-auto shrink-0 text-accent/70" />
+            <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-text-muted whitespace-nowrap">By meaning</span>
+            <span className="flex-1 h-px bg-border-subtle" />
+        </div>
+    );
     // Card action handlers that depend only on [uid, toast] (R-3: useLinkActions).
     const {
         handleStatusChange,
@@ -267,6 +314,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // (Task B); 'notes' is the central My Notes view. The detail places are
     // history-like: back returns to their parent list, never to the home library.
     const [viewMode, setViewMode] = useState<'grid' | 'list' | 'review' | 'graph' | 'ask' | 'collections' | 'collection' | 'digest' | 'digestDetail' | 'notes'>('grid');
+    // True while the review deck was opened from the Today tab: it deals a
+    // shorter session and its exit returns to Today instead of the library.
+    const [reviewFromToday, setReviewFromToday] = useState(false);
     // The collection currently open as a place (viewMode 'collection').
     const [openCollectionId, setOpenCollectionId] = useState<string | null>(null);
     // The digest currently open as a place (viewMode 'digestDetail'); a
@@ -781,6 +831,54 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         setReminderModalLink(link);
     }, []);
 
+    // ── Today tab ────────────────────────────────────────────────────────────
+    // Every card whose reminder still wants attention: one that has already
+    // fired and not been acted on (`reminderDue` — the in-app delivery that
+    // works with or without push) plus any still-pending one. DigestView keeps
+    // the ones due now and the ones landing later today; the rest wait for their
+    // day. Derived from visibleLinks so a locked private card can never surface
+    // here, exactly like the home feed's due strip.
+    const reminderCards = useMemo(
+        () => visibleLinks
+            .filter((l) => (l.reminderStatus === 'pending' || l.reminderDue === true) && !isEffectivelyPrivateCard(l))
+            .sort((a, b) => (a.nextReminderAt ?? a.reminderDueAt ?? 0) - (b.nextReminderAt ?? b.reminderDueAt ?? 0)),
+        [visibleLinks, isEffectivelyPrivateCard]
+    );
+
+    // How many cards the review deck could deal right now. 0 hides Today's
+    // review row rather than sending the user into an empty deck.
+    const todayReviewCount = useMemo(() => reviewSessionQueue(visibleLinks).length, [visibleLinks]);
+
+    // "Done" on a due card: stop a still-pending reminder from coming back, and
+    // clear the fired flag. Both writes are the ones the rest of the app already
+    // uses, so a card marked done here looks done everywhere.
+    const completeReminder = useCallback(async (link: Link) => {
+        if (!uid) return;
+        if (link.reminderStatus === 'pending') {
+            try {
+                await updateLinkReminder(uid, link.id, false);
+            } catch {
+                toast.error("Couldn't update that reminder. Please try again.");
+                return;
+            }
+        }
+        if (link.reminderDue) void clearReminderDue(link.id);
+    }, [uid, toast, clearReminderDue]);
+
+    // Today's "Review N cards" opens the same deck the library's Review mode
+    // opens, dealt a shorter session and pointed back at Today when it ends.
+    const startTodayReview = useCallback(() => {
+        setReviewFromToday(true);
+        setViewMode('review');
+    }, []);
+    // The deck's own exit clears the flag, but a push deep-link (or any other
+    // direct setViewMode) can leave review without passing through it. Reset on
+    // the way out so the NEXT session opened from the view switcher is a full
+    // library session again.
+    useEffect(() => {
+        if (viewMode !== 'review' && reviewFromToday) setReviewFromToday(false);
+    }, [viewMode, reviewFromToday]);
+
     // A pending capture (processing / failed) rendered with Card's dedicated
     // skeleton / retry treatment. Reused above both the grid and list layouts.
     const renderPendingCard = (link: Link) => (
@@ -890,7 +988,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
             })();
         return base.filter((l) => !isPending(l) && !isEffectivelyPrivateCard(l));
     }, [viewMode, graphFiltersActive, filteredLinks, links, libraryLinks, isEffectivelyPrivateCard]);
-    // Graph → Ask hand-off: a cluster's "Ask about cluster" opens Ask with this
+    // Pre-sent question hand-off: a graph cluster's "Ask about cluster" (and the
+    // search question row, see handleAskFromSearch) opens Ask with this
     // question pre-sent (nonce-gated inside AskBrain, fresh conversation). The
     // restore payload re-opens the same graph focus when the user comes back —
     // Ask is a detour from the graph, not an exit.
@@ -926,6 +1025,19 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         setGraphRestore(focus);
         setGraphFromChat(fromChatId);
         setViewMode('graph');
+    }, []);
+    // Search → Ask: the question row above the results hands the typed words
+    // straight to Ask, pre-sent, in a fresh conversation. It rides the SAME
+    // one-shot channel the graph's "Ask about cluster" uses (AskBrain consumes
+    // each nonce exactly once) minus the graph trail — this ask came from the
+    // library, so leaving Ask returns to the library. The query stays in the
+    // field on purpose: coming back lands on the search that was left.
+    const handleAskFromSearch = useCallback((question: string) => {
+        setGraphAsk((prev) => ({ question, nonce: (prev?.nonce ?? 0) + 1 }));
+        setGraphRestore(null);
+        setAskOpenChat(null);
+        setAskFromGraph(false);
+        setViewMode('ask');
     }, []);
     // A card → the Graph, focused on that card: the "See in graph" button on an
     // open card's Related list, and the ⋯ menu's row on a closed one. Reuses the
@@ -1391,7 +1503,10 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     ];
     // The layout the Ask/Collections buttons return you to when you leave them.
     const lastLayout = useRef<'grid' | 'list' | 'review' | 'graph'>('grid');
-    if (viewMode === 'grid' || viewMode === 'list' || viewMode === 'review' || viewMode === 'graph') lastLayout.current = viewMode;
+    // A review session opened from Today is a detour, not a layout choice — it
+    // must never become the view the Home tab returns you to.
+    if (viewMode === 'grid' || viewMode === 'list' || viewMode === 'graph'
+        || (viewMode === 'review' && !reviewFromToday)) lastLayout.current = viewMode;
 
     // ---- Mobile v4 chrome (bottom tab bar + header glyphs) ----
     // Which bottom tab the current viewMode belongs to; detail places roll up
@@ -1427,7 +1542,10 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // hands down a command and we consume it here.
     useEffect(() => {
         if (!headerCommand) return;
-        if (headerCommand.action === 'search') openSearch();
+        // 'search' no longer opens anything — the field is always on Home — so
+        // the command just gives it the caret. The channel stays wired because
+        // the header may still route a search intent here (deep link, push).
+        if (headerCommand.action === 'search') focusSearchField();
         else if (headerCommand.action === 'sources') setIsSourcesOpen(true);
         else if (headerCommand.action === 'view') setIsViewOpen(true);
         else setIsDisplayOpen(true);
@@ -1543,6 +1661,12 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
             onOpenDigestSettings={onOpenDigestSettings}
             onDeleteDigest={uid ? (id) => { void deleteDigest(uid, id); } : undefined}
             onOpenDigest={openDigestDetail}
+            reminderCards={reminderCards}
+            onOpenReminderCard={(l) => { openLinkDetails(l); if (l.reminderDue) void clearReminderDue(l.id); }}
+            onEditReminder={handleOpenReminderModal}
+            onCompleteReminder={(l) => { void completeReminder(l); }}
+            reviewCount={todayReviewCount}
+            onStartReview={startTodayReview}
         />
     );
 
@@ -1777,14 +1901,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                         />
                     </div>
                 ) : viewMode === 'digest' ? (
-                    // Desktop only: the digest history flows inline beneath this
-                    // subheader. Mobile renders its own full-screen overlay below.
+                    // Desktop only: Today flows inline beneath this subheader.
+                    // Mobile renders its own full-screen overlay below.
                     <div className="hidden sm:block">
                         <MobileSubheader
                             onBack={() => setViewMode(lastLayout.current)}
                             backLabel="Back to your library"
-                            icon={<Newspaper className="w-5 h-5" />}
-                            title="Digest"
+                            icon={<CalendarCheck className="w-5 h-5" />}
+                            title="Today"
                         />
                     </div>
                 ) : viewMode === 'digestDetail' ? (
@@ -1793,7 +1917,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                     <div className="hidden sm:block">
                         <MobileSubheader
                             onBack={closeDigestToList}
-                            backLabel="Back to digests"
+                            backLabel="Back to Today"
                             icon={<Newspaper className="w-5 h-5" />}
                             title={digestDetailTitle}
                         />
@@ -1809,37 +1933,17 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             title="My Notes"
                         />
                     </div>
-                ) : searchOpen ? (
-                    // Desktop: like iOS, search is an icon in the toolbar that expands
-                    // this input on demand — so the resting layout reclaims the line the
-                    // always-on search bar used to occupy. Esc or the × collapses it.
-                    <div data-tour="search" className="relative hidden sm:block animate-in fade-in slide-in-from-top-1 duration-200">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
-                        <input
-                            type="text"
-                            autoFocus
-                            dir="auto"
-                            value={searchQuery}
-                            onChange={(e) => updateSearchQuery(e.target.value)}
-                            onKeyDown={(e) => { if (e.key === 'Escape') { if (searchQuery) setSearchQuery(''); else setSearchOpen(false); } }}
-                            placeholder="Search Machina…"
-                            className="w-full pl-9 pr-10 py-2 bg-card rounded-xl text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent/30 transition-all"
-                        />
-                        <button
-                            onClick={() => { setSearchQuery(''); setSearchOpen(false); }}
-                            aria-label="Close search"
-                            className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 p-1.5 hover:bg-fill-strong rounded-full transition-all"
-                        >
-                            <X className="w-4 h-4 text-text-muted" />
-                        </button>
-                    </div>
                 ) : null}
 
 
-                {/* Mobile Row 1 — the ANCHOR: an always-live search field (tap, type,
-                    results — no expand dance) with the filter funnel inside it as a
-                    trailing accessory, plus ONE tools capsule (view switcher ‖ select).
-                    Selection mode swaps in for the whole row. */}
+                {/* Mobile Row 1 — the ANCHOR: the search field itself, always on
+                    screen directly under the app header (it replaced the header's
+                    search glyph). Tap, type, results — no expand dance, and no
+                    hidden entry point for the one thing Machina is for. It sits in
+                    the NON-sticky header block on purpose: it scrolls away with the
+                    feed like the search field in Mail or Notes, and a flick back to
+                    the top brings it home, so the glass header's own scroll-away
+                    behaviour is untouched. Selection mode swaps in for the row. */}
                 {isLibraryView && (
                     isSelectionMode ? (
                         <div className="flex sm:hidden items-center animate-in fade-in slide-in-from-top-1 duration-200">
@@ -1877,19 +1981,26 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                 </button>
                             </div>
                         </div>
-                    ) : searchOpen ? (
-                        <div className="flex sm:hidden items-center gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                    ) : (
+                        <div className="flex sm:hidden items-center gap-2">
                             <div className="relative flex-1 min-w-0">
                                 <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
                                 <input
+                                    ref={mobileSearchRef}
+                                    data-tour="search"
                                     type="text"
-                                    autoFocus
                                     enterKeyHint="search"
+                                    /* dir="auto" so a Hebrew query flows right to left in
+                                       place. The two side paddings are equal, so whichever
+                                       way the text runs it clears both the glyph and the ×. */
                                     dir="auto"
                                     value={searchQuery}
                                     onChange={(e) => updateSearchQuery(e.target.value)}
-                                    onKeyDown={(e) => { if (e.key === 'Escape') setSearchOpen(false); }}
-                                    placeholder="Search Machina…"
+                                    onFocus={handleSearchFocus}
+                                    onBlur={() => setSearchFocused(false)}
+                                    onKeyDown={(e) => { if (e.key === 'Escape') { if (searchQuery) setSearchQuery(''); else e.currentTarget.blur(); } }}
+                                    placeholder="Search or ask your saves"
+                                    aria-label="Search or ask your saves"
                                     className="w-full h-10 ps-9 pe-9 bg-card border border-border-subtle rounded-full text-[15px] text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-transparent transition-shadow"
                                 />
                                 {searchQuery && (
@@ -1902,14 +2013,21 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                     </button>
                                 )}
                             </div>
-                            <button
-                                onClick={() => setSearchOpen(false)}
-                                className="shrink-0 text-[13px] font-semibold text-accent px-1.5 py-2"
-                            >
-                                Done
-                            </button>
+                            {/* Done appears with the keyboard and puts it away again;
+                                the × inside the field is what clears the query. The
+                                pointer-down guard keeps the button from unmounting
+                                (on blur) before the tap lands on it. */}
+                            {searchFocused && (
+                                <button
+                                    onPointerDown={(e) => e.preventDefault()}
+                                    onClick={() => mobileSearchRef.current?.blur()}
+                                    className="shrink-0 text-[13px] font-semibold text-accent px-1.5 py-2 animate-fade-in"
+                                >
+                                    Done
+                                </button>
+                            )}
                         </div>
-                    ) : null
+                    )
                 )}
 
 
@@ -1927,20 +2045,38 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                         Filters sheet. Hidden entirely in Ask mode (no grid to filter). */}
                     <div className="hidden sm:flex items-center gap-2">
                         {isLibraryView && (<>
-                        {/* Search — an icon that expands the input above (iOS-style), so
-                            the resting toolbar keeps the reclaimed line. Accent while a
-                            query is active so it reads as "on" even when collapsed. */}
-                        <button
-                            data-tour="search"
-                            onClick={() => (searchOpen ? setSearchOpen(false) : openSearch())}
-                            aria-label="Search"
-                            title="Search"
-                            className={`${ctrlBase} w-9 px-0 border ${searchQuery
-                                ? 'bg-accent text-accent-ink border-accent shadow-sm'
-                                : ctrlIdle}`}
-                        >
-                            <Search className="w-4 h-4" />
-                        </button>
+                        {/* Search — the FIRST control in the toolbar and a real field,
+                            not an icon that expands one: recall is the point of the
+                            app, so its entry point is never a click away. Same 36px
+                            height as every other control here (ctrlBase), quiet until
+                            it has the caret. Esc clears, then releases the caret. */}
+                        <div data-tour="search" className="relative">
+                            <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
+                            <input
+                                ref={desktopSearchRef}
+                                type="text"
+                                /* dir="auto" + equal side paddings: a Hebrew query
+                                   flows right to left and still clears glyph and ×. */
+                                dir="auto"
+                                value={searchQuery}
+                                onChange={(e) => updateSearchQuery(e.target.value)}
+                                onFocus={handleSearchFocus}
+                                onBlur={() => setSearchFocused(false)}
+                                onKeyDown={(e) => { if (e.key === 'Escape') { if (searchQuery) setSearchQuery(''); else e.currentTarget.blur(); } }}
+                                placeholder="Search or ask your saves"
+                                aria-label="Search or ask your saves"
+                                className="h-9 w-56 lg:w-72 ps-9 pe-9 rounded-full bg-card border border-border-subtle text-[13px] text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-transparent transition-shadow"
+                            />
+                            {searchQuery && (
+                                <button
+                                    onClick={() => setSearchQuery('')}
+                                    aria-label="Clear search"
+                                    className="absolute end-2 top-1/2 -translate-y-1/2 p-1 rounded-full text-text-muted hover:text-text hover:bg-fill-strong transition-colors cursor-pointer"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            )}
+                        </div>
                         {/* ONE consolidated Filter button (mirrors the iOS drawer): opens
                             the responsive filters modal holding Show (status), Categories,
                             and Tags. Sources graduated to their own control (globe, next). */}
@@ -2102,12 +2238,12 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             </button>
                             <button
                                 onClick={() => setViewMode('digest')}
-                                title="Your curated digests"
-                                aria-label="Digest"
+                                title="What is coming back to you today"
+                                aria-label="Today"
                                 className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
                             >
-                                <Newspaper className="w-4 h-4" />
-                                <span>Digest</span>
+                                <CalendarCheck className="w-4 h-4" />
+                                <span>Today</span>
                             </button>
                             <button
                                 onClick={() => openNotesView()}
@@ -2446,6 +2582,26 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
 
                 {/* Links Grid / Ask */}
                 <div className="flex-grow min-w-0">
+                    {/* Question routing — ONE row, above everything the search
+                        found. A query that reads like a question ("why do we
+                        dream", "מה למדתי על שינה") is something the grid can only
+                        answer sideways, so this hands the same words to Ask, which
+                        answers with citations. It is an OFFER: nothing switches
+                        until it is tapped, and the results stay right below it. */}
+                    {(viewMode === 'grid' || viewMode === 'list') && askableQuestion && (
+                        <button
+                            onClick={() => handleAskFromSearch(askableQuestion)}
+                            className="w-full mb-5 flex items-center gap-2.5 px-3.5 py-3 rounded-2xl bg-card border border-border-subtle text-start cursor-pointer hover:bg-card-hover hover:border-text-muted/40 transition-colors animate-fade-in"
+                        >
+                            <CitationGlyph className="w-3.5 h-auto shrink-0 text-accent" />
+                            {/* bdi isolates the query: a Hebrew question keeps its
+                                own direction inside this English chrome line. */}
+                            <span className="min-w-0 flex-1 truncate text-[13px] text-text-secondary">
+                                <span className="font-bold text-text">Ask Machina:</span>{' '}
+                                <bdi>“{askableQuestion}”</bdi>
+                            </span>
+                        </button>
+                    )}
                     {/* Search typeahead — split the live results into "Sources" and
                         "Tags" rows (tap to jump straight to that filter) above the
                         "Cards" grid below, so searching "ynet" or a tag offers both.
@@ -2606,6 +2762,10 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             onOpenGraphFocus={handleOpenGraphFocus}
                             onBackToGraph={askFromGraph ? handleBackToGraph : undefined}
                             openChatId={askOpenChat}
+                            // Sharing an answer publishes the titles of the cards
+                            // it cited — never a card in the privacy vault, which
+                            // an answer CAN cite while the vault is unlocked.
+                            privateCollectionIds={privateCollectionIds}
                         />
                     ) : filteredLinks.length === 0 && pendingCards.length === 0 ? (
                         (() => {
@@ -2646,14 +2806,15 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                 }
                                 : filter === 'unread' ? {
                                     Icon: CheckCircle2, title: 'All caught up',
-                                    body: 'Every save has been read. New links land here first.',
+                                    body: 'You have opened everything you saved. New links land here first.',
                                 }
                                 : filter === 'read' ? {
                                     Icon: BookOpenCheck, title: 'Nothing read yet',
-                                    // Read is an EXPLICIT action (⋯ → Mark as read /
-                                    // the check on a card) — opening a card never sets
-                                    // it (lib/useLinkActions.ts). Don't promise otherwise.
-                                    body: 'Cards you mark as read collect here.',
+                                    // Opening a card marks it read (PM-1B, the
+                                    // auto-read effect in LinkDetailModal), and the
+                                    // check on a card / ⋯ still sets it by hand.
+                                    // Say both, in that order.
+                                    body: 'Cards collect here once you open them, or mark them read yourself.',
                                 }
                                 : filter === 'private' ? {
                                     Icon: Lock, title: 'No private cards',
@@ -2672,8 +2833,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                     body: 'Clear a filter or two to widen the results.',
                                 }
                                 : {
+                                    // Name the platform's FIRST capture surface
+                                    // first, so this line matches what the
+                                    // first run just taught: the share sheet on
+                                    // iPhone, the plus button on the web.
                                     Icon: Inbox, title: 'Your Machina is empty',
-                                    body: 'Save your first link with the + button. Machina reads it, tags it, and files it for you.',
+                                    body: isNativeApp()
+                                        ? 'Share a link to Machina from any app, or tap + to add one here. Machina reads it, tags it, and files it for you.'
+                                        : 'Tap + to save your first link, or add the browser extension to clip any page. Machina reads it, tags it, and files it for you.',
                                 };
                             return (
                         <div className="text-center py-16 px-6 animate-fade-in">
@@ -2720,7 +2887,11 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                         />
                     ) : viewMode === 'review' ? (
                         <SwipeDeck
-                            links={filteredLinks}
+                            // From Today the deck is a short, unfiltered session
+                            // (the user came from Today, not from a filtered
+                            // library) and its exit returns there.
+                            links={reviewFromToday ? visibleLinks : filteredLinks}
+                            limit={reviewFromToday ? TODAY_REVIEW_SIZE : undefined}
                             onKeep={swipeKeep}
                             onArchive={swipeArchive}
                             onRemind={handleOpenReminderModal}
@@ -2729,47 +2900,63 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             onCancelRemind={swipeCancelRemind}
                             onToggleFavorite={swipeToggleFavorite}
                             remindSignal={remindSignal}
-                            onExit={() => setViewMode(lastLayout.current === 'review' ? 'grid' : lastLayout.current)}
+                            onExit={() => {
+                                if (reviewFromToday) { setReviewFromToday(false); setViewMode('digest'); return; }
+                                setViewMode(lastLayout.current === 'review' ? 'grid' : lastLayout.current);
+                            }}
                         />
                     ) : viewMode === 'list' ? (
                         <div className="flex flex-col gap-2 max-w-3xl mx-auto">
                             {feedModules}
                             {pendingCards.map(renderPendingCard)}
-                            {filteredLinks.map((link, idx) => (
+                            {/* The "By meaning" divider drops in at the boundary
+                                (meaningSplit) — the rows below it share no word
+                                with the query. -1 while not searching, so the
+                                list is untouched off search. */}
+                            {filteredLinks.flatMap((link, idx) => {
                                 // cv-card: off-screen rows skip layout/paint (3.15).
-                                <div key={link.id} className="cv-card">
-                                    <ListCard
-                                        index={idx}
-                                        link={link}
-                                        onOpenDetails={openLinkDetails}
-                                        onStatusChange={handleStatusChange}
-                                        onDelete={handleDelete}
-                                        isSelectionMode={isSelectionMode}
-                                        isSelected={selectedIds.has(link.id)}
-                                        onToggleSelection={toggleSelection}
-                                        onReadStatusChange={handleReadStatusChange}
-                                        onUpdateReminder={handleOpenReminderModal}
-                                        onAddToCollection={handleAddToCollection}
-                                        onShare={handleShareCard}
-                                        onTogglePrivate={handleToggleCardPrivate}
-                                        onOpenInGraph={isEffectivelyPrivateCard(link) ? undefined : openInGraphFromMenu}
-                                        cardCollections={cardCollectionsByLink.get(link.id)}
-                                        activeCollectionId={openCol?.id}
-                                        onRemoveFromCollection={handleRemoveFromCollection}
-                                    />
-                                </div>
-                            ))}
+                                const row = (
+                                    <div key={link.id} className="cv-card">
+                                        <ListCard
+                                            index={idx}
+                                            link={link}
+                                            onOpenDetails={openLinkDetails}
+                                            onStatusChange={handleStatusChange}
+                                            onDelete={handleDelete}
+                                            isSelectionMode={isSelectionMode}
+                                            isSelected={selectedIds.has(link.id)}
+                                            onToggleSelection={toggleSelection}
+                                            onReadStatusChange={handleReadStatusChange}
+                                            onUpdateReminder={handleOpenReminderModal}
+                                            onAddToCollection={handleAddToCollection}
+                                            onShare={handleShareCard}
+                                            onTogglePrivate={handleToggleCardPrivate}
+                                            onOpenInGraph={isEffectivelyPrivateCard(link) ? undefined : openInGraphFromMenu}
+                                            cardCollections={cardCollectionsByLink.get(link.id)}
+                                            activeCollectionId={openCol?.id}
+                                            onRemoveFromCollection={handleRemoveFromCollection}
+                                        />
+                                    </div>
+                                );
+                                return idx === meaningSplit ? [meaningDivider, row] : row;
+                            })}
                             <LoadMoreSentinel hasMore={hasMore} onLoadMore={loadMore} />
                         </div>
                     ) : (
                         <>
                         {feedModules}
-                        <Masonry columnWidth={340} gap={16}>
-                            {pendingCards.map(renderPendingCard)}
-                            {filteredLinks.map((link, idx) => (
+                        {(() => {
+                            // Search results in two groups: the cards that literally
+                            // contain the query, then — under the "By meaning"
+                            // divider — the ones meaning search reached that share
+                            // no word with it. TWO Masonry blocks, because a
+                            // full-width divider cannot live inside a column
+                            // layout. Off search (meaningSplit -1) this is exactly
+                            // the single block it has always been.
+                            const cards = (list: Link[], offset: number) => list.map((link, i) => (
                                 <Card
                                     key={link.id}
-                                    index={idx}
+                                    index={offset + i}
                                     link={link}
                                     onOpenDetails={openLinkDetails}
                                     onStatusChange={handleStatusChange}
@@ -2790,9 +2977,30 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                     cardCollections={cardCollectionsByLink.get(link.id)}
                                     activeCollectionId={activeCollectionId}
                                     onRemoveFromCollection={handleRemoveFromCollection}
+                                    isMeaningMatch={semanticOnlyIds.has(link.id)}
                                 />
-                            ))}
-                        </Masonry>
+                            ));
+                            if (meaningSplit < 0) {
+                                return (
+                                    <Masonry columnWidth={340} gap={16}>
+                                        {pendingCards.map(renderPendingCard)}
+                                        {cards(filteredLinks, 0)}
+                                    </Masonry>
+                                );
+                            }
+                            return (
+                                <>
+                                    <Masonry columnWidth={340} gap={16}>
+                                        {pendingCards.map(renderPendingCard)}
+                                        {cards(filteredLinks.slice(0, meaningSplit), 0)}
+                                    </Masonry>
+                                    {meaningDivider}
+                                    <Masonry columnWidth={340} gap={16}>
+                                        {cards(filteredLinks.slice(meaningSplit), meaningSplit)}
+                                    </Masonry>
+                                </>
+                            );
+                        })()}
                         <LoadMoreSentinel hasMore={hasMore} onLoadMore={loadMore} />
                         </>
                     )}
@@ -2861,14 +3069,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                 </div>
             )}
 
-            {/* Digest — mobile full-screen overlay (mirrors Collections). */}
+            {/* Today — mobile full-screen overlay (mirrors Collections). */}
             {viewMode === 'digest' && (
                 <div className="sm:hidden fixed inset-x-0 top-0 z-50 bg-background flex flex-col animate-fade-in transition-[bottom] duration-300 [transition-timing-function:var(--ease-modal)]" style={{ bottom: overlayBottom }}>
                     <MobileSubheader
                         onBack={() => setViewMode(lastLayout.current)}
                         backLabel="Back to your library"
-                        icon={<Newspaper className="w-5 h-5" />}
-                        title="Digest"
+                        icon={<CalendarCheck className="w-5 h-5" />}
+                        title="Today"
                     />
                     <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-4" style={{ paddingBottom: '1rem' }}>
                         {digestContent}
@@ -2893,12 +3101,12 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
             )}
 
             {/* Digest detail — mobile full-screen place (Task B). Back returns to
-                the list of digests. */}
+                the Today list. */}
             {viewMode === 'digestDetail' && (
                 <div className="sm:hidden fixed inset-x-0 top-0 z-50 bg-background flex flex-col animate-fade-in transition-[bottom] duration-300 [transition-timing-function:var(--ease-modal)]" style={{ bottom: overlayBottom }}>
                     <MobileSubheader
                         onBack={closeDigestToList}
-                        backLabel="Back to digests"
+                        backLabel="Back to Today"
                         icon={<Newspaper className="w-5 h-5" />}
                         title={digestDetailTitle}
                     />

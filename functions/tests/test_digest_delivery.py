@@ -168,6 +168,66 @@ def test_synthesis_force_bypasses_week_dedupe(monkeypatch):
     assert res["sent"] is True
 
 
+# ── legacy: digest_mode 'synthesis' still routes to the synthesis path ──────
+
+def test_legacy_synthesis_mode_still_routes_to_the_synthesis_path(monkeypatch):
+    # Pre-toggle workspaces encode the weekly recap as digest_mode ==
+    # 'synthesis'. normalize_mode now collapses every stored mode to 'smart', so
+    # this routing reads the raw value; without that, these users would silently
+    # start getting a curated digest instead of their recap.
+    routed = {}
+
+    def fake_synthesis(uid, user_data, links, force=False):
+        routed["uid"] = uid
+        return {"uid": uid, "sent": True, "channels": ["in_app"], "card_count": 3,
+                "skipped": None, "mode": "synthesis"}
+
+    monkeypatch.setattr(ds, "fetch_candidate_links", lambda uid: _recent_cards())
+    monkeypatch.setattr(ds, "build_and_send_synthesis", fake_synthesis)
+    # Pro gate would come after this branch; make it explicit that it isn't hit.
+    monkeypatch.setattr(ds, "is_pro", lambda uid: False)
+
+    res = ds.build_and_send_digest("u1", {"settings": {"digest_mode": "synthesis"}}, force=True)
+
+    assert routed["uid"] == "u1"
+    assert res["mode"] == "synthesis"
+    assert res["skipped"] is None
+
+
+def test_a_stored_curation_mode_does_not_route_to_synthesis(monkeypatch):
+    monkeypatch.setattr(ds, "fetch_candidate_links", lambda uid: _recent_cards())
+    monkeypatch.setattr(ds, "build_and_send_synthesis",
+                        lambda *a, **k: pytest.fail("synthesis path taken for a curation mode"))
+    monkeypatch.setattr(ds, "is_pro", lambda uid: False)
+
+    res = ds.build_and_send_digest("u1", {"settings": {"digest_mode": "rediscover"}}, force=True)
+
+    assert res["skipped"] == "pro_required"
+
+
+# ── curated digest: the doc no longer carries a mode choice or topics ───────
+
+def test_written_digest_carries_the_single_mode_and_no_topics(monkeypatch):
+    rec = RecordingDB()
+    monkeypatch.setattr(ds, "get_db", lambda: rec)
+    monkeypatch.setattr(ds, "is_pro", lambda uid: True)
+    monkeypatch.setattr(ds, "fetch_candidate_links", lambda uid: _recent_cards())
+
+    # A workspace still carrying a retired style and its topics gets the one
+    # curation, and the digest it receives claims nothing else.
+    ds.build_and_send_digest(
+        "u1",
+        {"settings": {"digest_mode": "topic", "digest_topics": ["Tech"],
+                      "digest_frequency": "daily"}},
+        force=True,
+    )
+
+    written = list(rec.written.values())[0]
+    assert written["mode"] == "smart"
+    assert written["topics"] == []
+    assert written["cardCount"] > 0
+
+
 # ── curated digest: period id derived in the user's LOCAL time, not UTC ─────
 
 def test_daily_digest_id_uses_local_day(monkeypatch):
@@ -187,7 +247,7 @@ def test_daily_digest_id_uses_local_day(monkeypatch):
 
     monkeypatch.setattr(ds, "_local_now", fake_local_now)
 
-    user_data = {"settings": {"digest_mode": "smart", "digest_frequency": "daily"},
+    user_data = {"settings": {"digest_frequency": "daily"},
                  "timezone": "America/Los_Angeles"}
     res = ds.build_and_send_digest("u1", user_data, force=True)
 
@@ -205,7 +265,7 @@ def test_curated_digest_skipped_for_free_workspace(monkeypatch):
     monkeypatch.setattr(ds, "fetch_candidate_links", lambda uid: _recent_cards())
 
     res = ds.build_and_send_digest(
-        "u1", {"settings": {"digest_mode": "smart", "digest_frequency": "daily"}}, force=True,
+        "u1", {"settings": {"digest_frequency": "daily"}}, force=True,
     )
     assert res["sent"] is False
     assert res["skipped"] == "pro_required"

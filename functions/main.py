@@ -84,7 +84,8 @@ from entitlement import (
 # these helpers. share_service imports only db + stdlib (never main → no cycle).
 from share_service import (
     _publish_share_logic, _unpublish_share_logic,
-    _render_shared_card, _render_shared_collection, _share_not_found_html,
+    _render_shared_card, _render_shared_collection, _render_shared_answer,
+    _share_not_found_html,
 )
 
 # Configure logging
@@ -422,6 +423,12 @@ _RATE_LIMITS = {
     # costs an invocation, nothing else — on its OWN bucket so pings never eat
     # real search quota. Per-IP, fail closed (public unauthenticated surface).
     "search-warm": (120, 3600, False),
+    # Bulk import (import_links_http). One import is at most 200 links posted in
+    # a handful of chunked requests, so a generous per-hour ceiling still bounds
+    # a script. Mirrors the IP + uid double-bucket the paid endpoints use, and
+    # fails CLOSED: each accepted link enqueues a paid Gemini analysis.
+    "import": (60, 3600, False),
+    "import-uid": (60, 3600, False),
     # Unauthenticated crash reports (client_error_http). Per-IP only — a caller
     # with no workspace has no uid to bucket on — and fail CLOSED, because this
     # is a public write surface. The client already caps itself at 20 reports
@@ -684,8 +691,9 @@ def _rate_limited(bucket: str, identity: str, headers: dict = None):
 # blocking large-doc spam / storage abuse. Over-cap → 413.
 MAX_PUBLISH_BYTES = 200 * 1024
 
-def _quota_blocked(uid: str, kind: str, headers: dict = None, plan: str = None):
-    """Meter one `kind` unit against `uid`'s monthly quota; 429 Response if over.
+def _quota_blocked(uid: str, kind: str, headers: dict = None, plan: str = None,
+                   amount: int = 1):
+    """Meter `amount` units of `kind` against `uid`'s quota; 429 Response if over.
 
     Plan-aware (Machina Pro): the limit is the workspace's plan's, resolved
     here from the entitlement doc unless the caller already has it (`plan`).
@@ -696,6 +704,10 @@ def _quota_blocked(uid: str, kind: str, headers: dict = None, plan: str = None):
     effect when the call is allowed, so callers invoke it exactly once, before
     the paid work / enqueue.
 
+    `amount` above 1 charges a batch (a bulk import) atomically: it is refused
+    outright rather than partially charged, so a half-imported file is never a
+    state the user has to reason about.
+
     The 429 body carries `upgrade`/`kind`/`used`/`limit` next to `error` so the
     client can open the paywall (free plan) instead of a plain error toast.
     """
@@ -703,7 +715,7 @@ def _quota_blocked(uid: str, kind: str, headers: dict = None, plan: str = None):
         return None
     if plan is None:
         plan = plan_for(uid)
-    r = meter_quota(uid, kind, plan=plan)
+    r = meter_quota(uid, kind, amount=amount, plan=plan)
     if not r["ok"]:
         logger.warning("Monthly quota exceeded (kind=%s plan=%s)", kind, plan)
         body = {
@@ -783,9 +795,39 @@ def _estimate_read_time(text: str, words_per_minute: int = 200) -> int:
 # It appended a "⚠️ the full text couldn't be read, try a screenshot" blockquote
 # to detailedSummary whenever `scraped['truncated']` was set (Facebook's
 # truncated og:description, social-teaser fallbacks, login walls, PDFs). The
-# owner does not want it on cards. The scraper still SETS `truncated` — it is
-# read elsewhere and is worth keeping as a signal — nothing appends user-facing
-# text from it any more.
+# owner does not want it on cards, and nothing appends user-facing text into
+# `detailedSummary` from it any more — do NOT bring that back.
+#
+# What DOES read it now (PM-1C): `_capture_quality` below turns the same signal
+# into a STRUCTURED field on the link doc. Prose inside the summary was the
+# wrong shape for this — it can't be styled, translated, dismissed or queried,
+# and it put an apology in the middle of the model's writing. A flag lets the
+# detail view render one quiet line in the card's own language, under the
+# summary, and lets the card face carry a small marker, while the summary text
+# itself stays exactly what the model wrote.
+
+
+def _capture_quality(scraped: dict) -> dict:
+    """`{'captureQuality': 'partial', 'captureReason': ...}` for a partial read.
+
+    Returns an EMPTY dict when the scrape was complete, so a good capture writes
+    no field at all: absence means "read fine", and no existing card is
+    retroactively labelled. Callers merge the result into the link doc.
+
+    Only ever called on the paths that actually ran `scrape_url` over a web page
+    — never for images, notes or shared text, which have nothing to be partial
+    about.
+    """
+    if not scraped.get("truncated"):
+        return {}
+    # Lazy import (house pattern at the top of this file): scraper pulls in
+    # heavy deps that the non-scraping paths have no reason to load.
+    from scraper import CAPTURE_REASONS
+
+    reason = scraped.get("capture_reason")
+    if reason not in CAPTURE_REASONS:
+        reason = "truncated"
+    return {"captureQuality": "partial", "captureReason": reason}
 
 
 # Images embedded in a shared post (e.g. photos on an X post) that we fetch and
@@ -1321,6 +1363,26 @@ def _card_source_name(c: dict):
     return meta.get("youtubeChannel") or c.get("sourceName")
 
 
+def _card_takeaway(c: dict) -> str:
+    """The card's actionable takeaway, trimmed, or "" when it has none.
+
+    Reads BOTH shapes and prefers the top-level key, matching the web reader in
+    `web/lib/takeaway.ts`. What every save path actually WRITES today is
+    `metadata.actionableTakeaway` (one builder: `_build_link_data`), so on a real
+    stored card it is the nested read that finds it — ask_brain's slimmer read
+    only the top-level key, which nothing writes, so no card's takeaway had ever
+    reached the Ask prompt. Old documents are not migrated; reading both shapes
+    is the whole fix. A blank or non-string value counts as absent rather than
+    reaching the model as junk.
+    """
+    meta = c.get("metadata")
+    nested = meta.get("actionableTakeaway") if isinstance(meta, dict) else None
+    for value in (c.get("actionableTakeaway"), nested):
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
+
+
 @https_fn.on_request(max_instances=1)
 def backfill_youtube_channels(req: https_fn.Request) -> https_fn.Response:
     """One-off repair: set metadata.youtubeChannel (and sourceName) from YouTube
@@ -1740,6 +1802,10 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
         else:
             # X/Instagram photo posts: show the cover image we read for vision.
             _apply_post_thumbnail(link_data, scraped, uid)
+            # Say so when the read was partial (PM-1C). YouTube is excluded: a
+            # video is watched, not scraped, and a free-plan video already gets
+            # its own honest `proFeature` line.
+            link_data.update(_capture_quality(scraped))
 
         return https_fn.Response(
             json.dumps({"success": True, "link": link_data}),
@@ -2138,7 +2204,7 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
                 detail = (c.get("detailedSummary") or "").strip()
                 if detail:
                     s["detailedSummary"] = detail[:ASK_DETAIL_MAX_CHARS]
-                takeaway = (c.get("actionableTakeaway") or "").strip()
+                takeaway = _card_takeaway(c)
                 if takeaway:
                     s["actionableTakeaway"] = takeaway[:600]
                 recipe = c.get("recipe")
@@ -2865,6 +2931,244 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
     except Exception as e:
         logger.error(f"Share ingest failed: {e}", exc_info=True)
         return _error_response("Internal server error", 500, headers)
+
+
+
+# ─────────────────────────────────────────────
+# Bulk import (browser bookmarks / Pocket export / a pasted list)
+# ─────────────────────────────────────────────
+
+# Hard ceiling on one /api/import request. The client caps a whole import at the
+# same number and posts it in smaller chunks so its progress is real, but the
+# endpoint must hold the line on its own.
+MAX_IMPORT_LINKS = 200
+# Caps on the per-link fields the client may send. Titles land on a placeholder
+# card and tag hints ride the queue doc; neither reaches a Gemini prompt, but
+# both are user-controlled strings written to Firestore, so they are bounded.
+MAX_IMPORT_TITLE_LENGTH = 300
+MAX_IMPORT_TAGS = 8
+MAX_IMPORT_TAG_LENGTH = 40
+
+
+def _import_url(value) -> Optional[str]:
+    """Validate one imported URL, returning it cleaned or None if unusable.
+
+    A bookmarks file is full of things that are not web pages: `javascript:`
+    bookmarklets, `place:` and `chrome://` internal entries, `file://` paths,
+    and truncated junk. The front gate here is the same one the rest of the
+    codebase uses (http(s) only, a real host, under MAX_URL_LENGTH); the
+    scraper's `validate_public_url` is still the SSRF backstop when the worker
+    actually fetches the page.
+    """
+    if not isinstance(value, str):
+        return None
+    url = value.strip()
+    if not url or len(url) > MAX_URL_LENGTH:
+        return None
+    from urllib.parse import urlparse
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return None
+    if parsed.scheme not in ("http", "https"):
+        return None
+    if not parsed.hostname:
+        return None
+    return url
+
+
+def _import_tags(value) -> list:
+    """Bounded, de-duplicated tag hints from the imported file (folder path,
+    Pocket tags). Stored on the card as provenance; the AI still assigns the
+    card's real tags."""
+    if not isinstance(value, list):
+        return []
+    out = []
+    for raw in value[:MAX_IMPORT_TAGS]:
+        tag = (raw if isinstance(raw, str) else str(raw)).strip()[:MAX_IMPORT_TAG_LENGTH]
+        if tag and tag not in out:
+            out.append(tag)
+    return out
+
+
+def _import_added_at(value) -> Optional[int]:
+    """The original bookmark date in ms, or None. Accepts seconds or ms (a
+    Netscape ADD_DATE is seconds, a Pocket time_added is seconds, and some
+    exporters emit ms), and rejects anything outside a sane range."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    ms = int(value)
+    if ms <= 0:
+        return None
+    if ms < 100_000_000_000:  # seconds, as every real exporter writes them
+        ms *= 1000
+    # 1990-01-01 .. now + a day of clock skew. Anything else is junk.
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    if ms < 631_152_000_000 or ms > now_ms + 86_400_000:
+        return None
+    return ms
+
+
+@https_fn.on_request(max_instances=10, timeout_sec=120)
+def import_links_http(req: https_fn.Request) -> https_fn.Response:
+    """POST /api/import: bring a browser bookmarks export, a Pocket export, or a
+    pasted list of links into the library.
+
+    Each accepted link becomes exactly what a share-sheet capture becomes: a
+    `processing` placeholder card written here, plus one `pending_processing`
+    queue doc carrying its `cardId`, which the SAME `process_link_background`
+    trigger picks up. There is no second pipeline and no second analysis path.
+
+    Body: ``{"links": [{"url", "title"?, "addedAt"?, "tags"?}, ...]}``, at most
+    MAX_IMPORT_LINKS entries. Duplicates (already saved, already queued, or
+    repeated inside the request) are skipped and NOT charged.
+
+    Imported links are metered on their own lifetime `imports` quota rather than
+    the monthly `saves` quota: a new user filling an empty library must never
+    walk into the paywall while doing it. Returns
+    ``{queued, duplicates, invalid, received}``.
+    """
+    if req.method == 'OPTIONS':
+        return _cors_preflight(req)
+
+    headers = _cors_headers(req)
+    if req.method != 'POST':
+        return _error_response("Method not allowed", 405, headers)
+
+    rl = _rate_limited("import", _rate_limit_identity(req), headers)
+    if rl:
+        return rl
+
+    if not _require_app_check(req, headers):
+        return _error_response("App Check verification failed", 401, headers)
+
+    try:
+        data = req.get_json(silent=True) or {}
+        # _authed_uid never returns (None, None): a caller with no resolvable
+        # workspace gets the error response above, so `uid` is set from here on.
+        uid, auth_err = _authed_uid(req, headers, data.get('uid'))
+        if auth_err:
+            return auth_err
+        rl = _rate_limited("import-uid", uid, headers)
+        if rl:
+            return rl
+
+        raw_links = data.get('links')
+        if not isinstance(raw_links, list) or not raw_links:
+            return _error_response("No links to import", 400, headers)
+        if len(raw_links) > MAX_IMPORT_LINKS:
+            return _error_response(f"Up to {MAX_IMPORT_LINKS} links per import", 400, headers)
+
+        # 1. Validate + de-duplicate inside the request itself.
+        invalid = 0
+        seen = set()
+        candidates = []
+        for entry in raw_links:
+            if not isinstance(entry, dict):
+                invalid += 1
+                continue
+            url = _import_url(entry.get('url'))
+            if not url:
+                invalid += 1
+                continue
+            if url in seen:
+                continue
+            seen.add(url)
+            title = entry.get('title')
+            candidates.append({
+                "url": url,
+                "title": (title.strip()[:MAX_IMPORT_TITLE_LENGTH]
+                          if isinstance(title, str) and title.strip() else ""),
+                "addedAt": _import_added_at(entry.get('addedAt')),
+                "tags": _import_tags(entry.get('tags')),
+            })
+
+        # 2. Skip what the library already has. The client de-dupes too (so the
+        #    count it shows before importing is honest), but a second device or
+        #    a re-submitted file would otherwise duplicate cards.
+        fresh = []
+        duplicates = 0
+        for item in candidates:
+            if link_exists_for_url(uid, item["url"]) or pending_exists_for_url(uid, item["url"]):
+                duplicates += 1
+                continue
+            fresh.append(item)
+
+        if not fresh:
+            return https_fn.Response(
+                json.dumps({"success": True, "queued": 0, "duplicates": duplicates,
+                            "invalid": invalid, "received": len(raw_links)}),
+                status=200, headers=headers, mimetype='application/json'
+            )
+
+        # 3. Charge the whole batch to the lifetime import allowance, once,
+        #    before any paid work is enqueued. All-or-nothing: a batch that
+        #    would cross the limit is refused with the upgrade hint the client
+        #    turns into the paywall, rather than being half-imported.
+        q = _quota_blocked(uid, "imports", headers, amount=len(fresh))
+        if q:
+            return q
+
+        # 4. Placeholder card + queue doc per link, exactly as the share path
+        #    produces them, so the feed shows the same processing skeletons and
+        #    the same analyzing pill while the import fills in.
+        db = get_db()
+        links_ref = db.collection('users').document(uid).collection('links')
+        now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+        queued = 0
+        for item in fresh:
+            try:
+                card_ref = links_ref.document()
+                card = {
+                    "url": item["url"],
+                    "title": item["title"] or _capture_placeholder_title(item["url"], False),
+                    "summary": "",
+                    "tags": [],
+                    "category": "",
+                    "status": LinkStatus.PROCESSING.value,
+                    "sourceType": "web",
+                    "isRead": False,
+                    # `createdAt` is deliberately NOW, not the original bookmark
+                    # date: the feed answers "what you saved into Machina", and
+                    # an import that back-dated itself would bury every card
+                    # under years of old timestamps on arrival. The original
+                    # date is kept beside it instead.
+                    "createdAt": now_ms,
+                    "processingStartedAt": now_ms,
+                    "importedAt": now_ms,
+                    "metadata": {"originalTitle": item["title"], "estimatedReadTime": 0},
+                }
+                if item["addedAt"] is not None:
+                    card["importedFromAt"] = item["addedAt"]
+                if item["tags"]:
+                    card["importedTags"] = item["tags"]
+                card_ref.set(card)
+
+                queue_doc = _pending_url_doc(uid, item["url"], card_id=card_ref.id,
+                                             source="import")
+                if item["addedAt"] is not None:
+                    queue_doc["importedFromAt"] = item["addedAt"]
+                if item["tags"]:
+                    queue_doc["importedTags"] = item["tags"]
+                db.collection('pending_processing').document().set(queue_doc)
+                queued += 1
+            except Exception as e:
+                # One bad write must not lose the rest of the import. Refund the
+                # unit it was charged for and carry on.
+                logger.error(f"Import enqueue failed for one link: {e}", exc_info=True)
+                refund_quota(uid, "imports")
+
+        logger.info("Import queued %d link(s) for %s (%d duplicate, %d invalid)",
+                    queued, _mask_uid(uid), duplicates, invalid)
+        return https_fn.Response(
+            json.dumps({"success": True, "queued": queued, "duplicates": duplicates,
+                        "invalid": invalid, "received": len(raw_links)}),
+            status=200, headers=headers, mimetype='application/json'
+        )
+
+    except Exception as e:
+        logger.error(f"Import failed: {e}", exc_info=True)
+        return _server_error(headers, e, "Import failed")
 
 
 @https_fn.on_call()
@@ -3600,9 +3904,9 @@ def client_error_http(req: https_fn.Request) -> https_fn.Response:
 # The web app is a static export, so a client-rendered /s?id=… page can't give
 # link-preview crawlers (iMessage, Slack, X…) per-card OpenGraph tags —
 # they don't run JS, so every shared link previewed as the generic app. These
-# functions OWN the /s (single card) and /c (collection) routes via Hosting
-# rewrites and return real HTML: correct og:title/description/image for crawlers,
-# and a readable card for humans with no JS required.
+# functions OWN the /s (single card), /c (collection) and /a (Ask answer) routes
+# via Hosting rewrites and return real HTML: correct og:title/description/image
+# for crawlers, and a readable page for humans with no JS required.
 
 
 # min_instances=1 keeps ONE instance warm. The card-share flow (web/lib/
@@ -3616,11 +3920,11 @@ def client_error_http(req: https_fn.Request) -> https_fn.Response:
 # and previews rendered fine while it was cold; the race was purely the write.
 @https_fn.on_request(min_instances=1)
 def publish_share_http(req: https_fn.Request) -> https_fn.Response:
-    """Publish (or re-publish) a card/collection as a public snapshot.
+    """Publish (or re-publish) a card/collection/answer as a public snapshot.
 
     HTTP (not callable) so the native WKWebView can reach it (callable CORS
     preflight fails from `capacitor://localhost` — see claim_workspace_http).
-    Body: { type: 'card'|'collection', shareId: str, payload: object, uid?: str }.
+    Body: { type: 'card'|'collection'|'answer', shareId: str, payload: object, uid?: str }.
     `payload` is the snapshot the client built (e.g. toSharedCard); the server
     strips any `ownerUid` and stamps shareId/publishedAt. Returns { shareId }."""
     if req.method == 'OPTIONS':
@@ -3700,7 +4004,8 @@ def unpublish_share_http(req: https_fn.Request) -> https_fn.Response:
 
 @https_fn.on_request()
 def share_page(req: https_fn.Request) -> https_fn.Response:
-    """Server-rendered public page for a shared card (/s) or collection (/c).
+    """Server-rendered public page for a shared card (/s), collection (/c) or
+    Ask answer (/a).
 
     Owns those routes via Hosting rewrites so link-preview crawlers get real
     per-item OpenGraph tags (the static export can't). Always returns HTML.
@@ -3720,22 +4025,32 @@ def share_page(req: https_fn.Request) -> https_fn.Response:
     }
     try:
         share_id = (req.args.get("id") or "").strip()
-        is_collection = "/c" in req.path
+        # Which of the three public pages this is. One function owns all three
+        # routes, and Hosting/Vercel rewrite each of /s, /c and /a to it.
+        path = req.path or ""
+        kind = "collection" if "/c" in path else "answer" if "/a" in path else "card"
+        route = {"collection": "/c", "answer": "/a", "card": "/s"}[kind]
         # og:url — read by every link preview, so it must be the brand domain.
-        share_url = f"{WEB_URL}{'/c' if is_collection else '/s'}?id={share_id}"
+        share_url = f"{WEB_URL}{route}?id={share_id}"
 
         if not share_id:
             return https_fn.Response(_share_not_found_html(), status=404, headers=nf_headers)
 
         db = get_db()
-        collection = "shared_collections" if is_collection else "shared_cards"
+        collection = {
+            "collection": "shared_collections",
+            "answer": "shared_answers",
+            "card": "shared_cards",
+        }[kind]
         snap = db.collection(collection).document(share_id).get()
         if not snap.exists:
             return https_fn.Response(_share_not_found_html(), status=404, headers=nf_headers)
 
         data = snap.to_dict() or {}
-        if is_collection:
+        if kind == "collection":
             html_out = _render_shared_collection(data, share_url)
+        elif kind == "answer":
+            html_out = _render_shared_answer(data, share_url)
         else:
             html_out = _render_shared_card(data.get("card", {}) or {}, share_url,
                                            og_preview=data.get("ogPreview"))
@@ -3838,6 +4153,20 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
     if existing_card_id:
         card_ref = get_db().collection('users').document(uid).collection('links').document(existing_card_id)
         card_id = existing_card_id
+        # Restart the card's processing clock now that work is actually
+        # beginning. The janitor ages a `processing` card out after 15 minutes,
+        # measured from this field, and a bulk import (POST /api/import) queues
+        # far more jobs than max_instances can run at once: its tail can wait
+        # well past that before an instance picks it up. Timing the wait as if
+        # it were the work would fail out perfectly healthy imported cards. For
+        # the web capture path this re-stamps about a second later, which
+        # changes nothing.
+        try:
+            card_ref.update({"processingStartedAt": int(datetime.now(timezone.utc).timestamp() * 1000)})
+        except Exception as stamp_err:
+            # The card may have been deleted while queued; the work below still
+            # runs and the except handler owns the outcome.
+            logger.warning(f"Could not re-stamp processingStartedAt: {stamp_err}")
     else:
         card_ref = get_db().collection('users').document(uid).collection('links').document()
         card_id = card_ref.id
@@ -4020,6 +4349,13 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         if is_image and isinstance(data.get("imageUrls"), list) and len(data["imageUrls"]) > 1:
             link_data["imageUrls"] = data["imageUrls"][:MAX_CARD_IMAGES]
 
+        # Import provenance (POST /api/import). The set() below REPLACES the
+        # placeholder card wholesale, so anything the import wrote on it would
+        # be dropped; the queue doc carries it through instead.
+        for key in ("importedFromAt", "importedTags"):
+            if data.get(key) is not None:
+                link_data[key] = data[key]
+
         # Embedding: only store a real Vector. If the embed failed (None), omit
         # the field and flag the card so a backfill repairs it later — never
         # write a poisoned near-zero vector that looks embedded but isn't.
@@ -4040,6 +4376,12 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             # X/Instagram photo posts: show the cover image we read for vision.
             # task_id keys the blob so a retry reuses the same path (idempotent).
             _apply_post_thumbnail(link_data, scraped, uid, task_id)
+            # Say so when the read was partial (PM-1C). Gated on `not is_image`
+            # for a reason that is easy to miss: scrape_url runs on the IMAGE's
+            # storage URL too (step 1 is unconditional), and reading image bytes
+            # as HTML always comes back unreadable — stamping that would put a
+            # "couldn't read the full post" line on every screenshot card.
+            link_data.update(_capture_quality(scraped))
 
         # 5. Save to Firestore — flip the placeholder card to its ready state in
         # place (preserving its id) so it transitions processing → ready without
@@ -4089,6 +4431,9 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
                 "estimatedReadTime": 0
             }
         }
+        for key in ("importedFromAt", "importedTags"):
+            if data.get(key) is not None:
+                failed_data[key] = data[key]
         # A failed multi-image card keeps its ordered set so Retry can re-enqueue
         # ALL the images (via share_ingest's imageUrls path), not just the first.
         if is_image and isinstance(data.get("imageUrls"), list) and len(data["imageUrls"]) > 1:
@@ -4121,8 +4466,19 @@ def check_reminders(event: scheduler_fn.ScheduledEvent) -> None:
 
 # How long a card may sit in `processing` before the janitor rules it dead.
 # Real analysis finishes in seconds to ~1 min; 15 min is comfortably past any
-# legitimate run, so this only catches genuinely-stuck captures.
+# legitimate run, so this only catches genuinely-stuck captures. Measured from
+# `processingStartedAt`, which the trigger stamps when work actually starts, so
+# time spent WAITING in the queue is not counted against it.
 _PROCESSING_TIMEOUT_MS = 15 * 60 * 1000
+
+# How long a queue doc that has never STARTED may live. Deliberately far longer
+# than the timeout above, because the two failures are different: a job that
+# started and was hard-killed is dead, while a job still `queued` may simply be
+# waiting its turn. A 200-link import enqueues much more work than
+# process_link_background's max_instances can run at once, and deleting the tail
+# out from under it would make the trigger's first write raise NOT_FOUND and
+# turn a healthy import into failed cards.
+_QUEUED_TIMEOUT_MS = 4 * 60 * 60 * 1000
 
 
 def _to_ms(value) -> Optional[int]:
@@ -4202,10 +4558,17 @@ def run_processing_janitor() -> dict:
     report["queue_pruned"] = 0
     try:
         cutoff_iso = datetime.fromtimestamp(cutoff / 1000, tz=timezone.utc).isoformat()
+        queued_cutoff_iso = datetime.fromtimestamp(
+            (now_ms - _QUEUED_TIMEOUT_MS) / 1000, tz=timezone.utc).isoformat()
         stale_jobs = db.collection("pending_processing").where(
             filter=FieldFilter("createdAt", "<", cutoff_iso)
         ).limit(200).stream()
         for doc in stale_jobs:
+            job = doc.to_dict() or {}
+            # Never started, and still inside the longer queue window: it is
+            # waiting for capacity, not dead. Leave it alone.
+            if job.get("status") == "queued" and str(job.get("createdAt") or "") >= queued_cutoff_iso:
+                continue
             doc.reference.delete()
             report["queue_pruned"] += 1
     except Exception as e:
@@ -4455,7 +4818,9 @@ def send_digest_now(req: https_fn.CallableRequest) -> dict:
 
     # Allow the caller to preview an unsaved configuration.
     overrides = {}
-    for key in ("digest_mode", "digest_topic", "digest_topics", "digest_count", "digest_channels", "digest_frequency"):
+    # digest_mode / digest_topic(s) are deliberately NOT previewable: there is
+    # one curation now and both fields are inert (digest_service.normalize_mode).
+    for key in ("digest_count", "digest_channels", "digest_frequency"):
         short = key.replace("digest_", "")
         if req.data and short in req.data:
             overrides[key] = req.data[short]

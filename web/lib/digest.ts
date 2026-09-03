@@ -23,8 +23,13 @@ import { CuratedDigest } from './types';
 
 const digestsCol = (uid: string) => collection(db, 'users', uid, 'digests');
 
-/** "Daily digest" / "Weekly digest" — user-facing kind label. Modes like
-    'topic'/'smart' are curation internals and never shown. */
+/** How many cards the Today tab's "Review N cards" button deals. Deliberately
+    shorter than the library's own Review session (reviewQueue REVIEW_SESSION_SIZE
+    = 12): Today is a place you pass through, not a place you sit down in. */
+export const TODAY_REVIEW_SIZE = 5;
+
+/** "Daily digest" / "Weekly digest" — user-facing kind label. The curation
+    mode is a server-side internal and is never shown. */
 export function digestKindLabel(frequency: CuratedDigest['frequency']): string {
     return frequency === 'weekly' ? 'Weekly digest' : 'Daily digest';
 }

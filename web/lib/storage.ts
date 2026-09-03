@@ -319,7 +319,10 @@ export async function updateNoteText(uid: string, id: string, text: string): Pro
  * and surfaces like everything else. `titleOnly` is the note-EDIT path: a text
  * edit re-derives the first-line title (updateNoteText), so it refreshes the
  * heading the same way without touching tags/category the user may have
- * curated since. Never throws: if the call fails, the note simply stays as
+ * curated since. The actionable takeaway is the one field written on BOTH
+ * paths: it isn't a filing choice the user can curate, it's read straight out
+ * of the note's words, so re-analyzed text must bring a fresh takeaway or clear
+ * the stale one. Never throws: if the call fails, the note simply stays as
  * written — still saved, still searchable, still the user's words.
  */
 export async function enrichNoteCard(uid: string, cardId: string, text: string,
@@ -352,6 +355,20 @@ export async function enrichNoteCard(uid: string, cardId: string, text: string,
             if (Array.isArray(l.concepts) && l.concepts.length) patch.concepts = l.concepts;
             if (Array.isArray(l.relatedLinks) && l.relatedLinks.length) patch.relatedLinks = l.relatedLinks;
         }
+
+        // The note's actionable takeaway, when the analysis found one. This is
+        // the ONE card path that used to drop it: every backend save path stores
+        // it (functions/main.py `_build_link_data`), but a note card is written
+        // client-side and this enrichment never copied it across, so a note
+        // carrying a real action never showed one.
+        //
+        // Set-or-CLEAR, not set-when-present: on the edit path the note's words
+        // just changed, and a takeaway derived from the old ones would be shown
+        // as if it described the new text.
+        const takeaway = typeof l.metadata?.actionableTakeaway === 'string'
+            ? l.metadata.actionableTakeaway.trim()
+            : '';
+        patch['metadata.actionableTakeaway'] = takeaway || deleteField();
 
         // AI heading for LONG-FORM notes only (see the doc comment above). The
         // getDoc guard makes the overwrite conditional on the card still wearing
@@ -514,6 +531,11 @@ export async function retryFailedLink(uid: string, link: Link): Promise<void> {
             },
             sourceType: l.sourceType || 'web',
             sourceName: l.sourceName ?? null,
+            // Capture honesty (PM-1C). Written on EVERY retry, null included: a
+            // retry that finally reads the page in full has to clear the flag,
+            // or the card would keep apologizing for a read that now succeeded.
+            captureQuality: l.captureQuality ?? null,
+            captureReason: l.captureReason ?? null,
             // Intentionally NOT writing embedding_vector here. The API no longer
             // returns it, and a client write would store it as a plain array
             // (invisible to vector search). The `sync_link_embedding` Firestore

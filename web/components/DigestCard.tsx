@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { Newspaper, ChevronDown, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { CuratedDigest, DigestCardRef } from '@/lib/types';
 import { hapticLight } from '@/lib/haptics';
@@ -115,60 +116,9 @@ export default function DigestCard({
                         line, AND a two-line summary (iOS inset-grouped feel on
                         the flat phone screen). */}
                     <div className="flex flex-col gap-2">
-                        {digest.cards.map((card) => {
-                            // Whole row mirrors per card language (ListCard's
-                            // pattern): dir flips title alignment AND the
-                            // thumbnail to the correct side; the metadata line
-                            // stays LTR internally (brand icon + latin handle)
-                            // but hugs the title's edge on RTL cards.
-                            const isRtl = getDirection(card.title) === 'rtl';
-                            const colorStyle = getCategoryColorStyle(card.category || 'General');
-                            return (
-                                <button
-                                    key={card.id}
-                                    dir={isRtl ? 'rtl' : 'ltr'}
-                                    onClick={() => openCard(card)}
-                                    className="group w-full flex items-start gap-3 rounded-2xl border border-border-subtle bg-card px-3.5 py-3 text-start cursor-pointer transition-all hover:bg-card-hover hover:border-text-muted/40 active:scale-[0.99]"
-                                >
-                                    <div className="min-w-0 flex-1">
-                                        <div className={`text-sm font-semibold leading-snug text-text group-hover:text-accent transition-colors ${isRtl ? 'font-hebrew' : ''}`}>
-                                            {card.title}
-                                        </div>
-                                        {/* Same byline language as the home cards:
-                                            SourceByline (X logo + @handle, YouTube
-                                            channel, plain publisher…) + the category
-                                            chip, exactly like ListCard's meta row. */}
-                                        <div className={`mt-1 flex items-center gap-1.5 min-w-0 text-[11px] text-text-muted ${isRtl ? 'justify-end' : ''}`} dir="ltr">
-                                            <SourceByline link={{ url: card.url ?? undefined, sourceName: card.sourceName ?? undefined }} />
-                                            {card.category && (
-                                                <span
-                                                    className="shrink-0 max-w-[120px] px-1.5 py-px rounded-full text-[9px] leading-4 font-bold uppercase tracking-wider truncate"
-                                                    style={{ backgroundColor: colorStyle.backgroundColor, color: colorStyle.color }}
-                                                    title={card.category}
-                                                >
-                                                    {card.category}
-                                                </span>
-                                            )}
-                                        </div>
-                                        {card.summary && (
-                                            <SimpleMarkdown
-                                                inline
-                                                content={card.summary}
-                                                className="mt-1 text-[13px] leading-relaxed text-text-secondary line-clamp-2"
-                                            />
-                                        )}
-                                    </div>
-                                    {card.thumbnailUrl && (
-                                        <img
-                                            src={card.thumbnailUrl}
-                                            alt=""
-                                            loading="lazy"
-                                            className="w-14 h-14 mt-0.5 rounded-xl object-cover shrink-0 bg-fill-subtle"
-                                        />
-                                    )}
-                                </button>
-                            );
-                        })}
+                        {digest.cards.map((card) => (
+                            <ResurfacedCardRow key={card.id} card={card} onOpen={() => openCard(card)} />
+                        ))}
                     </div>
 
                     {/* Per-digest actions: jump to settings, remove this digest. */}
@@ -211,6 +161,92 @@ export default function DigestCard({
                     )}
                 </div>
             )}
+        </div>
+    );
+}
+
+/**
+ * One resurfaced card, as a row. THE shared look for a card coming back to you:
+ * the curated digest's list and the Today tab's due reminders both render it, so
+ * a resurfaced card looks the same wherever it resurfaces.
+ *
+ * Whole row mirrors per card language (ListCard's pattern): dir flips title
+ * alignment AND the thumbnail to the correct side; the metadata line stays LTR
+ * internally (brand icon + latin handle) but hugs the title's edge on RTL cards.
+ */
+export function ResurfacedCardRow({ card, onOpen, trailing }: {
+    card: DigestCardRef;
+    onOpen: () => void;
+    /** Controls pinned to the end of the row (Today hangs the reminder actions
+     *  here). Rendered OUTSIDE the tappable area so a tap on them never opens
+     *  the card. */
+    trailing?: ReactNode;
+}) {
+    const isRtl = getDirection(card.title) === 'rtl';
+    const colorStyle = getCategoryColorStyle(card.category || 'General');
+    const body = (
+        <>
+            <div className="min-w-0 flex-1">
+                <div className={`text-sm font-semibold leading-snug text-text group-hover:text-accent transition-colors ${isRtl ? 'font-hebrew' : ''}`}>
+                    {card.title}
+                </div>
+                {/* Same byline language as the home cards: SourceByline (X logo +
+                    @handle, YouTube channel, plain publisher…) + the category
+                    chip, exactly like ListCard's meta row. */}
+                <div className={`mt-1 flex items-center gap-1.5 min-w-0 text-[11px] text-text-muted ${isRtl ? 'justify-end' : ''}`} dir="ltr">
+                    <SourceByline link={{ url: card.url ?? undefined, sourceName: card.sourceName ?? undefined }} />
+                    {card.category && (
+                        <span
+                            className="shrink-0 max-w-[120px] px-1.5 py-px rounded-full text-[9px] leading-4 font-bold uppercase tracking-wider truncate"
+                            style={{ backgroundColor: colorStyle.backgroundColor, color: colorStyle.color }}
+                            title={card.category}
+                        >
+                            {card.category}
+                        </span>
+                    )}
+                </div>
+                {card.summary && (
+                    <SimpleMarkdown
+                        inline
+                        content={card.summary}
+                        className="mt-1 text-[13px] leading-relaxed text-text-secondary line-clamp-2"
+                    />
+                )}
+            </div>
+            {card.thumbnailUrl && (
+                <img
+                    src={card.thumbnailUrl}
+                    alt=""
+                    loading="lazy"
+                    className="w-14 h-14 mt-0.5 rounded-xl object-cover shrink-0 bg-fill-subtle"
+                />
+            )}
+        </>
+    );
+
+    if (!trailing) {
+        return (
+            <button
+                dir={isRtl ? 'rtl' : 'ltr'}
+                onClick={onOpen}
+                className="group w-full flex items-start gap-3 rounded-2xl border border-border-subtle bg-card px-3.5 py-3 text-start cursor-pointer transition-all hover:bg-card-hover hover:border-text-muted/40 active:scale-[0.99]"
+            >
+                {body}
+            </button>
+        );
+    }
+    // With trailing controls the row can't be one <button> (nested buttons are
+    // invalid), so the tappable area is its own button and the controls sit
+    // beside it inside the same bordered shell.
+    return (
+        <div
+            dir={isRtl ? 'rtl' : 'ltr'}
+            className="group flex items-start gap-1 rounded-2xl border border-border-subtle bg-card ps-3.5 pe-2 py-3 transition-all hover:bg-card-hover hover:border-text-muted/40"
+        >
+            <button onClick={onOpen} className="min-w-0 flex-1 flex items-start gap-3 text-start cursor-pointer">
+                {body}
+            </button>
+            <span className="flex items-center gap-0.5 shrink-0">{trailing}</span>
         </div>
     );
 }

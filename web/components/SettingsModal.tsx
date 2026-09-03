@@ -16,9 +16,10 @@ import { MainView } from './settings/MainView';
 import { AccountView } from './settings/AccountSection';
 import { StatsView } from './settings/StatsView';
 import { StoryView } from './settings/StoryView';
+import { ExtensionView } from './settings/ExtensionView';
 import {
-    DIGEST_MODES, DAYS, DAY_NAMES, COUNT_OPTIONS, formatTime,
-    ResurfacingView, StyleView, ScheduleView, PickerView,
+    DAYS, DAY_NAMES, COUNT_OPTIONS, formatTime,
+    ResurfacingView, ScheduleView, PickerView,
 } from './settings/DigestSettings';
 import { useScrollLock } from '@/lib/useScrollLock';
 import { usePrivacyLock } from '@/lib/privacyLock';
@@ -48,11 +49,11 @@ const VIEW_TITLE: Record<View, string> = {
     stats: 'Insights',
     resurfacing: 'Reminders & Digest',
     cadence: 'Reminder pacing',
-    style: 'Digest style',
     schedule: 'Schedule',
     cards: 'Cards per digest',
     synthesisDay: 'Delivery day',
     story: 'Our story',
+    extension: 'Browser extension',
 };
 
 const FREQUENCY_NOTE: Record<string, string> = {
@@ -115,13 +116,12 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
     })();
     const providerLabel = providerName ? `Signed in with ${providerName}` : 'Signed in';
 
-    // The settings-persistence brain: loaded settings, topic options, the
-    // dirty-tracking baseline, and every mutation/persistence helper.
+    // The settings-persistence brain: loaded settings, the dirty-tracking
+    // baseline, and every mutation/persistence helper.
     const {
         settings, setSettings, loadError,
-        categoryTopics, tagTopics, topicQuery, setTopicQuery,
-        savePreferences, loadSettings, loadDigestExtras,
-        togglePush, sendTestNotification, pushBusy, pushNote, toggleTopic,
+        savePreferences, loadSettings,
+        togglePush, sendTestNotification, pushBusy, pushNote,
     } = useUserSettings(uid);
 
     // Navigation stack; the last entry is the visible screen.
@@ -253,25 +253,14 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
             // Forget last session's offsets — a fresh open of Settings should
             // always start at the top, not where a previous visit left off.
             scrollByView.current.clear();
-            setTopicQuery('');
             loadSettings();
-            loadDigestExtras();
         }
-    }, [isOpen, uid, initialSection, loadSettings, loadDigestExtras, setTopicQuery]);
+    }, [isOpen, uid, initialSection, loadSettings]);
 
     // ---- value-row summaries (shown on parent screens) ----
-    const modeLabel = DIGEST_MODES.find((m) => m.value === settings.digest_mode)?.label ?? 'Smart mix';
     const scheduleValue = settings.digest_frequency === 'weekly'
         ? `${DAYS[settings.digest_day]} · ${formatTime(settings.digest_hour, settings.digest_minute)}`
         : `Daily · ${formatTime(settings.digest_hour, settings.digest_minute)}`;
-
-    // Derived topic-picker state (only meaningful in topic mode).
-    const totalTopics = categoryTopics.length + tagTopics.length;
-    const isTopicActive = (t: string) => settings.digest_topics.some((x) => x.toLowerCase() === t.toLowerCase());
-    const topicQ = topicQuery.trim().toLowerCase();
-    const matchesQuery = (t: string) => !topicQ || t.toLowerCase().includes(topicQ);
-    const visibleCategories = categoryTopics.filter(matchesQuery);
-    const visibleTags = tagTopics.filter(matchesQuery);
 
     if (!isOpen) return null;
 
@@ -363,12 +352,13 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
 
                         {view === 'story' && <StoryView />}
 
+                        {view === 'extension' && <ExtensionView uid={uid || null} />}
+
                         {view === 'resurfacing' && (
                             <ResurfacingView
                                 settings={settings}
                                 setSettings={setSettings}
                                 cadenceLabel={CADENCE_LABEL[settings.reminder_frequency] ?? 'Smart'}
-                                modeLabel={modeLabel}
                                 scheduleValue={scheduleValue}
                                 go={go}
                             />
@@ -381,20 +371,6 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                                 value={settings.reminder_frequency}
                                 onSelect={(v) => setSettings((p) => ({ ...p, reminder_frequency: v as Frequency }))}
                                 footnote={FREQUENCY_NOTE[settings.reminder_frequency]}
-                            />
-                        )}
-
-                        {view === 'style' && (
-                            <StyleView
-                                settings={settings}
-                                setSettings={setSettings}
-                                toggleTopic={toggleTopic}
-                                topicQuery={topicQuery}
-                                setTopicQuery={setTopicQuery}
-                                totalTopics={totalTopics}
-                                visibleCategories={visibleCategories}
-                                visibleTags={visibleTags}
-                                isTopicActive={isTopicActive}
                             />
                         )}
 

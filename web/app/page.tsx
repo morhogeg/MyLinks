@@ -8,7 +8,7 @@ import AnalyzingBanner, { AnalyzingState } from "@/components/AnalyzingBanner";
 import SettingsModal from "@/components/SettingsModal";
 import ScrollToTop from "@/components/ScrollToTop";
 import OnboardingTour, { ONBOARDING_STORAGE_KEY } from "@/components/OnboardingTour";
-import { Settings, Search, LayoutGrid, List, GalleryHorizontalEnd, Waypoints, StickyNote } from "lucide-react";
+import { Settings, LayoutGrid, List, GalleryHorizontalEnd, Waypoints, StickyNote } from "lucide-react";
 import DisplayGlyph from "@/components/feed/DisplayGlyph";
 import ThemeToggle from "@/components/ThemeToggle";
 import { CitationGlyph, Wordmark } from "@/components/ui/Wordmark";
@@ -183,10 +183,6 @@ export default function Home() {
   const sharedSignal = useSharedCaptureBanner(!!processing?.active, feedLoaded, readyCaptureAt);
   const bannerState = pickBanner(analyzing, processing, sharedSignal);
   const [isTourOpen, setIsTourOpen] = useState(false);
-  // Gate the first-run tour to a non-empty library: it spotlights real cards,
-  // so over an empty feed it must wait (the welcome screen + example seed run
-  // first; the tour fires after the first card — seeded or real — arrives).
-  const [hasCards, setHasCards] = useState(false);
   // Scroll-scrubbed top bar: opacity rides the scroll itself (down = away,
   // up = back), settling to shown/hidden when the finger rests.
   const headerRef = useHeaderFade<HTMLElement>();
@@ -209,12 +205,14 @@ export default function Home() {
     }
   }, [loading, bootPhase]);
 
-  // First-run onboarding: once auth resolves and the feed is on screen, show the
-  // guided tour if this browser hasn't seen it yet. A short delay lets the
-  // toolbar anchors (Ask, Collections, view switcher…) mount so they can be
-  // spotlighted. Ask/Collections views hide those anchors, so wait for the grid.
+  // First run, page three: once auth resolves and the feed is on screen, show
+  // "How Machina works" if this browser hasn't seen it yet. It is deliberately
+  // NOT gated on the library having cards — it is a story about the product,
+  // told to a brand-new account whose library is empty by definition, and the
+  // hasCards gate meant it never fired for exactly the people it was written
+  // for. The short delay lets the feed's first paint land underneath it.
   useEffect(() => {
-    if (loading || !uid || isAskMode || hideAddButton || !hasCards) return;
+    if (loading || !uid || isAskMode || hideAddButton) return;
     let seen = true;
     try {
       seen = !!localStorage.getItem(ONBOARDING_STORAGE_KEY);
@@ -224,7 +222,7 @@ export default function Home() {
     if (seen) return;
     const timer = setTimeout(() => setIsTourOpen(true), 600);
     return () => clearTimeout(timer);
-  }, [loading, uid, isAskMode, hideAddButton, hasCards]);
+  }, [loading, uid, isAskMode, hideAddButton]);
 
   // Connections stay honest on their own: once signed in, check whether this
   // library's `relatedLinks` predate the current graph logic and, if so,
@@ -239,7 +237,7 @@ export default function Home() {
 
   const replayTour = () => {
     setIsSettingsOpen(false);
-    // Let the settings sheet finish closing before the spotlight appears.
+    // Let the settings sheet finish closing before the tour appears.
     setTimeout(() => setIsTourOpen(true), 250);
   };
 
@@ -287,22 +285,16 @@ export default function Home() {
           {/* Controls — one cohesive cluster */}
           <div className="flex items-center gap-2">
             {/* Mobile v4: the library's controls are BARE GLYPHS in this one
-                header line (Apple nav-bar grammar) — search, the view
-                switcher, and the sliders display menu (sort/filter/select).
+                header line (Apple nav-bar grammar) — the view switcher and the
+                sliders display menu (sort/filter/select). SEARCH left this row
+                (2026-09-03): recall is what the app is for, so it is a standing
+                field under the header rather than a glyph that opens one.
                 Sources lives inside Filters now (2026-08-07 owner call:
                 switching views outranks source filtering). Home tab only; the
                 other tabs bring their own subheaders. Desktop keeps its
                 toolbar, so these stay sm:hidden. */}
             {feedTab === 'home' && (
               <div className="flex sm:hidden items-center">
-                <button
-                  data-tour="search"
-                  onClick={() => sendHeaderCommand('search')}
-                  aria-label="Search"
-                  className="h-10 w-10 flex items-center justify-center text-text-secondary hover:text-text active:text-text transition-colors"
-                >
-                  <Search className="w-[19px] h-[19px]" />
-                </button>
                 <button
                   data-tour="views"
                   onClick={() => sendHeaderCommand('view')}
@@ -347,7 +339,7 @@ export default function Home() {
         {/* The feed is already live via onSnapshot, so a new save streams in on
             its own — no remount needed. (Previously keyed on refreshKey, which
             tore down listeners and wiped view/filter/search on every add.) */}
-        <Feed onAskModeChange={setIsAskMode} onHideAddButton={setHideAddButton} onProcessingChange={setProcessing} onFeedLoadedChange={setFeedLoaded} onReadyCaptureChange={setReadyCaptureAt} onOpenDigestSettings={() => { setSettingsSection('digest'); setIsSettingsOpen(true); }} onHasCardsChange={setHasCards} onActiveFilterCountChange={setActiveFilterCount} onLibraryViewChange={setLibraryView} libraryFacet={libraryFacet} onLibraryFacetApplied={() => setLibraryFacet(null)} onBackToInsights={() => { setSettingsSection('stats'); setIsSettingsOpen(true); }} headerCommand={headerCommand} onCapture={() => setCaptureSignal((n) => n + 1)} onTabChange={setFeedTab} onFullBleedChange={setIsFullBleed} suppressProcessingId={dialogCardId} />
+        <Feed onAskModeChange={setIsAskMode} onHideAddButton={setHideAddButton} onProcessingChange={setProcessing} onFeedLoadedChange={setFeedLoaded} onReadyCaptureChange={setReadyCaptureAt} onOpenDigestSettings={() => { setSettingsSection('digest'); setIsSettingsOpen(true); }} onActiveFilterCountChange={setActiveFilterCount} onLibraryViewChange={setLibraryView} libraryFacet={libraryFacet} onLibraryFacetApplied={() => setLibraryFacet(null)} onBackToInsights={() => { setSettingsSection('stats'); setIsSettingsOpen(true); }} headerCommand={headerCommand} onCapture={() => setCaptureSignal((n) => n + 1)} onTabChange={setFeedTab} onFullBleedChange={setIsFullBleed} suppressProcessingId={dialogCardId} />
       </main>
 
       {/* Add Link FAB — hidden in Ask & Collections (neither view captures links). */}
@@ -371,7 +363,7 @@ export default function Home() {
         />
       )}
 
-      {/* First-run guided tour */}
+      {/* First run, page three: "How Machina works" */}
       <OnboardingTour open={isTourOpen} onClose={() => setIsTourOpen(false)} />
     </div>
     )}

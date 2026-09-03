@@ -73,10 +73,10 @@ export function Chevron() {
     return <ChevronRight className="w-[18px] h-[18px] text-text-muted/60 shrink-0" />;
 }
 
-export function NavRow({ tile, tileClass, title, value, onClick }: { tile?: ReactNode; tileClass?: string; title: string; value?: string; onClick: () => void }) {
+export function NavRow({ tile, tileClass, title, sub, value, onClick }: { tile?: ReactNode; tileClass?: string; title: string; sub?: string; value?: string; onClick: () => void }) {
     return (
         <RowShell tile={tile} tileClass={tileClass} onClick={onClick}>
-            <RowText title={title} />
+            <RowText title={title} sub={sub} />
             {value && <span className="ml-auto text-[15px] text-text-muted whitespace-nowrap tabular-nums">{value}</span>}
             <Chevron />
         </RowShell>

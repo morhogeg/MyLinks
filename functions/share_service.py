@@ -3,17 +3,18 @@ SecondBrain / Machina — Public share-page subsystem.
 
 Extracted verbatim from `main.py` (the Cloud Functions entry point) so that the
 entry point stays focused on deployable-function discovery. This module owns
-everything behind the public /s (single card) and /c (collection) routes:
+everything behind the public /s (single card), /c (collection) and /a (Ask
+answer) routes:
 
 - Markdown → safe-HTML rendering used to render stored card text on the
   server-rendered share pages: `_esc`, `_md_inline`, `_md_to_html`.
 - Full share-page HTML shells with OpenGraph/Twitter-card metadata:
   `_share_card_image`, `_share_html_shell`, `_render_shared_card`,
-  `_render_shared_collection`, `_share_not_found_html`.
+  `_render_shared_collection`, `_render_shared_answer`, `_share_not_found_html`.
 - Publish/unpublish logic that writes the world-readable share snapshot WITHOUT
   the owner's PII, keeping the owner mapping in the functions-only
-  `shared_owners` collection: `_SHARE_COLLECTIONS`, `_share_owner_uid`,
-  `_publish_share_logic`, `_unpublish_share_logic`.
+  `shared_owners` collection: `_SHARE_COLLECTIONS`, `_sanitize_answer_payload`,
+  `_share_owner_uid`, `_publish_share_logic`, `_unpublish_share_logic`.
 
 The three HTTP ENDPOINTS that expose this (`publish_share_http`,
 `unpublish_share_http`, `share_page`) REMAIN in `main.py`: Firebase Functions
@@ -530,6 +531,12 @@ def _share_html_shell(*, title: str, description: str, image: str, url: str, bod
   .col-item h3 a:hover {{ color:#E9E9F2; }}
   .col-item p {{ margin:0; color:#a1a1aa; font-size:15px; }}
   .col-item .visit {{ font-size:13px; color:#E9E9F2; text-decoration:none; }}
+  /* Answer pages: the Sources section label, and the honest note an ungrounded
+     answer carries (the same downgrade the app shows in place of citations). */
+  .srcs-h {{ font-size:11px; font-weight:700; letter-spacing:.5px; text-transform:uppercase;
+            color:#8b8b93; margin:28px 0 0; }}
+  .notice {{ margin:18px 0 0; padding:12px 14px; border:1px solid #262629; border-radius:12px;
+            background:#161618; color:#a1a1aa; font-size:14px; }}
   .foot {{ margin-top:40px; font-size:13px; color:#71717a; text-align:center; }}
   a {{ color:#E9E9F2; }}
 </style>
@@ -666,6 +673,11 @@ def _generate_og_preview(share_type: str, doc: dict, share_id: str) -> Optional[
     embeds only the share id — never the owner's uid — because og:image is
     world-visible.
     """
+    if share_type == "answer":
+        # An answer has no image of its own, and the sources' thumbnails are not
+        # in the snapshot (it carries titles and URLs only). The page falls back
+        # to the brand icon, which is already under the messenger size budget.
+        return None
     if share_type == "card":
         src = _card_thumb(doc.get("card") or {})
     else:
@@ -768,10 +780,77 @@ def _render_shared_collection(data: dict, share_url: str) -> str:
     )
 
 
+def _render_shared_answer(data: dict, share_url: str) -> str:
+    """The public page for a shared Ask answer (/a?id=).
+
+    Same shell, type scale and footer as the card page — an answer page is a
+    Machina page first. What is specific to it is the PROOF: the Sources list
+    under the answer, the count beside the Machina link, and, for an answer the
+    app flagged as ungrounded, the same honest downgrade the app shows in place
+    of citations. The page never claims more grounding than the answer had.
+
+    The snapshot carries no card ids (see web/lib/answerShare.ts), so a source
+    here is a title plus, at most, its ORIGINAL public URL — a shared answer can
+    never point back into anyone's library. Cards in a PIN-locked private
+    collection are dropped before publishing, not hidden at render time.
+    """
+    question = data.get("question") or "Shared answer"
+    answer = data.get("answer") or ""
+    sources = [s for s in (data.get("sources") or []) if isinstance(s, dict)]
+    ungrounded = bool(data.get("ungrounded"))
+
+    rows = []
+    for src in sources[:50]:
+        title = _esc(src.get("title") or "Untitled")
+        url = src.get("url") or ""
+        linked = (
+            f'<a href="{_esc(url)}" rel="noopener nofollow" target="_blank">{title}</a>'
+            if isinstance(url, str) and url.startswith("http") else title
+        )
+        rows.append(f'<div class="col-item"><div class="body"><h3 dir="auto">{linked}</h3></div></div>')
+    count = len(rows)
+    sources_html = ""
+    if rows:
+        sources_html = (
+            f'<p class="srcs-h">Source{"s" if count != 1 else ""}</p>' + "".join(rows)
+        )
+
+    notice_html = ""
+    if ungrounded:
+        notice_html = ('<div class="notice" dir="auto">Machina could not tie this answer to any '
+                       'saved source. Treat it with extra caution.</div>')
+
+    credit = (f"Answered by Machina from {count} save{'s' if count != 1 else ''}"
+              if count else "Answered by Machina")
+
+    body = f"""<div class="card">
+      <div class="badge">Answer</div>
+      <h1 dir="auto">{_esc(question)}</h1>
+      <div class="summary md" dir="auto">{_md_to_html(answer)}</div>
+      {notice_html}
+      {sources_html}
+      <p class="col-meta" style="margin-top:28px">{_esc(credit)}</p>
+      <div class="actions">
+        <a class="btn btn-primary" href="{_esc(WEB_URL)}">Open in Machina</a>
+      </div>
+    </div>"""
+
+    # No image exists for an answer, so the shell falls back to the 512px brand
+    # icon — declared with its exact size and type, which is what keeps
+    # WhatsApp from dropping the preview (see _share_html_shell).
+    og_image, og_w, og_h, og_type = _og_image_meta(None, f"{WEB_URL}/icon-512.png")
+    return _share_html_shell(
+        title=question,
+        description=_md_to_plain(answer) or "An answer from Machina, with its sources.",
+        image=og_image, url=share_url, body=body,
+        image_width=og_w, image_height=og_h, image_type=og_type,
+    )
+
+
 def _share_not_found_html() -> str:
     body = """<div class="card">
       <h1>This page isn’t available</h1>
-      <div class="summary">The shared card or collection may have been removed.</div>
+      <div class="summary">This shared page may have been removed.</div>
       <div class="actions"><a class="btn btn-primary" href="%s">Open Machina</a></div>
     </div>""" % _esc(WEB_URL)
     return _share_html_shell(
@@ -793,7 +872,55 @@ def _share_not_found_html() -> str:
 # access). The locked ruleset denies direct client writes to `shared_*`, so these
 # endpoints (Admin SDK bypasses rules) are the only writers.
 
-_SHARE_COLLECTIONS = {"card": "shared_cards", "collection": "shared_collections"}
+_SHARE_COLLECTIONS = {
+    "card": "shared_cards",
+    "collection": "shared_collections",
+    "answer": "shared_answers",
+}
+
+
+# An answer snapshot is world-readable, so the SERVER decides its shape rather
+# than trusting whatever the client posted. The client already drops private
+# cards and card ids on the way out (web/lib/answerShare.ts); this is the second
+# lock on the same door — a future client (or a hand-rolled request) still can't
+# put an id, a thumbnail, or an unbounded blob on a public page.
+_ANSWER_MAX_QUESTION = 500
+_ANSWER_MAX_BODY = 20_000
+_ANSWER_MAX_SOURCES = 50
+_ANSWER_MAX_TITLE = 300
+_ANSWER_MAX_URL = 2_000
+
+
+def _sanitize_answer_payload(payload: dict) -> dict:
+    """The only fields a published answer may carry, clipped to sane lengths.
+
+    Sources keep a title and, when it is a real http(s) link, the ORIGINAL
+    public URL. Everything else in a source — a card id above all — is dropped,
+    because a public answer page must never be able to point back into the
+    library it was answered from.
+    """
+    question = str(payload.get("question") or "").strip()[:_ANSWER_MAX_QUESTION]
+    answer = str(payload.get("answer") or "").strip()[:_ANSWER_MAX_BODY]
+
+    sources = []
+    raw_sources = payload.get("sources")
+    if isinstance(raw_sources, list):
+        for entry in raw_sources[:_ANSWER_MAX_SOURCES]:
+            if not isinstance(entry, dict):
+                continue
+            title = str(entry.get("title") or "").strip()[:_ANSWER_MAX_TITLE]
+            if not title:
+                continue
+            clean = {"title": title}
+            url = str(entry.get("url") or "").strip()[:_ANSWER_MAX_URL]
+            if url.lower().startswith(("http://", "https://")):
+                clean["url"] = url
+            sources.append(clean)
+
+    out = {"question": question, "answer": answer, "sources": sources}
+    if payload.get("ungrounded"):
+        out["ungrounded"] = True
+    return out
 
 
 def _share_owner_uid(db, share_id: str, public_coll: str) -> Optional[str]:
@@ -825,7 +952,13 @@ def _publish_share_logic(uid: str, share_type: str, share_id: str, payload: dict
         raise PermissionError("This share id belongs to another account")
 
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
-    doc = {k: v for k, v in payload.items() if v is not None}
+    # An answer snapshot is rebuilt from an allowlist rather than filtered, so a
+    # field the client invents (a card id, a thumbnail) can never reach the
+    # public doc — see _sanitize_answer_payload.
+    if share_type == "answer":
+        doc = _sanitize_answer_payload(payload)
+    else:
+        doc = {k: v for k, v in payload.items() if v is not None}
     doc.pop("ownerUid", None)  # never persist PII in the world-readable doc
     doc["shareId"] = share_id
     doc["publishedAt"] = now_ms

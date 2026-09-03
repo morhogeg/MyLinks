@@ -1,5 +1,9 @@
 // Settings popup. Reads/writes chrome.storage.sync and talks to the service
-// worker for "Test connection" / "Save this page now". No capture logic here.
+// worker for token validation / "Save this page now". No capture logic here.
+//
+// The token is checked, never just stored: the popup validates on open and
+// again on every save, so the screen always says whether this browser is
+// actually connected to Machina instead of looking saved and failing later.
 
 const DEFAULT_BASE_URL = "https://secondbrain-app-94da2.web.app";
 
@@ -8,6 +12,11 @@ const tokenInput = $("token");
 const baseUrlInput = $("baseUrl");
 const banner = $("banner");
 const statusEl = $("status");
+const connEl = $("conn");
+const connTextEl = $("connText");
+const saveBtn = $("save");
+
+const PASTE_PROMPT = "Paste your Machina token to start saving.";
 
 function setStatus(text, kind) {
   statusEl.textContent = text || "";
@@ -23,28 +32,17 @@ function showBanner(text) {
   }
 }
 
-async function load() {
-  const { token = "", baseUrl = "" } = await chrome.storage.sync.get(["token", "baseUrl"]);
-  tokenInput.value = token;
-  baseUrlInput.value = baseUrl;
-  if (!token) {
-    showBanner("Paste your Machina AI token to start saving.");
-  } else {
-    showBanner("");
+// The one line of truth about this browser's connection: hidden when no token
+// is set (the banner is asking for one), otherwise checking / connected / the
+// reason it failed.
+function setConnection(kind, text) {
+  if (!kind) {
+    connEl.className = "conn hidden";
+    connTextEl.textContent = "";
+    return;
   }
-}
-
-async function saveSettings() {
-  const token = tokenInput.value.trim();
-  const baseUrl = baseUrlInput.value.trim().replace(/\/+$/, "");
-  await chrome.storage.sync.set({ token, baseUrl });
-  if (!token) {
-    showBanner("Paste your Machina AI token to start saving.");
-    setStatus("Token cleared.", "");
-  } else {
-    showBanner("");
-    setStatus("Settings saved.", "ok");
-  }
+  connEl.className = "conn " + kind;
+  connTextEl.textContent = text;
 }
 
 function sendMessage(msg) {
@@ -59,20 +57,59 @@ function sendMessage(msg) {
   });
 }
 
-async function testConnection() {
-  await saveSettings(); // persist before testing so the SW uses current values
-  if (!tokenInput.value.trim()) {
-    setStatus("Enter a token first.", "err");
+// Validate the stored token against the backend. The check saves nothing (see
+// validateToken in background.js) and is safe to run on every popup open.
+async function checkConnection() {
+  setConnection("checking", "Checking…");
+  saveBtn.disabled = true;
+  const resp = await sendMessage({ type: "test-connection" });
+  saveBtn.disabled = false;
+  if (resp.ok) {
+    setConnection("ok", "Connected");
+  } else {
+    setConnection("err", resp.message || "Not connected.");
+  }
+  return resp.ok;
+}
+
+async function load() {
+  const { token = "", baseUrl = "" } = await chrome.storage.sync.get(["token", "baseUrl"]);
+  tokenInput.value = token;
+  baseUrlInput.value = baseUrl;
+  if (!token) {
+    showBanner(PASTE_PROMPT);
+    setConnection(null);
+  } else {
+    showBanner("");
+    await checkConnection();
+  }
+}
+
+// Persist whatever is in the fields. Returns the trimmed token so callers can
+// decide whether there is anything to validate.
+async function saveSettings() {
+  const token = tokenInput.value.trim();
+  const baseUrl = baseUrlInput.value.trim().replace(/\/+$/, "");
+  await chrome.storage.sync.set({ token, baseUrl });
+  return token;
+}
+
+async function saveAndConnect() {
+  setStatus("", "");
+  const token = await saveSettings();
+  if (!token) {
+    showBanner(PASTE_PROMPT);
+    setConnection(null);
+    setStatus("Paste your token first.", "err");
     return;
   }
-  setStatus("Testing…", "");
-  const resp = await sendMessage({ type: "test-connection" });
-  setStatus(resp.message || (resp.ok ? "Connected." : "Failed."), resp.ok ? "ok" : "err");
+  showBanner("");
+  await checkConnection();
 }
 
 async function saveThisPage() {
   if (!tokenInput.value.trim()) {
-    setStatus("Enter a token first.", "err");
+    setStatus("Paste your token first.", "err");
     return;
   }
   setStatus("Saving…", "");
@@ -82,24 +119,29 @@ async function saveThisPage() {
   } else if (resp.ok) {
     setStatus("Saved ✓", "ok");
   } else if (resp.error === "no-token") {
-    setStatus("Enter a token first.", "err");
+    setStatus("Paste your token first.", "err");
   } else if (resp.error === "bad-url") {
     setStatus("This page can't be saved.", "err");
   } else if (resp.status === 403) {
     setStatus("Invalid token.", "err");
+    setConnection("err", "Invalid token, check it above.");
   } else {
-    setStatus("Couldn't save — check your token/connection.", "err");
+    setStatus("Couldn't save. Check your token and connection.", "err");
   }
 }
 
-$("save").addEventListener("click", saveSettings);
-$("test").addEventListener("click", testConnection);
+saveBtn.addEventListener("click", saveAndConnect);
 $("saveTab").addEventListener("click", saveThisPage);
 
 $("reveal").addEventListener("click", () => {
   const showing = tokenInput.type === "text";
   tokenInput.type = showing ? "password" : "text";
   $("reveal").textContent = showing ? "Show" : "Hide";
+});
+
+// Enter in the token field is the same as clicking the primary button.
+tokenInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") saveAndConnect();
 });
 
 baseUrlInput.placeholder = DEFAULT_BASE_URL;

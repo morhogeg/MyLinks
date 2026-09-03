@@ -176,15 +176,27 @@ def _readable_len(text: Optional[str]) -> int:
     return len(re.sub(r"\s+", "", probe))
 
 
-def _unreadable_result(title: str, note: str = "[no text content available]") -> dict:
+# Why a read came back partial. Rides alongside ``truncated`` so the card can
+# say something specific instead of a bare "this is incomplete":
+#   login_wall  the page (or post) is gated and served us nothing readable
+#   teaser      only the social preview text (og:description) came back
+#   pdf         a PDF or other non-HTML document the HTML scraper can't read
+#   truncated   partial for a reason we didn't classify
+CAPTURE_REASONS = ("login_wall", "teaser", "pdf", "truncated")
+
+
+def _unreadable_result(title: str, note: str = "[no text content available]",
+                       reason: str = "login_wall") -> dict:
     """An honest 'this content couldn't be read' result.
 
     The body is the EXACT ``[no text content available]`` placeholder the
     GROUNDING prompt rule (ai_service.py) recognizes, so the model writes a
     plain "content could not be retrieved" card instead of fabricating a summary
-    of unread bytes. Also sets ``truncated=True`` — the SAME channel Facebook
-    uses — so ``main._analyze_scraped`` appends the capture note."""
-    return {"html": "", "title": title, "text": note, "truncated": True}
+    of unread bytes. Also sets ``truncated=True`` plus a ``capture_reason`` —
+    the SAME channel Facebook uses — which main stamps onto the card as
+    ``captureQuality: 'partial'`` so the detail view can say so."""
+    return {"html": "", "title": title, "text": note,
+            "truncated": True, "capture_reason": reason}
 
 
 def scrape_url(url: str, message_body: Optional[str] = None) -> dict:
@@ -218,7 +230,7 @@ def scrape_url(url: str, message_body: Optional[str] = None) -> dict:
         path = (urlparse(url).path or '').lower()
         if path.endswith('.pdf'):
             logger.info(f"Unreadable content type (.pdf URL): {url}")
-            return _unreadable_result("PDF document")
+            return _unreadable_result("PDF document", reason="pdf")
 
         # Special handling for Twitter/X URLs
         if _host_is('twitter.com', 'x.com'):
@@ -255,7 +267,7 @@ def scrape_url(url: str, message_body: Optional[str] = None) -> dict:
         ctype = (response.headers.get('Content-Type') or '').lower()
         if 'application/pdf' in ctype:
             logger.info(f"Unreadable content type ({ctype}): {url}")
-            return _unreadable_result("PDF document")
+            return _unreadable_result("PDF document", reason="pdf")
 
         html = response.text
 
@@ -280,9 +292,10 @@ def scrape_url(url: str, message_body: Optional[str] = None) -> dict:
         text = " ".join(text_parts).strip()[:5000]
 
         # `truncated` = we could only read a partial preview, not the real body.
-        # It rides the SAME channel Facebook uses; main._analyze_scraped appends
-        # the honest "couldn't get the full text" note when it's set.
+        # It rides the SAME channel Facebook uses; `capture_reason` names WHY, and
+        # main stamps both onto the card as captureQuality/captureReason.
         truncated = False
+        capture_reason = "truncated"
 
         # Fallbacks for JS-gated pages (TikTok, JS shells, SPAs) that carry no
         # <p>/<article> text. First try the body's visible text (scripts/styles
@@ -305,6 +318,7 @@ def scrape_url(url: str, message_body: Optional[str] = None) -> dict:
                         og_bits.append(tag['content'].strip())
                 text = "\n".join(dict.fromkeys(b for b in og_bits if b))[:5000]
                 truncated = True
+                capture_reason = "teaser"
 
         # Fold in any caption/text the share carried. For JS-gated pages the
         # on-page extraction is often empty, and this shared text is the only
@@ -329,6 +343,7 @@ def scrape_url(url: str, message_body: Optional[str] = None) -> dict:
             "title": title,
             "text": text,
             "truncated": truncated,
+            "capture_reason": capture_reason,
             "source_name": _generic_source_name(soup, url),
         }
 
@@ -565,6 +580,7 @@ def _scrape_linkedin_url(url: str) -> dict:
             "title": title,
             "text": text or html[:5000],
             "truncated": truncated,
+            "capture_reason": "teaser",
             "source_name": source_name,
             # Poster ONLY for actual VIDEO posts: LinkedIn serves a generic
             # "Posted on LinkedIn" branding og:image even for plain TEXT posts, so
@@ -578,7 +594,8 @@ def _scrape_linkedin_url(url: str) -> dict:
         # never a fabricated summary), but keep the slug author: who posted is
         # still knowable from the URL even when the page won't load.
         return {"html": "", "title": "", "text": "[no text content available]",
-                "source_name": linkedin_author_from_url(url), "truncated": True}
+                "source_name": linkedin_author_from_url(url),
+                "truncated": True, "capture_reason": "login_wall"}
 
 
 def _scrape_twitter_url(url: str) -> dict:
@@ -1286,8 +1303,12 @@ def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
                 best_title = caption_guess[:100].split('\n')[0]
 
     if not metadata_lines and not best_desc:
+        # Nothing readable came back (login wall / gated post). Flag it the same
+        # way Facebook and LinkedIn do so the card can admit the capture is
+        # partial rather than presenting an empty read as a finished one.
         return {"html": "", "title": "Instagram Link", "text": "Instagram content (metadata extraction failed)",
-                "source_name": _instagram_source_name(url, best_title, best_desc, html=raw_html, og_url=og_url)}
+                "source_name": _instagram_source_name(url, best_title, best_desc, html=raw_html, og_url=og_url),
+                "truncated": True, "capture_reason": "login_wall"}
 
     # Final Title fallback
     if best_title in generic_titles and best_desc:
@@ -1484,16 +1505,22 @@ def _scrape_facebook_url(url: str, message_body: Optional[str] = None) -> dict:
         # No readable caption — FB served a login wall or nothing. Return a
         # placeholder (the grounding rule turns this into an honest "content could
         # not be retrieved" card instead of summarizing the login page) and flag
-        # truncated=True so the caller adds the "save a screenshot" note.
+        # truncated=True, which main stamps onto the card as captureQuality:
+        # 'partial' so the detail view can offer the screenshot fix.
         return {"html": "", "title": "Facebook post", "text": "[no text content available]",
-                "source_name": source_name, "truncated": True}
+                "source_name": source_name,
+                "truncated": True, "capture_reason": "login_wall"}
 
     final_text = "\n\n---\n\n".join(metadata_lines)
     # video_thumbnail_url is set ONLY for actual video posts (gated above); text /
     # photo posts leave it "" and stay media-less, since a generic FB og:image
     # can't be told apart from real content reliably.
+    # capture_reason is only ever READ when `truncated` is true (main gates on
+    # it), so naming the reason unconditionally here costs nothing and keeps the
+    # two keys next to each other.
     return {"html": final_text, "title": best_title, "text": final_text,
             "source_name": source_name, "truncated": truncated,
+            "capture_reason": "teaser",
             "video_thumbnail_url": fb_image}
 
 

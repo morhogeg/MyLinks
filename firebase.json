@@ -94,11 +94,19 @@
         "function": "entitlement_sync_http"
       },
       {
+        "source": "/api/import",
+        "function": "import_links_http"
+      },
+      {
         "source": "/s",
         "function": "share_page"
       },
       {
         "source": "/c",
+        "function": "share_page"
+      },
+      {
+        "source": "/a",
         "function": "share_page"
       },
       {
