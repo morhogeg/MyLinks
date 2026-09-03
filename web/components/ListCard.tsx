@@ -6,7 +6,7 @@ import { getCategoryColorStyle } from '@/lib/colors';
 import { getDirection } from '@/lib/rtl';
 import { getPlatform, platformIcon, platformColor, PLATFORM_LABELS, xHandle, prettyHost } from '@/lib/platform';
 import { hapticLight, hapticMedium } from '@/lib/haptics';
-import { Star, Check, Trash2, StickyNote, Lock, MoreHorizontal } from 'lucide-react';
+import { Star, Check, Trash2, StickyNote, Lock, MoreHorizontal, EyeOff } from 'lucide-react';
 import { getNotes } from '@/lib/notes';
 import CardActionSheet from './CardActionSheet';
 
@@ -230,6 +230,17 @@ function ListCard({
                         {link.isPrivate && (
                             <span className="shrink-0 inline-flex items-center" title="Private" aria-label="Private">
                                 <Lock className="w-3 h-3" />
+                            </span>
+                        )}
+                        {/* Partial capture (PM-1C) — the same subtle marker the
+                            grid card carries, so the two layouts say the same
+                            thing about the same card. The sentence and the fix
+                            live in the open view, never on the face. */}
+                        {link.captureQuality === 'partial'
+                            && link.sourceType !== 'image'
+                            && link.sourceType !== 'note' && (
+                            <span className="shrink-0 inline-flex items-center" title="Partial capture" aria-label="Partial capture">
+                                <EyeOff className="w-3 h-3" />
                             </span>
                         )}
                         {platform && (

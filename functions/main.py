@@ -783,9 +783,39 @@ def _estimate_read_time(text: str, words_per_minute: int = 200) -> int:
 # It appended a "⚠️ the full text couldn't be read, try a screenshot" blockquote
 # to detailedSummary whenever `scraped['truncated']` was set (Facebook's
 # truncated og:description, social-teaser fallbacks, login walls, PDFs). The
-# owner does not want it on cards. The scraper still SETS `truncated` — it is
-# read elsewhere and is worth keeping as a signal — nothing appends user-facing
-# text from it any more.
+# owner does not want it on cards, and nothing appends user-facing text into
+# `detailedSummary` from it any more — do NOT bring that back.
+#
+# What DOES read it now (PM-1C): `_capture_quality` below turns the same signal
+# into a STRUCTURED field on the link doc. Prose inside the summary was the
+# wrong shape for this — it can't be styled, translated, dismissed or queried,
+# and it put an apology in the middle of the model's writing. A flag lets the
+# detail view render one quiet line in the card's own language, under the
+# summary, and lets the card face carry a small marker, while the summary text
+# itself stays exactly what the model wrote.
+
+
+def _capture_quality(scraped: dict) -> dict:
+    """`{'captureQuality': 'partial', 'captureReason': ...}` for a partial read.
+
+    Returns an EMPTY dict when the scrape was complete, so a good capture writes
+    no field at all: absence means "read fine", and no existing card is
+    retroactively labelled. Callers merge the result into the link doc.
+
+    Only ever called on the paths that actually ran `scrape_url` over a web page
+    — never for images, notes or shared text, which have nothing to be partial
+    about.
+    """
+    if not scraped.get("truncated"):
+        return {}
+    # Lazy import (house pattern at the top of this file): scraper pulls in
+    # heavy deps that the non-scraping paths have no reason to load.
+    from scraper import CAPTURE_REASONS
+
+    reason = scraped.get("capture_reason")
+    if reason not in CAPTURE_REASONS:
+        reason = "truncated"
+    return {"captureQuality": "partial", "captureReason": reason}
 
 
 # Images embedded in a shared post (e.g. photos on an X post) that we fetch and
@@ -1760,6 +1790,10 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
         else:
             # X/Instagram photo posts: show the cover image we read for vision.
             _apply_post_thumbnail(link_data, scraped, uid)
+            # Say so when the read was partial (PM-1C). YouTube is excluded: a
+            # video is watched, not scraped, and a free-plan video already gets
+            # its own honest `proFeature` line.
+            link_data.update(_capture_quality(scraped))
 
         return https_fn.Response(
             json.dumps({"success": True, "link": link_data}),
@@ -4060,6 +4094,12 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             # X/Instagram photo posts: show the cover image we read for vision.
             # task_id keys the blob so a retry reuses the same path (idempotent).
             _apply_post_thumbnail(link_data, scraped, uid, task_id)
+            # Say so when the read was partial (PM-1C). Gated on `not is_image`
+            # for a reason that is easy to miss: scrape_url runs on the IMAGE's
+            # storage URL too (step 1 is unconditional), and reading image bytes
+            # as HTML always comes back unreadable — stamping that would put a
+            # "couldn't read the full post" line on every screenshot card.
+            link_data.update(_capture_quality(scraped))
 
         # 5. Save to Firestore — flip the placeholder card to its ready state in
         # place (preserving its id) so it transitions processing → ready without

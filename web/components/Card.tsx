@@ -3,7 +3,7 @@
 
 
 import { Link, StatusChangeHandler } from '@/lib/types';
-import { Archive, Star, Clock, Trash2, Bell, Pencil, Circle, Check, MoreHorizontal, ExternalLink, Layers, Share2, RotateCcw, AlertTriangle, StickyNote, Lock, ImageOff, Image as ImageIcon, Images } from 'lucide-react';
+import { Archive, Star, Clock, Trash2, Bell, Pencil, Circle, Check, MoreHorizontal, ExternalLink, Layers, Share2, RotateCcw, AlertTriangle, StickyNote, Lock, ImageOff, Image as ImageIcon, Images, EyeOff } from 'lucide-react';
 import { useState, memo } from 'react';
 import SourceByline from './SourceByline';
 import { cardThumbnailUrl } from '@/lib/cardThumbnail';
@@ -667,6 +667,17 @@ function Card({
                                 {link.metadata.estimatedReadTime}{isRtl ? ' דק׳' : 'm'}
                             </span>
                             {now > 0 && <span>{getTimeAgo(link.createdAt, now)}</span>}
+                            {/* Partial capture (PM-1C): a marker, not a message.
+                                The card face stays clean and the honest sentence
+                                (plus the screenshot fix) lives in the open view.
+                                Never on notes or screenshots, which aren't scraped. */}
+                            {link.captureQuality === 'partial'
+                                && link.sourceType !== 'image'
+                                && link.sourceType !== 'note' && (
+                                <span title="Partial capture" aria-label="Partial capture" className="flex items-center">
+                                    <EyeOff className="w-3 h-3" />
+                                </span>
+                            )}
                         </div>
                     </div>
                 </div>

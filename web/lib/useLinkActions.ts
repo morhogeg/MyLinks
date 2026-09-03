@@ -34,11 +34,20 @@ export function useLinkActions(uid: string | null | undefined, toast: ReturnType
             // silent: callers whose UI already confirms the action (the Review
             // deck's fling + session tallies) skip the success toast — stacked
             // per-swipe toasts covered the deck's action buttons. Errors always toast.
+            //
+            // ONE FIELD, SO SAY WHAT REALLY HAPPENED (PM-1A). favorite/archived/
+            // unread are three values of the same `status`, so starring an
+            // archived card also pulls it back into the feed, and archiving a
+            // favorite also drops the star. We keep the data model (a card is in
+            // exactly one of those states) and make the toast admit the side
+            // effect instead of naming only the half the user tapped.
             const label =
-                status === 'favorite' ? 'Added to favorites'
-                    : status === 'archived' ? 'Archived'
+                status === 'favorite'
+                    ? (opts?.from === 'archived' ? 'Back in your feed and starred' : 'Added to favorites')
+                    : status === 'archived'
+                        ? (opts?.from === 'favorite' ? 'Archived, and no longer a favorite' : 'Archived')
                         : opts?.from === 'favorite' ? 'Removed from favorites'
-                            : opts?.from === 'archived' ? 'Unarchived'
+                            : opts?.from === 'archived' ? 'Back in your feed'
                                 : 'Marked as unread';
             if (!opts?.silent) toast.success(label);
         } catch {
