@@ -2,6 +2,7 @@
 
 import { Youtube, Image as ImageIcon, StickyNote, Quote } from 'lucide-react';
 import { getPlatform, platformIcon, platformColor, xHandle, instagramHandle, linkedinDisplayName, prettyHost } from '@/lib/platform';
+import { CitationGlyph } from '@/components/ui/Wordmark';
 
 /** Machina's own hosts — the ONLY place a "Machina" source name is legitimate
     (a card shared FROM Machina). Anywhere else it's a bad backend fallback that
@@ -15,7 +16,8 @@ export interface SourceBylineLink {
     url?: string;
     sourceName?: string;
     sourceType?: string;
-    /** 'text' = a note card whose body is verbatim shared text (see Link). */
+    /** 'text' = a note card whose body is verbatim shared text; 'answer' = a
+        card kept from an Ask answer (see Link). */
     captureType?: string;
     metadata?: { youtubeChannel?: string };
 }
@@ -65,6 +67,18 @@ export default function SourceByline({
     // shrinking produces is a proper ellipsis, never a severed word.
     const wrap = `flex items-center gap-1.5 min-w-0 shrink ${size === 'md' ? 'text-sm' : 'text-xs'} text-text-muted whitespace-nowrap max-w-[240px]`;
     const nameCls = 'truncate';
+
+    // A kept Ask answer has no publisher — Machina wrote it. It carries the same
+    // Citation mark the app uses for its own voice everywhere else (the chat's
+    // citation chips, Machina's read), so the reader recognises it instantly.
+    if (link.captureType === 'answer') {
+        return (
+            <span dir="ltr" className={wrap} title="Machina answer">
+                {icon(<CitationGlyph className={`${size === 'md' ? 'h-4' : 'h-3.5'} w-auto shrink-0 text-accent`} />)}
+                {label(<span className={nameCls}>Machina answer</span>)}
+            </span>
+        );
+    }
 
     const platform = getPlatform(link.url);
     const isYouTube = platform === 'youtube' || link.sourceType === 'youtube';

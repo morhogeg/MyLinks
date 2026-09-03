@@ -102,6 +102,10 @@
         "function": "share_page"
       },
       {
+        "source": "/a",
+        "function": "share_page"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

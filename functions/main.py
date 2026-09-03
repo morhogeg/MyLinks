@@ -84,7 +84,8 @@ from entitlement import (
 # these helpers. share_service imports only db + stdlib (never main → no cycle).
 from share_service import (
     _publish_share_logic, _unpublish_share_logic,
-    _render_shared_card, _render_shared_collection, _share_not_found_html,
+    _render_shared_card, _render_shared_collection, _render_shared_answer,
+    _share_not_found_html,
 )
 
 # Configure logging
@@ -3600,9 +3601,9 @@ def client_error_http(req: https_fn.Request) -> https_fn.Response:
 # The web app is a static export, so a client-rendered /s?id=… page can't give
 # link-preview crawlers (iMessage, Slack, X…) per-card OpenGraph tags —
 # they don't run JS, so every shared link previewed as the generic app. These
-# functions OWN the /s (single card) and /c (collection) routes via Hosting
-# rewrites and return real HTML: correct og:title/description/image for crawlers,
-# and a readable card for humans with no JS required.
+# functions OWN the /s (single card), /c (collection) and /a (Ask answer) routes
+# via Hosting rewrites and return real HTML: correct og:title/description/image
+# for crawlers, and a readable page for humans with no JS required.
 
 
 # min_instances=1 keeps ONE instance warm. The card-share flow (web/lib/
@@ -3616,11 +3617,11 @@ def client_error_http(req: https_fn.Request) -> https_fn.Response:
 # and previews rendered fine while it was cold; the race was purely the write.
 @https_fn.on_request(min_instances=1)
 def publish_share_http(req: https_fn.Request) -> https_fn.Response:
-    """Publish (or re-publish) a card/collection as a public snapshot.
+    """Publish (or re-publish) a card/collection/answer as a public snapshot.
 
     HTTP (not callable) so the native WKWebView can reach it (callable CORS
     preflight fails from `capacitor://localhost` — see claim_workspace_http).
-    Body: { type: 'card'|'collection', shareId: str, payload: object, uid?: str }.
+    Body: { type: 'card'|'collection'|'answer', shareId: str, payload: object, uid?: str }.
     `payload` is the snapshot the client built (e.g. toSharedCard); the server
     strips any `ownerUid` and stamps shareId/publishedAt. Returns { shareId }."""
     if req.method == 'OPTIONS':
@@ -3700,7 +3701,8 @@ def unpublish_share_http(req: https_fn.Request) -> https_fn.Response:
 
 @https_fn.on_request()
 def share_page(req: https_fn.Request) -> https_fn.Response:
-    """Server-rendered public page for a shared card (/s) or collection (/c).
+    """Server-rendered public page for a shared card (/s), collection (/c) or
+    Ask answer (/a).
 
     Owns those routes via Hosting rewrites so link-preview crawlers get real
     per-item OpenGraph tags (the static export can't). Always returns HTML.
@@ -3720,22 +3722,32 @@ def share_page(req: https_fn.Request) -> https_fn.Response:
     }
     try:
         share_id = (req.args.get("id") or "").strip()
-        is_collection = "/c" in req.path
+        # Which of the three public pages this is. One function owns all three
+        # routes, and Hosting/Vercel rewrite each of /s, /c and /a to it.
+        path = req.path or ""
+        kind = "collection" if "/c" in path else "answer" if "/a" in path else "card"
+        route = {"collection": "/c", "answer": "/a", "card": "/s"}[kind]
         # og:url — read by every link preview, so it must be the brand domain.
-        share_url = f"{WEB_URL}{'/c' if is_collection else '/s'}?id={share_id}"
+        share_url = f"{WEB_URL}{route}?id={share_id}"
 
         if not share_id:
             return https_fn.Response(_share_not_found_html(), status=404, headers=nf_headers)
 
         db = get_db()
-        collection = "shared_collections" if is_collection else "shared_cards"
+        collection = {
+            "collection": "shared_collections",
+            "answer": "shared_answers",
+            "card": "shared_cards",
+        }[kind]
         snap = db.collection(collection).document(share_id).get()
         if not snap.exists:
             return https_fn.Response(_share_not_found_html(), status=404, headers=nf_headers)
 
         data = snap.to_dict() or {}
-        if is_collection:
+        if kind == "collection":
             html_out = _render_shared_collection(data, share_url)
+        elif kind == "answer":
+            html_out = _render_shared_answer(data, share_url)
         else:
             html_out = _render_shared_card(data.get("card", {}) or {}, share_url,
                                            og_preview=data.get("ogPreview"))

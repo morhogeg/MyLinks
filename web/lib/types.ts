@@ -145,7 +145,20 @@ export interface Link {
   // a card is never paraphrased: `summary` holds the text exactly as shared, the
   // AI contributes only the `title` heading, and its standard summary waits in
   // `aiSummary`/`aiDetailedSummary` until the reader taps the Machina mark.
-  captureType?: 'text';
+  //
+  // 'answer' marks a card kept from an Ask answer (lib/answerCards.ts): the
+  // question is the title, the answer markdown is the body, and the cards the
+  // answer cited are recorded in `answerSources` AND mirrored into
+  // `relatedLinks` so the card is connected in the graph the moment it lands.
+  captureType?: 'text' | 'answer';
+  // The cards an 'answer' card was built from, denormalized so the "Based on"
+  // row still renders after a cited card is deleted. `url` is absent for a
+  // source that has none (a note or an image card).
+  answerSources?: AnswerSource[];
+  // Identity of the Ask message this card was kept from ("<chatId>:<index>", or
+  // a content hash when the conversation had no id yet). Saving the same answer
+  // twice finds this card instead of writing a second one.
+  answerRef?: string;
   // Machina's read of a verbatim card — generated but deliberately not shown
   // until asked for. Absent on a card whose summary has never been requested
   // (e.g. a note typed in the Note tab), in which case the mark generates one.
@@ -262,6 +275,34 @@ export interface SharedCardDoc {
   ownerUid: string;
   publishedAt: number;
   card: SharedCard;
+}
+
+/**
+ * One card an Ask answer was built from, as stored on an 'answer' card and in a
+ * public answer snapshot. `id` is the owner's card id — it exists on the LOCAL
+ * card (so the "Based on" chips can open the real card) and is deliberately
+ * stripped from the public snapshot, which never points back into a library.
+ */
+export interface AnswerSource {
+  id: string;
+  title: string;
+  url?: string;
+}
+
+/**
+ * A published answer snapshot — top-level, world-readable. shared_answers/{shareId}.
+ * Rendered server-side at /a?id= by the `share_page` function.
+ *
+ * `sources` carries titles and ORIGINAL public URLs only: no card ids, and no
+ * card that sits in a PIN-locked private collection (see lib/answerShare.ts).
+ */
+export interface SharedAnswerDoc {
+  shareId: string;
+  publishedAt: number;
+  question: string;
+  answer: string;                       // markdown, exactly as the app rendered it
+  sources: { title: string; url?: string }[];
+  ungrounded?: boolean;
 }
 
 export interface RelatedLink {
@@ -426,6 +467,13 @@ export interface ChatMessage {
   // wording is ours and says nothing about their preference. See
   // functions/search.py `conversation_language`.
   generated?: boolean;
+  // Set on an ASSISTANT message once the answer has been kept as a card
+  // (lib/answerCards.ts). Rides the chat doc, so reopening the conversation
+  // still shows "Saved" and reopens that exact card.
+  savedCardId?: string;
+  // Set on an ASSISTANT message while its public page exists —
+  // shared_answers/{shareId}, served at /a?id=. Cleared by "Stop sharing".
+  shareId?: string;
 }
 
 /** A saved conversation in the Ask history sidebar (users/{uid}/chats/{id}). */

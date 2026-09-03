@@ -184,7 +184,7 @@ export function toSharedCard(link: Link): SharedCard {
  * public share doc. The server keeps the owner mapping in a functions-only
  * collection. HTTP (not a callable) so native's WKWebView can reach it.
  */
-async function callShareApi(path: string, body: Record<string, unknown>): Promise<{ shareId?: string }> {
+export async function callShareApi(path: string, body: Record<string, unknown>): Promise<{ shareId?: string }> {
     const res = await fetchWithTimeout(apiUrl(path), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()), ...(await authHeaders()) },

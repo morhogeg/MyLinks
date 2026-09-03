@@ -101,6 +101,10 @@
     {
       "source": "/c",
       "destination": "https://secondbrain-app-94da2.web.app/c"
+    },
+    {
+      "source": "/a",
+      "destination": "https://secondbrain-app-94da2.web.app/a"
     }
   ]
 }

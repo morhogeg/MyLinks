@@ -5,16 +5,24 @@ import { Check, AlertCircle, Info, X } from 'lucide-react';
 
 type ToastVariant = 'success' | 'error' | 'info';
 
+/** An optional one-tap follow-through on a confirmation ("Saved as a card" →
+    "Open"). Tapping it dismisses the toast and runs `onClick`. */
+export interface ToastAction {
+    label: string;
+    onClick: () => void;
+}
+
 interface ToastItem {
     id: number;
     message: string;
     variant: ToastVariant;
+    action?: ToastAction;
 }
 
 interface ToastContextValue {
-    success: (message: string) => void;
-    error: (message: string) => void;
-    info: (message: string) => void;
+    success: (message: string, action?: ToastAction) => void;
+    error: (message: string, action?: ToastAction) => void;
+    info: (message: string, action?: ToastAction) => void;
 }
 
 const ToastContext = createContext<ToastContextValue | null>(null);
@@ -30,16 +38,16 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         setToasts((prev) => prev.filter((t) => t.id !== id));
     }, []);
 
-    const push = useCallback((message: string, variant: ToastVariant) => {
+    const push = useCallback((message: string, variant: ToastVariant, action?: ToastAction) => {
         const id = Date.now() + Math.random();
-        setToasts((prev) => [...prev, { id, message, variant }]);
+        setToasts((prev) => [...prev, { id, message, variant, action }]);
     }, []);
 
     // Stable reference so consumers can safely list `toast` in effect deps.
     const value = useMemo<ToastContextValue>(() => ({
-        success: (m) => push(m, 'success'),
-        error: (m) => push(m, 'error'),
-        info: (m) => push(m, 'info'),
+        success: (m, action) => push(m, 'success', action),
+        error: (m, action) => push(m, 'error', action),
+        info: (m, action) => push(m, 'info', action),
     }), [push]);
 
     return (
@@ -69,8 +77,9 @@ const VARIANTS: Record<ToastVariant, { icon: typeof Info; accent: string; stroke
 
 function Toast({ item, onDismiss }: { item: ToastItem; onDismiss: () => void }) {
     // Errors linger a bit longer since they may need action; everything else is
-    // brief — a confirmation shouldn't hang around after it's been read.
-    const duration = item.variant === 'error' ? 4500 : 2400;
+    // brief — a confirmation shouldn't hang around after it's been read. A toast
+    // carrying an action gets the same longer beat: it is asking to be tapped.
+    const duration = item.variant === 'error' || item.action ? 4500 : 2400;
 
     useEffect(() => {
         const timer = setTimeout(onDismiss, duration);
@@ -83,6 +92,15 @@ function Toast({ item, onDismiss }: { item: ToastItem; onDismiss: () => void }) 
         <div className="pointer-events-auto w-full flex items-start gap-3 bg-card border border-border-strong rounded-xl px-4 py-3 shadow-2xl backdrop-blur-lg animate-slide-up">
             <Icon className={`w-5 h-5 shrink-0 mt-0.5 ${accent}`} strokeWidth={strokeWidth} />
             <p className="flex-1 text-sm text-text leading-snug">{item.message}</p>
+            {item.action && (
+                <button
+                    type="button"
+                    onClick={() => { item.action?.onClick(); onDismiss(); }}
+                    className="shrink-0 -my-0.5 px-2.5 py-1 rounded-lg text-sm font-bold text-accent hover:bg-accent/10 transition-colors"
+                >
+                    {item.action.label}
+                </button>
+            )}
             <button
                 type="button"
                 onClick={onDismiss}
