@@ -1516,7 +1516,7 @@ G3. **[ ] iOS share extension: multi-screenshot cards (deferred half of the
     search is back in the bar (see the 2026-08-07 §9 entry). Do NOT delete the
     search backend or the `/api/search` rewrites. (`search_links`, the
     callable twin, is now the only caller-less piece; harmless to keep.)
-20. **[ ] M19 Shareable cited answers — FIRST POST-LAUNCH ITEM (re-ranked to the
+20. **[x] M19 Shareable cited answers — ✅ DONE 2026-09-03 (PM-3, see §9): Save-as-card + `/a?id=` cited public page, `shared_answers` collection, vault filtering.** *(original text kept below)* FIRST POST-LAUNCH ITEM (re-ranked to the
     top of P3, 2026-07-10 product review).** Ask Machina is the hero; a shareable
     cited answer is its growth surface and every share is a public OG page
     linking back to the app (`share_page` backend exists). Do this before any
@@ -1547,6 +1547,22 @@ G3. **[ ] iOS share extension: multi-screenshot cards (deferred half of the
     invariant), F-29 (up-swipe remind is now outcome-aware: cancel returns the
     card, Undo clears the created reminder), F-32 (deck order snapshotted as ids,
     live card data, deleted/externally-acted cards skip).
+
+PM-F. **[ ] Follow-ups from the 2026-09-03 product-review build (all small, none
+    blocking):** (a) the "Meaning" chip is on grid cards only; `ListCard.tsx`
+    relies on the "By meaning" divider alone (PM-4 left it outside its file
+    ownership); (b) the full merge of the five resurfacing surfaces into Today
+    (the 2026-09-03 round shipped the cheap half: Due now + This week + Review 5
+    + digests); (c) a SAVED answer card shared through the ordinary `/s` card
+    path gets no vault filtering, because it shares the card's own text; decide
+    between auto-vaulting saved answers and blocking `/s` for them (PM-3 left it
+    as the pre-existing card-share behaviour); (d) nothing writes `lastViewedAt`,
+    so the digest's rediscover pool and the review deck's ordering never see it
+    (PM-1 chose not to start writing it; separate decision); (e) three latent
+    Ask-retrieval reads of top-level `videoHighlights`/`speakers` where the doc
+    stores them under `metadata` (PM-5 found them, out of scope): `main.py`
+    `_cap_list(c.get("videoHighlights"))` / `speakers`, and
+    `search.py build_embedding_text` for the trigger/backfill callers.
 
 ### ✅ Done — verified against code (do not redo)
 
@@ -1873,6 +1889,90 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-03 — PRODUCT-REVIEW BUILD: seven parallel sessions, one
+  integration branch (`claude/apple-pm-feedback-9qgdbt`), NOT YET SHIPPED.**
+  Owner asked for an Apple-PM review of the product and approved all seven
+  ranked fixes; each was built by its own Opus session on a branch off
+  `6c12214`, then merged here (three trivial import-line conflicts). Handoffs
+  were written to `handoff/*.md` on the worker branches
+  (`claude/pm-{1..7}-*`, kept on origin for the detail) and removed from the
+  integration branch per the no-handoff-docs rule. What landed:
+  **PM-1 trust** — the default feed now hides archived cards
+  (`showsArchived()` in `useFeedFilters.ts`: All/Unread/Read hide them,
+  Archived/Reminders/Private and any live search show them; facet counts follow);
+  opening a card marks it read after 1.5s or a scroll (silent, idempotent,
+  never for processing/failed); star/archive toasts name the whole outcome;
+  a scraper-detected partial read (`scraper.CAPTURE_REASONS`
+  login_wall/teaser/pdf/truncated → `captureQuality: 'partial'` +
+  `captureReason` on the card, both scraper save paths, never images/notes)
+  renders one quiet EyeOff line under the summary in EN/HE with a native
+  "How" expander for the screenshot route, plus a Partial-capture glyph on
+  grid and list faces. The removed `_append_capture_note` stays removed.
+  **PM-2 first run + import + trial clock** — consent → "Bring what you've
+  saved" (Import a file / Save your first thing with in-place how-to /
+  Not now) → a 4-step tour on a shared `onboarding/FlowScreen.tsx`; the
+  tour's `hasCards` gate is gone so it fires on an empty account; empty-feed
+  copy leads with each platform's first capture surface. Import: pure
+  parsers (`lib/importParsers.ts`: Netscape bookmarks HTML incl. folder
+  tags, Pocket CSV, plain URL list/paste; 20 node tests via
+  `npm run test:parsers`), `ImportSheet.tsx` (dedup walk, 200 per import,
+  chunks of 25, live count, 429 → paywall), `POST /api/import` →
+  `import_links_http` (auth + App Check + own buckets, writes the same
+  `processing` placeholder + `pending_processing` queue doc the share sheet
+  uses; `importedFromAt`/`importedTags` ride the queue doc), a LIFETIME
+  `imports` quota (free 500 / pro 10000, env-overridable, does NOT touch
+  monthly saves), rewrites in `firebase.json` + `vercel.json`, and a janitor
+  fix (re-stamp `processingStartedAt` when work starts; queued jobs get a
+  4h window so a long import's tail is not pruned). Trial: 14 days now
+  start when the library reaches 10 cards (`maybe_start_trial` from the
+  embedding trigger on create; ceiling `createdAt + 60d`; founders and
+  grandfathered docs untouched; `/api/entitlement` adds `trialAnchorAt`,
+  `trialAnchorCards`, `quotas.imports`); welcome line reads "The clock
+  starts once you've saved 10 things."
+  **PM-3 answers become things** — Save (card with `captureType: 'answer'`,
+  `answerSources`, `relatedLinks` reason "Cited in this answer" at 0.9 so it
+  joins the graph strong, idempotent via `answerRef`, byline "Machina
+  answer", "Based on" row in the detail view, toast with Open action) and
+  Share (`ShareAnswerSheet.tsx`; client vault filtering + server allowlist
+  `_sanitize_answer_payload`; `shared_answers/{id}` get-only in both rule
+  files with emulator cases; `/a?id=` rendered by `share_page`; OG image =
+  brand icon; `/a` rewrites). **PM-4 search front door** — a standing field
+  under the header (mobile) / first in the toolbar (desktop), "Search or ask
+  your saves", replaces the header glyph; literal hits, then a "By meaning"
+  divider and a Meaning chip on semantic-only grid cards
+  (`semanticOnlyIds` in `useFeedFilters`); question-shaped queries (EN/HE)
+  get an "Ask Machina: …" row that opens Ask pre-sent. **PM-5 takeaway** —
+  the analysis' `actionableTakeaway` finally renders ("Do this" / "לעשות"
+  after the detailed summary), the Note-tab enrich path now stores it, Ask
+  retrieval's top-level read that never matched is fixed
+  (`_card_takeaway`), Markdown export carries it. **PM-6 Today** — Digest
+  tab → Today (key/push payload stay `digest`), top section Due now (fired
+  or due reminders with snooze/done) + This/Last week synthesis + "Review 5
+  cards" (`SwipeDeck limit`), digest style picker and topics removed
+  (`normalize_mode` → always smart; legacy `digest_mode == 'synthesis'`
+  read raw so weekly recaps keep routing). **PM-7 extension** — Settings →
+  Your library → Browser extension (`ExtensionView.tsx`: install steps,
+  masked token with Reveal/Copy, paste steps, honest states), extension
+  renamed to Machina, one "Save and connect" that validates the token via
+  the existing empty-body `/api/share` probe with a Connected chip; 26-check
+  node harness. Supervisor fix on top: PM-3's embedding tests built events
+  without `change.before`, which PM-2's create-only anchor hook reads (test
+  fixture only, prod events always carry it). **Verified on the merged
+  tree:** `tsc` clean, em-dash gate clean, `npm run build` passes (with
+  placeholder `NEXT_PUBLIC_FIREBASE_*`), eslint on all changed files shows
+  only the pre-existing `SettingsModal` errors + 2 warnings, `py_compile`
+  clean, **pytest 807 passed**, parsers 20/20, extension 26/26. **NOT
+  verified:** anything on device or signed in (no session could), the rules
+  emulator suite (CI runs it on merge), a real import through the queue, the
+  trial anchor firing in a deployed trigger, the `/a` page in a browser.
+  **Ship notes:** functions deploy must be UNSCOPED (new `import_links_http`;
+  `share_page`, `publish_share_http`, `unpublish_share_http`, `ask_brain`,
+  `analyze_link`, `process_link_background`, `sync_link_embedding`,
+  `run_processing_janitor`, digest senders all changed); Hosting needs a
+  redeploy for `/api/import` and `/a` (deploy functions first, hosting
+  after, or expect the known race); rules deploy fires from the
+  `shared_answers` edit. Owner QA list in the §4 PM-F item and the
+  handoffs. Nothing merged to main; waiting on "ship".
 - **2026-09-02 (later) — push notifications lose the brain emoji (owner, from
   a lock-screen screenshot of "🧠 Your Daily Brew").** `digest_service.py`
   digest push title is now plain "Your Daily/Weekly Brew" and

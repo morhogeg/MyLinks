@@ -30,9 +30,11 @@ class _Snap:
 
 
 def _event(data, uid="uid-1"):
+    """An UPDATE event (`before` exists): these tests exercise the embedding
+    path alone, never the create-only trial-anchor hook that runs first."""
     snap = _Snap(data)
     return types.SimpleNamespace(
-        data=types.SimpleNamespace(after=snap),
+        data=types.SimpleNamespace(after=snap, before=_Snap(data)),
         params={"uid": uid, "linkId": snap.id},
     )
 

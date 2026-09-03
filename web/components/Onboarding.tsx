@@ -124,7 +124,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
                                         n={2}
                                         icon={<Puzzle className="w-[18px] h-[18px]" />}
                                         title="Add the browser extension"
-                                        body="Get the Machina extension for Chrome, Edge, or Brave. It lives right in your toolbar."
+                                        body="Get the Machina extension for Chrome, Edge, or Brave. Settings, then Browser extension, has the steps and your token."
                                     />
                                 </li>
                                 <li>
