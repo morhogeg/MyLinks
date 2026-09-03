@@ -101,7 +101,7 @@ export async function shareLink(url: string, title?: string, text?: string): Pro
     legacy hidden-textarea + execCommand('copy') — which still works inside the
     iOS WKWebView and after transient user-activation has been consumed by an
     await, where navigator.clipboard is often unavailable or rejects. */
-async function copyToClipboard(text: string): Promise<boolean> {
+export async function copyToClipboard(text: string): Promise<boolean> {
     try {
         if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
             await navigator.clipboard.writeText(text);

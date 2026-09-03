@@ -1,4 +1,4 @@
-// Machina AI — Save to Machina
+// Machina browser extension: save to Machina.
 // Service worker: all capture logic lives here. The popup only manages settings.
 
 const DEFAULT_BASE_URL = "https://secondbrain-app-94da2.web.app";
@@ -38,7 +38,7 @@ const badgeDuplicate = () => setBadge("✓", "#64748b"); // ✓ muted (already s
 const badgeError = () => setBadge("✗", "#ef4444"); // ✗ red
 
 // ── Notification feedback ────────────────────────────────────────────────────
-// A persistent toast confirms the save with the page title — sturdier than the
+// A persistent toast confirms the save with the page title, sturdier than the
 // 2s badge. A stable id means each new save replaces the previous toast.
 
 const NOTIF_ID = "machina-save";
@@ -106,7 +106,7 @@ async function saveAndReport({ url, note, label }) {
 
   if (!url || !/^https?:\/\//i.test(url)) {
     await badgeError();
-    notify("Can't save this page", "Only http(s) pages can be saved — not browser or store pages.");
+    notify("Can't save this page", "Only http(s) pages can be saved, not browser or store pages.");
     return { ok: false, status: 0, error: "bad-url" };
   }
 
@@ -125,13 +125,13 @@ async function saveAndReport({ url, note, label }) {
     } else {
       await badgeSaved();
       const extra = note ? " (with your selection)" : "";
-      notify("Saved to Machina ✓", `${name}${extra} — analyzing now, it'll appear in your app shortly.`);
+      notify("Saved to Machina ✓", `${name}${extra}. Analyzing now, it'll appear in your app shortly.`);
     }
   } else {
     await badgeError();
     const reason =
-      result.status === 403 ? "Invalid token — check it in settings." :
-      result.status === 401 ? "No token sent — check it in settings." :
+      result.status === 403 ? "Invalid token. Check it in settings." :
+      result.status === 401 ? "No token sent. Check it in settings." :
       "Couldn't reach Machina. Check your connection.";
     notify("Couldn't save", reason);
   }
@@ -212,8 +212,10 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 });
 
 // Harmless token check: POST with no URL. share_ingest validates the token
-// BEFORE looking for a URL, so a valid token yields 400 "No URL found" while a
-// bad/missing token yields 401/403. Nothing is ever saved.
+// BEFORE looking for a URL or text, so a valid token yields 400 "No URL or text
+// found in shared content" while a bad/missing token yields 401/403. Nothing is
+// ever saved and no save quota is spent; it does consume one slot of the
+// endpoint's per-token rate-limit bucket, hence the 429 branch below.
 async function validateToken() {
   const { token, baseUrl } = await getSettings();
   if (!token) return { ok: false, reason: "missing", message: "No token set." };
@@ -229,9 +231,10 @@ async function validateToken() {
     return { ok: false, reason: "network", message: "Could not reach the server. Check the backend URL." };
   }
 
-  if (res.status === 400) return { ok: true, message: "Connected — your token works." };
+  if (res.status === 400) return { ok: true, message: "Connected." };
   if (res.status === 401) return { ok: false, reason: "missing", message: "Server didn't see the token." };
-  if (res.status === 403) return { ok: false, reason: "invalid", message: "Invalid token — double-check it." };
+  if (res.status === 403) return { ok: false, reason: "invalid", message: "Invalid token, double-check it." };
+  if (res.status === 429) return { ok: false, reason: "rate-limited", message: "Too many requests. Try again in a minute." };
   return { ok: false, reason: "unexpected", message: `Unexpected response (${res.status}).` };
 }
 

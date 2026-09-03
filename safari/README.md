@@ -40,8 +40,10 @@ regenerates the Safari wrapper from it.
 ## Set your token
 
 Same as Chrome: open the extension's settings (toolbar menu → it opens the settings
-page), paste your **ingest token**, **Save settings**, then **Test connection**.
-See [`../extension/README.md`](../extension/README.md) for where to find the token.
+page), paste your **ingest token**, then click **Save and connect** (the popup
+validates the token and shows **Connected**). The token lives in the Machina app
+under **Settings → Browser extension**; see
+[`../extension/README.md`](../extension/README.md).
 
 ## Safari differences (vs Chrome)
 

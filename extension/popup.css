@@ -6,7 +6,7 @@
   --text-sec: #b8b8c4;
   --text-muted: #7b7b8a;
   --border: #2c2c38;
-  /* Lumen: neutral emphasis — porcelain on the dark popup, no hue. */
+  /* Lumen: neutral emphasis, porcelain on the dark popup, no hue. */
   --accent: #e9e9f2;
   --accent-2: #cbd2e0;
   --gradient: linear-gradient(135deg, #ffffff 0%, #cbd2e0 100%);
@@ -58,13 +58,38 @@ html, body {
   color: var(--text-muted);
 }
 
+/* Connection state: one dot + one word, directly under the header, so the
+   first thing you see is whether this browser is actually talking to Machina. */
+.conn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.conn.hidden { display: none; }
+.conn .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+.conn.ok { color: var(--ok); }
+.conn.err { color: var(--err); }
+
 .banner {
   border-radius: 8px;
   padding: 8px 10px;
   font-size: 12px;
   margin-bottom: 12px;
-  background: rgba(139, 92, 246, 0.12);
-  border: 1px solid rgba(139, 92, 246, 0.35);
+  /* Neutral, like the rest of the Lumen popup. The old violet tint was a
+     leftover from the pre-Lumen accent and was the one off-brand element on
+     the first screen a new user sees. */
+  background: var(--card-2);
+  border: 1px solid var(--border);
   color: var(--text-sec);
 }
 .banner.hidden { display: none; }
@@ -143,15 +168,6 @@ button:active { transform: translateY(0.5px); }
   color: #101016;
 }
 .primary:hover { filter: brightness(1.08); }
-
-.secondary {
-  flex: 1;
-  padding: 9px 12px;
-  background: var(--card-2);
-  border: 1px solid var(--border);
-  color: var(--text);
-}
-.secondary:hover { border-color: var(--accent); }
 
 .divider {
   height: 1px;

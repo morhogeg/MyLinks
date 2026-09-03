@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, BellRing, Sun, Moon, Monitor, Clock, Compass, Lock, BarChart3, Heart, Crown } from 'lucide-react';
+import { Bell, BellRing, Sun, Moon, Monitor, Clock, Compass, Lock, BarChart3, Heart, Crown, Puzzle } from 'lucide-react';
 import { policyUrl, openExternal } from '@/lib/share';
 import { isNativeApp } from '@/lib/api';
 import ProfileAvatar from '../ProfileAvatar';
@@ -123,6 +123,15 @@ export function MainView({
             <SectionHeader>Your library</SectionHeader>
             <List>
                 <NavRow tile={<BarChart3 className="w-[17px] h-[17px]" />} title="Insights" onClick={() => go('stats')} />
+                {/* Desktop capture. On native the row stays (people set up their
+                    Mac from their phone), with a sub-line saying it's a computer
+                    thing so the tap isn't a surprise. */}
+                <NavRow
+                    tile={<Puzzle className="w-[16px] h-[16px]" />}
+                    title="Browser extension"
+                    sub={isNativeApp() ? 'One-click saving in a desktop browser' : undefined}
+                    onClick={() => go('extension')}
+                />
             </List>
 
             <SectionHeader>Notifications</SectionHeader>
