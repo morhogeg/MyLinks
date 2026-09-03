@@ -42,6 +42,7 @@ const PERIOD_LABEL: Record<ProPeriod, { name: string; per: string }> = {
 const HEADLINE: Record<PaywallReason, string> = {
     saves: 'You’ve used this month’s free saves',
     asks: 'You’ve used this month’s free questions',
+    imports: 'You’ve imported everything the free plan includes',
     synthesis: 'Read the whole synthesis',
     digest: 'Curated digests come with Pro',
     youtube: 'Video transcripts come with Pro',
@@ -70,7 +71,7 @@ export default function Paywall({
     /** Re-fetch the entitlement after a purchase or restore. */
     onPurchased: () => Promise<void>;
 }) {
-    const { isTrial, daysLeft, isPro, source } = useEntitlement();
+    const { isTrial, trialStarted, trialAnchorCards, daysLeft, isPro, source } = useEntitlement();
     const availability = purchasesAvailability();
     const [packages, setPackages] = useState<ProPackage[] | null>(null);
     const [period, setPeriod] = useState<ProPeriod>('annual');
@@ -170,7 +171,9 @@ export default function Paywall({
     if (!isOpen) return null;
 
     const canBuy = availability.available && !!selected && busy === null;
-    const trialLine = isTrial && daysLeft !== null
+    const trialLine = isTrial && !trialStarted
+        ? `Your free trial starts once you have saved ${trialAnchorCards} things.`
+        : isTrial && daysLeft !== null
         ? (daysLeft === 0 ? 'Your free trial ends today.' : `Your free trial has ${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} left.`)
         : isPro && source === 'founder'
             ? 'You have Pro as a founding member. Subscribing keeps it after that ends.'

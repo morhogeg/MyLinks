@@ -2833,8 +2833,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                     body: 'Clear a filter or two to widen the results.',
                                 }
                                 : {
+                                    // Name the platform's FIRST capture surface
+                                    // first, so this line matches what the
+                                    // first run just taught: the share sheet on
+                                    // iPhone, the plus button on the web.
                                     Icon: Inbox, title: 'Your Machina is empty',
-                                    body: 'Save your first link with the + button. Machina reads it, tags it, and files it for you.',
+                                    body: isNativeApp()
+                                        ? 'Share a link to Machina from any app, or tap + to add one here. Machina reads it, tags it, and files it for you.'
+                                        : 'Tap + to save your first link, or add the browser extension to clip any page. Machina reads it, tags it, and files it for you.',
                                 };
                             return (
                         <div className="text-center py-16 px-6 animate-fade-in">

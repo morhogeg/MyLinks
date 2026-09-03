@@ -276,8 +276,9 @@ def test_quota_usage_reads_current_month_only(monkeypatch):
     store = {"value": {"2026-06": {"saves": 9}, "2026-07": {"saves": 3, "asks": "2"}}}
     _install_fake_db(monkeypatch, store)
     _pin_month(monkeypatch)
-    assert quota.quota_usage("u1") == {"saves": 3, "asks": 2}
-    assert quota.quota_usage(None) == {"saves": 0, "asks": 0}
+    # `imports` is lifetime-scoped and absent here, so it reads 0.
+    assert quota.quota_usage("u1") == {"saves": 3, "asks": 2, "imports": 0}
+    assert quota.quota_usage(None) == {"saves": 0, "asks": 0, "imports": 0}
 
 
 def test_env_still_overrides_the_ask_default(monkeypatch):
@@ -370,3 +371,103 @@ def test_refund_swallows_backend_error(monkeypatch):
     monkeypatch.setenv("MONTHLY_SAVE_QUOTA", "150")
     # Must not raise — a failed refund is best-effort.
     quota.refund_quota("u1", "saves")
+
+
+# ── imports: the LIFETIME-scoped kind ────────────────────────────────────────
+#
+# A bulk bookmark/Pocket import must not spend the monthly `saves` allowance
+# (a new user would meet the paywall while filling an empty library), so it
+# counts against its own lifetime allowance in a reserved "lifetime" sub-map.
+
+def test_imports_count_in_the_lifetime_map_not_the_month(monkeypatch):
+    store = {}
+    _install_fake_db(monkeypatch, store)
+    _pin_month(monkeypatch)
+    monkeypatch.setenv("FREE_IMPORT_QUOTA", "500")
+
+    r = quota.meter("u1", "imports", amount=40)
+    assert r["ok"] is True and r["used"] == 40 and r["remaining"] == 460
+    assert store["value"]["lifetime"]["imports"] == 40
+    assert "2026-07" not in store["value"]
+
+
+def test_importing_does_not_touch_the_monthly_save_quota(monkeypatch):
+    store = {}
+    _install_fake_db(monkeypatch, store)
+    _pin_month(monkeypatch)
+    monkeypatch.setenv("FREE_IMPORT_QUOTA", "500")
+    monkeypatch.setenv("MONTHLY_SAVE_QUOTA", "3")
+
+    quota.meter("u1", "imports", amount=200)
+    # All three monthly saves are still there for real captures.
+    assert [quota.meter("u1", "saves")["ok"] for _ in range(3)] == [True, True, True]
+    assert store["value"]["2026-07"]["saves"] == 3
+    assert store["value"]["lifetime"]["imports"] == 200
+
+
+def test_import_batch_over_the_limit_is_refused_whole(monkeypatch):
+    store = {}
+    _install_fake_db(monkeypatch, store)
+    _pin_month(monkeypatch)
+    monkeypatch.setenv("FREE_IMPORT_QUOTA", "500")
+
+    quota.meter("u1", "imports", amount=450)
+    r = quota.meter("u1", "imports", amount=100)
+    assert r["ok"] is False
+    # Nothing partial was charged, and the honest headroom is reported back.
+    assert r["used"] == 450 and r["limit"] == 500 and r["remaining"] == 50
+    assert store["value"]["lifetime"]["imports"] == 450
+
+
+def test_pro_import_ceiling_is_separate_from_free(monkeypatch):
+    store = {}
+    _install_fake_db(monkeypatch, store)
+    _pin_month(monkeypatch)
+    monkeypatch.delenv("FREE_IMPORT_QUOTA", raising=False)
+    monkeypatch.delenv("PRO_IMPORT_QUOTA", raising=False)
+
+    assert quota.quota_limit("imports", "free") == 500
+    assert quota.quota_limit("imports", "pro") == 10000
+    r = quota.meter("u1", "imports", amount=600, plan="pro")
+    assert r["ok"] is True and r["limit"] == 10000
+    # The same batch on the free plan is over the wall.
+    assert quota.meter("u2", "imports", amount=600, plan="free")["ok"] is False
+
+
+def test_month_pruning_never_drops_the_lifetime_map(monkeypatch):
+    store = {"value": {"lifetime": {"imports": 12}, "2019-01": {"saves": 99}}}
+    _install_fake_db(monkeypatch, store)
+    _pin_month(monkeypatch)
+    monkeypatch.setenv("MONTHLY_SAVE_QUOTA", "10")
+
+    quota.meter("u1", "saves")
+    assert store["value"]["lifetime"]["imports"] == 12
+    assert "2019-01" not in store["value"]
+
+
+def test_import_refund_lands_in_the_lifetime_map(monkeypatch):
+    store = {"value": {"lifetime": {"imports": 5}}}
+    _install_fake_db_for_refund(monkeypatch, store)
+    monkeypatch.setenv("FREE_IMPORT_QUOTA", "500")
+
+    quota.refund_quota("u1", "imports")
+    assert store["value"]["lifetime"]["imports"] == 4
+
+
+def test_quota_usage_reads_month_and_lifetime_together(monkeypatch):
+    store = {"value": {"2026-07": {"saves": 7, "asks": 2}, "lifetime": {"imports": 31}}}
+
+    class _ReadDB:
+        def collection(self, _name):
+            class _Col:
+                def document(self, _id):
+                    class _Ref:
+                        def get(self):
+                            return FakeSnap(store["value"])
+                    return _Ref()
+            return _Col()
+
+    monkeypatch.setattr(quota, "get_db", lambda: _ReadDB())
+    _pin_month(monkeypatch)
+    usage = quota.quota_usage("u1")
+    assert usage == {"saves": 7, "asks": 2, "imports": 31}

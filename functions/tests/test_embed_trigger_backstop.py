@@ -34,10 +34,12 @@ class _Snap:
         return self._data
 
 
-def _event(data, uid="uid-1"):
+def _event(data, uid="uid-1", before=None):
+    """An UPDATE event by default (`before` exists), so these tests exercise the
+    embedding path alone and never the create-only trial-anchor check."""
     snap = _Snap(data)
     return types.SimpleNamespace(
-        data=types.SimpleNamespace(after=snap),
+        data=types.SimpleNamespace(after=snap, before=before or _Snap(data)),
         params={"uid": uid, "linkId": snap.id},
     )
 
@@ -135,3 +137,48 @@ def test_settled_card_never_hits_the_limiter(monkeypatch):
     assert limiter_keys == []
     assert constructed == []
     assert db_touched == []
+
+
+# ── The trial-clock hook on the same trigger ─────────────────────────────────
+#
+# Machina Pro's reverse trial starts when the library reaches ten cards, and
+# this trigger is the one write path every capture ends in, so the check rides
+# here. Two properties matter: it runs on a CREATE (whatever the card's status,
+# including the `processing` placeholders an import writes, which the embedding
+# path skips), and it never runs on an UPDATE.
+
+class _Deleted:
+    exists = False
+
+    def to_dict(self):
+        return None
+
+
+def _anchor_calls(monkeypatch):
+    seen = []
+    import entitlement
+    monkeypatch.setattr(entitlement, "maybe_start_trial", lambda uid: seen.append(uid))
+    return seen
+
+
+def test_a_created_card_checks_the_trial_clock(monkeypatch):
+    _instrument(monkeypatch, {"embed-uid": True, "embed-global": True})
+    seen = _anchor_calls(monkeypatch)
+    _handler(_event(_EMBEDDABLE, before=_Deleted()))
+    assert seen == ["uid-1"]
+
+
+def test_a_processing_placeholder_still_checks_the_trial_clock(monkeypatch):
+    """An import writes ten `processing` cards; the embedding path returns early
+    on those, so the check must run before it does."""
+    _instrument(monkeypatch, {"embed-uid": True, "embed-global": True})
+    seen = _anchor_calls(monkeypatch)
+    _handler(_event({"status": "processing", "title": ""}, before=_Deleted()))
+    assert seen == ["uid-1"]
+
+
+def test_an_updated_card_does_not_recheck_the_trial_clock(monkeypatch):
+    _instrument(monkeypatch, {"embed-uid": True, "embed-global": True})
+    seen = _anchor_calls(monkeypatch)
+    _handler(_event(_EMBEDDABLE))          # before exists -> an update
+    assert seen == []

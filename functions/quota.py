@@ -5,6 +5,13 @@ per-month sub-maps, e.g. ``{"2026-07": {"saves": 12, "asks": 3}}``. This is the
 per-user-per-month spend ceiling that complements the per-request rate limits
 (``rate_limit.py``) and the per-function ``max_instances`` caps.
 
+One kind is scoped differently: ``imports`` (bulk bookmark/Pocket imports) is a
+LIFETIME allowance, kept in a reserved ``"lifetime"`` sub-map in the same doc.
+A month key is always ``YYYY-MM``, so the two namespaces cannot collide, and the
+month pruning below always keeps the lifetime map. Imports are metered on their
+own counter precisely so a first-run import does NOT eat the free tier's monthly
+saves: a new user must never meet the paywall while filling an empty library.
+
 Only the Admin SDK (this module) ever touches ``usage_quotas``; the locked
 ruleset denies all client access (no rule matches, plus an explicit deny),
 mirroring ``rate_limits``.
@@ -64,10 +71,30 @@ _QUOTA_KINDS = {
             "pro": "Monthly question limit reached. Resets on the 1st.",
         },
     },
+    "imports": {
+        # LIFETIME, not monthly (see the module docstring). A bookmark or Pocket
+        # export is a one-off migration, so a monthly window would be the wrong
+        # shape: it would either block a single big move or reset into an
+        # unbounded drip. 500 free links is more than the whole free tier is
+        # worth in a year and covers a normal browser bookmarks bar; Pro's
+        # number is an abuse ceiling, not a product cap, so its copy never
+        # mentions upgrading.
+        "scope": "lifetime",
+        "env": {"free": ("FREE_IMPORT_QUOTA",), "pro": ("PRO_IMPORT_QUOTA",)},
+        "default": {"free": 500, "pro": 10000},
+        "message": {
+            "free": "You've imported all {limit} links the free plan includes. Upgrade to Machina Pro to bring the rest of your library over.",
+            "pro": "Import limit reached. Contact support if you need to bring more over.",
+        },
+    },
 }
 
 _KINDS = tuple(_QUOTA_KINDS)
 _PLANS = ("free", "pro")
+
+# Reserved sub-map key for lifetime-scoped kinds. Month keys are always
+# ``YYYY-MM``, so this can never collide with one.
+_LIFETIME_KEY = "lifetime"
 
 # Sentinel "remaining" when the check is disabled or fails open. Callers gate on
 # `ok` only; a large number reads correctly as "plenty left".
@@ -78,10 +105,21 @@ def _normalize_plan(plan) -> str:
     return "pro" if plan == "pro" else "free"
 
 
+def _is_lifetime(kind: str) -> bool:
+    """True when `kind` is counted for the life of the workspace, not per month."""
+    return (_QUOTA_KINDS.get(kind) or {}).get("scope") == "lifetime"
+
+
+def _bucket_key(kind: str, now: datetime = None) -> str:
+    """The sub-map a `kind` counts in: the month key, or the lifetime key."""
+    return _LIFETIME_KEY if _is_lifetime(kind) else _current_month(now)
+
+
 def _limit_for(kind: str, plan: str = "free") -> int:
-    """Monthly limit for `kind` on `plan` from env. 0 (or negative / unparseable)
-    disables the check entirely (always allow). The first env name that is SET
-    wins, so FREE_SAVE_QUOTA overrides the legacy MONTHLY_SAVE_QUOTA alias."""
+    """Limit for `kind` on `plan` from env (monthly, or lifetime for a
+    lifetime-scoped kind). 0 (or negative / unparseable) disables the check
+    entirely (always allow). The first env name that is SET wins, so
+    FREE_SAVE_QUOTA overrides the legacy MONTHLY_SAVE_QUOTA alias."""
     cfg = _QUOTA_KINDS.get(kind)
     if cfg is None:
         return 0
@@ -144,18 +182,25 @@ def _recent_months(current: str, keep: int = _KEEP_MONTHS) -> set:
 
 
 def meter(uid: str, kind: str, amount: int = 1, plan: str = "free") -> dict:
-    """Atomically check + increment the caller's monthly `kind` counter.
+    """Atomically check + increment the caller's `kind` counter.
 
     Returns ``{ok, remaining, used, limit, plan}``:
-    - ``ok`` is ``False`` (and ``remaining`` 0) only when this increment would
-      exceed the plan's monthly limit; the counter is then NOT incremented and
-      ``used`` is the untouched current count.
+    - ``ok`` is ``False`` only when this increment would exceed the plan's
+      limit; the counter is then NOT incremented, ``used`` is the untouched
+      current count, and ``remaining`` is what is genuinely still left (0 for a
+      single unit over the wall, and the real headroom for a refused batch).
     - Otherwise ``ok`` is ``True``, ``used`` includes this increment, and
       ``remaining`` is what's left after it.
 
-    ``kind`` must be one of ``{"saves", "asks"}``. A limit of 0 disables the
-    check (always allows). Prunes month-maps older than the two most recent at
-    write time so the doc stays bounded.
+    ``kind`` must be one of ``{"saves", "asks", "imports"}``; "imports" counts
+    for the life of the workspace, the other two per calendar month. A limit of
+    0 disables the check (always allows). Prunes month-maps older than the two
+    most recent at write time so the doc stays bounded; the lifetime map is
+    never pruned.
+
+    ``amount`` may be greater than 1 (a bulk import charges its whole batch in
+    one transaction), in which case the batch is all-or-nothing: an amount that
+    would cross the limit is refused outright rather than partially charged.
 
     Fails OPEN on any Firestore error (soft cap, see module docstring): returns
     ok with ``_UNLIMITED`` remaining and logs a warning (never the uid, PII).
@@ -175,23 +220,26 @@ def meter(uid: str, kind: str, amount: int = 1, plan: str = "free") -> dict:
         db = get_db()
         doc_ref = db.collection(_COLLECTION).document(uid)
         month = _current_month()
-        keep = _recent_months(month)
+        bucket = _bucket_key(kind)
+        keep = _recent_months(month) | {_LIFETIME_KEY}
 
         @firestore.transactional
         def _txn(txn):
             snap = doc_ref.get(transaction=txn)
             data = (snap.to_dict() or {}) if snap.exists else {}
-            # Prune stale months so the doc can't accumulate forever.
+            # Prune stale months so the doc can't accumulate forever. The
+            # lifetime map is in `keep`, so it always survives.
             data = {k: v for k, v in data.items() if k in keep}
-            month_map = dict(data.get(month) or {})
-            current = int(month_map.get(kind, 0) or 0)
+            bucket_map = dict(data.get(bucket) or {})
+            current = int(bucket_map.get(kind, 0) or 0)
             if current + amount > limit:
                 # Over the cap: do NOT increment; report nothing remaining.
                 # Still persist the prune so the doc shrinks over time.
                 txn.set(doc_ref, data)
-                return {"ok": False, "remaining": 0, "used": current, "limit": limit, "plan": plan}
-            month_map[kind] = current + amount
-            data[month] = month_map
+                return {"ok": False, "remaining": max(0, limit - current), "used": current,
+                        "limit": limit, "plan": plan}
+            bucket_map[kind] = current + amount
+            data[bucket] = bucket_map
             txn.set(doc_ref, data)
             return {"ok": True, "remaining": max(0, limit - (current + amount)),
                     "used": current + amount, "limit": limit, "plan": plan}
@@ -209,10 +257,11 @@ def check_and_increment_quota(uid: str, kind: str, amount: int = 1, plan: str = 
 
 
 def quota_usage(uid: str) -> dict:
-    """Current-month counters ``{"saves": n, "asks": n}`` for `uid` (read-only).
+    """Counters ``{"saves": n, "asks": n, "imports": n}`` for `uid` (read-only).
 
-    Zeros when there is no doc yet or on any error: this feeds a meter in the
-    UI, never a gate, so a failed read must not raise."""
+    Monthly kinds report the CURRENT month; lifetime kinds report the running
+    total. Zeros when there is no doc yet or on any error: this feeds a meter in
+    the UI, never a gate, so a failed read must not raise."""
     out = {k: 0 for k in _KINDS}
     if not uid:
         return out
@@ -220,10 +269,14 @@ def quota_usage(uid: str) -> dict:
         snap = get_db().collection(_COLLECTION).document(uid).get()
         if not snap.exists:
             return out
-        month_map = (snap.to_dict() or {}).get(_current_month()) or {}
+        data = snap.to_dict() or {}
+        maps = {
+            _current_month(): data.get(_current_month()) or {},
+            _LIFETIME_KEY: data.get(_LIFETIME_KEY) or {},
+        }
         for k in _KINDS:
             try:
-                out[k] = max(0, int(month_map.get(k, 0) or 0))
+                out[k] = max(0, int(maps[_bucket_key(k)].get(k, 0) or 0))
             except (TypeError, ValueError):
                 out[k] = 0
     except Exception as e:
@@ -238,7 +291,8 @@ def refund_quota(uid: str, kind: str, amount: int = 1) -> None:
     permanently consume a unit the user never got value for. Best-effort and
     transactional: swallows+logs every error (a refund is a courtesy, never worth
     failing the response over) and never logs the uid (PII). No-op when metering
-    is disabled (limit <= 0 → nothing was charged) or the counter is already 0."""
+    is disabled (limit <= 0 → nothing was charged) or the counter is already 0.
+    Refunds land in the same sub-map the charge did (month, or lifetime)."""
     if kind not in _KINDS or not uid:
         return
     if _metering_disabled(kind):
@@ -249,7 +303,7 @@ def refund_quota(uid: str, kind: str, amount: int = 1) -> None:
     try:
         db = get_db()
         doc_ref = db.collection(_COLLECTION).document(uid)
-        month = _current_month()
+        bucket = _bucket_key(kind)
 
         @firestore.transactional
         def _txn(txn):
@@ -257,12 +311,12 @@ def refund_quota(uid: str, kind: str, amount: int = 1) -> None:
             if not snap.exists:
                 return
             data = snap.to_dict() or {}
-            month_map = dict(data.get(month) or {})
-            current = int(month_map.get(kind, 0) or 0)
+            bucket_map = dict(data.get(bucket) or {})
+            current = int(bucket_map.get(kind, 0) or 0)
             if current <= 0:
                 return
-            month_map[kind] = max(0, current - amount)
-            data[month] = month_map
+            bucket_map[kind] = max(0, current - amount)
+            data[bucket] = bucket_map
             txn.set(doc_ref, data)
 
         _txn(db.transaction())
