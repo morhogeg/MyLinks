@@ -36,6 +36,14 @@ interface EntitlementContextType {
     daysLeft: number | null;
     /** True while a reverse trial is what makes the plan Pro. */
     isTrial: boolean;
+    /**
+     * True once the trial's 14 days are actually running. A brand-new workspace
+     * is on the trial from day one, but the clock only starts at the tenth card,
+     * so an unstarted trial has no end date and no days left to show.
+     */
+    trialStarted: boolean;
+    /** How many cards start that clock (the server owns the number). */
+    trialAnchorCards: number;
     quotas: Entitlement['quotas'];
     /** False until the first successful fetch; consumers hide meters until then. */
     loaded: boolean;
@@ -46,6 +54,7 @@ interface EntitlementContextType {
 const UNMETERED: Entitlement['quotas'] = {
     saves: { used: 0, limit: 0 },
     asks: { used: 0, limit: 0 },
+    imports: { used: 0, limit: 0 },
 };
 
 const EntitlementContext = createContext<EntitlementContextType>({
@@ -56,6 +65,8 @@ const EntitlementContext = createContext<EntitlementContextType>({
     trialEndsAt: null,
     daysLeft: null,
     isTrial: false,
+    trialStarted: false,
+    trialAnchorCards: 10,
     quotas: UNMETERED,
     loaded: false,
     refresh: async () => {},
@@ -138,7 +149,14 @@ export function EntitlementProvider({ children }: { children: ReactNode }) {
         const plan = live?.plan ?? 'free';
         const isPro = plan === 'pro';
         const source = live?.source ?? null;
-        const until = isPro ? (source === 'trial' ? live?.trialEndsAt ?? live?.proUntil ?? null : live?.proUntil ?? null) : null;
+        const isTrial = isPro && source === 'trial';
+        // An unstarted trial holds Pro until a far-off ceiling. Reporting THAT
+        // as "days left" would advertise a 60-day trial, so a trial with no
+        // anchor has no countdown at all until the tenth card starts it.
+        const trialStarted = !isTrial || live?.trialAnchorAt != null;
+        const until = !isPro ? null
+            : isTrial ? (trialStarted ? live?.trialEndsAt ?? null : null)
+                : live?.proUntil ?? null;
         return {
             plan,
             isPro,
@@ -146,7 +164,9 @@ export function EntitlementProvider({ children }: { children: ReactNode }) {
             proUntil: live?.proUntil ?? null,
             trialEndsAt: live?.trialEndsAt ?? null,
             daysLeft: daysUntil(until),
-            isTrial: isPro && source === 'trial',
+            isTrial,
+            trialStarted,
+            trialAnchorCards: live?.trialAnchorCards ?? 10,
             quotas: live?.quotas ?? UNMETERED,
             loaded: live !== null,
             refresh,

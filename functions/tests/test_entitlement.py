@@ -27,16 +27,63 @@ def test_missing_created_at_is_a_founder():
     assert g["source"] == "founder"
 
 
-def test_trial_grant_counts_from_created_at_not_now():
+def test_trial_without_an_anchor_has_not_started_its_clock():
+    """Under 10 cards: still Pro, but with no end date and only the ceiling."""
     launch = _ms(ent.PRO_LAUNCH_AT)
     created = launch + 3 * DAY
     g = ent.grant_for(created)
     assert g["source"] == "trial"
-    assert g["trialEndsAt"] == created + 14 * DAY
+    assert g["trialEndsAt"] is None
+    assert g["trialAnchorAt"] is None
+    assert g["proUntil"] == created + ent.TRIAL_CEILING_DAYS * DAY
+    # The 14 days have not begun, so day 20 is still Pro...
+    assert ent.effective_plan(g, now_ms=created + 20 * DAY) == "pro"
+    # ...but the ceiling still ends it, so a dormant account is not Pro forever.
+    assert ent.effective_plan(g, now_ms=created + 61 * DAY) == "free"
+
+
+def test_trial_anchored_at_ten_cards_runs_fourteen_days_from_the_anchor():
+    launch = _ms(ent.PRO_LAUNCH_AT)
+    created = launch + 3 * DAY
+    anchor = created + 9 * DAY          # the 10th card landed on day 9
+    g = ent.grant_for(created, anchor)
+    assert g["trialAnchorAt"] == anchor
+    assert g["trialEndsAt"] == anchor + 14 * DAY
     assert g["proUntil"] == g["trialEndsAt"]
-    # A reinstall three weeks later gets the SAME (already-expired) grant.
+    assert ent.effective_plan(g, now_ms=anchor + 13 * DAY) == "pro"
+    assert ent.effective_plan(g, now_ms=anchor + 15 * DAY) == "free"
+    # A reinstall re-reads the STORED anchor, so the clock cannot restart.
+    assert ent.grant_for(created, anchor)["trialEndsAt"] == g["trialEndsAt"]
+
+
+def test_the_sixty_day_ceiling_caps_a_late_anchor():
+    launch = _ms(ent.PRO_LAUNCH_AT)
+    created = launch + 3 * DAY
+    anchor = created + 55 * DAY         # the 10th card landed on day 55
+    g = ent.grant_for(created, anchor)
+    # 55 + 14 = 69 days, but the ceiling lands first.
+    assert g["trialEndsAt"] == created + ent.TRIAL_CEILING_DAYS * DAY
+    assert ent.trial_ends_from_anchor(created, anchor) == g["trialEndsAt"]
+
+
+def test_a_pre_anchor_trial_doc_keeps_its_existing_end_date():
+    """Docs written before the anchor rule shipped are grandfathered, untouched."""
+    launch = _ms(ent.PRO_LAUNCH_AT)
+    created = launch + 3 * DAY
+    old_ends = created + 14 * DAY
+    g = ent.grant_for(created, None, old_ends)
+    assert g["trialEndsAt"] == old_ends
+    assert g["proUntil"] == old_ends
+    assert g["trialAnchorAt"] is None
     assert ent.effective_plan(g, now_ms=created + 21 * DAY) == "free"
-    assert ent.effective_plan(g, now_ms=created + 13 * DAY) == "pro"
+
+
+def test_founders_ignore_the_trial_clock_entirely():
+    launch = _ms(ent.PRO_LAUNCH_AT)
+    g = ent.grant_for(launch - DAY, launch + 5 * DAY, launch + 9 * DAY)
+    assert g["source"] == "founder"
+    assert g["proUntil"] == launch + 365 * DAY
+    assert g["trialEndsAt"] is None and g["trialAnchorAt"] is None
 
 
 def test_created_at_in_seconds_or_iso_is_normalised():
@@ -162,8 +209,198 @@ def test_get_entitlement_lazily_creates_the_grant(monkeypatch):
     monkeypatch.setattr(ent, "get_db", lambda: DB())
     doc = ent.get_entitlement("u1")
     assert doc["source"] == "trial"
-    assert doc["trialEndsAt"] == launch + 16 * DAY
+    # A fresh trial has no clock yet: it starts at the 10th card.
+    assert doc["trialEndsAt"] is None
+    assert doc["trialAnchorAt"] is None
+    assert doc["proUntil"] == launch + (2 + ent.TRIAL_CEILING_DAYS) * DAY
     assert doc["nudgedAt"] is None
     assert "u1" in created
     # Second call reads the stored doc rather than recreating it.
-    assert ent.get_entitlement("u1")["trialEndsAt"] == doc["trialEndsAt"]
+    assert ent.get_entitlement("u1")["proUntil"] == doc["proUntil"]
+
+
+# ── maybe_start_trial: the clock starts at the 10th card ─────────────────────
+
+class _AnchorDB:
+    """Fake Firestore with a users doc, an entitlements doc, and N link docs."""
+
+    def __init__(self, ent_doc, card_count, created_at):
+        self.ent_doc = ent_doc
+        self.card_count = card_count
+        self.created_at = created_at
+        self.writes = []
+        self.card_reads = 0
+
+    # users/{uid}/links -> a query that only ever reports its length
+    class _Links:
+        def __init__(self, outer):
+            self.outer = outer
+            self.cap = None
+
+        def select(self, _fields):
+            return self
+
+        def limit(self, n):
+            self.cap = n
+            return self
+
+        def get(self):
+            self.outer.card_reads += 1
+            return [object()] * min(self.outer.card_count, self.cap or self.outer.card_count)
+
+    class _UserRef:
+        def __init__(self, outer):
+            self.outer = outer
+
+        def get(self):
+            class _S:
+                exists = True
+
+                def to_dict(_self):
+                    return {"createdAt": self.outer.created_at}
+            return _S()
+
+        def collection(self, name):
+            assert name == "links"
+            return _AnchorDB._Links(self.outer)
+
+    class _EntRef:
+        def __init__(self, outer):
+            self.outer = outer
+
+        def get(self):
+            data = self.outer.ent_doc
+
+            class _S:
+                exists = data is not None
+
+                def to_dict(_self):
+                    return dict(data) if data is not None else None
+            return _S()
+
+        def create(self, doc):
+            self.outer.ent_doc = dict(doc)
+
+        def set(self, doc, merge=False):
+            self.outer.writes.append(dict(doc))
+            self.outer.ent_doc = {**(self.outer.ent_doc or {}), **doc} if merge else dict(doc)
+
+    def collection(self, name):
+        outer = self
+
+        class _Col:
+            def document(self, _id):
+                return _AnchorDB._UserRef(outer) if name == "users" else _AnchorDB._EntRef(outer)
+        return _Col()
+
+
+def _anchor_env(monkeypatch, cards, ent_doc=None, created_offset=3 * DAY):
+    launch = _ms(ent.PRO_LAUNCH_AT)
+    created = launch + created_offset
+    if ent_doc is None:
+        ent_doc = {"plan": "pro", "source": "trial", "proUntil": created + 60 * DAY,
+                   "trialEndsAt": None, "trialAnchorAt": None}
+    db = _AnchorDB(ent_doc, cards, created)
+    monkeypatch.setattr(ent, "get_db", lambda: db)
+    ent._TRIAL_SETTLED.clear()
+    return db, created
+
+
+def test_trial_clock_does_not_start_below_ten_cards(monkeypatch):
+    db, _created = _anchor_env(monkeypatch, cards=9)
+    assert ent.maybe_start_trial("u1") is False
+    assert db.writes == []
+    # Still unsettled: the next card must check again.
+    assert "u1" not in ent._TRIAL_SETTLED
+
+
+def test_trial_clock_starts_on_exactly_ten_cards(monkeypatch):
+    db, created = _anchor_env(monkeypatch, cards=10)
+    now = _ms("2026-09-20")
+    monkeypatch.setattr(ent, "_now_ms", lambda: now)
+
+    assert ent.maybe_start_trial("u1") is True
+    written = db.writes[0]
+    assert written["trialAnchorAt"] == now
+    assert written["trialEndsAt"] == min(now + 14 * DAY, created + 60 * DAY)
+    assert written["proUntil"] == written["trialEndsAt"]
+    assert written["plan"] == "pro" and written["source"] == "trial"
+    # Settled, so the eleventh card costs no Firestore read at all.
+    assert "u1" in ent._TRIAL_SETTLED
+    reads_before = db.card_reads
+    assert ent.maybe_start_trial("u1") is False
+    assert db.card_reads == reads_before
+
+
+def test_a_late_anchor_is_capped_by_the_sixty_day_ceiling(monkeypatch):
+    launch = _ms(ent.PRO_LAUNCH_AT)
+    db, created = _anchor_env(monkeypatch, cards=12)
+    now = created + 55 * DAY
+    monkeypatch.setattr(ent, "_now_ms", lambda: now)
+    assert launch < created < now
+
+    assert ent.maybe_start_trial("u1") is True
+    assert db.writes[0]["trialEndsAt"] == created + ent.TRIAL_CEILING_DAYS * DAY
+
+
+def test_founders_and_subscribers_are_never_anchored(monkeypatch):
+    for doc in (
+        {"plan": "pro", "source": "founder", "proUntil": 1, "trialEndsAt": None},
+        {"plan": "pro", "source": "revenuecat", "proUntil": 1, "trialEndsAt": None},
+    ):
+        db, _ = _anchor_env(monkeypatch, cards=50, ent_doc=doc)
+        assert ent.maybe_start_trial("u1") is False
+        assert db.writes == []
+        assert db.card_reads == 0          # short-circuits before counting
+        assert "u1" in ent._TRIAL_SETTLED
+
+
+def test_an_already_started_trial_is_left_alone(monkeypatch):
+    launch = _ms(ent.PRO_LAUNCH_AT)
+    already = {"plan": "pro", "source": "trial", "proUntil": launch + 20 * DAY,
+               "trialEndsAt": launch + 20 * DAY, "trialAnchorAt": launch + 6 * DAY}
+    db, _ = _anchor_env(monkeypatch, cards=50, ent_doc=already)
+    assert ent.maybe_start_trial("u1") is False
+    assert db.writes == []
+
+
+def test_grandfathered_trial_without_an_anchor_is_left_alone(monkeypatch):
+    """A doc written before this rule shipped has trialEndsAt but no anchor.
+    Re-anchoring it would silently extend a trial that is already running."""
+    launch = _ms(ent.PRO_LAUNCH_AT)
+    legacy = {"plan": "pro", "source": "trial", "proUntil": launch + 17 * DAY,
+              "trialEndsAt": launch + 17 * DAY}
+    db, _ = _anchor_env(monkeypatch, cards=50, ent_doc=legacy)
+    assert ent.maybe_start_trial("u1") is False
+    assert db.writes == []
+
+
+def test_anchor_failure_is_swallowed(monkeypatch):
+    class Boom:
+        def collection(self, _n):
+            raise RuntimeError("firestore down")
+
+    monkeypatch.setattr(ent, "get_db", lambda: Boom())
+    ent._TRIAL_SETTLED.clear()
+    # get_entitlement fails open to free, so there is no trial to anchor.
+    assert ent.maybe_start_trial("u1") is False
+
+
+def test_entitlement_summary_adds_the_trial_and_import_fields(monkeypatch):
+    launch = _ms(ent.PRO_LAUNCH_AT)
+    doc = {"plan": "pro", "source": "trial", "proUntil": launch + 60 * DAY,
+           "trialEndsAt": None, "trialAnchorAt": None}
+    monkeypatch.setattr(ent, "get_entitlement", lambda uid: dict(doc))
+    import quota
+    monkeypatch.setattr(quota, "quota_usage", lambda uid: {"saves": 2, "asks": 1, "imports": 40})
+
+    summary = ent.entitlement_summary("u1")
+    # Backward compatible: every field the shipped client reads is still here.
+    for key in ("plan", "source", "proUntil", "trialEndsAt", "quotas"):
+        assert key in summary
+    assert summary["plan"] == "pro"
+    assert summary["trialEndsAt"] is None
+    assert summary["trialAnchorAt"] is None
+    assert summary["trialAnchorCards"] == ent.TRIAL_ANCHOR_CARDS
+    assert summary["quotas"]["imports"]["used"] == 40
+    assert summary["quotas"]["saves"]["used"] == 2

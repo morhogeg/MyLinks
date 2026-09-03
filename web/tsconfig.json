@@ -11,6 +11,11 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
+    // Node's own type stripping (see `npm run test:parsers`) resolves imports
+    // literally, so the parser test imports `../importParsers.ts` by its real
+    // filename. This lets tsc type-check that file too instead of excluding it.
+    // Safe under `noEmit`: it permits the extension, it never requires one.
+    "allowImportingTsExtensions": true,
     "jsx": "react-jsx",
     "incremental": true,
     "plugins": [

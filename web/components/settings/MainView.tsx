@@ -1,10 +1,12 @@
 'use client';
 
-import { Bell, BellRing, Sun, Moon, Monitor, Clock, Compass, Lock, BarChart3, Heart, Crown } from 'lucide-react';
+import { useState } from 'react';
+import { Bell, BellRing, Sun, Moon, Monitor, Clock, Compass, Lock, BarChart3, Heart, Crown, Upload } from 'lucide-react';
 import { policyUrl, openExternal } from '@/lib/share';
 import { isNativeApp } from '@/lib/api';
 import ProfileAvatar from '../ProfileAvatar';
 import DataExport from './DataExport';
+import ImportSheet from '@/components/ImportSheet';
 import { useEntitlement } from '@/components/EntitlementProvider';
 import type { Settings, View } from './types';
 import {
@@ -43,9 +45,13 @@ export function MainView({
     const remindersOrDigest = settings.reminders_enabled || settings.digest_enabled;
     // Machina Pro row: one line of truth about the plan, and the way to change it.
     const ent = useEntitlement();
+    // A trial whose 14 days have not started yet has no countdown to show: the
+    // clock begins at the tenth card, so "0 days left" would be a lie.
     const proValue = !ent.loaded
         ? undefined
-        : ent.isTrial
+        : ent.isTrial && !ent.trialStarted
+            ? 'trial'
+            : ent.isTrial
             ? `trial, ${ent.daysLeft ?? 0} ${ent.daysLeft === 1 ? 'day' : 'days'} left`
             : ent.isPro && ent.source === 'founder'
                 ? 'founding member'
@@ -54,8 +60,11 @@ export function MainView({
                     : undefined;
     const proTitle = ent.loaded && !ent.isPro ? 'Upgrade to Pro' : 'Machina Pro';
     const manageSubscription = () => openExternal('https://apps.apple.com/account/subscriptions');
+    // The same sheet the first run opens, reachable for good from Settings.
+    const [importing, setImporting] = useState(false);
     return (
         <>
+            <ImportSheet isOpen={importing} onClose={() => setImporting(false)} />
             {/* Account (web only — native has no signed-in user) */}
             {authUid && (
                 <List>
@@ -167,7 +176,17 @@ export function MainView({
             </Footnote>
 
             <SectionHeader>Your data</SectionHeader>
-            <DataExport />
+            <List>
+                <NavRow
+                    tile={<Upload className="w-[16px] h-[16px]" />}
+                    title="Import bookmarks or a Pocket export"
+                    onClick={() => setImporting(true)}
+                />
+            </List>
+            <Footnote>Bring links over from your browser&apos;s bookmarks, a Pocket export, or a list you paste. Imported links do not count against your monthly saves.</Footnote>
+            <div className="pt-3.5">
+                <DataExport />
+            </div>
             <Footnote>Download everything you&apos;ve saved (cards and collections) as a full JSON backup plus a readable Markdown file. Your data is yours to take anywhere.</Footnote>
 
             <SectionHeader>Advanced</SectionHeader>

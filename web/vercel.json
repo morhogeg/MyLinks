@@ -91,6 +91,10 @@
       "destination": "https://secondbrain-app-94da2.web.app/api/entitlement/sync"
     },
     {
+      "source": "/api/import",
+      "destination": "https://secondbrain-app-94da2.web.app/api/import"
+    },
+    {
       "source": "/__/:path*",
       "destination": "https://secondbrain-app-94da2.firebaseapp.com/__/:path*"
     },

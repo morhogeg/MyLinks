@@ -7,7 +7,8 @@
     "prebuild": "node scripts/check-em-dash.mjs",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:parsers": "node --test --experimental-strip-types lib/__tests__/importParsers.test.ts"
   },
   "dependencies": {
     "@capacitor-firebase/authentication": "^8.3.0",

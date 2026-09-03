@@ -1209,6 +1209,17 @@ def sync_link_embedding(event: firestore_fn.Event[firestore_fn.Change[firestore_
         link_id = snapshot.id
         uid = event.params["uid"]
 
+        # Machina Pro's reverse trial starts when the library reaches ten cards,
+        # not at sign-up. This trigger is the one write path EVERY capture ends
+        # in (share sheet, web add, note, import), so the count is checked here
+        # on a card's CREATE rather than by a scheduler. It settles itself after
+        # the tenth card and costs nothing on later writes (see
+        # entitlement.maybe_start_trial), and it deliberately runs before the
+        # embedding early-returns below, which skip most writes.
+        if change is not None and (change.before is None or not change.before.exists):
+            from entitlement import maybe_start_trial
+            maybe_start_trial(uid)
+
         # Only embed cards in a settled, searchable state. Skip mid-flight
         # (`processing` placeholder / retry optimistic write — content isn't
         # final and the terminal write re-fires this trigger) and `failed` cards

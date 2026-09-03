@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, type ReactNode } from 'react';
 import {
-    X,
     ArrowRight,
     ArrowLeft,
     ArrowUp,
@@ -19,39 +18,36 @@ import {
     MessageCircle,
     Bookmark,
     MoreHorizontal,
-    Layers,
-    Lock,
-    Search,
     Waypoints,
     Image as ImageIcon,
     StickyNote,
 } from 'lucide-react';
 import { CitationGlyph } from './ui/Wordmark';
+import { FlowScreen } from './onboarding/FlowScreen';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { isNativeApp } from '@/lib/api';
 import { hapticSelection, hapticLight } from '@/lib/haptics';
-import { useVisualViewport } from '@/lib/useVisualViewport';
 
 /**
- * First-run onboarding tour.
+ * "How Machina works" — page three of the first run, and the only page that is
+ * a story rather than a decision.
  *
- * A short, full-screen story that showcases what makes Machina different — one
- * crisp headline, one supporting line, and one self-contained illustrative
- * visual per step. The visuals are built entirely from theme-token UI primitives
- * (mock share-sheet row, mock structured card, mock cited answer, mock digest),
- * NOT bitmap assets, so they render correctly in both light and dark themes and
- * never go stale as the real UI evolves.
+ * Four steps, one idea each: it catches things, it understands and connects
+ * them, you can ask it anything, and it brings the right thing back. That is
+ * the whole product. The eight-step version this replaces spent five of its
+ * steps on features (search, collections, a graph, a send-off) that the four
+ * below already imply, and it was gated on a non-empty library, so a brand-new
+ * account never saw it at all.
  *
- * Design goals: showcase the real differentiators (capture anywhere → AI reads
- * everything → ask your knowledge → organize into collections → it comes back
- * to you), stay to ~5 steps,
- * keep a persistent Skip and a progress indicator on every step, and finish on
- * an actionable CTA. It is never an obstacle: it shows once, animates fast
- * (`--ease-modal`), supports swipe + keyboard, and ticks a light haptic on each
- * step (native only).
+ * Every visual is a miniature of the REAL surface, built from theme-token UI
+ * primitives rather than bitmaps, so it renders correctly in both themes and
+ * cannot go stale as the app evolves. They are decorative (aria-hidden); screen
+ * readers get the headline and body.
  *
- * Completion is remembered in localStorage so first-time users see it once; it
- * can be replayed any time from Settings → "Take the tour again".
+ * It shows once (localStorage), animates fast, supports swipe and keyboard, and
+ * ticks a light haptic per step on native. It can be replayed any time from
+ * Settings -> "Take the tour again", and it reads identically either way, so
+ * nothing here needs to know which of the two it is.
  */
 
 export const ONBOARDING_STORAGE_KEY = 'machina_onboarding_v1';
@@ -135,12 +131,20 @@ function CaptureMock({ native }: { native: boolean }) {
 
 /** A miniature of the REAL feed card — same anatomy as Card.tsx (category chip
     + source byline chrome row, bold title, summary, uppercase tag chips, read
-    time), so the tour shows the product, not a generic mock-up. */
+    time), so the tour shows the product, not a generic mock-up. The connections
+    strip below it is the other half of the same step: a card is understood AND
+    placed among everything else, so both belong in one frame. Related cards
+    wear their category's app-wide identity color (the same
+    `getCategoryColorStyle` hash the graph, the cards and the filters use). */
 function StructuredCardMock() {
+    const related = [
+        { title: 'Morning routines that stick', category: 'Health' },
+        { title: 'Attention is a trainable skill', category: 'Science' },
+    ];
     return (
         <div className="w-full rounded-[20px] bg-card border border-border-subtle shadow-xl overflow-hidden" aria-hidden>
             {/* Thumbnail band — like a real card's image, with its bottom scrim */}
-            <div className="relative h-16 bg-[image:var(--accent-gradient)] opacity-90">
+            <div className="relative h-14 bg-[image:var(--accent-gradient)] opacity-90">
                 <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
             </div>
             <div className="p-3.5 space-y-2">
@@ -173,6 +177,23 @@ function StructuredCardMock() {
                         <Clock className="w-3 h-3" /> 4m
                     </span>
                     <span>2d ago</span>
+                </div>
+            </div>
+            {/* Connections — the card's own "related" strip. */}
+            <div className="px-3.5 pb-3.5 pt-2.5 border-t border-border-subtle">
+                <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-text-muted/70 mb-1.5">
+                    Connected to
+                </p>
+                <div className="flex flex-col gap-1.5">
+                    {related.map((r) => (
+                        <div key={r.title} className="flex items-center gap-2 rounded-lg bg-fill-subtle px-2 py-1.5">
+                            <span
+                                className="w-2 h-2 rounded-full shrink-0"
+                                style={{ background: getCategoryColorStyle(r.category).color }}
+                            />
+                            <span className="text-[10.5px] text-text-secondary truncate">{r.title}</span>
+                        </div>
+                    ))}
                 </div>
             </div>
         </div>
@@ -220,150 +241,6 @@ function AskMock() {
     );
 }
 
-/** A miniature of the REAL graph view, in its exact visual vocabulary
-    (KnowledgeGraph.tsx): nodes wear their category's app-wide identity color
-    (same `getCategoryColorStyle` hash as cards and filters), sized by how
-    connected they are; the focused node carries a soft halo in its own color;
-    lit edges blend both endpoint colors; strangers are dimmed; and the header
-    speaks the graph's own stats line ("N connected cards · N connections"). */
-function GraphMock() {
-    const alpha = (rgb: string, a: number) => rgb.replace('rgb(', 'rgba(').replace(')', `, ${a})`);
-    const nodes = [
-        { x: 50, y: 42, size: 20, label: 'Deep focus', category: 'Productivity', focus: true },
-        { x: 16, y: 22, size: 13, label: 'Morning routines', category: 'Health' },
-        { x: 84, y: 26, size: 13, label: 'Sleep quality', category: 'Health' },
-        { x: 27, y: 76, size: 13, label: 'Attention span', category: 'Science' },
-        // Dim strangers — their own little island, outside the lit neighbourhood.
-        { x: 78, y: 74, size: 10, category: 'Food', dim: true },
-        { x: 64, y: 88, size: 8, category: 'Food', dim: true },
-    ] as Array<{ x: number; y: number; size: number; label?: string; category: string; focus?: boolean; dim?: boolean }>;
-    const edges: Array<[number, number, boolean]> = [[0, 1, true], [0, 2, true], [0, 3, true], [4, 5, false]];
-    return (
-        <div className="w-full rounded-2xl bg-card border border-border-subtle shadow-xl p-3" aria-hidden>
-            {/* The graph view's stats header */}
-            <p className="mb-1 text-[10px] font-medium text-text-secondary tabular-nums">
-                4 connected cards <span className="text-text-muted">·</span> 3 connections
-            </p>
-            <div className="relative w-full h-40">
-                {/* Edges — lit ones blend both endpoint colors, like the canvas. */}
-                <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-                    <defs>
-                        {edges.filter(([, , lit]) => lit).map(([a, b], i) => (
-                            <linearGradient
-                                key={i}
-                                id={`tour-edge-${i}`}
-                                gradientUnits="userSpaceOnUse"
-                                x1={nodes[a].x} y1={nodes[a].y} x2={nodes[b].x} y2={nodes[b].y}
-                            >
-                                <stop offset="0%" stopColor={getCategoryColorStyle(nodes[a].category).color} />
-                                <stop offset="100%" stopColor={getCategoryColorStyle(nodes[b].category).color} />
-                            </linearGradient>
-                        ))}
-                    </defs>
-                    {edges.map(([a, b, lit], i) => (
-                        <line
-                            key={`${a}-${b}`}
-                            x1={nodes[a].x} y1={nodes[a].y} x2={nodes[b].x} y2={nodes[b].y}
-                            stroke={lit ? `url(#tour-edge-${i})` : 'currentColor'}
-                            strokeWidth={lit ? 0.8 : 0.5}
-                            strokeOpacity={lit ? 0.75 : 0.2}
-                            className="text-text-muted"
-                        />
-                    ))}
-                </svg>
-                {/* Nodes — category-colored discs, hairline ring, halo on focus. */}
-                {nodes.map((n) => {
-                    const color = getCategoryColorStyle(n.category).color;
-                    return (
-                        <div
-                            key={`${n.x}-${n.y}`}
-                            className={`absolute flex flex-col items-center -translate-x-1/2 -translate-y-1/2 ${n.dim ? 'opacity-40' : ''}`}
-                            style={{ left: `${n.x}%`, top: `${n.y}%` }}
-                        >
-                            <span
-                                className="rounded-full"
-                                style={{
-                                    width: n.size,
-                                    height: n.size,
-                                    background: `radial-gradient(circle at 35% 35%, ${alpha(color, 0.95)}, ${alpha(color, 0.65)})`,
-                                    boxShadow: n.focus
-                                        ? `0 0 0 1.5px ${alpha(color, 0.95)}, 0 0 18px 3px ${alpha(color, 0.35)}`
-                                        : `0 0 0 1px ${alpha(color, 0.35)}`,
-                                }}
-                            />
-                            {n.label && (
-                                <span className={`mt-1 text-[9px] whitespace-nowrap ${n.focus ? 'font-bold text-text' : 'font-semibold text-text-secondary'}`}>
-                                    {n.label}
-                                </span>
-                            )}
-                        </div>
-                    );
-                })}
-            </div>
-        </div>
-    );
-}
-
-/** Meaning search — a plain-words query finding a card that shares none of its
-    words, with the runner-up ranked below it. */
-function SearchMock() {
-    return (
-        <div className="w-full rounded-2xl bg-card border border-border-subtle shadow-xl p-3.5 flex flex-col gap-2.5" aria-hidden>
-            {/* Search field carrying a how-you-remember-it query */}
-            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-background border border-border-subtle">
-                <Search className="w-3.5 h-3.5 text-text-muted shrink-0" />
-                <span className="text-[11.5px] text-text truncate">that video about waking up early</span>
-            </div>
-            {/* Top result — zero shared words with the query */}
-            <div className="flex items-center gap-2.5 rounded-xl bg-fill-subtle px-2.5 py-2">
-                <span className="w-8 h-8 rounded-lg bg-[image:var(--accent-gradient)] opacity-80 shrink-0" />
-                <span className="min-w-0 flex-1 flex flex-col">
-                    <span className="text-[11px] font-semibold text-text truncate">Morning routines that stick</span>
-                    <span className="text-[9.5px] text-text-muted truncate">youtube.com · 12m</span>
-                </span>
-                <span className="shrink-0 text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-accent/12 text-accent">
-                    Meaning
-                </span>
-            </div>
-            {/* Runner-up, dimmer */}
-            <div className="flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 opacity-60">
-                <span className="w-8 h-8 rounded-lg bg-fill-subtle shrink-0" />
-                <span className="min-w-0 flex flex-col">
-                    <span className="text-[11px] font-semibold text-text truncate">The science of deep focus</span>
-                    <span className="text-[9.5px] text-text-muted truncate">nature.com · 4m</span>
-                </span>
-            </div>
-        </div>
-    );
-}
-
-/** A mini collections shelf — one shared-feeling stack, one PIN-locked. */
-function CollectionsMock() {
-    return (
-        <div className="w-full grid grid-cols-2 gap-2.5" aria-hidden>
-            {[
-                { name: 'Deep work', count: '12 saves', locked: false },
-                { name: 'Career moves', count: '8 saves', locked: true },
-            ].map((c) => (
-                <div key={c.name} className="rounded-2xl bg-card border border-border-subtle shadow-xl p-3">
-                    {/* Cover band — stacked-cards feel. */}
-                    <div className="relative h-14 rounded-xl bg-fill-subtle overflow-hidden mb-2.5">
-                        <div className="absolute inset-x-3 top-2 h-14 rounded-lg bg-[image:var(--accent-gradient)] opacity-25" />
-                        <div className="absolute inset-x-1.5 top-4 h-14 rounded-lg bg-[image:var(--accent-gradient)] opacity-60" />
-                        {c.locked && (
-                            <span className="absolute top-1.5 end-1.5 w-5 h-5 rounded-full bg-accent text-accent-ink flex items-center justify-center shadow">
-                                <Lock className="w-2.5 h-2.5" />
-                            </span>
-                        )}
-                    </div>
-                    <p className="text-[12px] font-bold text-text truncate">{c.name}</p>
-                    <p className="text-[10px] text-text-muted">{c.locked ? `${c.count} · Private` : c.count}</p>
-                </div>
-            ))}
-        </div>
-    );
-}
-
 /** A "comes back to you" digest with a resurfaced item and a reminder. */
 function ResurfaceMock() {
     return (
@@ -397,18 +274,6 @@ function ResurfaceMock() {
     );
 }
 
-/** Celebratory send-off mark. */
-function ReadyMock() {
-    return (
-        <div className="relative flex items-center justify-center py-2" aria-hidden>
-            <div className="absolute w-24 h-24 rounded-full bg-[image:var(--accent-gradient)] opacity-20 blur-2xl" />
-            <div className="relative w-20 h-20 rounded-3xl overflow-hidden shadow-xl shadow-accent/25 ring-1 ring-white/15">
-                <img src="/app-icon.png" alt="" className="w-full h-full object-cover" />
-            </div>
-        </div>
-    );
-}
-
 function buildSteps(native: boolean): Step[] {
     return [
         {
@@ -421,39 +286,18 @@ function buildSteps(native: boolean): Step[] {
             visual: <CaptureMock native={native} />,
         },
         {
-            icon: <CitationGlyph className="w-4 h-auto" />,
-            eyebrow: 'Understand',
-            title: 'Every save gets understood',
-            body: 'Machina reads every article, video, screenshot, and note in full, then files a clean card: a summary, key points, smart tags, and a category. No manual filing.',
-            visual: <StructuredCardMock />,
-        },
-        {
             icon: <Waypoints className="w-4 h-4" />,
-            eyebrow: 'Connect',
-            title: 'Your saves find each other',
-            body: 'Each new save is matched against everything you’ve kept. Truly related cards appear on the card itself, and the graph shows your library as one connected map.',
-            visual: <GraphMock />,
+            eyebrow: 'Understand',
+            title: 'Understood, and connected',
+            body: 'Machina reads every article, video, screenshot and note in full, then files a clean card: summary, key points, tags, category. Each one is matched against everything you already kept, so related saves find each other.',
+            visual: <StructuredCardMock />,
         },
         {
             icon: <MessageCircleQuestion className="w-4 h-4" />,
             eyebrow: 'Recall',
-            title: 'Ask your own knowledge',
-            body: 'Ask in plain words and get a real answer, drawn only from what you’ve saved, with citations back to the exact source.',
+            title: 'Ask, and find',
+            body: 'Ask in plain words and get a real answer drawn only from what you saved, with citations. Search the same way: “that video about waking up early” finds it, in English or Hebrew.',
             visual: <AskMock />,
-        },
-        {
-            icon: <Search className="w-4 h-4" />,
-            eyebrow: 'Find',
-            title: 'Search the way you remember',
-            body: 'Type what you remember, not the exact words: “that video about waking up early” finds the morning-routine talk. In English or Hebrew, however you saved it.',
-            visual: <SearchMock />,
-        },
-        {
-            icon: <Layers className="w-4 h-4" />,
-            eyebrow: 'Organize',
-            title: 'Collect what belongs together',
-            body: 'Group saves into collections for every project or theme, and put the personal ones behind a PIN, visible only to you.',
-            visual: <CollectionsMock />,
         },
         {
             icon: <Bell className="w-4 h-4" />,
@@ -461,13 +305,6 @@ function buildSteps(native: boolean): Step[] {
             title: 'It comes back to you',
             body: 'A daily digest, a weekly synthesis, and gentle reminders bring the right save back at exactly the right moment.',
             visual: <ResurfaceMock />,
-        },
-        {
-            icon: <CitationGlyph className="w-4 h-auto" />,
-            eyebrow: 'You’re set',
-            title: 'Your Machina is ready',
-            body: 'Save from any app or right here, and every save is read, tagged, and connected, ready to answer your questions with citations and to resurface when it matters. Save your first thing to see it work.',
-            visual: <ReadyMock />,
         },
     ];
 }
@@ -482,7 +319,6 @@ export default function OnboardingTour({
     const native = isNativeApp();
     const [steps] = useState<Step[]>(() => buildSteps(native));
     const [index, setIndex] = useState(0);
-    const vp = useVisualViewport();
 
     const step = steps[index];
     const total = steps.length;
@@ -564,64 +400,21 @@ export default function OnboardingTour({
     if (!open) return null;
 
     return (
-        <div
-            className="fixed inset-0 z-[100] bg-background text-text animate-fade-in"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Product tour"
-        >
-            <div
-                className="flex flex-col mx-auto w-full max-w-md"
-                style={{
-                    height: vp.height ? vp.height : '100dvh',
-                    paddingTop: 'max(env(safe-area-inset-top), 12px)',
-                    paddingBottom: 'max(env(safe-area-inset-bottom), 16px)',
-                    paddingInline: '20px',
-                }}
-                onTouchStart={onTouchStart}
-                onTouchEnd={onTouchEnd}
-            >
-                {/* Top bar: step counter + persistent Skip */}
-                <div className="flex items-center justify-between shrink-0 pt-1">
-                    <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-lg bg-accent/12 text-accent flex items-center justify-center ring-1 ring-accent/20">
-                            {step.icon}
-                        </div>
-                        <span className="text-[11px] font-semibold tracking-wide text-text-muted tabular-nums">
-                            {index + 1} / {total}
-                        </span>
-                    </div>
-                    <button
-                        onClick={finish}
-                        className="inline-flex items-center gap-1 h-8 px-3 rounded-full text-[12.5px] font-semibold text-text-muted hover:text-text hover:bg-card-hover transition-colors cursor-pointer"
-                        aria-label="Skip tour"
-                    >
-                        Skip
-                        <X className="w-3.5 h-3.5" />
-                    </button>
-                </div>
-
-                {/* Body: visual + copy. Keyed on index so each step replays its
-                    enter animation. Scrolls internally on very short screens. */}
-                <div className="flex-1 min-h-0 flex flex-col items-center justify-center overflow-y-auto py-4">
-                    <div key={index} className="w-full flex flex-col items-center animate-slide-up">
-                        <div className="w-full max-w-[340px] flex items-center justify-center">
-                            {step.visual}
-                        </div>
-                        <p className="mt-7 text-[11px] font-bold uppercase tracking-[0.14em] text-accent">
-                            {step.eyebrow}
-                        </p>
-                        <h2 className="mt-2 text-[22px] font-extrabold tracking-tight text-text text-center leading-tight">
-                            {step.title}
-                        </h2>
-                        <p className="mt-2.5 text-[14px] text-text-secondary text-center leading-relaxed max-w-[320px]">
-                            {step.body}
-                        </p>
-                    </div>
-                </div>
-
-                {/* Footer: progress dots + controls */}
-                <div className="shrink-0">
+        <FlowScreen
+            overlay
+            label="How Machina works"
+            icon={step.icon}
+            counter={`${index + 1} / ${total}`}
+            onSkip={finish}
+            animationKey={index}
+            visual={step.visual}
+            eyebrow={step.eyebrow}
+            title={step.title}
+            body={step.body}
+            onTouchStart={onTouchStart}
+            onTouchEnd={onTouchEnd}
+            footer={
+                <>
                     <div className="flex items-center justify-center gap-1.5 mb-4">
                         {steps.map((_, i) => (
                             <span
@@ -664,8 +457,8 @@ export default function OnboardingTour({
                             )}
                         </button>
                     </div>
-                </div>
-            </div>
-        </div>
+                </>
+            }
+        />
     );
 }
