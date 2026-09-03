@@ -22,14 +22,19 @@
       </div>
     </header>
 
+    <div id="conn" class="conn hidden" role="status" aria-live="polite">
+      <span class="dot" aria-hidden="true"></span>
+      <span id="connText"></span>
+    </div>
+
     <div id="banner" class="banner hidden"></div>
 
     <section class="field">
       <label for="token">Ingest token</label>
       <input id="token" type="password" autocomplete="off" spellcheck="false"
-             placeholder="Paste your Machina token to start saving" />
+             placeholder="Paste your Machina token" />
       <button id="reveal" type="button" class="link-btn">Show</button>
-      <p class="hint">From the Machina web app → Settings → Browser extension.</p>
+      <p class="hint">Find it in Machina: Settings, then Browser extension.</p>
     </section>
 
     <section class="field">
@@ -39,8 +44,7 @@
     </section>
 
     <div class="actions">
-      <button id="save" type="button" class="primary">Save settings</button>
-      <button id="test" type="button" class="secondary">Test connection</button>
+      <button id="save" type="button" class="primary">Save and connect</button>
     </div>
 
     <div class="divider"></div>

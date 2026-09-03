@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Machina — one-click save",
+  "name": "Machina: one-click save",
   "description": "One-click capture of any page, link, or selection into your Machina library.",
   "version": "1.1.0",
   "icons": {
