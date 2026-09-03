@@ -54,12 +54,13 @@ import NotesView from './NotesView';
 import KnowledgeGraph from './KnowledgeGraph';
 import { getNoteGroups } from '@/lib/notes';
 import LoadMoreSentinel from './feed/LoadMoreSentinel';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, Share2, Globe, Plus, Pencil, Newspaper, Lock, BookOpenCheck, ChevronLeft, BarChart3, StickyNote, Waypoints } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, Share2, Globe, Plus, Pencil, Newspaper, CalendarCheck, Lock, BookOpenCheck, ChevronLeft, BarChart3, StickyNote, Waypoints } from 'lucide-react';
 import { usePullToRefresh } from '@/lib/usePullToRefresh';
 import { useProcessingBanner } from '@/lib/useProcessingBanner';
 import { cardStartMs } from '@/lib/shareProgress';
 import { subscribeSyntheses, subscribeSynthesisNotes, saveSynthesisNotes } from '@/lib/synthesis';
-import { subscribeDigests, deleteDigest } from '@/lib/digest';
+import { subscribeDigests, deleteDigest, TODAY_REVIEW_SIZE } from '@/lib/digest';
+import { reviewSessionQueue } from '@/lib/reviewQueue';
 import { PUSH_INTENT_EVENT, PUSH_FOREGROUND_EVENT, consumePendingPushIntent, readLocalPushPrompt, type PushIntent } from '@/lib/push';
 import { isNativeApp } from '@/lib/api';
 import { reportError } from '@/lib/errorReporter';
@@ -267,6 +268,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // (Task B); 'notes' is the central My Notes view. The detail places are
     // history-like: back returns to their parent list, never to the home library.
     const [viewMode, setViewMode] = useState<'grid' | 'list' | 'review' | 'graph' | 'ask' | 'collections' | 'collection' | 'digest' | 'digestDetail' | 'notes'>('grid');
+    // True while the review deck was opened from the Today tab: it deals a
+    // shorter session and its exit returns to Today instead of the library.
+    const [reviewFromToday, setReviewFromToday] = useState(false);
     // The collection currently open as a place (viewMode 'collection').
     const [openCollectionId, setOpenCollectionId] = useState<string | null>(null);
     // The digest currently open as a place (viewMode 'digestDetail'); a
@@ -780,6 +784,54 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         remindSavedRef.current = false;
         setReminderModalLink(link);
     }, []);
+
+    // ── Today tab ────────────────────────────────────────────────────────────
+    // Every card whose reminder still wants attention: one that has already
+    // fired and not been acted on (`reminderDue` — the in-app delivery that
+    // works with or without push) plus any still-pending one. DigestView keeps
+    // the ones due now and the ones landing later today; the rest wait for their
+    // day. Derived from visibleLinks so a locked private card can never surface
+    // here, exactly like the home feed's due strip.
+    const reminderCards = useMemo(
+        () => visibleLinks
+            .filter((l) => (l.reminderStatus === 'pending' || l.reminderDue === true) && !isEffectivelyPrivateCard(l))
+            .sort((a, b) => (a.nextReminderAt ?? a.reminderDueAt ?? 0) - (b.nextReminderAt ?? b.reminderDueAt ?? 0)),
+        [visibleLinks, isEffectivelyPrivateCard]
+    );
+
+    // How many cards the review deck could deal right now. 0 hides Today's
+    // review row rather than sending the user into an empty deck.
+    const todayReviewCount = useMemo(() => reviewSessionQueue(visibleLinks).length, [visibleLinks]);
+
+    // "Done" on a due card: stop a still-pending reminder from coming back, and
+    // clear the fired flag. Both writes are the ones the rest of the app already
+    // uses, so a card marked done here looks done everywhere.
+    const completeReminder = useCallback(async (link: Link) => {
+        if (!uid) return;
+        if (link.reminderStatus === 'pending') {
+            try {
+                await updateLinkReminder(uid, link.id, false);
+            } catch {
+                toast.error("Couldn't update that reminder. Please try again.");
+                return;
+            }
+        }
+        if (link.reminderDue) void clearReminderDue(link.id);
+    }, [uid, toast, clearReminderDue]);
+
+    // Today's "Review N cards" opens the same deck the library's Review mode
+    // opens, dealt a shorter session and pointed back at Today when it ends.
+    const startTodayReview = useCallback(() => {
+        setReviewFromToday(true);
+        setViewMode('review');
+    }, []);
+    // The deck's own exit clears the flag, but a push deep-link (or any other
+    // direct setViewMode) can leave review without passing through it. Reset on
+    // the way out so the NEXT session opened from the view switcher is a full
+    // library session again.
+    useEffect(() => {
+        if (viewMode !== 'review' && reviewFromToday) setReviewFromToday(false);
+    }, [viewMode, reviewFromToday]);
 
     // A pending capture (processing / failed) rendered with Card's dedicated
     // skeleton / retry treatment. Reused above both the grid and list layouts.
@@ -1391,7 +1443,10 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     ];
     // The layout the Ask/Collections buttons return you to when you leave them.
     const lastLayout = useRef<'grid' | 'list' | 'review' | 'graph'>('grid');
-    if (viewMode === 'grid' || viewMode === 'list' || viewMode === 'review' || viewMode === 'graph') lastLayout.current = viewMode;
+    // A review session opened from Today is a detour, not a layout choice — it
+    // must never become the view the Home tab returns you to.
+    if (viewMode === 'grid' || viewMode === 'list' || viewMode === 'graph'
+        || (viewMode === 'review' && !reviewFromToday)) lastLayout.current = viewMode;
 
     // ---- Mobile v4 chrome (bottom tab bar + header glyphs) ----
     // Which bottom tab the current viewMode belongs to; detail places roll up
@@ -1543,6 +1598,12 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
             onOpenDigestSettings={onOpenDigestSettings}
             onDeleteDigest={uid ? (id) => { void deleteDigest(uid, id); } : undefined}
             onOpenDigest={openDigestDetail}
+            reminderCards={reminderCards}
+            onOpenReminderCard={(l) => { openLinkDetails(l); if (l.reminderDue) void clearReminderDue(l.id); }}
+            onEditReminder={handleOpenReminderModal}
+            onCompleteReminder={(l) => { void completeReminder(l); }}
+            reviewCount={todayReviewCount}
+            onStartReview={startTodayReview}
         />
     );
 
@@ -1777,14 +1838,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                         />
                     </div>
                 ) : viewMode === 'digest' ? (
-                    // Desktop only: the digest history flows inline beneath this
-                    // subheader. Mobile renders its own full-screen overlay below.
+                    // Desktop only: Today flows inline beneath this subheader.
+                    // Mobile renders its own full-screen overlay below.
                     <div className="hidden sm:block">
                         <MobileSubheader
                             onBack={() => setViewMode(lastLayout.current)}
                             backLabel="Back to your library"
-                            icon={<Newspaper className="w-5 h-5" />}
-                            title="Digest"
+                            icon={<CalendarCheck className="w-5 h-5" />}
+                            title="Today"
                         />
                     </div>
                 ) : viewMode === 'digestDetail' ? (
@@ -1793,7 +1854,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                     <div className="hidden sm:block">
                         <MobileSubheader
                             onBack={closeDigestToList}
-                            backLabel="Back to digests"
+                            backLabel="Back to Today"
                             icon={<Newspaper className="w-5 h-5" />}
                             title={digestDetailTitle}
                         />
@@ -2102,12 +2163,12 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             </button>
                             <button
                                 onClick={() => setViewMode('digest')}
-                                title="Your curated digests"
-                                aria-label="Digest"
+                                title="What is coming back to you today"
+                                aria-label="Today"
                                 className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
                             >
-                                <Newspaper className="w-4 h-4" />
-                                <span>Digest</span>
+                                <CalendarCheck className="w-4 h-4" />
+                                <span>Today</span>
                             </button>
                             <button
                                 onClick={() => openNotesView()}
@@ -2721,7 +2782,11 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                         />
                     ) : viewMode === 'review' ? (
                         <SwipeDeck
-                            links={filteredLinks}
+                            // From Today the deck is a short, unfiltered session
+                            // (the user came from Today, not from a filtered
+                            // library) and its exit returns there.
+                            links={reviewFromToday ? visibleLinks : filteredLinks}
+                            limit={reviewFromToday ? TODAY_REVIEW_SIZE : undefined}
                             onKeep={swipeKeep}
                             onArchive={swipeArchive}
                             onRemind={handleOpenReminderModal}
@@ -2730,7 +2795,10 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             onCancelRemind={swipeCancelRemind}
                             onToggleFavorite={swipeToggleFavorite}
                             remindSignal={remindSignal}
-                            onExit={() => setViewMode(lastLayout.current === 'review' ? 'grid' : lastLayout.current)}
+                            onExit={() => {
+                                if (reviewFromToday) { setReviewFromToday(false); setViewMode('digest'); return; }
+                                setViewMode(lastLayout.current === 'review' ? 'grid' : lastLayout.current);
+                            }}
                         />
                     ) : viewMode === 'list' ? (
                         <div className="flex flex-col gap-2 max-w-3xl mx-auto">
@@ -2862,14 +2930,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                 </div>
             )}
 
-            {/* Digest — mobile full-screen overlay (mirrors Collections). */}
+            {/* Today — mobile full-screen overlay (mirrors Collections). */}
             {viewMode === 'digest' && (
                 <div className="sm:hidden fixed inset-x-0 top-0 z-50 bg-background flex flex-col animate-fade-in transition-[bottom] duration-300 [transition-timing-function:var(--ease-modal)]" style={{ bottom: overlayBottom }}>
                     <MobileSubheader
                         onBack={() => setViewMode(lastLayout.current)}
                         backLabel="Back to your library"
-                        icon={<Newspaper className="w-5 h-5" />}
-                        title="Digest"
+                        icon={<CalendarCheck className="w-5 h-5" />}
+                        title="Today"
                     />
                     <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-4" style={{ paddingBottom: '1rem' }}>
                         {digestContent}
@@ -2894,12 +2962,12 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
             )}
 
             {/* Digest detail — mobile full-screen place (Task B). Back returns to
-                the list of digests. */}
+                the Today list. */}
             {viewMode === 'digestDetail' && (
                 <div className="sm:hidden fixed inset-x-0 top-0 z-50 bg-background flex flex-col animate-fade-in transition-[bottom] duration-300 [transition-timing-function:var(--ease-modal)]" style={{ bottom: overlayBottom }}>
                     <MobileSubheader
                         onBack={closeDigestToList}
-                        backLabel="Back to digests"
+                        backLabel="Back to Today"
                         icon={<Newspaper className="w-5 h-5" />}
                         title={digestDetailTitle}
                     />

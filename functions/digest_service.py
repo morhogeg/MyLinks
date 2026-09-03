@@ -10,19 +10,17 @@ The user controls, from Settings:
   • whether digests are on at all              (digest_enabled)
   • how often                                  (digest_frequency: daily | weekly)
   • where to                                   (digest_channels: push)
-  • what to curate                             (digest_mode)
-  • a topic to focus on                        (digest_topic, when mode=topic)
   • how many cards                             (digest_count)
   • when, in their local time                  (digest_hour, digest_minute, digest_day)
 
-Curation modes (digest_mode) — three survivors:
-  smart      – a balanced mix of backlog + rediscovery (the default)
-  rediscover – "on this day": older saves you haven't opened in a while
-  topic      – only cards from a chosen category/tag
-
-Three earlier modes (random / unread / favorites) were retired. A stored value
-of any of them is mapped to 'smart' at read time (see REMOVED_MODE_ALIASES) so
-existing settings keep working; the removed value is never written back.
+There is ONE curation: a balanced mix of the backlog and older saves worth a
+second look (`curate`). Digests used to offer a STYLE — smart / rediscover /
+by-topic, and before those random / unread / favorites — but resurfacing now has
+one surface (the app's Today tab) and one behaviour, so the picker is gone and
+`digest_mode` is no longer a user choice. Every stored value, live or retired,
+resolves to that one curation at read time (`normalize_mode`); nothing is
+rewritten, so an existing workspace keeps working untouched. `digest_topic` /
+`digest_topics` only ever fed the by-topic style and are now ignored.
 """
 
 import random
@@ -38,9 +36,10 @@ from log_safe import mask_uid
 
 logger = logging.getLogger(__name__)
 
-# How old (days) a save must be before "rediscover" will resurface it.
-# Client mirror: web/lib/reviewQueue.ts forgottenQueue() twins the rediscover
-# branch for in-app Review mode — keep the SHAPE in sync (constants
+# How old (days) a save must be before curate() counts it as "worth a second
+# look" and mixes it in with the fresh backlog.
+# Client mirror: web/lib/reviewQueue.ts forgottenQueue() twins this half of the
+# curation for in-app Review mode — keep the SHAPE in sync (constants
 # intentionally differ: the deck uses 30d and no random backfill).
 REDISCOVER_MIN_AGE_DAYS = 14
 # Cap how many links we pull per user when curating (keeps reads bounded).
@@ -53,23 +52,37 @@ CANDIDATE_LIMIT = 500
 # chosen minute but proportionally more scheduler invocations (cost).
 DIGEST_CADENCE_MINUTES = 5
 
-VALID_MODES = {"smart", "topic", "rediscover", "synthesis"}
+# The one curation. Still written onto every digest doc (the client type carries
+# the field) and still the value the client saves, so nothing about the stored
+# shape changes.
+DIGEST_MODE = "smart"
 
-# Retired curation modes → the surviving mode they now resolve to. A user whose
-# settings still carry one of these keeps getting a digest (curated via the
-# mapped survivor) with no error; the stale value is normalized at read time and
-# never written back. Kept here (not in curate) so every read path shares it.
-# MIRRORED in web/lib/useUserSettings.ts REMOVED_DIGEST_MODES — retire or add
-# modes in BOTH places or client and server will disagree on stored settings.
-REMOVED_MODE_ALIASES = {"random": "smart", "unread": "smart", "favorites": "smart"}
+# The weekly synthesis's LEGACY encoding: it used to be a digest style occupying
+# the mode slot, before it got its own `synthesis_enabled` toggle. It is not a
+# curation mode, so normalize_mode never returns it — the two read paths that
+# still honour it (_synthesis_enabled and build_and_send_digest's routing) test
+# the RAW stored value instead. Removing that test would silently stop the
+# weekly recap for any workspace that hasn't saved its settings since the
+# toggle shipped.
+LEGACY_SYNTHESIS_MODE = "synthesis"
 
 
 def normalize_mode(mode: Optional[str]) -> str:
-    """Resolve a stored digest_mode to a live one: retired modes map to their
-    survivor (REMOVED_MODE_ALIASES), anything unrecognized falls back to 'smart'."""
-    mode = mode or "smart"
-    mode = REMOVED_MODE_ALIASES.get(mode, mode)
-    return mode if mode in VALID_MODES else "smart"
+    """Resolve any stored digest_mode to the one live curation.
+
+    Every value maps to 'smart': the three modes that used to be pickable
+    (smart / rediscover / topic), the three retired before them (random /
+    unread / favorites), the legacy 'synthesis' style, and anything
+    unrecognized. The stale value is never written back. MIRRORED in
+    web/lib/useUserSettings.ts normalizeDigestMode."""
+    return DIGEST_MODE
+
+
+def is_legacy_synthesis_mode(settings: dict) -> bool:
+    """True when this workspace still encodes the weekly synthesis the old way,
+    as digest_mode == 'synthesis'. Reads the RAW value on purpose (see
+    LEGACY_SYNTHESIS_MODE)."""
+    return (settings or {}).get("digest_mode") == LEGACY_SYNTHESIS_MODE
 
 # How many days of saves the weekly "What you learned" synthesis (M12) looks back
 # over, and the minimum number of cards in that window worth synthesizing (below
@@ -160,34 +173,14 @@ def fetch_candidate_links(uid: str) -> List[dict]:
     return links
 
 
-def _normalize_topics(topics) -> List[str]:
-    """Accept a str, list, or None and return a lowercased, de-duped list."""
-    if not topics:
-        return []
-    if isinstance(topics, str):
-        topics = [topics]
-    seen, out = set(), []
-    for t in topics:
-        key = (t or "").strip().lower()
-        if key and key not in seen:
-            seen.add(key)
-            out.append(key)
-    return out
-
-
-def curate(links: List[dict], mode: str, count: int, topics=None) -> List[dict]:
+def curate(links: List[dict], count: int) -> List[dict]:
     """
-    Pick `count` cards out of `links` according to `mode`.
-
-    `topics` may be a single string or a list of categories/tags (used when
-    mode == "topic"). Pure function (no I/O) so it can be unit-tested.
+    Pick `count` cards out of `links`: a balanced mix of the untouched backlog
+    and older saves worth a second look. THE curation — the mode/topic branches
+    that used to sit here went with the style picker. Pure function (no I/O) so
+    it can be unit-tested.
     """
-    # Read-time mapping: retired modes resolve to their survivor here too, so a
-    # stale stored value curates via 'smart' rather than crashing or curating
-    # nothing (defense in depth — build_and_send_digest also normalizes on read).
-    mode = normalize_mode(mode)
     count = max(1, min(int(count or 5), 20))
-    topic_set = set(_normalize_topics(topics))
     # Defense in depth: never surface archived cards even if they slip in.
     links = [l for l in links if l.get("status") != "archived"]
     if not links:
@@ -202,34 +195,6 @@ def curate(links: List[dict], mode: str, count: int, topics=None) -> List[dict]:
     def viewed(l):
         return _to_ms(l.get("lastViewedAt"))
 
-    if mode == "topic":
-        pool = [
-            l for l in links
-            if topic_set and (
-                (l.get("category") or "").lower() in topic_set
-                or any(tag.lower() in topic_set for tag in (l.get("tags") or []))
-            )
-        ]
-        random.shuffle(pool)
-        return pool[:count]
-
-    if mode == "rediscover":
-        pool = [l for l in links
-                if created(l) and created(l) < age_cutoff
-                and viewed(l) < age_cutoff]
-        # Prefer the ones gathering the most dust (least recently touched).
-        pool.sort(key=lambda l: max(viewed(l), created(l)))
-        if len(pool) < count:
-            # Backfill with random older items so the digest isn't thin. Dedupe
-            # by id (like smart, below) — not `l not in pool`, which is an O(n²)
-            # whole-dict comparison.
-            pool_ids = {l["id"] for l in pool}
-            extra = [l for l in links if l["id"] not in pool_ids]
-            random.shuffle(extra)
-            pool += extra
-        return pool[:count]
-
-    # ── smart: a balanced mix of backlog + rediscovery ──────────────────
     unread = [l for l in links if l.get("status") not in ("archived", "favorite")
               and not l.get("isRead")]
     unread.sort(key=created)
@@ -512,7 +477,7 @@ def _digest_id(frequency: str, now: Optional[datetime] = None) -> str:
     return _week_id(now)
 
 
-def _write_inapp_digest(uid: str, cards: List[dict], mode: str, frequency: str, topics, tz_name: Optional[str] = None) -> Optional[str]:
+def _write_inapp_digest(uid: str, cards: List[dict], frequency: str, tz_name: Optional[str] = None) -> Optional[str]:
     """Persist the curated digest to users/{uid}/digests/{digestId} (mirrors
     _write_inapp_synthesis). Cards are denormalized so the digest renders even
     if a source link is later deleted; the app still deep-links by id when the
@@ -541,10 +506,15 @@ def _write_inapp_digest(uid: str, cards: List[dict], mode: str, frequency: str, 
     doc = {
         "id": digest_id,
         "createdAt": int(datetime.now(timezone.utc).timestamp() * 1000),
-        "mode": mode,
+        # Constant now (there is one curation), kept on the doc because the
+        # client's CuratedDigest type reads it and older docs carry it.
+        "mode": DIGEST_MODE,
         "frequency": frequency,
         "title": f"Your {period} Brew",
-        "topics": _normalize_topics(topics),
+        # Topics only ever meant "the by-topic style picked these"; with that
+        # style gone nothing narrows a digest, so a new one carries none. Older
+        # docs keep theirs and still render their chips.
+        "topics": [],
         "cards": card_refs,
         "cardCount": len(card_refs),
     }
@@ -589,13 +559,6 @@ def build_and_send_digest(uid: str, user_data: dict, force: bool = False) -> dic
     settings = user_data.get("settings", {}) or {}
     result = {"uid": uid, "sent": False, "channels": [], "card_count": 0, "skipped": None}
 
-    # Read-time mapping: a stored retired mode (random/unread/favorites) resolves
-    # to its survivor here so it's never carried past load or written back.
-    mode = normalize_mode(settings.get("digest_mode"))
-    # Support multi-topic (digest_topics) with single-topic (digest_topic) fallback.
-    topics = settings.get("digest_topics") or []
-    if not topics and settings.get("digest_topic"):
-        topics = [settings["digest_topic"]]
     count = settings.get("digest_count", 5)
     frequency = settings.get("digest_frequency", "weekly")
     channels = _normalize_channels(settings.get("digest_channels"))
@@ -603,8 +566,10 @@ def build_and_send_digest(uid: str, user_data: dict, force: bool = False) -> dic
     links = fetch_candidate_links(uid)
 
     # The weekly "What you learned" synthesis (M12) is its own narrative path —
-    # it recaps the week's saves instead of curating a set of cards.
-    if mode == "synthesis":
+    # it recaps the week's saves instead of curating a set of cards. Routed on
+    # the RAW stored mode: a workspace that predates the synthesis_enabled
+    # toggle still encodes the recap here (see LEGACY_SYNTHESIS_MODE).
+    if is_legacy_synthesis_mode(settings):
         return build_and_send_synthesis(uid, user_data, links, force=force)
 
     # Curated digests are Pro-only (Machina Pro). Checked after the synthesis
@@ -615,7 +580,7 @@ def build_and_send_digest(uid: str, user_data: dict, force: bool = False) -> dic
         result["skipped"] = "pro_required"
         return result
 
-    cards = curate(links, mode, count, topics)
+    cards = curate(links, count)
 
     # Nothing to curate → nothing to deliver. NOTE: the `digest_skip_empty`
     # setting is currently inert — an empty digest is always skipped, because a
@@ -634,7 +599,7 @@ def build_and_send_digest(uid: str, user_data: dict, force: bool = False) -> dic
     # so the Digest section shows it even when every outbound channel fails. The
     # digest's period id is computed in the user's local time so its doc id (and
     # the date the client renders from it) agree with the schedule that fired it.
-    digest_id = _write_inapp_digest(uid, cards, mode, frequency, topics, user_data.get("timezone"))
+    digest_id = _write_inapp_digest(uid, cards, frequency, user_data.get("timezone"))
     if digest_id:
         result["channels"].append("in_app")
         result["digest_id"] = digest_id
@@ -706,7 +671,7 @@ def _synthesis_enabled(settings: dict) -> bool:
     migrates that to synthesis_enabled on its next settings save."""
     if settings.get("synthesis_enabled"):
         return True
-    return normalize_mode(settings.get("digest_mode")) == "synthesis"
+    return is_legacy_synthesis_mode(settings)
 
 
 def is_synthesis_due(settings: dict, tz_name: Optional[str]) -> bool:

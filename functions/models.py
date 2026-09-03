@@ -108,15 +108,14 @@ class UserSettings(BaseModel):
     # Delivery channels — push only (retired whatsapp/email entries are
     # migrated/dropped at read time in digest_service._normalize_channels)
     digest_channels: List[str] = Field(default_factory=lambda: ["push"])
-    # Curation strategy (retired modes random/unread/favorites map to "smart" at
-    # read time in digest_service.normalize_mode):
-    #   "smart"      – a balanced mix of backlog + rediscovery (default)
-    #   "topic"      – only cards from a chosen category/tag (see digest_topic)
-    #   "rediscover" – "on this day": older saves you haven't opened recently
+    # INERT since the style picker was removed: there is one curation (a
+    # balanced mix of backlog + rediscovery) and every stored value resolves to
+    # "smart" at read time in digest_service.normalize_mode. Kept so existing
+    # settings docs round-trip unchanged. The one value still READ raw is the
+    # legacy "synthesis" (see synthesis_enabled below).
     digest_mode: str = "smart"
-    # Categories/tags to focus on when digest_mode == "topic". `digest_topics`
-    # (plural) supports picking several; `digest_topic` (singular) is kept for
-    # backward compatibility and treated as a single-item list.
+    # Also inert: these only ever fed the retired by-topic style. Kept so an
+    # existing settings doc round-trips without losing fields.
     digest_topics: List[str] = Field(default_factory=list)
     digest_topic: Optional[str] = None
     # How many cards per digest.
