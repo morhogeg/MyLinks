@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import type { User, DigestChannel, DigestMode, ReminderChannel } from '@/lib/types';
-import { updateUserSettings, getUserSettings, getLinksFromFirestore } from '@/lib/storage';
+import { updateUserSettings, getUserSettings } from '@/lib/storage';
 import { registerPush, openNotificationSettings, sendTestPush, unregisterPush } from '@/lib/push';
 import { useToast } from '@/components/Toast';
 
@@ -22,6 +22,9 @@ export const DEFAULT_SETTINGS: User['settings'] = {
     digest_enabled: true,
     digest_frequency: 'weekly',
     digest_channels: ['push'],
+    // digest_mode / digest_topics are INERT: there is one curation now and no
+    // by-topic mode to feed. Both are still loaded and written back untouched so
+    // a workspace that carries them loses nothing, and neither is configurable.
     digest_mode: 'smart',
     digest_topics: [],
     digest_topic: null,
@@ -55,19 +58,15 @@ export function normalizeChannels<T extends string>(channels: readonly string[] 
     return kept.length ? kept : [fallback];
 }
 
-// Retired digest modes → the surviving mode they now resolve to. Mirrors
-// normalizeChannels: a stored value of a removed mode is mapped to 'smart' at
-// load time so an existing setting keeps working (curating via the survivor),
-// and the stale value is never written back on save — the Style picker only
-// offers survivors, so settings.digest_mode can never become a removed value.
-// MIRRORED in functions/digest_service.py REMOVED_MODE_ALIASES — retire or add
-// modes in BOTH places or client and server will disagree on stored settings.
-const REMOVED_DIGEST_MODES: Record<string, DigestMode> = { random: 'smart', unread: 'smart', favorites: 'smart' };
-const VALID_DIGEST_MODES: readonly DigestMode[] = ['smart', 'topic', 'rediscover', 'synthesis'];
-export function normalizeDigestMode(mode: string | undefined): DigestMode {
-    if (!mode) return 'smart';
-    if (mode in REMOVED_DIGEST_MODES) return REMOVED_DIGEST_MODES[mode];
-    return (VALID_DIGEST_MODES as readonly string[]).includes(mode) ? (mode as DigestMode) : 'smart';
+// There is ONE curation now, so every stored digest_mode — the three that used
+// to be pickable (smart / rediscover / topic), the three retired before them
+// (random / unread / favorites), and anything unrecognized — resolves to
+// 'smart' at load time. The stale value is never written back: the next save
+// writes 'smart'. MIRRORED in functions/digest_service.py normalize_mode, which
+// does the same on the delivery side, so a workspace that never opens Settings
+// still gets the one curation.
+export function normalizeDigestMode(): DigestMode {
+    return 'smart';
 }
 
 /**
@@ -85,12 +84,6 @@ export function useUserSettings(uid: string) {
     // must NOT let the user Save them over their real config — so Save is disabled
     // and an inline notice offers a retry until a load succeeds.
     const [loadError, setLoadError] = useState(false);
-
-    // Topic options, split by origin and de-duped case-insensitively (the
-    // digest matcher lowercases everything, so "Tech" and "tech" are the same).
-    const [categoryTopics, setCategoryTopics] = useState<string[]>([]);
-    const [tagTopics, setTagTopics] = useState<string[]>([]);
-    const [topicQuery, setTopicQuery] = useState('');
 
     // Dirty-tracking (M7): a baseline captured when the form loads, so closing
     // with unsaved edits warns instead of silently discarding the user's work.
@@ -132,34 +125,6 @@ export function useUserSettings(uid: string) {
         }
     };
 
-    const loadDigestExtras = useCallback(async () => {
-        try {
-            const links = await getLinksFromFirestore(uid);
-            // Categories and tags → topic options, keyed by lowercase so case
-            // variants collapse to one chip. Keep the nicer-cased label.
-            const startsUpper = (s: string) => s.length > 0 && s[0] === s[0].toUpperCase() && s[0] !== s[0].toLowerCase();
-            const prefer = (existing: string | undefined, next: string) =>
-                !existing ? next : (startsUpper(next) && !startsUpper(existing) ? next : existing);
-            const catMap = new Map<string, string>();
-            const tagMap = new Map<string, string>();
-            links.forEach((l) => {
-                const cat = (l.category || '').trim();
-                if (cat) catMap.set(cat.toLowerCase(), prefer(catMap.get(cat.toLowerCase()), cat));
-                (l.tags || []).forEach((raw) => {
-                    const t = (raw || '').trim();
-                    if (t) tagMap.set(t.toLowerCase(), prefer(tagMap.get(t.toLowerCase()), t));
-                });
-            });
-            // A tag that's also a category shouldn't appear twice.
-            catMap.forEach((_, key) => tagMap.delete(key));
-            const byLabel = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: 'base' });
-            setCategoryTopics(Array.from(catMap.values()).sort(byLabel));
-            setTagTopics(Array.from(tagMap.values()).sort(byLabel));
-        } catch (error) {
-            console.error('Failed to load digest extras:', error);
-        }
-    }, [uid]);
-
     const loadSettings = useCallback(async () => {
         setIsLoading(true);
         setLoadError(false);
@@ -167,11 +132,11 @@ export function useUserSettings(uid: string) {
             const userSettings = await getUserSettings(uid);
             // Legacy migration: 'synthesis' used to be a digest STYLE, which
             // silently replaced the card digest. It's now its own weekly toggle —
-            // a stored synthesis mode becomes synthesis_enabled and the digest
-            // style falls back to smart. Persisted on the next save; the Style
-            // picker no longer offers synthesis, so the old value can't return.
-            const storedMode = normalizeDigestMode(userSettings?.digest_mode);
-            const legacySynthesisMode = storedMode === 'synthesis';
+            // a stored synthesis mode becomes synthesis_enabled and the mode
+            // falls back to smart, persisted on the next save. Read the RAW
+            // stored value: normalizeDigestMode collapses everything to 'smart',
+            // so asking IT would quietly drop a pre-migration user's recap.
+            const legacySynthesisMode = userSettings?.digest_mode === 'synthesis';
             let loaded: User['settings'] = userSettings
                 ? {
                     theme: userSettings.theme || 'dark',
@@ -186,7 +151,7 @@ export function useUserSettings(uid: string) {
                     digest_enabled: userSettings.digest_enabled ?? false,
                     digest_frequency: userSettings.digest_frequency || 'weekly',
                     digest_channels: normalizeChannels<DigestChannel>(userSettings.digest_channels, ['push'], 'push'),
-                    digest_mode: legacySynthesisMode ? 'smart' : storedMode,
+                    digest_mode: normalizeDigestMode(),
                     digest_topics: userSettings.digest_topics?.length
                         ? userSettings.digest_topics
                         : (userSettings.digest_topic ? [userSettings.digest_topic] : []),
@@ -313,32 +278,15 @@ export function useUserSettings(uid: string) {
         }
     };
 
-    const toggleTopic = (topic: string) => {
-        setSettings((p) => {
-            const key = topic.toLowerCase();
-            const has = p.digest_topics.some((t) => t.toLowerCase() === key);
-            const next = has
-                ? p.digest_topics.filter((t) => t.toLowerCase() !== key)
-                : [...p.digest_topics, topic];
-            return { ...p, digest_topics: next };
-        });
-    };
-
     return {
         settings,
         setSettings,
         loadError,
-        categoryTopics,
-        tagTopics,
-        topicQuery,
-        setTopicQuery,
         savePreferences,
         loadSettings,
-        loadDigestExtras,
         togglePush,
         sendTestNotification,
         pushBusy,
         pushNote,
-        toggleTopic,
     };
 }

@@ -1,27 +1,21 @@
 'use client';
 
 import { useState } from 'react';
-import type { ReactNode } from 'react';
-import { DigestMode } from '@/lib/types';
-import { Check, Tag, History, Search, Info } from 'lucide-react';
-import { CitationGlyph } from '@/components/ui/Wordmark';
-import { X } from 'lucide-react';
+import { Check, Info } from 'lucide-react';
 import type { Settings, SetSettings, View } from './types';
 import ProBadge from '@/components/ui/ProBadge';
 import { useEntitlement } from '@/components/EntitlementProvider';
 import {
     LargeTitle, SectionHeader, Footnote, List, RowShell, RowText,
-    NavRow, Toggle, Segmented, TopicGroup, TopicPill, Wheel,
+    NavRow, Toggle, Segmented, Wheel,
 } from './primitives';
 
-// Every mode is curated server-side; this is presentation only. Styles are
-// BATCHES of saved cards — the weekly synthesis is a different artifact (an
-// AI-written recap) and lives under its own section/toggle, not here.
-export const DIGEST_MODES: { value: DigestMode; label: string; icon: ReactNode; note: string }[] = [
-    { value: 'smart', label: 'Smart mix', icon: <CitationGlyph className="w-[18px] h-[18px]" />, note: 'A balanced blend of your backlog and older gems worth a second look.' },
-    { value: 'rediscover', label: 'Rediscover', icon: <History className="w-[18px] h-[18px]" />, note: 'Resurface older saves you haven\'t opened in a while.' },
-    { value: 'topic', label: 'By topic', icon: <Tag className="w-[18px] h-[18px]" />, note: 'Only cards from a category or tag you choose.' },
-];
+// There is ONE curation, chosen server-side (digest_service.curate): a balanced
+// mix of the backlog and older saves worth a second look. The picker that used
+// to offer smart / rediscover / by-topic is gone — resurfacing has one surface
+// (the Today tab) and one behaviour, so there is nothing left to configure but
+// when it arrives. Stored modes on existing workspaces still load; they resolve
+// to that one curation (see digest_service.normalize_mode).
 
 export const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 export const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -44,12 +38,11 @@ export const formatTime = (hour: number, minute: number) => {
 };
 
 export function ResurfacingView({
-    settings, setSettings, cadenceLabel, modeLabel, scheduleValue, go,
+    settings, setSettings, cadenceLabel, scheduleValue, go,
 }: {
     settings: Settings;
     setSettings: SetSettings;
     cadenceLabel: string;
-    modeLabel: string;
     scheduleValue: string;
     go: (v: View) => void;
 }) {
@@ -86,7 +79,6 @@ export function ResurfacingView({
                     </div>
                     <Toggle on={settings.digest_enabled && !gated} onChange={gated ? () => openPaywall('digest') : () => setSettings((p) => ({ ...p, digest_enabled: !p.digest_enabled }))} />
                 </RowShell>
-                {settings.digest_enabled && !gated && <NavRow title="Style" value={modeLabel} onClick={() => go('style')} />}
                 {settings.digest_enabled && !gated && <NavRow title="Schedule" value={scheduleValue} onClick={() => go('schedule')} />}
                 {settings.digest_enabled && !gated && <NavRow title="Cards per digest" value={String(settings.digest_count)} onClick={() => go('cards')} />}
                 {settings.digest_enabled && !gated && (
@@ -98,7 +90,7 @@ export function ResurfacingView({
                     </RowShell>
                 )}
             </List>
-            <Footnote>{gated ? 'Part of Machina Pro. Tap the row to see what Pro includes.' : 'Machina picks the cards; you choose the style and when they arrive.'}</Footnote>
+            <Footnote>{gated ? 'Part of Machina Pro. Tap the row to see what Pro includes.' : 'Machina picks a balanced mix of your backlog and older saves worth a second look. You choose when it arrives.'}</Footnote>
 
             <SectionHeader>Weekly synthesis</SectionHeader>
             <List tight>
@@ -110,7 +102,7 @@ export function ResurfacingView({
                     <NavRow title="Delivery day" value={DAY_NAMES[settings.synthesis_day] ?? 'Sunday'} onClick={() => go('synthesisDay')} />
                 )}
             </List>
-            <Footnote>Ties the week&apos;s saves into a short story: themes, a standout, and an open question. Lands in your feed and Digest tab{settings.synthesis_enabled ? ` every ${DAY_NAMES[settings.synthesis_day] ?? 'Sunday'}` : ''}.</Footnote>
+            <Footnote>Ties the week&apos;s saves into a short story: themes, a standout, and an open question. Lands in your feed and Today tab{settings.synthesis_enabled ? ` every ${DAY_NAMES[settings.synthesis_day] ?? 'Sunday'}` : ''}.</Footnote>
 
             <Footnote>In-app and push delivery are always on. Push is toggled on the main screen.</Footnote>
         </>
@@ -132,122 +124,6 @@ function SkipEmptyLabel() {
                 <p className="text-[12.5px] text-text-muted mt-1.5 leading-snug max-w-[30ch] animate-in fade-in slide-in-from-top-1 duration-200">
                     When there&apos;s nothing new worth surfacing, no digest is sent, so you never get an empty notification.
                 </p>
-            )}
-        </>
-    );
-}
-
-export function StyleView({
-    settings, setSettings, toggleTopic, topicQuery, setTopicQuery,
-    totalTopics, visibleCategories, visibleTags, isTopicActive,
-}: {
-    settings: Settings;
-    setSettings: SetSettings;
-    toggleTopic: (t: string) => void;
-    topicQuery: string;
-    setTopicQuery: (q: string) => void;
-    totalTopics: number;
-    visibleCategories: string[];
-    visibleTags: string[];
-    isTopicActive: (t: string) => boolean;
-}) {
-    const note = DIGEST_MODES.find((m) => m.value === settings.digest_mode)?.note;
-    return (
-        <>
-            <LargeTitle>Digest style</LargeTitle>
-            <List tight>
-                {DIGEST_MODES.map((m) => (
-                    <RowShell
-                        key={m.value}
-                        onClick={() => setSettings((p) => ({ ...p, digest_mode: m.value }))}
-                    >
-                        <span className="text-text-secondary shrink-0">{m.icon}</span>
-                        <RowText title={m.label} />
-                        {settings.digest_mode === m.value && <Check className="ml-auto w-[18px] h-[18px] text-accent shrink-0" strokeWidth={2.6} />}
-                    </RowShell>
-                ))}
-            </List>
-            {note && <Footnote>{note}</Footnote>}
-
-            {/* Topic picker — searchable, grouped by categories & tags */}
-            {settings.digest_mode === 'topic' && (
-                <>
-                    <div className="flex items-center justify-between px-1.5 pt-6 pb-2">
-                        <span className="text-[12px] font-semibold uppercase tracking-[0.06em] text-text-muted">Topics</span>
-                        {settings.digest_topics.length > 0 && (
-                            <button
-                                onClick={() => setSettings((p) => ({ ...p, digest_topics: [] }))}
-                                className="text-[11px] font-semibold text-text-muted hover:text-text transition-colors cursor-pointer"
-                            >
-                                Clear <span className="text-accent">{settings.digest_topics.length}</span>
-                            </button>
-                        )}
-                    </div>
-                    {totalTopics === 0 ? (
-                        <div className="rounded-2xl border border-dashed border-border-subtle p-4 text-center">
-                            <p className="text-[12px] text-text-muted">Save some links first to build topics.</p>
-                        </div>
-                    ) : (
-                        <div className="rounded-2xl border border-border-subtle bg-card p-4 space-y-4">
-                            {settings.digest_topics.length > 0 && (
-                                <div className="flex flex-wrap gap-1.5">
-                                    {settings.digest_topics.map((t) => (
-                                        <button
-                                            key={t}
-                                            onClick={() => toggleTopic(t)}
-                                            className="inline-flex items-center gap-1 pl-2.5 pr-1.5 h-7 rounded-full bg-accent/15 border border-accent/40 text-[12px] font-semibold text-accent hover:bg-accent/25 transition-colors cursor-pointer"
-                                            aria-label={`Remove ${t}`}
-                                        >
-                                            {t}
-                                            <X className="w-3 h-3" />
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                            {totalTopics > 8 && (
-                                <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted pointer-events-none" />
-                                    <input
-                                        type="text"
-                                        value={topicQuery}
-                                        onChange={(e) => setTopicQuery(e.target.value)}
-                                        placeholder="Search topics…"
-                                        className="w-full h-9 pl-9 pr-8 rounded-xl bg-card-hover border border-border-subtle text-[13px] text-text placeholder:text-text-muted focus:outline-none focus:border-accent/50 transition-colors"
-                                    />
-                                    {topicQuery && (
-                                        <button
-                                            onClick={() => setTopicQuery('')}
-                                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text transition-colors cursor-pointer"
-                                            aria-label="Clear search"
-                                        >
-                                            <X className="w-3.5 h-3.5" />
-                                        </button>
-                                    )}
-                                </div>
-                            )}
-                            {visibleCategories.length === 0 && visibleTags.length === 0 ? (
-                                <p className="text-[12px] text-text-muted text-center py-3">No topics match “{topicQuery}”.</p>
-                            ) : (
-                                <div className="max-h-[22rem] overflow-y-auto scrollbar-subtle pr-1 space-y-4">
-                                    {visibleCategories.length > 0 && (
-                                        <TopicGroup label="Categories">
-                                            {visibleCategories.map((t) => (
-                                                <TopicPill key={t} label={t} active={isTopicActive(t)} onClick={() => toggleTopic(t)} />
-                                            ))}
-                                        </TopicGroup>
-                                    )}
-                                    {visibleTags.length > 0 && (
-                                        <TopicGroup label="Tags">
-                                            {visibleTags.map((t) => (
-                                                <TopicPill key={t} label={t} active={isTopicActive(t)} onClick={() => toggleTopic(t)} />
-                                            ))}
-                                        </TopicGroup>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </>
             )}
         </>
     );

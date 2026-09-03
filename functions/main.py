@@ -4455,7 +4455,9 @@ def send_digest_now(req: https_fn.CallableRequest) -> dict:
 
     # Allow the caller to preview an unsaved configuration.
     overrides = {}
-    for key in ("digest_mode", "digest_topic", "digest_topics", "digest_count", "digest_channels", "digest_frequency"):
+    # digest_mode / digest_topic(s) are deliberately NOT previewable: there is
+    # one curation now and both fields are inert (digest_service.normalize_mode).
+    for key in ("digest_count", "digest_channels", "digest_frequency"):
         short = key.replace("digest_", "")
         if req.data and short in req.data:
             overrides[key] = req.data[short]

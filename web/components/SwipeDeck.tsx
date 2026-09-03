@@ -38,6 +38,10 @@ interface SwipeDeckProps {
     /** Leave review and return to the previous card layout. Review is a focused
      *  mode (the bottom tab bar hides while it's open), so it owns its own exit. */
     onExit?: () => void;
+    /** How many cards one session deals. Defaults to the library's own
+     *  REVIEW_SESSION_SIZE; the Today tab passes a shorter session so "Review 5
+     *  cards" means exactly five. */
+    limit?: number;
 }
 
 const THRESHOLD = 110; // px past which a drag commits to a swipe
@@ -81,11 +85,16 @@ export default function SwipeDeck({
     onToggleFavorite,
     remindSignal,
     onExit,
+    limit,
 }: SwipeDeckProps) {
+    // Cards per session. Read once per render and used everywhere a window is
+    // cut, so the deal, the re-deal and the "review more" offer can never
+    // disagree about how long a session is.
+    const sessionSize = limit ?? REVIEW_SESSION_SIZE;
     // Ordered card ids for the current session window. Snapshotted so acting on a
     // card never reshuffles the stack mid-session (F-32 keeps order stable).
     const [sessionIds, setSessionIds] = useState<string[]>(
-        () => reviewSessionQueue(links).slice(0, REVIEW_SESSION_SIZE).map((l) => l.id),
+        () => reviewSessionQueue(links).slice(0, sessionSize).map((l) => l.id),
     );
     const [pos, setPos] = useState(0);
     const [drag, setDrag] = useState({ x: 0, y: 0 });
@@ -149,7 +158,7 @@ export default function SwipeDeck({
 
     // Deal a fresh session window from the current live pool.
     const deal = () => {
-        setSessionIds(reviewSessionQueue(links).slice(0, REVIEW_SESSION_SIZE).map((l) => l.id));
+        setSessionIds(reviewSessionQueue(links).slice(0, sessionSize).map((l) => l.id));
         setPos(0);
         setLastAction(null);
         setKept(0);
@@ -422,7 +431,7 @@ export default function SwipeDeck({
                             className="inline-flex items-center gap-2 h-10 px-5 rounded-full text-white transition-opacity hover:opacity-90 cursor-pointer text-sm font-semibold"
                             style={{ backgroundImage: 'var(--accent-gradient)' }}
                         >
-                            Review {Math.min(REVIEW_SESSION_SIZE, poolCount)} more
+                            Review {Math.min(sessionSize, poolCount)} more
                         </button>
                     ) : onExit && (
                         <button
