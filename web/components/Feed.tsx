@@ -2762,6 +2762,10 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             onOpenGraphFocus={handleOpenGraphFocus}
                             onBackToGraph={askFromGraph ? handleBackToGraph : undefined}
                             openChatId={askOpenChat}
+                            // Sharing an answer publishes the titles of the cards
+                            // it cited — never a card in the privacy vault, which
+                            // an answer CAN cite while the vault is unlocked.
+                            privateCollectionIds={privateCollectionIds}
                         />
                     ) : filteredLinks.length === 0 && pendingCards.length === 0 ? (
                         (() => {

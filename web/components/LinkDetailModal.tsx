@@ -1182,7 +1182,12 @@ export default function LinkDetailModal({
                             {(() => {
                                 const detailed = link.detailedSummary || '';
                                 const headingIdx = detailed.indexOf('## ');
-                                const hasSections = headingIdx >= 0;
+                                // A kept Ask ANSWER is exempt from the gist-strip:
+                                // its detailedSummary is the whole answer and its
+                                // summary is that answer's own first paragraph, so
+                                // slicing at the first "## " would silently drop
+                                // every word between them. It renders whole, once.
+                                const hasSections = link.captureType !== 'answer' && headingIdx >= 0;
                                 const detailBody = hasSections ? detailed.slice(headingIdx) : detailed;
                                 // Lead with the summary unless doing so would duplicate
                                 // a legacy overview-only (section-less) detailedSummary.
@@ -1417,6 +1422,49 @@ export default function LinkDetailModal({
                                 )}
                             </div>
                         )}
+
+                        {/* BASED ON — the cards this answer was built from, on an
+                            'answer' card only. `answerSources` is denormalized onto
+                            the card at save time (lib/answerCards) so the SHARE path
+                            has titles even for cards outside the loaded window, but
+                            what renders here is resolved against the live feed —
+                            exactly like the Related cards list below. That is not
+                            only about deleted cards: `allLinks` hides everything in
+                            the PIN-locked privacy vault, and a private card's title
+                            must not surface on an ordinary card's detail view just
+                            because an answer once cited it. Unresolved sources
+                            simply don't appear. */}
+                        {link.captureType === 'answer' && (() => {
+                            const basedOn = (link.answerSources ?? [])
+                                .map((src) => allLinks.find((l) => l.id === src.id))
+                                .filter((l): l is Link => !!l);
+                            if (basedOn.length === 0) return null;
+                            return (
+                                <div className="mb-8">
+                                    <h3 className={`text-sm font-bold text-text-muted uppercase tracking-wider mb-3 flex items-center gap-2 ${isRtl ? 'flex-row-reverse' : ''}`}>
+                                        <CitationMark state="listening" size={16} className="text-accent shrink-0" />
+                                        {isRtl ? 'מבוסס על' : 'Based on'}
+                                    </h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        {basedOn.map((src) => (
+                                            <button
+                                                key={src.id}
+                                                onClick={() => onOpenOtherLink?.(src)}
+                                                title={src.title}
+                                                className="group inline-flex max-w-full items-center gap-2 px-3 py-2 rounded-xl bg-card-hover border border-border-subtle shadow-sm hover:border-accent/50 transition-colors cursor-pointer text-start"
+                                            >
+                                                {/* Each title takes its own direction: a Hebrew
+                                                    source cited by an English answer reads RTL
+                                                    inside its own chip. */}
+                                                <span dir="auto" className="min-w-0 truncate text-[13px] font-medium text-text group-hover:text-accent transition-colors">
+                                                    {src.title}
+                                                </span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            );
+                        })()}
 
                         <div className="flex flex-wrap items-center gap-4 text-sm text-text-muted mb-8">
                             <span className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-fill-subtle border border-border-subtle">

@@ -1,25 +1,28 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { ArrowUp, Plus, MessagesSquare, Copy, Check, TriangleAlert, RefreshCw, Square, RotateCcw, ArrowDown, X, ChevronLeft, Waypoints, Image as ImageIcon, StickyNote } from 'lucide-react';
+import { ArrowUp, Plus, MessagesSquare, Copy, Check, TriangleAlert, RefreshCw, Square, RotateCcw, ArrowDown, X, ChevronLeft, Waypoints, Image as ImageIcon, StickyNote, Bookmark, BookmarkCheck, Share2 } from 'lucide-react';
 import type { OrbState } from '@/components/ui/CitationMark';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import { getDominantDirection } from '@/lib/rtl';
-import { breakIntoParagraphs } from '@/lib/answerLayout';
+import { breakIntoParagraphs, normalizeListMarkers } from '@/lib/answerLayout';
 import SourceByline from '@/components/SourceByline';
 import { getPlatform, platformIcon, platformColor } from '@/lib/platform';
 import { appCheckHeaders } from '@/lib/firebase';
 import { authHeaders } from '@/lib/auth';
 import { apiUrl, isNativeApp, fetchWithTimeout } from '@/lib/api';
-import { trackFirstAsk, trackAskNoCitations, trackAskSuggestionUsed, trackAskFollowupUsed, trackAskStopped } from '@/lib/analytics';
+import { track, trackFirstAsk, trackAskNoCitations, trackAskSuggestionUsed, trackAskFollowupUsed, trackAskStopped } from '@/lib/analytics';
 import { reportError } from '@/lib/errorReporter';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import { ChatMessage, ChatSource, ChatSession, Link } from '@/lib/types';
 import { buildAskSuggestions, buildFollowUps, newestReadyLink, iso, fullTitle, AskHints, ClassifiableCard } from '@/lib/askSuggestions';
 import { subscribeChats, createChat, updateChat, deleteChat } from '@/lib/chats';
+import { answerRefFor, saveAnswerAsCard } from '@/lib/answerCards';
 import { hapticLight } from '@/lib/haptics';
+import { useToast } from '@/components/Toast';
+import ShareAnswerSheet from './ShareAnswerSheet';
 import ConfirmDialog from './ConfirmDialog';
 import ChatHistorySidebar from './ChatHistorySidebar';
 import MobileSubheader from './MobileSubheader';
@@ -44,37 +47,6 @@ function meaningfulName(name?: string | null): string | null {
 // feed, the detail modal and the review deck. The bespoke sourceTag() that used
 // to live here (platform label + boxed brand logo) was the last copy of that
 // logic outside SourceByline, and it drifted, which is what this replaced.
-
-/** The model sometimes writes bullets as literal glyphs ("• a • b • c") or a
- *  numbered list ("1. a 2. b 3. c") all inline in one paragraph — Markdown
- *  doesn't parse those as a list, so they render as a wall of text. Normalize
- *  them to real Markdown list items: line-leading bullet glyphs become "- ",
- *  inline " • " separators break into new items, "1)" numbering becomes "1.",
- *  and inline numbered markers each break onto their own line. */
-function normalizeListMarkers(md: string): string {
-    // Quoted spans are protected: a card title like "Artist • Song • Live"
-    // must not be chopped into fake list items by the inline-bullet splitter.
-    // Split alternates [outside, quoted, outside, …]; transform outside only.
-    return md
-        .split(/(["“”«»][^"“”«»\n]{0,300}["“”«»])/)
-        .map((seg, i) => {
-            if (i % 2 === 1) return seg;
-            let out = seg
-                .replace(/^([ \t]*)[•◦▪‣·][ \t]+/gm, '$1- ')
-                .replace(/[ \t]+[•◦▪‣][ \t]+/g, '\n- ')
-                .replace(/^([ \t]*)(\d{1,2})\)[ \t]+/gm, '$1$2. ');
-            // Inline numbered list: only when the segment actually carries a
-            // "1." followed later on the SAME line by a "2." (a real inline
-            // ordered list) do we break each marker onto its own line — gated so
-            // ordinary prose like "It cost $2. Then I left." is never chopped.
-            // `.` doesn't cross newlines, so already-multiline lists don't match.
-            if (/(?:^|\s)1[.)]\s+\S.*?\s2[.)]\s/.test(out)) {
-                out = out.replace(/(\S)[ \t]+(\d{1,2})[.)][ \t]+/g, '$1\n$2. ');
-            }
-            return out;
-        })
-        .join('');
-}
 
 /** Renders an assistant answer as Markdown, styled to match the chat. GFM gives
  *  us tables/strikethrough; remark-breaks turns single newlines into <br> so the
@@ -127,6 +99,12 @@ function MarkdownMessage({ content, dir: dirProp }: { content: string; dir?: 'rt
     );
 }
 
+/** The shared look of every affordance under an answer: quiet, muted, and on
+ *  desktop revealed by hovering the message (mobile has no hover, so they stay
+ *  visible there). One constant so Copy, Save and Share can never drift apart. */
+const ANSWER_ACTION_CLS =
+    'inline-flex items-center gap-1 px-1.5 py-1 rounded-md text-text-muted text-xs hover:text-text disabled:opacity-50 transition-opacity sm:opacity-0 sm:group-hover:opacity-100';
+
 /** Subtle "copy this answer" affordance shown under each assistant bubble.
  *  When the answer has citations, the copied text carries them along as a
  *  "Sources:" list — a pasted answer keeps its proof. */
@@ -149,10 +127,35 @@ function CopyButton({ text, sources }: { text: string; sources?: ChatSource[] })
         <button
             onClick={onCopy}
             aria-label={copied ? 'Copied' : 'Copy answer'}
-            className="mt-1.5 inline-flex items-center gap-1 px-1.5 py-1 rounded-md text-text-muted text-xs hover:text-text transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
+            className={ANSWER_ACTION_CLS}
         >
             {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
             {copied ? 'Copied' : 'Copy'}
+        </button>
+    );
+}
+
+/** "Keep this answer." Once kept, the same control opens the card it made —
+ *  the state is the affordance, so there is never a second, duplicate card and
+ *  never a dead "Saved" label with nowhere to go. */
+function SaveAnswerButton({ saved, busy, onSave, onOpen }: {
+    saved: boolean;
+    busy: boolean;
+    onSave: () => void;
+    onOpen: () => void;
+}) {
+    return (
+        <button
+            onClick={saved ? onOpen : onSave}
+            disabled={busy}
+            aria-label={saved ? 'Open the saved card' : 'Save this answer as a card'}
+            title={saved ? 'Open the saved card' : 'Save this answer as a card'}
+            className={ANSWER_ACTION_CLS}
+        >
+            {saved
+                ? <BookmarkCheck className="w-3.5 h-3.5 text-accent" />
+                : <Bookmark className="w-3.5 h-3.5" />}
+            {busy ? 'Saving…' : saved ? 'Saved' : 'Save'}
         </button>
     );
 }
@@ -300,14 +303,24 @@ interface AskBrainProps {
     /** Reopen this saved conversation on entry — the graph's "Back to Ask".
      *  Nonce-gated so one hand-back fires exactly once. */
     openChatId?: { id: string; nonce: number } | null;
+    /** Ids of the PIN-locked private collections. An answer can cite a card
+     *  from one (the vault may be unlocked while Ask runs), and no card in one
+     *  may ever be named on a public share page — see lib/answerShare. */
+    privateCollectionIds?: Set<string>;
 }
 
 const HISTORY_COLLAPSE_KEY = 'askbrain:histcollapsed';
 
-export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackToGraph, overlayOpen = false, links, initialAsk, onOpenGraphFocus, openChatId }: AskBrainProps) {
+/** Stable empty fallbacks for the share sheet's inputs — a fresh Set()/[] per
+ *  render would restart its vault check on every keystroke. */
+const EMPTY_PRIVATE_IDS: Set<string> = new Set();
+const EMPTY_SOURCES: ChatSource[] = [];
+
+export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackToGraph, overlayOpen = false, links, initialAsk, onOpenGraphFocus, openChatId, privateCollectionIds }: AskBrainProps) {
     // Machina Pro: the monthly Ask meter for free workspaces, and the paywall
     // a free-plan 429 opens instead of a plain error bubble.
     const { isPro, quotas, loaded: entitlementLoaded, refresh: refreshEntitlement, openPaywall } = useEntitlement();
+    const toast = useToast();
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
     const [isThinking, setIsThinking] = useState(false);
@@ -324,6 +337,11 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
     const [chatsLoaded, setChatsLoaded] = useState(false);
     const [activeChatId, setActiveChatId] = useState<string | null>(null);
     const [chatToDelete, setChatToDelete] = useState<string | null>(null);
+    // Keeping / sharing an answer (handlers further down). Declared up here with
+    // the rest of the conversation state because the edge-swipe gate reads
+    // `shareIdx` before those handlers exist.
+    const [savingIdx, setSavingIdx] = useState<number | null>(null);
+    const [shareIdx, setShareIdx] = useState<number | null>(null);
     const [historyOpen, setHistoryOpen] = useState(false);          // mobile drawer
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false); // desktop panel
 
@@ -485,7 +503,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
     // the cited-card modal / sheets, which register their own edge-swipe) or Ask's
     // own delete-confirm dialog. The history drawer stays handled here (it has no
     // handler of its own), so the swipe closes it rather than exiting Ask.
-    const askEdgeSwipeEnabled = isMobile && !overlayOpen && chatToDelete === null;
+    const askEdgeSwipeEnabled = isMobile && !overlayOpen && chatToDelete === null && shareIdx === null;
     // Back unwinds one hop: to the graph that opened this Ask when there is one,
     // otherwise out of Ask entirely.
     const goBack = useCallback(() => {
@@ -631,6 +649,62 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
         saveTimer.current = setTimeout(() => persistConversation(snapshot, convo), 600);
         return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
     }, [messages, uid, persistConversation]);
+
+    // ── Keeping and sharing an answer ─────────────────────────────────────────
+    // An answer used to be the one thing you could not keep: copy the text or
+    // lose it. These two give it an artifact — a real card in the library, and
+    // a public cited page — without either touching the conversation itself.
+
+    /** Patch one message in place. The debounced auto-save above persists it, so
+     *  a kept or shared answer still reads that way when the conversation is
+     *  reopened, on this device or another. */
+    const patchMessageAt = useCallback((idx: number, patch: Partial<ChatMessage>) => {
+        setMessages(prev => {
+            if (idx < 0 || idx >= prev.length) return prev;
+            const next = [...prev];
+            next[idx] = { ...next[idx], ...patch };
+            return next;
+        });
+    }, []);
+
+    /** The question the answer at `idx` was given for. */
+    const questionFor = useCallback((idx: number): string => {
+        for (let i = idx - 1; i >= 0; i--) {
+            if (messages[i].role === 'user') return messages[i].content;
+        }
+        return '';
+    }, [messages]);
+
+    const saveAnswer = async (idx: number) => {
+        const m = messages[idx];
+        if (!uid || !m || m.role !== 'assistant' || !m.content || savingIdx !== null) return;
+        hapticLight();
+        setSavingIdx(idx);
+        try {
+            const question = questionFor(idx);
+            const chatId = activeChatId ?? convoRef.current.id;
+            // An ungrounded answer carries no citations, so its card carries no
+            // sources — the card must never imply proof the answer didn't have.
+            const { id, existed } = await saveAnswerAsCard(uid, {
+                question,
+                answer: m.content,
+                sources: m.ungrounded ? [] : (m.sources ?? []),
+                links,
+                answerRef: answerRefFor(chatId, idx, question, m.content),
+            });
+            patchMessageAt(idx, { savedCardId: id });
+            track('answer_saved_as_card', { sources: (m.sources ?? []).length, existed });
+            // Keeping the same answer twice is not an error and never a second
+            // card: it simply takes you to the one that already exists.
+            if (existed) onOpenLink(id);
+            else toast.success('Saved as a card', { label: 'Open', onClick: () => onOpenLink(id) });
+        } catch (e) {
+            reportError(e, 'ask-save-answer-card');
+            toast.error("Couldn't save this answer. Please try again.");
+        } finally {
+            setSavingIdx(null);
+        }
+    };
 
     // ── Conversation actions ──────────────────────────────────────────────────
     const newChat = () => {
@@ -1344,9 +1418,35 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                                             : m.content}
                                     </div>
 
-                                    {/* Copy affordance — subtle, under non-error assistant answers. */}
+                                    {/* What you can do with an answer, under every
+                                        non-error assistant message. Copy shows while
+                                        the answer is still writing (it always did);
+                                        Save and Share appear only once the answer has
+                                        SETTLED, because a half-written answer is not
+                                        a thing to keep or publish. */}
                                     {m.role === 'assistant' && !m.error && m.content && (
-                                        <CopyButton text={m.content} sources={m.ungrounded ? undefined : m.sources} />
+                                        <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                                            <CopyButton text={m.content} sources={m.ungrounded ? undefined : m.sources} />
+                                            {!(busy && i === messages.length - 1) && (
+                                                <>
+                                                    <SaveAnswerButton
+                                                        saved={!!m.savedCardId}
+                                                        busy={savingIdx === i}
+                                                        onSave={() => void saveAnswer(i)}
+                                                        onOpen={() => m.savedCardId && onOpenLink(m.savedCardId)}
+                                                    />
+                                                    <button
+                                                        onClick={() => { hapticLight(); setShareIdx(i); }}
+                                                        aria-label="Share this answer as a page"
+                                                        title="Share this answer as a page"
+                                                        className={ANSWER_ACTION_CLS}
+                                                    >
+                                                        <Share2 className={`w-3.5 h-3.5 ${m.shareId ? 'text-accent' : ''}`} />
+                                                        {m.shareId ? 'Shared' : 'Share'}
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
                                     )}
 
                                     {/* One-tap retry for the most recent failed exchange. */}
@@ -1656,6 +1756,27 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                 cancelLabel="Keep it"
                 variant="danger"
             />
+
+            {/* Publishing one answer as a public cited page. Mounted per open
+                answer so the sheet always carries that exact exchange, and the
+                resulting shareId is written back onto the message (and so into
+                the chat doc) — that is what makes "Stop sharing" still reachable
+                after the conversation is reopened tomorrow. */}
+            {shareIdx !== null && messages[shareIdx] && (
+                <ShareAnswerSheet
+                    uid={uid}
+                    question={questionFor(shareIdx)}
+                    answer={messages[shareIdx].content}
+                    sources={messages[shareIdx].ungrounded ? EMPTY_SOURCES : (messages[shareIdx].sources ?? EMPTY_SOURCES)}
+                    ungrounded={messages[shareIdx].ungrounded}
+                    links={links}
+                    privateCollectionIds={privateCollectionIds ?? EMPTY_PRIVATE_IDS}
+                    shareId={messages[shareIdx].shareId}
+                    onShareIdChange={(id) => patchMessageAt(shareIdx, { shareId: id ?? undefined })}
+                    isOpen
+                    onClose={() => setShareIdx(null)}
+                />
+            )}
         </div>
     );
 }

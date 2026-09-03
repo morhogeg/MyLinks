@@ -114,6 +114,7 @@ const SOURCE_LABEL: Record<string, string> = {
     youtube: 'YouTube',
     image: 'Images',
     note: 'Notes',
+    answer: 'Machina answers',
 };
 
 export function computeStats(links: Link[], now = Date.now()): LibraryStats {

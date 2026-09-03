@@ -154,6 +154,17 @@ service cloud.firestore {
       allow list: if false;
       allow write: if false;
     }
+    // Shared Ask ANSWERS (/a?id=). Same posture as the two above, for the same
+    // reasons: get-by-id only (never enumerable), and Admin-SDK-only writes via
+    // publish_share_http, so the world-readable snapshot carries no ownerUid.
+    // The snapshot also carries no card ids and no card that sits in a
+    // PIN-locked private collection — that filtering happens on the way in
+    // (web/lib/answerShare.ts), because rules cannot hide a field.
+    match /shared_answers/{shareId} {
+      allow get: if true;
+      allow list: if false;
+      allow write: if false;
+    }
     // shared_owners: functions-only shareId → ownerUid map. Never client-readable
     // (that would re-expose the PII we just removed) or client-writable.
     match /shared_owners/{shareId} {

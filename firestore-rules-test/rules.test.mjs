@@ -5,7 +5,7 @@
 //   - owner doc updates (timezone/settings), links/chats/collections CRUD
 //   - syntheses / digests: client READ-ONLY (written by Cloud Functions via Admin SDK)
 //   - synthesisNotes: the user's own notes on a week — full owner read/write
-//   - shared_cards / shared_collections: public read, owner-only write
+//   - shared_cards / shared_collections / shared_answers: public read, Admin-only write
 //   - rate_limits / pending_processing / task_logs / usage_quotas /
 //     entitlements / synthesis_vault: never client-accessible
 //
@@ -81,6 +81,16 @@ beforeEach(async () => {
     });
     await setDoc(doc(db, 'shared_collections', 'col-share-1'), {
       shareId: 'col-share-1', ownerUid: OWNER_DOC, name: 'Shared col', cards: [],
+    });
+    // A published Ask answer. Note what the real publish path writes: NO card
+    // ids and NO ownerUid — only the question, the answer, and the sources'
+    // titles/public URLs (see web/lib/answerShare.ts + share_service.py).
+    await setDoc(doc(db, 'shared_answers', 'answer-share-1'), {
+      shareId: 'answer-share-1',
+      question: 'What did I save about sleep?',
+      answer: 'Three of your saves agree on one thing.',
+      sources: [{ title: 'Why We Sleep', url: 'https://example.com/sleep' }],
+      publishedAt: 1,
     });
     await setDoc(doc(db, 'rate_limits', 'analyze:1.2.3.4'), { count: 1 });
   });
@@ -329,15 +339,22 @@ test('owner cannot delete a synthesis (no client delete path exists)', async () 
   await assertFails(deleteDoc(doc(ownerDb(), 'users', OWNER_DOC, 'syntheses', '2026-W27')));
 });
 
-// ── shared_cards / shared_collections: public read, Admin-SDK-only write ──────
+// ── shared_cards / shared_collections / shared_answers: public read, ─────────
+// ── Admin-SDK-only write ─────────────────────────────────────────────────────
 //
 // Writes now go exclusively through publish_share_http / unpublish_share_http
 // (Admin SDK) so the world-readable snapshot never carries `ownerUid` (PII). The
 // rules therefore deny ALL client writes — including the owner's. This also makes
 // the public-share takeover impossible by construction.
 
-for (const col of ['shared_cards', 'shared_collections']) {
-  const existing = col === 'shared_cards' ? 'card-share-1' : 'col-share-1';
+const SHARE_FIXTURE = {
+  shared_cards: 'card-share-1',
+  shared_collections: 'col-share-1',
+  shared_answers: 'answer-share-1',
+};
+
+for (const col of ['shared_cards', 'shared_collections', 'shared_answers']) {
+  const existing = SHARE_FIXTURE[col];
 
   test(`${col}: publicly readable BY ID, even logged out`, async () => {
     await assertSucceeds(getDoc(doc(anonDb(), col, existing)));
@@ -373,7 +390,7 @@ for (const col of ['shared_cards', 'shared_collections']) {
   });
 
   test(`${col}: public-share takeover is impossible (all client writes denied)`, async () => {
-    // shareIds are public (they appear in /s?id= and /c?id= URLs). Even a
+    // shareIds are public (they appear in /s?id=, /c?id= and /a?id= URLs). Even a
     // signed-in stranger who forges their own ownerUid cannot overwrite the
     // existing share, because client writes to shared_* are denied outright.
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
