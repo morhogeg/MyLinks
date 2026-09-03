@@ -226,7 +226,21 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-09-02): install build **1316** (Machina Pro), then the §4 item 26 checklist
+> ## 🚨 OWNER ACTION (updated 2026-09-03): install build **1317** (product-review build) and run the test guide
+>
+> **1317** (run #317, merge `bda93d2`) carries all seven product-review
+> changes (PM-1..PM-7, §9 2026-09-03): archive really archives, open marks
+> read, partial-capture line, one first run + bookmarks/Pocket import + trial
+> clock at 10 cards, Ask answers Save/Share (`/a` pages), the standing search
+> field with "By meaning", "Do this" on cards, the Today tab, and the Browser
+> extension screen in Settings. Nothing here has been seen on a device: the
+> owner test guide (artifact "Machina 1317 Test Run", 7 tests in order, ~45
+> min) is the QA pass. Tests 1-6 on the founder account, test 7 on a fresh
+> account. Backend: functions run #99 (unscoped), rules run #12, hosting
+> re-fired after the #13 race for the `/api/import` and `/a` rewrites. The
+> item-26 RevenueCat checklist below still stands.
+>
+> ## (superseded) OWNER ACTION (updated 2026-09-02): install build **1316** (Machina Pro), then the §4 item 26 checklist
 >
 > **1316** (run #316, merge `87a1d3b`) carries Machina Pro. What you will see
 > on device with NO RevenueCat keys yet: Settings shows a "Plan" row reading
@@ -1889,8 +1903,17 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-09-03 — PRODUCT-REVIEW BUILD: seven parallel sessions, one
-  integration branch (`claude/apple-pm-feedback-9qgdbt`), NOT YET SHIPPED.**
+- **2026-09-03 — PRODUCT-REVIEW BUILD SHIPPED: seven parallel sessions, one
+  integration branch (`claude/apple-pm-feedback-9qgdbt`), merged to main as
+  `bda93d2`.** Deploys: Python tests #113 green, Firestore rules tests #15
+  green, Deploy Firestore rules #12 green (`shared_answers` live), Deploy
+  Cloud Functions #99 (unscoped, all functions incl. the new
+  `import_links_http`), Deploy Firebase Hosting #13 FAILED on the known race
+  ("Cloud Run service `import-links-http` does not exist") and was re-fired
+  by the deploy-hosting.yml comment edit in the docs commit that follows
+  this entry, iOS → TestFlight run #317 = **build 1317**. Vercel auto-deploy
+  from the merge. Owner QA: the "Machina 1317 Test Run" artifact (7 tests in
+  order, what to notice, red flags per test).
   Owner asked for an Apple-PM review of the product and approved all seven
   ranked fixes; each was built by its own Opus session on a branch off
   `6c12214`, then merged here (three trivial import-line conflicts). Handoffs
@@ -1972,7 +1995,7 @@ exact-match, capped.
   redeploy for `/api/import` and `/a` (deploy functions first, hosting
   after, or expect the known race); rules deploy fires from the
   `shared_answers` edit. Owner QA list in the §4 PM-F item and the
-  handoffs. Nothing merged to main; waiting on "ship".
+  handoffs.
 - **2026-09-02 (later) — push notifications lose the brain emoji (owner, from
   a lock-screen screenshot of "🧠 Your Daily Brew").** `digest_service.py`
   digest push title is now plain "Your Daily/Weekly Brew" and
