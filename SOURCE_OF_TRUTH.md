@@ -1930,6 +1930,25 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-04 (round 2) — "רמזי" still showed a restaurant, an emigration
+  study and an enlistment card under By meaning after the round below, so the
+  judge path itself was letting cards through (or a timeout was still landing
+  on the gates; the phone can't say which). Both paths are now closed:**
+  (1) the judge must QUOTE its evidence: the verdict is a JSON array of
+  `{"n", "evidence"}` objects where evidence is words copied verbatim from
+  that card's digest (title/summary/tags/concepts, concepts newly included),
+  and `parse_judge_selection` verifies the quote occurs in the card
+  (`_evidence_norm`: case, punctuation, niqqud forgiven); a hallucinated or
+  missing quote drops the card, and a bare-number reply keeps nothing. The
+  prompt also says outright that sharing a language with the query is never
+  evidence. (2) With the judge unavailable the search bar serves LITERAL
+  matches only: the distance-gate fallback (threshold + cliff + rerank) is
+  gone from `perform_hybrid_search`; `mode: "gate"` in the response now
+  means "literal only". Ask retrieval is untouched. `SEARCH_JUDGE_TIMEOUT_MS`
+  stays at 9s. Verified: pytest 854 passed. Not verified live (owner to
+  retry "רמזי"/"גורדון" after functions deploy). If a genuine cross-language
+  match ever goes missing now, the judge dropped it or could not quote it;
+  the fix is prompt-side, not a looser gate.
 - **2026-09-04 (later) — no unrelated cards under "By meaning" (owner:
   searching "גורדון" showed a Rabin/Entebbe card as a meaning match).**
   Backend only, `functions/search.py` + the `search_links_http` response.
