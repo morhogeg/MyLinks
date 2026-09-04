@@ -322,7 +322,12 @@ _JUDGE_MAX_CANDIDATES = 20
 _JUDGE_SUMMARY_CHARS = 240
 # Own hard timeout, far below ai_service's 90s analysis budget — a hung judge
 # must degrade to the distance gates, not stall the search bar.
-_JUDGE_TIMEOUT_MS = int(os.environ.get("SEARCH_JUDGE_TIMEOUT_MS", "6000") or 6000)
+# 9s, up from 6s (2026-09-04): a cold Gemini call past the timeout silently
+# dropped search to the distance gates, and the gates are what let a query the
+# library has nothing about ("גורדון") surface unrelated Hebrew cards under
+# "By meaning". The judge runs in parallel with the keyword scan and the client
+# waits 15s, so the extra 3s only ever costs latency on an already-slow call.
+_JUDGE_TIMEOUT_MS = int(os.environ.get("SEARCH_JUDGE_TIMEOUT_MS", "9000") or 9000)
 
 
 def build_judge_prompt(query_text: str, candidates: List[dict]) -> str:
@@ -352,8 +357,13 @@ def build_judge_prompt(query_text: str, candidates: List[dict]) -> str:
         "field or category with the query (both health-related, both about "
         "AI/tech) is NOT a match; neither is one overlapping word used in a "
         "different sense. The query and a card may be in different languages "
-        "- a genuine cross-language match counts the same. Expect to drop "
-        "most candidates; keeping one card - or none - is a normal answer.\n"
+        "- a genuine cross-language match counts the same. If the query is a "
+        "NAME (a person, place, product, brand or organisation), keep only "
+        "cards that mention that name or are clearly about that same entity, "
+        "in any language or spelling; a card about a different person, place "
+        "or thing from the same country, era, field or language is NOT a "
+        "match. Expect to drop most candidates; keeping one card - or none - "
+        "is a normal answer.\n"
         'Answer with ONLY a JSON array of the matching card numbers, e.g. '
         "[1, 4]. No other text."
     )
@@ -1356,7 +1366,8 @@ def perform_search_logic(uid: str, query_text: str, limit: int = 10) -> List[dic
     return links
 
 
-def perform_hybrid_search(uid: str, query_text: str, limit: int = 20) -> List[dict]:
+def perform_hybrid_search(uid: str, query_text: str, limit: int = 20,
+                          meta: Optional[dict] = None) -> List[dict]:
     """Search-bar retrieval: quality-gated vector search + lexical scan, fused.
 
     This is what the home search bar (web callable + native HTTP twin) serves:
@@ -1375,9 +1386,18 @@ def perform_hybrid_search(uid: str, query_text: str, limit: int = 20) -> List[di
          above meaning hits anyway.
 
     FALLBACK: when the judge can't serve (no key, call failure, unparseable
-    reply), the pre-judge pipeline runs unchanged — `apply_distance_threshold`
-    + `cut_at_distance_cliff` + `rerank_candidates` — so search degrades to
-    exactly the previous behavior, never to nothing.
+    reply), the pre-judge pipeline runs — `apply_distance_threshold` +
+    `cut_at_distance_cliff` + `rerank_candidates` — WITHOUT the top-3 recall
+    floor (2026-09-04): the floor kept the three nearest cards under the loose
+    0.80 bound however far they were, which for a query the library has
+    nothing about ("גורדון") meant three unrelated Hebrew cards presented as
+    meaning matches. Cross-language recall at large distances is the judge's
+    job; with the judge down, precision wins and the bar only shows what is
+    genuinely close plus literal matches.
+
+    `meta`, when given, receives `mode`: "judge" (the LLM verdict served) or
+    "gate" (the distance-gate fallback served) so a bad result can be traced
+    to the path that produced it without log access.
 
     Degrades instead of failing: if the vector half errors transiently, the
     lexical half still serves (an outage must not blank the search bar). Only
@@ -1432,6 +1452,10 @@ def perform_hybrid_search(uid: str, query_text: str, limit: int = 20) -> List[di
             logger.error(f"Hybrid search: keyword scan failed: {e}")
             keyword_hits = []
 
+    if meta is not None:
+        meta["mode"] = "judge" if judged is not None else "gate"
+    logger.info(f"Hybrid search served by {'judge' if judged is not None else 'distance gates'}")
+
     if judged is not None:
         # Judge path: its verdict IS the precision gate — an empty verdict is
         # an honest "nothing about this topic", not a failure. Keyword extras
@@ -1447,8 +1471,9 @@ def perform_hybrid_search(uid: str, query_text: str, limit: int = 20) -> List[di
                          and keyword_match_score(k, q_tokens) >= 2]
         ranked = (judged + strong_extras)[:limit]
     else:
-        # Legacy distance-gate path, byte-for-byte the pre-judge behavior.
-        vector_results = apply_distance_threshold(vector_results)
+        # Distance-gate path (judge unavailable). No recall floor: a hit must
+        # clear the real cutoff, or it is not shown (see the docstring).
+        vector_results = apply_distance_threshold(vector_results, min_keep=0)
         # The absolute gate bounds worst-case junk, the cliff removes the "wall
         # of loosely-related cards" behind the actual matches.
         vector_results = cut_at_distance_cliff(vector_results)

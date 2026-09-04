@@ -2435,9 +2435,12 @@ def search_links_http(req: https_fn.Request) -> https_fn.Response:
             limit = 10
         limit = max(1, min(limit, 50))
 
-        links = perform_hybrid_search(uid, query_text, limit)
+        meta = {}
+        links = perform_hybrid_search(uid, query_text, limit, meta=meta)
         return https_fn.Response(
-            json.dumps({"links": links}),
+            # `mode` names the path that served ("judge" | "gate") so an odd
+            # result is diagnosable from the response alone.
+            json.dumps({"links": links, "mode": meta.get("mode")}),
             status=200, headers=headers, mimetype='application/json',
         )
     except Exception as e:

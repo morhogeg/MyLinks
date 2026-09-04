@@ -80,8 +80,10 @@ def test_empty_query_is_rejected():
 def test_happy_path_runs_hybrid_search(monkeypatch):
     captured = {}
 
-    def fake_search(uid, query_text, limit):
+    def fake_search(uid, query_text, limit, meta=None):
         captured["args"] = (uid, query_text, limit)
+        if meta is not None:
+            meta["mode"] = "judge"
         return [{"id": "a", "title": "Dogs 101"}, {"id": "b", "title": "Puppies"}]
 
     monkeypatch.setattr(main, "perform_hybrid_search", fake_search)
@@ -96,6 +98,8 @@ def test_happy_path_runs_hybrid_search(monkeypatch):
     assert captured["args"] == ("user1", "dogs", 5)
     payload = json.loads(resp.body)
     assert [c["id"] for c in payload["links"]] == ["a", "b"]
+    # The serving path rides along so a bad result is diagnosable client-side.
+    assert payload["mode"] == "judge"
 
 
 # ── Warmup ping (cold-start absorber) ───────────────────────────────────────

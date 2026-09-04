@@ -672,3 +672,53 @@ def test_hybrid_fallback_path_keeps_all_keyword_extras(monkeypatch):
                              "summary": "software functions explained", "createdAt": 1}])
     out = [c["id"] for c in perform_hybrid_search("u", "cognitive function", limit=20)]
     assert set(out) == {"v1", "weak"}
+
+
+# ── 2026-09-04: no unrelated cards under "By meaning" ───────────────────────
+# Owner: searching "גורדון" (a name; one brownie card is the literal hit) put a
+# Rabin/Entebbe card under By meaning. The fallback distance-gate path kept the
+# three nearest cards under the loose hard ceiling no matter how far they were,
+# so a query the library has nothing about surfaced three unrelated Hebrew
+# cards. The floor is gone from that path, the judge names the name rule, and
+# the response says which path served.
+
+def test_fallback_path_has_no_recall_floor_for_far_neighbours(monkeypatch):
+    monkeypatch.setattr(search_mod, "judge_relevance", lambda q, c: None)
+    monkeypatch.setattr(search_mod, "perform_search_logic", lambda uid, q, limit: [
+        _vres("rabin", 0.70), _vres("entebbe", 0.72), _vres("other", 0.74)])
+    monkeypatch.setattr(search_mod, "keyword_scan_cards",
+                        lambda uid, q, exclude_ids=None, limit=10, fields=None: [])
+    meta = {}
+    assert perform_hybrid_search("u", "גורדון", limit=20, meta=meta) == []
+    assert meta["mode"] == "gate"
+
+
+def test_fallback_path_still_keeps_a_genuinely_close_cluster(monkeypatch):
+    monkeypatch.setattr(search_mod, "judge_relevance", lambda q, c: None)
+    monkeypatch.setattr(search_mod, "perform_search_logic", lambda uid, q, limit: [
+        _vres("m1", 0.45), _vres("m2", 0.48), _vres("junk", 0.75)])
+    monkeypatch.setattr(search_mod, "keyword_scan_cards",
+                        lambda uid, q, exclude_ids=None, limit=10, fields=None: [])
+    out = [c["id"] for c in perform_hybrid_search("u", "muffins", limit=20)]
+    assert out == ["m1", "m2"]
+
+
+def test_judge_path_reports_its_mode(monkeypatch):
+    monkeypatch.setattr(search_mod, "perform_search_logic", lambda uid, q, limit: [_vres("a", 0.5)])
+    monkeypatch.setattr(search_mod, "keyword_scan_cards",
+                        lambda uid, q, exclude_ids=None, limit=10, fields=None: [])
+    monkeypatch.setattr(search_mod, "judge_relevance", lambda q, c: list(c))
+    meta = {}
+    out = [c["id"] for c in perform_hybrid_search("u", "q", limit=20, meta=meta)]
+    assert out == ["a"] and meta["mode"] == "judge"
+
+
+def test_judge_prompt_carries_the_name_rule():
+    prompt = search_mod.build_judge_prompt("גורדון", [{"title": "x", "summary": "y"}])
+    assert "NAME" in prompt
+    assert "different person" in prompt
+
+
+def test_judge_timeout_is_generous_enough_for_a_cold_call():
+    # Under 6s a cold Gemini call fell to the gates and the gates showed junk.
+    assert search_mod._JUDGE_TIMEOUT_MS >= 9000
