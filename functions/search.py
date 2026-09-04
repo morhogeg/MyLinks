@@ -330,23 +330,38 @@ _JUDGE_SUMMARY_CHARS = 240
 _JUDGE_TIMEOUT_MS = int(os.environ.get("SEARCH_JUDGE_TIMEOUT_MS", "9000") or 9000)
 
 
+def _judge_digest(c: dict) -> str:
+    """The one-line card entry the judge reads AND the text its quoted evidence
+    is verified against: title, summary head, tags, concepts."""
+    title = str(c.get("title") or "").strip()
+    summary = str(c.get("summary") or "").strip()[:_JUDGE_SUMMARY_CHARS]
+    tags = ", ".join(str(t) for t in (c.get("tags") or []) if t)
+    concepts = ", ".join(str(t) for t in (c.get("concepts") or []) if t)
+    entry = title
+    if summary:
+        entry += f" - {summary}"
+    if tags:
+        entry += f" [tags: {tags}]"
+    if concepts:
+        entry += f" [concepts: {concepts}]"
+    return entry
+
+
 def build_judge_prompt(query_text: str, candidates: List[dict]) -> str:
     """The relevance-filter prompt: query + numbered candidate digests. Pure."""
-    lines = []
-    for i, c in enumerate(candidates, start=1):
-        title = str(c.get("title") or "").strip()
-        summary = str(c.get("summary") or "").strip()[:_JUDGE_SUMMARY_CHARS]
-        tags = ", ".join(str(t) for t in (c.get("tags") or []) if t)
-        entry = f"{i}. {title}"
-        if summary:
-            entry += f" - {summary}"
-        if tags:
-            entry += f" [tags: {tags}]"
-        lines.append(entry)
+    lines = [f"{i}. {_judge_digest(c)}" for i, c in enumerate(candidates, start=1)]
     # Deliberately STRICT (owner round 2, query "Cognitive function": a lenient
     # "keep borderline matches" wording let same-field cards through — every
     # health card, every AI card). The junk wall is same-field, so the prompt
     # names that failure and normalizes small/empty answers.
+    #
+    # EVIDENCE (owner round 3, 2026-09-04, query "רמזי" — a chef's surname —
+    # kept a restaurant card, an emigration-statistics card and an army
+    # enlistment card): a kept card must come with the exact words FROM THAT
+    # CARD that match the query, and the caller verifies the quote exists in
+    # the card (parse_judge_selection). A card the model cannot quote for is
+    # not a match, whatever it "feels" like — and being in the same language
+    # as the query is never evidence.
     return (
         "You filter search results for a personal knowledge base.\n"
         f"The user searched for: {query_text}\n\n"
@@ -355,47 +370,90 @@ def build_judge_prompt(query_text: str, candidates: List[dict]) -> str:
         "Keep ONLY cards whose content is actually about the query's specific "
         "topic - a card this exact search is looking for. Sharing a broad "
         "field or category with the query (both health-related, both about "
-        "AI/tech) is NOT a match; neither is one overlapping word used in a "
-        "different sense. The query and a card may be in different languages "
-        "- a genuine cross-language match counts the same. If the query is a "
-        "NAME (a person, place, product, brand or organisation), keep only "
-        "cards that mention that name or are clearly about that same entity, "
-        "in any language or spelling; a card about a different person, place "
-        "or thing from the same country, era, field or language is NOT a "
-        "match. Expect to drop most candidates; keeping one card - or none - "
-        "is a normal answer.\n"
-        'Answer with ONLY a JSON array of the matching card numbers, e.g. '
-        "[1, 4]. No other text."
+        "AI/tech, both about food) is NOT a match; neither is one overlapping "
+        "word used in a different sense, and neither is simply being written "
+        "in the same language as the query. The query and a card may be in "
+        "different languages - a genuine cross-language match counts the "
+        "same. If the query is a NAME (a person, place, product, brand or "
+        "organisation), keep only cards that mention that name or are clearly "
+        "about that same entity, in any language or spelling; a card about a "
+        "different person, place or thing from the same country, era, field "
+        "or language is NOT a match. Expect to drop most candidates; keeping "
+        "one card - or none - is a normal answer.\n"
+        "For every card you keep, quote the EVIDENCE: the exact words copied "
+        "verbatim from that card's entry above (its title, summary, tags or "
+        "concepts) that match the query. If you cannot quote such words from "
+        "a card, do not keep it.\n"
+        'Answer with ONLY a JSON array of objects, e.g. '
+        '[{"n": 1, "evidence": "Gordon Ramsay"}, {"n": 4, "evidence": "מאפינס"}]. '
+        "No other text. If nothing matches, answer []."
     )
 
 
-def parse_judge_selection(text, n: int) -> Optional[List[int]]:
+def _evidence_norm(text) -> str:
+    """Case-folded, punctuation- and niqqud-free, single-spaced — so a quote
+    survives the model dropping a comma or a vowel point, but not inventing
+    words."""
+    t = str(text or "").casefold()
+    t = re.sub(r"[\u0591-\u05C7]", "", t)  # Hebrew niqqud / cantillation
+    t = re.sub(r"[^\w\s]+", " ", t, flags=re.UNICODE)
+    return re.sub(r"\s+", " ", t).strip()
+
+
+def parse_judge_selection(text, n: int, candidates: Optional[List[dict]] = None) -> Optional[List[int]]:
     """0-based candidate indices from the judge's reply.
 
-    Defensive on purpose (model output): tolerates code fences and prose around
-    the array, drops non-numbers, out-of-range and duplicate entries. Returns
-    None when no array can be read at all — the caller treats that as "judge
-    unavailable" and falls back, whereas a real `[]` is a verdict (nothing
-    relevant) and is honored. Pure."""
+    The reply is a JSON array of `{"n": <1-based>, "evidence": "<quote>"}`
+    objects. A kept card counts ONLY when its evidence is a non-empty quote
+    that actually occurs in that card's digest (title/summary/tags/concepts,
+    normalised by `_evidence_norm`) — a hallucinated or missing quote drops the
+    card. When `candidates` is not given the quote cannot be checked and a
+    non-empty evidence string is trusted (pure-parse callers/tests).
+
+    Bare numbers (the pre-evidence format) are NOT a verdict any more: they
+    carry no proof, and a card kept on feel is exactly the failure this guards
+    against. A reply of only numbers therefore keeps nothing. Returns None when
+    no array can be read at all — the caller treats that as "judge unavailable"
+    — whereas a real `[]` is a verdict (nothing relevant) and is honored.
+    Defensive on model output: code fences, prose, duplicates, out-of-range.
+    """
     if not isinstance(text, str):
         return None
-    m = re.search(r"\[[^\[\]]*\]", text)
-    if not m:
-        return None
+    arr = None
     try:
-        arr = json.loads(m.group(0))
+        arr = json.loads(text)
     except Exception:
-        return None
+        m = re.search(r"\[.*\]", text, re.S)
+        if m:
+            try:
+                arr = json.loads(m.group(0))
+            except Exception:
+                arr = None
+    if isinstance(arr, dict):
+        # A wrapped shape ({"results": [...]}) — take its only list value.
+        lists = [v for v in arr.values() if isinstance(v, list)]
+        arr = lists[0] if len(lists) == 1 else None
     if not isinstance(arr, list):
         return None
+    digests = [_evidence_norm(_judge_digest(c)) for c in candidates] if candidates is not None else None
     out, seen = [], set()
     for v in arr:
-        if isinstance(v, bool) or not isinstance(v, (int, float)):
+        if not isinstance(v, dict):
+            continue  # a bare number carries no evidence
+        num = v.get("n", v.get("card", v.get("id")))
+        if isinstance(num, bool) or not isinstance(num, (int, float)):
             continue
-        i = int(v) - 1  # prompt numbers candidates from 1
-        if 0 <= i < n and i not in seen:
-            seen.add(i)
-            out.append(i)
+        i = int(num) - 1  # prompt numbers candidates from 1
+        if not (0 <= i < n) or i in seen:
+            continue
+        evidence = _evidence_norm(v.get("evidence"))
+        if len(evidence) < 2:
+            continue
+        if digests is not None and evidence not in digests[i]:
+            logger.info("Search judge kept card %d with evidence not found in the card; dropped", i + 1)
+            continue
+        seen.add(i)
+        out.append(i)
     return out
 
 
@@ -426,7 +484,7 @@ def judge_relevance(query_text: str, candidates: List[dict]) -> Optional[List[di
     if not text:
         logger.warning("Search judge returned empty (blocked?) — falling back to distance gates")
         return None
-    kept = parse_judge_selection(text, len(candidates))
+    kept = parse_judge_selection(text, len(candidates), candidates)
     if kept is None:
         logger.warning("Search judge reply unparseable — falling back to distance gates")
         return None
@@ -1385,15 +1443,13 @@ def perform_hybrid_search(uid: str, query_text: str, limit: int = 20,
          already decided relevance, and the client re-tiers literal matches
          above meaning hits anyway.
 
-    FALLBACK: when the judge can't serve (no key, call failure, unparseable
-    reply), the pre-judge pipeline runs — `apply_distance_threshold` +
-    `cut_at_distance_cliff` + `rerank_candidates` — WITHOUT the top-3 recall
-    floor (2026-09-04): the floor kept the three nearest cards under the loose
-    0.80 bound however far they were, which for a query the library has
-    nothing about ("גורדון") meant three unrelated Hebrew cards presented as
-    meaning matches. Cross-language recall at large distances is the judge's
-    job; with the judge down, precision wins and the bar only shows what is
-    genuinely close plus literal matches.
+    FALLBACK (2026-09-04): when the judge can't serve (no key, call failure,
+    unparseable reply) the search bar serves LITERAL matches only — no vector
+    results at all. The old distance-gate fallback (threshold + cliff +
+    rerank) is what showed a Rabin card for "גורדון": a Hebrew one-word query
+    embeds close to every Hebrew card, so nearest-neighbour output past the
+    judge is same-language padding, not meaning. An empty "By meaning" section
+    is honest; a wrong one is not. Ask retrieval keeps its own gates.
 
     `meta`, when given, receives `mode`: "judge" (the LLM verdict served) or
     "gate" (the distance-gate fallback served) so a bad result can be traced
@@ -1471,16 +1527,11 @@ def perform_hybrid_search(uid: str, query_text: str, limit: int = 20,
                          and keyword_match_score(k, q_tokens) >= 2]
         ranked = (judged + strong_extras)[:limit]
     else:
-        # Distance-gate path (judge unavailable). No recall floor: a hit must
-        # clear the real cutoff, or it is not shown (see the docstring).
-        vector_results = apply_distance_threshold(vector_results, min_keep=0)
-        # The absolute gate bounds worst-case junk, the cliff removes the "wall
-        # of loosely-related cards" behind the actual matches.
-        vector_results = cut_at_distance_cliff(vector_results)
+        # Judge unavailable: literal matches only (see the docstring). Ranked
+        # by the lexical score so a title hit leads.
+        q_tokens = keyword_query_tokens(query_text)
+        ranked = sorted(keyword_hits, key=lambda k: -keyword_match_score(k, q_tokens))[:limit]
 
-        have = {r.get("id") for r in vector_results}
-        merged = vector_results + [k for k in keyword_hits if k.get("id") not in have]
-        ranked = rerank_candidates(query_text, merged, top_k=limit)
     # The distance served its purpose (threshold + rank) — don't leak internals.
     for r in ranked:
         r.pop("vector_distance", None)
