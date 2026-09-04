@@ -1930,6 +1930,27 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-04 (later) — no unrelated cards under "By meaning" (owner:
+  searching "גורדון" showed a Rabin/Entebbe card as a meaning match).**
+  Backend only, `functions/search.py` + the `search_links_http` response.
+  Cause: the search bar's LLM relevance judge has a timeout (was 6s), and
+  when it can't serve, search falls to the distance gates, whose "recall
+  floor" kept the 3 nearest cards under the loose 0.80 bound however far
+  they were. A one-word name query has nothing to embed, so its nearest
+  neighbours are just other Hebrew cards, and three of them were shown as
+  meaning matches. Fixes: (1) the fallback path now runs
+  `apply_distance_threshold(min_keep=0)`: no floor, a hit must clear the real
+  cutoff (cross-language recall at large distances is the judge's job; with
+  the judge down, precision wins). Ask's retrieval keeps the default floor,
+  untouched. (2) The judge prompt carries a NAME rule: a person/place/brand
+  query keeps only cards that mention that entity in any language; a
+  different person from the same country, era or field is not a match.
+  (3) `_JUDGE_TIMEOUT_MS` 6s → 9s so a cold call is less likely to fall to
+  the gates at all (env `SEARCH_JUDGE_TIMEOUT_MS`). (4) The search response
+  carries `mode: "judge" | "gate"` so the next odd result is diagnosable
+  from the network tab. Verified: pytest 851 passed, py_compile. Not
+  verified: the "גורדון" query on the live backend (owner to retry after the
+  functions deploy). Deploy scoped `search_links_http,search_links`.
 - **2026-09-04 (ship) — card-trust round SHIPPED.** Merge `534c00b` to main.
   Deploy Cloud Functions run #100 green (scoped
   `share_ingest,process_link_background,analyze_link`), Python tests #114
