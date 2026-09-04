@@ -226,7 +226,17 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-09-03): install build **1317** (product-review build) and run the test guide
+> ## 🚨 OWNER ACTION (updated 2026-09-04): install build **1318** (card-trust round), then run the 1317 test guide if not yet done
+>
+> **1318** (run #318, merge `534c00b`) carries the 2026-09-04 round: the
+> partial-capture line ends in an **"Add a screenshot"** button that completes
+> the card in place (Facebook/LinkedIn login-wall cards), the graph draws
+> exactly the ties the Related list shows, and LinkedIn "See X's activity"
+> labels no longer become bylines (existing cards fix themselves). Backend is
+> live via functions run #100. QA steps: §4 PM-G. The 1317 guide below still
+> stands for everything not yet checked on a device.
+>
+> ## (superseded) OWNER ACTION (updated 2026-09-03): install build **1317** (product-review build) and run the test guide
 >
 > **1317** (run #317, merge `bda93d2`) carries all seven product-review
 > changes (PM-1..PM-7, §9 2026-09-03): archive really archives, open marks
@@ -1920,6 +1930,13 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-04 (ship) — card-trust round SHIPPED.** Merge `534c00b` to main.
+  Deploy Cloud Functions run #100 green (scoped
+  `share_ingest,process_link_background,analyze_link`), Python tests #114
+  green, iOS → TestFlight run #318 = **build 1318** (in flight when this was
+  written; outcome recorded in the follow-up line above when it lands),
+  Vercel auto-deploy from the merge. No hosting or
+  rules change. Owner QA list: §4 PM-G.
 - **2026-09-04 — Card trust round: partial cards take a screenshot, the graph
   matches the Related list, LinkedIn bylines stop leaking UI chrome.** Owner
   reported three things from device (Crispy Kitchens Facebook recipe, the
