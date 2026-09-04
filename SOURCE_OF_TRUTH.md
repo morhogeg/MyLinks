@@ -1950,7 +1950,9 @@ exact-match, capped.
   carries `mode: "judge" | "gate"` so the next odd result is diagnosable
   from the network tab. Verified: pytest 851 passed, py_compile. Not
   verified: the "גורדון" query on the live backend (owner to retry after the
-  functions deploy). Deploy scoped `search_links_http,search_links`.
+  functions deploy). SHIPPED: merge `b47612b`, Deploy Cloud Functions run
+  #101 green (scoped `search_links_http,search_links`), Python tests #115
+  green. Backend only; no build needed, live for 1318 and the web now.
 - **2026-09-04 (ship) — card-trust round SHIPPED.** Merge `534c00b` to main.
   Deploy Cloud Functions run #100 green (scoped
   `share_ingest,process_link_background,analyze_link`), Python tests #114
