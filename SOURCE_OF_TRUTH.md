@@ -1946,7 +1946,9 @@ exact-match, capped.
   gone from `perform_hybrid_search`; `mode: "gate"` in the response now
   means "literal only". Ask retrieval is untouched. `SEARCH_JUDGE_TIMEOUT_MS`
   stays at 9s. Verified: pytest 854 passed. Not verified live (owner to
-  retry "רמזי"/"גורדון" after functions deploy). If a genuine cross-language
+  retry "רמזי"/"גורדון"). SHIPPED: merge `8e1fea7`, Deploy Cloud Functions
+  run #102 green (scoped `search_links_http,search_links`), Python tests
+  #116 green. If a genuine cross-language
   match ever goes missing now, the judge dropped it or could not quote it;
   the fix is prompt-side, not a looser gate.
 - **2026-09-04 (later) — no unrelated cards under "By meaning" (owner:
