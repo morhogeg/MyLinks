@@ -1578,6 +1578,23 @@ PM-F. **[ ] Follow-ups from the 2026-09-03 product-review build (all small, none
     `_cap_list(c.get("videoHighlights"))` / `speakers`, and
     `search.py build_embedding_text` for the trigger/backfill callers.
 
+PM-G. **[ ] Owner QA for the 2026-09-04 card-trust round (see §9):** (a) open
+    the Crispy Kitchens (Facebook) card → the partial line now ends in an
+    **"Add a screenshot"** button (no trailing "How"); pick the post's
+    screenshot → the row reads "Reading your screenshot…" → within ~30s the
+    card's summary/ingredients come from the screenshot, the partial line is
+    gone, and the screenshot shows at the top of the card. If it fails the row
+    says so and offers "Try again". (b) The Stanford Law School card's byline
+    should read **Adam Sterling** (a LinkedIn "See X's activity" label is no
+    longer accepted as a name, and old cards fix themselves on render). (c)
+    Stanford card → Related cards vs "See in graph": the graph draws every
+    card the list shows, and only those. (d) NOT verifiable from a cloud
+    session: whether Facebook's public embed endpoint returns a body for the
+    posts you save (it is tried only when the meta read was cut off; a miss
+    leaves the card exactly as before). Deploy: functions scoped to
+    `share_ingest,process_link_background` (+ `analyze_link` since scraper.py
+    changed), then a TestFlight build; Vercel auto.
+
 ### ✅ Done — verified against code (do not redo)
 
 - **Shared text is a text card, not a link (2026-08-08, merge `e0cfdda`,
@@ -1902,6 +1919,63 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-09-04 — Card trust round: partial cards take a screenshot, the graph
+  matches the Related list, LinkedIn bylines stop leaking UI chrome.** Owner
+  reported three things from device (Crispy Kitchens Facebook recipe, the
+  Stanford Law School LinkedIn card): the partial-capture "How" dangled after
+  the Hebrew sentence and only explained a share-sheet route that makes a NEW
+  card; the Stanford card listed two related cards while its graph node drew
+  one edge; and its byline read "See Stanford Law School's activity" although
+  Adam Sterling posted it. What landed, branch `claude/card-display-graph-issues-qd4z76`:
+  **(1) Add a screenshot to a partial card.** `PartialCaptureNote` in
+  `LinkDetailModal.tsx` now reads "Machina couldn't read the full post. Add a
+  screenshot of it and Machina completes the card." with an **Add a
+  screenshot** button (photo picker, native and web; up to 5), processing
+  ("Reading your screenshot…") and failed ("Try again") states driven by the
+  card's `enrichStatus`. `web/lib/enrich.ts` compresses and POSTs the images
+  to the existing `/api/share` images path with `enrichCardId` (no new
+  rewrite). `share_ingest` validates the card (`_card_accepts_screenshots`:
+  a settled web card only; the partial flag is NOT required, the user judges),
+  charges NO save unit, stores the images, stamps `enrichStatus: 'processing'`
+  and queues an `enrich: true` job. `process_link_background` routes it to
+  `_enrich_card_with_images` before any placeholder logic: vision reads the
+  screenshots as the authoritative content (`analyze_text_with_images`,
+  `image_is_primary`) with the partial read as context, then UPDATES the same
+  card: title/summary/details/concepts/category/takeaway, tags = user's tags +
+  new ones, `imageUrls` = the screenshots (the detail gallery now renders on
+  a web card with `enrichedAt`), fresh `embedding_vector` +
+  `embeddingVersion`, recomputed `relatedLinks`, and deletes
+  `captureQuality`/`captureReason`. Failure leaves the card untouched with
+  `enrichStatus: 'failed'`. Identity (url, byline, createdAt, notes,
+  reminders, collections) is never written. **(2) Facebook embed fallback.**
+  `_scrape_facebook_url` now tries Facebook's public embed plugin
+  (`/plugins/post.php`, `_facebook_embed_text`) exactly when the meta read
+  was empty or cut off with "…"; a body from it replaces the fragment and
+  clears `truncated`; a login wall, no body, or any error leaves the og read
+  untouched. Parser targets the plugin's `post_message`/`userContent`
+  containers. **(3) Graph = Related list.** `related.ts` now exports the ONE
+  qualifier both surfaces use (`genericConcepts`, `qualifyLiveTie`,
+  `liveScore`, `MAX_RELATED`, `CONCEPT_SIM_FLOOR`): the Related list gained
+  the graph's generic-concept discount and concept-only embedding veto, and
+  `graph.ts` dropped its flat "5 strongest live edges per node, library-wide"
+  cap for the list's own rule, per node keep the top `MAX_RELATED - stored`
+  live ties by the same score, and draw an edge when it makes EITHER
+  endpoint's list. **(4) LinkedIn UI chrome.** LinkedIn's logged-out page
+  hands its accessibility copy ("See X's activity", "View X's profile") over
+  as the JSON-LD/meta author, and a personal post RESHARING a company post
+  carries the company's label while the URL slug names the poster.
+  `scraper.linkedin_ui_boilerplate` rejects those shapes in the ld+json and
+  meta paths so the slug wins (`_linkedin_wrapped_name` uses the inner name
+  only as a last resort); `platform.tsx linkedinUiBoilerplate` does the same
+  inside `looksLikeAuthorName`, so cards already saved with the chrome render
+  the slug name. **Verified:** `tsc` clean, eslint clean on touched files
+  (one pre-existing warning), em-dash gate clean, `py_compile` clean,
+  **pytest 846 passed** against the real `requirements.txt` (new suites
+  `test_screenshot_enrich.py` 17, `test_facebook_embed_fallback.py` 5,
+  LinkedIn +11). **NOT verified:** anything on device; the Facebook embed
+  endpoint against live Facebook (no egress from the cloud session); the
+  enrich job end to end against Gemini/Storage. Owner QA list: §4 PM-G.
 
 - **2026-09-03 — PRODUCT-REVIEW BUILD SHIPPED: seven parallel sessions, one
   integration branch (`claude/apple-pm-feedback-9qgdbt`), merged to main as

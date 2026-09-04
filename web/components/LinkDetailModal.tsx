@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, StatusChangeHandler, UserNote } from '@/lib/types';
 import SourceByline from './SourceByline';
-import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, CircleCheck, Check, Network, Play, Youtube, ImageOff, Image as ImageIcon, Layers, Share2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, StickyNote, Waypoints, EyeOff } from 'lucide-react';
+import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, CircleCheck, Check, Network, Play, Youtube, ImageOff, Image as ImageIcon, ImagePlus, Loader2, Layers, Share2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, StickyNote, Waypoints, EyeOff } from 'lucide-react';
 import { getPlatform } from '@/lib/platform';
 import SimpleMarkdown from './SimpleMarkdown';
 import PosterImage from './ui/PosterImage';
@@ -22,7 +22,8 @@ import CitationMark from './ui/CitationMark';
 import ProBadge from './ui/ProBadge';
 import { requestPaywall } from '@/lib/entitlement';
 import { getActionableTakeaway } from '@/lib/takeaway';
-import { isNativeApp } from '@/lib/api';
+import { addScreenshotsToCard, MAX_CARD_SCREENSHOTS } from '@/lib/enrich';
+import { useToast } from '@/components/Toast';
 
 // Sentinel `editingNoteId` for the composer when adding a brand-new note (as
 // opposed to editing an existing one, keyed by its real id).
@@ -98,65 +99,104 @@ interface LinkDetailModalProps {
 }
 
 /**
- * PARTIAL CAPTURE, SAID ON THE CARD (PM-1C).
+ * PARTIAL CAPTURE, SAID ON THE CARD (PM-1C) — AND FIXED FROM THE CARD.
  *
  * One quiet line under the summary lead, on the cards whose page the scraper
  * could only partly read (a login wall, a social-preview teaser, a PDF). It is
  * deliberately NOT prose inside the summary: the model's writing stays the
  * model's writing, and this sits beside it as chrome the card owns.
  *
- * The line follows the CARD's language, not the app's, like every other piece
- * of card content in this view. On the native app it also offers "How", which
- * expands the three share-sheet steps in place, because a screenshot is the one
- * fix the user can actually apply and it isn't obvious.
+ * Under the line, ONE action: "Add a screenshot". It opens the photo picker
+ * (native and web alike), sends the screenshots to the same card, and the
+ * backend merges what it reads into it — the card keeps its identity, notes,
+ * reminders and collections, loses the partial flag, and shows the screenshots
+ * (lib/enrich.ts). This replaces the old trailing "How" word that expanded the
+ * share-sheet steps: those steps made a NEW card and, in Hebrew, the dangling
+ * "איך" read like part of the sentence (owner, 2026-09-04). While the backend
+ * reads, the row says so; if it fails, the row says that and offers another
+ * try. The line follows the CARD's language, like every other card element.
  */
 function PartialCaptureNote({
-    reason,
+    link,
+    uid,
     isRtl,
     className = '',
 }: {
-    reason?: 'login_wall' | 'teaser' | 'pdf' | 'truncated';
+    link: Link;
+    uid: string | null;
     isRtl: boolean;
     className?: string;
 }) {
-    const [howOpen, setHowOpen] = useState(false);
-    const native = isNativeApp();
-    const isPdf = reason === 'pdf';
+    const toast = useToast();
+    const inputRef = useRef<HTMLInputElement>(null);
+    const [uploading, setUploading] = useState(false);
+    const isPdf = link.captureReason === 'pdf';
+    const reading = uploading || link.enrichStatus === 'processing';
+    const failed = !reading && link.enrichStatus === 'failed';
     const line = isPdf
-        ? (isRtl
-            ? 'לא הצלחנו לקרוא את קובץ ה-PDF. שתפו צילום מסך שלו כדי לקבל כרטיס מלא.'
-            : 'Machina couldn’t read this PDF. Share a screenshot of it for the full card.')
-        : (isRtl
-            ? 'לא הצלחנו לקרוא את הפוסט במלואו. שתפו צילום מסך שלו כדי לקבל כרטיס מלא.'
-            : 'Machina couldn’t read the full post. Share a screenshot of it for the full card.');
-    const steps = isRtl
-        ? ['צלמו מסך של הפוסט.', 'פתחו את תפריט השיתוף ובחרו ב-Machina.', 'נקרא את צילום המסך וניצור ממנו כרטיס מלא.']
-        : ['Take a screenshot of the post.', 'Open the share sheet and choose Machina.', 'Machina reads the screenshot and files a full card.'];
+        ? (isRtl ? 'לא הצלחנו לקרוא את קובץ ה-PDF.' : 'Machina couldn’t read this PDF.')
+        : (isRtl ? 'לא הצלחנו לקרוא את הפוסט במלואו.' : 'Machina couldn’t read the full post.');
+    const hint = uid
+        ? (isRtl ? 'הוסיפו צילום מסך שלו ונשלים את הכרטיס.' : 'Add a screenshot of it and Machina completes the card.')
+        : (isRtl ? 'שתפו צילום מסך שלו כדי לקבל כרטיס מלא.' : 'Share a screenshot of it for the full card.');
+
+    const onPick = async (files: File[]) => {
+        if (!uid || !files.length || reading) return;
+        setUploading(true);
+        try {
+            const { count } = await addScreenshotsToCard(uid, link.id, files);
+            hapticSuccess();
+            toast.success(count > 1
+                ? (isRtl ? 'קוראים את צילומי המסך. הכרטיס יתעדכן בעוד רגע.' : 'Reading your screenshots. The card updates in a moment.')
+                : (isRtl ? 'קוראים את צילום המסך. הכרטיס יתעדכן בעוד רגע.' : 'Reading your screenshot. The card updates in a moment.'));
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : (isRtl ? 'לא הצלחנו לשלוח את צילום המסך.' : 'Could not send the screenshot.'));
+        } finally {
+            setUploading(false);
+            if (inputRef.current) inputRef.current.value = '';
+        }
+    };
 
     return (
         <div className={className} dir={isRtl ? 'rtl' : 'ltr'}>
             <p className="flex items-start gap-2 text-[13px] leading-relaxed text-text-muted">
                 <EyeOff className="w-3.5 h-3.5 mt-[3px] shrink-0" aria-hidden="true" />
-                <span className="min-w-0">
-                    {line}
-                    {native && (
-                        <button
-                            onClick={() => setHowOpen((v) => !v)}
-                            aria-expanded={howOpen}
-                            aria-label={isRtl ? 'איך לשתף צילום מסך' : 'How to share a screenshot'}
-                            className="ms-1.5 align-baseline font-semibold text-accent hover:text-accent-hover transition-colors"
-                        >
-                            {isRtl ? 'איך' : 'How'}
-                        </button>
-                    )}
-                </span>
+                <span className="min-w-0">{line} {hint}</span>
             </p>
-            {native && howOpen && (
-                <ol className="mt-2 ms-[22px] space-y-1 text-[13px] leading-relaxed text-text-muted list-decimal list-inside">
-                    {steps.map((step) => (
-                        <li key={step}>{step}</li>
-                    ))}
-                </ol>
+            {uid && (
+                <div className="mt-2.5 ms-[22px] flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                    {reading ? (
+                        <span className="inline-flex items-center gap-1.5 text-[13px] text-text-muted" role="status">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" aria-hidden="true" />
+                            {isRtl ? 'קוראים את צילום המסך…' : 'Reading your screenshot…'}
+                        </span>
+                    ) : (
+                        <>
+                            <button
+                                type="button"
+                                onClick={() => inputRef.current?.click()}
+                                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-card-hover border border-border-subtle text-[12px] font-semibold text-text-secondary hover:text-text hover:border-accent/40 transition-colors cursor-pointer"
+                            >
+                                <ImagePlus className="w-3.5 h-3.5 shrink-0 text-accent" aria-hidden="true" />
+                                <span>{failed ? (isRtl ? 'נסו שוב' : 'Try again') : (isRtl ? 'הוסיפו צילום מסך' : 'Add a screenshot')}</span>
+                            </button>
+                            {failed && (
+                                <span className="text-[12px] text-text-muted">
+                                    {isRtl ? 'לא הצלחנו לקרוא את צילום המסך הזה.' : 'Couldn’t read that screenshot.'}
+                                </span>
+                            )}
+                        </>
+                    )}
+                    <input
+                        ref={inputRef}
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        hidden
+                        aria-label={isRtl ? 'בחירת צילום מסך' : 'Choose a screenshot'}
+                        onChange={(e) => onPick(Array.from(e.target.files ?? []).slice(0, MAX_CARD_SCREENSHOTS))}
+                    />
+                </div>
             )}
         </div>
     );
@@ -412,7 +452,7 @@ export default function LinkDetailModal({
     // The ordered image set behind a screenshot card: the multi-image array when
     // present, else the single stored image. Scheme-guarded — a stored
     // javascript:/data: value must never render or open.
-    const galleryUrls = (link.imageUrls?.length ? link.imageUrls : [link.url]).filter((u): u is string => isHttpUrl(u));
+    const galleryUrls = (link.imageUrls?.length ? link.imageUrls : (link.sourceType === 'image' ? [link.url] : [])).filter((u): u is string => isHttpUrl(u));
 
     // Scroll back to the top when the card changes. Opening a related card reuses
     // this same scroll container, so without this it would open scrolled down to
@@ -832,7 +872,10 @@ export default function LinkDetailModal({
                         slide 1 starts visible and the flick direction is identical
                         on Hebrew cards. Each image keeps zoom-to-open, and one
                         broken image never hides its neighbours. */}
-                    {link.sourceType === 'image' && (() => {
+                    {(link.sourceType === 'image' || (!!link.enrichedAt && !!link.imageUrls?.length)) && (() => {
+                        // A web card completed from the user's screenshots
+                        // (enrichedAt + imageUrls) shows them the same way — the
+                        // screenshot IS the source the card was read from.
                         const slides = galleryUrls.filter((u) => !failedImages[u]);
                         const slideIndex = Math.min(galleryIndex, slides.length - 1);
                         return slides.length > 0 ? (
@@ -1280,7 +1323,8 @@ export default function LinkDetailModal({
                                             summary, the second is how complete it is. */}
                                         {isPartialCapture && (
                                             <PartialCaptureNote
-                                                reason={link.captureReason}
+                                                link={link}
+                                                uid={uid}
                                                 isRtl={isRtl}
                                                 className={detailBody ? 'mb-6' : ''}
                                             />

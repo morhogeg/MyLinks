@@ -150,6 +150,15 @@ export interface Link {
   // text), 'pdf' (a document the HTML scraper can't read), 'truncated'
   // (partial, unclassified).
   captureReason?: 'login_wall' | 'teaser' | 'pdf' | 'truncated';
+  // Completing a partial card with the user's own screenshots of the post
+  // (the "Add a screenshot" action under the partial-capture line). The backend
+  // stamps 'processing' when the screenshots are queued and clears the field
+  // on success (also clearing captureQuality/captureReason, and setting
+  // `imageUrls` to the screenshots + `enrichedAt`), or leaves 'failed' with a
+  // short `enrichError` so the card can offer another try.
+  enrichStatus?: 'processing' | 'failed';
+  enrichError?: string;
+  enrichedAt?: number;
   sourceName?: string;
   // 'text' marks a note card whose body is the user's OWN verbatim words, sent
   // in from the share sheet / extension rather than typed in the Note tab. Such

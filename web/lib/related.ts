@@ -37,9 +37,6 @@ export interface RelatedCardEntry {
     sharedConcepts: string[];
 }
 
-// Matches what a node's neighborhood can realistically hold in the graph — the
-// two surfaces must be able to agree on a count (the graph's "Connections · N").
-const MAX_RELATED = 8;
 // Gemini embeddings sit on a high cosine floor; the backend badges > 0.85 as a
 // strong tie. Alone, a match must clear SEMANTIC_MIN; with a shared concept or
 // tag corroborating it, SEMANTIC_ASSIST_MIN is enough. Exported so the
@@ -48,6 +45,73 @@ const MAX_RELATED = 8;
 export const STRONG = 0.85;
 export const SEMANTIC_MIN = 0.8;
 export const SEMANTIC_ASSIST_MIN = 0.74;
+// Cards the detail view lists per card. Exported because the graph keeps, for
+// every node, exactly the live ties that would make this list — so the two
+// surfaces show the same connections (owner QA, 2026-09-04: a card listed two
+// related cards while its graph node drew one edge).
+export const MAX_RELATED = 8;
+// A concept-only tie (shared vocabulary, no qualifying embedding match) is only
+// trusted when the two cards' embeddings still point roughly the same way. Well
+// below SEMANTIC_ASSIST_MIN on purpose: a veto on the clearly unrelated, not a
+// second similarity bar.
+export const CONCEPT_SIM_FLOOR = 0.55;
+
+/**
+ * Concepts too widespread in this library to prove two cards are related.
+ *
+ * The model attaches broad labels ("Israel", "Economic Policy", "Analysis") to
+ * cards across unrelated subjects, so counting them as shared signal chains a
+ * Hyundai review into a cluster about pay gaps and enlistment figures (owner
+ * QA, 2026-08-07). A concept carried by a large share of the library, or by
+ * more than a flat ceiling of cards, is vocabulary, not a tie. ONE definition,
+ * used by both the Related list and the graph, so neither can qualify a tie the
+ * other rejects.
+ */
+export function genericConcepts(links: Link[]): Set<string> {
+    const df = new Map<string, number>();
+    for (const l of links) {
+        for (const c of new Set((l.concepts ?? []).map((s) => (s || '').toLowerCase()).filter(Boolean))) {
+            df.set(c, (df.get(c) ?? 0) + 1);
+        }
+    }
+    const ceiling = Math.max(4, Math.min(30, Math.ceil(links.length * 0.15)));
+    const generic = new Set<string>();
+    for (const [c, n] of df) if (n > ceiling) generic.add(c);
+    return generic;
+}
+
+/**
+ * THE qualification bar for a live (computed) tie between two cards, shared by
+ * the Related list and the graph. Relatedness must mean "about the same
+ * specific thing", NOT "same broad area". Two paths, both requiring a SPECIFIC
+ * signal:
+ *   - semantic: strong embedding similarity (>= SEMANTIC_MIN, i.e. the same
+ *     precise topic), or a softer one (>= SEMANTIC_ASSIST_MIN) backed by a
+ *     shared specific concept.
+ *   - concept: >= 2 shared specific concepts, and (when both cards have vectors)
+ *     embeddings that do not contradict it (>= CONCEPT_SIM_FLOOR).
+ * `sharedSpecific` counts shared concepts that are NOT generic in this library
+ * (see genericConcepts). Deliberately NOT qualifying: same category, shared
+ * broad tags. Returns the tie's kind, or null.
+ */
+export function qualifyLiveTie(
+    sim: number,
+    sharedSpecific: number,
+    haveVectors: boolean,
+): 'semantic' | 'concept' | null {
+    if (sim >= SEMANTIC_MIN || (sim >= SEMANTIC_ASSIST_MIN && sharedSpecific >= 1)) return 'semantic';
+    if (sharedSpecific >= 2 && (!haveVectors || sim >= CONCEPT_SIM_FLOOR)) return 'concept';
+    return null;
+}
+
+/**
+ * Rank among already-qualified live ties: real similarity first; concept
+ * overlap and (weakly) tags / category only break ties. Shared by the Related
+ * list and the graph's per-node budget so both keep the same top entries.
+ */
+export function liveScore(sim: number, sharedConcepts: number, sharedTags: number, sameCategory: boolean): number {
+    return (sim > 0 ? sim : 0.5) + sharedConcepts * 0.05 + sharedTags * 0.01 + (sameCategory ? 0.01 : 0);
+}
 
 /**
  * Normalize an embedding read from Firestore. The backend has stored the field
@@ -171,44 +235,31 @@ export function getRelatedCards(
     if (entries.length >= MAX_RELATED) return entries;
 
     // 3) Live matches — cards the snapshot can't know about (saved later, or
-    //    this card predates the graph entirely).
+    //    this card predates the graph entirely). Qualified by the SAME bar and
+    //    ranked by the SAME score the graph uses (qualifyLiveTie / liveScore),
+    //    with the library's generic concepts discounted the same way.
     const myVec = toVector(link.embedding_vector);
+    const generic = genericConcepts(allLinks);
     const candidates: Array<{ entry: RelatedCardEntry; score: number }> = [];
     for (const other of allLinks) {
         if (used.has(other.id)) continue;
         // Skip in-flight / failed captures — nothing meaningful to relate to.
         if (other.status === 'processing' || other.status === 'failed') continue;
 
-        const sharedConcepts = overlap(link.concepts, other.concepts);
+        // Only SPECIFIC concepts corroborate a tie (and are worth naming in the
+        // reason / chips): a concept the whole library carries says nothing
+        // about whether these two cards belong together.
+        const sharedConcepts = overlap(link.concepts, other.concepts).filter((c) => !generic.has(c.toLowerCase()));
         const sharedTags = overlap(link.tags, other.tags);
         const sameCategory = !!link.category && link.category === other.category;
         const otherVec = myVec ? toVector(other.embedding_vector) : null;
-        const sim = myVec && otherVec ? cosine(myVec, otherVec) : 0;
+        const haveVectors = !!(myVec && otherVec && myVec.length === otherVec.length);
+        const sim = haveVectors ? cosine(myVec!, otherVec!) : 0;
 
-        // Relatedness must mean "about the same specific thing," NOT "same broad
-        // area." Two paths, both requiring a SPECIFIC signal:
-        //   • semantic — strong embedding similarity (≥0.80, i.e. same precise
-        //     topic), or a softer one (≥0.74) backed by a shared *concept*.
-        //   • conceptual — ≥2 shared concepts (concepts are granular:
-        //     "sun exposure", "UV radiation" — unlike the broad category tags
-        //     HEALTH/SCIENCE that half the library shares).
-        // Deliberately NOT qualifying signals: same category, and shared broad
-        // tags. Otherwise every Health card would relate to every other — the
-        // two sun-exposure cards must stand out from the rest of Health, and
-        // only embedding similarity / specific concepts distinguish them.
-        const semantic = sim >= SEMANTIC_MIN || (sim >= SEMANTIC_ASSIST_MIN && sharedConcepts.length >= 1);
-        const conceptual = sharedConcepts.length >= 2;
-        if (!semantic && !conceptual) continue;
-
-        // Rank by real similarity first; concept overlap and (weakly) tags /
-        // category only break ties among already-qualified cards.
-        const score = (sim > 0 ? sim : 0.5)
-            + sharedConcepts.length * 0.05
-            + sharedTags.length * 0.01
-            + (sameCategory ? 0.01 : 0);
+        if (!qualifyLiveTie(sim, sharedConcepts.length, haveVectors)) continue;
 
         candidates.push({
-            score,
+            score: liveScore(sim, sharedConcepts.length, sharedTags.length, sameCategory),
             entry: {
                 link: other,
                 reason: liveReason(sharedConcepts, sharedTags, sameCategory, link.category, isRtl),

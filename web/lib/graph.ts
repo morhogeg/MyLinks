@@ -1,5 +1,5 @@
 import { Link } from './types';
-import { overlap, toVector, STRONG, SEMANTIC_MIN, SEMANTIC_ASSIST_MIN } from './related';
+import { overlap, toVector, genericConcepts, qualifyLiveTie, liveScore, STRONG, MAX_RELATED } from './related';
 
 /**
  * The knowledge-graph model behind the Graph view — nodes are cards, edges are
@@ -93,35 +93,8 @@ export interface BuildSignal {
 // Above this many cards the O(n²) embedding pass is skipped (AI + concept
 // edges still connect the graph); below it the full live pass runs.
 const MAX_PAIRWISE = 600;
-// Live (computed) edges per node are capped so dense libraries stay legible —
-// AI-verified edges are never capped (the backend already limits them per card).
-const MAX_LIVE_EDGES_PER_NODE = 5;
 // Rows of the pairwise loop per event-loop yield.
 const CHUNK_ROWS = 24;
-
-// A concept-only edge (shared vocabulary, no qualifying embedding match) is
-// only trusted when the two cards' embeddings still point roughly the same way.
-// Well below SEMANTIC_ASSIST_MIN on purpose — this is a veto on the clearly
-// unrelated, not a second similarity bar.
-const CONCEPT_SIM_FLOOR = 0.55;
-
-/**
- * Concepts too widespread in this library to prove two cards are related.
- *
- * The model attaches broad labels ("Israel", "Economic Policy", "Analysis") to
- * cards across unrelated subjects, so counting them as shared signal chains a
- * Hyundai review into a cluster about pay gaps and enlistment figures (owner
- * QA, 2026-08-07). A concept carried by a large share of the library — or by
- * more than a flat ceiling of cards — is vocabulary, not a tie.
- */
-function genericConcepts(sets: Set<string>[], poolSize: number): Set<string> {
-    const df = new Map<string, number>();
-    for (const s of sets) for (const c of s) df.set(c, (df.get(c) ?? 0) + 1);
-    const ceiling = Math.max(4, Math.min(30, Math.ceil(poolSize * 0.15)));
-    const generic = new Set<string>();
-    for (const [c, n] of df) if (n > ceiling) generic.add(c);
-    return generic;
-}
 
 const pairKey = (i: number, j: number) => (i < j ? `${i}|${j}` : `${j}|${i}`);
 
@@ -183,8 +156,12 @@ export async function buildGraphModel(
         }
     }
 
-    // 2) Live edges — the related.ts qualification bar, applied pairwise.
-    const liveCandidates: Candidate[] = [];
+    // 2) Live edges — the related.ts qualification bar, applied pairwise. Every
+    //    decision here (which concepts count, when a tie qualifies, how ties
+    //    rank) is imported from related.ts, so an edge exists in the graph
+    //    exactly when the card detail would list it.
+    type LiveCandidate = Candidate & { score: number };
+    const liveCandidates: LiveCandidate[] = [];
     if (pool.length >= 2 && pool.length <= MAX_PAIRWISE) {
         // Pre-normalize embeddings once so each pair is a plain dot product.
         const vectors: (Float32Array | null)[] = pool.map((l) => {
@@ -199,7 +176,8 @@ export async function buildGraphModel(
             return out;
         });
         const concepts = pool.map((l) => new Set((l.concepts ?? []).map((c) => c.toLowerCase()).filter(Boolean)));
-        const generic = genericConcepts(concepts, pool.length);
+        const generic = genericConcepts(pool);
+        const tags = pool.map((l) => new Set((l.tags ?? []).map((t) => (t || '').toLowerCase()).filter(Boolean)));
 
         for (let i = 0; i < pool.length; i++) {
             if (signal?.cancelled) return null;
@@ -223,20 +201,20 @@ export async function buildGraphModel(
                     for (let k = 0; k < vi!.length; k++) sim += vi![k] * vj![k];
                 }
 
-                const semantic = sim >= SEMANTIC_MIN || (sim >= SEMANTIC_ASSIST_MIN && shared >= 1);
-                // A concept-only edge must not contradict the embeddings: when
-                // both cards have vectors, shared vocabulary alone is not enough
-                // if the texts are plainly about different things (a car review
-                // landing inside a pay-gap cluster — owner QA, 2026-08-07).
-                const conceptual = shared >= 2 && (!haveVectors || sim >= CONCEPT_SIM_FLOOR);
-                if (!semantic && !conceptual) continue;
+                const kind = qualifyLiveTie(sim, shared, haveVectors);
+                if (!kind) continue;
+
+                let sharedTags = 0;
+                if (tags[i].size) for (const t of tags[j]) if (tags[i].has(t)) sharedTags++;
+                const sameCategory = !!pool[i].category && pool[i].category === pool[j].category;
 
                 liveCandidates.push({
                     i,
                     j,
-                    weight: semantic ? sim : Math.min(0.79, 0.7 + shared * 0.03),
+                    weight: kind === 'semantic' ? sim : Math.min(0.79, 0.7 + shared * 0.03),
                     strong: sim > STRONG,
-                    kind: semantic ? 'semantic' : 'concept',
+                    kind,
+                    score: liveScore(sim, shared, sharedTags, sameCategory),
                 });
             }
         }
@@ -265,21 +243,40 @@ export async function buildGraphModel(
         for (const [key, count] of sharedCount) {
             if (count < 2 || kept.has(key)) continue;
             const [i, j] = key.split('|').map(Number);
-            liveCandidates.push({ i, j, weight: Math.min(0.79, 0.7 + count * 0.03), strong: false, kind: 'concept' });
+            const weight = Math.min(0.79, 0.7 + count * 0.03);
+            liveCandidates.push({ i, j, weight, strong: false, kind: 'concept', score: liveScore(0, count, 0, false) });
         }
     }
     if (signal?.cancelled) return null;
 
-    // Cap live edges per node, strongest first, so hubs don't become hairballs.
-    liveCandidates.sort((a, b) => b.weight - a.weight);
-    const liveDegree = new Array<number>(pool.length).fill(0);
+    // Per-node budget, mirroring the Related list exactly: that list holds
+    // MAX_RELATED entries, stored relations (own + reverse) first, then live
+    // matches by score. So for each card the live ties that make its list are
+    // the top (MAX_RELATED - stored) by score, and an edge is drawn when it
+    // makes EITHER endpoint's list — the same rule that puts a reverse stored
+    // relation on both cards. A flat "5 strongest per node, library-wide"
+    // cap used to drop a tie the card's own list showed (owner QA, 2026-09-04).
+    const storedDegree = new Array<number>(pool.length).fill(0);
+    for (const c of kept.values()) {
+        storedDegree[c.i]++;
+        storedDegree[c.j]++;
+    }
+    const perNode: LiveCandidate[][] = pool.map(() => []);
     for (const c of liveCandidates) {
-        if (liveDegree[c.i] >= MAX_LIVE_EDGES_PER_NODE || liveDegree[c.j] >= MAX_LIVE_EDGES_PER_NODE) continue;
+        perNode[c.i].push(c);
+        perNode[c.j].push(c);
+    }
+    const chosen = new Set<LiveCandidate>();
+    for (let i = 0; i < pool.length; i++) {
+        const budget = Math.max(0, MAX_RELATED - storedDegree[i]);
+        if (!budget || !perNode[i].length) continue;
+        perNode[i].sort((a, b) => b.score - a.score);
+        for (let k = 0; k < budget && k < perNode[i].length; k++) chosen.add(perNode[i][k]);
+    }
+    for (const c of chosen) {
         const key = pairKey(c.i, c.j);
         if (kept.has(key)) continue;
         kept.set(key, c);
-        liveDegree[c.i]++;
-        liveDegree[c.j]++;
     }
 
     // 3) Assemble: connected cards become nodes; the rest are counted.
