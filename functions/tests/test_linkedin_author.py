@@ -178,3 +178,62 @@ def test_image_capture_has_no_url_and_keeps_the_model_guess():
 
 def _pick(scraped, model, url):
     return main._pick_source_name(scraped or None, model, url)
+
+
+# ── LinkedIn UI chrome is not a name (2026-09-04) ────────────────────────────
+# Reported: an Adam Sterling post bylined "See Stanford Law School's activity".
+# The logged-out page hands its accessibility copy over where the author name
+# used to be, and a personal post RESHARING a company post carries the
+# company's label there while the URL slug still names the person who posted.
+
+@pytest.mark.parametrize("wrapped, inner", [
+    ("See Stanford Law School's activity", "Stanford Law School"),
+    ("See Stanford Law School\u2019s activity", "Stanford Law School"),
+    ("View Adam Sterling's profile", "Adam Sterling"),
+    ("view adam sterling's posts", "adam sterling"),
+    ("Stanford Law School's activity", "Stanford Law School"),
+    ("Adam Sterling on LinkedIn", "Adam Sterling"),
+])
+def test_ui_boilerplate_yields_the_inner_name(wrapped, inner):
+    assert scraper.linkedin_ui_boilerplate(wrapped) == inner
+
+
+@pytest.mark.parametrize("name", ["Adam Sterling", "Stanford Law School", "Claude for Business",
+                                  "Seen and Heard Media", "Viewpoint Labs", "", None])
+def test_real_names_are_not_boilerplate(name):
+    assert scraper.linkedin_ui_boilerplate(name) is None
+
+
+_RESHARE_PAGE = (
+    '<html><head><title>Adam Sterling on LinkedIn: Stanford Law School launches</title>'
+    '<meta property="og:title" content="Adam Sterling on LinkedIn: Stanford Law School launches" />'
+    '<script type="application/ld+json">'
+    '{"@type": "DiscussionForumPosting", '
+    '"author": {"@type": "Organization", "name": "See Stanford Law School\'s activity"}, '
+    '"articleBody": "Stanford Law School is launching the Legal Engineering Academy."}'
+    '</script></head></html>'
+)
+
+
+def test_ldjson_rejects_ui_chrome_as_author():
+    author, body = scraper._linkedin_ldjson_fields(_RESHARE_PAGE)
+    assert author is None
+    assert "Legal Engineering Academy" in body
+
+
+def test_meta_path_then_names_the_poster_not_the_reshared_company():
+    # With the JSON-LD chrome rejected, the "<Author> on LinkedIn:" title wins.
+    assert scraper._extract_linkedin_author(_RESHARE_PAGE, "https://www.linkedin.com/posts/adam-sterling_x-activity-1") == "Adam Sterling"
+
+
+def test_meta_path_rejects_ui_chrome_too():
+    html = '<meta property="og:title" content="See Stanford Law School\'s activity on LinkedIn: hello" />'
+    got = scraper._extract_linkedin_author(html, "https://www.linkedin.com/posts/adam-sterling_x-activity-1")
+    assert got == "Adam Sterling"  # the slug, not the chrome
+
+
+def test_wrapped_name_is_the_last_resort():
+    html = ('<script type="application/ld+json">'
+            '{"author": {"name": "See Stanford Law School\'s activity"}}</script>')
+    assert scraper._linkedin_wrapped_name(html) == "Stanford Law School"
+    assert scraper._linkedin_wrapped_name("<html></html>") is None

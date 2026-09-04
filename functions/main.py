@@ -2715,10 +2715,27 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                     return _error_response("Image is too large", 413, headers)
                 decoded.append((img_bytes, entry.get('mimeType') or 'image/jpeg'))
 
-            # ONE save unit for the whole set — a multi-screenshot card is one save.
-            q = _quota_blocked(uid, "saves", headers)
-            if q:
-                return q
+            # ENRICH mode: the screenshots complete an EXISTING partial card
+            # (a Facebook/LinkedIn post the scraper could only preview) instead
+            # of becoming a new one. The card is validated as the caller's own
+            # web card before anything is stored; no save unit is charged (the
+            # user is repairing a save they already paid for), the rate limits
+            # above still apply.
+            enrich_card_id = data.get('enrichCardId')
+            enrich_ref = None
+            if enrich_card_id:
+                if not isinstance(enrich_card_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', enrich_card_id):
+                    return _error_response("Invalid card", 400, headers)
+                enrich_ref = get_db().collection('users').document(uid).collection('links').document(enrich_card_id)
+                enrich_snap = enrich_ref.get()
+                enrich_card = enrich_snap.to_dict() if enrich_snap.exists else None
+                if not _card_accepts_screenshots(enrich_card):
+                    return _error_response("This card can't take a screenshot", 400, headers)
+            else:
+                # ONE save unit for the whole set — a multi-screenshot card is one save.
+                q = _quota_blocked(uid, "saves", headers)
+                if q:
+                    return q
 
             stored_urls = []
             try:
@@ -2728,10 +2745,38 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                         f"screenshots/{uid}/{uuid.uuid4().hex}.{ext}", img_bytes, mime))
             except Exception as e:
                 logger.error(f"Multi-image store failed: {e}", exc_info=True)
-                refund_quota(uid, "saves")
+                if not enrich_ref:
+                    refund_quota(uid, "saves")
                 return _server_error(headers, e)
 
             process_ref = get_db().collection('pending_processing').document()
+            if enrich_ref is not None:
+                now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+                # Stamp the card first so the detail view shows "Reading your
+                # screenshot…" the moment the request returns; the worker
+                # clears it on either outcome.
+                enrich_ref.update({"enrichStatus": "processing", "enrichStartedAt": now_ms,
+                                   "enrichError": gc_firestore.DELETE_FIELD})
+                process_ref.set({
+                    "uid": uid,
+                    "url": stored_urls[0],
+                    "imageUrls": stored_urls,
+                    "isImage": True,
+                    "enrich": True,
+                    "cardId": enrich_card_id,
+                    "mimeType": decoded[0][1],
+                    "source": "web",
+                    "body": "",
+                    "createdAt": datetime.now(timezone.utc).isoformat(),
+                    "status": "queued",
+                    "attempts": 0,
+                })
+                logger.info(f"Share ingest queued {len(stored_urls)}-screenshot enrich for {_mask_uid(uid)}")
+                return https_fn.Response(
+                    json.dumps({"success": True, "queued": True, "id": process_ref.id,
+                                "enrich": True, "count": len(stored_urls)}),
+                    status=200, headers=headers, mimetype='application/json'
+                )
             queue_doc = {
                 "uid": uid,
                 "url": stored_urls[0],
@@ -4100,6 +4145,156 @@ def _capture_placeholder_title(url: str, is_image: bool) -> str:
         return "Analyzing link…"
 
 
+def _card_accepts_screenshots(card) -> bool:
+    """Can this card be completed with the user's screenshots?
+
+    Only a settled WEB card — a scraped page or post — has a partial read to
+    complete. Screenshot cards, notes, text, kept answers and YouTube videos
+    were never scraped, and a card still processing (or failed, which has its
+    own Retry) is not a finished thing to add to. The card need not carry
+    ``captureQuality: 'partial'``: the scraper cannot flag every thin read, and
+    the user is the judge of whether their card is missing the post.
+    """
+    if not isinstance(card, dict):
+        return False
+    if card.get("status") in (LinkStatus.PROCESSING.value, LinkStatus.FAILED.value):
+        return False
+    if card.get("sourceType") not in (None, "web"):
+        return False
+    if card.get("captureType") in ("text", "answer"):
+        return False
+    return bool(card.get("url"))
+
+
+def _enrich_context_text(card: dict) -> str:
+    """What the model is told about the card the screenshots complete: the
+    source URL and the partial read it produced. The screenshots are the
+    authoritative content (image_is_primary); this is context, so the analysis
+    keeps the post's identity and language rather than starting from nothing."""
+    parts = [f"SOURCE URL: {card.get('url') or ''}"]
+    if card.get("sourceName"):
+        parts.append(f"POSTED BY: {card['sourceName']}")
+    parts.append("WHAT COULD BE READ FROM THE PAGE (a partial preview only; the screenshot(s) "
+                 "are the FULL post and take precedence wherever they differ):")
+    for key in ("title", "summary", "detailedSummary"):
+        v = card.get(key)
+        if isinstance(v, str) and v.strip():
+            parts.append(v.strip())
+    return "\n\n".join(parts)
+
+
+def _merge_tags(existing, fresh) -> list:
+    """Existing tags first (the user may have curated them), then the new ones,
+    de-duplicated case-insensitively, capped to a sane length."""
+    out, seen = [], set()
+    for t in list(existing or []) + list(fresh or []):
+        if not isinstance(t, str):
+            continue
+        k = t.strip().lower()
+        if k and k not in seen:
+            seen.add(k)
+            out.append(t.strip())
+    return out[:12]
+
+
+def _enrich_card_with_images(ref, task_id: str, uid: str, card_ref, data: dict) -> None:
+    """Complete a partial card with the user's screenshots of the post.
+
+    The card keeps its identity (id, url, byline, createdAt, notes, reminders,
+    collections) and gets a fresh read: title/summary/details/tags/concepts
+    from the screenshots (with the partial read as context), a new embedding,
+    recomputed connections, the screenshots in ``imageUrls`` so the detail
+    view shows them, and the partial-capture flags removed. Every failure
+    leaves the card exactly as it was, with ``enrichStatus: 'failed'`` so the
+    detail view can offer another try. The queue doc is deleted either way.
+    """
+    from scraper import safe_get
+
+    card_id = card_ref.id
+    log_to_firestore(task_id, "Screenshot enrich started", data={"uid": uid, "cardId": card_id})
+    try:
+        ref.update({"status": "processing", "startedAt": datetime.now(timezone.utc).isoformat()})
+        snap = card_ref.get()
+        card = snap.to_dict() if snap.exists else None
+        if not card:
+            raise ValueError("Card no longer exists")
+
+        image_urls = [u for u in (data.get("imageUrls") or []) if isinstance(u, str)][:MAX_CARD_IMAGES]
+        if not image_urls:
+            raise ValueError("No screenshots to read")
+
+        ref.update({"status": "downloading_image"})
+        image_parts = []
+        for img_url in image_urls:
+            img_response = safe_get(img_url, timeout=30)
+            img_response.raise_for_status()
+            image_parts.append((img_response.content, img_response.headers.get('Content-Type') or 'image/jpeg'))
+
+        existing_tags, existing_categories = get_user_vocabulary(uid)
+        ai = GeminiService()
+        ref.update({"status": "analyzing_image"})
+        analysis = ai.analyze_text_with_images(
+            _enrich_context_text(card), image_parts,
+            existing_tags=existing_tags, existing_categories=existing_categories,
+            # The screenshot IS the post: read it at full legibility and trust
+            # it over the preview text (the Instagram rules, for the same reason).
+            image_is_primary=True, image_text_dense=True,
+        )
+        if not isinstance(analysis, dict) or not (analysis.get("summary") or "").strip():
+            raise AnalysisError("Screenshot analysis returned nothing")
+
+        embedding = ai.embed_text(_embedding_text_from_analysis(analysis))
+        related_links = GraphService(get_db()).find_related_links(
+            new_link_id=card_id,
+            title=analysis.get("title", ""),
+            summary=analysis.get("summary", ""),
+            embedding=embedding,
+            new_concepts=analysis.get("concepts", []),
+            uid=uid,
+        )
+
+        now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+        update = {
+            "title": (analysis.get("title") or "").strip() or card.get("title") or "Untitled",
+            "summary": analysis.get("summary"),
+            "detailedSummary": analysis.get("detailedSummary") or card.get("detailedSummary") or "",
+            "tags": _merge_tags(card.get("tags"), analysis.get("tags")),
+            "concepts": analysis.get("concepts") or card.get("concepts") or [],
+            "category": canonical_category(analysis.get("category", "")) or card.get("category") or "General",
+            "language": analysis.get("language") or card.get("language") or "en",
+            "metadata.actionableTakeaway": analysis.get("actionableTakeaway"),
+            "metadata.estimatedReadTime": max(
+                int((card.get("metadata") or {}).get("estimatedReadTime") or 0),
+                _estimate_read_time(" ".join(str(analysis.get(k) or "") for k in ("summary", "detailedSummary")))),
+            "imageUrls": image_urls,
+            "relatedLinks": related_links,
+            "captureQuality": gc_firestore.DELETE_FIELD,
+            "captureReason": gc_firestore.DELETE_FIELD,
+            "enrichStatus": gc_firestore.DELETE_FIELD,
+            "enrichError": gc_firestore.DELETE_FIELD,
+            "enrichedAt": now_ms,
+        }
+        if embedding:
+            update["embedding_vector"] = Vector(embedding)
+            update["embeddingVersion"] = EMBED_TEXT_VERSION
+            update["needsEmbedding"] = gc_firestore.DELETE_FIELD
+        else:
+            update["needsEmbedding"] = True
+        card_ref.update(update)
+        log_to_firestore(task_id, "Screenshot enrich complete", data={"cardId": card_id})
+        ref.delete()
+    except Exception as e:
+        logger.error(f"Screenshot enrich failed for {_mask_uid(uid)}/{card_id}: {e}", exc_info=True)
+        try:
+            card_ref.update({"enrichStatus": "failed", "enrichError": str(e)[:200]})
+        except Exception as write_err:
+            logger.error(f"Could not record enrich failure: {write_err}")
+        try:
+            ref.delete()
+        except Exception:
+            pass
+
+
 @firestore_fn.on_document_created(
     document="pending_processing/{doc_id}",
     memory=1024,
@@ -4150,6 +4345,15 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
     # we neither duplicate it nor overwrite the client's createdAt/ordering.
     # SHARE path: no cardId, so we create the placeholder card here.
     existing_card_id = data.get("cardId")
+    if data.get("enrich") and existing_card_id:
+        # Screenshots completing an EXISTING partial card: a different job
+        # shape (update in place, never a placeholder, never a failed card).
+        _enrich_card_with_images(
+            ref, task_id, uid,
+            get_db().collection('users').document(uid).collection('links').document(existing_card_id),
+            data,
+        )
+        return
     if existing_card_id:
         card_ref = get_db().collection('users').document(uid).collection('links').document(existing_card_id)
         card_id = existing_card_id

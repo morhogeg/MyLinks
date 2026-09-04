@@ -443,6 +443,49 @@ def linkedin_author_from_url(url: str) -> Optional[str]:
         return None
 
 
+# LinkedIn UI chrome that arrives where an author NAME should be. The logged-out
+# post page now labels the header link / JSON-LD author with its accessibility
+# copy ("See Stanford Law School's activity", "View Adam Sterling's profile")
+# instead of the bare name, and a personal post that RESHARES a company post
+# carries the company's label there while the URL slug still names the person
+# who posted. Reported 2026-09-04: an Adam Sterling post bylined
+# "See Stanford Law School's activity". Mirrored in web/lib/platform.tsx so
+# cards saved before this fix render correctly too.
+_LINKEDIN_UI_NAME = re.compile(
+    r"^\s*(?:see|view)\s+(.+?)(?:['\u2019]s?)?\s+(?:activity|profile|posts?|page)\s*$",
+    re.I,
+)
+
+
+def linkedin_ui_boilerplate(name) -> Optional[str]:
+    """If ``name`` is LinkedIn chrome wrapped around a name, return the inner
+    name (never the wrapper); otherwise None. ``None`` means "this reads like a
+    real name, keep it". Callers REJECT a boilerplate candidate so the URL slug
+    (who actually posted) wins, and use the inner name only as a last resort."""
+    if not isinstance(name, str):
+        return None
+    t = name.strip()
+    if not t:
+        return None
+    m = _LINKEDIN_UI_NAME.match(t)
+    if m:
+        return m.group(1).strip(" :-|") or None
+    low = t.lower()
+    for suffix in ("'s activity", "\u2019s activity", "'s profile", "\u2019s profile", " on linkedin", " | linkedin"):
+        if low.endswith(suffix):
+            inner = t[: len(t) - len(suffix)].strip(" :-|")
+            return inner or None
+    return None
+
+
+def _clean_linkedin_author(name) -> Optional[str]:
+    """A scraped author candidate, or None when it is UI chrome rather than a
+    name (see linkedin_ui_boilerplate)."""
+    if not isinstance(name, str) or not name.strip():
+        return None
+    return None if linkedin_ui_boilerplate(name) else name.strip()
+
+
 def _extract_linkedin_author(html: str, url: str = '') -> Optional[str]:
     """Pull the post author's display name for a LinkedIn URL.
 
@@ -474,11 +517,45 @@ def _extract_linkedin_author(html: str, url: str = '') -> Optional[str]:
         c = html_lib.unescape(c).strip()
         m = re.match(r'^(.{2,60}?)\s+on LinkedIn\b', c, re.I)
         if m:
-            author = m.group(1).strip(' :-|')
+            author = _clean_linkedin_author(m.group(1).strip(' :-|'))
             if author and author.lower() != 'linkedin':
                 return author
 
     return linkedin_author_from_url(url) if url else None
+
+
+def _linkedin_wrapped_name(html: str) -> Optional[str]:
+    """The name inside a LinkedIn UI wrapper ("See X's activity") found in the
+    page's JSON-LD author or og:title — used only when every real-name path
+    came up empty."""
+    import html as html_lib
+    import json
+    for m in re.finditer(
+            r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
+            html, re.I | re.S):
+        try:
+            data = json.loads(m.group(1))
+        except Exception:
+            continue
+        for obj in (data if isinstance(data, list) else [data]):
+            if not isinstance(obj, dict):
+                continue
+            a = obj.get('author')
+            if isinstance(a, list) and a:
+                a = a[0]
+            if isinstance(a, dict):
+                inner = linkedin_ui_boilerplate(a.get('name'))
+                if inner:
+                    return inner
+    for prop in ('og:title', 'twitter:title'):
+        m = re.search(
+            r'<meta[^>]+(?:property|name)=["\']' + prop + r'["\'][^>]+content=["\']([^"\']*)',
+            html, re.I)
+        if m:
+            inner = linkedin_ui_boilerplate(html_lib.unescape(m.group(1)))
+            if inner:
+                return inner
+    return None
 
 
 def _linkedin_ldjson_fields(html: str) -> tuple:
@@ -512,9 +589,9 @@ def _linkedin_ldjson_fields(html: str) -> tuple:
                 if isinstance(a, list) and a:
                     a = a[0]
                 if isinstance(a, dict):
-                    name = a.get('name')
-                    if isinstance(name, str) and 1 < len(name.strip()) <= 60:
-                        author = name.strip()
+                    name = _clean_linkedin_author(a.get('name'))
+                    if name and 1 < len(name) <= 60:
+                        author = name
         if author and body:
             break
     return author, body
@@ -569,7 +646,11 @@ def _scrape_linkedin_url(url: str) -> dict:
 
         source_name = (ld_author
                        or _extract_linkedin_author(html, final_url)
-                       or (linkedin_author_from_url(url) if final_url != url else None))
+                       or (linkedin_author_from_url(url) if final_url != url else None)
+                       # Last resort when no path produced a real name: the name
+                       # INSIDE the UI wrapper (e.g. the company a post reshares)
+                       # still beats an empty byline.
+                       or _linkedin_wrapped_name(html))
 
         # Name the poster IN the text so the analysis can attribute claims to
         # them ("Ryan Holiday recommends…") instead of an anonymous post.
@@ -1391,6 +1472,57 @@ def _clean_fb_title(raw: Optional[str]) -> tuple:
     return t.strip(), author
 
 
+# Facebook's PUBLIC embed plugin — the markup behind the official <iframe> embed
+# that any website can drop in without an app token. For a public post it
+# renders the post body server-side, which the post page itself never does for
+# a non-browser (that gets the JS login wall, so all we ever had was og:title /
+# og:description, and the latter is cut at ~2 lines with "…"). Reels, private
+# posts and group posts come back without a body → "" → the og read stands.
+_FB_EMBED_URL = "https://www.facebook.com/plugins/post.php?href={href}&show_text=true&width=500"
+_FB_EMBED_TIMEOUT = 8
+
+
+def _facebook_embed_text(url: str) -> str:
+    """Full text of a PUBLIC Facebook post via the embed plugin, or "".
+
+    Best-effort and never raises: a login wall, a missing body, a non-2xx or a
+    network error all return "" so the caller keeps whatever the meta tags
+    gave it. Only called when that read was empty or truncated, so the extra
+    request is paid exactly on the cards it can improve.
+    """
+    try:
+        from urllib.parse import quote
+        from bs4 import BeautifulSoup
+        headers = {
+            "User-Agent": ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 "
+                           "(KHTML, like Gecko) Version/17.4 Safari/605.1.15"),
+            "Accept": "text/html,application/xhtml+xml",
+            "Accept-Language": "en-US,en;q=0.9,he;q=0.8",
+        }
+        resp = safe_get(_FB_EMBED_URL.format(href=quote(url, safe="")), headers=headers,
+                        timeout=_FB_EMBED_TIMEOUT)
+        if not getattr(resp, "ok", False) or not resp.text:
+            return ""
+        soup = BeautifulSoup(resp.text, "html.parser")
+        node = (soup.find(attrs={"data-testid": "post_message"})
+                or soup.find(class_=re.compile(r"\buserContent\b"))
+                or soup.find(class_=re.compile(r"\b_5pbx\b")))
+        if node is None:
+            return ""
+        for br in node.find_all("br"):
+            br.replace_with("\n")
+        blocks = node.find_all("p") or [node]
+        text = "\n".join(t for t in (b.get_text(" ", strip=True) for b in blocks) if t)
+        # The plugin appends its own "See more" / "…More" toggle text.
+        text = re.sub(r"\s*(?:See more|\u05e2\u05d5\u05d3|\u2026\s*More)\s*$", "", text, flags=re.I).strip()
+        if not text or _looks_like_fb_login_wall(text):
+            return ""
+        return text[:8000]
+    except Exception as e:
+        logger.info(f"Facebook embed fallback unavailable: {e}")
+        return ""
+
+
 def _scrape_facebook_url(url: str, message_body: Optional[str] = None) -> dict:
     """Scrape Facebook post/reel/video URLs.
 
@@ -1489,6 +1621,23 @@ def _scrape_facebook_url(url: str, message_body: Optional[str] = None) -> dict:
                     fb_image = _extract_og_image(soup)
     except Exception as e:
         logger.warning(f"Facebook scrape failed: {e}")
+
+    # Second source when the meta tags came up short (nothing readable, or a
+    # preview cut off with "…"): the public embed plugin carries the FULL body
+    # of a public post. When it does, it replaces the fragment outright and the
+    # card is no longer a partial read. (Not reachable from every network; a
+    # miss leaves everything above exactly as it was.)
+    if not best_desc or truncated:
+        embed_text = _facebook_embed_text(url)
+        if embed_text and len(embed_text) > len(best_desc):
+            metadata_lines = [line for line in metadata_lines if not line.startswith("POST CAPTION:")]
+            metadata_lines.append(f"POST TEXT:\n{embed_text}")
+            best_desc = embed_text
+            truncated = embed_text.rstrip().endswith(("...", "\u2026"))
+            first_line = embed_text.split("\n", 1)[0].strip()
+            if first_line and (best_title in generic_titles or best_title == "Facebook Post"
+                               or best_title.rstrip().endswith(("...", "\u2026"))):
+                best_title = first_line[:120]
 
     # Fold in the shared caption from the message body — for recipe/video posts
     # this is often the most complete text (the on-page caption is gated).

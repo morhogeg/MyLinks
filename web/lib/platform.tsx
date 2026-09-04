@@ -147,7 +147,34 @@ const LINKEDIN_SMALL_WORDS = new Set([
 function looksLikeAuthorName(name: string): boolean {
     if (name.length > 60 || /[\n\r]/.test(name)) return false;
     if (/[:：]\s*$/.test(name) || /(…|\.\.\.)$/.test(name)) return false;
+    if (linkedinUiBoilerplate(name)) return false;
     return name.split(/\s+/).filter(Boolean).length <= 8;
+}
+
+/**
+ * LinkedIn UI chrome stored where a NAME should be. The logged-out post page
+ * labels its author link/JSON-LD with accessibility copy ("See Stanford Law
+ * School's activity", "View Adam Sterling's profile"), and a personal post
+ * that reshares a company post carries the COMPANY's label there while the
+ * URL slug still names the person who posted (owner, 2026-09-04: an Adam
+ * Sterling post bylined "See Stanford Law School's activity"). Returns the
+ * name inside the wrapper, or null when the string reads like a real name.
+ * The backend (`scraper.linkedin_ui_boilerplate`) rejects the same shapes at
+ * save time; this covers every card saved before it did.
+ */
+export function linkedinUiBoilerplate(name?: string | null): string | null {
+    const t = (name || '').trim();
+    if (!t) return null;
+    const m = /^(?:see|view)\s+(.+?)(?:['’]s?)?\s+(?:activity|profile|posts?|page)$/i.exec(t);
+    if (m) return m[1].trim().replace(/^[\s:\-|]+|[\s:\-|]+$/g, '') || null;
+    const low = t.toLowerCase();
+    for (const suffix of ["'s activity", '’s activity', "'s profile", '’s profile', ' on linkedin', ' | linkedin']) {
+        if (low.endsWith(suffix)) {
+            const inner = t.slice(0, t.length - suffix.length).replace(/^[\s:\-|]+|[\s:\-|]+$/g, '');
+            return inner || null;
+        }
+    }
+    return null;
 }
 
 /**
@@ -205,9 +232,11 @@ export function linkedinDisplayName(url?: string, sourceName?: string | null): s
         const lower = s.toLowerCase();
         const junk = !s || lower === 'linkedin' || lower === 'none' || lower === 'screenshot';
         // Only trust a stored name that actually reads like one. Post text
-        // loses to the URL slug; with no slug to fall back on we still show it
-        // rather than nothing.
-        if (!junk && (looksLikeAuthorName(s) || !fromUrl)) return s;
+        // and LinkedIn UI chrome lose to the URL slug; with no slug to fall
+        // back on we still show something rather than nothing: the name inside
+        // the chrome ("See X's activity" → "X"), else the raw value.
+        if (!junk && looksLikeAuthorName(s)) return s;
+        if (!junk && !fromUrl) return linkedinUiBoilerplate(s) ?? s;
     }
     return fromUrl;
 }
