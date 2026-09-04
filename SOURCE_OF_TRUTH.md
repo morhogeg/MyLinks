@@ -1933,9 +1933,8 @@ exact-match, capped.
 - **2026-09-04 (ship) — card-trust round SHIPPED.** Merge `534c00b` to main.
   Deploy Cloud Functions run #100 green (scoped
   `share_ingest,process_link_background,analyze_link`), Python tests #114
-  green, iOS → TestFlight run #318 = **build 1318** (in flight when this was
-  written; outcome recorded in the follow-up line above when it lands),
-  Vercel auto-deploy from the merge. No hosting or
+  green, iOS → TestFlight run #318 = **build 1318** green (archived, entitlements
+  verified, uploaded 19:37 UTC), Vercel auto-deploy from the merge. No hosting or
   rules change. Owner QA list: §4 PM-G.
 - **2026-09-04 — Card trust round: partial cards take a screenshot, the graph
   matches the Related list, LinkedIn bylines stop leaking UI chrome.** Owner
