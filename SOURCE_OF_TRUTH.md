@@ -1948,7 +1948,9 @@ exact-match, capped.
   the 0.68 ceiling); cross-script evidence is exempt so the English→Hebrew
   muffins case keeps working. Ask's answer path is unchanged except the
   whole-word scorer. Verified: pytest 871 passed. Not verified live (owner
-  to retry "ארוחת ערב" on desktop).
+  to retry "ארוחת ערב" on desktop). SHIPPED: merge `ddd439d`, Deploy Cloud
+  Functions run #103 green (scoped `search_links_http,search_links,ask_brain`),
+  Python tests #117 green.
 - **2026-09-04 (round 2) — "רמזי" still showed a restaurant, an emigration
   study and an enlistment card under By meaning after the round below, so the
   judge path itself was letting cards through (or a timeout was still landing
