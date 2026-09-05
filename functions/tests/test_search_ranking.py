@@ -376,8 +376,8 @@ def test_hybrid_gated_vector_hit_can_return_as_a_literal_match(monkeypatch):
     ])
     monkeypatch.setattr(search_mod, "keyword_scan_cards",
                         lambda uid, q, exclude_ids=None, limit=10, fields=None: [
-                            {"id": "far", "title": "q", "createdAt": 5}])
-    out = [c["id"] for c in perform_hybrid_search("u", "q", limit=10)]
+                            {"id": "far", "title": "muffins", "createdAt": 5}])
+    out = [c["id"] for c in perform_hybrid_search("u", "muffins", limit=10)]
     assert out == ["far"]
 
 
@@ -684,18 +684,21 @@ def test_hybrid_judge_path_drops_weak_substring_extras(monkeypatch):
     assert out == ["hit", "strong"]
 
 
-def test_hybrid_fallback_path_keeps_all_keyword_extras(monkeypatch):
-    # With the judge down the literal scan is the whole result: its extras are
-    # not score-filtered (the client re-tiers literal hits anyway).
+def test_hybrid_fallback_path_serves_literal_and_matches_every_token(monkeypatch):
+    # With the judge down the literal scan is the whole result, and like the
+    # client's literal layer it is AND over the query's words: a card carrying
+    # only "function" (and only inside "functions") is not a literal match for
+    # "cognitive function".
     monkeypatch.setattr(search_mod, "judge_relevance", lambda q, c: None)
     monkeypatch.setattr(search_mod, "perform_search_logic", lambda uid, q, limit: [
         _vres("v1", 0.45)])
     monkeypatch.setattr(search_mod, "keyword_scan_cards",
                         lambda uid, q, exclude_ids=None, limit=10, fields=None: [
                             {"id": "weak", "title": "other",
-                             "summary": "software functions explained", "createdAt": 1}])
+                             "summary": "software functions explained", "createdAt": 1},
+                            {"id": "full", "title": "Cognitive function and sleep", "createdAt": 1}])
     out = [c["id"] for c in perform_hybrid_search("u", "cognitive function", limit=20)]
-    assert out == ["weak"]
+    assert out == ["full"]
 
 
 # ── 2026-09-04: no unrelated cards under "By meaning" ───────────────────────
@@ -752,3 +755,88 @@ def test_judge_prompt_carries_the_name_rule():
 def test_judge_timeout_is_generous_enough_for_a_cold_call():
     # Under 6s a cold Gemini call fell to the gates and the gates showed junk.
     assert search_mod._JUDGE_TIMEOUT_MS >= 9000
+
+
+
+# ── 2026-09-05: "ארוחת ערב" on desktop showed politics cards under By meaning ─
+# ערב (evening) is a fragment of התערבות (intervention), מערבית (Western) and a
+# whole word inside ערב הסעודית (Saudi Arabia). Three rules close it: lexical
+# matching is whole-word with Hebrew clitic prefixes; a keyword extra must
+# match EVERY query token like the client's literal layer; and a judged card
+# whose evidence is in the query's own script must also be embedding-close.
+
+import pytest
+from search import token_in_text, keyword_all_tokens_match, parse_judge_verdict, apply_same_script_gate
+
+
+@pytest.mark.parametrize("token, text, hit", [
+    ("ערב", "ארוחת ערב טובה", True),
+    ("ערב", "בערב נצא", True),          # ב־ prefix
+    ("ערב", "ובערב נצא", True),         # stacked prefixes
+    ("ערב", "ערבים רבים", True),        # plural
+    ("ערב", "ההתערבות התבצעה", False),  # fragment inside a longer word
+    ("ערב", "התפיסה המערבית", False),
+    ("ערב", "ערב הסעודית", True),       # a real word: the judge's call, not lexical
+    ("muffin", "best muffins ever", True),
+    ("muffin", "the muffinator", False),
+    ("art", "the party was late", False),
+    ("art", "modern art, in short", True),
+])
+def test_token_in_text_is_whole_word(token, text, hit):
+    assert token_in_text(token, text) is hit
+
+
+def test_keyword_score_no_longer_counts_fragments():
+    card = {"title": "טראמפ: ההתערבות במונדיאל", "summary": "התפיסה המערבית"}
+    assert search_mod.keyword_match_score(card, {"ערב"}) == 0
+    assert search_mod.keyword_match_score({"title": "ארוחת ערב"}, {"ערב", "ארוחת"}) == 6
+
+
+def test_all_tokens_must_match_for_a_literal_extra():
+    assert keyword_all_tokens_match({"title": "ערב טוב", "summary": ""}, {"ארוחת", "ערב"}) is False
+    assert keyword_all_tokens_match({"title": "ארוחת ערב קלה", "summary": ""}, {"ארוחת", "ערב"}) is True
+    assert keyword_all_tokens_match({"title": "x"}, set()) is False
+
+
+def test_judge_path_extras_need_every_token(monkeypatch):
+    monkeypatch.setattr(search_mod, "perform_search_logic", lambda uid, q, limit: [])
+    monkeypatch.setattr(search_mod, "keyword_scan_cards",
+                        lambda uid, q, exclude_ids=None, limit=10, fields=None: [
+                            {"id": "mondial", "title": "טראמפ: ההתערבות במונדיאל", "createdAt": 1},
+                            {"id": "good", "title": "ערב טוב", "createdAt": 1},
+                            {"id": "dinner", "title": "ארוחת ערב ב-10 דקות", "createdAt": 1}])
+    monkeypatch.setattr(search_mod, "judge_relevance", lambda q, cands: list(cands))
+    out = [c["id"] for c in perform_hybrid_search("u", "ארוחת ערב", limit=20)]
+    assert out == ["dinner"]
+
+
+def test_evidence_must_be_whole_words_in_the_card():
+    cands = [{"title": "טראמפ: ההתערבות במונדיאל", "summary": "התפיסה המערבית"},
+             {"title": "מאפינס אוכמניות", "summary": "ארוחת ערב קלה"}]
+    assert parse_judge_verdict('[{"n": 1, "evidence": "ערב"}]', 2, cands) == []
+    assert parse_judge_verdict('[{"n": 2, "evidence": "ארוחת ערב"}]', 2, cands) == [(1, "ארוחת ערב")]
+
+
+def test_same_script_evidence_must_be_embedding_close():
+    cands = [_vres("muffins", 0.50), _vres("saudi", 0.66), _vres("hebrew-muffins", 0.72)]
+    verdict = [(0, "muffins"), (1, "ערב הסעודית"), (2, "מאפינס")]
+    # Query in Hebrew: Hebrew evidence must sit within the margin of the best
+    # candidate (0.50 + 0.12 = 0.62) → the Saudi card (0.66) drops, the
+    # far-but-Hebrew muffin card (0.72) drops too; Latin evidence is exempt.
+    assert apply_same_script_gate("ארוחת ערב", cands, verdict) == [0]
+    # Query in English: the Hebrew muffin card is cross-script and survives at
+    # 0.72; the English muffins card at 0.50 is the anchor and survives.
+    assert apply_same_script_gate("muffins", cands, [(0, "muffins"), (2, "מאפינס")]) == [0, 2]
+    # No distances at all → nothing to gate on, the verdict stands.
+    assert apply_same_script_gate("x", [{"id": "a"}], [(0, "x y")]) == [0]
+
+
+def test_judge_relevance_applies_the_same_script_gate(monkeypatch):
+    class _R:
+        text = '[{"n": 1, "evidence": "מאפינס"}, {"n": 2, "evidence": "ערב הסעודית"}]'
+    client = type("C", (), {"models": type("M", (), {"generate_content": staticmethod(lambda **kw: _R())})()})()
+    monkeypatch.setattr(search_mod, "_get_genai_client", lambda ms: client)
+    cands = [dict(_vres("m", 0.50), title="מאפינס אוכמניות"),
+             dict(_vres("s", 0.66), title="הסכם עם ערב הסעודית")]
+    kept = search_mod.judge_relevance("ארוחת ערב", cands)
+    assert [c["id"] for c in kept] == ["m"]

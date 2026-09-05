@@ -1930,6 +1930,25 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-05 (round 3) — "ארוחת ערב" on desktop showed Trump/Mondial,
+  the Saudi deal, the IDF chief and a time-perception card under By meaning,
+  AFTER round 2.** Cause, readable from the screenshot: ערב is a fragment of
+  התערבות, מערבית and a whole word in ערב הסעודית, and both lexical paths
+  matched by SUBSTRING. (a) `keyword_match_score` (server extras; also Ask's
+  lexical fallback) is now whole-word via `token_in_text`: optional Hebrew
+  clitic prefixes (והבלמשכ, stacked) + token + optional plural (ים/ות, s/es),
+  bounded by non-word characters; (b) a keyword extra must match EVERY query
+  token (`keyword_all_tokens_match`), the client's own AND rule, so the
+  server never labels a card literal that the client would reject (that gap
+  is exactly what rendered as MEANING); (c) judge evidence is verified at
+  word boundaries (`_evidence_in_digest`), and the prompt names the fragment
+  and different-sense cases; (d) `apply_same_script_gate`: a judged card
+  whose evidence is in the query's own script must also be embedding-close
+  (within `SEARCH_SAME_SCRIPT_MARGIN` 0.12 of the best candidate and under
+  the 0.68 ceiling); cross-script evidence is exempt so the English→Hebrew
+  muffins case keeps working. Ask's answer path is unchanged except the
+  whole-word scorer. Verified: pytest 871 passed. Not verified live (owner
+  to retry "ארוחת ערב" on desktop).
 - **2026-09-04 (round 2) — "רמזי" still showed a restaurant, an emigration
   study and an enlistment card under By meaning after the round below, so the
   judge path itself was letting cards through (or a timeout was still landing
