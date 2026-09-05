@@ -179,19 +179,66 @@ def _card_haystack(data: dict) -> str:
     ]).lower()
 
 
+# Hebrew clitic prefixes a query word may legitimately carry in a card
+# (ו־ and, ה־ the, ב־ in, ל־ to, מ־ from, ש־ that, כ־ as), alone or stacked
+# ("ובערב"). Anything else in front of the token is a different word.
+_HEBREW_PREFIXES = "והבלמשכ"
+_TOKEN_RE_CACHE: dict = {}
+
+
+def _token_pattern(token: str):
+    """Compiled whole-word pattern for one query token.
+
+    Substring matching is how "ערב" (evening) hit "התערבות" (intervention),
+    "מערבית" (Western) and "ערב הסעודית" (Saudi Arabia) and put three
+    politics cards under By meaning for "ארוחת ערב" (owner, 2026-09-05). A
+    token now has to be a WORD: optional Hebrew clitic prefix + token +
+    optional plural ending (ים/ות for Hebrew, s/es for Latin), bounded by
+    non-word characters. "ערב הסעודית" still contains the word ערב — that one
+    is the judge's to reject, which it does with the same-script distance rule.
+    """
+    pat = _TOKEN_RE_CACHE.get(token)
+    if pat is None:
+        t = re.escape(token)
+        if token.isascii():
+            body = rf"{t}(?:e?s)?"
+        else:
+            body = rf"(?:[{_HEBREW_PREFIXES}]{{0,2}})?{t}(?:ים|ות)?"
+        pat = re.compile(rf"(?<!\w){body}(?!\w)", re.IGNORECASE | re.UNICODE)
+        _TOKEN_RE_CACHE[token] = pat
+    return pat
+
+
+def token_in_text(token: str, text: str) -> bool:
+    """True when `token` occurs in `text` as a whole word (see _token_pattern)."""
+    return bool(token) and bool(text) and _token_pattern(token).search(text) is not None
+
+
 def keyword_match_score(data: dict, tokens: set) -> int:
     """Integer lexical score for a card against query `tokens`.
 
     A token in the title counts double (a title hit is the strongest lexical
     signal), plus one for appearing anywhere in title/summary/tags/source/
-    category. Shared by the keyword fallback so the "obvious title hit" is never
-    dropped.
+    category. Whole-word matches only (token_in_text). Shared by the keyword
+    fallback so the "obvious title hit" is never dropped.
     """
     if not tokens:
         return 0
     haystack = _card_haystack(data)
     title_l = str(data.get("title", "")).lower()
-    return sum((2 if t in title_l else 0) + (1 if t in haystack else 0) for t in tokens)
+    return sum((2 if token_in_text(t, title_l) else 0) + (1 if token_in_text(t, haystack) else 0)
+               for t in tokens)
+
+
+def keyword_all_tokens_match(data: dict, tokens: set) -> bool:
+    """Every query token occurs as a whole word somewhere in the card — the
+    same AND rule the client's literal layer applies (web/lib/searchMatch.ts),
+    so a server-side literal extra never shows a card the client would not
+    itself call a literal match."""
+    if not tokens:
+        return False
+    haystack = _card_haystack(data)
+    return all(token_in_text(t, haystack) for t in tokens)
 
 
 # ── Vector-distance quality gate (pure, unit-tested) ────────────────────────
@@ -382,8 +429,12 @@ def build_judge_prompt(query_text: str, candidates: List[dict]) -> str:
         "one card - or none - is a normal answer.\n"
         "For every card you keep, quote the EVIDENCE: the exact words copied "
         "verbatim from that card's entry above (its title, summary, tags or "
-        "concepts) that match the query. If you cannot quote such words from "
-        "a card, do not keep it.\n"
+        "concepts) that match the query. Evidence must be whole words that "
+        "mean what the query means - a fragment of the query inside a longer "
+        "word (ערב inside התערבות or מערבית; 'art' inside 'party') is not "
+        "evidence, and neither is the same word used in a different sense "
+        "(ערב הסעודית for ארוחת ערב). If you cannot quote such words from a "
+        "card, do not keep it.\n"
         'Answer with ONLY a JSON array of objects, e.g. '
         '[{"n": 1, "evidence": "Gordon Ramsay"}, {"n": 4, "evidence": "מאפינס"}]. '
         "No other text. If nothing matches, answer []."
@@ -400,22 +451,30 @@ def _evidence_norm(text) -> str:
     return re.sub(r"\s+", " ", t).strip()
 
 
-def parse_judge_selection(text, n: int, candidates: Optional[List[dict]] = None) -> Optional[List[int]]:
-    """0-based candidate indices from the judge's reply.
+def _evidence_in_digest(evidence: str, digest: str) -> bool:
+    """The quoted evidence occurs in the card digest as whole words — a quote
+    of "ערב" does not count against "התערבות" (both already normalised)."""
+    return re.search(rf"(?<!\w){re.escape(evidence)}(?!\w)", digest, re.UNICODE) is not None
+
+
+def parse_judge_verdict(text, n: int, candidates: Optional[List[dict]] = None) -> Optional[List[tuple]]:
+    """`[(0-based index, evidence), ...]` from the judge's reply, or None.
 
     The reply is a JSON array of `{"n": <1-based>, "evidence": "<quote>"}`
     objects. A kept card counts ONLY when its evidence is a non-empty quote
-    that actually occurs in that card's digest (title/summary/tags/concepts,
-    normalised by `_evidence_norm`) — a hallucinated or missing quote drops the
-    card. When `candidates` is not given the quote cannot be checked and a
-    non-empty evidence string is trusted (pure-parse callers/tests).
+    that actually occurs, as whole words, in that card's digest
+    (title/summary/tags/concepts, normalised by `_evidence_norm`) — a
+    hallucinated, missing, or fragment-of-a-word quote drops the card. When
+    `candidates` is not given the quote cannot be checked and a non-empty
+    evidence string is trusted (pure-parse callers/tests).
 
-    Bare numbers (the pre-evidence format) are NOT a verdict any more: they
-    carry no proof, and a card kept on feel is exactly the failure this guards
-    against. A reply of only numbers therefore keeps nothing. Returns None when
-    no array can be read at all — the caller treats that as "judge unavailable"
-    — whereas a real `[]` is a verdict (nothing relevant) and is honored.
-    Defensive on model output: code fences, prose, duplicates, out-of-range.
+    Bare numbers (the pre-evidence format) are NOT a verdict: they carry no
+    proof, and a card kept on feel is exactly the failure this guards
+    against. A reply of only numbers therefore keeps nothing. Returns None
+    when no array can be read at all — the caller treats that as "judge
+    unavailable" — whereas a real `[]` is a verdict (nothing relevant) and is
+    honored. Defensive on model output: code fences, prose, duplicates,
+    out-of-range.
     """
     if not isinstance(text, str):
         return None
@@ -449,12 +508,59 @@ def parse_judge_selection(text, n: int, candidates: Optional[List[dict]] = None)
         evidence = _evidence_norm(v.get("evidence"))
         if len(evidence) < 2:
             continue
-        if digests is not None and evidence not in digests[i]:
+        if digests is not None and not _evidence_in_digest(evidence, digests[i]):
             logger.info("Search judge kept card %d with evidence not found in the card; dropped", i + 1)
             continue
         seen.add(i)
-        out.append(i)
+        out.append((i, evidence))
     return out
+
+
+def parse_judge_selection(text, n: int, candidates: Optional[List[dict]] = None) -> Optional[List[int]]:
+    """0-based candidate indices the judge kept with verified evidence (see
+    parse_judge_verdict), or None when the reply is unreadable."""
+    verdict = parse_judge_verdict(text, n, candidates)
+    return None if verdict is None else [i for i, _ in verdict]
+
+
+_HEBREW_RE = re.compile(r"[\u0590-\u05FF]")
+
+
+def _script_of(text: str) -> str:
+    """'hebrew' | 'latin' | 'other' — the dominant script of a short string."""
+    t = str(text or "")
+    if _HEBREW_RE.search(t):
+        return "hebrew"
+    if re.search(r"[A-Za-z]", t):
+        return "latin"
+    return "other"
+
+
+# A judged card whose evidence is in the SAME script as the query must also be
+# embedding-close: within this margin of the best candidate and under the
+# normal ceiling. Same-language text the model "matched" while the embedding
+# says it is far is the "ערב הסעודית for ארוחת ערב" failure — a word in
+# common, nothing in meaning. Cross-script evidence is exempt because a genuine
+# cross-language match legitimately sits farther out (the muffins case).
+_SAME_SCRIPT_MARGIN = float(os.environ.get("SEARCH_SAME_SCRIPT_MARGIN", "0.12"))
+
+
+def apply_same_script_gate(query_text: str, candidates: List[dict], verdict: List[tuple]) -> List[int]:
+    """Indices from `verdict` that survive the same-script distance rule. Pure."""
+    q_script = _script_of(query_text)
+    dists = [c.get("vector_distance") for c in candidates
+             if isinstance(c.get("vector_distance"), (int, float))]
+    best = min(dists) if dists else None
+    kept = []
+    for i, evidence in verdict:
+        d = candidates[i].get("vector_distance")
+        same = _script_of(evidence) == q_script and q_script != "other"
+        if same and best is not None and isinstance(d, (int, float)):
+            if d > min(best + _SAME_SCRIPT_MARGIN, _DISTANCE_CEILING):
+                logger.info("Search judge kept card %d on same-script evidence but it is far (%.2f); dropped", i + 1, d)
+                continue
+        kept.append(i)
+    return kept
 
 
 def judge_relevance(query_text: str, candidates: List[dict]) -> Optional[List[dict]]:
@@ -484,10 +590,11 @@ def judge_relevance(query_text: str, candidates: List[dict]) -> Optional[List[di
     if not text:
         logger.warning("Search judge returned empty (blocked?) — falling back to distance gates")
         return None
-    kept = parse_judge_selection(text, len(candidates), candidates)
-    if kept is None:
-        logger.warning("Search judge reply unparseable — falling back to distance gates")
+    verdict = parse_judge_verdict(text, len(candidates), candidates)
+    if verdict is None:
+        logger.warning("Search judge reply unparseable — falling back to literal-only")
         return None
+    kept = apply_same_script_gate(query_text, candidates, verdict)
     logger.info(f"Search judge kept {len(kept)}/{len(candidates)} candidates")
     return [candidates[i] for i in sorted(kept)]
 
@@ -1521,16 +1628,22 @@ def perform_hybrid_search(uid: str, query_text: str, limit: int = 20,
         # results. A title hit (scores 2+1) or a multi-token match keeps its
         # seat; a single generic body-substring does not. The client's own
         # literal layer still surfaces in-window literal matches regardless.
+        # Extras must ALSO match every query token, as the client's literal
+        # layer does (AND): "ארוחת ערב" once pulled a card whose title merely
+        # contained ערב — a title hit scores 2 on its own — and it showed
+        # under By meaning because the client's literal pass rejected it.
         q_tokens = keyword_query_tokens(query_text)
         have = {r.get("id") for r in judged}
         strong_extras = [k for k in keyword_hits if k.get("id") not in have
+                         and keyword_all_tokens_match(k, q_tokens)
                          and keyword_match_score(k, q_tokens) >= 2]
         ranked = (judged + strong_extras)[:limit]
     else:
         # Judge unavailable: literal matches only (see the docstring). Ranked
         # by the lexical score so a title hit leads.
         q_tokens = keyword_query_tokens(query_text)
-        ranked = sorted(keyword_hits, key=lambda k: -keyword_match_score(k, q_tokens))[:limit]
+        literal = [k for k in keyword_hits if keyword_all_tokens_match(k, q_tokens)]
+        ranked = sorted(literal, key=lambda k: -keyword_match_score(k, q_tokens))[:limit]
 
     # The distance served its purpose (threshold + rank) — don't leak internals.
     for r in ranked:
