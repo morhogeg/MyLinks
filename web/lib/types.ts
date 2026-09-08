@@ -160,6 +160,14 @@ export interface Link {
   enrichError?: string;
   enrichedAt?: number;
   sourceName?: string;
+  // Screenshot provenance (sourceType 'image' only): the author @handle the
+  // vision pass read off the screenshot itself ("@OpenAI"), and the app whose
+  // own chrome it recognised ('x' | 'instagram' | 'threads' | 'tiktok' |
+  // 'youtube' | 'linkedin' | 'facebook'). Handle-first: a platform is never
+  // stored without a handle, a handle may be stored without a platform. Absent
+  // on a screenshot with no legible author, which stays "Screenshot".
+  sourceHandle?: string;
+  sourcePlatform?: string;
   // 'text' marks a note card whose body is the user's OWN verbatim words, sent
   // in from the share sheet / extension rather than typed in the Note tab. Such
   // a card is never paraphrased: `summary` holds the text exactly as shared, the

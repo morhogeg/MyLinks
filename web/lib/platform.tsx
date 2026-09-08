@@ -129,6 +129,28 @@ export function instagramHandle(sourceName?: string | null): string | null {
     return m ? m[1] : null;
 }
 
+/** The apps the backend may stamp on a screenshot card as `sourcePlatform`,
+    mapped to the platforms this module can draw. Threads and TikTok are read
+    by the backend but have no mark here yet, so they resolve to null and the
+    card shows its handle with the screenshot glyph. */
+const SCREENSHOT_PLATFORMS: Record<string, PlatformKey> = {
+    x: 'x', instagram: 'instagram', youtube: 'youtube', linkedin: 'linkedin', facebook: 'facebook',
+};
+
+/** A screenshot card's own provenance — the @handle the vision pass read off
+    the image (bare, no @) and the platform it recognised, if we can draw it.
+    Null when the card is not a screenshot or carries no legible handle. The
+    handle is re-validated here so an old or hand-edited value can never render
+    a sentence as a handle (`[A-Za-z0-9._-]`, ≤100). */
+export function screenshotSource(link: { sourceType?: string; sourceHandle?: string | null; sourcePlatform?: string | null }):
+    { handle: string; platform: PlatformKey | null; platformId: string | null } | null {
+    if (link.sourceType !== 'image') return null;
+    const m = /^@([A-Za-z0-9._-]{1,100})$/.exec((link.sourceHandle || '').trim());
+    if (!m) return null;
+    const platformId = (link.sourcePlatform || '').trim().toLowerCase() || null;
+    return { handle: m[1], platform: platformId ? SCREENSHOT_PLATFORMS[platformId] ?? null : null, platformId };
+}
+
 /** Joining words a company/person slug keeps lowercase when title-cased. */
 const LINKEDIN_SMALL_WORDS = new Set([
     'a', 'an', 'and', 'at', 'by', 'de', 'for', 'in', 'la', 'of', 'on', 'or', 'the', 'to', 'with',

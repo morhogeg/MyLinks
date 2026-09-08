@@ -1509,6 +1509,22 @@ G2. **[ ] Graph next levers (from the round-3 product pass):** (a) search/
     (reuse M12 machinery scoped to a cluster's cards). Build in this order —
     each is independent.
 
+G2b. **[x] Screenshot cards name who posted them (2026-09-08).** A screenshot
+    of a post used to read "Screenshot" as its source. The vision pass now
+    returns `sourcePlatform` (the app whose OWN chrome is visible) and
+    `sourceHandle` (the @handle literally printed next to the author), the
+    backend validates both against per-platform username rules
+    (`main._screenshot_source`) and stamps the card; the byline, the Sources
+    facet, the Ask chip and the share page render the app's mark + @handle,
+    and an X screenshot of @naval shares one facet with an x.com/naval link.
+    Handles only: an app with no legible handle stays "Screenshot". Needs a
+    functions deploy (unscoped, or `Deploy-Functions: analyze_image,
+    process_link_background,share_ingest,share_page`) and a TestFlight build
+    for the byline. **Owner QA:** save the OpenAI X screenshot again; the
+    card's byline should read the X mark + "@OpenAI" with a small screenshot
+    glyph, and Sources should list it under X. Existing "Screenshot" cards
+    are not backfilled.
+
 G3. **[ ] iOS share extension: multi-screenshot cards (deferred half of the
     2026-08-24 feature).** The web/plus-button path now builds ONE card from up
     to 5 ordered screenshots (`MAX_CARD_IMAGES`), but the share extension still
@@ -1930,6 +1946,39 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-08 — Screenshot cards name the account that posted them.**
+  Owner: a screenshot of an X post saved as source "Screenshot" although the
+  image shows "OpenAI ✓ @OpenAI". Cause: the vision prompt only asked for a
+  free-text `sourceName`, and both `SourceByline` and `getSourceInfo` discard
+  it for `sourceType 'image'` cards. Landed on
+  `claude/screenshot-source-detection-zug6wt`: **(1)** `models.AIAnalysis`
+  carries `sourcePlatform` + `sourceHandle` (structured output drops fields
+  the schema lacks); `analyze_images` tells the model to name the platform
+  from its interface chrome only (X logo + "· 55m" row, IG action row,
+  TikTok rail, LinkedIn "1st · Follow", FB Like bar), never from tone, and to
+  copy only a handle LITERALLY printed beside the author (not a mention,
+  reply or quoted post). **(2)** `main._screenshot_source` validates: enum
+  whitelist for the platform, per-platform username regex for the handle (X
+  1-15 `[A-Za-z0-9_]`, IG/Threads dots allowed, reserved X routes dropped); a
+  platform without a handle is dropped (handles only) and a bare app name as
+  `sourceName` reverts to "Screenshot". `_apply_screenshot_source` stamps
+  `sourceHandle`/`sourcePlatform` and sets `sourceName` to the "@handle" so
+  search-by-source, digests and Ask labels see the author; applied at both
+  image sites (`analyze_image` sync, `process_link_background` isImage). The
+  enrich path (web card + screenshots) is untouched. **(3)** Frontend:
+  `platform.screenshotSource()` re-validates and maps to a drawable
+  `PlatformKey` (Threads/TikTok have no mark yet, so they show the handle with
+  the screenshot glyph); `getSourceInfo` step 0 keys a recognised-platform
+  screenshot as `x:@handle`, the same key an x.com link gets, so both merge
+  into one facet under X; `SourceByline` renders brand mark + @handle + a
+  small trailing screenshot glyph; the Ask citation chip borrows the mark;
+  `share_service._source_byline` mirrors it. **Verified:** pytest 771 passed
+  + new `test_screenshot_source.py` (24), the 8 `test_import_links` failures
+  are pre-existing on the untouched tree (offline fake gap); `tsc` clean,
+  eslint clean on touched files, em-dash gate clean; `getSourceInfo` merge
+  checked with a scratch run. **Not verified:** the model's actual output on
+  a live screenshot (no Gemini in the session); anything on device. Not
+  shipped from this session; owner QA in §4 G2b.
 - **2026-09-05 (round 3) — "ארוחת ערב" on desktop showed Trump/Mondial,
   the Saudi deal, the IDF chief and a time-perception card under By meaning,
   AFTER round 2.** Cause, readable from the screenshot: ערב is a fragment of

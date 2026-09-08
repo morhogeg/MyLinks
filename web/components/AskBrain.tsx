@@ -9,7 +9,7 @@ import remarkBreaks from 'remark-breaks';
 import { getDominantDirection } from '@/lib/rtl';
 import { breakIntoParagraphs, normalizeListMarkers } from '@/lib/answerLayout';
 import SourceByline from '@/components/SourceByline';
-import { getPlatform, platformIcon, platformColor } from '@/lib/platform';
+import { getPlatform, platformIcon, platformColor, screenshotSource } from '@/lib/platform';
 import { appCheckHeaders } from '@/lib/firebase';
 import { authHeaders } from '@/lib/auth';
 import { apiUrl, isNativeApp, fetchWithTimeout } from '@/lib/api';
@@ -1497,7 +1497,10 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                                                         // the original complaint, the missing logo the second,
                                                         // and a Machina glyph on a screenshot the third
                                                         // (owner QA ×3). The byline draws no icon of its own.
-                                                        const platform = getPlatform(s.url || undefined);
+                                                        // A screenshot whose author was read off the image carries
+                                                        // that app's mark, like a saved link from it would.
+                                                        const platform = getPlatform(s.url || undefined)
+                                                            ?? (live ? screenshotSource(live)?.platform ?? null : null);
                                                         const shot = !platform && live?.sourceType === 'image';
                                                         const note = !platform && live?.sourceType === 'note';
                                                         const ownMark = !!platform || shot || note;
@@ -1522,6 +1525,8 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                                                                                 url: s.url || undefined,
                                                                                 sourceName: s.sourceName || undefined,
                                                                                 sourceType: live?.sourceType,
+                                                                                sourceHandle: live?.sourceHandle,
+                                                                                sourcePlatform: live?.sourcePlatform,
                                                                                 metadata: live?.metadata,
                                                                             }}
                                                                         />

@@ -1,7 +1,7 @@
 'use client';
 
 import { Youtube, Image as ImageIcon, StickyNote, Quote } from 'lucide-react';
-import { getPlatform, platformIcon, platformColor, xHandle, instagramHandle, linkedinDisplayName, prettyHost } from '@/lib/platform';
+import { getPlatform, platformIcon, platformColor, xHandle, instagramHandle, linkedinDisplayName, prettyHost, screenshotSource } from '@/lib/platform';
 import { CitationGlyph } from '@/components/ui/Wordmark';
 
 /** Machina's own hosts — the ONLY place a "Machina" source name is legitimate
@@ -19,6 +19,9 @@ export interface SourceBylineLink {
     /** 'text' = a note card whose body is verbatim shared text; 'answer' = a
         card kept from an Ask answer (see Link). */
     captureType?: string;
+    /** Screenshot provenance read off the image by the vision pass (see Link). */
+    sourceHandle?: string | null;
+    sourcePlatform?: string | null;
     metadata?: { youtubeChannel?: string };
 }
 
@@ -133,6 +136,25 @@ export default function SourceByline({
         );
     }
     if (link.sourceType === 'image') {
+        // A screenshot whose author handle was read off the image reads like
+        // the post it shows: the app's mark and the @handle. A small screenshot
+        // glyph trails the handle so the reader still knows this is a captured
+        // image, not a live link. Handle with no drawable platform: the glyph
+        // leads, as on a plain screenshot, and the handle is the label.
+        const shot = screenshotSource(link);
+        if (shot) {
+            const where = shot.platform ? ` on ${shot.platform === 'x' ? 'X' : shot.platform[0].toUpperCase() + shot.platform.slice(1)}` : '';
+            const title = `Screenshot of @${shot.handle}${where}`;
+            return (
+                <span dir="ltr" className={wrap} title={title} aria-label={title}>
+                    {icon(shot.platform
+                        ? <span className="shrink-0 inline-flex" style={{ color: platformColor(shot.platform) }}>{platformIcon(shot.platform, iconCls)}</span>
+                        : <ImageIcon className={`${iconCls} shrink-0`} />)}
+                    {label(<span className={nameCls}>@{shot.handle}</span>)}
+                    {shot.platform && label(<ImageIcon className={`${size === 'md' ? 'w-3 h-3' : 'w-2.5 h-2.5'} shrink-0 opacity-60`} aria-hidden="true" />)}
+                </span>
+            );
+        }
         return (
             <span className={wrap} title="Screenshot">
                 {icon(<ImageIcon className={`${iconCls} shrink-0`} />)}

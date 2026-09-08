@@ -5,6 +5,10 @@
 // label) so the filter list always matches the labels a user sees on their cards.
 //
 // Resolution order (first match wins):
+//   0. A screenshot with a legible author @handle → that handle; when the
+//      screenshotted app was recognised it is the SAME source as a saved link
+//      from that account (an X screenshot of @naval and an x.com/naval link
+//      share one facet)
 //   1. X / Twitter post  → the author @handle
 //   2. LinkedIn post     → the author's name (from the stored name or the URL slug)
 //   2b. Instagram post   → the author @handle the scraper stored in sourceName
@@ -21,6 +25,7 @@ import {
     instagramHandle,
     linkedinDisplayName,
     prettyHost,
+    screenshotSource,
     type PlatformKey,
 } from './platform';
 import type { Link } from './types';
@@ -45,9 +50,25 @@ function cleanSourceName(sourceName?: string | null): string {
 }
 
 /** Resolve a card to its source identity (see file header for the order). */
-export function getSourceInfo(link: Pick<Link, 'url' | 'sourceName' | 'sourceType'>): SourceInfo {
+export type SourceLink = Pick<Link, 'url' | 'sourceName' | 'sourceType' | 'sourceHandle' | 'sourcePlatform'>;
+
+export function getSourceInfo(link: SourceLink): SourceInfo {
     const platform = getPlatform(link.url);
     const isScreenshot = link.sourceType === 'image';
+
+    // 0. A screenshot whose author handle was read off the image. With the app
+    // recognised, the key is the one a saved link from that account gets
+    // (`x:@naval`) so the two merge in the Sources list and the filter; the
+    // card is then grouped under the platform, not under Screenshots. A handle
+    // with no drawable platform stays a screenshot source of its own.
+    const shot = screenshotSource(link);
+    if (shot) {
+        const label = `@${shot.handle}`;
+        if (shot.platform) {
+            return { key: `${shot.platform}:@${shot.handle.toLowerCase()}`, label, platform: shot.platform, isScreenshot: false };
+        }
+        return { key: `${shot.platformId ?? 'handle'}:@${shot.handle.toLowerCase()}`, label, platform: null, isScreenshot: true };
+    }
 
     // 1. X / Twitter → author handle (its own source, e.g. "@naval").
     const handle = xHandle(link.url);
@@ -135,7 +156,7 @@ export function sourceMatchesQuery(info: SourceInfo, query: string): boolean {
  * behind the Sources filter list. Sorted by count (desc) then label (A–Z), with
  * the first-seen label winning for a given key (so casing stays stable).
  */
-export function buildSourceFacets(links: Pick<Link, 'url' | 'sourceName' | 'sourceType'>[]): SourceFacet[] {
+export function buildSourceFacets(links: SourceLink[]): SourceFacet[] {
     const byKey = new Map<string, SourceFacet>();
     for (const link of links) {
         const info = getSourceInfo(link);

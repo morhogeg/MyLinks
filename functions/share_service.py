@@ -350,6 +350,12 @@ def _instagram_handle(source_name: str) -> Optional[str]:
     return m.group(1) if m else None
 
 
+def _screenshot_handle(source_handle) -> Optional[str]:
+    """Bare handle from a screenshot card's stored `@handle` (main._apply_screenshot_source)."""
+    m = re.fullmatch(r"@([A-Za-z0-9._-]{1,100})", str(source_handle or "").strip())
+    return m.group(1) if m else None
+
+
 def _byline_html(icon_svg: str, color: str, text: str) -> str:
     tinted = f' style="color:{color}"' if color else ""
     label = f'<span class="src-name">{_esc(text)}</span>' if text else ""
@@ -391,6 +397,16 @@ def _source_byline(card: dict) -> str:
         return _byline_html(svg, color, f"@{handle}" if handle else "Instagram")
 
     if source_type == "image":
+        # A screenshot whose author handle was read off the image: the app's
+        # mark (when its chrome was recognised and we have an icon for it) and
+        # the @handle, mirroring `SourceByline`. Otherwise the plain placeholder.
+        handle = _screenshot_handle(card.get("sourceHandle"))
+        if handle:
+            shot_platform = str(card.get("sourcePlatform") or "").lower()
+            if shot_platform in _PLATFORM_ICONS:
+                color, svg = _PLATFORM_ICONS[shot_platform]
+                return _byline_html(svg, color, f"@{handle}")
+            return _byline_html(_ICON_IMAGE, "", f"@{handle}")
         return _byline_html(_ICON_IMAGE, "", "Screenshot")
     if source_type == "note":
         return _byline_html(_ICON_NOTE, "", "Note")
