@@ -1,0 +1,156 @@
+---
+name: ship
+description: Ship Machina AI. Merge the current branch to main, deploy the frontend to Vercel (desktop web, auto on push), deploy Cloud Functions if the backend changed, and trigger the iOS → TestFlight GitHub Actions workflow if the app changed. Update SOURCE_OF_TRUTH.md for the next session. Use whenever the user says ship, deploy, release, "push it live", "make it live", or "send to TestFlight".
+---
+
+> **Codex notes (ported from `.claude/skills/ship`).** Differences from the
+> Claude version: (1) there is no GitHub MCP here by default, so watch workflow
+> runs with `gh run list --workflow=deploy-functions.yml --limit 3` /
+> `gh run watch <id>` (or the Actions tab) instead of `actions_list`; (2) the
+> "land via MCP `push_files`" fallback does not exist, so if `git push` is
+> blocked, stop and tell the owner; (3) `send_later` check-ins do not exist,
+> so poll the run with `gh run watch` and report the result in the same turn;
+> (4) Codex works in one checkout (no Claude worktrees), so step 4 switches to
+> `main` in place. Branch names: `codex/*`.
+
+
+# Ship Machina AI
+
+> **Before anything:** read `SOURCE_OF_TRUTH.md` (repo root). It is the single
+> source of truth for architecture, deploy gotchas, and the ranked backlog. All
+> post-ship documentation goes THERE (§4 checkboxes + §9 session log) — never
+> create or update HANDOFF/TASKS/spec files; they were consolidated and deleted.
+>
+> 🚨 **MANDATORY — every ship MUST update `SOURCE_OF_TRUTH.md` before it's done.**
+> Not optional, not just the session log. In the SAME ship you must:
+> 1. **§9 session log** — prepend a dated entry covering what advanced (features,
+>    fixes, deploys) AND any **new/known issues, workarounds, or deferred owner
+>    steps** discovered. Name concrete artifacts: commit SHAs, function names,
+>    TestFlight build numbers, endpoints.
+> 2. **§4 backlog** — check off completed items, add newly-discovered tasks/bugs,
+>    re-rank if priorities shifted.
+> 3. **§3 / live-state note / §2 gotchas** — update if the auth state, live build,
+>    or an operational gotcha changed.
+> A ship that deploys code but leaves the source of truth stale is an INCOMPLETE
+> ship. Bugs you couldn't fix, workarounds you shipped, follow-ups you left (a
+> console step, a config the user must set) MUST be written here so the next
+> session isn't blind. Commit + push the doc update to `main` (step 8).
+
+End-to-end release for this repo. Deploy surfaces:
+
+- **Desktop web** → Vercel (`my-links-sable.vercel.app`). **Auto-deploys on push to `main`.**
+- **iOS app** → **GitHub Actions "iOS → TestFlight" workflow**
+  (`.github/workflows/ios-testflight.yml`, macOS runner, cloud-managed signing,
+  build number = 1000 + run number). Trigger by pushing `trigger/testflight`
+  (step 6) or manual dispatch.
+- **Backend** → Python Cloud Functions in `functions/` (Firebase project
+  `secondbrain-app-94da2`). **Auto-deploys on `main` pushes touching
+  `functions/**`** (step 5); Mac fallback: `./deploy-functions.sh functions:<name>`.
+- ~~iPhone PWA (Firebase Hosting)~~ — **retired**: the native iOS app replaced it.
+  Do NOT routinely run `./deploy-hosting.sh`. Hosting still serves the `/api/*`
+  rewrites the native app calls and the `/s`,`/c` share pages, so deploy hosting
+  **only** when `firebase.json` (rewrites/headers) changes.
+
+Local deploy commands run from the repo checkout `~/MyLinks` (it has
+`node_modules`, `web/.env.local`, and `firebase login`). Work happens on a
+`codex/*` branch in that same checkout; `main` is merged there before pushing.
+
+## Steps
+
+1. **Assess scope.** `git status` + `git diff --name-only main...HEAD`:
+   - **Frontend changed?** any file under `web/` (excluding `web/ios/`).
+   - **Native iOS changed?** anything under `web/ios/` or `capacitor.config.ts`.
+   - **Backend changed?** any file under `functions/`. List the specific
+     functions whose code (or imported shared modules — `ai_service.py`,
+     `search.py`, `models.py`) changed; they become the deploy targets.
+   - **`firebase.json` changed?** only then is a hosting deploy needed.
+   - **Docs/skills only?** no deploys — commit + merge + push.
+
+2. **Commit** any uncommitted work on the current branch with a clear, scoped
+   message. Skip if the tree is already clean.
+
+3. **Typecheck** (if `web/` changed): `cd ~/MyLinks/web && ./node_modules/.bin/tsc --noEmit`
+   — must exit 0. Backend: `cd functions && python -m py_compile *.py`.
+
+4. **Merge to `main` and push.** Single checkout, so switch branches:
+   ```bash
+   git checkout main && git pull --no-rebase --no-edit origin main
+   git merge <current-branch> --no-ff --no-edit
+   git push -u origin main
+   ```
+   If push is rejected (origin advanced), pull `--no-rebase` again, re-run the
+   typecheck if `web/` changed, then push. The push triggers Vercel →
+   **desktop web is now deploying.**
+
+5. **Deploy Cloud Functions** (only if `functions/` changed): **the push to
+   `main` in step 4 does it automatically.** The "Deploy Cloud Functions"
+   workflow (`.github/workflows/deploy-functions.yml`) triggers on any `main`
+   push touching `functions/**` and deploys `firestore:indexes` + functions.
+   - **Scope the deploy** by putting a `Deploy-Functions: <funcA>,<funcB>` line
+     in the MERGE COMMIT message (`git merge --no-ff -m "…" -m "Deploy-Functions: a,b"`);
+     without it the whole codebase deploys ("all" — also fine, it prunes
+     deleted functions and ends main-vs-prod drift).
+   - **Watch the run** (GitHub MCP `actions_list` → `list_workflow_runs` for
+     `deploy-functions.yml`) and report the outcome — a ship isn't done until
+     the deploy is green. `process_link_background` 409s are auto-retried once.
+   - **Redeploy without a code change:** bump `functions/.deploy-ping` in a
+     commit carrying the `Deploy-Functions:` line and push to main.
+   - Manual fallbacks still work: Actions → Run workflow (owner), or
+     `./deploy-functions.sh functions:<a>,functions:<b>` on the Mac.
+   - Repo secrets `FIREBASE_SERVICE_ACCOUNT` + `GEMINI_API_KEY` are **set up and
+     verified (2026-07-17)** — this path is fully operational; no owner step.
+     If a deploy ever fails at "Check required secrets", a secret was rotated
+     or deleted — re-add per the setup block at the top of the workflow file.
+   - If `git push` to main is blocked in-session (permission classifier), land
+     the same content via the GitHub MCP `push_files` tool — the commit message
+     still carries the `Deploy-Functions:` line.
+
+6. **Deploy to TestFlight** (if frontend or native iOS changed and the user wants
+   the app updated — TestFlight builds are heavier than web deploys, so confirm
+   when ambiguous). **Trigger by pushing the trigger branch** (the dispatch API
+   403s for cloud sessions; push is the control channel):
+   ```bash
+   git push -f origin main:trigger/testflight
+   ```
+   This builds main's HEAD **with the auth gate ON** and uploads to TestFlight
+   automatically — no Xcode. Watch it via GitHub MCP `actions_list`
+   (`list_workflow_runs` for `ios-testflight.yml`); build number = 1000 + run
+   number. **Verified end-to-end 2026-07-17:** run #102 / build 1102 built and
+   uploaded green from a session-pushed trigger branch.
+
+   ⚠️ **Before 2026-08-03 this shortcut hardcoded the gate OFF** and shipped
+   ungated builds 1264/1266/1267 — the last two landed after the rules lock and
+   took the app down on device (SOURCE_OF_TRUTH §9, 2026-08-03). The default is
+   inverted now and a guard step fails the build rather than ship an ungated
+   bundle, so pushing the trigger branch is the correct path. An ungated build
+   is now **rollback only**: owner dispatch with `legacy_no_auth` ticked, valid
+   only while the Firestore rules are rolled back to the open ruleset. `gh
+   workflow run` / MCP `actions_run_trigger` also work where dispatch is
+   permitted.
+
+7. **Deploy Firebase Hosting** — only if `firebase.json` changed:
+   `cd ~/MyLinks && ./deploy-hosting.sh`. Otherwise skip; the iPhone PWA is retired.
+
+8. **Update `SOURCE_OF_TRUTH.md` (MANDATORY — see the 🚨 block up top).** Not
+   optional: check off / add / re-rank §4 backlog items (with commit SHAs),
+   prepend a dated §9 session-log entry covering **both what advanced and any new
+   issues / workarounds / deferred owner steps** (name build numbers, function
+   names, endpoints), and update §3 / the live-state note / §2 gotchas if auth
+   state, the live build, or an operational gotcha changed. Commit + push to
+   `main` (docs, safe to commit directly). **A ship is not complete until this is
+   pushed.**
+
+9. **Report.** Tell the user exactly what shipped: desktop (Vercel, ~1–2 min),
+   functions (deploy run link + targets), TestFlight (workflow run link + build
+   number 1000+N, arrives in TestFlight after Apple processing, ~10–30 min).
+
+## Notes / gotchas
+- **Env:** `GEMINI_API_KEY` is a plain env var in `functions/.env`
+  (gitignored) — not Secret Manager. Functions deploy needs a local venv so
+  firebase-tools can import the source.
+- **Don't redeploy what didn't change** — backend-only → functions only;
+  frontend-only → push (Vercel) + TestFlight if the app should get it; docs-only
+  → no deploys.
+- Full operational gotchas (CORS/capacitor origins, SSE buffering, 127.0.0.1
+  preview trick, deploy footguns): `SOURCE_OF_TRUTH.md` §2.
+- If the command-safety classifier is briefly unavailable, wait and retry.

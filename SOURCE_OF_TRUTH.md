@@ -10,7 +10,9 @@
 > - **Picking work?** §4 is the ranked backlog — every open task lives there.
 > - **Finishing a session?** Update §4 (check boxes, re-rank if needed) and add a
 >   one-paragraph entry to §9 (session log). Do NOT create new handoff/spec docs.
-> - **Skills** (`.claude/skills/ship`) point here; keep it that way.
+> - **Skills** (`.claude/skills/*` for Claude Code, `.agents/skills/*` for Codex,
+>   rules in `CLAUDE.md` / `AGENTS.md`) point here; keep it that way. Codex
+>   migration notes: `docs/CODEX_ONBOARDING.md`.
 >
 > Remaining *reference* docs (how-to guides, not task trackers — they stay):
 > `AUTH_SPEC.md` (auth design), `NATIVE_AUTH_SETUP.md` (auth cutover console/Xcode
@@ -1930,6 +1932,21 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-08 — Codex onboarding kit (docs only, no deploy).** The owner is
+  moving from Claude Code to OpenAI Codex. Added `AGENTS.md` (same rules as
+  `CLAUDE.md`; keep both in sync), ported the four skills to
+  `.agents/skills/{onboard,ship,polish,security}/SKILL.md` with a "Codex
+  notes" block each (no GitHub MCP: use `gh run list/watch`; no `send_later`;
+  no `/security-review`; single checkout so the ship merge step switches to
+  `main` in place; branch prefix `codex/*`), and wrote
+  `docs/CODEX_ONBOARDING.md`: files Codex reads, a suggested
+  `~/.codex/config.toml`, the project in one screen, deploy surfaces, current
+  state, and a distilled known-issues-and-fixes list mined from §2/§4/§9/AUDIT.
+  Deleted the stale `.agent/` folder (Vertex/Opus rules and a `firebase
+  deploy` workflow that contradicted the Actions deploy path). `.claude/` is
+  untouched so both tools work side by side. NOT verified: the Codex
+  discovery paths (`.agents/skills`, `AGENTS.md`) were written from memory of
+  the Codex docs, which this container could not fetch; the doc says so.
 - **2026-09-05 (round 3) — "ארוחת ערב" on desktop showed Trump/Mondial,
   the Saudi deal, the IDF chief and a time-perception card under By meaning,
   AFTER round 2.** Cause, readable from the screenshot: ערב is a fragment of
