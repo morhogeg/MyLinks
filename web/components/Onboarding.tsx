@@ -41,8 +41,9 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
     const native = isNativeApp();
     const [showHow, setShowHow] = useState(false);
     const [importing, setImporting] = useState(false);
-    // One line, only for a reverse trial (never for founders or subscribers).
-    const { isTrial, trialStarted, trialAnchorCards } = useEntitlement();
+    // One line, only while a reverse trial is what makes the plan Pro (never
+    // for a subscriber, never once the trial has ended).
+    const { isTrial, trialStarted, trialAnchorCards, daysLeft } = useEntitlement();
 
     return (
         <>
@@ -69,9 +70,13 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
                         )}
                         {isTrial && (
                             <p className={`${showHow ? 'mt-3' : ''} text-[12px] text-text-muted text-center leading-relaxed`}>
-                                {trialStarted
-                                    ? 'Pro is free for your first 14 days. Nothing to cancel.'
-                                    : `Pro is free for your first 14 days. The clock starts once you’ve saved ${trialAnchorCards} things.`}
+                                {!trialStarted
+                                    ? `Pro is free for your first 14 days. The clock starts once you’ve saved ${trialAnchorCards} things.`
+                                    : daysLeft === null
+                                        ? 'Pro is free for your first 14 days. Nothing to cancel.'
+                                        : daysLeft === 0
+                                            ? 'Your free Pro trial ends today. Nothing to cancel.'
+                                            : `Pro is free for ${daysLeft} more ${daysLeft === 1 ? 'day' : 'days'}. Nothing to cancel.`}
                             </p>
                         )}
                     </>

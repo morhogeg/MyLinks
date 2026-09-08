@@ -941,15 +941,19 @@ The multi-user auth work described below **was** fully written but not live:
 26. **[ ] Machina Pro (entitlements, trial, paywall) — CODE SHIPPED 2026-09-02
     (PR #18, merge `87a1d3b`; functions run #97, rules run #11, TestFlight
     build 1316). Owner checklist below still OPEN: no keys, so live is the
-    graceful-degradation state (founder grants + trials, paywall says
-    "not available in this build").** One
+    graceful-degradation state (trials, paywall says
+    "not available in this build"). Founders grant REMOVED 2026-09-08 (§9).** One
     plan, "Machina Pro" (monthly $7.99 / annual $49.99, prices live in App
     Store Connect + RevenueCat, never in code). Free: 100 saves + 20 asks a
     month, locked synthesis teaser, no curated digests, metadata-only YouTube
     cards. Pro: unlimited (abuse ceiling 1000), full synthesis, digests, video
-    ingestion. Every pre-launch workspace gets a 365-day founders grant; every
-    new workspace gets Pro free for 14 days (server-side reverse trial from
-    `createdAt`, no card, no StoreKit). Source of truth is functions-only
+    ingestion. Every workspace gets Pro free for 14 days (server-side reverse
+    trial, no card, no StoreKit): the clock starts at the 10th card
+    (`maybe_start_trial`), with a hard ceiling 60 days from `createdAt`. There
+    is no founders grant any more; the pre-launch workspaces (owner +
+    TestFlight testers) were migrated onto the same trial on first read after
+    the 2026-09-08 deploy, with their 60-day ceiling measured from that
+    migration rather than from `createdAt` (§9). Source of truth is functions-only
     `entitlements/{uid}` (`functions/entitlement.py`); capture is never gated
     (a free 429 carries `upgrade: true` and the client opens the paywall).
     Code: `functions/entitlement.py`, plan-aware `quota.py`,
@@ -985,8 +989,8 @@ The multi-user auth work described below **was** fully written but not live:
       binary that contains the paywall** (Apple reviews them as a set).
     - [ ] Merge the branch, then a TestFlight build with the key set, then
       sandbox-test purchase + restore + the "Manage subscription" link.
-    Until the keys exist the live app degrades gracefully: trials, founder
-    grants, quota gating and the locked synthesis all work; `/api/entitlement/sync`
+    Until the keys exist the live app degrades gracefully: trials, quota
+    gating and the locked synthesis all work; `/api/entitlement/sync`
     answers 503, the webhook refuses, and the paywall says subscriptions
     aren't available in this build. After the secrets are added, push any
     `functions/**` change (or bump `functions/.deploy-ping`) so
@@ -1752,9 +1756,11 @@ free. A hard paywall at install would show a price before the library has
 anything in it; the magic only appears after a few saves and the first Sunday
 synthesis, and 14 days guarantees two syntheses land during the trial. Capture
 is **never** gated — a save that bounces off a paywall destroys the "I can trust
-this caught it" promise the whole product stands on. Workspaces that existed
-before the feature shipped (owner + TestFlight friends) get a 365-day founders
-grant so nobody who helped test hits a wall.
+this caught it" promise the whole product stands on. The 14 days are counted
+from the tenth saved card, not from sign-up (a trial spent on an empty library
+teaches nothing), with a hard ceiling 60 days after the workspace was created.
+There is no separate grant for anyone: the pre-launch workspaces were moved
+onto this same trial on 2026-09-08 (§9).
 
 | Surface | Free | Pro |
 |---|---|---|
@@ -1930,6 +1936,70 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-08 — Founders grant removed; the 14-day reverse trial is the
+  only free Pro there is, and it was walked end to end. NOT shipped (branch
+  `claude/remove-founders-grant`, ready for `/ship`; every plan gate imports
+  `entitlement.py`, so deploy functions UNSCOPED; a TestFlight build carries
+  the new Settings/paywall copy).**
+  **How the trial works now, in plain words.** Every workspace is Pro from
+  the moment it exists. The 14-day clock does not start at sign-up; it starts
+  the moment the tenth card lands (from any capture path: share sheet, web
+  add, note, import, because all of them write `users/{uid}/links` and the
+  embedding trigger checks the count on every card CREATE). That moment is
+  stored once as `trialAnchorAt` and the end date is `min(anchor + 14d,
+  trialCeilingAt)`, where the ceiling is 60 days after the workspace was
+  created, so an account that never reaches ten cards still stops being Pro
+  on day 60. When the end passes, `/api/entitlement` answers plan `free`,
+  the quotas become the free caps (100 saves, 20 asks), the weekly synthesis
+  is written locked, curated digests stop, YouTube cards go metadata-only,
+  and the paywall opens on the next wall. A push ("Your Pro trial ends
+  Sunday") goes out once, 48h before the end. Settings shows the plan row in
+  three states: "trial, starts at 10 saves", "trial, N days left", and
+  "trial ended"; the welcome line says "The clock starts once you've saved
+  10 things" before the anchor and "Pro is free for N more days" after it.
+  **What happened to the pre-launch workspaces (you and the TestFlight
+  testers).** The 365-day "founding member" grant is gone from the code, so
+  the Settings row will never say "founding member" again. Nobody drops to
+  Free on deploy: the first time a pre-launch workspace's entitlement is read
+  after the deploy (any save, ask, digest run, or app open), its doc is
+  rewritten as an ordinary trial. If the library already has ten cards
+  (yours does), the 14 days start right then: Pro until 14 days after that
+  first read, then Free unless subscribed. If it has fewer than ten, it is
+  an unstarted trial whose 60-day ceiling counts from that read, and the 14
+  days start at the tenth card as for everyone else. The migration is
+  idempotent (it flips `source` from `founder` to `trial` and stamps
+  `migratedAt`, so it can only run once) and covers both a stored `founder`
+  doc and a pre-launch workspace with no doc at all (including the legacy
+  phone workspace with no `createdAt`). A lapsed subscriber keeps whatever
+  is left of that same trial, measured against the stored ceiling, never
+  against the months-old `createdAt`.
+  **Bugs found on the walk and fixed.** (1) The per-instance `_TRIAL_SETTLED`
+  memo marked a workspace settled whenever `source` was not `trial`, but a
+  Firestore outage yields a `source: None` fail-open shape and a subscriber's
+  `source` flips back to `trial` when the subscription lapses; either could
+  park a workspace that later needed its anchor. It now settles only on a
+  STORED anchor (or a grandfathered end date), and a fail-open read settles
+  nothing. (2) Ten cards from one import fire ten triggers at once; each
+  could count ten cards and rewrite the anchor a few ms later, moving the
+  end date. The anchor is now stamped inside a Firestore transaction that
+  gives up if one exists (`_stamp_trial_anchor`). (3) A subscriber who
+  reached ten cards before lapsing had no anchor, so a lapse inside the
+  ceiling handed out a fresh unstarted trial; the tenth card now records
+  `trialAnchorAt`/`trialEndsAt` on a RevenueCat doc too (plan and `proUntil`
+  untouched). (4) The client kept showing trial chrome if the app stayed
+  open across the end instant; `EntitlementProvider` now re-fetches at
+  `proUntil` (when within a week, no re-arm on a past expiry). Times are UTC
+  epoch ms on both sides (`Date.now()` vs Python `_now_ms`), so "days left"
+  needs no timezone; only the nudge's weekday phrase uses the user's zone
+  (test added). New stored fields: `trialCeilingAt`, `migratedAt`.
+  **Verified:** pytest 873 passed (45 in `test_entitlement.py`; the 13
+  failures in this sandbox are `test_import_links`/`test_post_image_analysis`
+  and fail identically on untouched `main` here because the real
+  `google.genai`/`firebase_functions` packages are not installed; CI has
+  them), `py_compile` clean, `tsc` clean, eslint clean on the five touched
+  web files, em-dash gate clean. **Not verified:** anything on device or
+  against live Firestore, the migration on the real owner doc, a real
+  import's ten concurrent triggers, the nudge push on a phone.
 - **2026-09-05 (round 3) — "ארוחת ערב" on desktop showed Trump/Mondial,
   the Saudi deal, the IDF chief and a time-perception card under By meaning,
   AFTER round 2.** Cause, readable from the screenshot: ערב is a fragment of

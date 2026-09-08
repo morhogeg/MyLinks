@@ -19,7 +19,7 @@ import { apiUrl, fetchWithTimeout } from './api';
 import { authHeaders } from './auth';
 
 export type Plan = 'free' | 'pro';
-export type EntitlementSource = 'trial' | 'founder' | 'revenuecat' | null;
+export type EntitlementSource = 'trial' | 'revenuecat' | null;
 
 export interface QuotaMeter {
     used: number;
@@ -90,7 +90,10 @@ export function parseEntitlement(raw: unknown): Entitlement {
     const source = r.source;
     return {
         plan: r.plan === 'pro' ? 'pro' : 'free',
-        source: source === 'trial' || source === 'founder' || source === 'revenuecat' ? source : null,
+        // 'founder' no longer exists server-side (the grant was removed; the
+        // server migrates old docs to a trial on first read), so anything else
+        // reads as "no grant".
+        source: source === 'trial' || source === 'revenuecat' ? source : null,
         proUntil: numOrNull(r.proUntil),
         trialEndsAt: numOrNull(r.trialEndsAt),
         trialAnchorAt: numOrNull(r.trialAnchorAt),
@@ -145,10 +148,24 @@ export function isUpgradeHint(data: unknown): data is UpgradeHint {
         && (d.kind === 'saves' || d.kind === 'asks' || d.kind === 'imports');
 }
 
-/** Whole days until `ts`, floored at 0; null when there is no date. */
+/**
+ * Whole days until `ts`, floored at 0; null when there is no date. Both sides
+ * are UTC epoch ms (the server writes ms ints, the client reads Date.now()),
+ * so no timezone enters the arithmetic: "1 day left" means fewer than 24
+ * hours remain, however the user's calendar is drawn.
+ */
 export function daysUntil(ts: number | null, now = Date.now()): number | null {
     if (ts === null) return null;
     return Math.max(0, Math.ceil((ts - now) / 86_400_000));
+}
+
+/**
+ * True once a reverse trial has run out: the server still reports the trial as
+ * the source (so the client can say "ended" rather than nothing), but the plan
+ * has fallen to free and the end date is in the past.
+ */
+export function trialHasEnded(e: Pick<Entitlement, 'plan' | 'source' | 'trialEndsAt'>, now = Date.now()): boolean {
+    return e.plan === 'free' && e.source === 'trial' && e.trialEndsAt !== null && e.trialEndsAt <= now;
 }
 
 /** "18 of 20 questions left this month", or null when unmetered. */

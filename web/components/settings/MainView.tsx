@@ -45,16 +45,19 @@ export function MainView({
     const remindersOrDigest = settings.reminders_enabled || settings.digest_enabled;
     // Machina Pro row: one line of truth about the plan, and the way to change it.
     const ent = useEntitlement();
-    // A trial whose 14 days have not started yet has no countdown to show: the
-    // clock begins at the tenth card, so "0 days left" would be a lie.
+    // The trial has three states and the row names each one. Not started: the
+    // clock begins at the tenth card, so "0 days left" would be a lie and the
+    // row says what starts it instead. Running: the countdown. Ended: said
+    // plainly, so the row explains why Pro features just locked. A
+    // subscription reads "active"; there is no other kind of grant.
     const proValue = !ent.loaded
         ? undefined
         : ent.isTrial && !ent.trialStarted
-            ? 'trial'
+            ? `trial, starts at ${ent.trialAnchorCards} saves`
             : ent.isTrial
             ? `trial, ${ent.daysLeft ?? 0} ${ent.daysLeft === 1 ? 'day' : 'days'} left`
-            : ent.isPro && ent.source === 'founder'
-                ? 'founding member'
+            : ent.trialEnded
+                ? 'trial ended'
                 : ent.isPro
                     ? 'active'
                     : undefined;

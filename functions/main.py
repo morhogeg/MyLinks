@@ -3733,7 +3733,7 @@ def _entitlement_caller(req, headers):
 @https_fn.on_request()
 def entitlement_http(req: https_fn.Request) -> https_fn.Response:
     """GET /api/entitlement: the caller's plan, grant dates, and this month's
-    quota usage. Lazily creates the founder/trial grant on first call."""
+    quota usage. Lazily creates the trial grant on first call."""
     if req.method == 'OPTIONS':
         return _cors_preflight(req)
     headers = _cors_headers(req)

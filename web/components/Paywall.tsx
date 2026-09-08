@@ -71,7 +71,7 @@ export default function Paywall({
     /** Re-fetch the entitlement after a purchase or restore. */
     onPurchased: () => Promise<void>;
 }) {
-    const { isTrial, trialStarted, trialAnchorCards, daysLeft, isPro, source } = useEntitlement();
+    const { isTrial, trialStarted, trialEnded, trialAnchorCards, daysLeft, isPro, source } = useEntitlement();
     const availability = purchasesAvailability();
     const [packages, setPackages] = useState<ProPackage[] | null>(null);
     const [period, setPeriod] = useState<ProPeriod>('annual');
@@ -175,8 +175,8 @@ export default function Paywall({
         ? `Your free trial starts once you have saved ${trialAnchorCards} things.`
         : isTrial && daysLeft !== null
         ? (daysLeft === 0 ? 'Your free trial ends today.' : `Your free trial has ${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} left.`)
-        : isPro && source === 'founder'
-            ? 'You have Pro as a founding member. Subscribing keeps it after that ends.'
+        : trialEnded
+            ? 'Your free trial has ended.'
             : isPro && source === 'revenuecat'
                 ? 'Machina Pro is active on this account.'
                 : null;

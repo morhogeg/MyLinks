@@ -5,7 +5,7 @@ import {
 } from 'react';
 import { useAuth } from '@/components/AuthProvider';
 import {
-    Entitlement, PaywallReason, PAYWALL_EVENT, fetchEntitlement, daysUntil,
+    Entitlement, PaywallReason, PAYWALL_EVENT, fetchEntitlement, daysUntil, trialHasEnded,
 } from '@/lib/entitlement';
 import { configurePurchases, logOutPurchases } from '@/lib/purchases';
 import { track } from '@/lib/analytics';
@@ -32,10 +32,16 @@ interface EntitlementContextType {
     source: Entitlement['source'];
     proUntil: number | null;
     trialEndsAt: number | null;
-    /** Whole days left on the current grant (trial / founder / subscription), or null. */
+    /** Whole days left on the current grant (trial / subscription), or null. */
     daysLeft: number | null;
     /** True while a reverse trial is what makes the plan Pro. */
     isTrial: boolean;
+    /**
+     * True once the reverse trial has run out and nothing replaced it: the
+     * plan is free, and the trial's end date is in the past. The third state
+     * of the trial copy (not started / running / ended).
+     */
+    trialEnded: boolean;
     /**
      * True once the trial's 14 days are actually running. A brand-new workspace
      * is on the trial from day one, but the clock only starts at the tenth card,
@@ -65,6 +71,7 @@ const EntitlementContext = createContext<EntitlementContextType>({
     trialEndsAt: null,
     daysLeft: null,
     isTrial: false,
+    trialEnded: false,
     trialStarted: false,
     trialAnchorCards: 10,
     quotas: UNMETERED,
@@ -117,6 +124,24 @@ export function EntitlementProvider({ children }: { children: ReactNode }) {
         return () => document.removeEventListener('visibilitychange', onVisible);
     }, [uid, refresh]);
 
+    // The moment the grant runs out, ask the server again. proUntil is UTC
+    // epoch ms and so is Date.now(), so this fires at the exact instant the
+    // server starts answering "free"; without it an app left open across the
+    // boundary would keep showing trial chrome until the next foreground. A
+    // far-off expiry (past a week) is left to the foreground refresh: browser
+    // timers overflow past ~24.8 days, and nothing needs that precision. An
+    // expiry already in the past is left alone too: the server has answered
+    // since then, so the plan it gave is the truth, and re-arming would spin.
+    useEffect(() => {
+        if (!uid || !ent || ent.uid !== uid) return;
+        const until = ent.data.plan === 'pro' ? ent.data.proUntil : null;
+        if (until === null) return;
+        const wait = until - Date.now();
+        if (wait <= 0 || wait > 7 * 86_400_000) return;
+        const timer = window.setTimeout(() => { void refresh(); }, wait + 1_000);
+        return () => window.clearTimeout(timer);
+    }, [uid, ent, refresh]);
+
     // RevenueCat identity follows the AUTH uid (never the workspace uid).
     useEffect(() => {
         if (authUid) {
@@ -150,6 +175,7 @@ export function EntitlementProvider({ children }: { children: ReactNode }) {
         const isPro = plan === 'pro';
         const source = live?.source ?? null;
         const isTrial = isPro && source === 'trial';
+        const trialEnded = live !== null && trialHasEnded(live);
         // An unstarted trial holds Pro until a far-off ceiling. Reporting THAT
         // as "days left" would advertise a 60-day trial, so a trial with no
         // anchor has no countdown at all until the tenth card starts it.
@@ -165,6 +191,7 @@ export function EntitlementProvider({ children }: { children: ReactNode }) {
             trialEndsAt: live?.trialEndsAt ?? null,
             daysLeft: daysUntil(until),
             isTrial,
+            trialEnded,
             trialStarted,
             trialAnchorCards: live?.trialAnchorCards ?? 10,
             quotas: live?.quotas ?? UNMETERED,

@@ -4,38 +4,48 @@ Source of truth is the functions-only top-level collection
 ``entitlements/{workspaceUid}`` (denied to every client by the locked ruleset,
 exactly like ``usage_quotas``). One doc per workspace::
 
-    plan          'free' | 'pro'        the granted plan (see effective_plan)
-    source        'trial'|'founder'|'revenuecat'
-    proUntil      ms                    plan is honoured only while now < proUntil
-    trialEndsAt   ms | None              when the trial ends; None until it starts
-    trialAnchorAt ms | None              when the 10th card landed (the clock start)
-    rcAppUserId   str | None             RevenueCat app user id (= Firebase Auth uid)
-    productId     str | None             App Store product id, when subscribed
-    nudgedAt      ms | None              trial_nudges stamps this once
-    updatedAt     ms
+    plan           'free' | 'pro'        the granted plan (see effective_plan)
+    source         'trial'|'revenuecat'
+    proUntil       ms                    plan is honoured only while now < proUntil
+    trialEndsAt    ms | None             when the trial ends; None until it starts
+    trialAnchorAt  ms | None             when the 10th card landed (the clock start)
+    trialCeilingAt ms                    the hard end of the trial whatever happens
+    migratedAt     ms | None             set once on a pre-launch workspace (below)
+    rcAppUserId    str | None            RevenueCat app user id (= Firebase Auth uid)
+    productId      str | None            App Store product id, when subscribed
+    nudgedAt       ms | None             trial_nudges stamps this once
+    updatedAt      ms
 
 Where the grant comes from, in order:
 
-1. **Founders** (every workspace created before ``PRO_LAUNCH_AT``): 365 days of
-   Pro, so the owner and the TestFlight testers never hit a wall the day this
-   ships. A legacy doc with no ``createdAt`` at all predates the feature by
-   definition and is a founder too.
-2. **Reverse trial** (every workspace created on/after launch): 14 days of Pro
-   whose clock starts when the library reaches ``TRIAL_ANCHOR_CARDS`` cards, not
-   at sign-up. A trial spent on an empty library teaches nothing, so the 14 days
-   begin the moment the 10th card is written (``maybe_start_trial``, called from
-   the links trigger) and ``trialAnchorAt`` records that moment. Until then the
-   plan resolves as trial-Pro, bounded by a hard ceiling so a dormant account
-   cannot sit on Pro forever: ``trialEndsAt = min(anchor + 14d, createdAt +
-   60d)``, and before the anchor exists ``proUntil`` is the ceiling alone. The
-   anchor is stored, never recomputed from "now", so deleting and reinstalling
-   the app cannot restart the clock. Entitlement docs written before this rule
-   shipped already carry a ``trialEndsAt`` and are left exactly as they are.
-3. **RevenueCat** (a real App Store subscription): ``sync_from_revenuecat``
+1. **Reverse trial** (every workspace): 14 days of Pro whose clock starts when
+   the library reaches ``TRIAL_ANCHOR_CARDS`` cards, not at sign-up. A trial
+   spent on an empty library teaches nothing, so the 14 days begin the moment
+   the 10th card is written (``maybe_start_trial``, called from the links
+   trigger) and ``trialAnchorAt`` records that moment. Until then the plan
+   resolves as trial-Pro, bounded by a hard ceiling so a dormant account cannot
+   sit on Pro forever: ``trialEndsAt = min(anchor + 14d, trialCeilingAt)``, and
+   before the anchor exists ``proUntil`` is the ceiling alone. The ceiling is
+   ``createdAt + 60d`` and is stored on the doc; the anchor is stored too, never
+   recomputed from "now", so deleting and reinstalling the app cannot restart
+   the clock. Entitlement docs written before the anchor rule shipped already
+   carry a ``trialEndsAt`` and are left exactly as they are.
+2. **RevenueCat** (a real App Store subscription): ``sync_from_revenuecat``
    reads the subscriber from RevenueCat's REST API and writes ``proUntil`` from
    the ``pro`` entitlement's expiry. The client calls it after a purchase or a
    restore; the webhook calls it on every billing event. Event bodies are never
    trusted for dates, only for "which user changed".
+
+**Pre-launch workspaces** (the owner and the TestFlight testers, created before
+``PRO_LAUNCH_AT``) used to hold a 365-day "founding member" grant. That grant is
+gone. Because their ``createdAt`` is months old, a naive "everyone is on the
+trial" would put them on Free the instant this deploys, so the first read after
+deploy migrates them instead (``_migrate_legacy``): a doc with ``source:
+'founder'``, or no doc at all for a workspace created before launch (or with no
+``createdAt``, which only the legacy phone workspace lacks), becomes an ordinary
+trial whose 60-day ceiling is measured from the migration moment, anchored
+right then if the library already has ten cards. The write flips ``source`` to
+``'trial'`` and stamps ``migratedAt``, so it runs exactly once per workspace.
 
 Fail OPEN to the free tier: any Firestore or network error here yields the
 free-plan limits and a warning. Nothing in this module may take a save or an
@@ -54,6 +64,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import requests
+from google.cloud import firestore
 
 from db import get_db
 from log_safe import mask_uid
@@ -63,18 +74,19 @@ logger = logging.getLogger(__name__)
 _COLLECTION = "entitlements"
 _VAULT_COLLECTION = "synthesis_vault"
 
-# The day Pro shipped. Workspaces created before this get the founders grant.
-# ISO date, UTC midnight. Set to the day the feature branch was pushed.
+# The day Pro shipped. Only used to recognise a pre-launch workspace that has
+# no entitlement doc yet, so it gets the migration below instead of a trial
+# clock measured from a months-old createdAt. ISO date, UTC midnight.
 PRO_LAUNCH_AT = "2026-09-02"
 
 TRIAL_DAYS = 14
-FOUNDER_DAYS = 365
 
 # How many cards a library needs before the 14-day trial clock starts.
 TRIAL_ANCHOR_CARDS = 10
-# Hard ceiling from workspace creation, so an account that never reaches ten
-# cards still stops being Pro. Without it "the clock starts at 10 saves" would
-# read as "Pro forever if you save nine things".
+# Hard ceiling from workspace creation (or from migration, for a pre-launch
+# workspace), so an account that never reaches ten cards still stops being
+# Pro. Without it "the clock starts at 10 saves" would read as "Pro forever if
+# you save nine things".
 TRIAL_CEILING_DAYS = 60
 
 PLAN_FREE = "free"
@@ -134,51 +146,61 @@ def free_entitlement() -> dict:
         "proUntil": None,
         "trialEndsAt": None,
         "trialAnchorAt": None,
+        "trialCeilingAt": None,
         "rcAppUserId": None,
         "productId": None,
     }
 
 
-def trial_ends_from_anchor(created_ms: int, anchor_ms: int) -> int:
+def is_pre_launch(user_created_at_ms) -> bool:
+    """True for a workspace that existed before Pro shipped. A missing
+    createdAt predates the feature by definition (only the legacy phone
+    workspace lacks one)."""
+    created = _to_ms(user_created_at_ms)
+    return created is None or created < _launch_ms()
+
+
+def trial_ceiling_for(user_created_at_ms, now_ms: Optional[int] = None) -> int:
+    """The hard end of a trial: 60 days from workspace creation. A workspace
+    with no createdAt measures from now (it is the migration case, or a doc
+    that should not exist; either way "60 days from here" is the safe read)."""
+    created = _to_ms(user_created_at_ms)
+    base = created if created is not None else (now_ms if now_ms is not None else _now_ms())
+    return base + TRIAL_CEILING_DAYS * _DAY_MS
+
+
+def trial_end_for(anchor_ms: int, ceiling_ms: int) -> int:
     """When a trial anchored at `anchor_ms` ends: 14 days later, or the hard
-    ceiling from workspace creation, whichever comes first. Pure."""
-    return min(anchor_ms + TRIAL_DAYS * _DAY_MS,
-               created_ms + TRIAL_CEILING_DAYS * _DAY_MS)
+    ceiling, whichever comes first. Pure."""
+    return min(anchor_ms + TRIAL_DAYS * _DAY_MS, ceiling_ms)
 
 
 def grant_for(user_created_at_ms: Optional[int],
               trial_anchor_at_ms: Optional[int] = None,
-              trial_ends_at_ms: Optional[int] = None) -> dict:
-    """The server-side grant a workspace is owed, given its creation date and
-    (for a trial) where its clock stands.
-
-    Founders (created before launch, or with no createdAt at all) get 365 days
-    from launch day and ignore both trial arguments. Everyone else is on the
-    reverse trial:
+              trial_ends_at_ms: Optional[int] = None,
+              trial_ceiling_at_ms: Optional[int] = None,
+              now_ms: Optional[int] = None) -> dict:
+    """The server-side trial grant a workspace is owed, given its creation date
+    and where its clock stands. Every workspace is on the reverse trial:
 
     - ``trial_anchor_at_ms`` set: the 10th card has landed, so the trial ends at
-      ``min(anchor + 14d, createdAt + 60d)``.
+      ``min(anchor + 14d, ceiling)``.
     - no anchor but ``trial_ends_at_ms`` set: a grandfathered doc from before the
       anchor rule shipped. Its end date stands, untouched.
     - neither: the clock has not started. Pro holds until the ceiling and
       ``trialEndsAt`` is None, which is how every caller reads "not started yet".
 
-    Pure: no I/O, so the rule is unit-testable.
+    The ceiling is the stored ``trialCeilingAt`` when the doc has one (a
+    migrated pre-launch workspace measures it from migration, not creation),
+    else ``createdAt + 60d``. Pure: no I/O, so the rule is unit-testable.
     """
-    launch = _launch_ms()
     created = _to_ms(user_created_at_ms)
-    if created is None or created < launch:
-        return {
-            "plan": PLAN_PRO,
-            "source": "founder",
-            "proUntil": launch + FOUNDER_DAYS * _DAY_MS,
-            "trialEndsAt": None,
-            "trialAnchorAt": None,
-        }
-    ceiling = created + TRIAL_CEILING_DAYS * _DAY_MS
+    ceiling = _to_ms(trial_ceiling_at_ms)
+    if ceiling is None:
+        ceiling = trial_ceiling_for(created, now_ms)
     anchor = _to_ms(trial_anchor_at_ms)
     if anchor is not None:
-        trial_ends = trial_ends_from_anchor(created, anchor)
+        trial_ends = trial_end_for(anchor, ceiling)
     else:
         trial_ends = _to_ms(trial_ends_at_ms)
     return {
@@ -187,6 +209,7 @@ def grant_for(user_created_at_ms: Optional[int],
         "proUntil": trial_ends if trial_ends is not None else ceiling,
         "trialEndsAt": trial_ends,
         "trialAnchorAt": anchor,
+        "trialCeilingAt": ceiling,
     }
 
 
@@ -208,8 +231,64 @@ def _user_created_at(uid: str) -> Optional[int]:
     return _to_ms((snap.to_dict() or {}).get("createdAt"))
 
 
+def count_cards(uid: str, cap: int) -> int:
+    """How many cards `uid` has, counted only up to `cap`.
+
+    Projected to one small field and limited, so this is at most `cap` cheap
+    document reads and never pages a library of thousands.
+    """
+    query = (
+        get_db()
+        .collection("users").document(uid).collection("links")
+        .select(["createdAt"])
+        .limit(cap)
+    )
+    return len(list(query.get()))
+
+
+def legacy_trial_fields(uid: str, now_ms: int) -> dict:
+    """The trial a pre-launch workspace is moved onto (see the module docstring).
+
+    The 60-day ceiling runs from `now_ms`, not from the months-old createdAt,
+    and the clock is anchored right away when the library already holds ten
+    cards (it almost always does for the owner and the testers), so they get
+    the same 14 days a new user gets from their tenth save. Counts up to ten
+    cards: one small read, once per workspace, ever.
+    """
+    ceiling = now_ms + TRIAL_CEILING_DAYS * _DAY_MS
+    anchored = count_cards(uid, TRIAL_ANCHOR_CARDS) >= TRIAL_ANCHOR_CARDS
+    anchor = now_ms if anchored else None
+    ends = trial_end_for(anchor, ceiling) if anchor is not None else None
+    return {
+        "plan": PLAN_PRO,
+        "source": "trial",
+        "proUntil": ends if ends is not None else ceiling,
+        "trialEndsAt": ends,
+        "trialAnchorAt": anchor,
+        "trialCeilingAt": ceiling,
+        "migratedAt": now_ms,
+    }
+
+
+def _migrate_legacy(uid: str, ref, data: dict) -> dict:
+    """Rewrite a stored ``source: 'founder'`` doc as a trial, once.
+
+    Merge-write, so rcAppUserId/nudgedAt and friends survive. After this the
+    doc's source is 'trial', which is what makes the migration idempotent: the
+    next read takes the ordinary path and never lands here again.
+    """
+    now = _now_ms()
+    fields = legacy_trial_fields(uid, now)
+    fields["updatedAt"] = now
+    ref.set(fields, merge=True)
+    merged = {**data, **fields}
+    logger.info("Migrated founder grant to a trial for %s: anchored=%s until %s",
+                mask_uid(uid), fields["trialAnchorAt"] is not None, fields["proUntil"])
+    return merged
+
+
 def get_entitlement(uid: str, user_created_at_ms: Optional[int] = None) -> dict:
-    """The entitlement doc for `uid`, lazily creating the founder/trial grant.
+    """The entitlement doc for `uid`, lazily creating the trial grant.
 
     `user_created_at_ms` saves a user-doc read when the caller already has it;
     otherwise it is fetched. Returns the free shape (never raises) on any error.
@@ -222,23 +301,33 @@ def get_entitlement(uid: str, user_created_at_ms: Optional[int] = None) -> dict:
         if snap.exists:
             data = snap.to_dict() or {}
             data.setdefault("plan", PLAN_FREE)
+            if data.get("source") == "founder":
+                return _migrate_legacy(uid, ref, data)
             return data
         created = user_created_at_ms if user_created_at_ms is not None else _user_created_at(uid)
-        # A brand-new trial has no anchor yet: the clock starts at the 10th card
-        # (maybe_start_trial), not here.
-        doc = dict(grant_for(created))
+        now = _now_ms()
+        if is_pre_launch(created):
+            # A pre-launch workspace that never read its entitlement before
+            # this deploy: same migration, minus the doc to rewrite.
+            doc = legacy_trial_fields(uid, now)
+        else:
+            # A brand-new trial has no anchor yet: the clock starts at the
+            # 10th card (maybe_start_trial), not here.
+            doc = dict(grant_for(created, now_ms=now))
+            doc["migratedAt"] = None
         doc.update({
             "rcAppUserId": None,
             "productId": None,
             "nudgedAt": None,
-            "updatedAt": _now_ms(),
+            "updatedAt": now,
         })
         # create() rather than set(): two concurrent first requests must not
         # both "create" and race each other's updatedAt.
         try:
             ref.create(doc)
-            logger.info("Entitlement created for %s: %s until %s",
-                        mask_uid(uid), doc["source"], doc["proUntil"])
+            logger.info("Entitlement created for %s: %s until %s (migrated=%s)",
+                        mask_uid(uid), doc["source"], doc["proUntil"],
+                        doc.get("migratedAt") is not None)
         except Exception:
             again = ref.get()
             if again.exists:
@@ -262,13 +351,16 @@ def is_pro(uid: str) -> bool:
 
 # ── Trial clock ───────────────────────────────────────────────────────────────
 #
-# Per-instance memo of workspaces whose trial clock needs no further attention
-# (already anchored, grandfathered, founder, or subscribed). Cloud Functions
-# instances are reused across invocations, so this turns the common case (every
-# card write after the tenth) into zero Firestore reads. It is a cache of a
-# ONE-WAY transition: a uid only ever moves from "watch" to "settled", so a cold
-# instance re-reading the doc reaches the same answer. Bounded so a busy
-# instance cannot grow it without limit.
+# Per-instance memo of workspaces whose trial clock needs no further attention.
+# Cloud Functions instances are reused across invocations, so this turns the
+# common case (every card write after the tenth) into zero Firestore reads. It
+# is a cache of a ONE-WAY fact: a uid is added only once its anchor (or a
+# grandfathered end date) is STORED, and neither is ever cleared, so a cold
+# instance re-reading the doc reaches the same answer. Nothing else is cached:
+# a subscriber's `source` can flip back to 'trial' when the subscription lapses
+# (sync_from_revenuecat), and a fail-open read has no source at all, so neither
+# of those may settle a uid. Bounded so a busy instance cannot grow it without
+# limit.
 _TRIAL_SETTLED: set = set()
 _TRIAL_SETTLED_MAX = 2000
 
@@ -279,19 +371,39 @@ def _mark_trial_settled(uid: str) -> None:
     _TRIAL_SETTLED.add(uid)
 
 
-def count_cards(uid: str, cap: int) -> int:
-    """How many cards `uid` has, counted only up to `cap`.
+def trial_clock_settled(doc: dict) -> bool:
+    """True once the clock can never need starting: the anchor is stored, or
+    the doc predates the anchor rule and carries its own end date."""
+    return bool(doc.get("trialAnchorAt") or doc.get("trialEndsAt"))
 
-    Projected to one small field and limited, so this is at most `cap` cheap
-    document reads and never pages a library of thousands.
+
+def _stamp_trial_anchor(uid: str, now_ms: int, ceiling_ms: int) -> bool:
+    """Write trialAnchorAt exactly once, inside a transaction.
+
+    Ten cards arriving in one import fire ten triggers at once, and each of
+    them can count ten cards; only the first may win. The transaction re-reads
+    the doc and gives up if an anchor is already there. On a trial doc the
+    anchor also fixes the end of the grant; on a subscriber's doc only the
+    anchor and trialEndsAt are recorded, so that a lapse later resolves to the
+    right remaining trial (grant_for) without ever restarting the 14 days.
     """
-    query = (
-        get_db()
-        .collection("users").document(uid).collection("links")
-        .select(["createdAt"])
-        .limit(cap)
-    )
-    return len(list(query.get()))
+    db = get_db()
+    ref = db.collection(_COLLECTION).document(uid)
+
+    @firestore.transactional
+    def _txn(txn):
+        snap = ref.get(transaction=txn)
+        data = (snap.to_dict() or {}) if snap.exists else {}
+        if trial_clock_settled(data):
+            return False
+        ends = trial_end_for(now_ms, ceiling_ms)
+        update = {"trialAnchorAt": now_ms, "trialEndsAt": ends, "updatedAt": now_ms}
+        if data.get("source") == "trial":
+            update.update({"proUntil": ends, "plan": PLAN_PRO})
+        txn.set(ref, update, merge=True)
+        return True
+
+    return bool(_txn(db.transaction()))
 
 
 def maybe_start_trial(uid: str) -> bool:
@@ -310,32 +422,28 @@ def maybe_start_trial(uid: str) -> bool:
         return False
     try:
         doc = get_entitlement(uid)
-        # Only an unstarted reverse trial has a clock to start. A founder, a
-        # subscriber, and a doc written before this rule shipped (which already
-        # carries trialEndsAt) are all settled forever.
-        if doc.get("source") != "trial" or doc.get("trialAnchorAt") or doc.get("trialEndsAt"):
+        if doc.get("source") is None:
+            # The fail-open shape: Firestore was unreachable. Nothing is known,
+            # so nothing is settled; the next card checks again.
+            return False
+        if trial_clock_settled(doc):
             _mark_trial_settled(uid)
             return False
         if count_cards(uid, TRIAL_ANCHOR_CARDS) < TRIAL_ANCHOR_CARDS:
             return False
 
         now = _now_ms()
-        # The ceiling is measured from the workspace's own creation date, so
-        # this needs the user doc (one read, once per workspace, ever).
-        created = _user_created_at(uid) or now
-        ends = trial_ends_from_anchor(created, now)
-        get_db().collection(_COLLECTION).document(uid).set({
-            "trialAnchorAt": now,
-            "trialEndsAt": ends,
-            "proUntil": ends,
-            "plan": PLAN_PRO,
-            "source": "trial",
-            "updatedAt": now,
-        }, merge=True)
+        ceiling = _to_ms(doc.get("trialCeilingAt"))
+        if ceiling is None:
+            # A doc from before the ceiling was stored: measure it from the
+            # workspace's own creation date (one read, once per workspace).
+            ceiling = trial_ceiling_for(_user_created_at(uid), now)
+        started = _stamp_trial_anchor(uid, now, ceiling)
         _mark_trial_settled(uid)
-        logger.info("Trial clock started for %s at %d cards, ends %s",
-                    mask_uid(uid), TRIAL_ANCHOR_CARDS, ends)
-        return True
+        if started:
+            logger.info("Trial clock started for %s at %d cards, ends %s",
+                        mask_uid(uid), TRIAL_ANCHOR_CARDS, trial_end_for(now, ceiling))
+        return started
     except Exception as e:
         logger.warning("Trial anchor check failed (ignored) for %s: %s", mask_uid(uid), e)
         return False
@@ -449,8 +557,8 @@ def sync_from_revenuecat(uid: str, app_user_id: str) -> dict:
     """Re-read the subscriber from RevenueCat and rewrite the entitlement doc.
 
     Active `pro` entitlement → plan pro, source revenuecat, proUntil = expiry.
-    Not active → fall back to whatever server-side grant (trial/founder) is
-    still running, else free. Restores any vaulted synthesis when the result is
+    Not active → fall back to whatever remains of the server-side trial, else
+    free. Restores any vaulted synthesis when the result is
     pro. Raises RevenueCatError when RevenueCat can't be reached; the caller
     decides how to answer (503 for the client, 502 for the webhook).
     """
@@ -470,12 +578,14 @@ def sync_from_revenuecat(uid: str, app_user_id: str) -> dict:
             "productId": state["productId"],
         }
     else:
-        # Subscription lapsed (or never existed): the free-standing grant, if
-        # any, is still theirs. Recompute from createdAt so a lapsed founder
-        # keeps the founders year. The trial clock is carried through, never
-        # recomputed: a subscriber who lapses does not get a fresh 14 days.
+        # Subscription lapsed (or never existed): whatever is left of the
+        # trial is still theirs. The trial clock and its ceiling are carried
+        # through from the doc, never recomputed: a subscriber who lapses does
+        # not get a fresh 14 days, and a migrated pre-launch workspace keeps
+        # the ceiling it was given at migration.
         grant = grant_for(_user_created_at(uid), existing.get("trialAnchorAt"),
-                          existing.get("trialEndsAt"))
+                          existing.get("trialEndsAt"), existing.get("trialCeilingAt"),
+                          now)
         if effective_plan(grant, now) == PLAN_PRO:
             doc = {**grant, "productId": None}
         else:
@@ -485,6 +595,7 @@ def sync_from_revenuecat(uid: str, app_user_id: str) -> dict:
                 "proUntil": state["proUntil"] or grant["proUntil"],
                 "trialEndsAt": grant.get("trialEndsAt"),
                 "trialAnchorAt": grant.get("trialAnchorAt"),
+                "trialCeilingAt": grant.get("trialCeilingAt"),
                 "productId": None,
             }
     doc.update({"rcAppUserId": app_user_id, "updatedAt": now})
