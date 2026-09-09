@@ -63,6 +63,15 @@ class AIAnalysis(BaseModel):
     videoDurationMinutes: Optional[int] = Field(None, description="Observed length of the video in whole minutes")
 
 
+class ScreenshotPlatform(BaseModel):
+    """Answer to the one-question follow-up "which app's interface is this?"
+    asked when a screenshot carried an author handle but the main analysis
+    left sourcePlatform empty (models.AIAnalysis). A closed set; null when
+    no app's own chrome is visible."""
+    platform: Optional[str] = Field(None, description='One of "x", "instagram", "threads", "tiktok", "youtube", "linkedin", "facebook", or null when no app interface is visible')
+    evidence: Optional[str] = Field(None, description="The interface element that identifies the app (e.g. 'X logo in the top bar'), or null")
+
+
 class BrainAnswer(BaseModel):
     """Structured output for the "Ask Your Brain" RAG endpoint.
 

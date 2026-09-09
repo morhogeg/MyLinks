@@ -1964,6 +1964,23 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-09 (round 3) — the platform mark is no longer left to chance.**
+  On 1320 the OpenAI card read "@OpenAI" with the screenshot glyph but no X
+  mark: that card was saved before round 2 and carries no platform, and the
+  owner's point stands that the platform is the feature. Backend only:
+  `_apply_screenshot_source` now resolves the platform from every signal in
+  order: a valid `sourcePlatform`; a bare app name the model answered as
+  `sourceName` ("X"/"Twitter"/"Instagram", `_platform_from_name`); and, for
+  a handle still without a platform, ONE focused follow-up on the image,
+  `GeminiService.classify_screenshot_platform` (own schema
+  `models.ScreenshotPlatform` {platform, evidence}, LOW resolution, one
+  attempt, never raises), which asks only "which app's interface is this?"
+  with the closed set. Runs only in the handle-without-platform case, so
+  the extra call is rare and cheap. Both image sites pass the screenshot
+  bytes (`screenshot_parts` in `process_link_background`). Verified: pytest
+  782 passed (+7; the 8 `test_import_links` failures are the known
+  offline-fake gap), py_compile. Not verified live. The morning OpenAI card
+  keeps no platform (nothing is backfilled); a fresh save gets the X mark.
 - **2026-09-09 — Screenshot byline fix round 2: the handle the model put in
   the wrong field.** Owner re-saved the OpenAI X screenshot on 1319 and the
   card still read "Screenshot". Diagnosed with the pipeline-debug harness
