@@ -1223,7 +1223,8 @@ Work only from what is legible: keep the subject at the level the image states i
 
 WHERE THE SCREENSHOT WAS TAKEN (sourcePlatform / sourceHandle):
 - sourcePlatform: the app whose OWN interface chrome is visible — one of "x", "instagram", "threads", "tiktok", "youtube", "linkedin", "facebook". Decide from the interface only (the X logo and "· 55m" timestamp row, Instagram's heart/comment/send row, the Threads layout, TikTok's side action rail, LinkedIn's "1st · Follow" line, Facebook's Like/Comment/Share bar). A post's tone, topic or writing style is NOT evidence of a platform. Anything else, or any doubt, is null.
-- sourceHandle: the author's @handle exactly as printed next to the author's name (e.g. "@OpenAI"), including the @. Only a handle that is LITERALLY visible counts: never derive one from a display name, a mention inside the post text, a reply, or a quoted post. No visible author handle means null."""
+- sourceHandle: the author's @handle exactly as printed next to the author's name (e.g. "@OpenAI"), including the @. Only a handle that is LITERALLY visible counts: never derive one from a display name, a mention inside the post text, a reply, or a quoted post. No visible author handle means null.
+- The handle goes in sourceHandle, NOT in sourceName: sourceName stays the app's brand name ("X", "Instagram") or "Screenshot". Fill sourcePlatform and sourceHandle whenever the interface and the handle are visible; leaving them null when they are on screen is an error."""
 
         from google.genai import types
 

@@ -1528,7 +1528,8 @@ G2b. **[x] Screenshot cards name who posted them (2026-09-08).** A screenshot
     and an X screenshot of @naval shares one facet with an x.com/naval link.
     Handles only: an app with no legible handle stays "Screenshot". Shipped
     2026-09-09: merge `48cc45c`, functions run #104 (unscoped) live, build
-    **1319** (TestFlight run #319) carries the byline. **Owner QA:** save the OpenAI X screenshot again; the
+    **1319** (TestFlight run #319) carries the byline; round 2 (2026-09-09,
+    handle-in-sourceName fallback, §9) needs the next build. **Owner QA:** save the OpenAI X screenshot again; the
     card's byline should read the X mark + "@OpenAI" with a small screenshot
     glyph, and Sources should list it under X. Existing "Screenshot" cards
     are not backfilled.
@@ -1954,6 +1955,27 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-09 — Screenshot byline fix round 2: the handle the model put in
+  the wrong field.** Owner re-saved the OpenAI X screenshot on 1319 and the
+  card still read "Screenshot". Diagnosed with the pipeline-debug harness
+  (temporary probe pushed to `trigger/pipeline-debug`, runs #8-#10; the
+  branch script is NOT on main): the stored card had `sourceName: "@OpenAI"`
+  and `sourceHandle`/`sourcePlatform` null, while re-running the same vision
+  call on the same image from the runner returned `sourcePlatform: "x",
+  sourceHandle: "@OpenAI"`. So the model is inconsistent between calls: in
+  production it answered the handle as the publisher and left the two new
+  fields null, and `_screenshot_source` only read the new fields. Fixes:
+  (1) `_screenshot_source` falls back to a handle-shaped `sourceName`
+  (`@name`) when `sourceHandle` is empty (platform still only from a valid
+  `sourcePlatform`); (2) `platform.screenshotSource()` does the same on the
+  client, so the card saved this morning renders "@OpenAI" (handle, no X
+  mark) without a backfill; (3) the vision prompt now says the handle goes
+  in sourceHandle, never sourceName, and that leaving the fields null when
+  they are on screen is an error. Verified: pytest 775 passed (+4 tests, the
+  8 `test_import_links` failures are the known offline-fake gap), tsc,
+  eslint, em-dash gate clean. Not verified: the model's consistency over
+  many saves (the probe shows one good call; the fallback covers the bad
+  shape). Ship record below.
 - **2026-09-08 — Screenshot cards name the account that posted them.**
   Owner: a screenshot of an X post saved as source "Screenshot" although the
   image shows "OpenAI ✓ @OpenAI". Cause: the vision prompt only asked for a

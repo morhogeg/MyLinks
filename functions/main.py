@@ -1244,6 +1244,11 @@ def _screenshot_source(analysis) -> tuple:
         platform = None
     raw = str(analysis.get("sourceHandle") or "").strip()
     if not raw.startswith("@"):
+        # Seen in production (2026-09-09, the OpenAI X screenshot): the model
+        # read the handle but answered it as sourceName ("@OpenAI") and left
+        # sourceHandle null. A handle-shaped sourceName is the same evidence.
+        raw = str(analysis.get("sourceName") or "").strip()
+    if not raw.startswith("@"):
         return None, None
     handle = raw[1:].strip()
     if not handle or any(ch.isspace() for ch in handle):

@@ -165,3 +165,31 @@ def test_share_byline_plain_screenshot_unchanged():
                                          "sourceName": "Screenshot"})
     assert "Screenshot" in html
     assert share_service._ICON_IMAGE in html
+
+
+# ── production shape 2026-09-09: handle answered as sourceName ───────────────
+
+def test_handle_in_source_name_with_new_fields_null_is_still_a_handle():
+    """The deployed model returned sourceName "@OpenAI" and both new fields
+    null for the owner's X screenshot; the card must still get its handle."""
+    analysis = {"sourceName": "@OpenAI", "sourceHandle": None, "sourcePlatform": None}
+    assert main._screenshot_source(analysis) == (None, "OpenAI")
+    card = main._apply_screenshot_source(_card(sourceName="@OpenAI"), analysis)
+    assert card["sourceHandle"] == "@OpenAI"
+    assert card["sourceName"] == "@OpenAI"
+    assert "sourcePlatform" not in card
+
+
+def test_handle_in_source_name_keeps_a_valid_platform():
+    analysis = {"sourceName": "@OpenAI", "sourceHandle": "", "sourcePlatform": "x"}
+    assert main._screenshot_source(analysis) == ("x", "OpenAI")
+
+
+def test_source_name_that_is_not_a_handle_is_not_promoted():
+    for name in ("X", "OpenAI", "The Verge", "@Open AI"):
+        assert main._screenshot_source({"sourceName": name}) == (None, None)
+
+
+def test_explicit_handle_wins_over_source_name():
+    analysis = {"sourceName": "@wrong", "sourceHandle": "@right", "sourcePlatform": "x"}
+    assert main._screenshot_source(analysis) == ("x", "right")
