@@ -1261,15 +1261,40 @@ def _screenshot_source(analysis) -> tuple:
     return platform, handle
 
 
-def _apply_screenshot_source(link_data: dict, analysis) -> dict:
+def _platform_from_name(name) -> str:
+    """A bare app name the model answered as the publisher ("X", "Twitter",
+    "Instagram") names the platform even when sourcePlatform is empty."""
+    n = str(name or "").strip().lower()
+    if n in ("twitter", "x.com", "twitter.com"):
+        return "x"
+    for pid, label in SCREENSHOT_PLATFORM_LABELS.items():
+        if n == label.lower():
+            return pid
+    return ""
+
+
+def _apply_screenshot_source(link_data: dict, analysis, images=None, ai=None) -> dict:
     """Stamp a screenshot card with who posted what it shows.
 
     Writes `sourceHandle` ("@name"), `sourcePlatform` (when recognised) and
     sets `sourceName` to the same "@name" so every surface that reads the
     plain name (search by source, Ask's citation label, digests) sees the
     author, not "Screenshot". Cards without a legible handle are untouched.
+
+    The platform is resolved from every signal the analysis carries, and when
+    a handle was found but no platform, from one focused follow-up question
+    on the image (`ai.classify_screenshot_platform`) — the point of a handle
+    byline is the app's mark beside it, so "handle, no platform" is the case
+    worth one more cheap call. `images` is the [(bytes, mime)] list and `ai`
+    the GeminiService; either missing skips the follow-up.
     """
     platform, handle = _screenshot_source(analysis)
+    if handle and not platform:
+        platform = _platform_from_name(analysis.get("sourceName")) or None
+    if handle and not platform and images and ai is not None:
+        guess = str(ai.classify_screenshot_platform(images) or "").strip().lower()
+        if guess in SCREENSHOT_HANDLE_RULES:
+            platform = guess
     if not handle:
         # Handles only: a bare app name ("X", "Instagram") as the publisher of a
         # screenshot names nobody, so it reverts to the honest placeholder.
@@ -2652,7 +2677,7 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
             confidence=0.9,
             key_entities=[],
         )
-        _apply_screenshot_source(link_data, analysis)
+        _apply_screenshot_source(link_data, analysis, images=[(image_bytes, mime_type)], ai=ai)
 
         return https_fn.Response(
             json.dumps({"success": True, "link": link_data}),
@@ -4408,6 +4433,7 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
     uid = data.get("uid")
     url = data.get("url")
     is_image = data.get("isImage", False)
+    screenshot_parts = []  # [(bytes, mime)] of a screenshot card, for the platform follow-up
     mime_type = data.get("mimeType", "image/jpeg")
     original_body = data.get("body")
 
@@ -4543,6 +4569,7 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
                 ref.update({"status": "analyzing_image", "storageUrl": url})
                 analysis = ai.analyze_images(image_parts, existing_tags=existing_tags,
                                              existing_categories=existing_categories)
+                screenshot_parts = image_parts
             else:
                 log_to_firestore(task_id, f"Downloading image bytes from: {url}")
                 ref.update({"status": "downloading_image"})
@@ -4560,6 +4587,7 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
                 ref.update({"status": "analyzing_image", "storageUrl": public_url})
                 analysis = ai.analyze_image(image_bytes, mime_type, existing_tags=existing_tags,
                                             existing_categories=existing_categories)
+                screenshot_parts = [(image_bytes, mime_type)]
         else:
             # Analyze with AI (YouTube → native video ingestion w/ fallback).
             # The plan is read here, once per capture, and only for videos: it
@@ -4636,7 +4664,7 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         if is_image and isinstance(data.get("imageUrls"), list) and len(data["imageUrls"]) > 1:
             link_data["imageUrls"] = data["imageUrls"][:MAX_CARD_IMAGES]
         if is_image:
-            _apply_screenshot_source(link_data, analysis)
+            _apply_screenshot_source(link_data, analysis, images=screenshot_parts, ai=ai)
 
         # Import provenance (POST /api/import). The set() below REPLACES the
         # placeholder card wholesale, so anything the import wrote on it would

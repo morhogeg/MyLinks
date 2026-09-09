@@ -193,3 +193,92 @@ def test_source_name_that_is_not_a_handle_is_not_promoted():
 def test_explicit_handle_wins_over_source_name():
     analysis = {"sourceName": "@wrong", "sourceHandle": "@right", "sourcePlatform": "x"}
     assert main._screenshot_source(analysis) == ("x", "right")
+
+
+# ── platform resolution: every signal, then the focused follow-up ───────────
+
+class _FakeAI:
+    def __init__(self, answer):
+        self.answer, self.calls = answer, 0
+
+    def classify_screenshot_platform(self, images):
+        self.calls += 1
+        return self.answer
+
+
+def test_bare_platform_source_name_names_the_platform():
+    analysis = {"sourceName": "X", "sourceHandle": "@OpenAI"}
+    ai = _FakeAI("instagram")
+    card = main._apply_screenshot_source(_card(sourceName="X"), analysis, images=[(b"i", "image/jpeg")], ai=ai)
+    assert card["sourcePlatform"] == "x"
+    assert ai.calls == 0  # the name already settled it
+
+
+def test_follow_up_runs_only_for_handle_without_platform():
+    analysis = {"sourceName": "@OpenAI", "sourceHandle": None, "sourcePlatform": None}
+    ai = _FakeAI("x")
+    card = main._apply_screenshot_source(_card(sourceName="@OpenAI"), analysis, images=[(b"i", "image/jpeg")], ai=ai)
+    assert ai.calls == 1
+    assert card["sourcePlatform"] == "x"
+    assert card["sourceHandle"] == "@OpenAI"
+
+
+def test_follow_up_answer_is_validated():
+    analysis = {"sourceHandle": "@someone"}
+    for bad in ("reddit", "", None, "X marks"):
+        card = main._apply_screenshot_source(_card(), analysis, images=[(b"i", "image/jpeg")], ai=_FakeAI(bad))
+        assert "sourcePlatform" not in card
+        assert card["sourceHandle"] == "@someone"
+
+
+def test_no_follow_up_without_handle_or_images():
+    ai = _FakeAI("x")
+    main._apply_screenshot_source(_card(), {"sourcePlatform": None}, images=[(b"i", "image/jpeg")], ai=ai)
+    main._apply_screenshot_source(_card(), {"sourceHandle": "@a"}, images=None, ai=ai)
+    main._apply_screenshot_source(_card(), {"sourceHandle": "@a"}, images=[(b"i", "image/jpeg")], ai=None)
+    assert ai.calls == 0
+
+
+def test_platform_from_name_table():
+    assert main._platform_from_name("Twitter") == "x"
+    assert main._platform_from_name("TikTok") == "tiktok"
+    assert main._platform_from_name("The Verge") == ""
+    assert main._platform_from_name(None) == ""
+
+
+def test_classify_prompt_uses_small_schema_and_low_resolution(monkeypatch):
+    import sys, types as _types
+    from ai_service import GeminiService
+    import models
+    try:
+        from google.genai import types as _t  # noqa: F401
+    except ImportError:
+        fake = _types.ModuleType("google.genai.types")
+        fake.Part = type("Part", (), {"from_bytes": staticmethod(lambda data, mime_type: ("part", mime_type))})
+        monkeypatch.setitem(sys.modules, "google.genai.types", fake)
+        monkeypatch.setattr(sys.modules["google.genai"], "types", fake, raising=False)
+    svc = GeminiService.__new__(GeminiService)
+    seen = {}
+
+    def fake_generate_json(contents, what, config_extra=None, model=None, attempts=3):
+        seen["extra"], seen["attempts"] = config_extra, attempts
+        seen["prompt"] = [c for c in contents if isinstance(c, str)][0]
+        return {"platform": "X", "evidence": "X logo"}
+
+    svc._generate_json = fake_generate_json
+    assert svc.classify_screenshot_platform([(b"i", "image/jpeg"), (b"j", "image/jpeg")]) == "x"
+    assert seen["extra"]["response_schema"] is models.ScreenshotPlatform
+    assert seen["extra"]["media_resolution"] == "MEDIA_RESOLUTION_LOW"
+    assert seen["attempts"] == 1
+    assert "NOT evidence" in seen["prompt"]
+
+
+def test_classify_never_raises(monkeypatch):
+    from ai_service import GeminiService
+    svc = GeminiService.__new__(GeminiService)
+
+    def boom(*a, **k):
+        raise RuntimeError("gemini down")
+
+    svc._generate_json = boom
+    assert svc.classify_screenshot_platform([(b"i", "image/jpeg")]) == ""
