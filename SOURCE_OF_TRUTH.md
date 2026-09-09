@@ -226,7 +226,16 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-09-09): install build **1319** (screenshot bylines), then the 1318/1317 QA below if not yet done
+> ## 🚨 OWNER ACTION (updated 2026-09-09, later): install build **1320** (screenshot byline fix), then the 1318/1317 QA below if not yet done
+>
+> **1320** (run #320, merge `c3a3c3e`) fixes what 1319 showed on device: the
+> OpenAI screenshot card saved this morning reads "@OpenAI" on 1320 with no
+> new save (the client reads the handle the model left in `sourceName`).
+> Backend live via functions run #105. QA: on 1320, open that card (expect
+> "@OpenAI" with the screenshot glyph), then save the X screenshot once
+> more and expect the X mark + "@OpenAI"; in Sources it should sit under X.
+>
+> ## (superseded) OWNER ACTION (updated 2026-09-09): install build **1319** (screenshot bylines), then the 1318/1317 QA below if not yet done
 >
 > **1319** (run #319, merge `48cc45c`) carries screenshot provenance: a
 > screenshot of a post whose author @handle is legible shows the app's mark +
@@ -1529,7 +1538,7 @@ G2b. **[x] Screenshot cards name who posted them (2026-09-08).** A screenshot
     Handles only: an app with no legible handle stays "Screenshot". Shipped
     2026-09-09: merge `48cc45c`, functions run #104 (unscoped) live, build
     **1319** (TestFlight run #319) carries the byline; round 2 (2026-09-09,
-    handle-in-sourceName fallback, §9) needs the next build. **Owner QA:** save the OpenAI X screenshot again; the
+    handle-in-sourceName fallback, §9) is in build **1320**. **Owner QA:** save the OpenAI X screenshot again; the
     card's byline should read the X mark + "@OpenAI" with a small screenshot
     glyph, and Sources should list it under X. Existing "Screenshot" cards
     are not backfilled.
@@ -1975,7 +1984,10 @@ exact-match, capped.
   8 `test_import_links` failures are the known offline-fake gap), tsc,
   eslint, em-dash gate clean. Not verified: the model's consistency over
   many saves (the probe shows one good call; the fallback covers the bad
-  shape). Ship record below.
+  shape). **SHIPPED:** merge `c3a3c3e`, Deploy Cloud Functions run #105
+  green (scoped `analyze_image,process_link_background,share_page`),
+  Python tests #119 green, Vercel from the merge, iOS → TestFlight run
+  #320 = **build 1320** green (uploaded 10:51 UTC).
 - **2026-09-08 — Screenshot cards name the account that posted them.**
   Owner: a screenshot of an X post saved as source "Screenshot" although the
   image shows "OpenAI ✓ @OpenAI". Cause: the vision prompt only asked for a
