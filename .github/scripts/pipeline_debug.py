@@ -66,13 +66,15 @@ def main():
     print(f"image bytes={len(img.content)} mime={mime}")
 
     from ai_service import GeminiService
-    import main as fn_main
     svc = GeminiService()
     analysis = svc.analyze_images([(img.content, mime)])
     got = {k: analysis.get(k) for k in ("sourcePlatform", "sourceHandle", "sourceName")}
     print("model returned:", json.dumps(got))
     print("all keys returned:", sorted(analysis.keys()))
-    print("validated (platform, handle):", fn_main._screenshot_source(analysis))
+    import re
+    raw = str(analysis.get("sourceHandle") or "").strip()
+    print("handle starts with @:", raw.startswith("@"), "| matches X rule:",
+          bool(re.fullmatch(r"@?[A-Za-z0-9_]{1,15}", raw)))
     report["probe"] = got
     with open("pipeline-debug-report.json", "w") as f:
         json.dump(report, f, indent=2, default=str)
