@@ -226,7 +226,16 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-09-04): install build **1318** (card-trust round), then run the 1317 test guide if not yet done
+> ## 🚨 OWNER ACTION (updated 2026-09-09): install build **1319** (screenshot bylines), then the 1318/1317 QA below if not yet done
+>
+> **1319** (run #319, merge `48cc45c`) carries screenshot provenance: a
+> screenshot of a post whose author @handle is legible shows the app's mark +
+> "@handle" (with a small screenshot glyph) instead of "Screenshot", and lands
+> under that app in the Sources list next to saved links from the same
+> account. Backend live via functions run #104. QA: §4 G2b (re-save the
+> OpenAI X screenshot). Everything below still stands.
+>
+> ## (superseded) OWNER ACTION (updated 2026-09-04): install build **1318** (card-trust round), then run the 1317 test guide if not yet done
 >
 > **1318** (run #318, merge `534c00b`) carries the 2026-09-04 round: the
 > partial-capture line ends in an **"Add a screenshot"** button that completes
@@ -1517,10 +1526,9 @@ G2b. **[x] Screenshot cards name who posted them (2026-09-08).** A screenshot
     (`main._screenshot_source`) and stamps the card; the byline, the Sources
     facet, the Ask chip and the share page render the app's mark + @handle,
     and an X screenshot of @naval shares one facet with an x.com/naval link.
-    Handles only: an app with no legible handle stays "Screenshot". Needs a
-    functions deploy (unscoped, or `Deploy-Functions: analyze_image,
-    process_link_background,share_ingest,share_page`) and a TestFlight build
-    for the byline. **Owner QA:** save the OpenAI X screenshot again; the
+    Handles only: an app with no legible handle stays "Screenshot". Shipped
+    2026-09-09: merge `48cc45c`, functions run #104 (unscoped) live, build
+    **1319** (TestFlight run #319) carries the byline. **Owner QA:** save the OpenAI X screenshot again; the
     card's byline should read the X mark + "@OpenAI" with a small screenshot
     glyph, and Sources should list it under X. Existing "Screenshot" cards
     are not backfilled.
@@ -1977,8 +1985,12 @@ exact-match, capped.
   are pre-existing on the untouched tree (offline fake gap); `tsc` clean,
   eslint clean on touched files, em-dash gate clean; `getSourceInfo` merge
   checked with a scratch run. **Not verified:** the model's actual output on
-  a live screenshot (no Gemini in the session); anything on device. Not
-  shipped from this session; owner QA in §4 G2b.
+  a live screenshot (no Gemini in the session); anything on device.
+  **SHIPPED 2026-09-09:** merge `48cc45c` to main, Deploy Cloud Functions
+  run #104 green (unscoped: `AIAnalysis` is every analysis call's response
+  schema), Python tests #118 green, Vercel auto-deploy from the merge, iOS →
+  TestFlight run #319 = **build 1319** green (uploaded 08:23 UTC). Owner QA
+  in §4 G2b.
 - **2026-09-05 (round 3) — "ארוחת ערב" on desktop showed Trump/Mondial,
   the Saudi deal, the IDF chief and a time-perception card under By meaning,
   AFTER round 2.** Cause, readable from the screenshot: ערב is a fragment of
