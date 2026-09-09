@@ -231,9 +231,11 @@ The multi-user auth work described below **was** fully written but not live:
 > **1320** (run #320, merge `c3a3c3e`) fixes what 1319 showed on device: the
 > OpenAI screenshot card saved this morning reads "@OpenAI" on 1320 with no
 > new save (the client reads the handle the model left in `sourceName`).
-> Backend live via functions run #105. QA: on 1320, open that card (expect
-> "@OpenAI" with the screenshot glyph), then save the X screenshot once
-> more and expect the X mark + "@OpenAI"; in Sources it should sit under X.
+> Backend live via functions run #106 (round 3: the platform mark is now
+> resolved by a focused follow-up when the main analysis leaves it empty).
+> QA on 1320: save the X screenshot once more and expect the X mark +
+> "@OpenAI"; in Sources it should sit under X. The card saved at 10:27
+> stays "@OpenAI" with no mark (saved before either fix; not backfilled).
 >
 > ## (superseded) OWNER ACTION (updated 2026-09-09): install build **1319** (screenshot bylines), then the 1318/1317 QA below if not yet done
 >
@@ -1981,6 +1983,9 @@ exact-match, capped.
   782 passed (+7; the 8 `test_import_links` failures are the known
   offline-fake gap), py_compile. Not verified live. The morning OpenAI card
   keeps no platform (nothing is backfilled); a fresh save gets the X mark.
+  **SHIPPED:** merge `fd9a819`, Deploy Cloud Functions run #106 green
+  (scoped `analyze_image,process_link_background`), Python tests #120
+  green. Backend only; 1320 stays the current build.
 - **2026-09-09 — Screenshot byline fix round 2: the handle the model put in
   the wrong field.** Owner re-saved the OpenAI X screenshot on 1319 and the
   card still read "Screenshot". Diagnosed with the pipeline-debug harness
