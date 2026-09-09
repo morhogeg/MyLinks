@@ -1205,6 +1205,80 @@ def _pick_source_name(scraped_name, model_name, url):
     return model_name
 
 
+# Screenshot provenance. Which apps the vision prompt may name, and what a
+# handle on each looks like. A value that fails either check is dropped, so the
+# worst a hallucination can do is leave the card reading "Screenshot".
+SCREENSHOT_HANDLE_RULES = {
+    "x": r"[A-Za-z0-9_]{1,15}",
+    "instagram": r"[A-Za-z0-9._]{1,30}",
+    "threads": r"[A-Za-z0-9._]{1,30}",
+    "tiktok": r"[A-Za-z0-9._]{1,24}",
+    "youtube": r"[A-Za-z0-9._-]{3,30}",
+    "linkedin": r"[A-Za-z0-9._-]{3,100}",
+    "facebook": r"[A-Za-z0-9.]{5,50}",
+}
+SCREENSHOT_PLATFORM_LABELS = {
+    "x": "X", "instagram": "Instagram", "threads": "Threads", "tiktok": "TikTok",
+    "youtube": "YouTube", "linkedin": "LinkedIn", "facebook": "Facebook",
+}
+
+
+_BARE_PLATFORM_NAMES = {v.lower() for v in SCREENSHOT_PLATFORM_LABELS.values()} | {"twitter", "x.com", "twitter.com"}
+
+
+def _screenshot_source(analysis) -> tuple:
+    """(platform, handle) read off a screenshot, or (None, None).
+
+    Handles only: the byline of a screenshot card is the author's @handle the
+    model saw printed on screen, with the app's mark when the app's own chrome
+    was recognised too. A platform with no handle is NOT kept — the card stays
+    an honest "Screenshot" rather than a bare "X" (which says nothing a reader
+    can act on). A handle whose platform is unknown is kept without a platform.
+    The model's values are checked against the per-platform username rules so a
+    display name, a sentence or a mention can never land in the byline.
+    """
+    if not isinstance(analysis, dict):
+        return None, None
+    platform = str(analysis.get("sourcePlatform") or "").strip().lower() or None
+    if platform not in SCREENSHOT_HANDLE_RULES:
+        platform = None
+    raw = str(analysis.get("sourceHandle") or "").strip()
+    if not raw.startswith("@"):
+        return None, None
+    handle = raw[1:].strip()
+    if not handle or any(ch.isspace() for ch in handle):
+        return None, None
+    rule = SCREENSHOT_HANDLE_RULES.get(platform, r"[A-Za-z0-9._-]{1,30}")
+    if not re.fullmatch(rule, handle):
+        return None, None
+    if platform == "x" and handle.lower() in {"home", "explore", "i", "search", "settings"}:
+        return None, None
+    return platform, handle
+
+
+def _apply_screenshot_source(link_data: dict, analysis) -> dict:
+    """Stamp a screenshot card with who posted what it shows.
+
+    Writes `sourceHandle` ("@name"), `sourcePlatform` (when recognised) and
+    sets `sourceName` to the same "@name" so every surface that reads the
+    plain name (search by source, Ask's citation label, digests) sees the
+    author, not "Screenshot". Cards without a legible handle are untouched.
+    """
+    platform, handle = _screenshot_source(analysis)
+    if not handle:
+        # Handles only: a bare app name ("X", "Instagram") as the publisher of a
+        # screenshot names nobody, so it reverts to the honest placeholder.
+        name = str(link_data.get("sourceName") or "").strip().lower()
+        if name in _BARE_PLATFORM_NAMES:
+            link_data["sourceName"] = "Screenshot"
+        return link_data
+    link_data["sourceHandle"] = f"@{handle}"
+    link_data["sourceName"] = f"@{handle}"
+    if platform:
+        link_data["sourcePlatform"] = platform
+    return link_data
+
+
 def _write_stage(card_ref, stage: str) -> None:
     """Mirror a pipeline stage onto the user-visible card doc (best-effort).
 
@@ -2573,6 +2647,7 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
             confidence=0.9,
             key_entities=[],
         )
+        _apply_screenshot_source(link_data, analysis)
 
         return https_fn.Response(
             json.dumps({"success": True, "link": link_data}),
@@ -4555,6 +4630,8 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         # is the additive field only the gallery surfaces read.
         if is_image and isinstance(data.get("imageUrls"), list) and len(data["imageUrls"]) > 1:
             link_data["imageUrls"] = data["imageUrls"][:MAX_CARD_IMAGES]
+        if is_image:
+            _apply_screenshot_source(link_data, analysis)
 
         # Import provenance (POST /api/import). The set() below REPLACES the
         # placeholder card wholesale, so anything the import wrote on it would

@@ -50,6 +50,12 @@ class AIAnalysis(BaseModel):
     actionableTakeaway: Optional[str] = Field(None, description="One concrete specific action, only when the content genuinely supports one")
     detailedSummary: Optional[str] = Field(None, description="Markdown formatted detailed summary")
     sourceName: Optional[str] = Field(None, description="Name of the source/publisher (e.g., CNN, X)")
+    # Screenshot provenance (vision path only). The app whose OWN chrome is
+    # visible in the screenshot, and the author @handle literally on screen.
+    # Both are None unless legible — the backend validates them again
+    # (main._screenshot_source) before they reach a card.
+    sourcePlatform: Optional[str] = Field(None, description="App whose interface is visible in a screenshot: x, instagram, threads, tiktok, youtube, linkedin, facebook — or null")
+    sourceHandle: Optional[str] = Field(None, description="The author's @handle exactly as shown in the screenshot (with the @), or null when no handle is visible")
     concepts: List[str] = Field(default_factory=list, description="3-5 abstract concepts or mental models")
     # YouTube-specific fields (populated only when analyzing video content)
     videoHighlights: List[str] = Field(default_factory=list, description="3-6 key moments from a video, each prefixed with its 'M:SS' timestamp")

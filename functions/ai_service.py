@@ -1219,7 +1219,11 @@ is an incomplete summary.
 If the image contains a tweet or social media post, extract the content as if it were the text.
 If the image is an article, extract the headline and body.
 COVER THE WHOLE IMAGE{'S' if n > 1 else ''}: a screenshot of a post or article is the user's saved copy of that content, so the analysis must span its ENTIRE text — from the first line to the last, including quotes and statements near the bottom. Do not stop after the opening paragraphs; a summary that covers only the top of the screenshot is an incomplete summary.
-Work only from what is legible: keep the subject at the level the image states it (a country stays a country, a category stays a category), and where the text is unclear or cropped, leave it out rather than guessing a place, name, brand, or date."""
+Work only from what is legible: keep the subject at the level the image states it (a country stays a country, a category stays a category), and where the text is unclear or cropped, leave it out rather than guessing a place, name, brand, or date.
+
+WHERE THE SCREENSHOT WAS TAKEN (sourcePlatform / sourceHandle):
+- sourcePlatform: the app whose OWN interface chrome is visible — one of "x", "instagram", "threads", "tiktok", "youtube", "linkedin", "facebook". Decide from the interface only (the X logo and "· 55m" timestamp row, Instagram's heart/comment/send row, the Threads layout, TikTok's side action rail, LinkedIn's "1st · Follow" line, Facebook's Like/Comment/Share bar). A post's tone, topic or writing style is NOT evidence of a platform. Anything else, or any doubt, is null.
+- sourceHandle: the author's @handle exactly as printed next to the author's name (e.g. "@OpenAI"), including the @. Only a handle that is LITERALLY visible counts: never derive one from a display name, a mention inside the post text, a reply, or a quoted post. No visible author handle means null."""
 
         from google.genai import types
 
