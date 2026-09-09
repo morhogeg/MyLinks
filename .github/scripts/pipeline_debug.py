@@ -49,8 +49,8 @@ def main():
                 "sourcePlatform": c.get("sourcePlatform"),
                 "hasImageUrl": bool(c.get("url")),
             }
-            print(json.dumps(row))
-            if newest is None or (row["createdAt"] or 0) > (newest[0]["createdAt"] or 0):
+            print(json.dumps(row, default=str))
+            if newest is None or str(row["createdAt"] or "") > str(newest[0]["createdAt"] or ""):
                 newest = (row, c)
     report["newest"] = newest[0] if newest else None
     if not newest:
