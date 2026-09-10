@@ -142,10 +142,14 @@ const SCREENSHOT_PLATFORMS: Record<string, PlatformKey> = {
     Null when the card is not a screenshot or carries no legible handle. The
     handle is re-validated here so an old or hand-edited value can never render
     a sentence as a handle (`[A-Za-z0-9._-]`, ≤100). */
-export function screenshotSource(link: { sourceType?: string; sourceHandle?: string | null; sourcePlatform?: string | null }):
+export function screenshotSource(link: { sourceType?: string; sourceName?: string | null; sourceHandle?: string | null; sourcePlatform?: string | null }):
     { handle: string; platform: PlatformKey | null; platformId: string | null } | null {
     if (link.sourceType !== 'image') return null;
-    const m = /^@([A-Za-z0-9._-]{1,100})$/.exec((link.sourceHandle || '').trim());
+    // `sourceHandle` is the stamped field; a handle-shaped `sourceName` is the
+    // same evidence for cards the backend saved before it learned to promote
+    // one (the model answered "@OpenAI" as the publisher, 2026-09-09).
+    const m = /^@([A-Za-z0-9._-]{1,100})$/.exec((link.sourceHandle || '').trim())
+        ?? /^@([A-Za-z0-9._-]{1,100})$/.exec((link.sourceName || '').trim());
     if (!m) return null;
     const platformId = (link.sourcePlatform || '').trim().toLowerCase() || null;
     return { handle: m[1], platform: platformId ? SCREENSHOT_PLATFORMS[platformId] ?? null : null, platformId };

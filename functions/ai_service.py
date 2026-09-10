@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from typing import List, Optional
 from google import genai
 from google.cloud.firestore_v1.vector import Vector
-from models import AIAnalysis, BrainAnswer, WeeklySynthesis
+from models import AIAnalysis, BrainAnswer, WeeklySynthesis, ScreenshotPlatform
 
 logger = logging.getLogger(__name__)
 
@@ -1223,7 +1223,8 @@ Work only from what is legible: keep the subject at the level the image states i
 
 WHERE THE SCREENSHOT WAS TAKEN (sourcePlatform / sourceHandle):
 - sourcePlatform: the app whose OWN interface chrome is visible — one of "x", "instagram", "threads", "tiktok", "youtube", "linkedin", "facebook". Decide from the interface only (the X logo and "· 55m" timestamp row, Instagram's heart/comment/send row, the Threads layout, TikTok's side action rail, LinkedIn's "1st · Follow" line, Facebook's Like/Comment/Share bar). A post's tone, topic or writing style is NOT evidence of a platform. Anything else, or any doubt, is null.
-- sourceHandle: the author's @handle exactly as printed next to the author's name (e.g. "@OpenAI"), including the @. Only a handle that is LITERALLY visible counts: never derive one from a display name, a mention inside the post text, a reply, or a quoted post. No visible author handle means null."""
+- sourceHandle: the author's @handle exactly as printed next to the author's name (e.g. "@OpenAI"), including the @. Only a handle that is LITERALLY visible counts: never derive one from a display name, a mention inside the post text, a reply, or a quoted post. No visible author handle means null.
+- The handle goes in sourceHandle, NOT in sourceName: sourceName stays the app's brand name ("X", "Instagram") or "Screenshot". Fill sourcePlatform and sourceHandle whenever the interface and the handle are visible; leaving them null when they are on screen is an error."""
 
         from google.genai import types
 
@@ -1239,6 +1240,34 @@ WHERE THE SCREENSHOT WAS TAKEN (sourcePlatform / sourceHandle):
         return self._enforce_tag_language(
             self._generate_json(contents, "image analysis", attempts=attempts,
                                 config_extra={"media_resolution": "MEDIA_RESOLUTION_HIGH"}))
+
+    def classify_screenshot_platform(self, images: list) -> str:
+        """Which app's own interface is visible in these screenshots? One
+        focused question with a closed answer set, asked only when the main
+        analysis found an author handle but left sourcePlatform empty (seen in
+        production 2026-09-09: the field is one of ~15 in the big schema and
+        the model sometimes skips it, while the same image answered alone is
+        unambiguous). Returns the lowercase platform id or "" — never raises;
+        a failed follow-up just leaves the card without a platform. LOW
+        resolution: recognising a logo and a layout needs no legibility."""
+        prompt = """Which app's OWN interface is visible in this screenshot?
+Answer from the interface chrome only: the X logo in the top bar and the "· 55m" style timestamp beside the author; Instagram's heart/comment/send row under a photo; the Threads layout; TikTok's vertical action rail; LinkedIn's "1st · Follow" line and reaction bar; Facebook's Like/Comment/Share bar; YouTube's player and channel row.
+The post's topic, tone or wording is NOT evidence. If no app's own interface is visible (a plain article, a document, a photo), platform is null.
+Return JSON: {"platform": one of "x","instagram","threads","tiktok","youtube","linkedin","facebook" or null, "evidence": the interface element you relied on}."""
+        try:
+            from google.genai import types
+            contents = [types.Part.from_bytes(data=b, mime_type=m) for b, m in images[:1]]
+            contents.append(prompt)
+            data = self._generate_json(
+                contents, "screenshot platform", attempts=1,
+                config_extra={"response_schema": ScreenshotPlatform,
+                              "media_resolution": "MEDIA_RESOLUTION_LOW"})
+            platform = str((data or {}).get("platform") or "").strip().lower()
+            logger.info(f"Screenshot platform follow-up: {platform or 'none'} ({(data or {}).get('evidence')})")
+            return platform
+        except Exception as e:
+            logger.warning(f"Screenshot platform follow-up failed (non-fatal): {e}")
+            return ""
 
     def _probe_prompt_blocked(self, prompt: str) -> bool:
         """Ask Gemini's filter whether it ACCEPTS a prompt, without paying for

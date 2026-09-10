@@ -226,7 +226,18 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-09-09): install build **1319** (screenshot bylines), then the 1318/1317 QA below if not yet done
+> ## 🚨 OWNER ACTION (updated 2026-09-09, later): install build **1320** (screenshot byline fix), then the 1318/1317 QA below if not yet done
+>
+> **1320** (run #320, merge `c3a3c3e`) fixes what 1319 showed on device: the
+> OpenAI screenshot card saved this morning reads "@OpenAI" on 1320 with no
+> new save (the client reads the handle the model left in `sourceName`).
+> Backend live via functions run #106 (round 3: the platform mark is now
+> resolved by a focused follow-up when the main analysis leaves it empty).
+> QA on 1320: save the X screenshot once more and expect the X mark +
+> "@OpenAI"; in Sources it should sit under X. The card saved at 10:27
+> stays "@OpenAI" with no mark (saved before either fix; not backfilled).
+>
+> ## (superseded) OWNER ACTION (updated 2026-09-09): install build **1319** (screenshot bylines), then the 1318/1317 QA below if not yet done
 >
 > **1319** (run #319, merge `48cc45c`) carries screenshot provenance: a
 > screenshot of a post whose author @handle is legible shows the app's mark +
@@ -1528,7 +1539,8 @@ G2b. **[x] Screenshot cards name who posted them (2026-09-08).** A screenshot
     and an X screenshot of @naval shares one facet with an x.com/naval link.
     Handles only: an app with no legible handle stays "Screenshot". Shipped
     2026-09-09: merge `48cc45c`, functions run #104 (unscoped) live, build
-    **1319** (TestFlight run #319) carries the byline. **Owner QA:** save the OpenAI X screenshot again; the
+    **1319** (TestFlight run #319) carries the byline; round 2 (2026-09-09,
+    handle-in-sourceName fallback, §9) is in build **1320**. **Owner QA:** save the OpenAI X screenshot again; the
     card's byline should read the X mark + "@OpenAI" with a small screenshot
     glyph, and Sources should list it under X. Existing "Screenshot" cards
     are not backfilled.
@@ -1954,6 +1966,50 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-09 (round 3) — the platform mark is no longer left to chance.**
+  On 1320 the OpenAI card read "@OpenAI" with the screenshot glyph but no X
+  mark: that card was saved before round 2 and carries no platform, and the
+  owner's point stands that the platform is the feature. Backend only:
+  `_apply_screenshot_source` now resolves the platform from every signal in
+  order: a valid `sourcePlatform`; a bare app name the model answered as
+  `sourceName` ("X"/"Twitter"/"Instagram", `_platform_from_name`); and, for
+  a handle still without a platform, ONE focused follow-up on the image,
+  `GeminiService.classify_screenshot_platform` (own schema
+  `models.ScreenshotPlatform` {platform, evidence}, LOW resolution, one
+  attempt, never raises), which asks only "which app's interface is this?"
+  with the closed set. Runs only in the handle-without-platform case, so
+  the extra call is rare and cheap. Both image sites pass the screenshot
+  bytes (`screenshot_parts` in `process_link_background`). Verified: pytest
+  782 passed (+7; the 8 `test_import_links` failures are the known
+  offline-fake gap), py_compile. Not verified live. The morning OpenAI card
+  keeps no platform (nothing is backfilled); a fresh save gets the X mark.
+  **SHIPPED:** merge `fd9a819`, Deploy Cloud Functions run #106 green
+  (scoped `analyze_image,process_link_background`), Python tests #120
+  green. Backend only; 1320 stays the current build.
+- **2026-09-09 — Screenshot byline fix round 2: the handle the model put in
+  the wrong field.** Owner re-saved the OpenAI X screenshot on 1319 and the
+  card still read "Screenshot". Diagnosed with the pipeline-debug harness
+  (temporary probe pushed to `trigger/pipeline-debug`, runs #8-#10; the
+  branch script is NOT on main): the stored card had `sourceName: "@OpenAI"`
+  and `sourceHandle`/`sourcePlatform` null, while re-running the same vision
+  call on the same image from the runner returned `sourcePlatform: "x",
+  sourceHandle: "@OpenAI"`. So the model is inconsistent between calls: in
+  production it answered the handle as the publisher and left the two new
+  fields null, and `_screenshot_source` only read the new fields. Fixes:
+  (1) `_screenshot_source` falls back to a handle-shaped `sourceName`
+  (`@name`) when `sourceHandle` is empty (platform still only from a valid
+  `sourcePlatform`); (2) `platform.screenshotSource()` does the same on the
+  client, so the card saved this morning renders "@OpenAI" (handle, no X
+  mark) without a backfill; (3) the vision prompt now says the handle goes
+  in sourceHandle, never sourceName, and that leaving the fields null when
+  they are on screen is an error. Verified: pytest 775 passed (+4 tests, the
+  8 `test_import_links` failures are the known offline-fake gap), tsc,
+  eslint, em-dash gate clean. Not verified: the model's consistency over
+  many saves (the probe shows one good call; the fallback covers the bad
+  shape). **SHIPPED:** merge `c3a3c3e`, Deploy Cloud Functions run #105
+  green (scoped `analyze_image,process_link_background,share_page`),
+  Python tests #119 green, Vercel from the merge, iOS → TestFlight run
+  #320 = **build 1320** green (uploaded 10:51 UTC).
 - **2026-09-08 — Screenshot cards name the account that posted them.**
   Owner: a screenshot of an X post saved as source "Screenshot" although the
   image shows "OpenAI ✓ @OpenAI". Cause: the vision prompt only asked for a
