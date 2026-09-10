@@ -1966,6 +1966,24 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-10 (round 4) — the real cause: the app's image tab dropped the
+  fields on save.** A fresh save after round 3 still showed "@OpenAI" with no
+  X mark. The probe (pipeline-debug run #11) settled it: the stored card had
+  NO `sourceHandle` key at all and a Firestore-timestamp `createdAt`, i.e.
+  it was written by the CLIENT, not by `process_link_background` (which
+  writes int-ms). The + button's Image tab calls the synchronous
+  `analyze_image` endpoint (which has stamped the fields since round 1) and
+  then saves the card itself through `saveLink` with a hand-picked field
+  list in `AddLinkForm.tsx` that never included `sourceHandle` /
+  `sourcePlatform`. Rounds 1-3 fixed the model, the validator and the
+  background path, none of which this save path reaches past the API call.
+  Fix: the two fields are passed through in `AddLinkForm.tsx` (`saveLink`
+  spreads its input, so nothing else needed). Both model calls on that
+  image answer "x"/"@OpenAI" (probe), so a save on the new build gets the X
+  mark. Verified: tsc, eslint. Not verified on device. Cards saved from the
+  tab before this build (the two OpenAI cards of 09-09) carry only the
+  handle in `sourceName`; a one-off backfill via the debug harness stamps
+  `sourceHandle` + `sourcePlatform` on them (see below).
 - **2026-09-09 (round 3) — the platform mark is no longer left to chance.**
   On 1320 the OpenAI card read "@OpenAI" with the screenshot glyph but no X
   mark: that card was saved before round 2 and carries no platform, and the
