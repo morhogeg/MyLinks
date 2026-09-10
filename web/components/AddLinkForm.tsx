@@ -768,6 +768,13 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                     },
                     sourceType: 'image',
                     sourceName: data.link.sourceName,
+                    // Screenshot provenance the backend read off the image (the
+                    // app's mark + @handle on the byline). This list is a
+                    // whitelist: a field left out here is silently dropped, which
+                    // is exactly how the first two rounds of the byline fix never
+                    // reached a card saved from this tab (2026-09-10).
+                    sourceHandle: data.link.sourceHandle,
+                    sourcePlatform: data.link.sourcePlatform,
                     concepts: data.link.concepts,
                     relatedLinks: data.link.relatedLinks,
                 });
