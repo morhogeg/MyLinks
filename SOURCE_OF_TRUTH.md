@@ -226,7 +226,16 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-09-09, later): install build **1320** (screenshot byline fix), then the 1318/1317 QA below if not yet done
+> ## 🚨 OWNER ACTION (updated 2026-09-10): install build **1321** (screenshot byline, real fix), then the 1318/1317 QA below if not yet done
+>
+> **1321** (run #321, merge `345faa6`) is the one that actually lands the
+> platform mark: the Image tab's own save was dropping the two provenance
+> fields the backend returns (§9 2026-09-10). QA: save the X screenshot
+> from the + button's Image tab on 1321 and expect the X mark + "@OpenAI"
+> on the byline, grouped under X in Sources. The two OpenAI cards saved on
+> 09-09 keep "@OpenAI" without the mark unless backfilled or re-saved.
+>
+> ## (superseded) OWNER ACTION (updated 2026-09-09, later): install build **1320** (screenshot byline fix), then the 1318/1317 QA below if not yet done
 >
 > **1320** (run #320, merge `c3a3c3e`) fixes what 1319 showed on device: the
 > OpenAI screenshot card saved this morning reads "@OpenAI" on 1320 with no
@@ -1983,7 +1992,12 @@ exact-match, capped.
   mark. Verified: tsc, eslint. Not verified on device. Cards saved from the
   tab before this build (the two OpenAI cards of 09-09) carry only the
   handle in `sourceName`; a one-off backfill via the debug harness stamps
-  `sourceHandle` + `sourcePlatform` on them (see below).
+  `sourceHandle` + `sourcePlatform` on them was prepared (a
+  `trigger/pipeline-debug` script; the session's classifier blocked the
+  push, so it is NOT run; owner decides, a re-save on 1321 is the
+  alternative). **SHIPPED:** merge `345faa6`, Vercel from the merge, iOS →
+  TestFlight run #321 = **build 1321** green (uploaded 10:21 UTC). No
+  backend change (functions #106 stays live).
 - **2026-09-09 (round 3) — the platform mark is no longer left to chance.**
   On 1320 the OpenAI card read "@OpenAI" with the screenshot glyph but no X
   mark: that card was saved before round 2 and carries no platform, and the
