@@ -48,6 +48,7 @@ def main():
                 "sourceHandle": c.get("sourceHandle"),
                 "sourcePlatform": c.get("sourcePlatform"),
                 "hasImageUrl": bool(c.get("url")),
+                "keys": sorted(c.keys()),
             }
             print(json.dumps(row, default=str))
             if newest is None or str(row["createdAt"] or "") > str(newest[0]["createdAt"] or ""):
@@ -71,6 +72,7 @@ def main():
     got = {k: analysis.get(k) for k in ("sourcePlatform", "sourceHandle", "sourceName")}
     print("model returned:", json.dumps(got))
     print("all keys returned:", sorted(analysis.keys()))
+    print("follow-up classify_screenshot_platform:", repr(svc.classify_screenshot_platform([(img.content, mime)])))
     import re
     raw = str(analysis.get("sourceHandle") or "").strip()
     print("handle starts with @:", raw.startswith("@"), "| matches X rule:",
