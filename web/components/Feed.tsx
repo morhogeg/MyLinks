@@ -10,7 +10,8 @@ import { platformIcon, platformColor, type PlatformKey } from '@/lib/platform';
 import DigestView from './DigestView';
 import DigestCard from './DigestCard';
 import Dropdown from './Dropdown';
-import { deleteLink, updateLinkReminder, markLinkReviewed, toLink } from '@/lib/storage';
+import { deleteLink, updateLinkReminder, markLinkReviewed, markTakeawayDone, toLink } from '@/lib/storage';
+import { openTakeaways } from '@/lib/takeaway';
 import { track } from '@/lib/analytics';
 import { collection, onSnapshot, doc, getDoc, updateDoc, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -845,9 +846,24 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         [visibleLinks, isEffectivelyPrivateCard]
     );
 
-    // How many cards the review deck could deal right now. 0 hides Today's
+    // How many cards the review deck could deal right now. 0 hides Revisit's
     // review row rather than sending the user into an empty deck.
     const todayReviewCount = useMemo(() => reviewSessionQueue(visibleLinks).length, [visibleLinks]);
+
+    // Revisit's "Do this" list: every visible card whose takeaway is still
+    // open. Derived from visibleLinks for the same reason the reminders are:
+    // a locked private card must never surface a line of its content here.
+    const takeawayCards = useMemo(() => openTakeaways(visibleLinks), [visibleLinks]);
+
+    // Ticking a takeaway off is one field on the card (lib/storage). The live
+    // subscription carries it back, so the row leaves the list on its own.
+    const completeTakeaway = useCallback((link: Link, done = true) => {
+        if (!uid) return;
+        markTakeawayDone(uid, link.id, done).then(
+            () => { if (done) track('takeaway_done'); },
+            () => { /* the row simply stays; the next tap tries again */ },
+        );
+    }, [uid]);
 
     // "Done" on a due card: stop a still-pending reminder from coming back, and
     // clear the fired flag. Both writes are the ones the rest of the app already
@@ -1667,6 +1683,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
             onCompleteReminder={(l) => { void completeReminder(l); }}
             reviewCount={todayReviewCount}
             onStartReview={startTodayReview}
+            takeawayCards={takeawayCards}
+            onOpenTakeawayCard={openLinkDetails}
+            onCompleteTakeaway={completeTakeaway}
         />
     );
 
@@ -1908,7 +1927,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             onBack={() => setViewMode(lastLayout.current)}
                             backLabel="Back to your library"
                             icon={<CalendarCheck className="w-5 h-5" />}
-                            title="Today"
+                            title="Revisit"
                         />
                     </div>
                 ) : viewMode === 'digestDetail' ? (
@@ -2238,12 +2257,12 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             </button>
                             <button
                                 onClick={() => setViewMode('digest')}
-                                title="What is coming back to you today"
-                                aria-label="Today"
+                                title="What is coming back to you"
+                                aria-label="Revisit"
                                 className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
                             >
                                 <CalendarCheck className="w-4 h-4" />
-                                <span>Today</span>
+                                <span>Revisit</span>
                             </button>
                             <button
                                 onClick={() => openNotesView()}
@@ -3076,7 +3095,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                         onBack={() => setViewMode(lastLayout.current)}
                         backLabel="Back to your library"
                         icon={<CalendarCheck className="w-5 h-5" />}
-                        title="Today"
+                        title="Revisit"
                     />
                     <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-4" style={{ paddingBottom: '1rem' }}>
                         {digestContent}
@@ -3123,6 +3142,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                     allLinks={visibleLinks}
                     allCategories={categories}
                     uid={uid}
+                    onToggleTakeawayDone={completeTakeaway}
                     isOpen={!!activeLink}
                     onClose={closeActiveLinkStack}
                     onBack={goBackOrClose}

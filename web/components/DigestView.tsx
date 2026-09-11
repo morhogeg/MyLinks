@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
-import { CalendarCheck, ChevronRight, ChevronDown, Bell, CheckCircle2, GalleryHorizontalEnd } from 'lucide-react';
+import { CalendarCheck, ChevronRight, ChevronDown, Bell, CheckCircle2, CircleCheck, GalleryHorizontalEnd } from 'lucide-react';
 import { CitationGlyph } from '@/components/ui/Wordmark';
 import type { CuratedDigest, WeeklySynthesis, DigestCardRef, UserNote, Link } from '@/lib/types';
 import { track } from '@/lib/analytics';
 import { digestDisplayTitle, digestKindLabel, TODAY_REVIEW_SIZE } from '@/lib/digest';
 import { synthesisWeekLabel } from '@/lib/synthesis';
 import { cardThumbnailUrl } from '@/lib/cardThumbnail';
+import { getActionableTakeaway } from '@/lib/takeaway';
 import DigestCard, { ResurfacedCardRow } from './DigestCard';
 import SynthesisCard from './SynthesisCard';
 
@@ -111,12 +112,21 @@ interface Props {
     /** How many cards the review deck could deal right now (0 hides the row). */
     reviewCount?: number;
     onStartReview?: () => void;
+    /** Cards whose "Do this" takeaway is still open, newest save first
+     *  (lib/takeaway openTakeaways). Feed derives it from the visible cards, so
+     *  a locked private card never surfaces here. */
+    takeawayCards?: Link[];
+    /** Open the card a takeaway came from. */
+    onOpenTakeawayCard?: (link: Link) => void;
+    /** Tick the takeaway off: it leaves this list and stays on its card. */
+    onCompleteTakeaway?: (link: Link) => void;
 }
 
 /**
- * The Today section — the one place saves come back to you. Above the curated
- * digest history it carries what today actually asks of you: reminders that are
- * due, this week's synthesis, and a short review session.
+ * The Revisit tab — the one place saves come back to you on their own. Above
+ * the curated digest history it carries what actually asks for you: reminders
+ * that are due, the things your saves told you to do, this week's synthesis,
+ * and a short review session.
  *
  * On phones/tablets the history below is an elegant single column of tappable
  * rows. On desktop it becomes a two-pane reader — a date-grouped sidebar of
@@ -128,9 +138,11 @@ export default function DigestView({
     onOpenDigestSettings, onDeleteDigest, onOpenDigest,
     reminderCards = [], onOpenReminderCard, onEditReminder, onCompleteReminder,
     reviewCount = 0, onStartReview,
+    takeawayCards = [], onOpenTakeawayCard, onCompleteTakeaway,
 }: Props) {
-    // The Today section mounts only when the user opens it (Feed swaps it in),
-    // so a mount is a genuine "digest opened" view. Fired once per mount.
+    // The Revisit tab mounts only when the user opens it (Feed swaps it in),
+    // so a mount is a genuine "digest opened" view. Fired once per mount (the
+    // event keeps its historical name so the analytics series stays whole).
     useEffect(() => {
         track('digest_opened');
     }, []);
@@ -147,13 +159,14 @@ export default function DigestView({
     });
     const SYNTHESES_KEY = 'weekly-synthesis';
     const DUE_KEY = 'due-now';
+    const DO_KEY = 'do-this';
     const WEEK_KEY = 'this-week';
 
     // Desktop sidebar selection. A digest id or `synthesis:<weekId>`; resolved
     // against the live lists below, so a deleted entry falls back on its own.
     const [selId, setSelId] = useState<string | null>(null);
 
-    // ── Today's top section ──────────────────────────────────────────────
+    // ── The top section: what is asking for you right now ────────────────
     // Computed at render, not memoized: this view is mounted when the tab is
     // opened, so "now" is the moment the user looked.
     const now = new Date();
@@ -175,7 +188,8 @@ export default function DigestView({
     const reviewSize = Math.min(TODAY_REVIEW_SIZE, reviewCount);
     const showReview = reviewSize > 0 && !!onStartReview;
 
-    const isEmpty = digests.length === 0 && syntheses.length === 0 && dueToday.length === 0 && !showReview;
+    const isEmpty = digests.length === 0 && syntheses.length === 0 && dueToday.length === 0
+        && takeawayCards.length === 0 && !showReview;
     if (isEmpty) {
         return (
             <div className="max-w-3xl mx-auto">
@@ -183,9 +197,9 @@ export default function DigestView({
                     <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-accent/10 flex items-center justify-center">
                         <CalendarCheck className="w-7 h-7 text-accent" strokeWidth={1.75} />
                     </div>
-                    <h3 className="text-base font-bold text-text">Nothing for today yet.</h3>
+                    <h3 className="text-base font-bold text-text">Nothing to revisit yet.</h3>
                     <p className="mt-1.5 max-w-xs mx-auto text-sm text-text-muted leading-relaxed">
-                        Reminders that come due, your weekly synthesis, and a curated pick of your saves all land here.
+                        Reminders that come due, things your saves ask you to do, your weekly synthesis, and a curated pick of your saves all land here.
                     </p>
                     {onOpenDigestSettings && (
                         <button
@@ -222,7 +236,7 @@ export default function DigestView({
         : null;
     const activeDigest = digests.find((d) => d.id === activeId) ?? null;
 
-    const todayTop = (dueToday.length > 0 || thisWeek || showReview) ? (
+    const todayTop = (dueToday.length > 0 || takeawayCards.length > 0 || thisWeek || showReview) ? (
         <div className="flex flex-col gap-4">
             {dueToday.length > 0 && (
                 <div className="flex flex-col gap-1.5">
@@ -271,6 +285,38 @@ export default function DigestView({
                 </div>
             )}
 
+            {takeawayCards.length > 0 && (
+                <div className="flex flex-col gap-1.5">
+                    <SectionHeader
+                        label="Do this"
+                        count={takeawayCards.length}
+                        open={isOpen(DO_KEY)}
+                        onToggle={() => toggle(DO_KEY)}
+                    />
+                    {/* The task is the row's headline and the card it came from
+                        is the line under it, so the list reads as a to-do list
+                        that happens to know its sources. Same row as Due now,
+                        so the two sections read as siblings. */}
+                    {isOpen(DO_KEY) && takeawayCards.map((l) => (
+                        <ResurfacedCardRow
+                            key={l.id}
+                            card={{ ...toCardRef(l), title: getActionableTakeaway(l), summary: l.title }}
+                            onOpen={() => onOpenTakeawayCard?.(l)}
+                            trailing={onCompleteTakeaway && (
+                                <button
+                                    onClick={() => onCompleteTakeaway(l)}
+                                    aria-label={`Mark “${getActionableTakeaway(l)}” as done`}
+                                    title="Mark as done"
+                                    className="w-9 h-9 shrink-0 flex items-center justify-center rounded-lg text-text-muted hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
+                                >
+                                    <CircleCheck className="w-4 h-4" />
+                                </button>
+                            )}
+                        />
+                    ))}
+                </div>
+            )}
+
             {thisWeek && (
                 <div className="flex flex-col gap-1.5">
                     <SectionHeader
@@ -309,7 +355,7 @@ export default function DigestView({
 
     return (
         <>
-            {/* Phone / tablet — today's top section, then a scannable LIST of
+            {/* Phone / tablet — the top section, then a scannable LIST of
                 every digest, newest first. Tapping one opens it as its own
                 screen (Feed owns that view + the back navigation). */}
             <div className="lg:hidden max-w-3xl mx-auto flex flex-col gap-4">
@@ -357,7 +403,7 @@ export default function DigestView({
                 ))}
             </div>
 
-            {/* Desktop — today's top section over the sidebar list + reading pane. */}
+            {/* Desktop — the top section over the sidebar list + reading pane. */}
             {/* Wider than the old max-w-6xl (owner QA: the reader left desktop
                 width on the table). The sidebar keeps its 288px; the extra room
                 all goes to the reading pane, where the article column centres

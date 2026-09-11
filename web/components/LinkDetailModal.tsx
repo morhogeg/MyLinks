@@ -21,7 +21,7 @@ import { isHttpUrl } from '@/lib/url';
 import CitationMark from './ui/CitationMark';
 import ProBadge from './ui/ProBadge';
 import { requestPaywall } from '@/lib/entitlement';
-import { getActionableTakeaway } from '@/lib/takeaway';
+import { getActionableTakeaway, isTakeawayDone } from '@/lib/takeaway';
 import { addScreenshotsToCard, MAX_CARD_SCREENSHOTS } from '@/lib/enrich';
 import { useToast } from '@/components/Toast';
 
@@ -60,6 +60,8 @@ interface LinkDetailModalProps {
     allLinks: Link[];
     allCategories: string[];
     uid: string | null;
+    /** Tick the card's "Do this" takeaway off or back on (Feed writes it). */
+    onToggleTakeawayDone?: (link: Link, done: boolean) => void;
     isOpen: boolean;
     onClose: () => void;            // dismiss the modal entirely (clears the back-stack)
     onBack?: () => void;           // step back to the previous card in the back-stack
@@ -207,6 +209,7 @@ export default function LinkDetailModal({
     allLinks,
     allCategories,
     uid,
+    onToggleTakeawayDone,
     isOpen,
     onClose,
     onBack,
@@ -1359,6 +1362,18 @@ export default function LinkDetailModal({
                             // or not that value is in the union yet.
                             const isAnswerCard = String(link.captureType) === 'answer';
                             if (!takeaway || isAnswerCard) return null;
+                            // Done is one field on the card (takeawayDoneAt). The
+                            // label doubles as the toggle: ticking it off removes
+                            // the row from Revisit's "Do this" list and strikes the
+                            // line through here, and the text itself never changes.
+                            const done = isTakeawayDone(link);
+                            const label = done
+                                ? (isRtl ? 'בוצע' : 'Done')
+                                : (isRtl ? 'לעשות' : 'Do this');
+                            const labelClass = `flex items-center gap-2 mb-2 text-sm font-bold text-text-muted ${isRtl ? '' : 'uppercase tracking-wider'}`;
+                            const icon = done
+                                ? <CircleCheck className="w-4 h-4 shrink-0 text-accent" />
+                                : <Circle className="w-4 h-4 shrink-0 text-accent" />;
                             return (
                                 <div className="mb-6" dir={isRtl ? 'rtl' : 'ltr'}>
                                     {/* Same label treatment as Machina's read below, so
@@ -1366,11 +1381,24 @@ export default function LinkDetailModal({
                                         unrelated inventions. Hebrew skips the uppercase
                                         (a no-op) and the wide tracking (which only makes
                                         Hebrew look loose). */}
-                                    <div className={`flex items-center gap-2 mb-2 text-sm font-bold text-text-muted ${isRtl ? '' : 'uppercase tracking-wider'}`}>
-                                        <CircleCheck className="w-4 h-4 shrink-0 text-accent" />
-                                        <span>{isRtl ? 'לעשות' : 'Do this'}</span>
-                                    </div>
-                                    <p className={`reading-prose text-text-secondary leading-relaxed ${isRtl ? 'text-right' : 'text-left'}`}>
+                                    {onToggleTakeawayDone ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => onToggleTakeawayDone(link, !done)}
+                                            aria-pressed={done}
+                                            aria-label={done ? 'Mark as not done' : 'Mark as done'}
+                                            className={`${labelClass} -mx-1 px-1 rounded-md hover:text-text-secondary transition-colors cursor-pointer`}
+                                        >
+                                            {icon}
+                                            <span>{label}</span>
+                                        </button>
+                                    ) : (
+                                        <div className={labelClass}>
+                                            {icon}
+                                            <span>{label}</span>
+                                        </div>
+                                    )}
+                                    <p className={`reading-prose leading-relaxed ${isRtl ? 'text-right' : 'text-left'} ${done ? 'text-text-muted line-through decoration-text-muted/60' : 'text-text-secondary'}`}>
                                         {takeaway}
                                     </p>
                                 </div>

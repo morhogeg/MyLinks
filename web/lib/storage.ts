@@ -596,6 +596,17 @@ export async function markLinkReviewed(uid: string, id: string, reviewed: boolea
 }
 
 /**
+ * Tick the card's "Do this" takeaway off (or back on). Touches nothing else:
+ * the takeaway text stays on the card, the card's status is not a task's
+ * status, and the marker only removes the row from the Revisit list
+ * (lib/takeaway openTakeaways).
+ */
+export async function markTakeawayDone(uid: string, id: string, done: boolean): Promise<void> {
+    const linkRef = doc(db, 'users', uid, 'links', id);
+    await updateDoc(linkRef, { takeawayDoneAt: done ? Date.now() : deleteField() });
+}
+
+/**
  * Update a link's tags in Firestore
  */
 export async function updateLinkTags(uid: string, id: string, tags: string[]): Promise<void> {
