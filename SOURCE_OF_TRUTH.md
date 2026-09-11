@@ -226,7 +226,19 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-09-10): install build **1321** (screenshot byline, real fix), then the 1318/1317 QA below if not yet done
+> ## 🚨 OWNER ACTION (updated 2026-09-11): install build **1322** (Revisit tab + "Do this" list), then the 1321 QA below if not yet done
+>
+> **1322** (run #322, merge `0e7bd0d`) renames the Today tab to **Revisit**
+> and adds a **Do this** section there: every card whose "לעשות / Do this"
+> line is still open, newest first, tap opens the card, the tick marks it
+> done (the card detail's "Do this" label becomes the same toggle). QA on
+> 1322: open Revisit, confirm the pinuk-now coupon card's task is listed
+> with the card title under it, tap the tick and watch it leave; open the
+> card and expect "Done / בוצע" with the line struck through, tap the label
+> to undo. Check a Hebrew task row reads right-to-left. Desktop web has the
+> same via Vercel.
+>
+> ## (superseded) OWNER ACTION (updated 2026-09-10): install build **1321** (screenshot byline, real fix), then the 1318/1317 QA below if not yet done
 >
 > **1321** (run #321, merge `345faa6`) is the one that actually lands the
 > platform mark: the Image tab's own save was dropping the two provenance
@@ -1976,9 +1988,12 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 
 - **2026-09-11 — Revisit tab (was "Today") + a "Do this" list of open
-  takeaways. NOT shipped (branch `claude/revisit-do-this`, ready for
-  `/ship`: web only, no functions or rules change, needs a TestFlight build
-  for the tab label).** Owner asked for a view that gathers every card's
+  takeaways. SHIPPED: merge `0e7bd0d` to main (Vercel auto-deploy for
+  desktop web), TestFlight run #322 = **build 1322** green (uploaded 09:59
+  UTC). Web only: no functions, rules or hosting deploy. The force-push of
+  `trigger/testflight` was blocked by the session's command classifier; a
+  plain fast-forward push of the same ref worked, which is the path to use
+  from a cloud session.** Owner asked for a view that gathers every card's
   "לעשות / Do this" line into one list that opens the card, and questioned
   the "Today" name. **Name.** The tab is now **Revisit** (bottom tab bar,
   the desktop toolbar button and its tooltip "What is coming back to you",
