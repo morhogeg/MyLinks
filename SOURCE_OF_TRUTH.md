@@ -226,7 +226,18 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-09-11): install build **1322** (Revisit tab + "Do this" list), then the 1321 QA below if not yet done
+> ## 🚨 OWNER ACTION (updated 2026-09-11, later): install build **1323** (calmer "Do this" list + Back to Revisit), then the 1321 QA below if not yet done
+>
+> **1323** (run #323, merge `af33754`) is round 2 of the Revisit "Do this"
+> list from your 1322 screenshot: one grouped list, blank circle per open
+> task, two lines of task + the card title, five rows then "Show all N".
+> A card opened from Revisit now has "‹ Revisit" at the start of its
+> toolbar. QA on 1323: tick a task and watch the row leave; open a card
+> from the list, then go back with the "‹ Revisit" control AND with the
+> edge swipe, and confirm Revisit is exactly where you left it (scroll,
+> "Show all" state); check a Hebrew task row. Desktop web has the same.
+>
+> ## (superseded) OWNER ACTION (updated 2026-09-11): install build **1322** (Revisit tab + "Do this" list), then the 1321 QA below if not yet done
 >
 > **1322** (run #322, merge `0e7bd0d`) renames the Today tab to **Revisit**
 > and adds a **Do this** section there: every card whose "לעשות / Do this"
@@ -1987,6 +1998,32 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-11 (round 2) — Revisit "Do this" calmed down + a named way
+  back. SHIPPED: merge `af33754` to main (Vercel auto-deploy), TestFlight
+  run #323 = **build 1323** green (uploaded 11:06 UTC). Web only.** Owner QA on 1322 from a
+  device screenshot: the list was too busy (each task was a full card row
+  with byline, chip, thumbnail and 2 to 4 bold lines, 49 of them) and the
+  outlined check icon read as already ticked. Now: one grouped container
+  with hairline dividers (`TakeawayRow` in `DigestView.tsx`), a blank 18px
+  half-opacity `Circle` for every open task (the card detail's own "not
+  yet" mark), the task on at most two lines, the card title as one muted
+  line, no byline, chip or thumbnail. Five rows by default, then "Show all
+  N" / "Show fewer". The text block follows the task's own direction; the
+  circles keep one column on the left so a mixed Hebrew/English list reads
+  as one list. Mockup shown to the owner first (artifact "Do This, Round
+  Two", built from the app's own tokens) and approved. Owner then asked to
+  make sure a tap opens the card, there is a way back to Revisit, swipe
+  back works, and back lands on the exact spot. Verified in code: Revisit
+  never unmounts under the card and scrolls in its own container, the body
+  lock only sets overflow hidden, the fold and collapsed sections are React
+  state, the card's `useEdgeSwipeBack` closes it, and Feed's own edge swipe
+  stands down while a card is open (`anyOverlayOpen`), so one swipe pops
+  one screen. Added: `LinkDetailModal` takes `backTo` and renders an
+  iOS-style "‹ Revisit" control at the start of the toolbar that closes the
+  card; Feed passes it when `viewMode === 'digest'`. Generic prop, wired
+  for Revisit only. **Verified:** tsc, eslint (one pre-existing `isYouTube`
+  warning), em-dash gate. **Not verified:** on device; the feel of the
+  swipe threshold and the return.
 - **2026-09-11 — Revisit tab (was "Today") + a "Do this" list of open
   takeaways. SHIPPED: merge `0e7bd0d` to main (Vercel auto-deploy for
   desktop web), TestFlight run #322 = **build 1322** green (uploaded 09:59
