@@ -226,7 +226,15 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-09-11, later): install build **1323** (calmer "Do this" list + Back to Revisit), then the 1321 QA below if not yet done
+> ## 🚨 OWNER ACTION (updated 2026-09-11, latest): install build **1324** ("Marked as done" toast with Undo), then the 1323 QA below if not yet done
+>
+> **1324** (run #324, merge `f1719d9`) adds the confirmation toast when a
+> "Do this" task is ticked in Revisit: "Marked as done" with an Undo that
+> puts the row back. QA on 1324: tick a task, tap Undo within ~4s, confirm
+> the row returns to the same place; tick again and let it go. Then the
+> 1323 list below.
+>
+> ## (superseded) OWNER ACTION (updated 2026-09-11, later): install build **1323** (calmer "Do this" list + Back to Revisit), then the 1321 QA below if not yet done
 >
 > **1323** (run #323, merge `af33754`) is round 2 of the Revisit "Do this"
 > list from your 1322 screenshot: one grouped list, blank circle per open
@@ -1998,6 +2006,20 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-11 (round 3) — "Marked as done" toast with Undo. SHIPPED:
+  merge `f1719d9` to main (Vercel auto-deploy), TestFlight run #324 =
+  **build 1324** green (uploaded 13:33 UTC). Web only.** Ticking a task in
+  Revisit's "Do this" now shows the app's success toast "Marked as done"
+  with an Undo action (4.5s, the action-toast beat); Undo clears
+  `takeawayDoneAt` and the row returns to its place (order is by save
+  date, unchanged). A failed write shows "Could not save that. Try again."
+  instead of silently keeping the row. Un-ticking from the card detail
+  stays toast-free (that label is a visible toggle). Owner asked where done
+  tasks are visible: only on the card itself ("Done / בוצע", struck
+  through); there is deliberately no aggregated done list. Recommendation
+  recorded: not needed now; if "did I already do this?" comes up often, add
+  a collapsed "Done N" line under the list with un-tick, ~1h. Verified:
+  tsc, eslint, em-dash gate. Not verified on device.
 - **2026-09-11 (round 2) — Revisit "Do this" calmed down + a named way
   back. SHIPPED: merge `af33754` to main (Vercel auto-deploy), TestFlight
   run #323 = **build 1323** green (uploaded 11:06 UTC). Web only.** Owner QA on 1322 from a
