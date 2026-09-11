@@ -220,6 +220,10 @@ export interface Link {
   // from review sessions for a cooldown (see lib/reviewQueue REVIEWED_REST_DAYS),
   // so Keep can't be confused with favoriting. Cleared by the deck's Undo.
   reviewedAt?: number; // Unix timestamp (ms)
+  // When the user ticked off the card's "Do this" takeaway (Revisit tab or the
+  // card detail). Absent means still open; the takeaway text itself is never
+  // touched, so a done card still shows what it asked for.
+  takeawayDoneAt?: number; // Unix timestamp (ms)
   language?: string;
   isRead?: boolean;
 

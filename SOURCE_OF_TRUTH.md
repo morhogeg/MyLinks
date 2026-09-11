@@ -1975,6 +1975,43 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-11 — Revisit tab (was "Today") + a "Do this" list of open
+  takeaways. NOT shipped (branch `claude/revisit-do-this`, ready for
+  `/ship`: web only, no functions or rules change, needs a TestFlight build
+  for the tab label).** Owner asked for a view that gathers every card's
+  "לעשות / Do this" line into one list that opens the card, and questioned
+  the "Today" name. **Name.** The tab is now **Revisit** (bottom tab bar,
+  the desktop toolbar button and its tooltip "What is coming back to you",
+  both subheader titles). The key stays `digest`, so the push payload and
+  deep links keep routing, and the recency bucket inside the view keeps its
+  own "Today" header, which no longer collides with the tab. "Recall" was
+  considered and rejected: it is the Ask pillar's word everywhere a user
+  meets it first (Recall Engine positioning, the landing Ask eyebrow, the
+  store name "Save, Ask & Recall"), this tab is the push half of that
+  engine rather than the pull half, and Recall is a named competitor.
+  **Do this.** A new section in Revisit, between Due now and This week,
+  lists every visible card whose `actionableTakeaway` is still open, newest
+  save first: the task is the row's headline, the card title is the line
+  under it, the byline and thumbnail are the card's, tapping opens the card,
+  and a tick button marks it done. Done is one new field, `takeawayDoneAt`
+  (`lib/storage markTakeawayDone`, allowed by the existing links rule with
+  no rules change); the row leaves the list and the card detail's "Do this"
+  label becomes a toggle reading "Done / בוצע" with the line struck through,
+  so the advice is never lost. Saved Ask answers never appear (same rule as
+  the detail view). The list is derived from `visibleLinks`, so a locked
+  private card never surfaces a line of its content. Pure rule in
+  `lib/takeaway openTakeaways` (handles legacy ISO-string `createdAt`),
+  covered by `npm run test:takeaway` (3 node tests). Empty state reads
+  "Nothing to revisit yet." Analytics: `takeaway_done`; `digest_opened`
+  keeps its name so the series stays whole. Reminders, the synthesis, and
+  the takeaway prompt are untouched; takeaways and reminders stay separate
+  concepts (a card's own advice vs. the user's intent to return).
+  **Verified:** `tsc` clean, eslint clean on the touched files (one
+  pre-existing `isYouTube` warning in `LinkDetailModal`), em-dash gate
+  clean, node tests 3/3, `npm run build` static export passes (placeholder `NEXT_PUBLIC_FIREBASE_*`). **Not verified:** on device (no
+  session can), light/dark render of the new row, RTL of a Hebrew takeaway
+  in the row (it reuses `ResurfacedCardRow`, whose direction follows the
+  title, here the takeaway text).
 - **2026-09-10 (round 4) — the real cause: the app's image tab dropped the
   fields on save.** A fresh save after round 3 still showed "@OpenAI" with no
   X mark. The probe (pipeline-debug run #11) settled it: the stored card had
