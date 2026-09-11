@@ -856,14 +856,25 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     const takeawayCards = useMemo(() => openTakeaways(visibleLinks), [visibleLinks]);
 
     // Ticking a takeaway off is one field on the card (lib/storage). The live
-    // subscription carries it back, so the row leaves the list on its own.
+    // subscription carries it back, so the row leaves the list on its own. The
+    // row vanishing IS the feedback, so the toast's job is the way back: Undo
+    // flips the same field, and the row returns where it was (newest-first
+    // order is by save date, which did not change). Un-ticking from the card
+    // detail is a visible toggle already and gets no toast.
     const completeTakeaway = useCallback((link: Link, done = true) => {
         if (!uid) return;
         markTakeawayDone(uid, link.id, done).then(
-            () => { if (done) track('takeaway_done'); },
-            () => { /* the row simply stays; the next tap tries again */ },
+            () => {
+                if (!done) return;
+                track('takeaway_done');
+                toast.success('Marked as done', {
+                    label: 'Undo',
+                    onClick: () => { void markTakeawayDone(uid, link.id, false); },
+                });
+            },
+            () => { toast.error('Could not save that. Try again.'); },
         );
-    }, [uid]);
+    }, [uid, toast]);
 
     // "Done" on a due card: stop a still-pending reminder from coming back, and
     // clear the fired flag. Both writes are the ones the rest of the app already
