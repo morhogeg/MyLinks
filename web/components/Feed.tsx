@@ -3147,6 +3147,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                     onClose={closeActiveLinkStack}
                     onBack={goBackOrClose}
                     canGoBack={linkStack.length > 0}
+                    backTo={viewMode === 'digest' ? 'Revisit' : undefined}
                     onStatusChange={handleStatusChange}
                     onReadStatusChange={handleReadStatusChange}
                     onUpdateTags={handleUpdateTags}
