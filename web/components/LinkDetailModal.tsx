@@ -66,6 +66,10 @@ interface LinkDetailModalProps {
     onClose: () => void;            // dismiss the modal entirely (clears the back-stack)
     onBack?: () => void;           // step back to the previous card in the back-stack
     canGoBack?: boolean;           // true when there's a previous card to return to
+    /** Name of the screen this card was opened from ("Revisit"), when that
+     *  screen is still waiting underneath. Renders a labelled back control
+     *  that closes the card; the edge swipe does the same thing. */
+    backTo?: string;
     onStatusChange: StatusChangeHandler;
     onReadStatusChange: (id: string, isRead: boolean) => void;
     onUpdateTags: (id: string, tags: string[]) => void;
@@ -214,6 +218,7 @@ export default function LinkDetailModal({
     onClose,
     onBack,
     canGoBack,
+    backTo,
     onStatusChange,
     onReadStatusChange,
     onUpdateTags,
@@ -737,6 +742,26 @@ export default function LinkDetailModal({
                                     className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-text-muted hover:text-text hover:bg-card-hover transition-colors"
                                 >
                                     <ChevronLeft className="w-5 h-5" />
+                                </button>
+                                <span className="shrink-0 mx-0.5 h-5 w-px bg-border-subtle" aria-hidden="true" />
+                            </>
+                        )}
+                        {/* Opened from a screen that is still there underneath
+                            (Revisit): a labelled back control, iOS style, so the
+                            way home is named rather than a lone X on the far
+                            side. Closing returns to that screen exactly as it
+                            was left: it never unmounted, and the body lock only
+                            hides overflow, so scroll and folds survive. */}
+                        {!canGoBack && backTo && (
+                            <>
+                                <button
+                                    onClick={onClose}
+                                    title={`Back to ${backTo}`}
+                                    aria-label={`Back to ${backTo}`}
+                                    className="shrink-0 h-10 ps-1.5 pe-2.5 rounded-xl flex items-center gap-0.5 text-text-muted hover:text-text hover:bg-card-hover transition-colors"
+                                >
+                                    <ChevronLeft className="w-5 h-5 rtl:rotate-180" />
+                                    <span className="text-[13px] font-medium">{backTo}</span>
                                 </button>
                                 <span className="shrink-0 mx-0.5 h-5 w-px bg-border-subtle" aria-hidden="true" />
                             </>

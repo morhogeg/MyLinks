@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
-import { CalendarCheck, ChevronRight, ChevronDown, Bell, CheckCircle2, CircleCheck, GalleryHorizontalEnd } from 'lucide-react';
+import { CalendarCheck, ChevronRight, ChevronDown, Bell, CheckCircle2, Circle, GalleryHorizontalEnd } from 'lucide-react';
 import { CitationGlyph } from '@/components/ui/Wordmark';
 import type { CuratedDigest, WeeklySynthesis, DigestCardRef, UserNote, Link } from '@/lib/types';
 import { track } from '@/lib/analytics';
@@ -10,6 +10,7 @@ import { digestDisplayTitle, digestKindLabel, TODAY_REVIEW_SIZE } from '@/lib/di
 import { synthesisWeekLabel } from '@/lib/synthesis';
 import { cardThumbnailUrl } from '@/lib/cardThumbnail';
 import { getActionableTakeaway } from '@/lib/takeaway';
+import { getDirection } from '@/lib/rtl';
 import DigestCard, { ResurfacedCardRow } from './DigestCard';
 import SynthesisCard from './SynthesisCard';
 
@@ -161,6 +162,10 @@ export default function DigestView({
     const DUE_KEY = 'due-now';
     const DO_KEY = 'do-this';
     const WEEK_KEY = 'this-week';
+    // "Do this" shows a short list by default (Revisit is a place you pass
+    // through); one tap unfolds the rest.
+    const [showAllTakeaways, setShowAllTakeaways] = useState(false);
+    const TAKEAWAYS_FOLDED = 5;
 
     // Desktop sidebar selection. A digest id or `synthesis:<weekId>`; resolved
     // against the live lists below, so a deleted entry falls back on its own.
@@ -293,27 +298,34 @@ export default function DigestView({
                         open={isOpen(DO_KEY)}
                         onToggle={() => toggle(DO_KEY)}
                     />
-                    {/* The task is the row's headline and the card it came from
-                        is the line under it, so the list reads as a to-do list
-                        that happens to know its sources. Same row as Due now,
-                        so the two sections read as siblings. */}
-                    {isOpen(DO_KEY) && takeawayCards.map((l) => (
-                        <ResurfacedCardRow
-                            key={l.id}
-                            card={{ ...toCardRef(l), title: getActionableTakeaway(l), summary: l.title }}
-                            onOpen={() => onOpenTakeawayCard?.(l)}
-                            trailing={onCompleteTakeaway && (
+                    {/* A to-do list, not a card list (owner QA on 1322: the card
+                        rows were too busy). One grouped container, a blank circle
+                        to tick, the task on two lines at most, and the card title
+                        as one muted line under it. No byline, chip or thumbnail:
+                        tapping the row opens the card, which has all of that. */}
+                    {isOpen(DO_KEY) && (
+                        <>
+                            <div className="rounded-2xl border border-border-subtle bg-card divide-y divide-border-subtle overflow-hidden">
+                                {(showAllTakeaways ? takeawayCards : takeawayCards.slice(0, TAKEAWAYS_FOLDED)).map((l) => (
+                                    <TakeawayRow
+                                        key={l.id}
+                                        task={getActionableTakeaway(l)}
+                                        cardTitle={l.title}
+                                        onOpen={() => onOpenTakeawayCard?.(l)}
+                                        onDone={onCompleteTakeaway ? () => onCompleteTakeaway(l) : undefined}
+                                    />
+                                ))}
+                            </div>
+                            {takeawayCards.length > TAKEAWAYS_FOLDED && (
                                 <button
-                                    onClick={() => onCompleteTakeaway(l)}
-                                    aria-label={`Mark “${getActionableTakeaway(l)}” as done`}
-                                    title="Mark as done"
-                                    className="w-9 h-9 shrink-0 flex items-center justify-center rounded-lg text-text-muted hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
+                                    onClick={() => setShowAllTakeaways((v) => !v)}
+                                    className="self-start px-1 py-1 text-[12px] font-semibold text-text-muted hover:text-accent transition-colors cursor-pointer"
                                 >
-                                    <CircleCheck className="w-4 h-4" />
+                                    {showAllTakeaways ? 'Show fewer' : `Show all ${takeawayCards.length}`}
                                 </button>
                             )}
-                        />
-                    ))}
+                        </>
+                    )}
                 </div>
             )}
 
@@ -476,6 +488,49 @@ export default function DigestView({
 /** A collapsible group header — same typographic weight as the plain date
  *  headers next to it, so the submenu reads as part of the same list rather
  *  than as a control bolted on top. */
+/**
+ * One line of Revisit's "Do this" list. The circle is the SAME blank circle the
+ * card detail uses for "not yet" (18px, half opacity), so an open task never
+ * looks ticked; ticking it removes the row. The text block follows the task's
+ * own direction while the circle keeps one column on the left, so a mixed
+ * Hebrew/English list still reads as one list.
+ */
+function TakeawayRow({ task, cardTitle, onOpen, onDone }: {
+    task: string;
+    cardTitle: string;
+    onOpen: () => void;
+    onDone?: () => void;
+}) {
+    const dir = getDirection(task);
+    const isRtl = dir === 'rtl';
+    return (
+        <div className="flex items-start gap-1 ps-1.5 pe-3.5">
+            {onDone && (
+                <button
+                    onClick={onDone}
+                    aria-label="Mark as done"
+                    title="Mark as done"
+                    className="w-10 h-11 shrink-0 flex items-center justify-center text-text-muted hover:text-accent transition-colors cursor-pointer"
+                >
+                    <Circle className="w-[18px] h-[18px] opacity-50" />
+                </button>
+            )}
+            <button
+                onClick={onOpen}
+                dir={dir}
+                className="group min-w-0 flex-1 py-3 text-start cursor-pointer"
+            >
+                <div className={`text-[14px] font-medium leading-snug text-text group-hover:text-accent transition-colors line-clamp-2 ${isRtl ? 'font-hebrew' : ''}`}>
+                    {task}
+                </div>
+                {cardTitle && (
+                    <div className="mt-0.5 text-[12px] text-text-muted truncate">{cardTitle}</div>
+                )}
+            </button>
+        </div>
+    );
+}
+
 function SectionHeader({ label, count, open, onToggle }: {
     label: string;
     /** Omitted where a count would say nothing (a section holding one thing). */
