@@ -145,10 +145,11 @@ def test_synthesis_skips_when_week_already_delivered(monkeypatch):
     assert res["skipped"] == "already_sent_this_week"
 
 
-def test_synthesis_force_bypasses_week_dedupe(monkeypatch):
+def test_synthesis_force_bypasses_week_dedupe_for_pro(monkeypatch):
     import ai_service
 
-    # Even with an existing week doc, the preview button (force=True) regenerates.
+    # Even with an existing week doc, the preview button (force=True) regenerates
+    # for a Pro workspace.
     called = {"synth": False}
 
     class G:
@@ -159,6 +160,7 @@ def test_synthesis_force_bypasses_week_dedupe(monkeypatch):
     monkeypatch.setattr(ai_service, "GeminiService", G)
     monkeypatch.setattr(ds, "get_db", lambda: RecordingDB(synth_exists=True))
     monkeypatch.setattr(ds, "_write_inapp_synthesis", lambda *a, **k: True)
+    monkeypatch.setattr(ds, "is_pro", lambda uid: True)
 
     res = ds.build_and_send_synthesis(
         "u1", {"settings": {"digest_channels": ["push"]}}, _recent_cards(), force=True,
@@ -166,6 +168,31 @@ def test_synthesis_force_bypasses_week_dedupe(monkeypatch):
 
     assert called["synth"] is True
     assert res["sent"] is True
+
+
+def test_synthesis_force_does_not_regenerate_for_a_free_workspace(monkeypatch):
+    """A free workspace only ever sees the locked teaser, so `force` must not
+    buy it a fresh 500-card synthesis on every tap (10/hour, forever)."""
+    import ai_service
+
+    called = {"synth": False}
+
+    class G:
+        def synthesize_week(self, cards):
+            called["synth"] = True
+            return {"title": "T", "narrative": "n"}
+
+    monkeypatch.setattr(ai_service, "GeminiService", G)
+    monkeypatch.setattr(ds, "get_db", lambda: RecordingDB(synth_exists=True))
+    monkeypatch.setattr(ds, "_write_inapp_synthesis", lambda *a, **k: True)
+    monkeypatch.setattr(ds, "is_pro", lambda uid: False)
+
+    res = ds.build_and_send_synthesis(
+        "u1", {"settings": {"digest_channels": ["push"]}}, _recent_cards(), force=True,
+    )
+
+    assert called["synth"] is False
+    assert res["skipped"] == "already_sent_this_week"
 
 
 # ── legacy: digest_mode 'synthesis' still routes to the synthesis path ──────

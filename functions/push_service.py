@@ -31,12 +31,41 @@ def _mask_token(token: str) -> str:
     return f"{s[:6]}…{s[-4:]}" if len(s) > 12 else "***"
 
 
+# Notification text ceilings. APNs caps the whole payload at 4 KB and FCM
+# rejects an oversized message with INVALID_ARGUMENT for EVERY token in the
+# batch; the title/body here come from card titles and model-generated
+# synthesis titles, which a hostile page can inflate. Truncating keeps a
+# single bad card from killing delivery, and `_is_dead_token` below no longer
+# treats a payload rejection as a dead token.
+MAX_PUSH_TITLE_CHARS = 200
+MAX_PUSH_BODY_CHARS = 500
+
+_CONTROL_CHARS = {c: " " for c in range(0x20)}
+_CONTROL_CHARS[0x7F] = " "
+
+
+def _clean_text(value, limit: int) -> str:
+    """Notification text: control characters (incl. newlines) collapsed to a
+    space, whitespace squeezed, truncated to `limit`."""
+    s = str(value or "").translate(_CONTROL_CHARS)
+    s = " ".join(s.split())
+    return s[:limit]
+
+
 def _is_dead_token(exc) -> bool:
-    """True when FCM says the token will never work again (safe to prune)."""
+    """True when FCM says the TOKEN will never work again (safe to prune).
+
+    INVALID_ARGUMENT is ambiguous: FCM uses it for a malformed registration
+    token AND for a rejected payload (too large, bad field). Only the former
+    is about the token; pruning on the latter used to drop every device of a
+    user whose card title happened to push the payload over the limit."""
     if isinstance(exc, messaging.UnregisteredError):
         return True
     if isinstance(exc, exceptions.FirebaseError):
-        return exc.code in ("NOT_FOUND", "INVALID_ARGUMENT")
+        if exc.code == "NOT_FOUND":
+            return True
+        if exc.code == "INVALID_ARGUMENT":
+            return "registration token" in str(exc).lower()
     return False
 
 
@@ -67,6 +96,8 @@ def send_push(uid: str, title: str, body: str, data: Optional[dict] = None) -> d
         return result
 
     str_data = {str(k): str(v) for k, v in (data or {}).items() if v is not None}
+    title = _clean_text(title, MAX_PUSH_TITLE_CHARS)
+    body = _clean_text(body, MAX_PUSH_BODY_CHARS)
 
     message = messaging.MulticastMessage(
         tokens=tokens,

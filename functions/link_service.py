@@ -27,6 +27,13 @@ MAX_PROMPT_TAGS = 50
 # noise; a long list of near-duplicates would defeat the point.
 MAX_PROMPT_CATEGORIES = 20
 
+# Per-item length caps for the same two lists. They mirror main.MAX_TAG_LENGTH
+# / MAX_CATEGORY_LENGTH (the client-supplied twins) — the stored values are
+# model output that a hostile page can steer, and this list is interpolated
+# verbatim into every later analysis prompt for the workspace.
+MAX_PROMPT_TAG_LENGTH = 60
+MAX_PROMPT_CATEGORY_LENGTH = 40
+
 # Defaults for a brand-new workspace. Mirrors DEFAULT_SETTINGS in
 # web/lib/useUserSettings.ts — keep the two in sync.
 DEFAULT_USER_SETTINGS = {
@@ -227,6 +234,31 @@ def delete_shares_for_owner(uid: str) -> int:
                 logger.warning(f"Share preview cleanup failed for {share_id}: {e}")
         except Exception as e:
             logger.warning(f"Share cleanup failed for {share_id}: {e}")
+
+    # Legacy shares (published before the 2026-07-07 `shared_owners` split)
+    # carry `ownerUid` on the PUBLIC doc and have no owner row, so the loop
+    # above never sees them. Sweep those too: the page would otherwise stay
+    # live forever after the account is gone, phone-number field included.
+    for coll in ('shared_cards', 'shared_collections'):
+        try:
+            legacy = db.collection(coll).where(filter=FieldFilter('ownerUid', '==', uid)).stream()
+            for doc in legacy:
+                try:
+                    doc.reference.delete()
+                    deleted += 1
+                    owner_ref = db.collection('shared_owners').document(doc.id)
+                    if owner_ref.get().exists:
+                        owner_ref.delete()
+                        deleted += 1
+                    try:
+                        from share_service import _delete_share_previews
+                        _delete_share_previews(doc.id)
+                    except Exception as e:
+                        logger.warning(f"Share preview cleanup failed for {doc.id}: {e}")
+                except Exception as e:
+                    logger.warning(f"Legacy share cleanup failed for {doc.id}: {e}")
+        except Exception as e:
+            logger.warning(f"Legacy share sweep failed for {coll}: {e}")
     return deleted
 
 
@@ -473,10 +505,12 @@ def get_user_vocabulary(uid: str) -> tuple:
         if isinstance(link_tags, list):
             for tag in link_tags:
                 if isinstance(tag, str) and tag.strip():
+                    tag = tag.strip()[:MAX_PROMPT_TAG_LENGTH]
                     tag_counts[tag] = tag_counts.get(tag, 0) + 1
         category = data.get('category')
         if isinstance(category, str) and category.strip():
-            cat_counts[category.strip()] = cat_counts.get(category.strip(), 0) + 1
+            category = category.strip()[:MAX_PROMPT_CATEGORY_LENGTH]
+            cat_counts[category] = cat_counts.get(category, 0) + 1
 
     def _ranked(counts, cap):
         return [k for k, _ in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:cap]]
@@ -517,6 +551,57 @@ def ensure_ingest_token(uid: str) -> str:
     user_ref.set({'ingestToken': token}, merge=True)
     logger.info(f"Generated new ingest token for user {mask_uid(uid)}")
     return token
+
+
+def rotate_ingest_token(uid: str) -> str:
+    """Replace the workspace's ingest token. The lookup is an equality query on
+    the single `ingestToken` field, so overwriting it invalidates the old
+    token on the next share-ingest call — no grace window, by design."""
+    token = secrets.token_urlsafe(24)
+    get_db().collection('users').document(uid).set({
+        'ingestToken': token,
+        'ingestTokenRotatedAt': datetime.now(timezone.utc).isoformat(),
+    }, merge=True)
+    logger.info(f"Rotated ingest token for user {mask_uid(uid)}")
+    return token
+
+
+# ── Opaque storage key ───────────────────────────────────────────────────────
+# Storage objects used to live under `screenshots/{uid}/…` and
+# `post_thumbs/{uid}/…`, and their public download URLs reach world-readable
+# share snapshots. For the legacy owner workspace the uid IS a phone number,
+# so every shared screenshot carried it. New blobs are written under a random
+# per-workspace key instead (server-only field `storageKey` on the user doc,
+# outside the client allowlist). Existing blobs are migrated by
+# tools/backfill_storage_keys.py; until then both prefixes are the workspace's
+# own (share_ingest's re-enqueue check and account deletion accept both).
+_STORAGE_KEY_CACHE: dict = {}
+
+
+def storage_key_for(uid: str) -> str:
+    """The opaque Storage prefix key for `uid`, minted on first use.
+
+    Fail-soft: if the key cannot be read or written (a transient Firestore
+    error) the legacy uid-keyed path is used, exactly as before this change,
+    so a save never fails on the prefix."""
+    if not uid:
+        return uid
+    cached = _STORAGE_KEY_CACHE.get(uid)
+    if cached:
+        return cached
+    try:
+        ref = get_db().collection('users').document(uid)
+        snap = ref.get()
+        key = (snap.to_dict() or {}).get('storageKey') if snap.exists else None
+        if not isinstance(key, str) or not key:
+            key = secrets.token_hex(16)
+            ref.set({'storageKey': key}, merge=True)
+            logger.info(f"Minted storage key for user {mask_uid(uid)}")
+        _STORAGE_KEY_CACHE[uid] = key
+        return key
+    except Exception as e:
+        logger.warning(f"Storage key lookup failed for {mask_uid(uid)}; using legacy prefix: {e}")
+        return uid
 
 
 def find_user_by_ingest_token(token: str) -> Optional[str]:

@@ -192,8 +192,11 @@ export async function signOutUser(): Promise<void> {
         // everything else this function purges — drop it first so the share
         // sheet cannot keep posting into the departing account's library.
         try {
-            const { clearNativeShareConfig } = await import('@/lib/shareConfig');
+            const { clearNativeShareConfig, clearNativeWebsiteData } = await import('@/lib/shareConfig');
             await clearNativeShareConfig();
+            // The WebView's own HTTP cache holds every screenshot and thumbnail
+            // the feed showed; JS cannot reach it, the native side can.
+            await clearNativeWebsiteData();
         } catch {
             // Never let the bridge block a sign-out.
         }

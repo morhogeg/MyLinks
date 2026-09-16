@@ -185,7 +185,10 @@ def test_rate_limit_blocks_the_write(monkeypatch, db):
     assert db.written == []
 
 
-def test_rate_limit_bucket_is_per_ip(monkeypatch, db):
+def test_rate_limit_bucket_is_per_identity(monkeypatch, db):
+    """Anonymous reports are bucketed per IP; a signed-in caller gets its own
+    bucket (`_rate_limit_identity`), so 30 anonymous posts behind the Hosting
+    proxy no longer blind every real device's crash report for the hour."""
     seen = {}
 
     def _fake(key, limit, window, fail_open=False):
@@ -195,9 +198,13 @@ def test_rate_limit_bucket_is_per_ip(monkeypatch, db):
 
     monkeypatch.setattr(main, "check_rate_limit", _fake)
     main.client_error_http(_Req(raw=_body(message="boom"), remote_addr="9.9.9.9"))
-    assert seen["key"] == "client-error:9.9.9.9"
+    assert seen["key"] == "client-error:ip:9.9.9.9"
     # Public write surface → must fail CLOSED when the limiter is unavailable.
     assert seen["fail_open"] is False
+
+    monkeypatch.setattr(main, "_verify_bearer", lambda req: {"uid": "auth-1"})
+    main.client_error_http(_Req(raw=_body(message="boom"), remote_addr="9.9.9.9"))
+    assert seen["key"] == "client-error:auth:auth-1"
 
 
 def test_firestore_failure_does_not_fail_the_caller(monkeypatch):

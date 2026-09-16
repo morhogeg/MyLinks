@@ -5,6 +5,7 @@
 // `rules-tests.yml` prove it, then promote it here — deploy-rules.yml deploys
 // whatever this file says. See NATIVE_AUTH_SETUP.md ("Cutover order").
 rules_version = '2';
+rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -51,6 +52,34 @@ service cloud.firestore {
               'onboarded', 'privacyLock', 'graphVersion'];
     }
 
+    // The TYPE each client-writable field must have when present. The key
+    // allowlist alone let a modified client write `settings: "x"` (or
+    // `timezone: 5`), and the schedulers read those fields for EVERY user in
+    // one loop: `settings.get(...)` on a string raised before the per-user
+    // try/except, so one account could halt reminders/digests for everyone.
+    // The servers now coerce too; this keeps the bad value out of the DB.
+    // A field that is being deleted (deleteField) is absent from the new
+    // data and therefore passes.
+    function clientUserFieldsTyped(d) {
+      return (!('settings' in d) || d.settings is map)
+        && (!('timezone' in d) || d.timezone is string)
+        && (!('aiConsentAt' in d) || d.aiConsentAt is number)
+        && (!('pushPromptedAt' in d) || d.pushPromptedAt is number)
+        && (!('onboarded' in d) || d.onboarded is bool)
+        && (!('privacyLock' in d) || d.privacyLock is map)
+        && (!('graphVersion' in d) || d.graphVersion is number);
+    }
+
+    // See the links rule. `resource.data.get()` (not a bare field read) so a
+    // doc without the field never errors the rule into a denial.
+    function reminderTimeSane() {
+      let d = request.resource.data;
+      return !('nextReminderAt' in d)
+        || d.nextReminderAt == null
+        || (request.method == 'update' && d.nextReminderAt == resource.data.get('nextReminderAt', null))
+        || (d.nextReminderAt is number && d.nextReminderAt >= request.time.toMillis() - 300000);
+    }
+
     match /users/{uid} {
       // Read = get + list, written against `resource` (NOT owns()) on purpose:
       // the client resolves its workspace with the LIST query
@@ -77,7 +106,8 @@ service cloud.firestore {
       allow update: if isSignedIn()
         && request.auth.uid in resource.data.authUids
         && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(clientWritableUserKeys());
+             .hasOnly(clientWritableUserKeys())
+        && clientUserFieldsTyped(request.resource.data);
 
       // Self-serve workspace creation — the client-side fallback when both
       // claim transports fail (AuthProvider.createWorkspaceClientSide,
@@ -101,7 +131,14 @@ service cloud.firestore {
       allow delete: if false;
 
       match /links/{linkId} {
-        allow read, write: if owns(uid);
+        allow read, delete: if owns(uid);
+        // Create/update: the owner may write any field, EXCEPT that a
+        // reminder cannot be moved into the past. The reminder scheduler is
+        // one shared query ordered by nextReminderAt across every user, so a
+        // client that wrote 500 docs with `nextReminderAt: 1` held the head of
+        // that query and starved everyone else's reminders. A value may be
+        // absent, null, unchanged, or no more than 5 minutes ago.
+        allow create, update: if owns(uid) && reminderTimeSane();
       }
 
       // Ask-your-brain saved conversations

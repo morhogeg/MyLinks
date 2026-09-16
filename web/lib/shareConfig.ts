@@ -12,6 +12,7 @@ import { apiUrl } from './api';
 interface ShareConfigPlugin {
     save(options: { endpoint: string; token: string }): Promise<void>;
     clear(): Promise<void>;
+    clearWebsiteData(): Promise<void>;
     consumePendingShare(): Promise<{ pending: boolean; kind?: string; ageMs?: number; progress?: number; startedAt?: number }>;
 }
 
@@ -97,8 +98,13 @@ export interface ShareBridgeStatus {
 
 const STATUS_KEY = 'share-bridge-status-v1';
 
-let lastSuccessUid: string | null = null;
+// Latched on uid AND token: a rotated token (Settings "Reset token", or the
+// user-doc snapshot re-firing after a rotate on another device) must reach
+// the App Group in this session, not after the next relaunch.
+let lastSuccessKey: string | null = null;
 let lastArgs: { uid: string; docToken?: string } | null = null;
+
+const syncKey = (uid: string, docToken?: string) => `${uid}:${docToken ?? ''}`;
 let inFlight = false;
 const listeners = new Set<(s: ShareBridgeStatus) => void>();
 
@@ -209,7 +215,7 @@ async function attemptOnce(uid: string, docToken?: string): Promise<void> {
 export async function syncShareConfigToNative(uid: string, docToken?: string): Promise<void> {
     if (!uid || !isNativeIos()) return;
     lastArgs = { uid, docToken };
-    if (lastSuccessUid === uid) return; // already synced this session
+    if (lastSuccessKey === syncKey(uid, docToken)) return; // already synced this session
     if (inFlight) return;
     inFlight = true;
 
@@ -220,7 +226,7 @@ export async function syncShareConfigToNative(uid: string, docToken?: string): P
             if (d) await sleep(d);
             try {
                 await attemptOnce(uid, docToken);
-                lastSuccessUid = uid;
+                lastSuccessKey = syncKey(uid, docToken);
                 recordStatus({ state: 'ok', at: Date.now() });
                 return;
             } catch (e) {
@@ -245,7 +251,7 @@ export async function syncShareConfigToNative(uid: string, docToken?: string): P
  */
 export async function clearNativeShareConfig(): Promise<void> {
     if (!isNativeIos()) return;
-    lastSuccessUid = null;
+    lastSuccessKey = null;
     lastArgs = null;
     try {
         await ShareConfigNative.clear();
@@ -254,12 +260,56 @@ export async function clearNativeShareConfig(): Promise<void> {
     }
 }
 
+/**
+ * Drop the WKWebView's HTTP cache on sign-out (screenshots and thumbnails the
+ * feed rendered live there, outside anything JS can purge). No-op off native
+ * iOS; never throws (an older native build has no such method).
+ */
+export async function clearNativeWebsiteData(): Promise<void> {
+    if (!isNativeIos()) return;
+    try {
+        await ShareConfigNative.clearWebsiteData();
+    } catch {
+        // Older build without the method — nothing to do.
+    }
+}
+
 /** Manual retry (Settings "Fix now" button). Clears the success latch. */
 export async function resyncShareConfig(): Promise<ShareBridgeStatus> {
     if (!lastArgs) return getShareBridgeStatus();
-    lastSuccessUid = null;
+    lastSuccessKey = null;
     await syncShareConfigToNative(lastArgs.uid, lastArgs.docToken);
     return getShareBridgeStatus();
+}
+
+/**
+ * Mint a NEW ingest token for this workspace (Settings "Reset token"). The
+ * old one stops working on the next share-ingest call. Pushes the new token
+ * straight into the App Group on native so the share sheet keeps working;
+ * the browser extension needs the new value pasted by hand.
+ */
+export async function rotateShareToken(): Promise<{ endpoint: string; token: string }> {
+    const { fetchWithTimeout } = await import('./api');
+    const { authHeaders } = await import('./auth');
+    const res = await fetchWithTimeout(apiUrl('/api/share-config/rotate'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+        body: '{}',
+    });
+    if (!res.ok) throw new Error(`share-config rotate HTTP ${res.status}`);
+    const body = (await res.json()) as { endpoint?: string; token?: string };
+    if (!body.endpoint || !body.token) throw new Error('No token returned');
+    if (isNativeIos()) {
+        lastSuccessKey = null;
+        try {
+            await ShareConfigNative.save({ endpoint: body.endpoint, token: body.token });
+            lastSuccessKey = syncKey(lastArgs?.uid ?? '', body.token);
+            recordStatus({ state: 'ok', at: Date.now() });
+        } catch (e) {
+            recordStatus({ state: 'error', detail: e instanceof Error ? e.message : String(e), at: Date.now() });
+        }
+    }
+    return { endpoint: body.endpoint, token: body.token };
 }
 
 // After a failed sync, quietly try again whenever the app comes back to the
@@ -268,7 +318,7 @@ if (typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState !== 'visible') return;
         if (!isNativeIos() || !lastArgs) return;
-        if (lastSuccessUid === lastArgs.uid) return;
+        if (lastSuccessKey === syncKey(lastArgs.uid, lastArgs.docToken)) return;
         void syncShareConfigToNative(lastArgs.uid, lastArgs.docToken);
     });
 }

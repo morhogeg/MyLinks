@@ -55,14 +55,32 @@ def _esc(value) -> str:
 
 # Inline markdown patterns, applied AFTER the whole string is HTML-escaped.
 # Order matters: bold (**/__) before italic (*/_) so we don't eat the inner stars.
-_MD_LINK_RE = re.compile(r"\[([^\]]+)\]\((https?://[^\s)]+)\)")
-_MD_BOLD_RE = re.compile(r"(?<!\*)\*\*(?!\s)(.+?)(?<!\s)\*\*(?!\*)|(?<!_)__(?!\s)(.+?)(?<!\s)__(?!_)")
+#
+# Every capture is LENGTH-BOUNDED (no bare `.+?`). The share page is public and
+# unauthenticated, and the snapshot text is client-supplied: with an unbounded
+# lazy group, each unmatched opener rescanned the rest of the line looking for
+# its closer, so 20 000 stray `**` markers cost ~40 s per page render (measured)
+# and a loop of cache-busting GETs pinned the function pool. A span of markdown
+# emphasis is never hundreds of characters long, so the bound costs nothing
+# real; `_md_to_html` also caps each line and `_md_to_plain` its input.
+_MD_SPAN = 400
+_MD_LINK_RE = re.compile(r"\[([^\]\[\n]{1,%d})\]\((https?://[^\s)]{1,2000})\)" % _MD_SPAN)
+_MD_BOLD_RE = re.compile(
+    r"(?<!\*)\*\*(?!\s)(.{1,%d}?)(?<!\s)\*\*(?!\*)|(?<!_)__(?!\s)(.{1,%d}?)(?<!\s)__(?!_)"
+    % (_MD_SPAN, _MD_SPAN))
 # Note: no \w lookbehind on the * form, so emphasis works flush against
 # letters in RTL scripts (e.g. Hebrew "ו*נטוי*"). Bold (**) runs first, and
 # the (?<!\*)/(?!\*) guards keep us from eating bold's leftover stars. The _
 # form keeps word-boundary guards to avoid mangling snake_case identifiers.
-_MD_ITALIC_RE = re.compile(r"(?<!\*)\*(?!\s)([^*]+?)(?<!\s)\*(?!\*)|(?<![_\w])_(?!\s)(.+?)(?<!\s)_(?![_\w])")
-_MD_CODE_RE = re.compile(r"`([^`]+)`")
+_MD_ITALIC_RE = re.compile(
+    r"(?<!\*)\*(?!\s)([^*]{1,%d}?)(?<!\s)\*(?!\*)|(?<![_\w])_(?!\s)(.{1,%d}?)(?<!\s)_(?![_\w])"
+    % (_MD_SPAN, _MD_SPAN))
+_MD_CODE_RE = re.compile(r"`([^`]{1,%d})`" % _MD_SPAN)
+
+# Per-line ceiling for the inline pass, and the input ceiling for the plain-
+# text flattener (whose output is a ~200-char meta description anyway).
+_MD_LINE_MAX = 4000
+_MD_PLAIN_INPUT_MAX = 4000
 
 
 def _md_inline(text: str) -> str:
@@ -98,7 +116,7 @@ def _md_to_plain(value, *, limit: int = 200) -> str:
     """
     if not value:
         return ""
-    text = str(value).replace("\r\n", "\n").replace("\r", "\n")
+    text = str(value)[:_MD_PLAIN_INPUT_MAX].replace("\r\n", "\n").replace("\r", "\n")
     # Unwrap links: [label](url) -> label
     text = _MD_LINK_RE.sub(lambda m: m.group(1), text)
     # Drop inline code backticks, keeping the code text.
@@ -147,7 +165,7 @@ def _md_to_html(value) -> str:
             html_parts.append(f"</{list_stack.pop()}>")
 
     for raw in lines:
-        line = raw.rstrip()
+        line = raw[:_MD_LINE_MAX].rstrip()
         stripped = line.strip()
 
         if not stripped:
@@ -422,6 +440,18 @@ def _source_byline(card: dict) -> str:
     return f'<div class="src"><span class="src-name">{_esc(display)}</span></div>' if display else ""
 
 
+def _display_host(url: str) -> str:
+    """`example.com` for a URL, '' when it has no usable host."""
+    try:
+        from urllib.parse import urlsplit
+        host = (urlsplit(url).hostname or "").lower()
+    except ValueError:
+        return ""
+    if host.startswith("www."):
+        host = host[4:]
+    return host[:80]
+
+
 def _share_card_image(card: dict) -> str:
     """Best preview image for a card; falls back to the Machina icon."""
     thumb = card.get("thumbnailUrl")
@@ -599,7 +629,12 @@ def _render_shared_card(card: dict, share_url: str, og_preview: Optional[dict] =
     # "View original" only for real external links (not stored screenshot images).
     original_btn = ""
     if original.startswith("http") and card.get("sourceType") != "image":
-        original_btn = f'<a class="btn btn-ghost" href="{_esc(original)}" rel="noopener nofollow" target="_blank">View original</a>'
+        # The snapshot is client-supplied, so the destination is named on the
+        # button: a page that reads like Machina but sends people to
+        # evil.example says so before they tap.
+        host = _display_host(original)
+        label = f"View original on {_esc(host)}" if host else "View original"
+        original_btn = f'<a class="btn btn-ghost" href="{_esc(original)}" rel="noopener nofollow" target="_blank">{label}</a>'
 
     body = f"""<div class="card">
       {badge}
@@ -708,7 +743,9 @@ def _generate_og_preview(share_type: str, doc: dict, share_id: str) -> Optional[
         return None
 
     from scraper import safe_get
-    resp = safe_get(src, timeout=15)
+    # `max_bytes` cuts the stream at the ceiling instead of buffering the
+    # scraper's 10 MB default first; this runs inside the warm publish instance.
+    resp = safe_get(src, timeout=8, max_bytes=_OG_SOURCE_MAX_BYTES)
     resp.raise_for_status()
     content = resp.content
     if not content or len(content) > _OG_SOURCE_MAX_BYTES:
@@ -955,6 +992,85 @@ def _sanitize_answer_payload(payload: dict) -> dict:
     return out
 
 
+# Ceilings for the card / collection snapshots. The renderer reads exactly
+# these keys (grep `card.get(` / `data.get(` in this module); anything else the
+# client posts is dropped, and every string is clipped so a world-readable doc
+# can neither approach Firestore's 1 MB limit nor carry a multi-hundred-KB
+# body into the (now bounded) markdown renderer.
+_CARD_MAX_TITLE = 300
+_CARD_MAX_SUMMARY = 5000
+_CARD_MAX_DETAIL = 20000
+_CARD_MAX_SHORT = 200
+_CARD_MAX_URL = 2048
+_CARD_MAX_TAGS = 20
+_CARD_MAX_TAG = 50
+_COLLECTION_MAX_CARDS = 200
+_CARD_STRING_KEYS = {
+    "title": _CARD_MAX_TITLE, "summary": _CARD_MAX_SUMMARY, "detailedSummary": _CARD_MAX_DETAIL,
+    "url": _CARD_MAX_URL, "thumbnailUrl": _CARD_MAX_URL, "sourceName": _CARD_MAX_SHORT,
+    "sourceType": 40, "sourcePlatform": 40, "sourceHandle": 120, "category": 60,
+    "language": 16,
+}
+
+
+def _clip_str(value, limit: int) -> str:
+    return str(value).strip()[:limit] if isinstance(value, (str, int, float)) and not isinstance(value, bool) else ""
+
+
+def _sanitize_card_snapshot(card) -> dict:
+    """The allowlisted, clipped shape of one card inside a public snapshot."""
+    if not isinstance(card, dict):
+        return {}
+    out = {}
+    for key, limit in _CARD_STRING_KEYS.items():
+        v = _clip_str(card.get(key), limit)
+        if v:
+            out[key] = v
+    raw_tags = card.get("tags")
+    if isinstance(raw_tags, list):
+        tags = [_clip_str(t, _CARD_MAX_TAG) for t in raw_tags[:_CARD_MAX_TAGS]]
+        tags = [t for t in tags if t]
+        if tags:
+            out["tags"] = tags
+    meta = card.get("metadata")
+    if isinstance(meta, dict):
+        clean_meta = {}
+        for key in ("youtubeChannel", "originalTitle"):
+            v = _clip_str(meta.get(key), _CARD_MAX_SHORT)
+            if v:
+                clean_meta[key] = v
+        rt = meta.get("estimatedReadTime")
+        if isinstance(rt, (int, float)) and not isinstance(rt, bool) and 0 < rt < 100000:
+            clean_meta["estimatedReadTime"] = int(rt)
+        if clean_meta:
+            out["metadata"] = clean_meta
+    for key in ("createdAt", "publishedAt"):
+        v = card.get(key)
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            out[key] = int(v)
+    return out
+
+
+def _sanitize_card_share_payload(payload: dict) -> dict:
+    return {"card": _sanitize_card_snapshot(payload.get("card"))}
+
+
+def _sanitize_collection_share_payload(payload: dict) -> dict:
+    out = {
+        "name": _clip_str(payload.get("name"), _CARD_MAX_TITLE),
+        "description": _clip_str(payload.get("description"), _CARD_MAX_SUMMARY),
+    }
+    raw_cards = payload.get("cards")
+    cards = []
+    if isinstance(raw_cards, list):
+        for c in raw_cards[:_COLLECTION_MAX_CARDS]:
+            clean = _sanitize_card_snapshot(c)
+            if clean:
+                cards.append(clean)
+    out["cards"] = cards
+    return out
+
+
 def _share_owner_uid(db, share_id: str, public_coll: str) -> Optional[str]:
     """Resolve who owns a share id. Prefers the functions-only `shared_owners`
     mapping; falls back to a legacy public doc's `ownerUid` (pre-migration shares
@@ -989,8 +1105,10 @@ def _publish_share_logic(uid: str, share_type: str, share_id: str, payload: dict
     # public doc — see _sanitize_answer_payload.
     if share_type == "answer":
         doc = _sanitize_answer_payload(payload)
+    elif share_type == "card":
+        doc = _sanitize_card_share_payload(payload)
     else:
-        doc = {k: v for k, v in payload.items() if v is not None}
+        doc = _sanitize_collection_share_payload(payload)
     doc.pop("ownerUid", None)  # never persist PII in the world-readable doc
     doc["shareId"] = share_id
     doc["publishedAt"] = now_ms
@@ -1006,10 +1124,15 @@ def _publish_share_logic(uid: str, share_type: str, share_id: str, payload: dict
     except Exception as e:
         logger.warning(f"og preview generation failed for {share_id}: {e}")
 
-    db.collection(public_coll).document(share_id).set(doc)
-    db.collection("shared_owners").document(share_id).set({
+    # One atomic batch: a public doc that exists with NO owner row would be
+    # claimable by any account on its next publish (the owner check only
+    # refuses when an owner is recorded).
+    batch = db.batch()
+    batch.set(db.collection(public_coll).document(share_id), doc)
+    batch.set(db.collection("shared_owners").document(share_id), {
         "ownerUid": uid, "type": share_type, "publishedAt": now_ms,
     })
+    batch.commit()
     return {"shareId": share_id}
 
 

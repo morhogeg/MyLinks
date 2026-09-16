@@ -49,9 +49,9 @@ from ai_service import GeminiService, AnalysisError
 from link_service import (
     save_link_to_firestore, get_user_tags, get_user_vocabulary, is_hebrew,
     canonical_category, run_category_migration,
-    ensure_ingest_token, find_user_by_ingest_token, link_exists_for_url,
-    pending_exists_for_url, find_data_uid_by_auth_uid, delete_user_data,
-    create_workspace,
+    ensure_ingest_token, rotate_ingest_token, find_user_by_ingest_token,
+    link_exists_for_url, pending_exists_for_url, find_data_uid_by_auth_uid,
+    delete_user_data, create_workspace, storage_key_for, delete_shares_for_owner,
 )
 from reminder_service import handle_reminder_intent, set_reminder, run_reminder_check, format_local_time
 from graph_service import GraphService
@@ -76,7 +76,8 @@ from rate_limit import check_rate_limit, client_ip, RateLimitBackendError
 from quota import meter as meter_quota, refund_quota, quota_message
 from entitlement import (
     plan_for, entitlement_summary, sync_from_revenuecat, resolve_workspace_for_app_user,
-    rc_configured, RevenueCatError, run_trial_nudges,
+    rc_configured, RevenueCatError, run_trial_nudges, entitlement_source,
+    plan_for_imports,
 )
 # Public share-page subsystem (renderers + publish/unpublish logic). The three
 # HTTP endpoints (publish_share_http, unpublish_share_http, share_page) stay in
@@ -85,7 +86,7 @@ from entitlement import (
 from share_service import (
     _publish_share_logic, _unpublish_share_logic,
     _render_shared_card, _render_shared_collection, _render_shared_answer,
-    _share_not_found_html,
+    _share_not_found_html, _valid_share_id,
 )
 
 # Configure logging
@@ -423,8 +424,16 @@ _RATE_LIMITS = {
     # (20 embeds / 8 relates per call, so a 500-card library is ~90 calls);
     # `send_digest_now` builds and pushes a digest on every call (a synthesis
     # call for synthesis-mode workspaces). Per-uid, fail closed.
-    "rebuild-uid": (240, 3600, False),
+    "rebuild-uid": (60, 3600, False),
     "digest-now-uid": (10, 3600, False),
+    # Ingest-token rotation (Settings "Reset token"): a handful per hour is
+    # plenty for a person; more is a script.
+    "share-config-rotate": (5, 3600, False),
+    # Native YouTube video ingestion on a TRIAL workspace. Trials are free to
+    # mint, and a 3-hour video costs real money to watch, so a trial gets a
+    # few per hour (the honest metadata-only card past that); paid and founder
+    # workspaces are not limited here. Fail closed: the cheap answer wins.
+    "video-trial-uid": (3, 3600, False),
 }
 
 # Input caps for client-supplied fields that flow into the Gemini prompt, so a
@@ -794,13 +803,25 @@ def _quota_blocked(uid: str, kind: str, headers: dict = None, plan: str = None,
 # tokens before flipping APPCHECK_ENFORCE=true to start rejecting.
 APPCHECK_ENFORCE = os.environ.get("APPCHECK_ENFORCE", "").lower() in ("1", "true", "yes")
 
-# Auth enforcement flag for the staged multi-user rollout. When OFF (default),
-# the backend still accepts a client-supplied uid so the current app keeps
-# working; a verified ID token is preferred when present. When ON, every data
+# Auth enforcement flag. ON by default since the 2026-08-02 cutover: every data
 # endpoint/callable REQUIRES a valid ID token and derives the workspace uid from
-# it (client-supplied uids are rejected). Flip to true only after sign-in is
-# confirmed working end-to-end. See NATIVE_AUTH_SETUP.md ("Cutover order").
-REQUIRE_AUTH = os.environ.get("REQUIRE_AUTH", "").lower() in ("1", "true", "yes")
+# it (client-supplied uids are rejected). Set REQUIRE_AUTH=false explicitly to
+# roll back to the pre-cutover posture (client-supplied uid accepted, verified
+# token preferred). See NATIVE_AUTH_SETUP.md ("Cutover order").
+def _require_auth_flag(raw) -> bool:
+    """REQUIRE_AUTH defaults ON. The cutover is live (SOURCE_OF_TRUTH §3), so a
+    redeploy whose env lost the secret must NOT fall back to trusting the
+    client-supplied uid (the pre-cutover IDOR). Rollback is explicit:
+    REQUIRE_AUTH=false."""
+    if raw is None:
+        return True
+    v = str(raw).strip().lower()
+    if v == "":
+        return True
+    return v not in ("0", "false", "no", "off")
+
+
+REQUIRE_AUTH = _require_auth_flag(os.environ.get("REQUIRE_AUTH"))
 
 # Cost cap for YouTube native video ingestion (~100 tokens/sec at LOW media
 # resolution ≈ $0.09 per hour of video, and the model has no pre-call limit of
@@ -928,6 +949,29 @@ def _fetch_post_images(image_urls: list) -> list:
             logger.warning(f"Failed to fetch post image {raw_url}: {e}")
             continue
     return images
+
+
+def _video_ingest_allowed(uid: str, plan: str = None) -> bool:
+    """May this save WATCH a YouTube video (native ingestion, ~$0.09/hour)?
+
+    Paid and founder workspaces: yes. A reverse-trial workspace: yes, but a few
+    per hour (`video-trial-uid`, fail closed) — trials are free to mint and
+    the import path can enqueue thousands of links. Free: no (the honest
+    metadata-only card, stamped `proFeature: 'youtube'`)."""
+    if not uid:
+        return False
+    if plan is not None and plan != "pro":
+        return False
+    source = entitlement_source(uid)
+    if source is None:
+        return False
+    if source == "trial":
+        limit, window, fail_open = _RATE_LIMITS["video-trial-uid"]
+        try:
+            return check_rate_limit(f"video-trial-uid:{uid}", limit, window, fail_open=fail_open)
+        except RateLimitBackendError:
+            return False
+    return True
 
 
 def _analyze_scraped(ai, scraped: dict, existing_tags: list, attempts: int = None,
@@ -1188,7 +1232,7 @@ def _apply_post_thumbnail(link_data: dict, scraped: dict, uid: str, key: str = N
         import uuid
         image_bytes, mime, aspect = _downscale_thumbnail(thumb[0], thumb[1])
         blob_key = key or uuid.uuid4().hex
-        url = _store_image(f"post_thumbs/{uid}/{blob_key}.jpg", image_bytes, mime)
+        url = _store_image(f"post_thumbs/{storage_key_for(uid)}/{blob_key}.jpg", image_bytes, mime)
         meta = link_data.setdefault("metadata", {})
         meta["thumbnailUrl"] = url
         if is_video_poster:
@@ -1396,6 +1440,40 @@ def _write_stage(card_ref, stage: str) -> None:
         logger.warning(f"Stage write '{stage}' failed (non-fatal): {e}")
 
 
+# Caps on MODEL-returned list/string fields at the point they become a card
+# (see _build_link_data). The schema asks for ≤5 tags; these are ceilings, not
+# targets, so a well-behaved answer is never touched.
+MAX_CARD_TAGS = 12
+MAX_CARD_CONCEPTS = 20
+MAX_TAKEAWAY_LENGTH = 1000
+
+
+def _clip(value, limit: int) -> str:
+    """`value` as a stripped string of at most `limit` chars ('' for non-str)."""
+    if not isinstance(value, str):
+        return ""
+    return value.strip()[:limit]
+
+
+def _clip_or_none(value, limit: int):
+    s = _clip(value, limit)
+    return s if s else None
+
+
+def _clip_list(values, max_items: int, max_len: int) -> list:
+    """Model list fields (tags, concepts): strings only, stripped, capped."""
+    if not isinstance(values, list):
+        return []
+    out = []
+    for v in values:
+        if len(out) >= max_items:
+            break
+        s = _clip(v, max_len)
+        if s:
+            out.append(s)
+    return out
+
+
 def _build_link_data(*, url, title, summary, detailed_summary, source_type,
                      source_name, original_title, estimated_read_time, analysis,
                      related_links=_OMIT, confidence=_OMIT, key_entities=_OMIT):
@@ -1413,25 +1491,32 @@ def _build_link_data(*, url, title, summary, detailed_summary, source_type,
     handling (embedding_vector / needsEmbedding) stays at the background call
     site since only it writes those.
     """
+    # The model's structured output is NOT trusted for length: a hostile page
+    # can steer any field, and `category` / `tags` / `concepts` are fed back
+    # into every later analysis prompt for this workspace (get_user_vocabulary),
+    # so an oversized or instruction-bearing value would otherwise persist as
+    # prompt text indefinitely. Clamp once here, the one place analysis
+    # becomes a stored card.
+    category = canonical_category(_clip(analysis.get("category", ""), MAX_CATEGORY_LENGTH))
     data = {
         "url": url,
         "title": title,
         "summary": summary,
         "detailedSummary": detailed_summary,
-        "tags": analysis.get("tags", []),
+        "tags": _clip_list(analysis.get("tags"), MAX_CARD_TAGS, MAX_TAG_LENGTH),
         # Canonicalised here because this is the ONE place analysis becomes a
         # stored card — so no model answer can reintroduce a case-variant of a
         # category that already exists (link_service.canonical_category).
-        "category": canonical_category(analysis.get("category", "")) or "General",
+        "category": category or "General",
         "status": LinkStatus.UNREAD.value,
         "createdAt": int(datetime.now(timezone.utc).timestamp() * 1000),
-        "language": analysis.get("language", "en"),
+        "language": _clip(analysis.get("language", "en"), 16) or "en",
         "metadata": {
             "originalTitle": original_title,
             "estimatedReadTime": estimated_read_time,
-            "actionableTakeaway": analysis.get("actionableTakeaway"),
+            "actionableTakeaway": _clip_or_none(analysis.get("actionableTakeaway"), MAX_TAKEAWAY_LENGTH),
         },
-        "concepts": analysis.get("concepts", []),
+        "concepts": _clip_list(analysis.get("concepts"), MAX_CARD_CONCEPTS, MAX_TAG_LENGTH),
         "sourceType": source_type,
         "sourceName": source_name,
     }
@@ -1905,7 +1990,7 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
             charged = (uid, "saves")
         else:
             plan = "free"
-        pro = plan == "pro"
+        pro = _video_ingest_allowed(uid, plan)
 
         logger.info(f"Analyzing URL synchronously: {url}")
 
@@ -1913,6 +1998,12 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
         from scraper import scrape_url
         scraped = scrape_url(url)
         if not scraped.get("text") and not scraped.get("html"):
+            # Nothing was analysed, so nothing should have been charged: this
+            # path returned a plain error (no exception), so the refund in the
+            # handler below never ran and every unscrapable URL cost a save.
+            if charged:
+                refund_quota(*charged)
+                charged = None
             return _error_response("Failed to scrape content", 500, headers)
 
         # 2. Analyze with AI (YouTube → native video ingestion w/ fallback)
@@ -2734,7 +2825,7 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
         if image_b64 and uid:
             try:
                 import uuid
-                stored_url = _store_image(f"screenshots/{uid}/{uuid.uuid4().hex}.jpg", image_bytes, mime_type)
+                stored_url = _store_image(f"screenshots/{storage_key_for(uid)}/{uuid.uuid4().hex}.jpg", image_bytes, mime_type)
                 # Don't log stored_url — the object path embeds the uid (phone #).
                 logger.info(f"Stored screenshot for {_mask_uid(uid)}")
             except Exception as e:
@@ -2936,6 +3027,13 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                 enrich_card = enrich_snap.to_dict() if enrich_snap.exists else None
                 if not _card_accepts_screenshots(enrich_card):
                     return _error_response("This card can't take a screenshot", 400, headers)
+                # An enrich is a full vision analysis (up to five images at
+                # full legibility) plus an embed and a relate call: the same
+                # paid work as a save, so it is metered as one. It used to be
+                # free, which made it the one unmetered Gemini surface.
+                q = _quota_blocked(uid, "saves", headers)
+                if q:
+                    return q
             else:
                 # ONE save unit for the whole set — a multi-screenshot card is one save.
                 q = _quota_blocked(uid, "saves", headers)
@@ -2947,11 +3045,10 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                 for img_bytes, mime in decoded:
                     ext = 'png' if 'png' in mime else 'jpg'
                     stored_urls.append(_store_image(
-                        f"screenshots/{uid}/{uuid.uuid4().hex}.{ext}", img_bytes, mime))
+                        f"screenshots/{storage_key_for(uid)}/{uuid.uuid4().hex}.{ext}", img_bytes, mime))
             except Exception as e:
                 logger.error(f"Multi-image store failed: {e}", exc_info=True)
-                if not enrich_ref:
-                    refund_quota(uid, "saves")
+                refund_quota(uid, "saves")
                 return _server_error(headers, e)
 
             process_ref = get_db().collection('pending_processing').document()
@@ -3013,10 +3110,15 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                 return _error_response(f"Up to {MAX_CARD_IMAGES} images per card", 400, headers)
             from urllib.parse import quote
             bucket_name = storage.bucket().name
-            required_prefix = (f"https://firebasestorage.googleapis.com/v0/b/{bucket_name}/o/"
-                               + quote(f"screenshots/{uid}/", safe=""))
+            base = f"https://firebasestorage.googleapis.com/v0/b/{bucket_name}/o/"
+            # Both the legacy uid-keyed prefix (blobs stored before the opaque
+            # storage key) and the current opaque prefix are the caller's own.
+            allowed_prefixes = tuple(
+                base + quote(f"screenshots/{key}/", safe="")
+                for key in {uid, storage_key_for(uid)}
+            )
             for u in image_urls_in:
-                if not isinstance(u, str) or len(u) > MAX_URL_LENGTH or not u.startswith(required_prefix):
+                if not isinstance(u, str) or len(u) > MAX_URL_LENGTH or not u.startswith(allowed_prefixes):
                     return _error_response("Invalid image URL", 400, headers)
             q = _quota_blocked(uid, "saves", headers)
             if q:
@@ -3078,7 +3180,7 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
             ext = 'png' if 'png' in mime_type else 'jpg'
             try:
                 stored_url = _store_image(
-                    f"screenshots/{uid}/{uuid.uuid4().hex}.{ext}", image_bytes, mime_type
+                    f"screenshots/{storage_key_for(uid)}/{uuid.uuid4().hex}.{ext}", image_bytes, mime_type
                 )
             except Exception as e:
                 logger.error(f"Share image store failed: {e}", exc_info=True)
@@ -3355,7 +3457,7 @@ def import_links_http(req: https_fn.Request) -> https_fn.Response:
         #    before any paid work is enqueued. All-or-nothing: a batch that
         #    would cross the limit is refused with the upgrade hint the client
         #    turns into the paywall, rather than being half-imported.
-        q = _quota_blocked(uid, "imports", headers, amount=len(fresh))
+        q = _quota_blocked(uid, "imports", headers, amount=len(fresh), plan=plan_for_imports(uid))
         if q:
             return q
 
@@ -3480,6 +3582,42 @@ def get_share_config_http(req: https_fn.Request) -> https_fn.Response:
         return _server_error(headers, e, "Share config failed")
 
 
+@https_fn.on_request()
+def rotate_ingest_token_http(req: https_fn.Request) -> https_fn.Response:
+    """Mint a NEW share-ingest token for the caller's workspace, invalidating
+    the old one immediately (Settings → Browser extension → "Reset token").
+
+    Until now a leaked token was permanent short of deleting the account: it
+    lives in the App Group on the phone, in the browser extension's storage,
+    and in whatever the user pasted it into. Bearer-authed like the twin above;
+    POST only; a small fail-closed per-uid bucket (a person resets a handful
+    of times, a script does not). Returns the same shape as share-config so
+    the client can hand it straight to the native bridge."""
+    if req.method == 'OPTIONS':
+        return _cors_preflight(req)
+    headers = _cors_headers(req)
+    if req.method != 'POST':
+        return _error_response("Method not allowed", 405, headers)
+
+    decoded = _verify_bearer(req)
+    if not decoded:
+        return _error_response("User must be signed in", 401, headers)
+    uid = find_data_uid_by_auth_uid(decoded.get("uid"))
+    if not uid:
+        return _error_response("No workspace for this account", 403, headers)
+    rl = _rate_limited("share-config-rotate", uid, headers)
+    if rl:
+        return rl
+    try:
+        token = rotate_ingest_token(uid)
+        return https_fn.Response(
+            json.dumps({"endpoint": f"{APP_URL}/api/share", "token": token}),
+            status=200, headers=headers, mimetype='application/json',
+        )
+    except Exception as e:
+        return _server_error(headers, e, "Token reset failed")
+
+
 @https_fn.on_call()
 def rebuild_connections(req: https_fn.CallableRequest) -> dict:
     """Recompute the knowledge graph for the CALLER's own library, one page at
@@ -3595,8 +3733,39 @@ def _claim_workspace_logic(auth_uid: str, email: str = None,
     if not REQUIRE_AUTH:
         return {"uid": None, "created": False}
 
+    # Creating a workspace is the one step that turns a token into durable
+    # state (a doc, an ingest token that never expires), so it gets two checks
+    # the hot paths don't pay for:
+    #   - the provider must be one the app actually signs in with. A token
+    #     from a provider enabled by accident in the console (anonymous,
+    #     email/password) must not mint a library.
+    #   - the Auth user must still exist. An ID token stays valid for up to an
+    #     hour after delete_account removed the user, and re-creating the doc
+    #     for a dead uid would leave an orphan nobody can delete in-app.
+    if not _provider_may_create_workspace(token_claims):
+        logger.warning("Workspace creation refused: sign-in provider not allowed")
+        return {"uid": None, "created": False}
+    try:
+        admin_auth.get_user(auth_uid)
+    except admin_auth.UserNotFoundError:
+        logger.warning("Workspace creation refused: Auth user no longer exists")
+        return {"uid": None, "created": False}
+
     new_uid = create_workspace(auth_uid, email)
     return {"uid": new_uid, "created": True}
+
+
+# Sign-in providers the clients use (web/lib/auth.ts, capacitor.config.ts).
+# Anything else reaching claim is a console misconfiguration, not a user.
+_WORKSPACE_PROVIDERS = frozenset({"google.com", "apple.com"})
+
+
+def _provider_may_create_workspace(token_claims) -> bool:
+    if not isinstance(token_claims, dict):
+        return False
+    fb = token_claims.get("firebase")
+    provider = fb.get("sign_in_provider") if isinstance(fb, dict) else None
+    return isinstance(provider, str) and provider in _WORKSPACE_PROVIDERS
 
 
 @https_fn.on_call()
@@ -3663,6 +3832,17 @@ class _DeleteAccountError(Exception):
     """
 
 
+def _storage_key_before_delete(uid: str):
+    """The workspace's opaque storage key, read BEFORE the user doc is deleted
+    (the Storage sweep needs it; best-effort, None when absent)."""
+    try:
+        snap = get_db().collection('users').document(uid).get()
+        key = (snap.to_dict() or {}).get('storageKey') if snap.exists else None
+        return key if isinstance(key, str) and key else None
+    except Exception:
+        return None
+
+
 def _delete_account_logic(auth_uid: str) -> dict:
     """Permanently delete the account keyed by `auth_uid` and all its data.
 
@@ -3675,18 +3855,24 @@ def _delete_account_logic(auth_uid: str) -> dict:
     uid = find_data_uid_by_auth_uid(auth_uid)
 
     if uid:
+        storage_key = _storage_key_before_delete(uid)
         try:
             delete_user_data(uid)
         except Exception as e:
             logger.error("Failed to delete Firestore data for account: %s", e)
             raise _DeleteAccountError("Failed to delete account data")
         # Best-effort: remove the user's screenshots and post thumbnails from
-        # Storage (both prefixes are keyed by the workspace uid).
+        # Storage — under the legacy uid-keyed prefixes AND the opaque storage
+        # key (blobs written after 2026-09-16 live under the latter).
         try:
             bucket = storage.bucket()
-            for prefix in (f"screenshots/{uid}/", f"post_thumbs/{uid}/"):
-                for blob in bucket.list_blobs(prefix=prefix):
-                    blob.delete()
+            keys = {uid}
+            if storage_key:
+                keys.add(storage_key)
+            for key in keys:
+                for prefix in (f"screenshots/{key}/", f"post_thumbs/{key}/"):
+                    for blob in bucket.list_blobs(prefix=prefix):
+                        blob.delete()
         except Exception as e:
             logger.warning("Failed to delete storage objects for account: %s", e)
 
@@ -4089,8 +4275,12 @@ def client_error_http(req: https_fn.Request) -> https_fn.Response:
     if req.method != 'POST':
         return _error_response("Method not allowed", 405, headers)
 
-    # Per-IP only: the whole point is that the caller may have no identity.
-    rl = _rate_limited("client-error", client_ip(req), headers)
+    # Per USER when the caller can prove who they are, per IP otherwise (the
+    # whole point is that the caller may have no identity). Keying on the raw
+    # IP alone shared one 30/hr bucket across everyone behind the Hosting
+    # proxy, so 30 anonymous posts blinded every real device's crash report
+    # for the hour.
+    rl = _rate_limited("client-error", _rate_limit_identity(req), headers)
     if rl:
         return rl
 
@@ -4287,7 +4477,10 @@ def share_page(req: https_fn.Request) -> https_fn.Response:
         # og:url — read by every link preview, so it must be the brand domain.
         share_url = f"{WEB_URL}{route}?id={share_id}"
 
-        if not share_id:
+        # One path segment of URL-safe chars (share_service._valid_share_id):
+        # anything else can only be a probe, and a `/` or an oversized value
+        # used to raise inside the Firestore client and log a stack trace.
+        if not share_id or not _valid_share_id(share_id):
             return https_fn.Response(_share_not_found_html(), status=404, headers=nf_headers)
 
         db = get_db()
@@ -4340,6 +4533,25 @@ def log_to_firestore(task_id: str, message: str, level: str = "INFO", data: dict
         logger.info(f"[{task_id}] {message}")
     except Exception as e:
         logger.error(f"Failed to log to Firestore: {e}")
+
+
+def _apply_reminder_intent(uid: str, link_id: str, original_body) -> None:
+    """Parse a share note for a reminder intent and set it on the saved card.
+
+    Never raises: this runs AFTER the card is written, inside
+    process_link_background's success path, so an exception here used to be
+    caught by the outer handler and overwrite the good card with a FAILED
+    record. The note is user (or hostile page) text, so the parser's failure
+    modes are not ours to trust."""
+    try:
+        body = original_body if isinstance(original_body, str) else ""
+        reminder_time = handle_reminder_intent(body)
+        if reminder_time:
+            reply = body.strip().lower()
+            profile = "spaced" if ("spaced" in reply or reply == "s") else "once"
+            set_reminder(uid, link_id, reminder_time, profile=profile)
+    except Exception as e:
+        logger.warning(f"Reminder intent ignored for a saved card: {type(e).__name__}: {e}")
 
 
 def _capture_placeholder_title(url: str, is_image: bool) -> str:
@@ -4680,7 +4892,7 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
 
                 # Upload to Firebase Storage
                 log_to_firestore(task_id, "Uploading image to Firebase Storage")
-                public_url = _store_image(f"screenshots/{uid}/{task_id}.jpg", image_bytes, mime_type)
+                public_url = _store_image(f"screenshots/{storage_key_for(uid)}/{task_id}.jpg", image_bytes, mime_type)
 
                 url = public_url
 
@@ -4693,7 +4905,7 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             # Analyze with AI (YouTube → native video ingestion w/ fallback).
             # The plan is read here, once per capture, and only for videos: it
             # is the one content type whose analysis is Pro-gated.
-            pro = plan_for(uid) == "pro" if scraped.get("content_type") == "youtube" else True
+            pro = _video_ingest_allowed(uid) if scraped.get("content_type") == "youtube" else True
             analysis = _analyze_scraped(ai, scraped, existing_tags,
                                         existing_categories=existing_categories, pro=pro)
 
@@ -4814,12 +5026,9 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             link_id = save_link_to_firestore(uid, link_data)
         db.collection('users').document(uid).update({'lastSavedLinkId': link_id})
 
-        # 6. Check for reminder intent
-        reminder_time = handle_reminder_intent(original_body)
-        if reminder_time:
-            reply = original_body.strip().lower()
-            profile = "spaced" if ("spaced" in reply or reply == "s") else "once"
-            set_reminder(uid, link_id, reminder_time, profile=profile)
+        # 6. Check for reminder intent. Own guard: the card is already saved,
+        # and a bad parse (a hostile share note) must not flip it to FAILED.
+        _apply_reminder_intent(uid, link_id, original_body)
 
         logger.info(f"Processing complete for {data.get('source', 'unknown')} item")
 
@@ -5066,7 +5275,29 @@ def run_processing_janitor() -> dict:
         logger.error(f"server_errors prune failed: {e}")
         report["errors"].append(f"server_errors: {e}")
 
-    if report["failed_out"] or report["queue_pruned"] or report["logs_pruned"] or report["server_errors_pruned"]:
+    # client_error_reports pruning — same 14-day `expireAt` policy. The write
+    # surface is unauthenticated (bounded per identity/IP), so the collection
+    # must not grow without a sweep even if no Firestore TTL policy is set.
+    report["client_error_reports_pruned"] = 0
+    try:
+        cer_refs = [
+            doc.reference
+            for doc in db.collection("client_error_reports").where(
+                filter=FieldFilter("expireAt", "<=", now_dt)
+            ).limit(200).stream()
+        ]
+        if cer_refs:
+            batch = db.batch()
+            for ref in cer_refs:
+                batch.delete(ref)
+            batch.commit()
+            report["client_error_reports_pruned"] = len(cer_refs)
+    except Exception as e:
+        logger.error(f"client_error_reports prune failed: {e}")
+        report["errors"].append(f"client_error_reports: {e}")
+
+    if (report["failed_out"] or report["queue_pruned"] or report["logs_pruned"]
+            or report["server_errors_pruned"] or report["client_error_reports_pruned"]):
         logger.info(f"Processing janitor: {report}")
     return report
 
@@ -5245,8 +5476,10 @@ def send_digest_now(req: https_fn.CallableRequest) -> dict:
         if req.data and short in req.data:
             overrides[key] = req.data[short]
     if overrides:
-        user_data.setdefault("settings", {})
-        user_data["settings"] = {**user_data.get("settings", {}), **overrides}
+        stored_settings = user_data.get("settings")
+        if not isinstance(stored_settings, dict):
+            stored_settings = {}
+        user_data["settings"] = {**stored_settings, **overrides}
 
     try:
         result = build_and_send_digest(uid, user_data, force=True)

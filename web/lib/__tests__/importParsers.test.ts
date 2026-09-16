@@ -267,3 +267,37 @@ test('recoverUrls stops a url at a quote or an angle bracket', () => {
     const found = recoverUrls(`<a href="https://a.example/1">x</a> 'https://b.example/2'`);
     assert.deepEqual(found.map((l) => l.url), ['https://a.example/1', 'https://b.example/2']);
 });
+
+/* ------------------------------------------------------------------ *
+ * Hostile inputs stay linear (2026-09-16 security round 2)
+ * ------------------------------------------------------------------ */
+
+function timed(label: string, fn: () => void, budgetMs = 1000) {
+    const t = performance.now();
+    fn();
+    const took = performance.now() - t;
+    assert.ok(took < budgetMs, `${label} took ${took.toFixed(0)} ms (budget ${budgetMs} ms)`);
+}
+
+test('an export of unclosed <a> tags does not go quadratic', () => {
+    const html = '<a href="https://x.y/">'.repeat(20_000);
+    timed('unclosed anchors', () => parseNetscapeBookmarks(html));
+});
+
+test('a giant attribute blob does not go quadratic', () => {
+    const html = '<a ' + 'a'.repeat(80_000) + '></a>';
+    timed('attribute blob', () => parseNetscapeBookmarks(html));
+});
+
+test('a URL with tens of thousands of trailing brackets is refused fast', () => {
+    const html = '<a href="https://a.b/' + ')'.repeat(80_000) + 'x"></a>';
+    timed('trailing brackets', () => parseNetscapeBookmarks(html));
+    assert.equal(cleanImportUrl('https://a.b/' + ')'.repeat(80_000)), null);
+});
+
+test('ordinary bookmarks still parse after the bounds', () => {
+    const out = parseNetscapeBookmarks(SAFARI_BOOKMARKS);
+    assert.equal(out.links.length, 3);
+    assert.equal(out.links[0].title, 'World & Nation');
+    assert.deepEqual(out.links[0].tags, ['Favorites']);
+});

@@ -109,6 +109,14 @@
     {
       "source": "/a",
       "destination": "https://secondbrain-app-94da2.web.app/a"
+    },
+    {
+      "source": "/api/share-config",
+      "destination": "https://secondbrain-app-94da2.web.app/api/share-config"
+    },
+    {
+      "source": "/api/share-config/rotate",
+      "destination": "https://secondbrain-app-94da2.web.app/api/share-config/rotate"
     }
   ]
 }

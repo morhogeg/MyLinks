@@ -1,10 +1,15 @@
 import Foundation
 import Capacitor
+import WebKit
 
 /// Bridges the share-ingest endpoint + token from the WebView (where the
-/// Firebase session lives) into the App Group's shared UserDefaults, so the
-/// Share Extension — which runs in its own process and can't see the WebView —
-/// can authenticate uploads to the backend.
+/// Firebase session lives) to the Share Extension — which runs in its own
+/// process and can't see the WebView — so it can authenticate uploads.
+///
+/// The TOKEN goes into the shared Keychain (KeychainStore: this-device-only,
+/// not in backups); only the endpoint stays in the App Group's UserDefaults.
+/// Any legacy copy of the token in the App Group is removed on the next save
+/// or clear, and the Share Extension migrates one it finds on read.
 ///
 /// JS side: registerPlugin('ShareConfig').save({ endpoint, token })  (see
 /// web/lib/shareConfig.ts).
@@ -15,6 +20,7 @@ public class ShareConfigPlugin: CAPPlugin, CAPBridgedPlugin {
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "save", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "clear", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "clearWebsiteData", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "consumePendingShare", returnType: CAPPluginReturnPromise)
     ]
 
@@ -30,13 +36,25 @@ public class ShareConfigPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
+        // The endpoint is where the token gets POSTed. Only the app's own
+        // hosts, over https, ever qualify.
+        guard ShareEndpointPolicy.isAllowed(endpoint) else {
+            call.reject("endpoint is not an allowed Machina host")
+            return
+        }
+
         guard let defaults = UserDefaults(suiteName: ShareConfigPlugin.appGroup) else {
             call.reject("App Group \(ShareConfigPlugin.appGroup) is not configured")
             return
         }
 
+        guard KeychainStore.set(token, account: KeychainStore.ingestTokenAccount) else {
+            call.reject("Could not store the token in the Keychain")
+            return
+        }
         defaults.set(endpoint, forKey: "shareEndpoint")
-        defaults.set(token, forKey: "ingestToken")
+        // Purge the pre-Keychain copy so the App Group plist stops carrying it.
+        defaults.removeObject(forKey: "ingestToken")
         call.resolve()
     }
 
@@ -46,13 +64,33 @@ public class ShareConfigPlugin: CAPPlugin, CAPBridgedPlugin {
     /// so the share sheet on a shared or handed-down device kept posting into
     /// that library until another account signed in and overwrote it.
     @objc func clear(_ call: CAPPluginCall) {
+        KeychainStore.delete(account: KeychainStore.ingestTokenAccount)
         guard let defaults = UserDefaults(suiteName: ShareConfigPlugin.appGroup) else {
             call.resolve()
             return
         }
         defaults.removeObject(forKey: "ingestToken")
         defaults.removeObject(forKey: "shareEndpoint")
+        // The "a capture is in flight" hint too, so the next account never
+        // sees the departed one's Analyzing banner.
+        for key in ["pendingShareAt", "pendingShareKind", "pendingShareProgress", "pendingShareStartedAt"] {
+            defaults.removeObject(forKey: key)
+        }
         call.resolve()
+    }
+
+    /// Drop the WKWebView's HTTP caches (memory + disk). Sign-out purges
+    /// Firestore's IndexedDB mirror and localStorage from JS, but the images
+    /// the feed rendered (screenshots, post thumbnails at tokenized public
+    /// URLs) sit in the WebView's own cache, outside anything JS can reach.
+    /// Best-effort; never fails the sign-out.
+    @objc func clearWebsiteData(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            let types: Set<String> = [WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache]
+            WKWebsiteDataStore.default().removeData(ofTypes: types, modifiedSince: .distantPast) {
+                call.resolve()
+            }
+        }
     }
 
     /// Read (and clear) the "a capture was just shared" hint the Share Extension

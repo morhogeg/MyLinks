@@ -244,6 +244,33 @@ test('owner cannot smuggle a server-owned field in with an allowed one', async (
   await assertFails(updateDoc(doc(ownerDb(), 'users', OWNER_DOC), { onboarded: true, authUids: arrayUnion(STRANGER_AUTH) }));
 });
 
+// ── Type guards on the client-writable fields (2026-09-16 round 2) ──────────
+//
+// The key allowlist alone let `settings: "x"` through, and the schedulers
+// read `settings` for every user in one loop: a non-map value raised before
+// the per-user try/except and halted reminders / digests for everyone.
+
+const MISTYPED = {
+  settings: 'not-a-map',
+  timezone: 5,
+  aiConsentAt: 'yesterday',
+  pushPromptedAt: true,
+  onboarded: 'yes',
+  privacyLock: 'pin',
+  graphVersion: '2',
+};
+
+for (const [field, value] of Object.entries(MISTYPED)) {
+  test(`owner CANNOT write ${field} with the wrong type`, async () => {
+    await assertFails(updateDoc(doc(ownerDb(), 'users', OWNER_DOC), { [field]: value }));
+  });
+}
+
+test('a mistyped field cannot ride in with a well-typed one', async () => {
+  await assertFails(updateDoc(doc(ownerDb(), 'users', OWNER_DOC), { timezone: 'UTC', settings: [] }));
+  await assertFails(updateDoc(doc(ownerDb(), 'users', OWNER_DOC), { settings: null }));
+});
+
 test('owner cannot grow or shrink authUids from the client', async () => {
   await assertFails(updateDoc(doc(ownerDb(), 'users', OWNER_DOC), { authUids: arrayUnion(STRANGER_AUTH) }));
   await assertFails(updateDoc(doc(ownerDb(), 'users', OWNER_DOC), { authUids: [] }));
@@ -334,6 +361,45 @@ for (const sub of ['links', 'chats', 'collections']) {
     await assertFails(addDoc(collection(anonDb(), 'users', OWNER_DOC, sub), { a: 1 }));
   });
 }
+
+// ── links: a reminder cannot be moved into the past ──────────────────────────
+//
+// The reminder scheduler is ONE query ordered by nextReminderAt across every
+// user (limit 500). 500 client-written docs with `nextReminderAt: 1` held the
+// head of that query and starved everyone else's reminders. The client only
+// ever writes a future time (lib/storage updateLinkReminder) or null.
+
+test('owner can set a reminder for the future, clear it, or leave it untouched', async () => {
+  const ref = doc(ownerDb(), 'users', OWNER_DOC, 'links', 'link1');
+  await assertSucceeds(updateDoc(ref, { reminderStatus: 'pending', nextReminderAt: Date.now() + 86_400_000 }));
+  await assertSucceeds(updateDoc(ref, { title: 'renamed' }));                   // field untouched
+  await assertSucceeds(updateDoc(ref, { reminderStatus: 'none', nextReminderAt: null }));
+  await assertSucceeds(updateDoc(ref, { nextReminderAt: Date.now() - 60_000 })); // a minute ago: clock skew
+  await assertSucceeds(addDoc(collection(ownerDb(), 'users', OWNER_DOC, 'links'), {
+    url: 'https://example.com/2', reminderStatus: 'pending', nextReminderAt: Date.now() + 3_600_000,
+  }));
+});
+
+test('owner cannot backdate a reminder (update or create)', async () => {
+  const ref = doc(ownerDb(), 'users', OWNER_DOC, 'links', 'link1');
+  await assertFails(updateDoc(ref, { reminderStatus: 'pending', nextReminderAt: 1 }));
+  await assertFails(updateDoc(ref, { nextReminderAt: Date.now() - 3_600_000 }));
+  await assertFails(updateDoc(ref, { nextReminderAt: 'yesterday' }));
+  await assertFails(addDoc(collection(ownerDb(), 'users', OWNER_DOC, 'links'), {
+    url: 'https://example.com/3', reminderStatus: 'pending', nextReminderAt: 1,
+  }));
+});
+
+test('a legacy past nextReminderAt survives an unrelated update, and can still be deleted', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'users', OWNER_DOC, 'links', 'stale'), {
+      url: 'https://example.com/stale', reminderStatus: 'pending', nextReminderAt: 1,
+    });
+  });
+  const ref = doc(ownerDb(), 'users', OWNER_DOC, 'links', 'stale');
+  await assertSucceeds(updateDoc(ref, { isRead: true }));  // value unchanged → allowed
+  await assertSucceeds(deleteDoc(ref));
+});
 
 // ── analytics_events / client_errors: owner-only, client-appended ─────────────
 //
