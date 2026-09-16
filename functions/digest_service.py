@@ -763,7 +763,7 @@ def run_digest_check() -> dict:
                         report["digests_sent"] += 1
                         report["cards_delivered"] += res.get("card_count", 0)
             except Exception as e:
-                err = f"Digest failed for {uid}: {e}"
+                err = f"Digest failed for {mask_uid(uid)}: {e}"
                 logger.error(err)
                 report["errors"].append(err)
 
@@ -777,7 +777,7 @@ def run_digest_check() -> dict:
                 if synth_res.get("sent"):
                     report["syntheses_sent"] += 1
         except Exception as e:
-            err = f"Synthesis failed for {uid}: {e}"
+            err = f"Synthesis failed for {mask_uid(uid)}: {e}"
             logger.error(err)
             report["errors"].append(err)
 

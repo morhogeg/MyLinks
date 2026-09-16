@@ -31,7 +31,7 @@ It takes about a minute.
 4. *(Optional)* change the **Backend URL**. It defaults to
    `https://secondbrain-app-94da2.web.app`, which is what the app hands out today.
 
-Settings are stored in `chrome.storage.sync`, so they follow your Chrome profile.
+Settings are stored in `chrome.storage.local` (this browser profile only, never synced to your Google account: the token is a credential for your library).
 The popup re-checks the connection every time you open it.
 
 ## How to save

@@ -639,6 +639,7 @@ def _card_thumb(card: dict) -> Optional[str]:
 _OG_PREVIEW_MAX_EDGE = 1000
 _OG_PREVIEW_MAX_BYTES = 280 * 1024
 _OG_SOURCE_MAX_BYTES = 10 * 1024 * 1024
+_OG_MAX_DECODE_PIXELS = 25_000_000
 
 
 def _downscale_og_preview(image_bytes: bytes):
@@ -646,7 +647,12 @@ def _downscale_og_preview(image_bytes: bytes):
     import io
     from PIL import Image
     try:
-        img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        img = Image.open(io.BytesIO(image_bytes))
+        # Header-declared size is known before the decode allocates; refuse
+        # decompression bombs (see main.MAX_DECODE_PIXELS for the reasoning).
+        if img.width * img.height > _OG_MAX_DECODE_PIXELS:
+            return None
+        img = img.convert("RGB")
     except Exception:
         return None
     long_edge = max(img.size)
@@ -894,6 +900,16 @@ _SHARE_COLLECTIONS = {
     "answer": "shared_answers",
 }
 
+# A share id is a client-minted UUID (hex, dashes stripped or not). It becomes
+# a Firestore DOCUMENT id, so it must be one path segment: a `/` would nest
+# the write under a path no rule covers, and an odd segment count raised a
+# ValueError whose text was echoed back to the client.
+_SHARE_ID_RE = re.compile(r"[A-Za-z0-9_-]{1,128}")
+
+
+def _valid_share_id(share_id) -> bool:
+    return isinstance(share_id, str) and _SHARE_ID_RE.fullmatch(share_id) is not None
+
 
 # An answer snapshot is world-readable, so the SERVER decides its shape rather
 # than trusting whatever the client posted. The client already drops private
@@ -959,7 +975,7 @@ def _publish_share_logic(uid: str, share_type: str, share_id: str, payload: dict
     public_coll = _SHARE_COLLECTIONS.get(share_type)
     if not public_coll:
         raise ValueError("invalid share type")
-    if not share_id or not isinstance(payload, dict):
+    if not _valid_share_id(share_id) or not isinstance(payload, dict):
         raise ValueError("shareId and payload are required")
 
     db = get_db()
@@ -1002,7 +1018,7 @@ def _unpublish_share_logic(uid: str, share_type: str, share_id: str) -> dict:
     public_coll = _SHARE_COLLECTIONS.get(share_type)
     if not public_coll:
         raise ValueError("invalid share type")
-    if not share_id:
+    if not _valid_share_id(share_id):
         raise ValueError("shareId is required")
 
     db = get_db()

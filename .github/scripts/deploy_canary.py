@@ -88,7 +88,7 @@ def main() -> int:
 
     print(f"CANARY FAILED: pipeline did not resolve the card within {TIMEOUT_S}s "
           f"(last: {last}). The deployed runtime is NOT healthy — "
-          f"see .github/scripts/pipeline_debug.py to diagnose.")
+          f"diagnose from the functions logs.")
     return 1
 
 

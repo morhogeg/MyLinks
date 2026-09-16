@@ -181,6 +181,123 @@ def test_redirect_loop_still_bounded(monkeypatch):
         scraper.safe_get("https://example.com/loop", max_redirects=3)
 
 
+class _Sock:
+    def __init__(self, peer):
+        self._peer = peer
+
+    def getpeername(self):
+        return (self._peer, 443)
+
+
+class _PinnedResponse(_FakeResponse):
+    """A response whose transport exposes the connected peer the way urllib3
+    does (`raw._connection.sock`)."""
+
+    def __init__(self, chunks, peer):
+        super().__init__(chunks)
+        conn = type("Conn", (), {})()
+        conn.sock = _Sock(peer)
+        self.raw = type("Raw", (), {})()
+        self.raw._connection = conn
+
+
+@pytest.fixture
+def _direct(monkeypatch):
+    """No environment proxy for the URL under test (a proxied fetch skips the
+    peer check because the socket peer would be the proxy itself)."""
+    monkeypatch.setattr(scraper, "_proxied", lambda url: False)
+
+
+def test_proxied_reflects_the_environment(monkeypatch):
+    for var in ("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("NO_PROXY", "")
+    monkeypatch.setenv("no_proxy", "")
+    assert scraper._proxied("https://example.com/") is False
+    monkeypatch.setenv("HTTPS_PROXY", "http://127.0.0.1:3128")
+    assert scraper._proxied("https://example.com/") is True
+    assert scraper._proxied("http://example.com/") is False
+
+
+def test_proxied_fetch_skips_the_peer_check(monkeypatch):
+    monkeypatch.setattr(scraper, "_proxied", lambda url: True)
+    resp = _PinnedResponse([b"via proxy"], "127.0.0.1")
+    _install(monkeypatch, [resp])
+    assert scraper.safe_get("https://example.com/").content == b"via proxy"
+
+
+@pytest.mark.parametrize("peer", ["127.0.0.1", "169.254.169.254", "10.1.2.3", "::1", "::ffff:127.0.0.1"])
+def test_connection_that_lands_on_a_private_peer_is_dropped(monkeypatch, _direct, peer):
+    """DNS rebinding: the resolver said public, the socket connected private.
+    The response must be closed before any body byte is read."""
+    resp = _PinnedResponse([b"secret"], peer)
+    _install(monkeypatch, [resp])
+    with pytest.raises(UnsafeURLError):
+        scraper.safe_get("https://rebind.example.com/")
+    assert resp.closed
+    assert resp.content is None  # never read
+
+
+def test_connection_on_a_public_peer_is_read(monkeypatch, _direct):
+    resp = _PinnedResponse([b"fine"], "93.184.216.34")
+    _install(monkeypatch, [resp])
+    assert scraper.safe_get("https://example.com/").content == b"fine"
+
+
+def test_private_peer_on_a_redirect_hop_is_dropped(monkeypatch, _direct):
+    hop = _FakeRedirect("https://example.com/final")
+    hop.raw = type("Raw", (), {})()
+    hop.raw._connection = type("Conn", (), {})()
+    hop.raw._connection.sock = _Sock("192.168.0.9")
+    final = _FakeResponse([b"done"])
+    _install(monkeypatch, [hop, final])
+    with pytest.raises(UnsafeURLError):
+        scraper.safe_get("https://example.com/start")
+    assert hop.closed
+
+
+class _Read1Response(_FakeResponse):
+    """A transport that exposes urllib3 2.x's `read1`: the reader must prefer
+    it (returns on ANY buffered bytes) over `iter_content` (blocks for a full
+    chunk), so a slow drip is cut at the wall clock, not at the function
+    timeout."""
+
+    def __init__(self, pieces):
+        super().__init__([b"never via iter_content"])
+        pieces = list(pieces)
+        self.raw = type("Raw", (), {})()
+
+        def read1(amt, decode_content=None):
+            return pieces.pop(0) if pieces else b""
+
+        self.raw.read1 = read1
+
+    def iter_content(self, chunk_size):
+        raise AssertionError("iter_content must not be used when read1 exists")
+
+
+def test_reader_prefers_read1_when_the_transport_offers_it(monkeypatch):
+    _install(monkeypatch, [_Read1Response([b"ab", b"cd", b"e"])])
+    assert scraper.safe_get("https://example.com/").content == b"abcde"
+
+
+def test_read1_drip_is_cut_by_the_wall_clock(monkeypatch):
+    clock = {"t": 0.0}
+    monkeypatch.setattr(scraper.time, "monotonic", lambda: clock["t"])
+
+    def _pieces():
+        for _ in range(100):
+            clock["t"] += 20.0
+            yield b"a"
+
+    resp = _Read1Response([])
+    gen = _pieces()
+    resp.raw.read1 = lambda amt, decode_content=None: next(gen, b"")
+    _install(monkeypatch, [resp])
+    with pytest.raises(ResponseTooLargeError):
+        scraper.safe_get("https://example.com/slow")
+
+
 def test_fetches_are_never_auto_redirecting(monkeypatch):
     """`allow_redirects` must stay False — that is what forces re-validation."""
     calls = _install(monkeypatch, [_FakeResponse([b"ok"])])

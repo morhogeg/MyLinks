@@ -14,6 +14,7 @@ public class ShareConfigPlugin: CAPPlugin, CAPBridgedPlugin {
     public let jsName = "ShareConfig"
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "save", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "clear", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "consumePendingShare", returnType: CAPPluginReturnPromise)
     ]
 
@@ -36,6 +37,21 @@ public class ShareConfigPlugin: CAPPlugin, CAPBridgedPlugin {
 
         defaults.set(endpoint, forKey: "shareEndpoint")
         defaults.set(token, forKey: "ingestToken")
+        call.resolve()
+    }
+
+    /// Remove the ingest token + endpoint from the App Group. Called on sign-out
+    /// (web/lib/auth.ts signOutUser): the token is a long-lived credential for
+    /// the signed-out account's library, and without this it survived sign-out,
+    /// so the share sheet on a shared or handed-down device kept posting into
+    /// that library until another account signed in and overwrote it.
+    @objc func clear(_ call: CAPPluginCall) {
+        guard let defaults = UserDefaults(suiteName: ShareConfigPlugin.appGroup) else {
+            call.resolve()
+            return
+        }
+        defaults.removeObject(forKey: "ingestToken")
+        defaults.removeObject(forKey: "shareEndpoint")
         call.resolve()
     }
 

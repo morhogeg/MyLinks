@@ -229,23 +229,6 @@ def _record_server_error(fn: str, exc: Exception, uid: str = None) -> None:
         logger.warning("server_errors write failed (ignored): %s", log_exc)
 
 
-def _ask_diag(exc: Exception) -> str:
-    """TEMPORARY owner-facing diagnostic tail for the Ask error message.
-
-    Ask keeps failing in prod for one owner-reported query and the recorded
-    cause lives in `server_errors`, which is unreadable from a cloud session
-    (no egress, ADMIN_TOKEN unset). Until the real cause is confirmed, append a
-    compact, bounded reason (exception type + trimmed message — which now names
-    the Gemini finish_reason/block_reason) to the sanitized Ask error so the
-    owner can read it straight off the screen. REMOVE once the cause is fixed."""
-    try:
-        detail = str(exc).strip()
-        detail = re.sub(r"\s+", " ", detail)[:180]
-        return f" (diag: {type(exc).__name__}: {detail})" if detail else f" (diag: {type(exc).__name__})"
-    except Exception:
-        return ""
-
-
 # Sentinel so a memoized `None` ("checked, no valid token") is distinguishable
 # from "not checked yet". A plain `None` default would re-verify every time for
 # exactly the anonymous callers we most want to keep cheap.
@@ -435,6 +418,13 @@ _RATE_LIMITS = {
     # per session and de-dupes identical messages, so 30/hr is generous for a
     # real device and tight for anything else.
     "client-error": (30, 3600, False),
+    # Callables that run paid Gemini work for the caller's own workspace and
+    # had no ceiling at all. `rebuild_connections` pages the whole library
+    # (20 embeds / 8 relates per call, so a 500-card library is ~90 calls);
+    # `send_digest_now` builds and pushes a digest on every call (a synthesis
+    # call for synthesis-mode workspaces). Per-uid, fail closed.
+    "rebuild-uid": (240, 3600, False),
+    "digest-now-uid": (10, 3600, False),
 }
 
 # Input caps for client-supplied fields that flow into the Gemini prompt, so a
@@ -622,6 +612,36 @@ def _sanitize_categories(categories) -> list:
     return cleaned
 
 
+# Ingest tokens are `secrets.token_urlsafe(24)` (link_service.ensure_ingest_token):
+# 32 URL-safe base64 characters. Anything else is not one of ours and is
+# refused before it can reach the limiter or Firestore.
+_INGEST_TOKEN_RE = re.compile(r"[A-Za-z0-9_-]{16,128}")
+
+
+def _looks_like_ingest_token(token) -> bool:
+    return isinstance(token, str) and _INGEST_TOKEN_RE.fullmatch(token) is not None
+
+
+# Content types we will store and serve back from the public bucket. A client
+# used to pick the stored object's Content-Type freely, which turned an
+# image upload into arbitrary content hosting (`text/html` at a tokenized
+# public URL). Anything not on this list is stored as JPEG bytes-as-is; the
+# image pipeline reads the bytes, not the label.
+_ALLOWED_IMAGE_MIMES = frozenset({
+    "image/jpeg", "image/png", "image/webp", "image/gif", "image/heic", "image/heif",
+})
+
+
+def _safe_image_mime(value) -> str:
+    if isinstance(value, str):
+        v = value.split(";", 1)[0].strip().lower()
+        if v == "image/jpg":
+            v = "image/jpeg"
+        if v in _ALLOWED_IMAGE_MIMES:
+            return v
+    return "image/jpeg"
+
+
 def _rate_limit_identity(req) -> str:
     """Identity for the pre-body rate-limit gate: per USER when we know who the
     caller is, per IP only when we don't.
@@ -658,6 +678,42 @@ def _rate_limit_identity(req) -> str:
     decoded = _verify_bearer(req)
     auth_uid = decoded.get("uid") if decoded else None
     return f"auth:{auth_uid}" if auth_uid else f"ip:{client_ip(req)}"
+
+
+def _json_object(req) -> dict:
+    """The request's JSON body as a dict, or {} for anything else.
+
+    `req.get_json()` raises on a malformed body or a non-JSON content type,
+    which the generic handlers turned into a 500 (and, on the Ask path, a
+    `server_errors` row) for what is a client mistake; a JSON array body
+    survived parsing and then blew up on `.get`. Both are 400s now.
+    """
+    try:
+        data = req.get_json(silent=True)
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _callable_rate_limited(bucket: str, identity: str) -> None:
+    """The callable-transport twin of `_rate_limited`: raise the HttpsError the
+    client expects instead of returning an HTTP Response."""
+    limit, window, fail_open = _RATE_LIMITS[bucket]
+    try:
+        allowed = check_rate_limit(f"{bucket}:{identity}", limit, window, fail_open=fail_open)
+    except RateLimitBackendError as e:
+        logger.error("Rate limiter backend error on bucket %s", bucket)
+        _record_server_error("rate_limiter", e)
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAVAILABLE,
+            message="Service temporarily unavailable. Please try again in a minute.",
+        )
+    if not allowed:
+        logger.warning("Rate limit exceeded: %s", bucket)
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.RESOURCE_EXHAUSTED,
+            message="Too many requests. Please slow down.",
+        )
 
 
 def _rate_limited(bucket: str, identity: str, headers: dict = None):
@@ -1017,6 +1073,20 @@ _POST_THUMB_MAX_EDGE = 600
 _POST_THUMB_JPEG_QUALITY = 80
 
 
+# Pixel ceiling for any image we DECODE server-side (thumbnails, poster checks,
+# og previews). Pillow reads the dimensions from the header before allocating,
+# so this is checked before the decode: a 519 KB PNG declaring 13000×13000 px
+# otherwise peaks at ~670 MB RSS and OOM-kills the instance. 25 MP is a 5000×5000
+# frame — far above any social cover image or screenshot.
+MAX_DECODE_PIXELS = 25_000_000
+
+
+def _reject_image_bomb(img) -> None:
+    w, h = img.size
+    if w * h > MAX_DECODE_PIXELS:
+        raise ValueError(f"Image too large to decode: {w}x{h}")
+
+
 def _downscale_thumbnail(image_bytes: bytes, mime_type: str) -> tuple:
     """Downscale a post cover image to a small JPEG card thumbnail.
 
@@ -1033,6 +1103,7 @@ def _downscale_thumbnail(image_bytes: bytes, mime_type: str) -> tuple:
         import io
         from PIL import Image
         img = Image.open(io.BytesIO(image_bytes))
+        _reject_image_bomb(img)
         img.thumbnail((_POST_THUMB_MAX_EDGE, _POST_THUMB_MAX_EDGE))
         w, h = img.size
         aspect = round(w / h, 4) if h else None
@@ -1071,7 +1142,9 @@ def _video_poster_looks_like_junk(image_bytes: bytes) -> bool:
     try:
         import io
         from PIL import Image, ImageStat
-        img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        img = Image.open(io.BytesIO(image_bytes))
+        _reject_image_bomb(img)
+        img = img.convert("RGB")
         w, h = img.size
         if min(w, h) < _VIDEO_POSTER_MIN_EDGE:
             return True
@@ -1737,12 +1810,16 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
     charged = None
 
     try:
-        data = req.get_json()
+        data = _json_object(req)
         if not data:
             return _error_response("Invalid JSON body", 400, headers)
 
         url = data.get('url')
+        if url is not None and not isinstance(url, str):
+            return _error_response("Invalid URL", 400, headers)
         text = data.get('text') or data.get('note')
+        if text is not None and not isinstance(text, str):
+            return _error_response("Invalid note", 400, headers)
         existing_tags = _sanitize_tags(data.get('existingTags'))
         existing_categories = _sanitize_categories(data.get('existingCategories'))
 
@@ -1953,7 +2030,7 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
     uid = None
 
     try:
-        data = req.get_json()
+        data = _json_object(req)
         if not data:
             return _error_response("Invalid JSON body", 400, headers)
 
@@ -2378,7 +2455,6 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
                         refund_quota(*charged)
                     msg = (
                         "Machina couldn't generate an answer right now. Please try again in a minute."
-                        + _ask_diag(stream_exc)  # TEMPORARY diagnostic — remove once cause fixed
                         if isinstance(stream_exc, AnalysisError)
                         else "Internal server error"
                     )
@@ -2457,8 +2533,7 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         _record_server_error("ask_brain", e, uid=uid)
         return _server_error(
             headers, e,
-            "Machina couldn't generate an answer right now. Please try again in a minute."
-            + _ask_diag(e),  # TEMPORARY diagnostic — remove once cause fixed
+            "Machina couldn't generate an answer right now. Please try again in a minute.",
             502,
         )
     except Exception as e:
@@ -2571,12 +2646,15 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
     charged = None
 
     try:
-        data = req.get_json()
+        data = _json_object(req)
         if not data:
             return _error_response("Invalid JSON body", 400, headers)
 
         image_url = data.get('imageUrl')
         image_b64 = data.get('imageBytes')
+        if (image_url is not None and not isinstance(image_url, str)) or \
+                (image_b64 is not None and not isinstance(image_b64, str)):
+            return _error_response("Invalid image payload", 400, headers)
         existing_tags = _sanitize_tags(data.get('existingTags'))
         existing_categories = _sanitize_categories(data.get('existingCategories'))
         # Identity: prefer the verified ID token; falls back to the body uid only
@@ -2614,7 +2692,7 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
             try:
                 import base64
                 image_bytes = base64.b64decode(image_b64)
-                mime_type = data.get('mimeType', 'image/jpeg')
+                mime_type = _safe_image_mime(data.get('mimeType'))
                 logger.info(f"Analyzing inline image ({len(image_bytes)} bytes)")
             except Exception as e:
                 logger.error("Invalid image bytes: %s", e)
@@ -2634,7 +2712,7 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
                 img_response = safe_get(image_url, timeout=20)
                 img_response.raise_for_status()
                 image_bytes = img_response.content
-                mime_type = img_response.headers.get('Content-Type', 'image/jpeg')
+                mime_type = _safe_image_mime(img_response.headers.get('Content-Type'))
             except Exception as e:
                 logger.error("Failed to download image: %s", e)
                 return _error_response("Failed to download image", 502, headers)
@@ -2756,21 +2834,40 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
     # the clear) so each device gets its own ceiling. The token is validated
     # immediately below, and the share-uid bucket still caps the resolved
     # workspace, so an invalid token buys nothing but its own private bucket.
+    #
+    # The hash bucket is keyed on the token AS PRESENTED, so it is only opened
+    # for a token that is well-formed AND resolves to a workspace: a random
+    # header value used to mint a fresh `rate_limits` doc per request (one
+    # transactional write each, never pruned) and then 403. Now a token that
+    # does not look like ours never touches the limiter, and one that looks
+    # right but matches nothing is charged to the caller's IP bucket instead,
+    # which bounds the churn to one doc per source address.
     _pre_tok = req.headers.get('X-Ingest-Token') or ''
-    _pre_identity = (
-        f"tok:{hashlib.sha256(_pre_tok.encode()).hexdigest()[:16]}"
-        if _pre_tok else _rate_limit_identity(req)
-    )
+    if _pre_tok and not _looks_like_ingest_token(_pre_tok):
+        return _error_response("Invalid ingest token", 403, headers)
+    if _pre_tok:
+        _pre_uid = find_user_by_ingest_token(_pre_tok)
+        if not _pre_uid:
+            rl = _rate_limited("share", _rate_limit_identity(req), headers)
+            return rl or _error_response("Invalid ingest token", 403, headers)
+        _pre_identity = f"tok:{hashlib.sha256(_pre_tok.encode()).hexdigest()[:16]}"
+    else:
+        _pre_uid = None
+        _pre_identity = _rate_limit_identity(req)
     rl = _rate_limited("share", _pre_identity, headers)
     if rl:
         return rl
 
     try:
         data = req.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return _error_response("Invalid JSON body", 400, headers)
 
         token = req.headers.get('X-Ingest-Token') or data.get('token')
         if token:
-            uid = find_user_by_ingest_token(token)
+            if not isinstance(token, str) or not _looks_like_ingest_token(token):
+                return _error_response("Invalid ingest token", 403, headers)
+            uid = _pre_uid if token == _pre_tok else find_user_by_ingest_token(token)
             if not uid:
                 return _error_response("Invalid ingest token", 403, headers)
             # Per-uid ceiling on the token path (report 3.3): the IP `share`
@@ -2821,7 +2918,7 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                     return _error_response("Invalid image data", 400, headers)
                 if len(img_bytes) > MAX_IMAGE_BYTES:
                     return _error_response("Image is too large", 413, headers)
-                decoded.append((img_bytes, entry.get('mimeType') or 'image/jpeg'))
+                decoded.append((img_bytes, _safe_image_mime(entry.get('mimeType'))))
 
             # ENRICH mode: the screenshots complete an EXISTING partial card
             # (a Facebook/LinkedIn post the scraper could only preview) instead
@@ -2977,7 +3074,7 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
             if q:
                 return q
 
-            mime_type = data.get('mimeType', 'image/jpeg')
+            mime_type = _safe_image_mime(data.get('mimeType'))
             ext = 'png' if 'png' in mime_type else 'jpg'
             try:
                 stored_url = _store_image(
@@ -3404,6 +3501,8 @@ def rebuild_connections(req: https_fn.CallableRequest) -> dict:
             message="User must be identified",
         )
 
+    _callable_rate_limited("rebuild-uid", uid)
+
     phase = (req.data or {}).get("phase", "embed")
     if phase not in ("embed", "relate"):
         raise https_fn.HttpsError(
@@ -3581,11 +3680,13 @@ def _delete_account_logic(auth_uid: str) -> dict:
         except Exception as e:
             logger.error("Failed to delete Firestore data for account: %s", e)
             raise _DeleteAccountError("Failed to delete account data")
-        # Best-effort: remove the user's screenshots from Storage.
+        # Best-effort: remove the user's screenshots and post thumbnails from
+        # Storage (both prefixes are keyed by the workspace uid).
         try:
             bucket = storage.bucket()
-            for blob in bucket.list_blobs(prefix=f"screenshots/{uid}/"):
-                blob.delete()
+            for prefix in (f"screenshots/{uid}/", f"post_thumbs/{uid}/"):
+                for blob in bucket.list_blobs(prefix=prefix):
+                    blob.delete()
         except Exception as e:
             logger.warning("Failed to delete storage objects for account: %s", e)
 
@@ -4434,7 +4535,7 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
     url = data.get("url")
     is_image = data.get("isImage", False)
     screenshot_parts = []  # [(bytes, mime)] of a screenshot card, for the platform follow-up
-    mime_type = data.get("mimeType", "image/jpeg")
+    mime_type = _safe_image_mime(data.get("mimeType"))
     original_body = data.get("body")
 
     log_to_firestore(task_id, "Background processing started", data={"url": url, "uid": uid, "isImage": is_image})
@@ -5124,6 +5225,8 @@ def send_digest_now(req: https_fn.CallableRequest) -> dict:
             code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
             message="User must be identified",
         )
+
+    _callable_rate_limited("digest-now-uid", uid)
 
     db = get_db()
     snap = db.collection("users").document(uid).get()

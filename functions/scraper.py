@@ -63,6 +63,23 @@ def validate_public_url(url: str) -> None:
     if not host:
         raise UnsafeURLError("URL has no host")
 
+    # The guard and the HTTP client must agree on WHICH host is being dialled.
+    # `urlparse` treats a backslash in the authority as ordinary text, but
+    # urllib3 (what `requests` connects with) ends the authority at it — so
+    # `http://127.0.0.1\@example.com/` validates as example.com and connects to
+    # 127.0.0.1. Refuse any authority containing a backslash outright, and
+    # cross-check against urllib3's own parse so any other divergence fails
+    # closed rather than open.
+    if "\\" in parsed.netloc:
+        raise UnsafeURLError("URL authority contains a backslash")
+    try:
+        from urllib3.util import parse_url as _u3_parse_url
+        dialled = (_u3_parse_url(url).host or "").strip("[]").lower()
+    except Exception:
+        dialled = None
+    if dialled is not None and dialled != host.lower():
+        raise UnsafeURLError("URL host is ambiguous between parsers")
+
     try:
         addrinfos = socket.getaddrinfo(host, None)
     except socket.gaierror as e:
@@ -78,6 +95,85 @@ def validate_public_url(url: str) -> None:
         # 169.254.169.254) / reserved / multicast / unspecified.
         if not ip.is_global:
             raise UnsafeURLError(f"URL resolves to a non-public address: {ip}")
+
+
+def _iter_body(resp, chunk_size: int):
+    """Yield body chunks as soon as ANY bytes arrive.
+
+    `Response.iter_content(n)` blocks inside urllib3 until `n` bytes (or EOF)
+    have been received, so the wall-clock check between chunks never runs while
+    a server drips one byte at a time just inside the socket timeout — a 64 KB
+    declared body at 1 byte / 9 s held an instance for the whole function
+    timeout. urllib3 2.x exposes `read1`, which returns whatever is buffered
+    (decoded), so the deadline is checked on every trickle. Falls back to
+    `iter_content` when `read1` is unavailable (older urllib3, test fakes).
+    """
+    raw = getattr(resp, "raw", None)
+    read1 = getattr(raw, "read1", None)
+    if callable(read1):
+        while True:
+            try:
+                chunk = read1(chunk_size, decode_content=True)
+            except TypeError:
+                chunk = read1(chunk_size)
+            if not chunk:
+                return
+            yield chunk
+        return
+    yield from resp.iter_content(chunk_size)
+
+
+def _peer_ip(resp) -> Optional[str]:
+    """The address the response's socket is actually connected to, if the
+    transport exposes it (urllib3 does); None otherwise. Best-effort."""
+    raw = getattr(resp, "raw", None)
+    candidates = (
+        # urllib3 keeps the pooled connection on the response while streaming.
+        lambda: raw._connection.sock,
+        # http.client wraps the socket in a SocketIO file object; the socket
+        # object (plain or SSL) is still reachable through it.
+        lambda: raw._fp.fp.raw._sock,
+    )
+    for get in candidates:
+        try:
+            sock = get()
+            if sock is None:
+                continue
+            peer = sock.getpeername()[0]
+            if isinstance(peer, str) and peer:
+                return peer
+        except Exception:
+            continue
+    return None
+
+
+def _proxied(url: str) -> bool:
+    """True when `requests` would send `url` through an environment proxy."""
+    try:
+        proxies = requests.utils.get_environ_proxies(url)
+        return bool(requests.utils.select_proxy(url, proxies))
+    except Exception:
+        return False
+
+
+def _assert_peer_public(resp) -> None:
+    """Close the DNS-rebinding window: `validate_public_url` resolved the host
+    once, but `requests` resolved it again to connect. If the socket ended up
+    on a non-public address anyway (a zero-TTL name that flipped between the
+    two lookups), drop the response before a single body byte is read."""
+    peer = _peer_ip(resp)
+    if not peer:
+        return
+    try:
+        ip = ipaddress.ip_address(peer.split("%", 1)[0])
+    except ValueError:
+        return
+    mapped = getattr(ip, "ipv4_mapped", None)
+    if mapped is not None:
+        ip = mapped
+    if not ip.is_global:
+        resp.close()
+        raise UnsafeURLError(f"Connection landed on a non-public address: {ip}")
 
 
 def _read_capped(resp: requests.Response, max_bytes: int,
@@ -99,7 +195,7 @@ def _read_capped(resp: requests.Response, max_bytes: int,
 
     chunks, total = [], 0
     try:
-        for chunk in resp.iter_content(64 * 1024):
+        for chunk in _iter_body(resp, 64 * 1024):
             if not chunk:
                 continue
             total += len(chunk)
@@ -138,9 +234,9 @@ def safe_get(url: str, *, headers: Optional[dict] = None,
     — `requests` would otherwise buffer the entire body before any caller-side
     length check could run.
 
-    Residual: a TOCTOU gap remains between DNS resolution and the socket connect
-    (DNS rebinding). Pinning the connection to the validated IP would close it
-    fully; tracked as a follow-up.
+    DNS rebinding (the name resolving public for the guard and private for the
+    connect) is closed by `_assert_peer_public`: the socket's real peer address
+    is re-checked after connect and before any body byte is read.
     """
     deadline = time.monotonic() + MAX_TOTAL_SECONDS
     current = url
@@ -150,6 +246,11 @@ def safe_get(url: str, *, headers: Optional[dict] = None,
         validate_public_url(current)
         resp = requests.get(current, headers=headers, timeout=timeout,
                              allow_redirects=False, stream=True)
+        # Behind an explicit HTTP(S) proxy the socket peer IS the proxy, so
+        # the check would refuse every fetch; production functions run with
+        # no proxy env, and the resolver check above still applies either way.
+        if not _proxied(current):
+            _assert_peer_public(resp)
         if resp.is_redirect or resp.is_permanent_redirect:
             location = resp.headers.get("Location")
             if not location:
@@ -159,6 +260,46 @@ def safe_get(url: str, *, headers: Optional[dict] = None,
             continue
         return _read_capped(resp, max_bytes, deadline)
     raise UnsafeURLError("Too many redirects")
+
+
+# Regex scans over raw page HTML (og/twitter meta, JSON-LD, embedded JSON) are
+# bounded to the first N characters. Everything they look for lives in <head>
+# or the first script blocks, and a hostile 10 MB body stuffed with half-open
+# tags otherwise turns those scans quadratic (one URL pinned an instance for
+# minutes in testing). The patterns themselves are also written to stop at
+# the next `<` / `{` so a run can't cross into the following tag.
+_REGEX_SCAN_LIMIT = 512_000
+
+
+def _regex_scan_slice(html):
+    if isinstance(html, str) and len(html) > _REGEX_SCAN_LIMIT:
+        return html[:_REGEX_SCAN_LIMIT]
+    return html
+
+
+_LDJSON_OPEN_RE = re.compile(
+    r'<script[^<>]+type=["\']application/ld\+json["\'][^<>]*>', re.I)
+
+
+def _ldjson_blocks(html):
+    """The text of every `<script type="application/ld+json">` block, in
+    order. Linear: each opening tag is paired with the NEXT `</script>` via a
+    forward `find`, and the walk stops at the first opener with no closer, so
+    a page stuffed with unclosed script tags costs one pass, not one pass per
+    tag (a lazy `(.*?)</script>` regex rescans to the end for every opener)."""
+    html = _regex_scan_slice(html) or ""
+    blocks = []
+    pos = 0
+    while True:
+        m = _LDJSON_OPEN_RE.search(html, pos)
+        if not m:
+            break
+        end = html.find("</script", m.end())
+        if end < 0:
+            break
+        blocks.append(html[m.end():end])
+        pos = end + 8
+    return blocks
 
 
 # A scraped result whose readable text (whitespace removed) is shorter than this
@@ -502,9 +643,10 @@ def _extract_linkedin_author(html: str, url: str = '') -> Optional[str]:
     import html as html_lib
 
     candidates = []
+    html = _regex_scan_slice(html)
     for prop in ('og:title', 'twitter:title'):
         m = re.search(
-            r'<meta[^>]+(?:property|name)=["\']' + prop + r'["\'][^>]+content=["\']([^"\']*)',
+            r'<meta[^<>]+(?:property|name)=["\']' + prop + r'["\'][^<>]+content=["\']([^"\']*)',
             html, re.I,
         )
         if m:
@@ -530,11 +672,10 @@ def _linkedin_wrapped_name(html: str) -> Optional[str]:
     came up empty."""
     import html as html_lib
     import json
-    for m in re.finditer(
-            r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
-            html, re.I | re.S):
+    html = _regex_scan_slice(html)
+    for block in _ldjson_blocks(html):
         try:
-            data = json.loads(m.group(1))
+            data = json.loads(block)
         except Exception:
             continue
         for obj in (data if isinstance(data, list) else [data]):
@@ -549,7 +690,7 @@ def _linkedin_wrapped_name(html: str) -> Optional[str]:
                     return inner
     for prop in ('og:title', 'twitter:title'):
         m = re.search(
-            r'<meta[^>]+(?:property|name)=["\']' + prop + r'["\'][^>]+content=["\']([^"\']*)',
+            r'<meta[^<>]+(?:property|name)=["\']' + prop + r'["\'][^<>]+content=["\']([^"\']*)',
             html, re.I)
         if m:
             inner = linkedin_ui_boilerplate(html_lib.unescape(m.group(1)))
@@ -570,11 +711,9 @@ def _linkedin_ldjson_fields(html: str) -> tuple:
     """
     import json
     author = body = None
-    for m in re.finditer(
-            r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
-            html, re.I | re.S):
+    for block in _ldjson_blocks(html):
         try:
-            data = json.loads(m.group(1))
+            data = json.loads(block)
         except Exception:
             continue
         for obj in (data if isinstance(data, list) else [data]):
@@ -624,12 +763,13 @@ def _scrape_linkedin_url(url: str) -> dict:
         title = soup.title.string.strip() if soup.title and soup.title.string else ""
 
         ld_author, ld_body = _linkedin_ldjson_fields(html)
+        head_html = _regex_scan_slice(html)
 
         def _meta(*names):
             for name in names:
                 m = re.search(
-                    r'<meta[^>]+(?:property|name)=["\']' + re.escape(name)
-                    + r'["\'][^>]+content=["\']([^"\']*)', html, re.I)
+                    r'<meta[^<>]+(?:property|name)=["\']' + re.escape(name)
+                    + r'["\'][^<>]+content=["\']([^"\']*)', head_html, re.I)
                 if m:
                     return html_lib.unescape(m.group(1)).strip()
             return ""
@@ -1106,6 +1246,7 @@ def _extract_instagram_handle(
             return h
 
     if html:
+        html = _regex_scan_slice(html)
         # 3. Embedded JSON: "username": "veryshortphilosophy"
         m = re.search(r'"username"\s*:\s*"([A-Za-z0-9._]{1,30})"', html)
         h = _valid_ig_handle(m.group(1)) if m else None
@@ -1113,7 +1254,7 @@ def _extract_instagram_handle(
             return h
         # 4. Embedded JSON: "owner": { … "username": "…" }
         m = re.search(
-            r'"owner"\s*:\s*\{[^}]*?"username"\s*:\s*"([A-Za-z0-9._]{1,30})"', html
+            r'"owner"\s*:\s*\{[^{}]*?"username"\s*:\s*"([A-Za-z0-9._]{1,30})"', html
         )
         h = _valid_ig_handle(m.group(1)) if m else None
         if h:

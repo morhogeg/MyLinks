@@ -188,6 +188,15 @@ export async function completeRedirectSignIn(): Promise<User | null> {
  */
 export async function signOutUser(): Promise<void> {
     if (isNativeApp()) {
+        // The Share Extension's credential lives in the App Group, outside
+        // everything else this function purges — drop it first so the share
+        // sheet cannot keep posting into the departing account's library.
+        try {
+            const { clearNativeShareConfig } = await import('@/lib/shareConfig');
+            await clearNativeShareConfig();
+        } catch {
+            // Never let the bridge block a sign-out.
+        }
         try {
             const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
             await FirebaseAuthentication.signOut();

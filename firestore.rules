@@ -35,6 +35,22 @@ service cloud.firestore {
         && (request.auth.uid in get(/databases/$(database)/documents/users/$(uid)).data.authUids);
     }
 
+    // The user-doc fields the CLIENT is allowed to write (update rule above).
+    // Add a key here only when a client write for it exists; every write site
+    // is enumerated in firestore-rules-test/rules.test.mjs.
+    //   timezone       AuthProvider (device zone on sign-in)
+    //   settings       lib/storage updateUserSettings (dot-path `settings.*`
+    //                  updates affect the top-level `settings` key)
+    //   aiConsentAt    AIConsentNotice via AuthProvider
+    //   pushPromptedAt PushNudge / AuthProvider
+    //   onboarded      AuthProvider (first-run flow done)
+    //   privacyLock    lib/privacyLock (set / clear the PIN record)
+    //   graphVersion   lib/rebuildConnections
+    function clientWritableUserKeys() {
+      return ['timezone', 'settings', 'aiConsentAt', 'pushPromptedAt',
+              'onboarded', 'privacyLock', 'graphVersion'];
+    }
+
     match /users/{uid} {
       // Read = get + list, written against `resource` (NOT owns()) on purpose:
       // the client resolves its workspace with the LIST query
@@ -45,10 +61,23 @@ service cloud.firestore {
       // (e.g. the legacy limit(1) "first doc" lookup) is denied.
       allow read: if isSignedIn() && request.auth.uid in resource.data.authUids;
 
-      // Owner-only updates (timezone, settings, digest prefs, ingest token…).
-      // Same resource-based check as read: only a doc already linked to this
-      // account can be touched, and only linked accounts can grow `authUids`.
-      allow update: if isSignedIn() && request.auth.uid in resource.data.authUids;
+      // Owner-only updates, FIELD-LIMITED. Only a doc already linked to this
+      // account can be touched, and only the fields the client actually
+      // writes (see clientWritableUserKeys). Everything else on the user doc
+      // is server-owned and stays that way:
+      //   - `createdAt` decides the founder / trial grant (entitlement.py
+      //     grant_for): a client that could rewrite it to 0 minted itself a
+      //     year of Pro. Frozen after create.
+      //   - `authUids` is how the backend resolves a workspace: a client that
+      //     could add a stranger's auth uid to its own doc could pull that
+      //     account's saves and device token into its library. Linking is
+      //     server-side only (claim_workspace / create_workspace).
+      //   - `ingestToken` (share-sheet auth), `fcmTokens` (push targets),
+      //     `lastDigestSentAt`, `email`: minted / maintained by functions.
+      allow update: if isSignedIn()
+        && request.auth.uid in resource.data.authUids
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(clientWritableUserKeys());
 
       // Self-serve workspace creation — the client-side fallback when both
       // claim transports fail (AuthProvider.createWorkspaceClientSide,
@@ -57,9 +86,16 @@ service cloud.firestore {
       // touch any other doc id (== uid check), cannot claim a legacy doc
       // (create fails on an existing doc; the update rule then rejects a
       // non-linked writer), and cannot seed another account into authUids.
+      // The doc may carry only the birth fields, and `createdAt` must be
+      // "now" (±5 min of the server clock) so a fresh account cannot
+      // backdate itself into the founders' Pro grant.
       allow create: if isSignedIn()
         && request.auth.uid == uid
-        && request.resource.data.authUids == [request.auth.uid];
+        && request.resource.data.authUids == [request.auth.uid]
+        && request.resource.data.keys().hasOnly(['authUids', 'createdAt', 'onboarded', 'email'])
+        && request.resource.data.createdAt is number
+        && request.resource.data.createdAt >= request.time.toMillis() - 300000
+        && request.resource.data.createdAt <= request.time.toMillis() + 300000;
 
       // Deletion stays server-side only (delete_account, Admin SDK).
       allow delete: if false;

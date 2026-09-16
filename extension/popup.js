@@ -1,4 +1,4 @@
-// Settings popup. Reads/writes chrome.storage.sync and talks to the service
+// Settings popup. Reads/writes chrome.storage.local and talks to the service
 // worker for token validation / "Save this page now". No capture logic here.
 //
 // The token is checked, never just stored: the popup validates on open and
@@ -73,7 +73,7 @@ async function checkConnection() {
 }
 
 async function load() {
-  const { token = "", baseUrl = "" } = await chrome.storage.sync.get(["token", "baseUrl"]);
+  const { token = "", baseUrl = "" } = await chrome.storage.local.get(["token", "baseUrl"]);
   tokenInput.value = token;
   baseUrlInput.value = baseUrl;
   if (!token) {
@@ -90,7 +90,7 @@ async function load() {
 async function saveSettings() {
   const token = tokenInput.value.trim();
   const baseUrl = baseUrlInput.value.trim().replace(/\/+$/, "");
-  await chrome.storage.sync.set({ token, baseUrl });
+  await chrome.storage.local.set({ token, baseUrl });
   return token;
 }
 

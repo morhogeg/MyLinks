@@ -56,6 +56,12 @@ on:
 
 # Never let two deploys run at once — concurrent `firebase deploy` to the same
 # project fights over the same function resources.
+# Least-privilege token: no workflow here uses GITHUB_TOKEN (Firebase/Apple
+# auth via their own secrets), so the default write-scoped token is pure
+# exposure if a third-party action were ever compromised.
+permissions:
+  contents: read
+
 concurrency:
   group: deploy-functions
   cancel-in-progress: false

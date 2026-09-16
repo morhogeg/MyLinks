@@ -11,6 +11,7 @@ import { apiUrl } from './api';
  */
 interface ShareConfigPlugin {
     save(options: { endpoint: string; token: string }): Promise<void>;
+    clear(): Promise<void>;
     consumePendingShare(): Promise<{ pending: boolean; kind?: string; ageMs?: number; progress?: number; startedAt?: number }>;
 }
 
@@ -231,6 +232,25 @@ export async function syncShareConfigToNative(uid: string, docToken?: string): P
         recordStatus({ state: 'error', detail: msg, at: Date.now() });
     } finally {
         inFlight = false;
+    }
+}
+
+/**
+ * Remove the ingest token + endpoint from the App Group on sign-out, so the
+ * iOS Share Extension stops authenticating as the account that just left.
+ * The token is a long-lived credential for that account's library; the
+ * Firebase sign-out and the local-data purge never touched it. No-op off
+ * native iOS, and never throws (an older native build without `clear` must
+ * not block the sign-out).
+ */
+export async function clearNativeShareConfig(): Promise<void> {
+    if (!isNativeIos()) return;
+    lastSuccessUid = null;
+    lastArgs = null;
+    try {
+        await ShareConfigNative.clear();
+    } catch {
+        // Plugin method missing (older build) or no App Group — nothing to clear.
     }
 }
 

@@ -48,6 +48,12 @@ on:
       # next unrelated firebase.json edit.
       - ".github/workflows/deploy-hosting.yml"
 
+# Least-privilege token: no workflow here uses GITHUB_TOKEN (Firebase/Apple
+# auth via their own secrets), so the default write-scoped token is pure
+# exposure if a third-party action were ever compromised.
+permissions:
+  contents: read
+
 concurrency:
   group: deploy-hosting
   cancel-in-progress: false

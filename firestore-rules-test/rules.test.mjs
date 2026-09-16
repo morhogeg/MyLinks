@@ -21,8 +21,8 @@ import {
   assertFails,
 } from '@firebase/rules-unit-testing';
 import {
-  doc, getDoc, setDoc, updateDoc, deleteDoc,
-  collection, query, where, limit, getDocs, addDoc,
+  doc, getDoc, setDoc, updateDoc, deleteDoc, deleteField, arrayUnion,
+  collection, collectionGroup, query, where, limit, getDocs, addDoc,
 } from 'firebase/firestore';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -188,6 +188,122 @@ test('self-serve create cannot take over an EXISTING doc (bare setDoc = update t
   await assertFails(
     setDoc(doc(strangerDb(), 'users', OWNER_DOC), { authUids: [STRANGER_AUTH] }),
   );
+});
+
+// ── users/{uid}: field-level protection (2026-09-16 security pass) ───────────
+//
+// The update rule used to allow ANY field once the writer was linked. Two
+// server-owned fields made that a real hole: `createdAt` is what the founder
+// Pro grant keys on (entitlement.grant_for), and `authUids` is how the backend
+// resolves a workspace. These cases pin the allowlist from both sides: every
+// real client write still works, and every server-owned field is refused.
+
+const CLIENT_WRITES = {
+  timezone: 'Asia/Jerusalem',                       // AuthProvider
+  'settings.digest_count': 3,                        // lib/storage updateUserSettings (dot path)
+  aiConsentAt: 1,                                    // AIConsentNotice
+  pushPromptedAt: 1,                                 // PushNudge
+  onboarded: true,                                   // AuthProvider
+  privacyLock: { hash: 'x', salt: 'y', iterations: 1 }, // lib/privacyLock
+  graphVersion: 2,                                   // lib/rebuildConnections
+};
+
+for (const [field, value] of Object.entries(CLIENT_WRITES)) {
+  test(`owner CAN write client field ${field}`, async () => {
+    await assertSucceeds(updateDoc(doc(ownerDb(), 'users', OWNER_DOC), { [field]: value }));
+  });
+}
+
+test('owner can clear privacyLock (deleteField) and set nested settings', async () => {
+  await assertSucceeds(updateDoc(doc(ownerDb(), 'users', OWNER_DOC), { privacyLock: { hash: 'x' } }));
+  await assertSucceeds(updateDoc(doc(ownerDb(), 'users', OWNER_DOC), { privacyLock: deleteField() }));
+  await assertSucceeds(updateDoc(doc(ownerDb(), 'users', OWNER_DOC), {
+    'settings.digest_enabled': true, 'settings.digest_hour': 8, timezone: 'UTC',
+  }));
+});
+
+const SERVER_OWNED = {
+  createdAt: 0,                       // founder-grant forgery (entitlement.py)
+  authUids: [OWNER_AUTH, STRANGER_AUTH], // workspace-resolver hijack (link_service)
+  ingestToken: 'a',                   // share-sheet auth, minted server-side
+  fcmTokens: ['forged-token'],        // push targets, registered server-side
+  lastDigestSentAt: 0,                // digest scheduler state
+  email: 'someone-else@example.com',
+  plan: 'pro',                        // not a real field, but must not become one
+};
+
+for (const [field, value] of Object.entries(SERVER_OWNED)) {
+  test(`owner CANNOT write server-owned field ${field}`, async () => {
+    await assertFails(updateDoc(doc(ownerDb(), 'users', OWNER_DOC), { [field]: value }));
+  });
+}
+
+test('owner cannot smuggle a server-owned field in with an allowed one', async () => {
+  await assertFails(updateDoc(doc(ownerDb(), 'users', OWNER_DOC), { timezone: 'UTC', createdAt: 0 }));
+  await assertFails(updateDoc(doc(ownerDb(), 'users', OWNER_DOC), { timezone: 'UTC', createdAt: deleteField() }));
+  await assertFails(updateDoc(doc(ownerDb(), 'users', OWNER_DOC), { onboarded: true, authUids: arrayUnion(STRANGER_AUTH) }));
+});
+
+test('owner cannot grow or shrink authUids from the client', async () => {
+  await assertFails(updateDoc(doc(ownerDb(), 'users', OWNER_DOC), { authUids: arrayUnion(STRANGER_AUTH) }));
+  await assertFails(updateDoc(doc(ownerDb(), 'users', OWNER_DOC), { authUids: [] }));
+});
+
+test('self-serve create must stamp createdAt as now, not a backdated founder date', async () => {
+  const now = Date.now();
+  await assertSucceeds(
+    setDoc(doc(strangerDb(), 'users', STRANGER_AUTH), { authUids: [STRANGER_AUTH], createdAt: now, onboarded: false }),
+  );
+});
+
+test('self-serve create with a backdated, missing, or non-numeric createdAt is denied', async () => {
+  for (const createdAt of [0, 1, Date.now() - 24 * 3600 * 1000, 'now', null]) {
+    await assertFails(
+      setDoc(doc(strangerDb(), 'users', STRANGER_AUTH), { authUids: [STRANGER_AUTH], createdAt, onboarded: false }),
+    );
+  }
+  await assertFails(
+    setDoc(doc(strangerDb(), 'users', STRANGER_AUTH), { authUids: [STRANGER_AUTH], onboarded: false }),
+  );
+});
+
+test('self-serve create cannot carry server-owned fields', async () => {
+  const now = Date.now();
+  for (const extra of [{ ingestToken: 'a' }, { fcmTokens: ['t'] }, { plan: 'pro' }, { settings: {} }]) {
+    await assertFails(
+      setDoc(doc(strangerDb(), 'users', STRANGER_AUTH), { authUids: [STRANGER_AUTH], createdAt: now, ...extra }),
+    );
+  }
+});
+
+test('self-serve create may carry the email (AuthProvider payload shape)', async () => {
+  await assertSucceeds(
+    setDoc(doc(strangerDb(), 'users', STRANGER_AUTH), {
+      authUids: [STRANGER_AUTH], createdAt: Date.now(), onboarded: false, email: 's@example.com',
+    }),
+  );
+});
+
+// ── Deny-by-default probes ───────────────────────────────────────────────────
+
+test('a collection-group query over links is denied for everyone', async () => {
+  for (const db of [ownerDb(), strangerDb(), anonDb()]) {
+    await assertFails(getDocs(collectionGroup(db, 'links')));
+  }
+});
+
+test('an unknown top-level collection is denied (no catch-all allow)', async () => {
+  for (const db of [ownerDb(), strangerDb(), anonDb()]) {
+    await assertFails(getDoc(doc(db, 'migrations', 'x')));
+    await assertFails(setDoc(doc(db, 'migrations', 'x'), { a: 1 }));
+  }
+});
+
+test('the /users list rule is per-caller: a stranger cannot list by the OWNER uid', async () => {
+  await assertFails(getDocs(query(
+    collection(strangerDb(), 'users'),
+    where('authUids', 'array-contains', OWNER_AUTH),
+  )));
 });
 
 test('anon cannot self-serve create; nobody can delete user docs', async () => {

@@ -99,7 +99,7 @@ def main() -> int:
         print("\nPIPELINE HEALTH: FAILING")
         for p in problems:
             print(f"  ✗ {p}")
-        print("\nDiagnose with .github/scripts/pipeline_debug.py "
+        print("\nDiagnose from the functions logs (the debug harness was removed 2026-09-16) "
               "(push to trigger/pipeline-debug).")
         return 1
     print("\nPIPELINE HEALTH: OK")

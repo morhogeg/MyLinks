@@ -70,15 +70,27 @@ def find_data_uid_by_auth_uid(auth_uid: str) -> Optional[str]:
     if not auth_uid:
         return None
     db = get_db()
-    docs = (
+    docs = list(
         db.collection('users')
         .where(filter=FieldFilter('authUids', 'array_contains', auth_uid))
-        .limit(1)
+        .limit(2)
         .get()
     )
-    if docs:
+    if not docs:
+        return None
+    if len(docs) == 1:
         return docs[0].id
-    return None
+    # More than one workspace claims this account. The rules no longer let a
+    # client grow `authUids` (so a stranger can't list someone else's uid on
+    # their own doc), but the resolver must not hand a caller to whichever doc
+    # Firestore happens to order first. Prefer the account's OWN doc (new
+    # workspaces are keyed by the auth uid); otherwise keep the deterministic
+    # first-by-id result and record the ambiguity so it can be cleaned up.
+    for d in docs:
+        if d.id == auth_uid:
+            return d.id
+    logger.warning("Auth account is linked to %d workspaces; using the first by id", len(docs))
+    return docs[0].id
 
 
 def create_workspace(auth_uid: str, email: Optional[str] = None) -> str:
@@ -131,10 +143,10 @@ def delete_user_data(uid: str) -> int:
     db = get_db()
     user_ref = db.collection('users').document(uid)
     deleted = 0
-    # 'syntheses' holds the M12 weekly recaps at users/{uid}/syntheses/{week_id};
-    # they're a subcollection so they survive the parent user doc's deletion and
-    # must be swept explicitly.
-    for sub in ('links', 'chats', 'collections', 'syntheses'):
+    # Subcollections survive the parent user doc's deletion and must each be
+    # swept explicitly: the M12 weekly recaps, the user's margin notes on
+    # them, in-app digests, self-hosted analytics and crash reports.
+    for sub in USER_SUBCOLLECTIONS:
         for doc in user_ref.collection(sub).stream():
             doc.reference.delete()
             deleted += 1
@@ -147,9 +159,74 @@ def delete_user_data(uid: str) -> int:
     for doc in db.collection('task_logs').where(filter=FieldFilter('data.uid', '==', uid)).stream():
         doc.reference.delete()
         deleted += 1
+    # Per-workspace server-side state keyed by uid: the plan grant, the monthly
+    # quota counters, and the vaulted full syntheses (synthesis_vault rows carry
+    # a `uid` field — see entitlement.stash_synthesis).
+    for coll in ('entitlements', 'usage_quotas'):
+        ref = db.collection(coll).document(uid)
+        if ref.get().exists:
+            ref.delete()
+            deleted += 1
+    for doc in db.collection('synthesis_vault').where(filter=FieldFilter('uid', '==', uid)).stream():
+        doc.reference.delete()
+        deleted += 1
+    # Every public share this workspace published: the world-readable snapshot,
+    # its owner mapping, and the generated link-preview image. Without this a
+    # deleted account's /s, /c and /a pages stayed live forever with nobody
+    # able to unpublish them.
+    deleted += delete_shares_for_owner(uid)
     user_ref.delete()
     deleted += 1
     logger.info(f"Deleted {deleted} docs for user workspace")
+    return deleted
+
+
+# Every client-facing subcollection under users/{uid}. Keep in step with
+# firestore.rules: a new subcollection there must be added here so account
+# deletion sweeps it.
+USER_SUBCOLLECTIONS = (
+    'links', 'chats', 'collections', 'syntheses', 'synthesisNotes',
+    'digests', 'analytics_events', 'client_errors',
+)
+
+_SHARE_TYPE_COLLECTIONS = {
+    "card": "shared_cards",
+    "collection": "shared_collections",
+    "answer": "shared_answers",
+}
+
+
+def delete_shares_for_owner(uid: str) -> int:
+    """Delete every public share owned by `uid` (snapshot + owner map +
+    previews). Returns the number of docs deleted; best-effort per share so
+    one failure never blocks the rest of the account deletion."""
+    db = get_db()
+    deleted = 0
+    owners = db.collection('shared_owners').where(filter=FieldFilter('ownerUid', '==', uid)).stream()
+    for owner_doc in owners:
+        share_id = owner_doc.id
+        share_type = (owner_doc.to_dict() or {}).get('type')
+        try:
+            public_coll = _SHARE_TYPE_COLLECTIONS.get(share_type)
+            if public_coll is None:
+                # Unknown/missing type: the snapshot lives in one of the three.
+                for coll in _SHARE_TYPE_COLLECTIONS.values():
+                    ref = db.collection(coll).document(share_id)
+                    if ref.get().exists:
+                        ref.delete()
+                        deleted += 1
+            else:
+                db.collection(public_coll).document(share_id).delete()
+                deleted += 1
+            owner_doc.reference.delete()
+            deleted += 1
+            try:
+                from share_service import _delete_share_previews
+                _delete_share_previews(share_id)
+            except Exception as e:
+                logger.warning(f"Share preview cleanup failed for {share_id}: {e}")
+        except Exception as e:
+            logger.warning(f"Share cleanup failed for {share_id}: {e}")
     return deleted
 
 
