@@ -226,7 +226,18 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-09-11, latest): install build **1324** ("Marked as done" toast with Undo), then the 1323 QA below if not yet done
+> ## 🚨 OWNER ACTION (updated 2026-09-16, latest): install build **1325** (share sheet: several screenshots become one card), then the 1324 QA below if not yet done
+>
+> **1325** (run #325, merge `f3bf08b`) fixes the share extension keeping
+> only the FIRST of several shared screenshots. QA on 1325: in Photos,
+> select 3 screenshots in a deliberate order and share to Machina; the HUD
+> hint should read "3 screenshots become one card", and the finished card
+> should hold all 3 in that order (swipe the carousel). Then share 6 and
+> expect "Saving the first 5 of 6 screenshots as one card". A single
+> screenshot must behave exactly as before. Order is the one unverified
+> assumption (§4 G3). Then the 1324 list below.
+>
+> ## (superseded) OWNER ACTION (updated 2026-09-11): install build **1324** ("Marked as done" toast with Undo), then the 1323 QA below if not yet done
 >
 > **1324** (run #324, merge `f1719d9`) adds the confirmation toast when a
 > "Do this" task is ticked in Revisit: "Marked as done" with an Undo that
@@ -1585,7 +1596,7 @@ G2b. **[x] Screenshot cards name who posted them (2026-09-08).** A screenshot
     glyph, and Sources should list it under X. Existing "Screenshot" cards
     are not backfilled.
 
-G3. **[x] iOS share extension: multi-screenshot cards — CODE DONE 2026-09-16
+G3. **[x] iOS share extension: multi-screenshot cards — SHIPPED 2026-09-16 (merge `f3bf08b`, build 1325)
     (launch-readiness review, "fix the product bug").** Sharing several
     images now sends ALL of them (up to `MAX_CARD_IMAGES` = 5) as the
     backend's ordered `images:[{data,mimeType}]` list, so they become ONE
@@ -2013,8 +2024,9 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 
 - **2026-09-16 — PM launch-readiness review + share-extension multi-image
-  fix (iOS only, branch `claude/onboard-launch-readiness-3zizp0`, NOT yet
-  shipped).** Owner asked for a product-manager launch verdict. Recorded:
+  fix. SHIPPED: merge `f3bf08b` to main, iOS → TestFlight run #325 =
+  **build 1325** (Archive + entitlement check green; the Swift compiled on
+  the first CI pass). iOS only: no functions, rules or hosting deploy.** Owner asked for a product-manager launch verdict. Recorded:
   **No for a public App Store launch yet, Yes for an open TestFlight beta.**
   Features are launch-grade and the roadmap items (voice, routes, offline,
   export) are not needed; freeze features. Blockers, in order: (1) Machina
@@ -2032,8 +2044,8 @@ exact-match, capped.
   `uploadImages(from:)` (sequential load, per-image downsample, ordered
   `images` payload, cap 5 with honest HUD copy), `encodedImage(from:)`
   shared with the single-image path, `upload(payload:)` widened to
-  `[String: Any]`. **Verified:** none of it compiles here (no Swift
-  toolchain in the cloud session); the CI archive is the first compile.
+  `[String: Any]`. **Verified:** CI archive (run #325) compiled and signed
+  it; there is no Swift toolchain in the cloud session.
   **Not verified:** attachment order on device, memory with 5 large HEICs.
   Ship: `/ship` (iOS build only, no functions/rules/hosting change).
 - **2026-09-11 (round 3) — "Marked as done" toast with Undo. SHIPPED:
