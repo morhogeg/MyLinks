@@ -879,6 +879,13 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         }
 
         if provider.hasItemConformingToTypeIdentifier(kImage) {
+            // Several screenshots shared at once become ONE card, in the order
+            // iOS hands them over — never silently just the first one.
+            let providers = imageProviders()
+            if providers.count > 1 {
+                uploadImages(from: providers)
+                return
+            }
             provider.loadItem(forTypeIdentifier: kImage, options: nil) { [weak self] item, _ in
                 self?.uploadImage(from: item)
             }
@@ -1076,6 +1083,89 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         return nil
     }
 
+    /// EVERY image attachment across all input items, in the order iOS lists
+    /// them (Photos hands them over in selection order). The multi-screenshot
+    /// card is built from this list; `firstProvider()` only decides the flow.
+    private func imageProviders() -> [NSItemProvider] {
+        guard let items = extensionContext?.inputItems as? [NSExtensionItem] else { return [] }
+        var out: [NSItemProvider] = []
+        for item in items {
+            for provider in item.attachments ?? [] where provider.hasItemConformingToTypeIdentifier(kImage) {
+                out.append(provider)
+            }
+        }
+        return out
+    }
+
+    /// Mirrors MAX_CARD_IMAGES in functions/main.py (and MAX_CARD_SCREENSHOTS in
+    /// web/lib/enrich.ts): how many ordered screenshots may make up one card.
+    private static let maxCardImages = 5
+
+    /// Several shared images → ONE card. Loads the attachments one at a time (in
+    /// order, each downsampled before the next is touched, so five 48MP HEICs
+    /// never sit in memory together), then posts the backend's ordered `images`
+    /// list. Anything past the cap is dropped, and the HUD says so up front:
+    /// the sheet must never claim it saved what it did not.
+    private func uploadImages(from providers: [NSItemProvider]) {
+        let total = providers.count
+        let kept = Array(providers.prefix(Self.maxCardImages))
+        var images: [[String: String]] = []
+        var preview: UIImage?
+
+        func loadNext(_ index: Int) {
+            if index >= kept.count {
+                guard !images.isEmpty else {
+                    showResult("Couldn't read the images", success: false)
+                    return
+                }
+                let count = images.count
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self else { return }
+                    self.presentScan(with: preview)
+                    self.hintLabel.text = total > count
+                        ? "Saving the first \(count) of \(total) screenshots as one card. You can close this."
+                        : "\(count) screenshots become one card. You can close this."
+                }
+                upload(payload: ["images": images])
+                return
+            }
+            kept[index].loadItem(forTypeIdentifier: kImage, options: nil) { [weak self] item, _ in
+                guard let self = self else { return }
+                autoreleasepool {
+                    if let encoded = self.encodedImage(from: item) {
+                        images.append(["data": encoded.0.base64EncodedString(), "mimeType": encoded.1])
+                        if preview == nil { preview = encoded.2 }
+                    }
+                }
+                loadNext(index + 1)
+            }
+        }
+        loadNext(0)
+    }
+
+    /// One shared image attachment → bounded JPEG bytes (+ mime, + a preview),
+    /// or nil if the item is not a decodable image. Shared by the single- and
+    /// multi-image paths so both downsample identically.
+    private func encodedImage(from item: NSSecureCoding?) -> (Data, String, UIImage?)? {
+        if let img = item as? UIImage {
+            if let raw = img.jpegData(compressionQuality: 1.0),
+               let small = downsampledJPEG(from: raw) {
+                return (small, "image/jpeg", img)
+            }
+            guard let data = img.jpegData(compressionQuality: 0.8) else { return nil }
+            return (data, "image/jpeg", img)
+        }
+        if let raw = item as? Data {
+            if let small = downsampledJPEG(from: raw) { return (small, "image/jpeg", UIImage(data: small)) }
+            return (raw, "image/jpeg", UIImage(data: raw))
+        }
+        if let url = item as? URL, let raw = try? Data(contentsOf: url) {
+            if let small = downsampledJPEG(from: raw) { return (small, "image/jpeg", UIImage(data: small)) }
+            return (raw, Self.mime(for: url), UIImage(data: raw))
+        }
+        return nil
+    }
+
     /// Downsample image bytes to a bounded pixel size and JPEG-encode, WITHOUT
     /// ever allocating the full-resolution bitmap. `UIImage(data:)` on a 48MP
     /// HEIC decodes a ~200MB ARGB bitmap; base64-ing that into an in-memory JSON
@@ -1098,44 +1188,11 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     }
 
     private func uploadImage(from item: NSSecureCoding?) {
-        var data: Data?
-        var mime = "image/jpeg"
-        var preview: UIImage?
-
-        if let img = item as? UIImage {
-            preview = img
-            // Downsample via the encoded bytes when possible; fall back to a
-            // direct JPEG encode of the (already in-memory) UIImage.
-            if let raw = img.jpegData(compressionQuality: 1.0),
-               let small = downsampledJPEG(from: raw) {
-                data = small
-            } else {
-                data = img.jpegData(compressionQuality: 0.8)
-            }
-        } else if let raw = item as? Data {
-            // Downsample straight from the source bytes (no full-res bitmap).
-            if let small = downsampledJPEG(from: raw) {
-                data = small
-                preview = UIImage(data: small)
-            } else {
-                data = raw
-                preview = UIImage(data: raw)
-            }
-        } else if let url = item as? URL, let raw = try? Data(contentsOf: url) {
-            if let small = downsampledJPEG(from: raw) {
-                data = small
-                preview = UIImage(data: small)
-            } else {
-                data = raw
-                preview = UIImage(data: raw)
-                mime = Self.mime(for: url)
-            }
-        }
-
-        guard let imageData = data else {
+        guard let encoded = encodedImage(from: item) else {
             showResult("Couldn't read the image", success: false)
             return
         }
+        let (imageData, mime, preview) = encoded
 
         // Kick off the gorgeous native scan animation while the upload runs.
         DispatchQueue.main.async { [weak self] in self?.presentScan(with: preview) }
@@ -1145,7 +1202,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
 
     // MARK: - Networking
 
-    private func upload(payload: [String: String]) {
+    private func upload(payload: [String: Any]) {
         let defaults = UserDefaults(suiteName: Self.appGroup)
         let token = defaults?.string(forKey: "ingestToken")
         let endpoint = defaults?.string(forKey: "shareEndpoint") ?? Self.defaultEndpoint
