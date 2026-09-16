@@ -2001,11 +2001,10 @@ shared from Photos, an article), the tab bar and header read Revisit, the
 endcard's letterspaced line is the current subtitle `Never lose another great
 find`, the light `--accent-ring` matches `globals.css`, every burned-in caption
 and demo card is em-dash-free, and `npm run verify` now fails on an em dash
-the way the web build does. The `.srt` re-emits from the same array. **One
-deferred owner step:** `public/score-vo.wav` (the spoken editions) was mixed
-before this pass, so it lacks the new fourth-cut tick and carries the old
-dash-pause on two lines; re-run `synth-vo.py` + `mix-vo.mjs` on a machine with
-the Kokoro model (see the README) before shipping a VO edition.
+the way the web build does. The `.srt` re-emits from the same array, and
+`public/score-vo.wav` was re-synthesized (Kokoro, 14 lines, all inside their
+caption windows) and re-mixed in the same pass, so the spoken editions carry
+the new fourth-cut tick and the de-dashed lines too.
 
 *Where to "advertise" for free:* X (primary), Product Hunt, Hacker News,
 r/PKMS + r/productivity (follow self-promo rules: give value first), Indie
@@ -2043,9 +2042,12 @@ exact-match, capped.
   `npm run score` + `npm run verify` OK (no overlaps, no clipping, no
   holes, no em dashes), `.srt` re-emitted (13 cues), stills of every
   touched beat rendered and eyeballed in landscape and vertical, and a full
-  `MachinaLaunch` render completed. **Not verified / deferred:**
-  `public/score-vo.wav` is stale by one tick and two dash pauses;
-  regenerate with Kokoro locally before using a VO edition. §4 25c (the
+  `MachinaLaunch` render completed. Second pass in the same session (owner: "do
+  everything that is needed"): the Kokoro model downloaded fine from GitHub
+  releases in the cloud session, `synth-vo.py` regenerated all 14 lines
+  (every one fits its window), `mix-vo.mjs` rewrote `public/score-vo.wav`,
+  and `MachinaLaunchVO` rendered exit 0. **Not verified:** nobody has
+  listened to either mix; the checks are numerical. §4 25c (the
   literal "AI" on the Ask and feed screens, the D-3 blocker for putting the
   film on the landing page) is unchanged and still the owner's call.
 - **2026-09-11 (round 3) — "Marked as done" toast with Undo. SHIPPED:
