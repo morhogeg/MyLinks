@@ -1995,6 +1995,17 @@ badge/URL once the listing is live, so **that swap now costs the tagline its
 best-placed appearance**; prefer adding the badge above the rule to replacing the
 line. Nothing in the film claims availability yet. The stills it renders double as the
 X-thread screenshots the posts above ask for.
+**Re-synced to the shipped app 2026-09-16** (first pass since 08-02): the
+capture beat cross-cuts FOUR sources now (Instagram, YouTube, a screenshot
+shared from Photos, an article), the tab bar and header read Revisit, the
+endcard's letterspaced line is the current subtitle `Never lose another great
+find`, the light `--accent-ring` matches `globals.css`, every burned-in caption
+and demo card is em-dash-free, and `npm run verify` now fails on an em dash
+the way the web build does. The `.srt` re-emits from the same array. **One
+deferred owner step:** `public/score-vo.wav` (the spoken editions) was mixed
+before this pass, so it lacks the new fourth-cut tick and carries the old
+dash-pause on two lines; re-run `synth-vo.py` + `mix-vo.mjs` on a machine with
+the Kokoro model (see the README) before shipping a VO edition.
 
 *Where to "advertise" for free:* X (primary), Product Hunt, Hacker News,
 r/PKMS + r/productivity (follow self-promo rules: give value first), Indie
@@ -2006,6 +2017,37 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-16 — Launch film re-synced to the shipped app (`marketing/
+  launch-clip/`, first pass since 2026-08-02). NOT shipped: the film is a
+  marketing asset, nothing under `web/` or `functions/` changed.** Owner
+  asked whether the film needs additions for features shipped since it was
+  cut. Verdict given and approved: no new beat (Revisit, "Do this",
+  Insights, Pro do not earn one; the film is a story, not a feature list),
+  but four verified drifts plus one addition. **Done:** (1) the capture
+  beat's share sheet now cross-cuts four sources, with a screenshot shared
+  from Photos (a chat with Dana about the pour-over set, which is the
+  `gift` card's origin) as the third cut, holds 46/24/24/24 frames, taps
+  and pulses retimed, `HITS.sourceCutA/B/C` mirrored in `timeline.mjs` and
+  the score ticks each swap; (2) tab bar `Digest`/Newspaper became
+  `Revisit`/CalendarCheck and the digest header title `Revisit`, matching
+  `BottomTabBar.tsx`; (3) the endcard's letterspaced line is the current
+  App Store subtitle `Never lose another great find` (was the retired
+  `Capture. Ask. Connect.`; the act kickers keep those words); (4) light
+  `accentRing` now `rgba(90, 88, 80, 0.22)` as in `globals.css`; (5) the
+  feed search placeholder reads `Search or ask your saves` as the app
+  does; (6) em dashes removed from three captions, nine demo-card / synthesis
+  / Ask strings and the notes placeholder (the VO script mirrors the
+  punctuation, wording untouched), and `audio/verify.mjs` gained the same
+  comment-aware em-dash gate the web build has, over captions and `src/`.
+  README edit table and prose updated. **Verified:** film `tsc` clean,
+  `npm run score` + `npm run verify` OK (no overlaps, no clipping, no
+  holes, no em dashes), `.srt` re-emitted (13 cues), stills of every
+  touched beat rendered and eyeballed in landscape and vertical, and a full
+  `MachinaLaunch` render completed. **Not verified / deferred:**
+  `public/score-vo.wav` is stale by one tick and two dash pauses;
+  regenerate with Kokoro locally before using a VO edition. §4 25c (the
+  literal "AI" on the Ask and feed screens, the D-3 blocker for putting the
+  film on the landing page) is unchanged and still the owner's call.
 - **2026-09-11 (round 3) — "Marked as done" toast with Undo. SHIPPED:
   merge `f1719d9` to main (Vercel auto-deploy), TestFlight run #324 =
   **build 1324** green (uploaded 13:33 UTC). Web only.** Ticking a task in

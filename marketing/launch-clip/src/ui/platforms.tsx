@@ -360,7 +360,7 @@ export const SaveSurface: React.FC<{ k: PlatformKey; save: number }> = ({ k, sav
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 7 }}>
             <div style={{ fontSize: 12, color: 'rgba(96,102,116,0.85)' }}>@futuretense</div>
             <div style={{ fontSize: 14.5, fontWeight: 600, lineHeight: 1.3, color: '#14161c' }}>
-              What AI actually changes about work — a thread:
+              What AI actually changes about work, a thread:
             </div>
             {grey(94)}
             {grey(78)}

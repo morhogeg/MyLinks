@@ -55,6 +55,7 @@ export const light = {
   accent2: '#14141B',
   accent3: '#55555F',
   accentGradient: 'linear-gradient(135deg, #34343F, #14141B)',
+  accentRing: 'rgba(90, 88, 80, 0.22)',
   shadowCard: [
     '0 0 0 0.5px rgba(16, 24, 40, 0.05)',
     '0 1px 2px -1px rgba(16, 24, 40, 0.05)',

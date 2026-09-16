@@ -10,6 +10,11 @@ import { sans } from '../fonts';
  * The endcard: the bare mark, the drawn wordmark, the App Store subtitle —
  * ink on paper, the light grade's closing statement.
  *
+ * The letterspaced line IS the listing's subtitle, so it tracks
+ * `docs/APP_STORE.md` §2: `Never lose another great find` since 2026-08-26
+ * (it was `Capture. Ask. Connect.` until then; the act kickers keep those
+ * three words, this line does not).
+ *
  * The mark is the BARE glyph, not the app-icon tile — `docs/BRANDING.md` makes
  * the same call for the header ("a rounded container there reads as a shrunken
  * app icon rather than as the brand mark"), and on a full-frame endcard the grey
@@ -112,7 +117,7 @@ export const Endcard: React.FC = () => {
             transform: `translateY(${(1 - tag) * 8}px)`,
           }}
         >
-          Capture. Ask. Connect.
+          Never lose another great find
         </div>
 
         <div

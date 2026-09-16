@@ -657,6 +657,7 @@ tick(b(HITS.shareSheet), 0.085, 1.1);
 // the world behind the sheet changing — a soft tick on each cut
 tick(b(HITS.sourceCutA), 0.075, 1.25);
 tick(b(HITS.sourceCutB), 0.075, 1.4);
+tick(b(HITS.sourceCutC), 0.075, 1.55);
 whoosh(b(HITS.collectionsIn) - 0.25, 0.7, 0.055, 0.25);
 whoosh(b(HITS.pipelineIn) - 0.25, 0.7, 0.06, -0.25);
 shimmer(b(HITS.pipelineIn) + 0.15, [72, 76, 79], 0.04);

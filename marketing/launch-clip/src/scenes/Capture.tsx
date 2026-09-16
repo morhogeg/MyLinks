@@ -8,6 +8,7 @@ import {
   AnalyzingScreen,
   ArticleScreen,
   InstagramSource,
+  ScreenshotSource,
   ShareSheet,
   YouTubeSource,
 } from '../ui/screens';
@@ -19,7 +20,11 @@ import {
  * which demonstrated that Machina can take a link, not that it can take a link
  * from anywhere. So the share sheet is now the constant: it slides up once and
  * STAYS, while the world behind it cross-cuts through an Instagram carousel, a
- * YouTube video and an article. Same gesture, three different places, no copy.
+ * YouTube video, an article and a screenshot. Same gesture, four different
+ * places, no copy. (The screenshot is the 2026-09-16 addition: screenshots
+ * became a first-class capture after the film was cut, and the store listing
+ * leads with them. It is the LAST cut so the beat still ends on the one source
+ * whose card then lands in the app.)
  *
  * Only then do we go inside the app, for the real five-phase pipeline and the
  * finished card. The user's job ended when they hit share; the rest is ours, and
@@ -29,9 +34,13 @@ import {
 const SOURCES = [
   { Screen: InstagramSource, item: { title: 'Hidden coves of Sardinia', site: 'instagram.com' } },
   { Screen: YouTubeSource, item: { title: 'How to Use AI to Improve Yourself So Much it Will Scare People', site: 'youtube.com' } },
+  { Screen: ScreenshotSource, item: { title: 'Screenshot', site: 'Photos' } },
   { Screen: ArticleScreen, item: { title: 'The jobs AI actually changes', site: 'theatlantic.com' } },
 ];
-const CUTS = [0, 56, 88]; // frames where the world behind the sheet swaps
+// frames where the world behind the sheet swaps: the first source holds while
+// the sheet slides up, then 24 frames (0.8s) per cut. Mirrored in
+// `timeline.mjs` HITS.sourceCutA/B/C so the score ticks each swap.
+const CUTS = [0, 46, 70, 94];
 
 export const Capture: React.FC = () => {
   const f = useCurrentFrame();
@@ -52,16 +61,18 @@ export const Capture: React.FC = () => {
   const cutDip = sourceIndex > 0 ? prog(f - CUTS[sourceIndex], 0, 7, EASE_OUT) : 1;
   // Machina pulses in the app row on every one of them
   const pick = Math.max(
-    prog(f, 32, 46, EASE_OUT) * (1 - prog(f, 48, 55)),
-    prog(f, 58, 70, EASE_OUT) * (1 - prog(f, 80, 88)),
-    prog(f, 92, 106, EASE_OUT),
+    prog(f, 26, 40, EASE_OUT) * (1 - prog(f, 42, 46)),
+    prog(f, 50, 64, EASE_OUT) * (1 - prog(f, 66, 70)),
+    prog(f, 74, 88, EASE_OUT) * (1 - prog(f, 90, 94)),
+    prog(f, 98, 112, EASE_OUT),
   );
   // …and a FINGER lands on it each time, just ahead of the pulse — the pulses
   // read as consequences of a tap instead of the UI acting on its own
   const taps = [
-    prog(f, 26, 46, EASE_IN_OUT),
-    prog(f, 52, 72, EASE_IN_OUT),
-    prog(f, 86, 106, EASE_IN_OUT),
+    prog(f, 20, 40, EASE_IN_OUT),
+    prog(f, 44, 64, EASE_IN_OUT),
+    prog(f, 68, 88, EASE_IN_OUT),
+    prog(f, 92, 112, EASE_IN_OUT),
   ];
   const tap = taps.find((t) => t > 0 && t < 1) ?? 0;
 

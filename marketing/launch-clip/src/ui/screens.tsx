@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronLeft, Crosshair, Instagram, Lock, MessagesSquare, Newspaper, Play, Plus, Share2, Star, Youtube } from 'lucide-react';
+import { ChevronLeft, Crosshair, Heart, Info, Instagram, Lock, MessagesSquare, Newspaper, Play, Plus, Share2, Star, Trash2, Youtube } from 'lucide-react';
 import { T, categoryColor } from '../theme';
 import { sans } from '../fonts';
 import { StatusBar, HomeIndicator, SCREEN_W, SCREEN_H } from './Phone';
@@ -345,6 +345,150 @@ export const YouTubeSource: React.FC = () => (
     </div>
   </Screen>
 );
+
+/**
+ * The fourth source (2026-09-16): a SCREENSHOT, shared from Photos. Screenshots
+ * became a first-class capture after the film was cut (multi-screenshot cards,
+ * bylines read off the image), and the store listing now opens on "Save links,
+ * screenshots and videos from any app", so the cross-cut carries one. The
+ * screenshot is of a chat: that is the honest case (a friend's message, the
+ * thing you screenshot because there is nowhere to save it), and it is the
+ * `gift` card's origin in the library, so the feed later shows where it went.
+ * Photos' own light chrome, nobody's logo.
+ */
+export const ScreenshotSource: React.FC = () => {
+  const bubble = (side: 'them' | 'me', text: string) => (
+    <div
+      style={{
+        alignSelf: side === 'me' ? 'flex-end' : 'flex-start',
+        maxWidth: '78%',
+        padding: '6px 10px',
+        borderRadius: 14,
+        background: side === 'me' ? '#2f7ce0' : '#e9e9eb',
+        color: side === 'me' ? '#ffffff' : '#111318',
+        fontSize: 11,
+        lineHeight: 1.3,
+      }}
+    >
+      {text}
+    </div>
+  );
+  // the screenshot fits the view by height, as Photos shows a portrait shot
+  const shotH = 560;
+  const shotW = Math.round((shotH * SCREEN_W) / SCREEN_H);
+  return (
+    <Screen style={{ background: '#ffffff' }}>
+      <StatusBar />
+      <div style={{ position: 'absolute', top: 54, left: 0, right: 0, bottom: 0 }}>
+        {/* Photos' single-photo bar: back, the date, the day's time */}
+        <div
+          style={{
+            height: 46,
+            display: 'flex',
+            alignItems: 'center',
+            padding: '0 12px',
+            color: '#2f7ce0',
+          }}
+        >
+          <ChevronLeft size={22} strokeWidth={2.2} />
+          <div style={{ flex: 1, textAlign: 'center', marginRight: 22 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#111318' }}>Today</div>
+            <div style={{ fontSize: 10.5, color: '#7a7a84' }}>9:41</div>
+          </div>
+        </div>
+        {/* the screenshot itself: a messages thread, framed like the photo it is */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 8 }}>
+          <div
+            style={{
+              width: shotW,
+              height: shotH,
+              background: '#ffffff',
+              border: '1px solid rgba(0,0,0,0.1)',
+              boxShadow: '0 2px 10px rgba(16,24,40,0.08)',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            <div
+              style={{
+                height: 44,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+                borderBottom: '1px solid rgba(0,0,0,0.08)',
+                background: 'rgba(247,247,249,0.96)',
+                fontSize: 11.5,
+                fontWeight: 600,
+                color: '#111318',
+              }}
+            >
+              <div
+                style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 20,
+                  background: 'linear-gradient(160deg, #c9ced8, #8e95a3)',
+                }}
+              />
+              Dana
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '12px 10px' }}>
+              {bubble('them', 'ok this is the one I meant')}
+              <div
+                style={{
+                  alignSelf: 'flex-start',
+                  width: '78%',
+                  borderRadius: 12,
+                  overflow: 'hidden',
+                  border: '1px solid rgba(0,0,0,0.08)',
+                }}
+              >
+                <div
+                  style={{
+                    height: 78,
+                    background:
+                      'radial-gradient(60% 70% at 30% 35%, rgba(221,196,170,0.9), rgba(221,196,170,0) 70%), linear-gradient(160deg, #e7dfd6, #b9a897)',
+                  }}
+                />
+                <div style={{ padding: '6px 8px', background: '#f3f3f5' }}>
+                  <div style={{ fontSize: 10.5, fontWeight: 600, color: '#111318' }}>Ceramic pour-over set</div>
+                  <div style={{ fontSize: 9.5, color: '#7a7a84' }}>studio.smallbatch.co</div>
+                </div>
+              </div>
+              {bubble('them', 'the ceramic one, not the glass')}
+              {bubble('me', 'noted. saving this')}
+              {bubble('them', 'ships in three days apparently')}
+            </div>
+          </div>
+        </div>
+        {/* Photos' bottom toolbar; the share glyph is where the finger goes next */}
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: 78,
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            padding: '14px 26px 0',
+            color: '#2f7ce0',
+            borderTop: '1px solid rgba(0,0,0,0.06)',
+            background: 'rgba(247,247,249,0.96)',
+          }}
+        >
+          <Share2 size={20} strokeWidth={1.9} />
+          <Heart size={20} strokeWidth={1.9} />
+          <Info size={20} strokeWidth={1.9} />
+          <Trash2 size={20} strokeWidth={1.9} />
+        </div>
+      </div>
+    </Screen>
+  );
+};
 
 /**
  * The iOS share sheet, with Machina in the app row. This is the app's widest
@@ -1137,7 +1281,7 @@ export const DigestScreen: React.FC<{ enter?: number; reviewEnter?: number }> = 
 }) => (
   <Screen>
     <StatusBar />
-    <AppHeader title="Digest" showSearch={false} />
+    <AppHeader title="Revisit" showSearch={false} />
     <div style={{ position: 'absolute', top: 105, left: 0, right: 0, bottom: 0, padding: '14px 14px' }}>
       {/* THE REAL SYNTHESIS READING VIEW (owner call, round 13j) — ported from
           the shipped SynthesisCard.tsx `alwaysOpen` layout: accent-tinted card,
@@ -1296,7 +1440,7 @@ export const DigestScreen: React.FC<{ enter?: number; reviewEnter?: number }> = 
             </span>
           </div>
           <div style={{ marginTop: 8, fontSize: 12, lineHeight: 1.5, color: T.textMuted }}>
-            Nothing yet — jot down what you want to carry forward from this week.
+            Nothing yet. Jot down what you want to carry forward from this week.
           </div>
         </div>
       </div>

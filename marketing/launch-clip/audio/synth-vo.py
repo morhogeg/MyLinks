@@ -37,23 +37,23 @@ LINES = [
     # a deliberate beat of silence before this one — the first wrong pile
     # opens wordless (owner note, round 13c)
     (4.8, 1.3, "Saved, and rarely seen again.", 0.9),
-    (6.45, 1.35, f"Introducing {SAY_NAME} — one place for all your saved links."),
+    (6.45, 1.35, f"Introducing {SAY_NAME}: one place for all your saved links."),
     (8.35, 1.25, "Save anything, from anywhere."),
     (9.95, 2.4, f"{SAY_NAME} reads it, summarizes it, and files it."),
     # Spoken with the dichotomy CARVED (owner note, 13f): a full stop after
     # "From now on" forces the break, and "And" resets the breath before the
-    # second half. The caption shows the dash version of the same sentence.
+    # second half. The caption carries the same full stops since 2026-09-16.
     (13.3, 2.45, "From now on. Lose nothing. And find everything."),
     (16.35, 1.6, f"Ask {SAY_NAME} anything."),
     (18.4, 1.9, "Every answer comes straight from your saves."),
     (21.4, 2.3, f"{SAY_NAME} notices when things you saved belong together."),
     (24.25, 1.7, "Group your saves into collections that mirror how you think."),
-    # Full stop before "Ready" = the audible break; caption shows the dash.
+    # Full stop before "Ready" = the audible break; the caption has it too.
     # Spoken-only "And" (owner call, 13l): conversational lead-in the caption
     # deliberately doesn't carry — same precedent as the SAY_NAME respelling.
     (26.1, 2.6, f"And behind the scenes, {SAY_NAME} pieces it all together. Ready when you are."),
     # the closing statement, over the endcard's own line
-    (30.1, 1.6, f"{SAY_NAME}. Everything you save — finally useful."),
+    (30.1, 1.6, f"{SAY_NAME}. Everything you save, finally useful."),
 ]
 
 k = Kokoro(os.path.join(VO, "kokoro-v1.0.onnx"), os.path.join(VO, "voices-v1.0.bin"))

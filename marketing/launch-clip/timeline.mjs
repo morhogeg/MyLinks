@@ -69,6 +69,9 @@ export const sceneAt = (id) => {
  * Subtitles. `bar` is fractional bars from film start; `bars` is length.
  * Written to read as narration, not as a feature list — and short enough to be
  * absorbed in a glance while the picture does the real talking.
+ *
+ * NO EM DASHES in any `text` (the app-wide ban of 2026-08-27, which the film's
+ * burned-in captions are just as bound by); `npm run verify` fails on one.
  */
 export const SUBTITLES = [
   // `place` is a LAYOUT: 'left' puts the line in the left column with the device
@@ -99,7 +102,7 @@ export const SUBTITLES = [
   { bar: 4.8, bars: 1.3, place: 'bottom', text: 'Saved, and rarely seen again.' },
   // The turn is an INTRODUCTION now (owner call, round 13b) — the film stops
   // describing and presents the product by name.
-  { bar: 6.45, bars: 1.35, place: 'bottom', kicker: 'Introducing', text: 'Machina — one place for all your saved links.' },
+  { bar: 6.45, bars: 1.35, place: 'bottom', kicker: 'Introducing', text: 'Machina: one place for all your saved links.' },
   // Value first (owner note, round 13c): anything + anywhere. No tap-count
   // claim — the share sheet is two touches (owner correction).
   { bar: 8.35, bars: 1.25, place: 'left', kicker: 'Capture', text: 'Save anything, from anywhere.' },
@@ -107,7 +110,7 @@ export const SUBTITLES = [
   // THE PROMISE — one line for the whole library beat; the search (a query
   // sharing no words with the one card it finds) plays wordless underneath
   // and proves the second half.
-  { bar: 13.3, bars: 2.45, place: 'left', text: 'From now on — lose nothing. And find everything.' },
+  { bar: 13.3, bars: 2.45, place: 'left', text: 'From now on. Lose nothing. And find everything.' },
   // A new feature, not a continuation — no "Then" (owner note, round 13c).
   // The name still carries the line: "ask it" mushed out loud (round 12).
   { bar: 16.35, bars: 1.6, place: 'left', kicker: 'Ask', text: 'Ask Machina anything.' },
@@ -128,7 +131,7 @@ export const SUBTITLES = [
   // Round 13g (workshopped): proactivity explicit ("Behind the scenes"),
   // synthesis value in kitchen-table words, the result on YOUR timing. "it
   // all" not "your saves" — the two lines before already say saves/saved.
-  { bar: 26.1, bars: 2.6, place: 'left', text: 'Behind the scenes, Machina pieces it all together — ready when you are.' },
+  { bar: 26.1, bars: 2.6, place: 'left', text: 'Behind the scenes, Machina pieces it all together. Ready when you are.' },
 ];
 
 /**
@@ -158,8 +161,11 @@ export const HITS = {
   markLock: 6.55,
   deviceIn: 8.0,
   shareSheet: 8.6,
-  sourceCutA: 8.75,
-  sourceCutB: 9.17,
+  // the world behind the sheet swaps (Capture.tsx CUTS, local frames 46/70/94):
+  // Instagram → YouTube → screenshot → article
+  sourceCutA: 8.613,
+  sourceCutB: 8.933,
+  sourceCutC: 9.253,
   pipelineIn: 9.6,
   cardLands: 11.85,
   searchIn: 13.0,

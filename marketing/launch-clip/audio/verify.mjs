@@ -8,6 +8,11 @@
  *    the frame, so a 0.2-bar overlap silently stacks two lines in the same place.
  *    (This is not hypothetical: cue 3 ran 0.2 bars into cue 4 and it took a
  *    by-hand audit to notice.)
+ * 0. EM DASHES. The app bans them from every string a user can see
+ *    (web/scripts/check-em-dash.mjs, a build gate since 2026-08-27). Burned-in
+ *    captions and the endcard are user-facing copy, so the film has the same
+ *    gate: every SUBTITLES text, plus every non-comment line of src/. A
+ *    legitimate non-copy use is exempted with `emdash-ok` on the line.
  * 2. SCORE DYNAMICS. There is no audio device in the render environment, so the
  *    mix is verified numerically: per-bar RMS and peak, DC offset, and a
  *    near-clip count. What to look for — a quiet cold open, a build through
@@ -22,6 +27,59 @@ import { BAR, SUBTITLES, TOTAL_BARS } from '../timeline.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 let failed = false;
+
+// ── 0. em dashes (the app-wide ban, mirrored)
+{
+  const hits = [];
+  SUBTITLES.forEach((c, i) => {
+    if (c.text.includes('—')) hits.push(`caption ${i + 1}: ${c.text}`);
+  });
+  const srcRoot = path.join(here, '..', 'src');
+  const walk = (dir) => {
+    for (const name of fs.readdirSync(dir)) {
+      const p = path.join(dir, name);
+      if (fs.statSync(p).isDirectory()) walk(p);
+      else if (/\.tsx?$/.test(name)) scan(p);
+    }
+  };
+  // comment-aware, same heuristics as web/scripts/check-em-dash.mjs
+  const scan = (file) => {
+    const lines = fs.readFileSync(file, 'utf8').split('\n');
+    let inBlock = false;
+    lines.forEach((raw, i) => {
+      if (raw.includes('emdash-ok')) return;
+      let l = raw;
+      if (inBlock) {
+        const end = l.indexOf('*/');
+        if (end === -1) return;
+        l = l.slice(end + 2);
+        inBlock = false;
+      }
+      let open;
+      while ((open = l.indexOf('/*')) !== -1) {
+        const close = l.indexOf('*/', open + 2);
+        if (close === -1) {
+          l = l.slice(0, open);
+          inBlock = true;
+          break;
+        }
+        l = l.slice(0, open) + l.slice(close + 2);
+      }
+      if (/^\s*\*/.test(raw)) return;
+      const slash = l.indexOf('//');
+      if (slash !== -1 && !/https?:$/.test(l.slice(0, slash).trimEnd().slice(-6))) l = l.slice(0, slash);
+      if (l.includes('—')) hits.push(`${path.relative(path.join(here, '..'), file)}:${i + 1}: ${raw.trim().slice(0, 120)}`);
+    });
+  };
+  walk(srcRoot);
+  if (hits.length) {
+    console.error('✗ em dash in user-facing film text (the app-wide ban; use a period, colon or comma):');
+    for (const h of hits) console.error('    ' + h);
+    failed = true;
+  } else {
+    console.log('✓ no em dashes in captions or src/');
+  }
+}
 
 // ── 1. captions
 {
