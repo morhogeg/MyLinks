@@ -62,8 +62,8 @@ into one point of light that the brackets close around, and the middle acts
 follow what the product actually does, in order: **saving was never the hard part → Machina reads
 what you save → summarized, tagged and filed → so you can find it again → then
 ask it anything → answers built from what you saved → every save connects to the
-rest → nothing worth keeping stays buried.** The film closes on
-"Everything you save, finally useful." It deliberately avoids two framings the
+rest → nothing worth keeping stays buried.** The film closes on the subtitle,
+"Never lose another great find." It deliberately avoids two framings the
 owner ruled out: it is **not** a learning app, and it does **not** sell
 "search by meaning" as the headline. The word *library* appears nowhere.
 
@@ -80,7 +80,7 @@ owner ruled out: it is **not** a learning app, and it does **not** sell
 | 20–23 | 0:50 | `GraphScene` | Edges draw in staggered — connections being found, not a diagram revealed |
 | 23–26 | 0:57.5 | `CollectionsScene` | The organising that is yours |
 | 26–29 | 1:05 | `DigestScene` | The weekly write-up, then the resurfaced save as its own beat |
-| 29–32 | 1:12.5 | `Endcard` | The bare mark, the wordmark, the App Store subtitle (`Never lose another great find`), the tagline |
+| 29–32 | 1:12.5 | `Endcard` | The bare mark, the wordmark, the App Store subtitle (`Never lose another great find`), which the voice-over also speaks |
 
 `Capture` / `Ask` / `Connect` print as a letterspaced kicker above the line on
 their own beats, so a viewer can place each act inside the film's three acts
@@ -290,6 +290,8 @@ The endcard is the **bare** Citation mark — not the app-icon tile.
 there reads as a shrunken app icon rather than as the brand mark"), and full-frame
 the grey squircle read as a screenshot of an icon instead of as an identity.
 
-The line under the rule (`Everything you save, finally useful.`) is the one slot
-meant to change: replace it with a real App Store badge or URL once the listing is
-live. Nothing else in the film claims availability.
+The endcard carries one line, the App Store subtitle, and the voice-over speaks
+the same words (owner call 2026-09-17; the tagline that used to sit under a rule
+beneath it was cut so screen and voice agree). The space under the subtitle is
+the slot for a real App Store badge or URL once the listing is live. Nothing else
+in the film claims availability.

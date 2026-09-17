@@ -110,7 +110,7 @@ export const SUBTITLES = [
   // THE PROMISE — one line for the whole library beat; the search (a query
   // sharing no words with the one card it finds) plays wordless underneath
   // and proves the second half.
-  { bar: 13.3, bars: 2.45, place: 'left', text: 'From now on. Lose nothing. And find everything.' },
+  { bar: 13.3, bars: 2.45, place: 'left', text: 'From now on, lose nothing. And find everything.' },
   // A new feature, not a continuation — no "Then" (owner note, round 13c).
   // The name still carries the line: "ask it" mushed out loud (round 12).
   { bar: 16.35, bars: 1.6, place: 'left', kicker: 'Ask', text: 'Ask Machina anything.' },

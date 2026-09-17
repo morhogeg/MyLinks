@@ -2005,6 +2005,12 @@ the way the web build does. The `.srt` re-emits from the same array, and
 `public/score-vo.wav` was re-synthesized (Kokoro, 14 lines, all inside their
 caption windows) and re-mixed in the same pass, so the spoken editions carry
 the new fourth-cut tick and the de-dashed lines too.
+**Endcard revised 2026-09-17 (owner, from phone QA):** the film now closes on
+the subtitle ALONE, `Never lose another great find`, and the voice speaks the
+same words; the tagline line under the rule was cut so screen and voice agree.
+So the "one slot to swap for a badge" note above is now the empty space under
+the subtitle, and the tagline's best-placed appearance is the promotional text,
+not the film. The library caption reads "From now on, lose nothing." (comma).
 
 *Where to "advertise" for free:* X (primary), Product Hunt, Hacker News,
 r/PKMS + r/productivity (follow self-promo rules: give value first), Indie
@@ -2047,7 +2053,14 @@ exact-match, capped.
   releases in the cloud session, `synth-vo.py` regenerated all 14 lines
   (every one fits its window), `mix-vo.mjs` rewrote `public/score-vo.wav`,
   and `MachinaLaunchVO` rendered exit 0. **Not verified:** nobody has
-  listened to either mix; the checks are numerical. §4 25c (the
+  listened to either mix; the checks are numerical. **Owner phone QA, next
+  day (2026-09-17):** two calls, both built: the library caption drops the
+  full stop ("From now on, lose nothing. And find everything."; the VO keeps
+  its spoken stop for the break), and the endcard closes on the subtitle
+  alone with the voice saying "Never lose another great find" (the tagline
+  line and its rule are gone from the film; `Endcard.tsx`, `synth-vo.py`,
+  README). VO re-synthesized (closing line 2.56s in a 4.9s window), re-mixed,
+  `MachinaLaunchVO` re-rendered exit 0. §4 25c (the
   literal "AI" on the Ask and feed screens, the D-3 blocker for putting the
   film on the landing page) is unchanged and still the owner's call.
 - **2026-09-11 (round 3) — "Marked as done" toast with Undo. SHIPPED:

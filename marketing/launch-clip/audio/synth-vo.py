@@ -42,7 +42,8 @@ LINES = [
     (9.95, 2.4, f"{SAY_NAME} reads it, summarizes it, and files it."),
     # Spoken with the dichotomy CARVED (owner note, 13f): a full stop after
     # "From now on" forces the break, and "And" resets the breath before the
-    # second half. The caption carries the same full stops since 2026-09-16.
+    # second half. The caption reads "From now on, lose nothing." (owner call
+    # 2026-09-17: no full stop on screen); the stop stays spoken-only.
     (13.3, 2.45, "From now on. Lose nothing. And find everything."),
     (16.35, 1.6, f"Ask {SAY_NAME} anything."),
     (18.4, 1.9, "Every answer comes straight from your saves."),
@@ -52,8 +53,9 @@ LINES = [
     # Spoken-only "And" (owner call, 13l): conversational lead-in the caption
     # deliberately doesn't carry — same precedent as the SAY_NAME respelling.
     (26.1, 2.6, f"And behind the scenes, {SAY_NAME} pieces it all together. Ready when you are."),
-    # the closing statement, over the endcard's own line
-    (30.1, 1.6, f"{SAY_NAME}. Everything you save, finally useful."),
+    # the closing statement = the endcard's one line, the App Store subtitle
+    # (owner call 2026-09-17: the voice says what the screen shows)
+    (30.1, 1.6, f"{SAY_NAME}. Never lose another great find."),
 ]
 
 k = Kokoro(os.path.join(VO, "kokoro-v1.0.onnx"), os.path.join(VO, "voices-v1.0.bin"))

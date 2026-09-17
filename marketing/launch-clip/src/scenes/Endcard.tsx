@@ -27,23 +27,22 @@ import { sans } from '../fonts';
  *
  * No price, no urgency, no "download now" — the film's whole argument is that
  * the product is quiet and confident, and a hard sell in the last four seconds
- * would retract it. The closing line names the payoff the whole film has been
- * building — saves that are read, filed, connected and answerable, i.e. finally
- * USEFUL — and it is the one slot to swap for a real App Store badge or URL once
- * the listing is live. (It deliberately does NOT claim anything about learning:
- * Machina is not a learning app.)
+ * would retract it. The endcard closes on ONE line, the subtitle, and the voice
+ * says the same words (owner call 2026-09-17; the tagline `Everything you save,
+ * finally useful.` used to sit under a rule below it and was cut so the screen
+ * and the voice agree). The space under the subtitle is the slot for a real App
+ * Store badge or URL once the listing is live. (It deliberately does NOT claim
+ * anything about learning: Machina is not a learning app.)
  */
 export const Endcard: React.FC = () => {
   const f = useCurrentFrame();
   const fr = useFraming();
 
   // Slowed in round 13b (owner: the last slide was a bit fast) — each element
-  // gets its own breath, and the frame holds a full second after the footer.
+  // gets its own breath, and the frame holds after the subtitle lands.
   const icon = prog(f, 2, 30, EASE_OUT);
   const word = prog(f, 56, 96, EASE_MODAL);
   const tag = prog(f, 94, 130, EASE_MODAL);
-  const rule = prog(f, 134, 166, EASE_MODAL);
-  const foot = prog(f, 148, 182, EASE_MODAL);
 
   const bloom = Math.max(0, 1 - Math.max(0, f - 34) / 36);
   const float = drift(f, 4, 300);
@@ -118,29 +117,6 @@ export const Endcard: React.FC = () => {
           }}
         >
           Never lose another great find
-        </div>
-
-        <div
-          style={{
-            marginTop: 40,
-            width: 300 * rule,
-            height: 1,
-            background: 'linear-gradient(90deg, rgba(20,20,27,0) 0%, rgba(20,20,27,0.45) 50%, rgba(20,20,27,0) 100%)',
-          }}
-        />
-
-        <div
-          style={{
-            marginTop: 24,
-            fontFamily: sans,
-            fontSize: 16,
-            fontWeight: 500,
-            letterSpacing: '0.02em',
-            color: 'rgba(55,60,72,0.92)',
-            opacity: foot,
-          }}
-        >
-          Everything you save, finally useful.
         </div>
       </AbsoluteFill>
     </AbsoluteFill>
