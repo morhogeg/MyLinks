@@ -1669,6 +1669,12 @@ def search_links(req: https_fn.CallableRequest) -> Any:
         if not uid:
             raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.UNAUTHENTICATED, message="User must be authenticated")
 
+        # Same per-uid ceiling as the HTTP twin (`search-uid`): a search is a
+        # query embedding plus an LLM relevance judge, and this transport had
+        # no limit at all.
+        from main import _callable_rate_limited
+        _callable_rate_limited("search-uid", uid)
+
         query_text = req.data.get("query")
         limit = req.data.get("limit", 10)
 

@@ -96,6 +96,10 @@ function cleanTitle(raw: string | undefined): string | undefined {
  */
 export function cleanImportUrl(raw: string | undefined | null): string | null {
     if (typeof raw !== 'string') return null;
+    // Length gate FIRST: the trailing-punctuation strip below backtracks per
+    // character, so 80 000 closing brackets cost seconds before the length
+    // check ever ran. Nothing over the cap can become a URL anyway.
+    if (raw.length > MAX_URL_LENGTH * 2) return null;
     const url = decodeEntities(raw).trim().replace(/[),.;'"\]>]+$/, '');
     if (!url || url.length > MAX_URL_LENGTH) return null;
     if (!/^https?:\/\//i.test(url)) return null;
@@ -168,12 +172,19 @@ export function dedupeImported(links: ImportedLink[]): ImportedLink[] {
  * Netscape bookmarks HTML (Safari / Chrome / Firefox / Edge / Arc)
  * ------------------------------------------------------------------ */
 
+/** Ceiling on one tag's attribute text and one anchor's label. A real
+ *  bookmark row is a few hundred bytes; past this it is not a bookmark. */
+const MAX_TAG_SOURCE = 4096;
+
 /** Attributes of one tag, lower-cased keys, quoted or bare values. */
 function parseAttributes(source: string): Record<string, string> {
     const attrs: Record<string, string> = {};
-    const re = /([a-z_][\w:-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/gi;
+    // Anchored on a preceding start-of-string or whitespace: an attribute name
+    // can then only start where one really begins, so a run of 80 000 letters
+    // is scanned once instead of once per starting position.
+    const re = /(?:^|\s)([a-z_][\w:-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/gi;
     let match: RegExpExecArray | null;
-    while ((match = re.exec(source)) !== null) {
+    while ((match = re.exec(source.slice(0, MAX_TAG_SOURCE))) !== null) {
         attrs[match[1].toLowerCase()] = match[2] ?? match[3] ?? match[4] ?? '';
     }
     return attrs;
@@ -194,7 +205,11 @@ export function parseNetscapeBookmarks(html: string): ImportParseResult {
     const folders: string[] = [];
     let pendingFolder: string | null = null;
 
-    const re = /<h3[^>]*>([\s\S]*?)<\/h3>|<a\s+([^>]*)>([\s\S]*?)<\/a>|<dl[^>]*>|<\/dl\s*>/gi;
+    // The label groups are bounded and exclude `<`: an unclosed <a> used to
+    // send the lazy `[\s\S]*?` scanning to the end of the file for every
+    // opener (quadratic on a hostile export). A bookmark label never contains
+    // a tag, so nothing real is lost.
+    const re = /<h3[^>]*>([^<]{0,4096})<\/h3>|<a\s+([^>]{0,4096})>([^<]{0,4096})<\/a>|<dl[^>]*>|<\/dl\s*>/gi;
     let match: RegExpExecArray | null;
     while ((match = re.exec(html)) !== null && links.length < MAX_PARSED_LINKS) {
         const token = match[0].toLowerCase();

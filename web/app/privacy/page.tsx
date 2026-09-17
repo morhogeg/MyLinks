@@ -61,7 +61,7 @@ export default function PrivacyPage() {
       <h1 className="mt-6 text-3xl font-semibold tracking-tight text-text">
         Privacy Policy
       </h1>
-      <p className="mt-2 text-sm text-text-muted">Last updated: July 27, 2026</p>
+      <p className="mt-2 text-sm text-text-muted">Last updated: September 16, 2026</p>
 
       <p className="mt-6 leading-relaxed text-text-secondary">
         Machina (&ldquo;we&rdquo;) is a personal knowledge base: you save
@@ -292,7 +292,21 @@ export default function PrivacyPage() {
             Serves the web application, and receives standard web-server request logs, including IP
             addresses, in order to do so.
           </li>
+          <li>
+            <span className="text-text">RevenueCat.</span>{" "}
+            Manages Machina Pro subscriptions in the iOS app. It receives your account identifier
+            (an opaque sign-in id, not your name or email), your App Store purchase receipts, and
+            basic device information from the App Store, so that your subscription status can be
+            checked and restored. Payment itself is handled by Apple; we never see your card
+            details.
+          </li>
         </ul>
+        <p className="mt-4 leading-relaxed text-text-secondary">
+          Two small Google services also run on your device rather than on our servers: the web app
+          loads reCAPTCHA to tell real browsers from bots, and the in-app link form fetches a site
+          favicon from Google for the address you are saving. Both see your IP address and, for
+          the favicon, the domain being saved, but never your account or your saved content.
+        </p>
       </Section>
 
       <Section id="storage" n={7} title="Where your data is stored">
@@ -315,8 +329,8 @@ export default function PrivacyPage() {
           Sharing is off by default and nothing you save is public unless you choose to publish it.
           If you explicitly publish a card or a collection as a public Machina page, a snapshot of
           that content becomes visible to anyone holding the link, until you unpublish or delete it.
-          Deleting your account does not automatically retract share pages you published earlier;
-          unpublish them first, or contact us and we will remove them for you.
+          Deleting your account also removes every share page you published. Copies that other
+          people or link-preview services made before that are outside our control.
         </p>
       </Section>
 
@@ -359,7 +373,8 @@ export default function PrivacyPage() {
           account, requests to our backend are verified server-side rather than trusted from the
           app, and AI provider API keys exist only on our servers, never in the app or the browser
           bundle. No system is perfectly secure, but we keep the attack surface deliberately small:
-          no third-party SDKs beyond the providers listed in{" "}
+          no analytics, advertising, or tracking SDKs, and no third-party code beyond the providers
+          listed in{" "}
           <a href="#processors" className="text-accent underline underline-offset-2">section 6</a>.
         </p>
       </Section>

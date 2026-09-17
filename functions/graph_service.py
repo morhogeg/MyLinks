@@ -33,6 +33,11 @@ logger = logging.getLogger(__name__)
 _RELATED_DISTANCE_CEILING = float(os.environ.get("RELATED_DISTANCE_CEILING", "0.60"))
 _RELATED_SIMILARITY_FLOOR = float(os.environ.get("RELATED_SIMILARITY_FLOOR", "0.75"))
 
+# Caps on the verifier's free-text fields (see _coerce_relations).
+MAX_REASON_CHARS = 400
+MAX_CONCEPT_CHARS = 60
+MAX_COMMON_CONCEPTS = 10
+
 
 class GraphService:
     def __init__(self, db):
@@ -118,21 +123,20 @@ class GraphService:
             # ("technically both involve reviews…"); those are exactly the ties
             # the card must NOT show. No connections is a valid outcome.
             results = []
-            for rel in relations:
-                target_id = rel.get("id")
+            for rel in self._coerce_relations(relations):
+                target_id = rel["id"]
                 if target_id not in valid_candidates_map:
                     continue
-                sim = rel.get("similarity")
-                if not isinstance(sim, (int, float)) or sim < _RELATED_SIMILARITY_FLOOR:
+                if rel["similarity"] < _RELATED_SIMILARITY_FLOOR:
                     continue
                 target_data = valid_candidates_map[target_id]
                 # Build the related-link dict written to the card's relatedLinks.
                 results.append({
                     "id": target_id,
                     "title": target_data.get("title"),
-                    "reason": rel.get("reason"),
-                    "similarity": sim,
-                    "commonConcepts": rel.get("commonConcepts", [])
+                    "reason": rel["reason"],
+                    "similarity": rel["similarity"],
+                    "commonConcepts": rel["commonConcepts"],
                 })
 
             return results
@@ -324,6 +328,31 @@ class GraphService:
             'skipped': skipped,
             'failed': failed,
         }
+
+    @staticmethod
+    def _coerce_relations(relations) -> List[Dict]:
+        """Shape-check the verifier's JSON. The call asks for JSON but has no
+        response_schema, so `reason` / `commonConcepts` are whatever the model
+        (steered by the page it just read) chose to emit; the client renders
+        `reason` as a React child and an object there throws. Keep only dict
+        entries with a string id and a numeric similarity; coerce the rest."""
+        out = []
+        for rel in relations if isinstance(relations, list) else []:
+            if not isinstance(rel, dict):
+                continue
+            target_id = rel.get("id")
+            sim = rel.get("similarity")
+            if not isinstance(target_id, str) or not isinstance(sim, (int, float)):
+                continue
+            reason = rel.get("reason")
+            reason = (reason if isinstance(reason, str) else "").strip()[:MAX_REASON_CHARS]
+            raw_concepts = rel.get("commonConcepts")
+            concepts = [c.strip()[:MAX_CONCEPT_CHARS] for c in raw_concepts
+                        if isinstance(c, str) and c.strip()][:MAX_COMMON_CONCEPTS] \
+                if isinstance(raw_concepts, list) else []
+            out.append({"id": target_id, "similarity": float(sim), "reason": reason,
+                        "commonConcepts": concepts})
+        return out
 
     def _verify_relationships_with_llm(self,
                                      title: str, 

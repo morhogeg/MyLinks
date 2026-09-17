@@ -1,14 +1,15 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-
-    // Screenshots: users can read their own; only Cloud Functions write
-    match /screenshots/{uid}/{allPaths=**} {
-      allow read: if request.auth != null && request.auth.uid == uid;
-      allow write: if false; // Only admin SDK (Cloud Functions) writes here
-    }
-
-    // Deny everything else
+    // Deny everything to the client SDK. Nothing in the app reads or writes
+    // Storage through the SDK (web/lib/firebase.ts initialises it and nothing
+    // imports it; the Swift targets have no FirebaseStorage): every stored
+    // image is served by its `firebaseStorageDownloadTokens` URL, which the
+    // server mints (main._store_image) and which bypasses these rules, and
+    // every write is Admin SDK. The old `screenshots/{uid}` read arm compared
+    // the AUTH uid to the DATA uid, which differ for the phone-keyed
+    // workspace, so it never matched a real reader anyway. Keep this file
+    // deployed: it is what refuses a tokenless `alt=media` read.
     match /{allPaths=**} {
       allow read, write: if false;
     }

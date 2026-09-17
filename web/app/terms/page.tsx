@@ -20,7 +20,7 @@ export default function TermsPage() {
       <h1 className="mt-6 text-3xl font-semibold tracking-tight text-text">
         Terms of Service
       </h1>
-      <p className="mt-2 text-sm text-text-muted">Last updated: July 21, 2026</p>
+      <p className="mt-2 text-sm text-text-muted">Last updated: September 16, 2026</p>
 
       <p className="mt-6 leading-relaxed text-text-secondary">
         These terms govern your use of Machina (&ldquo;Machina&rdquo;, the
@@ -80,6 +80,20 @@ export default function TermsPage() {
         Saved links point to content owned by third parties, and Machina&rsquo;s extracts of that
         content are for your personal reference. The original sites&rsquo; own terms and rights
         apply to their content.
+      </p>
+
+      <h2 className="mt-10 text-xl font-semibold text-text">6a. Machina Pro subscriptions</h2>
+      <p className="mt-4 leading-relaxed text-text-secondary">
+        Some features are part of Machina Pro, an optional auto-renewing subscription bought
+        through Apple&rsquo;s App Store. The price and billing period are shown in the app before
+        you confirm. Payment is charged to your Apple ID at confirmation, and the subscription
+        renews automatically at the same price unless you cancel at least 24 hours before the end of
+        the current period. You can manage or cancel it at any time in your Apple ID subscription
+        settings; cancelling stops future renewals and keeps Pro active until the period you already
+        paid for ends. Refunds are handled by Apple under its own policies. A free trial or a
+        founders&rsquo; grant, where offered, ends on the date shown in Settings and does not
+        convert to a paid plan unless you subscribe. Subscription status is checked through
+        RevenueCat, described in the Privacy Policy.
       </p>
 
       <h2 className="mt-10 text-xl font-semibold text-text">7. Availability and changes</h2>

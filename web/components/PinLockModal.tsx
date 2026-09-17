@@ -2,7 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Lock, X } from 'lucide-react';
-import { setPin, attemptUnlock, verifyPin, disablePin, tryBiometricUnlock } from '@/lib/privacyLock';
+import {
+    setPin, attemptUnlock, verifyPin, disablePin, tryBiometricUnlock,
+    getLockoutRemainingMs, getAttemptsLeft,
+} from '@/lib/privacyLock';
 import { useScrollLock } from '@/lib/useScrollLock';
 import { useVisualViewport } from '@/lib/useVisualViewport';
 
@@ -62,6 +65,19 @@ export default function PinLockModal({
     // iOS keyboard instead of the full window (where the keyboard covers it).
     const vp = useVisualViewport();
 
+    // Wrong-PIN backoff (lib/privacyLock): while a wait is running the pad is
+    // disabled and the subtitle counts it down. Close and the scrim stay live
+    // so the wait never traps anyone in the dialog.
+    const [lockoutMs, setLockoutMs] = useState(0);
+    useEffect(() => {
+        if (!isOpen) return;
+        const tick = () => setLockoutMs(getLockoutRemainingMs());
+        tick();
+        const id = setInterval(tick, 1000);
+        return () => clearInterval(id);
+    }, [isOpen, error]);
+    const waiting = step === 'verify' && lockoutMs > 0;
+
     // Reset the flow whenever the modal (re)opens or the mode changes.
     const [resetKey, setResetKey] = useState({ isOpen, mode });
     if (resetKey.isOpen !== isOpen || resetKey.mode !== mode) {
@@ -108,17 +124,24 @@ export default function PinLockModal({
         inputRef.current?.focus();
     };
 
+    const wrongPin = () => {
+        const left = getAttemptsLeft();
+        if (getLockoutRemainingMs() > 0) return fail('Too many attempts.');
+        return fail(left > 0 && left < 5 ? `Wrong PIN. ${left} ${left === 1 ? 'try' : 'tries'} left.` : 'Wrong PIN. Try again.');
+    };
+
     const handleComplete = async (pin: string) => {
         if (busy) return;
+        if (step === 'verify' && getLockoutRemainingMs() > 0) return;
         setBusy(true);
         setError(null);
         try {
             if (step === 'verify') {
                 if (mode === 'unlock') {
                     if (await attemptUnlock(pin)) return finish();
-                    return fail('Wrong PIN. Try again.');
+                    return wrongPin();
                 }
-                if (!(await verifyPin(pin))) return fail('Wrong PIN. Try again.');
+                if (!(await verifyPin(pin))) return wrongPin();
                 if (mode === 'disable') {
                     await disablePin(uid);
                     return finish();
@@ -164,8 +187,14 @@ export default function PinLockModal({
         if (digits.length === PIN_LENGTH) void handleComplete(digits);
     };
 
+    const waitLabel = (() => {
+        const s = Math.ceil(lockoutMs / 1000);
+        const m = Math.floor(s / 60);
+        return m > 0 ? `${m}:${String(s % 60).padStart(2, '0')}` : `${s}s`;
+    })();
     const subtitle =
-        mode === 'disable' && step === 'verify' ? 'Confirm your PIN to turn off the privacy lock.'
+        waiting ? `Too many attempts. Try again in ${waitLabel}.`
+        : mode === 'disable' && step === 'verify' ? 'Confirm your PIN to turn off the privacy lock.'
         : mode === 'change' && step === 'verify' ? 'Enter your current PIN first.'
         : step === 'create' ? 'This one PIN protects all your private collections.'
         : step === 'confirm' ? 'Enter the same PIN once more.'
@@ -229,7 +258,7 @@ export default function PinLockModal({
                             pattern="[0-9]*"
                             autoComplete="one-time-code"
                             value={value}
-                            disabled={busy}
+                            disabled={busy || waiting}
                             onChange={(e) => handleChange(e.target.value)}
                             aria-label={`${STEP_TITLE[step]}: ${PIN_LENGTH} digits`}
                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"

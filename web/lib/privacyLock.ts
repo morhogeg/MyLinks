@@ -73,12 +73,14 @@ export interface PrivacyLockState {
     hasPin: boolean | null;
     /** True after a successful PIN entry this session (until relock). */
     unlocked: boolean;
+    /** Epoch ms until which wrong-PIN backoff refuses guesses (0 = none). */
+    lockedUntil: number;
 }
 
 let config: PrivacyLockConfig | null = null;
 let loadedForUid: string | null = null;
-let snapshot: PrivacyLockState = { hasPin: null, unlocked: false };
-const SERVER_SNAPSHOT: PrivacyLockState = { hasPin: null, unlocked: false };
+let snapshot: PrivacyLockState = { hasPin: null, unlocked: false, lockedUntil: 0 };
+const SERVER_SNAPSHOT: PrivacyLockState = { hasPin: null, unlocked: false, lockedUntil: 0 };
 const listeners = new Set<() => void>();
 
 function emit(next: Partial<PrivacyLockState>) {
@@ -130,19 +132,103 @@ export async function disablePin(uid: string): Promise<void> {
     emit({ hasPin: false, unlocked: false });
 }
 
+// ── Attempt backoff ──────────────────────────────────────────────────────────
+// A 4-digit PIN has 10 000 values; with no throttle the pad accepted a guess
+// every hash (~100 ms), i.e. the whole space in minutes for someone holding
+// the unlocked phone. Five free tries, then a growing wait, capped at an
+// hour, remembered per device (localStorage; sign-out purges it, which is
+// the right reset: the account itself is the real boundary). This is
+// cosmetic by design, like the lock: a modified client bypasses it and the
+// data is already readable by the signed-in account. It never touches
+// sign-out, Close, or the setup flow.
+
+const BACKOFF_KEY = 'privacy-lock-backoff-v1';
+const FREE_ATTEMPTS = 5;
+const BACKOFF_MS = [30_000, 60_000, 300_000, 900_000, 3_600_000];
+/** Ceiling on the stored iteration count: a self-corrupted config with
+ *  `iterations: 1e9` would otherwise hang the pad on every keystroke. */
+const MAX_ITERATIONS = 600_000;
+
+let backoff: { attempts: number; lockedUntil: number } = { attempts: 0, lockedUntil: 0 };
+let backoffLoaded = false;
+
+function loadBackoff(): void {
+    if (backoffLoaded) return;
+    backoffLoaded = true;
+    try {
+        const raw = localStorage.getItem(BACKOFF_KEY);
+        if (raw) {
+            const parsed = JSON.parse(raw) as { a?: unknown; u?: unknown };
+            backoff = {
+                attempts: typeof parsed.a === 'number' && parsed.a >= 0 ? Math.floor(parsed.a) : 0,
+                lockedUntil: typeof parsed.u === 'number' && parsed.u > 0 ? parsed.u : 0,
+            };
+        }
+    } catch {
+        // Private mode or blocked storage: in-memory only for this session.
+    }
+}
+
+function saveBackoff(): void {
+    try {
+        if (backoff.attempts === 0 && backoff.lockedUntil === 0) localStorage.removeItem(BACKOFF_KEY);
+        else localStorage.setItem(BACKOFF_KEY, JSON.stringify({ a: backoff.attempts, u: backoff.lockedUntil }));
+    } catch {
+        // ignore
+    }
+}
+
+/** Milliseconds until the pad accepts another guess (0 = now). */
+export function getLockoutRemainingMs(): number {
+    loadBackoff();
+    return Math.max(0, backoff.lockedUntil - Date.now());
+}
+
+/** Free guesses left before the first wait kicks in (0 once waiting). */
+export function getAttemptsLeft(): number {
+    loadBackoff();
+    return Math.max(0, FREE_ATTEMPTS - backoff.attempts);
+}
+
+function recordAttempt(ok: boolean): void {
+    loadBackoff();
+    if (ok) {
+        backoff = { attempts: 0, lockedUntil: 0 };
+    } else {
+        const attempts = backoff.attempts + 1;
+        const over = attempts - FREE_ATTEMPTS;
+        const wait = over > 0 ? BACKOFF_MS[Math.min(over - 1, BACKOFF_MS.length - 1)] : 0;
+        backoff = { attempts, lockedUntil: wait ? Date.now() + wait : 0 };
+    }
+    saveBackoff();
+    emit({ lockedUntil: backoff.lockedUntil });
+}
+
+/** Pure helper for the modal's copy: the wait a given failure count earns. */
+export function backoffForAttempts(attempts: number): number {
+    const over = attempts - FREE_ATTEMPTS;
+    return over > 0 ? BACKOFF_MS[Math.min(over - 1, BACKOFF_MS.length - 1)] : 0;
+}
+
+async function matches(pin: string): Promise<boolean> {
+    if (!config) return false;
+    if (getLockoutRemainingMs() > 0) return false;
+    const iterations = Math.min(Math.max(1, config.iterations || 0), MAX_ITERATIONS);
+    const ok = (await hashPin(pin, config.salt, iterations)) === config.pinHash;
+    recordAttempt(ok);
+    return ok;
+}
+
 /** Check a PIN against the stored hash; unlocks the vault on success. */
 export async function attemptUnlock(pin: string): Promise<boolean> {
-    if (!config) return false;
-    const candidate = await hashPin(pin, config.salt, config.iterations);
-    if (candidate !== config.pinHash) return false;
+    if (!(await matches(pin))) return false;
     emit({ unlocked: true });
     return true;
 }
 
 /** Verify without unlocking (used by change/disable flows). */
 export async function verifyPin(pin: string): Promise<boolean> {
-    if (!config) return false;
-    return (await hashPin(pin, config.salt, config.iterations)) === config.pinHash;
+    return matches(pin);
 }
 
 /** Re-lock the vault (called automatically when the app is hidden). */
@@ -182,6 +268,7 @@ export function usePrivacyLock(uid: string | null) {
     return {
         hasPin: state.hasPin,
         unlocked: state.unlocked,
+        lockedUntil: state.lockedUntil,
         // hasPin === null (still loading) counts as locked so private cards
         // never flash before the config arrives.
         locked: state.hasPin !== false && !state.unlocked,

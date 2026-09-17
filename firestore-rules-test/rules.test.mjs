@@ -21,8 +21,8 @@ import {
   assertFails,
 } from '@firebase/rules-unit-testing';
 import {
-  doc, getDoc, setDoc, updateDoc, deleteDoc,
-  collection, query, where, limit, getDocs, addDoc,
+  doc, getDoc, setDoc, updateDoc, deleteDoc, deleteField, arrayUnion,
+  collection, collectionGroup, query, where, limit, getDocs, addDoc,
 } from 'firebase/firestore';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -154,9 +154,11 @@ test('unauthenticated cannot read or write the owner doc', async () => {
 // AuthProvider.createWorkspaceClientSide — a signed-in account may create
 // exactly ONE doc: its own, keyed by its auth uid, linked to itself alone.
 test('new account CAN create its own workspace doc (self-serve fallback)', async () => {
+  // createdAt must be "now": the rule refuses a backdated birth date (a
+  // founder-grant forgery), so the payload mirrors AuthProvider's Date.now().
   await assertSucceeds(
     setDoc(doc(strangerDb(), 'users', STRANGER_AUTH), {
-      authUids: [STRANGER_AUTH], createdAt: 1, onboarded: false,
+      authUids: [STRANGER_AUTH], createdAt: Date.now(), onboarded: false,
     }),
   );
 });
@@ -190,6 +192,152 @@ test('self-serve create cannot take over an EXISTING doc (bare setDoc = update t
   );
 });
 
+// ── users/{uid}: field-level protection (2026-09-16 security pass) ───────────
+//
+// The update rule used to allow ANY field once the writer was linked. Two
+// server-owned fields made that a real hole: `createdAt` is what the founder
+// Pro grant keys on (entitlement.grant_for), and `authUids` is how the backend
+// resolves a workspace. These cases pin the allowlist from both sides: every
+// real client write still works, and every server-owned field is refused.
+
+const CLIENT_WRITES = {
+  timezone: 'Asia/Jerusalem',                       // AuthProvider
+  'settings.digest_count': 3,                        // lib/storage updateUserSettings (dot path)
+  aiConsentAt: 1,                                    // AIConsentNotice
+  pushPromptedAt: 1,                                 // PushNudge
+  onboarded: true,                                   // AuthProvider
+  privacyLock: { hash: 'x', salt: 'y', iterations: 1 }, // lib/privacyLock
+  graphVersion: 2,                                   // lib/rebuildConnections
+};
+
+for (const [field, value] of Object.entries(CLIENT_WRITES)) {
+  test(`owner CAN write client field ${field}`, async () => {
+    await assertSucceeds(updateDoc(doc(ownerDb(), 'users', OWNER_DOC), { [field]: value }));
+  });
+}
+
+test('owner can clear privacyLock (deleteField) and set nested settings', async () => {
+  await assertSucceeds(updateDoc(doc(ownerDb(), 'users', OWNER_DOC), { privacyLock: { hash: 'x' } }));
+  await assertSucceeds(updateDoc(doc(ownerDb(), 'users', OWNER_DOC), { privacyLock: deleteField() }));
+  await assertSucceeds(updateDoc(doc(ownerDb(), 'users', OWNER_DOC), {
+    'settings.digest_enabled': true, 'settings.digest_hour': 8, timezone: 'UTC',
+  }));
+});
+
+const SERVER_OWNED = {
+  createdAt: 0,                       // founder-grant forgery (entitlement.py)
+  authUids: [OWNER_AUTH, STRANGER_AUTH], // workspace-resolver hijack (link_service)
+  ingestToken: 'a',                   // share-sheet auth, minted server-side
+  fcmTokens: ['forged-token'],        // push targets, registered server-side
+  lastDigestSentAt: 0,                // digest scheduler state
+  email: 'someone-else@example.com',
+  plan: 'pro',                        // not a real field, but must not become one
+};
+
+for (const [field, value] of Object.entries(SERVER_OWNED)) {
+  test(`owner CANNOT write server-owned field ${field}`, async () => {
+    await assertFails(updateDoc(doc(ownerDb(), 'users', OWNER_DOC), { [field]: value }));
+  });
+}
+
+test('owner cannot smuggle a server-owned field in with an allowed one', async () => {
+  await assertFails(updateDoc(doc(ownerDb(), 'users', OWNER_DOC), { timezone: 'UTC', createdAt: 0 }));
+  // Deleting a server-owned field that EXISTS is a change to it (deleting an
+  // absent one is a no-op and never reaches affectedKeys). The fixture carries
+  // `email`, so that is the field this asserts on.
+  await assertFails(updateDoc(doc(ownerDb(), 'users', OWNER_DOC), { timezone: 'UTC', email: deleteField() }));
+  await assertFails(updateDoc(doc(ownerDb(), 'users', OWNER_DOC), { onboarded: true, authUids: arrayUnion(STRANGER_AUTH) }));
+});
+
+// ── Type guards on the client-writable fields (2026-09-16 round 2) ──────────
+//
+// The key allowlist alone let `settings: "x"` through, and the schedulers
+// read `settings` for every user in one loop: a non-map value raised before
+// the per-user try/except and halted reminders / digests for everyone.
+
+const MISTYPED = {
+  settings: 'not-a-map',
+  timezone: 5,
+  aiConsentAt: 'yesterday',
+  pushPromptedAt: true,
+  onboarded: 'yes',
+  privacyLock: 'pin',
+  graphVersion: '2',
+};
+
+for (const [field, value] of Object.entries(MISTYPED)) {
+  test(`owner CANNOT write ${field} with the wrong type`, async () => {
+    await assertFails(updateDoc(doc(ownerDb(), 'users', OWNER_DOC), { [field]: value }));
+  });
+}
+
+test('a mistyped field cannot ride in with a well-typed one', async () => {
+  await assertFails(updateDoc(doc(ownerDb(), 'users', OWNER_DOC), { timezone: 'UTC', settings: [] }));
+  await assertFails(updateDoc(doc(ownerDb(), 'users', OWNER_DOC), { settings: null }));
+});
+
+test('owner cannot grow or shrink authUids from the client', async () => {
+  await assertFails(updateDoc(doc(ownerDb(), 'users', OWNER_DOC), { authUids: arrayUnion(STRANGER_AUTH) }));
+  await assertFails(updateDoc(doc(ownerDb(), 'users', OWNER_DOC), { authUids: [] }));
+});
+
+test('self-serve create must stamp createdAt as now, not a backdated founder date', async () => {
+  const now = Date.now();
+  await assertSucceeds(
+    setDoc(doc(strangerDb(), 'users', STRANGER_AUTH), { authUids: [STRANGER_AUTH], createdAt: now, onboarded: false }),
+  );
+});
+
+test('self-serve create with a backdated, missing, or non-numeric createdAt is denied', async () => {
+  for (const createdAt of [0, 1, Date.now() - 24 * 3600 * 1000, 'now', null]) {
+    await assertFails(
+      setDoc(doc(strangerDb(), 'users', STRANGER_AUTH), { authUids: [STRANGER_AUTH], createdAt, onboarded: false }),
+    );
+  }
+  await assertFails(
+    setDoc(doc(strangerDb(), 'users', STRANGER_AUTH), { authUids: [STRANGER_AUTH], onboarded: false }),
+  );
+});
+
+test('self-serve create cannot carry server-owned fields', async () => {
+  const now = Date.now();
+  for (const extra of [{ ingestToken: 'a' }, { fcmTokens: ['t'] }, { plan: 'pro' }, { settings: {} }]) {
+    await assertFails(
+      setDoc(doc(strangerDb(), 'users', STRANGER_AUTH), { authUids: [STRANGER_AUTH], createdAt: now, ...extra }),
+    );
+  }
+});
+
+test('self-serve create may carry the email (AuthProvider payload shape)', async () => {
+  await assertSucceeds(
+    setDoc(doc(strangerDb(), 'users', STRANGER_AUTH), {
+      authUids: [STRANGER_AUTH], createdAt: Date.now(), onboarded: false, email: 's@example.com',
+    }),
+  );
+});
+
+// ── Deny-by-default probes ───────────────────────────────────────────────────
+
+test('a collection-group query over links is denied for everyone', async () => {
+  for (const db of [ownerDb(), strangerDb(), anonDb()]) {
+    await assertFails(getDocs(collectionGroup(db, 'links')));
+  }
+});
+
+test('an unknown top-level collection is denied (no catch-all allow)', async () => {
+  for (const db of [ownerDb(), strangerDb(), anonDb()]) {
+    await assertFails(getDoc(doc(db, 'migrations', 'x')));
+    await assertFails(setDoc(doc(db, 'migrations', 'x'), { a: 1 }));
+  }
+});
+
+test('the /users list rule is per-caller: a stranger cannot list by the OWNER uid', async () => {
+  await assertFails(getDocs(query(
+    collection(strangerDb(), 'users'),
+    where('authUids', 'array-contains', OWNER_AUTH),
+  )));
+});
+
 test('anon cannot self-serve create; nobody can delete user docs', async () => {
   await assertFails(
     setDoc(doc(anonDb(), 'users', 'anon-id'), { authUids: ['anon-id'] }),
@@ -218,6 +366,45 @@ for (const sub of ['links', 'chats', 'collections']) {
     await assertFails(addDoc(collection(anonDb(), 'users', OWNER_DOC, sub), { a: 1 }));
   });
 }
+
+// ── links: a reminder cannot be moved into the past ──────────────────────────
+//
+// The reminder scheduler is ONE query ordered by nextReminderAt across every
+// user (limit 500). 500 client-written docs with `nextReminderAt: 1` held the
+// head of that query and starved everyone else's reminders. The client only
+// ever writes a future time (lib/storage updateLinkReminder) or null.
+
+test('owner can set a reminder for the future, clear it, or leave it untouched', async () => {
+  const ref = doc(ownerDb(), 'users', OWNER_DOC, 'links', 'link1');
+  await assertSucceeds(updateDoc(ref, { reminderStatus: 'pending', nextReminderAt: Date.now() + 86_400_000 }));
+  await assertSucceeds(updateDoc(ref, { title: 'renamed' }));                   // field untouched
+  await assertSucceeds(updateDoc(ref, { reminderStatus: 'none', nextReminderAt: null }));
+  await assertSucceeds(updateDoc(ref, { nextReminderAt: Date.now() - 60_000 })); // a minute ago: clock skew
+  await assertSucceeds(addDoc(collection(ownerDb(), 'users', OWNER_DOC, 'links'), {
+    url: 'https://example.com/2', reminderStatus: 'pending', nextReminderAt: Date.now() + 3_600_000,
+  }));
+});
+
+test('owner cannot backdate a reminder (update or create)', async () => {
+  const ref = doc(ownerDb(), 'users', OWNER_DOC, 'links', 'link1');
+  await assertFails(updateDoc(ref, { reminderStatus: 'pending', nextReminderAt: 1 }));
+  await assertFails(updateDoc(ref, { nextReminderAt: Date.now() - 3_600_000 }));
+  await assertFails(updateDoc(ref, { nextReminderAt: 'yesterday' }));
+  await assertFails(addDoc(collection(ownerDb(), 'users', OWNER_DOC, 'links'), {
+    url: 'https://example.com/3', reminderStatus: 'pending', nextReminderAt: 1,
+  }));
+});
+
+test('a legacy past nextReminderAt survives an unrelated update, and can still be deleted', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'users', OWNER_DOC, 'links', 'stale'), {
+      url: 'https://example.com/stale', reminderStatus: 'pending', nextReminderAt: 1,
+    });
+  });
+  const ref = doc(ownerDb(), 'users', OWNER_DOC, 'links', 'stale');
+  await assertSucceeds(updateDoc(ref, { isRead: true }));  // value unchanged → allowed
+  await assertSucceeds(deleteDoc(ref));
+});
 
 // ── analytics_events / client_errors: owner-only, client-appended ─────────────
 //
@@ -424,7 +611,7 @@ test('shared_owners: denied for owner, stranger, and anon (read and write)', asy
 // thing keeping its rate limit and field truncation meaningful is that clients
 // cannot reach the collection directly. Reads stay denied because the records
 // carry an auth uid and an IP.
-for (const col of ['rate_limits', 'pending_processing', 'task_logs', 'usage_quotas', 'server_errors', 'client_error_reports', 'entitlements', 'synthesis_vault']) {
+for (const col of ['rate_limits', 'pending_processing', 'task_logs', 'usage_quotas', 'server_errors', 'client_error_reports', 'entitlements', 'synthesis_vault', 'deleted_accounts', 'shared_owners']) {
   test(`${col}: denied for owner, stranger, and anon`, async () => {
     await assertFails(getDoc(doc(ownerDb(), col, 'x')));
     await assertFails(setDoc(doc(ownerDb(), col, 'x'), { a: 1 }));

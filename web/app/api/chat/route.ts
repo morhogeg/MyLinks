@@ -9,6 +9,7 @@
 // to the function and simply degrades to one buffered response.)
 
 import { NextRequest, NextResponse } from 'next/server';
+import { readJsonBody, upstreamSignal } from '@/lib/apiProxy';
 
 // Give the SSE proxy a longer ceiling than the default on Vercel — a cold RAG
 // backend call can be slow.
@@ -23,18 +24,23 @@ import { NextRequest, NextResponse } from 'next/server';
 // (request.json() + headers), so it is already dynamic-by-default and streams
 // SSE fine without the directive.
 export const maxDuration = 60;
+// A question plus the last few turns of history (the backend caps each turn
+// at 4 000 chars, six turns) and a handful of context ids.
+const MAX_BODY_BYTES = 256 * 1024;
+// Just under maxDuration so the caller gets a JSON error rather than a
+// platform-level timeout when the backend hangs.
+const UPSTREAM_TIMEOUT_MS = 58_000;
 
 const CHAT_BACKEND_URL =
     process.env.CHAT_BACKEND_URL ||
     'https://us-central1-secondbrain-app-94da2.cloudfunctions.net/ask_brain';
 
 export async function POST(request: NextRequest): Promise<NextResponse | Response> {
-    let body: unknown;
-    try {
-        body = await request.json();
-    } catch {
-        return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 });
+    const parsed = await readJsonBody(request, MAX_BODY_BYTES);
+    if ('error' in parsed) {
+        return NextResponse.json({ success: false, error: parsed.error }, { status: parsed.status });
     }
+    const body = parsed.body;
 
     // Forward the caller's App Check token (and other relevant headers) so the
     // backend sees the same auth context as a direct call would.
@@ -51,6 +57,9 @@ export async function POST(request: NextRequest): Promise<NextResponse | Respons
             method: 'POST',
             headers: fwdHeaders,
             body: JSON.stringify(body),
+            // Also aborts the upstream stream when the client disconnects
+            // mid-answer, instead of streaming to nobody until the deadline.
+            signal: upstreamSignal(request, UPSTREAM_TIMEOUT_MS),
         });
 
         // Stream pass-through: when the backend speaks SSE, pipe the body straight

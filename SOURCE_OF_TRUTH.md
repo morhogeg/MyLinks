@@ -226,7 +226,31 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-09-11, latest): install build **1324** ("Marked as done" toast with Undo), then the 1323 QA below if not yet done
+> ## 🚨 OWNER ACTION (updated 2026-09-17, latest): install build **1326** (security round 2: Keychain share token, Reset token, PIN lockout), then the 1325 QA below if not yet done
+>
+> **1326** (run #326, merge `8f3ebf8` + `4456ccc`) carries both security
+> rounds. QA on 1326, in this order: (1) do NOT open the app first: share a
+> page from Safari; it must save (the extension migrates the old token into
+> the Keychain on read). (2) Open the app, Settings → Browser extension →
+> Reset token, confirm, then share again from Safari: must save. (3) Enter
+> a wrong PIN six times on a private collection: expect "tries left" copy,
+> then a 30 s lockout with a countdown, and Close must still work. (4) Sign
+> out, then share from Safari: must say "Open the Machina app and sign in
+> first". Backend, rules and hosting are already live (functions #108,
+> rules #14, hosting #15). Then the 1325 list below.
+>
+> ## (superseded) OWNER ACTION (updated 2026-09-16): install build **1325** (share sheet: several screenshots become one card), then the 1324 QA below if not yet done
+>
+> **1325** (run #325, merge `f3bf08b`) fixes the share extension keeping
+> only the FIRST of several shared screenshots. QA on 1325: in Photos,
+> select 3 screenshots in a deliberate order and share to Machina; the HUD
+> hint should read "3 screenshots become one card", and the finished card
+> should hold all 3 in that order (swipe the carousel). Then share 6 and
+> expect "Saving the first 5 of 6 screenshots as one card". A single
+> screenshot must behave exactly as before. Order is the one unverified
+> assumption (§4 G3). Then the 1324 list below.
+>
+> ## (superseded) OWNER ACTION (updated 2026-09-11): install build **1324** ("Marked as done" toast with Undo), then the 1323 QA below if not yet done
 >
 > **1324** (run #324, merge `f1719d9`) adds the confirmation toast when a
 > "Do this" task is ticked in Revisit: "Marked as done" with an Undo that
@@ -1158,8 +1182,20 @@ The multi-user auth work described below **was** fully written but not live:
     rejected: it needs a shared secret in both the Vercel and functions envs,
     i.e. new owner config that can silently drift out of sync, to end up at the
     same place.
-11d. **[ ] Dependency + CSP posture (audit S-13/S-14) — reviewed 2026-07-25, no
-    reachable exposure.** `npm audit` in `web/`: 1 critical / 18 high / 1
+11d. **[x] Dependency + CSP posture (audit S-13/S-14) — CLOSED 2026-09-16.**
+    `next` bumped 16.2.10 → 16.3.5 (+ `eslint-config-next`), `npm audit fix`
+    run: `npm audit` is **0 vulnerabilities** (prod and dev). Static export
+    build verified with placeholder Firebase env; tsc clean; the 9 standing
+    eslint errors are pre-existing on `main` (React-compiler rules, untouched
+    files) and unchanged by the bump. CSP `connect-src` on Vercel + Hosting
+    no longer allows the attacker-registrable wildcards `*.web.app`,
+    `*.firebaseapp.com`, `*.vercel.app`; it names the project's exact hosts.
+    `'unsafe-eval'`/`'unsafe-inline'` in `script-src` stay (S-14 reasoning
+    below still holds). **Not verified on device** (no session can): the
+    16.3 runtime inside the WKWebView, and that no client call goes to a host
+    the tightened `connect-src` now blocks (Vercel preview URLs would, but
+    they call their own origin = `'self'`).
+    Original triage, kept: `npm audit` in `web/`: 1 critical / 18 high / 1
     moderate, all triaged as unreachable — `next@16.2.10`'s nine advisories need
     middleware (none exists), Server Actions (none), the image optimizer
     (`images.unoptimized: true`, nothing imports `next/image`) or a dynamic
@@ -1176,8 +1212,118 @@ The multi-user auth work described below **was** fully written but not live:
     `layout.tsx:56` theme bootstrap + Next hydration), `'unsafe-eval'` has no
     identifiable consumer but removing it needs a live check against the
     Firebase JS SDK + reCAPTCHA v3 on a real deploy.
-12. **[ ] Ingest token hardening (audit H-1).** Move from App Group UserDefaults
-    to Keychain; server copy to a functions-only collection; add rotation.
+12. **[x] Ingest token hardening (audit H-1) — CODE COMPLETE 2026-09-16
+    (round 2), device-unverified.** Round 1 landed the sign-out clear, the
+    rules refusal of client writes to `ingestToken`, and `chrome.storage.local`.
+    Round 2 landed the rest: the token now lives in the shared **Keychain**
+    (`web/ios/App/App/KeychainStore.swift`, compiled into both targets,
+    `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`, access group = the
+    existing App Group `group.com.morhogeg.machina`, so NO new entitlement or
+    profile), the Share Extension reads Keychain first and migrates a legacy
+    App Group copy on read, `ShareConfigPlugin.save` purges the plist copy and
+    refuses any endpoint that is not https on an allowlisted Machina host
+    (the extension applies the same allowlist and falls back to its built-in
+    endpoint), and `clear` also drops the pendingShare* hints.
+    **Rotation:** `rotate_ingest_token_http` (`/api/share-config/rotate`,
+    bearer, POST, `share-config-rotate` 5/h fail-closed) overwrites the single
+    `ingestToken` field so the old value dies on the next share; Settings →
+    Browser extension has a **Reset token** button (confirm dialog, pushes the
+    new token to the App Group at once; `syncShareConfigToNative` now latches
+    on uid+token so a rotate on another device propagates via the user-doc
+    snapshot). Sign-out additionally clears the WKWebView HTTP cache
+    (`clearWebsiteData`) so rendered screenshots/thumbnails do not outlive
+    the account on the device. NOT done: "server copy to a functions-only
+    collection" (the field is already unreadable to clients under the locked
+    rules; moving it buys nothing today).
+    **Not verified (no session can):** Swift compiles by inspection only;
+    the Keychain access-group behaviour and the migration path need one
+    TestFlight build: after installing, share from Safari WITHOUT opening the
+    app first (must still work: the extension migrates the plist token), then
+    open the app, Settings → Browser extension → Reset token, share again
+    (must work with the new token), sign out and share (must say "Open the
+    Machina app and sign in first").
+12b. **[x] Round-2 security pass SHIPPED 2026-09-17 (owner said "do
+    everything except rotating Gemini keys").** What ran, with receipts:
+    - **Merged** `8f3ebf8` (+ `2219ffb` maintenance control channel, `4456ccc`
+      rules-file fix). **Rules tests run #17: 95/95 green**, the first time
+      either round's cases executed (56 of the 95 are from the two rounds;
+      two round-1 cases were themselves wrong and are fixed in `4456ccc`:
+      one wrote a backdated `createdAt` the rule rejects on purpose, one
+      deleted a field the fixture never had). **Deploy Firestore rules run
+      #14 green** (type guards, reminder backdating guard, `deleted_accounts`,
+      `storage.rules` deny-all are LIVE). **Deploy Cloud Functions run #108
+      green** (unscoped; run #107 failed at the rules compile step before
+      deploying anything, see §9). **Deploy Firebase Hosting run #15 green**
+      (`/api/share-config/rotate` rewrite). Vercel auto-deployed from the
+      merge. **iOS → TestFlight run #326 = build 1326** (see §9 for its
+      state at the time of writing).
+    - **Legacy share `ownerUid` migrated:** Maintenance run #3 moved all 8
+      legacy docs (of 39 share docs scanned) into `shared_owners` and
+      deleted the field from the public copy. No public share doc carries
+      the phone number any more.
+    - **Storage key backfill:** Maintenance run #2 (dry run) counted 5
+      workspaces, 128 uid-keyed blobs; run #4 applied it (128 blobs copied, 85 docs rewritten)
+      (copy to `screenshots/{storageKey}/`, rewrite links / digests / share
+      snapshots). The OLD blobs are deliberately still there: a `--delete-old`
+      run is the last step once a device has been seen loading the new URLs
+      (an offline Firestore cache or a cached share preview could still
+      point at an old blob for a while). **Owner: run the Maintenance
+      workflow once with `backfill_storage_keys`, args `--all`, apply +
+      delete_old ticked, in a week.**
+    - **Maintenance workflow** (`.github/workflows/maintenance.yml`): runs a
+      named tool under `functions/tools` with the deploy service account,
+      dry run unless `apply` is ticked. Owner: the Actions tab dispatch
+      form. Cloud sessions: push `.github/maintenance-request.json` to
+      `trigger/maintenance` (the dispatch API 403s for them; the branch push
+      is the control channel, same posture as `trigger/pipeline-health`).
+    - **Trial-reset tombstone (was "deferred S-23"): BUILT.** `delete_account`
+      writes `deleted_accounts/{sha256(email)}` with the workspace's first
+      `createdAt`; `create_workspace` inherits it, so delete-and-resignup
+      keeps the old trial clock. Functions-only collection, rules-tested.
+    - **Still owner-only, not done here:**
+      1. **Delete the stale branches** `trigger/ask-debug`,
+         `trigger/pipeline-debug` and the 25 `claude/ship-tf-trigger-*`
+         (`git push origin --delete …` from a Mac; the cloud session's git
+         proxy drops delete pushes, and the GitHub MCP has no branch-delete).
+      2. **Rotate the Gemini key** (explicitly excluded by the owner today)
+         and the **ASC `.p8`** (App Store Connect console).
+      3. **Branch protection on `trigger/**`** and, optionally, an
+         `environment: production` gate with a required reviewer on
+         `ios-testflight.yml` / `pipeline-health.yml` / `maintenance.yml`:
+         repo Settings, no API tool in this session.
+      4. **App Check enforcement**: still OFF on purpose. Flipping
+         `APPCHECK_ENFORCE=true` today takes the iOS app down (no native App
+         Attest provider). The code half is a proposal in §9 (2026-09-16
+         round 2); build the native provider first, then flip.
+      5. **On-device QA of build 1326** (item 12's checklist): share from
+         Safari before opening the app (Keychain migration), Reset token,
+         sign out and share, the PIN pad's "tries left" and lockout copy.
+      6. **`--delete-old` backfill run** (above), after a week.
+12a. **[ ] Owner actions from the 2026-09-16 security pass (not doable from
+    code):**
+    - **Delete the stale remote branches** `trigger/ask-debug` and
+      `trigger/pipeline-debug`. The two debug workflows are removed from
+      `main`, but a push to a `trigger/*` branch runs the workflow file ON
+      THAT BRANCH, so the branches still carry a harness that uploads
+      unredacted user data (uids, card titles, queue docs) as an artifact any
+      logged-in GitHub user can download from this PUBLIC repo, and
+      `ask_debug.py` writes `askExcluded` to a real user's card. Also prune
+      the 25 `claude/ship-tf-trigger-*` branches while there.
+    - **Rotate the Gemini key and the ASC `.p8`** (task 5, still open).
+    - **Branch protection / ruleset on `trigger/**`** so only you can push
+      them: any write-access account or leaked PAT runs code with the prod
+      service account by pushing there. Fine single-owner; not once there is
+      a second collaborator.
+    - **Run the rules emulator suite** (`cd firestore-rules-test && npm
+      test`) or just let `rules-tests.yml` run on the merge: the emulator jar
+      download is blocked from cloud sessions, so the 35 new cases
+      (field allowlist, createdAt freeze, deny-by-default probes) have NOT
+      been executed. The rules-file edit is syntax-checked by eye only.
+    - **`pip-audit -r functions/requirements.txt`** on the Mac once; the
+      pins look current from memory but nothing here could verify them.
+    - **GitHub secret scanning** (Settings → Code security) for the full
+      history: this clone is shallow (97 commits, oldest 2026-08-26), so the
+      history sweep only covered that window. Nothing was found in it.
 13. **[x] Remaining audit mediums — landed 2026-07-09 (AUDIT.md S-2/S-3).**
     Per-uid+IP rate limits on the paid endpoints and `ask_brain` history/input
     caps shipped. ~~Phone-log masking (H-4 residue) is **moot**~~ — **that
@@ -1585,19 +1731,25 @@ G2b. **[x] Screenshot cards name who posted them (2026-09-08).** A screenshot
     glyph, and Sources should list it under X. Existing "Screenshot" cards
     are not backfilled.
 
-G3. **[ ] iOS share extension: multi-screenshot cards (deferred half of the
-    2026-08-24 feature).** The web/plus-button path now builds ONE card from up
-    to 5 ordered screenshots (`MAX_CARD_IMAGES`), but the share extension still
-    takes only the FIRST attachment (`firstProvider()`,
-    `ShareViewController.swift:~1065`) — sharing 3 screenshots makes 1 card and
-    silently drops 2. The backend is ready (`share_ingest` accepts an ordered
-    `images:[{data,mimeType}]` list; one queue doc, one save unit). Blockers
-    that deferred it: the order iOS hands attachments over is UNVERIFIED on
-    device, and the share sheet has no confirm step to correct it in — so
-    fixing `firstProvider()` alone risks shipping "wrong order, no way to fix
-    it", the exact failure the confirm-strip on web exists to prevent. Needs a
-    device test of NSItemProvider order first, then either trust-it-or a
-    minimal reorder UI in the sheet.
+G3. **[x] iOS share extension: multi-screenshot cards — SHIPPED 2026-09-16 (merge `f3bf08b`, build 1325)
+    (launch-readiness review, "fix the product bug").** Sharing several
+    images now sends ALL of them (up to `MAX_CARD_IMAGES` = 5) as the
+    backend's ordered `images:[{data,mimeType}]` list, so they become ONE
+    card exactly like the + button's Image tab. `imageProviders()` collects
+    every image attachment across the input items in the order iOS lists
+    them; `uploadImages(from:)` loads them one at a time (each downsampled
+    before the next is touched, memory-safe) and the HUD's hint line says
+    "3 screenshots become one card" or, past the cap, "Saving the first 5
+    of 7 screenshots as one card", so the sheet never claims more or less
+    than it saved. A single image keeps the old `image` payload.
+    **Owner QA (not verifiable from a cloud session):** share 3 screenshots
+    from Photos and check the finished card holds all 3 IN SELECTION ORDER.
+    The order iOS hands attachments over is still the one unverified
+    assumption; if it is wrong on device, the fallback is a reorder strip in
+    the sheet (the web confirm-step, in Swift). *(Original deferral, kept:)*
+    the share extension used to take only the FIRST attachment
+    (`firstProvider()`), so sharing 3 screenshots made 1 card and silently
+    dropped 2, against the "never lies about saving" promise.
 
 18c. **[ ] Native share-extension indicator: per-phase states.** Web maps every
     capture phase to its own motion (`LINK_SCAN_ORBS` in `web/lib/scanPhases.ts` —
@@ -2096,6 +2248,377 @@ exact-match, capped.
   `MachinaLaunchVO` re-rendered exit 0. §4 25c (the
   literal "AI" on the Ask and feed screens, the D-3 blocker for putting the
   film on the landing page) is unchanged and still the owner's call.
+- **2026-09-17 — Security round 2 SHIPPED, migrations run, tombstone built.
+  Owner: "do everything except rotating Gemini keys." Merge `8f3ebf8` to
+  main (round 1 `e000fb1` + round 2 `ef83d4d`/`b407d50`, with main's build
+  1325 merged in first), then `2219ffb`, `4456ccc`.** What happened, in
+  order, including the two things that went wrong:
+  **(1) The first deploy attempt failed at compile time, deploying
+  nothing.** Promoting `firestore.rules.locked` into `firestore.rules` kept
+  seven header lines instead of six, so `rules_version` appeared twice;
+  `firebase deploy` compiles the rules before touching anything, so Deploy
+  Cloud Functions #107 and Deploy Firestore rules #13 both stopped there
+  (fail-closed, prod untouched). Fixed in `4456ccc` (+ a `.deploy-ping` bump
+  to re-fire functions). Lesson recorded in the file itself: the two files
+  differ only in their comment header, and that header is 6 lines in
+  `firestore.rules`, 7 in `.locked`.
+  **(2) Rules tests #16 was the FIRST execution of either round's emulator
+  cases: 93/95.** Both failures were round-1 test bugs, not rule bugs:
+  "new account CAN create its own workspace doc" wrote `createdAt: 1`,
+  which the round-1 create rule refuses as a backdated birth date (the
+  founder-grant forgery it exists to stop); "cannot smuggle a server-owned
+  field" asserted on `createdAt: deleteField()` against a fixture with no
+  `createdAt`, which Firestore treats as a no-op (not in `affectedKeys`).
+  Fixed to `Date.now()` and `email: deleteField()`. **Run #17: 95/95.** Every
+  rule from both rounds is therefore now emulator-proven AND live (Deploy
+  Firestore rules #14 green, which also deployed the deny-all
+  `storage.rules`).
+  **(3) Deployed:** Cloud Functions #108 (unscoped, all functions incl. the
+  new `rotate_ingest_token_http`), Hosting #15 (rotate rewrite), Vercel
+  (auto), TestFlight #326 → build 1326 (Keychain token, Reset token, PIN
+  backoff, WKWebView cache clear, API route caps).
+  **(4) Maintenance workflow** (`maintenance.yml`, `workflow_dispatch` + a
+  request file on `trigger/maintenance`): run #1 `migrate_share_owners` dry
+  run → 39 share docs, 8 legacy; **run #3 applied it**: the 8 legacy
+  `shared_cards` docs now have a `shared_owners` row and no `ownerUid`.
+  Run #2 `backfill_storage_keys --all` dry run → 5 workspaces, 128
+  uid-keyed blobs; **run #4 applied it** (128 copied, 85 docs rewritten) (copy + rewrite, old
+  blobs kept for a `--delete-old` pass in a week, §4 12b). The tool
+  learned `--all` and reads the bucket name from an existing stored URL
+  (the project's bucket name is not in the repo), and a short-circuit
+  `any()` that would have rewritten only the first card of a digest was
+  fixed before the apply.
+  **(5) Deleted-account tombstone built** (§4 12b item, was deferred):
+  `link_service.write_account_tombstone` / `inherited_created_at`,
+  `deleted_accounts` denied to clients, 5 pytest cases + 1 emulator case.
+  **Not done, owner-only (§4 12b list):** stale branch deletion (the
+  session's git proxy drops delete pushes), Gemini key (excluded) and ASC
+  `.p8` rotation, `trigger/**` branch protection / environment gate, App
+  Check enforcement (needs the native provider first), on-device QA of
+  1326, the `--delete-old` backfill.
+  **Verified:** pytest 1021, tsc, eslint 16 pre-existing, static export,
+  parser 24/24, extension 1/1, rules emulator 95/95 (CI), every deploy run
+  green on its second attempt as listed. **Not verified:** anything on
+  device.
+- **2026-09-16 (round 2) — Adversarial re-verification of round 1 plus
+  everything it did not reach. Branch `claude/security-round-2` off
+  `e000fb1`. NOT SHIPPED at time of writing; the merge needs an unscoped
+  functions deploy, the rules workflow, hosting (new rewrite), Vercel, and
+  a TestFlight build (§4 12b).** Method: baseline reproduced first (pytest
+  964, tsc, static export, extension 1/1, eslint 16 pre-existing), then eight
+  lenses run in parallel, every candidate traced to a `file:line` and a
+  request before it counted. Ranked, exploitable-today first:
+  **(1) One account could halt reminders and digests for everyone (HIGH,
+  modified client).** The round-1 rule allowlist checked WHICH user-doc keys
+  a client writes, not their type: `updateDoc({settings: "x"})` passed, and
+  `reminder_service.run_reminder_check` read `settings.get(...)` for every
+  user in one loop OUTSIDE its per-link try (line ~331), so the tick raised
+  and delivered nothing; with one own doc at `nextReminderAt: 1` the
+  attacker's uid sorted first in the shared ascending query, every 2 min,
+  forever. Same shape in `digest_service.run_digest_check` (line ~751,
+  every user sorting after the attacker's uid lost digests and syntheses).
+  Fix, both sides: rules `clientUserFieldsTyped()` (settings map, timezone
+  string, aiConsentAt/pushPromptedAt/graphVersion number, onboarded bool,
+  privacyLock map; deleteField still passes) on every user-doc update; the
+  servers coerce (`digest_service._settings_of`, the reminder loop, a
+  non-list `reminders_channel`/`digest_channels`, `send_digest_now`'s
+  override merge). 7+2 rules cases, 4 pytest cases.
+  **(2) Reminder starvation by backdating (HIGH, script + rules-allowed
+  writes).** Even with typed settings, 500 own link docs with
+  `reminderStatus: pending, nextReminderAt: 1` filled the limit-500 due
+  query every tick; only 10 per user advanced, the other 490 held the head.
+  Fix: rules `reminderTimeSane()` on links create/update (absent, null,
+  unchanged, or ≥ now-5min; a legacy past value survives unrelated updates
+  and can still be deleted), and the scheduler now SNOOZES a user's overflow
+  beyond the per-tick cap by 10 min (`REMINDER_OVERFLOW_SNOOZE_MS`) so it
+  leaves the head. Residual: an attacker rewriting 500 docs every 2 min can
+  delay others by at most ~5 min.
+  **(3) Public share page ReDoS (HIGH, unauthenticated GETs).** The share
+  markdown regexes (`_MD_BOLD_RE`/`_MD_ITALIC_RE`/`_MD_LINK_RE`) used
+  unbounded lazy groups; measured on the real renderer: 20 000 `**` markers
+  in a stored summary = 42 s per render, and `/s?id=X&x=<random>` busts the
+  CDN. Any account could store a 190 KB summary via publish. Fix: every
+  capture bounded to 400 chars, lines capped at 4 000, the plain-text
+  flattener's input at 4 000 (20 000 markers now 0.02 s); card/collection
+  snapshots are allowlisted and clipped at publish
+  (`_sanitize_card_snapshot`: title 300, summary 5 000, detail 20 000, tags
+  20×50, ≤200 cards, drops ids/embeddings/ownerUid); publish writes the
+  public doc and the owner row in ONE batch (a half-written share was
+  claimable by any account); `share_page` 404s a malformed id before
+  Firestore; og-preview fetch cut at 2 MB / 8 s; "View original" now says
+  "View original on evil.example" (the snapshot is client text on the brand
+  domain). 5 timed tests + 4.
+  **(4) Cost, trial economics (HIGH, one free account).** A reverse trial is
+  `plan: pro`, so it had the Pro import ceiling (10 000 lifetime links) and
+  native YouTube video ingestion (~$0.09/hour of video), i.e. ≈$2 700 of
+  Gemini per disposable trial account through `/api/import`. Now
+  `entitlement.plan_for_imports` gives a trial the FREE allowance (500), and
+  `_video_ingest_allowed` lets paid/founder workspaces watch freely, a trial
+  3 videos/hour (`video-trial-uid`, fail closed; the honest metadata card
+  past that), free none. Also: the `enrichCardId` screenshot path (five
+  images, vision, embed, relate) was the one unmetered Gemini surface and now
+  charges a save; the `search_links` callable had no limit (HTTP twin had
+  120/h) and now shares `search-uid`; `rebuild-uid` 240→60/h (8 cards per
+  call with `force` = 1 920 relate calls/h); `send_digest_now` with `force`
+  no longer regenerates a 500-card synthesis for a FREE workspace (it only
+  ever sees the teaser); an unscrapable URL used to consume a save without
+  refund (error path, no exception) and now refunds; `client-error` keys on
+  `_rate_limit_identity` (30 anonymous posts behind the Hosting egress IP
+  blinded every real device's crash report for the hour); the janitor prunes
+  `client_error_reports` like `server_errors`.
+  **(5) Stale token after account deletion (MEDIUM).** `_verify_bearer` does
+  not `check_revoked` (deliberately: one network call per request); an ID
+  token stays valid ≤1 h after `delete_account`, and `claim_workspace` then
+  re-created a workspace for the dead uid with a never-expiring ingest
+  token. Now the create step calls `admin_auth.get_user` (rare path only)
+  and refuses a provider outside {google.com, apple.com} (a console
+  accident enabling anonymous/email auth must not mint libraries). Residual
+  1 h of bearer access on the other endpoints is accepted (cost of
+  check_revoked everywhere). `REQUIRE_AUTH` now defaults ON: a redeploy
+  whose env lost the secret used to fall back to trusting the client uid
+  (the pre-cutover IDOR); rollback is an explicit `REQUIRE_AUTH=false`.
+  **(6) Push delivery (MEDIUM).** `send_push` sent card titles and the
+  model's synthesis title untruncated; FCM rejects >4 KB with
+  INVALID_ARGUMENT for EVERY token in the batch, and `_is_dead_token`
+  pruned on that code, so one hostile title wiped all of a user's devices.
+  Now title/body are cleaned (control chars → space) and capped 200/500,
+  and INVALID_ARGUMENT only prunes when the message names the registration
+  token.
+  **(7) Prompt-injection persistence (MEDIUM).** Model output was stored
+  with no length cap and `category`/`tags` are fed back into every later
+  analysis prompt via `get_user_vocabulary` (only the client-supplied twin
+  was capped). `_build_link_data` now clips tags (12×60), category (40),
+  concepts (20×60), language, takeaway (1 000); the vocabulary clips per
+  item too. Graph verifier JSON (`reason`, `commonConcepts`) is coerced
+  (`_coerce_relations`: an object `reason` threw in the React tree). The
+  "in N days" reminder parse is bounded to 1..365 and isolated
+  (`_apply_reminder_intent`): an overflow after the card was written used to
+  flip the good card to FAILED.
+  **(8) Storage paths (MEDIUM, owner PII).** New blobs go under
+  `screenshots/{storageKey}/` and `post_thumbs/{storageKey}/`
+  (`link_service.storage_key_for`, random per workspace, server-only field,
+  fail-soft to the legacy path); the re-enqueue prefix check and account
+  deletion accept both prefixes; `tools/backfill_storage_keys.py` migrates
+  existing blobs and rewrites every stored URL (12b). `storage.rules` is
+  now deny-all with the reason in the file (nothing uses the Storage SDK;
+  the old read arm compared auth uid to data uid and never matched).
+  Legacy public shares with `ownerUid` on the doc are now swept on account
+  deletion and `tools/migrate_share_owners.py` moves the field.
+  **(9) Web client.** `importParsers.ts` had three quadratic regexes
+  (unclosed `<a>` scanning to EOF per opener, an unanchored attribute
+  scanner, a trailing-punctuation strip before the length check: 80 000
+  brackets = 10 s); bounded, 4 timed node tests. PIN pad: 5 free tries then
+  30 s/1 m/5 m/15 m/1 h per device (localStorage, purged on sign-out;
+  cosmetic like the lock itself, Close never blocked), and a self-corrupted
+  `iterations` is clamped at 600 000. The three Vercel routes are LIVE on
+  Vercel (route handlers match before rewrites, the old "dev-only" comment
+  was wrong): body ceilings before parsing (64 KB / 4.4 MB / 256 KB) and an
+  upstream `AbortSignal` (125 s / 125 s / 58 s, also on client disconnect)
+  via `lib/apiProxy.ts`. `createWorkspaceClientSide` re-queries before its
+  create (a timed-out server claim that then completed left the owner with
+  two linked workspaces).
+  **(10) Supply chain.** Pillow 11.3.0 → 12.3.0: `pip-audit` (run here,
+  online) reported 35 advisories across 18 ids on 11.3.0 (PSD/FITS/JPEG2000
+  decoders) and `Image.open` picks the decoder from the BYTES a remote
+  og:image serves; 12.3.0 is clean. All GitHub Actions pinned to commit
+  SHAs resolved by `git ls-remote` (checkout `11d5960a`, setup-node
+  `49933ea5`, setup-python `a26af69b`, setup-java `cf277c60`). npm: 3
+  install scripts (`@firebase/util`, `protobufjs`, `unrs-resolver`), all
+  read and benign; single registry, full integrity.
+  **Round-1 fixes re-verified, held:** the SSRF guard on 45 parser tricks on
+  real sockets (IDNA `faß.de` refused as ambiguous, percent-encoded
+  authority consistent, IPv6 zone refused, NAT64 `64:ff9b::` correctly
+  global, `[::ffff:127.0.0.1]` refused on 3.11 too); the peer-IP check
+  attributes correctly under HTTP/1.1, HTTP/1.0, TLS and pooled reuse; the
+  read1 reader keeps chunked+gzip intact and surfaces a Content-Encoding
+  mismatch as `urllib3.DecodeError`, which every caller's `except
+  Exception` degrades to the honest card (not a 500); `_safe_image_mime`
+  stores HTML bytes as image/jpeg, which browsers never sniff into HTML
+  (harmless); `_looks_like_ingest_token` matches every token format in the
+  reachable history (one mint site, `token_urlsafe(24)`); the resolver
+  tie-break prefers the own doc.
+  **Investigated and dismissed, with reasons:** quota metering is a real
+  transaction (no TOCTOU; its fail-open on transaction failure is moot
+  because the fail-closed limiter shares the same Firestore); RevenueCat
+  sync sends nothing from the client (uid from the token, server secret to
+  RC) and webhook replay only re-reads live state; trial anchor is
+  server-written and `createdAt` is frozen; every share-page interpolation
+  escapes (probed `"><script>`, `javascript:`, `</script><!--`); markdown
+  hrefs are `https?://` only; Ask citations and streamed ids are filtered
+  against the retrieved set; related-link candidate pools are per uid, no
+  collection-group query reaches a prompt; push `data` carries only
+  `linkId`/`view`; deep links open own-workspace docs only; no
+  `github.event.*` in any `run:`; the IPA checks inspect the exported IPA;
+  `pipeline_health.py` prints no PII; `_peer_ip` returning None is
+  fail-open by design (resolver check still applies; the transport always
+  exposed the socket in every tested mode); the janitor starvation via
+  client `processingStartedAt` needs a composite index to fix and the
+  janitor never spends money (P2, S-24); the 10-slot slow-drip DoS on
+  `analyze_link` is bounded by the 120 s function timeout and is the App
+  Check enforcement case (S-25); Apple Hide-My-Email cannot claim the legacy
+  workspace (foot-gun, documented, no leak); the duplicate-workspace race
+  is owner-only and now guarded client-side.
+  **App Check enforcement, code half (proposal, not flipped):** omitting the
+  header today buys nothing a scripted first-party account cannot already
+  do with its own token. Enforcing needs (1) `@capacitor-firebase/app-check`
+  with App Attest (DeviceCheck fallback) and a `CustomProvider` in
+  `firebase.ts` when `isCapacitor`, (2) a per-endpoint "missing token"
+  counter in soft mode for one TestFlight cycle, (3) an explicit exempt list
+  (`share_ingest` token branch, `share_page`, the RevenueCat webhook, the
+  claim/delete twins, admin), then (4) `APPCHECK_ENFORCE=true`.
+  **Verified:** pytest **1016 passed** (964 → 1016, all new, under Pillow
+  12.3.0), `py_compile` clean incl. tools, `pip-audit` no known
+  vulnerabilities, `tsc` clean, eslint identical to `main` (16 problems,
+  pre-existing), `next build` static export green with placeholder env,
+  node parser tests 24/24, takeaway 3/3, extension 1/1, rules test file
+  `node --check` clean. **Not verified:** the rules emulator suite (56 new
+  cases across both rounds), Swift compile, anything on device.
+- **2026-09-16 — Pre-launch security pass (`/onboard` + full-tree sweep,
+  six parallel lenses: backend endpoints, scraper/AI, rules, web client,
+  iOS/extensions/CI, secrets/PII/deps). Branch
+  `claude/ios-security-review-6voci8`. NOT YET SHIPPED at time of writing;
+  functions + rules + hosting + web + iOS all change, so `/ship` needs an
+  unscoped functions deploy, the rules workflow, a hosting redeploy (CSP in
+  `firebase.json`), Vercel, and a TestFlight build.** What was found and
+  fixed, exploitable-today first:
+  **(1) Founder-Pro forgery + workspace hijack via the user doc
+  (HIGH).** `users/{uid}` update allowed ANY field once the writer was
+  linked. `createdAt` is what `entitlement.grant_for` keys the founders'
+  365-day Pro on, so `updateDoc({createdAt: 0})` + `/api/entitlement/sync`
+  minted Pro; and `authUids` is how `find_data_uid_by_auth_uid` resolves a
+  workspace, so `arrayUnion(victimAuthUid)` on the attacker's own doc plus
+  Firestore's `limit(1)` order could route the victim's saves, share-sheet
+  captures and FCM device token into the attacker's library. Fix, both
+  sides: `firestore.rules` (+ `.locked`, identical) update rule is now
+  `affectedKeys().hasOnly(clientWritableUserKeys())` (timezone, settings,
+  aiConsentAt, pushPromptedAt, onboarded, privacyLock, graphVersion: every
+  client write site, enumerated in the rules comment and in
+  `rules.test.mjs`); create pins the field set and requires `createdAt`
+  within ±5 min of the server clock. `link_service.find_data_uid_by_auth_uid`
+  queries `limit(2)`, prefers the account's OWN doc id, logs the ambiguity
+  otherwise (first-by-id kept so the phone-keyed owner never regresses).
+  35 rules cases added; **not executed here** (emulator jar download blocked),
+  `rules-tests.yml` runs them on the merge. 4 resolver tests in
+  `test_security_hardening_2026_09.py`.
+  **(2) SSRF guard bypass (HIGH), scraper.** `validate_public_url` read
+  the host with `urlparse`, `requests` dials with urllib3, and they disagree
+  on a backslash: `http://127.0.0.1\@example.com/` validated as example.com
+  and connected to loopback (metadata `169.254.169.254` the same way;
+  reproduced on the pinned requests 2.34.2). Now: any backslash in the
+  authority is refused AND urllib3's own parse must agree on the host.
+  Plus the DNS-rebinding window is closed: after connect, the socket's real
+  peer address is re-checked (`_assert_peer_public`, reads the peer through
+  urllib3's connection or http.client's SocketIO) before a body byte is
+  read. Plus the slow-drip hole: `iter_content(64K)` blocks inside urllib3
+  until 64 KB arrive, so the 45 s wall clock never ran during a 1-byte drip;
+  the reader now uses urllib3 2.x `read1` (returns on any bytes, decoded),
+  falling back to `iter_content`. **Verified on real sockets** (scratch
+  server: gzip + chunked bodies intact, 65 KB drip cut at 3.0 s, loopback
+  peer refused, both backslash forms refused). +3 SSRF tests, +6 reader/
+  peer tests.
+  **(3) Regex DoS on attacker HTML (MEDIUM).** The LinkedIn/Instagram
+  branches ran `<meta[^>]+…`, a lazy `(.*?)</script>` JSON-LD scan and
+  `"owner"\s*:\s*\{[^}]*?` over the full 10 MB body; a `lnkd.in` short link
+  redirects anywhere, and 20 000 half-open tags cost 24 s at 180 KB (hours at
+  10 MB). Patterns now stop at the next `<`/`{`, JSON-LD is walked with a
+  linear `find` pairing (`_ldjson_blocks`), and every raw-HTML regex scan is
+  bounded to the first 512 KB (`_regex_scan_slice`). Timed: 10 MB hostile
+  body 0.01 s. `test_scraper_regex_bounds.py` (6 tests with 1 s budgets).
+  **(4) Image decompression bombs (MEDIUM).** A 519 KB PNG declaring
+  13000×13000 px peaked ~670 MB in Pillow → OOM on `publish_share_http`
+  (client-supplied `thumbnailUrl`) and `analyze_link` (og:image). All three
+  decode sites check header-declared pixels against 25 MP before decoding
+  (`_reject_image_bomb`, `_OG_MAX_DECODE_PIXELS`).
+  **(5) Stored-object Content-Type was client-chosen (MEDIUM):** `mimeType`
+  from the body went straight to Storage, so `{image: <b64 HTML>, mimeType:
+  "text/html"}` hosted arbitrary HTML at a tokenized public bucket URL.
+  `_safe_image_mime` allowlists jpeg/png/webp/gif/heic at all four sites
+  (inline image, fetched image, multi-image, share image, queue doc).
+  **(6) `share_ingest` limiter churn (MEDIUM):** the pre-body gate keyed a
+  fresh `rate_limits` doc on the hash of ANY presented token, so random
+  headers minted unbounded docs (one transactional write each, never
+  pruned). Now a token that isn't 16-128 URL-safe chars is refused before
+  the limiter, and a well-formed unknown token is charged to the caller's IP
+  bucket; a valid token keeps its private hash bucket + `share-uid`.
+  **(7) Two paid callables had no ceiling:** `rebuild_connections` (Gemini
+  per card, `force: true` re-runs all) and `send_digest_now` (synthesis call
+  per invocation). New fail-closed per-uid buckets `rebuild-uid` 240/h,
+  `digest-now-uid` 10/h via `_callable_rate_limited` (raises the callable
+  error shape).
+  **(8) Account deletion left data behind:** `delete_user_data` skipped the
+  `digests`, `synthesisNotes`, `analytics_events`, `client_errors`
+  subcollections, `entitlements/{uid}`, `usage_quotas/{uid}`,
+  `synthesis_vault` rows, `post_thumbs/{uid}/` blobs, and EVERY public share
+  the user published (the /s /c /a pages stayed live forever with nobody
+  able to unpublish). All swept now (`USER_SUBCOLLECTIONS`,
+  `delete_shares_for_owner`); a test asserts the subcollection list covers
+  every `match /users/{uid}/<sub>` in the rules file. Privacy policy §8
+  updated to say deletion removes share pages.
+  **(9) Sign-out left the share-sheet token in the App Group** (task 12
+  half): `ShareConfigPlugin.clear` (Swift, not compilable here) +
+  `clearNativeShareConfig()` at the top of `signOutUser`. Extension token
+  moved `chrome.storage.sync` → `local`.
+  **(10) Smaller:** `_ask_diag` (echoed Gemini exception text to clients)
+  removed; malformed/array JSON bodies on analyze/ask/image are 400 not 500
+  (`_json_object`); share ids validated as one path segment
+  (`_valid_share_id`); the two raw-uid f-strings in `digest_service`
+  (assigned before the logger call, invisible to the AST scan) masked;
+  `permissions: contents: read` on all workflows; the two "DELETE once the
+  incident is resolved" debug workflows + their scripts removed (they
+  uploaded unredacted user data as artifacts on a public repo; one wrote to
+  prod); owner phone number scrubbed from `AUDIT_FINDINGS.md`; CSP
+  `connect-src` exact hosts; `next` 16.3.5 (0 advisories); Privacy Policy
+  names RevenueCat + reCAPTCHA/favicon lookups, Terms gain a Machina Pro
+  subscriptions section (App Review reads both).
+  **Investigated and dismissed, so the next pass doesn't re-find them:**
+  every HTTP data endpoint reaches `_verify_bearer`/`_authed_uid` before
+  user data; callables and HTTP twins share logic; all nine admin endpoints
+  gated + constant-time + fail closed; RevenueCat webhook verified; CORS
+  allowlist exact with capacitor origins; uids masked in logs everywhere
+  else; no XSS surface in `web/` (one constant `dangerouslySetInnerHTML`,
+  react-markdown without rehype-raw, every `href` behind `isHttpUrl`); no
+  open redirects; tokens never in localStorage/URLs; sign-out purge intact;
+  PIN is PBKDF2 (no throttle, cosmetic lock by design); no secrets in the
+  tree or reachable history; `.gitignore` covers env/p8/p12/plists;
+  capacitor config has no `server.url`/cleartext/debug; no ATS exceptions;
+  `machina://` does nothing; extension manifest minimal. The pre-cutover
+  `req.data.uid` fallbacks in `get_share_config`/`rebuild_connections`/
+  `send_digest_now` are dead under `REQUIRE_AUTH=true` and kept for the
+  documented rollback. The legacy owner's phone number in `screenshots/
+  {uid}/…` public image URLs (reaches `shared_cards` + /s pages) affects
+  only the owner's own workspace and needs a storage-path migration; NOT
+  done, tracked under item 12a as a decision.
+  **Verified:** pytest **964 passed** (906 → 964, all new), `py_compile`
+  clean, `tsc` clean, eslint identical to `main` (16 problems, all
+  pre-existing in untouched files), `next build` static export green with
+  placeholder env (privacy/terms pages render the new sections), extension
+  node test 1/1, `npm audit` 0. **Not verified:** rules emulator suite
+  (blocked egress), Swift compile, anything on device.
+- **2026-09-16 — PM launch-readiness review + share-extension multi-image
+  fix. SHIPPED: merge `f3bf08b` to main, iOS → TestFlight run #325 =
+  **build 1325** (Archive + entitlement check green; the Swift compiled on
+  the first CI pass). iOS only: no functions, rules or hosting deploy.** Owner asked for a product-manager launch verdict. Recorded:
+  **No for a public App Store launch yet, Yes for an open TestFlight beta.**
+  Features are launch-grade and the roadmap items (voice, routes, offline,
+  export) are not needed; freeze features. Blockers, in order: (1) Machina
+  Pro is a dead end (trial live, no RevenueCat/IAP, paywall says "not
+  available"): finish §4 item 26 or extend the founders grant to every
+  pre-IAP signup; (2) Gemini spend cap ₪50 = outage at ~70 users (5b);
+  (3) reviewer sign-in unsolved, OAuth-only with `PASSWORD_TBD` in
+  `docs/APP_STORE.md` §5; (4) every §9 entry since 09-01 is "not verified
+  on device" (import, trial anchor, `/a` page, search front door, bylines,
+  Revisit): one owner QA evening on 1324 with a fresh account, plus task 11,
+  PM-F, PM-G; (5) Connect metadata + 6 screenshots + consent screen on a
+  fresh install, and the two key rotations. **Built this session:** the
+  share extension no longer drops all but the first shared screenshot (§4
+  G3, code done). `ShareViewController.swift`: `imageProviders()`,
+  `uploadImages(from:)` (sequential load, per-image downsample, ordered
+  `images` payload, cap 5 with honest HUD copy), `encodedImage(from:)`
+  shared with the single-image path, `upload(payload:)` widened to
+  `[String: Any]`. **Verified:** CI archive (run #325) compiled and signed
+  it; there is no Swift toolchain in the cloud session.
+  **Not verified:** attachment order on device, memory with 5 large HEICs.
+  Ship: `/ship` (iOS build only, no functions/rules/hosting change).
 - **2026-09-11 (round 3) — "Marked as done" toast with Undo. SHIPPED:
   merge `f1719d9` to main (Vercel auto-deploy), TestFlight run #324 =
   **build 1324** green (uploaded 13:33 UTC). Web only.** Ticking a task in

@@ -249,12 +249,29 @@ class _FakeColl:
         return _FakeDoc(self._store, self._name, doc_id)
 
 
+class _FakeBatch:
+    """Mirrors the Firestore WriteBatch surface publish uses (set + commit)."""
+    def __init__(self):
+        self._ops = []
+
+    def set(self, ref, data):
+        self._ops.append((ref, data))
+
+    def commit(self):
+        for ref, data in self._ops:
+            ref.set(data)
+        self._ops = []
+
+
 class _FakeDb:
     def __init__(self):
         self.store = {}
 
     def collection(self, name):
         return _FakeColl(self.store, name)
+
+    def batch(self):
+        return _FakeBatch()
 
 
 @pytest.fixture

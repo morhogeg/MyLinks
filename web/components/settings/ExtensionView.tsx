@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Check, Copy, Eye, EyeOff, RefreshCw } from 'lucide-react';
-import { fetchShareConfig } from '@/lib/shareConfig';
+import { Check, Copy, Eye, EyeOff, RefreshCw, RotateCcw } from 'lucide-react';
+import { fetchShareConfig, rotateShareToken } from '@/lib/shareConfig';
+import ConfirmDialog from '@/components/ConfirmDialog';
 import { copyToClipboard } from '@/lib/share';
 import { isNativeApp } from '@/lib/api';
 import { LargeTitle, SectionHeader, Footnote } from './primitives';
@@ -69,6 +70,23 @@ export function ExtensionView({ uid }: { uid: string | null }) {
     const [revealed, setRevealed] = useState(false);
     const [copied, setCopied] = useState(false);
     const [reload, setReload] = useState(0);
+    const [confirmReset, setConfirmReset] = useState(false);
+    const [resetState, setResetState] = useState<'idle' | 'busy' | 'done' | 'error'>('idle');
+
+    const doReset = useCallback(async () => {
+        setConfirmReset(false);
+        setResetState('busy');
+        try {
+            const cfg = await rotateShareToken();
+            setToken(cfg.token);
+            setEndpoint(cfg.endpoint);
+            setRevealed(false);
+            setCopied(false);
+            setResetState('done');
+        } catch {
+            setResetState('error');
+        }
+    }, []);
 
     useEffect(() => {
         if (!uid) return;
@@ -166,10 +184,36 @@ export function ExtensionView({ uid }: { uid: string | null }) {
                                 : <Copy className="w-[14px] h-[14px]" />}
                             {copied ? 'Copied' : 'Copy'}
                         </button>
+                        <button
+                            onClick={() => setConfirmReset(true)}
+                            disabled={resetState === 'busy'}
+                            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-card-hover border border-border-subtle text-[13px] font-semibold text-text hover:border-accent/40 transition-colors cursor-pointer disabled:opacity-60"
+                        >
+                            <RotateCcw className="w-[14px] h-[14px]" />
+                            {resetState === 'busy' ? 'Resetting' : 'Reset token'}
+                        </button>
                     </div>
+                    {resetState === 'done' && (
+                        <div className="mt-2 text-[12.5px] text-text-secondary leading-snug">
+                            New token issued. The old one no longer works. Paste this one into the browser extension.
+                        </div>
+                    )}
+                    {resetState === 'error' && (
+                        <div className="mt-2 text-[12.5px] text-red-400 leading-snug">
+                            Could not reset the token. Try again in a moment.
+                        </div>
+                    )}
                 </div>
             )}
-            <Footnote>Anything saved with this token lands in this account, so keep it to yourself.</Footnote>
+            <Footnote>Anything saved with this token lands in this account, so keep it to yourself. If it ever leaks, Reset token makes the old one useless immediately.</Footnote>
+            <ConfirmDialog
+                isOpen={confirmReset}
+                onClose={() => setConfirmReset(false)}
+                onConfirm={doReset}
+                title="Reset your token?"
+                message="The current token stops working right away. The Machina app on this phone updates itself; the browser extension needs the new token pasted in."
+                confirmLabel="Reset token"
+            />
 
             {needsBackendUrl && (
                 <Footnote>

@@ -60,6 +60,47 @@ def test_rejects_missing_host():
         validate_public_url("https:///nohost")
 
 
+@pytest.mark.parametrize("url", [
+    # `urlparse` reads the host as example.com; urllib3 (what `requests` dials)
+    # ends the authority at the backslash and connects to the loopback /
+    # metadata address. The guard must refuse rather than validate the wrong
+    # host.
+    "http://127.0.0.1\\@example.com/",
+    "http://169.254.169.254\\@example.com/computeMetadata/v1/",
+    "https://10.0.0.5\\.example.com/",
+])
+def test_rejects_backslash_in_authority(monkeypatch, url):
+    monkeypatch.setattr(socket, "getaddrinfo", _fake_resolution("93.184.216.34"))
+    with pytest.raises(UnsafeURLError):
+        validate_public_url(url)
+
+
+def test_rejects_host_that_urllib3_would_dial_differently(monkeypatch):
+    """Belt and braces: any divergence between the two parsers fails closed."""
+    monkeypatch.setattr(socket, "getaddrinfo", _fake_resolution("93.184.216.34"))
+    import urllib3.util
+
+    class _Parsed:
+        host = "127.0.0.1"
+
+    monkeypatch.setattr(urllib3.util, "parse_url", lambda u: _Parsed())
+    with pytest.raises(UnsafeURLError):
+        validate_public_url("https://example.com/")
+
+
+def test_userinfo_host_is_dialled_as_parsed(monkeypatch):
+    """A userinfo form both parsers agree on still validates the REAL host."""
+    seen = []
+
+    def _getaddrinfo(host, *a, **k):
+        seen.append(host)
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 0))]
+
+    monkeypatch.setattr(socket, "getaddrinfo", _getaddrinfo)
+    validate_public_url("https://x.com@evil.test/")
+    assert seen == ["evil.test"]
+
+
 def test_rejects_unresolvable_host(monkeypatch):
     def _boom(*a, **k):
         raise socket.gaierror("nope")

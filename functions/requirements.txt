@@ -19,8 +19,11 @@ pydantic==2.13.4
 flask==3.1.3
 # Pillow — downscale social-post cover images to small card thumbnails before
 # storing them (post thumbnails are the only image-processing use).
-# Pillow>=11.0.0,<12.0
-Pillow==11.3.0
+# Pillow>=11.0.0,<13.0
+# 12.3.0 (2026-09-16): 11.3.0 carried 18 open advisories (PSD/FITS/JPEG2000
+# decoders), and Image.open picks the decoder from the BYTES a remote og:image
+# serves, so the remote host chose the code path. pip-audit clean at 12.3.0.
+Pillow==12.3.0
 
 # ── Transitive pins: 2026-08-26 Firestore outage (§9 round 15) ────────────────
 # Exception to the "top-level only" rule above, deliberately. Containers built

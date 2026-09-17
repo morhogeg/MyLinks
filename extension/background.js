@@ -9,7 +9,7 @@ const BADGE_RESET_MS = 2000;
 // ── Settings ────────────────────────────────────────────────────────────────
 
 async function getSettings() {
-  const { token = "", baseUrl = "" } = await chrome.storage.sync.get(["token", "baseUrl"]);
+  const { token = "", baseUrl = "" } = await chrome.storage.local.get(["token", "baseUrl"]);
   return {
     token: (token || "").trim(),
     baseUrl: (baseUrl || "").trim().replace(/\/+$/, "") || DEFAULT_BASE_URL,
