@@ -154,9 +154,11 @@ test('unauthenticated cannot read or write the owner doc', async () => {
 // AuthProvider.createWorkspaceClientSide — a signed-in account may create
 // exactly ONE doc: its own, keyed by its auth uid, linked to itself alone.
 test('new account CAN create its own workspace doc (self-serve fallback)', async () => {
+  // createdAt must be "now": the rule refuses a backdated birth date (a
+  // founder-grant forgery), so the payload mirrors AuthProvider's Date.now().
   await assertSucceeds(
     setDoc(doc(strangerDb(), 'users', STRANGER_AUTH), {
-      authUids: [STRANGER_AUTH], createdAt: 1, onboarded: false,
+      authUids: [STRANGER_AUTH], createdAt: Date.now(), onboarded: false,
     }),
   );
 });
@@ -240,7 +242,10 @@ for (const [field, value] of Object.entries(SERVER_OWNED)) {
 
 test('owner cannot smuggle a server-owned field in with an allowed one', async () => {
   await assertFails(updateDoc(doc(ownerDb(), 'users', OWNER_DOC), { timezone: 'UTC', createdAt: 0 }));
-  await assertFails(updateDoc(doc(ownerDb(), 'users', OWNER_DOC), { timezone: 'UTC', createdAt: deleteField() }));
+  // Deleting a server-owned field that EXISTS is a change to it (deleting an
+  // absent one is a no-op and never reaches affectedKeys). The fixture carries
+  // `email`, so that is the field this asserts on.
+  await assertFails(updateDoc(doc(ownerDb(), 'users', OWNER_DOC), { timezone: 'UTC', email: deleteField() }));
   await assertFails(updateDoc(doc(ownerDb(), 'users', OWNER_DOC), { onboarded: true, authUids: arrayUnion(STRANGER_AUTH) }));
 });
 
