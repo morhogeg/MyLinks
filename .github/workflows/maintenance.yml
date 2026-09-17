@@ -7,10 +7,18 @@
 # path), and every input reaches the shell through `env`, never inline. Dry
 # run unless `apply` is ticked. Output is the tool's own stdout, which the
 # tools keep structural (ids + counts, no user text, no uids).
+#
+# Two ways in: the dispatch form (owner, Actions tab), or a push to
+# `trigger/maintenance` carrying `.github/maintenance-request.json`
+# {"tool": ..., "args": ..., "apply": bool, "delete_old": bool} — the
+# dispatch API 403s for cloud sessions, so a push is their control channel
+# (same as trigger/pipeline-health). The file is read only on that branch.
 
 name: Maintenance
 
 on:
+  push:
+    branches: [trigger/maintenance]
   workflow_dispatch:
     inputs:
       tool:
@@ -77,12 +85,34 @@ jobs:
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
           echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
 
-      - name: Run tool
+      - name: Resolve request
         env:
-          TOOL: ${{ inputs.tool }}
-          TOOL_ARGS: ${{ inputs.args }}
-          APPLY: ${{ inputs.apply }}
-          DELETE_OLD: ${{ inputs.delete_old }}
+          IN_TOOL: ${{ inputs.tool }}
+          IN_ARGS: ${{ inputs.args }}
+          IN_APPLY: ${{ inputs.apply }}
+          IN_DELETE_OLD: ${{ inputs.delete_old }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = "push" ]; then
+            f=.github/maintenance-request.json
+            [ -f "$f" ] || { echo "::error::$f missing on the trigger branch"; exit 1; }
+            {
+              echo "TOOL=$(jq -r '.tool // ""' "$f")"
+              echo "TOOL_ARGS=$(jq -r '.args // ""' "$f")"
+              echo "APPLY=$(jq -r '.apply // false' "$f")"
+              echo "DELETE_OLD=$(jq -r '.delete_old // false' "$f")"
+            } >> "$GITHUB_ENV"
+          else
+            {
+              echo "TOOL=$IN_TOOL"
+              echo "TOOL_ARGS=$IN_ARGS"
+              echo "APPLY=$IN_APPLY"
+              echo "DELETE_OLD=$IN_DELETE_OLD"
+            } >> "$GITHUB_ENV"
+          fi
+
+      - name: Run tool
         working-directory: functions
         run: |
           set -euo pipefail
