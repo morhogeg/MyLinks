@@ -226,7 +226,16 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-09-17, latest): install build **1326** (security round 2: Keychain share token, Reset token, PIN lockout), then the 1325 QA below if not yet done
+> ## 🚨 OWNER ACTION (updated 2026-09-17, latest): install build **1327** (first-run tour re-synced), then the 1326 QA below if not yet done
+>
+> **1327** (run #327, merge `9f2ee29`) carries the tour pass on top of both
+> security rounds. QA on 1327: Settings → "Take the tour again", read all
+> four steps in your theme: step 1 is the share sheet (native), step 2's
+> card wears the orange Productivity chip and says "Related cards", step 4
+> is titled Revisit and shows Due now / Do this / Weekly synthesis, and the
+> last button reads "Start saving" and simply closes. Then the 1326 list.
+>
+> ## (superseded) OWNER ACTION (updated 2026-09-17): install build **1326** (security round 2: Keychain share token, Reset token, PIN lockout), then the 1325 QA below if not yet done
 >
 > **1326** (run #326, merge `8f3ebf8` + `4456ccc`) carries both security
 > rounds. QA on 1326, in this order: (1) do NOT open the app first: share a
@@ -2175,9 +2184,11 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 
 - **2026-09-17 — First-run tour reviewed and re-synced to the shipped app
-  (`web/components/OnboardingTour.tsx`, `Onboarding.tsx`). NOT shipped:
-  committed and pushed on `claude/onboard-launch-video-updates-2mwxyl`,
-  awaiting `/ship` (Vercel + TestFlight; no functions change).** Owner asked
+  (`web/components/OnboardingTour.tsx`, `Onboarding.tsx`). SHIPPED: merge
+  `9f2ee29` to main (Vercel auto-deploy), TestFlight run #327 = **build
+  1327**; the same merge carries the launch-film re-sync below (marketing
+  only). No functions, rules or hosting deploy. The branch merged origin/main
+  first (security rounds 1+2, build 1326); the only conflict was this log.** Owner asked
   for a quality and currency pass on the tour. The four-step story from the
   09-03 product-review build had drifted in six places, all fixed: (1) the
   last step described the old digest ("A daily digest, a weekly synthesis,
