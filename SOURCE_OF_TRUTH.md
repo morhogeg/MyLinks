@@ -2022,6 +2022,39 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-17 — First-run tour reviewed and re-synced to the shipped app
+  (`web/components/OnboardingTour.tsx`, `Onboarding.tsx`). NOT shipped:
+  committed and pushed on `claude/onboard-launch-video-updates-2mwxyl`,
+  awaiting `/ship` (Vercel + TestFlight; no functions change).** Owner asked
+  for a quality and currency pass on the tour. The four-step story from the
+  09-03 product-review build had drifted in six places, all fixed: (1) the
+  last step described the old digest ("A daily digest, a weekly synthesis,
+  and gentle reminders") with an invented mock ("3 threads came together");
+  it is now the **Revisit** step, named after the tab, and the mock is a
+  miniature of the real Revisit screen: Due now (a resurfaced row with the
+  reminder bell and time), Do this (the blank circle, the task, the card
+  under it) and Weekly synthesis (the "This week in Machina" masthead);
+  (2) desktop web showed the iOS share sheet, a phone gesture a web user
+  cannot perform (left open 08-23); web now gets a miniature of the real +
+  form (Link / Image / Note tabs, a pasted link, Save) and its copy names
+  the three web paths honestly (the + form, the phone share sheet, the
+  browser extension that Settings documents); (3) the card mock's category
+  chip wore the accent instead of the category colour every real card uses,
+  and its byline had an icon a plain publisher never has; both match
+  `Card.tsx` / `SourceByline.tsx` now; (4) "Connected to" became the card
+  detail's real label, "Related cards"; (5) the Understand copy promised
+  "key points", which no card has; now "title, summary, tags, category";
+  (6) the final button said "Save your first link" but only closes the tour;
+  it now says "Start saving" on both surfaces. Page two's "Not now" row used
+  the retired `Sparkles` glyph (banned app-wide 08-26); it is a `Clock` now,
+  and web/ is back to zero Sparkles references. **Verified:** `tsc` clean,
+  eslint clean on both files, em-dash gate clean, and all four steps
+  RENDERED through a throwaway harness page (deleted) with Playwright:
+  light and dark, phone and desktop widths, every step eyeballed. **Not
+  verified:** on device; the native share-sheet mock is unchanged apart from
+  the shared chip row. Left alone, deliberately: the stale `data-tour`
+  attributes in Feed/BottomTabBar/AddLinkForm/DisplayGlyph are dead markup
+  from the old spotlight tour, harmless, worth a sweep some day.
 - **2026-09-16 — Launch film re-synced to the shipped app (`marketing/
   launch-clip/`, first pass since 2026-08-02). NOT shipped: the film is a
   marketing asset, nothing under `web/` or `functions/` changed.** Owner
