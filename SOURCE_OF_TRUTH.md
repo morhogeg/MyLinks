@@ -226,7 +226,20 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-09-16, latest): install build **1325** (share sheet: several screenshots become one card), then the 1324 QA below if not yet done
+> ## 🚨 OWNER ACTION (updated 2026-09-17, latest): install build **1326** (security round 2: Keychain share token, Reset token, PIN lockout), then the 1325 QA below if not yet done
+>
+> **1326** (run #326, merge `8f3ebf8` + `4456ccc`) carries both security
+> rounds. QA on 1326, in this order: (1) do NOT open the app first: share a
+> page from Safari; it must save (the extension migrates the old token into
+> the Keychain on read). (2) Open the app, Settings → Browser extension →
+> Reset token, confirm, then share again from Safari: must save. (3) Enter
+> a wrong PIN six times on a private collection: expect "tries left" copy,
+> then a 30 s lockout with a countdown, and Close must still work. (4) Sign
+> out, then share from Safari: must say "Open the Machina app and sign in
+> first". Backend, rules and hosting are already live (functions #108,
+> rules #14, hosting #15). Then the 1325 list below.
+>
+> ## (superseded) OWNER ACTION (updated 2026-09-16): install build **1325** (share sheet: several screenshots become one card), then the 1324 QA below if not yet done
 >
 > **1325** (run #325, merge `f3bf08b`) fixes the share extension keeping
 > only the FIRST of several shared screenshots. QA on 1325: in Photos,
@@ -1229,42 +1242,63 @@ The multi-user auth work described below **was** fully written but not live:
     open the app, Settings → Browser extension → Reset token, share again
     (must work with the new token), sign out and share (must say "Open the
     Machina app and sign in first").
-12b. **[ ] Owner actions from the 2026-09-16 round-2 security pass (not
-    doable from code; §9 entry has the full reasoning):**
-    - **Let `rules-tests.yml` prove the ruleset before anything deploys.**
-      Round 2 adds type guards on the client-writable user fields and a
-      "no backdated reminder" guard on links (35 + 21 new emulator cases,
-      NOT executed here: the emulator jar download is blocked). The deploy
-      workflow runs the suite first and refuses the deploy on red, so a
-      wrong rule cannot reach prod, but a red run means the merge must be
-      followed up, not left.
-    - **Merge = functions (unscoped), rules, hosting (new
-      `/api/share-config/rotate` rewrite), Vercel, and a TestFlight build**
-      (Keychain + Reset token + PIN backoff + WKWebView cache clear). Then
-      the on-device checklist under item 12.
-    - **Run `functions/tools/migrate_share_owners.py`** (dry run, then
-      `--apply`) once: legacy public share docs still carry `ownerUid` (the
-      phone number) until it runs. Deletion now sweeps them, but the field is
-      readable by anyone holding a legacy link until then.
-    - **Run `functions/tools/backfill_storage_keys.py <owner uid>`** (dry
-      run, `--apply`, later `--apply --delete-old`): new images are stored
-      under an opaque per-workspace key, but every screenshot saved before
-      2026-09-16 still has the phone number in its public URL. The script
-      copies the blobs, rewrites every stored URL (links, digests, shares),
-      and leaves the old blobs until you pass `--delete-old`.
-    - **Decide the App Check enforcement path** (§9 has the code-half
-      proposal): today omitting the header buys an attacker nothing beyond
-      what their own token already allows; enforcing needs a native App
-      Attest provider first or the iOS app goes dark.
-    - **Trial-reset tombstone (deferred, P2 id S-23):** `delete_account` +
-      re-signup with the same email yields a fresh 14-day trial and fresh
-      counters. The cheap mitigation (a hashed-email tombstone carrying the
-      first `createdAt`) is designed but not built; decide whether the
-      abuse is worth the record.
-    - **Consider an `environment: production` gate with a required reviewer
-      on `ios-testflight.yml` / `pipeline-health.yml`**: a push to
-      `trigger/*` runs the pushed branch's workflow file with prod secrets
-      (round 1 flagged the ruleset; this is the GitHub-native complement).
+12b. **[x] Round-2 security pass SHIPPED 2026-09-17 (owner said "do
+    everything except rotating Gemini keys").** What ran, with receipts:
+    - **Merged** `8f3ebf8` (+ `2219ffb` maintenance control channel, `4456ccc`
+      rules-file fix). **Rules tests run #17: 95/95 green**, the first time
+      either round's cases executed (56 of the 95 are from the two rounds;
+      two round-1 cases were themselves wrong and are fixed in `4456ccc`:
+      one wrote a backdated `createdAt` the rule rejects on purpose, one
+      deleted a field the fixture never had). **Deploy Firestore rules run
+      #14 green** (type guards, reminder backdating guard, `deleted_accounts`,
+      `storage.rules` deny-all are LIVE). **Deploy Cloud Functions run #108
+      green** (unscoped; run #107 failed at the rules compile step before
+      deploying anything, see §9). **Deploy Firebase Hosting run #15 green**
+      (`/api/share-config/rotate` rewrite). Vercel auto-deployed from the
+      merge. **iOS → TestFlight run #326 = build 1326** (see §9 for its
+      state at the time of writing).
+    - **Legacy share `ownerUid` migrated:** Maintenance run #3 moved all 8
+      legacy docs (of 39 share docs scanned) into `shared_owners` and
+      deleted the field from the public copy. No public share doc carries
+      the phone number any more.
+    - **Storage key backfill:** Maintenance run #2 (dry run) counted 5
+      workspaces, 128 uid-keyed blobs; run #4 applied it (128 blobs copied, 85 docs rewritten)
+      (copy to `screenshots/{storageKey}/`, rewrite links / digests / share
+      snapshots). The OLD blobs are deliberately still there: a `--delete-old`
+      run is the last step once a device has been seen loading the new URLs
+      (an offline Firestore cache or a cached share preview could still
+      point at an old blob for a while). **Owner: run the Maintenance
+      workflow once with `backfill_storage_keys`, args `--all`, apply +
+      delete_old ticked, in a week.**
+    - **Maintenance workflow** (`.github/workflows/maintenance.yml`): runs a
+      named tool under `functions/tools` with the deploy service account,
+      dry run unless `apply` is ticked. Owner: the Actions tab dispatch
+      form. Cloud sessions: push `.github/maintenance-request.json` to
+      `trigger/maintenance` (the dispatch API 403s for them; the branch push
+      is the control channel, same posture as `trigger/pipeline-health`).
+    - **Trial-reset tombstone (was "deferred S-23"): BUILT.** `delete_account`
+      writes `deleted_accounts/{sha256(email)}` with the workspace's first
+      `createdAt`; `create_workspace` inherits it, so delete-and-resignup
+      keeps the old trial clock. Functions-only collection, rules-tested.
+    - **Still owner-only, not done here:**
+      1. **Delete the stale branches** `trigger/ask-debug`,
+         `trigger/pipeline-debug` and the 25 `claude/ship-tf-trigger-*`
+         (`git push origin --delete …` from a Mac; the cloud session's git
+         proxy drops delete pushes, and the GitHub MCP has no branch-delete).
+      2. **Rotate the Gemini key** (explicitly excluded by the owner today)
+         and the **ASC `.p8`** (App Store Connect console).
+      3. **Branch protection on `trigger/**`** and, optionally, an
+         `environment: production` gate with a required reviewer on
+         `ios-testflight.yml` / `pipeline-health.yml` / `maintenance.yml`:
+         repo Settings, no API tool in this session.
+      4. **App Check enforcement**: still OFF on purpose. Flipping
+         `APPCHECK_ENFORCE=true` today takes the iOS app down (no native App
+         Attest provider). The code half is a proposal in §9 (2026-09-16
+         round 2); build the native provider first, then flip.
+      5. **On-device QA of build 1326** (item 12's checklist): share from
+         Safari before opening the app (Keychain migration), Reset token,
+         sign out and share, the PIN pad's "tries left" and lockout copy.
+      6. **`--delete-old` backfill run** (above), after a week.
 12a. **[ ] Owner actions from the 2026-09-16 security pass (not doable from
     code):**
     - **Delete the stale remote branches** `trigger/ask-debug` and
@@ -2124,6 +2158,58 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-17 — Security round 2 SHIPPED, migrations run, tombstone built.
+  Owner: "do everything except rotating Gemini keys." Merge `8f3ebf8` to
+  main (round 1 `e000fb1` + round 2 `ef83d4d`/`b407d50`, with main's build
+  1325 merged in first), then `2219ffb`, `4456ccc`.** What happened, in
+  order, including the two things that went wrong:
+  **(1) The first deploy attempt failed at compile time, deploying
+  nothing.** Promoting `firestore.rules.locked` into `firestore.rules` kept
+  seven header lines instead of six, so `rules_version` appeared twice;
+  `firebase deploy` compiles the rules before touching anything, so Deploy
+  Cloud Functions #107 and Deploy Firestore rules #13 both stopped there
+  (fail-closed, prod untouched). Fixed in `4456ccc` (+ a `.deploy-ping` bump
+  to re-fire functions). Lesson recorded in the file itself: the two files
+  differ only in their comment header, and that header is 6 lines in
+  `firestore.rules`, 7 in `.locked`.
+  **(2) Rules tests #16 was the FIRST execution of either round's emulator
+  cases: 93/95.** Both failures were round-1 test bugs, not rule bugs:
+  "new account CAN create its own workspace doc" wrote `createdAt: 1`,
+  which the round-1 create rule refuses as a backdated birth date (the
+  founder-grant forgery it exists to stop); "cannot smuggle a server-owned
+  field" asserted on `createdAt: deleteField()` against a fixture with no
+  `createdAt`, which Firestore treats as a no-op (not in `affectedKeys`).
+  Fixed to `Date.now()` and `email: deleteField()`. **Run #17: 95/95.** Every
+  rule from both rounds is therefore now emulator-proven AND live (Deploy
+  Firestore rules #14 green, which also deployed the deny-all
+  `storage.rules`).
+  **(3) Deployed:** Cloud Functions #108 (unscoped, all functions incl. the
+  new `rotate_ingest_token_http`), Hosting #15 (rotate rewrite), Vercel
+  (auto), TestFlight #326 → build 1326 (Keychain token, Reset token, PIN
+  backoff, WKWebView cache clear, API route caps).
+  **(4) Maintenance workflow** (`maintenance.yml`, `workflow_dispatch` + a
+  request file on `trigger/maintenance`): run #1 `migrate_share_owners` dry
+  run → 39 share docs, 8 legacy; **run #3 applied it**: the 8 legacy
+  `shared_cards` docs now have a `shared_owners` row and no `ownerUid`.
+  Run #2 `backfill_storage_keys --all` dry run → 5 workspaces, 128
+  uid-keyed blobs; **run #4 applied it** (128 copied, 85 docs rewritten) (copy + rewrite, old
+  blobs kept for a `--delete-old` pass in a week, §4 12b). The tool
+  learned `--all` and reads the bucket name from an existing stored URL
+  (the project's bucket name is not in the repo), and a short-circuit
+  `any()` that would have rewritten only the first card of a digest was
+  fixed before the apply.
+  **(5) Deleted-account tombstone built** (§4 12b item, was deferred):
+  `link_service.write_account_tombstone` / `inherited_created_at`,
+  `deleted_accounts` denied to clients, 5 pytest cases + 1 emulator case.
+  **Not done, owner-only (§4 12b list):** stale branch deletion (the
+  session's git proxy drops delete pushes), Gemini key (excluded) and ASC
+  `.p8` rotation, `trigger/**` branch protection / environment gate, App
+  Check enforcement (needs the native provider first), on-device QA of
+  1326, the `--delete-old` backfill.
+  **Verified:** pytest 1021, tsc, eslint 16 pre-existing, static export,
+  parser 24/24, extension 1/1, rules emulator 95/95 (CI), every deploy run
+  green on its second attempt as listed. **Not verified:** anything on
+  device.
 - **2026-09-16 (round 2) — Adversarial re-verification of round 1 plus
   everything it did not reach. Branch `claude/security-round-2` off
   `e000fb1`. NOT SHIPPED at time of writing; the merge needs an unscoped
