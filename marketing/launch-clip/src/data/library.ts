@@ -49,7 +49,7 @@ export const CARDS: Card[] = [
     category: 'AI',
     title: 'What AI actually changes about work',
     summary:
-      'A thread arguing the models take the typing, not the judgment — and which skills to bet on either way.',
+      'A thread arguing the models take the typing, not the judgment, and which skills to bet on either way.',
     source: '@futuretense',
     sourceKind: 'x',
     tags: ['ai', 'work'],
@@ -61,7 +61,7 @@ export const CARDS: Card[] = [
     category: 'Cooking',
     title: 'One-pan lemon chicken with orzo',
     summary:
-      'Bright, briny, twenty minutes start to finish — the whole thing happens in a single skillet.',
+      'Bright, briny, twenty minutes start to finish. The whole thing happens in a single skillet.',
     source: '@sundaytable',
     sourceKind: 'instagram',
     tags: ['weeknight', 'to-try'],
@@ -73,7 +73,7 @@ export const CARDS: Card[] = [
     category: 'Travel',
     title: 'Hidden coves of Sardinia',
     summary:
-      'A carousel of beaches you can only reach on foot — go in June, before the boats find them.',
+      'A carousel of beaches you can only reach on foot. Go in June, before the boats find them.',
     source: '@quietplaces',
     sourceKind: 'instagram',
     tags: ['places', 'summer'],
@@ -110,19 +110,19 @@ export const CARDS: Card[] = [
     category: 'AI',
     title: 'The jobs AI actually changes',
     summary:
-      'A sober look past the hype at which work shifts first — and why the viral lists keep getting it wrong.',
+      'A sober look past the hype at which work shifts first, and why the viral lists keep getting it wrong.',
     source: 'theatlantic.com',
     tags: ['ai', 'work'],
     readTime: 9,
     age: '3w ago',
-    note: 'Maya sent this — the part about editors is us.',
+    note: 'Maya sent this. The part about editors is us.',
   },
   {
     id: 'machineminds',
     category: 'AI',
     title: 'How to Use AI to Improve Yourself So Much it Will Scare People',
     summary:
-      'Use the tools without outsourcing the thinking — blunt, funny, and specific about what to automate and what to keep yours.',
+      'Use the tools without outsourcing the thinking: blunt, funny, and specific about what to automate and what to keep yours.',
     source: 'IAmMarkManson',
     sourceKind: 'youtube',
     tags: ['self-improvement', 'watch-again'],
@@ -174,7 +174,7 @@ export const ASK_QUESTION = 'What have I been saving about AI?';
 export const ASK_ANSWER = [
   'Your saves circle one question: what stays human.',
   '',
-  'The thread you starred argues AI takes the typing and leaves the judgment, the article Maya sent maps which jobs actually shift, and Mark Manson’s video flips it — use the machines to sharpen the human part.',
+  'The thread you starred argues AI takes the typing and leaves the judgment, the article Maya sent maps which jobs actually shift, and Mark Manson’s video flips it: use the machines to sharpen the human part.',
 ].join('\n');
 
 export const ASK_SOURCES = [
@@ -246,8 +246,8 @@ export const CLUSTERS = [
 export const SYNTHESIS = {
   title: 'You keep circling one idea',
   meta: 'Jul 21 – 27 · 8 saves',
-  lead: 'The AI thread, Maya’s article, and Mark Manson’s video — three saves, one question: what stays human. You might be ready to write your own take.',
+  lead: 'The AI thread, Maya’s article, and Mark Manson’s video: three saves, one question. What stays human? You might be ready to write your own take.',
   standoutTitle: 'How to Use AI to Improve Yourself So Much it Will Scare People',
-  standoutReason: 'Saved two months ago, never revisited — and it’s the missing half of the argument your newer saves are having.',
+  standoutReason: 'Saved two months ago, never revisited. It’s the missing half of the argument your newer saves are having.',
   question: 'If the models take the typing, what’s the part of your work only you can do?',
 };

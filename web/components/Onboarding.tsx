@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import {
-    Share, MoreHorizontal, Puzzle, MousePointerClick, Plus, Upload, Sparkles, ArrowRight,
+    Share, MoreHorizontal, Puzzle, MousePointerClick, Plus, Upload, Clock, ArrowRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { CitationGlyph } from '@/components/ui/Wordmark';
@@ -157,7 +157,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
                             onClick={() => { hapticLight(); setShowHow(true); }}
                         />
                         <FlowRow
-                            icon={<Sparkles className="w-[18px] h-[18px]" />}
+                            icon={<Clock className="w-[18px] h-[18px]" />}
                             title="Not now"
                             body="Start empty and save as you go. Importing is always there in Settings."
                             onClick={() => { hapticLight(); onDone(); }}

@@ -10,9 +10,9 @@ import {
     Link2,
     MessageCircleQuestion,
     Bell,
-    CalendarClock,
+    CalendarCheck,
+    Circle,
     Clock,
-    ExternalLink,
     FileText,
     Mail,
     MessageCircle,
@@ -33,7 +33,8 @@ import { hapticSelection, hapticLight } from '@/lib/haptics';
  * a story rather than a decision.
  *
  * Four steps, one idea each: it catches things, it understands and connects
- * them, you can ask it anything, and it brings the right thing back. That is
+ * them, you can ask it anything, and it brings the right thing back (the
+ * Revisit tab, named as such so the tour teaches the app's own words). That is
  * the whole product. The eight-step version this replaces spent five of its
  * steps on features (search, collections, a graph, a send-off) that the four
  * below already imply, and it was gated on a non-empty library, so a brand-new
@@ -81,8 +82,65 @@ function ShareTile({ icon, label }: { icon: ReactNode; label: string }) {
     );
 }
 
-/** iOS share-sheet row (native) / in-app capture (web) — Machina highlighted. */
+/** The three first-class save types, as a quiet chip row under either capture mock. */
+function SaveTypeChips() {
+    return (
+        <div className="flex items-center justify-center gap-1.5 mt-3 pt-3 border-t border-border-subtle">
+            {[
+                { icon: <Link2 className="w-3 h-3" />, label: 'Links' },
+                { icon: <ImageIcon className="w-3 h-3" />, label: 'Images' },
+                { icon: <StickyNote className="w-3 h-3" />, label: 'Notes' },
+            ].map((t) => (
+                <span key={t.label} className="inline-flex items-center gap-1 rounded-full bg-fill-subtle text-text-secondary text-[10px] font-medium px-2 py-1">
+                    <span className="text-accent">{t.icon}</span>
+                    {t.label}
+                </span>
+            ))}
+        </div>
+    );
+}
+
+/** Web: a miniature of the REAL + capture form (AddLinkForm.tsx): the
+    Link / Image / Note tab strip, the link field with a pasted URL, the Save
+    button. Desktop web used to show the iOS share sheet here, a phone gesture
+    the web user cannot perform (left open on 2026-08-23, closed now). */
+function WebCaptureMock() {
+    return (
+        <div className="w-full rounded-2xl bg-card border border-border-subtle shadow-xl p-4" aria-hidden>
+            <div className="flex gap-1 p-1 rounded-xl bg-fill-subtle">
+                {[
+                    { icon: <Link2 className="w-3 h-3" />, label: 'Link', on: true },
+                    { icon: <ImageIcon className="w-3 h-3" />, label: 'Image', on: false },
+                    { icon: <StickyNote className="w-3 h-3" />, label: 'Note', on: false },
+                ].map((t) => (
+                    <span
+                        key={t.label}
+                        className={`flex-1 inline-flex items-center justify-center gap-1 py-1.5 rounded-lg text-[11px] font-medium ${
+                            t.on ? 'bg-card text-text shadow-sm' : 'text-text-muted'
+                        }`}
+                    >
+                        {t.icon}
+                        {t.label}
+                    </span>
+                ))}
+            </div>
+            <div className="mt-3 flex items-center gap-2 h-10 px-3 rounded-xl bg-background border border-border-subtle">
+                <Link2 className="w-3.5 h-3.5 text-text-muted shrink-0" />
+                <span className="flex-1 text-[12px] text-text truncate">nature.com/articles/focus</span>
+                <span className="w-[2px] h-4 bg-accent rounded-full" />
+            </div>
+            <div className="mt-3 h-10 rounded-full bg-accent text-accent-ink text-[13px] font-bold flex items-center justify-center gap-1.5">
+                <Plus className="w-3.5 h-3.5" />
+                Save
+            </div>
+            <SaveTypeChips />
+        </div>
+    );
+}
+
+/** iOS share sheet with Machina highlighted (native only; web gets WebCaptureMock). */
 function CaptureMock({ native }: { native: boolean }) {
+    if (!native) return <WebCaptureMock />;
     return (
         <div className="w-full rounded-2xl bg-card border border-border-subtle shadow-xl p-4" aria-hidden>
             {/* Content being shared */}
@@ -92,9 +150,7 @@ function CaptureMock({ native }: { native: boolean }) {
                 </div>
                 <div className="min-w-0">
                     <p className="text-[12px] font-semibold text-text truncate">The science of deep focus</p>
-                    <p className="text-[10px] text-text-muted truncate">
-                        {native ? 'Sharing from Safari' : 'nature.com/articles/focus'}
-                    </p>
+                    <p className="text-[10px] text-text-muted truncate">Sharing from Safari</p>
                 </div>
             </div>
             {/* App / target row */}
@@ -112,19 +168,7 @@ function CaptureMock({ native }: { native: boolean }) {
                 <ShareTile icon={<Bookmark className="w-5 h-5" />} label="Saved" />
                 <ShareTile icon={<MoreHorizontal className="w-5 h-5" />} label="More" />
             </div>
-            {/* What Machina captures — the three first-class save types. */}
-            <div className="flex items-center justify-center gap-1.5 mt-3 pt-3 border-t border-border-subtle">
-                {[
-                    { icon: <Link2 className="w-3 h-3" />, label: 'Links' },
-                    { icon: <ImageIcon className="w-3 h-3" />, label: 'Images' },
-                    { icon: <StickyNote className="w-3 h-3" />, label: 'Notes' },
-                ].map((t) => (
-                    <span key={t.label} className="inline-flex items-center gap-1 rounded-full bg-fill-subtle text-text-secondary text-[10px] font-medium px-2 py-1">
-                        <span className="text-accent">{t.icon}</span>
-                        {t.label}
-                    </span>
-                ))}
-            </div>
+            <SaveTypeChips />
         </div>
     );
 }
@@ -137,6 +181,9 @@ function CaptureMock({ native }: { native: boolean }) {
     wear their category's app-wide identity color (the same
     `getCategoryColorStyle` hash the graph, the cards and the filters use). */
 function StructuredCardMock() {
+    // The chip wears the category's app-wide colour, as on every real card
+    // (Card.tsx uses the same getCategoryColorStyle hash), not the accent.
+    const chip = getCategoryColorStyle('Productivity');
     const related = [
         { title: 'Morning routines that stick', category: 'Health' },
         { title: 'Attention is a trainable skill', category: 'Science' },
@@ -150,13 +197,14 @@ function StructuredCardMock() {
             <div className="p-3.5 space-y-2">
                 {/* Chrome row: category (start) + source (end), as on every card */}
                 <div className="flex items-center justify-between gap-2">
-                    <span className="text-[9px] uppercase font-black tracking-widest px-1.5 py-0.5 rounded-lg bg-accent/12 text-accent">
+                    <span
+                        className="text-[9px] uppercase font-black tracking-widest px-1.5 py-0.5 rounded-lg"
+                        style={{ backgroundColor: chip.backgroundColor, color: chip.color }}
+                    >
                         Productivity
                     </span>
-                    <span className="inline-flex items-center gap-1 text-[10px] text-text-muted/70 min-w-0">
-                        <ExternalLink className="w-2.5 h-2.5 shrink-0" />
-                        <span className="truncate">nature.com</span>
-                    </span>
+                    {/* A plain publisher is just its name, no icon (SourceByline.tsx). */}
+                    <span className="text-[10px] text-text-muted truncate">nature.com</span>
                 </div>
                 <p className="text-[13px] font-bold text-text leading-tight">The science of deep focus</p>
                 <p className="text-[11px] text-text-secondary leading-relaxed">
@@ -179,10 +227,10 @@ function StructuredCardMock() {
                     <span>2d ago</span>
                 </div>
             </div>
-            {/* Connections — the card's own "related" strip. */}
+            {/* Connections — the card detail's own "Related cards" section, by its real name. */}
             <div className="px-3.5 pb-3.5 pt-2.5 border-t border-border-subtle">
                 <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-text-muted/70 mb-1.5">
-                    Connected to
+                    Related cards
                 </p>
                 <div className="flex flex-col gap-1.5">
                     {related.map((r) => (
@@ -241,34 +289,61 @@ function AskMock() {
     );
 }
 
-/** A "comes back to you" digest with a resurfaced item and a reminder. */
-function ResurfaceMock() {
+/** A miniature of the REAL Revisit tab (DigestView.tsx): its three sections in
+    their own vocabulary. "Due now" holds a ResurfacedCardRow with the reminder
+    bell, "Do this" holds a TakeawayRow (the blank circle, the task, the card
+    under it), and "Weekly synthesis" holds the SynthesisCard masthead. The old
+    mock here was an invented digest ("3 threads came together") that matched
+    no screen in the app. */
+function RevisitMock() {
+    const chip = getCategoryColorStyle('Productivity');
+    const section = (label: string) => (
+        <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-text-muted">{label}</p>
+    );
     return (
-        <div className="w-full rounded-2xl bg-card border border-border-subtle shadow-xl p-3.5" aria-hidden>
-            <div className="flex items-center justify-between mb-2.5">
-                <p className="text-[11px] font-bold text-text">Your weekly synthesis</p>
-                <span className="text-[9px] font-medium text-text-muted">Sun · 9:00</span>
+        <div className="w-full rounded-2xl bg-card border border-border-subtle shadow-xl p-3.5 flex flex-col gap-3" aria-hidden>
+            <div className="flex items-center gap-2">
+                <CalendarCheck className="w-3.5 h-3.5 text-accent" />
+                <p className="text-[12px] font-bold text-text">Revisit</p>
             </div>
-            <div className="flex flex-col gap-2">
-                {[
-                    { icon: <CalendarClock className="w-3.5 h-3.5" />, title: '3 threads came together', sub: 'Focus · habits · attention' },
-                    { icon: <CitationGlyph className="w-3.5 h-auto" />, title: 'A new connection surfaced', sub: 'Deep work ↔ sleep quality' },
-                ].map((r) => (
-                    <div key={r.title} className="flex items-center gap-2.5 rounded-xl bg-fill-subtle px-2.5 py-2">
-                        <div className="w-7 h-7 rounded-lg bg-accent/12 text-accent flex items-center justify-center shrink-0 ring-1 ring-accent/20">
-                            {r.icon}
-                        </div>
-                        <div className="min-w-0">
-                            <p className="text-[11px] font-semibold text-text truncate">{r.title}</p>
-                            <p className="text-[9.5px] text-text-muted truncate">{r.sub}</p>
+            <div className="flex flex-col gap-1.5">
+                {section('Due now')}
+                <div className="flex items-center gap-2 rounded-xl bg-fill-subtle px-2.5 py-2">
+                    <div className="min-w-0 flex-1">
+                        <p className="text-[11px] font-semibold text-text truncate">The science of deep focus</p>
+                        <div className="mt-0.5 flex items-center gap-1.5 text-[9.5px] text-text-muted">
+                            <span>nature.com</span>
+                            <span
+                                className="px-1.5 rounded-full text-[8px] leading-4 font-bold uppercase tracking-wider"
+                                style={{ backgroundColor: chip.backgroundColor, color: chip.color }}
+                            >
+                                Productivity
+                            </span>
                         </div>
                     </div>
-                ))}
+                    <span className="text-[9.5px] font-semibold text-text-muted tabular-nums">4:30 PM</span>
+                    <Bell className="w-3.5 h-3.5 text-text-muted shrink-0" />
+                </div>
             </div>
-            {/* Reminder chip */}
-            <div className="mt-2.5 flex items-center gap-1.5 text-accent">
-                <Bell className="w-3.5 h-3.5" />
-                <span className="text-[10px] font-semibold">Reminder: revisit “The science of deep focus”</span>
+            <div className="flex flex-col gap-1.5">
+                {section('Do this')}
+                <div className="flex items-start gap-2 rounded-xl bg-fill-subtle px-2.5 py-2">
+                    <Circle className="w-3.5 h-3.5 mt-px text-text-muted opacity-50 shrink-0" />
+                    <div className="min-w-0">
+                        <p className="text-[11px] font-medium text-text leading-snug">Block two 90-minute focus sessions this week</p>
+                        <p className="mt-0.5 text-[9.5px] text-text-muted truncate">The science of deep focus</p>
+                    </div>
+                </div>
+            </div>
+            <div className="flex flex-col gap-1.5">
+                {section('Weekly synthesis')}
+                <div className="rounded-xl bg-fill-subtle px-2.5 py-2">
+                    <div className="flex items-center gap-1.5 text-[8.5px] font-semibold uppercase tracking-[0.14em] text-accent">
+                        <CitationGlyph className="w-2 h-auto" />
+                        This week in Machina
+                    </div>
+                    <p className="mt-1 text-[11.5px] font-bold text-text leading-tight">You keep circling one idea</p>
+                </div>
             </div>
         </div>
     );
@@ -282,14 +357,14 @@ function buildSteps(native: boolean): Step[] {
             title: 'Save anything, from anywhere',
             body: native
                 ? 'Links, screenshots, images, or a quick note. Share them to Machina from any app, or capture right here. No copy-paste, no switching apps.'
-                : 'Share to Machina from any app on your phone, or capture right here with +: paste a link, add a screenshot, jot a thought. Every save lands as a card.',
+                : 'Capture here with +: paste a link, add a screenshot, jot a thought. On your phone, share to Machina from any app; in your browser, the extension clips any page in one click.',
             visual: <CaptureMock native={native} />,
         },
         {
             icon: <Waypoints className="w-4 h-4" />,
             eyebrow: 'Understand',
             title: 'Understood, and connected',
-            body: 'Machina reads every article, video, screenshot and note in full, then files a clean card: summary, key points, tags, category. Each one is matched against everything you already kept, so related saves find each other.',
+            body: 'Machina reads every article, video, screenshot and note in full, then files a clean card: title, summary, tags, category. Each one is matched against everything you already kept, so related saves find each other.',
             visual: <StructuredCardMock />,
         },
         {
@@ -300,11 +375,11 @@ function buildSteps(native: boolean): Step[] {
             visual: <AskMock />,
         },
         {
-            icon: <Bell className="w-4 h-4" />,
-            eyebrow: 'Resurface',
+            icon: <CalendarCheck className="w-4 h-4" />,
+            eyebrow: 'Revisit',
             title: 'It comes back to you',
-            body: 'A daily digest, a weekly synthesis, and gentle reminders bring the right save back at exactly the right moment.',
-            visual: <ResurfaceMock />,
+            body: 'Reminders come due, the to-dos inside your saves gather in one list, and each week Machina writes up what you kept. All of it waits for you in Revisit.',
+            visual: <RevisitMock />,
         },
     ];
 }
@@ -446,8 +521,8 @@ export default function OnboardingTour({
                         >
                             {isLast ? (
                                 <>
-                                    <Plus className="w-4 h-4" />
-                                    {native ? 'Save your first link' : 'Start saving'}
+                                    Start saving
+                                    <ArrowRight className="w-4 h-4 rtl:-scale-x-100" />
                                 </>
                             ) : (
                                 <>

@@ -7,7 +7,7 @@ import {
   Youtube,
   Layers,
   MessagesSquare,
-  Newspaper,
+  CalendarCheck,
   Plus,
   Search,
   StickyNote,
@@ -118,7 +118,9 @@ export const TabBar: React.FC<{ active?: 'home' | 'collections' | 'ask' | 'diges
     { key: 'home', label: 'Home', Icon: Home },
     { key: 'collections', label: 'Collections', Icon: Layers },
     { key: 'ask', label: 'Ask', Icon: MessagesSquare },
-    { key: 'digest', label: 'Digest', Icon: Newspaper },
+    // 'Revisit' since 2026-09-11 (was Today, before that Digest); the key stays
+    // `digest` in the app too. Icon and label are BottomTabBar.tsx's.
+    { key: 'digest', label: 'Revisit', Icon: CalendarCheck },
   ] as const;
 
   const Tab: React.FC<{ t: (typeof tabs)[number] }> = ({ t }) => {
@@ -420,7 +422,7 @@ export const SearchField: React.FC<{ value: string; caret?: boolean; semantic?: 
   >
     <Search size={15} color={T.textMuted} />
     <span style={{ fontSize: 13.5, color: value ? T.text : T.textMuted, whiteSpace: 'nowrap' }}>
-      {value || 'Search everything you saved'}
+      {value || 'Search or ask your saves'}
       {caret && (
         <span
           style={{

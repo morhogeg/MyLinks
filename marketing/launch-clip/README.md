@@ -62,8 +62,8 @@ into one point of light that the brackets close around, and the middle acts
 follow what the product actually does, in order: **saving was never the hard part → Machina reads
 what you save → summarized, tagged and filed → so you can find it again → then
 ask it anything → answers built from what you saved → every save connects to the
-rest → nothing worth keeping stays buried.** The film closes on
-"Everything you save, finally useful." It deliberately avoids two framings the
+rest → nothing worth keeping stays buried.** The film closes on the subtitle,
+"Never lose another great find." It deliberately avoids two framings the
 owner ruled out: it is **not** a learning app, and it does **not** sell
 "search by meaning" as the headline. The word *library* appears nowhere.
 
@@ -74,17 +74,22 @@ owner ruled out: it is **not** a learning app, and it does **not** sell
 | 0–1 | 0:00 | `ColdOpen` | **The app booting** — the real `BootScreen` motion, in the film's light grade |
 | 1–5 | 0:02.5 | `Scatter` | **Scattered saving, as a story**: five save gestures (bookmark / playlist / send-to-self / star / one-more-tab), each flying into its own silo → the piles grow unreadable → **the loss on bar 3** (the film's only minor chord): the wrong pile opened twice |
 | 5–7 | 0:12.5 | `WordmarkScene` | The five silos rush back and collapse into one point of ink; the mark closes around it, then pushes through into the product |
-| 7–12 | 0:17.5 | `Capture` | **One share sheet, three sources behind it** (the sheet names each one) → the five-phase pipeline, held ~5.5s under a push-in → a finished card |
+| 7–12 | 0:17.5 | `Capture` | **One share sheet, four sources behind it** (the sheet names each one: an Instagram carousel, a YouTube video, a screenshot from Photos, an article) → the five-phase pipeline, held ~5.5s under a push-in → a finished card |
 | 12–15 | 0:30 | `Library` | The feed, then the search that finds the one you meant |
 | 15–20 | 0:37.5 | `AskScene` | **The hero, five bars.** Question → streamed answer → three citation chips, from three different platforms |
 | 20–23 | 0:50 | `GraphScene` | Edges draw in staggered — connections being found, not a diagram revealed |
 | 23–26 | 0:57.5 | `CollectionsScene` | The organising that is yours |
 | 26–29 | 1:05 | `DigestScene` | The weekly write-up, then the resurfaced save as its own beat |
-| 29–32 | 1:12.5 | `Endcard` | The bare mark, the wordmark, `Capture. Ask. Connect.` |
+| 29–32 | 1:12.5 | `Endcard` | The bare mark, the wordmark, the App Store subtitle (`Never lose another great find`), which the voice-over also speaks |
 
 `Capture` / `Ask` / `Connect` print as a letterspaced kicker above the line on
-their own beats, so a viewer can place each act inside the tagline without being
-told.
+their own beats, so a viewer can place each act inside the film's three acts
+without being told. (They were the App Store subtitle until 2026-08-26; the
+endcard now carries the current subtitle, the kickers keep the act names.)
+
+**No em dashes anywhere a viewer can read** — the app-wide ban
+(`web/scripts/check-em-dash.mjs`) applies to burned-in captions, demo cards and
+the endcard alike, and `npm run verify` fails on one (comments are fine).
 
 The cold open is the app's own boot sequence, not an invented title card — same
 staged arrival (brackets close → the point strikes → only then does the wordmark
@@ -117,8 +122,12 @@ reads as an answer if it undoes the same scatter.
 ## Capture is schematic on purpose
 
 The share sheet slides up **once and stays** while the source behind it
-cross-cuts through an Instagram carousel, a YouTube video and an article — the
-sheet's preview row names each one. Showing a single app and then cutting into
+cross-cuts through an Instagram carousel, a YouTube video, a screenshot in
+Photos and an article — the sheet's preview row names each one. The screenshot
+(added 2026-09-16) is a chat with a friend, the honest reason anyone screenshots
+anything, and it is the `gift` card's origin in the demo library; screenshots
+became a first-class capture after the film was first cut and the store listing
+now opens on "links, screenshots and videos". Showing a single app and then cutting into
 Machina proved that Machina can take a link; holding the gesture still while the
 world behind it changes proves it takes them from *anywhere*, in the same ten
 seconds and without a word of copy.
@@ -281,6 +290,8 @@ The endcard is the **bare** Citation mark — not the app-icon tile.
 there reads as a shrunken app icon rather than as the brand mark"), and full-frame
 the grey squircle read as a screenshot of an icon instead of as an identity.
 
-The line under the rule (`Everything you save, finally useful.`) is the one slot
-meant to change: replace it with a real App Store badge or URL once the listing is
-live. Nothing else in the film claims availability.
+The endcard carries one line, the App Store subtitle, and the voice-over speaks
+the same words (owner call 2026-09-17; the tagline that used to sit under a rule
+beneath it was cut so screen and voice agree). The space under the subtitle is
+the slot for a real App Store badge or URL once the listing is live. Nothing else
+in the film claims availability.

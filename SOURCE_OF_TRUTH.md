@@ -2147,6 +2147,22 @@ badge/URL once the listing is live, so **that swap now costs the tagline its
 best-placed appearance**; prefer adding the badge above the rule to replacing the
 line. Nothing in the film claims availability yet. The stills it renders double as the
 X-thread screenshots the posts above ask for.
+**Re-synced to the shipped app 2026-09-16** (first pass since 08-02): the
+capture beat cross-cuts FOUR sources now (Instagram, YouTube, a screenshot
+shared from Photos, an article), the tab bar and header read Revisit, the
+endcard's letterspaced line is the current subtitle `Never lose another great
+find`, the light `--accent-ring` matches `globals.css`, every burned-in caption
+and demo card is em-dash-free, and `npm run verify` now fails on an em dash
+the way the web build does. The `.srt` re-emits from the same array, and
+`public/score-vo.wav` was re-synthesized (Kokoro, 14 lines, all inside their
+caption windows) and re-mixed in the same pass, so the spoken editions carry
+the new fourth-cut tick and the de-dashed lines too.
+**Endcard revised 2026-09-17 (owner, from phone QA):** the film now closes on
+the subtitle ALONE, `Never lose another great find`, and the voice speaks the
+same words; the tagline line under the rule was cut so screen and voice agree.
+So the "one slot to swap for a badge" note above is now the empty space under
+the subtitle, and the tagline's best-placed appearance is the promotional text,
+not the film. The library caption reads "From now on, lose nothing." (comma).
 
 *Where to "advertise" for free:* X (primary), Product Hunt, Hacker News,
 r/PKMS + r/productivity (follow self-promo rules: give value first), Indie
@@ -2158,6 +2174,80 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-17 — First-run tour reviewed and re-synced to the shipped app
+  (`web/components/OnboardingTour.tsx`, `Onboarding.tsx`). NOT shipped:
+  committed and pushed on `claude/onboard-launch-video-updates-2mwxyl`,
+  awaiting `/ship` (Vercel + TestFlight; no functions change).** Owner asked
+  for a quality and currency pass on the tour. The four-step story from the
+  09-03 product-review build had drifted in six places, all fixed: (1) the
+  last step described the old digest ("A daily digest, a weekly synthesis,
+  and gentle reminders") with an invented mock ("3 threads came together");
+  it is now the **Revisit** step, named after the tab, and the mock is a
+  miniature of the real Revisit screen: Due now (a resurfaced row with the
+  reminder bell and time), Do this (the blank circle, the task, the card
+  under it) and Weekly synthesis (the "This week in Machina" masthead);
+  (2) desktop web showed the iOS share sheet, a phone gesture a web user
+  cannot perform (left open 08-23); web now gets a miniature of the real +
+  form (Link / Image / Note tabs, a pasted link, Save) and its copy names
+  the three web paths honestly (the + form, the phone share sheet, the
+  browser extension that Settings documents); (3) the card mock's category
+  chip wore the accent instead of the category colour every real card uses,
+  and its byline had an icon a plain publisher never has; both match
+  `Card.tsx` / `SourceByline.tsx` now; (4) "Connected to" became the card
+  detail's real label, "Related cards"; (5) the Understand copy promised
+  "key points", which no card has; now "title, summary, tags, category";
+  (6) the final button said "Save your first link" but only closes the tour;
+  it now says "Start saving" on both surfaces. Page two's "Not now" row used
+  the retired `Sparkles` glyph (banned app-wide 08-26); it is a `Clock` now,
+  and web/ is back to zero Sparkles references. **Verified:** `tsc` clean,
+  eslint clean on both files, em-dash gate clean, and all four steps
+  RENDERED through a throwaway harness page (deleted) with Playwright:
+  light and dark, phone and desktop widths, every step eyeballed. **Not
+  verified:** on device; the native share-sheet mock is unchanged apart from
+  the shared chip row. Left alone, deliberately: the stale `data-tour`
+  attributes in Feed/BottomTabBar/AddLinkForm/DisplayGlyph are dead markup
+  from the old spotlight tour, harmless, worth a sweep some day.
+- **2026-09-16 — Launch film re-synced to the shipped app (`marketing/
+  launch-clip/`, first pass since 2026-08-02). NOT shipped: the film is a
+  marketing asset, nothing under `web/` or `functions/` changed.** Owner
+  asked whether the film needs additions for features shipped since it was
+  cut. Verdict given and approved: no new beat (Revisit, "Do this",
+  Insights, Pro do not earn one; the film is a story, not a feature list),
+  but four verified drifts plus one addition. **Done:** (1) the capture
+  beat's share sheet now cross-cuts four sources, with a screenshot shared
+  from Photos (a chat with Dana about the pour-over set, which is the
+  `gift` card's origin) as the third cut, holds 46/24/24/24 frames, taps
+  and pulses retimed, `HITS.sourceCutA/B/C` mirrored in `timeline.mjs` and
+  the score ticks each swap; (2) tab bar `Digest`/Newspaper became
+  `Revisit`/CalendarCheck and the digest header title `Revisit`, matching
+  `BottomTabBar.tsx`; (3) the endcard's letterspaced line is the current
+  App Store subtitle `Never lose another great find` (was the retired
+  `Capture. Ask. Connect.`; the act kickers keep those words); (4) light
+  `accentRing` now `rgba(90, 88, 80, 0.22)` as in `globals.css`; (5) the
+  feed search placeholder reads `Search or ask your saves` as the app
+  does; (6) em dashes removed from three captions, nine demo-card / synthesis
+  / Ask strings and the notes placeholder (the VO script mirrors the
+  punctuation, wording untouched), and `audio/verify.mjs` gained the same
+  comment-aware em-dash gate the web build has, over captions and `src/`.
+  README edit table and prose updated. **Verified:** film `tsc` clean,
+  `npm run score` + `npm run verify` OK (no overlaps, no clipping, no
+  holes, no em dashes), `.srt` re-emitted (13 cues), stills of every
+  touched beat rendered and eyeballed in landscape and vertical, and a full
+  `MachinaLaunch` render completed. Second pass in the same session (owner: "do
+  everything that is needed"): the Kokoro model downloaded fine from GitHub
+  releases in the cloud session, `synth-vo.py` regenerated all 14 lines
+  (every one fits its window), `mix-vo.mjs` rewrote `public/score-vo.wav`,
+  and `MachinaLaunchVO` rendered exit 0. **Not verified:** nobody has
+  listened to either mix; the checks are numerical. **Owner phone QA, next
+  day (2026-09-17):** two calls, both built: the library caption drops the
+  full stop ("From now on, lose nothing. And find everything."; the VO keeps
+  its spoken stop for the break), and the endcard closes on the subtitle
+  alone with the voice saying "Never lose another great find" (the tagline
+  line and its rule are gone from the film; `Endcard.tsx`, `synth-vo.py`,
+  README). VO re-synthesized (closing line 2.56s in a 4.9s window), re-mixed,
+  `MachinaLaunchVO` re-rendered exit 0. §4 25c (the
+  literal "AI" on the Ask and feed screens, the D-3 blocker for putting the
+  film on the landing page) is unchanged and still the owner's call.
 - **2026-09-17 — Security round 2 SHIPPED, migrations run, tombstone built.
   Owner: "do everything except rotating Gemini keys." Merge `8f3ebf8` to
   main (round 1 `e000fb1` + round 2 `ef83d4d`/`b407d50`, with main's build
