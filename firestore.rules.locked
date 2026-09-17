@@ -288,6 +288,15 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // deleted_accounts: only Cloud Functions (admin SDK) — one row per deleted
+    // account keyed by an email HASH, carrying when its first workspace was
+    // created, so a re-signup does not restart the trial clock. Never
+    // client-readable (it maps hashes to dates) or -writable (a client could
+    // erase its own tombstone).
+    match /deleted_accounts/{docId} {
+      allow read, write: if false;
+    }
+
     // client_error_reports: only Cloud Functions (admin SDK) — crash reports
     // from clients that could NOT write to users/{uid}/client_errors, i.e. the
     // ones with no resolvable workspace (see main.py client_error_http). They

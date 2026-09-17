@@ -3,6 +3,7 @@ Link Service
 Handles Firestore operations for links and users.
 """
 
+import hashlib
 import secrets
 import logging
 from datetime import datetime, timezone
@@ -100,6 +101,61 @@ def find_data_uid_by_auth_uid(auth_uid: str) -> Optional[str]:
     return docs[0].id
 
 
+# ── Deleted-account tombstones ───────────────────────────────────────────────
+# `delete_account` used to be a free reset: re-signing up with the same email
+# minted a brand-new workspace with `createdAt = now`, i.e. a fresh 14-day
+# trial and zeroed counters. The tombstone keeps ONE fact about a deleted
+# account, keyed by a hash of its email (no address stored): when its first
+# workspace was created. A new workspace for the same email inherits that
+# date, so the trial clock does not restart. Functions-only collection.
+TOMBSTONE_COLLECTION = 'deleted_accounts'
+
+
+def email_tombstone_id(email) -> Optional[str]:
+    if not isinstance(email, str) or '@' not in email:
+        return None
+    return hashlib.sha256(email.strip().lower().encode('utf-8')).hexdigest()
+
+
+def write_account_tombstone(email, created_at_ms) -> None:
+    """Record the deleted workspace's createdAt under the email hash. Keeps the
+    EARLIEST date seen so repeated delete/re-create cycles never move it
+    forward. Best-effort: never blocks a deletion."""
+    tid = email_tombstone_id(email)
+    if not tid:
+        return
+    try:
+        ref = get_db().collection(TOMBSTONE_COLLECTION).document(tid)
+        snap = ref.get()
+        existing = (snap.to_dict() or {}).get('firstCreatedAt') if snap.exists else None
+        first = created_at_ms if isinstance(created_at_ms, (int, float)) else None
+        if isinstance(existing, (int, float)) and (first is None or existing < first):
+            first = existing
+        ref.set({
+            'firstCreatedAt': int(first) if first is not None else None,
+            'deletedAt': int(datetime.now(timezone.utc).timestamp() * 1000),
+        }, merge=True)
+    except Exception as e:
+        logger.warning(f"Account tombstone write failed: {e}")
+
+
+def inherited_created_at(email, now_ms: int) -> int:
+    """`createdAt` for a new workspace: the tombstoned first date for this
+    email when one exists and is earlier, else now. Best-effort."""
+    tid = email_tombstone_id(email)
+    if not tid:
+        return now_ms
+    try:
+        snap = get_db().collection(TOMBSTONE_COLLECTION).document(tid).get()
+        first = (snap.to_dict() or {}).get('firstCreatedAt') if snap.exists else None
+        if isinstance(first, (int, float)) and 0 < first < now_ms:
+            logger.info("New workspace inherits its trial clock from a deleted account")
+            return int(first)
+    except Exception as e:
+        logger.warning(f"Account tombstone read failed: {e}")
+    return now_ms
+
+
 def create_workspace(auth_uid: str, email: Optional[str] = None) -> str:
     """Create a fresh, empty workspace for a brand-new signed-in account.
 
@@ -124,9 +180,10 @@ def create_workspace(auth_uid: str, email: Optional[str] = None) -> str:
         user_ref.set(update, merge=True)
         logger.info("Re-linked existing doc as workspace for new account")
     else:
+        now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
         doc = {
             'authUids': [auth_uid],
-            'createdAt': int(datetime.now(timezone.utc).timestamp() * 1000),
+            'createdAt': inherited_created_at(email, now_ms),
             'settings': dict(DEFAULT_USER_SETTINGS),
             # First-run onboarding pending; the client flips this to True.
             'onboarded': False,

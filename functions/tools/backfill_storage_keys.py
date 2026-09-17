@@ -23,10 +23,12 @@ Per workspace this script:
 Idempotent: a blob already copied is skipped, a URL already rewritten is
 left alone. Dry run by default.
 
-Owner-run, needs prod credentials:
-    GOOGLE_APPLICATION_CREDENTIALS=... python tools/backfill_storage_keys.py <uid>
-    GOOGLE_APPLICATION_CREDENTIALS=... python tools/backfill_storage_keys.py <uid> --apply
-    GOOGLE_APPLICATION_CREDENTIALS=... python tools/backfill_storage_keys.py <uid> --apply --delete-old
+Owner-run (or via the Maintenance workflow), needs prod credentials:
+    python tools/backfill_storage_keys.py <uid>                 # dry run
+    python tools/backfill_storage_keys.py --all                 # every workspace, dry run
+    python tools/backfill_storage_keys.py --all --apply
+    python tools/backfill_storage_keys.py --all --apply --delete-old
+The bucket is read from an existing stored URL (--bucket <name> overrides).
 
 Public repo => stdout stays structural (counts); no uid, URL or title is printed.
 """
@@ -58,21 +60,54 @@ def _rewrite(value, mapping):
     return value
 
 
+def _bucket_from_stored_urls(db) -> str:
+    """The bucket name every stored image URL already names."""
+    import re
+    for user in db.collection("users").limit(50).stream():
+        for snap in user.reference.collection("links").limit(200).stream():
+            data = snap.to_dict() or {}
+            for cand in [data.get("url"), (data.get("metadata") or {}).get("thumbnailUrl")] + list(data.get("imageUrls") or []):
+                m = re.match(r"https://firebasestorage\.googleapis\.com/v0/b/([^/]+)/o/", str(cand or ""))
+                if m:
+                    return m.group(1)
+    raise SystemExit("No stored Storage URL found to read the bucket from; pass --bucket <name>")
+
+
 def main() -> int:
-    args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    if not args:
+    argv = sys.argv[1:]
+    bucket_name = None
+    if "--bucket" in argv:
+        i = argv.index("--bucket")
+        bucket_name = argv[i + 1]
+        del argv[i:i + 2]
+    args = [a for a in argv if not a.startswith("--")]
+    everyone = "--all" in argv
+    if not args and not everyone:
         print(__doc__)
         return 2
-    uid = args[0]
-    apply = "--apply" in sys.argv
-    delete_old = "--delete-old" in sys.argv
+    apply = "--apply" in argv
+    delete_old = "--delete-old" in argv
 
     if not firebase_admin._apps:
-        firebase_admin.initialize_app(options={"projectId": PROJECT,
-                                               "storageBucket": f"{PROJECT}.firebasestorage.app"})
+        firebase_admin.initialize_app(options={"projectId": PROJECT})
     db = firestore.client()
-    bucket = storage.bucket()
+    if not bucket_name:
+        bucket_name = _bucket_from_stored_urls(db)
+    bucket = storage.bucket(bucket_name)
 
+    uids = [args[0]] if args else [d.id for d in db.collection("users").stream()]
+    print(f"workspaces={len(uids)} mode={'apply' if apply else 'dry-run'}")
+    rc = 0
+    for uid in uids:
+        try:
+            _migrate_one(db, bucket, uid, apply, delete_old)
+        except Exception as e:  # keep going; one bad workspace must not stop the rest
+            print(f"workspace failed: {type(e).__name__}")
+            rc = 1
+    return rc
+
+
+def _migrate_one(db, bucket, uid: str, apply: bool, delete_old: bool) -> None:
     user_ref = db.collection("users").document(uid)
     user = user_ref.get().to_dict() or {}
     key = user.get("storageKey")
@@ -107,7 +142,7 @@ def main() -> int:
             copied += 1
     print(f"blobs={copied} mapped_urls={len(mapping)}")
     if not mapping:
-        return 0
+        return
 
     # 2. Rewrite Firestore references.
     rewritten = 0
@@ -137,7 +172,8 @@ def main() -> int:
     for snap in user_ref.collection("digests").stream():
         data = snap.to_dict() or {}
         cards = data.get("cards")
-        if isinstance(cards, list) and any(_fix_card(c) for c in cards if isinstance(c, dict)):
+        # A list, not any(): every card must be rewritten, not just the first.
+        if isinstance(cards, list) and any([_fix_card(c) for c in cards if isinstance(c, dict)]):
             rewritten += 1
             if apply:
                 snap.reference.update({"cards": cards})
@@ -169,7 +205,6 @@ def main() -> int:
             for blob in bucket.list_blobs(prefix=f"{kind}/{uid}/"):
                 blob.delete(); removed += 1
         print(f"old_blobs_deleted={removed}")
-    return 0
 
 
 if __name__ == "__main__":

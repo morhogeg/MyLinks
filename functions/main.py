@@ -52,6 +52,7 @@ from link_service import (
     ensure_ingest_token, rotate_ingest_token, find_user_by_ingest_token,
     link_exists_for_url, pending_exists_for_url, find_data_uid_by_auth_uid,
     delete_user_data, create_workspace, storage_key_for, delete_shares_for_owner,
+    write_account_tombstone,
 )
 from reminder_service import handle_reminder_intent, set_reminder, run_reminder_check, format_local_time
 from graph_service import GraphService
@@ -3832,18 +3833,17 @@ class _DeleteAccountError(Exception):
     """
 
 
-def _storage_key_before_delete(uid: str):
-    """The workspace's opaque storage key, read BEFORE the user doc is deleted
-    (the Storage sweep needs it; best-effort, None when absent)."""
+def _user_doc_before_delete(uid: str) -> dict:
+    """The user doc, read BEFORE it is deleted: the Storage sweep needs
+    `storageKey`, the tombstone needs `createdAt`. Best-effort, {} on error."""
     try:
         snap = get_db().collection('users').document(uid).get()
-        key = (snap.to_dict() or {}).get('storageKey') if snap.exists else None
-        return key if isinstance(key, str) and key else None
+        return (snap.to_dict() or {}) if snap.exists else {}
     except Exception:
-        return None
+        return {}
 
 
-def _delete_account_logic(auth_uid: str) -> dict:
+def _delete_account_logic(auth_uid: str, email: str = None) -> dict:
     """Permanently delete the account keyed by `auth_uid` and all its data.
 
     Shared core for the `delete_account` callable and the `delete_account_http`
@@ -3855,7 +3855,11 @@ def _delete_account_logic(auth_uid: str) -> dict:
     uid = find_data_uid_by_auth_uid(auth_uid)
 
     if uid:
-        storage_key = _storage_key_before_delete(uid)
+        before = _user_doc_before_delete(uid)
+        storage_key = before.get('storageKey') if isinstance(before.get('storageKey'), str) else None
+        # Remember when this email's first workspace was created, so a
+        # re-signup does not restart the trial clock (link_service tombstone).
+        write_account_tombstone(email or before.get('email'), before.get('createdAt'))
         try:
             delete_user_data(uid)
         except Exception as e:
@@ -3901,7 +3905,7 @@ def delete_account(req: https_fn.CallableRequest) -> dict:
             message="User must be signed in",
         )
     try:
-        return _delete_account_logic(req.auth.uid)
+        return _delete_account_logic(req.auth.uid, (req.auth.token or {}).get("email"))
     except _DeleteAccountError as e:
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.INTERNAL,
@@ -3928,7 +3932,7 @@ def delete_account_http(req: https_fn.Request) -> https_fn.Response:
         return _error_response("User must be signed in", 401, headers)
 
     try:
-        result = _delete_account_logic(decoded.get("uid"))
+        result = _delete_account_logic(decoded.get("uid"), decoded.get("email"))
         return https_fn.Response(
             json.dumps(result),
             status=200, headers=headers, mimetype='application/json',

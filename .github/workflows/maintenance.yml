@@ -1,0 +1,101 @@
+# One-off data maintenance against production, from CI, with the same
+# service account the deploy workflows use — so an owner (or a cloud session
+# through the dispatch API) can run a repo tool without a Mac and without
+# handing credentials to a laptop.
+#
+# Only the tools named in the `tool` choice list can run (never an arbitrary
+# path), and every input reaches the shell through `env`, never inline. Dry
+# run unless `apply` is ticked. Output is the tool's own stdout, which the
+# tools keep structural (ids + counts, no user text, no uids).
+
+name: Maintenance
+
+on:
+  workflow_dispatch:
+    inputs:
+      tool:
+        description: "Which tool under functions/tools to run"
+        required: true
+        type: choice
+        options:
+          - migrate_share_owners
+          - backfill_storage_keys
+      args:
+        description: "Extra arguments (e.g. `--all`, or a uid)"
+        required: false
+        default: ""
+        type: string
+      apply:
+        description: "Write changes (unticked = dry run)"
+        required: false
+        default: false
+        type: boolean
+      delete_old:
+        description: "backfill_storage_keys only: delete the old blobs after copying"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: maintenance
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Check required secrets
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "::error::Missing repo secret FIREBASE_SERVICE_ACCOUNT."
+            exit 1
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install deps
+        run: pip install -q -r functions/requirements.txt
+
+      - name: Write service account credentials
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          umask 077
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
+
+      - name: Run tool
+        env:
+          TOOL: ${{ inputs.tool }}
+          TOOL_ARGS: ${{ inputs.args }}
+          APPLY: ${{ inputs.apply }}
+          DELETE_OLD: ${{ inputs.delete_old }}
+        working-directory: functions
+        run: |
+          set -euo pipefail
+          case "$TOOL" in
+            migrate_share_owners|backfill_storage_keys) ;;
+            *) echo "::error::unknown tool"; exit 1 ;;
+          esac
+          flags=()
+          [ "$APPLY" = "true" ] && flags+=(--apply)
+          [ "$DELETE_OLD" = "true" ] && flags+=(--delete-old)
+          # shellcheck disable=SC2086
+          python "tools/$TOOL.py" $TOOL_ARGS "${flags[@]}"
+
+      - name: Scrub credentials
+        if: always()
+        run: rm -f "$RUNNER_TEMP/sa.json"

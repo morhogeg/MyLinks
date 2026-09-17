@@ -677,3 +677,84 @@ def test_rotate_endpoint_requires_a_bearer_and_is_post_only(monkeypatch):
     assert resp.status_code == 200
     import json as _json
     assert _json.loads(resp.get_data(as_text=True))["token"] == "n" * 32
+
+
+# ── deleted-account tombstone ────────────────────────────────────────────────
+
+def _tombstone_db(monkeypatch, existing=None):
+    store = {}
+    if existing is not None:
+        store["existing"] = existing
+
+    class _Snap:
+        def __init__(self, d): self._d = d; self.exists = d is not None
+        def to_dict(self): return self._d
+
+    class _Ref:
+        def __init__(self, coll, id): self.coll, self.id = coll, id
+        def get(self):
+            return _Snap(store.get(self.coll, {}).get(self.id))
+        def set(self, data, merge=False):
+            store.setdefault(self.coll, {}).setdefault(self.id, {}).update(data)
+
+    class _Coll:
+        def __init__(self, name): self.name = name
+        def document(self, id): return _Ref(self.name, id)
+
+    class _Db:
+        def collection(self, name): return _Coll(name)
+
+    monkeypatch.setattr(link_service, "get_db", lambda: _Db())
+    return store
+
+
+def test_tombstone_id_hashes_the_email_and_rejects_junk():
+    tid = link_service.email_tombstone_id("  A@Example.com ")
+    assert tid == link_service.email_tombstone_id("a@example.com")
+    assert len(tid) == 64 and "example" not in tid
+    assert link_service.email_tombstone_id(None) is None
+    assert link_service.email_tombstone_id("not-an-email") is None
+
+
+def test_delete_then_recreate_keeps_the_first_created_at(monkeypatch):
+    store = _tombstone_db(monkeypatch)
+    link_service.write_account_tombstone("a@example.com", 1_000)
+    tid = link_service.email_tombstone_id("a@example.com")
+    assert store["deleted_accounts"][tid]["firstCreatedAt"] == 1_000
+    # A later delete never moves the date forward.
+    link_service.write_account_tombstone("a@example.com", 5_000)
+    assert store["deleted_accounts"][tid]["firstCreatedAt"] == 1_000
+    assert link_service.inherited_created_at("a@example.com", 9_000) == 1_000
+    assert link_service.inherited_created_at("other@example.com", 9_000) == 9_000
+    assert link_service.inherited_created_at(None, 9_000) == 9_000
+
+
+def test_create_workspace_inherits_the_tombstoned_date(monkeypatch):
+    store = _tombstone_db(monkeypatch)
+    link_service.write_account_tombstone("a@example.com", 1_000)
+    monkeypatch.setattr(link_service, "ensure_ingest_token", lambda uid: "t" * 32)
+    link_service.create_workspace("new-uid", "A@example.com")
+    assert store["users"]["new-uid"]["createdAt"] == 1_000
+    link_service.create_workspace("other-uid", "fresh@example.com")
+    assert store["users"]["other-uid"]["createdAt"] > 1_000
+
+
+def test_delete_account_writes_the_tombstone(monkeypatch):
+    written = []
+    monkeypatch.setattr(main, "find_data_uid_by_auth_uid", lambda uid: "ws")
+    monkeypatch.setattr(main, "_user_doc_before_delete", lambda uid: {"createdAt": 42, "email": "doc@example.com"})
+    monkeypatch.setattr(main, "write_account_tombstone", lambda email, created: written.append((email, created)))
+    monkeypatch.setattr(main, "delete_user_data", lambda uid: 0)
+    monkeypatch.setattr(main, "storage", types.SimpleNamespace(bucket=lambda: types.SimpleNamespace(list_blobs=lambda prefix: [])))
+    monkeypatch.setattr(main, "admin_auth", types.SimpleNamespace(delete_user=lambda uid: None))
+    assert main._delete_account_logic("auth-1", "token@example.com") == {"success": True}
+    assert written == [("token@example.com", 42)]
+    # No email on the token → the doc's own email is used.
+    main._delete_account_logic("auth-1", None)
+    assert written[-1] == ("doc@example.com", 42)
+
+
+def test_deleted_accounts_is_functions_only():
+    rules = open(main.__file__.replace("functions/main.py", "firestore.rules.locked")).read()
+    block = rules[rules.index("match /deleted_accounts/{docId}"):]
+    assert "allow read, write: if false;" in block[:200]

@@ -606,7 +606,7 @@ test('shared_owners: denied for owner, stranger, and anon (read and write)', asy
 // thing keeping its rate limit and field truncation meaningful is that clients
 // cannot reach the collection directly. Reads stay denied because the records
 // carry an auth uid and an IP.
-for (const col of ['rate_limits', 'pending_processing', 'task_logs', 'usage_quotas', 'server_errors', 'client_error_reports', 'entitlements', 'synthesis_vault']) {
+for (const col of ['rate_limits', 'pending_processing', 'task_logs', 'usage_quotas', 'server_errors', 'client_error_reports', 'entitlements', 'synthesis_vault', 'deleted_accounts', 'shared_owners']) {
   test(`${col}: denied for owner, stranger, and anon`, async () => {
     await assertFails(getDoc(doc(ownerDb(), col, 'x')));
     await assertFails(setDoc(doc(ownerDb(), col, 'x'), { a: 1 }));

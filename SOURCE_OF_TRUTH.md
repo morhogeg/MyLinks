@@ -226,7 +226,18 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-09-11, latest): install build **1324** ("Marked as done" toast with Undo), then the 1323 QA below if not yet done
+> ## 🚨 OWNER ACTION (updated 2026-09-16, latest): install build **1325** (share sheet: several screenshots become one card), then the 1324 QA below if not yet done
+>
+> **1325** (run #325, merge `f3bf08b`) fixes the share extension keeping
+> only the FIRST of several shared screenshots. QA on 1325: in Photos,
+> select 3 screenshots in a deliberate order and share to Machina; the HUD
+> hint should read "3 screenshots become one card", and the finished card
+> should hold all 3 in that order (swipe the carousel). Then share 6 and
+> expect "Saving the first 5 of 6 screenshots as one card". A single
+> screenshot must behave exactly as before. Order is the one unverified
+> assumption (§4 G3). Then the 1324 list below.
+>
+> ## (superseded) OWNER ACTION (updated 2026-09-11): install build **1324** ("Marked as done" toast with Undo), then the 1323 QA below if not yet done
 >
 > **1324** (run #324, merge `f1719d9`) adds the confirmation toast when a
 > "Do this" task is ticked in Revisit: "Marked as done" with an Undo that
@@ -1686,19 +1697,25 @@ G2b. **[x] Screenshot cards name who posted them (2026-09-08).** A screenshot
     glyph, and Sources should list it under X. Existing "Screenshot" cards
     are not backfilled.
 
-G3. **[ ] iOS share extension: multi-screenshot cards (deferred half of the
-    2026-08-24 feature).** The web/plus-button path now builds ONE card from up
-    to 5 ordered screenshots (`MAX_CARD_IMAGES`), but the share extension still
-    takes only the FIRST attachment (`firstProvider()`,
-    `ShareViewController.swift:~1065`) — sharing 3 screenshots makes 1 card and
-    silently drops 2. The backend is ready (`share_ingest` accepts an ordered
-    `images:[{data,mimeType}]` list; one queue doc, one save unit). Blockers
-    that deferred it: the order iOS hands attachments over is UNVERIFIED on
-    device, and the share sheet has no confirm step to correct it in — so
-    fixing `firstProvider()` alone risks shipping "wrong order, no way to fix
-    it", the exact failure the confirm-strip on web exists to prevent. Needs a
-    device test of NSItemProvider order first, then either trust-it-or a
-    minimal reorder UI in the sheet.
+G3. **[x] iOS share extension: multi-screenshot cards — SHIPPED 2026-09-16 (merge `f3bf08b`, build 1325)
+    (launch-readiness review, "fix the product bug").** Sharing several
+    images now sends ALL of them (up to `MAX_CARD_IMAGES` = 5) as the
+    backend's ordered `images:[{data,mimeType}]` list, so they become ONE
+    card exactly like the + button's Image tab. `imageProviders()` collects
+    every image attachment across the input items in the order iOS lists
+    them; `uploadImages(from:)` loads them one at a time (each downsampled
+    before the next is touched, memory-safe) and the HUD's hint line says
+    "3 screenshots become one card" or, past the cap, "Saving the first 5
+    of 7 screenshots as one card", so the sheet never claims more or less
+    than it saved. A single image keeps the old `image` payload.
+    **Owner QA (not verifiable from a cloud session):** share 3 screenshots
+    from Photos and check the finished card holds all 3 IN SELECTION ORDER.
+    The order iOS hands attachments over is still the one unverified
+    assumption; if it is wrong on device, the fallback is a reorder strip in
+    the sheet (the web confirm-step, in Swift). *(Original deferral, kept:)*
+    the share extension used to take only the FIRST attachment
+    (`firstProvider()`), so sharing 3 screenshots made 1 card and silently
+    dropped 2, against the "never lies about saving" promise.
 
 18c. **[ ] Native share-extension indicator: per-phase states.** Web maps every
     capture phase to its own motion (`LINK_SCAN_ORBS` in `web/lib/scanPhases.ts` —
@@ -2401,6 +2418,31 @@ exact-match, capped.
   placeholder env (privacy/terms pages render the new sections), extension
   node test 1/1, `npm audit` 0. **Not verified:** rules emulator suite
   (blocked egress), Swift compile, anything on device.
+- **2026-09-16 — PM launch-readiness review + share-extension multi-image
+  fix. SHIPPED: merge `f3bf08b` to main, iOS → TestFlight run #325 =
+  **build 1325** (Archive + entitlement check green; the Swift compiled on
+  the first CI pass). iOS only: no functions, rules or hosting deploy.** Owner asked for a product-manager launch verdict. Recorded:
+  **No for a public App Store launch yet, Yes for an open TestFlight beta.**
+  Features are launch-grade and the roadmap items (voice, routes, offline,
+  export) are not needed; freeze features. Blockers, in order: (1) Machina
+  Pro is a dead end (trial live, no RevenueCat/IAP, paywall says "not
+  available"): finish §4 item 26 or extend the founders grant to every
+  pre-IAP signup; (2) Gemini spend cap ₪50 = outage at ~70 users (5b);
+  (3) reviewer sign-in unsolved, OAuth-only with `PASSWORD_TBD` in
+  `docs/APP_STORE.md` §5; (4) every §9 entry since 09-01 is "not verified
+  on device" (import, trial anchor, `/a` page, search front door, bylines,
+  Revisit): one owner QA evening on 1324 with a fresh account, plus task 11,
+  PM-F, PM-G; (5) Connect metadata + 6 screenshots + consent screen on a
+  fresh install, and the two key rotations. **Built this session:** the
+  share extension no longer drops all but the first shared screenshot (§4
+  G3, code done). `ShareViewController.swift`: `imageProviders()`,
+  `uploadImages(from:)` (sequential load, per-image downsample, ordered
+  `images` payload, cap 5 with honest HUD copy), `encodedImage(from:)`
+  shared with the single-image path, `upload(payload:)` widened to
+  `[String: Any]`. **Verified:** CI archive (run #325) compiled and signed
+  it; there is no Swift toolchain in the cloud session.
+  **Not verified:** attachment order on device, memory with 5 large HEICs.
+  Ship: `/ship` (iOS build only, no functions/rules/hosting change).
 - **2026-09-11 (round 3) — "Marked as done" toast with Undo. SHIPPED:
   merge `f1719d9` to main (Vercel auto-deploy), TestFlight run #324 =
   **build 1324** green (uploaded 13:33 UTC). Web only.** Ticking a task in
