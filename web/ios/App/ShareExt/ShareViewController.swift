@@ -1204,14 +1204,28 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
 
     private func upload(payload: [String: Any]) {
         let defaults = UserDefaults(suiteName: Self.appGroup)
-        let token = defaults?.string(forKey: "ingestToken")
-        let endpoint = defaults?.string(forKey: "shareEndpoint") ?? Self.defaultEndpoint
+        // The token lives in the shared Keychain (KeychainStore). A build
+        // that predates it left the token in the App Group plist: migrate a
+        // copy found there into the Keychain and drop it from the plist, so
+        // the first share after an app update still works without a relaunch.
+        var token = KeychainStore.get(account: KeychainStore.ingestTokenAccount)
+        if token == nil, let legacy = defaults?.string(forKey: "ingestToken"), !legacy.isEmpty {
+            if KeychainStore.set(legacy, account: KeychainStore.ingestTokenAccount) {
+                defaults?.removeObject(forKey: "ingestToken")
+            }
+            token = legacy
+        }
+        let stored = defaults?.string(forKey: "shareEndpoint") ?? ""
+        // The token is only ever posted to the app's own hosts. A stored
+        // endpoint that fails the allowlist falls back to the built-in one
+        // rather than being trusted.
+        let endpoint = ShareEndpointPolicy.isAllowed(stored) ? stored : Self.defaultEndpoint
 
         guard let token = token, !token.isEmpty else {
             showResult("Open the Machina app and sign in first", success: false)
             return
         }
-        guard let url = URL(string: endpoint) else {
+        guard let url = URL(string: endpoint), ShareEndpointPolicy.isAllowed(endpoint) else {
             showResult("Bad endpoint", success: false)
             return
         }

@@ -47,7 +47,7 @@ const els = new Map(ids.map((id) => {
 const store = {};
 let messageHandler = async () => ({ ok: true });
 const chrome = {
-    storage: { sync: {
+    storage: { local: {
         get: async (keys) => Object.fromEntries(keys.map((k) => [k, store[k]]).filter(([, v]) => v !== undefined)),
         set: async (obj) => { Object.assign(store, obj); },
     } },

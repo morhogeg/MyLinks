@@ -108,6 +108,20 @@ def _to_ms(value) -> int:
     return 0
 
 
+def _settings_of(user_data) -> dict:
+    """The user's `settings` map, or {} when it is missing or not a map.
+
+    `settings` is client-writable, and the schedulers read it for every user
+    in one loop. A non-dict value (a modified client could write
+    `settings: "x"`; the rules now type-check it, this is the server half)
+    must degrade to defaults for THAT user, never raise into the loop.
+    """
+    if not isinstance(user_data, dict):
+        return {}
+    settings = user_data.get("settings")
+    return settings if isinstance(settings, dict) else {}
+
+
 def _normalize_channels(stored) -> List[str]:
     """Resolve a user's stored digest_channels into the live channel set.
 
@@ -117,11 +131,11 @@ def _normalize_channels(stored) -> List[str]:
     receives push digests. The retired 'email' channel is dropped at read time —
     email delivery was cut — and is never written back.
     """
-    if stored is None:
+    if not isinstance(stored, list):
         return ["push"]
     return list(dict.fromkeys(
         "push" if c == "whatsapp" else c
-        for c in (stored or [])
+        for c in stored
         if c != "email"
     ))
 
@@ -372,7 +386,7 @@ def build_and_send_synthesis(uid: str, user_data: dict, links: List[dict], force
     """
     from ai_service import GeminiService, AnalysisError
 
-    settings = user_data.get("settings", {}) or {}
+    settings = _settings_of(user_data)
     channels = _normalize_channels(settings.get("digest_channels"))
     result = {"uid": uid, "sent": False, "channels": [], "card_count": 0, "skipped": None, "mode": "synthesis"}
 
@@ -383,8 +397,11 @@ def build_and_send_synthesis(uid: str, user_data: dict, links: List[dict], force
     # which is_due's 20h guard would fire this path every day, re-generating the
     # same 7-day recap (wasted Gemini spend) and pushing a duplicate each day.
     # Guard on the per-week doc: if this week's synthesis already exists, it's
-    # been delivered — skip regen + push. `force` (the preview button) bypasses.
-    if not force:
+    # been delivered — skip regen + push. `force` (the preview button) bypasses
+    # for a Pro workspace only: a free workspace sees a locked teaser either
+    # way, and letting it regenerate a 500-card synthesis on every tap
+    # (10/hour, forever) was a paid call with no product behind it.
+    if not force or not is_pro(uid):
         try:
             existing = (
                 get_db().collection("users").document(uid)
@@ -556,7 +573,7 @@ def build_and_send_digest(uid: str, user_data: dict, force: bool = False) -> dic
 
     Returns a per-user result dict.
     """
-    settings = user_data.get("settings", {}) or {}
+    settings = _settings_of(user_data)
     result = {"uid": uid, "sent": False, "channels": [], "card_count": 0, "skipped": None}
 
     count = settings.get("digest_count", 5)
@@ -748,7 +765,7 @@ def run_digest_check() -> dict:
         report["users_checked"] += 1
         uid = user_doc.id
         user_data = user_doc.to_dict() or {}
-        settings = user_data.get("settings", {}) or {}
+        settings = _settings_of(user_data)
 
         # Curated digest pass. Legacy note: a stored digest_mode of 'synthesis'
         # still routes build_and_send_digest to the synthesis path here — the
@@ -763,7 +780,7 @@ def run_digest_check() -> dict:
                         report["digests_sent"] += 1
                         report["cards_delivered"] += res.get("card_count", 0)
             except Exception as e:
-                err = f"Digest failed for {uid}: {e}"
+                err = f"Digest failed for {mask_uid(uid)}: {e}"
                 logger.error(err)
                 report["errors"].append(err)
 
@@ -777,7 +794,7 @@ def run_digest_check() -> dict:
                 if synth_res.get("sent"):
                     report["syntheses_sent"] += 1
         except Exception as e:
-            err = f"Synthesis failed for {uid}: {e}"
+            err = f"Synthesis failed for {mask_uid(uid)}: {e}"
             logger.error(err)
             report["errors"].append(err)
 

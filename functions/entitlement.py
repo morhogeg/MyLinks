@@ -260,6 +260,36 @@ def is_pro(uid: str) -> bool:
     return plan_for(uid) == PLAN_PRO
 
 
+# Sources that represent a real commitment (money, or the founders' grant).
+# A reverse trial is also "pro" for feature gates, but it is free to obtain
+# (create an account, delete it, create another), so the two costliest paid
+# surfaces — native video ingestion and the 10,000-link import ceiling — key
+# on the SOURCE, not just the plan.
+_COMMITTED_SOURCES = frozenset({"revenuecat", "founder"})
+
+
+def entitlement_source(uid: str) -> Optional[str]:
+    """'trial' | 'founder' | 'revenuecat' | None for a workspace (never raises)."""
+    doc = get_entitlement(uid)
+    if effective_plan(doc) != PLAN_PRO:
+        return None
+    src = doc.get("source")
+    return src if isinstance(src, str) else None
+
+
+def is_committed_pro(uid: str) -> bool:
+    """Pro through a subscription or the founders' grant — never a trial."""
+    return entitlement_source(uid) in _COMMITTED_SOURCES
+
+
+def plan_for_imports(uid: str) -> str:
+    """The plan whose LIFETIME import allowance applies. A trial gets the free
+    allowance: the Pro ceiling (10,000) is an abuse ceiling for paying users,
+    and a disposable trial account with 10,000 imports of 3-hour videos was
+    the cheapest way to spend the Gemini budget."""
+    return PLAN_PRO if is_committed_pro(uid) else PLAN_FREE
+
+
 # ── Trial clock ───────────────────────────────────────────────────────────────
 #
 # Per-instance memo of workspaces whose trial clock needs no further attention

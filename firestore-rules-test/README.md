@@ -13,9 +13,17 @@ the app's **real** client access patterns before it is deployed
   unfiltered `limit(1)` query is denied.
 - A different signed-in uid and an unauthenticated client can access nothing
   under `users/**`.
-- `shared_cards` / `shared_collections` are publicly readable but writable only
-  by the owner of the `ownerUid` workspace (forged `ownerUid` denied).
-- `rate_limits`, `pending_processing`, `task_logs` are denied to every client.
+- `shared_cards` / `shared_collections` / `shared_answers` are publicly
+  readable by id, never listable, and never client-writable (publish and
+  unpublish go through the Admin-SDK endpoints).
+- The owner doc update rule is field-limited (`clientWritableUserKeys()` in
+  the rules): every real client write succeeds, and `createdAt`, `authUids`,
+  `ingestToken`, `fcmTokens`, `lastDigestSentAt`, `email` are refused.
+- Self-serve workspace creation is allowed for the caller's own doc id only,
+  with `createdAt` stamped as now (no backdating into the founders' grant).
+- `rate_limits`, `pending_processing`, `task_logs`, `usage_quotas`,
+  `entitlements`, `synthesis_vault`, `server_errors`, `client_error_reports`
+  are denied to every client.
 
 ## Prerequisites
 
@@ -58,6 +66,8 @@ which rules file the running emulator was started with.)
   wildcard, so an `owns()`-based read rule would reject the workspace-resolve
   query and every sign-in would dead-end on the restricted screen. The list
   test here is what catches that class of regression.
-- If the new-user onboarding path ever creates `users/{id}` **client-side**
-  (instead of in `claim_workspace`), the rules need an `allow create` — today
-  client-side create is denied and the test asserts that.
+- New-user onboarding CAN create `users/{id}` client-side as a last-resort
+  fallback (`AuthProvider.createWorkspaceClientSide`); the `allow create`
+  clause pins the doc id, the `authUids` seed, the field set, and a
+  present-day `createdAt`. If that payload ever changes shape, the create
+  cases here fail first.

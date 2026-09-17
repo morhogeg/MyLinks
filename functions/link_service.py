@@ -3,6 +3,7 @@ Link Service
 Handles Firestore operations for links and users.
 """
 
+import hashlib
 import secrets
 import logging
 from datetime import datetime, timezone
@@ -26,6 +27,13 @@ MAX_PROMPT_TAGS = 50
 # reuse list short enough that the model treats it as a menu rather than as
 # noise; a long list of near-duplicates would defeat the point.
 MAX_PROMPT_CATEGORIES = 20
+
+# Per-item length caps for the same two lists. They mirror main.MAX_TAG_LENGTH
+# / MAX_CATEGORY_LENGTH (the client-supplied twins) — the stored values are
+# model output that a hostile page can steer, and this list is interpolated
+# verbatim into every later analysis prompt for the workspace.
+MAX_PROMPT_TAG_LENGTH = 60
+MAX_PROMPT_CATEGORY_LENGTH = 40
 
 # Defaults for a brand-new workspace. Mirrors DEFAULT_SETTINGS in
 # web/lib/useUserSettings.ts — keep the two in sync.
@@ -70,15 +78,82 @@ def find_data_uid_by_auth_uid(auth_uid: str) -> Optional[str]:
     if not auth_uid:
         return None
     db = get_db()
-    docs = (
+    docs = list(
         db.collection('users')
         .where(filter=FieldFilter('authUids', 'array_contains', auth_uid))
-        .limit(1)
+        .limit(2)
         .get()
     )
-    if docs:
+    if not docs:
+        return None
+    if len(docs) == 1:
         return docs[0].id
-    return None
+    # More than one workspace claims this account. The rules no longer let a
+    # client grow `authUids` (so a stranger can't list someone else's uid on
+    # their own doc), but the resolver must not hand a caller to whichever doc
+    # Firestore happens to order first. Prefer the account's OWN doc (new
+    # workspaces are keyed by the auth uid); otherwise keep the deterministic
+    # first-by-id result and record the ambiguity so it can be cleaned up.
+    for d in docs:
+        if d.id == auth_uid:
+            return d.id
+    logger.warning("Auth account is linked to %d workspaces; using the first by id", len(docs))
+    return docs[0].id
+
+
+# ── Deleted-account tombstones ───────────────────────────────────────────────
+# `delete_account` used to be a free reset: re-signing up with the same email
+# minted a brand-new workspace with `createdAt = now`, i.e. a fresh 14-day
+# trial and zeroed counters. The tombstone keeps ONE fact about a deleted
+# account, keyed by a hash of its email (no address stored): when its first
+# workspace was created. A new workspace for the same email inherits that
+# date, so the trial clock does not restart. Functions-only collection.
+TOMBSTONE_COLLECTION = 'deleted_accounts'
+
+
+def email_tombstone_id(email) -> Optional[str]:
+    if not isinstance(email, str) or '@' not in email:
+        return None
+    return hashlib.sha256(email.strip().lower().encode('utf-8')).hexdigest()
+
+
+def write_account_tombstone(email, created_at_ms) -> None:
+    """Record the deleted workspace's createdAt under the email hash. Keeps the
+    EARLIEST date seen so repeated delete/re-create cycles never move it
+    forward. Best-effort: never blocks a deletion."""
+    tid = email_tombstone_id(email)
+    if not tid:
+        return
+    try:
+        ref = get_db().collection(TOMBSTONE_COLLECTION).document(tid)
+        snap = ref.get()
+        existing = (snap.to_dict() or {}).get('firstCreatedAt') if snap.exists else None
+        first = created_at_ms if isinstance(created_at_ms, (int, float)) else None
+        if isinstance(existing, (int, float)) and (first is None or existing < first):
+            first = existing
+        ref.set({
+            'firstCreatedAt': int(first) if first is not None else None,
+            'deletedAt': int(datetime.now(timezone.utc).timestamp() * 1000),
+        }, merge=True)
+    except Exception as e:
+        logger.warning(f"Account tombstone write failed: {e}")
+
+
+def inherited_created_at(email, now_ms: int) -> int:
+    """`createdAt` for a new workspace: the tombstoned first date for this
+    email when one exists and is earlier, else now. Best-effort."""
+    tid = email_tombstone_id(email)
+    if not tid:
+        return now_ms
+    try:
+        snap = get_db().collection(TOMBSTONE_COLLECTION).document(tid).get()
+        first = (snap.to_dict() or {}).get('firstCreatedAt') if snap.exists else None
+        if isinstance(first, (int, float)) and 0 < first < now_ms:
+            logger.info("New workspace inherits its trial clock from a deleted account")
+            return int(first)
+    except Exception as e:
+        logger.warning(f"Account tombstone read failed: {e}")
+    return now_ms
 
 
 def create_workspace(auth_uid: str, email: Optional[str] = None) -> str:
@@ -105,9 +180,10 @@ def create_workspace(auth_uid: str, email: Optional[str] = None) -> str:
         user_ref.set(update, merge=True)
         logger.info("Re-linked existing doc as workspace for new account")
     else:
+        now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
         doc = {
             'authUids': [auth_uid],
-            'createdAt': int(datetime.now(timezone.utc).timestamp() * 1000),
+            'createdAt': inherited_created_at(email, now_ms),
             'settings': dict(DEFAULT_USER_SETTINGS),
             # First-run onboarding pending; the client flips this to True.
             'onboarded': False,
@@ -131,10 +207,10 @@ def delete_user_data(uid: str) -> int:
     db = get_db()
     user_ref = db.collection('users').document(uid)
     deleted = 0
-    # 'syntheses' holds the M12 weekly recaps at users/{uid}/syntheses/{week_id};
-    # they're a subcollection so they survive the parent user doc's deletion and
-    # must be swept explicitly.
-    for sub in ('links', 'chats', 'collections', 'syntheses'):
+    # Subcollections survive the parent user doc's deletion and must each be
+    # swept explicitly: the M12 weekly recaps, the user's margin notes on
+    # them, in-app digests, self-hosted analytics and crash reports.
+    for sub in USER_SUBCOLLECTIONS:
         for doc in user_ref.collection(sub).stream():
             doc.reference.delete()
             deleted += 1
@@ -147,9 +223,99 @@ def delete_user_data(uid: str) -> int:
     for doc in db.collection('task_logs').where(filter=FieldFilter('data.uid', '==', uid)).stream():
         doc.reference.delete()
         deleted += 1
+    # Per-workspace server-side state keyed by uid: the plan grant, the monthly
+    # quota counters, and the vaulted full syntheses (synthesis_vault rows carry
+    # a `uid` field — see entitlement.stash_synthesis).
+    for coll in ('entitlements', 'usage_quotas'):
+        ref = db.collection(coll).document(uid)
+        if ref.get().exists:
+            ref.delete()
+            deleted += 1
+    for doc in db.collection('synthesis_vault').where(filter=FieldFilter('uid', '==', uid)).stream():
+        doc.reference.delete()
+        deleted += 1
+    # Every public share this workspace published: the world-readable snapshot,
+    # its owner mapping, and the generated link-preview image. Without this a
+    # deleted account's /s, /c and /a pages stayed live forever with nobody
+    # able to unpublish them.
+    deleted += delete_shares_for_owner(uid)
     user_ref.delete()
     deleted += 1
     logger.info(f"Deleted {deleted} docs for user workspace")
+    return deleted
+
+
+# Every client-facing subcollection under users/{uid}. Keep in step with
+# firestore.rules: a new subcollection there must be added here so account
+# deletion sweeps it.
+USER_SUBCOLLECTIONS = (
+    'links', 'chats', 'collections', 'syntheses', 'synthesisNotes',
+    'digests', 'analytics_events', 'client_errors',
+)
+
+_SHARE_TYPE_COLLECTIONS = {
+    "card": "shared_cards",
+    "collection": "shared_collections",
+    "answer": "shared_answers",
+}
+
+
+def delete_shares_for_owner(uid: str) -> int:
+    """Delete every public share owned by `uid` (snapshot + owner map +
+    previews). Returns the number of docs deleted; best-effort per share so
+    one failure never blocks the rest of the account deletion."""
+    db = get_db()
+    deleted = 0
+    owners = db.collection('shared_owners').where(filter=FieldFilter('ownerUid', '==', uid)).stream()
+    for owner_doc in owners:
+        share_id = owner_doc.id
+        share_type = (owner_doc.to_dict() or {}).get('type')
+        try:
+            public_coll = _SHARE_TYPE_COLLECTIONS.get(share_type)
+            if public_coll is None:
+                # Unknown/missing type: the snapshot lives in one of the three.
+                for coll in _SHARE_TYPE_COLLECTIONS.values():
+                    ref = db.collection(coll).document(share_id)
+                    if ref.get().exists:
+                        ref.delete()
+                        deleted += 1
+            else:
+                db.collection(public_coll).document(share_id).delete()
+                deleted += 1
+            owner_doc.reference.delete()
+            deleted += 1
+            try:
+                from share_service import _delete_share_previews
+                _delete_share_previews(share_id)
+            except Exception as e:
+                logger.warning(f"Share preview cleanup failed for {share_id}: {e}")
+        except Exception as e:
+            logger.warning(f"Share cleanup failed for {share_id}: {e}")
+
+    # Legacy shares (published before the 2026-07-07 `shared_owners` split)
+    # carry `ownerUid` on the PUBLIC doc and have no owner row, so the loop
+    # above never sees them. Sweep those too: the page would otherwise stay
+    # live forever after the account is gone, phone-number field included.
+    for coll in ('shared_cards', 'shared_collections'):
+        try:
+            legacy = db.collection(coll).where(filter=FieldFilter('ownerUid', '==', uid)).stream()
+            for doc in legacy:
+                try:
+                    doc.reference.delete()
+                    deleted += 1
+                    owner_ref = db.collection('shared_owners').document(doc.id)
+                    if owner_ref.get().exists:
+                        owner_ref.delete()
+                        deleted += 1
+                    try:
+                        from share_service import _delete_share_previews
+                        _delete_share_previews(doc.id)
+                    except Exception as e:
+                        logger.warning(f"Share preview cleanup failed for {doc.id}: {e}")
+                except Exception as e:
+                    logger.warning(f"Legacy share cleanup failed for {doc.id}: {e}")
+        except Exception as e:
+            logger.warning(f"Legacy share sweep failed for {coll}: {e}")
     return deleted
 
 
@@ -396,10 +562,12 @@ def get_user_vocabulary(uid: str) -> tuple:
         if isinstance(link_tags, list):
             for tag in link_tags:
                 if isinstance(tag, str) and tag.strip():
+                    tag = tag.strip()[:MAX_PROMPT_TAG_LENGTH]
                     tag_counts[tag] = tag_counts.get(tag, 0) + 1
         category = data.get('category')
         if isinstance(category, str) and category.strip():
-            cat_counts[category.strip()] = cat_counts.get(category.strip(), 0) + 1
+            category = category.strip()[:MAX_PROMPT_CATEGORY_LENGTH]
+            cat_counts[category] = cat_counts.get(category, 0) + 1
 
     def _ranked(counts, cap):
         return [k for k, _ in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:cap]]
@@ -440,6 +608,57 @@ def ensure_ingest_token(uid: str) -> str:
     user_ref.set({'ingestToken': token}, merge=True)
     logger.info(f"Generated new ingest token for user {mask_uid(uid)}")
     return token
+
+
+def rotate_ingest_token(uid: str) -> str:
+    """Replace the workspace's ingest token. The lookup is an equality query on
+    the single `ingestToken` field, so overwriting it invalidates the old
+    token on the next share-ingest call — no grace window, by design."""
+    token = secrets.token_urlsafe(24)
+    get_db().collection('users').document(uid).set({
+        'ingestToken': token,
+        'ingestTokenRotatedAt': datetime.now(timezone.utc).isoformat(),
+    }, merge=True)
+    logger.info(f"Rotated ingest token for user {mask_uid(uid)}")
+    return token
+
+
+# ── Opaque storage key ───────────────────────────────────────────────────────
+# Storage objects used to live under `screenshots/{uid}/…` and
+# `post_thumbs/{uid}/…`, and their public download URLs reach world-readable
+# share snapshots. For the legacy owner workspace the uid IS a phone number,
+# so every shared screenshot carried it. New blobs are written under a random
+# per-workspace key instead (server-only field `storageKey` on the user doc,
+# outside the client allowlist). Existing blobs are migrated by
+# tools/backfill_storage_keys.py; until then both prefixes are the workspace's
+# own (share_ingest's re-enqueue check and account deletion accept both).
+_STORAGE_KEY_CACHE: dict = {}
+
+
+def storage_key_for(uid: str) -> str:
+    """The opaque Storage prefix key for `uid`, minted on first use.
+
+    Fail-soft: if the key cannot be read or written (a transient Firestore
+    error) the legacy uid-keyed path is used, exactly as before this change,
+    so a save never fails on the prefix."""
+    if not uid:
+        return uid
+    cached = _STORAGE_KEY_CACHE.get(uid)
+    if cached:
+        return cached
+    try:
+        ref = get_db().collection('users').document(uid)
+        snap = ref.get()
+        key = (snap.to_dict() or {}).get('storageKey') if snap.exists else None
+        if not isinstance(key, str) or not key:
+            key = secrets.token_hex(16)
+            ref.set({'storageKey': key}, merge=True)
+            logger.info(f"Minted storage key for user {mask_uid(uid)}")
+        _STORAGE_KEY_CACHE[uid] = key
+        return key
+    except Exception as e:
+        logger.warning(f"Storage key lookup failed for {mask_uid(uid)}; using legacy prefix: {e}")
+        return uid
 
 
 def find_user_by_ingest_token(token: str) -> Optional[str]:

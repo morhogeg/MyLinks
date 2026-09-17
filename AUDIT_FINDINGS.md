@@ -96,7 +96,7 @@ background-upload pending-record reconciliation is a separate new subsystem.
 | Committed `web/output.json` debug artifact (real article data) | `web/output.json` | ✅ deleted |
 | `@capacitor/cli` in `dependencies` → `devDependencies` | `web/package.json` | ✅ |
 | Dead `test_locally.sh`; `deploy-hosting.sh` header contradicts PWA retirement; `docs/IOS_CICD.md` stale | root | 🔧 (IOS_CICD ✅; others ⬜) |
-| Owner PII (`+16462440305`, uid) in `models.py:194` + tracked docs | `functions/models.py` | ⬜ deferred |
+| Owner PII (the owner phone number, uid) in `models.py:194` + tracked docs | `functions/models.py` | ⬜ deferred |
 | Browser extension: no web UI exposes ingest token (new users can't configure); stale "MyLinks" manifest branding | `extension/` | ⬜ deferred |
 | CI: `altool` deprecated → `-exportArchive destination:upload`; Xcode glob can pick beta; App(21)/ShareExt(19) build-number drift | `.github/workflows/ios-testflight.yml`, `pbxproj` | ⬜ deferred |
 

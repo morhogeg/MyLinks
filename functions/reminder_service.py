@@ -35,6 +35,20 @@ def format_local_time(dt: datetime, tz_name: Optional[str], is_he: bool = False)
     return dt.strftime('%d/%m %H:%M') if is_he else dt.strftime('%b %d at %I:%M %p')
 
 
+# "in N days" from a share note is bounded like the quick-reply number: the
+# note may be hostile page text, and an unbounded N overflowed `timedelta`
+# AFTER the card was saved, which the pipeline then recorded as a failure.
+MAX_REMINDER_DAYS = 365
+
+
+def _bounded_days(raw: str) -> int:
+    try:
+        days = int(raw)
+    except (TypeError, ValueError):
+        return 0
+    return days if 1 <= days <= MAX_REMINDER_DAYS else 0
+
+
 def handle_reminder_intent(text: str) -> Optional[datetime]:
     """Parse text for reminder commands (English and Hebrew)."""
     text = re.sub(r'https?://[^\s]+', '', text).lower().strip()
@@ -45,18 +59,22 @@ def handle_reminder_intent(text: str) -> Optional[datetime]:
         return now + timedelta(days=1)
     if 'next week' in text:
         return now + timedelta(days=7)
-    match = re.search(r'\bin (\d+) days?', text)
+    match = re.search(r'\bin (\d{1,4}) days?', text)
     if match:
-        return now + timedelta(days=int(match.group(1)))
+        days = _bounded_days(match.group(1))
+        if days:
+            return now + timedelta(days=days)
 
     # Hebrew Patterns
     if 'מחר' in text:
         return now + timedelta(days=1)
     if 'שבוע הבא' in text:
         return now + timedelta(days=7)
-    match_he = re.search(r'(?:בעוד|עוד)\s+(\d+)\s+ימים', text)
+    match_he = re.search(r'(?:בעוד|עוד)\s+(\d{1,4})\s+ימים', text)
     if match_he:
-        return now + timedelta(days=int(match_he.group(1)))
+        days = _bounded_days(match_he.group(1))
+        if days:
+            return now + timedelta(days=days)
 
     # Quick-reply menu: a bare number means "remind me in that many days"
     # (1 -> 1 day, 2 -> 2 days, 7 -> 7 days …). "S" starts spaced repetition,
@@ -153,10 +171,17 @@ REMINDER_BATCH_LIMIT = 500
 
 # Max due reminders DELIVERED per user per tick. A user with a large accumulated
 # backlog (e.g. reminders re-enabled after a long pause) would otherwise get all
-# of them — pushes and writes — in a single tick. The rest stay pending and fire
-# on subsequent ticks; there's no starvation because each processed doc changes
-# status/nextReminderAt and so leaves the ASC-ordered batch head.
+# of them — pushes and writes — in a single tick. The rest are SNOOZED by
+# REMINDER_OVERFLOW_SNOOZE_MS so they leave the head of the ASC-ordered batch:
+# left "due in the past" they kept every other user's later-due reminders out
+# of the limit-500 query (500 client-written docs with nextReminderAt: 1 were
+# enough to starve everyone; the rules now also refuse a backdated value).
 REMINDER_PER_USER_LIMIT = 10
+
+# How far a user's OVERFLOW due docs (beyond REMINDER_PER_USER_LIMIT) are
+# pushed forward each tick. Short: a real backlog still drains at 10 per
+# 10 minutes, but the docs no longer sit at the head of the shared query.
+REMINDER_OVERFLOW_SNOOZE_MS = 10 * 60 * 1000
 
 # How long a due doc is snoozed when its owner can't be delivered to right now
 # (reminders disabled, or the user doc is missing / failed to load). Pushing
@@ -328,7 +353,14 @@ def run_reminder_check() -> dict:
             _snooze_due_links(user_links, now_ms + REMINDER_SNOOZE_MS)
             continue
 
-        settings = user_data.get('settings', {}) or {}
+        # `settings` is client-writable (rules allow the key; the type guard
+        # there is new). A non-dict value must not raise here: this loop runs
+        # for EVERY user with a due reminder, and the due query orders by
+        # nextReminderAt, so one account could otherwise sit at the head of
+        # the batch and abort the whole tick for everyone.
+        settings = user_data.get('settings')
+        if not isinstance(settings, dict):
+            settings = {}
         enabled = settings.get('reminders_enabled', settings.get('remindersEnabled', True))
 
         if not enabled:
@@ -351,7 +383,7 @@ def run_reminder_check() -> dict:
         # 'whatsapp' entry is normalized to 'push' (deduped). New workspaces
         # default to ["push"] (DEFAULT_USER_SETTINGS in link_service.py).
         stored = settings.get('reminders_channel')
-        if stored is None:
+        if not isinstance(stored, list):
             channels = ['push']
         else:
             channels = list(dict.fromkeys(
@@ -429,6 +461,11 @@ def run_reminder_check() -> dict:
                 err_msg = f"Failed to send reminder for link {link_id}: {e}"
                 logger.error(err_msg)
                 report["errors"].append(err_msg)
+
+        overflow = user_links[REMINDER_PER_USER_LIMIT:]
+        if overflow:
+            _snooze_due_links(overflow, now_ms + REMINDER_OVERFLOW_SNOOZE_MS)
+            report["reminders_snoozed"] = report.get("reminders_snoozed", 0) + len(overflow)
 
     logger.info(f"Reminder execution complete. Report: {report}")
     return report

@@ -5,6 +5,7 @@
 // `rules-tests.yml` prove it, then promote it here — deploy-rules.yml deploys
 // whatever this file says. See NATIVE_AUTH_SETUP.md ("Cutover order").
 rules_version = '2';
+rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -35,6 +36,50 @@ service cloud.firestore {
         && (request.auth.uid in get(/databases/$(database)/documents/users/$(uid)).data.authUids);
     }
 
+    // The user-doc fields the CLIENT is allowed to write (update rule above).
+    // Add a key here only when a client write for it exists; every write site
+    // is enumerated in firestore-rules-test/rules.test.mjs.
+    //   timezone       AuthProvider (device zone on sign-in)
+    //   settings       lib/storage updateUserSettings (dot-path `settings.*`
+    //                  updates affect the top-level `settings` key)
+    //   aiConsentAt    AIConsentNotice via AuthProvider
+    //   pushPromptedAt PushNudge / AuthProvider
+    //   onboarded      AuthProvider (first-run flow done)
+    //   privacyLock    lib/privacyLock (set / clear the PIN record)
+    //   graphVersion   lib/rebuildConnections
+    function clientWritableUserKeys() {
+      return ['timezone', 'settings', 'aiConsentAt', 'pushPromptedAt',
+              'onboarded', 'privacyLock', 'graphVersion'];
+    }
+
+    // The TYPE each client-writable field must have when present. The key
+    // allowlist alone let a modified client write `settings: "x"` (or
+    // `timezone: 5`), and the schedulers read those fields for EVERY user in
+    // one loop: `settings.get(...)` on a string raised before the per-user
+    // try/except, so one account could halt reminders/digests for everyone.
+    // The servers now coerce too; this keeps the bad value out of the DB.
+    // A field that is being deleted (deleteField) is absent from the new
+    // data and therefore passes.
+    function clientUserFieldsTyped(d) {
+      return (!('settings' in d) || d.settings is map)
+        && (!('timezone' in d) || d.timezone is string)
+        && (!('aiConsentAt' in d) || d.aiConsentAt is number)
+        && (!('pushPromptedAt' in d) || d.pushPromptedAt is number)
+        && (!('onboarded' in d) || d.onboarded is bool)
+        && (!('privacyLock' in d) || d.privacyLock is map)
+        && (!('graphVersion' in d) || d.graphVersion is number);
+    }
+
+    // See the links rule. `resource.data.get()` (not a bare field read) so a
+    // doc without the field never errors the rule into a denial.
+    function reminderTimeSane() {
+      let d = request.resource.data;
+      return !('nextReminderAt' in d)
+        || d.nextReminderAt == null
+        || (request.method == 'update' && d.nextReminderAt == resource.data.get('nextReminderAt', null))
+        || (d.nextReminderAt is number && d.nextReminderAt >= request.time.toMillis() - 300000);
+    }
+
     match /users/{uid} {
       // Read = get + list, written against `resource` (NOT owns()) on purpose:
       // the client resolves its workspace with the LIST query
@@ -45,10 +90,24 @@ service cloud.firestore {
       // (e.g. the legacy limit(1) "first doc" lookup) is denied.
       allow read: if isSignedIn() && request.auth.uid in resource.data.authUids;
 
-      // Owner-only updates (timezone, settings, digest prefs, ingest token…).
-      // Same resource-based check as read: only a doc already linked to this
-      // account can be touched, and only linked accounts can grow `authUids`.
-      allow update: if isSignedIn() && request.auth.uid in resource.data.authUids;
+      // Owner-only updates, FIELD-LIMITED. Only a doc already linked to this
+      // account can be touched, and only the fields the client actually
+      // writes (see clientWritableUserKeys). Everything else on the user doc
+      // is server-owned and stays that way:
+      //   - `createdAt` decides the founder / trial grant (entitlement.py
+      //     grant_for): a client that could rewrite it to 0 minted itself a
+      //     year of Pro. Frozen after create.
+      //   - `authUids` is how the backend resolves a workspace: a client that
+      //     could add a stranger's auth uid to its own doc could pull that
+      //     account's saves and device token into its library. Linking is
+      //     server-side only (claim_workspace / create_workspace).
+      //   - `ingestToken` (share-sheet auth), `fcmTokens` (push targets),
+      //     `lastDigestSentAt`, `email`: minted / maintained by functions.
+      allow update: if isSignedIn()
+        && request.auth.uid in resource.data.authUids
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(clientWritableUserKeys())
+        && clientUserFieldsTyped(request.resource.data);
 
       // Self-serve workspace creation — the client-side fallback when both
       // claim transports fail (AuthProvider.createWorkspaceClientSide,
@@ -57,15 +116,29 @@ service cloud.firestore {
       // touch any other doc id (== uid check), cannot claim a legacy doc
       // (create fails on an existing doc; the update rule then rejects a
       // non-linked writer), and cannot seed another account into authUids.
+      // The doc may carry only the birth fields, and `createdAt` must be
+      // "now" (±5 min of the server clock) so a fresh account cannot
+      // backdate itself into the founders' Pro grant.
       allow create: if isSignedIn()
         && request.auth.uid == uid
-        && request.resource.data.authUids == [request.auth.uid];
+        && request.resource.data.authUids == [request.auth.uid]
+        && request.resource.data.keys().hasOnly(['authUids', 'createdAt', 'onboarded', 'email'])
+        && request.resource.data.createdAt is number
+        && request.resource.data.createdAt >= request.time.toMillis() - 300000
+        && request.resource.data.createdAt <= request.time.toMillis() + 300000;
 
       // Deletion stays server-side only (delete_account, Admin SDK).
       allow delete: if false;
 
       match /links/{linkId} {
-        allow read, write: if owns(uid);
+        allow read, delete: if owns(uid);
+        // Create/update: the owner may write any field, EXCEPT that a
+        // reminder cannot be moved into the past. The reminder scheduler is
+        // one shared query ordered by nextReminderAt across every user, so a
+        // client that wrote 500 docs with `nextReminderAt: 1` held the head of
+        // that query and starved everyone else's reminders. A value may be
+        // absent, null, unchanged, or no more than 5 minutes ago.
+        allow create, update: if owns(uid) && reminderTimeSane();
       }
 
       // Ask-your-brain saved conversations
@@ -212,6 +285,15 @@ service cloud.firestore {
     // (see main.py _record_server_error). They can carry a workspace uid, so
     // never client-readable; surfaced only via the admin debug_status endpoint.
     match /server_errors/{docId} {
+      allow read, write: if false;
+    }
+
+    // deleted_accounts: only Cloud Functions (admin SDK) — one row per deleted
+    // account keyed by an email HASH, carrying when its first workspace was
+    // created, so a re-signup does not restart the trial clock. Never
+    // client-readable (it maps hashes to dates) or -writable (a client could
+    // erase its own tombstone).
+    match /deleted_accounts/{docId} {
       allow read, write: if false;
     }
 

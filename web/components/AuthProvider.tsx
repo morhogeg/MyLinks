@@ -521,6 +521,19 @@ async function createWorkspaceClientSide(
     authUid: string,
     email: string | null,
 ): Promise<{ id: string; data: Record<string, unknown>; created: boolean }> {
+    // Look once more before creating: this fallback only runs after BOTH
+    // server claim transports failed, and a timed-out server claim can still
+    // complete in the background. For the owner that claim links the legacy
+    // phone-keyed doc; creating a second, empty doc here would then leave the
+    // account linked to two workspaces (the server resolver prefers the
+    // uid-keyed one, the client's limit(1) query the other).
+    const linkedNow = await getDocs(
+        query(collection(db, 'users'), where('authUids', 'array-contains', authUid), limit(1)),
+    );
+    if (!linkedNow.empty) {
+        const d = linkedNow.docs[0];
+        return { id: d.id, data: d.data(), created: false };
+    }
     const payload: Record<string, unknown> = {
         authUids: [authUid],
         createdAt: Date.now(),
