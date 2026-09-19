@@ -96,6 +96,7 @@ export const Subtitles: React.FC = () => {
                   color: 'rgba(17,24,39,0.96)',
                   textShadow: '0 1px 2px rgba(255,255,255,0.6), 0 2px 30px rgba(238,240,244,0.9)',
                   maxWidth: 940,
+                  whiteSpace: 'pre-line',
                 }}
               >
                 {s.text}
@@ -160,6 +161,7 @@ export const Subtitles: React.FC = () => {
                   letterSpacing: '-0.026em',
                   color: 'rgba(17,24,39,0.96)',
                   textShadow: '0 1px 2px rgba(255,255,255,0.6), 0 2px 30px rgba(238,240,244,0.9)',
+                  whiteSpace: 'pre-line',
                 }}
               >
                 {s.text}
@@ -223,6 +225,7 @@ export const Subtitles: React.FC = () => {
                   textAlign: 'center',
                   maxWidth: vertical ? 940 : 1300,
                   padding: '0 60px',
+                  whiteSpace: 'pre-line',
                 }}
               >
                 {s.text}

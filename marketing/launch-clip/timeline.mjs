@@ -70,6 +70,10 @@ export const sceneAt = (id) => {
  * Written to read as narration, not as a feature list — and short enough to be
  * absorbed in a glance while the picture does the real talking.
  *
+ * A `\n` in `text` is a hard line break (owner call 2026-09-19): a caption that
+ * holds two sentences starts the second one on its own line instead of
+ * wrapping mid-sentence; the `.srt` carries the same break.
+ *
  * NO EM DASHES in any `text` (the app-wide ban of 2026-08-27, which the film's
  * burned-in captions are just as bound by); `npm run verify` fails on one.
  */
@@ -110,7 +114,7 @@ export const SUBTITLES = [
   // THE PROMISE — one line for the whole library beat; the search (a query
   // sharing no words with the one card it finds) plays wordless underneath
   // and proves the second half.
-  { bar: 13.3, bars: 2.45, place: 'left', text: 'From now on, lose nothing. And find everything.' },
+  { bar: 13.3, bars: 2.45, place: 'left', text: 'From now on, lose nothing.\nAnd find everything.' },
   // A new feature, not a continuation — no "Then" (owner note, round 13c).
   // The name still carries the line: "ask it" mushed out loud (round 12).
   { bar: 16.35, bars: 1.6, place: 'left', kicker: 'Ask', text: 'Ask Machina anything.' },
@@ -131,7 +135,7 @@ export const SUBTITLES = [
   // Round 13g (workshopped): proactivity explicit ("Behind the scenes"),
   // synthesis value in kitchen-table words, the result on YOUR timing. "it
   // all" not "your saves" — the two lines before already say saves/saved.
-  { bar: 26.1, bars: 2.6, place: 'left', text: 'Behind the scenes, Machina pieces it all together. Ready when you are.' },
+  { bar: 26.1, bars: 2.6, place: 'left', text: 'Behind the scenes, Machina pieces it all together.\nReady when you are.' },
 ];
 
 /**
