@@ -226,7 +226,19 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-09-19, later): install build **1329** (search framing words stripped for every query, Ask row always offered), then the 1327 QA below if not yet done
+> ## 🚨 OWNER ACTION (updated 2026-09-19, latest): install build **1330** (search only searches; "Ask Machina instead" on a dead end), then the 1327 QA below if not yet done
+>
+> **1330** (run #330, merge `2925249`) is the product decision that closed
+> today's search thread: one field, one job. No functions deploy (backend
+> unchanged since run #110). QA on 1330: the field reads "Search your
+> saves"; "Best breastfeeding positions" shows the lactation card instantly
+> with NO row above the results; "pasta" likewise, no row; type a query
+> that matches nothing ("zzzz quantum") and the No matches screen shows
+> "Clear search" and, under it, "Ask Machina instead"; tap the latter and
+> Ask opens with those words already sent. The Ask tab is otherwise
+> unchanged. Then the 1327 list below.
+>
+> ## (superseded) OWNER ACTION (updated 2026-09-19, later): install build **1329** (search framing words stripped for every query, Ask row always offered), then the 1327 QA below if not yet done
 >
 > **1329** (run #329, merge `d7d21a7`) is round 2 of the search-bar fix
 > after your 1328 screenshot ("Best breastfeeding positions": no match, no
@@ -2216,6 +2228,41 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-09-19 (round 3, the decision) — Search only searches; Ask stays
+  manual, offered once on a dead end (`web/components/Feed.tsx`,
+  `web/lib/searchIntent.ts` deleted, `marketing/launch-clip/src/ui/app.tsx`).
+  SHIPPED: merge `2925249` to main (Vercel auto-deploy), TestFlight run #330
+  = **build 1330**. No functions, rules or hosting deploy.** After rounds 1
+  and 2 the owner asked whether the field should ask as well as search
+  ("if the input field says search and ask, we must search and ask"),
+  then whether that spends money needlessly, then whether it is wonderful
+  to use. Costed first (flash-lite $0.25/$1.50 per M, embeddings $0.15/M):
+  a search is ~$0.0006 (embedding + judge), an Ask ~$0.002-0.003, so 300
+  searches + 100 asks a month is ~$0.45; money was never the constraint,
+  the 60-asks-an-hour rate limit and answer-paragraph clutter on lookups
+  were. Options weighed: (a) Ask on every settled query (fires on
+  fragments, burns the limit, clutters "pasta"); (b) Ask on Return (a
+  hidden gesture; the phone keyboard button says Search); (c) auto-answer
+  only question-shaped queries (the owner's first "go", then withdrawn);
+  (d) one field, one job, with a single bridge to Ask at the one moment
+  the grid cannot help. Owner chose (d), matching §1's "subtraction, trust,
+  focus". Built: placeholder "Search your saves" (both inputs); the
+  "Get a cited answer" row from rounds 1-2 removed (it was clutter on every
+  lookup); the "No matches" state gains "Ask Machina instead", a quiet
+  bordered pill under "Clear search", which calls `handleAskFromSearch`
+  with the typed words (same pre-sent hand-off the row used, nothing asked
+  until tapped, so a search never spends a model call on its own). Round
+  1-2's retrieval fixes stay (questions and framed lookups find their
+  card). `searchIntent.ts` had no importer left and is deleted; the launch
+  film's field placeholder follows the app. **Verified:** `tsc` clean,
+  eslint on Feed.tsx clean, em-dash gate clean, no "Search or ask" left in
+  web/. **Not verified:** on device; the film was not re-rendered for the
+  one-word placeholder change. **Stale note to clear in the next backend
+  change:** `search.py`'s `looks_like_question` docstring still names
+  `web/lib/searchIntent.looksLikeQuestion` as its client twin; the twin is
+  now `stripSearchFraming` in `searchMatch.ts`. Left untouched so the
+  docs-only change did not trigger a functions deploy.
 
 - **2026-09-19 (round 2) — Search bar: framing words stripped for EVERY
   query, and the Ask row is offered for every query (`web/lib/searchMatch.ts`,
