@@ -3,7 +3,7 @@ import { Link } from '@/lib/types';
 import { getSourceInfo, buildSourceFacets, sourceMatchesQuery } from '@/lib/source';
 import { PLATFORM_LABELS, type PlatformKey } from '@/lib/platform';
 import { isPending, getTimestampNumber } from '@/lib/feedUtils';
-import { tokenizeSearch, matchCard, normalizeSearchText } from '@/lib/searchMatch';
+import { tokenizeSearch, matchCard, partialMatchCount, normalizeSearchText } from '@/lib/searchMatch';
 
 export type FilterType = 'all' | 'unread' | 'read' | 'archived' | 'favorite' | 'reminders' | 'private';
 export type SortType = 'date-desc' | 'date-asc' | 'title-asc' | 'category';
@@ -140,6 +140,25 @@ export function useFeedFilters(
         return m;
     }, [searchBase, queryTokens]);
 
+    // PARTIAL matches — the rescue tier. Only when the strict AND found NOTHING
+    // and the query has two or more content words: cards whose title or tags
+    // carry at least one of them, ranked by how many. "breastfeeding cradle"
+    // with no cradle card anywhere shows the breastfeeding cards under a
+    // "Close matches" divider instead of "No matches" (owner, 2026-09-19:
+    // not finding a card the library plainly has is not acceptable). Never
+    // computed while strict matches exist, so a good result never grows a
+    // wall of one-word neighbours underneath it.
+    const partialMatches = useMemo(() => {
+        const m = new Map<string, number>();
+        if (queryTokens.length < 2 || searchMatches.size > 0) return m;
+        for (const link of searchBase) {
+            const n = partialMatchCount(link, queryTokens);
+            if (n > 0) m.set(link.id, n);
+        }
+        return m;
+    }, [searchBase, queryTokens, searchMatches]);
+    const partialIds = useMemo(() => new Set(partialMatches.keys()), [partialMatches]);
+
     // Server rank per meaning-search hit (0 = best). Only consulted while a
     // query is live; an id that never made it into searchBase simply never
     // renders (it failed the privacy/pending gate or the library fetch).
@@ -158,9 +177,9 @@ export function useFeedFilters(
     // like an unexplained result.
     const semanticOnlyIds = useMemo(() => {
         const s = new Set<string>();
-        semanticRank.forEach((_, id) => { if (!searchMatches.has(id)) s.add(id); });
+        semanticRank.forEach((_, id) => { if (!searchMatches.has(id) && !partialMatches.has(id)) s.add(id); });
         return s;
-    }, [semanticRank, searchMatches]);
+    }, [semanticRank, searchMatches, partialMatches]);
 
     // 4. Hybrid Search Logic — memoized so a banner tick or any unrelated state
     // change (search typing, overlay toggles) doesn't re-run the 6-stage filter +
@@ -207,7 +226,7 @@ export function useFeedFilters(
             // Apply search: every query word in the title or the summary,
             // OR a meaning-search hit (semantic widening, ranked last).
             if (queryTokens.length === 0) return true;
-            return searchMatches.has(link.id) || semanticRank.has(link.id);
+            return searchMatches.has(link.id) || partialMatches.has(link.id) || semanticRank.has(link.id);
         })
         .sort((a, b) => {
             // While searching (under the default sort), three tiers: literal
@@ -217,11 +236,18 @@ export function useFeedFilters(
             // literally contains the query. An explicit non-default sort wins
             // outright.
             if (queryTokens.length > 0 && sortBy === 'date-desc') {
-                const tier = (l: Link) => searchMatches.has(l.id) ? (searchMatches.get(l.id) ? 2 : 1) : 0;
+                // Four tiers: literal title/tag, literal summary, partial
+                // (only ever present when the first two are empty), meaning.
+                const tier = (l: Link) => searchMatches.has(l.id) ? (searchMatches.get(l.id) ? 3 : 2)
+                    : partialMatches.has(l.id) ? 1 : 0;
                 const ta = tier(a);
                 const tb = tier(b);
                 if (ta !== tb) return tb - ta;
                 if (ta === 0) return (semanticRank.get(a.id) ?? 0) - (semanticRank.get(b.id) ?? 0);
+                if (ta === 1) {
+                    const d = (partialMatches.get(b.id) ?? 0) - (partialMatches.get(a.id) ?? 0);
+                    if (d !== 0) return d;
+                }
                 return getTimestampNumber(b.createdAt) - getTimestampNumber(a.createdAt);
             }
 
@@ -243,7 +269,7 @@ export function useFeedFilters(
                     return 0;
             }
         }),
-        [searchBase, filter, selectedCategory, selectedTags, selectedCollections, selectedSources, queryTokens, searchMatches, semanticRank, sortBy]);
+        [searchBase, filter, selectedCategory, selectedTags, selectedCollections, selectedSources, queryTokens, searchMatches, partialMatches, semanticRank, sortBy]);
 
     // Facet base: the chips and their counts describe the cards the CURRENT view
     // can actually show, so "Tech (12)" can never resolve to 9 cards because
@@ -414,6 +440,7 @@ export function useFeedFilters(
         matchingSources,
         matchingTags,
         semanticOnlyIds,
+        partialIds,
         reminderCount,
     };
 }

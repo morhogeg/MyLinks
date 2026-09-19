@@ -44,39 +44,47 @@ export function normalizeSearchText(s: string): string {
         .replace(/ץ/g, 'צ');
 }
 
-/** Words a query puts IN FRONT of the thing it is looking for: question
- *  openers, function words and quality adjectives. "Best breastfeeding
- *  positions" and "What the best breastfeeding position" are both lookups for
- *  "breastfeeding position", and under AND matching the framing words are
- *  what turned them into "No matches" (owner, 2026-09-19: "best" is on no
- *  card). Stripped only as a LEADING run, so a framing word inside the query
- *  ("the best of both worlds") keeps its place, and never when nothing would
- *  be left. Mirrors `_TOPIC_FRAME_WORDS` in functions/search.py. */
-const SEARCH_FRAMING = new Set([
+/** Words that never DECIDE a match: question openers, function words, quality
+ *  adjectives and generic descriptors ("tips", "guide", "ideas"). "Latching
+ *  tips" is a lookup for "latching"; "Best breastfeeding positions" for
+ *  "breastfeeding positions". Under AND matching these words were exactly what
+ *  turned real cards into "No matches" (owner, 2026-09-19, three times in one
+ *  day), because no card says "tips" or "best". They are dropped WHEREVER they
+ *  sit in the query, never only at the front; a query made only of such words
+ *  keeps them (it is a lookup for those words). Mirrors `_TOPIC_FRAME_WORDS`
+ *  in functions/search.py. */
+const SEARCH_FRAMING_WORDS = [
     'what', 'whats', 'how', 'why', 'when', 'where', 'who', 'which', 'is', 'are',
     'can', 'should', 'do', 'does', 'did', 'was', 'were', 'will', 'would', 'could',
     'the', 'a', 'an', 'of', 'to', 'in', 'on', 'at', 'by', 'for', 'and', 'or',
     'i', 'me', 'my', 'you', 'your', 'it', 'its', 'this', 'that', 'there', 'any',
     'some', 'about', 'with', 'from', 'have', 'has', 'best', 'good', 'better',
-    'great', 'top', 'way', 'ways', 'tips', 'tip', 'know', 'learn', 'learned',
-    'saved', 'save', 'find', 'get', 'tell', 'recommend', 'recommended', 'most',
-    'right', 'proper', 'correct', 'kind', 'sort', 'type', 'one',
+    'great', 'top', 'way', 'ways', 'tips', 'tip', 'tricks', 'trick', 'hacks',
+    'guide', 'guides', 'ideas', 'idea', 'advice', 'tutorial', 'examples',
+    'example', 'list', 'help', 'info', 'article', 'video', 'post', 'thing',
+    'things', 'stuff', 'know', 'learn', 'learned', 'saved', 'save', 'find',
+    'get', 'tell', 'recommend', 'recommended', 'most', 'right', 'proper',
+    'correct', 'kind', 'sort', 'type', 'one',
     'מה', 'איך', 'למה', 'מדוע', 'מתי', 'איפה', 'מי', 'איזה', 'איזו', 'האם', 'כמה',
     'הכי', 'טוב', 'טובה', 'טובים', 'דרך', 'כדאי', 'צריך', 'אפשר', 'יש', 'את', 'של',
     'על', 'עם', 'זה', 'זו', 'יודע', 'יודעת', 'למדתי', 'שמרתי', 'לי', 'שלי',
-]);
+    'טיפים', 'טיפ', 'מדריך', 'רעיונות', 'רעיון', 'עצות', 'עצה', 'טריקים', 'דוגמאות',
+];
 
-/** Drop the leading run of framing words; keep the original when that would
- *  leave nothing (a query made only of framing words is a lookup for them). */
+/** The set is built through the SAME normalization as the query tokens, so a
+ *  Hebrew entry with a final letter ("טיפים" → "טיפימ") still matches. */
+const SEARCH_FRAMING = new Set(SEARCH_FRAMING_WORDS.map(normalizeSearchText));
+
+/** Drop the framing words wherever they sit; keep the original when that
+ *  would leave nothing. */
 export function stripSearchFraming(tokens: string[]): string[] {
-    let i = 0;
-    while (i < tokens.length && SEARCH_FRAMING.has(tokens[i])) i++;
-    return i === 0 || i === tokens.length ? tokens : tokens.slice(i);
+    const content = tokens.filter((t) => !SEARCH_FRAMING.has(t));
+    return content.length === 0 ? tokens : content;
 }
 
 /** Split a query into normalized match tokens (Unicode-aware, so Hebrew and
- *  numbers tokenize intact), minus any leading framing words. Empty/whitespace
- *  queries yield []. */
+ *  numbers tokenize intact), minus the framing words. Empty/whitespace queries
+ *  yield []. */
 export function tokenizeSearch(query: string): string[] {
     return stripSearchFraming(normalizeSearchText(query).match(/[\p{L}\p{N}]+/gu) ?? []);
 }
@@ -113,6 +121,21 @@ function tokenVariants(token: string): string[] {
     const variants = [token];
     if (token.length > 4 && token.endsWith('es')) variants.push(token.slice(0, -2));
     if (token.length > 3 && token.endsWith('s')) variants.push(token.slice(0, -1));
+    if (token.length > 4 && token.endsWith('ies')) variants.push(token.slice(0, -3) + 'y');
+    // Light stemming for the common English inflections, matched as substrings
+    // so the stem reaches every form on the card: "latching" → "latch" finds
+    // "latch", "latches" and "latched"; "positioned" → "position" finds
+    // "positioning". A doubled final consonant is folded too ("running" →
+    // "run"). Only for words long enough that the stem still means something.
+    if (token.length > 5 && token.endsWith('ing')) {
+        const stem = token.slice(0, -3);
+        variants.push(stem);
+        if (stem.length > 3 && stem[stem.length - 1] === stem[stem.length - 2]) variants.push(stem.slice(0, -1));
+    } else if (token.length > 4 && token.endsWith('ed')) {
+        const stem = token.slice(0, -2);
+        variants.push(stem);
+        if (stem.length > 3 && stem[stem.length - 1] === stem[stem.length - 2]) variants.push(stem.slice(0, -1));
+    }
     return variants;
 }
 
@@ -135,4 +158,24 @@ export function matchCard(link: Link, tokens: string[]): SearchMatch | null {
         if (!containsAny(summary, variants)) return null;
     }
     return { titleHit };
+}
+
+
+/**
+ * Partial match: how many of the query's words hit the card's TITLE or TAGS
+ * (the curated fields, never the summary). Used only when the strict AND
+ * match finds nothing, so a two-word query where one word is missing from
+ * the library ("breastfeeding cradle") still surfaces the cards about the
+ * word it does have, ranked by how many words they cover, instead of a dead
+ * end. 0 when no word hits.
+ */
+export function partialMatchCount(link: Link, tokens: string[]): number {
+    if (tokens.length < 2) return 0;
+    const { title, tags } = getSearchText(link);
+    let n = 0;
+    for (const token of tokens) {
+        const variants = tokenVariants(token);
+        if (containsAny(title, variants) || containsAny(tags, variants)) n++;
+    }
+    return n;
 }

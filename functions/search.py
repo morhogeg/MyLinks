@@ -282,11 +282,33 @@ _TOPIC_FRAME_WORDS = _QUESTION_OPENERS | _RANK_STOPWORDS | {
     "יודעת", "למדתי", "שמרתי", "יש", "איזו", "אילו", "הם", "הן",
 }
 _TOPIC_TAIL_WORDS = {"me", "us", "you", "him", "her", "them", "לי", "לנו", "לך", "לכם"}
+# Generic descriptors a query wears anywhere ("latching TIPS", "sourdough
+# GUIDE"). They never decide a match: no card says "tips". Owner report
+# 2026-09-19 round 4: "Latching tips" → No matches for a card titled
+# "... Latching Techniques" and tagged latching.
+_TOPIC_DESCRIPTOR_WORDS = {
+    "tips", "tip", "tricks", "trick", "hacks", "guide", "guides", "ideas", "idea",
+    "advice", "tutorial", "examples", "example", "list", "help", "info",
+    "article", "video", "post", "thing", "things", "stuff",
+    "טיפים", "טיפ", "מדריך", "רעיונות", "רעיון", "עצות", "עצה", "טריקים", "דוגמאות",
+}
+_TOPIC_FRAME_WORDS |= _TOPIC_DESCRIPTOR_WORDS
+
+
+def content_tokens(query: str) -> set:
+    """The query tokens that must match: keyword_query_tokens minus every
+    framing/descriptor word, wherever it sits. Falls back to the full token
+    set when nothing would be left (a query made of framing words is a
+    lookup for them). Mirrors `stripSearchFraming` in web/lib/searchMatch.ts."""
+    toks = keyword_query_tokens(query)
+    content = {t for t in toks if t not in _TOPIC_FRAME_WORDS}
+    return content or toks
 
 
 def looks_like_question(query: str) -> bool:
-    """Server twin of web/lib/searchIntent.looksLikeQuestion: ends in "?" or
-    opens with a question word and carries at least one more word."""
+    """Ends in "?" or opens with a question word and carries at least one more
+    word. The client's literal layer (web/lib/searchMatch.ts) does not need
+    the distinction: it strips framing words from every query."""
     t = (query or "").strip()
     if len(t) < 2:
         return False
@@ -339,6 +361,13 @@ _DISTANCE_CEILING = float(os.environ.get("SEARCH_DISTANCE_CEILING", "0.68"))
 _DISTANCE_MARGIN = float(os.environ.get("SEARCH_DISTANCE_MARGIN", "0.22"))
 # Looser bound for the top-`min_keep` recall floor (see apply_distance_threshold).
 _DISTANCE_HARD_CEILING = float(os.environ.get("SEARCH_DISTANCE_HARD_CEILING", "0.80"))
+# When the judge cannot serve, only CONFIDENT vector hits pass (2026-09-19):
+# under this distance a hit is the query's own topic in any language seen so
+# far, while the 0.55-0.70 band where a Hebrew one-word query meets every
+# Hebrew card (the "גורדון" wall) stays out. Literal-only, the previous
+# fallback, showed nothing at all from the vector half, which made a judge
+# timeout indistinguishable from "you never saved that".
+_DISTANCE_STRONG = float(os.environ.get("SEARCH_DISTANCE_STRONG", "0.50"))
 
 
 def _to_unix_ms(val) -> int:
@@ -1645,17 +1674,21 @@ def perform_hybrid_search(uid: str, query_text: str, limit: int = 20,
          already decided relevance, and the client re-tiers literal matches
          above meaning hits anyway.
 
-    FALLBACK (2026-09-04): when the judge can't serve (no key, call failure,
-    unparseable reply) the search bar serves LITERAL matches only — no vector
-    results at all. The old distance-gate fallback (threshold + cliff +
-    rerank) is what showed a Rabin card for "גורדון": a Hebrew one-word query
-    embeds close to every Hebrew card, so nearest-neighbour output past the
-    judge is same-language padding, not meaning. An empty "By meaning" section
-    is honest; a wrong one is not. Ask retrieval keeps its own gates.
+    FALLBACK (2026-09-19, revising 2026-09-04): when the judge can't serve (no
+    key, call failure, timeout, unparseable reply) the search bar serves the
+    CONFIDENT vector hits (distance <= _DISTANCE_STRONG, no recall floor, no
+    cliff) plus literal matches. The 2026-09-04 literal-only fallback was a
+    reaction to the old distance-gate wall (a Rabin card for "גורדון": a
+    Hebrew one-word query sits 0.55-0.70 from every Hebrew card), but it also
+    meant a judge timeout showed NOTHING from the vector half, and a real
+    match looked like "you never saved that". The strong band keeps the wall
+    out (it starts above 0.55) and the real match in. Ask retrieval keeps its
+    own gates.
 
     `meta`, when given, receives `mode`: "judge" (the LLM verdict served) or
-    "gate" (the distance-gate fallback served) so a bad result can be traced
-    to the path that produced it without log access.
+    "gate" (the strong-distance fallback served) so a bad result can be traced
+    to the path that produced it without log access; the client records a
+    non-judge mode once per session in client_errors.
 
     Degrades instead of failing: if the vector half errors transiently, the
     lexical half still serves (an outage must not blank the search bar). Only
@@ -1734,18 +1767,24 @@ def perform_hybrid_search(uid: str, query_text: str, limit: int = 20,
         # layer does (AND): "ארוחת ערב" once pulled a card whose title merely
         # contained ערב — a title hit scores 2 on its own — and it showed
         # under By meaning because the client's literal pass rejected it.
-        q_tokens = keyword_query_tokens(topic)
+        q_tokens = content_tokens(topic)
         have = {r.get("id") for r in judged}
         strong_extras = [k for k in keyword_hits if k.get("id") not in have
                          and keyword_all_tokens_match(k, q_tokens)
                          and keyword_match_score(k, q_tokens) >= 2]
         ranked = (judged + strong_extras)[:limit]
     else:
-        # Judge unavailable: literal matches only (see the docstring). Ranked
-        # by the lexical score so a title hit leads.
-        q_tokens = keyword_query_tokens(topic)
-        literal = [k for k in keyword_hits if keyword_all_tokens_match(k, q_tokens)]
-        ranked = sorted(literal, key=lambda k: -keyword_match_score(k, q_tokens))[:limit]
+        # Judge unavailable: confident vector hits (vector order), then literal
+        # matches ranked by lexical score so a title hit leads (see docstring).
+        q_tokens = content_tokens(topic)
+        strong = [r for r in vector_results
+                  if isinstance(r.get("vector_distance"), (int, float))
+                  and r["vector_distance"] <= _DISTANCE_STRONG]
+        have = {r.get("id") for r in strong}
+        literal = [k for k in keyword_hits if k.get("id") not in have
+                   and keyword_all_tokens_match(k, q_tokens)]
+        literal.sort(key=lambda k: -keyword_match_score(k, q_tokens))
+        ranked = (strong + literal)[:limit]
 
     # The distance served its purpose (threshold + rank) — don't leak internals.
     for r in ranked:
