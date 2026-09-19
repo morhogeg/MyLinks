@@ -195,7 +195,7 @@ export const SaveSurface: React.FC<{ k: PlatformKey; save: number }> = ({ k, sav
           }}
         >
           <span style={{ fontSize: 21, fontWeight: 700, lineHeight: 1.2, letterSpacing: '-0.02em', color: '#1b1c22', textAlign: 'center' }}>
-            One-pan lemon chicken with orzo
+            Why you forget most of what you read
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', marginTop: 14, gap: 14, color: 'rgba(40,44,54,0.75)' }}>

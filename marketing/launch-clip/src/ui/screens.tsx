@@ -1021,7 +1021,7 @@ export const AskScreen: React.FC<{
 const GRAPH_LEGEND = [
   { name: 'AI', n: 4 },
   { name: 'Home', n: 4 },
-  { name: 'Cooking', n: 3 },
+  { name: 'Science', n: 3 },
   { name: 'Philosophy', n: 1 },
   { name: 'Travel', n: 1 },
 ];
@@ -1454,7 +1454,7 @@ export const DigestScreen: React.FC<{ enter?: number; reviewEnter?: number }> = 
 export const CollectionsScreen: React.FC<{ enter?: number }> = ({ enter = 1 }) => {
   const cols = [
     { name: 'AI & what it means', n: 12, key: 'indigo' },
-    { name: 'Recipes to try', n: 18, key: 'teal' },
+    { name: 'Ideas worth keeping', n: 18, key: 'teal' },
     { name: 'The apartment hunt', n: 9, key: 'orange' },
     { name: 'Gift ideas', n: 7, key: 'blue' },
     { name: 'Workouts', n: 11, key: 'pink' },

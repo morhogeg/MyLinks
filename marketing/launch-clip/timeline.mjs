@@ -98,7 +98,7 @@ export const SUBTITLES = [
   // Act-one lines carry real AIR between them (round 13e — the owner: VO too
   // fast, needs breaks) and their VO speaks at 0.9 speed (synth-vo.py).
   { bar: 1.05, bars: 0.85, place: 'bottom', text: 'You save things everywhere.' },
-  { bar: 2.0, bars: 1.35, place: 'bottom', text: 'A recipe here. A video there. A thread somewhere else.' },
+  { bar: 2.0, bars: 1.35, place: 'bottom', text: 'An essay here. A video there. A thread somewhere else.' },
   { bar: 3.6, bars: 0.7, place: 'bottom', text: 'Multiple apps, countless saved links.' },
   // A DELIBERATE BEAT OF SILENCE (bars 4.3–4.8) — the first wrong pile opens
   // with no words at all, then the truth lands over the second one. Owner's

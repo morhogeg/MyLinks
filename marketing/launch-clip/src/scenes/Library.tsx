@@ -11,8 +11,8 @@ import { CARDS, SEARCH_HITS, SEARCH_QUERY } from '../data/library';
  * The library, and the claim the film has to actually PROVE: retrieval from a
  * half-memory.
  *
- * The typed query — "easy dinner for guests" — shares not one word with the
- * ONE card it retrieves (the one-pan lemon chicken). That is the entire reason
+ * The typed query — "remembering more from books" — shares not one word with the
+ * ONE card it retrieves ("Why you forget most of what you read"). That is the entire reason
  * this scene exists, and why the copy in `data/library.ts` is fixed: a query
  * with lexical overlap would make the beat indistinguishable from ⌘F, and more
  * than one survivor would make it read as a filter narrowing rather than the

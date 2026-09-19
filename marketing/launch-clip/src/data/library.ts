@@ -1,7 +1,7 @@
 /**
  * The library the film shows.
  *
- * Round 13 (owner call): DIVERSE on purpose — a recipe, an X thread about AI,
+ * Round 13 (owner call): DIVERSE on purpose — an essay on memory, an X thread about AI,
  * a philosophy video, a travel carousel, an apartment listing, a gift idea, a
  * workout, an article a friend sent. The whole point of the product is that
  * one life produces saves this different, across this many apps, and no single
@@ -12,8 +12,9 @@
  * the philosophy video, the article Maya sent) powers the Ask answer with
  * citations from three different platforms, gives the graph its months-apart
  * pair (the video is 2mo old, the thread 2d), and gives the digest the thing
- * "you keep circling". The search query — "easy dinner for guests" — shares
- * NOT ONE word with the one card it retrieves (the one-pan lemon chicken).
+ * "you keep circling". The search query — "remembering more from books" — shares
+ * NOT ONE word with the one card it retrieves ("Why you forget most of what you
+ * read"; the recipe it replaced on 2026-09-19 was the owner's "lame example").
  */
 
 export type Card = {
@@ -57,14 +58,14 @@ export const CARDS: Card[] = [
     age: '2d ago',
   },
   {
-    id: 'recipe',
-    category: 'Cooking',
-    title: 'One-pan lemon chicken with orzo',
+    id: 'memory',
+    category: 'Science',
+    title: 'Why you forget most of what you read',
     summary:
-      'Bright, briny, twenty minutes start to finish. The whole thing happens in a single skillet.',
-    source: '@sundaytable',
+      'Rereading feels like learning and is not. Testing yourself, spaced out over days, is what makes a thing stay.',
+    source: '@nautilusmag',
     sourceKind: 'instagram',
-    tags: ['weeknight', 'to-try'],
+    tags: ['memory', 'learning'],
     readTime: 4,
     age: '1w ago',
   },
@@ -138,7 +139,7 @@ export const CARDS: Card[] = [
  * visible work to do; buried mid-feed, the non-matches collapse and the match
  * pulls up, which is what a filter actually looks like.
  */
-export const FEED_ORDER = ['apartment', 'machineminds', 'recipe', 'aithread', 'travelgram', 'gift', 'workout', 'aiarticle'];
+export const FEED_ORDER = ['apartment', 'machineminds', 'memory', 'aithread', 'travelgram', 'gift', 'workout', 'aiarticle'];
 
 export const byId = (id: string) => {
   const c = CARDS.find((x) => x.id === id);
@@ -158,15 +159,16 @@ export const INCOMING = {
 /**
  * The search demo. The query shares NOT ONE word with the card it retrieves —
  * that is the whole point of the scene, and it is why the phrasing here is
- * fixed rather than decorative. ("easy dinner for guests" → the one-pan lemon
- * chicken. No card in the library contains "easy", "dinner" or "guests".)
+ * fixed rather than decorative. ("remembering more from books" → "Why you
+ * forget most of what you read". No card in the library contains "remembering",
+ * "more", "from" or "books"; forget/remember is the semantic bridge.)
  *
  * ONE result, deliberately (owner call): three matches read as a filter doing
  * roughly the right thing; a single card left standing reads as the app
  * FINDING the thing you meant.
  */
-export const SEARCH_QUERY = 'easy dinner for guests';
-export const SEARCH_HITS = ['recipe'];
+export const SEARCH_QUERY = 'remembering more from books';
+export const SEARCH_HITS = ['memory'];
 
 /** The Ask exchange — assembled from the AI trio, one card per platform. */
 export const ASK_QUESTION = 'What have I been saving about AI?';
@@ -207,9 +209,9 @@ export const GRAPH_NODES: {
   { id: 'commute', x: 0.81, y: 0.33, r: 8, cluster: 1, category: 'Home' },
   // NOT labelled with the cluster's own words — label and island caption
   // stacked read as the same words twice (the same dedup the app itself does).
-  { id: 'recipe', x: 0.55, y: 0.78, r: 11, cluster: 2, category: 'Cooking', label: 'Lemon chicken orzo' },
-  { id: 'marketlist', x: 0.44, y: 0.86, r: 8, cluster: 2, category: 'Cooking' },
-  { id: 'pasta', x: 0.66, y: 0.86, r: 8, cluster: 2, category: 'Cooking' },
+  { id: 'memory', x: 0.55, y: 0.78, r: 11, cluster: 2, category: 'Science', label: 'Why you forget' },
+  { id: 'spacing', x: 0.44, y: 0.86, r: 8, cluster: 2, category: 'Science' },
+  { id: 'notetaking', x: 0.66, y: 0.86, r: 8, cluster: 2, category: 'Science' },
 ];
 
 export const GRAPH_EDGES: [string, string][] = [
@@ -224,11 +226,11 @@ export const GRAPH_EDGES: [string, string][] = [
   ['renttips', 'neighborhood'],
   ['neighborhood', 'apartment'],
   ['machineminds', 'apartment'],
-  ['recipe', 'marketlist'],
-  ['recipe', 'pasta'],
-  ['recipe', 'aiarticle'],
-  ['marketlist', 'pasta'],
-  ['renttips', 'recipe'],
+  ['memory', 'spacing'],
+  ['memory', 'notetaking'],
+  ['memory', 'aiarticle'],
+  ['spacing', 'notetaking'],
+  ['renttips', 'memory'],
 ];
 
 /** Island captions. The app draws these in textSecondary, NOT in a cluster
@@ -236,7 +238,7 @@ export const GRAPH_EDGES: [string, string][] = [
 export const CLUSTERS = [
   { name: 'AI & what stays human', x: 0.35, y: 0.19 },
   { name: 'The apartment hunt', x: 0.74, y: 0.24 },
-  { name: 'Weeknight cooking', x: 0.55, y: 0.93 },
+  { name: 'Learning that sticks', x: 0.55, y: 0.93 },
 ];
 
 /** The digest beat — the REAL synthesis reading view (owner call, 13j):

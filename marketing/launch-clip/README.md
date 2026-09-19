@@ -38,15 +38,15 @@ self-hosts. **If a token changes in `globals.css`, change it here too** — a dr
 film is worse than no film.
 
 **The demo content is one person's actual week, DIVERSE on purpose**
-(`src/data/library.ts`, round 13 owner call) — a recipe, an X thread about AI,
+(`src/data/library.ts`, round 13 owner call) — an essay on memory, an X thread about AI,
 a philosophy video, a travel carousel, an apartment listing, a gift idea, a
 workout, an article a friend sent. That diversity is the founding story: one
 life produces saves this different, and no single app holds them. One THREAD
 still runs through it (the AI/what-stays-human trio: thread + philosophy video
 + Maya's article), because three scenes need internal coherence:
 the Ask scene's answer is genuinely assemblable from those three saves;
-the search scene's query — *"easy dinner for guests"* — shares **not one word**
-with the ONE card it retrieves (the one-pan lemon chicken; a single survivor
+the search scene's query — *"remembering more from books"* — shares **not one word**
+with the ONE card it retrieves ("Why you forget most of what you read"; a single survivor
 reads as the app *finding the thing*, where three read as a filter narrowing),
 which is the only way that beat proves retrieval rather than ⌘F; and the feed
 visibly mixes YouTube, Instagram, X and articles, which is what proves "one
