@@ -20,7 +20,6 @@ import { useToast } from '@/components/Toast';
 import { useLinks } from '@/lib/useLinks';
 import { useSearchLibrary } from '@/lib/useSearchLibrary';
 import { useSemanticSearch, warmSearchBackend } from '@/lib/useSemanticSearch';
-import { looksLikeQuestion } from '@/lib/searchIntent';
 import { useLinkActions } from '@/lib/useLinkActions';
 import { useFeedFilters, type FilterType, type SortType } from '@/lib/useFeedFilters';
 import { isPending, getTimestampNumber } from '@/lib/feedUtils';
@@ -186,14 +185,17 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // LIVE query in — literal matching is instant per keystroke; the semantic
     // ids arrive debounced and append below the literal tiers.
     } = useFeedFilters(visibleLinks, searchQuery, libraryLinks, privateCollectionIds, semanticIds);
-    // A query that reads like a QUESTION earns one offer above the results:
-    // hand the same words to Ask, which answers in a cited paragraph instead of
-    // a grid. Null on an empty library — there is nothing to answer from — and
-    // it is only ever an offer: the results still render underneath.
+    // EVERY search earns one offer above the results: hand the same words to
+    // Ask, which answers in a cited paragraph instead of a grid. It used to
+    // show only for question-shaped queries, and "Best breastfeeding
+    // positions" (no opener, no "?") got neither a match nor the offer
+    // (owner, 2026-09-19: "if we can ask, then ask"). Null on an empty
+    // library — there is nothing to answer from — and it is only ever an
+    // offer: the results still render underneath.
     const askableQuestion = useMemo(() => {
         const q = searchQuery.trim();
-        if (!q || visibleLinks.length === 0) return null;
-        return looksLikeQuestion(q) ? q : null;
+        if (q.length < 2 || visibleLinks.length === 0) return null;
+        return q;
     }, [searchQuery, visibleLinks.length]);
     // Where the literal hits end and the meaning-only hits begin. useFeedFilters
     // sorts literal matches first and meaning-only ones last, so the boundary is
@@ -2612,10 +2614,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
 
                 {/* Links Grid / Ask */}
                 <div className="flex-grow min-w-0">
-                    {/* Question routing — ONE row, above everything the search
-                        found. A query that reads like a question ("why do we
-                        dream", "מה למדתי על שינה") is something the grid can only
-                        answer sideways, so this hands the same words to Ask, which
+                    {/* Ask routing — ONE row, above everything the search found,
+                        for every query. The grid can only answer a question
+                        sideways, so this hands the same words to Ask, which
                         answers with citations. It is an OFFER: nothing switches
                         until it is tapped, and the results stay right below it.
                         The row names the PAYOFF (a cited answer), not the query —
