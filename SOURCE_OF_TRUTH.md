@@ -226,7 +226,24 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-09-19, latest): install build **1330** (search only searches; "Ask Machina instead" on a dead end), then the 1327 QA below if not yet done
+> ## 🚨 OWNER ACTION (updated 2026-09-19, round 4): install build **1331** (search recall pass across every layer), then the 1327 QA below if not yet done
+>
+> **1331** (run #331, merge `f2f53ac`) is the complete recall fix after your
+> 1330 screenshot ("Latching tips" → No matches for a card titled "...
+> Latching Techniques"). Backend half: functions deploy run #111
+> (`search_links_http`, `search_links`). QA on 1331, in this order:
+> (1) "Latching tips" → the lactation card, instantly, top tier, no
+> divider. (2) "latch" → same card (stem match). (3) "Best breastfeeding
+> positions" and "What the best breastfeeding position" → same card.
+> (4) "breastfeeding cradle hold" (no card has "hold") → the lactation card
+> under a "Close matches" divider rather than No matches. (5) "pasta" and
+> "גורדון" unchanged. (6) Then, please, the two-minute log check: Firebase
+> console → Firestore → `client_errors`, look for source
+> `semantic-search-degraded`; if it appears, the search judge is failing in
+> production and the next session should read the `search_links_http` logs
+> for "relevance judge failed". Then the 1327 list below.
+>
+> ## (superseded) OWNER ACTION (updated 2026-09-19, latest): install build **1330** (search only searches; "Ask Machina instead" on a dead end), then the 1327 QA below if not yet done
 >
 > **1330** (run #330, merge `2925249`) is the product decision that closed
 > today's search thread: one field, one job. No functions deploy (backend
@@ -2228,6 +2245,56 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-09-19 (round 4) — SEARCH RECALL PASS ACROSS EVERY LAYER
+  (`web/lib/searchMatch.ts`, `web/lib/useFeedFilters.ts`,
+  `web/lib/useSemanticSearch.ts`, `web/components/Feed.tsx`,
+  `functions/search.py`). SHIPPED: merge `f2f53ac` to main (Vercel
+  auto-deploy), functions deploy run #111 scoped to
+  `search_links_http,search_links`, TestFlight run #331 = **build 1331**.**
+  Owner on 1330, screenshot: "Latching tips" → No matches, then the new
+  "Ask Machina instead" button answered from the card titled
+  "Breastfeeding Positioning and Latching Techniques" (tagged latching).
+  Owner: "a complete fix of the search results, not finding something like
+  latching tips is not acceptable." Root causes, all four fixed: (1) both
+  literal layers REQUIRED every query word, and generic words ("tips",
+  "best", "guide") are on no card; round 2 had only stripped them at the
+  FRONT of the query. (2) No stemming: "latching" could not reach "latch".
+  (3) A two-word query with one word missing from the library was a dead
+  end. (4) Server: when the relevance judge cannot serve, the 2026-09-04
+  literal-only fallback showed nothing from the meaning half, so a judge
+  timeout looked like "you never saved that" and nothing recorded it.
+  **Client word layer:** `SEARCH_FRAMING` (openers, function words, quality
+  adjectives, descriptors, English + Hebrew, normalized like the tokens so
+  final letters match) is dropped WHEREVER it sits; a query made only of
+  such words keeps them. `tokenVariants` adds -ing/-ed/-ies stems as
+  substrings ("latching" → "latch", doubled consonant folded). NEW
+  `partialMatchCount` (title/tags only). **Ranking:** a partial tier,
+  computed ONLY when the strict AND finds nothing and there are 2+ content
+  words, ranked by words covered; four tiers now: title/tag, summary,
+  partial, meaning. **Feed:** "Close matches" divider opens the partial
+  tier; the grid renders one Masonry block per segment (`resultSegments`,
+  `dividerAt`) so both dividers sit full-width; list view unchanged in
+  shape. **Meaning search:** timeout 15s → 25s; the response's `mode` is
+  read and a non-"judge" mode is reported ONCE per session to
+  `client_errors` as `semantic-search-degraded` (the durable trail that
+  was missing all day). **Server:** NEW `content_tokens()` (framing and
+  descriptor words never required, both paths); `_TOPIC_DESCRIPTOR_WORDS`
+  joined the frame set; judge-failure fallback now serves CONFIDENT vector
+  hits (distance <= `_DISTANCE_STRONG` = 0.50, env `SEARCH_DISTANCE_STRONG`,
+  no floor, no cliff) plus literal matches, keeping the 0.55-0.70
+  same-language wall out. This REVERSES the 2026-09-04 literal-only
+  contract; the five tests that pinned it were rewritten to the new one.
+  The stale `searchIntent.ts` docstring reference is gone. **Verified:**
+  client matcher exercised offline against the real card: "Latching tips",
+  "latch", "Best breastfeeding positions", "What the best breastfeeding
+  position" all title-tier hits; "breastfeeding cradle hold" partial;
+  "pasta", "best tips", "טיפים להנקה" behave; 111 search/ask tests green
+  (4 new), full backend suite 904 passed with the same 14 container-only
+  failures; `tsc`, eslint on the four files, em-dash gate clean. **Not
+  verified:** on device, the "Close matches" divider rendered (types
+  only), and the production judge (owner log check in the box above).
+  **Cost:** unchanged; no new model calls anywhere in this round.
 
 - **2026-09-19 (round 3, the decision) — Search only searches; Ask stays
   manual, offered once on a dead end (`web/components/Feed.tsx`,
