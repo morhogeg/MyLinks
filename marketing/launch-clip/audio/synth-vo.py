@@ -37,7 +37,7 @@ LINES = [
     # a deliberate beat of silence before this one — the first wrong pile
     # opens wordless (owner note, round 13c)
     (4.8, 1.3, "Saved, and rarely seen again.", 0.9),
-    (6.45, 1.35, f"Introducing {SAY_NAME}: one place for all your saved links."),
+    (6.45, 1.35, f"Introducing {SAY_NAME}. Everything you save, finally useful."),
     (8.35, 1.25, "Save anything, from anywhere."),
     (9.95, 2.4, f"{SAY_NAME} reads it, summarizes it, and files it."),
     # Spoken with the dichotomy CARVED (owner note, 13f): a full stop after

@@ -223,8 +223,10 @@ export const Subtitles: React.FC = () => {
                   color: 'rgba(17,24,39,0.96)',
                   textShadow: '0 1px 2px rgba(255,255,255,0.6), 0 8px 34px rgba(238,240,244,0.9)',
                   textAlign: 'center',
-                  maxWidth: vertical ? 940 : 1300,
-                  padding: '0 60px',
+                  // vertical: a wider measure so a two-sentence line does not
+                  // orphan its last word onto a third line (the intro, 2026-09-19)
+                  maxWidth: vertical ? 1040 : 1300,
+                  padding: vertical ? '0 36px' : '0 60px',
                   whiteSpace: 'pre-line',
                 }}
               >

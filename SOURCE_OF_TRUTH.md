@@ -2185,6 +2185,15 @@ same words; the tagline line under the rule was cut so screen and voice agree.
 So the "one slot to swap for a badge" note above is now the empty space under
 the subtitle, and the tagline's best-placed appearance is the promotional text,
 not the film. The library caption reads "From now on, lose nothing." (comma).
+**Slogan roles settled 2026-09-19 (owner, after asking "which one is it?"):**
+the film's introduction line is the TAGLINE ("Machina. / Everything you save,
+finally useful.", replacing "one place for all your saved links", which
+volunteered Machina into the link-saver category and undersold screenshots
+and notes), and the endcard is the SUBTITLE ("Never lose another great find").
+Promise opens, loss-aversion closes. Same session: the recipe card became
+"Why you forget most of what you read" (Science; the query "remembering more
+from books" still shares no word with it), the Manson title is shortened so
+the Ask chip never truncates, and two-sentence captions break at the sentence.
 
 *Where to "advertise" for free:* X (primary), Product Hunt, Hacker News,
 r/PKMS + r/productivity (follow self-promo rules: give value first), Indie
