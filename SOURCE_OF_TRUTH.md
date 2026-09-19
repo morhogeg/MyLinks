@@ -226,7 +226,19 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-09-19, latest): install build **1328** (search bar answers a question with the card), then the 1327 QA below if not yet done
+> ## 🚨 OWNER ACTION (updated 2026-09-19, later): install build **1329** (search framing words stripped for every query, Ask row always offered), then the 1327 QA below if not yet done
+>
+> **1329** (run #329, merge `d7d21a7`) is round 2 of the search-bar fix
+> after your 1328 screenshot ("Best breastfeeding positions": no match, no
+> Ask row). The backend half is functions deploy run #110. QA on 1329:
+> type "Best breastfeeding positions" and expect the @thelactationmentor
+> card INSTANTLY in the top tier (a literal title hit now, no "Searching by
+> meaning…" beat), with the "Get a cited answer from your saves" row above
+> it; then "What the best breastfeeding position", same expectation; then
+> confirm the row shows for a plain lookup like "pasta" and that "pasta"
+> and "גורדון" return what they did before. Then the 1327 list below.
+>
+> ## (superseded) OWNER ACTION (updated 2026-09-19): install build **1328** (search bar answers a question with the card), then the 1327 QA below if not yet done
 >
 > **1328** (run #328, merge `77417c0`) makes a question typed into the
 > search bar find the card it asks about; the backend half is functions
@@ -2204,6 +2216,38 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-09-19 (round 2) — Search bar: framing words stripped for EVERY
+  query, and the Ask row is offered for every query (`web/lib/searchMatch.ts`,
+  `web/components/Feed.tsx`, `functions/search.py`). SHIPPED: merge `d7d21a7`
+  to main (Vercel auto-deploy), functions deploy run #110 scoped to
+  `search_links_http,search_links`, TestFlight run #329 = **build 1329**.**
+  Owner on 1328, screenshot: "Best breastfeeding positions" → "No matches"
+  and no Ask row ("Where is the ask option??"). Both were the round-1 scope
+  being question-only: no opener, no "?", so neither the topic reduction nor
+  the row applied, and "best" is on no card, so the AND sank it on the client
+  literal layer and on the server literal fallback alike (server-side
+  "positions" also failed the whole-word rule against "Positioning"). Fix:
+  (1) the client literal layer's `tokenizeSearch` now drops the LEADING run
+  of framing words (`SEARCH_FRAMING`: question openers, function words,
+  quality adjectives, English + Hebrew), keeping the original tokens when
+  nothing would be left. Exercised offline against the real card: both owner
+  queries now hit the TITLE tier instantly, "the best" and "pasta" are
+  unchanged. (2) Server `search_topic_of` strips the leading run for every
+  query; the "?"/pronoun tail and the nearest-card ceiling exemption stay
+  question-only. (3) `_token_pattern`: a 5+ letter Latin token matches from
+  its singular stem and may wear -ing/-ed/-er ("positions" → "Positioning");
+  short tokens and the Hebrew clitic rule untouched (ערב still does not reach
+  התערבות). (4) Feed: the "Get a cited answer from your saves" row shows for
+  any query of 2+ characters with a non-empty library; `searchIntent.ts` is
+  now unused by Feed (kept: it documents the server twin). **Verified:** 175
+  search/ask tests green including 4 new; full backend suite 902 passed with
+  the same 14 container-only failures as before; `tsc`, eslint on the three
+  files and the em-dash gate clean. **Not verified:** on device; the meaning
+  path against prod remains unobserved (the client literal hit makes it
+  moot for these two queries). **Scope note:** framing stripping also
+  applies to the Sources/Tags typeahead since they share `tokenizeSearch`;
+  "the verge" now matches sources on "verge", which is the better behaviour.
 
 - **2026-09-19 — Search bar: a question finds the card it asks about
   (`functions/search.py`, `web/components/Feed.tsx`). SHIPPED: merge
