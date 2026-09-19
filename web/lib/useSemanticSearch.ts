@@ -53,6 +53,8 @@ const CACHE_CAP = 50;
  *  that window buy nothing. */
 const WARMUP_INTERVAL_MS = 10 * 60_000;
 let lastWarmupAt = 0;
+/** One degraded-mode report per session is signal; one per keystroke is spam. */
+let degradedReported = false;
 
 /**
  * Fire-and-forget cold-start absorber. Called the moment the search UI opens
@@ -123,9 +125,19 @@ export function useSemanticSearch(uid: string | null | undefined, searchQuery: s
                         ...(await authHeaders()),
                     },
                     body: JSON.stringify({ query: trimmed, limit: RESULT_LIMIT, uid }),
-                }, 15_000);
+                }, 25_000);
                 if (!res.ok) throw new Error(`search_links_http ${res.status}`);
                 const data = await res.json();
+                // The server says which path served (`mode`): "judge" is the
+                // LLM verdict, anything else means the judge failed or timed
+                // out and precision degraded. Invisible on device, so leave
+                // ONE durable trail per session in client_errors — the owner
+                // saw three "No matches" in a day for a card Ask found at
+                // once, and nothing said why (2026-09-19).
+                if (data && typeof data.mode === 'string' && data.mode !== 'judge' && !degradedReported) {
+                    degradedReported = true;
+                    reportError(new Error(`search served by ${data.mode}`), 'semantic-search-degraded');
+                }
                 const ids: string[] = Array.isArray(data?.links)
                     ? data.links.map((l: { id?: unknown }) => l?.id).filter((id: unknown): id is string => typeof id === 'string')
                     : [];

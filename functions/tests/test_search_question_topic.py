@@ -133,3 +133,31 @@ def test_hybrid_search_feeds_the_topic_to_every_half(monkeypatch):
     perform_hybrid_search("u", "Best breastfeeding positions")
     assert seen["vector"] == "breastfeeding positions"
     assert seen["exempt"] is False   # a lookup: no ceiling exemption
+
+
+# ── 2026-09-19 round 4: "Latching tips" ─────────────────────────────────────
+from search import content_tokens
+
+
+def test_content_tokens_drop_descriptors_anywhere():
+    assert content_tokens("Latching tips") == {"latching"}
+    assert content_tokens("sourdough starter guide") == {"sourdough", "starter"}
+    assert content_tokens("טיפים להנקה") == {"להנקה"}
+    # Nothing left → the framing words themselves are the lookup.
+    assert content_tokens("best tips") == {"best", "tips"}
+
+
+def test_hybrid_literal_extra_ignores_descriptor_words(monkeypatch):
+    # The judge kept nothing (or was down); the literal scan must still
+    # return the card whose title carries the one content word.
+    monkeypatch.setattr(search_mod, "judge_relevance", lambda q, c, **kw: [])
+    monkeypatch.setattr(search_mod, "perform_search_logic", lambda uid, q, limit: [])
+    monkeypatch.setattr(search_mod, "keyword_scan_cards",
+                        lambda uid, q, exclude_ids=None, limit=10, fields=None: [
+                            {"id": "card", "title": "Breastfeeding Positioning and Latching Techniques",
+                             "tags": ["latching"], "createdAt": 1}])
+    out = [c["id"] for c in perform_hybrid_search("u", "Latching tips", limit=20)]
+    assert out == ["card"]
+    monkeypatch.setattr(search_mod, "judge_relevance", lambda q, c, **kw: None)
+    out = [c["id"] for c in perform_hybrid_search("u", "Latching tips", limit=20)]
+    assert out == ["card"]

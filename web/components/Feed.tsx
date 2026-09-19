@@ -3,7 +3,7 @@
 
 
 
-import { useState, useEffect, useRef, useMemo, useCallback, cloneElement, type ReactElement } from 'react';
+import { Fragment, useState, useEffect, useRef, useMemo, useCallback, cloneElement, type ReactElement } from 'react';
 import { Link, Collection, WeeklySynthesis, CuratedDigest, DigestCardRef, UserNote } from '@/lib/types';
 import { getColorStyleByKey, getCategoryColorStyle } from '@/lib/colors';
 import { platformIcon, platformColor, type PlatformKey } from '@/lib/platform';
@@ -181,6 +181,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         matchingSources,
         matchingTags,
         semanticOnlyIds,
+        partialIds,
         reminderCount,
     // LIVE query in — literal matching is instant per keystroke; the semantic
     // ids arrive debounced and append below the literal tiers.
@@ -195,17 +196,44 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         const i = filteredLinks.findIndex((l) => semanticOnlyIds.has(l.id));
         return i > 0 ? i : -1;
     }, [searchQuery, sortBy, semanticOnlyIds, filteredLinks]);
-    // The divider itself — same quiet section-label grammar as the search
-    // typeahead's Sources/Tags/Cards rows, with the mark that already stands for
-    // meaning search ("Searching by meaning…"). The rule is a flex child, so it
-    // fills whichever side the label doesn't.
-    const meaningDivider = (
-        <div key="by-meaning" className="flex items-center gap-2 mt-6 mb-3">
-            <CitationGlyph className="w-3 h-auto shrink-0 text-accent/70" />
-            <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-text-muted whitespace-nowrap">By meaning</span>
+    // The partial tier (useFeedFilters.partialIds) only exists when the strict
+    // match found nothing, so it always starts the list: its divider sits at
+    // index 0 whenever the tier is present. Kept as an index like meaningSplit
+    // so both dividers go through the same segment logic below.
+    const partialSplit = useMemo(() => {
+        if (!searchQuery.trim() || sortBy !== 'date-desc' || partialIds.size === 0) return -1;
+        return filteredLinks.length > 0 && partialIds.has(filteredLinks[0].id) ? 0 : -1;
+    }, [searchQuery, sortBy, partialIds, filteredLinks]);
+    // The dividers themselves — same quiet section-label grammar as the search
+    // typeahead's Sources/Tags/Cards rows. "By meaning" carries the mark that
+    // already stands for meaning search ("Searching by meaning…"); "Close
+    // matches" says what the partial tier is: cards that carry SOME of the
+    // query's words, shown because none carries all of them.
+    const sectionDivider = (key: string, label: string, mark: boolean) => (
+        <div key={key} className={`flex items-center gap-2 mb-3 ${key === 'close-matches' ? 'mt-1' : 'mt-6'}`}>
+            {mark && <CitationGlyph className="w-3 h-auto shrink-0 text-accent/70" />}
+            <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-text-muted whitespace-nowrap">{label}</span>
             <span className="flex-1 h-px bg-border-subtle" />
         </div>
     );
+    const meaningDivider = sectionDivider('by-meaning', 'By meaning', true);
+    const partialDivider = sectionDivider('close-matches', 'Close matches', false);
+    /** Divider to render BEFORE the row at this index, if any. */
+    const dividerAt = (idx: number) => idx === partialSplit ? partialDivider : idx === meaningSplit ? meaningDivider : null;
+    /** The result list cut into segments, each with the divider that opens it
+     *  (null for the leading segment when it has none). Off search this is
+     *  one undivided segment. */
+    const resultSegments = useMemo(() => {
+        const cuts = [partialSplit, meaningSplit].filter((i) => i >= 0).sort((a, b) => a - b);
+        const segs: { start: number; links: Link[] }[] = [];
+        let prev = 0;
+        for (const c of cuts) {
+            if (c > prev) segs.push({ start: prev, links: filteredLinks.slice(prev, c) });
+            prev = c;
+        }
+        segs.push({ start: prev, links: filteredLinks.slice(prev) });
+        return segs;
+    }, [filteredLinks, partialSplit, meaningSplit]);
     // Card action handlers that depend only on [uid, toast] (R-3: useLinkActions).
     const {
         handleStatusChange,
@@ -2956,7 +2984,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                         />
                                     </div>
                                 );
-                                return idx === meaningSplit ? [meaningDivider, row] : row;
+                                const divider = dividerAt(idx);
+                                return divider ? [divider, row] : row;
                             })}
                             <LoadMoreSentinel hasMore={hasMore} onLoadMore={loadMore} />
                         </div>
@@ -2998,26 +3027,18 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                     isMeaningMatch={semanticOnlyIds.has(link.id)}
                                 />
                             ));
-                            if (meaningSplit < 0) {
-                                return (
+                            // One Masonry block per segment; a segment's divider
+                            // (if any) sits full-width above it. Pending captures
+                            // stay pinned at the very top.
+                            return resultSegments.map((seg, i) => (
+                                <Fragment key={seg.start}>
+                                    {dividerAt(seg.start)}
                                     <Masonry columnWidth={340} gap={16}>
-                                        {pendingCards.map(renderPendingCard)}
-                                        {cards(filteredLinks, 0)}
+                                        {i === 0 && pendingCards.map(renderPendingCard)}
+                                        {cards(seg.links, seg.start)}
                                     </Masonry>
-                                );
-                            }
-                            return (
-                                <>
-                                    <Masonry columnWidth={340} gap={16}>
-                                        {pendingCards.map(renderPendingCard)}
-                                        {cards(filteredLinks.slice(0, meaningSplit), 0)}
-                                    </Masonry>
-                                    {meaningDivider}
-                                    <Masonry columnWidth={340} gap={16}>
-                                        {cards(filteredLinks.slice(meaningSplit), meaningSplit)}
-                                    </Masonry>
-                                </>
-                            );
+                                </Fragment>
+                            ));
                         })()}
                         <LoadMoreSentinel hasMore={hasMore} onLoadMore={loadMore} />
                         </>

@@ -323,9 +323,8 @@ def test_normalize_leaves_ms_created_at_alone():
 # ── perform_hybrid_search: fusion + degradation (halves stubbed) ────────────
 
 def test_hybrid_merges_vector_and_keyword_deduped(monkeypatch):
-    # Judge down (2026-09-04 contract): the search bar serves LITERAL matches
-    # only — the vector half contributes nothing, so a keyword hit that the
-    # vector half also returned appears exactly once, from the scan.
+    # Judge down (2026-09-19 contract): confident vector hits lead, then the
+    # literal scan, deduped by id; v2 is confident too, so it stays.
     monkeypatch.setattr(search_mod, "judge_relevance", lambda q, c, **kw: None)
     monkeypatch.setattr(search_mod, "perform_search_logic", lambda uid, q, limit: [
         _vres("v1", 0.30), _vres("v2", 0.35),
@@ -341,8 +340,7 @@ def test_hybrid_merges_vector_and_keyword_deduped(monkeypatch):
     out = perform_hybrid_search("u", "improve sleep", limit=10)
     ids = [c["id"] for c in out]
     assert captured["fields"] == search_mod.SEARCH_SCAN_FIELDS
-    assert sorted(ids) == ["k1", "v1"]
-    assert "v2" not in ids
+    assert ids == ["v1", "v2", "k1"]
     assert all("vector_distance" not in c for c in out)
 
 
@@ -369,8 +367,8 @@ def test_hybrid_propagates_config_error(monkeypatch):
 
 def test_hybrid_gated_vector_hit_can_return_as_a_literal_match(monkeypatch):
     monkeypatch.setattr(search_mod, "judge_relevance", lambda q, c, **kw: None)
-    # With the judge down no vector hit is shown, however close; a card the
-    # keyword scan finds still returns as a REAL literal match.
+    # With the judge down only a CONFIDENT vector hit is shown (2026-09-19);
+    # a far one the keyword scan finds still returns as a REAL literal match.
     monkeypatch.setattr(search_mod, "perform_search_logic", lambda uid, q, limit: [
         _vres("close", 0.30), _vres("far", 0.85),
     ])
@@ -378,7 +376,7 @@ def test_hybrid_gated_vector_hit_can_return_as_a_literal_match(monkeypatch):
                         lambda uid, q, exclude_ids=None, limit=10, fields=None: [
                             {"id": "far", "title": "muffins", "createdAt": 5}])
     out = [c["id"] for c in perform_hybrid_search("u", "muffins", limit=10)]
-    assert out == ["far"]
+    assert out == ["close", "far"]
 
 
 # ── Timestamp-shape robustness (the 2026-07-16 search-outage regression) ────
@@ -426,7 +424,7 @@ def test_hybrid_survives_mixed_timestamps_end_to_end(monkeypatch):
                         lambda uid, q, exclude_ids=None, limit=10, fields=None: [
                             {"id": "k1", "title": "muffins", "createdAt": "2026-07-01T10:00:00Z"}])
     out = perform_hybrid_search("u", "muffins", limit=10)
-    assert {c["id"] for c in out} == {"k1"}
+    assert {c["id"] for c in out} == {"v1", "k1"}
 
 
 # ── cut_at_distance_cliff: the per-query precision trim ─────────────────────
@@ -474,10 +472,11 @@ def test_cliff_short_list_untouched():
     assert cut_at_distance_cliff(results) == results
 
 
-def test_hybrid_judge_down_means_no_meaning_results(monkeypatch):
-    # The old distance-gate fallback (threshold + cliff) is gone from the
-    # search bar: without a judge verdict, nearest-neighbour output is never
-    # shown, however close it looks (2026-09-04, "גורדון" → a Rabin card).
+def test_hybrid_judge_down_means_only_confident_meaning_results(monkeypatch):
+    # The old distance-gate fallback (threshold + cliff + recall floor) is gone
+    # from the search bar (2026-09-04, "גורדון" → a Rabin card at 0.70). Since
+    # 2026-09-19 a judge outage serves the CONFIDENT band only: the 0.62/0.64
+    # same-language neighbours stay out, the 0.45/0.48 matches stay in.
     monkeypatch.setattr(search_mod, "judge_relevance", lambda q, c, **kw: None)
     monkeypatch.setattr(search_mod, "perform_search_logic", lambda uid, q, limit: [
         _vres("m1", 0.45), _vres("m2", 0.48),
@@ -485,7 +484,8 @@ def test_hybrid_judge_down_means_no_meaning_results(monkeypatch):
     ])
     monkeypatch.setattr(search_mod, "keyword_scan_cards",
                         lambda uid, q, exclude_ids=None, limit=10, fields=None: [])
-    assert perform_hybrid_search("u", "muffins", limit=20) == []
+    out = [c["id"] for c in perform_hybrid_search("u", "muffins", limit=20)]
+    assert out == ["m1", "m2"]
 
 
 # ── LLM relevance judge: parsing, prompt, and the judged hybrid path ────────
@@ -610,8 +610,8 @@ def test_hybrid_judge_keeps_vector_order_and_appends_keyword_extras(monkeypatch)
                for c in perform_hybrid_search("u", "sleep", limit=20))
 
 
-def test_hybrid_judge_failure_serves_literal_matches_only(monkeypatch):
-    # Judge raises → no vector results reach the client; keyword hits do.
+def test_hybrid_judge_failure_serves_confident_hits_and_literal_matches(monkeypatch):
+    # Judge raises → only confident vector hits reach the client, then keyword hits.
     monkeypatch.setattr(search_mod, "perform_search_logic", lambda uid, q, limit: [
         _vres("m1", 0.45), _vres("m2", 0.48),
         _vres("junk1", 0.62), _vres("junk2", 0.64)])
@@ -624,7 +624,9 @@ def test_hybrid_judge_failure_serves_literal_matches_only(monkeypatch):
     monkeypatch.setattr(search_mod, "judge_relevance", boom)
     meta = {}
     out = [c["id"] for c in perform_hybrid_search("u", "muffins", limit=20, meta=meta)]
-    assert out == ["k1"]
+    # 2026-09-19: confident vector hits (<= 0.50) survive a judge failure in
+    # vector order; the 0.62/0.64 neighbours do not; the literal hit follows.
+    assert out == ["m1", "m2", "k1"]
     assert meta["mode"] == "gate"
 
 
@@ -698,7 +700,9 @@ def test_hybrid_fallback_path_serves_literal_and_matches_every_token(monkeypatch
                              "summary": "software functions explained", "createdAt": 1},
                             {"id": "full", "title": "Cognitive function and sleep", "createdAt": 1}])
     out = [c["id"] for c in perform_hybrid_search("u", "cognitive function", limit=20)]
-    assert out == ["full"]
+    # 2026-09-19: the confident vector hit (0.45) leads, the literal AND still
+    # keeps "weak" out.
+    assert out == ["v1", "full"]
 
 
 # ── 2026-09-04: no unrelated cards under "By meaning" ───────────────────────
@@ -720,13 +724,16 @@ def test_fallback_path_has_no_recall_floor_for_far_neighbours(monkeypatch):
     assert meta["mode"] == "gate"
 
 
-def test_fallback_path_shows_nothing_from_the_vector_half(monkeypatch):
+def test_fallback_path_keeps_only_confident_vector_hits(monkeypatch):
+    # 2026-09-19: the judge being down must not hide a real match. Confident
+    # hits (<= 0.50) serve in vector order; the 0.75 neighbour does not.
     monkeypatch.setattr(search_mod, "judge_relevance", lambda q, c, **kw: None)
     monkeypatch.setattr(search_mod, "perform_search_logic", lambda uid, q, limit: [
         _vres("m1", 0.45), _vres("m2", 0.48), _vres("junk", 0.75)])
     monkeypatch.setattr(search_mod, "keyword_scan_cards",
                         lambda uid, q, exclude_ids=None, limit=10, fields=None: [])
-    assert perform_hybrid_search("u", "muffins", limit=20) == []
+    out = [c["id"] for c in perform_hybrid_search("u", "muffins", limit=20)]
+    assert out == ["m1", "m2"]
 
 
 def test_judge_prompt_demands_quoted_evidence():
