@@ -38,7 +38,7 @@ self-hosts. **If a token changes in `globals.css`, change it here too** — a dr
 film is worse than no film.
 
 **The demo content is one person's actual week, DIVERSE on purpose**
-(`src/data/library.ts`, round 13 owner call) — an essay on memory, an X thread about AI,
+(`src/data/library.ts`, round 13 owner call) — an article on memory, an X thread about AI,
 a philosophy video, a travel carousel, an apartment listing, a gift idea, a
 workout, an article a friend sent. That diversity is the founding story: one
 life produces saves this different, and no single app holds them. One THREAD

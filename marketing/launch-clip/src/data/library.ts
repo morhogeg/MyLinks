@@ -1,7 +1,7 @@
 /**
  * The library the film shows.
  *
- * Round 13 (owner call): DIVERSE on purpose — an essay on memory, an X thread about AI,
+ * Round 13 (owner call): DIVERSE on purpose — an article on memory, an X thread about AI,
  * a philosophy video, a travel carousel, an apartment listing, a gift idea, a
  * workout, an article a friend sent. The whole point of the product is that
  * one life produces saves this different, across this many apps, and no single

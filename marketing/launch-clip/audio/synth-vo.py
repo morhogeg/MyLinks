@@ -32,7 +32,7 @@ SAY_NAME = "Makeena"
 # and the retimed caption windows put real air between the lines.
 LINES = [
     (1.05, 0.85, "You save things everywhere.", 0.9),
-    (2.0, 1.35, "An essay here. A video there. A thread somewhere else.", 0.9),
+    (2.0, 1.35, "An article here. A video there. A thread somewhere else.", 0.9),
     (3.6, 0.7, "Multiple apps, countless saved links.", 0.9),
     # a deliberate beat of silence before this one — the first wrong pile
     # opens wordless (owner note, round 13c)
