@@ -44,10 +44,41 @@ export function normalizeSearchText(s: string): string {
         .replace(/ץ/g, 'צ');
 }
 
+/** Words a query puts IN FRONT of the thing it is looking for: question
+ *  openers, function words and quality adjectives. "Best breastfeeding
+ *  positions" and "What the best breastfeeding position" are both lookups for
+ *  "breastfeeding position", and under AND matching the framing words are
+ *  what turned them into "No matches" (owner, 2026-09-19: "best" is on no
+ *  card). Stripped only as a LEADING run, so a framing word inside the query
+ *  ("the best of both worlds") keeps its place, and never when nothing would
+ *  be left. Mirrors `_TOPIC_FRAME_WORDS` in functions/search.py. */
+const SEARCH_FRAMING = new Set([
+    'what', 'whats', 'how', 'why', 'when', 'where', 'who', 'which', 'is', 'are',
+    'can', 'should', 'do', 'does', 'did', 'was', 'were', 'will', 'would', 'could',
+    'the', 'a', 'an', 'of', 'to', 'in', 'on', 'at', 'by', 'for', 'and', 'or',
+    'i', 'me', 'my', 'you', 'your', 'it', 'its', 'this', 'that', 'there', 'any',
+    'some', 'about', 'with', 'from', 'have', 'has', 'best', 'good', 'better',
+    'great', 'top', 'way', 'ways', 'tips', 'tip', 'know', 'learn', 'learned',
+    'saved', 'save', 'find', 'get', 'tell', 'recommend', 'recommended', 'most',
+    'right', 'proper', 'correct', 'kind', 'sort', 'type', 'one',
+    'מה', 'איך', 'למה', 'מדוע', 'מתי', 'איפה', 'מי', 'איזה', 'איזו', 'האם', 'כמה',
+    'הכי', 'טוב', 'טובה', 'טובים', 'דרך', 'כדאי', 'צריך', 'אפשר', 'יש', 'את', 'של',
+    'על', 'עם', 'זה', 'זו', 'יודע', 'יודעת', 'למדתי', 'שמרתי', 'לי', 'שלי',
+]);
+
+/** Drop the leading run of framing words; keep the original when that would
+ *  leave nothing (a query made only of framing words is a lookup for them). */
+export function stripSearchFraming(tokens: string[]): string[] {
+    let i = 0;
+    while (i < tokens.length && SEARCH_FRAMING.has(tokens[i])) i++;
+    return i === 0 || i === tokens.length ? tokens : tokens.slice(i);
+}
+
 /** Split a query into normalized match tokens (Unicode-aware, so Hebrew and
- *  numbers tokenize intact). Empty/whitespace queries yield []. */
+ *  numbers tokenize intact), minus any leading framing words. Empty/whitespace
+ *  queries yield []. */
 export function tokenizeSearch(query: string): string[] {
-    return normalizeSearchText(query).match(/[\p{L}\p{N}]+/gu) ?? [];
+    return stripSearchFraming(normalizeSearchText(query).match(/[\p{L}\p{N}]+/gu) ?? []);
 }
 
 // Per-card normalized text, built once per card object and reused across
