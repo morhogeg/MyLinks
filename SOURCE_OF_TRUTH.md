@@ -226,7 +226,20 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-09-17, latest): install build **1327** (first-run tour re-synced), then the 1326 QA below if not yet done
+> ## 🚨 OWNER ACTION (updated 2026-09-19, latest): install build **1328** (search bar answers a question with the card), then the 1327 QA below if not yet done
+>
+> **1328** (run #328, merge `77417c0`) makes a question typed into the
+> search bar find the card it asks about; the backend half is functions
+> deploy run #109 (`search_links_http`, `search_links`), live before the
+> build lands. QA on 1328: type "What the best breastfeeding position" in
+> the search field and expect the @thelactationmentor card under "By
+> meaning" after the "Searching by meaning…" beat, with the row above it
+> reading "Get a cited answer from your saves" (tap it: Ask opens with the
+> full question, as before). Then a lookup that must NOT change: "pasta",
+> "גורדון". Then a Hebrew question ("מה למדתי על שינה") if you have a sleep
+> card. Desktop web has the same via Vercel. Then the 1327 list below.
+>
+> ## (superseded) OWNER ACTION (updated 2026-09-17): install build **1327** (first-run tour re-synced), then the 1326 QA below if not yet done
 >
 > **1327** (run #327, merge `9f2ee29`) carries the tour pass on top of both
 > security rounds. QA on 1327: Settings → "Take the tour again", read all
@@ -2182,6 +2195,49 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-09-19 — Search bar: a question finds the card it asks about
+  (`functions/search.py`, `web/components/Feed.tsx`). SHIPPED: merge
+  `77417c0` to main (Vercel auto-deploy), functions deploy run #109 scoped
+  to `search_links_http,search_links`, TestFlight run #328 = **build
+  1328**. No rules or hosting deploy.** Owner, device screenshots: "What
+  the best breastfeeding position" in the search field gave "No matches"
+  while the Ask row answered it instantly from the @thelactationmentor
+  card, and the row echoing the query read as redundant. Root cause
+  (verified in code, not against prod logs): every search-bar gate was
+  tuned on one- and two-word lookups. The literal layer ANDs every word and
+  "best" is not in the card; on the meaning path the card was the top
+  vector hit but a sentence embeds farther than a keyword, so it fell to
+  one of the same-script 0.68 ceiling, the judge's strict "quote the
+  matching words" rule, or a judge timeout that drops to literal-only.
+  Fix: NEW `looks_like_question` (server twin of `searchIntent.ts`) and
+  `search_topic_of`, which strip the leading run of question framing and
+  the trailing "?" ("What the best breastfeeding position" → "breastfeeding
+  position", "מה למדתי על שינה" → "שינה"; a content word in the middle
+  survives, a lookup is untouched, an all-framing question falls back to
+  itself). `perform_hybrid_search` feeds the TOPIC to the embedding, the
+  keyword scan, the judge prompt and the token AND, and passes
+  `exempt_nearest=True` to `judge_relevance` → `apply_same_script_gate`, so
+  the judge-approved nearest card skips the absolute ceiling for a question
+  (the margin still governs everything behind it, and the judge still has
+  to have quoted evidence). Ask retrieval (`ask_brain`) untouched. Feed: the
+  question row no longer repeats the query; it reads "Get a cited answer
+  from your saves" with a trailing chevron (`rtl:rotate-180`), tap
+  behaviour unchanged (`handleAskFromSearch` with the original question).
+  Mockup the owner approved: https://claude.ai/artifact/DQS2iX4uY9CiKa2geW1Sqm
+  **Verified:** 8 new offline tests in `tests/test_search_question_topic.py`
+  green; the full backend suite is 899 passed with the SAME 14 failures the
+  untouched baseline shows in this container (`test_import_links`,
+  `test_security_round2`, `test_security_hardening_2026_09`: the local
+  `firebase_functions` shim returns a bare function, `'function' object has
+  no attribute 'status_code'`; environment, not code, and CI's
+  `python-tests.yml` is the authority). `tsc --noEmit`, eslint on Feed.tsx
+  and the em-dash gate clean. **Not verified:** a live judged search
+  against prod (no creds here); owner QA in the box above. **Known
+  limit:** the framing-word list is a list; a question opening with a word
+  it lacks ("Anyone know a good sourdough starter?") is only reduced by the
+  trailing "?" and still goes through the gates as a sentence. Add words
+  to `_TOPIC_FRAME_WORDS` as real misses show up.
 
 - **2026-09-17 — First-run tour reviewed and re-synced to the shipped app
   (`web/components/OnboardingTour.tsx`, `Onboarding.tsx`). SHIPPED: merge
