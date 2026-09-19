@@ -33,7 +33,7 @@ import {
 
 const SOURCES = [
   { Screen: InstagramSource, item: { title: 'Hidden coves of Sardinia', site: 'instagram.com' } },
-  { Screen: YouTubeSource, item: { title: 'How to Use AI to Improve Yourself So Much it Will Scare People', site: 'youtube.com' } },
+  { Screen: YouTubeSource, item: { title: 'How to Use AI to Improve Yourself', site: 'youtube.com' } },
   { Screen: ScreenshotSource, item: { title: 'Screenshot', site: 'Photos' } },
   { Screen: ArticleScreen, item: { title: 'The jobs AI actually changes', site: 'theatlantic.com' } },
 ];

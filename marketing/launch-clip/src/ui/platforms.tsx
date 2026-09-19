@@ -274,7 +274,7 @@ export const SaveSurface: React.FC<{ k: PlatformKey; save: number }> = ({ k, sav
           </span>
         </div>
         <div style={{ marginTop: 12, fontSize: 15.5, fontWeight: 700, letterSpacing: '-0.02em', color: '#111318', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          How to Use AI to Improve Yourself So Much it Will Scare People
+          How to Use AI to Improve Yourself
         </div>
         <div style={{ display: 'flex', alignItems: 'center', marginTop: 10 }}>
           <span style={{ fontSize: 12, color: '#606068' }}>IAmMarkManson</span>

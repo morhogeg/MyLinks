@@ -120,7 +120,7 @@ export const CARDS: Card[] = [
   {
     id: 'machineminds',
     category: 'AI',
-    title: 'How to Use AI to Improve Yourself So Much it Will Scare People',
+    title: 'How to Use AI to Improve Yourself',
     summary:
       'Use the tools without outsourcing the thinking: blunt, funny, and specific about what to automate and what to keep yours.',
     source: 'IAmMarkManson',
@@ -179,7 +179,7 @@ export const ASK_ANSWER = [
 
 export const ASK_SOURCES = [
   { id: 'aithread', label: '@futuretense', kind: 'x' as const, title: 'What AI actually changes about work' },
-  { id: 'machineminds', label: 'IAmMarkManson', kind: 'youtube' as const, title: 'How to Use AI to Improve Yourself So Much it Will Scare People' },
+  { id: 'machineminds', label: 'IAmMarkManson', kind: 'youtube' as const, title: 'How to Use AI to Improve Yourself' },
   { id: 'aiarticle', label: 'theatlantic.com', kind: 'link' as const, title: 'The jobs AI actually changes' },
 ];
 
@@ -247,7 +247,7 @@ export const SYNTHESIS = {
   title: 'You keep circling one idea',
   meta: 'Jul 21 – 27 · 8 saves',
   lead: 'The AI thread, Maya’s article, and Mark Manson’s video: three saves, one question. What stays human? You might be ready to write your own take.',
-  standoutTitle: 'How to Use AI to Improve Yourself So Much it Will Scare People',
+  standoutTitle: 'How to Use AI to Improve Yourself',
   standoutReason: 'Saved two months ago, never revisited. It’s the missing half of the argument your newer saves are having.',
   question: 'If the models take the typing, what’s the part of your work only you can do?',
 };

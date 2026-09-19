@@ -335,7 +335,7 @@ export const YouTubeSource: React.FC = () => (
       </div>
       <div style={{ padding: '16px 16px 0' }}>
         <div style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.22, letterSpacing: '-0.02em', color: '#111318' }}>
-          How to Use AI to Improve Yourself So Much it Will Scare People
+          How to Use AI to Improve Yourself
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 11 }}>
           <Youtube size={15} color="rgb(255,0,0)" />
