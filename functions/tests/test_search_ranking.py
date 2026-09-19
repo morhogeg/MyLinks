@@ -326,7 +326,7 @@ def test_hybrid_merges_vector_and_keyword_deduped(monkeypatch):
     # Judge down (2026-09-04 contract): the search bar serves LITERAL matches
     # only — the vector half contributes nothing, so a keyword hit that the
     # vector half also returned appears exactly once, from the scan.
-    monkeypatch.setattr(search_mod, "judge_relevance", lambda q, c: None)
+    monkeypatch.setattr(search_mod, "judge_relevance", lambda q, c, **kw: None)
     monkeypatch.setattr(search_mod, "perform_search_logic", lambda uid, q, limit: [
         _vres("v1", 0.30), _vres("v2", 0.35),
     ])
@@ -368,7 +368,7 @@ def test_hybrid_propagates_config_error(monkeypatch):
 
 
 def test_hybrid_gated_vector_hit_can_return_as_a_literal_match(monkeypatch):
-    monkeypatch.setattr(search_mod, "judge_relevance", lambda q, c: None)
+    monkeypatch.setattr(search_mod, "judge_relevance", lambda q, c, **kw: None)
     # With the judge down no vector hit is shown, however close; a card the
     # keyword scan finds still returns as a REAL literal match.
     monkeypatch.setattr(search_mod, "perform_search_logic", lambda uid, q, limit: [
@@ -418,7 +418,7 @@ def test_normalize_converts_string_and_seconds_created_at():
 
 
 def test_hybrid_survives_mixed_timestamps_end_to_end(monkeypatch):
-    monkeypatch.setattr(search_mod, "judge_relevance", lambda q, c: None)
+    monkeypatch.setattr(search_mod, "judge_relevance", lambda q, c, **kw: None)
     monkeypatch.setattr(search_mod, "perform_search_logic", lambda uid, q, limit: [
         {"id": "v1", "title": "x", "vector_distance": 0.3, "createdAt": 1_752_600_000_000},
     ])
@@ -478,7 +478,7 @@ def test_hybrid_judge_down_means_no_meaning_results(monkeypatch):
     # The old distance-gate fallback (threshold + cliff) is gone from the
     # search bar: without a judge verdict, nearest-neighbour output is never
     # shown, however close it looks (2026-09-04, "גורדון" → a Rabin card).
-    monkeypatch.setattr(search_mod, "judge_relevance", lambda q, c: None)
+    monkeypatch.setattr(search_mod, "judge_relevance", lambda q, c, **kw: None)
     monkeypatch.setattr(search_mod, "perform_search_logic", lambda uid, q, limit: [
         _vres("m1", 0.45), _vres("m2", 0.48),
         _vres("junk1", 0.62), _vres("junk2", 0.64),
@@ -577,7 +577,7 @@ def test_hybrid_judge_filters_the_junk_wall(monkeypatch):
     monkeypatch.setattr(search_mod, "keyword_scan_cards",
                         lambda uid, q, exclude_ids=None, limit=10, fields=None: [])
     monkeypatch.setattr(search_mod, "judge_relevance",
-                        lambda q, cands: [c for c in cands if c["id"] == "hit"])
+                        lambda q, cands, **kw: [c for c in cands if c["id"] == "hit"])
     out = [c["id"] for c in perform_hybrid_search("u", "דעה על פרוגרס", limit=20)]
     assert out == ["hit"]
 
@@ -588,7 +588,7 @@ def test_hybrid_judge_empty_verdict_is_honest_no_matches(monkeypatch):
     monkeypatch.setattr(search_mod, "keyword_scan_cards",
                         lambda uid, q, exclude_ids=None, limit=10, fields=None: [
                             {"id": "k1", "title": "muffins recipe", "createdAt": 1}])
-    monkeypatch.setattr(search_mod, "judge_relevance", lambda q, cands: [])
+    monkeypatch.setattr(search_mod, "judge_relevance", lambda q, cands, **kw: [])
     # Nothing topical → only the strong (title-hit) keyword match survives.
     out = [c["id"] for c in perform_hybrid_search("u", "muffins", limit=20)]
     assert out == ["k1"]
@@ -602,7 +602,7 @@ def test_hybrid_judge_keeps_vector_order_and_appends_keyword_extras(monkeypatch)
                             {"id": "v1", "title": "dupe", "createdAt": 1},
                             {"id": "k1", "title": "sleep hygiene", "createdAt": 1}])
     monkeypatch.setattr(search_mod, "judge_relevance",
-                        lambda q, cands: [c for c in cands if c["id"] in ("v1", "v3")])
+                        lambda q, cands, **kw: [c for c in cands if c["id"] in ("v1", "v3")])
     out = [c["id"] for c in perform_hybrid_search("u", "sleep", limit=20)]
     assert out == ["v1", "v3", "k1"]  # vector order kept, dupe collapsed
     # No internals leak on the judge path either.
@@ -619,7 +619,7 @@ def test_hybrid_judge_failure_serves_literal_matches_only(monkeypatch):
                         lambda uid, q, exclude_ids=None, limit=10, fields=None: [
                             {"id": "k1", "title": "muffins", "createdAt": 1}])
 
-    def boom(q, cands):
+    def boom(q, cands, **kw):
         raise Exception("judge timeout")
     monkeypatch.setattr(search_mod, "judge_relevance", boom)
     meta = {}
@@ -635,7 +635,7 @@ def test_hybrid_judge_precut_caps_and_respects_hard_ceiling(monkeypatch):
         _vres(f"v{i}", 0.40 + i * 0.01) for i in range(25)] + [_vres("far", 0.95)])
     monkeypatch.setattr(search_mod, "keyword_scan_cards",
                         lambda uid, q, exclude_ids=None, limit=10, fields=None: [])
-    def spy(q, cands):
+    def spy(q, cands, **kw):
         seen["ids"] = [c["id"] for c in cands]
         return list(cands)
     monkeypatch.setattr(search_mod, "judge_relevance", spy)
@@ -678,7 +678,7 @@ def test_hybrid_judge_path_drops_weak_substring_extras(monkeypatch):
                              "summary": "software functions explained", "createdAt": 1},
                             {"id": "strong", "title": "Cognitive function and sleep",
                              "createdAt": 1}])
-    monkeypatch.setattr(search_mod, "judge_relevance", lambda q, cands: list(cands))
+    monkeypatch.setattr(search_mod, "judge_relevance", lambda q, cands, **kw: list(cands))
     out = [c["id"] for c in perform_hybrid_search("u", "cognitive function", limit=20)]
     assert "weak" not in out
     assert out == ["hit", "strong"]
@@ -689,7 +689,7 @@ def test_hybrid_fallback_path_serves_literal_and_matches_every_token(monkeypatch
     # client's literal layer it is AND over the query's words: a card carrying
     # only "function" (and only inside "functions") is not a literal match for
     # "cognitive function".
-    monkeypatch.setattr(search_mod, "judge_relevance", lambda q, c: None)
+    monkeypatch.setattr(search_mod, "judge_relevance", lambda q, c, **kw: None)
     monkeypatch.setattr(search_mod, "perform_search_logic", lambda uid, q, limit: [
         _vres("v1", 0.45)])
     monkeypatch.setattr(search_mod, "keyword_scan_cards",
@@ -710,7 +710,7 @@ def test_hybrid_fallback_path_serves_literal_and_matches_every_token(monkeypatch
 # the response says which path served.
 
 def test_fallback_path_has_no_recall_floor_for_far_neighbours(monkeypatch):
-    monkeypatch.setattr(search_mod, "judge_relevance", lambda q, c: None)
+    monkeypatch.setattr(search_mod, "judge_relevance", lambda q, c, **kw: None)
     monkeypatch.setattr(search_mod, "perform_search_logic", lambda uid, q, limit: [
         _vres("rabin", 0.70), _vres("entebbe", 0.72), _vres("other", 0.74)])
     monkeypatch.setattr(search_mod, "keyword_scan_cards",
@@ -721,7 +721,7 @@ def test_fallback_path_has_no_recall_floor_for_far_neighbours(monkeypatch):
 
 
 def test_fallback_path_shows_nothing_from_the_vector_half(monkeypatch):
-    monkeypatch.setattr(search_mod, "judge_relevance", lambda q, c: None)
+    monkeypatch.setattr(search_mod, "judge_relevance", lambda q, c, **kw: None)
     monkeypatch.setattr(search_mod, "perform_search_logic", lambda uid, q, limit: [
         _vres("m1", 0.45), _vres("m2", 0.48), _vres("junk", 0.75)])
     monkeypatch.setattr(search_mod, "keyword_scan_cards",
@@ -740,7 +740,7 @@ def test_judge_path_reports_its_mode(monkeypatch):
     monkeypatch.setattr(search_mod, "perform_search_logic", lambda uid, q, limit: [_vres("a", 0.5)])
     monkeypatch.setattr(search_mod, "keyword_scan_cards",
                         lambda uid, q, exclude_ids=None, limit=10, fields=None: [])
-    monkeypatch.setattr(search_mod, "judge_relevance", lambda q, c: list(c))
+    monkeypatch.setattr(search_mod, "judge_relevance", lambda q, c, **kw: list(c))
     meta = {}
     out = [c["id"] for c in perform_hybrid_search("u", "q", limit=20, meta=meta)]
     assert out == ["a"] and meta["mode"] == "judge"
@@ -805,7 +805,7 @@ def test_judge_path_extras_need_every_token(monkeypatch):
                             {"id": "mondial", "title": "טראמפ: ההתערבות במונדיאל", "createdAt": 1},
                             {"id": "good", "title": "ערב טוב", "createdAt": 1},
                             {"id": "dinner", "title": "ארוחת ערב ב-10 דקות", "createdAt": 1}])
-    monkeypatch.setattr(search_mod, "judge_relevance", lambda q, cands: list(cands))
+    monkeypatch.setattr(search_mod, "judge_relevance", lambda q, cands, **kw: list(cands))
     out = [c["id"] for c in perform_hybrid_search("u", "ארוחת ערב", limit=20)]
     assert out == ["dinner"]
 

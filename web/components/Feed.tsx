@@ -57,7 +57,7 @@ import NotesView from './NotesView';
 import KnowledgeGraph from './KnowledgeGraph';
 import { getNoteGroups } from '@/lib/notes';
 import LoadMoreSentinel from './feed/LoadMoreSentinel';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, Share2, Globe, Plus, Pencil, Newspaper, CalendarCheck, Lock, BookOpenCheck, ChevronLeft, BarChart3, StickyNote, Waypoints } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, Share2, Globe, Plus, Pencil, Newspaper, CalendarCheck, Lock, BookOpenCheck, ChevronLeft, ChevronRight, BarChart3, StickyNote, Waypoints } from 'lucide-react';
 import { usePullToRefresh } from '@/lib/usePullToRefresh';
 import { useProcessingBanner } from '@/lib/useProcessingBanner';
 import { cardStartMs } from '@/lib/shareProgress';
@@ -2617,7 +2617,11 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                         dream", "מה למדתי על שינה") is something the grid can only
                         answer sideways, so this hands the same words to Ask, which
                         answers with citations. It is an OFFER: nothing switches
-                        until it is tapped, and the results stay right below it. */}
+                        until it is tapped, and the results stay right below it.
+                        The row names the PAYOFF (a cited answer), not the query —
+                        the query sits one line up in the field, and echoing it
+                        made the row read as a second search rather than a
+                        shortcut (owner, 2026-09-19). */}
                     {(viewMode === 'grid' || viewMode === 'list') && askableQuestion && (
                         <button
                             onClick={() => handleAskFromSearch(askableQuestion)}
@@ -2627,9 +2631,10 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             {/* bdi isolates the query: a Hebrew question keeps its
                                 own direction inside this English chrome line. */}
                             <span className="min-w-0 flex-1 truncate text-[13px] text-text-secondary">
-                                <span className="font-bold text-text">Ask Machina:</span>{' '}
-                                <bdi>“{askableQuestion}”</bdi>
+                                <span className="font-bold text-text">Get a cited answer</span>{' '}
+                                from your saves
                             </span>
+                            <ChevronRight className="w-4 h-4 shrink-0 text-text-muted rtl:rotate-180" />
                         </button>
                     )}
                     {/* Search typeahead — split the live results into "Sources" and
