@@ -241,6 +241,77 @@ def keyword_all_tokens_match(data: dict, tokens: set) -> bool:
     return all(token_in_text(t, haystack) for t in tokens)
 
 
+# ── Question → topic (search-bar recall for sentence-shaped queries) ────────
+# Every gate below (distance ceiling, same-script margin, the judge's strict
+# "quote the matching words" rule, the AND over keyword tokens) was tuned on
+# one- and two-word lookups. A question typed into the same bar — "What the
+# best breastfeeding position" — is a different shape: the embedding sits
+# farther from the card than "breastfeeding position" does, "best" and "what"
+# poison the AND, and the judge is asked to match a sentence. The owner-reported
+# failure (2026-09-19) was exactly that: the card was the top vector hit (Ask
+# found it instantly) and the search bar still said "No matches". So a query
+# that READS like a question is reduced to its topic before any gate sees it:
+# the leading run of question scaffolding is dropped, the trailing "?" too.
+# Lookups are untouched; the reduction only ever removes framing words from the
+# ends, never a content word from the middle, and falls back to the original
+# text when nothing would be left.
+_QUESTION_OPENERS = {
+    "what", "whats", "how", "why", "when", "where", "who", "which", "is", "are",
+    "can", "should", "do", "does", "did", "was", "were", "will", "would", "could",
+    "מה", "איך", "למה", "מדוע", "מתי", "איפה", "מי", "איזה", "האם", "כמה",
+}
+# Words a question puts in front of its topic. Stripped only as a LEADING run
+# (and "?"/pronoun tails at the end), so "best" survives inside "the best of
+# both worlds" but not in "what is the best …".
+_TOPIC_FRAME_WORDS = _QUESTION_OPENERS | _RANK_STOPWORDS | {
+    "best", "good", "better", "way", "ways", "tips", "tip", "there", "any",
+    "some", "know", "learn", "learned", "learnt", "saved", "save", "find",
+    "get", "tell", "recommend", "recommended", "think", "thoughts", "one",
+    "ones", "most", "right", "proper", "correct", "kind", "sort", "type",
+    "הכי", "טוב", "טובה", "טובים", "דרך", "כדאי", "צריך", "אפשר", "יודע",
+    "יודעת", "למדתי", "שמרתי", "יש", "איזו", "אילו", "הם", "הן",
+}
+_TOPIC_TAIL_WORDS = {"me", "us", "you", "him", "her", "them", "לי", "לנו", "לך", "לכם"}
+
+
+def looks_like_question(query: str) -> bool:
+    """Server twin of web/lib/searchIntent.looksLikeQuestion: ends in "?" or
+    opens with a question word and carries at least one more word."""
+    t = (query or "").strip()
+    if len(t) < 2:
+        return False
+    if t.endswith("?"):
+        return True
+    words = t.split()
+    if len(words) < 2:
+        return False
+    first = re.sub(r"[^\w]", "", words[0].lower(), flags=re.UNICODE)
+    return first in _QUESTION_OPENERS
+
+
+def search_topic_of(query: str) -> str:
+    """The lookup a question is really asking for. Pure.
+
+    "What the best breastfeeding position" → "breastfeeding position";
+    "how do I focus at work?" → "focus at work"; "מה למדתי על שינה" → "שינה".
+    A query that does not read like a question comes back unchanged, and so
+    does one where stripping would leave nothing (a question made only of
+    framing words is a lookup for those words)."""
+    t = (query or "").strip()
+    if not looks_like_question(t):
+        return t
+    words = t.rstrip("?").strip().split()
+    key = lambda w: re.sub(r"[^\w]", "", w.lower(), flags=re.UNICODE)  # noqa: E731
+    i = 0
+    while i < len(words) and (not key(words[i]) or key(words[i]) in _TOPIC_FRAME_WORDS):
+        i += 1
+    j = len(words)
+    while j > i and (not key(words[j - 1]) or key(words[j - 1]) in _TOPIC_TAIL_WORDS):
+        j -= 1
+    topic = " ".join(words[i:j]).strip()
+    return topic or t
+
+
 # ── Vector-distance quality gate (pure, unit-tested) ────────────────────────
 # find_nearest always returns the `limit` nearest neighbours no matter how far
 # away they are — for a query the library has nothing about, that's 20 random
@@ -545,8 +616,15 @@ def _script_of(text: str) -> str:
 _SAME_SCRIPT_MARGIN = float(os.environ.get("SEARCH_SAME_SCRIPT_MARGIN", "0.12"))
 
 
-def apply_same_script_gate(query_text: str, candidates: List[dict], verdict: List[tuple]) -> List[int]:
-    """Indices from `verdict` that survive the same-script distance rule. Pure."""
+def apply_same_script_gate(query_text: str, candidates: List[dict], verdict: List[tuple],
+                           exempt_nearest: bool = False) -> List[int]:
+    """Indices from `verdict` that survive the same-script distance rule. Pure.
+
+    `exempt_nearest`: the judge-approved NEAREST candidate skips the absolute
+    ceiling. Set for question-shaped queries — a sentence legitimately embeds
+    farther from its card than a keyword does, and the ceiling was tuned on
+    keywords; the margin rule still holds for everything behind the best hit,
+    and the judge still has to have quoted evidence for it."""
     q_script = _script_of(query_text)
     dists = [c.get("vector_distance") for c in candidates
              if isinstance(c.get("vector_distance"), (int, float))]
@@ -556,6 +634,9 @@ def apply_same_script_gate(query_text: str, candidates: List[dict], verdict: Lis
         d = candidates[i].get("vector_distance")
         same = _script_of(evidence) == q_script and q_script != "other"
         if same and best is not None and isinstance(d, (int, float)):
+            if exempt_nearest and d == best:
+                kept.append(i)
+                continue
             if d > min(best + _SAME_SCRIPT_MARGIN, _DISTANCE_CEILING):
                 logger.info("Search judge kept card %d on same-script evidence but it is far (%.2f); dropped", i + 1, d)
                 continue
@@ -563,7 +644,8 @@ def apply_same_script_gate(query_text: str, candidates: List[dict], verdict: Lis
     return kept
 
 
-def judge_relevance(query_text: str, candidates: List[dict]) -> Optional[List[dict]]:
+def judge_relevance(query_text: str, candidates: List[dict], *,
+                    exempt_nearest: bool = False) -> Optional[List[dict]]:
     """The candidates the judge kept, in their original (vector) order.
 
     Returns None when the judge can't serve — no API key, call failure, or an
@@ -594,7 +676,7 @@ def judge_relevance(query_text: str, candidates: List[dict]) -> Optional[List[di
     if verdict is None:
         logger.warning("Search judge reply unparseable — falling back to literal-only")
         return None
-    kept = apply_same_script_gate(query_text, candidates, verdict)
+    kept = apply_same_script_gate(query_text, candidates, verdict, exempt_nearest=exempt_nearest)
     logger.info(f"Search judge kept {len(kept)}/{len(candidates)} candidates")
     return [candidates[i] for i in sorted(kept)]
 
@@ -1571,10 +1653,17 @@ def perform_hybrid_search(uid: str, query_text: str, limit: int = 20,
     # ever a dedupe convenience — the merge below dedupes anyway), so they run
     # CONCURRENTLY: the query embedding + vector search no longer sit in front of
     # the 1000-card lexical scan. Wall clock is the slower half, not their sum.
+    # A question is searched as the lookup it stands for (see search_topic_of):
+    # the embedding, the keyword scan, the judge and the AND over tokens all
+    # see "breastfeeding position", not "What the best breastfeeding position".
+    is_question = looks_like_question(query_text)
+    topic = search_topic_of(query_text) if is_question else query_text
+    if topic != query_text:
+        logger.info(f"Hybrid search: question reduced to topic ({len(topic)} chars)")
     with ThreadPoolExecutor(max_workers=2) as pool:
-        vector_future = pool.submit(perform_search_logic, uid, query_text, 30)
+        vector_future = pool.submit(perform_search_logic, uid, topic, 30)
         keyword_future = pool.submit(
-            keyword_scan_cards, uid, query_text, None, 10, SEARCH_SCAN_FIELDS)
+            keyword_scan_cards, uid, topic, None, 10, SEARCH_SCAN_FIELDS)
 
         vector_results: List[dict] = []
         try:
@@ -1597,7 +1686,7 @@ def perform_hybrid_search(uid: str, query_text: str, limit: int = 20,
         ][:_JUDGE_MAX_CANDIDATES]
         if candidates:
             try:
-                judged = judge_relevance(query_text, candidates)
+                judged = judge_relevance(topic, candidates, exempt_nearest=is_question)
             except Exception as e:
                 logger.error(f"Hybrid search: relevance judge failed, using distance gates: {e}")
                 # Durable trail (lazy import — main imports this module at load
@@ -1632,7 +1721,7 @@ def perform_hybrid_search(uid: str, query_text: str, limit: int = 20,
         # layer does (AND): "ארוחת ערב" once pulled a card whose title merely
         # contained ערב — a title hit scores 2 on its own — and it showed
         # under By meaning because the client's literal pass rejected it.
-        q_tokens = keyword_query_tokens(query_text)
+        q_tokens = keyword_query_tokens(topic)
         have = {r.get("id") for r in judged}
         strong_extras = [k for k in keyword_hits if k.get("id") not in have
                          and keyword_all_tokens_match(k, q_tokens)
@@ -1641,7 +1730,7 @@ def perform_hybrid_search(uid: str, query_text: str, limit: int = 20,
     else:
         # Judge unavailable: literal matches only (see the docstring). Ranked
         # by the lexical score so a title hit leads.
-        q_tokens = keyword_query_tokens(query_text)
+        q_tokens = keyword_query_tokens(topic)
         literal = [k for k in keyword_hits if keyword_all_tokens_match(k, q_tokens)]
         ranked = sorted(literal, key=lambda k: -keyword_match_score(k, q_tokens))[:limit]
 
