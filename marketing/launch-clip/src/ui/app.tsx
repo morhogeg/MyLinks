@@ -422,7 +422,7 @@ export const SearchField: React.FC<{ value: string; caret?: boolean; semantic?: 
   >
     <Search size={15} color={T.textMuted} />
     <span style={{ fontSize: 13.5, color: value ? T.text : T.textMuted, whiteSpace: 'nowrap' }}>
-      {value || 'Search or ask your saves'}
+      {value || 'Search your saves'}
       {caret && (
         <span
           style={{
