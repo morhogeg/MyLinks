@@ -199,9 +199,19 @@ def _token_pattern(token: str):
     """
     pat = _TOKEN_RE_CACHE.get(token)
     if pat is None:
-        t = re.escape(token)
+        # A plural query token matches from its singular stem, as the client
+        # does (tokenVariants): "positions" → "position" → "Positioning".
+        stem = token
+        if token.isascii() and len(token) > 4 and token.endswith("es"):
+            stem = token[:-2]
+        elif token.isascii() and len(token) > 3 and token.endswith("s"):
+            stem = token[:-1]
+        t = re.escape(stem)
         if token.isascii():
-            body = rf"{t}(?:e?s)?"
+            # A 5+ letter Latin token also matches its -ing/-ed/-er forms:
+            # "positions" must find "Positioning" (owner, 2026-09-19). Short
+            # tokens stay exact-plus-plural so "art" never reaches "artist".
+            body = rf"{t}(?:e?s|ing|ed|er)?" if len(stem) >= 5 else rf"{t}(?:e?s)?"
         else:
             body = rf"(?:[{_HEBREW_PREFIXES}]{{0,2}})?{t}(?:ים|ות)?"
         pat = re.compile(rf"(?<!\w){body}(?!\w)", re.IGNORECASE | re.UNICODE)
@@ -290,24 +300,27 @@ def looks_like_question(query: str) -> bool:
 
 
 def search_topic_of(query: str) -> str:
-    """The lookup a question is really asking for. Pure.
+    """The lookup a query is really asking for. Pure.
 
     "What the best breastfeeding position" → "breastfeeding position";
+    "Best breastfeeding positions" → "breastfeeding positions";
     "how do I focus at work?" → "focus at work"; "מה למדתי על שינה" → "שינה".
-    A query that does not read like a question comes back unchanged, and so
-    does one where stripping would leave nothing (a question made only of
-    framing words is a lookup for those words)."""
+    The LEADING run of framing words goes for every query (a lookup wears them
+    too: "best", "good", "the"), the trailing "?" and pronoun tails only for a
+    question. A query where stripping would leave nothing comes back unchanged
+    (a query made only of framing words is a lookup for those words). Mirrors
+    `stripSearchFraming` in web/lib/searchMatch.ts."""
     t = (query or "").strip()
-    if not looks_like_question(t):
-        return t
-    words = t.rstrip("?").strip().split()
+    question = looks_like_question(t)
+    words = (t.rstrip("?").strip() if question else t).split()
     key = lambda w: re.sub(r"[^\w]", "", w.lower(), flags=re.UNICODE)  # noqa: E731
     i = 0
     while i < len(words) and (not key(words[i]) or key(words[i]) in _TOPIC_FRAME_WORDS):
         i += 1
     j = len(words)
-    while j > i and (not key(words[j - 1]) or key(words[j - 1]) in _TOPIC_TAIL_WORDS):
-        j -= 1
+    if question:
+        while j > i and (not key(words[j - 1]) or key(words[j - 1]) in _TOPIC_TAIL_WORDS):
+            j -= 1
     topic = " ".join(words[i:j]).strip()
     return topic or t
 
@@ -1657,9 +1670,9 @@ def perform_hybrid_search(uid: str, query_text: str, limit: int = 20,
     # the embedding, the keyword scan, the judge and the AND over tokens all
     # see "breastfeeding position", not "What the best breastfeeding position".
     is_question = looks_like_question(query_text)
-    topic = search_topic_of(query_text) if is_question else query_text
+    topic = search_topic_of(query_text)
     if topic != query_text:
-        logger.info(f"Hybrid search: question reduced to topic ({len(topic)} chars)")
+        logger.info(f"Hybrid search: query reduced to topic ({len(topic)} chars)")
     with ThreadPoolExecutor(max_workers=2) as pool:
         vector_future = pool.submit(perform_search_logic, uid, topic, 30)
         keyword_future = pool.submit(

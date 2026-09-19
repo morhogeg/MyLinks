@@ -45,10 +45,32 @@ def test_topic_keeps_content_words_in_the_middle():
     assert search_topic_of("Why does Gordon Ramsay shout?") == "Gordon Ramsay shout"
 
 
-def test_topic_leaves_lookups_alone():
-    assert search_topic_of("best pasta recipe") == "best pasta recipe"
+def test_topic_strips_leading_framing_from_lookups_too():
+    # Not a question, but "best" is on no card and the AND would sink it.
+    assert search_topic_of("Best breastfeeding positions") == "breastfeeding positions"
+    assert search_topic_of("best pasta recipe") == "pasta recipe"
+    assert search_topic_of("הכי טוב מתכון פסטה") == "מתכון פסטה"
+
+
+def test_topic_leaves_plain_lookups_alone():
     assert search_topic_of("Breastfeeding positioning") == "Breastfeeding positioning"
+    assert search_topic_of("pasta recipe?") == "pasta recipe"   # only the "?" goes
     assert search_topic_of("גורדון") == "גורדון"
+    assert search_topic_of("Gordon Ramsay") == "Gordon Ramsay"
+
+
+def test_topic_falls_back_when_a_lookup_is_all_framing():
+    assert search_topic_of("the best") == "the best"
+
+
+def test_token_matches_inflected_forms_of_long_words():
+    from search import token_in_text
+    assert token_in_text("positions", "Breastfeeding Positioning and Latching")
+    assert token_in_text("position", "Breastfeeding Positioning and Latching")
+    assert token_in_text("sleep", "sleeping well")
+    assert token_in_text("train", "trained hard")     # 5 letters: -ed allowed
+    assert not token_in_text("art", "the artist")     # short tokens stay exact
+    assert not token_in_text("ערב", "התערבות")         # Hebrew rule untouched
 
 
 def test_topic_falls_back_when_nothing_is_left():
@@ -106,3 +128,8 @@ def test_hybrid_search_feeds_the_topic_to_every_half(monkeypatch):
     perform_hybrid_search("u", "pasta")
     assert seen["vector"] == seen["keyword"] == seen["judge"] == "pasta"
     assert seen["exempt"] is False
+
+    seen.clear()
+    perform_hybrid_search("u", "Best breastfeeding positions")
+    assert seen["vector"] == "breastfeeding positions"
+    assert seen["exempt"] is False   # a lookup: no ceiling exemption
