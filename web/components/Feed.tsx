@@ -56,7 +56,7 @@ import NotesView from './NotesView';
 import KnowledgeGraph from './KnowledgeGraph';
 import { getNoteGroups } from '@/lib/notes';
 import LoadMoreSentinel from './feed/LoadMoreSentinel';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, Share2, Globe, Plus, Pencil, Newspaper, CalendarCheck, Lock, BookOpenCheck, ChevronLeft, ChevronRight, BarChart3, StickyNote, Waypoints } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, Share2, Globe, Plus, Pencil, Newspaper, CalendarCheck, Lock, BookOpenCheck, ChevronLeft, BarChart3, StickyNote, Waypoints } from 'lucide-react';
 import { usePullToRefresh } from '@/lib/usePullToRefresh';
 import { useProcessingBanner } from '@/lib/useProcessingBanner';
 import { cardStartMs } from '@/lib/shareProgress';
@@ -185,18 +185,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // LIVE query in — literal matching is instant per keystroke; the semantic
     // ids arrive debounced and append below the literal tiers.
     } = useFeedFilters(visibleLinks, searchQuery, libraryLinks, privateCollectionIds, semanticIds);
-    // EVERY search earns one offer above the results: hand the same words to
-    // Ask, which answers in a cited paragraph instead of a grid. It used to
-    // show only for question-shaped queries, and "Best breastfeeding
-    // positions" (no opener, no "?") got neither a match nor the offer
-    // (owner, 2026-09-19: "if we can ask, then ask"). Null on an empty
-    // library — there is nothing to answer from — and it is only ever an
-    // offer: the results still render underneath.
-    const askableQuestion = useMemo(() => {
-        const q = searchQuery.trim();
-        if (q.length < 2 || visibleLinks.length === 0) return null;
-        return q;
-    }, [searchQuery, visibleLinks.length]);
     // Where the literal hits end and the meaning-only hits begin. useFeedFilters
     // sorts literal matches first and meaning-only ones last, so the boundary is
     // one index — but ONLY under the default sort, the only one that tiers by
@@ -1018,7 +1006,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         return base.filter((l) => !isPending(l) && !isEffectivelyPrivateCard(l));
     }, [viewMode, graphFiltersActive, filteredLinks, links, libraryLinks, isEffectivelyPrivateCard]);
     // Pre-sent question hand-off: a graph cluster's "Ask about cluster" (and the
-    // search question row, see handleAskFromSearch) opens Ask with this
+    // "Ask Machina instead" on a dead-end search, see handleAskFromSearch) opens Ask with this
     // question pre-sent (nonce-gated inside AskBrain, fresh conversation). The
     // restore payload re-opens the same graph focus when the user comes back —
     // Ask is a detour from the graph, not an exit.
@@ -1055,8 +1043,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         setGraphFromChat(fromChatId);
         setViewMode('graph');
     }, []);
-    // Search → Ask: the question row above the results hands the typed words
-    // straight to Ask, pre-sent, in a fresh conversation. It rides the SAME
+    // Search → Ask: the "Ask Machina instead" button on a dead-end search hands
+    // the typed words straight to Ask, pre-sent, in a fresh conversation. It rides the SAME
     // one-shot channel the graph's "Ask about cluster" uses (AskBrain consumes
     // each nonce exactly once) minus the graph trail — this ask came from the
     // library, so leaving Ask returns to the library. The query stays in the
@@ -2031,8 +2019,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                     onFocus={handleSearchFocus}
                                     onBlur={() => setSearchFocused(false)}
                                     onKeyDown={(e) => { if (e.key === 'Escape') { if (searchQuery) setSearchQuery(''); else e.currentTarget.blur(); } }}
-                                    placeholder="Search or ask your saves"
-                                    aria-label="Search or ask your saves"
+                                    placeholder="Search your saves"
+                                    aria-label="Search your saves"
                                     className="w-full h-10 ps-9 pe-9 bg-card border border-border-subtle rounded-full text-[15px] text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-transparent transition-shadow"
                                 />
                                 {searchQuery && (
@@ -2095,8 +2083,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                 onFocus={handleSearchFocus}
                                 onBlur={() => setSearchFocused(false)}
                                 onKeyDown={(e) => { if (e.key === 'Escape') { if (searchQuery) setSearchQuery(''); else e.currentTarget.blur(); } }}
-                                placeholder="Search or ask your saves"
-                                aria-label="Search or ask your saves"
+                                placeholder="Search your saves"
+                                aria-label="Search your saves"
                                 className="h-9 w-56 lg:w-72 ps-9 pe-9 rounded-full bg-card border border-border-subtle text-[13px] text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-transparent transition-shadow"
                             />
                             {searchQuery && (
@@ -2614,30 +2602,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
 
                 {/* Links Grid / Ask */}
                 <div className="flex-grow min-w-0">
-                    {/* Ask routing — ONE row, above everything the search found,
-                        for every query. The grid can only answer a question
-                        sideways, so this hands the same words to Ask, which
-                        answers with citations. It is an OFFER: nothing switches
-                        until it is tapped, and the results stay right below it.
-                        The row names the PAYOFF (a cited answer), not the query —
-                        the query sits one line up in the field, and echoing it
-                        made the row read as a second search rather than a
-                        shortcut (owner, 2026-09-19). */}
-                    {(viewMode === 'grid' || viewMode === 'list') && askableQuestion && (
-                        <button
-                            onClick={() => handleAskFromSearch(askableQuestion)}
-                            className="w-full mb-5 flex items-center gap-2.5 px-3.5 py-3 rounded-2xl bg-card border border-border-subtle text-start cursor-pointer hover:bg-card-hover hover:border-text-muted/40 transition-colors animate-fade-in"
-                        >
-                            <CitationGlyph className="w-3.5 h-auto shrink-0 text-accent" />
-                            {/* bdi isolates the query: a Hebrew question keeps its
-                                own direction inside this English chrome line. */}
-                            <span className="min-w-0 flex-1 truncate text-[13px] text-text-secondary">
-                                <span className="font-bold text-text">Get a cited answer</span>{' '}
-                                from your saves
-                            </span>
-                            <ChevronRight className="w-4 h-4 shrink-0 text-text-muted rtl:rotate-180" />
-                        </button>
-                    )}
                     {/* Search typeahead — split the live results into "Sources" and
                         "Tags" rows (tap to jump straight to that filter) above the
                         "Cards" grid below, so searching "ynet" or a tag offers both.
@@ -2903,6 +2867,24 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                         says "Clear search"; a filtered-out view says
                                         "Clear filters" (both clear everything). */}
                                     {searchQuery ? 'Clear search' : 'Clear filters'}
+                                </button>
+                            )}
+                            {/* The ONE bridge from search to Ask (owner call,
+                                2026-09-19): search only searches, Ask stays
+                                manual, and this dead end is the single moment
+                                the grid cannot help. It carries the typed words
+                                into Ask, pre-sent (handleAskFromSearch). Nothing
+                                is asked until it is tapped, so a search never
+                                spends a model call on its own. Same pill height
+                                as Clear search, quieter fill: the primary action
+                                on a dead end is still to try other words. */}
+                            {searchQuery && visibleLinks.length > 0 && (
+                                <button
+                                    onClick={() => handleAskFromSearch(searchQuery.trim())}
+                                    className="mt-3 inline-flex items-center gap-2 px-4 h-10 rounded-full bg-card border border-border-subtle text-text text-sm font-bold hover:bg-card-hover active:scale-95 transition-all"
+                                >
+                                    <CitationGlyph className="w-3.5 h-auto text-accent" />
+                                    Ask Machina instead
                                 </button>
                             )}
                         </div>
