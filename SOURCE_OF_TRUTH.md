@@ -1847,8 +1847,20 @@ G3. **[x] iOS share extension: multi-screenshot cards — SHIPPED 2026-09-16 (me
     Add-to-collection sheet ranks suggested targets per card. **2026-07-21
     (Collections UX round 1):** suggestions are no longer blind — tapping a
     suggested tile opens `SuggestionPreviewSheet` listing the exact member cards
-    before Create/Dismiss. Still open: embedding-based clustering server-side for
-    deeper/semantic groupings.
+    before Create/Dismiss. **2026-09-20 (Collections launch pass, see §9):**
+    categories no longer seed suggestions (`clusterTerms` vs `affinityTerms`),
+    dismissals sync per user (`users/{uid}.dismissedSuggestions`), the tile
+    button previews instead of creating blind. Still open: embedding-based
+    clustering server-side for deeper/semantic groupings.
+23a. **[x] Collections launch pass (2026-09-20) — four-reviewer audit, all
+    findings fixed; see §9.** The P0 was real: a card in a PIN-locked
+    collection (or flagged private) was published inside a public collection
+    page. Left for post-launch: publish's two-step write (server snapshot,
+    then client flag write) can still mint a second shareId if the second
+    step fails; a server-side delete endpoint for collections (the client
+    sweep reads full member docs, embeddings included); `Link.updatedAt` is
+    stamped only by title/summary/category/thumbnail edits, so the stale
+    signature ignores note edits (not rendered on the page anyway).
 24. **[ ] T10 export** (MD/PDF/HTML from ReadingView), **T11 highlights**, T5/T6
     connector framework + YouTube liked-videos sync (pull connectors; IG/FB saved
     have no legitimate API — won't do), Chrome Web Store listing for the extension.
@@ -2245,6 +2257,76 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-09-20 — COLLECTIONS LAUNCH PASS (four parallel read-only reviews:
+  design/UX, backend+data, sharing surface, product; then three parallel
+  build workers with disjoint file ownership; coordinator integrated).
+  Frontend `web/components/{Feed,CollectionsGallery,ShareCollectionSheet,
+  AddToCollectionSheet,ManageCollectionCardsSheet,CollectionFormModal,
+  SuggestionPreviewSheet,PinLockModal}.tsx`, `web/lib/{collections,
+  collectionSuggest,useCollectionLinks,storage,types}.ts`; backend
+  `functions/{share_service,main}.py`; rules `firestore.rules` +
+  `.locked` + `firestore-rules-test`. NOT yet shipped from this branch.**
+  Owner: "review everything to do with the collections page ... must be
+  perfect". Three reviewers independently found the same **P0: a card the
+  user marked Private, or that sits in a PIN-locked collection, was published
+  world-readable inside a public collection page** (the share sheet got the
+  raw `array-contains` member query, `publishCollection` froze it, and the
+  server has no privacy signal). Fixed in Feed: `publishableMembers` (no
+  pending, no effectively-private card, regardless of vault state) feeds the
+  sheet, the publish, AND the stale signature; the sheet says "N private
+  cards are left out." **Sharing:** `unpublishCollection`/`deleteCollection`
+  no longer swallow the endpoint error and then erase the shareId (that left
+  an orphaned public page while toasting "gone"); delete unpublishes FIRST
+  and throws with nothing changed. Server: unpublish now TOMBSTONES
+  `shared_owners/{id}` (keeps ownerUid, stamps unpublishedAt) so a
+  circulated link can never be re-claimed by another account; share ids
+  need 20+ chars; collection snapshots drop `detailedSummary`/`tags`
+  (never rendered, risked the 200KB cap) on both client and server;
+  `<meta name="robots" content="noindex">` on every share page;
+  share_page cache 300/600s -> 60/60s so Stop sharing lands within a
+  minute; hidden thumbnails stay hidden on the page. `search_links_http`
+  now strips private cards server-side like Ask. **Windowed-feed bugs:** the
+  gallery's amber "Update link" badge was computed from the 150-card feed
+  window (permanent false positive on big collections) and is gone (detail
+  header + sheet, which have the full set, keep it, now worded "Update
+  page"); Manage cards gets the full member set unioned with the feed so old
+  members can be unticked. **Vault:** Add-to-collection PIN-gates private
+  rows while locked (new props `privateCollectionIds`/`lockedIds`/
+  `onRequestUnlock`), shows a lock glyph, toasts "This card is now
+  private."; Home tab clears an open collection's scope (and relocks).
+  **Product:** categories no longer become suggested collections;
+  dismissals sync via `users/{uid}.dismissedSuggestions` (new
+  client-writable key + list type guard in BOTH rules files, test case
+  added); membership writes bump the collection's `updatedAt` so the
+  gallery sort tracks activity (Manage cards commits as two batched sweeps
+  to avoid hot-doc contention); `collectionSignature` folds member
+  `updatedAt`, stamped by title/summary/category/thumbnail edits;
+  **NEW "Ask about this" pill** in the collection header reuses the graph
+  cluster hand-off (`anchorIds` exclusive) and leaving Ask returns to the
+  collection. **Polish:** `useCollectionLinks` returns `{links, loading}`
+  so a full collection never flashes "Nothing here yet"/"0 cards"; keyboard-
+  reachable tiles; one lock signal on locked tiles; "Share" not "Share /
+  manage"; suggestion tile button is Preview; Manage cards is always
+  "Done" + result toast, logical RTL classes, honest empty copy; Hebrew
+  direction on add-sheet rows; 44px targets on close/dismiss buttons; mobile
+  "New" button h-9; Shuffle color button removed (form already randomizes);
+  copy button uses the WKWebView-safe `copyToClipboard`; dead `ownerUid`
+  removed from the shared types. **Verified:** `tsc` clean, eslint clean on
+  every touched file, `py_compile` clean, 57 share/search tests green (18
+  new: 20-char floor, tombstone semantics incl. stranger refusal and owner
+  republish, collection-card shape, noindex, search privacy strip). **Not
+  verified:** the rules emulator suite (the emulator jar download is blocked
+  in this sandbox; deploy-rules runs it before deploying and refuses on
+  red); nothing on device. **Owner QA after ship:** (1) put a card in a
+  private collection AND a public one, publish the public one: page must not
+  show it and the sheet must say "1 private card is left out"; (2) Stop
+  sharing, reload the link within ~1 min: 404; (3) open a 150+ card
+  collection: no empty-state flash, Manage cards lists old members; (4)
+  gallery: no "Technology"-style suggestion, tile button says Preview; (5)
+  collection header "Ask about this" -> Ask answers from those cards, back
+  returns to the collection; (6) dismiss a suggestion on iPhone, open web:
+  still dismissed.
 
 - **2026-09-19 (round 4) — SEARCH RECALL PASS ACROSS EVERY LAYER
   (`web/lib/searchMatch.ts`, `web/lib/useFeedFilters.ts`,

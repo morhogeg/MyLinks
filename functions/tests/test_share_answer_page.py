@@ -286,25 +286,25 @@ class TestPublishAnswer:
         assert _SHARE_COLLECTIONS["answer"] == "shared_answers"
 
     def test_publish_writes_the_sanitized_snapshot_without_owner_uid(self, db):
-        result = _publish_share_logic("+15551234567", "answer", "share-1", {
+        result = _publish_share_logic("+15551234567", "answer", "share-1-aaaaaaaaaaaaaaaaaaaaaa", {
             "question": "What did I save about sleep?",
             "answer": "Consistency beats duration.",
             "sources": [{"id": "card-1", "title": "Why We Sleep", "url": "https://example.com/sleep"}],
             "ownerUid": "+15551234567",
         })
-        assert result == {"shareId": "share-1"}
+        assert result == {"shareId": "share-1-aaaaaaaaaaaaaaaaaaaaaa"}
 
-        doc = db.store[("shared_answers", "share-1")]
+        doc = db.store[("shared_answers", "share-1-aaaaaaaaaaaaaaaaaaaaaa")]
         assert doc["question"] == "What did I save about sleep?"
         assert doc["sources"] == [{"title": "Why We Sleep", "url": "https://example.com/sleep"}]
-        assert doc["shareId"] == "share-1" and doc["publishedAt"] > 0
+        assert doc["shareId"] == "share-1-aaaaaaaaaaaaaaaaaaaaaa" and doc["publishedAt"] > 0
         # The two things that must never be in a world-readable doc.
         assert "ownerUid" not in doc
         assert "card-1" not in str(doc)
 
         # The owner mapping lives in the functions-only collection instead.
-        assert db.store[("shared_owners", "share-1")]["ownerUid"] == "+15551234567"
-        assert db.store[("shared_owners", "share-1")]["type"] == "answer"
+        assert db.store[("shared_owners", "share-1-aaaaaaaaaaaaaaaaaaaaaa")]["ownerUid"] == "+15551234567"
+        assert db.store[("shared_owners", "share-1-aaaaaaaaaaaaaaaaaaaaaa")]["type"] == "answer"
 
     def test_publish_generates_no_og_preview_for_an_answer(self, db, monkeypatch):
         # An answer has no image, and the preview path would fetch a URL. It must
@@ -313,17 +313,17 @@ class TestPublishAnswer:
             raise AssertionError("answers must not run the og-preview fetch")
 
         monkeypatch.setattr(share_service, "_downscale_og_preview", _boom)
-        _publish_share_logic("+15551234567", "answer", "share-2", {
+        _publish_share_logic("+15551234567", "answer", "share-2-aaaaaaaaaaaaaaaaaaaaaa", {
             "question": "Q?", "answer": "A.", "sources": [],
         })
-        assert "ogPreview" not in db.store[("shared_answers", "share-2")]
+        assert "ogPreview" not in db.store[("shared_answers", "share-2-aaaaaaaaaaaaaaaaaaaaaa")]
 
     def test_another_account_cannot_overwrite_a_published_answer(self, db):
-        _publish_share_logic("+15551234567", "answer", "share-3", {
+        _publish_share_logic("+15551234567", "answer", "share-3-aaaaaaaaaaaaaaaaaaaaaa", {
             "question": "Q?", "answer": "A.", "sources": [],
         })
         with pytest.raises(PermissionError):
-            _publish_share_logic("+15559999999", "answer", "share-3", {
+            _publish_share_logic("+15559999999", "answer", "share-3-aaaaaaaaaaaaaaaaaaaaaa", {
                 "question": "Phishing", "answer": "Click here.", "sources": [],
             })
-        assert db.store[("shared_answers", "share-3")]["question"] == "Q?"
+        assert db.store[("shared_answers", "share-3-aaaaaaaaaaaaaaaaaaaaaa")]["question"] == "Q?"

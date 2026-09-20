@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Collection } from '@/lib/types';
-import { X, Check, Layers, Shuffle, Lock } from 'lucide-react';
+import { X, Check, Layers, Lock } from 'lucide-react';
 import { COLOR_KEYS, getColorStyleByKey } from '@/lib/colors';
 import { createCollection, updateCollection, unpublishCollection } from '@/lib/collections';
 import { usePrivacyLock } from '@/lib/privacyLock';
@@ -155,12 +155,16 @@ export default function CollectionFormModal({
                         <h3 className="flex-1 text-lg font-bold text-text">
                             {isEdit ? 'Edit collection' : 'New collection'}
                         </h3>
+                        {/* 44px hit target; the visible 32px circle is nested so the
+                            header keeps its compact look. */}
                         <button
                             onClick={onClose}
                             aria-label="Close"
-                            className="p-1.5 rounded-full text-text-muted hover:text-text hover:bg-fill-subtle transition-colors"
+                            className="group/close -me-1.5 w-11 h-11 flex items-center justify-center text-text-muted hover:text-text transition-colors"
                         >
-                            <X className="w-5 h-5" />
+                            <span className="flex items-center justify-center w-8 h-8 rounded-full group-hover/close:bg-fill-subtle transition-colors">
+                                <X className="w-5 h-5" />
+                            </span>
                         </button>
                     </div>
                 </div>
@@ -194,19 +198,11 @@ export default function CollectionFormModal({
                     </div>
 
                     <div>
-                        <div className="flex items-center justify-between mb-2">
-                            <label className="text-[11px] font-bold uppercase tracking-wider text-text-muted">
-                                Color <span className="font-medium normal-case text-text-muted/60">(optional)</span>
-                            </label>
-                            <button
-                                type="button"
-                                onClick={() => setColor(randomColorKey())}
-                                className="inline-flex items-center gap-1 text-[11px] font-semibold text-accent hover:text-accent-hover transition-colors"
-                            >
-                                <Shuffle className="w-3.5 h-3.5" />
-                                Surprise me
-                            </button>
-                        </div>
+                        {/* New collections already open with a random color (see the
+                            reset block above), so no separate shuffle control. */}
+                        <label className="block text-[11px] font-bold uppercase tracking-wider text-text-muted mb-2">
+                            Color <span className="font-medium normal-case text-text-muted/60">(optional)</span>
+                        </label>
                         <div className="flex flex-wrap gap-2">
                             {COLOR_KEYS.map((key) => {
                                 const style = getColorStyleByKey(key);
@@ -237,7 +233,7 @@ export default function CollectionFormModal({
                                 <p className="mt-0.5 text-[11px] text-text-muted leading-snug">
                                     Requires your PIN to open. Its cards become private too:
                                     hidden from your library, search, and suggestions; they
-                                    live only in here and under Show → Private.
+                                    live only in here and in the Private view.
                                     {collection?.isPublic && isPrivate && !collection?.isPrivate
                                         ? ' Saving will also stop sharing its public page.'
                                         : ''}

@@ -622,7 +622,7 @@ export async function updateLinkCategory(uid: string, id: string, category: stri
     // Canonicalised on the way in, so typing "sports" into the category editor
     // joins the existing "Sports" instead of forking a second one that differs
     // only by case. Matches the backend's canonical_category exactly.
-    await updateDoc(linkRef, { category: canonicalCategory(category) || 'General' });
+    await updateDoc(linkRef, { category: canonicalCategory(category) || 'General', updatedAt: Date.now() });
 }
 
 /**
@@ -637,7 +637,9 @@ export async function updateLinkTitle(uid: string, id: string, title: string, re
     // is built from that text — so a title edit must re-flag `needsEmbedding` to
     // keep search/Ask honest. For a regular link the title is just metadata (the
     // embedding comes from the article), so we leave the vector untouched.
-    await updateDoc(linkRef, reembed ? { title, needsEmbedding: true } : { title });
+    // `updatedAt` feeds collectionSignature: a published collection page that
+    // shows this card is flagged stale when what it shows has changed.
+    await updateDoc(linkRef, { title, updatedAt: Date.now(), ...(reembed ? { needsEmbedding: true } : {}) });
 }
 
 /**
@@ -648,7 +650,7 @@ export async function updateLinkTitle(uid: string, id: string, title: string, re
  */
 export async function updateLinkSummary(uid: string, id: string, summary: string, reembed = false): Promise<void> {
     const linkRef = doc(db, 'users', uid, 'links', id);
-    await updateDoc(linkRef, reembed ? { summary, needsEmbedding: true } : { summary });
+    await updateDoc(linkRef, { summary, updatedAt: Date.now(), ...(reembed ? { needsEmbedding: true } : {}) });
 }
 
 /**

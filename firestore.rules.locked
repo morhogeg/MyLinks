@@ -47,9 +47,12 @@ service cloud.firestore {
     //   onboarded      AuthProvider (first-run flow done)
     //   privacyLock    lib/privacyLock (set / clear the PIN record)
     //   graphVersion   lib/rebuildConnections
+    //   dismissedSuggestions  lib/collectionSuggest dismissSuggestion
+    //                  (arrayUnion of declined suggestion keys, so a
+    //                  dismissal follows the user across devices)
     function clientWritableUserKeys() {
       return ['timezone', 'settings', 'aiConsentAt', 'pushPromptedAt',
-              'onboarded', 'privacyLock', 'graphVersion'];
+              'onboarded', 'privacyLock', 'graphVersion', 'dismissedSuggestions'];
     }
 
     // The TYPE each client-writable field must have when present. The key
@@ -67,7 +70,8 @@ service cloud.firestore {
         && (!('pushPromptedAt' in d) || d.pushPromptedAt is number)
         && (!('onboarded' in d) || d.onboarded is bool)
         && (!('privacyLock' in d) || d.privacyLock is map)
-        && (!('graphVersion' in d) || d.graphVersion is number);
+        && (!('graphVersion' in d) || d.graphVersion is number)
+        && (!('dismissedSuggestions' in d) || d.dismissedSuggestions is list);
     }
 
     // See the links rule. `resource.data.get()` (not a bare field read) so a

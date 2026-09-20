@@ -3,12 +3,20 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Collection, Link } from '@/lib/types';
 import { Check, Search, LayoutGrid } from 'lucide-react';
-import { addLinkToCollection, removeLinkFromCollection } from '@/lib/collections';
+import { addLinksToCollection, removeLinksFromCollection } from '@/lib/collections';
 import { useToast } from '@/components/Toast';
 import { useVisualViewport } from '@/lib/useVisualViewport';
 import { useScrollLock } from '@/lib/useScrollLock';
 import { useSheetDrag, useIsMobile } from '@/lib/useSheetDrag';
 import { hapticSelection } from '@/lib/haptics';
+
+/** "Added 3, removed 2" / "Added 1 card" / "Removed 2 cards". Callers skip it when both are 0. */
+function summarizeDiff(added: number, removed: number): string {
+    const noun = (n: number) => (n === 1 ? 'card' : 'cards');
+    if (added && removed) return `Added ${added}, removed ${removed}`;
+    if (added) return `Added ${added} ${noun(added)}`;
+    return `Removed ${removed} ${noun(removed)}`;
+}
 
 interface ManageCollectionCardsSheetProps {
     uid: string | null;
@@ -22,9 +30,10 @@ interface ManageCollectionCardsSheetProps {
  * Add or remove cards from a collection in one place. Lists every card with a
  * checkbox reflecting membership; toggles are STAGED locally (nothing is written
  * per tap) and applied in one batch when the sheet closes — so unchecking a card
- * doesn't make it vanish out from under you; you review, then save. A search box
- * filters the (potentially long) list. Members float to the top so what's
- * already in the collection is easy to review/remove.
+ * doesn't make it vanish out from under you. Every dismissal (Done, scrim, swipe,
+ * Escape) commits the diff, the way an iOS sheet does, and a toast summarizes
+ * what changed. A search box filters the (potentially long) list. Members float
+ * to the top so what's already in the collection is easy to review/remove.
  */
 export default function ManageCollectionCardsSheet({
     uid,
@@ -66,15 +75,21 @@ export default function ManageCollectionCardsSheet({
 
     // Apply the staged diff (fire-and-forget; the feed's onSnapshot reflects it)
     // then close. Every dismissal path routes through here so edits are never lost.
+    // The toast is the only confirmation the user gets that a swipe-away saved.
     const commitAndClose = () => {
         if (uid) {
             const toAdd = [...pending].filter((id) => !original.has(id));
             const toRemove = [...original].filter((id) => !pending.has(id));
             if (toAdd.length || toRemove.length) {
+                // Two batched sweeps, not one write per card: each per-card
+                // helper also bumps the collection doc, and thirty of those in
+                // parallel would contend on that one document.
                 Promise.all([
-                    ...toAdd.map((id) => addLinkToCollection(uid, id, collection.id)),
-                    ...toRemove.map((id) => removeLinkFromCollection(uid, id, collection.id)),
-                ]).catch(() => toast.error("Couldn't update the collection. Please try again."));
+                    addLinksToCollection(uid, toAdd, collection.id),
+                    removeLinksFromCollection(uid, toRemove, collection.id),
+                ])
+                    .then(() => toast.success(summarizeDiff(toAdd.length, toRemove.length)))
+                    .catch(() => toast.error("Couldn't update the collection. Please try again."));
             }
         }
         onClose();
@@ -112,8 +127,6 @@ export default function ManageCollectionCardsSheet({
 
     if (!isOpen) return null;
 
-    const dirty = pending.size !== original.size || [...pending].some((id) => !original.has(id));
-
     const toggle = (l: Link) => {
         hapticSelection();
         setPending((prev) => {
@@ -149,14 +162,19 @@ export default function ManageCollectionCardsSheet({
                         <LayoutGrid className="w-5 h-5 text-accent shrink-0" />
                         <div className="flex-1 min-w-0">
                             <h3 className="text-base font-bold text-text truncate">Manage cards</h3>
-                            <p className="text-xs text-text-muted truncate">{collection.name} · {pending.size} in collection</p>
+                            {/* No member count here: it would be computed from whatever
+                                slice of the library the parent passed, and a wrong number
+                                is worse than none. */}
+                            <p className="text-xs text-text-muted truncate">{collection.name}</p>
                         </div>
+                        {/* Always "Done": closing commits either way, so a "Save"
+                            label would imply a step that doesn't exist. */}
                         <button
                             onClick={commitAndClose}
-                            aria-label={dirty ? 'Save changes' : 'Done'}
+                            aria-label="Done"
                             className="px-4 h-9 rounded-full bg-accent text-accent-ink text-sm font-semibold hover:bg-accent-hover transition-colors"
                         >
-                            {dirty ? 'Save' : 'Done'}
+                            Done
                         </button>
                     </div>
                 </div>
@@ -164,12 +182,12 @@ export default function ManageCollectionCardsSheet({
                 {/* Search */}
                 <div className="px-4 py-3 border-b border-border-subtle">
                     <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+                        <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
                         <input
                             value={q}
                             onChange={(e) => setQ(e.target.value)}
                             placeholder="Search your cards…"
-                            className="w-full pl-9 pr-3 py-2 bg-background rounded-xl text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent/40"
+                            className="w-full ps-9 pe-3 py-2 bg-background rounded-xl text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent/40"
                         />
                     </div>
                 </div>
@@ -177,7 +195,9 @@ export default function ManageCollectionCardsSheet({
                 {/* Card list */}
                 <div className="flex-1 overflow-y-auto py-1">
                     {rows.length === 0 ? (
-                        <p className="px-5 py-8 text-center text-sm text-text-muted">No cards match “{q}”.</p>
+                        <p className="px-5 py-8 text-center text-sm text-text-muted">
+                            {q.trim() ? `No cards match “${q}”.` : 'No cards yet. Save something first.'}
+                        </p>
                     ) : rows.map((l) => {
                         const isMember = pending.has(l.id);
                         const thumb = l.metadata?.thumbnailUrl;

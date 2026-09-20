@@ -17,17 +17,21 @@ import { reportError } from '@/lib/errorReporter';
  * count/list + ShareCollectionSheet display and what publishCollection freezes —
  * always see the whole collection.
  *
- * No-ops (returns `[]`, opens no listener) when `collectionId` is null, so the
- * hook can sit unconditionally in a component whose collection selection is
- * optional.
+ * Returns `{ links, loading }`. `loading` is true from mount (or an id change)
+ * until the first snapshot for THAT id lands, so a caller can tell "no members
+ * yet" from "empty collection" and not flash an empty state or a zero count
+ * while the query is in flight. No-ops (`links: []`, `loading: false`, no
+ * listener) when `collectionId` (or `uid`) is null, so the hook can sit
+ * unconditionally in a component whose collection selection is optional.
  */
 export function useCollectionLinks(
     uid: string | null | undefined,
     collectionId: string | null | undefined,
-): Link[] {
+): { links: Link[]; loading: boolean } {
     // Tag the loaded set with the collection it belongs to, so we can return []
     // (rather than a previous collection's members) the instant the id changes,
-    // without a synchronous setState in the effect body.
+    // without a synchronous setState in the effect body. The same tag is the
+    // loading signal: a mismatch means this id's first snapshot has not landed.
     const [state, setState] = useState<{ id: string | null; links: Link[] }>({ id: null, links: [] });
 
     useEffect(() => {
@@ -42,5 +46,8 @@ export function useCollectionLinks(
         return () => unsubscribe();
     }, [uid, collectionId]);
 
-    return collectionId && state.id === collectionId ? state.links : [];
+    // No uid means no listener will ever open, so nothing is "loading".
+    if (!uid || !collectionId) return { links: [], loading: false };
+    const loaded = state.id === collectionId;
+    return { links: loaded ? state.links : [], loading: !loaded };
 }

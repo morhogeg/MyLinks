@@ -2708,6 +2708,16 @@ def search_links_http(req: https_fn.Request) -> https_fn.Response:
 
         meta = {}
         links = perform_hybrid_search(uid, query_text, limit, meta=meta)
+        # PRIVACY: same strip as Ask (1h above). The web client hides private
+        # cards from search itself, but this twin serves the native shell over
+        # plain HTTP and a PIN-locked client must not receive a private card's
+        # title and summary in a response body it never renders. Belt-and-
+        # braces fallback mirrors Ask: never serve un-stripped on a filter bug.
+        try:
+            links = strip_private_cards(links, private_collection_ids(uid))
+        except Exception as e:
+            logger.error(f"search_links_http privacy strip failed: {e}")
+            links = [c for c in links if c and not c.get("isPrivate")]
         return https_fn.Response(
             # `mode` names the path that served ("judge" | "gate") so an odd
             # result is diagnosable from the response alone.
@@ -4420,8 +4430,9 @@ def publish_share_http(req: https_fn.Request) -> https_fn.Response:
 
 @https_fn.on_request()
 def unpublish_share_http(req: https_fn.Request) -> https_fn.Response:
-    """Stop sharing a card/collection (delete the public snapshot + owner map).
-    Body: { type: 'card'|'collection', shareId: str, uid?: str }."""
+    """Stop sharing a card/collection/answer: delete the public snapshot and
+    tombstone the owner row (share_service._unpublish_share_logic).
+    Body: { type: 'card'|'collection'|'answer', shareId: str, uid?: str }."""
     if req.method == 'OPTIONS':
         return _cors_preflight(req)
     headers = _cors_headers(req)
@@ -4460,8 +4471,10 @@ def share_page(req: https_fn.Request) -> https_fn.Response:
     """
     html_headers = {
         "Content-Type": "text/html; charset=utf-8",
-        # Let CDNs/crawlers cache briefly; cards are immutable snapshots.
-        "Cache-Control": "public, max-age=300, s-maxage=600",
+        # Short cache on both browser and CDN: a snapshot is only immutable
+        # until the owner taps "Update share link" or "Stop sharing", and both
+        # must take effect within about a minute, not ten.
+        "Cache-Control": "public, max-age=60, s-maxage=60",
     }
     # Not-found must NEVER be CDN-cached: the share flow opens the OS share
     # sheet while the publish is still in flight, so a link-preview crawler can

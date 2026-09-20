@@ -471,7 +471,12 @@ def _share_html_shell(*, title: str, description: str, image: str, url: str, bod
 
     Declare og:image dimensions/type whenever known — WhatsApp in particular
     often renders NO preview on the first share of a page whose image carries
-    no declared size."""
+    no declared size.
+
+    `noindex` on every share page: a share link is meant for the people it was
+    sent to. Link previews still work (crawlers read the og tags regardless),
+    but a search engine must not turn someone's saved cards into a public
+    search result they never asked for."""
     t, d = _esc(title), _esc(description)
     img, u = _esc(image), _esc(url)
     img_meta = ""
@@ -487,6 +492,7 @@ def _share_html_shell(*, title: str, description: str, image: str, url: str, bod
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>{t} · Machina</title>
 <meta name="description" content="{d}">
+<meta name="robots" content="noindex">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="Machina">
 <meta property="og:title" content="{t}">
@@ -940,8 +946,11 @@ _SHARE_COLLECTIONS = {
 # A share id is a client-minted UUID (hex, dashes stripped or not). It becomes
 # a Firestore DOCUMENT id, so it must be one path segment: a `/` would nest
 # the write under a path no rule covers, and an odd segment count raised a
-# ValueError whose text was echoed back to the client.
-_SHARE_ID_RE = re.compile(r"[A-Za-z0-9_-]{1,128}")
+# ValueError whose text was echoed back to the client. The 20-char floor keeps
+# the id space unguessable: the client mints 32 hex chars (newShareId), and a
+# hand-rolled request must not be able to publish at /c?id=abc and squat on
+# short, typeable URLs.
+_SHARE_ID_RE = re.compile(r"[A-Za-z0-9_-]{20,128}")
 
 
 def _valid_share_id(share_id) -> bool:
@@ -1017,15 +1026,33 @@ def _clip_str(value, limit: int) -> str:
     return str(value).strip()[:limit] if isinstance(value, (str, int, float)) and not isinstance(value, bool) else ""
 
 
-def _sanitize_card_snapshot(card) -> dict:
-    """The allowlisted, clipped shape of one card inside a public snapshot."""
+# What a member card of a PUBLIC COLLECTION may carry. `_render_collection_item`
+# shows thumbnail, source kicker, linked title and the short summary, nothing
+# else, so the long-form body and the tags would only sit in a world-readable
+# doc for no reader. Sharing a collection must not publish more of a card than
+# its page shows; the single-card page (/s) keeps the full shape.
+_COLLECTION_ITEM_KEYS = (
+    "title", "summary", "url", "thumbnailUrl", "sourceName", "sourceType",
+    "sourcePlatform", "sourceHandle", "category",
+)
+
+
+def _sanitize_card_snapshot(card, collection_item: bool = False) -> dict:
+    """The allowlisted, clipped shape of one card inside a public snapshot.
+
+    `collection_item` narrows it to `_COLLECTION_ITEM_KEYS`: no detailedSummary,
+    tags, metadata, language or timestamps for a card inside a collection."""
     if not isinstance(card, dict):
         return {}
     out = {}
     for key, limit in _CARD_STRING_KEYS.items():
+        if collection_item and key not in _COLLECTION_ITEM_KEYS:
+            continue
         v = _clip_str(card.get(key), limit)
         if v:
             out[key] = v
+    if collection_item:
+        return out
     raw_tags = card.get("tags")
     if isinstance(raw_tags, list):
         tags = [_clip_str(t, _CARD_MAX_TAG) for t in raw_tags[:_CARD_MAX_TAGS]]
@@ -1064,7 +1091,7 @@ def _sanitize_collection_share_payload(payload: dict) -> dict:
     cards = []
     if isinstance(raw_cards, list):
         for c in raw_cards[:_COLLECTION_MAX_CARDS]:
-            clean = _sanitize_card_snapshot(c)
+            clean = _sanitize_card_snapshot(c, collection_item=True)
             if clean:
                 cards.append(clean)
     out["cards"] = cards
@@ -1087,7 +1114,10 @@ def _share_owner_uid(db, share_id: str, public_coll: str) -> Optional[str]:
 def _publish_share_logic(uid: str, share_type: str, share_id: str, payload: dict) -> dict:
     """Write a public share snapshot for `uid` WITHOUT `ownerUid`, plus the
     functions-only owner mapping. Rejects overwriting a share id owned by someone
-    else (the server-side equivalent of the rules' anti-takeover guard)."""
+    else (the server-side equivalent of the rules' anti-takeover guard). The
+    owner check also reads unpublish TOMBSTONES (see _unpublish_share_logic),
+    so a stopped share's id stays the original owner's: they can republish over
+    it, nobody else can."""
     public_coll = _SHARE_COLLECTIONS.get(share_type)
     if not public_coll:
         raise ValueError("invalid share type")
@@ -1137,7 +1167,18 @@ def _publish_share_logic(uid: str, share_type: str, share_id: str, payload: dict
 
 
 def _unpublish_share_logic(uid: str, share_type: str, share_id: str) -> dict:
-    """Delete a public share + its owner mapping, if `uid` owns it."""
+    """Delete a public share, if `uid` owns it, and TOMBSTONE its owner row.
+
+    The public doc goes (share_page 404s from then on), but the
+    `shared_owners` row stays with `unpublishedAt` stamped. A share URL that
+    has circulated keeps naming this id forever; if the row were deleted the
+    id would be unclaimed, and any other account could publish its own page
+    under it and every old copy of the link would start pointing there. The
+    tombstone keeps `ownerUid`, so the publish owner check refuses everyone
+    but the original owner, who can still republish over it (that is how
+    "Update share link" and re-sharing after Stop sharing work).
+    delete_shares_for_owner sweeps tombstones with the live rows.
+    """
     public_coll = _SHARE_COLLECTIONS.get(share_type)
     if not public_coll:
         raise ValueError("invalid share type")
@@ -1149,7 +1190,12 @@ def _unpublish_share_logic(uid: str, share_type: str, share_id: str) -> dict:
     if owner is not None and owner != uid:
         raise PermissionError("This share id belongs to another account")
 
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     db.collection(public_coll).document(share_id).delete()
-    db.collection("shared_owners").document(share_id).delete()
+    # merge=True: a legacy share (owner only on the public doc, no owner row)
+    # gets a row now; an existing row keeps publishedAt and everything else.
+    db.collection("shared_owners").document(share_id).set({
+        "ownerUid": owner or uid, "type": share_type, "unpublishedAt": now_ms,
+    }, merge=True)
     _delete_share_previews(share_id)
     return {"success": True}

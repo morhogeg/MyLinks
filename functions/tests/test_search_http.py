@@ -132,3 +132,40 @@ def test_warmup_false_is_a_normal_request(monkeypatch):
     # here that means the empty-query rejection, not a 204.
     resp = main.search_links_http(_Req(json_body={"warmup": False, "query": "  ", "uid": "u"}))
     assert resp.status == 400
+
+
+# ── Privacy strip ───────────────────────────────────────────────────────────
+# The twin serves the native shell over plain HTTP, so a PIN-locked client must
+# never receive a private card in the response body. Same strip as Ask.
+
+def test_private_cards_are_stripped_from_the_response(monkeypatch):
+    def fake_search(uid, query_text, limit, meta=None):
+        return [
+            {"id": "pub", "title": "Public"},
+            {"id": "flag", "title": "Own flag", "isPrivate": True},
+            {"id": "member", "title": "In a private collection", "collectionIds": ["vault"]},
+            {"id": "other", "title": "In a public collection", "collectionIds": ["open"]},
+        ]
+
+    monkeypatch.setattr(main, "perform_hybrid_search", fake_search)
+    monkeypatch.setattr(main, "private_collection_ids", lambda uid: {"vault"})
+
+    resp = main.search_links_http(_Req(json_body={"query": "dogs", "uid": "user1"}))
+    assert resp.status == 200
+    assert [c["id"] for c in json.loads(resp.body)["links"]] == ["pub", "other"]
+
+
+def test_strip_failure_still_drops_flagged_cards(monkeypatch):
+    # A bug in the collection lookup must degrade to the card-level flag, never
+    # to serving everything.
+    def fake_search(uid, query_text, limit, meta=None):
+        return [{"id": "pub", "title": "Public"}, {"id": "flag", "isPrivate": True}]
+
+    def boom(uid):
+        raise RuntimeError("firestore down")
+
+    monkeypatch.setattr(main, "perform_hybrid_search", fake_search)
+    monkeypatch.setattr(main, "private_collection_ids", boom)
+
+    resp = main.search_links_http(_Req(json_body={"query": "dogs", "uid": "user1"}))
+    assert [c["id"] for c in json.loads(resp.body)["links"]] == ["pub"]

@@ -7,19 +7,27 @@ import {
 } from 'lucide-react';
 import { getColorStyleByKey } from '@/lib/colors';
 import { publishCollection, unpublishCollection, isShareStale } from '@/lib/collections';
-import { shareLink, shareUrlFor, openExternal } from '@/lib/share';
+import { shareLink, shareUrlFor, openExternal, copyToClipboard } from '@/lib/share';
 import { useToast } from '@/components/Toast';
 import { useVisualViewport } from '@/lib/useVisualViewport';
 import { track } from '@/lib/analytics';
 import { useScrollLock } from '@/lib/useScrollLock';
 import { useSheetDrag, useIsMobile } from '@/lib/useSheetDrag';
 
+/** Server-side cap on the number of cards a published snapshot carries. */
+const SHARE_CARD_CAP = 200;
+
 interface ShareCollectionSheetProps {
     uid: string | null;
     /** The live collection doc (from the feed's onSnapshot). */
     collection: Collection;
-    /** The collection's current member cards — what a (re)publish would snapshot. */
+    /** The collection's current member cards — what a (re)publish would snapshot.
+     *  Already filtered to non-private cards; see `excludedPrivateCount`. */
     memberLinks: Link[];
+    /** Member cards that are private (in a vaulted collection) and therefore
+     *  never make it onto the public page. Shown so the count on the sheet and
+     *  the count on the page never silently disagree. */
+    excludedPrivateCount: number;
     isOpen: boolean;
     onClose: () => void;
 }
@@ -38,6 +46,7 @@ export default function ShareCollectionSheet({
     uid,
     collection,
     memberLinks,
+    excludedPrivateCount,
     isOpen,
     onClose,
 }: ShareCollectionSheetProps) {
@@ -77,6 +86,13 @@ export default function ShareCollectionSheet({
     if (!isOpen) return null;
 
     const count = memberLinks.length;
+    // The publish endpoint snapshots at most this many cards; anything past it
+    // is silently dropped server-side, so say so here instead of surprising the
+    // user on the public page.
+    const capped = count > SHARE_CARD_CAP;
+    const excludedLine = excludedPrivateCount > 0
+        ? `${excludedPrivateCount} private ${excludedPrivateCount === 1 ? 'card is' : 'cards are'} left out.`
+        : null;
 
     const doPublish = async () => {
         if (!uid || busy) return;
@@ -97,7 +113,9 @@ export default function ShareCollectionSheet({
         setBusy('unpublish');
         try {
             await unpublishCollection(uid, collection);
-            toast.success('Sharing turned off. The public page is gone');
+            // The page is served from a snapshot with edge caching, so "gone"
+            // is only true once that cache expires.
+            toast.success('Sharing turned off. The link stops working within a minute.');
         } catch {
             toast.error("Couldn't stop sharing. Please try again.");
         } finally {
@@ -107,11 +125,12 @@ export default function ShareCollectionSheet({
 
     const doCopy = async () => {
         if (!url) return;
-        try {
-            await navigator.clipboard.writeText(url);
+        // copyToClipboard falls back to execCommand inside WKWebView, where the
+        // async Clipboard API is often missing or rejects.
+        if (await copyToClipboard(url)) {
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
-        } catch {
+        } else {
             toast.error("Couldn't copy the link.");
         }
     };
@@ -147,12 +166,15 @@ export default function ShareCollectionSheet({
                     <div className="flex items-center gap-3 px-5 pt-3 pb-4 border-b border-border-subtle">
                         <Share2 className="w-5 h-5 text-accent shrink-0" />
                         <h3 className="flex-1 text-lg font-bold text-text truncate">Share collection</h3>
+                        {/* 44px hit target with the 32px visible circle nested inside. */}
                         <button
                             onClick={onClose}
                             aria-label="Close"
-                            className="p-1.5 rounded-full text-text-muted hover:text-text hover:bg-fill-subtle transition-colors"
+                            className="group/close -me-1.5 w-11 h-11 flex items-center justify-center text-text-muted hover:text-text transition-colors"
                         >
-                            <X className="w-5 h-5" />
+                            <span className="flex items-center justify-center w-8 h-8 rounded-full group-hover/close:bg-fill-subtle transition-colors">
+                                <X className="w-5 h-5" />
+                            </span>
                         </button>
                     </div>
                 </div>
@@ -181,14 +203,21 @@ export default function ShareCollectionSheet({
                                 {collection.description ? ` · ${collection.description}` : ''}
                             </span>
                         </div>
+                        {(excludedLine || capped) && (
+                            <div className="px-3.5 pb-2.5 -mt-1 space-y-0.5 text-xs text-text-muted">
+                                {excludedLine && <p>{excludedLine}</p>}
+                                {capped && <p>Only the first {SHARE_CARD_CAP} cards are included.</p>}
+                            </div>
+                        )}
                     </div>
 
                     {!isPublic ? (
                         <>
                             <p className="text-sm text-text-muted leading-relaxed">
                                 Sharing creates a page with a snapshot of these {count === 1 ? 'card' : `${count} cards`}:
-                                titles, summaries, and sources. Anyone with the link can view it; nothing
+                                titles, summaries, sources and thumbnails. Anyone with the link can view it; nothing
                                 identifies you, and your library stays private.
+                                {excludedLine ? ` ${excludedLine}` : ''}
                             </p>
                             <button
                                 onClick={doPublish}
@@ -241,7 +270,7 @@ export default function ShareCollectionSheet({
                                         disabled={busy !== null}
                                         className="shrink-0 px-3 h-8 rounded-lg bg-amber-500 text-white text-xs font-bold hover:bg-amber-600 transition-colors disabled:opacity-40"
                                     >
-                                        {busy === 'publish' ? 'Updating…' : 'Update share link'}
+                                        {busy === 'publish' ? 'Updating…' : 'Update page'}
                                     </button>
                                 </div>
                             )}
