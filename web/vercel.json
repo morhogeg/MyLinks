@@ -79,6 +79,10 @@
       "destination": "https://secondbrain-app-94da2.web.app/api/unpublish-share"
     },
     {
+      "source": "/api/delete-collection",
+      "destination": "https://secondbrain-app-94da2.web.app/api/delete-collection"
+    },
+    {
       "source": "/api/client-error",
       "destination": "https://secondbrain-app-94da2.web.app/api/client-error"
     },

@@ -74,6 +74,10 @@
         "function": "unpublish_share_http"
       },
       {
+        "source": "/api/delete-collection",
+        "function": "delete_collection_http"
+      },
+      {
         "source": "/api/register-device-token",
         "function": "register_device_token_http"
       },

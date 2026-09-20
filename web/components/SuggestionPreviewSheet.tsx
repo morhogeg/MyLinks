@@ -123,12 +123,16 @@ export default function SuggestionPreviewSheet({
                                 {suggestion.name}
                             </p>
                         </div>
+                        {/* 44px hit target; the visible 36px circle is nested so the
+                            header looks exactly as before. */}
                         <button
                             onClick={onClose}
                             aria-label="Close"
-                            className="p-2 -me-2 rounded-full text-text-muted hover:text-text hover:bg-fill-subtle transition-colors"
+                            className="group/close -me-3 w-11 h-11 flex items-center justify-center text-text-muted hover:text-text transition-colors"
                         >
-                            <X className="w-5 h-5" />
+                            <span className="flex items-center justify-center w-9 h-9 rounded-full group-hover/close:bg-fill-subtle transition-colors">
+                                <X className="w-5 h-5" />
+                            </span>
                         </button>
                     </div>
                 </div>
@@ -172,12 +176,16 @@ export default function SuggestionPreviewSheet({
                                         <SourceByline link={link} />
                                     </div>
                                 </div>
+                                {/* 44px hit target (negative end margin keeps the glyph
+                                    where the 32px button used to sit). */}
                                 <button
                                     onClick={(e) => { e.stopPropagation(); remove(link.id); }}
                                     aria-label={`Remove ${link.title} from this suggestion`}
-                                    className="shrink-0 flex items-center justify-center w-8 h-8 rounded-full text-text-muted hover:text-text hover:bg-card active:bg-fill-strong transition-colors"
+                                    className="group/remove shrink-0 -me-1.5 flex items-center justify-center w-11 h-11 text-text-muted hover:text-text transition-colors"
                                 >
-                                    <X className="w-4 h-4" />
+                                    <span className="flex items-center justify-center w-8 h-8 rounded-full group-hover/remove:bg-card group-active/remove:bg-fill-strong transition-colors">
+                                        <X className="w-4 h-4" />
+                                    </span>
                                 </button>
                             </div>
                         );

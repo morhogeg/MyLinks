@@ -69,7 +69,7 @@ import { reportError } from '@/lib/errorReporter';
 import PushNudge from './PushNudge';
 import { deleteCollection, createCollection, addLinksToCollection, isShareStale, updateCollection, unpublishCollection, batchedUpdate } from '@/lib/collections';
 import { useCollectionLinks } from '@/lib/useCollectionLinks';
-import { suggestNewCollections, dismissSuggestion, type CollectionSuggestion } from '@/lib/collectionSuggest';
+import { suggestNewCollections, dismissSuggestion, getDismissedSuggestions, loadDismissedSuggestions, type CollectionSuggestion } from '@/lib/collectionSuggest';
 import ShareCollectionSheet from './ShareCollectionSheet';
 import PinLockModal from './PinLockModal';
 import { usePrivacyLock, relock } from '@/lib/privacyLock';
@@ -382,6 +382,17 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     const [previewSuggestion, setPreviewSuggestion] = useState<CollectionSuggestion | null>(null);
     // Bumped when a suggestion is dismissed so the memo below re-reads localStorage.
     const [suggestionTick, setSuggestionTick] = useState(0);
+    // Dismissals synced from the user's account, so a suggestion waved away on
+    // one device stays away on the next. Merged with the localStorage cache.
+    const [syncedDismissals, setSyncedDismissals] = useState<Set<string>>(() => new Set());
+    useEffect(() => {
+        if (!uid) return;
+        let cancelled = false;
+        loadDismissedSuggestions(uid)
+            .then((keys) => { if (!cancelled) setSyncedDismissals(keys); })
+            .catch((e: unknown) => reportError(e, 'loadDismissedSuggestions'));
+        return () => { cancelled = true; };
+    }, [uid]);
 
     // Weekly syntheses (M12), newest first — [0] is the in-app "What you
     // learned" feed card; the whole run is the Digest section's archive.
@@ -1053,6 +1064,35 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // Ask → the graph it came from. `graphRestore` was set at the hand-off and
     // deliberately survives the detour, so the graph reopens on the same focus.
     const handleBackToGraph = useCallback(() => setViewMode('graph'), []);
+    // A collection's "Ask about this": same pre-sent hand-off as the graph
+    // cluster (exact ids, exclusive grounding) but no graph restore payload,
+    // and leaving Ask lands back on the collection, not the graph or home.
+    // `askReturnTo` is the one-shot return address for that exit.
+    const [askReturnTo, setAskReturnTo] = useState<'collection' | null>(null);
+    const handleAskCollection = useCallback((col: Collection, members: Link[]) => {
+        if (!members.length) return;
+        const name = col.name.replace(/["“”«»]/g, '').trim();
+        const question = `What do my saves in “${name}” cover?`;
+        setGraphAsk((prev) => ({
+            question,
+            hints: {
+                anchorTitles: members.slice(0, 8).map((m) => m.title),
+                anchorIds: members.slice(0, 20).map((m) => m.id),
+                exclusive: true,
+            },
+            nonce: (prev?.nonce ?? 0) + 1,
+        }));
+        setAskFromGraph(false);
+        setAskReturnTo('collection');
+        setViewMode('ask');
+    }, []);
+    // Leaving Ask: back to the collection that opened it when there is one
+    // (and it still exists), otherwise to the last library layout as before.
+    const handleAskExit = useCallback(() => {
+        const toCollection = askReturnTo === 'collection' && openCollectionId !== null;
+        setAskReturnTo(null);
+        setViewMode(toCollection ? 'collection' : lastLayout.current);
+    }, [askReturnTo, openCollectionId]);
     // An answer's "Graph" chip: open the Graph focused on the chat's origin
     // cluster (graph-born chats) or the cited card's neighborhood. The chat id
     // rides along so the graph can offer a way BACK into that conversation —
@@ -1336,7 +1376,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         try {
             await updateDoc(doc(db, 'users', uid, 'links', link.id), { isPrivate });
             toast.success(isPrivate
-                ? 'Moved to Private. Find it under Show → Private'
+                ? 'Moved to Private. Find it in the Private view'
                 : 'Removed from Private');
         } catch {
             toast.error("Couldn't update the card. Please try again.");
@@ -1356,7 +1396,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         if (!uid) return;
         const next = !link.hideThumbnail;
         try {
-            await updateDoc(doc(db, 'users', uid, 'links', link.id), { hideThumbnail: next });
+            await updateDoc(doc(db, 'users', uid, 'links', link.id), { hideThumbnail: next, updatedAt: Date.now() });
         } catch {
             toast.error("Couldn't update the card. Please try again.");
         }
@@ -1379,12 +1419,18 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     const collectionSuggestions = useMemo(
         // Effectively-private cards never seed suggestions — a suggested cluster
         // must not surface a hidden card's title in the gallery.
+        // Dismissed = the localStorage cache (this device) plus what the account
+        // has synced (other devices); either alone is enough to hide a cluster.
         () => (viewMode === 'collections'
-            ? suggestNewCollections(visibleLinks.filter((l) => !isEffectivelyPrivateCard(l)), collections)
+            ? suggestNewCollections(
+                visibleLinks.filter((l) => !isEffectivelyPrivateCard(l)),
+                collections,
+                new Set([...getDismissedSuggestions(), ...syncedDismissals]),
+            )
             : []),
         // suggestionTick re-reads the localStorage dismissal list after a dismiss.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [viewMode, visibleLinks, collections, suggestionTick]
+        [viewMode, visibleLinks, collections, suggestionTick, syncedDismissals]
     );
 
     const handleCreateSuggestion = async (s: CollectionSuggestion, linkIds: string[] = s.linkIds) => {
@@ -1405,7 +1451,13 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
 
     const handleDismissSuggestion = (s: CollectionSuggestion) => {
         setPreviewSuggestion(null);
-        dismissSuggestion(s.key);
+        // Hide it right away from local state; the account write (which also
+        // refreshes the localStorage cache) may finish later or fail quietly.
+        setSyncedDismissals((prev) => new Set(prev).add(s.key));
+        if (uid) {
+            Promise.resolve(dismissSuggestion(uid, s.key))
+                .catch((e: unknown) => reportError(e, 'dismissSuggestion'));
+        }
         setSuggestionTick(t => t + 1);
     };
 
@@ -1429,7 +1481,12 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                 return next;
             });
         } catch {
-            toast.error("Couldn't delete the collection. Please try again.");
+            // deleteCollection unpublishes first and THROWS if that fails, so a
+            // shared collection that lands here still has its public page up.
+            // Say so: the user thinks they just took it down.
+            toast.error(col.isPublic
+                ? "Couldn't delete the collection. Its public page is still up. Try again."
+                : "Couldn't delete the collection. Please try again.");
         }
     };
 
@@ -1599,7 +1656,21 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
 
     const selectTab = (tab: BottomTab) => {
         if (tab === activeTab && tab === 'home') { window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
-        if (tab === 'home') setViewMode(lastLayout.current);
+        if (tab === 'home') {
+            // Home is the whole library. An open collection scoped the feed to
+            // itself (openCollection sets selectedCollections); drop that scope
+            // here so Home doesn't silently inherit it. A collection filter the
+            // user picked deliberately (no collection open) is left alone, so
+            // its "Collection:" banner survives the tab switch. Leaving a
+            // private collection relocks, as closeCollectionToGallery does.
+            if (openCollectionId) {
+                const col = collections.find((c) => c.id === openCollectionId);
+                if (col?.isPrivate) relock();
+                setSelectedCollections(new Set());
+                setOpenCollectionId(null);
+            }
+            setViewMode(lastLayout.current);
+        }
         else if (tab === 'collections') { setSelectedCollections(new Set()); setOpenCollectionId(null); setViewMode('collections'); }
         else if (tab === 'ask') {
             // The tab bar is Ask's BLANK-SLATE entrance (owner call): clear
@@ -1611,6 +1682,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
             setGraphRestore(null);
             setAskOpenChat(null);
             setAskFromGraph(false);
+            setAskReturnTo(null);
             setViewMode('ask');
         }
         else setViewMode('digest');
@@ -1752,9 +1824,45 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // detail view's list/count nor a published snapshot is ever truncated by the
     // windowed feed (report 3.15 follow-up). One for the open collection, one for
     // whichever collection the Share sheet targets (they can differ — Share is
-    // reachable from the gallery without opening the detail).
-    const openCollectionMembers = useCollectionLinks(uid, openCollectionId);
-    const shareCollectionMembers = useCollectionLinks(uid, shareCollection?.id ?? null);
+    // reachable from the gallery without opening the detail), and one for the
+    // collection Manage cards is editing (also reachable from the gallery and
+    // the Collection: banner, so it too may differ from the open one).
+    const { links: openCollectionMembers, loading: openCollectionLoading } = useCollectionLinks(uid, openCollectionId);
+    const { links: shareCollectionMembers } = useCollectionLinks(uid, shareCollection?.id ?? null);
+    const { links: manageCollectionMembers } = useCollectionLinks(uid, manageCardsCollection?.id ?? null);
+
+    // What a public page may contain: the complete member set minus pending
+    // cards and minus every effectively-private card. Privacy here does NOT
+    // depend on the vault being unlocked (unlike the detail grid, which only
+    // hides while locked): a card in a private collection must never be
+    // published, whatever the vault state. The stale check below uses this
+    // same set so its signature matches what publishCollection freezes.
+    const publishableMembers = useCallback(
+        (members: Link[]) => members.filter((l) => !isPending(l) && !isEffectivelyPrivateCard(l)),
+        [isEffectivelyPrivateCard]
+    );
+    const shareableMembers = useMemo(() => publishableMembers(shareCollectionMembers), [shareCollectionMembers, publishableMembers]);
+    // Non-pending members the privacy filter removed, so the Share sheet can say
+    // how many cards the public page leaves out.
+    const shareExcludedPrivateCount = useMemo(
+        () => shareCollectionMembers.filter((l) => !isPending(l)).length - shareableMembers.length,
+        [shareCollectionMembers, shareableMembers]
+    );
+
+    // Manage cards must see the WHOLE collection, not just the windowed feed:
+    // otherwise an old member outside the window can't be unticked (and looks
+    // absent). Union of the collection's complete members with the visible
+    // library, deduped by id, feed docs winning (they are the live window).
+    // Effectively-private cards stay out while the vault is locked, same as
+    // everywhere else.
+    const manageCardsLinks = useMemo(() => {
+        if (!manageCardsCollection) return visibleLinks;
+        const seen = new Set(visibleLinks.map((l) => l.id));
+        const extra = manageCollectionMembers.filter(
+            (l) => !seen.has(l.id) && (!vaultLocked || !isEffectivelyPrivateCard(l))
+        );
+        return extra.length ? [...visibleLinks, ...extra] : visibleLinks;
+    }, [manageCardsCollection, visibleLinks, manageCollectionMembers, vaultLocked, isEffectivelyPrivateCard]);
 
     // One collection opened as its own place (Task A): a real header (name,
     // description, count, share status + actions) over the normal card grid.
@@ -1768,7 +1876,15 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
             .filter((l) => !isPending(l) && (!vaultLocked || !isEffectivelyPrivateCard(l)))
             .sort((a, b) => getTimestampNumber(b.createdAt) - getTimestampNumber(a.createdAt));
         const count = members.length;
-        const stale = isShareStale(openCol, members.map((m) => ({ id: m.id })));
+        // Stale is judged against what a public page would actually hold (never
+        // a private card), so an unlocked vault can't make a fresh share read
+        // "Update link" — or hide that it needs one.
+        const publishable = publishableMembers(openCollectionMembers);
+        const stale = isShareStale(openCol, publishable);
+        // "Ask about this" grounds Ask in exactly the cards the grid shows (so
+        // while locked no hidden card's title rides into the question). Ask
+        // may see vault cards while unlocked, same as its normal context.
+        const canAsk = members.length > 0 && !(openCol.isPrivate && vaultLocked);
         const colStyle = getColorStyleByKey(openCol.color || openCol.name);
         const nameDir = getDirection(openCol.name);
         return (
@@ -1782,10 +1898,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                     <div className="flex items-center gap-2.5" dir={nameDir}>
                         <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: colStyle.color }} />
                         <h1 className={`min-w-0 truncate text-[22px] sm:text-[26px] font-extrabold tracking-tight text-text ${nameDir === 'rtl' ? 'font-hebrew' : ''}`}>{openCol.name}</h1>
-                        <span className="shrink-0 whitespace-nowrap text-[13px] sm:text-[14px] font-medium text-text-muted tabular-nums" dir="ltr">· {count} {count === 1 ? 'card' : 'cards'}</span>
+                        {/* No count until the member subscription has answered, so
+                            a big collection never flashes "0 cards" on open. */}
+                        {!openCollectionLoading && (
+                            <span className="shrink-0 whitespace-nowrap text-[13px] sm:text-[14px] font-medium text-text-muted tabular-nums" dir="ltr">· {count} {count === 1 ? 'card' : 'cards'}</span>
+                        )}
                         {openCol.isPublic && (
                             <span className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide ${stale ? 'bg-amber-500/15 text-amber-600' : 'bg-accent/10 text-accent'}`}>
-                                <Globe className="w-3 h-3" /> {stale ? 'Update link' : 'Shared'}
+                                <Globe className="w-3 h-3" /> {stale ? 'Update page' : 'Shared'}
                             </span>
                         )}
                     </div>
@@ -1809,6 +1929,16 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                 <span>{openCol.isPublic ? 'Shared' : 'Share'}</span>
                             </button>
                         )}
+                        {/* Ask Machina about exactly these cards — the graph's
+                            "Ask about this" cluster path, seeded from the collection. */}
+                        {canAsk && (
+                            <button
+                                onClick={() => handleAskCollection(openCol, members)}
+                                className={`${ctrlBase} px-3.5 ${ctrlIdle} hover:text-accent hover:border-accent/40`}
+                            >
+                                <MessagesSquare className="w-4 h-4" /><span>Ask about this</span>
+                            </button>
+                        )}
                         <OverflowMenu
                             ariaLabel="Collection actions"
                             items={[
@@ -1819,8 +1949,10 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                     </div>
                 </div>
 
-                {/* Cards — the complete member set for this collection. */}
-                {members.length === 0 ? (
+                {/* Cards — the complete member set for this collection. Until
+                    the subscription answers, show nothing rather than the empty
+                    state: "Nothing here yet" on a full collection is a lie. */}
+                {openCollectionLoading ? null : members.length === 0 ? (
                     <div className="text-center py-16">
                         <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-accent/10 flex items-center justify-center">
                             <Layers className="w-7 h-7 text-accent" />
@@ -1929,7 +2061,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             <button
                                 onClick={openNewCollectionForm}
                                 aria-label="New collection"
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-text-muted text-xs font-medium hover:text-text active:bg-card-hover transition-colors cursor-pointer"
+                                className="inline-flex items-center gap-1.5 px-3 h-9 rounded-full text-text-muted text-xs font-medium hover:text-text active:bg-card-hover transition-colors cursor-pointer"
                             >
                                 <Plus className="w-3.5 h-3.5" />
                                 New
@@ -2780,7 +2912,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             uid={uid}
                             totalLinks={visibleLinks.length}
                             onOpenLink={(id) => setActiveLinkId(id)}
-                            onExit={() => setViewMode(lastLayout.current)}
+                            onExit={handleAskExit}
                             // A cited-card modal (or any Feed sheet/dialog) open over
                             // Ask owns the edge-swipe; Ask stands down so one swipe
                             // pops only the modal, back to the chat — not out to home.
@@ -3062,7 +3194,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                         <button
                             onClick={openNewCollectionForm}
                             aria-label="New collection"
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-text-muted text-xs font-medium hover:text-text active:bg-card-hover transition-colors cursor-pointer"
+                            className="inline-flex items-center gap-1.5 px-3 h-9 rounded-full text-text-muted text-xs font-medium hover:text-text active:bg-card-hover transition-colors cursor-pointer"
                         >
                             <Plus className="w-3.5 h-3.5" />
                             New
@@ -3210,17 +3342,25 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                     link={links.find(l => l.id === addToCollectionLink.id) ?? addToCollectionLink}
                     collections={collections}
                     links={visibleLinks}
+                    // Vault gating: adding to a private collection while locked
+                    // goes through the same PIN prompt as opening one.
+                    privateCollectionIds={privateCollectionIds}
+                    lockedIds={vaultLocked ? privateCollectionIds : undefined}
+                    onRequestUnlock={(then) => setUnlockPrompt(() => then)}
                     isOpen={!!addToCollectionLink}
                     onClose={() => setAddToCollectionLink(null)}
                 />
             )}
 
-            {/* Share collection — preview, publish/update, copy link, stop sharing. */}
+            {/* Share collection — preview, publish/update, copy link, stop sharing.
+                Gets only the publishable members (never a private card, locked or
+                not) plus how many the privacy filter left out. */}
             {shareCollection && (
                 <ShareCollectionSheet
                     uid={uid}
                     collection={collections.find(c => c.id === shareCollection.id) ?? shareCollection}
-                    memberLinks={shareCollectionMembers}
+                    memberLinks={shareableMembers}
+                    excludedPrivateCount={shareExcludedPrivateCount}
                     isOpen={!!shareCollection}
                     onClose={() => setShareCollection(null)}
                 />
@@ -3239,7 +3379,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                 <ManageCollectionCardsSheet
                     uid={uid}
                     collection={collections.find(c => c.id === manageCardsCollection.id) ?? manageCardsCollection}
-                    links={visibleLinks}
+                    links={manageCardsLinks}
                     isOpen={!!manageCardsCollection}
                     onClose={() => setManageCardsCollection(null)}
                 />

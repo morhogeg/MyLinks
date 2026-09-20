@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Collection, Link } from '@/lib/types';
-import { Check, X, Layers, FolderPlus } from 'lucide-react';
+import { Check, X, Layers, FolderPlus, Lock } from 'lucide-react';
 import { CitationGlyph } from '@/components/ui/Wordmark';
 import { getColorStyleByKey } from '@/lib/colors';
 import {
@@ -15,6 +15,8 @@ import { useToast } from '@/components/Toast';
 import { useVisualViewport } from '@/lib/useVisualViewport';
 import { useScrollLock } from '@/lib/useScrollLock';
 import { useSheetDrag, useIsMobile } from '@/lib/useSheetDrag';
+import { getDirection } from '@/lib/rtl';
+import { hapticSelection } from '@/lib/haptics';
 
 interface AddToCollectionSheetProps {
     uid: string | null;
@@ -22,6 +24,14 @@ interface AddToCollectionSheetProps {
     collections: Collection[];
     /** The full feed — used to rank collections by topical affinity with the card. */
     links?: Link[];
+    /** Ids of private collections: rows get a lock glyph, and adding to one
+     *  warns that the card itself becomes private. */
+    privateCollectionIds?: Set<string>;
+    /** Private collections whose vault is currently locked. Toggling one goes
+     *  through `onRequestUnlock` first so the PIN pad appears before any write. */
+    lockedIds?: Set<string>;
+    /** Parent-owned PIN gate: show the pad, then run `then` once unlocked. */
+    onRequestUnlock?: (then: () => void) => void;
     isOpen: boolean;
     onClose: () => void;
 }
@@ -42,6 +52,9 @@ export default function AddToCollectionSheet({
     link,
     collections,
     links = [],
+    privateCollectionIds,
+    lockedIds,
+    onRequestUnlock,
     isOpen,
     onClose,
 }: AddToCollectionSheetProps) {
@@ -100,16 +113,31 @@ export default function AddToCollectionSheet({
 
     const toggle = async (c: Collection) => {
         if (!uid) return;
+        hapticSelection();
         try {
             if (memberIds.has(c.id)) {
                 await removeLinkFromCollection(uid, link.id, c.id);
             } else {
                 await addLinkToCollection(uid, link.id, c.id);
-                toast.success(`Added to ${c.name}`);
+                // Joining a private collection makes the card private everywhere
+                // (library, search, suggestions), so say so at the moment it happens.
+                toast.success(privateCollectionIds?.has(c.id)
+                    ? `Added to ${c.name}. This card is now private.`
+                    : `Added to ${c.name}`);
             }
         } catch {
             toast.error("Couldn't update the collection. Please try again.");
         }
+    };
+
+    // A locked vault must be opened before its membership changes; the parent
+    // shows the PIN pad and calls back into the real toggle on success.
+    const requestToggle = (c: Collection) => {
+        if (lockedIds?.has(c.id) && onRequestUnlock) {
+            onRequestUnlock(() => { void toggle(c); });
+            return;
+        }
+        void toggle(c);
     };
 
     const handleCreate = async () => {
@@ -183,7 +211,7 @@ export default function AddToCollectionSheet({
                                 <CitationGlyph className="w-3 h-3" /> Suggested
                             </p>
                             {suggested.map((c) => (
-                                <CollectionRow key={c.id} collection={c} isMember={memberIds.has(c.id)} onToggle={toggle} />
+                                <CollectionRow key={c.id} collection={c} isMember={memberIds.has(c.id)} isPrivate={privateCollectionIds?.has(c.id) ?? false} onToggle={requestToggle} />
                             ))}
                             {/* Own header for the A–Z remainder so it never reads as
                                 part of "Suggested" — same 11px uppercase style, muted
@@ -196,7 +224,7 @@ export default function AddToCollectionSheet({
                         </>
                     )}
                     {sorted.map((c) => (
-                        <CollectionRow key={c.id} collection={c} isMember={memberIds.has(c.id)} onToggle={toggle} />
+                        <CollectionRow key={c.id} collection={c} isMember={memberIds.has(c.id)} isPrivate={privateCollectionIds?.has(c.id) ?? false} onToggle={requestToggle} />
                     ))}
                 </div>
 
@@ -242,13 +270,16 @@ export default function AddToCollectionSheet({
 function CollectionRow({
     collection,
     isMember,
+    isPrivate,
     onToggle,
 }: {
     collection: Collection;
     isMember: boolean;
+    isPrivate: boolean;
     onToggle: (c: Collection) => void;
 }) {
     const dot = getColorStyleByKey(collection.color || collection.name);
+    const nameDir = getDirection(collection.name);
     return (
         <button
             role="menuitemcheckbox"
@@ -260,7 +291,8 @@ function CollectionRow({
                 className="w-2.5 h-2.5 rounded-full shrink-0"
                 style={{ backgroundColor: dot.color }}
             />
-            <span className="flex-1 text-start truncate">{collection.name}</span>
+            <span dir={nameDir} className={`flex-1 text-start truncate ${nameDir === 'rtl' ? 'font-hebrew' : ''}`}>{collection.name}</span>
+            {isPrivate && <Lock aria-label="Private" className="w-3.5 h-3.5 shrink-0 text-text-muted" />}
             <span
                 className={`flex items-center justify-center w-6 h-6 rounded-full border transition-colors ${
                     isMember

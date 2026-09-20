@@ -217,12 +217,16 @@ export default function PinLockModal({
                 // Keep focus in the hidden input so the keyboard stays up.
                 onClick={() => inputRef.current?.focus()}
             >
+                {/* 44px hit target; the visible 28px circle sits where the old
+                    top-3/end-3 button did. */}
                 <button
                     onClick={onClose}
                     aria-label="Close"
-                    className="absolute top-3 end-3 p-1.5 rounded-full text-text-muted hover:text-text hover:bg-fill-subtle transition-colors"
+                    className="group/close absolute top-1 end-1 w-11 h-11 flex items-center justify-center text-text-muted hover:text-text transition-colors"
                 >
-                    <X className="w-4 h-4" />
+                    <span className="flex items-center justify-center w-7 h-7 rounded-full group-hover/close:bg-fill-subtle transition-colors">
+                        <X className="w-4 h-4" />
+                    </span>
                 </button>
 
                 <div className="flex flex-col items-center text-center">

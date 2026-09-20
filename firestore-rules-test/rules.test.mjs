@@ -208,6 +208,7 @@ const CLIENT_WRITES = {
   onboarded: true,                                   // AuthProvider
   privacyLock: { hash: 'x', salt: 'y', iterations: 1 }, // lib/privacyLock
   graphVersion: 2,                                   // lib/rebuildConnections
+  dismissedSuggestions: arrayUnion('tag:politics'),  // lib/collectionSuggest dismissSuggestion
 };
 
 for (const [field, value] of Object.entries(CLIENT_WRITES)) {
@@ -263,6 +264,7 @@ const MISTYPED = {
   onboarded: 'yes',
   privacyLock: 'pin',
   graphVersion: '2',
+  dismissedSuggestions: 'tag:politics',
 };
 
 for (const [field, value] of Object.entries(MISTYPED)) {

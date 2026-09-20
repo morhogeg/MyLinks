@@ -250,6 +250,10 @@ export interface Link {
   // Collections — ids of the collections this card belongs to. Mirrors `tags`:
   // membership lives on the card so the already-loaded feed can filter in memory.
   collectionIds?: string[];
+  // When the card's CONTENT was last edited (Unix ms). Optional and not yet
+  // stamped by every writer; where present it feeds collectionSignature so an
+  // edited member marks a published collection stale (lib/collections.ts).
+  updatedAt?: number;
 }
 
 /**
@@ -294,7 +298,6 @@ export interface SharedCard {
 /** A published collection snapshot — top-level, world-readable. shared_collections/{shareId}. */
 export interface SharedCollection {
   shareId: string;
-  ownerUid: string;
   name: string;
   description?: string;
   publishedAt: number;
@@ -304,7 +307,6 @@ export interface SharedCollection {
 /** A published single-card snapshot — top-level, world-readable. shared_cards/{shareId}. */
 export interface SharedCardDoc {
   shareId: string;
-  ownerUid: string;
   publishedAt: number;
   card: SharedCard;
 }

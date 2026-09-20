@@ -1,3 +1,5 @@
+import { doc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { db } from './firebase';
 import { Collection, Link } from './types';
 
 /**
@@ -12,8 +14,24 @@ import { Collection, Link } from './types';
  *    by topical affinity with the card so the right one is one tap away.
  *
  * Everything is heuristic and cheap on purpose: token overlap over tags,
- * concepts, and category — recomputed in a useMemo, never persisted. Dismissed
- * suggestions are remembered in localStorage so declining one is respected.
+ * concepts, and category — recomputed in a useMemo, never persisted.
+ *
+ * Dismissals (`dismissedSuggestions` below) follow the USER, not the device:
+ * the source of truth is a `dismissedSuggestions` string array on users/{uid}
+ * (same owner-writable pattern as `privacyLock`), with localStorage kept as a
+ * fast path so the first render after a reload does not flash a suggestion
+ * the user already declined on this device.
+ *
+ * Exported API for the Feed:
+ *   loadDismissedSuggestions(uid): Promise<Set<string>>
+ *       Read users/{uid}.dismissedSuggestions, merge it into the local cache,
+ *       and return the union. Resolves to the local cache alone on a read
+ *       failure (never rejects), so suggestions still render offline.
+ *   getDismissedSuggestions(): Set<string>
+ *       The synchronous local cache (what suggestNewCollections defaults to).
+ *   dismissSuggestion(uid, key): Promise<void>
+ *       Record a dismissal locally (immediately) and on the user doc
+ *       (arrayUnion, best-effort). Never rejects.
  */
 
 export interface CollectionSuggestion {
@@ -41,30 +59,84 @@ function titleCase(term: string): string {
     return term.replace(/\p{L}[\p{L}\p{M}'’-]*/gu, (w) => w.charAt(0).toUpperCase() + w.slice(1));
 }
 
-/** The card's topical vocabulary: tags + concepts (+ category), normalized. */
-function linkTerms(link: Link): Set<string> {
+/**
+ * The card's topical vocabulary for CLUSTERING: tags + concepts, normalized.
+ * Deliberately NOT the category. A category ("Technology", "Sports") is the
+ * library's own top-level filter; proposing it back as a collection would
+ * duplicate a facet the user already has, so it must never seed a suggestion.
+ */
+function clusterTerms(link: Link): Set<string> {
     const terms = new Set<string>();
     for (const t of link.tags ?? []) terms.add(normalize(t));
     for (const c of link.concepts ?? []) terms.add(normalize(c));
+    terms.delete('');
+    return terms;
+}
+
+/**
+ * The card's vocabulary for RANKING existing collections: clusterTerms plus the
+ * category. Here category is a legitimate affinity signal (a "Football"
+ * collection full of Sports cards should rank for a new Sports card); it only
+ * must not become a collection name, which the clustering path guards.
+ */
+function affinityTerms(link: Link): Set<string> {
+    const terms = clusterTerms(link);
     if (link.category) terms.add(normalize(link.category));
     terms.delete('');
     return terms;
 }
 
-export function getDismissedSuggestions(): Set<string> {
+function readLocalDismissed(): Set<string> {
     try {
         const raw = localStorage.getItem(DISMISSED_KEY);
         if (raw) return new Set(JSON.parse(raw) as string[]);
-    } catch { /* unavailable / corrupt — treat as none dismissed */ }
+    } catch { /* unavailable / corrupt: treat as none dismissed */ }
     return new Set();
 }
 
-export function dismissSuggestion(key: string): void {
+function writeLocalDismissed(keys: Set<string>): void {
     try {
-        const next = getDismissedSuggestions();
-        next.add(key);
-        localStorage.setItem(DISMISSED_KEY, JSON.stringify([...next]));
-    } catch { /* localStorage unavailable — dismissal just won't persist */ }
+        localStorage.setItem(DISMISSED_KEY, JSON.stringify([...keys]));
+    } catch { /* localStorage unavailable: the user doc still has it */ }
+}
+
+/** The synchronous per-device cache of dismissed suggestion keys. */
+export function getDismissedSuggestions(): Set<string> {
+    return readLocalDismissed();
+}
+
+/**
+ * Per-user dismissals from users/{uid}.dismissedSuggestions, merged into the
+ * local cache. Never rejects: on a read failure the local cache is returned
+ * alone, so a declined suggestion can at worst reappear on a NEW device while
+ * offline, never on the device it was declined on.
+ */
+export async function loadDismissedSuggestions(uid: string): Promise<Set<string>> {
+    const merged = readLocalDismissed();
+    try {
+        const snap = await getDoc(doc(db, 'users', uid));
+        const remote = snap.exists() ? snap.data().dismissedSuggestions : undefined;
+        if (Array.isArray(remote)) {
+            for (const k of remote) if (typeof k === 'string' && k) merged.add(k);
+        }
+        writeLocalDismissed(merged);
+    } catch { /* offline or rules hiccup: local cache is the answer for now */ }
+    return merged;
+}
+
+/**
+ * Dismiss a suggestion for this user everywhere. The local cache updates
+ * synchronously (so the tile can disappear at once); the user-doc arrayUnion
+ * is best-effort and never rejects, since the dismissal already took effect
+ * on this device and the next loadDismissedSuggestions re-merges.
+ */
+export async function dismissSuggestion(uid: string, key: string): Promise<void> {
+    const next = readLocalDismissed();
+    next.add(key);
+    writeLocalDismissed(next);
+    try {
+        await updateDoc(doc(db, 'users', uid), { dismissedSuggestions: arrayUnion(key) });
+    } catch { /* offline: the local cache carries it until the next successful sync */ }
 }
 
 /**
@@ -90,7 +162,7 @@ export function suggestNewCollections(
     // term → member cards.
     const clusters = new Map<string, Link[]>();
     for (const link of ready) {
-        for (const term of linkTerms(link)) {
+        for (const term of clusterTerms(link)) {
             // Single-character or purely numeric "topics" make bad collections.
             if (term.length < 2 || /^\d+$/.test(term)) continue;
             const bucket = clusters.get(term);
@@ -171,7 +243,7 @@ export function rankCollectionsForLink(
     links: Link[],
     limit = 2
 ): Collection[] {
-    const cardTerms = linkTerms(link);
+    const cardTerms = affinityTerms(link);
     if (cardTerms.size === 0 || collections.length === 0) return [];
     const memberOf = new Set(link.collectionIds ?? []);
 
@@ -181,19 +253,19 @@ export function rankCollectionsForLink(
     const N = Math.max(1, links.length);
     const df = new Map<string, number>();
     for (const l of links) {
-        for (const t of linkTerms(l)) df.set(t, (df.get(t) ?? 0) + 1);
+        for (const t of affinityTerms(l)) df.set(t, (df.get(t) ?? 0) + 1);
     }
     const idf = (t: string) => Math.log((N + 1) / ((df.get(t) ?? 0) + 1)) + 1;
 
     // Aggregate each collection's vocabulary + size from its members once. `counts`
-    // is members-sharing-a-term (linkTerms is a Set, so ≤1 per member).
+    // is members-sharing-a-term (affinityTerms is a Set, so ≤1 per member).
     const vocab = new Map<string, Map<string, number>>();
     const sizes = new Map<string, number>();
     for (const l of links) {
         if (l.id === link.id) continue;
         const cids = l.collectionIds;
         if (!cids || cids.length === 0) continue;
-        const terms = linkTerms(l);
+        const terms = affinityTerms(l);
         for (const cid of cids) {
             sizes.set(cid, (sizes.get(cid) ?? 0) + 1);
             let counts = vocab.get(cid);

@@ -3,10 +3,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Collection, Link } from '@/lib/types';
-import { MoreHorizontal, Pencil, Share2, Trash2, Globe, LayoutGrid, Plus, X, Layers, Lock } from 'lucide-react';
+import { MoreHorizontal, Pencil, Share2, Trash2, Globe, LayoutGrid, Plus, X, Layers, Lock, Eye } from 'lucide-react';
 import { CitationGlyph } from '@/components/ui/Wordmark';
 import { getColorStyleByKey } from '@/lib/colors';
-import { isShareStale } from '@/lib/collections';
 import { CollectionSuggestion } from '@/lib/collectionSuggest';
 import { getDirection } from '@/lib/rtl';
 import { hapticLight } from '@/lib/haptics';
@@ -39,8 +38,10 @@ interface CollectionsGalleryProps {
  * Card counts and cover mosaics (up to 4 member thumbnails) are derived from
  * the already-loaded feed, so this needs no extra reads. Tapping a tile opens
  * the collection (the parent scopes the feed to it); a per-tile menu exposes
- * manage / edit / share / delete. Published tiles flag when the public page has
- * drifted from the live collection. Below the grid, suggested collections
+ * manage / edit / share / delete. Published tiles carry a plain "Shared" badge;
+ * staleness is NOT judged here because the gallery only sees the windowed feed,
+ * which would flag big collections as stale forever (the share sheet, which
+ * gets the full member set, owns that call). Below the grid, suggested collections
  * (clustered client-side from tags/concepts) invite one-tap creation.
  * Creating a collection lives in the page header's "+" button, not here.
  */
@@ -70,23 +71,19 @@ export default function CollectionsGallery({
         setMenu((cur) => (cur?.collection.id === collection.id ? null : { collection, rect }));
     };
 
-    // Per-collection count, member ids (for share-staleness), and up to 4
-    // member thumbnails for the mosaic cover — derived once per feed change.
+    // Up to 4 member thumbnails per collection for the mosaic cover — derived
+    // once per feed change.
     const meta = useMemo(() => {
-        const counts: Record<string, number> = {};
         const covers: Record<string, string[]> = {};
-        const members: Record<string, { id: string }[]> = {};
         for (const link of links) {
             for (const cid of link.collectionIds ?? []) {
-                counts[cid] = (counts[cid] || 0) + 1;
-                (members[cid] ||= []).push({ id: link.id });
                 const thumb = link.metadata?.thumbnailUrl;
                 if (thumb && (covers[cid]?.length ?? 0) < 4) {
                     (covers[cid] ||= []).push(thumb);
                 }
             }
         }
-        return { counts, covers, members };
+        return { covers };
     }, [links]);
 
     const sorted = useMemo(
@@ -109,15 +106,18 @@ export default function CollectionsGallery({
                 const thumbs = locked ? [] : explicitCover
                     ? [explicitCover, ...(meta.covers[c.id] ?? []).filter((t) => t !== explicitCover)].slice(0, 4)
                     : meta.covers[c.id] ?? [];
-                const stale = isShareStale(c, meta.members[c.id] ?? []);
                 const open = menu?.collection.id === c.id;
                 const nameDir = getDirection(c.name);
                 const hasCover = !locked && thumbs.length > 0;
                 return (
                     <div
                         key={c.id}
-                        className={`group relative rounded-[20px] border border-border-subtle bg-card shadow-[var(--shadow-card)] cursor-pointer transition-all [@media(hover:hover)]:hover:shadow-[var(--shadow-card-hover)] hover:border-accent/30 active:scale-[0.98] ${open ? 'z-20' : ''}`}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`Open collection ${c.name}`}
                         onClick={() => { hapticLight(); onOpen(c.id); }}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(c.id); } }}
+                        className={`group relative rounded-[20px] border border-border-subtle bg-card shadow-[var(--shadow-card)] cursor-pointer transition-all [@media(hover:hover)]:hover:shadow-[var(--shadow-card-hover)] hover:border-accent/30 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${open ? 'z-20' : ''}`}
                     >
                         {/* Cover — a mosaic of member thumbnails, or (when a collection
                             has no artwork) a compact color band with a glyph, so the
@@ -140,10 +140,11 @@ export default function CollectionsGallery({
                                 </span>
                             )}
                             {hasCover && <div className="absolute inset-0 bg-gradient-to-t from-card/90 to-transparent" />}
-                            {/* Private badge — icon only (no wording), always shown on
-                                private collections so the lock state is visible even
-                                when the vault is open. */}
-                            {c.isPrivate && (
+                            {/* Private badge — icon only (no wording), shown when the
+                                vault is open so the lock state stays visible. A locked
+                                tile already has the big cover lock + "Locked" caption,
+                                so a third lock here would be noise. */}
+                            {c.isPrivate && !locked && (
                                 <span
                                     aria-label="Private"
                                     title="Private"
@@ -152,10 +153,10 @@ export default function CollectionsGallery({
                                     <Lock className="w-3 h-3" />
                                 </span>
                             )}
-                            {/* Public badge — amber when the page is behind the live collection. */}
+                            {/* Public badge. */}
                             {c.isPublic && !c.isPrivate && (
-                                <span className={`absolute top-2 start-2 flex items-center gap-1 px-1.5 py-0.5 rounded-full backdrop-blur-sm text-[9px] font-bold uppercase tracking-wide text-white ${stale ? 'bg-amber-600/80' : 'bg-black/55'}`}>
-                                    <Globe className="w-2.5 h-2.5" /> {stale ? 'Update link' : 'Shared'}
+                                <span className="absolute top-2 start-2 flex items-center gap-1 px-1.5 py-0.5 rounded-full backdrop-blur-sm bg-black/55 text-[9px] font-bold uppercase tracking-wide text-white">
+                                    <Globe className="w-2.5 h-2.5" /> Shared
                                 </span>
                             )}
                         </div>
@@ -169,7 +170,7 @@ export default function CollectionsGallery({
                             aria-label="Collection actions"
                             aria-haspopup="menu"
                             aria-expanded={open}
-                            className="group/menu absolute top-1 end-1 w-11 h-11 flex items-center justify-center text-white/90 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity"
+                            className="group/menu absolute top-1 end-1 w-11 h-11 flex items-center justify-center text-white/90 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity"
                         >
                             <span className="flex items-center justify-center w-8 h-8 rounded-full bg-black/45 backdrop-blur-sm group-hover/menu:bg-black/70 transition-colors">
                                 <MoreHorizontal className="w-4 h-4" />
@@ -230,8 +231,10 @@ export default function CollectionsGallery({
                             <button
                                 onClick={(e) => { e.stopPropagation(); onDismissSuggestion(s); }}
                                 aria-label={`Dismiss suggestion ${s.name}`}
-                                className="absolute top-1 end-1 w-9 h-9 flex items-center justify-center text-white/80 hover:text-white"
+                                className="absolute top-0 end-0 w-11 h-11 flex items-center justify-center text-white/80 hover:text-white"
                             >
+                                {/* 44px hit target with the same compact 28px glyph
+                                    nested inside, like the ⋯ trigger on real tiles. */}
                                 <span className="flex items-center justify-center w-7 h-7 rounded-full bg-black/45 backdrop-blur-sm">
                                     <X className="w-3.5 h-3.5" />
                                 </span>
@@ -243,12 +246,24 @@ export default function CollectionsGallery({
                         <p dir="ltr" className={`mt-0.5 text-[11px] font-semibold text-text-muted/70 ${sDir === 'rtl' ? 'text-right' : ''}`}>
                             {s.linkIds.length} {s.linkIds.length === 1 ? 'card' : 'cards'}
                         </p>
-                        <button
-                            onClick={(e) => { e.stopPropagation(); onCreateSuggestion?.(s); }}
-                            className="mt-2.5 self-start inline-flex items-center gap-1.5 px-3 h-8 rounded-full bg-accent text-accent-ink text-xs font-bold hover:bg-accent-hover active:scale-[0.97] transition-all"
-                        >
-                            <Plus className="w-3.5 h-3.5" /> Create
-                        </button>
+                        {/* Preview when the parent can show one (adopting blind from
+                            a tile is how bad clusters get created); plain Create only
+                            as the fallback when no preview exists. */}
+                        {onPreviewSuggestion ? (
+                            <button
+                                onClick={(e) => { e.stopPropagation(); hapticLight(); onPreviewSuggestion(s); }}
+                                className="mt-2.5 self-start inline-flex items-center gap-1.5 px-3 h-8 rounded-full bg-accent text-accent-ink text-xs font-bold hover:bg-accent-hover active:scale-[0.97] transition-all"
+                            >
+                                <Eye className="w-3.5 h-3.5" /> Preview
+                            </button>
+                        ) : (
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onCreateSuggestion?.(s); }}
+                                className="mt-2.5 self-start inline-flex items-center gap-1.5 px-3 h-8 rounded-full bg-accent text-accent-ink text-xs font-bold hover:bg-accent-hover active:scale-[0.97] transition-all"
+                            >
+                                <Plus className="w-3.5 h-3.5" /> Create
+                            </button>
+                        )}
                     </div>
                 </div>
                 );
@@ -279,7 +294,6 @@ export default function CollectionsGallery({
             {menu && (
                 <CollectionMenu
                     anchor={menu.rect}
-                    isPublic={menu.collection.isPublic}
                     isPrivate={menu.collection.isPrivate}
                     onClose={() => setMenu(null)}
                     onManageCards={() => { onManageCards(menu.collection); setMenu(null); }}
@@ -296,10 +310,9 @@ export default function CollectionsGallery({
 /** A portal dropdown anchored to a trigger's screen rect. Rendered at the document
  *  root with fixed positioning so no ancestor `overflow`/stacking can clip it. */
 function CollectionMenu({
-    anchor, isPublic, isPrivate, onClose, onManageCards, onShare, onEdit, onTogglePrivate, onDelete,
+    anchor, isPrivate, onClose, onManageCards, onShare, onEdit, onTogglePrivate, onDelete,
 }: {
     anchor: DOMRect;
-    isPublic?: boolean;
     isPrivate?: boolean;
     onClose: () => void;
     onManageCards: () => void;
@@ -345,9 +358,11 @@ function CollectionMenu({
                 onClick={(e) => e.stopPropagation()}
             >
                 <MenuRow icon={<LayoutGrid className="w-4 h-4" />} label="Manage cards" onClick={onManageCards} />
-                {/* A private collection can't have a public page — no Share entry. */}
+                {/* A private collection can't have a public page — no Share entry.
+                    One label whether or not it's live: the sheet itself is where
+                    an existing share gets managed. */}
                 {!isPrivate && (
-                    <MenuRow icon={<Share2 className="w-4 h-4" />} label={isPublic ? 'Share / manage' : 'Share'} onClick={onShare} />
+                    <MenuRow icon={<Share2 className="w-4 h-4" />} label="Share" onClick={onShare} />
                 )}
                 <MenuRow icon={<Pencil className="w-4 h-4" />} label="Edit" onClick={onEdit} />
                 <MenuRow icon={<Lock className="w-4 h-4" />} label={isPrivate ? 'Remove from Private' : 'Make private'} onClick={onTogglePrivate} />
