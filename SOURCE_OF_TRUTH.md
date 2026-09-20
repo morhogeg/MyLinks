@@ -129,6 +129,13 @@ surface in the category and a knowledge graph computed on every save. The path t
   (`wantStream = !isNativeApp()`); `/api/chat` bypasses Hosting via
   `web/app/api/chat/route.ts` → the function's direct URL.
 - Web builds self-host fonts (`geist` package) so builds never fetch Google Fonts.
+- **Hosting rewrite to a NEW function races the functions deploy.** Both
+  workflows start on the same `main` push; hosting finishes in ~1 min and
+  Firebase rejects the version with "Cloud Run service `x` does not exist"
+  if the function is not created yet (2026-09-20, deploy-hosting run #16 for
+  `delete_collection_http`). Re-trigger hosting by editing
+  `.github/workflows/deploy-hosting.yml` (self-referential path; dispatch and
+  re-run APIs 403 for the app), or land the function a push before its rewrite.
 - Cloud sessions can't reach `*.run.app` URLs (egress allowlist) — verify deployed
   functions via the app, not curl.
 - **iOS CI signing — the hard-won rules (2026-07-04):** the archive step MUST

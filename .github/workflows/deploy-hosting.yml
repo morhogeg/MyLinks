@@ -45,7 +45,14 @@ on:
       - "firebase.json"
       # Self-referential on purpose (mirrors deploy-functions.yml): a change to
       # this workflow takes effect on its own merge rather than waiting for the
-      # next unrelated firebase.json edit.
+      # next unrelated firebase.json edit. It is also the re-run lever from a
+      # cloud session (the dispatch and re-run APIs 403 for the GitHub App).
+      #
+      # ORDERING: a rewrite to a NEW function fails here with "Cloud Run
+      # service X does not exist" when this run finishes before the functions
+      # deploy of the same push has created it (2026-09-20, run #16). Either
+      # land the function one push before its rewrite, or re-trigger this
+      # workflow by editing this file once the functions run is green.
       - ".github/workflows/deploy-hosting.yml"
 
 # Least-privilege token: no workflow here uses GITHUB_TOKEN (Firebase/Apple
