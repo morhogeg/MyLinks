@@ -233,7 +233,29 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-09-20): install build **1332** (collections launch pass), then the 1331 QA below if not yet done
+> ## 🚨 OWNER ACTION (updated 2026-09-20, later): install build **1333** (import pass: folders become tags, more export formats), then the 1332 QA below if not yet done
+>
+> **1333** (run #333, merge `d1b9b8a`) is the first build where the import
+> path has anything to show on device: it has NEVER been run on a phone
+> (every §9 entry since 09-03 says so), so this QA is the file-picker
+> test as much as the feature test. Backend half: functions deploy run
+> #113 (`process_link_background`). QA on 1333, on a fresh or the founder
+> account: (1) Safari → Bookmarks → export from a Mac, AirDrop the .html
+> to the phone, Settings → Import → Choose a file: the Files picker must
+> open and accept it, the count line must read "N new links, M already
+> saved", and after Import the feed fills with processing skeletons.
+> (2) Open one of those cards once it lands: its folder name is among
+> the tags (e.g. "Reading", "Longform") after the model's own, and the
+> chips row has an "Imported, first saved Mar 2019" chip. (3) Empty
+> library (a fresh account, or the Archived/All filters cleared on an
+> empty one): the "Your Machina is empty" state shows an "Import
+> bookmarks" pill; tap it, the same sheet opens. (4) Desktop web: + →
+> Link tab → "Have a bookmarks file? Import it" under the field opens
+> the sheet. (5) A Raindrop CSV export: read as "a reading-list export",
+> folder and tags both land as tags. (6) Retry on a failed imported card
+> keeps its folder tag. Then the 1332 list below.
+>
+> ## (superseded) OWNER ACTION (updated 2026-09-20): install build **1332** (collections launch pass), then the 1331 QA below if not yet done
 >
 > **1332** (run #332, merge `81b61f6`) carries the whole collections pass:
 > functions deploy run #112 (`publish_share_http`, `unpublish_share_http`,
@@ -2287,6 +2309,50 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-09-20 (later) — IMPORT PASS: the bookmarks/Pocket import (PM-2,
+  build 1317) reviewed and refined, not rebuilt.** Findings that drove it:
+  `importedTags` / `importedFromAt` were written to the card and read by
+  NOTHING in the web client, so a bookmark folder never became anything
+  the card could be filed by; Raindrop CSV lost its `folder` and ISO
+  dates; the Chrome/Edge profile `Bookmarks` JSON was unsupported; the
+  sheet was reachable only from first run and Settings; a Retry on a
+  failed imported card dropped the hints. What landed (branch
+  `claude/bookmark-import-onboard-15ccqm`, commit `5b7ea79`, merge
+  `d1b9b8a`): **backend** `_merge_import_tags` in `process_link_background`
+  puts the folder path / export tags on the card's `tags` AFTER the
+  model's (case-insensitive dedupe, `MAX_CARD_TAGS` cap; the failed-card
+  path still only carries them as provenance); **client**
+  `mergeImportedTags` in `storage.ts` does the same on Retry; the detail
+  view's chip row gets "Imported, first saved <Mon YYYY>" (EN/HE) from
+  `importedFromAt`; `Link` type gains `importedAt/importedFromAt/
+  importedTags`. **Parsers** (`lib/importParsers.ts`): the CSV reader
+  finds `folder`/`collection` and `tags`/`labels` as separate columns
+  (Raindrop writes both, Instapaper only a folder; Unsorted/Unread/
+  Archive/Starred are not folders), `parseImportDate` accepts ISO
+  strings, date column names gain `created`/`date_added`/`added`; new
+  `parseChromeBookmarksJson` (iterative stack walk, roots and children in
+  file order, WebKit microseconds since 1601 converted, "Bookmarks bar"/
+  "Other bookmarks" not tags) with `chrome-json` detection from a
+  `roots` key, `.json`, or a file literally named `Bookmarks`; an unknown
+  JSON shape falls through to `recoverUrls`. **Doors:** "Import
+  bookmarks" pill on the empty-library state in `Feed.tsx` (only when no
+  filter/search is active), and "Have a bookmarks file? Import it" under
+  the link field in `AddLinkForm.tsx`; both mount the same `ImportSheet`.
+  Sheet copy names Raindrop/Instapaper; file input accepts `.json`/`.tsv`.
+  **Deliberately unchanged:** the 200-per-import cap, the lifetime
+  `imports` quota and `plan_for_imports` (security round 2 cost gates),
+  the client dedupe walk. **Verified:** `npm run test:parsers` 31/31 (+7:
+  Raindrop, Instapaper, ISO dates, Chrome JSON order/dates/roots, JSON
+  fallback, malformed JSON); backend pytest **1064 passed** in a real venv
+  (the 8 `test_import_links` "offline-fake" failures earlier entries
+  mention were the missing venv, not code; +2 `_merge_import_tags`
+  tests); `tsc --noEmit` clean; eslint clean on touched files (one
+  pre-existing `isYouTube` warning in LinkDetailModal). **NOT verified:**
+  anything on device, including whether WKWebView's file picker accepts a
+  bookmarks .html at all (owner QA above is the first time). Deploys:
+  Vercel auto from `d1b9b8a`; Deploy Cloud Functions run #113 scoped
+  `process_link_background`; iOS → TestFlight run #333 = **build 1333**.
 
 - **2026-09-20 — COLLECTIONS LAUNCH PASS (four parallel read-only reviews:
   design/UX, backend+data, sharing surface, product; then three parallel
