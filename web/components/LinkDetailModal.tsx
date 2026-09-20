@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, StatusChangeHandler, UserNote } from '@/lib/types';
 import SourceByline from './SourceByline';
-import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, CircleCheck, Check, Network, Play, Youtube, ImageOff, Image as ImageIcon, ImagePlus, Loader2, Layers, Share2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, StickyNote, Waypoints, EyeOff } from 'lucide-react';
+import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, CircleCheck, Check, Network, Play, Youtube, ImageOff, Image as ImageIcon, ImagePlus, Loader2, Layers, Share2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, StickyNote, Waypoints, EyeOff, Upload } from 'lucide-react';
 import { getPlatform } from '@/lib/platform';
 import SimpleMarkdown from './SimpleMarkdown';
 import PosterImage from './ui/PosterImage';
@@ -1572,6 +1572,19 @@ export default function LinkDetailModal({
                                 <Tag className="w-3.5 h-3.5 text-accent" />
                                 {getTimeAgo(link.createdAt, now)}
                             </span>
+                            {/* Import provenance: where the card came from and
+                                when it was first saved THERE. The folder it
+                                lived in is already among the tags below (the
+                                worker merges it), so it is not repeated here. */}
+                            {!!link.importedAt && (
+                                <span className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-fill-subtle border border-border-subtle">
+                                    <Upload className="w-3.5 h-3.5" />
+                                    {link.importedFromAt
+                                        ? (isRtl ? 'יובא, נשמר במקור ' : 'Imported, first saved ')
+                                            + new Date(link.importedFromAt).toLocaleDateString(isRtl ? 'he-IL' : undefined, { month: 'short', year: 'numeric' })
+                                        : (isRtl ? 'יובא' : 'Imported')}
+                                </span>
+                            )}
                             {isReminderActive && nextReminderDate && (
                                 <span
                                     onClick={handleToggleReminder}

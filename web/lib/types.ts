@@ -158,6 +158,15 @@ export interface Link {
   // short `enrichError` so the card can offer another try.
   enrichStatus?: 'processing' | 'failed';
   enrichError?: string;
+  // Bulk import provenance (POST /api/import, ImportSheet). `importedAt` is
+  // when the import ran; `importedFromAt` is the ORIGINAL save date the export
+  // carried (a bookmark's ADD_DATE, Pocket's time_added), kept beside
+  // `createdAt` rather than replacing it so the feed still answers "what you
+  // saved into Machina". `importedTags` are the folder path / export tags,
+  // which the worker also merges into `tags` so the user's own filing survives.
+  importedAt?: number;
+  importedFromAt?: number;
+  importedTags?: string[];
   enrichedAt?: number;
   sourceName?: string;
   // Screenshot provenance (sourceType 'image' only): the author @handle the

@@ -301,3 +301,103 @@ test('ordinary bookmarks still parse after the bounds', () => {
     assert.equal(out.links[0].title, 'World & Nation');
     assert.deepEqual(out.links[0].tags, ['Favorites']);
 });
+
+/* ------------------------------------------------------------------ *
+ * Raindrop / Instapaper CSV, ISO dates, Chrome JSON (2026-09-20)
+ * ------------------------------------------------------------------ */
+
+import { parseChromeBookmarksJson } from '../importParsers.ts';
+
+const RAINDROP_CSV = `title,note,excerpt,url,folder,tags,created,cover,highlights,favorite
+"A long read",,"An excerpt, with a comma",https://longreads.com/a,Reading / Longform,"design, systems",2023-04-05T10:11:12.000Z,,,false
+Unsorted thing,,,https://example.com/u,Unsorted,,2024-01-02T00:00:00Z,,,false
+`;
+
+const INSTAPAPER_CSV = `URL,Title,Selection,Folder,Timestamp
+https://example.com/one,One,,Unread,1600000000
+https://example.com/two,Two,,Cooking,1600100000
+`;
+
+const CHROME_JSON = JSON.stringify({
+    checksum: 'abc',
+    roots: {
+        bookmark_bar: {
+            type: 'folder', name: 'Bookmarks bar', children: [
+                { type: 'url', name: 'First', url: 'https://example.com/first', date_added: '13300000000000000' },
+                {
+                    type: 'folder', name: 'Reading', children: [
+                        { type: 'folder', name: 'Longform', children: [
+                            { type: 'url', name: 'Deep', url: 'https://longreads.com/deep', date_added: '13300000000000000' },
+                        ] },
+                        { type: 'url', name: 'Bookmarklet', url: 'javascript:void(0)' },
+                    ],
+                },
+            ],
+        },
+        other: { type: 'folder', name: 'Other bookmarks', children: [
+            { type: 'url', name: 'Other', url: 'https://example.org/other' },
+        ] },
+        synced: { type: 'folder', name: 'Mobile bookmarks', children: [] },
+    },
+    version: 1,
+});
+
+test('raindrop export: url found by name, folder AND tags become hints, ISO date read', () => {
+    const { links, format } = parsePocketCsv(RAINDROP_CSV);
+    assert.equal(format, 'pocket');
+    assert.equal(links.length, 2);
+    assert.equal(links[0].url, 'https://longreads.com/a');
+    assert.equal(links[0].title, 'A long read');
+    assert.deepEqual(links[0].tags, ['Reading', 'Longform', 'design', 'systems']);
+    assert.equal(links[0].addedAt, Date.parse('2023-04-05T10:11:12.000Z'));
+    // "Unsorted" is the absence of a folder, not a folder.
+    assert.equal(links[1].tags, undefined);
+});
+
+test('instapaper export: capitalised header, Unread is not a folder, Cooking is', () => {
+    const { links } = parseImportFile(INSTAPAPER_CSV, 'instapaper-export.csv');
+    assert.equal(links.length, 2);
+    assert.equal(links[0].tags, undefined);
+    assert.deepEqual(links[1].tags, ['Cooking']);
+});
+
+test('iso dates parse; junk strings do not', () => {
+    assert.equal(parseImportDate('2023-04-05'), Date.parse('2023-04-05'));
+    assert.equal(parseImportDate('2023-04-05T10:11:12Z'), Date.parse('2023-04-05T10:11:12Z'));
+    assert.equal(parseImportDate('yesterday'), undefined);
+    assert.equal(parseImportDate('1999-13-45'), undefined);
+});
+
+test('chrome json: roots walked in order, root folders are not tags, webkit dates converted', () => {
+    const { links, skipped, format } = parseChromeBookmarksJson(CHROME_JSON);
+    assert.equal(format, 'chrome-json');
+    assert.equal(skipped, 1);
+    assert.deepEqual(links.map((l) => l.url), [
+        'https://example.com/first',
+        'https://longreads.com/deep',
+        'https://example.org/other',
+    ]);
+    assert.equal(links[0].tags, undefined);
+    assert.deepEqual(links[1].tags, ['Reading', 'Longform']);
+    assert.equal(links[2].tags, undefined);
+    // 13300000000000000 µs since 1601-01-01 = 2022-06-18T04:26:40Z
+    assert.equal(links[0].addedAt, Date.parse('2022-06-18T04:26:40Z'));
+});
+
+test('chrome json is detected from the profile file with no extension, and from .json', () => {
+    assert.equal(detectImportFormat(CHROME_JSON, 'Bookmarks'), 'chrome-json');
+    assert.equal(detectImportFormat(CHROME_JSON, 'chrome.json'), 'chrome-json');
+    assert.equal(parseImportFile(CHROME_JSON, 'Bookmarks').links.length, 3);
+});
+
+test('an unknown json shape still recovers its urls', () => {
+    const odd = JSON.stringify({ items: [{ link: 'https://example.com/x' }, { link: 'https://example.com/y' }] });
+    const { links } = parseImportFile(odd, 'export.json');
+    assert.deepEqual(links.map((l) => l.url), ['https://example.com/x', 'https://example.com/y']);
+});
+
+test('chrome json: a malformed file yields nothing, not a crash', () => {
+    assert.equal(parseChromeBookmarksJson('{"roots": 5').links.length, 0);
+    assert.equal(parseChromeBookmarksJson('{"roots": {"bookmark_bar": null}}').links.length, 0);
+    assert.equal(parseChromeBookmarksJson('[]').links.length, 0);
+});

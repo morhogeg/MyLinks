@@ -48,7 +48,8 @@ const MAX_FILE_BYTES = 32 * 1024 * 1024;
 
 const FORMAT_LABEL: Record<ImportFormat, string> = {
     bookmarks: 'browser bookmarks',
-    pocket: 'a Pocket export',
+    pocket: 'a reading-list export',
+    'chrome-json': 'a Chrome bookmarks file',
     urls: 'a list of links',
 };
 
@@ -270,7 +271,7 @@ export default function ImportSheet({
                                 Bring your links over
                             </h2>
                             <p className="mt-1 text-[13px] text-text-secondary leading-snug">
-                                Browser bookmarks, a Pocket export, or a list you paste. Machina reads and files every one.
+                                Browser bookmarks, a Pocket, Raindrop or Instapaper export, or a list you paste. Machina reads and files every one.
                             </p>
                         </div>
                         <button
@@ -322,7 +323,7 @@ export default function ImportSheet({
                             <input
                                 ref={fileInput}
                                 type="file"
-                                accept=".html,.htm,.csv,.txt,text/html,text/csv,text/plain"
+                                accept=".html,.htm,.csv,.tsv,.txt,.json,text/html,text/csv,text/plain,application/json"
                                 className="hidden"
                                 onChange={(e) => { void onFile(e.target.files?.[0]); e.target.value = ''; }}
                             />
@@ -332,7 +333,7 @@ export default function ImportSheet({
                                     title={filename ?? 'Choose a file'}
                                     sub={filename
                                         ? 'Pick another to start over.'
-                                        : 'A bookmarks export (.html) or a Pocket export (.csv).'}
+                                        : 'Bookmarks (.html), or a Pocket, Raindrop or Instapaper export (.csv).'}
                                     active={!!filename && !pasting}
                                     onClick={() => { hapticLight(); fileInput.current?.click(); }}
                                 />

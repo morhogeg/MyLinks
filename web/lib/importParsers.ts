@@ -9,7 +9,13 @@
  *     tag hints, so "Reading / Longform" survives the move as something the card
  *     can be filed by.
  *   - **Pocket CSV** — `url,title,time_added,tags,status`, the export Pocket
- *     users have been running since it shut down.
+ *     users have been running since it shut down. The same reader handles a
+ *     **Raindrop** export (`title,note,excerpt,url,folder,tags,created,…`, ISO
+ *     dates, folder AND tags) and an **Instapaper** one (`URL,Title,Selection,
+ *     Folder`): columns are found by name, so any CSV with a `url` column works.
+ *   - **Chrome / Edge / Brave `Bookmarks` JSON** — the browser's own profile
+ *     file (`roots.bookmark_bar.children[…]`, WebKit microsecond dates), for
+ *     the person who copies that instead of using Export.
  *   - **Plain text** — one URL per line, which is also what "paste your links"
  *     produces.
  *
@@ -37,7 +43,7 @@ export interface ImportedLink {
     tags?: string[];
 }
 
-export type ImportFormat = 'bookmarks' | 'pocket' | 'urls';
+export type ImportFormat = 'bookmarks' | 'pocket' | 'chrome-json' | 'urls';
 
 export interface ImportParseResult {
     format: ImportFormat;
@@ -129,6 +135,14 @@ function cleanTags(values: (string | undefined)[]): string[] | undefined {
 export function parseImportDate(raw: string | number | undefined | null): number | undefined {
     if (raw === undefined || raw === null || raw === '') return undefined;
     let value = typeof raw === 'number' ? raw : Number(String(raw).trim());
+    if (typeof raw === 'string' && !Number.isFinite(value)) {
+        // Raindrop, Instapaper and most non-Pocket tools write an ISO date
+        // ("2023-04-05T10:11:12.000Z"); a bare "2023-04-05" also parses.
+        const text = raw.trim();
+        if (!/^\d{4}-\d{2}-\d{2}/.test(text)) return undefined;
+        value = new Date(text).getTime();
+        if (!Number.isFinite(value)) return undefined;
+    }
     if (!Number.isFinite(value) || value <= 0) return undefined;
     if (value > 1e14) value = Math.floor(value / 1000);   // microseconds
     else if (value < 1e11) value = value * 1000;           // seconds
@@ -313,8 +327,11 @@ export function parsePocketCsv(csv: string): ImportParseResult {
 
     let urlAt = hasHeader ? indexOf('url', 'uri', 'link') : -1;
     const titleAt = hasHeader ? indexOf('title', 'name', 'resolved_title') : -1;
-    const dateAt = hasHeader ? indexOf('time_added', 'timeadded', 'created_at', 'date') : -1;
-    const tagsAt = hasHeader ? indexOf('tags', 'folder') : -1;
+    const dateAt = hasHeader ? indexOf('time_added', 'timeadded', 'created_at', 'created', 'date_added', 'added', 'date') : -1;
+    // Raindrop writes BOTH a folder and tags; Instapaper only a folder. Each
+    // becomes a tag hint, folder first, the way a bookmarks path does.
+    const folderAt = hasHeader ? indexOf('folder', 'collection') : -1;
+    const tagsAt = hasHeader ? indexOf('tags', 'labels') : -1;
 
     const body = hasHeader ? rows.slice(1) : rows;
     if (urlAt === -1) {
@@ -335,14 +352,90 @@ export function parsePocketCsv(csv: string): ImportParseResult {
         const url = cleanImportUrl(row[urlAt]);
         if (!url) { skipped += 1; continue; }
         const rawTags = tagsAt !== -1 ? (row[tagsAt] ?? '') : '';
+        const rawFolder = folderAt !== -1 ? (row[folderAt] ?? '').trim() : '';
+        // Raindrop's "Unsorted" and Instapaper's "Unread" are the absence of a
+        // folder, not a folder.
+        const folder = /^(unsorted|unread|archive|starred)$/i.test(rawFolder) ? '' : rawFolder;
         links.push({
             url,
             title: cleanTitle(titleAt !== -1 ? row[titleAt] : undefined),
             addedAt: parseImportDate(dateAt !== -1 ? row[dateAt] : undefined),
-            tags: cleanTags(rawTags ? rawTags.split(POCKET_TAG_SEPARATORS) : []),
+            tags: cleanTags([
+                ...(folder ? folder.split('/').map((f) => f.trim()) : []),
+                ...(rawTags ? rawTags.split(POCKET_TAG_SEPARATORS) : []),
+            ]),
         });
     }
     return { format: 'pocket', links, skipped };
+}
+
+/* ------------------------------------------------------------------ *
+ * Chrome / Edge / Brave `Bookmarks` JSON (the profile file itself)
+ * ------------------------------------------------------------------ */
+
+/** Chrome stamps `date_added` in MICROSECONDS since 1601-01-01 (WebKit time). */
+const WEBKIT_EPOCH_OFFSET_MS = 11_644_473_600_000;
+
+function parseWebkitDate(raw: unknown): number | undefined {
+    const value = typeof raw === 'number' ? raw : Number(String(raw ?? '').trim());
+    if (!Number.isFinite(value) || value <= 0) return undefined;
+    // A value this large is only ever WebKit time; anything smaller is one of
+    // the ordinary unix shapes parseImportDate already knows.
+    if (value < 1e16) return parseImportDate(value);
+    return parseImportDate(Math.floor(value / 1000) - WEBKIT_EPOCH_OFFSET_MS);
+}
+
+/** Folder names Chrome gives its roots; they are not the user's filing. */
+const CHROME_ROOT_FOLDERS = /^(bookmarks bar|other bookmarks|mobile bookmarks|bookmarks|favorites bar|favorites|other favorites|mobile favorites)$/i;
+
+/**
+ * Parse the browser's own `Bookmarks` file: `{ roots: { bookmark_bar: {…},
+ * other: {…}, synced: {…} } }`, each a folder node `{ type: 'folder', name,
+ * children }` over url nodes `{ type: 'url', name, url, date_added }`. Walked
+ * iteratively with an explicit stack: a pathological file can nest deeper
+ * than the call stack, and `MAX_PARSED_LINKS` bounds the walk either way.
+ */
+export function parseChromeBookmarksJson(text: string): ImportParseResult {
+    const links: ImportedLink[] = [];
+    let skipped = 0;
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(text);
+    } catch {
+        return { format: 'chrome-json', links, skipped };
+    }
+    const roots = parsed && typeof parsed === 'object' ? (parsed as { roots?: unknown }).roots : undefined;
+    if (!roots || typeof roots !== 'object') return { format: 'chrome-json', links, skipped };
+
+    const stack: { node: unknown; path: string[] }[] = [];
+    // Reversed for the same reason the children are below: the stack pops
+    // last-in first, and the bar should come out ahead of "Other bookmarks".
+    const rootNodes = Object.values(roots as Record<string, unknown>);
+    for (let i = rootNodes.length - 1; i >= 0; i -= 1) stack.push({ node: rootNodes[i], path: [] });
+
+    while (stack.length && links.length < MAX_PARSED_LINKS) {
+        const { node, path } = stack.pop()!;
+        if (!node || typeof node !== 'object') continue;
+        const n = node as { type?: unknown; name?: unknown; url?: unknown; date_added?: unknown; children?: unknown };
+        if (n.type === 'url' || (typeof n.url === 'string' && !Array.isArray(n.children))) {
+            const url = cleanImportUrl(typeof n.url === 'string' ? n.url : undefined);
+            if (!url) { skipped += 1; continue; }
+            links.push({
+                url,
+                title: cleanTitle(typeof n.name === 'string' ? n.name : undefined),
+                addedAt: parseWebkitDate(n.date_added),
+                tags: cleanTags(path),
+            });
+            continue;
+        }
+        if (Array.isArray(n.children)) {
+            const name = cleanTitle(typeof n.name === 'string' ? n.name : undefined) ?? '';
+            const next = name && !CHROME_ROOT_FOLDERS.test(name) ? [...path, name] : path;
+            // Push in reverse so the walk visits children in file order.
+            for (let i = n.children.length - 1; i >= 0; i -= 1) stack.push({ node: n.children[i], path: next });
+        }
+    }
+    return { format: 'chrome-json', links, skipped };
 }
 
 /* ------------------------------------------------------------------ *
@@ -403,6 +496,10 @@ export function detectImportFormat(text: string, filename?: string): ImportForma
     const head = text.slice(0, 4096).toLowerCase();
     if (head.includes('netscape-bookmark-file') || /<dt>\s*<a\s+href/i.test(head)) return 'bookmarks';
     if (/\.html?$/.test(name)) return 'bookmarks';
+    // The Chrome profile file has no extension and starts with its checksum
+    // and `roots`; a `.json` named anything is tried the same way and falls
+    // through to URL recovery if it is not that shape.
+    if (/^\s*\{/.test(head) && (head.includes('"roots"') || /\.json$/.test(name) || /^bookmarks(\.bak)?$/.test(name))) return 'chrome-json';
     const firstLine = (text.split(/\r?\n/, 1)[0] ?? '').toLowerCase();
     if (firstLine.includes(',') && /(^|,)\s*"?url"?\s*(,|$)/.test(firstLine)) return 'pocket';
     if (/\.(csv|tsv)$/.test(name)) return 'pocket';
@@ -421,7 +518,8 @@ export function parseImportFile(text: string, filename?: string): ImportParseRes
     const format = detectImportFormat(text, filename);
     let result = format === 'bookmarks' ? parseNetscapeBookmarks(text)
         : format === 'pocket' ? parsePocketCsv(text)
-            : parseUrlList(text);
+            : format === 'chrome-json' ? parseChromeBookmarksJson(text)
+                : parseUrlList(text);
     if (!result.links.length && format !== 'urls') {
         const recovered = recoverUrls(text);
         if (recovered.length) result = { format, links: recovered, skipped: 0 };
