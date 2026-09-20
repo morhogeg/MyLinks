@@ -233,7 +233,25 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-09-19, round 4): install build **1331** (search recall pass across every layer), then the 1327 QA below if not yet done
+> ## 🚨 OWNER ACTION (updated 2026-09-20): install build **1332** (collections launch pass), then the 1331 QA below if not yet done
+>
+> **1332** (run #332, merge `81b61f6`) carries the whole collections pass:
+> functions deploy run #112 (`publish_share_http`, `unpublish_share_http`,
+> NEW `delete_collection_http`, `share_page`, `search_links_http`), rules
+> deploy run #15 (new client-writable `dismissedSuggestions`), hosting run
+> #17 (the `/api/delete-collection` rewrite; run #16 lost a race with the
+> functions deploy, see §2 gotchas). QA on 1332: (1) put a card in a
+> PRIVATE collection and in a public one, share the public one: the page
+> must not show it and the sheet says "1 private card is left out."
+> (2) Stop sharing, reload the link within ~1 min: 404. (3) Open a big
+> collection: no "Nothing here yet" flash; Manage cards lists old members
+> and says "Done". (4) Collections gallery: no category-named suggestion
+> (e.g. "Technology"); the tile button reads Preview. (5) Collection
+> header: "Ask about this" answers from those cards; leaving Ask returns to
+> the collection. (6) Dismiss a suggestion on iPhone, open desktop web:
+> still gone. (7) Delete a shared collection: it disappears, its link 404s.
+>
+> ## (superseded) OWNER ACTION (updated 2026-09-19, round 4): install build **1331** (search recall pass across every layer), then the 1327 QA below if not yet done
 >
 > **1331** (run #331, merge `f2f53ac`) is the complete recall fix after your
 > 1330 screenshot ("Latching tips" → No matches for a card titled "...
@@ -2279,7 +2297,14 @@ exact-match, capped.
   collectionSuggest,useCollectionLinks,storage,types}.ts`; backend
   `functions/{share_service,main}.py`; rules `firestore.rules` +
   `.locked` + `firestore-rules-test`; rewrites `firebase.json` +
-  `web/vercel.json`. Shipped via /ship (see the ship note at the end).**
+  `web/vercel.json`. SHIPPED: merge `81b61f6` to main (Vercel auto), functions
+  deploy run #112 green (scoped to the five functions), rules deploy run
+  #15 green (emulator suite passed in CI, then deployed), rules-tests run
+  #18 green, hosting run #16 FAILED ("Cloud Run service
+  `delete-collection-http` does not exist": it finished before the
+  functions deploy created it) and hosting run #17 green after the
+  self-referential re-trigger commit `4ffc79a`; TestFlight run #332 =
+  **build 1332** green.**
   **Post-launch items done in the same session (owner: "do everything"):**
   `_publish_share_logic(..., collection={id, signature})` writes
   shareId/isPublic/publishedAt/publishedSignature onto
