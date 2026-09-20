@@ -48,6 +48,8 @@ import AddToCollectionSheet from './AddToCollectionSheet';
 import CollectionsGallery from './CollectionsGallery';
 import SuggestionPreviewSheet from './SuggestionPreviewSheet';
 import OverflowMenu from './OverflowMenu';
+import { hapticLight } from '@/lib/haptics';
+import ImportSheet from './ImportSheet';
 import { getDirection } from '@/lib/rtl';
 import CollectionFormModal from './CollectionFormModal';
 import ManageCollectionCardsSheet from './ManageCollectionCardsSheet';
@@ -56,7 +58,7 @@ import NotesView from './NotesView';
 import KnowledgeGraph from './KnowledgeGraph';
 import { getNoteGroups } from '@/lib/notes';
 import LoadMoreSentinel from './feed/LoadMoreSentinel';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, Share2, Globe, Plus, Pencil, Newspaper, CalendarCheck, Lock, BookOpenCheck, ChevronLeft, BarChart3, StickyNote, Waypoints } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, Share2, Globe, Plus, Pencil, Newspaper, CalendarCheck, Lock, BookOpenCheck, ChevronLeft, BarChart3, StickyNote, Waypoints, Upload } from 'lucide-react';
 import { usePullToRefresh } from '@/lib/usePullToRefresh';
 import { useProcessingBanner } from '@/lib/useProcessingBanner';
 import { cardStartMs } from '@/lib/shareProgress';
@@ -250,6 +252,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         handleShareCard,
     } = useLinkActions(uid, toast);
     const [activeLinkId, setActiveLinkId] = useState<string | null>(null);
+    // The import sheet, offered from the empty library (the same sheet the
+    // first run and Settings open).
+    const [importing, setImporting] = useState(false);
     // Cards fetched directly by id for a deep-link (?linkId) that targets a card
     // older than the loaded window — reminder push taps and dup-save redirects
     // point at arbitrary-age links. Keyed by id; consulted by activeLink below.
@@ -3038,6 +3043,19 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                 spends a model call on its own. Same pill height
                                 as Clear search, quieter fill: the primary action
                                 on a dead end is still to try other words. */}
+                            {/* An empty LIBRARY (no filter, no search) is the
+                                one place a bookmarks file is worth more than a
+                                single save: offer the import here, not only in
+                                Settings and the first run. */}
+                            {!searchQuery && selectedTags.size === 0 && selectedSources.size === 0 && selectedCategory.size === 0 && selectedCollections.size === 0 && empty.Icon === Inbox && (
+                                <button
+                                    onClick={() => { hapticLight(); setImporting(true); }}
+                                    className="mt-5 inline-flex items-center gap-2 px-4 h-10 rounded-full bg-card border border-border-subtle text-text text-sm font-bold hover:bg-card-hover active:scale-95 transition-all"
+                                >
+                                    <Upload className="w-4 h-4 text-accent" />
+                                    Import bookmarks
+                                </button>
+                            )}
                             {searchQuery && visibleLinks.length > 0 && (
                                 <button
                                     onClick={() => handleAskFromSearch(searchQuery.trim())}
@@ -3466,6 +3484,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                 confirmLabel="Delete"
                 variant="danger"
             />
+
+            <ImportSheet isOpen={importing} onClose={() => setImporting(false)} />
 
             {/* Delete confirmation (bulk) */}
             <ConfirmDialog

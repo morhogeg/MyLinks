@@ -372,3 +372,21 @@ def test_a_queued_job_is_pruned_once_it_is_truly_abandoned(monkeypatch):
         {"id": "abandoned", "status": "queued", "createdAt": _ago(5 * 60), "source": "import"},
     ])
     assert deleted == ["abandoned"]
+
+
+# ── _merge_import_tags (the worker makes folder hints real tags) ─────────────
+
+def test_import_tags_follow_the_models_tags_without_repeats():
+    assert main._merge_import_tags(["Design", "python"], ["Reading", "design", " Longform "]) == [
+        "Design", "python", "Reading", "Longform",
+    ]
+
+
+def test_import_tags_are_bounded_and_junk_is_dropped():
+    hints = [f"h{i}" for i in range(20)] + [7, None]
+    out = main._merge_import_tags([f"m{i}" for i in range(10)], hints)
+    assert len(out) == main.MAX_CARD_TAGS
+    assert out[:10] == [f"m{i}" for i in range(10)]
+    assert out[10:] == ["h0", "h1"]
+    assert main._merge_import_tags(None, None) == []
+    assert main._merge_import_tags(["x"], ["x" * 200])[1] == "x" * main.MAX_TAG_LENGTH

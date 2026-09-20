@@ -442,6 +442,23 @@ export async function generateCardSummary(
  * existing analyze pipeline means no new backend/rules and the card keeps its id
  * — nothing is ever dropped or duplicated.
  */
+/** The model's tags first, then the import's folder / export tags not already
+ *  there (case-insensitive), capped like the backend's `_merge_import_tags`. */
+export function mergeImportedTags(modelTags: string[], imported?: string[]): string[] {
+    const out: string[] = [];
+    const seen = new Set<string>();
+    for (const raw of [...modelTags, ...(imported ?? []).slice(0, 8)]) {
+        if (typeof raw !== 'string') continue;
+        const tag = raw.trim().slice(0, 60);
+        const key = tag.toLowerCase();
+        if (!tag || seen.has(key)) continue;
+        seen.add(key);
+        out.push(tag);
+        if (out.length >= 12) break;
+    }
+    return out;
+}
+
 export async function retryFailedLink(uid: string, link: Link): Promise<void> {
     const linkRef = doc(db, 'users', uid, 'links', link.id);
     // Optimistic: show the processing skeleton immediately. Stamp when this retry
@@ -521,7 +538,9 @@ export async function retryFailedLink(uid: string, link: Link): Promise<void> {
             title: l.title,
             summary: l.summary,
             detailedSummary: l.detailedSummary ?? null,
-            tags: l.tags ?? [],
+            // An imported card keeps its folder / export tags through a retry,
+            // exactly as the background worker keeps them on first analysis.
+            tags: mergeImportedTags(l.tags ?? [], link.importedTags),
             category: canonicalCategory(l.category ?? '') || 'General',
             language: l.language ?? 'en',
             metadata: {

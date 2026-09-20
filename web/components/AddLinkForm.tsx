@@ -21,6 +21,7 @@ import { offerUpgradeFor } from '@/lib/entitlement';
 import ImageScanProgress from '@/components/ImageScanProgress';
 import VideoScanProgress from '@/components/VideoScanProgress';
 import LinkScanProgress from '@/components/LinkScanProgress';
+import ImportSheet from '@/components/ImportSheet';
 
 interface AddLinkFormProps {
     onLinkAdded: () => void;
@@ -111,6 +112,9 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isExpanded, setIsExpanded] = useState(false);
+    // The bulk import sheet, offered under the link field: one page at a time
+    // is the wrong tool for a bookmarks file.
+    const [importing, setImporting] = useState(false);
 
     // Bottom-bar capture (mobile v4): each openSignal bump opens the form.
     useEffect(() => {
@@ -943,6 +947,14 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                                             disabled={isLoading}
                                             autoFocus
                                         />
+                                        <button
+                                            type="button"
+                                            onClick={() => { setIsExpanded(false); setImporting(true); }}
+                                            className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-text-muted hover:text-accent transition-colors"
+                                        >
+                                            <Upload className="w-3.5 h-3.5" />
+                                            Have a bookmarks file? Import it
+                                        </button>
                                     </div>
                                 )
                             ) : activeTab === 'note' ? (
@@ -1081,6 +1093,8 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                     </form>
                 </div>
             )}
+
+            <ImportSheet isOpen={importing} onClose={() => setImporting(false)} />
 
             {/* FAB is desktop-only now — on phones the bottom bar's center +
                 is the capture button (see BottomTabBar). */}

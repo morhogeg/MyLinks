@@ -4663,6 +4663,25 @@ def _enrich_context_text(card: dict) -> str:
     return "\n\n".join(parts)
 
 
+def _merge_import_tags(model_tags, imported) -> list:
+    """Card tags = the model's tags, then the import's folder/tag hints that are
+    not already there (case-insensitive), capped at MAX_CARD_TAGS. Hints are
+    bounded again here because the queue doc is client-writable in shape."""
+    out, seen = [], set()
+    for t in list(model_tags or []) + list(imported or [])[:MAX_IMPORT_TAGS]:
+        if not isinstance(t, str):
+            continue
+        s = t.strip()[:MAX_TAG_LENGTH]
+        k = s.lower()
+        if not s or k in seen:
+            continue
+        seen.add(k)
+        out.append(s)
+        if len(out) >= MAX_CARD_TAGS:
+            break
+    return out
+
+
 def _merge_tags(existing, fresh) -> list:
     """Existing tags first (the user may have curated them), then the new ones,
     de-duplicated case-insensitively, capped to a sane length."""
@@ -5044,6 +5063,11 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         for key in ("importedFromAt", "importedTags"):
             if data.get(key) is not None:
                 link_data[key] = data[key]
+        # The folder a bookmark lived in ("Reading / Longform") and the tags a
+        # Pocket or Raindrop export carried are the user's OWN filing, so they
+        # become real tags on the card, after the model's, so the AI's tags
+        # still lead and the ceiling is the same MAX_CARD_TAGS.
+        link_data["tags"] = _merge_import_tags(link_data.get("tags"), data.get("importedTags"))
 
         # Embedding: only store a real Vector. If the embed failed (None), omit
         # the field and flag the card so a backfill repairs it later — never
