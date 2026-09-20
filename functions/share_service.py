@@ -1111,18 +1111,61 @@ def _share_owner_uid(db, share_id: str, public_coll: str) -> Optional[str]:
     return None
 
 
-def _publish_share_logic(uid: str, share_type: str, share_id: str, payload: dict) -> dict:
+# A collection id is a Firestore auto-id (or anything the client minted as a
+# document id). Same one-path-segment rule as share ids, no length floor: it is
+# scoped under users/{uid}, so guessability is not a concern.
+_COLLECTION_ID_RE = re.compile(r"[A-Za-z0-9_-]{1,128}")
+_SIGNATURE_MAX = 64
+# Firestore caps a batch at 500 ops; chunk conservatively (mirrors the client's
+# BATCH_LIMIT in web/lib/collections.ts).
+_BATCH_LIMIT = 450
+
+
+def _valid_collection_id(cid) -> bool:
+    return isinstance(cid, str) and _COLLECTION_ID_RE.fullmatch(cid) is not None
+
+
+def _collection_ref(db, uid: str, cid: str):
+    return db.collection("users").document(uid).collection("collections").document(cid)
+
+
+def _collection_share_flags(collection) -> tuple:
+    """Validate the optional `collection` argument of a collection publish:
+    `{id, signature?}` naming the owner's collection doc that should carry the
+    share flags. Returns (id, signature) or (None, None) when absent."""
+    if collection is None:
+        return None, None
+    if not isinstance(collection, dict) or not _valid_collection_id(collection.get("id")):
+        raise ValueError("collection.id is required")
+    sig = collection.get("signature")
+    sig = sig[:_SIGNATURE_MAX] if isinstance(sig, str) and sig else None
+    return collection["id"], sig
+
+
+def _publish_share_logic(uid: str, share_type: str, share_id: str, payload: dict,
+                         collection=None) -> dict:
     """Write a public share snapshot for `uid` WITHOUT `ownerUid`, plus the
     functions-only owner mapping. Rejects overwriting a share id owned by someone
     else (the server-side equivalent of the rules' anti-takeover guard). The
     owner check also reads unpublish TOMBSTONES (see _unpublish_share_logic),
     so a stopped share's id stays the original owner's: they can republish over
-    it, nobody else can."""
+    it, nobody else can.
+
+    For a collection, `collection={id, signature}` makes the share flags on
+    users/{uid}/collections/{id} (shareId, isPublic, publishedAt,
+    publishedSignature) part of the SAME batch as the public snapshot. The
+    client used to write those flags itself after this call returned; when that
+    second write failed the collection doc never learned its shareId, and the
+    next Share minted a fresh id while the first page stayed live, unreachable
+    by its owner."""
     public_coll = _SHARE_COLLECTIONS.get(share_type)
     if not public_coll:
         raise ValueError("invalid share type")
     if not _valid_share_id(share_id) or not isinstance(payload, dict):
         raise ValueError("shareId and payload are required")
+    if collection is not None and share_type != "collection":
+        raise ValueError("collection flags apply to collection shares only")
+    collection_id, signature = _collection_share_flags(collection)
 
     db = get_db()
     existing_owner = _share_owner_uid(db, share_id, public_coll)
@@ -1162,11 +1205,20 @@ def _publish_share_logic(uid: str, share_type: str, share_id: str, payload: dict
     batch.set(db.collection("shared_owners").document(share_id), {
         "ownerUid": uid, "type": share_type, "publishedAt": now_ms,
     })
+    if collection_id is not None:
+        col_ref = _collection_ref(db, uid, collection_id)
+        if not col_ref.get().exists:
+            raise LookupError("Collection not found")
+        flags = {"shareId": share_id, "isPublic": True, "publishedAt": now_ms, "updatedAt": now_ms}
+        if signature:
+            flags["publishedSignature"] = signature
+        batch.set(col_ref, flags, merge=True)
     batch.commit()
     return {"shareId": share_id}
 
 
-def _unpublish_share_logic(uid: str, share_type: str, share_id: str) -> dict:
+def _unpublish_share_logic(uid: str, share_type: str, share_id: str,
+                           collection_id=None) -> dict:
     """Delete a public share, if `uid` owns it, and TOMBSTONE its owner row.
 
     The public doc goes (share_page 404s from then on), but the
@@ -1178,6 +1230,11 @@ def _unpublish_share_logic(uid: str, share_type: str, share_id: str) -> dict:
     but the original owner, who can still republish over it (that is how
     "Update share link" and re-sharing after Stop sharing work).
     delete_shares_for_owner sweeps tombstones with the live rows.
+
+    `collection_id` (collection shares only) clears the share flags on
+    users/{uid}/collections/{id} in the same batch, for the same reason publish
+    writes them: the client's follow-up write used to be the only thing turning
+    "Public" off, and it could fail after the page was already gone.
     """
     public_coll = _SHARE_COLLECTIONS.get(share_type)
     if not public_coll:
@@ -1190,12 +1247,68 @@ def _unpublish_share_logic(uid: str, share_type: str, share_id: str) -> dict:
     if owner is not None and owner != uid:
         raise PermissionError("This share id belongs to another account")
 
+    if collection_id is not None and share_type != "collection":
+        raise ValueError("collectionId applies to collection shares only")
+    if collection_id is not None and not _valid_collection_id(collection_id):
+        raise ValueError("invalid collectionId")
+
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
-    db.collection(public_coll).document(share_id).delete()
+    batch = db.batch()
+    batch.delete(db.collection(public_coll).document(share_id))
     # merge=True: a legacy share (owner only on the public doc, no owner row)
     # gets a row now; an existing row keeps publishedAt and everything else.
-    db.collection("shared_owners").document(share_id).set({
+    batch.set(db.collection("shared_owners").document(share_id), {
         "ownerUid": owner or uid, "type": share_type, "unpublishedAt": now_ms,
     }, merge=True)
+    if collection_id is not None:
+        col_ref = _collection_ref(db, uid, collection_id)
+        # A missing doc (deleted meanwhile) is fine: nothing to clear.
+        if col_ref.get().exists:
+            batch.set(col_ref, {
+                "isPublic": False, "shareId": None, "publishedAt": None,
+                "publishedSignature": None, "updatedAt": now_ms,
+            }, merge=True)
+    batch.commit()
     _delete_share_previews(share_id)
     return {"success": True}
+
+
+def _delete_collection_logic(uid: str, collection_id: str) -> dict:
+    """Delete one of `uid`'s collections server-side: tear down its public
+    page if it has one, strip its id from every member card's `collectionIds`,
+    then delete the doc. Replaces the client-side sweep, which had to read every
+    member document in full (embedding vectors included) just to get the refs,
+    and could leave the page up when the unpublish call failed. Order matters
+    the same way it did on the client: unpublish FIRST, so a failure there
+    leaves the collection intact and visibly still shared."""
+    if not _valid_collection_id(collection_id):
+        raise ValueError("collectionId is required")
+    db = get_db()
+    col_ref = _collection_ref(db, uid, collection_id)
+    snap = col_ref.get()
+    if not snap.exists:
+        raise LookupError("Collection not found")
+    share_id = (snap.to_dict() or {}).get("shareId")
+    if share_id:
+        try:
+            _unpublish_share_logic(uid, "collection", share_id)
+        except ValueError:
+            # A malformed legacy shareId cannot name a live page; nothing to
+            # take down.
+            logger.warning(f"delete_collection: ignoring malformed shareId on {collection_id}")
+
+    from firebase_admin import firestore as _fs
+    links = db.collection("users").document(uid).collection("links")
+    # Refs only: `__name__` projection keeps a 500-card sweep from pulling
+    # 500 embedding vectors through the function.
+    members = links.where(
+        filter=_fs.FieldFilter("collectionIds", "array_contains", collection_id)
+    ).select(["__name__"]).stream()
+    refs = [m.reference for m in members]
+    for i in range(0, len(refs), _BATCH_LIMIT):
+        batch = db.batch()
+        for ref in refs[i:i + _BATCH_LIMIT]:
+            batch.update(ref, {"collectionIds": _fs.ArrayRemove([collection_id])})
+        batch.commit()
+    col_ref.delete()
+    return {"success": True, "removed": len(refs)}

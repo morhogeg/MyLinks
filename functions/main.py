@@ -85,7 +85,7 @@ from entitlement import (
 # this file — Firebase discovers deployables by scanning main.py — and call into
 # these helpers. share_service imports only db + stdlib (never main → no cycle).
 from share_service import (
-    _publish_share_logic, _unpublish_share_logic,
+    _publish_share_logic, _unpublish_share_logic, _delete_collection_logic,
     _render_shared_card, _render_shared_collection, _render_shared_answer,
     _share_not_found_html, _valid_share_id,
 )
@@ -4418,10 +4418,13 @@ def publish_share_http(req: https_fn.Request) -> https_fn.Response:
     try:
         result = _publish_share_logic(
             uid, data.get("type"), data.get("shareId"), data.get("payload"),
+            collection=data.get("collection"),
         )
         return https_fn.Response(json.dumps(result), status=200, headers=headers, mimetype='application/json')
     except PermissionError as e:
         return _error_response(str(e), 403, headers)
+    except LookupError as e:
+        return _error_response(str(e), 404, headers)
     except ValueError as e:
         return _error_response(str(e), 400, headers)
     except Exception as e:
@@ -4432,7 +4435,8 @@ def publish_share_http(req: https_fn.Request) -> https_fn.Response:
 def unpublish_share_http(req: https_fn.Request) -> https_fn.Response:
     """Stop sharing a card/collection/answer: delete the public snapshot and
     tombstone the owner row (share_service._unpublish_share_logic).
-    Body: { type: 'card'|'collection'|'answer', shareId: str, uid?: str }."""
+    Body: { type: 'card'|'collection'|'answer', shareId: str, uid?: str,
+            collectionId?: str  (collection shares: also clear its share flags) }."""
     if req.method == 'OPTIONS':
         return _cors_preflight(req)
     headers = _cors_headers(req)
@@ -4451,7 +4455,9 @@ def unpublish_share_http(req: https_fn.Request) -> https_fn.Response:
     if auth_err:
         return auth_err
     try:
-        result = _unpublish_share_logic(uid, data.get("type"), data.get("shareId"))
+        result = _unpublish_share_logic(
+            uid, data.get("type"), data.get("shareId"), collection_id=data.get("collectionId"),
+        )
         return https_fn.Response(json.dumps(result), status=200, headers=headers, mimetype='application/json')
     except PermissionError as e:
         return _error_response(str(e), 403, headers)
@@ -4459,6 +4465,42 @@ def unpublish_share_http(req: https_fn.Request) -> https_fn.Response:
         return _error_response(str(e), 400, headers)
     except Exception as e:
         return _server_error(headers, e, "Unpublish failed")
+
+
+@https_fn.on_request()
+def delete_collection_http(req: https_fn.Request) -> https_fn.Response:
+    """Delete one of the caller's collections (share_service._delete_collection_logic):
+    unpublish its page if shared, strip its id from every member card, delete
+    the doc. Server-side so the membership sweep never pulls full card docs
+    through the client and the unpublish can't be skipped.
+    Body: { collectionId: str, uid?: str }. Returns { success, removed }."""
+    if req.method == 'OPTIONS':
+        return _cors_preflight(req)
+    headers = _cors_headers(req)
+    # Same gate as unpublish: this can take a public page down.
+    rl = _rate_limited("publish-ip", _rate_limit_identity(req), headers)
+    if rl:
+        return rl
+    if not _require_app_check(req, headers):
+        return _error_response("App Check verification failed", 401, headers)
+    try:
+        data = req.get_json(silent=True) or {}
+    except Exception:
+        data = {}
+    uid, auth_err = _authed_uid(req, headers, data.get("uid"))
+    if auth_err:
+        return auth_err
+    try:
+        result = _delete_collection_logic(uid, data.get("collectionId"))
+        return https_fn.Response(json.dumps(result), status=200, headers=headers, mimetype='application/json')
+    except PermissionError as e:
+        return _error_response(str(e), 403, headers)
+    except LookupError as e:
+        return _error_response(str(e), 404, headers)
+    except ValueError as e:
+        return _error_response(str(e), 400, headers)
+    except Exception as e:
+        return _server_error(headers, e, "Delete failed")
 
 
 @https_fn.on_request()

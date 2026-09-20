@@ -83,20 +83,33 @@ export async function updateCollection(
 }
 
 /**
- * Delete a collection. Order matters: the public snapshot is torn down FIRST,
- * then membership is stripped from every member card's `collectionIds`
- * (batched), then the doc goes. If the unpublish call fails this throws with
- * nothing changed, so the caller can toast and the user still sees a
- * collection they know is public, rather than a vanished collection whose
- * page quietly stays up.
+ * Delete a collection. The work runs server-side (`/api/delete-collection`):
+ * unpublish its page if shared, strip its id from every member card, delete
+ * the doc. That keeps the membership sweep from reading every member document
+ * in full (embedding vectors included) through the client, and makes the
+ * unpublish impossible to skip. Order on the server matches the old client
+ * order: unpublish FIRST, so a failure there leaves the collection intact and
+ * visibly still shared, and this throws for the caller to toast.
+ *
+ * Falls back to the client-side sweep when the endpoint itself is unreachable
+ * (a hosting rewrite not yet live, an old function build): the fallback keeps
+ * the same unpublish-first guarantee, so deletion never depends on which side
+ * happens to be deployed.
  */
 export async function deleteCollection(uid: string, id: string, shareId?: string): Promise<void> {
-    if (shareId) {
-        // Public snapshot is Admin-SDK-owned now (locked rules deny client
-        // writes to shared_*), so tear it down via the endpoint, not deleteDoc.
-        await callShareApi('/api/unpublish-share', { uid, type: 'collection', shareId });
+    try {
+        await callShareApi('/api/delete-collection', { uid, collectionId: id });
+        return;
+    } catch (e) {
+        // The server refusing (403: not the owner) is final; anything else
+        // (route missing, timeout) falls through to the client path.
+        if (e instanceof Error && /belongs to another account/.test(e.message)) throw e;
     }
-    // Find all member cards and clear the membership in one batch.
+    if (shareId) {
+        // Public snapshot is Admin-SDK-owned (locked rules deny client writes
+        // to shared_*), so tear it down via the endpoint, not deleteDoc.
+        await callShareApi('/api/unpublish-share', { uid, type: 'collection', shareId, collectionId: id });
+    }
     const linksRef = collection(db, 'users', uid, 'links');
     const members = await getDocs(query(linksRef, where('collectionIds', 'array-contains', id)));
     if (!members.empty) {
@@ -276,23 +289,33 @@ export async function publishCollection(
     memberLinks: Link[]
 ): Promise<string> {
     const shareId = collectionDoc.shareId || newShareId();
+    const signature = collectionSignature(collectionDoc, memberLinks);
+    // The server writes the share flags onto the collection doc in the SAME
+    // batch as the public snapshot (`collection: {id, signature}`), so a
+    // publish can never leave a live page whose shareId the collection doc
+    // never learned (the old two-step wrote the flags from here afterwards,
+    // and a failure between the two minted a fresh id on the next Share).
     await callShareApi('/api/publish-share', {
         uid,
         type: 'collection',
         shareId,
+        collection: { id: collectionDoc.id, signature },
         payload: clean({
             name: collectionDoc.name,
             description: collectionDoc.description,
             cards: memberLinks.map(toSharedCollectionCard),
         }),
     });
+    // Belt and braces for a function build that predates the server-side
+    // flags: the same values, idempotent, and no longer load-bearing, so a
+    // failure here is not an error.
     await updateDoc(doc(db, 'users', uid, 'collections', collectionDoc.id), {
         shareId,
         isPublic: true,
         publishedAt: Date.now(),
-        publishedSignature: collectionSignature(collectionDoc, memberLinks),
+        publishedSignature: signature,
         updatedAt: Date.now(),
-    });
+    }).catch(() => {});
     return shareId;
 }
 
@@ -303,8 +326,10 @@ export async function publishCollection(
  */
 export async function unpublishCollection(uid: string, collectionDoc: Collection): Promise<void> {
     if (collectionDoc.shareId) {
+        // `collectionId` lets the server clear the flags in the same batch
+        // that removes the page; the write below is the pre-server fallback.
         await callShareApi('/api/unpublish-share', {
-            uid, type: 'collection', shareId: collectionDoc.shareId,
+            uid, type: 'collection', shareId: collectionDoc.shareId, collectionId: collectionDoc.id,
         });
     }
     await updateDoc(doc(db, 'users', uid, 'collections', collectionDoc.id), {
@@ -313,7 +338,7 @@ export async function unpublishCollection(uid: string, collectionDoc: Collection
         publishedAt: null,
         publishedSignature: null,
         updatedAt: Date.now(),
-    });
+    }).catch(() => {});
 }
 
 /**

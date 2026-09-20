@@ -112,6 +112,7 @@ import share_service
 from share_service import (
     _publish_share_logic,
     _unpublish_share_logic,
+    _delete_collection_logic,
     _sanitize_collection_share_payload,
     _sanitize_card_share_payload,
     _share_html_shell,
@@ -124,9 +125,19 @@ SHARE_ID = "3f2a9c1d4e5b6a7f8c9d0e1f2a3b4c5d"
 
 
 class _FakeDoc:
+    """One document. Store keys are (collection path, doc id); a subcollection
+    path is 'users/<uid>/collections' style, so nested refs work too."""
     def __init__(self, store, coll, doc_id):
         self._store, self._coll, self._id = store, coll, doc_id
         self.exists = (coll, doc_id) in store
+
+    @property
+    def id(self):
+        return self._id
+
+    @property
+    def reference(self):
+        return self
 
     def get(self):
         self.exists = (self._coll, self._id) in self._store
@@ -142,8 +153,46 @@ class _FakeDoc:
         else:
             self._store[key] = dict(data)
 
+    def update(self, data):
+        key = (self._coll, self._id)
+        cur = dict(self._store[key])
+        for k, v in data.items():
+            if isinstance(v, _ArrayRemove):
+                cur[k] = [x for x in cur.get(k, []) if x not in v.values]
+            else:
+                cur[k] = v
+        self._store[key] = cur
+
     def delete(self):
         self._store.pop((self._coll, self._id), None)
+
+    def collection(self, name):
+        return _FakeColl(self._store, f"{self._coll}/{self._id}/{name}")
+
+
+class _ArrayRemove:
+    def __init__(self, values):
+        self.values = list(values)
+
+
+class _FieldFilter:
+    def __init__(self, field, op, value):
+        self.field, self.op, self.value = field, op, value
+
+
+class _FakeQuery:
+    def __init__(self, store, name, flt):
+        self._store, self._name, self._flt = store, name, flt
+
+    def select(self, _fields):
+        return self
+
+    def stream(self):
+        for (coll, doc_id), data in list(self._store.items()):
+            if coll != self._name:
+                continue
+            if self._flt.op == "array_contains" and self._flt.value in (data.get(self._flt.field) or []):
+                yield _FakeDoc(self._store, coll, doc_id)
 
 
 class _FakeColl:
@@ -153,17 +202,31 @@ class _FakeColl:
     def document(self, doc_id):
         return _FakeDoc(self._store, self._name, doc_id)
 
+    def where(self, filter):
+        return _FakeQuery(self._store, self._name, filter)
+
 
 class _FakeBatch:
     def __init__(self):
         self._ops = []
 
-    def set(self, ref, data):
-        self._ops.append((ref, data))
+    def set(self, ref, data, merge=False):
+        self._ops.append(("set", ref, data, merge))
+
+    def update(self, ref, data):
+        self._ops.append(("update", ref, data, False))
+
+    def delete(self, ref):
+        self._ops.append(("delete", ref, None, False))
 
     def commit(self):
-        for ref, data in self._ops:
-            ref.set(data)
+        for op, ref, data, merge in self._ops:
+            if op == "set":
+                ref.set(data, merge=merge)
+            elif op == "update":
+                ref.update(data)
+            else:
+                ref.delete()
         self._ops = []
 
 
@@ -185,6 +248,14 @@ def db(monkeypatch):
     # Never touch Storage for preview cleanup / generation in these tests.
     monkeypatch.setattr(share_service, "_delete_share_previews", lambda _id: None)
     monkeypatch.setattr(share_service, "_generate_og_preview", lambda *a, **k: None)
+    # _delete_collection_logic imports firebase_admin.firestore lazily for
+    # FieldFilter / ArrayRemove; hand it the fakes above.
+    import sys, types
+    fs = types.SimpleNamespace(FieldFilter=_FieldFilter, ArrayRemove=_ArrayRemove)
+    fa = sys.modules.get("firebase_admin") or types.ModuleType("firebase_admin")
+    monkeypatch.setattr(fa, "firestore", fs, raising=False)
+    monkeypatch.setitem(sys.modules, "firebase_admin", fa)
+    monkeypatch.setitem(sys.modules, "firebase_admin.firestore", fs)
     return fake
 
 
@@ -302,3 +373,136 @@ class TestNoIndex:
         ]
         for html in pages:
             assert '<meta name="robots" content="noindex">' in html
+
+
+# ── Server-owned collection flags + server-side delete (2026-09-20) ──────────
+# The share flags on users/{uid}/collections/{id} ride the publish/unpublish
+# batch, and deleting a collection is one endpoint that unpublishes first.
+
+COLLECTION_ID = "col_abc123"
+COLL_PATH = f"users/{OWNER}/collections"
+LINKS_PATH = f"users/{OWNER}/links"
+
+
+def _seed_collection(db, share_id=None):
+    data = {"name": "Deep Learning", "updatedAt": 1}
+    if share_id:
+        data.update({"shareId": share_id, "isPublic": True})
+    db.store[(COLL_PATH, COLLECTION_ID)] = data
+
+
+class TestCollectionFlagsRideTheBatch:
+    def test_publish_writes_the_flags_onto_the_collection_doc(self, db):
+        _seed_collection(db)
+        _publish_share_logic(OWNER, "collection", SHARE_ID,
+                             {"name": "N", "cards": [_card()]},
+                             collection={"id": COLLECTION_ID, "signature": "3.abc"})
+        col = db.store[(COLL_PATH, COLLECTION_ID)]
+        assert col["shareId"] == SHARE_ID and col["isPublic"] is True
+        assert col["publishedSignature"] == "3.abc" and col["publishedAt"] > 0
+        assert col["name"] == "Deep Learning"  # merge, not replace
+
+    def test_publish_into_a_missing_collection_writes_nothing(self, db):
+        with pytest.raises(LookupError):
+            _publish_share_logic(OWNER, "collection", SHARE_ID,
+                                 {"name": "N", "cards": [_card()]},
+                                 collection={"id": COLLECTION_ID})
+        assert ("shared_collections", SHARE_ID) not in db.store
+        assert ("shared_owners", SHARE_ID) not in db.store
+
+    def test_collection_flags_are_refused_on_a_card_share(self, db):
+        with pytest.raises(ValueError):
+            _publish_share_logic(OWNER, "card", SHARE_ID, {"card": _card()},
+                                 collection={"id": COLLECTION_ID})
+
+    def test_a_bad_collection_id_is_refused(self, db):
+        with pytest.raises(ValueError):
+            _publish_share_logic(OWNER, "collection", SHARE_ID, {"name": "N", "cards": []},
+                                 collection={"id": "a/b"})
+
+    def test_unpublish_clears_the_flags(self, db):
+        _seed_collection(db)
+        _publish_share_logic(OWNER, "collection", SHARE_ID, {"name": "N", "cards": [_card()]},
+                             collection={"id": COLLECTION_ID, "signature": "s"})
+        _unpublish_share_logic(OWNER, "collection", SHARE_ID, collection_id=COLLECTION_ID)
+        col = db.store[(COLL_PATH, COLLECTION_ID)]
+        assert col["isPublic"] is False and col["shareId"] is None
+        assert col["publishedSignature"] is None
+        assert ("shared_collections", SHARE_ID) not in db.store
+
+    def test_a_stranger_cannot_clear_someone_elses_flags(self, db):
+        _seed_collection(db)
+        _publish_share_logic(OWNER, "collection", SHARE_ID, {"name": "N", "cards": [_card()]},
+                             collection={"id": COLLECTION_ID})
+        with pytest.raises(PermissionError):
+            _unpublish_share_logic(STRANGER, "collection", SHARE_ID, collection_id=COLLECTION_ID)
+        assert db.store[(COLL_PATH, COLLECTION_ID)]["isPublic"] is True
+
+
+class TestDeleteCollection:
+    def _seed_members(self, db, n, other="col_other"):
+        for i in range(n):
+            db.store[(LINKS_PATH, f"link{i}")] = {
+                "title": f"t{i}", "collectionIds": [COLLECTION_ID, other],
+                "embedding_vector": [0.1] * 8,
+            }
+        db.store[(LINKS_PATH, "unrelated")] = {"title": "u", "collectionIds": [other]}
+
+    def test_delete_strips_membership_and_removes_the_doc(self, db):
+        _seed_collection(db)
+        self._seed_members(db, 3)
+        result = _delete_collection_logic(OWNER, COLLECTION_ID)
+        assert result == {"success": True, "removed": 3}
+        assert (COLL_PATH, COLLECTION_ID) not in db.store
+        for i in range(3):
+            assert db.store[(LINKS_PATH, f"link{i}")]["collectionIds"] == ["col_other"]
+        assert db.store[(LINKS_PATH, "unrelated")]["collectionIds"] == ["col_other"]
+
+    def test_delete_of_a_shared_collection_takes_the_page_down_first(self, db):
+        _seed_collection(db, share_id=SHARE_ID)
+        _publish_share_logic(OWNER, "collection", SHARE_ID, {"name": "N", "cards": [_card()]})
+        self._seed_members(db, 1)
+        _delete_collection_logic(OWNER, COLLECTION_ID)
+        assert ("shared_collections", SHARE_ID) not in db.store
+        assert db.store[("shared_owners", SHARE_ID)]["unpublishedAt"] > 0  # tombstoned
+        assert (COLL_PATH, COLLECTION_ID) not in db.store
+
+    def test_delete_stops_when_the_share_belongs_to_someone_else(self, db):
+        # Defence in depth: a collection doc pointing at a share id another
+        # account owns must not be able to take that page down.
+        _seed_collection(db, share_id=SHARE_ID)
+        _publish_share_logic(STRANGER, "collection", SHARE_ID, {"name": "N", "cards": [_card()]})
+        self._seed_members(db, 1)
+        with pytest.raises(PermissionError):
+            _delete_collection_logic(OWNER, COLLECTION_ID)
+        assert (COLL_PATH, COLLECTION_ID) in db.store  # nothing changed
+        assert db.store[(LINKS_PATH, "link0")]["collectionIds"] == [COLLECTION_ID, "col_other"]
+        assert ("shared_collections", SHARE_ID) in db.store
+
+    def test_missing_collection_is_a_lookup_error(self, db):
+        with pytest.raises(LookupError):
+            _delete_collection_logic(OWNER, COLLECTION_ID)
+
+    def test_bad_ids_are_refused(self, db):
+        for bad in (None, "", "a/b", 5):
+            with pytest.raises(ValueError):
+                _delete_collection_logic(OWNER, bad)
+
+    def test_large_collections_are_swept_in_chunks(self, db, monkeypatch):
+        commits = []
+        real_batch = db.batch
+
+        def counting_batch():
+            b = real_batch()
+            orig = b.commit
+            def commit():
+                commits.append(len(b._ops))
+                orig()
+            b.commit = commit
+            return b
+        monkeypatch.setattr(db, "batch", counting_batch)
+        _seed_collection(db)
+        self._seed_members(db, 1000)
+        result = _delete_collection_logic(OWNER, COLLECTION_ID)
+        assert result["removed"] == 1000
+        assert max(commits) <= share_service._BATCH_LIMIT

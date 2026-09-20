@@ -1853,14 +1853,19 @@ G3. **[x] iOS share extension: multi-screenshot cards — SHIPPED 2026-09-16 (me
     button previews instead of creating blind. Still open: embedding-based
     clustering server-side for deeper/semantic groupings.
 23a. **[x] Collections launch pass (2026-09-20) — four-reviewer audit, all
-    findings fixed; see §9.** The P0 was real: a card in a PIN-locked
-    collection (or flagged private) was published inside a public collection
-    page. Left for post-launch: publish's two-step write (server snapshot,
-    then client flag write) can still mint a second shareId if the second
-    step fails; a server-side delete endpoint for collections (the client
-    sweep reads full member docs, embeddings included); `Link.updatedAt` is
-    stamped only by title/summary/category/thumbnail edits, so the stale
-    signature ignores note edits (not rendered on the page anyway).
+    findings fixed, post-launch items included; see §9.** The P0 was real: a
+    card in a PIN-locked collection (or flagged private) was published inside
+    a public collection page. Same day, the two items first deferred: the
+    server now writes the collection's share flags in the SAME batch as the
+    public snapshot (publish `collection: {id, signature}`, unpublish
+    `collectionId`), so a publish can no longer leave a live page whose
+    shareId the collection doc never learned; and collection delete is a
+    server endpoint (`/api/delete-collection` -> `delete_collection_http`,
+    unpublish first, `__name__`-projected membership sweep in 450-op
+    batches) with the old client sweep kept only as a fallback for deploy
+    skew. Remaining, deliberately: `Link.updatedAt` is stamped by
+    title/summary/category/thumbnail edits only, since notes are not on the
+    public page.
 24. **[ ] T10 export** (MD/PDF/HTML from ReadingView), **T11 highlights**, T5/T6
     connector framework + YouTube liked-videos sync (pull connectors; IG/FB saved
     have no legitimate API — won't do), Chrome Web Store listing for the extension.
@@ -2266,7 +2271,26 @@ exact-match, capped.
   SuggestionPreviewSheet,PinLockModal}.tsx`, `web/lib/{collections,
   collectionSuggest,useCollectionLinks,storage,types}.ts`; backend
   `functions/{share_service,main}.py`; rules `firestore.rules` +
-  `.locked` + `firestore-rules-test`. NOT yet shipped from this branch.**
+  `.locked` + `firestore-rules-test`; rewrites `firebase.json` +
+  `web/vercel.json`. Shipped via /ship (see the ship note at the end).**
+  **Post-launch items done in the same session (owner: "do everything"):**
+  `_publish_share_logic(..., collection={id, signature})` writes
+  shareId/isPublic/publishedAt/publishedSignature onto
+  `users/{uid}/collections/{id}` in the snapshot's batch (404 if the doc is
+  missing, 400 on a card share); `_unpublish_share_logic(...,
+  collection_id)` clears them in the tombstone batch; the client keeps its
+  own flag write as a no-longer-load-bearing `.catch(() => {})` for a
+  function build that predates this. NEW `_delete_collection_logic` +
+  `delete_collection_http` (`/api/delete-collection` on both origins;
+  firebase.json change auto-deploys hosting): unpublish first
+  (PermissionError aborts with nothing changed), members via
+  `array_contains` + `select(["__name__"])`, `ArrayRemove` in 450-op
+  batches, then the doc. Client `deleteCollection` calls it and falls back
+  to the old sweep only when the endpoint is unreachable. 11 new tests
+  (flags ride the batch, missing collection, stranger cannot clear flags,
+  delete order, chunking at 1000 members); the fake Firestore in
+  `test_share_page.py` grew subcollections, queries and batch
+  update/delete.
   Owner: "review everything to do with the collections page ... must be
   perfect". Three reviewers independently found the same **P0: a card the
   user marked Private, or that sits in a PIN-locked collection, was published
