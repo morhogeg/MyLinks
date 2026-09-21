@@ -2369,9 +2369,13 @@ exact-match, capped.
   decisions 09-02):** Day 1 = launch day, no pre-launch posts, brand voice,
   English only, "AI" as plumbing only, `@machinaapp`, Attach / First
   comment, internal IDs, tagline only in bio + T1.5 + close, no emoji /
-  hashtags / em dashes. **Verified:** `python3 marketing/x-launch/verify.py`
-  → 35 tweets, 21 first comments, 12 playbook replies all ≤280, zero em
-  dashes, no banned phrase, "finally" only inside the tagline. **NOT
+  hashtags / em dashes. **Self-contained pass (owner asked):** an audit found 18 of 35
+  tweets named Machina without saying what it is; each now carries "one
+  place for everything you save" or an equivalent clause, and `verify.py`
+  fails any tweet that lacks the name or the clause. **Verified:**
+  `python3 marketing/x-launch/verify.py` → 35 tweets, 21 first comments,
+  12 playbook replies all ≤280, every tweet names Machina and says what it
+  is, zero em dashes, no banned phrase, "finally" only inside the tagline. **NOT
   verified:** anything on a device (every `[fill]` screenshot, the video
   timestamp format, the import count line as rendered, the live App Store
   price). Nothing shipped; docs and marketing only, no `/ship`.

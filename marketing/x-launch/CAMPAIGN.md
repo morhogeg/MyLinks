@@ -470,9 +470,9 @@ Nothing you keep has to stay kept.
 ```tweet
 What a Machina card knows, 1/3: the summary.
 
-Save anything to Machina, one place for everything you save, and it reads the whole piece and writes what it says. Not the first paragraph. Not the blurb.
+Save anything to Machina, one place for everything you save, and it reads the whole piece and writes what it says. Not the first paragraph. Not a blurb.
 
-Your own note? Your words stay as written. Machina's read sits behind the mark.
+Your own note? Your words stay as written. Machina's read sits behind a mark.
 ```
 
 - **Attach:** two cards side by side: an article card with summary and key
