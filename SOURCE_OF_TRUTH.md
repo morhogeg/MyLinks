@@ -2200,7 +2200,29 @@ paid spend.
 
 **Launch assets — first set (ready to adapt):**
 
-*Announcement thread (X), post 1:*
+*X launch campaign (BUILT 2026-09-02, REVIEWED AND REWRITTEN 2026-09-21):*
+`marketing/x-launch/CAMPAIGN.md` is the full six-week plan for the
+`@machinaapp` account — Day 1 = App Store launch day (a Tuesday, 9:00 AM ET),
+brand voice, English only, no posts before Day 1. 31 posts built from a
+five-tweet launch thread, four **arcs** (three or four numbered posts that
+read as chapters: Save from anywhere 1/4–4/4, What a card knows 1/3–3/3, Ask
+1/3–3/3, Trust 1/3–3/3), nine **singles**, and six Sundays for the synthesis
+ritual. Every claim re-verified against build 1333 after Machina Pro (§7.1),
+import, shared collections and the 14-day trial shipped: the two Pro-only
+beats (video, full synthesis) say so, the price post carries the real free
+numbers and the trial, export and the Chrome extension are no longer
+promised. Also: account setup, Day-1 preconditions (now six, incl. approved
+IAP products and campaign links), a slip plan and Day-1 runbook, a 27-item
+attachment checklist, a twelve-question reply playbook, App Store campaign
+links per channel for attribution, the post-31 cadence, the Product Hunt /
+Show HN / LinkedIn / Reddit / short-form / press reuse plan, a claims register
+and a launch log. `marketing/x-launch/verify.py` enforces the house rules
+(≤280 per tweet and first comment, zero em dashes, banned phrases, one
+tagline surface). It **supersedes the four-post announcement thread below**
+for X; the thread stays as history and as the Product Hunt first-comment
+source.
+
+*Announcement thread (X), post 1 (superseded for X by the campaign above):*
 > I kept saving links I never looked at again. Bookmarks, WhatsApp self-messages,
 > screenshots — a graveyard.
 >
@@ -2309,6 +2331,50 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-09-21 — X LAUNCH CAMPAIGN reviewed and rewritten
+  (`/onboard`, owner: "make sure it's great and improve and add as needed",
+  then "Apple-level; arcs of 3–4 tweets that work together, some
+  individual ones; adhere to our previous discussions").** The 2026-09-02
+  draft lived only on the unmerged branch
+  `claude/x-launch-marketing-campaign-7o71hw`; it is now on this branch as
+  `marketing/x-launch/CAMPAIGN.md` (draft committed unchanged first, then
+  the rewrite, so the diff is reviewable). Findings that drove the rewrite,
+  each checked against build 1333: **(1) pricing** — §7.1 (decided later the
+  same day as the draft) makes free 100 saves + 20 asks a month, the
+  synthesis a teaser, YouTube Pro-only; the draft said "Free on iPhone and
+  web" under the synthesis and the video and "Saving is never behind a
+  paywall". Rewritten: T5/T9 first comments say the Pro beat plainly, T24
+  (Trust 2/3) carries the real free numbers, the 14-day trial and $7.99 /
+  $49.99, T1.5 says "Pro is free for your first 14 days. Nothing to cancel."
+  **(2) Export** promised in Trust 1/3 is not built (§7.1 "when built") —
+  removed. **(3)** `support@machinaapp.app` → `support@mymachina.app`;
+  "if @machinaapp is ever free" → `@mymachina`; the "use the browser
+  extension" first comment dropped (load-unpacked only); the T31 endcard
+  note updated to the 2026-09-17 film (subtitle alone, badge in the empty
+  space). **Added:** Save-from-anywhere becomes a four-part arc ending on
+  import (T11: bookmarks / Pocket / Raindrop / Instapaper / pasted list,
+  folders become tags, 200 per import, 500 lifetime free); collections
+  single now carries "Ask about this" and PIN; sharing single covers shared
+  collection pages and "private cards never leave"; a Day-1 runbook and a
+  slip plan (nothing posts until Ready for Sale is true on a phone; the
+  schedule moves as a block); IAP products approved + sandbox trial-to-free
+  run as Day-1 preconditions; App Store Connect campaign links per surface
+  (`x-bio`, `x-launch`, `x-week1`, `x-day30`, `x-close`, `producthunt`,
+  `hn`, …) replacing "source x.com"; a twelve-question reply playbook
+  (Android, free, after the trial, price, which AI, where is my data,
+  export, extension, languages, import, vs read-later, video) with every
+  answer verified; Reddit gets the import clip on Day 12; the tester email
+  mentions the founders grant; a launch log table. **Kept exactly (owner
+  decisions 09-02):** Day 1 = launch day, no pre-launch posts, brand voice,
+  English only, "AI" as plumbing only, `@machinaapp`, Attach / First
+  comment, internal IDs, tagline only in bio + T1.5 + close, no emoji /
+  hashtags / em dashes. **Verified:** `python3 marketing/x-launch/verify.py`
+  → 35 tweets, 21 first comments, 12 playbook replies all ≤280, zero em
+  dashes, no banned phrase, "finally" only inside the tagline. **NOT
+  verified:** anything on a device (every `[fill]` screenshot, the video
+  timestamp format, the import count line as rendered, the live App Store
+  price). Nothing shipped; docs and marketing only, no `/ship`.
 
 - **2026-09-20 (later) — IMPORT PASS: the bookmarks/Pocket import (PM-2,
   build 1317) reviewed and refined, not rebuilt.** Findings that drove it:
