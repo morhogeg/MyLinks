@@ -245,7 +245,7 @@ Machina is one place that holds everything you save, reads it, and gives it back
 
 Out today on iPhone.
 ~
-Share anything to Machina from any app. It reads the whole thing, not the preview, and files a clean card: summary, key points, tags, category.
+Share anything to Machina, one place for everything you save, from any app. It reads the whole thing, not the preview, and files a clean card: summary, key points, tags, category.
 
 No folders. No filing. The card finishes on its own, even if you never open the app that day.
 ~
@@ -310,11 +310,11 @@ Machina holds everything you save, from any app, and the card finishes on its ow
 #### T4 · Day 4 · Friday · single: anatomy of a card
 
 ```tweet
-This is what one tap on Share becomes in Machina.
+This is what one tap on Share becomes in Machina, one place for everything you save.
 
 A real summary, written from the whole piece.
 Key points.
-A category and tags, chosen from the content.
+A category and tags, from the content.
 Reading time.
 Three related saves, found on their own.
 
@@ -362,7 +362,7 @@ One week of Machina on the App Store.
 
 Things people saved first: [fill: five real, varied examples from launch week, with permission].
 
-One library holds all of that, from every app, read and filed on its own.
+Machina holds all of that in one place, from every app, read and filed on its own.
 
 What did you save first?
 ```
@@ -400,9 +400,9 @@ Long or short, English or Hebrew, it gets read in full. One place for everything
 ```tweet
 Machina saves from anywhere, 2/4: the video.
 
-Share a YouTube link. Machina watches the whole talk and writes the summary, the key points, and the moments that matter, each with its timestamp.
+Share a YouTube link. Machina watches the whole talk and writes the summary, the key points, and the moments that matter, with timestamps.
 
-A forty-minute talk, read in the time it took to save it.
+A forty-minute talk, read in the time it took to save it. One place for everything you save.
 ```
 
 - **Attach:** card screenshot with the video highlights visible, timestamps
@@ -418,7 +418,7 @@ A forty-minute talk, read in the time it took to save it.
 ```tweet
 Machina saves from anywhere, 3/4: the screenshots.
 
-A carousel you do not want to lose? Take up to five screenshots and share them to Machina together.
+A carousel worth keeping? Take up to five screenshots and share them to Machina, one place for everything you save.
 
 They become one card, in order, read as one piece. What is written in the images is read too.
 ```
@@ -432,9 +432,9 @@ They become one card, in order, read as one piece. What is written in the images
 ```tweet
 Machina saves from anywhere, 4/4: everything you already saved.
 
-Browser bookmarks. A Pocket, Raindrop or Instapaper export. A list of links you paste.
+Browser bookmarks. A Pocket, Raindrop or Instapaper export. A pasted list of links.
 
-Import the file and Machina reads and files every one, folders and all. Ten years of saving, read for the first time.
+Import the file. Machina reads and files every one, folders included. Ten years of saving, in one place with all you save next.
 ```
 
 - **Attach:** a 12-second clip: Settings, Import, a file chosen, the count line
@@ -470,9 +470,9 @@ Nothing you keep has to stay kept.
 ```tweet
 What a Machina card knows, 1/3: the summary.
 
-Not the first paragraph. Not the site's description. Machina reads the whole piece and writes what it says, key points underneath.
+Save anything to Machina, one place for everything you save, and it reads the whole piece and writes what it says. Not the first paragraph. Not the blurb.
 
-A note of your own? Your words stay exactly as you wrote them. Machina's read waits behind the mark.
+Your own note? Your words stay as written. Machina's read sits behind the mark.
 ```
 
 - **Attach:** two cards side by side: an article card with summary and key
@@ -485,9 +485,9 @@ A note of your own? Your words stay exactly as you wrote them. Machina's read wa
 ```tweet
 What a Machina card knows, 2/3: the filing.
 
-Every save gets a category and tags picked from its content. Health, Design, Finance, Cooking sort themselves.
+Every save in Machina, one place for everything you save, gets a category and tags from its content. Health, Design, Finance, Cooking sort themselves.
 
-Insights shows where your attention actually went this month.
+Insights shows where your attention went this month.
 
 You never make a folder.
 ```
@@ -527,7 +527,7 @@ Machina searches everything you saved by meaning, in English or Hebrew, however 
 #### T17 · Day 20 · Sunday · a real synthesis
 
 ```tweet
-This week's Machina synthesis, from one real library, shared with permission.
+This week's synthesis from Machina, one place for everything you save, written from one real library, shared with permission.
 
 Three themes. One standout. One open question. Written every Sunday from that person's own saves alone.
 
@@ -559,7 +559,7 @@ The answer is yours because the sources are.
 ```tweet
 Ask Machina, 2/3: the citation.
 
-Every line of an answer carries one. Tap it and the exact save opens, at the passage that backs the line.
+Machina answers questions from everything you saved. Every line of an answer carries a citation. Tap it and the exact save opens, at the passage that backs the line.
 
 No trust required. Check it.
 ```
@@ -572,7 +572,7 @@ No trust required. Check it.
 ```tweet
 Ask Machina, 3/3: the honest no.
 
-Ask about something you never saved, and Machina says so:
+Machina answers from what you saved, nothing else. Ask about something you never saved, and it says so:
 
 "I couldn't find anything in your library about that yet."
 
@@ -621,7 +621,7 @@ Reply with the question. Next Sunday: the best ones, and the answers Machina gav
 ```tweet
 Trust Machina, 1/3: yours.
 
-Your library is yours. No ads. No tracking. Nothing sold.
+Machina holds everything you save, from any app. That library is yours. No ads. No tracking. Nothing sold.
 
 Delete your account from inside the app and it is gone, every card with it.
 ```
@@ -637,9 +637,9 @@ Delete your account from inside the app and it is gone, every card with it.
 ```tweet
 Trust Machina, 2/3: free.
 
-The free plan is a real plan: 100 saves a month, each one read and filed. 20 questions. Search, collections, reminders, sharing, import.
+Machina, one place for everything you save, has a real free plan: 100 saves a month, each one read and filed. 20 questions. Search, collections, reminders.
 
-Pro is free for your first 14 days, then $7.99 a month or $49.99 a year. Nothing to cancel if you never subscribe.
+Pro is free for your first 14 days, then $7.99 a month or $49.99 a year. Nothing to cancel.
 ```
 
 - **Attach:** the paywall screen, or the welcome line "Pro is free for your
@@ -655,7 +655,7 @@ Pro is free for your first 14 days, then $7.99 a month or $49.99 a year. Nothing
 ```tweet
 Trust Machina, 3/3: everywhere.
 
-The web app holds the same library as your phone. Save from your phone in the morning, read it on your laptop at night, ask from either.
+Machina holds everything you save. The web app holds the same library as your phone. Save from your phone in the morning, read it on your laptop at night, ask from either.
 
 mymachina.app
 ```
@@ -668,7 +668,7 @@ mymachina.app
 ```tweet
 Machina reads Hebrew.
 
-Save a Hebrew article and the card is in Hebrew, right to left, with the right tags. Search in Hebrew. Ask in Hebrew.
+Save a Hebrew article to Machina, one place for everything you save, and the card is in Hebrew, right to left, with the right tags. Search in Hebrew. Ask in Hebrew.
 
 A mixed library is fine. Most libraries are.
 ```
@@ -681,11 +681,9 @@ A mixed library is fine. Most libraries are.
 ```tweet
 What Machina learned this month.
 
-Your questions from last Sunday, asked against real libraries:
+Last Sunday you sent questions. Machina, one place for everything you save, answered each from one real library's own saves, nothing from the web:
 
-[fill: three of the best questions from T22, each with a two-line answer excerpt and the count of saves it cited]
-
-Every answer came from someone's own saves. Nothing from the web.
+[fill: three questions, a two-line answer excerpt each, the count of saves cited]
 ```
 
 - **Attach:** three Ask screenshots stacked, one image.
@@ -698,11 +696,11 @@ Every answer came from someone's own saves. Nothing from the web.
 #### T28 · Day 36 · Tuesday · single: share a card, or a whole collection
 
 ```tweet
-Any card in Machina can be shared as a page. So can a whole collection.
+Any card in Machina, one place for everything you save, can be shared as a page. So can a whole collection.
 
-The summary, the key points, the source. Nothing you did not choose to show. Cards you marked private never leave.
+The summary, the key points, the source. Nothing you did not choose to show. Private cards never leave.
 
-Send the card, not the link. The person gets the point before they get the page.
+Send the card, not the link. They get the point before the page.
 ```
 
 - **Attach:** a shared card's public page as it renders in a WhatsApp preview,
@@ -728,7 +726,7 @@ Machina, one place for everything you save, exists for the second half.
 #### T30 · Day 39 · Friday · single: thirty days
 
 ```tweet
-Thirty days of Machina.
+Thirty days of Machina, one place for everything you save.
 
 [fill] libraries. [fill] saves. The most-saved source: [fill]. The most common question: "What did I save about ___?"
 

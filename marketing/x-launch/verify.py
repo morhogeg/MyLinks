@@ -56,6 +56,18 @@ def main() -> int:
         if "finally" in low and TAGLINE not in body:
             errors.append(f"{name}: 'finally' outside the tagline")
 
+    what_it_is = (
+        "everything you save", "everything you saved", "one place", "your saves",
+        "what you saved", "your own saves", "everything you have saved",
+        "everything you have kept", "everything you have already kept",
+    )
+    for name, body in tweets:
+        low = body.lower()
+        if "machina" not in low:
+            errors.append(f"{name}: does not name Machina")
+        if not any(w in low for w in what_it_is):
+            errors.append(f"{name}: does not say what Machina is")
+
     tagline_posts = [name for name, body in posts if TAGLINE in body]
     if len(tagline_posts) != 2:
         errors.append(f"tagline should appear in exactly 2 posts (thread close + T31), found {tagline_posts}")
