@@ -74,8 +74,6 @@ service cloud.firestore {
         && (!('dismissedSuggestions' in d) || d.dismissedSuggestions is list);
     }
 
-    // See the links rule. `resource.data.get()` (not a bare field read) so a
-    // doc without the field never errors the rule into a denial.
     // Server-only capture charge token (functions/capture_charge.py): the
     // janitor refunds the quota unit a card's `charge` names, so a client that
     // could write it would mint refunds. Creates may not carry it; updates may
@@ -86,6 +84,8 @@ service cloud.firestore {
         : request.resource.data.get('charge', null) == resource.data.get('charge', null);
     }
 
+    // See the links rule. `resource.data.get()` (not a bare field read) so a
+    // doc without the field never errors the rule into a denial.
     function reminderTimeSane() {
       let d = request.resource.data;
       return !('nextReminderAt' in d)

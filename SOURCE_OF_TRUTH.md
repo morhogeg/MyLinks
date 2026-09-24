@@ -233,7 +233,38 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (updated 2026-09-20, later): install build **1333** (import pass: folders become tags, more export formats), then the 1332 QA below if not yet done
+> ## 🚨 OWNER ACTION (2026-09-24): launch edge-case pass (branch `claude/onboarding-edge-cases-xn54vh`) — not yet shipped
+>
+> ~38 realistic launch edge cases found by four read-only audits (capture,
+> account/billing, library/sharing, device/lifecycle) and fixed; see the
+> 2026-09-24 §9 entry. **Ship as one unscoped deploy** (no `Deploy-Functions:`
+> line — new functions `cleanup_deleted_card`, most others changed; indexes
+> deploy first). Rules change (`charge` field guard + public `config/app`
+> get) rides deploy-rules. Then, in order:
+> 1. **TestFlight build** — first compile of the Swift/Xcode changes (none
+>    could be built here). QA: share 3 photos from Photos; free-limit share
+>    → "Monthly limit reached" then paywall on next open; badge clears;
+>    status bar legible in light+dark; delete+reinstall → share says "sign in
+>    first"; update keeps share working; `machina://open?card=<id>`;
+>    iPhone Settings → Export; Apple account delete (token revoke);
+>    Link Apple/Google in Settings → Account; Forgot PIN.
+> 2. **Firebase console:** Authentication → Apple provider has Services ID,
+>    Team ID, Key ID, private key (needed for token revoke); User account
+>    linking = one account per email.
+> 3. **Backfills (after functions deploy):** `python functions/tools/backfill_url_keys.py --all`
+>    (dry) then `--apply`. Vectors: wait for the `vectors` vector index READY,
+>    `python functions/tools/backfill_vectors.py --all --apply` (twice, 2nd = 0
+>    changes), then `--mark-ready`; soak. **Only after** the next TestFlight
+>    build is out: `migrate_strip_card_vectors.py --all` dry → `--apply`.
+> 4. **Optional:** create Firestore `config/app {minBuild, message?, appStoreId?}`
+>    to force an update; set `APP_STORE_ID` in functions env once listed (Smart
+>    App Banner on /s,/c); universal links = enable Associated Domains on the
+>    App ID FIRST, then add `applinks:mymachina.app` entitlement (reverse order
+>    breaks CI signing). RevenueCat: confirm TRANSFER events are sent.
+> 5. **Decisions:** iPad compatibility-mode pass before review; untick "available
+>    on Mac" in ASC if unwanted. Min iOS is now 16.4.
+>
+> ## (superseded) OWNER ACTION (updated 2026-09-20, later): install build **1333** (import pass: folders become tags, more export formats), then the 1332 QA below if not yet done
 >
 > **1333** (run #333, merge `d1b9b8a`) is the first build where the import
 > path has anything to show on device: it has NEVER been run on a phone
@@ -2310,6 +2341,58 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-24 — LAUNCH EDGE-CASE PASS (4 read-only audits → 5 parallel
+  fix agents in worktrees → cross-agent review → fix round).** Branch
+  `claude/onboarding-edge-cases-xn54vh`; verified tsc 0, pytest 1241 pass,
+  web node tests pass; NOTHING run on device, live Firestore, or compiled for
+  iOS. **Capture:** scraper 404/410/timeouts → retryable FAILED, 401/403/429/
+  cookie walls → partial (+URL/og in prompt); article extraction prefers
+  article/main, 25k cap, `contentTruncated`; charset from bytes/meta (Hebrew);
+  image URLs → vision, PDFs ≤10MB → Gemini, other binaries `captureReason:
+  'file'`; `urlKey`/`finalUrlKey` dedupe (`functions/url_key.py` ≡
+  `web/lib/urlKey.ts`, tracking params/hosts/youtu.be/SPA `#/` kept); import
+  placeholders `queuedAt` (6h clock, "Queued"); worker never resurrects a
+  deleted card and MERGES onto existing cards (keeps createdAt, tags, notes,
+  collections, privacy, share); **single-refund charge records**
+  (`functions/capture_charge.py`, rules forbid client `charge` writes);
+  shared text kept as note, multi-URL → first saved + `savedFirstOf`; share-
+  sheet notes write-first; extension selection never sets reminders; web
+  form extracts URL from pasted text / offers Note; offline save queues
+  (`pendingEnqueue`, `web/lib/offlineSave.ts`). **Account/billing:** Apple
+  token revoke on delete; delete dialog warns App Store sub keeps billing +
+  export-first; account-exists-with-different-credential copy; new-library
+  notice on onboarding; Settings → Sign-in methods (link Apple/Google);
+  Forgot PIN via re-auth; FCM token dedupe across users; RevenueCat TRANSFER;
+  trial clock for client-created workspaces; timezone native-only + on
+  resume; Apple display name; revoked-session check on delete/claim.
+  **Sharing/library:** card `shareId` reused, Stop sharing / Update link
+  (refuses reviving a stopped share), "Stop all public card links";
+  `cleanup_deleted_card` trigger unpublishes + deletes own Storage blobs +
+  vector sibling (skips during account delete via `deleting` flag);
+  hideThumbnail honored on /s,/c; stale search snapshot fixed; delete confirm
+  names public collections; tags case-insensitive + Rename/Merge/Delete +
+  bulk Select all/Add tag/Add to collection; Ask zero-result refunded + Hebrew;
+  export adds notes/summary/chats, strips vectors, native iOS export
+  (`@capacitor/filesystem`); reminder pushes generic for private cards;
+  deleted/locked card toasts; share-page overflow-wrap; notes/tags
+  concurrent-edit safe; cursor-paged feed listeners; graph capped at 400.
+  **Embeddings:** dual-write to `users/{uid}/vectors/{linkId}`
+  (`functions/vector_store.py`), server similarity via `/api/search`
+  `similarity` body; reads switch on `config/vector_store.siblingReady`;
+  strip-from-cards script NOT run (owner steps in §4 box). **Native/app:**
+  ShareExt image cap 1→5, quota 429 → message + pending-paywall hint via App
+  Group, URL punctuation trim, keychain wipe on fresh install, badge clear,
+  `@capacitor/status-bar` + `@capacitor/app`, Auto theme follows OS live,
+  min iOS 16.4, forced update (`config/app`, `NativeShell.tsx`),
+  `machina://open?card=`, AASA file (entitlement NOT added), share pages
+  "Open in Machina" carry context + Smart App Banner when `APP_STORE_ID`,
+  pinch-zoom re-enabled; trial-ending push opens the paywall. **Extension/
+  a11y:** real error mapping incl. quota → `?paywall=saves`; Settings
+  toggles + icon buttons labelled; error screens offer Reload/Home.
+  **Known gaps:** `ß` IDN hosts can key differently TS vs Python; jobs in
+  flight at deploy have no charge record (no refund on failure); nested
+  button in DigestSettings curated row; pre-existing eslint errors in
+  KnowledgeGraph/SettingsModal.
 - **2026-09-20 (later) — IMPORT PASS: the bookmarks/Pocket import (PM-2,
   build 1317) reviewed and refined, not rebuilt.** Findings that drove it:
   `importedTags` / `importedFromAt` were written to the card and read by
