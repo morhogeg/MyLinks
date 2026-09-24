@@ -506,3 +506,42 @@ class TestDeleteCollection:
         result = _delete_collection_logic(OWNER, COLLECTION_ID)
         assert result["removed"] == 1000
         assert max(commits) <= share_service._BATCH_LIMIT
+
+
+class TestOpenInMachina:
+    """The "Open in Machina" button carries the share's context, and the Smart
+    App Banner only appears once APP_STORE_ID is configured."""
+
+    SHARE_ID = "a" * 32
+
+    def test_card_button_carries_share_context(self):
+        from share_service import WEB_URL
+        html = _render_shared_card(_card(), f"{WEB_URL}/s?id={self.SHARE_ID}")
+        assert f'href="{WEB_URL}/?shared={self.SHARE_ID}&amp;type=card"' in html
+
+    def test_collection_button_carries_share_context(self):
+        from share_service import WEB_URL
+        html = _render_shared_collection(_collection([_card()]), f"{WEB_URL}/c?id={self.SHARE_ID}")
+        assert f'?shared={self.SHARE_ID}&amp;type=collection"' in html
+
+    def test_unparseable_share_url_falls_back_to_root(self):
+        from share_service import WEB_URL, _open_in_app_href
+        assert _open_in_app_href("https://x/s?id=short") == WEB_URL
+        assert _open_in_app_href("https://x/elsewhere?id=" + self.SHARE_ID) == WEB_URL
+        assert _open_in_app_href("") == WEB_URL
+
+    def test_no_app_banner_without_app_store_id(self, monkeypatch):
+        monkeypatch.delenv("APP_STORE_ID", raising=False)
+        html = _render_shared_card(_card(), f"https://x/s?id={self.SHARE_ID}")
+        assert "apple-itunes-app" not in html
+
+    def test_app_banner_with_app_store_id(self, monkeypatch):
+        monkeypatch.setenv("APP_STORE_ID", "1234567890")
+        html = _render_shared_card(_card(), f"https://x/s?id={self.SHARE_ID}")
+        assert ('<meta name="apple-itunes-app" '
+                'content="app-id=1234567890, app-argument=https://x/s?id=') in html
+
+    def test_non_numeric_app_store_id_is_ignored(self, monkeypatch):
+        monkeypatch.setenv("APP_STORE_ID", '1"><script>')
+        html = _render_shared_card(_card(), f"https://x/s?id={self.SHARE_ID}")
+        assert "apple-itunes-app" not in html

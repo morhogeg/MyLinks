@@ -1,0 +1,13 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["8Y2M94RUHG.com.morhogeg.machina"],
+        "components": [
+          { "/": "/", "?": { "linkId": "?*" }, "comment": "Open one of your cards: https://mymachina.app/?linkId=<id>" },
+          { "/": "/", "?": { "shared": "?*" }, "comment": "Share page 'Open in Machina' context" }
+        ]
+      }
+    ]
+  }
+}

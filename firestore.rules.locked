@@ -310,5 +310,17 @@ service cloud.firestore {
     match /client_error_reports/{docId} {
       allow read, write: if false;
     }
+
+    // config/app: the forced-update switch the native app reads on launch and
+    // resume (web/lib/appUpdate.ts) — { minBuild, message?, appStoreId? }. It
+    // must be readable BEFORE sign-in (an unsupported build is stopped at the
+    // login screen too), so get-by-id is public. It holds no user data. Only
+    // this one doc id: no list, and nothing else under /config is readable.
+    // Written by the owner in the console / Admin SDK only.
+    match /config/app {
+      allow get: if true;
+      allow list: if false;
+      allow write: if false;
+    }
   }
 }
