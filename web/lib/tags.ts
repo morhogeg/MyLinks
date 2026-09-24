@@ -83,3 +83,64 @@ export function buildTagTree(
 
     return root;
 }
+
+// ── Case-insensitive tag vocabulary ────────────────────────────────────────
+// Tags are stored exactly as typed, so "AI" and "ai" can both exist in a
+// library. Everything that GROUPS tags (facet counts, the tag list, filters)
+// treats them as one tag, shown under its most-used spelling.
+
+/** The grouping key for a tag: case-insensitive, trimmed. */
+export function tagKey(tag: string): string {
+    return tag.trim().toLowerCase();
+}
+
+/** True when `tag` is `selected` or nested under it ("Work/Project" under
+ *  "Work"), ignoring case. */
+export function tagMatches(tag: string, selected: string): boolean {
+    const t = tagKey(tag);
+    const s = tagKey(selected);
+    return t === s || t.startsWith(`${s}/`);
+}
+
+/** key → the spelling to show: the most-used one, ties to the first seen. */
+export function canonicalTagSpellings(tagLists: Iterable<string[]>): Map<string, string> {
+    const uses = new Map<string, Map<string, number>>();
+    for (const tags of tagLists) {
+        for (const tag of tags) {
+            const k = tagKey(tag);
+            if (!k) continue;
+            const m = uses.get(k) ?? new Map<string, number>();
+            m.set(tag, (m.get(tag) ?? 0) + 1);
+            uses.set(k, m);
+        }
+    }
+    const out = new Map<string, string>();
+    uses.forEach((m, k) => {
+        let best = '';
+        let bestN = -1;
+        m.forEach((n, spelling) => { if (n > bestN) { best = spelling; bestN = n; } });
+        out.set(k, best);
+    });
+    return out;
+}
+
+/** Rewrite one card's tag list: `from` (any case, plus nested children) →
+ *  `to` (null deletes). Order kept, duplicates dropped case-insensitively. */
+export function retagList(tags: string[], from: string, to: string | null): string[] {
+    const fromKey = tagKey(from);
+    const out: string[] = [];
+    const seen = new Set<string>();
+    for (const t of tags) {
+        let next: string | null = t;
+        if (tagMatches(t, from)) {
+            if (to === null) next = null;
+            else next = to.trim() + t.trim().slice(fromKey.length);
+        }
+        if (next === null) continue;
+        const k = tagKey(next);
+        if (!k || seen.has(k)) continue;
+        seen.add(k);
+        out.push(next);
+    }
+    return out;
+}

@@ -36,6 +36,8 @@ export default function MobileFiltersSheet({
     tagCounts,
     selectedTags,
     onToggleTag,
+    onRenameTag,
+    onDeleteTag,
 }: {
     isOpen: boolean;
     onClose: () => void;
@@ -60,6 +62,8 @@ export default function MobileFiltersSheet({
     tagCounts: Record<string, number>;
     selectedTags: Set<string>;
     onToggleTag: (tag: string) => void;
+    onRenameTag?: (from: string, to: string) => Promise<void>;
+    onDeleteTag?: (tag: string) => Promise<void>;
 }) {
     // Bottom sheet on phones (drag-to-dismiss), centered modal on desktop (no drag).
     const isMobile = useIsMobile();
@@ -209,6 +213,8 @@ export default function MobileFiltersSheet({
                                     onToggleTag={onToggleTag}
                                     onClearFilters={() => setSelectedTags(new Set())}
                                     variant="embedded"
+                                    onRenameTag={onRenameTag}
+                                    onDeleteTag={onDeleteTag}
                                     className="px-1"
                                     rankByCount={selectedCategory.size > 0}
                                 />

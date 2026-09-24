@@ -229,6 +229,13 @@ export function toSharedCard(link: Link): SharedCard {
     if (link.tags !== undefined) card.tags = link.tags;
     // A thumbnail the owner hid on the card stays hidden on the public page too.
     if (!link.hideThumbnail && link.metadata?.thumbnailUrl !== undefined) card.thumbnailUrl = link.metadata.thumbnailUrl;
+    // …and the page must know it: a screenshot card's `url` IS the image, and
+    // the server used to fall back to it (share_service._share_card_image).
+    // Its url is dropped too — the image itself must not ride in the snapshot.
+    if (link.hideThumbnail) {
+        card.hideThumbnail = true;
+        if (link.sourceType === 'image') card.url = '';
+    }
     if (link.sourceName !== undefined) card.sourceName = link.sourceName;
     if (link.sourceType !== undefined) card.sourceType = link.sourceType;
     return card;
@@ -348,12 +355,33 @@ export async function unpublishCollection(uid: string, collectionDoc: Collection
  * share URL and open the OS share sheet BEFORE this network write resolves
  * (see handleShareCard) — the sheet no longer waits on the publish round-trip.
  */
-export async function publishCard(uid: string, link: Link, shareId: string = newShareId()): Promise<string> {
+export async function publishCard(uid: string, link: Link, shareId: string = link.shareId || newShareId()): Promise<string> {
     await callShareApi('/api/publish-share', {
         uid,
         type: 'card',
         shareId,
+        // The server records shareId/sharePublishedAt on the card in the same
+        // batch, so re-sharing reuses this URL and Stop sharing can find it.
+        card: { id: link.id },
         payload: { card: toSharedCard(link) },
     });
     return shareId;
+}
+
+/** True when the card has a live public page older than its last edit. */
+export function isCardShareStale(link: Pick<Link, 'shareId' | 'sharePublishedAt' | 'updatedAt'>): boolean {
+    return !!link.shareId && !!link.updatedAt && !!link.sharePublishedAt && link.updatedAt > link.sharePublishedAt;
+}
+
+/** Take a card's public page down and clear its shareId (server-side batch). */
+export async function unpublishCard(uid: string, link: Link): Promise<void> {
+    if (!link.shareId) return;
+    await callShareApi('/api/unpublish-share', { uid, type: 'card', shareId: link.shareId, cardId: link.id });
+}
+
+/** Settings → Privacy: stop every public card link this account owns.
+ *  Collections and answers are untouched. Returns how many were stopped. */
+export async function unpublishAllCards(uid: string): Promise<number> {
+    const res = await callShareApi('/api/unpublish-share', { uid, type: 'card', all: true }) as { stopped?: number };
+    return typeof res.stopped === 'number' ? res.stopped : 0;
 }

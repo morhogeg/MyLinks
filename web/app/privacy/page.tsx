@@ -351,8 +351,9 @@ export default function PrivacyPage() {
       <Section id="rights" n={10} title="Your rights">
         <p className="mt-4 leading-relaxed text-text-secondary">
           You can read, edit, and delete everything you have saved directly in the app, and export
-          all of it from Settings as a JSON backup plus a readable Markdown file, no request to us
-          required.
+          all of it (your cards and your notes on them, collections, and Ask conversations) from
+          Settings, on the web or in the iPhone app, as a JSON backup plus a readable Markdown file,
+          no request to us required.
         </p>
         <p className="mt-4 leading-relaxed text-text-secondary">
           Depending on where you live, you may also have legal rights to access your personal data,

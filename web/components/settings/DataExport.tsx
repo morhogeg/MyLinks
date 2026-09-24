@@ -12,7 +12,18 @@ import { track } from '@/lib/analytics';
 import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
 import { getActionableTakeaway } from '@/lib/takeaway';
+import { getNotes } from '@/lib/notes';
+import type { Link } from '@/lib/types';
+import { registerPlugin } from '@capacitor/core';
 import { List, RowShell, RowText } from './primitives';
+
+/** The two @capacitor/filesystem calls the native export uses. Registered by
+ *  name (the plugin's JS layer is exactly this registerPlugin call), so the
+ *  web bundle carries no filesystem code and the web build never needs it. */
+interface FilesystemPlugin {
+    writeFile(opts: { path: string; data: string; directory: 'CACHE'; encoding: 'utf8' }): Promise<{ uri: string }>;
+}
+const Filesystem = registerPlugin<FilesystemPlugin>('Filesystem');
 
 /**
  * Settings → Export my data.
@@ -26,9 +37,15 @@ import { List, RowShell, RowText } from './primitives';
  * in pages instead of hanging on one giant query, and every doc is included
  * (ordering by document id can't silently drop docs missing a sort field).
  *
- * Web downloads via a Blob object URL. The native iOS shell has no file-save
- * plugin wired (only @capacitor/share, which shares text/URLs, not files), so
- * rather than a broken button it shows an honest "use the web app" note.
+ * What goes in: every card (with the user's own notes and the long summary),
+ * every collection, and every Ask conversation. Embedding vectors are left
+ * out of the JSON: they are Machina's search index, not the user's data, and
+ * they made a 1000-card export tens of megabytes of numbers.
+ *
+ * Web downloads via a Blob object URL. The native iOS app writes both files
+ * to the app's cache directory (@capacitor/filesystem) and opens the share
+ * sheet with them (@capacitor/share `files`), so "Save to Files", AirDrop or
+ * Mail all work.
  */
 
 const PAGE_SIZE = 500;
@@ -36,7 +53,7 @@ const PAGE_SIZE = 500;
 /** Read every doc in a user subcollection, batched by document id. */
 async function fetchAllDocs(
     uid: string,
-    sub: 'links' | 'collections',
+    sub: 'links' | 'collections' | 'chats',
 ): Promise<QueryDocumentSnapshot<DocumentData>[]> {
     const ref = collection(db, 'users', uid, sub);
     const out: QueryDocumentSnapshot<DocumentData>[] = [];
@@ -55,8 +72,15 @@ async function fetchAllDocs(
     return out;
 }
 
-/** Firestore Timestamps → millis so the JSON export is portable and readable. */
-function jsonReplacer(_key: string, value: unknown): unknown {
+/** Search-index fields that are not the user's data (see the header). */
+function isIndexField(key: string): boolean {
+    return key === 'embedding_vector' || /embedding/i.test(key);
+}
+
+/** Firestore Timestamps → millis so the JSON export is portable and readable;
+ *  embedding vectors dropped at any depth. */
+function jsonReplacer(key: string, value: unknown): unknown {
+    if (key && isIndexField(key)) return undefined;
     if (value && typeof value === 'object' && typeof (value as { toMillis?: unknown }).toMillis === 'function') {
         return (value as { toMillis: () => number }).toMillis();
     }
@@ -114,6 +138,12 @@ function buildMarkdown(
             lines.push('');
             lines.push(mdEscape(d.summary));
         }
+        // The long-form summary is multi-paragraph markdown already; keep its
+        // line breaks rather than flattening it like the one-line fields.
+        if (typeof d.detailedSummary === 'string' && d.detailedSummary.trim()) {
+            lines.push('');
+            lines.push(d.detailedSummary.trim());
+        }
         // The card's one concrete action, when the analysis found one. It is
         // part of what Machina produced for this card, so an export that ships
         // the summary without it would hand back less than the app holds.
@@ -121,6 +151,17 @@ function buildMarkdown(
         if (takeaway) {
             lines.push('');
             lines.push(`**Do this:** ${mdEscape(takeaway)}`);
+        }
+        // The user's own notes (legacy single note + the notes array, via the
+        // one shared reader) — the most personal thing on the card.
+        const notes = getNotes({ ...(d as Link), id: doc.id });
+        if (notes.length > 0) {
+            lines.push('');
+            lines.push('**My notes:**');
+            for (const n of notes) {
+                const when = displayDate(n.updatedAt ?? n.createdAt);
+                lines.push(`- ${when ? `${when}: ` : ''}${mdEscape(n.text)}`);
+            }
         }
         lines.push('');
         lines.push('---');
@@ -140,6 +181,25 @@ function buildMarkdown(
     }
 
     return lines.join('\n');
+}
+
+/** Native iOS: write the files to the cache directory and hand them to the
+ *  share sheet. A dismissed sheet is not an error. */
+async function shareFilesNative(files: { name: string; content: string }[]): Promise<boolean> {
+    const uris: string[] = [];
+    for (const f of files) {
+        const { uri } = await Filesystem.writeFile({ path: f.name, data: f.content, directory: 'CACHE', encoding: 'utf8' });
+        uris.push(uri);
+    }
+    const { Share } = await import('@capacitor/share');
+    try {
+        await Share.share({ title: 'Machina export', files: uris });
+        return true;
+    } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (/cancel/i.test(msg)) return false;
+        throw e;
+    }
 }
 
 /** Trigger a browser download of `content` as `filename`. */
@@ -166,23 +226,35 @@ export default function DataExport() {
         if (!uid || busy) return;
         setBusy(true);
         try {
-            const [links, collections] = await Promise.all([
+            const [links, collections, chats] = await Promise.all([
                 fetchAllDocs(uid, 'links'),
                 fetchAllDocs(uid, 'collections'),
+                // Ask conversations are the user's words too. A read failure
+                // here must not sink the whole export.
+                fetchAllDocs(uid, 'chats').catch(() => [] as QueryDocumentSnapshot<DocumentData>[]),
             ]);
 
             const json = JSON.stringify({
                 exportedAt: new Date().toISOString(),
-                version: 1,
-                counts: { links: links.length, collections: collections.length },
+                version: 2,
+                counts: { links: links.length, collections: collections.length, chats: chats.length },
                 links: links.map((d) => ({ id: d.id, ...d.data() })),
                 collections: collections.map((d) => ({ id: d.id, ...d.data() })),
+                chats: chats.map((d) => ({ id: d.id, ...d.data() })),
             }, jsonReplacer, 2);
 
             const markdown = buildMarkdown(links, collections);
 
-            downloadBlob(json, 'machina-export.json', 'application/json');
-            downloadBlob(markdown, 'machina-export.md', 'text/markdown');
+            if (native) {
+                const shared = await shareFilesNative([
+                    { name: 'machina-export.json', content: json },
+                    { name: 'machina-export.md', content: markdown },
+                ]);
+                if (!shared) return;
+            } else {
+                downloadBlob(json, 'machina-export.json', 'application/json');
+                downloadBlob(markdown, 'machina-export.md', 'text/markdown');
+            }
 
             track('export_used', { count: links.length });
             toast.success(`Exported ${links.length} card${links.length === 1 ? '' : 's'}.`);
@@ -193,18 +265,6 @@ export default function DataExport() {
         }
     };
 
-    // Native: no file-save plugin is wired, so be honest instead of shipping a
-    // button that silently does nothing.
-    if (native) {
-        return (
-            <List>
-                <RowShell tile={<Download className="w-[16px] h-[16px]" />}>
-                    <RowText title="Export my data" sub="Available on the Machina web app." />
-                </RowShell>
-            </List>
-        );
-    }
-
     return (
         <List>
             <RowShell
@@ -213,7 +273,9 @@ export default function DataExport() {
             >
                 <RowText
                     title={busy ? 'Preparing your export…' : 'Export my data'}
-                    sub="Download all your cards and collections as JSON + Markdown."
+                    sub={native
+                        ? 'Save or send all your cards, notes, collections and Ask chats as JSON + Markdown.'
+                        : 'Download all your cards, notes, collections and Ask chats as JSON + Markdown.'}
                 />
             </RowShell>
         </List>

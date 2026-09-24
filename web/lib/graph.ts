@@ -1,4 +1,5 @@
 import { Link } from './types';
+import { getTimestampNumber } from './feedUtils';
 import { overlap, toVector, genericConcepts, qualifyLiveTie, liveScore, STRONG, MAX_RELATED } from './related';
 
 /**
@@ -83,12 +84,21 @@ export interface GraphModel {
     isolatedCount: number;
     clusterCount: number;
     totalCards: number;
+    /** Cards left off the map by the node cap (MAX_GRAPH_CARDS); 0 when all fit. */
+    omittedCount: number;
 }
 
 /** A cooperative-cancellation token for the chunked build. */
 export interface BuildSignal {
     cancelled: boolean;
 }
+
+// The map draws at most this many cards: the most CONNECTED ones first (by
+// stored related links), then the most recent. Past a few hundred nodes the
+// layout is an unreadable hairball and the physics tick drops frames on a
+// phone; the header says how many were left off, and a filter or search maps
+// any subset in full.
+export const MAX_GRAPH_CARDS = 400;
 
 // Above this many cards the O(n²) embedding pass is skipped (AI + concept
 // edges still connect the graph); below it the full live pass runs.
@@ -132,9 +142,23 @@ export function spacingScale(nodeCount: number): number {
 export async function buildGraphModel(
     links: Link[],
     signal?: BuildSignal,
+    /** Cards that must stay on the map through the node cap (a card the user
+     *  asked to "See in graph", the cited set of an Ask answer). */
+    pinIds?: Iterable<string>,
 ): Promise<GraphModel | null> {
     // Only settled cards participate — in-flight/failed captures have no analysis.
-    const pool = links.filter((l) => l.status !== 'processing' && l.status !== 'failed');
+    const settled = links.filter((l) => l.status !== 'processing' && l.status !== 'failed');
+    // Node cap (MAX_GRAPH_CARDS): keep pinned cards, then the connected ones,
+    // newest first.
+    const pinned = new Set(pinIds ?? []);
+    const pool = settled.length <= MAX_GRAPH_CARDS
+        ? settled
+        : settled
+            .map((l) => ({ l, pin: pinned.has(l.id) ? 1 : 0, deg: l.relatedLinks?.length ?? 0, t: getTimestampNumber(l.createdAt) }))
+            .sort((a, b) => b.pin - a.pin || (b.deg > 0 ? 1 : 0) - (a.deg > 0 ? 1 : 0) || b.t - a.t || b.deg - a.deg)
+            .slice(0, MAX_GRAPH_CARDS)
+            .map((x) => x.l);
+    const omittedCount = settled.length - pool.length;
     const indexById = new Map<string, number>();
     pool.forEach((l, i) => indexById.set(l.id, i));
 
@@ -447,6 +471,7 @@ export async function buildGraphModel(
         // raw components (a split island contributes several).
         clusterCount: clusters.length,
         totalCards: pool.length,
+        omittedCount,
     };
 }
 

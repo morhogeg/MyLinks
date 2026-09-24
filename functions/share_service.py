@@ -492,7 +492,13 @@ def _display_host(url: str) -> str:
 
 
 def _share_card_image(card: dict) -> str:
-    """Best preview image for a card; falls back to the Machina icon."""
+    """Best preview image for a card; falls back to the Machina icon.
+
+    `hideThumbnail` (the owner's "Hide image" on the card) wins over every
+    source: without it a screenshot card fell back to its `url`, which IS the
+    screenshot, and published the image the owner had hidden."""
+    if card.get("hideThumbnail"):
+        return f"{WEB_URL}/icon-512.png"
     thumb = card.get("thumbnailUrl")
     if thumb and str(thumb).startswith("http"):
         return thumb
@@ -551,7 +557,10 @@ def _share_html_shell(*, title: str, description: str, image: str, url: str, bod
   * {{ box-sizing: border-box; }}
   body {{ margin:0; background:#050505; color:#E5E5E5;
          font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-         line-height:1.6; }}
+         line-height:1.6;
+         /* A title or summary that is one long URL must wrap, not push the
+            page into a sideways scroll on a phone. */
+         overflow-wrap:anywhere; word-break:break-word; }}
   .wrap {{ max-width:640px; margin:0 auto; padding:32px 20px 64px; }}
   .brand {{ display:flex; align-items:center; gap:10px; margin-bottom:28px; }}
   .brand img {{ width:32px; height:32px; border-radius:8px; }}
@@ -1090,6 +1099,15 @@ def _sanitize_card_snapshot(card, collection_item: bool = False) -> dict:
         v = _clip_str(card.get(key), limit)
         if v:
             out[key] = v
+    # "Hide image" travels with the snapshot so the renderers can honor it
+    # (see _share_card_image). A hidden card keeps no thumbnail either.
+    if card.get("hideThumbnail") is True:
+        out["hideThumbnail"] = True
+        out.pop("thumbnailUrl", None)
+        # A screenshot card's `url` IS the image: keep it out of the
+        # world-readable doc too, not just off the rendered page.
+        if out.get("sourceType") == "image":
+            out.pop("url", None)
     if collection_item:
         return out
     raw_tags = card.get("tags")
@@ -1181,8 +1199,22 @@ def _collection_share_flags(collection) -> tuple:
     return collection["id"], sig
 
 
+def _card_share_target(card) -> Optional[str]:
+    """Validate the optional `card` argument of a card publish: `{id}` naming
+    the owner's card doc that should remember its shareId. None when absent."""
+    if card is None:
+        return None
+    if not isinstance(card, dict) or not _valid_collection_id(card.get("id")):
+        raise ValueError("card.id is required")
+    return card["id"]
+
+
+def _link_ref(db, uid: str, link_id: str):
+    return db.collection("users").document(uid).collection("links").document(link_id)
+
+
 def _publish_share_logic(uid: str, share_type: str, share_id: str, payload: dict,
-                         collection=None) -> dict:
+                         collection=None, card=None) -> dict:
     """Write a public share snapshot for `uid` WITHOUT `ownerUid`, plus the
     functions-only owner mapping. Rejects overwriting a share id owned by someone
     else (the server-side equivalent of the rules' anti-takeover guard). The
@@ -1204,7 +1236,10 @@ def _publish_share_logic(uid: str, share_type: str, share_id: str, payload: dict
         raise ValueError("shareId and payload are required")
     if collection is not None and share_type != "collection":
         raise ValueError("collection flags apply to collection shares only")
+    if card is not None and share_type != "card":
+        raise ValueError("card flags apply to card shares only")
     collection_id, signature = _collection_share_flags(collection)
+    card_id = _card_share_target(card)
 
     db = get_db()
     existing_owner = _share_owner_uid(db, share_id, public_coll)
@@ -1252,12 +1287,21 @@ def _publish_share_logic(uid: str, share_type: str, share_id: str, payload: dict
         if signature:
             flags["publishedSignature"] = signature
         batch.set(col_ref, flags, merge=True)
+    if card_id is not None:
+        # The card remembers its public page (same batch, same reason as the
+        # collection flags): re-sharing reuses the id, "Stop sharing" can find
+        # it, and the card-delete trigger can take it down. `updatedAt` is
+        # deliberately NOT touched — it means "the owner edited this card".
+        link_ref = _link_ref(db, uid, card_id)
+        if not link_ref.get().exists:
+            raise LookupError("Card not found")
+        batch.set(link_ref, {"shareId": share_id, "sharePublishedAt": now_ms}, merge=True)
     batch.commit()
     return {"shareId": share_id}
 
 
 def _unpublish_share_logic(uid: str, share_type: str, share_id: str,
-                           collection_id=None) -> dict:
+                           collection_id=None, card_id=None) -> dict:
     """Delete a public share, if `uid` owns it, and TOMBSTONE its owner row.
 
     The public doc goes (share_page 404s from then on), but the
@@ -1290,6 +1334,10 @@ def _unpublish_share_logic(uid: str, share_type: str, share_id: str,
         raise ValueError("collectionId applies to collection shares only")
     if collection_id is not None and not _valid_collection_id(collection_id):
         raise ValueError("invalid collectionId")
+    if card_id is not None and share_type != "card":
+        raise ValueError("cardId applies to card shares only")
+    if card_id is not None and not _valid_collection_id(card_id):
+        raise ValueError("invalid cardId")
 
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     batch = db.batch()
@@ -1307,9 +1355,47 @@ def _unpublish_share_logic(uid: str, share_type: str, share_id: str,
                 "isPublic": False, "shareId": None, "publishedAt": None,
                 "publishedSignature": None, "updatedAt": now_ms,
             }, merge=True)
+    if card_id is not None:
+        link_ref = _link_ref(db, uid, card_id)
+        snap = link_ref.get()
+        # Only clear the card's pointer when it still names THIS share.
+        if snap.exists and (snap.to_dict() or {}).get("shareId") == share_id:
+            batch.set(link_ref, {"shareId": None, "sharePublishedAt": None}, merge=True)
     batch.commit()
     _delete_share_previews(share_id)
     return {"success": True}
+
+
+def _unpublish_all_card_shares_logic(uid: str) -> dict:
+    """Stop every live public CARD link `uid` owns (Settings → Privacy).
+
+    Sweeps `shared_owners` by owner + type 'card', skipping rows already
+    tombstoned, and clears each card's `shareId` pointer where one still
+    names the share (a card-id lookup by shareId; best-effort). Collection
+    and answer shares are untouched. Returns {success, stopped}."""
+    from google.cloud.firestore_v1.base_query import FieldFilter as _FF
+    db = get_db()
+    rows = (db.collection("shared_owners")
+            .where(filter=_FF("ownerUid", "==", uid))
+            .stream())  # type filtered in memory: no composite index needed
+    links = db.collection("users").document(uid).collection("links")
+    stopped = 0
+    for row in rows:
+        data = row.to_dict() or {}
+        if data.get("type") != "card" or data.get("unpublishedAt"):
+            continue
+        share_id = row.id
+        if not _valid_share_id(share_id):
+            continue
+        try:
+            card_id = None
+            for hit in links.where(filter=_FF("shareId", "==", share_id)).limit(1).get():
+                card_id = hit.id
+            _unpublish_share_logic(uid, "card", share_id, card_id=card_id)
+            stopped += 1
+        except Exception as e:
+            logger.warning(f"stop-all: unpublish failed for {share_id}: {e}")
+    return {"success": True, "stopped": stopped}
 
 
 def _delete_collection_logic(uid: str, collection_id: str) -> dict:

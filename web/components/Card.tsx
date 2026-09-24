@@ -2,7 +2,7 @@
 // Refreshed colors
 
 
-import { Link, StatusChangeHandler } from '@/lib/types';
+import { Link, StatusChangeHandler, CardShareMode } from '@/lib/types';
 import { Archive, Star, Clock, Trash2, Bell, Pencil, Circle, Check, MoreHorizontal, ExternalLink, Layers, Share2, RotateCcw, AlertTriangle, StickyNote, Lock, ImageOff, Image as ImageIcon, Images, EyeOff } from 'lucide-react';
 import { useState, memo } from 'react';
 import SourceByline from './SourceByline';
@@ -37,7 +37,7 @@ interface CardProps {
     /** Open the "add to collection" sheet for this card. */
     onAddToCollection?: (link: Link) => void;
     /** Share this card as a public Machina page. */
-    onShare?: (link: Link) => void;
+    onShare?: (link: Link, mode?: CardShareMode) => void;
     /** Toggle the card's Private flag (parent owns PIN setup — lib/privacyLock). */
     onTogglePrivate?: (link: Link) => void;
     /** Collections this card belongs to — rendered as subtle chips. */

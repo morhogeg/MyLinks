@@ -4,6 +4,7 @@ import { getSourceInfo, buildSourceFacets, sourceMatchesQuery } from '@/lib/sour
 import { PLATFORM_LABELS, type PlatformKey } from '@/lib/platform';
 import { isPending, getTimestampNumber } from '@/lib/feedUtils';
 import { tokenizeSearch, matchCard, partialMatchCount, normalizeSearchText } from '@/lib/searchMatch';
+import { tagKey, tagMatches, canonicalTagSpellings } from '@/lib/tags';
 
 export type FilterType = 'all' | 'unread' | 'read' | 'archived' | 'favorite' | 'reminders' | 'private';
 export type SortType = 'date-desc' | 'date-asc' | 'title-asc' | 'category';
@@ -205,10 +206,9 @@ export function useFeedFilters(
         .filter((link) => {
             // Apply tag filters
             if (selectedTags.size === 0) return true;
+            // Case-insensitive: "ai" and "AI" are one tag (lib/tags tagMatches).
             return link.tags.some(tag => {
-                return Array.from(selectedTags).some(selected => {
-                    return tag === selected || tag.startsWith(`${selected}/`);
-                });
+                return Array.from(selectedTags).some(selected => tagMatches(tag, selected));
             });
         })
         .filter((link) => {
@@ -291,7 +291,7 @@ export function useFeedFilters(
     const categoryCounts = useMemo(() => {
         const forCounts = selectedTags.size === 0
             ? facetLinks
-            : facetLinks.filter(link => link.tags.some(tag => Array.from(selectedTags).some(s => tag === s || tag.startsWith(`${s}/`))));
+            : facetLinks.filter(link => link.tags.some(tag => Array.from(selectedTags).some(s => tagMatches(tag, s))));
         return forCounts.reduce((acc, link) => {
             acc[link.category] = (acc[link.category] || 0) + 1;
             return acc;
@@ -308,21 +308,26 @@ export function useFeedFilters(
         [facetLinks]
     );
 
+    // Tags group case-insensitively: "AI" and "ai" are one chip, counted once
+    // per card, shown under the library's most-used spelling.
+    const tagSpellings = useMemo(() => canonicalTagSpellings(facetLinks.map(l => l.tags)), [facetLinks]);
+
     const tagCounts = useMemo(() => {
         const forCounts = selectedCategory.size === 0
             ? facetLinks
             : facetLinks.filter(link => selectedCategory.has(link.category));
         return forCounts.reduce((acc, link) => {
-            link.tags.forEach(tag => {
-                acc[tag] = (acc[tag] || 0) + 1;
+            new Set(link.tags.map(tagKey)).forEach(k => {
+                const tag = tagSpellings.get(k);
+                if (tag) acc[tag] = (acc[tag] || 0) + 1;
             });
             return acc;
         }, {} as Record<string, number>);
-    }, [facetLinks, selectedCategory]);
+    }, [facetLinks, selectedCategory, tagSpellings]);
 
     const allTags = useMemo(
-        () => Array.from(new Set(facetLinks.flatMap(l => l.tags))).sort(),
-        [facetLinks]
+        () => Array.from(tagSpellings.values()).sort(),
+        [tagSpellings]
     );
 
     const handleToggleTag = useCallback((tag: string) => {

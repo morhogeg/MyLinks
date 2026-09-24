@@ -121,7 +121,17 @@ export default function TagInput({
     // ── Suggestions ───────────────────────────────────────────────────────────
     const suggestions = allTags.filter(t => t.toLowerCase().includes(value.toLowerCase()));
     const exactMatch = allTags.some(t => t.toLowerCase() === value.toLowerCase().trim());
-    const isNew = value.trim() !== '' && !exactMatch && !existingTags.includes(value.trim());
+    const isNew = value.trim() !== '' && !exactMatch && !existingTags.some(t => t.toLowerCase() === value.toLowerCase().trim());
+
+    // Tags are one vocabulary regardless of case: typing "ai" when the library
+    // already has "AI" joins "AI" instead of forking a second tag that only
+    // differs by case (the card's own tags win, then the library's).
+    const canonicalTag = (tag: string): string => {
+        const key = tag.trim().toLowerCase();
+        return existingTags.find(t => t.toLowerCase() === key)
+            ?? allTags.find(t => t.toLowerCase() === key)
+            ?? tag.trim();
+    };
 
     // Typing resets the keyboard selection — done in the change handlers (not an
     // effect) to avoid a redundant render pass.
@@ -130,8 +140,9 @@ export default function TagInput({
         setSelectedIndex(-1);
     };
 
-    const handleSelectTag = (tag: string) => {
-        if (existingTags.includes(tag)) return;
+    const handleSelectTag = (raw: string) => {
+        const tag = canonicalTag(raw);
+        if (!tag || existingTags.some(t => t.toLowerCase() === tag.toLowerCase())) return;
         onAdd(tag);
         setValue('');
     };

@@ -180,6 +180,10 @@ def push_calls(monkeypatch):
     stub = types.ModuleType("push_service")
     stub.send_push = _send_push
     monkeypatch.setitem(sys.modules, "push_service", stub)
+    # The push path reads the user's private collections (privacy check);
+    # keep it offline — tests that need private collections override this.
+    import search
+    monkeypatch.setattr(search, "private_collection_ids", lambda uid: set())
     return calls
 
 
@@ -457,3 +461,43 @@ def test_coerce_pending_reminder_times_rewrites_legacy(monkeypatch):
     assert links["str"]["nextReminderAt"] == 1_609_459_200_000
     assert links["bad"]["nextReminderAt"] == "garbage"  # left in place
     assert links["done"]["nextReminderAt"] == "2021-01-01T00:00:00Z"  # untouched
+
+
+def test_private_card_reminder_push_never_carries_its_title(monkeypatch, past_ms, push_calls):
+    """A push lands on a locked phone: a card flagged private, or inside a
+    private collection, gets a generic body. The linkId stays so the tap
+    still routes to the card (behind the lock); in-app delivery is unchanged."""
+    import search
+    monkeypatch.setattr(search, "private_collection_ids", lambda uid: {"vault"})
+    store = {
+        "users": {
+            "dana": {
+                "settings": {},
+                "fcmTokens": ["tok-d"],
+                "links": {
+                    "own": {"reminderStatus": "pending", "nextReminderAt": past_ms,
+                            "title": "Divorce lawyer notes", "category": "Legal", "isPrivate": True,
+                            "reminderProfile": "once", "reminderCount": 0},
+                    "inherited": {"reminderStatus": "pending", "nextReminderAt": past_ms,
+                                  "title": "Therapy homework", "collectionIds": ["vault"],
+                                  "reminderProfile": "once", "reminderCount": 0},
+                    "public": {"reminderStatus": "pending", "nextReminderAt": past_ms,
+                               "title": "Sourdough guide", "category": "Food",
+                               "reminderProfile": "once", "reminderCount": 0},
+                },
+            }
+        }
+    }
+    _install_db(monkeypatch, store)
+
+    rs.run_reminder_check()
+
+    by_link = {c[3]["linkId"]: c for c in push_calls}
+    assert set(by_link) == {"own", "inherited", "public"}
+    for lid in ("own", "inherited"):
+        _, title, body, _ = by_link[lid]
+        assert "Divorce" not in body and "Therapy" not in body and "Legal" not in body
+        assert "private" in body.lower()
+    assert by_link["public"][2] == "Sourdough guide · Food"
+    for lid in ("own", "inherited", "public"):
+        assert store["users"]["dana"]["links"][lid]["reminderDue"] is True

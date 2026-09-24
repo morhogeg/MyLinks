@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Link, StatusChangeHandler, UserNote } from '@/lib/types';
+import { Link, StatusChangeHandler, UserNote, CardShareMode } from '@/lib/types';
 import SourceByline from './SourceByline';
-import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, CircleCheck, Check, Network, Play, Youtube, ImageOff, Image as ImageIcon, ImagePlus, Loader2, Layers, Share2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, StickyNote, Waypoints, EyeOff, Upload } from 'lucide-react';
+import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, CircleCheck, Check, Network, Play, Youtube, ImageOff, Image as ImageIcon, ImagePlus, Loader2, Layers, Share2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, StickyNote, Waypoints, EyeOff, Upload, RefreshCw, Link2Off } from 'lucide-react';
 import { getPlatform } from '@/lib/platform';
 import SimpleMarkdown from './SimpleMarkdown';
 import PosterImage from './ui/PosterImage';
@@ -18,6 +18,7 @@ import { getRelatedCards } from '@/lib/related';
 import { getNotes, makeNote, touchNote } from '@/lib/notes';
 import { hapticSuccess, hapticMedium } from '@/lib/haptics';
 import { isHttpUrl } from '@/lib/url';
+import { isCardShareStale } from '@/lib/collections';
 import CitationMark from './ui/CitationMark';
 import ProBadge from './ui/ProBadge';
 import { requestPaywall } from '@/lib/entitlement';
@@ -72,13 +73,13 @@ interface LinkDetailModalProps {
     backTo?: string;
     onStatusChange: StatusChangeHandler;
     onReadStatusChange: (id: string, isRead: boolean) => void;
-    onUpdateTags: (id: string, tags: string[]) => void;
+    onUpdateTags: (id: string, tags: string[], previous?: string[]) => void;
     onUpdateCategory: (id: string, category: string) => void;
     onUpdateTitle?: (id: string, title: string, reembed?: boolean) => void;
     onUpdateSummary?: (id: string, summary: string, reembed?: boolean) => void;
     /** Edit a note card as one field — re-derives title/body from the text. */
     onUpdateNote?: (id: string, text: string) => void;
-    onUpdateNotes?: (id: string, notes: UserNote[], removed?: boolean) => void;
+    onUpdateNotes?: (id: string, notes: UserNote[], removed?: boolean, previous?: UserNote[]) => void;
     /** Write Machina's summary of a text/note card, on demand (the mark under
         the text). Resolves null on failure — the card is left untouched. */
     onGenerateSummary?: (id: string, text: string) => Promise<{ aiSummary: string; aiDetailedSummary: string } | null>;
@@ -92,7 +93,7 @@ interface LinkDetailModalProps {
      *  already is, and which only renders when there ARE connections to see. */
     onOpenInGraph?: (link: Link) => void;
     onAddToCollection?: (link: Link) => void;
-    onShare?: (link: Link) => void;
+    onShare?: (link: Link, mode?: CardShareMode) => void;
     /** Toggle the card's thumbnail banner on/off (Hide image / Show image). */
     onToggleThumbnail?: (link: Link) => void;
     /** Open revealed at the My-notes section (set when entered from the
@@ -424,12 +425,12 @@ export default function LinkDetailModal({
         const text = noteDraft.trim();
         if (!text) return;
         if (isNewNote) {
-            onUpdateNotes?.(link.id, [makeNote(text), ...notes]);
+            onUpdateNotes?.(link.id, [makeNote(text), ...notes], false, notes);
             hapticSuccess();
         } else {
             const existing = notes.find(n => n.id === editingNoteId);
             if (!existing || existing.text === text) return; // unchanged — skip the write
-            onUpdateNotes?.(link.id, notes.map(n => n.id === editingNoteId ? touchNote(n, text) : n));
+            onUpdateNotes?.(link.id, notes.map(n => n.id === editingNoteId ? touchNote(n, text) : n), false, notes);
             hapticSuccess();
         }
     };
@@ -444,7 +445,7 @@ export default function LinkDetailModal({
         setEditingNoteId(null);
         if (id === NEW_NOTE_ID) { hapticMedium(); return; }
         if (notes.some(n => n.id === id)) {
-            onUpdateNotes?.(link.id, notes.filter(n => n.id !== id), true);
+            onUpdateNotes?.(link.id, notes.filter(n => n.id !== id), true, notes);
             hapticMedium();
         }
     };
@@ -830,6 +831,28 @@ export default function LinkDetailModal({
                                 className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors"
                             >
                                 <Share2 className="w-[18px] h-[18px]" />
+                            </button>
+                        )}
+                        {/* The card's public page is a snapshot: refresh it in
+                            place after an edit (same URL), or take it down. */}
+                        {onShare && isCardShareStale(link) && (
+                            <button
+                                onClick={() => onShare(link, 'update')}
+                                title="Update public link"
+                                aria-label="Update public link"
+                                className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors"
+                            >
+                                <RefreshCw className="w-[18px] h-[18px]" />
+                            </button>
+                        )}
+                        {onShare && link.shareId && (
+                            <button
+                                onClick={() => onShare(link, 'stop')}
+                                title="Stop sharing"
+                                aria-label="Stop sharing this card"
+                                className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors"
+                            >
+                                <Link2Off className="w-[18px] h-[18px]" />
                             </button>
                         )}
                         {onToggleThumbnail && link.metadata?.thumbnailUrl && (
@@ -1617,7 +1640,7 @@ export default function LinkDetailModal({
                                             className="w-3 h-3 ml-1 opacity-40 group-hover/tag:opacity-100 hover:text-red-400 cursor-pointer transition-all"
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                onUpdateTags(link.id, link.tags.filter(t => t !== tag));
+                                                onUpdateTags(link.id, link.tags.filter(t => t !== tag), link.tags);
                                             }}
                                         />
                                     </span>
@@ -1629,7 +1652,7 @@ export default function LinkDetailModal({
                                     allTags={allTags}
                                     existingTags={link.tags}
                                     onAdd={(tag) => {
-                                        onUpdateTags(link.id, [...link.tags, tag]);
+                                        onUpdateTags(link.id, [...link.tags, tag], link.tags);
                                         setIsAddingTag(false);
                                     }}
                                     onCancel={() => setIsAddingTag(false)}
