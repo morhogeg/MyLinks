@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useReadingScale } from '@/lib/useReadingScale';
+import { isNativeApp } from '@/lib/api';
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -42,24 +43,53 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         const root = window.document.documentElement;
-        const effectiveTheme = resolveTheme(theme);
+        const apply = () => {
+            const effectiveTheme = resolveTheme(theme);
+            setResolvedTheme(effectiveTheme);
+            if (effectiveTheme === 'light') {
+                root.classList.add('light');
+            } else {
+                root.classList.remove('light');
+            }
+        };
 
         // Intentionally set state from this effect: resolvedTheme is deliberately
         // seeded to 'dark' and only resolved post-hydration (via matchMedia +
         // localStorage) so consumers don't hydration-mismatch and the head
         // bootstrap script's `light` class isn't briefly stripped — this is a
         // sync with those external systems, not a render-time derivation.
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setResolvedTheme(effectiveTheme);
+        apply();
 
-        if (effectiveTheme === 'light') {
-            root.classList.add('light');
-        } else {
-            root.classList.remove('light');
+        try {
+            localStorage.setItem('theme', theme);
+        } catch {
+            // Private mode — the choice still applies for this session.
         }
 
-        localStorage.setItem('theme', theme);
+        // 'system' (Auto) must follow the OS live: flipping iOS/macOS
+        // appearance (or Control Center's dark-mode toggle, or the scheduled
+        // sunset switch) while the app is open re-resolves the theme instead of
+        // waiting for the next launch.
+        if (theme !== 'system') return;
+        const mq = window.matchMedia('(prefers-color-scheme: dark)');
+        mq.addEventListener('change', apply);
+        return () => mq.removeEventListener('change', apply);
     }, [theme]);
+
+    // Native status bar text follows the resolved theme: light text on the
+    // dark theme, dark text on the light one. Without this iOS picks by the
+    // system appearance, so a light-theme app on a dark-mode phone drew white
+    // clock/battery glyphs on a white header. Native only; the plugin is
+    // imported lazily so the web bundle never loads it.
+    useEffect(() => {
+        if (!isNativeApp()) return;
+        void import('@capacitor/status-bar')
+            .then(({ StatusBar, Style }) =>
+                StatusBar.setStyle({ style: resolvedTheme === 'dark' ? Style.Dark : Style.Light }))
+            .catch(() => {
+                // Older native build without the plugin — iOS keeps its default.
+            });
+    }, [resolvedTheme]);
 
     const setTheme = (newTheme: Theme) => setThemeState(newTheme);
 

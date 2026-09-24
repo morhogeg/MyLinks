@@ -1,7 +1,7 @@
-import { useCallback } from 'react';
-import { CaptureState, Link, LinkStatus, UserNote } from '@/lib/types';
+import { useCallback, useEffect, useRef } from 'react';
+import { CaptureState, CardShareMode, Link, LinkStatus, UserNote } from '@/lib/types';
 import { updateLinkStatus, updateLinkTags, updateLinkCategory, updateLinkTitle, updateLinkSummary, updateNoteText, updateLinkNotes, updateLinkReadStatus, retryFailedLink, generateCardSummary, enrichNoteCard } from '@/lib/storage';
-import { newShareId, publishCard, removeLinkFromCollection } from '@/lib/collections';
+import { newShareId, publishCard, removeLinkFromCollection, unpublishCard } from '@/lib/collections';
 import { shareLink, shareUrlFor } from '@/lib/share';
 import { useToast } from '@/components/Toast';
 
@@ -14,7 +14,18 @@ import { useToast } from '@/components/Toast';
  * and reverts them if the write fails, so the UI updates instantly. We just
  * surface failures and confirm meaningful actions.
  */
-export function useLinkActions(uid: string | null | undefined, toast: ReturnType<typeof useToast>) {
+export function useLinkActions(
+    uid: string | null | undefined,
+    toast: ReturnType<typeof useToast>,
+    /** Told about every successful field edit, so a snapshot outside the live
+     *  feed window (the search library) can apply it too. Held in a ref: the
+     *  handlers stay stable whatever the caller passes. */
+    onLocalEdit?: (id: string, patch: Partial<Link>) => void,
+) {
+    const onLocalEditRef = useRef(onLocalEdit);
+    useEffect(() => { onLocalEditRef.current = onLocalEdit; }, [onLocalEdit]);
+    const localEdit = useCallback((id: string, patch: Partial<Link>) => onLocalEditRef.current?.(id, patch), []);
+
     const handleStatusChange = useCallback(async (
         id: string,
         status: LinkStatus,
@@ -23,6 +34,7 @@ export function useLinkActions(uid: string | null | undefined, toast: ReturnType
         if (!uid) return;
         try {
             await updateLinkStatus(uid, id, status);
+            localEdit(id, { status });
             // Name the TRANSITION, not the destination. `unread` is where three
             // different actions land — un-favourite, un-archive, and an explicit
             // "mark as unread" — so keying the label off `status` alone made
@@ -53,34 +65,37 @@ export function useLinkActions(uid: string | null | undefined, toast: ReturnType
         } catch {
             toast.error("Couldn't update the link. Please try again.");
         }
-    }, [uid, toast]);
+    }, [uid, toast, localEdit]);
 
     const handleReadStatusChange = useCallback(async (id: string, isRead: boolean) => {
         if (!uid) return;
         try {
             await updateLinkReadStatus(uid, id, isRead);
+            localEdit(id, { isRead });
         } catch {
             toast.error("Couldn't update read status. Please try again.");
         }
-    }, [uid, toast]);
+    }, [uid, toast, localEdit]);
 
-    const handleUpdateTags = useCallback(async (id: string, tags: string[]) => {
+    const handleUpdateTags = useCallback(async (id: string, tags: string[], previous?: string[]) => {
         if (!uid) return;
         try {
-            await updateLinkTags(uid, id, tags);
+            await updateLinkTags(uid, id, tags, previous);
+            localEdit(id, { tags });
         } catch {
             toast.error("Couldn't save tags. Please try again.");
         }
-    }, [uid, toast]);
+    }, [uid, toast, localEdit]);
 
     const handleUpdateCategory = useCallback(async (id: string, category: string) => {
         if (!uid) return;
         try {
             await updateLinkCategory(uid, id, category);
+            localEdit(id, { category });
         } catch {
             toast.error("Couldn't change category. Please try again.");
         }
-    }, [uid, toast]);
+    }, [uid, toast, localEdit]);
 
     // Editable AI output — the summary/title the model produced is a draft, not a
     // verdict. Optimistic via onSnapshot latency compensation (same as the others).
@@ -88,19 +103,21 @@ export function useLinkActions(uid: string | null | undefined, toast: ReturnType
         if (!uid) return;
         try {
             await updateLinkTitle(uid, id, title, reembed);
+            localEdit(id, { title });
         } catch {
             toast.error("Couldn't save the title. Please try again.");
         }
-    }, [uid, toast]);
+    }, [uid, toast, localEdit]);
 
     const handleUpdateSummary = useCallback(async (id: string, summary: string, reembed = false) => {
         if (!uid) return;
         try {
             await updateLinkSummary(uid, id, summary, reembed);
+            localEdit(id, { summary });
         } catch {
             toast.error("Couldn't save the summary. Please try again.");
         }
-    }, [uid, toast]);
+    }, [uid, toast, localEdit]);
 
     // A note card is edited as ONE field (see updateNoteText) — re-derives
     // title/body from the single text and re-embeds. The edit reset the title
@@ -122,15 +139,16 @@ export function useLinkActions(uid: string | null | undefined, toast: ReturnType
     // `removed` picks the right confirmation. Optimistic via onSnapshot latency
     // compensation. A note is user content (like a favorite/collection add, which
     // also confirm), so we acknowledge the save/removal.
-    const handleUpdateNotes = useCallback(async (id: string, notes: UserNote[], removed = false) => {
+    const handleUpdateNotes = useCallback(async (id: string, notes: UserNote[], removed = false, previous?: UserNote[]) => {
         if (!uid) return;
         try {
-            await updateLinkNotes(uid, id, notes);
+            await updateLinkNotes(uid, id, notes, previous);
+            localEdit(id, { userNotes: notes });
             toast.success(removed ? 'Note removed' : 'Note saved');
         } catch {
             toast.error("Couldn't save your note. Please try again.");
         }
-    }, [uid, toast]);
+    }, [uid, toast, localEdit]);
 
     // Machina's read of a text/note card, produced only when the reader asks for
     // it (the mark under the text). A card captured from the share sheet already
@@ -177,9 +195,40 @@ export function useLinkActions(uid: string | null | undefined, toast: ReturnType
     // mobile web the `await` would also consume the transient user-activation
     // that navigator.share requires. By the time a recipient taps the link, the
     // snapshot is live. If the background publish fails we surface a toast.
-    const handleShareCard = useCallback(async (link: Link) => {
+    //
+    // A card has ONE public URL: the shareId is stored on the card by the
+    // publish endpoint, so a re-share reuses it and simply republishes the
+    // snapshot with the card's current content. `mode`:
+    //   'share'  (default) — publish/republish and open the share sheet;
+    //   'update' — republish in place, no sheet (after an edit);
+    //   'stop'   — take the public page down and forget the id.
+    const handleShareCard = useCallback(async (link: Link, mode: CardShareMode = 'share') => {
         if (!uid) return;
-        const shareId = newShareId();
+        if (mode === 'stop') {
+            try {
+                await unpublishCard(uid, link);
+                toast.success('Stopped sharing. The link no longer works.');
+            } catch {
+                toast.error("Couldn't stop sharing. Please try again.");
+            }
+            return;
+        }
+        if (mode === 'update') {
+            try {
+                if (!link.shareId) return;
+                await publishCard(uid, link, link.shareId, { updateOnly: true });
+                toast.success('Public link updated');
+            } catch (err) {
+                // The server refuses an update for a share stopped elsewhere,
+                // and says so; anything else is the generic failure.
+                const msg = err instanceof Error && /stopped/i.test(err.message)
+                    ? 'This link was stopped. Share the card again to make a new one.'
+                    : "Couldn't update the share link. Please try again.";
+                toast.error(msg);
+            }
+            return;
+        }
+        const shareId = link.shareId || newShareId();
         // Start the publish, but do NOT await it before opening the sheet.
         const publishPromise = publishCard(uid, link, shareId);
 

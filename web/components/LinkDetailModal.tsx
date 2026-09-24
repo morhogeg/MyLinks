@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { Link, StatusChangeHandler, UserNote } from '@/lib/types';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { Link, StatusChangeHandler, UserNote, CardShareMode } from '@/lib/types';
 import SourceByline from './SourceByline';
-import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, CircleCheck, Check, Network, Play, Youtube, ImageOff, Image as ImageIcon, ImagePlus, Loader2, Layers, Share2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, StickyNote, Waypoints, EyeOff, Upload } from 'lucide-react';
+import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, CircleCheck, Check, Network, Play, Youtube, ImageOff, Image as ImageIcon, ImagePlus, Loader2, Layers, Share2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, StickyNote, Waypoints, EyeOff, Upload, RefreshCw, Link2Off } from 'lucide-react';
 import { getPlatform } from '@/lib/platform';
 import SimpleMarkdown from './SimpleMarkdown';
 import PosterImage from './ui/PosterImage';
@@ -14,10 +14,12 @@ import TagInput from './TagInput';
 import { hasHebrew, getDominantDirection } from '@/lib/rtl';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import { useVisualViewport } from '@/lib/useVisualViewport';
-import { getRelatedCards } from '@/lib/related';
+import { getRelatedCards, relatedSimCandidates } from '@/lib/related';
+import { fetchAnchorSims, AnchorSims } from '@/lib/similarity';
 import { getNotes, makeNote, touchNote } from '@/lib/notes';
 import { hapticSuccess, hapticMedium } from '@/lib/haptics';
 import { isHttpUrl } from '@/lib/url';
+import { isCardShareStale } from '@/lib/collections';
 import CitationMark from './ui/CitationMark';
 import ProBadge from './ui/ProBadge';
 import { requestPaywall } from '@/lib/entitlement';
@@ -72,13 +74,13 @@ interface LinkDetailModalProps {
     backTo?: string;
     onStatusChange: StatusChangeHandler;
     onReadStatusChange: (id: string, isRead: boolean) => void;
-    onUpdateTags: (id: string, tags: string[]) => void;
+    onUpdateTags: (id: string, tags: string[], previous?: string[]) => void;
     onUpdateCategory: (id: string, category: string) => void;
     onUpdateTitle?: (id: string, title: string, reembed?: boolean) => void;
     onUpdateSummary?: (id: string, summary: string, reembed?: boolean) => void;
     /** Edit a note card as one field — re-derives title/body from the text. */
     onUpdateNote?: (id: string, text: string) => void;
-    onUpdateNotes?: (id: string, notes: UserNote[], removed?: boolean) => void;
+    onUpdateNotes?: (id: string, notes: UserNote[], removed?: boolean, previous?: UserNote[]) => void;
     /** Write Machina's summary of a text/note card, on demand (the mark under
         the text). Resolves null on failure — the card is left untouched. */
     onGenerateSummary?: (id: string, text: string) => Promise<{ aiSummary: string; aiDetailedSummary: string } | null>;
@@ -92,7 +94,7 @@ interface LinkDetailModalProps {
      *  already is, and which only renders when there ARE connections to see. */
     onOpenInGraph?: (link: Link) => void;
     onAddToCollection?: (link: Link) => void;
-    onShare?: (link: Link) => void;
+    onShare?: (link: Link, mode?: CardShareMode) => void;
     /** Toggle the card's thumbnail banner on/off (Hide image / Show image). */
     onToggleThumbnail?: (link: Link) => void;
     /** Open revealed at the My-notes section (set when entered from the
@@ -141,7 +143,9 @@ function PartialCaptureNote({
     const failed = !reading && link.enrichStatus === 'failed';
     const line = isPdf
         ? (isRtl ? 'לא הצלחנו לקרוא את קובץ ה-PDF.' : 'Machina couldn’t read this PDF.')
-        : (isRtl ? 'לא הצלחנו לקרוא את הפוסט במלואו.' : 'Machina couldn’t read the full post.');
+        : link.captureReason === 'file'
+            ? (isRtl ? 'לא הצלחנו לקרוא את הקובץ.' : 'Machina couldn’t read this file.')
+            : (isRtl ? 'לא הצלחנו לקרוא את הפוסט במלואו.' : 'Machina couldn’t read the full post.');
     const hint = uid
         ? (isRtl ? 'הוסיפו צילום מסך שלו ונשלים את הכרטיס.' : 'Add a screenshot of it and Machina completes the card.')
         : (isRtl ? 'שתפו צילום מסך שלו כדי לקבל כרטיס מלא.' : 'Share a screenshot of it for the full card.');
@@ -422,12 +426,12 @@ export default function LinkDetailModal({
         const text = noteDraft.trim();
         if (!text) return;
         if (isNewNote) {
-            onUpdateNotes?.(link.id, [makeNote(text), ...notes]);
+            onUpdateNotes?.(link.id, [makeNote(text), ...notes], false, notes);
             hapticSuccess();
         } else {
             const existing = notes.find(n => n.id === editingNoteId);
             if (!existing || existing.text === text) return; // unchanged — skip the write
-            onUpdateNotes?.(link.id, notes.map(n => n.id === editingNoteId ? touchNote(n, text) : n));
+            onUpdateNotes?.(link.id, notes.map(n => n.id === editingNoteId ? touchNote(n, text) : n), false, notes);
             hapticSuccess();
         }
     };
@@ -442,7 +446,7 @@ export default function LinkDetailModal({
         setEditingNoteId(null);
         if (id === NEW_NOTE_ID) { hapticMedium(); return; }
         if (notes.some(n => n.id === id)) {
-            onUpdateNotes?.(link.id, notes.filter(n => n.id !== id), true);
+            onUpdateNotes?.(link.id, notes.filter(n => n.id !== id), true, notes);
             hapticMedium();
         }
     };
@@ -592,6 +596,27 @@ export default function LinkDetailModal({
         return () => window.removeEventListener('keydown', onKey);
     }, [isOpen, isEditingNote, isEditingTitle, isEditingSummary, editingNoteId, isEditingCategory, isAddingTag, onClose]);
 
+    // Server similarities for the Related list (lib/similarity.ts). Held per
+    // card id, so a refresh for the same card keeps showing the last answer
+    // instead of flashing back to the local fallback while it loads.
+    const [remoteSims, setRemoteSims] = useState<{ id: string; sims: AnchorSims } | null>(null);
+    const simCandidates = useMemo(
+        () => (isOpen && link ? relatedSimCandidates(link, allLinks) : []),
+        [isOpen, link, allLinks],
+    );
+    const simCandidateKey = simCandidates.join(',');
+    useEffect(() => {
+        if (!isOpen || !uid || !link?.id) return;
+        let live = true;
+        const anchorId = link.id;
+        fetchAnchorSims(uid, anchorId, simCandidates).then((sims) => {
+            if (live && sims) setRemoteSims({ id: anchorId, sims });
+        });
+        return () => { live = false; };
+        // simCandidateKey stands in for simCandidates (a new array each render).
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOpen, uid, link?.id, simCandidateKey]);
+
     if (!isOpen) return null;
 
     const isRtl = link.language === 'he' || hasHebrew(link.title) || hasHebrew(link.summary) || (link.detailedSummary ? hasHebrew(link.detailedSummary) : false);
@@ -608,7 +633,10 @@ export default function LinkDetailModal({
     // Live related cards: stored AI relations merged with fresh embedding /
     // concept matches (see lib/related.ts). Computed here, below the isOpen
     // guard, so the closed modal costs nothing.
-    const relatedCards = getRelatedCards(link, allLinks, isRtl, excludeRelatedIds);
+    const relatedCards = getRelatedCards(
+        link, allLinks, isRtl, excludeRelatedIds,
+        remoteSims && remoteSims.id === link.id ? remoteSims.sims : null,
+    );
 
     // Branded source credit, matching the card: YouTube channel in red, X
     // author (@handle from the URL) in the X grey, everything else muted.
@@ -828,6 +856,28 @@ export default function LinkDetailModal({
                                 className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors"
                             >
                                 <Share2 className="w-[18px] h-[18px]" />
+                            </button>
+                        )}
+                        {/* The card's public page is a snapshot: refresh it in
+                            place after an edit (same URL), or take it down. */}
+                        {onShare && isCardShareStale(link) && (
+                            <button
+                                onClick={() => onShare(link, 'update')}
+                                title="Update public link"
+                                aria-label="Update public link"
+                                className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors"
+                            >
+                                <RefreshCw className="w-[18px] h-[18px]" />
+                            </button>
+                        )}
+                        {onShare && link.shareId && (
+                            <button
+                                onClick={() => onShare(link, 'stop')}
+                                title="Stop sharing"
+                                aria-label="Stop sharing this card"
+                                className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors"
+                            >
+                                <Link2Off className="w-[18px] h-[18px]" />
                             </button>
                         )}
                         {onToggleThumbnail && link.metadata?.thumbnailUrl && (
@@ -1615,7 +1665,7 @@ export default function LinkDetailModal({
                                             className="w-3 h-3 ml-1 opacity-40 group-hover/tag:opacity-100 hover:text-red-400 cursor-pointer transition-all"
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                onUpdateTags(link.id, link.tags.filter(t => t !== tag));
+                                                onUpdateTags(link.id, link.tags.filter(t => t !== tag), link.tags);
                                             }}
                                         />
                                     </span>
@@ -1627,7 +1677,7 @@ export default function LinkDetailModal({
                                     allTags={allTags}
                                     existingTags={link.tags}
                                     onAdd={(tag) => {
-                                        onUpdateTags(link.id, [...link.tags, tag]);
+                                        onUpdateTags(link.id, [...link.tags, tag], link.tags);
                                         setIsAddingTag(false);
                                     }}
                                     onCancel={() => setIsAddingTag(false)}

@@ -806,13 +806,23 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     ///   We must NOT claim success OR a hard failure — show a calm "still saving"
     ///   terminal state and leave the ✕ as the escape hatch (no auto-dismiss).
     /// - otherwise         → a real, terminal failure (auth/HTTP/parse error).
-    private func showResult(_ message: String, success: Bool, neutral: Bool = false) {
+    ///
+    /// `stickyHint` (failures only): a second line the user needs time to read
+    /// (the quota wall). The card then stays up with the ✕ instead of
+    /// auto-dismissing after 1.6s.
+    private func showResult(_ message: String, success: Bool, neutral: Bool = false,
+                            stickyHint: String? = nil) {
         DispatchQueue.main.async {
             // Idempotency guard: a real network response and the watchdog can both
             // call this. Whichever lands first owns the UI; later calls are dropped
             // so we never flip a shown error into a (false) success or vice-versa.
             guard !self.resultShown else { return }
             self.resultShown = true
+
+            // A hard failure means no card is coming, so drop the hand-off flag:
+            // otherwise the app, opened next, floats an "Analyzing" banner for a
+            // save the server refused.
+            if !success && !neutral { self.clearPendingShareHint() }
 
             if self.isImageFlow || self.isLinkFlow || self.isTextFlow {
                 if success {
@@ -832,7 +842,10 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
                     self.citationMark.alpha = 0
                     self.phaseLabel.text = message
                     self.phaseLabel.textColor = Lumen.text
-                    if neutral {
+                    if let stickyHint = stickyHint {
+                        // Leave it up: the ✕ closes it.
+                        self.hintLabel.text = stickyHint
+                    } else if neutral {
                         // Neutral terminal state: the save may still be finishing on
                         // the background session. Keep the card up with the ✕ close
                         // affordance instead of auto-dismissing, and never a check.
@@ -847,7 +860,11 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
             // Generic (non-image) HUD path.
             self.card.isHidden = false
             self.label.text = message
-            if neutral {
+            if let stickyHint = stickyHint {
+                self.label.text = message + "\n\n" + stickyHint
+                self.spinner.stopAnimating()
+                self.spinner.isHidden = true
+            } else if neutral {
                 // Keep a subtle spinner going to signal the background upload is
                 // still in flight; the ✕ dismisses. No auto-finish, no false check.
                 self.spinner.startAnimating()
@@ -860,6 +877,25 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
                 }
             }
         }
+    }
+
+    /// The free plan's monthly quota refused this save (429 + `upgrade: true`).
+    ///
+    /// There is deliberately no "Open Machina" button: iOS forbids a share
+    /// extension from launching its host app (the URL-scheme and notification
+    /// attempts in builds 1051-1055 were dead ends and were removed). Instead we
+    /// leave a one-shot paywall hint in the App Group; the app consumes it on
+    /// its next launch or foreground (ShareConfigPlugin.consumePendingPaywall →
+    /// web/lib/useSharedCaptureBanner.ts → requestPaywall) and opens the
+    /// paywall, so "Open Machina" in the copy is literally what to do.
+    private func showQuotaResult(_ serverText: String, kind: String) {
+        if let defaults = UserDefaults(suiteName: Self.appGroup) {
+            defaults.set(kind, forKey: "pendingPaywallKind")
+            defaults.set(Date().timeIntervalSince1970, forKey: "pendingPaywallAt")
+        }
+        let reason = serverText.isEmpty ? "You've used this month's free saves." : serverText
+        showResult("Monthly limit reached", success: false,
+                   stickyHint: reason + " Open Machina to see your options.")
     }
 
     private func finish() {
@@ -953,15 +989,45 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     /// NOT NSDataDetector (which also matches "example.com" and would send the
     /// HUD down the link story for something the backend saves as text). This one
     /// predicate decides which flow the user watches, so the words on screen and
-    /// the card that lands can never tell different stories.
+    /// the card that lands can never tell different stories. (The trailing-
+    /// punctuation trim in `firstHttpUrl` only changes WHICH link is shown, never
+    /// whether one is found, except for a bare "https://" + punctuation.)
     private static func containsHttpUrl(_ s: String) -> Bool {
-        s.range(of: "https?://[^\\s]+", options: [.regularExpression, .caseInsensitive]) != nil
+        firstHttpUrl(in: s) != nil
+    }
+
+    /// Sentence punctuation that follows a link in prose ("see https://x.com/a."
+    /// or "(https://x.com/a)") and is never part of it.
+    private static let urlTrailingPunctuation: Set<Character> =
+        [")", ".", ",", ";", ":", "!", "?", "\"", "'", "\u{201D}", "\u{2019}", "\u{00BB}"]
+
+    /// The first http(s) link in a shared string, minus trailing punctuation.
+    /// A ")" is only trimmed while the link has more ")" than "(" so that
+    /// balanced ones (Wikipedia's "/wiki/Foo_(bar)") survive. Nil when nothing
+    /// is left after the scheme.
+    private static func firstHttpUrl(in s: String) -> String? {
+        guard let range = s.range(of: "https?://[^\\s]+", options: [.regularExpression, .caseInsensitive]) else {
+            return nil
+        }
+        var url = String(s[range])
+        while let last = url.last {
+            if last == ")" {
+                let opens = url.filter { $0 == "(" }.count
+                let closes = url.filter { $0 == ")" }.count
+                if closes <= opens { break }
+            } else if !urlTrailingPunctuation.contains(last) {
+                break
+            }
+            url.removeLast()
+        }
+        guard let scheme = url.range(of: "://"), scheme.upperBound < url.endIndex else { return nil }
+        return url
     }
 
     /// Route a shared string to the flow that matches what will really happen to
     /// it: a link is fetched and read, plain text is already in hand.
     private func presentSharedString(_ s: String) {
-        if Self.containsHttpUrl(s) { presentLinkScan(urlString: s) } else { presentTextScan(s) }
+        if let url = Self.firstHttpUrl(in: s) { presentLinkScan(urlString: url) } else { presentTextScan(s) }
     }
 
     /// Show the scan animation for shared TEXT — a paragraph with no link in it.
@@ -1311,14 +1377,37 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
                 let body = (try? JSONSerialization.jsonObject(with: responseData)) as? [String: Any]
                 if (body?["duplicate"] as? Bool) == true {
                     showDuplicateResult()
+                } else if let total = body?["savedFirstOf"] as? Int, total > 1 {
+                    // Shared text held several links: only the first became a
+                    // card, the rest ride along in its note. Say so.
+                    showResult("Saved the first of \(total) links ✓", success: true)
                 } else {
                     showResult("Saved ✓ · Making your card", success: true)
                 }
             } else if code == 403 || code == 401 {
                 showResult("Auth failed. Reopen Machina to sign in", success: false)
             } else if code == 429 {
-                // Rate limited — the save is refused for now, not broken.
-                showResult("Too many saves right now. Try again in a few minutes", success: false)
+                // Two different 429s share this code (functions/main.py): the
+                // monthly plan quota (_quota_blocked — JSON with `upgrade: true`
+                // on the free plan, plus a human `error`), and the per-minute
+                // rate limiter (plain "Too many requests").
+                let body = (try? JSONSerialization.jsonObject(with: responseData)) as? [String: Any]
+                let serverText = ((body?["error"] as? String) ?? "")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                if (body?["upgrade"] as? Bool) == true {
+                    showQuotaResult(serverText, kind: (body?["kind"] as? String) ?? "saves")
+                } else if (body?["kind"] as? String) != nil, !serverText.isEmpty {
+                    // Quota wall on a plan with no upgrade path (already Pro):
+                    // the server's own words, no paywall hint.
+                    showResult("Monthly limit reached", success: false, stickyHint: serverText)
+                } else {
+                    // Rate limited — the save is refused for now, not broken.
+                    showResult("Too many saves right now. Try again in a few minutes", success: false)
+                }
+            } else if code == 503 {
+                // The rate limiter's backing store (or the service) is down —
+                // main.py returns 503 for that on purpose, not 429.
+                showResult("Machina is busy. Try again in a minute", success: false)
             } else {
                 showResult("Couldn't save (\(code))", success: false)
             }

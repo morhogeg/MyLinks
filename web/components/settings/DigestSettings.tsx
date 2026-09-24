@@ -77,7 +77,7 @@ export function ResurfacingView({
                         </div>
                         <div className="text-[12.5px] text-text-muted mt-1 leading-snug">A hand-picked batch of your saved cards</div>
                     </div>
-                    <Toggle on={settings.digest_enabled && !gated} onChange={gated ? () => openPaywall('digest') : () => setSettings((p) => ({ ...p, digest_enabled: !p.digest_enabled }))} />
+                    <Toggle label="Curated digest" on={settings.digest_enabled && !gated} onChange={gated ? () => openPaywall('digest') : () => setSettings((p) => ({ ...p, digest_enabled: !p.digest_enabled }))} />
                 </RowShell>
                 {settings.digest_enabled && !gated && <NavRow title="Schedule" value={scheduleValue} onClick={() => go('schedule')} />}
                 {settings.digest_enabled && !gated && <NavRow title="Cards per digest" value={String(settings.digest_count)} onClick={() => go('cards')} />}
@@ -86,7 +86,7 @@ export function ResurfacingView({
                         <div className="flex-1 min-w-0 py-[11px]">
                             <SkipEmptyLabel />
                         </div>
-                        <Toggle on={settings.digest_skip_empty} onChange={() => setSettings((p) => ({ ...p, digest_skip_empty: !p.digest_skip_empty }))} />
+                        <Toggle label="Skip when empty" on={settings.digest_skip_empty} onChange={() => setSettings((p) => ({ ...p, digest_skip_empty: !p.digest_skip_empty }))} />
                     </RowShell>
                 )}
             </List>

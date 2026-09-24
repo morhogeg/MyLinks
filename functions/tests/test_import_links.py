@@ -178,7 +178,11 @@ def test_import_writes_one_placeholder_card_and_one_queue_doc_per_link(monkeypat
     assert first["title"] == "Alpha"
     # createdAt is NOW, so an import lands at the top of the feed; the original
     # bookmark date is kept beside it rather than back-dating the card.
-    assert first["createdAt"] == first["processingStartedAt"] == first["importedAt"]
+    assert first["createdAt"] == first["queuedAt"] == first["importedAt"]
+    # QUEUED, not started: the worker stamps processingStartedAt when it picks
+    # the job up, so the janitor never times out a card that is only waiting.
+    assert "processingStartedAt" not in first
+    assert first["urlKey"]
     assert first["importedFromAt"] == 1_600_000_000_000
     assert first["importedTags"] == ["Reading", "Later"]
     # A link with no title falls back to the host, like every other capture.
@@ -369,7 +373,7 @@ def test_a_job_that_started_and_died_is_still_pruned(monkeypatch):
 
 def test_a_queued_job_is_pruned_once_it_is_truly_abandoned(monkeypatch):
     deleted, _now, _report = _run_janitor(monkeypatch, [
-        {"id": "abandoned", "status": "queued", "createdAt": _ago(5 * 60), "source": "import"},
+        {"id": "abandoned", "status": "queued", "createdAt": _ago(7 * 60), "source": "import"},
     ])
     assert deleted == ["abandoned"]
 

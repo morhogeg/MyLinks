@@ -13,6 +13,8 @@ export default function MobileTagExplorerDrawer({
     selectedTags,
     onToggleTag,
     onClearFilters,
+    onRenameTag,
+    onDeleteTag,
 }: {
     isOpen: boolean;
     onClose: () => void;
@@ -21,6 +23,8 @@ export default function MobileTagExplorerDrawer({
     selectedTags: Set<string>;
     onToggleTag: (tag: string) => void;
     onClearFilters: () => void;
+    onRenameTag?: (from: string, to: string) => Promise<void>;
+    onDeleteTag?: (tag: string) => Promise<void>;
 }) {
     if (!isOpen) return null;
     return (
@@ -37,6 +41,7 @@ export default function MobileTagExplorerDrawer({
                     </h2>
                     <button
                         onClick={onClose}
+                        aria-label="Close"
                         className="p-2 hover:bg-fill-subtle rounded-full touch-manipulation"
                     >
                         <X className="w-5 h-5" />
@@ -49,6 +54,8 @@ export default function MobileTagExplorerDrawer({
                         selectedTags={selectedTags}
                         onToggleTag={onToggleTag}
                         onClearFilters={onClearFilters}
+                        onRenameTag={onRenameTag}
+                        onDeleteTag={onDeleteTag}
                         className="p-4"
                     />
                 </div>

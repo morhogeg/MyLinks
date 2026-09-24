@@ -333,6 +333,29 @@ test('an unknown top-level collection is denied (no catch-all allow)', async () 
   }
 });
 
+// ── config/app: the native forced-update switch (web/lib/appUpdate.ts) ──────
+// Read before sign-in, so get-by-id is public; nothing else under /config is
+// readable, nothing is listable, and no client may write it (a client that
+// could would lock every other user out with a huge minBuild).
+
+test('config/app: readable by id by anyone, even logged out', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'config', 'app'), { minBuild: 1000 });
+  });
+  for (const db of [anonDb(), strangerDb(), ownerDb()]) {
+    await assertSucceeds(getDoc(doc(db, 'config', 'app')));
+  }
+});
+
+test('config/app: no client can write it, and other config docs stay closed', async () => {
+  for (const db of [anonDb(), strangerDb(), ownerDb()]) {
+    await assertFails(setDoc(doc(db, 'config', 'app'), { minBuild: 999999 }));
+    await assertFails(deleteDoc(doc(db, 'config', 'app')));
+    await assertFails(getDoc(doc(db, 'config', 'secrets')));
+    await assertFails(getDocs(collection(db, 'config')));
+  }
+});
+
 test('the /users list rule is per-caller: a stranger cannot list by the OWNER uid', async () => {
   await assertFails(getDocs(query(
     collection(strangerDb(), 'users'),

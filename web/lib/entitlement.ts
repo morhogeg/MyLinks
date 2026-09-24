@@ -169,7 +169,39 @@ export function meterLabel(kind: QuotaKind, m: QuotaMeter): string | null {
 
 export const PAYWALL_EVENT = 'machina:paywall';
 
-export type PaywallReason = QuotaKind | 'synthesis' | 'digest' | 'youtube' | 'settings' | 'manual';
+const PAYWALL_REASONS = ['saves', 'asks', 'imports', 'synthesis', 'digest', 'youtube', 'settings', 'manual'] as const;
+
+export type PaywallReason = QuotaKind | (typeof PAYWALL_REASONS)[number];
+
+/** True for a known reason; guards the `?paywall=` deep link against junk. */
+export function isPaywallReason(v: unknown): v is PaywallReason {
+    return typeof v === 'string' && (PAYWALL_REASONS as readonly string[]).includes(v);
+}
+
+const PENDING_PAYWALL_KEY = 'machina.pendingPaywall';
+
+/**
+ * Open the paywall even if the app is still booting (a push tapped from a cold
+ * start fires before EntitlementProvider mounts). Stashes the reason for the
+ * provider to pick up after sign-in, and fires the live event for a warm app;
+ * whichever handles it first clears the stash.
+ */
+export function requestPaywallWhenReady(reason: PaywallReason): void {
+    try { sessionStorage.setItem(PENDING_PAYWALL_KEY, reason); } catch { /* private mode */ }
+    requestPaywall(reason);
+}
+
+/** Pop (and clear) a paywall request stashed by requestPaywallWhenReady. */
+export function consumePendingPaywall(): PaywallReason | null {
+    try {
+        const raw = sessionStorage.getItem(PENDING_PAYWALL_KEY);
+        if (raw === null) return null;
+        sessionStorage.removeItem(PENDING_PAYWALL_KEY);
+        return isPaywallReason(raw) ? raw : 'manual';
+    } catch {
+        return null;
+    }
+}
 
 /** Ask the mounted paywall to open. Safe to call anywhere, including SSR (no-op). */
 export function requestPaywall(reason: PaywallReason = 'manual'): void {

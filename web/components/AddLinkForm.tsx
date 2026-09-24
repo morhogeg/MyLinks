@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, FormEvent } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Link, Plus, X, Upload, Loader2, Image as ImageIcon, StickyNote } from 'lucide-react';
 import { doc, onSnapshot } from 'firebase/firestore';
-import { saveLink, getUserTags, findLinkIdByUrl, createProcessingPlaceholder, createImagePlaceholder, markLinkFailed, createNoteCard, enrichNoteCard } from '@/lib/storage';
+import { saveLink, getUserTags, findLinkIdByUrl, createProcessingPlaceholder, startProcessingPlaceholder, createImagePlaceholder, markLinkFailed, createNoteCard, enrichNoteCard } from '@/lib/storage';
 import { appCheckHeaders, db } from '@/lib/firebase';
 import { authHeaders } from '@/lib/auth';
 import { progressFor } from '@/lib/shareProgress';
@@ -22,6 +22,7 @@ import ImageScanProgress from '@/components/ImageScanProgress';
 import VideoScanProgress from '@/components/VideoScanProgress';
 import LinkScanProgress from '@/components/LinkScanProgress';
 import ImportSheet from '@/components/ImportSheet';
+import { enqueueOfflineSave } from '@/lib/offlineSave';
 
 interface AddLinkFormProps {
     onLinkAdded: () => void;
@@ -40,13 +41,42 @@ interface AddLinkFormProps {
     onDialogCardChange?: (cardId: string | null) => void;
 }
 
-const formatUrl = (input: string) => {
-    let formatted = input.trim();
-    if (!formatted) return '';
-    if (!/^https?:\/\//i.test(formatted)) {
-        formatted = `https://${formatted}`;
+// Sentence punctuation that trails a pasted URL but is never part of it
+// (mirrors functions/main.py _URL_TRAILING_PUNCT).
+const URL_TRAILING_PUNCT = /[).,;:!?"'”’»\]>]+$/;
+
+const validHttpUrl = (candidate: string): string => {
+    try {
+        const u = new URL(candidate);
+        // Validated, but returned as typed: the stored url stays what the user saved.
+        if ((u.protocol === 'http:' || u.protocol === 'https:') && u.hostname.includes('.')) return candidate;
+    } catch { /* not a URL */ }
+    return '';
+};
+
+/**
+ * The link to save from whatever was pasted. A bare "example.com/x" gets
+ * https:// in front; pasted TEXT ("Article title – https://…", a message with
+ * a link in it) yields the first URL inside it, trailing punctuation trimmed.
+ * Returns '' when there is no URL at all, so the form can offer to save the
+ * text as a note instead of saving "https://Article title – https://…".
+ */
+const formatUrl = (input: string): string => {
+    const text = input.trim();
+    if (!text) return '';
+    const found = text.match(/https?:\/\/[^\s<>"]+/i);
+    if (found) {
+        let raw = found[0];
+        const trimmed = raw.replace(URL_TRAILING_PUNCT, '');
+        // Keep a closing paren the URL itself opened (…/wiki/Foo_(bar)).
+        raw = raw.charAt(trimmed.length) === ')' && (trimmed.split('(').length > trimmed.split(')').length)
+            ? `${trimmed})`
+            : trimmed;
+        return validHttpUrl(raw);
     }
-    return formatted;
+    // No scheme: only a single token that looks like a host (+ path) counts.
+    if (/\s/.test(text)) return '';
+    return validHttpUrl(`https://${text.replace(URL_TRAILING_PUNCT, '')}`);
 };
 
 // Detect a YouTube link and pull its 11-char video ID, so we can show the
@@ -111,6 +141,9 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
     const [images, setImages] = useState<{ id: string; file: File; preview: string }[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // Link-tab input that holds no URL (e.g. a pasted sentence): shown as a
+    // hint offering to save it as a note. Cleared as soon as the input changes.
+    const [notUrlText, setNotUrlText] = useState<string | null>(null);
     const [isExpanded, setIsExpanded] = useState(false);
     // The bulk import sheet, offered under the link field: one page at a time
     // is the wrong tool for a bookmarks file.
@@ -457,10 +490,30 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
         return data;
     };
 
+    // Enqueue an offline-saved link once the device is back online (see
+    // lib/offlineSave.ts). If the app is closed before reconnecting, the card
+    // keeps `pendingEnqueue` and useResumeOfflineSaves (Feed) enqueues it on
+    // the next launch instead.
+    const enqueueWhenOnline = (ownerUid: string, linkUrl: string, cardId: string, written: Promise<void>) => {
+        const run = () => {
+            window.removeEventListener('online', run);
+            void enqueueOfflineSave(ownerUid, linkUrl, cardId, written);
+        };
+        window.addEventListener('online', run);
+    };
+
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
 
         const formattedUrl = formatUrl(url);
+
+        // Text with no link in it: don't invent "https://<the text>". Offer to
+        // keep it as a note instead (the hint under the field does the switch).
+        if (activeTab === 'link' && !formattedUrl && url.trim() && !isLoading) {
+            setError(null);
+            setNotUrlText(url.trim());
+            return;
+        }
 
         if ((activeTab === 'link' && !formattedUrl) || (activeTab === 'image' && images.length === 0) || (activeTab === 'note' && !note.trim()) || isLoading) {
             return;
@@ -476,6 +529,35 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
         // BEFORE the expensive analysis so a repeat paste is caught instantly and
         // no work is wasted. The check is best-effort: any failure (offline, query
         // error) falls through to a normal save — a save is NEVER blocked on it.
+        // OFFLINE link save. The placeholder write can't be acknowledged until
+        // the device reconnects, so awaiting it (the online path below) would
+        // pin the dialog on a spinner. Firestore queues the write and shows the
+        // card from its local cache at once; hand the URL to the pipeline when
+        // the connection comes back, and close now. The dedup probe is skipped:
+        // it needs the server, and a save is never blocked on it.
+        if (activeTab === 'link' && typeof navigator !== 'undefined' && navigator.onLine === false) {
+            let placeholder: { id: string; written: Promise<void> };
+            try {
+                placeholder = startProcessingPlaceholder(uid, formattedUrl, { offline: true });
+            } catch (writeErr) {
+                trackSaveFailed('save_failed');
+                const message = `Could not save to Machina: ${writeErr instanceof Error ? writeErr.message : String(writeErr)}`;
+                setError(message);
+                toast.error(message);
+                return;
+            }
+            enqueueWhenOnline(uid, formattedUrl, placeholder.id, placeholder.written);
+            trackSaveSucceeded('web_form');
+            trackFirstSave();
+            onLinkAdded();
+            hapticSuccess();
+            toast.info('Saved offline. Machina will analyze it when you’re back online.');
+            setUrl('');
+            setError(null);
+            setIsExpanded(false);
+            return;
+        }
+
         if (activeTab === 'link') {
             try {
                 const existingId = await findLinkIdByUrl(uid, formattedUrl);
@@ -941,7 +1023,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                                             autoCapitalize="off"
                                             spellCheck={false}
                                             value={url || ''}
-                                            onChange={(e) => setUrl(e.target.value)}
+                                            onChange={(e) => { setUrl(e.target.value); setNotUrlText(null); }}
                                             placeholder="example.com or https://..."
                                             className="w-full px-4 py-4 bg-background border border-border-subtle rounded-xl text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50 text-base"
                                             disabled={isLoading}
@@ -1089,6 +1171,27 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                             <p className="text-red-400 text-sm mt-4 text-center bg-red-400/10 py-2 rounded-lg border border-red-400/20">
                                 {error}
                             </p>
+                        )}
+
+                        {activeTab === 'link' && notUrlText && !error && (
+                            <div className="mt-4 rounded-xl border border-border-subtle bg-fill-subtle px-4 py-3 text-center">
+                                <p className="text-sm text-text-secondary">
+                                    That doesn’t contain a link.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setNote(notUrlText);
+                                        setUrl('');
+                                        setNotUrlText(null);
+                                        setActiveTab('note');
+                                    }}
+                                    className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-accent hover:text-accent-hover transition-colors"
+                                >
+                                    <StickyNote className="w-4 h-4" />
+                                    Save it as a note instead
+                                </button>
+                            </div>
                         )}
                     </form>
                 </div>

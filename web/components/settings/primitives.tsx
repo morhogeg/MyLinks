@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, Children } from 'react';
+import { useState, useEffect, useRef, Children, createContext, useContext, useId } from 'react';
 import type { ReactNode } from 'react';
 import { Check, ChevronRight, ShieldCheck, ExternalLink } from 'lucide-react';
 import { hapticSelection } from '@/lib/haptics';
@@ -41,6 +41,11 @@ export function List({ children, tight }: { children: ReactNode; tight?: boolean
     );
 }
 
+/** The id of the current row's title (set by RowShell, rendered by RowText), so a
+    Toggle inside the row is named by that title without each call site passing
+    a label. Null outside a RowShell. */
+const RowTitleIdContext = createContext<string | null>(null);
+
 export function RowShell({
     tile, tileClass, onClick, children, className,
 }: {
@@ -51,19 +56,21 @@ export function RowShell({
     className?: string;
 }) {
     const cls = `w-full flex items-center gap-3 px-[14px] min-h-[46px] text-left ${onClick ? 'hover:bg-card-hover transition-colors cursor-pointer' : ''} ${className || ''}`;
+    const titleId = useId();
     const inner = (
-        <>
+        <RowTitleIdContext.Provider value={titleId}>
             {tile && <span className={`${TILE_BASE} ${tileClass || 'bg-tile text-tile-ink'}`}>{tile}</span>}
             {children}
-        </>
+        </RowTitleIdContext.Provider>
     );
     return onClick ? <button onClick={onClick} className={cls}>{inner}</button> : <div className={cls}>{inner}</div>;
 }
 
 export function RowText({ title, sub }: { title: string; sub?: string }) {
+    const titleId = useContext(RowTitleIdContext);
     return (
         <div className="flex-1 min-w-0 py-[11px]">
-            <div className="text-[16px] text-text tracking-[-0.01em] leading-tight">{title}</div>
+            <div id={titleId ?? undefined} className="text-[16px] text-text tracking-[-0.01em] leading-tight">{title}</div>
             {sub && <div className="text-[12.5px] text-text-muted mt-1 leading-snug">{sub}</div>}
         </div>
     );
@@ -122,13 +129,20 @@ export function TopicPill({ label, active, onClick }: { label: string; active: b
     states — the ON travel is exactly the leftover free space (51 − 2×2 − 27 = 20px)
     and can't drift out of sync if the sizes change. `shrink-0` keeps the track from
     being squeezed by a long label in a settings row, so it never overflows the
-    row's rounded container. */
-export function Toggle({ on, onChange }: { on: boolean; onChange: () => void }) {
+    row's rounded container.
+    Accessible name: `label` when given; otherwise, inside a RowShell whose title
+    is a RowText, the switch is labelled by that title (aria-labelledby). A row
+    with a custom title block must pass `label`. */
+export function Toggle({ on, onChange, label }: { on: boolean; onChange: () => void; label?: string }) {
+    const rowTitleId = useContext(RowTitleIdContext);
     return (
         <button
+            type="button"
             onClick={onChange}
             role="switch"
             aria-checked={on}
+            aria-label={label}
+            aria-labelledby={!label && rowTitleId ? rowTitleId : undefined}
             className={`inline-flex items-center shrink-0 w-[51px] h-[31px] p-[2px] rounded-full transition-colors duration-200 cursor-pointer ${on ? 'bg-accent' : 'bg-text-muted/30'}`}
         >
             <span className={`block w-[27px] h-[27px] rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.2),0_2px_5px_rgba(0,0,0,0.18)] transition-transform duration-200 ease-out ${on ? 'translate-x-[20px] rtl:-translate-x-[20px]' : 'translate-x-0'}`} />

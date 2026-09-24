@@ -4,8 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Lock, X } from 'lucide-react';
 import {
     setPin, attemptUnlock, verifyPin, disablePin, tryBiometricUnlock,
-    getLockoutRemainingMs, getAttemptsLeft,
+    getLockoutRemainingMs, getAttemptsLeft, clearPinBackoff,
 } from '@/lib/privacyLock';
+import { reauthenticate, sessionProvider, type AuthProviderId } from '@/lib/auth';
 import { useScrollLock } from '@/lib/useScrollLock';
 import { useVisualViewport } from '@/lib/useVisualViewport';
 
@@ -77,6 +78,44 @@ export default function PinLockModal({
         return () => clearInterval(id);
     }, [isOpen, error]);
     const waiting = step === 'verify' && lockoutMs > 0;
+
+    // "Forgot PIN?": the PIN is a lock on this account's own data, so the
+    // account itself is the fallback — a fresh sign-in with the user's
+    // provider proves ownership, then the lock is cleared (or, when changing,
+    // the user goes straight to choosing a new PIN). The provider is resolved
+    // up front so the web popup opens inside the tap's user gesture. Hidden
+    // when there is no signed-in provider to confirm with (legacy native).
+    const [reauthProvider, setReauthProvider] = useState<AuthProviderId | null>(null);
+    const [recovering, setRecovering] = useState(false);
+    useEffect(() => {
+        if (!isOpen) return;
+        let cancelled = false;
+        void sessionProvider().then((p) => { if (!cancelled) setReauthProvider(p); });
+        return () => { cancelled = true; };
+    }, [isOpen]);
+    const forgotPin = async () => {
+        if (recovering || !reauthProvider) return;
+        setRecovering(true);
+        setError(null);
+        try {
+            await reauthenticate(reauthProvider);
+            clearPinBackoff();
+            if (mode === 'change') {
+                setStep('create');
+                setValue('');
+                setRecovering(false);
+                return;
+            }
+            await disablePin(uid);
+            setRecovering(false);
+            onSuccess?.();
+            onClose();
+        } catch (e) {
+            setRecovering(false);
+            const cancelled = (e as { cancelled?: boolean })?.cancelled;
+            if (!cancelled) setError((e as Error)?.message || 'Something went wrong. Please try again.');
+        }
+    };
 
     // Reset the flow whenever the modal (re)opens or the mode changes.
     const [resetKey, setResetKey] = useState({ isOpen, mode });
@@ -272,6 +311,19 @@ export default function PinLockModal({
                     <p className={`mt-3 text-[12px] font-medium min-h-[1rem] ${error ? 'text-red-400' : 'text-transparent'}`}>
                         {error ?? ' '}
                     </p>
+
+                    {step === 'verify' && reauthProvider && (
+                        <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); void forgotPin(); }}
+                            disabled={recovering}
+                            className="mt-1 text-[12.5px] font-semibold text-accent hover:opacity-80 disabled:opacity-60 transition-opacity cursor-pointer"
+                        >
+                            {recovering
+                                ? 'Confirming…'
+                                : `Forgot PIN? Confirm with ${reauthProvider === 'apple' ? 'Apple' : 'Google'}`}
+                        </button>
+                    )}
                 </div>
             </div>
         </div>

@@ -798,6 +798,21 @@ def _parse_cited_marker(full_text: str) -> list:
     return [t.strip() for t in m.group(1).split(",") if t.strip()]
 
 
+_EMPTY_LIBRARY_ANSWER_EN = ("I couldn't find anything in your library about that yet. "
+                            "Try saving a few links on the topic, then ask me again.")
+_EMPTY_LIBRARY_ANSWER_HE = ("לא מצאתי עדיין שום דבר בספרייה שלך בנושא הזה. "
+                            "כדאי לשמור כמה קישורים בנושא ואז לשאול שוב.")
+
+
+def empty_library_answer(question: str, answer_language: str = None) -> str:
+    """The fixed reply when retrieval found no cards, in the user's language:
+    Hebrew when the question (or the conversation language) is Hebrew."""
+    lang = (answer_language or "").strip().lower()
+    if lang in ("hebrew", "he", "עברית") or any("\u0590" <= ch <= "\u05FF" for ch in (question or "")):
+        return _EMPTY_LIBRARY_ANSWER_HE
+    return _EMPTY_LIBRARY_ANSWER_EN
+
+
 class GeminiService:
     """
     Wrapper for Google Gemini AI.
@@ -1144,6 +1159,39 @@ Content to analyze:
             config_extra={"media_resolution": media_resolution},
             attempts=attempts,
         ))
+
+    def analyze_document(self, doc_bytes: bytes, mime_type: str, context_text: str = "",
+                         existing_tags: list = None, attempts: int = _MAX_GENERATE_ATTEMPTS,
+                         existing_categories: list = None) -> dict:
+        """Analyze a document (a PDF) passed to Gemini as a native inline part.
+
+        The scraper can't read a PDF's bytes as text, but Gemini reads PDFs
+        directly (text, layout and scanned pages). `context_text` carries the
+        source URL / shared caption so the card keeps its provenance; the
+        document itself is the authoritative content. Raises AnalysisError on
+        failure so the caller can fall back to the honest "couldn't read this
+        PDF" card."""
+        from google.genai import types
+
+        clean_context = (context_text or "")[:4000]
+        existing_tags = self._same_script_tags(existing_tags, clean_context)
+        tags_context = (
+            f"\n\nExisting Tags in Brain (Reuse ONLY those in the content's language):\n{', '.join(existing_tags)}"
+            if existing_tags else ""
+        )
+        cats_context = self._categories_context(existing_categories)
+        prompt = f"""{SYSTEM_PROMPT}{tags_context}{cats_context}
+
+The attached document IS the content to analyze: read it in full (all pages, in
+order) and analyze it according to the instructions above. Work only from what the
+document actually says. The context below (source URL, any caption) is provenance,
+not content.
+
+Context:
+{clean_context}"""
+        contents = [types.Part.from_bytes(data=doc_bytes, mime_type=mime_type), prompt]
+        return self._enforce_tag_language(
+            self._generate_json(contents, "document analysis", attempts=attempts))
 
     def analyze_youtube(self, watch_url: str, existing_tags: list = None,
                         attempts: int = _MAX_GENERATE_ATTEMPTS, existing_categories: list = None) -> dict:
@@ -1503,8 +1551,7 @@ Return JSON: {"platform": one of "x","instagram","threads","tiktok","youtube","l
 
         if not cards:
             return {
-                "answer": "I couldn't find anything in your library about that yet. "
-                          "Try saving a few links on the topic, then ask me again.",
+                "answer": empty_library_answer(question, answer_language),
                 "citedIds": [],
                 "ungrounded": False,
             }
@@ -1670,9 +1717,7 @@ Return JSON: {"platform": one of "x","instagram","threads","tiktok","youtube","l
             raise AnalysisError("Gemini API key is not configured (GEMINI_API_KEY).")
 
         if not cards:
-            yield ("token",
-                   "I couldn't find anything in your library about that yet. "
-                   "Try saving a few links on the topic, then ask me again.")
+            yield ("token", empty_library_answer(question, answer_language))
             yield ("citedIds", [])
             return
 

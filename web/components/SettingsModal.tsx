@@ -7,6 +7,9 @@ import { readLocalAiConsent } from '@/lib/aiConsent';
 import { useTheme } from './ThemeProvider';
 import { useAuth } from './AuthProvider';
 import { deleteAccount } from '@/lib/auth';
+import { isNativeApp } from '@/lib/api';
+import { openExternal } from '@/lib/share';
+import { useEntitlement } from './EntitlementProvider';
 import { auth } from '@/lib/firebase';
 import ConfirmDialog from './ConfirmDialog';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
@@ -178,10 +181,34 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
             // gate. Close the modal so we don't sit over it.
             setShowDeleteConfirm(false);
             onClose();
-        } catch {
+        } catch (e) {
             setDeleting(false);
-            setDeleteError('Could not delete your account. Please try again.');
+            setDeleteError(
+                (e as Error)?.name === 'AppleConfirmCancelled'
+                    ? 'Account not deleted. Confirming with Apple is the last step. Try again when ready.'
+                    : 'Could not delete your account. Please try again.',
+            );
         }
+    };
+
+    // An App Store subscription belongs to the Apple ID, not to this account:
+    // deleting the account does not stop the billing. Say so in the confirm,
+    // with the way to cancel, while there is still time to act on it.
+    const ent = useEntitlement();
+    const hasStoreSubscription = ent.isPro && ent.source === 'revenuecat';
+    const openManageSubscriptions = () => openExternal(isNativeApp()
+        ? 'itms-apps://apps.apple.com/account/subscriptions'
+        : 'https://apps.apple.com/account/subscriptions');
+    // "Export your data first": leave the confirm, return to the main list and
+    // bring the export row into view (it lives under Your data).
+    const goToExport = () => {
+        setShowDeleteConfirm(false);
+        rememberScroll();
+        setStack(['main']);
+        setTimeout(() => {
+            document.getElementById('settings-data-export')
+                ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 60);
     };
 
     // AI-consent timestamp for the "Privacy & AI" section.
@@ -444,6 +471,29 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                 onConfirm={handleDeleteAccount}
                 title="Delete account?"
                 message="This permanently deletes your account and all saved links, collections, and chats. This action cannot be undone."
+                extra={
+                    <div className="mt-3 flex flex-col gap-2 text-sm leading-relaxed">
+                        {hasStoreSubscription && (
+                            <p className="text-text-secondary">
+                                Deleting your account doesn&apos;t cancel your App Store subscription.{' '}
+                                <button
+                                    type="button"
+                                    onClick={openManageSubscriptions}
+                                    className="font-semibold text-accent hover:opacity-80 transition-opacity cursor-pointer"
+                                >
+                                    Manage subscription
+                                </button>
+                            </p>
+                        )}
+                        <button
+                            type="button"
+                            onClick={goToExport}
+                            className="self-start font-semibold text-accent hover:opacity-80 transition-opacity cursor-pointer"
+                        >
+                            Export your data first
+                        </button>
+                    </div>
+                }
                 confirmLabel={deleting ? 'Deleting…' : 'Delete account'}
                 cancelLabel="Cancel"
                 variant="danger"

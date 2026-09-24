@@ -2,7 +2,7 @@
 // Refreshed colors
 
 
-import { Link, StatusChangeHandler } from '@/lib/types';
+import { Link, StatusChangeHandler, CardShareMode } from '@/lib/types';
 import { Archive, Star, Clock, Trash2, Bell, Pencil, Circle, Check, MoreHorizontal, ExternalLink, Layers, Share2, RotateCcw, AlertTriangle, StickyNote, Lock, ImageOff, Image as ImageIcon, Images, EyeOff } from 'lucide-react';
 import { useState, memo } from 'react';
 import SourceByline from './SourceByline';
@@ -37,7 +37,7 @@ interface CardProps {
     /** Open the "add to collection" sheet for this card. */
     onAddToCollection?: (link: Link) => void;
     /** Share this card as a public Machina page. */
-    onShare?: (link: Link) => void;
+    onShare?: (link: Link, mode?: CardShareMode) => void;
     /** Toggle the card's Private flag (parent owns PIN setup — lib/privacyLock). */
     onTogglePrivate?: (link: Link) => void;
     /** Collections this card belongs to — rendered as subtle chips. */
@@ -155,8 +155,17 @@ function Card({
         // affordance the `failed` branch renders, so a capture is never a
         // permanent "Saving…". Retry re-stamps processingStartedAt and re-runs.
         const STALE_PROCESSING_MS = 8 * 60 * 1000;
-        const startedMs =
-            typeof link.processingStartedAt === 'number'
+        // An imported card waiting for a worker carries only `queuedAt`: it is
+        // queued, not stuck, so it gets the backend's much longer queue window
+        // (main.py _QUEUED_TIMEOUT_MS) before it reads as failed.
+        const STALE_QUEUED_MS = 6 * 60 * 60 * 1000;
+        const queued =
+            link.status === 'processing' &&
+            typeof link.processingStartedAt !== 'number' &&
+            typeof link.queuedAt === 'number';
+        const startedMs = queued
+            ? (link.queuedAt as number)
+            : typeof link.processingStartedAt === 'number'
                 ? link.processingStartedAt
                 : typeof link.createdAt === 'number'
                     ? link.createdAt
@@ -165,7 +174,7 @@ function Card({
             link.status === 'processing' &&
             now > 0 &&
             startedMs > 0 &&
-            now - startedMs > STALE_PROCESSING_MS;
+            now - startedMs > (queued ? STALE_QUEUED_MS : STALE_PROCESSING_MS);
         const failed = link.status === 'failed' || staleProcessing;
         const host = (() => {
             try { return new URL(link.url).hostname.replace(/^www\./, ''); }
@@ -185,7 +194,7 @@ function Card({
                             <CitationMark state="working" size={20} />
                         )}
                         <span className={`text-[10px] uppercase font-black tracking-widest ${failed ? 'text-red-400' : 'text-accent'}`}>
-                            {failed ? 'Couldn’t analyze' : 'Saving…'}
+                            {failed ? 'Couldn’t analyze' : queued ? 'Queued' : 'Saving…'}
                         </span>
                     </div>
 
@@ -505,7 +514,8 @@ function Card({
                                                     e.stopPropagation();
                                                     setIsEditingCategory(true);
                                                 }}
-                                                className="opacity-0 group-hover/cat:opacity-100 transition-opacity p-1 -ms-1 hover:bg-fill-subtle rounded-md flex-shrink-0"
+                                                aria-label={isRtl ? 'עריכת קטגוריה' : 'Edit category'}
+                                                className="opacity-0 group-hover/cat:opacity-100 focus-visible:opacity-100 transition-opacity p-1 -ms-1 hover:bg-fill-subtle rounded-md flex-shrink-0"
                                             >
                                                 <Pencil className="w-3 h-3 text-text-muted/40 hover:text-text-muted" />
                                             </button>

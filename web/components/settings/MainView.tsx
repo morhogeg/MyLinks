@@ -6,6 +6,8 @@ import { policyUrl, openExternal } from '@/lib/share';
 import { isNativeApp } from '@/lib/api';
 import ProfileAvatar from '../ProfileAvatar';
 import DataExport from './DataExport';
+import { accountTitle, isPrivateRelay } from './AccountSection';
+import StopCardLinks from './StopCardLinks';
 import ImportSheet from '@/components/ImportSheet';
 import { useEntitlement } from '@/components/EntitlementProvider';
 import type { Settings, View } from './types';
@@ -59,7 +61,9 @@ export function MainView({
                     ? 'active'
                     : undefined;
     const proTitle = ent.loaded && !ent.isPro ? 'Upgrade to Pro' : 'Machina Pro';
-    const manageSubscription = () => openExternal('https://apps.apple.com/account/subscriptions');
+    const manageSubscription = () => openExternal(isNativeApp()
+        ? 'itms-apps://apps.apple.com/account/subscriptions'
+        : 'https://apps.apple.com/account/subscriptions');
     // The same sheet the first run opens, reachable for good from Settings.
     const [importing, setImporting] = useState(false);
     return (
@@ -71,7 +75,7 @@ export function MainView({
                     <RowShell onClick={() => go('account')} className="py-3">
                         <ProfileAvatar email={accountEmail} name={displayName} photoURL={photoURL} size={44} />
                         <div className="flex-1 min-w-0 py-0.5">
-                            <div className="text-[19px] font-semibold text-text truncate leading-tight">{displayName || accountEmail || 'Signed in'}</div>
+                            <div className="text-[19px] font-semibold text-text truncate leading-tight">{accountTitle(displayName, accountEmail)}</div>
                             {/* Email FIRST, provider after. The old order was
                                 "Signed in with Google · morhogeg@g…" — a
                                 fixed-length, low-value prefix that pushed the one
@@ -82,7 +86,7 @@ export function MainView({
                                 width it was spending. `providerName` keeps the full
                                 sentence for the a11y label and the Account screen. */}
                             <div className="text-[13px] text-text-muted truncate mt-0.5">
-                                {accountEmail
+                                {accountEmail && !isPrivateRelay(accountEmail)
                                     ? (providerName ? `${accountEmail} · ${providerName}` : accountEmail)
                                     : providerLabel}
                             </div>
@@ -178,6 +182,7 @@ export function MainView({
             <List>
                 <ExternalRow title="Privacy Policy" onClick={() => openExternal(policyUrl('/privacy'))} />
                 <ExternalRow title="Terms of Service" onClick={() => openExternal(policyUrl('/terms'))} />
+                <StopCardLinks />
             </List>
             <Footnote>
                 <b className="text-text-secondary font-semibold">Powered by Google Gemini.</b> Saved content and your questions are sent to Gemini for summaries and answers, on the paid tier, where Google&apos;s terms state your content is never used to train Google&apos;s models. Private cards are never sent. The Privacy Policy lists exactly what each feature sends.
@@ -193,10 +198,10 @@ export function MainView({
                 />
             </List>
             <Footnote>Bring links over from your browser&apos;s bookmarks, a Pocket export, or a list you paste. Imported links do not count against your monthly saves.</Footnote>
-            <div className="pt-3.5">
+            <div id="settings-data-export" className="pt-3.5">
                 <DataExport />
             </div>
-            <Footnote>Download everything you&apos;ve saved (cards and collections) as a full JSON backup plus a readable Markdown file. Your data is yours to take anywhere.</Footnote>
+            <Footnote>Everything you&apos;ve saved (cards with your notes, collections, and Ask chats) as a full JSON backup plus a readable Markdown file. Your data is yours to take anywhere.</Footnote>
 
             <SectionHeader>Advanced</SectionHeader>
             <List>

@@ -79,7 +79,15 @@ export default function ShareCollectionSheet({
     const url = collection.shareId ? shareUrlFor(`/c?id=${collection.shareId}`) : null;
     const style = getColorStyleByKey(collection.color || collection.name);
     const thumbs = useMemo(
-        () => memberLinks.map((l) => l.metadata?.thumbnailUrl).filter((t): t is string => !!t).slice(0, 4),
+        () => memberLinks.filter((l) => !l.hideThumbnail).map((l) => l.metadata?.thumbnailUrl).filter((t): t is string => !!t).slice(0, 4),
+        [memberLinks]
+    );
+    // Screenshots are the member cards most likely to carry something personal
+    // (a chat, a receipt), and on the public page the screenshot itself is the
+    // image. Say how many go out. A screenshot whose image is hidden is not
+    // published as an image, so it is not counted.
+    const screenshotCount = useMemo(
+        () => memberLinks.slice(0, SHARE_CARD_CAP).filter((l) => l.sourceType === 'image' && !l.hideThumbnail).length,
         [memberLinks]
     );
 
@@ -203,8 +211,11 @@ export default function ShareCollectionSheet({
                                 {collection.description ? ` · ${collection.description}` : ''}
                             </span>
                         </div>
-                        {(excludedLine || capped) && (
+                        {(excludedLine || capped || screenshotCount > 0) && (
                             <div className="px-3.5 pb-2.5 -mt-1 space-y-0.5 text-xs text-text-muted">
+                                {screenshotCount > 0 && (
+                                    <p>Includes {screenshotCount} {screenshotCount === 1 ? 'screenshot' : 'screenshots'}, shown as images on the page.</p>
+                                )}
                                 {excludedLine && <p>{excludedLine}</p>}
                                 {capped && <p>Only the first {SHARE_CARD_CAP} cards are included.</p>}
                             </div>

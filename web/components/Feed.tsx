@@ -13,11 +13,12 @@ import Dropdown from './Dropdown';
 import { deleteLink, updateLinkReminder, markLinkReviewed, markTakeawayDone, toLink } from '@/lib/storage';
 import { openTakeaways } from '@/lib/takeaway';
 import { track } from '@/lib/analytics';
-import { collection, onSnapshot, doc, getDoc, updateDoc, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, doc, getDoc, updateDoc, arrayUnion, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
 import { useLinks } from '@/lib/useLinks';
+import { useResumeOfflineSaves } from '@/lib/offlineSave';
 import { useSearchLibrary } from '@/lib/useSearchLibrary';
 import { useSemanticSearch, warmSearchBackend } from '@/lib/useSemanticSearch';
 import { useLinkActions } from '@/lib/useLinkActions';
@@ -58,7 +59,7 @@ import NotesView from './NotesView';
 import KnowledgeGraph from './KnowledgeGraph';
 import { getNoteGroups } from '@/lib/notes';
 import LoadMoreSentinel from './feed/LoadMoreSentinel';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, Share2, Globe, Plus, Pencil, Newspaper, CalendarCheck, Lock, BookOpenCheck, ChevronLeft, BarChart3, StickyNote, Waypoints, Upload } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, CheckCircle2, CheckSquare, CheckCheck, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, Share2, Globe, Plus, Pencil, Newspaper, CalendarCheck, Lock, BookOpenCheck, ChevronLeft, BarChart3, StickyNote, Waypoints, Upload } from 'lucide-react';
 import { usePullToRefresh } from '@/lib/usePullToRefresh';
 import { useProcessingBanner } from '@/lib/useProcessingBanner';
 import { cardStartMs } from '@/lib/shareProgress';
@@ -78,6 +79,9 @@ import { usePrivacyLock, relock } from '@/lib/privacyLock';
 import { openExternal } from '@/lib/share';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import TagExplorer from './TagExplorer';
+import TagInput from './TagInput';
+import { renameTag, deleteTag, retagList } from '@/lib/tagOps';
+import { tagMatches } from '@/lib/tags';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { useScrollLock } from '@/lib/useScrollLock';
@@ -101,6 +105,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // Links subscription + pull-refresh (R-3: useLinks). Windowed (report 3.15):
     // loadMore grows the subscription window; hasMore gates the scroll sentinel.
     const { links, isLoading, handlePullRefresh, loadMore, hasMore } = useLinks(uid, toast);
+    // Links saved offline in a session that ended before reconnecting.
+    useResumeOfflineSaves(uid);
     // Collections — declared before the filter pipeline so private-collection
     // membership can hide cards from it while the privacy vault is locked.
     const [collections, setCollections] = useState<Collection[]>([]);
@@ -132,7 +138,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     const desktopSearchRef = useRef<HTMLInputElement>(null);
     // Full-library snapshot for search — fetched once when search is first
     // focused/typed, so matches reach cards older than the loaded feed window.
-    const { libraryLinks, isLoadingLibrary, ensureLibrary } = useSearchLibrary(uid);
+    const { libraryLinks, isLoadingLibrary, ensureLibrary, markDeleted, patchLink } = useSearchLibrary(uid);
     // Focus IS the moment search opens now. Prefetch the library so full-history
     // matches are usually ready by the time the user finishes typing, and warm
     // the search function so its cold start runs during typing, not after it.
@@ -250,7 +256,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         handleRetryProcessing,
         handleRemoveFromCollection,
         handleShareCard,
-    } = useLinkActions(uid, toast);
+    } = useLinkActions(uid, toast, patchLink);
     const [activeLinkId, setActiveLinkId] = useState<string | null>(null);
     // The import sheet, offered from the empty library (the same sheet the
     // first run and Settings open).
@@ -290,7 +296,10 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         if (!activeLinkId || activeLink || !uid) return;
         if (fetchedCards[activeLinkId]) {
             // Already fetched but still unresolvable → vault gate — don't dangle.
+            // Say why nothing opened (a push / citation tap otherwise just
+            // lands on the feed with no explanation).
             setActiveLinkId(null);
+            toast.info('That card is in Private. Unlock Private to open it.');
             return;
         }
         let cancelled = false;
@@ -298,16 +307,25 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
             try {
                 const snap = await getDoc(doc(db, 'users', uid, 'links', activeLinkId));
                 if (cancelled) return;
-                if (!snap.exists()) { setActiveLinkId(null); return; }
+                if (!snap.exists()) {
+                    // Deleted since the push / citation / digest was written.
+                    // Same copy as the digest's deleted-card tap.
+                    setActiveLinkId(null);
+                    toast.info('That card is no longer in your library.');
+                    return;
+                }
                 const card = toLink(snap as QueryDocumentSnapshot<DocumentData>);
                 setFetchedCards(prev => ({ ...prev, [activeLinkId]: card }));
             } catch (e) {
                 reportError(e, 'feed-cited-card-fetch');
-                if (!cancelled) setActiveLinkId(null);
+                if (!cancelled) {
+                    setActiveLinkId(null);
+                    toast.error("Couldn't open that card. Please try again.");
+                }
             }
         })();
         return () => { cancelled = true; };
-    }, [activeLinkId, activeLink, uid, fetchedCards]);
+    }, [activeLinkId, activeLink, uid, fetchedCards, toast]);
 
     // Open a card reached from another card's "Related" list — remember where we
     // came from so the back-stack can return there.
@@ -370,6 +388,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     const remindSavedRef = useRef(false);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
     const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+    const [bulkTagOpen, setBulkTagOpen] = useState(false);
+    const [bulkCollectionOpen, setBulkCollectionOpen] = useState(false);
     // PIN prompt for a gated private-collection action (see withPrivacyGate).
     const [unlockPrompt, setUnlockPrompt] = useState<(() => void) | null>(null);
     // First-time PIN setup triggered by "Make private"; holds the pending action.
@@ -814,6 +834,74 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     const openLinkDetails = useCallback((link: Link) => setActiveLinkId(link.id), []);
     const handleAddToCollection = useCallback((link: Link) => setAddToCollectionLink(link), []);
 
+    // What else a delete touches that lives OUTSIDE the library, said in the
+    // confirm: a card's own public link stops working (the server's
+    // card-delete trigger unpublishes it), but a PUBLIC COLLECTION page is a
+    // frozen snapshot and keeps showing the card until the owner updates it.
+    const deleteShareNote = (ids: string[]): string => {
+        const wanted = new Set(ids);
+        const found = new Map<string, Link>();
+        for (const pool of [links, libraryLinks, Object.values(fetchedCards)]) {
+            for (const l of pool) if (wanted.has(l.id) && !found.has(l.id)) found.set(l.id, l);
+        }
+        const cards = Array.from(found.values());
+        const colIds = new Set(cards.flatMap((l) => l.collectionIds ?? []));
+        const pages = collections.filter((c) => c.isPublic && c.shareId && colIds.has(c.id)).map((c) => `“${c.name}”`);
+        const one = ids.length === 1;
+        let note = '';
+        if (cards.some((l) => l.shareId)) {
+            note += one ? ' Its public link will stop working.' : ' Their public card links will stop working.';
+        }
+        if (pages.length > 0) {
+            const list = pages.length > 3 ? `${pages.slice(0, 3).join(', ')} and ${pages.length - 3} more` : pages.join(', ');
+            const single = pages.length === 1;
+            note += ` ${one ? "It's" : "They're"} also on your public ${single ? 'page' : 'pages'} ${list}, which ${single ? 'keeps' : 'keep'} showing ${one ? 'it' : 'them'} until you update ${single ? 'it' : 'them'}.`;
+        }
+        return note;
+    };
+
+    // Tag Explorer → Rename / Merge / Delete, library-wide (lib/tagOps). The
+    // exact stored spellings to sweep come from every card loaded here (live
+    // window + search snapshot); the snapshot is patched so search agrees.
+    const tagVariants = (tag: string): string[] => {
+        const out = new Set<string>();
+        for (const pool of [links, libraryLinks]) {
+            for (const l of pool) for (const t of l.tags) if (tagMatches(t, tag)) out.add(t);
+        }
+        return Array.from(out);
+    };
+    const retagLocal = (from: string, to: string | null) => {
+        for (const l of libraryLinks) {
+            if (l.tags.some((t) => tagMatches(t, from))) patchLink(l.id, { tags: retagList(l.tags, from, to) });
+        }
+        setSelectedTags((prev) => {
+            if (!Array.from(prev).some((t) => tagMatches(t, from))) return prev;
+            const next = new Set(Array.from(prev).filter((t) => !tagMatches(t, from)));
+            if (to) next.add(to);
+            return next;
+        });
+    };
+    const handleRenameTag = async (from: string, to: string) => {
+        if (!uid) return;
+        try {
+            const n = await renameTag(uid, from, to, tagVariants(from));
+            retagLocal(from, to);
+            toast.success(`Updated ${n} card${n === 1 ? '' : 's'}`);
+        } catch {
+            toast.error("Couldn't rename the tag. Please try again.");
+        }
+    };
+    const handleDeleteTag = async (tag: string) => {
+        if (!uid) return;
+        try {
+            const n = await deleteTag(uid, tag, tagVariants(tag));
+            retagLocal(tag, null);
+            toast.success(`Removed from ${n} card${n === 1 ? '' : 's'}`);
+        } catch {
+            toast.error("Couldn't delete the tag. Please try again.");
+        }
+    };
+
     const performDelete = async (id: string) => {
         if (!uid) return;
         // If the deleted card is the one open in the modal, step back to whatever
@@ -821,6 +909,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         if (id === activeLinkId) goBackOrClose();
         try {
             await deleteLink(uid, id);
+            // The search snapshot is a one-time read: drop the card from it too,
+            // or an old deleted card keeps turning up in search this session.
+            markDeleted([id]);
             // No success toast on delete — the card disappearing is feedback enough.
         } catch {
             toast.error("Couldn't delete the link. Please try again.");
@@ -840,6 +931,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         const ids = Array.from(selectedIds);
         try {
             await batchedUpdate(linkRefs(ids), (batch, ref) => batch.update(ref, { status: 'archived' }));
+            ids.forEach((id) => patchLink(id, { status: 'archived' }));
             toast.success(`Archived ${ids.length} link${ids.length === 1 ? '' : 's'}`);
         } catch {
             toast.error("Couldn't archive some links. Please try again.");
@@ -848,11 +940,68 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         setIsSelectionMode(false);
     };
 
+    // Selection toolbar extras: select everything the current view shows, tag
+    // the selection, or add it to a collection (the same sheet a single card
+    // uses, in bulk mode).
+    const allVisibleSelected = filteredLinks.length > 0 && filteredLinks.every((l) => selectedIds.has(l.id));
+    const handleSelectAllVisible = () => {
+        setSelectedIds(allVisibleSelected ? new Set() : new Set(filteredLinks.map((l) => l.id)));
+    };
+    const handleBulkAddTag = async (tag: string) => {
+        if (!uid) return;
+        const ids = Array.from(selectedIds);
+        setBulkTagOpen(false);
+        try {
+            // arrayUnion: adds without rewriting each card's tag list, so a
+            // concurrent edit on another device is never clobbered.
+            await batchedUpdate(linkRefs(ids), (batch, ref) => batch.update(ref, { tags: arrayUnion(tag) }));
+            ids.forEach((id) => {
+                const l = libraryLinks.find((x) => x.id === id);
+                if (l && !l.tags.includes(tag)) patchLink(id, { tags: [...l.tags, tag] });
+            });
+            toast.success(`Tagged ${ids.length} card${ids.length === 1 ? '' : 's'} “${tag}”`);
+        } catch {
+            toast.error("Couldn't tag some cards. Please try again.");
+        }
+    };
+    const bulkExtraButtons = (size: string) => (
+        <>
+            <button
+                onClick={handleSelectAllVisible}
+                disabled={filteredLinks.length === 0}
+                title={allVisibleSelected ? 'Deselect all' : 'Select all visible'}
+                aria-label={allVisibleSelected ? 'Deselect all' : 'Select all visible'}
+                className={`${size} inline-flex items-center justify-center rounded-full text-accent cursor-pointer hover:bg-accent hover:text-accent-ink transition-colors disabled:opacity-30 disabled:cursor-not-allowed`}
+            >
+                <CheckCheck className="w-4 h-4" />
+            </button>
+            <button
+                onClick={() => setBulkTagOpen(true)}
+                disabled={selectedIds.size === 0}
+                title="Add a tag to selected"
+                aria-label="Add a tag to selected"
+                className={`${size} inline-flex items-center justify-center rounded-full text-accent cursor-pointer hover:bg-accent hover:text-accent-ink transition-colors disabled:opacity-30 disabled:cursor-not-allowed`}
+            >
+                <TagIcon className="w-4 h-4" />
+            </button>
+            <button
+                onClick={() => setBulkCollectionOpen(true)}
+                disabled={selectedIds.size === 0}
+                title="Add selected to a collection"
+                aria-label="Add selected to a collection"
+                className={`${size} inline-flex items-center justify-center rounded-full text-accent cursor-pointer hover:bg-accent hover:text-accent-ink transition-colors disabled:opacity-30 disabled:cursor-not-allowed`}
+            >
+                <Layers className="w-4 h-4" />
+            </button>
+        </>
+    );
+
     const performBulkDelete = async () => {
         if (!uid) return;
         const ids = Array.from(selectedIds);
         try {
             await batchedUpdate(linkRefs(ids), (batch, ref) => batch.delete(ref));
+            markDeleted(ids);
             toast.success(`Deleted ${ids.length} link${ids.length === 1 ? '' : 's'}`);
         } catch {
             toast.error("Couldn't delete some links. Please try again.");
@@ -1380,13 +1529,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         if (!uid) return;
         try {
             await updateDoc(doc(db, 'users', uid, 'links', link.id), { isPrivate });
+            patchLink(link.id, { isPrivate });
             toast.success(isPrivate
                 ? 'Moved to Private. Find it in the Private view'
                 : 'Removed from Private');
         } catch {
             toast.error("Couldn't update the card. Please try again.");
         }
-    }, [uid, toast]);
+    }, [uid, toast, patchLink]);
     const handleToggleCardPrivate = useCallback((link: Link) => {
         // "Remove from Private" is only reachable inside the unlocked Private
         // view, so no extra gate; hiding a card never needs the vault open.
@@ -1402,10 +1552,11 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         const next = !link.hideThumbnail;
         try {
             await updateDoc(doc(db, 'users', uid, 'links', link.id), { hideThumbnail: next, updatedAt: Date.now() });
+            patchLink(link.id, { hideThumbnail: next });
         } catch {
             toast.error("Couldn't update the card. Please try again.");
         }
-    }, [uid, toast]);
+    }, [uid, toast, patchLink]);
 
     // Status-filter selection, PIN-gated for 'private': entering the Private
     // view demands the PIN while the vault is locked, and LEAVING it relocks
@@ -2135,6 +2286,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             {/* Same 40px height as the row it replaces — no layout hop. */}
                             <div className="flex items-center gap-1 h-10 px-1.5 rounded-full bg-accent/10 border border-accent/20 animate-slide-up">
                                 <span className="text-xs font-bold text-accent px-1.5 tabular-nums">{selectedIds.size}</span>
+                                {bulkExtraButtons('h-8 w-8')}
                                 <button
                                     onClick={handleBulkArchive}
                                     disabled={selectedIds.size === 0}
@@ -2355,6 +2507,19 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                         ) : (
                             <div className="flex items-center gap-1 h-9 px-1.5 rounded-full bg-accent/10 border border-accent/20 animate-slide-up">
                                 <span className="text-xs font-bold text-accent px-1.5 tabular-nums">{selectedIds.size}</span>
+                                {bulkExtraButtons('h-7 w-7')}
+                                {/* One mount for both breakpoints: this toolbar is
+                                    display:none on phones, where TagInput opens its
+                                    own portal sheet instead of this inline field. */}
+                                {bulkTagOpen && (
+                                    <TagInput
+                                        allTags={allTags}
+                                        existingTags={[]}
+                                        onAdd={(tag) => void handleBulkAddTag(tag)}
+                                        onCancel={() => setBulkTagOpen(false)}
+                                        placeholder="Tag selected cards…"
+                                    />
+                                )}
                                 <button
                                     onClick={handleBulkArchive}
                                     disabled={selectedIds.size === 0}
@@ -2670,6 +2835,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                     onClearFilters={() => setSelectedTags(new Set())}
                                     onCollapse={toggleTagExplorer}
                                     rankByCount={selectedCategory.size > 0}
+                                    onRenameTag={handleRenameTag}
+                                    onDeleteTag={handleDeleteTag}
                                 />
                             </div>
                         )}
@@ -2699,6 +2866,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                     tagCounts={tagCounts}
                     selectedTags={selectedTags}
                     onToggleTag={handleToggleTag}
+                    onRenameTag={handleRenameTag}
+                    onDeleteTag={handleDeleteTag}
                 />
 
                 {/* Sort Sheet (Mobile) — the designated home for sort order. */}
@@ -2763,6 +2932,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                     selectedTags={selectedTags}
                     onToggleTag={handleToggleTag}
                     onClearFilters={() => setSelectedTags(new Set())}
+                    onRenameTag={handleRenameTag}
+                    onDeleteTag={handleDeleteTag}
                 />
 
                 {/* Links Grid / Ask */}
@@ -3080,6 +3251,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             onSaveCluster={handleSaveCluster}
                             onBackToAsk={graphFromChat ? handleBackToAsk : undefined}
                             onBackToCard={graphFromCard ? handleBackToCard : undefined}
+                            uid={uid}
                         />
                     ) : viewMode === 'review' ? (
                         <SwipeDeck
@@ -3472,6 +3644,25 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                 />
             )}
 
+            {bulkCollectionOpen && selectedIds.size > 0 && (() => {
+                const bulk = filteredLinks.filter((l) => selectedIds.has(l.id));
+                if (bulk.length === 0) return null;
+                return (
+                    <AddToCollectionSheet
+                        uid={uid}
+                        link={bulk[0]}
+                        bulk={bulk}
+                        collections={collections}
+                        links={visibleLinks}
+                        privateCollectionIds={privateCollectionIds}
+                        lockedIds={vaultLocked ? privateCollectionIds : undefined}
+                        onRequestUnlock={(then) => setUnlockPrompt(() => then)}
+                        isOpen
+                        onClose={() => setBulkCollectionOpen(false)}
+                    />
+                );
+            })()}
+
             {/* Delete confirmation (single) — branded, replaces window.confirm */}
             <ConfirmDialog
                 isOpen={confirmDeleteId !== null}
@@ -3480,7 +3671,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                     if (confirmDeleteId) performDelete(confirmDeleteId);
                 }}
                 title="Delete this card?"
-                message="It'll be removed from your Machina, along with its summary and connections."
+                message={`It'll be removed from your Machina, along with its summary and connections.${confirmDeleteId ? deleteShareNote([confirmDeleteId]) : ''}`}
                 confirmLabel="Delete"
                 variant="danger"
             />
@@ -3493,7 +3684,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                 onClose={() => setConfirmBulkDelete(false)}
                 onConfirm={performBulkDelete}
                 title={`Delete ${selectedIds.size} card${selectedIds.size === 1 ? '' : 's'}?`}
-                message="They'll be removed from your Machina, along with their summaries and connections."
+                message={`They'll be removed from your Machina, along with their summaries and connections.${confirmBulkDelete ? deleteShareNote(Array.from(selectedIds)) : ''}`}
                 confirmLabel="Delete"
                 variant="danger"
             />

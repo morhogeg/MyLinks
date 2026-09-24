@@ -121,6 +121,21 @@ export interface Link {
   // so the in-app ramp resumes where the Share Extension left off instead of
   // restarting at 0.
   processingStartedAt?: number;
+  // A bulk-imported card waiting for a worker (epoch ms). Set INSTEAD of
+  // processingStartedAt at import time; the worker stamps processingStartedAt
+  // when it picks the job up. While only this is set the card is QUEUED, not
+  // stuck: Card.tsx and the backend janitor age it on a much longer clock.
+  queuedAt?: number;
+  // Saved OFFLINE and not yet handed to the pipeline (lib/offlineSave.ts).
+  // The server clears it when it accepts the enqueue.
+  pendingEnqueue?: boolean;
+  // Canonical dedupe key of `url` (lib/urlKey.ts ≡ functions/url_key.py), and
+  // of the page a redirect/shortener landed on when that differs.
+  urlKey?: string;
+  finalUrlKey?: string;
+  // The article was longer than the scraper reads, so only its first part was
+  // analyzed. Not a partial capture: the page itself read fine.
+  contentTruncated?: boolean;
   // Coarse per-stage marker the backend writes while status === 'processing'
   // (deleted on completion/failure). Floors the capture-progress loaders to a
   // real milestone and pins their active step — see lib/scanPhases.ts
@@ -147,9 +162,9 @@ export interface Link {
   captureQuality?: 'partial';
   // Why the read came up short. Machine values only, mapped to copy in the UI:
   // 'login_wall' (gated, nothing readable), 'teaser' (only the social preview
-  // text), 'pdf' (a document the HTML scraper can't read), 'truncated'
-  // (partial, unclassified).
-  captureReason?: 'login_wall' | 'teaser' | 'pdf' | 'truncated';
+  // text), 'pdf' (a PDF the model couldn't read), 'file' (another non-HTML
+  // file: a Word doc, video, archive), 'truncated' (partial, unclassified).
+  captureReason?: 'login_wall' | 'teaser' | 'pdf' | 'file' | 'truncated';
   // Completing a partial card with the user's own screenshots of the post
   // (the "Add a screenshot" action under the partial-capture line). The backend
   // stamps 'processing' when the screenshots are queued and clears the field
@@ -263,7 +278,19 @@ export interface Link {
   // stamped by every writer; where present it feeds collectionSignature so an
   // edited member marks a published collection stale (lib/collections.ts).
   updatedAt?: number;
+  // Public card page (/s?id=…) this card is published as. Written by the
+  // publish endpoint in the same batch as the snapshot, cleared by Stop
+  // sharing; the card-delete trigger uses it to take the page down. Re-sharing
+  // reuses it, so a card has one stable public URL.
+  shareId?: string | null;
+  // When that page was last (re)published — compared with `updatedAt` to offer
+  // "Update public link" after an edit.
+  sharePublishedAt?: number | null;
 }
+
+/** What a card share action does: open the share sheet (publishing or
+ *  republishing), republish in place, or take the public page down. */
+export type CardShareMode = 'share' | 'update' | 'stop';
 
 /**
  * A user-curated group of cards (e.g. "Russian literature", "Tesla").
@@ -302,6 +329,8 @@ export interface SharedCard {
   thumbnailUrl?: string;
   sourceName?: string;
   sourceType?: string;
+  // The owner hid this card's image ("Hide image"): the public page shows none.
+  hideThumbnail?: boolean;
 }
 
 /** A published collection snapshot — top-level, world-readable. shared_collections/{shareId}. */

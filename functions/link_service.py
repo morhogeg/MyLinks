@@ -187,6 +187,9 @@ def create_workspace(auth_uid: str, email: Optional[str] = None) -> str:
             'settings': dict(DEFAULT_USER_SETTINGS),
             # First-run onboarding pending; the client flips this to True.
             'onboarded': False,
+            # The tombstone lookup above already ran (entitlement.py
+            # TRIAL_CLOCK_CHECKED): skip the fallback re-check.
+            'trialClockChecked': True,
         }
         if email:
             doc['email'] = email
@@ -207,6 +210,15 @@ def delete_user_data(uid: str) -> int:
     db = get_db()
     user_ref = db.collection('users').document(uid)
     deleted = 0
+    # Mark the workspace as being deleted BEFORE sweeping its cards: every
+    # card delete below fires cleanup_deleted_card, which would otherwise read
+    # the still-present user doc and run a per-card share/blob cleanup that
+    # this sweep already owns (card_cleanup skips while this flag is set).
+    # update(), not set(): a workspace doc that is already gone stays gone.
+    try:
+        user_ref.update({'deleting': True})
+    except Exception as e:
+        logger.info(f"Could not flag workspace as deleting (continuing): {e}")
     # Subcollections survive the parent user doc's deletion and must each be
     # swept explicitly: the M12 weekly recaps, the user's margin notes on
     # them, in-app digests, self-hosted analytics and crash reports.
@@ -251,6 +263,9 @@ def delete_user_data(uid: str) -> int:
 USER_SUBCOLLECTIONS = (
     'links', 'chats', 'collections', 'syntheses', 'synthesisNotes',
     'digests', 'analytics_events', 'client_errors',
+    # Server-only card embedding vectors (vector_store.py) — no client rule,
+    # but they are this user's data and must go with the account.
+    'vectors',
 )
 
 _SHARE_TYPE_COLLECTIONS = {
@@ -673,25 +688,39 @@ def find_user_by_ingest_token(token: str) -> Optional[str]:
 
 
 def link_exists_for_url(uid: str, url: str) -> bool:
-    """Return True if the user already has a saved link with this exact URL."""
+    """Return True if the user already has a saved link for this URL.
+
+    Matches on the canonical `urlKey` (url_key.py: scheme/host/tracking-param
+    variants of one page fold together), then on `finalUrlKey` (the page a
+    shortener or redirect landed on), then — for cards saved before urlKey
+    existed — on the exact stored `url`. All single-field equality queries on
+    the user's own subcollection: no composite index."""
     if not url:
         return False
+    from url_key import url_key
     db = get_db()
     links_ref = db.collection('users').document(uid).collection('links')
+    key = url_key(url)
+    if key:
+        for field in ('urlKey', 'finalUrlKey'):
+            if links_ref.where(filter=FieldFilter(field, '==', key)).limit(1).get():
+                return True
     docs = links_ref.where(filter=FieldFilter('url', '==', url)).limit(1).get()
     return len(docs) > 0
 
 
 def pending_exists_for_url(uid: str, url: str) -> bool:
-    """Return True if there's already a queued/processing item for this URL."""
+    """Return True if there's already a queued/processing item for this URL
+    (by `urlKey`, falling back to the exact `url` of queue docs written before
+    the key existed). Equality-only on two fields: served by merging the
+    single-field indexes, no composite index."""
     if not url:
         return False
+    from url_key import url_key
     db = get_db()
-    docs = (
-        db.collection('pending_processing')
-        .where(filter=FieldFilter('uid', '==', uid))
-        .where(filter=FieldFilter('url', '==', url))
-        .limit(1)
-        .get()
-    )
+    queue = db.collection('pending_processing').where(filter=FieldFilter('uid', '==', uid))
+    key = url_key(url)
+    if key and queue.where(filter=FieldFilter('urlKey', '==', key)).limit(1).get():
+        return True
+    docs = queue.where(filter=FieldFilter('url', '==', url)).limit(1).get()
     return len(docs) > 0

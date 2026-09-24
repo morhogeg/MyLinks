@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useRef, useState } from 'react';
-import { Link, StatusChangeHandler } from '@/lib/types';
+import { Link, StatusChangeHandler, CardShareMode } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { getDirection } from '@/lib/rtl';
 import { getPlatform, platformIcon, platformColor, PLATFORM_LABELS, xHandle, prettyHost } from '@/lib/platform';
@@ -28,7 +28,7 @@ interface ListCardProps {
     onReadStatusChange?: (id: string, isRead: boolean) => void;
     onUpdateReminder?: (link: Link) => void;
     onAddToCollection?: (link: Link) => void;
-    onShare?: (link: Link) => void;
+    onShare?: (link: Link, mode?: CardShareMode) => void;
     onTogglePrivate?: (link: Link) => void;
     // NOTE: deliberately NO onToggleThumbnail. A list row renders no thumbnail,
     // so "Show image" here changed a field with nothing on screen to show for it

@@ -156,3 +156,30 @@ def _install_fakes():
 
 
 _install_fakes()
+
+
+# ── Firestore transactions (capture_charge.run_transaction) ─────────────────
+# The real @firestore.transactional drives a live transaction object. Offline,
+# run the body directly with a transaction whose reads/writes go straight to
+# the refs it is handed, so the fakes each test builds (dicts, MagicMocks) keep
+# working. Single-threaded tests have no contention, so "atomic" holds.
+
+import pytest  # noqa: E402
+
+
+class DirectTransaction:
+    def set(self, ref, data, merge=False):
+        return ref.set(data, merge=True) if merge else ref.set(data)
+
+    def update(self, ref, data):
+        return ref.update(data)
+
+    def delete(self, ref):
+        return ref.delete()
+
+
+@pytest.fixture(autouse=True)
+def _direct_transactions(monkeypatch):
+    import capture_charge
+    monkeypatch.setattr(capture_charge, "run_transaction", lambda db, fn: fn(DirectTransaction()))
+    yield

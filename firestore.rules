@@ -73,6 +73,16 @@ service cloud.firestore {
         && (!('dismissedSuggestions' in d) || d.dismissedSuggestions is list);
     }
 
+    // Server-only capture charge token (functions/capture_charge.py): the
+    // janitor refunds the quota unit a card's `charge` names, so a client that
+    // could write it would mint refunds. Creates may not carry it; updates may
+    // not change it (the client's own writes merge around it untouched).
+    function chargeUntouched() {
+      return request.method == 'create'
+        ? !('charge' in request.resource.data)
+        : request.resource.data.get('charge', null) == resource.data.get('charge', null);
+    }
+
     // See the links rule. `resource.data.get()` (not a bare field read) so a
     // doc without the field never errors the rule into a denial.
     function reminderTimeSane() {
@@ -141,7 +151,7 @@ service cloud.firestore {
         // client that wrote 500 docs with `nextReminderAt: 1` held the head of
         // that query and starved everyone else's reminders. A value may be
         // absent, null, unchanged, or no more than 5 minutes ago.
-        allow create, update: if owns(uid) && reminderTimeSane();
+        allow create, update: if owns(uid) && reminderTimeSane() && chargeUntouched();
       }
 
       // Ask-your-brain saved conversations
@@ -308,6 +318,18 @@ service cloud.firestore {
     // be bypassed by talking to Firestore directly.
     match /client_error_reports/{docId} {
       allow read, write: if false;
+    }
+
+    // config/app: the forced-update switch the native app reads on launch and
+    // resume (web/lib/appUpdate.ts) — { minBuild, message?, appStoreId? }. It
+    // must be readable BEFORE sign-in (an unsupported build is stopped at the
+    // login screen too), so get-by-id is public. It holds no user data. Only
+    // this one doc id: no list, and nothing else under /config is readable.
+    // Written by the owner in the console / Admin SDK only.
+    match /config/app {
+      allow get: if true;
+      allow list: if false;
+      allow write: if false;
     }
   }
 }

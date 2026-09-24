@@ -11,6 +11,8 @@ from firebase_admin import firestore
 from google.cloud.firestore_v1.base_vector_query import DistanceMeasure
 from google.cloud.firestore_v1.vector import Vector
 from ai_service import GeminiService, GEMINI_ANALYSIS_MODEL, embedding_needs_repair
+import vector_store
+from vector_store import card_payload, mirror_vector_write, stored_vector, vector_needs_repair
 from log_safe import mask_uid
 
 logger = logging.getLogger(__name__)
@@ -59,33 +61,23 @@ class GraphService:
             # Vector(None) inside the query below.
             return []
         try:
-            # 1. Vector Search (Candidate Retrieval)
-            # Find top 10 similar vectors
-            links_ref = self.db.collection('users').document(uid).collection('links')
-            
-            # Simple vector search query
-            # Note: This requires a Firestore Vector Index to be created
-            vector_query = links_ref.find_nearest(
-                vector_field="embedding_vector",
-                query_vector=Vector(embedding),
-                distance_measure=DistanceMeasure.COSINE,
-                limit=10,
-                distance_result_field="vector_distance"
-            )
-
-            candidates = vector_query.get()
+            # 1. Vector Search (Candidate Retrieval) — top 10 nearest cards.
+            # Runs on the vector store (sibling docs once backfilled, else the
+            # card field; see vector_store.find_nearest_cards). Needs the
+            # Firestore vector index on whichever collection serves.
+            candidates = vector_store.find_nearest_cards(self.db, uid, embedding, 10)
 
             # Filter out the current link itself (if it was already saved), then
             # gate on real closeness: a candidate past the ceiling is not about
             # the same thing, and handing it to the LLM anyway is how forced
             # connections get invented. A missing distance fails open (kept).
-            candidates = [doc for doc in candidates if doc.id != new_link_id]
+            candidates = [(doc_id, data) for doc_id, data in candidates if doc_id != new_link_id]
             near = []
-            for doc in candidates:
-                dist = (doc.to_dict() or {}).get("vector_distance")
+            for doc_id, data in candidates:
+                dist = (data or {}).get("vector_distance")
                 if isinstance(dist, (int, float)) and dist > _RELATED_DISTANCE_CEILING:
                     continue
-                near.append(doc)
+                near.append((doc_id, data or {}))
             if len(near) < len(candidates):
                 logger.info(f"Distance gate dropped {len(candidates) - len(near)}/{len(candidates)} candidates")
             candidates = near
@@ -99,10 +91,7 @@ class GraphService:
             candidate_context = []
             valid_candidates_map = {} # Map ID to doc data
 
-            for doc in candidates:
-                data = doc.to_dict()
-                doc_id = doc.id
-                
+            for doc_id, data in candidates:
                 # Basic metadata for the prompt
                 info = {
                     "id": doc_id,
@@ -166,7 +155,7 @@ class GraphService:
         embedded = 0
         for doc in docs:
             d = doc.to_dict() or {}
-            if not (d.get('needsEmbedding') or embedding_needs_repair(d.get('embedding_vector'))):
+            if not (d.get('needsEmbedding') or vector_needs_repair(doc.reference, d, self.db)):
                 continue
             text = f"{d.get('title', '')}\n{d.get('summary', '')}".strip()
             if not text:
@@ -179,8 +168,10 @@ class GraphService:
             if not emb:
                 continue
             try:
-                doc.reference.update({'embedding_vector': Vector(emb),
-                                      'needsEmbedding': firestore.DELETE_FIELD})
+                update = {'embedding_vector': Vector(emb),
+                          'needsEmbedding': firestore.DELETE_FIELD}
+                doc.reference.update(card_payload(update, self.db))
+                mirror_vector_write(doc.reference, update, db=self.db)
                 embeddings[doc.id] = emb
                 embedded += 1
             except Exception as e:
@@ -262,15 +253,17 @@ class GraphService:
                 # Repair anything unsearchable: missing, list-typed (schema
                 # drift), degenerate/poisoned, or explicitly flagged — not just
                 # "field absent" (which missed drift/poison and left cards dead).
-                needs = d.get('needsEmbedding') or embedding_needs_repair(d.get('embedding_vector'))
+                needs = d.get('needsEmbedding') or vector_needs_repair(doc.reference, d, self.db)
                 if not needs or not text:
                     skipped += 1
                     continue
                 try:
                     emb = self.ai.embed_text(text)
                     if emb:
-                        doc.reference.update({'embedding_vector': Vector(emb),
-                                              'needsEmbedding': firestore.DELETE_FIELD})
+                        update = {'embedding_vector': Vector(emb),
+                                  'needsEmbedding': firestore.DELETE_FIELD}
+                        doc.reference.update(card_payload(update, self.db))
+                        mirror_vector_write(doc.reference, update, db=self.db)
                         embedded += 1
                     else:
                         doc.reference.update({'needsEmbedding': True})
@@ -291,10 +284,9 @@ class GraphService:
                 # migration until a pass finishes with failed == 0).
                 skipped += 1
                 continue
-            emb = None
-            raw = d.get('embedding_vector')
-            if raw is not None:
-                emb = raw.value if hasattr(raw, 'value') else (list(raw) if not isinstance(raw, list) else raw)
+            # The card's field, else its vector-store sibling (one read beats a
+            # paid re-embed once cards no longer carry the vector).
+            emb = vector_store.as_float_list(stored_vector(doc.reference, d))
             if not emb:
                 try:
                     emb = self.ai.embed_text(text)

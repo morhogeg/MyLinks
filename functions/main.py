@@ -43,6 +43,7 @@ options.set_global_options(max_instances=20)
 
 # Internal modules
 from db import get_db, ensure_app
+from url_key import url_key
 from log_safe import mask_uid
 from models import LinkStatus, ReminderStatus
 from ai_service import GeminiService, AnalysisError
@@ -56,6 +57,7 @@ from link_service import (
 )
 from reminder_service import handle_reminder_intent, set_reminder, run_reminder_check, format_local_time
 from graph_service import GraphService
+from vector_store import card_payload, mirror_vector_write
 # NOTE: `scraper` is imported lazily inside the functions that actually scrape
 # URLs, not at module top-level. That keeps it (and the scraping helpers it
 # pulls in, e.g. BeautifulSoup) off the import path of functions that never
@@ -75,6 +77,8 @@ from search import (
 from rate_limit import check_rate_limit, client_ip, RateLimitBackendError
 # Monthly per-user soft quotas (report 3.2). Imports only db + stdlib (no cycle).
 from quota import meter as meter_quota, refund_quota, quota_message
+# At-most-once refunds for queued captures (see the module docstring).
+import capture_charge
 from entitlement import (
     plan_for, entitlement_summary, sync_from_revenuecat, resolve_workspace_for_app_user,
     rc_configured, RevenueCatError, run_trial_nudges, entitlement_source,
@@ -86,6 +90,7 @@ from entitlement import (
 # these helpers. share_service imports only db + stdlib (never main → no cycle).
 from share_service import (
     _publish_share_logic, _unpublish_share_logic, _delete_collection_logic,
+    _unpublish_all_card_shares_logic,
     _render_shared_card, _render_shared_collection, _render_shared_answer,
     _share_not_found_html, _valid_share_id,
 )
@@ -408,6 +413,13 @@ _RATE_LIMITS = {
     # costs an invocation, nothing else — on its OWN bucket so pings never eat
     # real search quota. Per-IP, fail closed (public unauthenticated surface).
     "search-warm": (120, 3600, False),
+    # Card similarity (`/api/search` with a `similarity` body — the Related list
+    # and the knowledge graph, see similarity_service.py). Fired on card open and
+    # graph build, so well above the search ceiling. No Gemini call (Firestore
+    # reads + arithmetic only), so fail OPEN like the other cheap-read buckets:
+    # the client falls back to its own computation anyway.
+    "similarity": (300, 3600, True),
+    "similarity-uid": (300, 3600, True),
     # Bulk import (import_links_http). One import is at most 200 links posted in
     # a handful of chunked requests, so a generous per-hour ceiling still bounds
     # a script. Mirrors the IP + uid double-bucket the paid endpoints use, and
@@ -908,6 +920,23 @@ def _capture_quality(scraped: dict) -> dict:
     return {"captureQuality": "partial", "captureReason": reason}
 
 
+def _scrape_extras(key, scraped: dict) -> dict:
+    """Fields a scrape adds to a web card beyond the analysis:
+    - `finalUrlKey`: the dedupe key of the page a shortener/redirect landed on,
+      when it differs from the card's own `urlKey` (so saving the expanded URL
+      later is caught as a duplicate).
+    - `contentTruncated`: the article was longer than the scraper's cap
+      (scraper.MAX_ARTICLE_CHARS) and only its first part was analyzed. Not a
+      partial capture (no "couldn't read" line): the page read fine."""
+    out = {}
+    final_key = url_key(scraped.get("final_url") or "")
+    if final_key and final_key != key:
+        out["finalUrlKey"] = final_key
+    if scraped.get("text_truncated"):
+        out["contentTruncated"] = True
+    return out
+
+
 # Images embedded in a shared post (e.g. photos on an X post) that we fetch and
 # feed to vision alongside the text. Bounded so a single save can't balloon in
 # latency or cost: only the first few photos, only reasonably-sized ones.
@@ -975,6 +1004,43 @@ def _video_ingest_allowed(uid: str, plan: str = None) -> bool:
     return True
 
 
+_NO_TEXT_PLACEHOLDER = "[no text content available]"
+
+
+def _prompt_content(scraped: dict) -> str:
+    """The text handed to the model for a scraped page.
+
+    A full read is passed through unchanged. When the body is empty or only a
+    preview (a gated page, a PDF, a platform scrape that came back blank), the
+    model would otherwise see nothing or a bare placeholder, so the source URL
+    and page title go in front: enough to title the card honestly, while the
+    placeholder keeps the GROUNDING rule's "content could not be retrieved"
+    behaviour (the same handling /api/analyze gives an unscrapable URL)."""
+    text = scraped.get("text") or scraped.get("html", "") or ""
+    body = text.replace(_NO_TEXT_PLACEHOLDER, "")
+    thin = len(re.sub(r"\s+", "", body)) < 40
+    if not (thin or scraped.get("truncated")):
+        return text
+    header = []
+    src = scraped.get("source_url") or scraped.get("final_url")
+    if src:
+        header.append(f"SOURCE URL: {src}")
+    title = (scraped.get("title") or "").strip()
+    if title and title not in body:
+        header.append(f"PAGE TITLE: {title}")
+    if not header:
+        return text or _NO_TEXT_PLACEHOLDER
+    return "\n".join(header) + "\n\n" + (body.strip() if not thin else (body.strip() + "\n" + _NO_TEXT_PLACEHOLDER).strip())
+
+
+def _mark_unreadable(scraped: dict, reason: str) -> None:
+    """Downgrade a scrape whose native (PDF/image) analysis failed to the
+    honest partial card: placeholder body, captureQuality partial."""
+    scraped["text"] = _NO_TEXT_PLACEHOLDER
+    scraped["truncated"] = True
+    scraped["capture_reason"] = reason
+
+
 def _analyze_scraped(ai, scraped: dict, existing_tags: list, attempts: int = None,
                      existing_categories: list = None, pro: bool = True):
     """Run the right analysis for scraped content.
@@ -1030,7 +1096,37 @@ def _analyze_scraped(ai, scraped: dict, existing_tags: list, attempts: int = Non
             analysis["videoDurationMinutes"] = max(1, (length_seconds + 59) // 60)
         return analysis
 
-    content_text = scraped.get("text") or scraped.get("html", "")
+    content_text = _prompt_content(scraped)
+
+    # A URL that served an image file: analyze it exactly like a shared
+    # screenshot, and keep the bytes as the card's thumbnail so it SHOWS the
+    # image (the caller re-hosts a downscaled copy). A failure falls through to
+    # the honest text-only card below.
+    if scraped.get("image_bytes"):
+        try:
+            analysis = ai.analyze_image(scraped["image_bytes"], scraped.get("image_mime") or "image/jpeg",
+                                        existing_tags=existing_tags,
+                                        existing_categories=existing_categories, **kw)
+            scraped["_post_thumbnail"] = (scraped["image_bytes"], scraped.get("image_mime") or "image/jpeg")
+            return analysis
+        except AnalysisError as e:
+            logger.warning(f"Direct image analysis failed, using text-only fallback: {e}")
+            _mark_unreadable(scraped, "file")
+            content_text = _prompt_content(scraped)
+
+    # A PDF: Gemini reads it natively. If that fails, degrade to the honest
+    # "couldn't read this PDF" partial card, never a summary of nothing.
+    if scraped.get("document_bytes"):
+        try:
+            return ai.analyze_document(scraped["document_bytes"],
+                                       scraped.get("document_mime") or "application/pdf",
+                                       context_text=content_text.replace(_NO_TEXT_PLACEHOLDER, "").strip(),
+                                       existing_tags=existing_tags,
+                                       existing_categories=existing_categories, **kw)
+        except AnalysisError as e:
+            logger.warning(f"Native PDF analysis failed, using unreadable fallback: {e}")
+            _mark_unreadable(scraped, "pdf")
+            content_text = _prompt_content(scraped)
 
     # If the post carries embedded photos, read them with vision in the SAME call
     # as the text so the summary reflects both. Any failure (fetch or analysis)
@@ -1521,6 +1617,10 @@ def _build_link_data(*, url, title, summary, detailed_summary, source_type,
         "sourceType": source_type,
         "sourceName": source_name,
     }
+    # Canonical dedupe key (url_key.py) — what share/import/web dedupe query.
+    key = url_key(url) if url else ""
+    if key:
+        data["urlKey"] = key
     if related_links is not _OMIT:
         data["relatedLinks"] = related_links
     if confidence is not _OMIT:
@@ -1596,6 +1696,43 @@ def _note_link_data(analysis: dict, text: str, *, related_links=_OMIT,
         data["aiSummary"] = analysis.get("summary", "")
         data["aiDetailedSummary"] = analysis.get("detailedSummary", "")
     return data
+
+
+def _enrich_shared_note(uid: str, card_ref, note_text: str) -> bool:
+    """AI organization for a shared-text card that is ALREADY written.
+
+    share_ingest writes the note verbatim first (so the user's words can't be
+    lost to a model failure), then this fills in what analysis adds: the
+    heading, tags, category, concepts, language, takeaway, and the summary
+    parked behind the Machina mark. The body (`summary`) is never touched.
+    On failure the card stays exactly as written and the save unit is
+    refunded: the user kept their text, but got none of the paid work.
+    Returns True when the enrichment landed."""
+    try:
+        ai = GeminiService()
+        note_tags, note_cats = get_user_vocabulary(uid)
+        analysis = ai.analyze_text(note_text, existing_tags=note_tags,
+                                   existing_categories=note_cats)
+        if not isinstance(analysis, dict):
+            raise AnalysisError("Note analysis returned nothing")
+        full = _note_link_data(analysis, note_text, verbatim=True)
+        card_ref.update({
+            "title": full["title"],
+            "tags": full["tags"],
+            "category": full["category"],
+            "concepts": full["concepts"],
+            "language": full["language"],
+            "aiSummary": full.get("aiSummary", ""),
+            "aiDetailedSummary": full.get("aiDetailedSummary", ""),
+            "metadata.actionableTakeaway": full["metadata"].get("actionableTakeaway"),
+            # Re-embed with the organized card (sync_link_embedding).
+            "needsEmbedding": True,
+        })
+        return True
+    except Exception as e:
+        logger.error(f"Share note enrichment failed (card kept as written): {e}", exc_info=True)
+        refund_quota(uid, "saves")
+        return False
 
 
 def _embedding_text_from_analysis(analysis: dict) -> str:
@@ -1791,11 +1928,13 @@ def backfill_embeddings(req: https_fn.Request) -> https_fn.Response:
                     logger.error(f"Backfill embed failed for {doc.id}: {e}")
                     vector = None
                 if vector:
-                    doc.reference.update({
+                    update = {
                         "embedding_vector": Vector(vector),
                         "embeddingVersion": EMBED_TEXT_VERSION,
                         "needsEmbedding": gc_firestore.DELETE_FIELD,
-                    })
+                    }
+                    doc.reference.update(card_payload(update, db))
+                    mirror_vector_write(doc.reference, update, db=db)
                     totals["reembedded"] += 1
                 else:
                     doc.reference.update({"needsEmbedding": True})
@@ -1975,15 +2114,11 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
                 return rl
             # Monthly save quota — meter before scraping + paid Gemini analysis.
             #
-            # NOTE (report 3.2c retry double-charge): a Retry of a failed card
-            # (web/lib/storage.ts retryFailedLink) POSTs the SAME body shape as a
-            # fresh add — { url, existingTags, uid } — with NO distinguishing field
-            # (no linkId / retry flag). The backend therefore cannot tell a retry
-            # from a new save, so it charges again. Left as-is deliberately: the
-            # only clean fixes are client-side (send a retry marker) or accepting
-            # the rare double-charge; the failed original now REFUNDS its unit (see
-            # the 5xx handler below), so most retries follow a refund and net to one
-            # charge anyway.
+            # A Retry of a failed card (web/lib/storage.ts retryFailedLink) is
+            # charged like a new save. That is one unit net, not two, because
+            # every path that produces a failed card refunds its unit: this
+            # handler (5xx and unfetchable pages), process_link_background's
+            # failure path, and the processing janitor's timeout sweep.
             plan = plan_for(uid)
             q = _quota_blocked(uid, "saves", headers, plan=plan)
             if q:
@@ -1998,7 +2133,16 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
         # 1. Scrape content (scraper imported lazily — see top-of-file note).
         from scraper import scrape_url
         scraped = scrape_url(url)
-        if not scraped.get("text") and not scraped.get("html"):
+        if scraped.get("fetch_error"):
+            # 404/410/timeout/DNS: there is no page to analyze. Refund and say
+            # why, so the client's failed card carries a real reason.
+            if charged:
+                refund_quota(*charged)
+                charged = None
+            return _error_response(scraped.get("fetch_error_message") or "Couldn't open this link.",
+                                   422, headers)
+        if (not scraped.get("text") and not scraped.get("html")
+                and not scraped.get("image_bytes") and not scraped.get("document_bytes")):
             # Nothing was analysed, so nothing should have been charged: this
             # path returned a plain error (no exception), so the refund in the
             # handler below never ran and every unscrapable URL cost a save.
@@ -2079,6 +2223,7 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
             # video is watched, not scraped, and a free-plan video already gets
             # its own honest `proFeature` line.
             link_data.update(_capture_quality(scraped))
+            link_data.update(_scrape_extras(link_data.get("urlKey"), scraped))
 
         return https_fn.Response(
             json.dumps({"success": True, "link": link_data}),
@@ -2429,6 +2574,13 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
                 "Machina couldn't search your library right now. Please try again in a minute.",
                 503, headers)
 
+        # 1k. Nothing retrieved (empty/off-topic library): the reply is the
+        #     fixed "nothing saved on that yet" line with no model call, so it
+        #     must not cost the user an ask either.
+        if not cards and charged:
+            refund_quota(*charged)
+            charged = None
+
         # 2. Slim the cards to what the model needs (bounded tokens/cost).
         #    Every card carries its headline fields; the FIRST few additionally
         #    carry their stored deep content — detailedSummary, structured
@@ -2671,6 +2823,11 @@ def search_links_http(req: https_fn.Request) -> https_fn.Response:
             return rl
         return https_fn.Response('', status=204, headers=headers)
 
+    # Card similarity rides this endpoint (its own buckets, no search quota)
+    # so it needed no new function or Hosting rewrite — see _similarity_http.
+    if isinstance((req.get_json(silent=True) or {}).get('similarity'), dict):
+        return _similarity_http(req, headers)
+
     rl = _rate_limited("search", _rate_limit_identity(req), headers)
     if rl:
         return rl
@@ -2726,6 +2883,64 @@ def search_links_http(req: https_fn.Request) -> https_fn.Response:
         )
     except Exception as e:
         return _server_error(headers, e, "Search failed")
+
+
+def _similarity_http(req, headers: dict) -> https_fn.Response:
+    """POST /api/search with a `similarity` body: live related-card sims.
+
+    Replaces the client computing cosine similarity from the embedding vector
+    every card doc used to carry (web/lib/related.ts + graph.ts), so cards can
+    stop shipping vectors to clients (vector_store.py). Two shapes:
+
+      {similarity: {anchorId, candidateIds?: [id]}, uid?}
+          → {anchorHasVector, sims: {id: sim}, noVector: [id]}   (Related list)
+      {similarity: {ids: [id], concepts?: [[str]]}, uid?}
+          → {noVector: [id], pairs: [[i, j, sim]]}               (graph)
+
+    Same auth/App Check/rate-limit shape as the search twin; reads are scoped
+    to the caller's own users/{uid}. Only ids and numbers come back — no card
+    content — so no privacy strip is needed (the client holds these cards).
+    """
+    from similarity_service import (
+        clean_ids, related_similarity, graph_similarity,
+        MAX_GRAPH_IDS, MAX_RELATED_CANDIDATES,
+    )
+    rl = _rate_limited("similarity", _rate_limit_identity(req), headers)
+    if rl:
+        return rl
+    if not _require_app_check(req, headers):
+        return _error_response("App Check verification failed", 401, headers)
+    try:
+        data = req.get_json(silent=True) or {}
+        uid, auth_err = _authed_uid(req, headers, data.get('uid'))
+        if auth_err:
+            return auth_err
+        rl = _rate_limited("similarity-uid", uid, headers)
+        if rl:
+            return rl
+        spec = data.get('similarity') or {}
+        db = get_db()
+        anchor = clean_ids([spec.get('anchorId')], 1)
+        if anchor:
+            result = related_similarity(
+                db, uid, anchor[0],
+                clean_ids(spec.get('candidateIds'), MAX_RELATED_CANDIDATES))
+        else:
+            ids = clean_ids(spec.get('ids'), MAX_GRAPH_IDS)
+            if len(ids) < 2:
+                return _error_response("anchorId or at least two ids required", 400, headers)
+            concepts = spec.get('concepts')
+            # Concepts are positional; only usable when they line up with the
+            # ids as sent (clean_ids may have dropped a malformed one).
+            raw_ids = spec.get('ids') if isinstance(spec.get('ids'), list) else []
+            if not (isinstance(concepts, list) and len(concepts) == len(raw_ids) == len(ids)):
+                concepts = None
+            result = graph_similarity(db, uid, ids, concepts)
+        return https_fn.Response(
+            json.dumps(result), status=200, headers=headers, mimetype='application/json',
+        )
+    except Exception as e:
+        return _server_error(headers, e, "Similarity failed")
 
 
 @https_fn.on_request(max_instances=10, timeout_sec=120)
@@ -2876,15 +3091,70 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
 # Share Ingestion (iOS Share Extension / browser extension)
 # ─────────────────────────────────────────────
 
+_URL_IN_TEXT_RE = re.compile(r'https?://[^\s<>"]+', re.I)
+# Punctuation that ends a sentence around a URL, never the URL itself:
+# "read this (https://a.com/x)." must save https://a.com/x.
+_URL_TRAILING_PUNCT = ').,;:!?"\'”’»]>'
+
+
+def _trim_url(raw: str) -> str:
+    url = raw.rstrip(_URL_TRAILING_PUNCT)
+    # Keep a closing paren the URL itself opened (Wikipedia-style /Foo_(bar)).
+    if raw[len(url):len(url) + 1] == ")" and url.count("(") > url.count(")"):
+        url += ")"
+    return url
+
+
+def _urls_in(text) -> list:
+    """Every http(s) URL in `text`, in order, trailing punctuation trimmed."""
+    if not isinstance(text, str) or not text:
+        return []
+    return [u for u in (_trim_url(m.group(0)) for m in _URL_IN_TEXT_RE.finditer(text))
+            if re.match(r'https?://[^/\s]+\.[^/\s]', u, re.I)]
+
+
 def _extract_url(*candidates: str) -> str:
     """Return the first http(s) URL found across the candidate strings."""
     for candidate in candidates:
-        if not candidate:
-            continue
-        match = re.search(r'https?://[^\s]+', candidate)
-        if match:
-            return match.group(0)
+        urls = _urls_in(candidate)
+        if urls:
+            return urls[0]
     return ""
+
+
+def _split_shared_text(*candidates) -> tuple:
+    """Split a share payload into (first_url, remaining_text, other_urls).
+
+    The share sheet often sends one string: "Article title – https://…" or a
+    message with commentary and several links. The first URL becomes the card;
+    what the user wrote around it is kept (it becomes the scrape's caption and
+    the card's note), and any further URLs are listed in that text rather than
+    silently dropped. Candidates are searched in order; only the one the URL
+    came from contributes remaining text."""
+    for candidate in candidates:
+        if not isinstance(candidate, str):
+            continue
+        urls = _urls_in(candidate)
+        if not urls:
+            continue
+        rest = candidate
+        # Remove the first URL (as matched, with any trailing punctuation).
+        m = _URL_IN_TEXT_RE.search(rest)
+        if m:
+            tail = m.group(0)[len(_trim_url(m.group(0))):]
+            rest = (rest[:m.start()] + tail + rest[m.end():])
+        rest = re.sub(r'[ \t]+', ' ', rest)
+        rest = "\n".join(line.strip() for line in rest.splitlines()).strip()
+        rest = rest.strip(" \n-–—:|•·").strip()
+        # Leftover separators only ("Title –", "-", ":") are not a note.
+        if not re.search(r'\w', rest.replace(" ", "")):
+            rest = ""
+        extras = []
+        for u in urls[1:]:
+            if u != urls[0] and u not in extras:
+                extras.append(u)
+        return urls[0], rest, extras
+    return "", "", []
 
 
 def _pending_url_doc(uid: str, url: str, *, card_id: Optional[str] = None,
@@ -2907,9 +3177,34 @@ def _pending_url_doc(uid: str, url: str, *, card_id: Optional[str] = None,
         "status": "queued",
         "attempts": 0,
     }
+    # Dedupe key (url_key.py): pending_exists_for_url matches on it, so a
+    # tracking-param variant of a link still in flight is caught too.
+    key = url_key(url)
+    if key:
+        doc["urlKey"] = key
     if card_id:
         doc["cardId"] = card_id
     return doc
+
+
+def _claim_offline_enqueue(uid: str, card_id) -> Optional[bool]:
+    """Clear an offline-saved card's `pendingEnqueue` flag, atomically.
+    True: this caller cleared it and should enqueue. False: already cleared
+    (another path enqueued it). None: no such card."""
+    if not isinstance(card_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', card_id):
+        return None
+    db = get_db()
+    card_ref = db.collection('users').document(uid).collection('links').document(card_id)
+
+    def _body(tx):
+        snap = card_ref.get(transaction=tx)
+        if not snap.exists:
+            return None
+        if not (snap.to_dict() or {}).get("pendingEnqueue"):
+            return False
+        tx.update(card_ref, {"pendingEnqueue": gc_firestore.DELETE_FIELD})
+        return True
+    return capture_charge.run_transaction(db, _body)
 
 
 @https_fn.on_request(max_instances=10)
@@ -2960,6 +3255,9 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
     if rl:
         return rl
 
+    # (uid, kind) of a unit this request metered but has not yet turned into a
+    # written capture — refunded by the handler below if anything throws.
+    charged = None
     try:
         data = req.get_json(silent=True) or {}
         if not isinstance(data, dict):
@@ -3050,6 +3348,7 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                 q = _quota_blocked(uid, "saves", headers)
                 if q:
                     return q
+            charged = (uid, "saves")
 
             stored_urls = []
             try:
@@ -3059,6 +3358,7 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                         f"screenshots/{storage_key_for(uid)}/{uuid.uuid4().hex}.{ext}", img_bytes, mime))
             except Exception as e:
                 logger.error(f"Multi-image store failed: {e}", exc_info=True)
+                charged = None
                 refund_quota(uid, "saves")
                 return _server_error(headers, e)
 
@@ -3101,6 +3401,7 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                 "createdAt": datetime.now(timezone.utc).isoformat(),
                 "status": "queued",
                 "attempts": 0,
+                capture_charge.CHARGE_FIELD: capture_charge.token("saves"),
             }
             if data.get('cardId'):
                 queue_doc["cardId"] = data.get('cardId')
@@ -3134,6 +3435,7 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
             q = _quota_blocked(uid, "saves", headers)
             if q:
                 return q
+            charged = (uid, "saves")
             process_ref = get_db().collection('pending_processing').document()
             queue_doc = {
                 "uid": uid,
@@ -3146,6 +3448,7 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                 "createdAt": datetime.now(timezone.utc).isoformat(),
                 "status": "queued",
                 "attempts": 0,
+                capture_charge.CHARGE_FIELD: capture_charge.token("saves"),
             }
             if data.get('cardId'):
                 queue_doc["cardId"] = data.get('cardId')
@@ -3186,6 +3489,7 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
             q = _quota_blocked(uid, "saves", headers)
             if q:
                 return q
+            charged = (uid, "saves")
 
             mime_type = _safe_image_mime(data.get('mimeType'))
             ext = 'png' if 'png' in mime_type else 'jpg'
@@ -3195,6 +3499,9 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                 )
             except Exception as e:
                 logger.error(f"Share image store failed: {e}", exc_info=True)
+                # Nothing was saved: give back the unit metered above.
+                charged = None
+                refund_quota(uid, "saves")
                 return _server_error(headers, e)
 
             db = get_db()
@@ -3209,6 +3516,7 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                 "createdAt": datetime.now(timezone.utc).isoformat(),
                 "status": "queued",
                 "attempts": 0,
+                capture_charge.CHARGE_FIELD: capture_charge.token("saves"),
             })
             logger.info(f"Share ingest queued image for {_mask_uid(uid)}")
             return https_fn.Response(
@@ -3216,44 +3524,52 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                 status=200, headers=headers, mimetype='application/json'
             )
 
-        url = _extract_url(data.get('url'), data.get('text'), data.get('shared'))
+        url, shared_rest, extra_urls = _split_shared_text(
+            data.get('url'), data.get('text'), data.get('shared'))
         if not url:
             # NOTE PATH — shared plain text with no URL is a first-class note card,
-            # not an error. Analyze the text directly (no scraping) and write the
-            # card straight into the user's library; the embedding trigger fires on
-            # create and vectorizes it. (The web "Note" tab hits /api/analyze and
-            # lets the client save — here there is no client, so we persist here.)
-            note_text = (data.get('text') or data.get('shared') or data.get('note') or '').strip()
+            # not an error. The card is written FIRST, with the text exactly as
+            # sent, and only then enriched (AI heading, tags, category, summary
+            # behind the Machina mark). A Gemini failure used to lose the text
+            # outright — the analysis ran before any write — and keep the unit.
+            note_text = next((v for v in (data.get('text'), data.get('shared'), data.get('note'))
+                              if isinstance(v, str) and v.strip()), '').strip()
             if not note_text:
                 return _error_response("No URL or text found in shared content", 400, headers)
-            # Monthly save quota (a note is a save) — meter before the paid
-            # Gemini analysis + write below.
+            # Monthly save quota (a note is a save) — meter before the write
+            # and the paid Gemini analysis below.
             q = _quota_blocked(uid, "saves", headers)
             if q:
                 return q
+            charged = (uid, "saves")
             note_text = note_text[:MAX_NOTE_LENGTH]
-            try:
-                ai = GeminiService()
-                note_tags, note_cats = get_user_vocabulary(uid)
-                analysis = ai.analyze_text(note_text, existing_tags=note_tags,
-                                           existing_categories=note_cats)
-                # verbatim: shared text is kept as the user sent it (see
-                # _note_link_data) — the AI supplies the heading and a summary
-                # that waits behind the Machina mark, never the body.
-                link_data = _note_link_data(analysis, note_text, verbatim=True)
-                # A fresh note has no vector yet — flag it so sync_link_embedding
-                # (which fires on this create) generates one.
-                link_data["needsEmbedding"] = True
-                card_ref = get_db().collection('users').document(uid).collection('links').document()
-                card_ref.set(link_data)
-                logger.info(f"Share ingest saved note for {_mask_uid(uid)}")
-                return https_fn.Response(
-                    json.dumps({"success": True, "saved": True, "id": card_ref.id, "note": True}),
-                    status=200, headers=headers, mimetype='application/json'
-                )
-            except Exception as e:
-                logger.error(f"Share ingest note failed: {e}", exc_info=True)
-                return _error_response("Failed to analyze note", 500, headers)
+            card_ref = get_db().collection('users').document(uid).collection('links').document()
+            # verbatim: shared text is kept as the user sent it (see
+            # _note_link_data). A fresh note has no vector yet — flag it so
+            # sync_link_embedding (which fires on this create) generates one.
+            link_data = _note_link_data({}, note_text, verbatim=True)
+            link_data["needsEmbedding"] = True
+            card_ref.set(link_data)
+            charged = None  # the card exists; _enrich_shared_note owns the unit now
+            logger.info(f"Share ingest saved note for {_mask_uid(uid)}")
+            enriched = _enrich_shared_note(uid, card_ref, note_text)
+            return https_fn.Response(
+                json.dumps({"success": True, "saved": True, "id": card_ref.id, "note": True,
+                            "enriched": enriched}),
+                status=200, headers=headers, mimetype='application/json'
+            )
+
+        # What the user wrote around the link (share text, the extension's
+        # selection, a note field) travels with the capture: it is the scrape's
+        # SHARED CAPTION (model input) and, when it is more than the page title,
+        # the card's first personal note. With several links, the first becomes
+        # the card and the rest are listed in that text rather than dropped.
+        explicit_note = data.get('note') if isinstance(data.get('note'), str) else ''
+        body = "\n\n".join(p for p in (explicit_note.strip(), shared_rest) if p)[:MAX_NOTE_LENGTH]
+        # The extension's "save with selection" sends a QUOTE from the page, not
+        # an instruction: it must never be parsed for a reminder ("tomorrow").
+        note_kind = 'quote' if (data.get('noteKind') == 'quote'
+                                or data.get('source') == 'extension-selection') else None
 
         # Dedup: skip if already saved or already queued for this user.
         #
@@ -3271,28 +3587,65 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                 status=200, headers=headers, mimetype='application/json'
             )
 
+        # A link saved OFFLINE (web/lib/offlineSave.ts): the card carries
+        # `pendingEnqueue`, and more than one path (the form's reconnect
+        # listener, the launch hook, a second device) may try to enqueue it.
+        # Only the request that clears the flag enqueues; the rest are acked
+        # as duplicates, uncharged.
+        if card_id and data.get('offlineEnqueue'):
+            claimed = _claim_offline_enqueue(uid, card_id)
+            if claimed is None:
+                return _error_response("Card not found", 404, headers)
+            if not claimed:
+                return https_fn.Response(
+                    json.dumps({"success": True, "duplicate": True, "url": url}),
+                    status=200, headers=headers, mimetype='application/json'
+                )
+
         # Monthly save quota — a genuinely new (non-duplicate) URL becomes a save;
         # meter before enqueuing the paid background job. Duplicates returned
         # above are NOT counted.
         q = _quota_blocked(uid, "saves", headers)
         if q:
             return q
+        charged = (uid, "saves")
 
         db = get_db()
         process_ref = db.collection('pending_processing').document()
-        process_ref.set(_pending_url_doc(
-            uid, url, card_id=card_id, body=data.get('note', ''),
+        queue_doc = _pending_url_doc(
+            uid, url, card_id=card_id, body=body,
             source="web" if card_id else "share",
-        ))
+        )
+        queue_doc[capture_charge.CHARGE_FIELD] = capture_charge.token("saves")
+        if note_kind:
+            queue_doc["noteKind"] = note_kind
+        # Only an explicit `note` is parsed for a reminder ("remind me
+        # tomorrow"). Text that merely rode along with the link (a headline
+        # like "Tomorrow's AI") must not set one.
+        queue_doc["reminderText"] = explicit_note.strip()
+        if shared_rest:
+            # Free text shared around the link is the user's own words: the
+            # worker keeps it as the card's note unless it is just the title.
+            queue_doc["userNoteText"] = shared_rest[:MAX_NOTE_LENGTH]
+        process_ref.set(queue_doc)
+        charged = None
 
         logger.info(f"Share ingest queued: {url} for {_mask_uid(uid)}")
+        resp = {"success": True, "queued": True, "id": process_ref.id, "url": url}
+        if extra_urls:
+            # Lets a client say "Saved the first link" instead of implying all were.
+            resp["savedFirstOf"] = 1 + len(extra_urls)
+            resp["otherUrls"] = extra_urls[:20]
         return https_fn.Response(
-            json.dumps({"success": True, "queued": True, "id": process_ref.id, "url": url}),
+            json.dumps(resp),
             status=200, headers=headers, mimetype='application/json'
         )
 
     except Exception as e:
         logger.error(f"Share ingest failed: {e}", exc_info=True)
+        # A unit metered above whose capture never got written is given back.
+        if charged:
+            refund_quota(*charged)
         return _error_response("Internal server error", 500, headers)
 
 
@@ -3434,9 +3787,12 @@ def import_links_http(req: https_fn.Request) -> https_fn.Response:
             if not url:
                 invalid += 1
                 continue
-            if url in seen:
+            # Same page under a different spelling (tracking params, www.,
+            # http vs https) is one link: de-dupe on the canonical key.
+            seen_key = url_key(url) or url
+            if seen_key in seen:
                 continue
-            seen.add(url)
+            seen.add(seen_key)
             title = entry.get('title')
             candidates.append({
                 "url": url,
@@ -3497,7 +3853,14 @@ def import_links_http(req: https_fn.Request) -> https_fn.Response:
                     # under years of old timestamps on arrival. The original
                     # date is kept beside it instead.
                     "createdAt": now_ms,
-                    "processingStartedAt": now_ms,
+                    # QUEUED, not processing-started: a 200-link import waits
+                    # far longer for a worker than one job takes to run.
+                    # process_link_background stamps `processingStartedAt`
+                    # when it actually picks the job up; until then the
+                    # janitor and Card.tsx age this card by `queuedAt` on the
+                    # much longer queued clock (_QUEUED_TIMEOUT_MS), instead
+                    # of failing healthy imports that are only waiting.
+                    "queuedAt": now_ms,
                     "importedAt": now_ms,
                     "metadata": {"originalTitle": item["title"], "estimatedReadTime": 0},
                 }
@@ -3505,10 +3868,13 @@ def import_links_http(req: https_fn.Request) -> https_fn.Response:
                     card["importedFromAt"] = item["addedAt"]
                 if item["tags"]:
                     card["importedTags"] = item["tags"]
+                if url_key(item["url"]):
+                    card["urlKey"] = url_key(item["url"])
                 card_ref.set(card)
 
                 queue_doc = _pending_url_doc(uid, item["url"], card_id=card_ref.id,
                                              source="import")
+                queue_doc[capture_charge.CHARGE_FIELD] = capture_charge.token("imports")
                 if item["addedAt"] is not None:
                     queue_doc["importedFromAt"] = item["addedAt"]
                 if item["tags"]:
@@ -3779,6 +4145,44 @@ def _provider_may_create_workspace(token_claims) -> bool:
     return isinstance(provider, str) and provider in _WORKSPACE_PROVIDERS
 
 
+def _session_revoked(claims) -> bool:
+    """True when the ID token's session was revoked, or its user disabled.
+
+    `verify_id_token` (and the callable framework) only checks the token's
+    signature and expiry, so a token minted before "sign out everywhere" /
+    admin revocation stays usable for up to an hour. This is the
+    `check_revoked=True` comparison done by hand (so it works for BOTH
+    transports: the callable hands us already-verified claims): the session's
+    `auth_time` must not predate the user's `tokens_valid_after_timestamp`.
+    Costs one Auth lookup, so it guards only the paths where a stale session
+    does lasting damage — deleting an account and minting/linking a workspace.
+    A user that no longer exists is NOT reported here; each caller already
+    handles that case its own way.
+    """
+    if not isinstance(claims, dict):
+        return True
+    uid = claims.get("uid") or claims.get("sub") or claims.get("user_id")
+    if not uid:
+        return True
+    try:
+        user = admin_auth.get_user(uid)
+    except admin_auth.UserNotFoundError:
+        return False
+    except Exception as e:
+        # Fail open on an Auth lookup outage: the token itself is verified,
+        # and refusing every sign-up during a blip is the worse failure.
+        logger.warning("Revocation check skipped: %s", e)
+        return False
+    if getattr(user, "disabled", False):
+        return True
+    valid_after_ms = getattr(user, "tokens_valid_after_timestamp", None) or 0
+    auth_time = claims.get("auth_time") or claims.get("iat") or 0
+    try:
+        return bool(valid_after_ms) and int(auth_time) * 1000 < int(valid_after_ms)
+    except (TypeError, ValueError):
+        return False
+
+
 @https_fn.on_call()
 def claim_workspace(req: https_fn.CallableRequest) -> dict:
     """Resolve (or set up) the data workspace for a signed-in account (callable).
@@ -3796,6 +4200,11 @@ def claim_workspace(req: https_fn.CallableRequest) -> dict:
         )
     auth_uid = req.auth.uid
     claims = getattr(req.auth, "token", None) or None
+    if _session_revoked({**(claims or {}), "uid": auth_uid}):
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="Session expired. Please sign in again.",
+        )
     email = claims.get("email") if claims else None
     return _claim_workspace_logic(auth_uid, email, claims)
 
@@ -3822,6 +4231,8 @@ def claim_workspace_http(req: https_fn.Request) -> https_fn.Response:
     decoded = _verify_bearer(req)
     if not decoded:
         return _error_response("User must be signed in", 401, headers)
+    if _session_revoked(decoded):
+        return _error_response("Session expired. Please sign in again.", 401, headers)
 
     try:
         auth_uid = decoded.get("uid")
@@ -3914,6 +4325,11 @@ def delete_account(req: https_fn.CallableRequest) -> dict:
             code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
             message="User must be signed in",
         )
+    if _session_revoked({**(req.auth.token or {}), "uid": req.auth.uid}):
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="Session expired. Please sign in again.",
+        )
     try:
         return _delete_account_logic(req.auth.uid, (req.auth.token or {}).get("email"))
     except _DeleteAccountError as e:
@@ -3940,6 +4356,8 @@ def delete_account_http(req: https_fn.Request) -> https_fn.Response:
     decoded = _verify_bearer(req)
     if not decoded:
         return _error_response("User must be signed in", 401, headers)
+    if _session_revoked(decoded):
+        return _error_response("Session expired. Please sign in again.", 401, headers)
 
     try:
         result = _delete_account_logic(decoded.get("uid"), decoded.get("email"))
@@ -3998,6 +4416,28 @@ def _device_token_request(req):
     return uid, token, None
 
 
+def _drop_token_from_other_workspaces(db, uid: str, token: str) -> int:
+    """ArrayRemove `token` from every users/ doc except `uid`. `fcmTokens` is
+    single-field auto-indexed (no fieldOverrides exemption), so the
+    array-contains query needs no composite index. Best-effort: a failure here
+    must not fail the registration. Returns how many docs were cleaned."""
+    removed = 0
+    try:
+        query = db.collection("users").where(
+            filter=FieldFilter("fcmTokens", "array_contains", token)
+        ).limit(20)
+        for other in query.stream():
+            if other.id == uid:
+                continue
+            other.reference.update({"fcmTokens": gc_firestore.ArrayRemove([token])})
+            removed += 1
+        if removed:
+            logger.info("Moved a device token off %d other workspace(s)", removed)
+    except Exception as e:
+        logger.warning("Device token dedupe skipped: %s", e)
+    return removed
+
+
 @https_fn.on_request()
 def register_device_token_http(req: https_fn.Request) -> https_fn.Response:
     """Register an FCM device token for the verified caller's workspace.
@@ -4016,8 +4456,15 @@ def register_device_token_http(req: https_fn.Request) -> https_fn.Response:
         return err
 
     try:
-        user_ref = get_db().collection("users").document(uid)
+        db = get_db()
+        user_ref = db.collection("users").document(uid)
         user_ref.set({"fcmTokens": gc_firestore.ArrayUnion([token])}, merge=True)
+        # One device, one account: a token is per app install, so when this
+        # phone signs into a different account the previous workspace must stop
+        # receiving its pushes (otherwise account A's digests land on the phone
+        # now signed in as B). Sign-out unregisters, but a delete-and-reinstall,
+        # a crash, or an offline sign-out never did.
+        _drop_token_from_other_workspaces(db, uid, token)
         # Trim the oldest entries if a workspace somehow accumulates too many.
         tokens = (user_ref.get().to_dict() or {}).get("fcmTokens") or []
         if len(tokens) > MAX_DEVICE_TOKENS:
@@ -4189,11 +4636,45 @@ def entitlement_sync_http(req: https_fn.Request) -> https_fn.Response:
 
 
 # RevenueCat event types that change whether the `pro` entitlement is active.
-# Anything else (TEST, TRANSFER, SUBSCRIBER_ALIAS, …) is acknowledged and ignored.
+# Anything else (TEST, SUBSCRIBER_ALIAS, …) is acknowledged and ignored.
+# TRANSFER: a restore on a device signed into a DIFFERENT account moved the
+# App Store purchase between app user ids — both sides must be re-synced (the
+# old one loses Pro, the new one gains it). Its body carries
+# `transferred_from` / `transferred_to` lists instead of `app_user_id`.
 _RC_EVENTS = frozenset((
     "INITIAL_PURCHASE", "RENEWAL", "PRODUCT_CHANGE", "CANCELLATION",
-    "EXPIRATION", "BILLING_ISSUE", "UNCANCELLATION",
+    "EXPIRATION", "BILLING_ISSUE", "UNCANCELLATION", "TRANSFER",
 ))
+
+
+def _rc_transfer(event: dict) -> https_fn.Response:
+    """Re-sync every known workspace on both sides of a TRANSFER event."""
+    ids = []
+    for key in ("transferred_from", "transferred_to"):
+        vals = event.get(key) or []
+        if isinstance(vals, str):
+            vals = [vals]
+        for v in vals if isinstance(vals, list) else []:
+            if isinstance(v, str) and v and not v.startswith("$RCAnonymousID") and v not in ids:
+                ids.append(v)
+    synced = []
+    for app_user_id in ids:
+        try:
+            uid = resolve_workspace_for_app_user(app_user_id, [])
+        except Exception as e:
+            logger.error("revenuecat_webhook: TRANSFER resolve failed: %s", e)
+            return _error_response("Lookup failed", 500)
+        if not uid:
+            continue
+        try:
+            doc = sync_from_revenuecat(uid, app_user_id)
+        except RevenueCatError as e:
+            logger.warning("revenuecat_webhook: TRANSFER sync failed for %s: %s", _mask_uid(uid), e)
+            return _error_response("Subscription service unavailable", 502)
+        synced.append(doc.get("plan"))
+        logger.info("revenuecat_webhook: TRANSFER re-synced %s (plan=%s)", _mask_uid(uid), doc.get("plan"))
+    return https_fn.Response(json.dumps({"ok": True, "synced": len(synced)}), status=200,
+                             mimetype='application/json')
 
 
 @https_fn.on_request(max_instances=2)
@@ -4228,6 +4709,12 @@ def revenuecat_webhook(req: https_fn.Request) -> https_fn.Response:
         logger.info("revenuecat_webhook: ignoring event type %s", etype or "?")
         return https_fn.Response(json.dumps({"ok": True, "ignored": etype}), status=200,
                                  mimetype='application/json')
+
+    if etype == "TRANSFER":
+        try:
+            return _rc_transfer(event)
+        except Exception as e:
+            return _server_error(None, e, "Webhook processing failed")
 
     app_user_id = event.get("app_user_id") or event.get("original_app_user_id")
     aliases = event.get("aliases") or []
@@ -4418,7 +4905,8 @@ def publish_share_http(req: https_fn.Request) -> https_fn.Response:
     try:
         result = _publish_share_logic(
             uid, data.get("type"), data.get("shareId"), data.get("payload"),
-            collection=data.get("collection"),
+            collection=data.get("collection"), card=data.get("card"),
+            update_only=data.get("mode") == "update",
         )
         return https_fn.Response(json.dumps(result), status=200, headers=headers, mimetype='application/json')
     except PermissionError as e:
@@ -4455,8 +4943,16 @@ def unpublish_share_http(req: https_fn.Request) -> https_fn.Response:
     if auth_err:
         return auth_err
     try:
+        if data.get("all") is True:
+            # Settings → Privacy "Stop all public card links": every card share
+            # this account owns (shared_owners by owner + type 'card').
+            if data.get("type") != "card":
+                raise ValueError("all applies to card shares only")
+            result = _unpublish_all_card_shares_logic(uid)
+            return https_fn.Response(json.dumps(result), status=200, headers=headers, mimetype='application/json')
         result = _unpublish_share_logic(
             uid, data.get("type"), data.get("shareId"), collection_id=data.get("collectionId"),
+            card_id=data.get("cardId"),
         )
         return https_fn.Response(json.dumps(result), status=200, headers=headers, mimetype='application/json')
     except PermissionError as e:
@@ -4501,6 +4997,25 @@ def delete_collection_http(req: https_fn.Request) -> https_fn.Response:
         return _error_response(str(e), 400, headers)
     except Exception as e:
         return _server_error(headers, e, "Delete failed")
+
+
+@firestore_fn.on_document_deleted(document="users/{uid}/links/{linkId}")
+def cleanup_deleted_card(event: firestore_fn.Event[firestore_fn.DocumentSnapshot]) -> None:
+    """A card was deleted (client deleteDoc, single or bulk): take down its
+    public /s page and delete the screenshots / post thumbnail it stored under
+    the user's own Storage prefix (card_cleanup.py). Idempotent; never raises,
+    so a failed cleanup is logged instead of retried forever."""
+    try:
+        from card_cleanup import cleanup_deleted_card_logic
+        snap = event.data
+        data = snap.to_dict() if snap is not None else None
+        report = cleanup_deleted_card_logic(
+            event.params.get("uid"), event.params.get("linkId"), data,
+        )
+        if report.get("unpublished") or report.get("deleted_blobs"):
+            logger.info(f"Card cleanup: {report}")
+    except Exception as e:
+        logger.error(f"cleanup_deleted_card failed: {e}")
 
 
 @https_fn.on_request()
@@ -4779,11 +5294,14 @@ def _enrich_card_with_images(ref, task_id: str, uid: str, card_ref, data: dict) 
             update["needsEmbedding"] = gc_firestore.DELETE_FIELD
         else:
             update["needsEmbedding"] = True
-        card_ref.update(update)
+        card_ref.update(card_payload(update, get_db()))
+        mirror_vector_write(card_ref, update, db=get_db())
         log_to_firestore(task_id, "Screenshot enrich complete", data={"cardId": card_id})
         ref.delete()
     except Exception as e:
         logger.error(f"Screenshot enrich failed for {_mask_uid(uid)}/{card_id}: {e}", exc_info=True)
+        # share_ingest metered the enrich as a save; it produced nothing.
+        refund_quota(uid, "saves")
         try:
             card_ref.update({"enrichStatus": "failed", "enrichError": str(e)[:200]})
         except Exception as write_err:
@@ -4792,6 +5310,88 @@ def _enrich_card_with_images(ref, task_id: str, uid: str, card_ref, data: dict) 
             ref.delete()
         except Exception:
             pass
+
+
+class _FetchFailed(Exception):
+    """The scraper got no page at all (404/410/timeout/DNS). Carries the
+    user-facing reason the FAILED card shows (scraper.FETCH_ERROR_MESSAGES)."""
+
+
+# Fields on an existing card that belong to the USER, not to the analysis. The
+# worker's final write replaces the card (so stale analysis/failure fields go),
+# but a retry or a slow first capture must not wipe what the user did to the
+# card meanwhile: filing, notes, privacy, a live share, reminders, review state,
+# and the card's place in the feed (createdAt).
+_USER_OWNED_CARD_FIELDS = (
+    "createdAt", "collectionIds", "userNote", "userNoteUpdatedAt",
+    "isPrivate", "hideThumbnail", "shareId", "sharePublishedAt",
+    "reminderStatus", "nextReminderAt", "reminderCount", "reminderProfile",
+    "reminderDue", "reminderDueAt", "lastViewedAt", "reviewedAt", "takeawayDoneAt",
+    "archived", "isRead", "importedAt", "importedFromAt", "importedTags",
+)
+
+
+def _merge_card_write(new: dict, current: dict) -> dict:
+    """The worker's write for a card that already exists: ``new`` (the
+    analysis, or the failure record) with the user-owned fields of
+    ``current`` carried over. Tags: the user's existing tags first, then the
+    new ones (model + import hints), capped like every card; notes: the
+    existing ones plus a shared note that is not already there."""
+    out = dict(new)
+    current = current or {}
+    for key in _USER_OWNED_CARD_FIELDS:
+        if key in current:
+            out[key] = current[key]
+    out["tags"] = _merge_tags(current.get("tags"), new.get("tags"))[:MAX_CARD_TAGS]
+    notes = [n for n in (current.get("userNotes") or []) if isinstance(n, dict)]
+    have = {(n.get("text") or "").strip() for n in notes}
+    for n in new.get("userNotes") or []:
+        if isinstance(n, dict) and (n.get("text") or "").strip() not in have:
+            notes.append(n)
+    if notes:
+        out["userNotes"] = notes
+    return out
+
+
+def _write_capture_card(card_ref, data: dict) -> tuple:
+    """Write the worker's result onto its card without resurrecting a card the
+    user deleted, preserving user-owned fields (_merge_card_write) and removing
+    the charge token, all in one transaction. Returns ``(written,
+    removed_charge_kind)``."""
+    return capture_charge.finalize_card(get_db(), card_ref, lambda cur: _merge_card_write(data, cur))
+
+
+def _refund_job(uid: str, job_ref) -> None:
+    """Refund a job whose charge token never reached a card (it is claimed
+    off the queue doc, so this is a no-op if it already moved or was
+    refunded). Best-effort: refund_quota never raises."""
+    try:
+        kind = capture_charge.claim(get_db(), job_ref)
+    except Exception as e:
+        logger.error(f"Could not claim the job's charge: {e}")
+        return
+    if kind:
+        refund_quota(uid, kind)
+
+
+def _shared_note_entry(text, scraped: dict):
+    """The user's own text shared around a link, as a `userNotes` entry — or
+    None when it's empty or just the page title/teaser the share sheet adds
+    ("Article title – https://…")."""
+    if not isinstance(text, str):
+        return None
+    t = text.strip()[:MAX_NOTE_LENGTH]
+    if len(re.sub(r"\W", "", t)) < 3:
+        return None
+    norm = lambda v: re.sub(r"\W+", " ", (v or "")).strip().lower()
+    nt = norm(t)
+    for known in (scraped.get("title"), (scraped.get("text") or "")[:600]):
+        nk = norm(known)
+        if nk and (nt == nk or (len(nt) >= 8 and nt in nk)):
+            return None
+    import uuid
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    return {"id": uuid.uuid4().hex[:12], "text": t, "createdAt": now_ms}
 
 
 @firestore_fn.on_document_created(
@@ -4854,28 +5454,47 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             data,
         )
         return
+    # Refund bookkeeping: the job's charge token moves onto the card when work
+    # starts, and only whoever removes it refunds (capture_charge docstring).
     if existing_card_id:
         card_ref = get_db().collection('users').document(uid).collection('links').document(existing_card_id)
         card_id = existing_card_id
-        # Restart the card's processing clock now that work is actually
-        # beginning. The janitor ages a `processing` card out after 15 minutes,
-        # measured from this field, and a bulk import (POST /api/import) queues
-        # far more jobs than max_instances can run at once: its tail can wait
-        # well past that before an instance picks it up. Timing the wait as if
-        # it were the work would fail out perfectly healthy imported cards. For
-        # the web capture path this re-stamps about a second later, which
-        # changes nothing.
+        # Start the card's processing clock now that work is actually
+        # beginning, and move the charge token onto the card in the same
+        # transaction. The janitor ages a `processing` card out after 15
+        # minutes, measured from this field, and a bulk import (POST
+        # /api/import) queues far more jobs than max_instances can run at
+        # once: an imported card is written with only `queuedAt` and gets this
+        # stamp here, when an instance picks it up. `status` is re-set because
+        # the janitor may have timed out a card whose job was merely slow to
+        # start; work is running again, so the card shows it.
         try:
-            card_ref.update({"processingStartedAt": int(datetime.now(timezone.utc).timestamp() * 1000)})
+            started = capture_charge.move_to_card(get_db(), ref, card_ref, {
+                "status": LinkStatus.PROCESSING.value,
+                "processingStartedAt": int(datetime.now(timezone.utc).timestamp() * 1000),
+            })
         except Exception as stamp_err:
-            # The card may have been deleted while queued; the work below still
-            # runs and the except handler owns the outcome.
-            logger.warning(f"Could not re-stamp processingStartedAt: {stamp_err}")
+            # A read error counts as "present" (only a confirmed-missing card
+            # drops a job); the token stays on the job and the failure path
+            # claims it from there.
+            logger.warning(f"Could not start the card: {stamp_err}")
+            started = True
+        if not started:
+            # The user deleted the card while it waited in the queue: drop the
+            # job. Running it would re-create the card they just removed.
+            # Refunded (from the job's own token): no paid work ran.
+            logger.info("Card deleted before processing; dropping the job")
+            _refund_job(uid, ref)
+            try:
+                ref.delete()
+            except Exception:
+                pass
+            return
     else:
         card_ref = get_db().collection('users').document(uid).collection('links').document()
         card_id = card_ref.id
         try:
-            card_ref.set({
+            capture_charge.move_to_card(get_db(), ref, card_ref, {
                 "url": original_url,
                 "title": _capture_placeholder_title(original_url, is_image),
                 "summary": "",
@@ -4888,8 +5507,8 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
                 # which a retry preserves) to age out cards stuck in `processing`.
                 "processingStartedAt": int(datetime.now(timezone.utc).timestamp() * 1000),
                 "metadata": {"originalTitle": "", "estimatedReadTime": 0},
-            })
-            ref.update({"cardId": card_id})
+                **({"urlKey": url_key(original_url)} if not is_image and url_key(original_url) else {}),
+            }, create=True, job_fields={"cardId": card_id})
         except Exception as placeholder_err:
             # Non-fatal: if we can't write the placeholder, fall back to the legacy
             # "create the real card at the end" behaviour so a save is never lost.
@@ -4907,19 +5526,26 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         # is marked FAILED — rather than the capture being lost silently.
         ref.update({"status": "processing", "startedAt": datetime.now(timezone.utc).isoformat()})
 
-        # 1. Scrape content (only once)
-        log_to_firestore(task_id, f"Scraping content for: {url}")
-        ref.update({"status": "scraping"})
+        # 1. Scrape content (only once). Image jobs are NOT scraped: their `url`
+        # is our own Storage object, which the image branch below downloads
+        # itself; scraping it only cost a second download.
         if not is_image:
+            log_to_firestore(task_id, f"Scraping content for: {url}")
+            ref.update({"status": "scraping"})
             _write_stage(card_ref, "scraping")
-        scraped_raw = scrape_url(url, original_body)
-        
-        # Ensure scraped is a dict
-        if isinstance(scraped_raw, dict):
-            scraped = scraped_raw
-        else:
-            logger.error(f"Scraper returned non-dict {type(scraped_raw)}: {scraped_raw}")
-            scraped = {"html": str(scraped_raw), "title": "Scrape Failed", "text": str(scraped_raw)}
+            scraped_raw = scrape_url(url, original_body)
+
+            # Ensure scraped is a dict
+            if isinstance(scraped_raw, dict):
+                scraped = scraped_raw
+            else:
+                logger.error(f"Scraper returned non-dict {type(scraped_raw)}: {scraped_raw}")
+                scraped = {"html": str(scraped_raw), "title": "Scrape Failed", "text": str(scraped_raw)}
+
+            # No page at all (404/410/timeout/DNS): a FAILED, retryable card
+            # with the reason — never a "ready" card summarizing an error page.
+            if scraped.get("fetch_error"):
+                raise _FetchFailed(scraped.get("fetch_error_message") or "Couldn't open this link.")
 
         # 2. Analyze with AI
         log_to_firestore(task_id, "Starting AI analysis", data={"scrapedTitle": scraped.get("title")})
@@ -5095,23 +5721,48 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             # as HTML always comes back unreadable — stamping that would put a
             # "couldn't read the full post" line on every screenshot card.
             link_data.update(_capture_quality(scraped))
+            link_data.update(_scrape_extras(link_data.get("urlKey"), scraped))
 
         # 5. Save to Firestore — flip the placeholder card to its ready state in
         # place (preserving its id) so it transitions processing → ready without
         # flicker. If the placeholder couldn't be created, fall back to a new doc.
         # The full set() replaces the doc, so any prior processingStage is dropped
         # from the ready card without a separate delete.
+        # Text the user shared around the link becomes the card's first
+        # personal note (unless it's just the page title the share sheet adds).
+        shared_note = _shared_note_entry(data.get("userNoteText"), scraped)
+        if shared_note:
+            link_data["userNotes"] = [shared_note]
+
         _write_stage(card_ref, "organizing")
+        # Vector store: the card gets the vector only while cards still carry
+        # it (card_payload); the sibling doc is mirrored AFTER the card write,
+        # so a card deleted mid-processing never leaves an orphan vector. The
+        # write replaces the card's fields, so no vector here deletes the sibling too.
         if card_ref is not None:
-            card_ref.set(link_data)
+            # Merged onto the existing card (user-owned fields kept) and the
+            # charge token spent — see _write_capture_card.
+            if not _write_capture_card(card_ref, card_payload(link_data, db))[0]:
+                # Deleted mid-processing: the user doesn't want it. Drop the
+                # result rather than resurrect the card.
+                logger.info("Card deleted during processing; result dropped")
+                ref.delete()
+                return
             link_id = card_id
+            mirror_vector_write(card_ref, link_data, replace=True, db=db)
         else:
-            link_id = save_link_to_firestore(uid, link_data)
+            link_id = save_link_to_firestore(uid, card_payload(link_data, db))
+            mirror_vector_write(
+                db.collection('users').document(uid).collection('links').document(link_id),
+                link_data, replace=True, db=db)
         db.collection('users').document(uid).update({'lastSavedLinkId': link_id})
 
         # 6. Check for reminder intent. Own guard: the card is already saved,
         # and a bad parse (a hostile share note) must not flip it to FAILED.
-        _apply_reminder_intent(uid, link_id, original_body)
+        # A QUOTE (the extension's "save with selection") is page text, not an
+        # instruction — "tomorrow" in a quoted sentence must not set a reminder.
+        if data.get("noteKind") != "quote":
+            _apply_reminder_intent(uid, link_id, data["reminderText"] if "reminderText" in data else original_body)
 
         logger.info(f"Processing complete for {data.get('source', 'unknown')} item")
 
@@ -5148,13 +5799,31 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         # ALL the images (via share_ingest's imageUrls path), not just the first.
         if is_image and isinstance(data.get("imageUrls"), list) and len(data["imageUrls"]) > 1:
             failed_data["imageUrls"] = data["imageUrls"][:MAX_CARD_IMAGES]
+        if not is_image and url_key(original_url):
+            failed_data["urlKey"] = url_key(original_url)
+        refund_kind = None
         try:
             if card_ref is not None:
-                card_ref.set(failed_data)
+                # Never resurrect a card the user deleted mid-processing; keep
+                # the user-owned fields; take the charge token off the card.
+                written, refund_kind = _write_capture_card(card_ref, failed_data)
+                if not written:
+                    logger.info("Card deleted during processing; failure not recorded")
             else:
                 save_link_to_firestore(uid, failed_data)
         except Exception as write_err:
             logger.error(f"Failed to write FAILED card record: {write_err}", exc_info=True)
+
+        # The user got no card out of this capture: give back its unit, the
+        # kind it was charged as. At most once (capture_charge): the token was
+        # either on the card (removed by the write above; None if the janitor
+        # already refunded it) or never left the job (claimed here). Without a
+        # refund every failed capture permanently consumed quota, and Retry
+        # charged a second time.
+        if refund_kind:
+            refund_quota(uid, refund_kind)
+        else:
+            _refund_job(uid, ref)
 
         # The retryable failed card now lives in the library; drop the queue doc so
         # no orphaned pending_processing record is left behind.
@@ -5188,7 +5857,7 @@ _PROCESSING_TIMEOUT_MS = 15 * 60 * 1000
 # process_link_background's max_instances can run at once, and deleting the tail
 # out from under it would make the trigger's first write raise NOT_FOUND and
 # turn a healthy import into failed cards.
-_QUEUED_TIMEOUT_MS = 4 * 60 * 60 * 1000
+_QUEUED_TIMEOUT_MS = 6 * 60 * 60 * 1000
 
 
 def _to_ms(value) -> Optional[int]:
@@ -5236,25 +5905,56 @@ def run_processing_janitor() -> dict:
         report["errors"].append(str(e))
         return report
 
+    queued_cutoff = now_ms - _QUEUED_TIMEOUT_MS
     for doc in stuck:
         report["scanned"] += 1
         d = doc.to_dict() or {}
-        started = _to_ms(d.get("processingStartedAt")) or _to_ms(d.get("createdAt"))
-        # No usable timestamp → treat as stuck (a processing card with no age is
-        # already anomalous); otherwise only act once it's past the cutoff.
-        if started is not None and started > cutoff:
-            continue
+        started = _to_ms(d.get("processingStartedAt"))
+        queued = _to_ms(d.get("queuedAt"))
+        if started is None and queued is not None:
+            # Still QUEUED (an imported card no worker has picked up yet): it
+            # is waiting for capacity, not stuck. Only a very old one — past
+            # the queue window, whose job the prune below deletes — is dead.
+            if queued > queued_cutoff:
+                continue
+        else:
+            started = started or _to_ms(d.get("createdAt"))
+            # No usable timestamp → treat as stuck (a processing card with no
+            # age is already anomalous); otherwise only act once it's past the
+            # cutoff.
+            if started is not None and started > cutoff:
+                continue
         try:
-            doc.reference.update({
+            # Transactional: re-checks the card is still `processing` (the
+            # worker may have just finished it) and removes its charge token
+            # in the same write, so this refund and the worker's can never
+            # both happen (capture_charge docstring).
+            failed, refund_kind = capture_charge.fail_if_processing(db, doc.reference, {
                 "status": LinkStatus.FAILED.value,
                 "error": "Processing timed out — tap to retry.",
                 "failedAt": now_ms,
                 "processingStage": gc_firestore.DELETE_FIELD,
             })
-            report["failed_out"] += 1
         except Exception as e:
             logger.error(f"Janitor failed to update {doc.id}: {e}")
             report["errors"].append(f"{doc.id}: {e}")
+            continue
+        if not failed:
+            continue
+        report["failed_out"] += 1
+        # A hard-killed job never reached the worker's refund: give the unit
+        # back here, so Retry on this card isn't a second charge. Only a card
+        # that carried a charge token is refunded, as the kind it was charged
+        # (an imported card retried through /api/analyze carries none: that
+        # endpoint refunds its own failures), and never an offline placeholder
+        # that was never enqueued (no charge was ever made).
+        if refund_kind:
+            try:
+                owner = doc.reference.parent.parent.id
+            except Exception:
+                owner = None
+            if isinstance(owner, str) and owner:
+                refund_quota(owner, refund_kind)
 
     # Stale pending_processing queue docs. A hard-killed job (timeout/OOM) never
     # reaches the trigger's cleanup `ref.delete()`, so its queue doc lives
@@ -5279,6 +5979,11 @@ def run_processing_janitor() -> dict:
             # waiting for capacity, not dead. Leave it alone.
             if job.get("status") == "queued" and str(job.get("createdAt") or "") >= queued_cutoff_iso:
                 continue
+            # A job still holding its charge token never handed it to a card
+            # (abandoned in the queue, or its placeholder write failed), so no
+            # card refund can cover it: refund it here, once.
+            if capture_charge.charge_kind(job) and isinstance(job.get("uid"), str) and job.get("uid"):
+                _refund_job(job["uid"], doc.reference)
             doc.reference.delete()
             report["queue_pruned"] += 1
     except Exception as e:
