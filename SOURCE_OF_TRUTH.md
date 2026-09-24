@@ -233,7 +233,12 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (2026-09-24): launch edge-case pass (branch `claude/onboarding-edge-cases-xn54vh`) — not yet shipped
+> ## 🚨 OWNER ACTION (2026-09-24): install build **1334** (launch edge-case pass), then the steps below
+>
+> **SHIPPED 2026-09-24** as merge `18a304e`: TestFlight run #334 → **build
+> 1334** built + uploaded green (first compile of the Swift changes — it
+> compiled); deploy-rules #16, rules-tests #19, hosting #18, python-tests
+> #128 green; functions deploy #114 (unscoped "all") — see §9 for outcome.
 >
 > ~38 realistic launch edge cases found by four read-only audits (capture,
 > account/billing, library/sharing, device/lifecycle) and fixed; see the
@@ -2389,6 +2394,8 @@ exact-match, capped.
   pinch-zoom re-enabled; trial-ending push opens the paywall. **Extension/
   a11y:** real error mapping incl. quota → `?paywall=saves`; Settings
   toggles + icon buttons labelled; error screens offer Reload/Home.
+  **SHIPPED** as merge `18a304e` (build 1334, deploy-rules #16, hosting
+  #18, functions deploy #114 unscoped).
   **Known gaps:** `ß` IDN hosts can key differently TS vs Python; jobs in
   flight at deploy have no charge record (no refund on failure); nested
   button in DigestSettings curated row; pre-existing eslint errors in
