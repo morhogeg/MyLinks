@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, StatusChangeHandler, UserNote, CardShareMode } from '@/lib/types';
 import SourceByline from './SourceByline';
 import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, CircleCheck, Check, Network, Play, Youtube, ImageOff, Image as ImageIcon, ImagePlus, Loader2, Layers, Share2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, StickyNote, Waypoints, EyeOff, Upload, RefreshCw, Link2Off } from 'lucide-react';
@@ -14,7 +14,8 @@ import TagInput from './TagInput';
 import { hasHebrew, getDominantDirection } from '@/lib/rtl';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import { useVisualViewport } from '@/lib/useVisualViewport';
-import { getRelatedCards } from '@/lib/related';
+import { getRelatedCards, relatedSimCandidates } from '@/lib/related';
+import { fetchAnchorSims, AnchorSims } from '@/lib/similarity';
 import { getNotes, makeNote, touchNote } from '@/lib/notes';
 import { hapticSuccess, hapticMedium } from '@/lib/haptics';
 import { isHttpUrl } from '@/lib/url';
@@ -595,6 +596,27 @@ export default function LinkDetailModal({
         return () => window.removeEventListener('keydown', onKey);
     }, [isOpen, isEditingNote, isEditingTitle, isEditingSummary, editingNoteId, isEditingCategory, isAddingTag, onClose]);
 
+    // Server similarities for the Related list (lib/similarity.ts). Held per
+    // card id, so a refresh for the same card keeps showing the last answer
+    // instead of flashing back to the local fallback while it loads.
+    const [remoteSims, setRemoteSims] = useState<{ id: string; sims: AnchorSims } | null>(null);
+    const simCandidates = useMemo(
+        () => (isOpen && link ? relatedSimCandidates(link, allLinks) : []),
+        [isOpen, link, allLinks],
+    );
+    const simCandidateKey = simCandidates.join(',');
+    useEffect(() => {
+        if (!isOpen || !uid || !link?.id) return;
+        let live = true;
+        const anchorId = link.id;
+        fetchAnchorSims(uid, anchorId, simCandidates).then((sims) => {
+            if (live && sims) setRemoteSims({ id: anchorId, sims });
+        });
+        return () => { live = false; };
+        // simCandidateKey stands in for simCandidates (a new array each render).
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOpen, uid, link?.id, simCandidateKey]);
+
     if (!isOpen) return null;
 
     const isRtl = link.language === 'he' || hasHebrew(link.title) || hasHebrew(link.summary) || (link.detailedSummary ? hasHebrew(link.detailedSummary) : false);
@@ -611,7 +633,10 @@ export default function LinkDetailModal({
     // Live related cards: stored AI relations merged with fresh embedding /
     // concept matches (see lib/related.ts). Computed here, below the isOpen
     // guard, so the closed modal costs nothing.
-    const relatedCards = getRelatedCards(link, allLinks, isRtl, excludeRelatedIds);
+    const relatedCards = getRelatedCards(
+        link, allLinks, isRtl, excludeRelatedIds,
+        remoteSims && remoteSims.id === link.id ? remoteSims.sims : null,
+    );
 
     // Branded source credit, matching the card: YouTube channel in red, X
     // author (@handle from the URL) in the X grey, everything else muted.

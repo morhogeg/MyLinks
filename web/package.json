@@ -11,7 +11,8 @@
     "test:parsers": "node --test --experimental-strip-types lib/__tests__/importParsers.test.ts",
     "test:takeaway": "node --test --experimental-strip-types lib/__tests__/takeaway.test.ts",
     "test:urlkey": "node --test --experimental-strip-types lib/__tests__/urlKey.test.ts",
-    "test:tags": "node --test --experimental-strip-types lib/__tests__/tags.test.ts"
+    "test:tags": "node --test --experimental-strip-types lib/__tests__/tags.test.ts",
+    "test:related": "node --test --experimental-strip-types lib/__tests__/related.test.ts"
   },
   "dependencies": {
     "@capacitor-firebase/authentication": "^8.3.0",

@@ -57,6 +57,7 @@ from link_service import (
 )
 from reminder_service import handle_reminder_intent, set_reminder, run_reminder_check, format_local_time
 from graph_service import GraphService
+from vector_store import card_payload, mirror_vector_write
 # NOTE: `scraper` is imported lazily inside the functions that actually scrape
 # URLs, not at module top-level. That keeps it (and the scraping helpers it
 # pulls in, e.g. BeautifulSoup) off the import path of functions that never
@@ -410,6 +411,13 @@ _RATE_LIMITS = {
     # costs an invocation, nothing else — on its OWN bucket so pings never eat
     # real search quota. Per-IP, fail closed (public unauthenticated surface).
     "search-warm": (120, 3600, False),
+    # Card similarity (`/api/search` with a `similarity` body — the Related list
+    # and the knowledge graph, see similarity_service.py). Fired on card open and
+    # graph build, so well above the search ceiling. No Gemini call (Firestore
+    # reads + arithmetic only), so fail OPEN like the other cheap-read buckets:
+    # the client falls back to its own computation anyway.
+    "similarity": (300, 3600, True),
+    "similarity-uid": (300, 3600, True),
     # Bulk import (import_links_http). One import is at most 200 links posted in
     # a handful of chunked requests, so a generous per-hour ceiling still bounds
     # a script. Mirrors the IP + uid double-bucket the paid endpoints use, and
@@ -1918,11 +1926,13 @@ def backfill_embeddings(req: https_fn.Request) -> https_fn.Response:
                     logger.error(f"Backfill embed failed for {doc.id}: {e}")
                     vector = None
                 if vector:
-                    doc.reference.update({
+                    update = {
                         "embedding_vector": Vector(vector),
                         "embeddingVersion": EMBED_TEXT_VERSION,
                         "needsEmbedding": gc_firestore.DELETE_FIELD,
-                    })
+                    }
+                    doc.reference.update(card_payload(update, db))
+                    mirror_vector_write(doc.reference, update, db=db)
                     totals["reembedded"] += 1
                 else:
                     doc.reference.update({"needsEmbedding": True})
@@ -2811,6 +2821,11 @@ def search_links_http(req: https_fn.Request) -> https_fn.Response:
             return rl
         return https_fn.Response('', status=204, headers=headers)
 
+    # Card similarity rides this endpoint (its own buckets, no search quota)
+    # so it needed no new function or Hosting rewrite — see _similarity_http.
+    if isinstance((req.get_json(silent=True) or {}).get('similarity'), dict):
+        return _similarity_http(req, headers)
+
     rl = _rate_limited("search", _rate_limit_identity(req), headers)
     if rl:
         return rl
@@ -2866,6 +2881,64 @@ def search_links_http(req: https_fn.Request) -> https_fn.Response:
         )
     except Exception as e:
         return _server_error(headers, e, "Search failed")
+
+
+def _similarity_http(req, headers: dict) -> https_fn.Response:
+    """POST /api/search with a `similarity` body: live related-card sims.
+
+    Replaces the client computing cosine similarity from the embedding vector
+    every card doc used to carry (web/lib/related.ts + graph.ts), so cards can
+    stop shipping vectors to clients (vector_store.py). Two shapes:
+
+      {similarity: {anchorId, candidateIds?: [id]}, uid?}
+          → {anchorHasVector, sims: {id: sim}, noVector: [id]}   (Related list)
+      {similarity: {ids: [id], concepts?: [[str]]}, uid?}
+          → {noVector: [id], pairs: [[i, j, sim]]}               (graph)
+
+    Same auth/App Check/rate-limit shape as the search twin; reads are scoped
+    to the caller's own users/{uid}. Only ids and numbers come back — no card
+    content — so no privacy strip is needed (the client holds these cards).
+    """
+    from similarity_service import (
+        clean_ids, related_similarity, graph_similarity,
+        MAX_GRAPH_IDS, MAX_RELATED_CANDIDATES,
+    )
+    rl = _rate_limited("similarity", _rate_limit_identity(req), headers)
+    if rl:
+        return rl
+    if not _require_app_check(req, headers):
+        return _error_response("App Check verification failed", 401, headers)
+    try:
+        data = req.get_json(silent=True) or {}
+        uid, auth_err = _authed_uid(req, headers, data.get('uid'))
+        if auth_err:
+            return auth_err
+        rl = _rate_limited("similarity-uid", uid, headers)
+        if rl:
+            return rl
+        spec = data.get('similarity') or {}
+        db = get_db()
+        anchor = clean_ids([spec.get('anchorId')], 1)
+        if anchor:
+            result = related_similarity(
+                db, uid, anchor[0],
+                clean_ids(spec.get('candidateIds'), MAX_RELATED_CANDIDATES))
+        else:
+            ids = clean_ids(spec.get('ids'), MAX_GRAPH_IDS)
+            if len(ids) < 2:
+                return _error_response("anchorId or at least two ids required", 400, headers)
+            concepts = spec.get('concepts')
+            # Concepts are positional; only usable when they line up with the
+            # ids as sent (clean_ids may have dropped a malformed one).
+            raw_ids = spec.get('ids') if isinstance(spec.get('ids'), list) else []
+            if not (isinstance(concepts, list) and len(concepts) == len(raw_ids) == len(ids)):
+                concepts = None
+            result = graph_similarity(db, uid, ids, concepts)
+        return https_fn.Response(
+            json.dumps(result), status=200, headers=headers, mimetype='application/json',
+        )
+    except Exception as e:
+        return _server_error(headers, e, "Similarity failed")
 
 
 @https_fn.on_request(max_instances=10, timeout_sec=120)
@@ -5178,7 +5251,8 @@ def _enrich_card_with_images(ref, task_id: str, uid: str, card_ref, data: dict) 
             update["needsEmbedding"] = gc_firestore.DELETE_FIELD
         else:
             update["needsEmbedding"] = True
-        card_ref.update(update)
+        card_ref.update(card_payload(update, get_db()))
+        mirror_vector_write(card_ref, update, db=get_db())
         log_to_firestore(task_id, "Screenshot enrich complete", data={"cardId": card_id})
         ref.delete()
     except Exception as e:
@@ -5579,16 +5653,24 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             link_data["userNotes"] = [shared_note]
 
         _write_stage(card_ref, "organizing")
+        # Vector store: the card gets the vector only while cards still carry
+        # it (card_payload); the sibling doc is mirrored AFTER the card write,
+        # so a card deleted mid-processing never leaves an orphan vector. The
+        # set() replaces the card, so no vector here deletes the sibling too.
         if card_ref is not None:
-            if not _set_card_if_exists(card_ref, link_data):
+            if not _set_card_if_exists(card_ref, card_payload(link_data, db)):
                 # Deleted mid-processing: the user doesn't want it. Drop the
                 # result rather than resurrect the card.
                 logger.info("Card deleted during processing; result dropped")
                 ref.delete()
                 return
             link_id = card_id
+            mirror_vector_write(card_ref, link_data, replace=True, db=db)
         else:
-            link_id = save_link_to_firestore(uid, link_data)
+            link_id = save_link_to_firestore(uid, card_payload(link_data, db))
+            mirror_vector_write(
+                db.collection('users').document(uid).collection('links').document(link_id),
+                link_data, replace=True, db=db)
         db.collection('users').document(uid).update({'lastSavedLinkId': link_id})
 
         # 6. Check for reminder intent. Own guard: the card is already saved,

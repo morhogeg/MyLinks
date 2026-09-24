@@ -21,6 +21,8 @@ from google import genai
 from db import get_db
 from log_safe import mask_uid
 from ai_service import embedding_needs_repair, collect_notes_text
+import vector_store
+from vector_store import VECTOR_FIELD, card_payload, mirror_vector_write, vector_needs_repair
 from rate_limit import check_rate_limit
 
 logger = logging.getLogger(__name__)
@@ -1515,9 +1517,25 @@ def sync_link_embedding(event: firestore_fn.Event[firestore_fn.Change[firestore_
         # the tenth card and costs nothing on later writes (see
         # entitlement.maybe_start_trial), and it deliberately runs before the
         # embedding early-returns below, which skip most writes.
-        if change is not None and (change.before is None or not change.before.exists):
+        is_create = change is not None and (change.before is None or not change.before.exists)
+        if is_create:
             from entitlement import maybe_start_trial
             maybe_start_trial(uid)
+            # Vector-store backstop: a card CREATED already carrying a valid
+            # vector (an undo-delete / restore that re-writes the whole doc,
+            # a client round-trip) never passes through a server write site,
+            # so mirror it here — the card-delete cleanup removed the sibling.
+            # Creates only: an update event's `after` can be stale by the time
+            # it is delivered, and every server write site mirrors itself.
+            raw_vec = data.get(VECTOR_FIELD)
+            if isinstance(raw_vec, Vector) and not embedding_needs_repair(raw_vec):
+                try:
+                    _db = get_db()
+                    _ref = _db.collection("users").document(uid).collection("links").document(link_id)
+                    mirror_vector_write(_ref, {VECTOR_FIELD: raw_vec,
+                                               "embeddingVersion": data.get("embeddingVersion")}, db=_db)
+                except Exception as mirror_err:
+                    logger.warning(f"Create-time vector mirror failed: {mirror_err}")
 
         # Only embed cards in a settled, searchable state. Skip mid-flight
         # (`processing` placeholder / retry optimistic write — content isn't
@@ -1526,8 +1544,18 @@ def sync_link_embedding(event: firestore_fn.Event[firestore_fn.Change[firestore_
         if data.get("status") in ("processing", "failed"):
             return
 
-        if not (data.get("needsEmbedding") or embedding_needs_repair(data.get("embedding_vector"))):
-            return  # already has a valid Vector — no-op (also breaks the loop)
+        # Where the vector lives depends on the vector-store phase (see
+        # vector_store.py): the card field while cards carry it, else the
+        # sibling doc — so an ordinary write never re-embeds a settled card.
+        if not data.get("needsEmbedding"):
+            if VECTOR_FIELD in data:
+                if not embedding_needs_repair(data.get(VECTOR_FIELD)):
+                    return  # already has a valid Vector — no-op (also breaks the loop)
+            else:
+                _db = get_db()
+                _ref = _db.collection("users").document(uid).collection("links").document(link_id)
+                if not vector_needs_repair(_ref, data, db=_db):
+                    return
 
         if not (data.get("title") or data.get("summary")):
             return  # placeholder/empty card — wait for real content before embedding
@@ -1569,18 +1597,22 @@ def sync_link_embedding(event: firestore_fn.Event[firestore_fn.Change[firestore_
             # Embed failed: flag for backfill and drop any drift/degenerate value
             # rather than leaving something un-searchable in place silently.
             logger.error(f"Embedding failed for {link_id}, flagging needsEmbedding: {embed_err}")
-            doc_ref.update({"needsEmbedding": True, "embedding_vector": firestore.DELETE_FIELD})
+            update = {"needsEmbedding": True, "embedding_vector": firestore.DELETE_FIELD}
+            doc_ref.update(update)
+            mirror_vector_write(doc_ref, update, db=db)
             return
 
         if vector:
             logger.info(f"Vector generated (len={len(vector)}). Updating document...")
-            doc_ref.update({
+            update = {
                 "embedding_vector": Vector(vector),
                 "embeddingVersion": EMBED_TEXT_VERSION,
                 "needsEmbedding": firestore.DELETE_FIELD,
-            })
+            }
         else:
-            doc_ref.update({"needsEmbedding": True, "embedding_vector": firestore.DELETE_FIELD})
+            update = {"needsEmbedding": True, "embedding_vector": firestore.DELETE_FIELD}
+        doc_ref.update(card_payload(update, db))
+        mirror_vector_write(doc_ref, update, db=db)
 
     except Exception as e:
         logger.error(f"Error in sync_link_embedding: {e}")
@@ -1608,7 +1640,6 @@ def perform_search_logic(uid: str, query_text: str, limit: int = 10) -> List[dic
         raise Exception("Failed to generate query embedding")
 
     db = get_db()
-    links_ref = db.collection("users").document(uid).collection("links")
 
     # NOTE (latency): the "has this library any embeddings at all?" probe used to
     # run HERE, before every search — an extra serial Firestore round trip that
@@ -1627,28 +1658,24 @@ def perform_search_logic(uid: str, query_text: str, limit: int = 10) -> List[dic
     # `order_by('embedding_vector')` or a `where('embedding_vector', '!=', None)`
     # would each require a scalar index the field doesn't have (it only has the
     # vectorConfig index used by find_nearest), whereas a small scan does not.
+    #
+    # Vector store (vector_store.py): once the backfill flips `siblingReady`,
+    # the nearest-neighbour query runs on users/{uid}/vectors and the matching
+    # cards are fetched by id; before that (or if that query errors / finds
+    # nothing) it runs on the card field exactly as it always did.
     try:
-        vector_query = links_ref.find_nearest(
-            vector_field="embedding_vector",
-            query_vector=Vector(query_vector),
-            distance_measure=DistanceMeasure.COSINE,
-            limit=limit,
-            distance_result_field="vector_distance"
-        )
-
-        results = vector_query.get()
+        results = vector_store.find_nearest_cards(db, uid, query_vector, limit)
     except Exception as e:
         logger.error(f"Vector search query failed: {e}")
         # If the vector index isn't ready, return empty with message
         raise Exception(f"VECTOR_SEARCH_ERROR: {str(e)}. Make sure the vector index is deployed in Firestore.")
 
-    links = [normalize_card_for_search(doc.to_dict(), doc.id) for doc in results]
+    links = [normalize_card_for_search(data, doc_id) for doc_id, data in results]
 
     if not links:
         # Empty is ambiguous: nothing near the query, or nothing embedded at all.
         # Only now is the probe worth a round trip (see the note above).
-        sample_docs = list(links_ref.limit(10).stream())
-        if not any("embedding_vector" in d.to_dict() for d in sample_docs):
+        if not vector_store.library_has_vectors(db, uid):
             logger.warning(f"No embeddings found for user {mask_uid(uid)}. Use Settings → Connections → Rebuild (or the backfill_related_links admin endpoint) to generate embeddings for existing links.")
 
     logger.info(f"Found {len(links)} results.")

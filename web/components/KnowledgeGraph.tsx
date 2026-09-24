@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowUpRight, ChevronLeft, FileText, LocateFixed, MessagesSquare, Waypoints, X } from 'lucide-react';
 import { AskHints, Link } from '@/lib/types';
 import { buildGraphModel, edgeReason, GraphModel, GraphNode, BuildSignal } from '@/lib/graph';
+import { fetchPoolSims } from '@/lib/similarity';
 import { tick, ALPHA_MIN } from '@/lib/graphPhysics';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { getDominantDirection } from '@/lib/rtl';
@@ -114,9 +115,13 @@ export default function KnowledgeGraph({
     onSaveCluster,
     onBackToAsk,
     onBackToCard,
+    uid,
 }: {
     /** The card pool (already privacy-filtered by the Feed). */
     links: Link[];
+    /** Workspace uid — lets the build ask the server for pairwise similarity
+     *  (lib/similarity.ts). Absent → local card vectors only. */
+    uid?: string | null;
     /** True while the full-library fetch is still in flight. */
     loading: boolean;
     /** True when grid filters/search currently scope the pool. */
@@ -267,7 +272,9 @@ export default function KnowledgeGraph({
             ...(restoreRef.current?.citedIds ?? []),
             restoreRef.current?.selectedId, keepId, pendingFocusIdRef.current,
         ].filter((x): x is string => !!x);
-        buildGraphModel(links, signal, pins).then((m) => {
+        buildGraphModel(links, signal, pins, uid
+            ? { poolSims: (ids, concepts) => fetchPoolSims(uid, ids, concepts) }
+            : undefined).then((m) => {
             if (signal.cancelled || !m) return;
             alphaRef.current = 1;
             autoFitRef.current = true;
@@ -329,7 +336,7 @@ export default function KnowledgeGraph({
         return () => {
             signal.cancelled = true;
         };
-    }, [links]);
+    }, [links, uid]);
 
     // ── Theme + reduced motion ───────────────────────────────────────────────
     useEffect(() => {

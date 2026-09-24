@@ -1,6 +1,7 @@
 import { Link } from './types';
 import { getTimestampNumber } from './feedUtils';
 import { overlap, toVector, genericConcepts, qualifyLiveTie, liveScore, STRONG, MAX_RELATED } from './related';
+import type { PoolSims } from './similarity';
 
 /**
  * The knowledge-graph model behind the Graph view — nodes are cards, edges are
@@ -15,8 +16,17 @@ import { overlap, toVector, genericConcepts, qualifyLiveTie, liveScore, STRONG, 
  *
  * Building the live edges is O(n²) over 768-dim embeddings, so `buildGraphModel`
  * is async and yields to the event loop between row chunks — the view shows a
- * "mapping" state instead of freezing the main thread.
+ * "mapping" state instead of freezing the main thread. The pairwise
+ * similarities come from the server when `options.poolSims` supplies them
+ * (lib/similarity.ts — vectors are moving off the card docs); otherwise, or if
+ * that fails, they are computed from the vectors cards still carry.
  */
+
+export interface BuildOptions {
+    /** Server pairwise similarity for the pool (ids + lower-cased concepts,
+     *  parallel). Resolve null to fall back to local card vectors. */
+    poolSims?: (ids: string[], concepts: string[][]) => Promise<PoolSims | null>;
+}
 
 export interface GraphNode {
     link: Link;
@@ -145,6 +155,7 @@ export async function buildGraphModel(
     /** Cards that must stay on the map through the node cap (a card the user
      *  asked to "See in graph", the cited set of an Ask answer). */
     pinIds?: Iterable<string>,
+    options?: BuildOptions,
 ): Promise<GraphModel | null> {
     // Only settled cards participate — in-flight/failed captures have no analysis.
     const settled = links.filter((l) => l.status !== 'processing' && l.status !== 'failed');
@@ -187,8 +198,20 @@ export async function buildGraphModel(
     type LiveCandidate = Candidate & { score: number };
     const liveCandidates: LiveCandidate[] = [];
     if (pool.length >= 2 && pool.length <= MAX_PAIRWISE) {
+        const concepts = pool.map((l) => new Set((l.concepts ?? []).map((c) => c.toLowerCase()).filter(Boolean)));
+        // Server similarities first (see BuildOptions); null → local vectors.
+        let remote: PoolSims | null = null;
+        if (options?.poolSims) {
+            try {
+                remote = await options.poolSims(pool.map((l) => l.id), concepts.map((c) => [...c]));
+            } catch {
+                remote = null;
+            }
+            if (signal?.cancelled) return null;
+        }
+        const remoteHasVec = remote ? pool.map((l) => !remote!.noVector.has(l.id)) : null;
         // Pre-normalize embeddings once so each pair is a plain dot product.
-        const vectors: (Float32Array | null)[] = pool.map((l) => {
+        const vectors: (Float32Array | null)[] = remote ? pool.map(() => null) : pool.map((l) => {
             const raw = toVector(l.embedding_vector);
             if (!raw) return null;
             let norm = 0;
@@ -199,7 +222,6 @@ export async function buildGraphModel(
             for (let k = 0; k < raw.length; k++) out[k] = raw[k] / norm;
             return out;
         });
-        const concepts = pool.map((l) => new Set((l.concepts ?? []).map((c) => c.toLowerCase()).filter(Boolean)));
         const generic = genericConcepts(pool);
         const tags = pool.map((l) => new Set((l.tags ?? []).map((t) => (t || '').toLowerCase()).filter(Boolean)));
 
@@ -218,11 +240,19 @@ export async function buildGraphModel(
                 let shared = 0;
                 if (ci.size) for (const c of concepts[j]) if (ci.has(c) && !generic.has(c)) shared++;
 
-                const vj = vectors[j];
-                const haveVectors = !!(vi && vj && vi.length === vj.length);
+                let haveVectors: boolean;
                 let sim = 0;
-                if (haveVectors) {
-                    for (let k = 0; k < vi!.length; k++) sim += vi![k] * vj![k];
+                if (remote) {
+                    // An omitted pair = both have vectors, similarity below
+                    // every bar (lib/similarity.ts) — the same verdict.
+                    haveVectors = remoteHasVec![i] && remoteHasVec![j];
+                    if (haveVectors) sim = remote.pairs.get(pairKey(i, j)) ?? 0;
+                } else {
+                    const vj = vectors[j];
+                    haveVectors = !!(vi && vj && vi.length === vj.length);
+                    if (haveVectors) {
+                        for (let k = 0; k < vi!.length; k++) sim += vi![k] * vj![k];
+                    }
                 }
 
                 const kind = qualifyLiveTie(sim, shared, haveVectors);

@@ -68,6 +68,19 @@
                     }
                 }
             ]
+        },
+        {
+            "collectionGroup": "vectors",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "embedding_vector",
+                    "vectorConfig": {
+                        "dimension": 768,
+                        "flat": {}
+                    }
+                }
+            ]
         }
     ],
     "fieldOverrides": [
