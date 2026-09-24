@@ -145,6 +145,12 @@ def cleanup_deleted_card_logic(uid: str, link_id: str, data: Optional[dict]) -> 
         # Account deletion in progress/done: it sweeps shares and blobs itself.
         report["skipped"] = "no-user"
         return report
+    if (user_snap.to_dict() or {}).get("deleting"):
+        # delete_user_data flags the workspace before it deletes the cards
+        # (the user doc goes last), so its per-card deletes land here while
+        # the doc still exists. The account sweep owns that cleanup.
+        report["skipped"] = "user-deleting"
+        return report
 
     try:
         report["unpublished"] = _unpublish_card_share(db, uid, data.get("shareId"))

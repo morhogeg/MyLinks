@@ -1214,7 +1214,7 @@ def _link_ref(db, uid: str, link_id: str):
 
 
 def _publish_share_logic(uid: str, share_type: str, share_id: str, payload: dict,
-                         collection=None, card=None) -> dict:
+                         collection=None, card=None, update_only: bool = False) -> dict:
     """Write a public share snapshot for `uid` WITHOUT `ownerUid`, plus the
     functions-only owner mapping. Rejects overwriting a share id owned by someone
     else (the server-side equivalent of the rules' anti-takeover guard). The
@@ -1228,7 +1228,13 @@ def _publish_share_logic(uid: str, share_type: str, share_id: str, payload: dict
     client used to write those flags itself after this call returned; when that
     second write failed the collection doc never learned its shareId, and the
     next Share minted a fresh id while the first page stayed live, unreachable
-    by its owner."""
+    by its owner.
+
+    `update_only` is "Update public link": it refreshes a page that is LIVE and
+    never brings back one that was stopped. Without it, a device still showing
+    the old shareId (Stop sharing ran on another device) would silently
+    republish the page the user took down. Re-sharing a stopped card goes
+    through the normal Share, which is an explicit choice."""
     public_coll = _SHARE_COLLECTIONS.get(share_type)
     if not public_coll:
         raise ValueError("invalid share type")
@@ -1245,6 +1251,14 @@ def _publish_share_logic(uid: str, share_type: str, share_id: str, payload: dict
     existing_owner = _share_owner_uid(db, share_id, public_coll)
     if existing_owner is not None and existing_owner != uid:
         raise PermissionError("This share id belongs to another account")
+    if update_only:
+        owner_snap = db.collection("shared_owners").document(share_id).get()
+        if owner_snap.exists:
+            live = not (owner_snap.to_dict() or {}).get("unpublishedAt")
+        else:  # legacy share: owner only on the public doc
+            live = db.collection(public_coll).document(share_id).get().exists
+        if not live:
+            raise LookupError("This public link was stopped. Share it again to make a new one.")
 
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     # An answer snapshot is rebuilt from an allowlist rather than filtered, so a
@@ -1293,8 +1307,11 @@ def _publish_share_logic(uid: str, share_type: str, share_id: str, payload: dict
         # it, and the card-delete trigger can take it down. `updatedAt` is
         # deliberately NOT touched — it means "the owner edited this card".
         link_ref = _link_ref(db, uid, card_id)
-        if not link_ref.get().exists:
+        link_snap = link_ref.get()
+        if not link_snap.exists:
             raise LookupError("Card not found")
+        if update_only and (link_snap.to_dict() or {}).get("shareId") != share_id:
+            raise LookupError("This public link was stopped. Share it again to make a new one.")
         batch.set(link_ref, {"shareId": share_id, "sharePublishedAt": now_ms}, merge=True)
     batch.commit()
     return {"shareId": share_id}

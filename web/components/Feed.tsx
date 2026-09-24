@@ -18,6 +18,7 @@ import { db } from '@/lib/firebase';
 import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
 import { useLinks } from '@/lib/useLinks';
+import { useResumeOfflineSaves } from '@/lib/offlineSave';
 import { useSearchLibrary } from '@/lib/useSearchLibrary';
 import { useSemanticSearch, warmSearchBackend } from '@/lib/useSemanticSearch';
 import { useLinkActions } from '@/lib/useLinkActions';
@@ -104,6 +105,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // Links subscription + pull-refresh (R-3: useLinks). Windowed (report 3.15):
     // loadMore grows the subscription window; hasMore gates the scroll sentinel.
     const { links, isLoading, handlePullRefresh, loadMore, hasMore } = useLinks(uid, toast);
+    // Links saved offline in a session that ended before reconnecting.
+    useResumeOfflineSaves(uid);
     // Collections — declared before the filter pipeline so private-collection
     // membership can hide cards from it while the privacy vault is locked.
     const [collections, setCollections] = useState<Collection[]>([]);

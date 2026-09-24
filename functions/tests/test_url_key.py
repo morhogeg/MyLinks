@@ -89,3 +89,33 @@ def test_ts_mirror_lists_match():
     assert ts_params == set(_TRACKING_PARAMS)
     prefixes = re.search(r"TRACKING_PREFIXES = \[(.*?)\]", ts, re.S).group(1)
     assert set(re.findall(r"'([^']+)'", prefixes)) == set(_TRACKING_PREFIXES)
+
+
+# Hash routes and IDN hosts. The same (input, key) pairs are pinned in
+# web/lib/__tests__/urlKey.test.ts so the two normalizers cannot drift.
+ROUTE_AND_IDN_CASES = [
+    ("https://app.example.com/#/inbox/42", "https://app.example.com#/inbox/42"),
+    ("https://app.example.com/#!/post/7/", "https://app.example.com#!/post/7"),
+    ("https://example.com/a#/x?y=1", "https://example.com/a#/x?y=1"),
+    ("https://example.com/a#/", "https://example.com/a"),
+    ("https://example.com/a#!", "https://example.com/a"),
+    ("https://example.com/a#top", "https://example.com/a"),
+    ("https://example.com/#/a b", "https://example.com#/a%20b"),
+    ("https://www.bücher.de/a", "https://xn--bcher-kva.de/a"),
+    ("https://xn--bcher-kva.de/a", "https://xn--bcher-kva.de/a"),
+]
+
+
+@pytest.mark.parametrize("raw,key", ROUTE_AND_IDN_CASES)
+def test_hash_routes_and_idn_hosts(raw, key):
+    assert url_key(raw) == key
+
+
+def test_distinct_hash_routes_are_distinct_pages():
+    assert url_key("https://app.example.com/#/inbox/1") != url_key("https://app.example.com/#/inbox/2")
+
+
+def test_unencodable_idn_host_never_raises():
+    # Python's IDNA 2003 codec rejects a label over 63 chars; the key falls
+    # back to the host as given instead of raising.
+    assert url_key("https://" + "\u00fc" * 70 + ".de/a").startswith("https://")

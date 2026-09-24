@@ -378,3 +378,53 @@ def test_ask_with_no_retrieved_cards_refunds_the_ask(monkeypatch):
     assert refunds == [("u1", "asks")]
     body = json.loads(resp.body)
     assert any("֐" <= ch <= "׿" for ch in body["answer"])
+
+
+# ── "Update public link" never revives a stopped share ──────────────────────
+
+def test_update_public_link_never_revives_a_share_stopped_elsewhere(env):
+    db, _ = env({"users/u1": {}, "users/u1/links/c1": {"title": "T"}})
+    payload = {"card": {"title": "T", "summary": "s", "url": "https://x.com"}}
+    share_service._publish_share_logic("u1", "card", SHARE, payload, card={"id": "c1"})
+    # A live page updates in place.
+    share_service._publish_share_logic("u1", "card", SHARE, payload, card={"id": "c1"}, update_only=True)
+    assert f"shared_cards/{SHARE}" in db.docs
+
+    # Stopped on another device; this device still shows the old shareId.
+    share_service._unpublish_share_logic("u1", "card", SHARE, card_id="c1")
+    with pytest.raises(LookupError):
+        share_service._publish_share_logic("u1", "card", SHARE, payload, card={"id": "c1"}, update_only=True)
+    assert f"shared_cards/{SHARE}" not in db.docs
+    assert db.docs["users/u1/links/c1"]["shareId"] is None
+
+    # An explicit re-share is still allowed (the owner keeps the id).
+    share_service._publish_share_logic("u1", "card", SHARE, payload, card={"id": "c1"})
+    assert f"shared_cards/{SHARE}" in db.docs
+
+
+# ── Account deletion: the per-card trigger stands down ──────────────────────
+
+def test_delete_trigger_stands_down_while_the_account_is_being_deleted(env):
+    shot = "screenshots/u1/a.jpg"
+    db, bucket = env({
+        "users/u1": {"deleting": True},
+        f"shared_cards/{SHARE}": {"card": {}},
+        f"shared_owners/{SHARE}": {"ownerUid": "u1", "type": "card"},
+    }, objects={shot})
+    report = card_cleanup.cleanup_deleted_card_logic("u1", "gone", {"shareId": SHARE, "url": _dl(shot)})
+    assert report["skipped"] == "user-deleting"
+    assert "unpublishedAt" not in db.docs[f"shared_owners/{SHARE}"]
+    assert shot in bucket.objects
+
+
+def test_account_deletion_flags_the_workspace_before_deleting_cards(monkeypatch):
+    from unittest.mock import MagicMock
+    import link_service
+    db = MagicMock()
+    monkeypatch.setattr(link_service, "get_db", lambda: db)
+    monkeypatch.setattr(link_service, "delete_shares_for_owner", lambda uid: 0)
+    link_service.delete_user_data("u1")
+    user_ref = db.collection.return_value.document.return_value
+    names = [c[0] for c in user_ref.mock_calls]
+    assert names[0] == "update" and user_ref.mock_calls[0].args == ({"deleting": True},)
+    assert names.index("update") < names.index("collection")

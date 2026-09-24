@@ -22,6 +22,7 @@ import ImageScanProgress from '@/components/ImageScanProgress';
 import VideoScanProgress from '@/components/VideoScanProgress';
 import LinkScanProgress from '@/components/LinkScanProgress';
 import ImportSheet from '@/components/ImportSheet';
+import { enqueueOfflineSave } from '@/lib/offlineSave';
 
 interface AddLinkFormProps {
     onLinkAdded: () => void;
@@ -489,35 +490,14 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
         return data;
     };
 
-    // Enqueue an offline-saved link once the device is back online. Waits for
-    // the placeholder write to reach the server first: the worker drops a job
-    // whose card doesn't exist yet (it reads that as "the user deleted it").
-    // If enqueueing fails the card flips to a retryable `failed` card; if the
-    // app is closed before reconnecting, the processing janitor does the same.
+    // Enqueue an offline-saved link once the device is back online (see
+    // lib/offlineSave.ts). If the app is closed before reconnecting, the card
+    // keeps `pendingEnqueue` and useResumeOfflineSaves (Feed) enqueues it on
+    // the next launch instead.
     const enqueueWhenOnline = (ownerUid: string, linkUrl: string, cardId: string, written: Promise<void>) => {
-        const run = async () => {
+        const run = () => {
             window.removeEventListener('online', run);
-            try {
-                await written;
-                const response = await apiFetch(apiUrl('/api/share'), {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()), ...(await authHeaders()) },
-                    body: JSON.stringify({ url: linkUrl, cardId, uid: ownerUid }),
-                }, 30_000);
-                const text = await response.text();
-                let resData: { success?: boolean; error?: string };
-                try { resData = JSON.parse(text); } catch { resData = {}; }
-                if (!response.ok || !resData.success) {
-                    if (response.status === 429) offerUpgradeFor(resData);
-                    throw new Error(resData?.error || 'Could not start analysis. Please try again.');
-                }
-            } catch (err) {
-                try {
-                    await markLinkFailed(ownerUid, cardId, err instanceof Error ? err.message : String(err));
-                } catch {
-                    // Best-effort; the processing janitor ages it out otherwise.
-                }
-            }
+            void enqueueOfflineSave(ownerUid, linkUrl, cardId, written);
         };
         window.addEventListener('online', run);
     };
@@ -558,7 +538,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
         if (activeTab === 'link' && typeof navigator !== 'undefined' && navigator.onLine === false) {
             let placeholder: { id: string; written: Promise<void> };
             try {
-                placeholder = startProcessingPlaceholder(uid, formattedUrl);
+                placeholder = startProcessingPlaceholder(uid, formattedUrl, { offline: true });
             } catch (writeErr) {
                 trackSaveFailed('save_failed');
                 const message = `Could not save to Machina: ${writeErr instanceof Error ? writeErr.message : String(writeErr)}`;

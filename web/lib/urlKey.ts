@@ -8,7 +8,8 @@
  *
  * https always, host lower-cased with www./m./mobile. stripped and
  * twitter.com → x.com, YouTube short forms → youtube.com/watch?v=ID, no
- * fragment, no trailing slash, tracking params dropped, remaining params sorted.
+ * fragment (except a hash route like `#/inbox` or `#!/post`, which IS the page
+ * in a single-page app), no trailing slash, tracking params dropped, remaining params sorted.
  * Returns '' for anything that isn't an http(s) URL with a host.
  */
 
@@ -77,6 +78,18 @@ function quotePath(path: string): string {
     });
 }
 
+// A hash route (`#/…` or `#!…`) is kept, trailing slashes trimmed; any other
+// fragment (an in-page anchor) is dropped. Mirrors url_key._route_fragment.
+function routeFragment(hash: string): string {
+    const frag = hash.startsWith('#') ? hash.slice(1) : hash;
+    if (!frag || (frag[0] !== '/' && frag[0] !== '!')) return '';
+    const trimmed = frag.replace(/\/+$/, '');
+    if (trimmed === '' || trimmed === '!') return '';
+    return trimmed.replace(/[^A-Za-z0-9/:@!$&'()*+,;=\-._~%?#]/g, c => {
+        try { return encodeURIComponent(c); } catch { return c; }
+    });
+}
+
 // Python's urlencode (quote_plus): space → '+', and !'()* escaped.
 function quotePlus(s: string): string {
     return encodeURIComponent(s)
@@ -111,5 +124,6 @@ export function urlKey(input: unknown): string {
         .filter(([k]) => !isTracking(k, host))
         .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0));
     const query = kept.map(([k, v]) => `${quotePlus(k)}=${quotePlus(v)}`).join('&');
-    return `https://${host}${cleanPath}${query ? `?${query}` : ''}`;
+    const frag = routeFragment(parsed.hash);
+    return `https://${host}${cleanPath}${query ? `?${query}` : ''}${frag ? `#${frag}` : ''}`;
 }

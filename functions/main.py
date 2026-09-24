@@ -77,6 +77,8 @@ from search import (
 from rate_limit import check_rate_limit, client_ip, RateLimitBackendError
 # Monthly per-user soft quotas (report 3.2). Imports only db + stdlib (no cycle).
 from quota import meter as meter_quota, refund_quota, quota_message
+# At-most-once refunds for queued captures (see the module docstring).
+import capture_charge
 from entitlement import (
     plan_for, entitlement_summary, sync_from_revenuecat, resolve_workspace_for_app_user,
     rc_configured, RevenueCatError, run_trial_nudges, entitlement_source,
@@ -3185,6 +3187,26 @@ def _pending_url_doc(uid: str, url: str, *, card_id: Optional[str] = None,
     return doc
 
 
+def _claim_offline_enqueue(uid: str, card_id) -> Optional[bool]:
+    """Clear an offline-saved card's `pendingEnqueue` flag, atomically.
+    True: this caller cleared it and should enqueue. False: already cleared
+    (another path enqueued it). None: no such card."""
+    if not isinstance(card_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', card_id):
+        return None
+    db = get_db()
+    card_ref = db.collection('users').document(uid).collection('links').document(card_id)
+
+    def _body(tx):
+        snap = card_ref.get(transaction=tx)
+        if not snap.exists:
+            return None
+        if not (snap.to_dict() or {}).get("pendingEnqueue"):
+            return False
+        tx.update(card_ref, {"pendingEnqueue": gc_firestore.DELETE_FIELD})
+        return True
+    return capture_charge.run_transaction(db, _body)
+
+
 @https_fn.on_request(max_instances=10)
 def share_ingest(req: https_fn.Request) -> https_fn.Response:
     """
@@ -3379,6 +3401,7 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                 "createdAt": datetime.now(timezone.utc).isoformat(),
                 "status": "queued",
                 "attempts": 0,
+                capture_charge.CHARGE_FIELD: capture_charge.token("saves"),
             }
             if data.get('cardId'):
                 queue_doc["cardId"] = data.get('cardId')
@@ -3425,6 +3448,7 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                 "createdAt": datetime.now(timezone.utc).isoformat(),
                 "status": "queued",
                 "attempts": 0,
+                capture_charge.CHARGE_FIELD: capture_charge.token("saves"),
             }
             if data.get('cardId'):
                 queue_doc["cardId"] = data.get('cardId')
@@ -3492,6 +3516,7 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                 "createdAt": datetime.now(timezone.utc).isoformat(),
                 "status": "queued",
                 "attempts": 0,
+                capture_charge.CHARGE_FIELD: capture_charge.token("saves"),
             })
             logger.info(f"Share ingest queued image for {_mask_uid(uid)}")
             return https_fn.Response(
@@ -3562,6 +3587,21 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                 status=200, headers=headers, mimetype='application/json'
             )
 
+        # A link saved OFFLINE (web/lib/offlineSave.ts): the card carries
+        # `pendingEnqueue`, and more than one path (the form's reconnect
+        # listener, the launch hook, a second device) may try to enqueue it.
+        # Only the request that clears the flag enqueues; the rest are acked
+        # as duplicates, uncharged.
+        if card_id and data.get('offlineEnqueue'):
+            claimed = _claim_offline_enqueue(uid, card_id)
+            if claimed is None:
+                return _error_response("Card not found", 404, headers)
+            if not claimed:
+                return https_fn.Response(
+                    json.dumps({"success": True, "duplicate": True, "url": url}),
+                    status=200, headers=headers, mimetype='application/json'
+                )
+
         # Monthly save quota — a genuinely new (non-duplicate) URL becomes a save;
         # meter before enqueuing the paid background job. Duplicates returned
         # above are NOT counted.
@@ -3576,6 +3616,7 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
             uid, url, card_id=card_id, body=body,
             source="web" if card_id else "share",
         )
+        queue_doc[capture_charge.CHARGE_FIELD] = capture_charge.token("saves")
         if note_kind:
             queue_doc["noteKind"] = note_kind
         # Only an explicit `note` is parsed for a reminder ("remind me
@@ -3833,6 +3874,7 @@ def import_links_http(req: https_fn.Request) -> https_fn.Response:
 
                 queue_doc = _pending_url_doc(uid, item["url"], card_id=card_ref.id,
                                              source="import")
+                queue_doc[capture_charge.CHARGE_FIELD] = capture_charge.token("imports")
                 if item["addedAt"] is not None:
                     queue_doc["importedFromAt"] = item["addedAt"]
                 if item["tags"]:
@@ -4864,6 +4906,7 @@ def publish_share_http(req: https_fn.Request) -> https_fn.Response:
         result = _publish_share_logic(
             uid, data.get("type"), data.get("shareId"), data.get("payload"),
             collection=data.get("collection"), card=data.get("card"),
+            update_only=data.get("mode") == "update",
         )
         return https_fn.Response(json.dumps(result), status=200, headers=headers, mimetype='application/json')
     except PermissionError as e:
@@ -5274,32 +5317,61 @@ class _FetchFailed(Exception):
     user-facing reason the FAILED card shows (scraper.FETCH_ERROR_MESSAGES)."""
 
 
-def _card_exists(card_ref) -> bool:
-    """Does the card doc still exist? A read error counts as yes: only a
-    confirmed-missing card (the user deleted it) should drop a job."""
+# Fields on an existing card that belong to the USER, not to the analysis. The
+# worker's final write replaces the card (so stale analysis/failure fields go),
+# but a retry or a slow first capture must not wipe what the user did to the
+# card meanwhile: filing, notes, privacy, a live share, reminders, review state,
+# and the card's place in the feed (createdAt).
+_USER_OWNED_CARD_FIELDS = (
+    "createdAt", "collectionIds", "userNote", "userNoteUpdatedAt",
+    "isPrivate", "hideThumbnail", "shareId", "sharePublishedAt",
+    "reminderStatus", "nextReminderAt", "reminderCount", "reminderProfile",
+    "reminderDue", "reminderDueAt", "lastViewedAt", "reviewedAt", "takeawayDoneAt",
+    "archived", "isRead", "importedAt", "importedFromAt", "importedTags",
+)
+
+
+def _merge_card_write(new: dict, current: dict) -> dict:
+    """The worker's write for a card that already exists: ``new`` (the
+    analysis, or the failure record) with the user-owned fields of
+    ``current`` carried over. Tags: the user's existing tags first, then the
+    new ones (model + import hints), capped like every card; notes: the
+    existing ones plus a shared note that is not already there."""
+    out = dict(new)
+    current = current or {}
+    for key in _USER_OWNED_CARD_FIELDS:
+        if key in current:
+            out[key] = current[key]
+    out["tags"] = _merge_tags(current.get("tags"), new.get("tags"))[:MAX_CARD_TAGS]
+    notes = [n for n in (current.get("userNotes") or []) if isinstance(n, dict)]
+    have = {(n.get("text") or "").strip() for n in notes}
+    for n in new.get("userNotes") or []:
+        if isinstance(n, dict) and (n.get("text") or "").strip() not in have:
+            notes.append(n)
+    if notes:
+        out["userNotes"] = notes
+    return out
+
+
+def _write_capture_card(card_ref, data: dict) -> tuple:
+    """Write the worker's result onto its card without resurrecting a card the
+    user deleted, preserving user-owned fields (_merge_card_write) and removing
+    the charge token, all in one transaction. Returns ``(written,
+    removed_charge_kind)``."""
+    return capture_charge.finalize_card(get_db(), card_ref, lambda cur: _merge_card_write(data, cur))
+
+
+def _refund_job(uid: str, job_ref) -> None:
+    """Refund a job whose charge token never reached a card (it is claimed
+    off the queue doc, so this is a no-op if it already moved or was
+    refunded). Best-effort: refund_quota never raises."""
     try:
-        return bool(card_ref.get().exists)
+        kind = capture_charge.claim(get_db(), job_ref)
     except Exception as e:
-        logger.warning(f"Card existence check failed (assuming present): {e}")
-        return True
-
-
-def _set_card_if_exists(card_ref, data: dict) -> bool:
-    """Replace the card wholesale, but never RESURRECT it: a card the user
-    deleted while it was processing must stay deleted (set() on a missing doc
-    silently re-creates it). Returns False when the card is gone."""
-    if not _card_exists(card_ref):
-        return False
-    card_ref.set(data)
-    return True
-
-
-def _refund_capture(uid: str, data: dict) -> None:
-    """Give back the unit a queued capture was charged: `imports` for a bulk
-    import (POST /api/import meters its own lifetime allowance), `saves` for
-    everything else. Best-effort (refund_quota never raises)."""
-    kind = "imports" if data.get("source") == "import" else "saves"
-    refund_quota(uid, kind)
+        logger.error(f"Could not claim the job's charge: {e}")
+        return
+    if kind:
+        refund_quota(uid, kind)
 
 
 def _shared_note_entry(text, scraped: dict):
@@ -5382,36 +5454,47 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             data,
         )
         return
+    # Refund bookkeeping: the job's charge token moves onto the card when work
+    # starts, and only whoever removes it refunds (capture_charge docstring).
     if existing_card_id:
         card_ref = get_db().collection('users').document(uid).collection('links').document(existing_card_id)
         card_id = existing_card_id
-        # The user deleted the card while it waited in the queue: drop the job.
-        # Running it would re-create the card they just removed. Refunded —
-        # no paid work ran, and the user got nothing.
-        if not _card_exists(card_ref):
+        # Start the card's processing clock now that work is actually
+        # beginning, and move the charge token onto the card in the same
+        # transaction. The janitor ages a `processing` card out after 15
+        # minutes, measured from this field, and a bulk import (POST
+        # /api/import) queues far more jobs than max_instances can run at
+        # once: an imported card is written with only `queuedAt` and gets this
+        # stamp here, when an instance picks it up. `status` is re-set because
+        # the janitor may have timed out a card whose job was merely slow to
+        # start; work is running again, so the card shows it.
+        try:
+            started = capture_charge.move_to_card(get_db(), ref, card_ref, {
+                "status": LinkStatus.PROCESSING.value,
+                "processingStartedAt": int(datetime.now(timezone.utc).timestamp() * 1000),
+            })
+        except Exception as stamp_err:
+            # A read error counts as "present" (only a confirmed-missing card
+            # drops a job); the token stays on the job and the failure path
+            # claims it from there.
+            logger.warning(f"Could not start the card: {stamp_err}")
+            started = True
+        if not started:
+            # The user deleted the card while it waited in the queue: drop the
+            # job. Running it would re-create the card they just removed.
+            # Refunded (from the job's own token): no paid work ran.
             logger.info("Card deleted before processing; dropping the job")
-            _refund_capture(uid, data)
+            _refund_job(uid, ref)
             try:
                 ref.delete()
             except Exception:
                 pass
             return
-        # Start the card's processing clock now that work is actually
-        # beginning. The janitor ages a `processing` card out after 15 minutes,
-        # measured from this field, and a bulk import (POST /api/import) queues
-        # far more jobs than max_instances can run at once: an imported card is
-        # written with only `queuedAt` and gets this stamp here, when an
-        # instance picks it up. For the web capture path this re-stamps about a
-        # second after the client did, which changes nothing.
-        try:
-            card_ref.update({"processingStartedAt": int(datetime.now(timezone.utc).timestamp() * 1000)})
-        except Exception as stamp_err:
-            logger.warning(f"Could not re-stamp processingStartedAt: {stamp_err}")
     else:
         card_ref = get_db().collection('users').document(uid).collection('links').document()
         card_id = card_ref.id
         try:
-            card_ref.set({
+            capture_charge.move_to_card(get_db(), ref, card_ref, {
                 "url": original_url,
                 "title": _capture_placeholder_title(original_url, is_image),
                 "summary": "",
@@ -5425,8 +5508,7 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
                 "processingStartedAt": int(datetime.now(timezone.utc).timestamp() * 1000),
                 "metadata": {"originalTitle": "", "estimatedReadTime": 0},
                 **({"urlKey": url_key(original_url)} if not is_image and url_key(original_url) else {}),
-            })
-            ref.update({"cardId": card_id})
+            }, create=True, job_fields={"cardId": card_id})
         except Exception as placeholder_err:
             # Non-fatal: if we can't write the placeholder, fall back to the legacy
             # "create the real card at the end" behaviour so a save is never lost.
@@ -5656,9 +5738,11 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         # Vector store: the card gets the vector only while cards still carry
         # it (card_payload); the sibling doc is mirrored AFTER the card write,
         # so a card deleted mid-processing never leaves an orphan vector. The
-        # set() replaces the card, so no vector here deletes the sibling too.
+        # write replaces the card's fields, so no vector here deletes the sibling too.
         if card_ref is not None:
-            if not _set_card_if_exists(card_ref, card_payload(link_data, db)):
+            # Merged onto the existing card (user-owned fields kept) and the
+            # charge token spent — see _write_capture_card.
+            if not _write_capture_card(card_ref, card_payload(link_data, db))[0]:
                 # Deleted mid-processing: the user doesn't want it. Drop the
                 # result rather than resurrect the card.
                 logger.info("Card deleted during processing; result dropped")
@@ -5717,20 +5801,29 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             failed_data["imageUrls"] = data["imageUrls"][:MAX_CARD_IMAGES]
         if not is_image and url_key(original_url):
             failed_data["urlKey"] = url_key(original_url)
+        refund_kind = None
         try:
             if card_ref is not None:
-                # Never resurrect a card the user deleted mid-processing.
-                if not _set_card_if_exists(card_ref, failed_data):
+                # Never resurrect a card the user deleted mid-processing; keep
+                # the user-owned fields; take the charge token off the card.
+                written, refund_kind = _write_capture_card(card_ref, failed_data)
+                if not written:
                     logger.info("Card deleted during processing; failure not recorded")
             else:
                 save_link_to_firestore(uid, failed_data)
         except Exception as write_err:
             logger.error(f"Failed to write FAILED card record: {write_err}", exc_info=True)
 
-        # The user got no card out of this capture: give back its unit (saves,
-        # or imports for an imported link). Without this every failed capture
-        # permanently consumed quota, and Retry charged a second time.
-        _refund_capture(uid, data)
+        # The user got no card out of this capture: give back its unit, the
+        # kind it was charged as. At most once (capture_charge): the token was
+        # either on the card (removed by the write above; None if the janitor
+        # already refunded it) or never left the job (claimed here). Without a
+        # refund every failed capture permanently consumed quota, and Retry
+        # charged a second time.
+        if refund_kind:
+            refund_quota(uid, refund_kind)
+        else:
+            _refund_job(uid, ref)
 
         # The retryable failed card now lives in the library; drop the queue doc so
         # no orphaned pending_processing record is left behind.
@@ -5832,25 +5925,36 @@ def run_processing_janitor() -> dict:
             if started is not None and started > cutoff:
                 continue
         try:
-            doc.reference.update({
+            # Transactional: re-checks the card is still `processing` (the
+            # worker may have just finished it) and removes its charge token
+            # in the same write, so this refund and the worker's can never
+            # both happen (capture_charge docstring).
+            failed, refund_kind = capture_charge.fail_if_processing(db, doc.reference, {
                 "status": LinkStatus.FAILED.value,
                 "error": "Processing timed out — tap to retry.",
                 "failedAt": now_ms,
                 "processingStage": gc_firestore.DELETE_FIELD,
             })
-            report["failed_out"] += 1
         except Exception as e:
             logger.error(f"Janitor failed to update {doc.id}: {e}")
             report["errors"].append(f"{doc.id}: {e}")
             continue
+        if not failed:
+            continue
+        report["failed_out"] += 1
         # A hard-killed job never reached the worker's refund: give the unit
-        # back here, so Retry on this card isn't a second charge.
-        try:
-            owner = doc.reference.parent.parent.id
-        except Exception:
-            owner = None
-        if isinstance(owner, str) and owner:
-            refund_quota(owner, "imports" if d.get("importedAt") else "saves")
+        # back here, so Retry on this card isn't a second charge. Only a card
+        # that carried a charge token is refunded, as the kind it was charged
+        # (an imported card retried through /api/analyze carries none: that
+        # endpoint refunds its own failures), and never an offline placeholder
+        # that was never enqueued (no charge was ever made).
+        if refund_kind:
+            try:
+                owner = doc.reference.parent.parent.id
+            except Exception:
+                owner = None
+            if isinstance(owner, str) and owner:
+                refund_quota(owner, refund_kind)
 
     # Stale pending_processing queue docs. A hard-killed job (timeout/OOM) never
     # reaches the trigger's cleanup `ref.delete()`, so its queue doc lives
@@ -5875,6 +5979,11 @@ def run_processing_janitor() -> dict:
             # waiting for capacity, not dead. Leave it alone.
             if job.get("status") == "queued" and str(job.get("createdAt") or "") >= queued_cutoff_iso:
                 continue
+            # A job still holding its charge token never handed it to a card
+            # (abandoned in the queue, or its placeholder write failed), so no
+            # card refund can cover it: refund it here, once.
+            if capture_charge.charge_kind(job) and isinstance(job.get("uid"), str) and job.get("uid"):
+                _refund_job(job["uid"], doc.reference)
             doc.reference.delete()
             report["queue_pruned"] += 1
     except Exception as e:

@@ -126,6 +126,9 @@ export interface Link {
   // when it picks the job up. While only this is set the card is QUEUED, not
   // stuck: Card.tsx and the backend janitor age it on a much longer clock.
   queuedAt?: number;
+  // Saved OFFLINE and not yet handed to the pipeline (lib/offlineSave.ts).
+  // The server clears it when it accepts the enqueue.
+  pendingEnqueue?: boolean;
   // Canonical dedupe key of `url` (lib/urlKey.ts ≡ functions/url_key.py), and
   // of the page a redirect/shortener landed on when that differs.
   urlKey?: string;

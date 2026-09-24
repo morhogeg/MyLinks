@@ -355,11 +355,20 @@ export async function unpublishCollection(uid: string, collectionDoc: Collection
  * share URL and open the OS share sheet BEFORE this network write resolves
  * (see handleShareCard) — the sheet no longer waits on the publish round-trip.
  */
-export async function publishCard(uid: string, link: Link, shareId: string = link.shareId || newShareId()): Promise<string> {
+export async function publishCard(
+    uid: string,
+    link: Link,
+    shareId: string = link.shareId || newShareId(),
+    opts: { updateOnly?: boolean } = {},
+): Promise<string> {
     await callShareApi('/api/publish-share', {
         uid,
         type: 'card',
         shareId,
+        // "Update public link" only refreshes a LIVE page: the server refuses
+        // it when the share was stopped (e.g. on another device), so a stale
+        // shareId in this device's copy of the card can't revive it.
+        ...(opts.updateOnly ? { mode: 'update' } : {}),
         // The server records shareId/sharePublishedAt on the card in the same
         // batch, so re-sharing reuses this URL and Stop sharing can find it.
         card: { id: link.id },
