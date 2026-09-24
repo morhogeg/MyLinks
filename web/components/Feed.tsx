@@ -3248,6 +3248,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             onSaveCluster={handleSaveCluster}
                             onBackToAsk={graphFromChat ? handleBackToAsk : undefined}
                             onBackToCard={graphFromCard ? handleBackToCard : undefined}
+                            uid={uid}
                         />
                     ) : viewMode === 'review' ? (
                         <SwipeDeck

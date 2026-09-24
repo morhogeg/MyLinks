@@ -1,4 +1,5 @@
-import { Link } from './types';
+import type { Link } from './types';
+import type { AnchorSims } from './similarity';
 
 /**
  * Related cards for the open-card view — live, not just the save-time snapshot.
@@ -12,9 +13,11 @@ import { Link } from './types';
  *     stored list is frozen).
  *  2. Cards that predate the graph (or whose embedding failed) have nothing.
  *
- * The feed already holds every card's `embedding_vector` and `concepts` in
- * memory, so we can compute fresh matches on open for free: cosine similarity
- * over embeddings, corroborated by shared concepts/tags.
+ * Fresh matches are computed on open: cosine similarity over embeddings,
+ * corroborated by shared concepts/tags. The similarities come from the server
+ * (`AnchorSims`, lib/similarity.ts) now that vectors are moving off the card
+ * docs; while that answer is pending or unavailable, cards that still carry
+ * `embedding_vector` are compared locally exactly as before.
  *
  * Order of the returned list, and the contract the Graph view depends on:
  *  1. This card's OWN stored relations (LLM-verified prose reasons).
@@ -184,6 +187,30 @@ export function liveReason(
     return isRtl ? 'עוסק בנושא קרוב מאוד' : 'Covers closely related ground';
 }
 
+/**
+ * The cards whose similarity to `link` the server must return EXACTLY: those
+ * sharing at least one specific concept with it (the only ones a concept
+ * signal can lift over a bar). Everything else can only qualify on similarity
+ * alone, which the server finds itself from its vector index.
+ */
+export function relatedSimCandidates(link: Link, allLinks: Link[]): string[] {
+    const mine = new Set((link.concepts ?? []).map((c) => (c || '').toLowerCase()).filter(Boolean));
+    if (!mine.size) return [];
+    const generic = genericConcepts(allLinks);
+    const scored: Array<{ id: string; n: number }> = [];
+    for (const other of allLinks) {
+        if (other.id === link.id) continue;
+        if (other.status === 'processing' || other.status === 'failed') continue;
+        let n = 0;
+        for (const c of new Set((other.concepts ?? []).map((s) => (s || '').toLowerCase()))) {
+            if (mine.has(c) && !generic.has(c)) n++;
+        }
+        if (n) scored.push({ id: other.id, n });
+    }
+    scored.sort((a, b) => b.n - a.n);
+    return scored.map((s) => s.id);
+}
+
 export function getRelatedCards(
     link: Link,
     allLinks: Link[],
@@ -193,6 +220,9 @@ export function getRelatedCards(
     // top this list — pointless when the Back arrow already returns you there.
     // Excluding them keeps every slot a genuinely new place to go.
     excludeIds?: Iterable<string>,
+    // Server similarities for `link` (lib/similarity.ts). When absent, the
+    // local vectors on the cards are used, if they still carry any.
+    remote?: AnchorSims | null,
 ): RelatedCardEntry[] {
     if (!allLinks?.length) return [];
     const byId = new Map(allLinks.map((l) => [l.id, l]));
@@ -238,7 +268,7 @@ export function getRelatedCards(
     //    this card predates the graph entirely). Qualified by the SAME bar and
     //    ranked by the SAME score the graph uses (qualifyLiveTie / liveScore),
     //    with the library's generic concepts discounted the same way.
-    const myVec = toVector(link.embedding_vector);
+    const myVec = remote ? null : toVector(link.embedding_vector);
     const generic = genericConcepts(allLinks);
     const candidates: Array<{ entry: RelatedCardEntry; score: number }> = [];
     for (const other of allLinks) {
@@ -252,9 +282,18 @@ export function getRelatedCards(
         const sharedConcepts = overlap(link.concepts, other.concepts).filter((c) => !generic.has(c.toLowerCase()));
         const sharedTags = overlap(link.tags, other.tags);
         const sameCategory = !!link.category && link.category === other.category;
-        const otherVec = myVec ? toVector(other.embedding_vector) : null;
-        const haveVectors = !!(myVec && otherVec && myVec.length === otherVec.length);
-        const sim = haveVectors ? cosine(myVec!, otherVec!) : 0;
+        let haveVectors: boolean;
+        let sim: number;
+        if (remote) {
+            // An omitted pair = both have vectors, similarity below every bar
+            // (see lib/similarity.ts) — the same verdict as its true value.
+            haveVectors = remote.anchorHasVector && !remote.noVector.has(other.id);
+            sim = haveVectors ? (remote.sims.get(other.id) ?? 0) : 0;
+        } else {
+            const otherVec = myVec ? toVector(other.embedding_vector) : null;
+            haveVectors = !!(myVec && otherVec && myVec.length === otherVec.length);
+            sim = haveVectors ? cosine(myVec!, otherVec!) : 0;
+        }
 
         if (!qualifyLiveTie(sim, sharedConcepts.length, haveVectors)) continue;
 

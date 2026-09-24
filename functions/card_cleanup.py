@@ -26,6 +26,7 @@ from urllib.parse import unquote, urlsplit
 
 from db import get_db
 from log_safe import mask_uid
+from vector_store import delete_vector
 
 logger = logging.getLogger(__name__)
 
@@ -125,11 +126,19 @@ def _unpublish_card_share(db, uid: str, share_id) -> bool:
 def cleanup_deleted_card_logic(uid: str, link_id: str, data: Optional[dict]) -> dict:
     """Unpublish the deleted card's share and delete its owned blobs.
     Best-effort per step; returns a small report (for logs and tests)."""
-    report = {"unpublished": False, "deleted_blobs": 0, "kept_blobs": 0, "skipped": None}
-    if not uid or not isinstance(data, dict):
+    report = {"unpublished": False, "deleted_blobs": 0, "kept_blobs": 0, "skipped": None,
+              "vector_deleted": False}
+    if not uid or not link_id:
         report["skipped"] = "no-data"
         return report
     db = get_db()
+    # The card's vector-store sibling (users/{uid}/vectors/{linkId}) goes with
+    # it, whatever else the card held. Idempotent; deleting a missing doc is a
+    # no-op, so a retried delivery or an account sweep racing this is fine.
+    report["vector_deleted"] = delete_vector(db, uid, link_id)
+    if not isinstance(data, dict):
+        report["skipped"] = "no-data"
+        return report
     user_ref = db.collection("users").document(uid)
     user_snap = user_ref.get()
     if not user_snap.exists:

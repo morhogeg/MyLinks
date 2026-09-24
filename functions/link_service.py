@@ -254,6 +254,9 @@ def delete_user_data(uid: str) -> int:
 USER_SUBCOLLECTIONS = (
     'links', 'chats', 'collections', 'syntheses', 'synthesisNotes',
     'digests', 'analytics_events', 'client_errors',
+    # Server-only card embedding vectors (vector_store.py) — no client rule,
+    # but they are this user's data and must go with the account.
+    'vectors',
 )
 
 _SHARE_TYPE_COLLECTIONS = {
