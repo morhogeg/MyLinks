@@ -1145,6 +1145,39 @@ Content to analyze:
             attempts=attempts,
         ))
 
+    def analyze_document(self, doc_bytes: bytes, mime_type: str, context_text: str = "",
+                         existing_tags: list = None, attempts: int = _MAX_GENERATE_ATTEMPTS,
+                         existing_categories: list = None) -> dict:
+        """Analyze a document (a PDF) passed to Gemini as a native inline part.
+
+        The scraper can't read a PDF's bytes as text, but Gemini reads PDFs
+        directly (text, layout and scanned pages). `context_text` carries the
+        source URL / shared caption so the card keeps its provenance; the
+        document itself is the authoritative content. Raises AnalysisError on
+        failure so the caller can fall back to the honest "couldn't read this
+        PDF" card."""
+        from google.genai import types
+
+        clean_context = (context_text or "")[:4000]
+        existing_tags = self._same_script_tags(existing_tags, clean_context)
+        tags_context = (
+            f"\n\nExisting Tags in Brain (Reuse ONLY those in the content's language):\n{', '.join(existing_tags)}"
+            if existing_tags else ""
+        )
+        cats_context = self._categories_context(existing_categories)
+        prompt = f"""{SYSTEM_PROMPT}{tags_context}{cats_context}
+
+The attached document IS the content to analyze: read it in full (all pages, in
+order) and analyze it according to the instructions above. Work only from what the
+document actually says. The context below (source URL, any caption) is provenance,
+not content.
+
+Context:
+{clean_context}"""
+        contents = [types.Part.from_bytes(data=doc_bytes, mime_type=mime_type), prompt]
+        return self._enforce_tag_language(
+            self._generate_json(contents, "document analysis", attempts=attempts))
+
     def analyze_youtube(self, watch_url: str, existing_tags: list = None,
                         attempts: int = _MAX_GENERATE_ATTEMPTS, existing_categories: list = None) -> dict:
         """Analyze an actual YouTube video via Gemini's native video ingestion.
