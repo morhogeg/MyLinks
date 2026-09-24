@@ -169,7 +169,14 @@ export function meterLabel(kind: QuotaKind, m: QuotaMeter): string | null {
 
 export const PAYWALL_EVENT = 'machina:paywall';
 
-export type PaywallReason = QuotaKind | 'synthesis' | 'digest' | 'youtube' | 'settings' | 'manual';
+const PAYWALL_REASONS = ['saves', 'asks', 'imports', 'synthesis', 'digest', 'youtube', 'settings', 'manual'] as const;
+
+export type PaywallReason = QuotaKind | (typeof PAYWALL_REASONS)[number];
+
+/** True for a known reason; guards the `?paywall=` deep link against junk. */
+export function isPaywallReason(v: unknown): v is PaywallReason {
+    return typeof v === 'string' && (PAYWALL_REASONS as readonly string[]).includes(v);
+}
 
 /** Ask the mounted paywall to open. Safe to call anywhere, including SSR (no-op). */
 export function requestPaywall(reason: PaywallReason = 'manual'): void {

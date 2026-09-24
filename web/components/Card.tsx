@@ -505,7 +505,8 @@ function Card({
                                                     e.stopPropagation();
                                                     setIsEditingCategory(true);
                                                 }}
-                                                className="opacity-0 group-hover/cat:opacity-100 transition-opacity p-1 -ms-1 hover:bg-fill-subtle rounded-md flex-shrink-0"
+                                                aria-label={isRtl ? 'עריכת קטגוריה' : 'Edit category'}
+                                                className="opacity-0 group-hover/cat:opacity-100 focus-visible:opacity-100 transition-opacity p-1 -ms-1 hover:bg-fill-subtle rounded-md flex-shrink-0"
                                             >
                                                 <Pencil className="w-3 h-3 text-text-muted/40 hover:text-text-muted" />
                                             </button>

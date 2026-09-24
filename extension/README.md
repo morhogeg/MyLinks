@@ -53,6 +53,21 @@ shortly."*, *"Already in Machina"*, or a clear error. The card then appears in t
 Machina app **automatically** (real-time sync, no refresh) within a few seconds,
 once the backend finishes scraping and analyzing it.
 
+When a save fails, the notification says why, based on the server's answer:
+
+| Server answer | What you see |
+|---|---|
+| Free plan monthly limit (429 with an upgrade offer) | *Free plan limit reached*. Clicking the notification (or its **Upgrade in Machina** button) opens `https://mymachina.app/?paywall=saves`, which opens the upgrade sheet |
+| Too many requests (plain 429) | *Too many saves. Try again in a minute.* |
+| Bad request (400) | the server's reason, or *That page can't be saved.* |
+| Too large (413) | *Too large to save.* |
+| Server error (5xx, including 503) | *Machina is busy. Try again shortly.* |
+| Invalid or missing token (403/401) | a prompt to check the token; clicking opens settings |
+| No response at all (offline) | *Couldn't reach Machina. Check your connection.* |
+
+The **Save this page now** button in the popup shows the same reason on its
+status line, with an **Upgrade** link for the free plan limit.
+
 A toolbar **badge** mirrors the result for a couple of seconds:
 
 - **✓ graphite**: saved (queued for processing).
