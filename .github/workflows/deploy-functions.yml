@@ -69,7 +69,9 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # An unscoped "all" deploy of ~40 functions ran past 30 min (run #114,
+    # 2026-09-24, cancelled mid-deploy). Scoped deploys take ~3 min.
+    timeout-minutes: 90
 
     env:
       FIREBASE_PROJECT: secondbrain-app-94da2
