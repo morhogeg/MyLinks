@@ -162,7 +162,11 @@ export async function createProcessingPlaceholder(uid: string, url: string): Pro
  * (Firestore queues the write and the card shows in the feed from its local
  * cache right away), so the offline save path must not await it.
  */
-export function startProcessingPlaceholder(uid: string, url: string): { id: string; written: Promise<void> } {
+export function startProcessingPlaceholder(
+    uid: string,
+    url: string,
+    opts: { offline?: boolean } = {},
+): { id: string; written: Promise<void> } {
     const ref = doc(collection(db, 'users', uid, 'links'));
     // A client ms clock (mirrors the trigger's int-ms writes) so feed ordering
     // and useProcessingBanner's ramp work the instant the card streams in — unlike
@@ -180,8 +184,15 @@ export function startProcessingPlaceholder(uid: string, url: string): { id: stri
         sourceType: 'web',
         isRead: false,
         createdAt: now,
-        // The processing janitor ages out cards stuck here past its timeout.
-        processingStartedAt: now,
+        ...(opts.offline
+            // OFFLINE: nothing is running yet, so the card is QUEUED (Card.tsx
+            // shows "Queued" and ages it on the long queue clock, as does the
+            // janitor), and flagged for enqueue once the device is back online
+            // (lib/offlineSave.ts; the server clears the flag on accept). The
+            // worker stamps processingStartedAt when it actually starts.
+            ? { queuedAt: now, pendingEnqueue: true }
+            // The processing janitor ages out cards stuck here past its timeout.
+            : { processingStartedAt: now }),
         metadata: { originalTitle: '', estimatedReadTime: 0 },
     });
     return { id: ref.id, written };
@@ -584,6 +595,11 @@ export async function retryFailedLink(uid: string, link: Link): Promise<void> {
             // or the card would keep apologizing for a read that now succeeded.
             captureQuality: l.captureQuality ?? null,
             captureReason: l.captureReason ?? null,
+            // Scrape extras (main.py _scrape_extras), set-or-cleared like the
+            // flags above: where a redirect landed (dedupe of the expanded
+            // URL) and whether only the article's first part was analyzed.
+            finalUrlKey: l.finalUrlKey || deleteField(),
+            contentTruncated: l.contentTruncated ? true : deleteField(),
             // Intentionally NOT writing embedding_vector here. The API no longer
             // returns it, and a client write would store it as a plain array
             // (invisible to vector search). The `sync_link_embedding` Firestore

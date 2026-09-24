@@ -215,10 +215,16 @@ export function useLinkActions(
         }
         if (mode === 'update') {
             try {
-                await publishCard(uid, link);
+                if (!link.shareId) return;
+                await publishCard(uid, link, link.shareId, { updateOnly: true });
                 toast.success('Public link updated');
-            } catch {
-                toast.error("Couldn't update the share link. Please try again.");
+            } catch (err) {
+                // The server refuses an update for a share stopped elsewhere,
+                // and says so; anything else is the generic failure.
+                const msg = err instanceof Error && /stopped/i.test(err.message)
+                    ? 'This link was stopped. Share the card again to make a new one.'
+                    : "Couldn't update the share link. Please try again.";
+                toast.error(msg);
             }
             return;
         }

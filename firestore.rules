@@ -75,6 +75,16 @@ service cloud.firestore {
 
     // See the links rule. `resource.data.get()` (not a bare field read) so a
     // doc without the field never errors the rule into a denial.
+    // Server-only capture charge token (functions/capture_charge.py): the
+    // janitor refunds the quota unit a card's `charge` names, so a client that
+    // could write it would mint refunds. Creates may not carry it; updates may
+    // not change it (the client's own writes merge around it untouched).
+    function chargeUntouched() {
+      return request.method == 'create'
+        ? !('charge' in request.resource.data)
+        : request.resource.data.get('charge', null) == resource.data.get('charge', null);
+    }
+
     function reminderTimeSane() {
       let d = request.resource.data;
       return !('nextReminderAt' in d)
@@ -141,7 +151,7 @@ service cloud.firestore {
         // client that wrote 500 docs with `nextReminderAt: 1` held the head of
         // that query and starved everyone else's reminders. A value may be
         // absent, null, unchanged, or no more than 5 minutes ago.
-        allow create, update: if owns(uid) && reminderTimeSane();
+        allow create, update: if owns(uid) && reminderTimeSane() && chargeUntouched();
       }
 
       // Ask-your-brain saved conversations

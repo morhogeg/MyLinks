@@ -210,6 +210,15 @@ def delete_user_data(uid: str) -> int:
     db = get_db()
     user_ref = db.collection('users').document(uid)
     deleted = 0
+    # Mark the workspace as being deleted BEFORE sweeping its cards: every
+    # card delete below fires cleanup_deleted_card, which would otherwise read
+    # the still-present user doc and run a per-card share/blob cleanup that
+    # this sweep already owns (card_cleanup skips while this flag is set).
+    # update(), not set(): a workspace doc that is already gone stays gone.
+    try:
+        user_ref.update({'deleting': True})
+    except Exception as e:
+        logger.info(f"Could not flag workspace as deleting (continuing): {e}")
     # Subcollections survive the parent user doc's deletion and must each be
     # swept explicitly: the M12 weekly recaps, the user's margin notes on
     # them, in-app digests, self-hosted analytics and crash reports.

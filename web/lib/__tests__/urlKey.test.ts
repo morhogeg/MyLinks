@@ -48,3 +48,21 @@ test('non-URLs have no key', () => {
         assert.equal(urlKey(bad), '');
     }
 });
+
+// Hash routes and IDN hosts: the same pairs functions/tests/test_url_key.py pins.
+const ROUTE_AND_IDN_CASES: [string, string][] = [
+    ['https://app.example.com/#/inbox/42', 'https://app.example.com#/inbox/42'],
+    ['https://app.example.com/#!/post/7/', 'https://app.example.com#!/post/7'],
+    ['https://example.com/a#/x?y=1', 'https://example.com/a#/x?y=1'],
+    ['https://example.com/a#/', 'https://example.com/a'],
+    ['https://example.com/a#!', 'https://example.com/a'],
+    ['https://example.com/a#top', 'https://example.com/a'],
+    ['https://example.com/#/a b', 'https://example.com#/a%20b'],
+    ['https://www.bücher.de/a', 'https://xn--bcher-kva.de/a'],
+    ['https://xn--bcher-kva.de/a', 'https://xn--bcher-kva.de/a'],
+];
+
+test('hash routes are kept and IDN hosts punycoded, like the Python normalizer', () => {
+    for (const [raw, key] of ROUTE_AND_IDN_CASES) assert.equal(urlKey(raw), key, raw);
+    assert.notEqual(urlKey('https://app.example.com/#/inbox/1'), urlKey('https://app.example.com/#/inbox/2'));
+});

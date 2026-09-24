@@ -12,12 +12,16 @@ keys. tests/test_url_key.py pins the cases; change both files together.
 
 Rules (in order):
 - scheme: http and https are the same page → always ``https``
-- host: lower-cased, default port dropped, a leading ``www.`` / ``m.`` /
+- host: IDN hosts punycoded (``bücher.de`` → ``xn--bcher-kva.de``, as the
+  browser's URL parser does), lower-cased, default port dropped, a leading
+  ``www.`` / ``m.`` /
   ``mobile.`` stripped, ``twitter.com`` → ``x.com``
 - YouTube: ``youtu.be/ID``, ``/shorts/ID``, ``/live/ID``, ``/embed/ID`` and
   ``watch?v=ID&…`` all become ``youtube.com/watch?v=ID`` (every other param
   — t, si, feature, list, pp — dropped)
-- fragment dropped
+- fragment dropped, EXCEPT a single-page-app route (``#/inbox/42``,
+  ``#!/post/7``): there the fragment IS the page, so it is kept (trailing
+  ``/`` trimmed; a bare ``#/`` or ``#!`` is dropped like any fragment)
 - trailing ``/`` dropped (the bare root becomes no path at all)
 - tracking params dropped (utm_*, fbclid, gclid, mc_*, igsh, ref, …; ``si`` on
   YouTube/Spotify; ``s``/``t`` on x.com); the rest are kept, sorted, so param
@@ -64,6 +68,33 @@ def _clean_host(host: str) -> str:
     return _HOST_ALIASES.get(host, host)
 
 
+def _idna(host: str) -> str:
+    """Punycode an internationalized host (the WHATWG URL parser in urlKey.ts
+    does this for free). Never raises: a host Python's IDNA 2003 codec
+    rejects is kept as it came."""
+    if not host or host.isascii():
+        return host
+    try:
+        return host.encode("idna").decode("ascii").lower()
+    except Exception:
+        return host
+
+
+# Characters left unescaped in a path or kept fragment (urlKey.ts quotePath).
+_SAFE = "/:@!$&'()*+,;=-._~%"
+
+
+def _route_fragment(fragment: str) -> str:
+    """The part of a fragment worth keeping: a hash route (``/…`` or ``!…``)
+    with its trailing slashes trimmed, re-quoted like the path; '' otherwise."""
+    if not fragment or fragment[0] not in "/!":
+        return ""
+    frag = fragment.rstrip("/")
+    if frag in ("", "!"):
+        return ""
+    return quote(frag, safe=_SAFE + "?#")
+
+
 def _valid_yt_id(value: str) -> Optional[str]:
     value = (value or "").strip()
     if 6 <= len(value) <= 20 and all(c.isalnum() or c in "-_" for c in value):
@@ -104,7 +135,7 @@ def url_key(url) -> str:
         parts = urlsplit(raw)
         if parts.scheme.lower() not in ("http", "https"):
             return ""
-        host = _clean_host(parts.hostname or "")
+        host = _clean_host(_idna(parts.hostname or ""))
         if not host:
             return ""
         port = parts.port
@@ -121,9 +152,11 @@ def url_key(url) -> str:
         return f"https://youtube.com/watch?v={yt}"
 
     # Re-quote so a percent-encoded and a raw path agree, and keep '/' as is.
-    path = quote(path, safe="/:@!$&'()*+,;=-._~%")
+    path = quote(path, safe=_SAFE)
     path = path.rstrip("/")
 
     kept = sorted((k, v) for k, v in params if not _is_tracking(k, host))
     query = urlencode(kept)
-    return f"https://{host}{path}" + (f"?{query}" if query else "")
+    frag = _route_fragment(parts.fragment)
+    return (f"https://{host}{path}" + (f"?{query}" if query else "")
+            + (f"#{frag}" if frag else ""))

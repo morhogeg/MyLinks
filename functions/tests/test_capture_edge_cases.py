@@ -395,7 +395,8 @@ def _drive_worker(monkeypatch, *, queue, card_exists=True, scraped=None, analysi
     """Run process_link_background on `queue`; return (card_ref, queue_ref, refunds, reminders)."""
     refunds, reminders = [], []
     card_ref = MagicMock()
-    card_ref.get.return_value = types.SimpleNamespace(exists=card_exists)
+    card_ref.get.return_value = types.SimpleNamespace(
+        exists=card_exists, to_dict=lambda: {"status": "processing"})
     user_doc = MagicMock()
     user_doc.collection.return_value.document.return_value = card_ref
     db = MagicMock()
@@ -415,6 +416,7 @@ def _drive_worker(monkeypatch, *, queue, card_exists=True, scraped=None, analysi
         "html": "", "title": "Scraped", "text": "body text " * 20}))
     snap = MagicMock()
     snap.to_dict.return_value = queue
+    snap.reference.get.return_value = types.SimpleNamespace(exists=True, to_dict=lambda: dict(queue))
     snap.id = "task-1"
     main.process_link_background.__wrapped__(types.SimpleNamespace(data=snap))
     return card_ref, snap.reference, refunds, reminders
@@ -423,7 +425,8 @@ def _drive_worker(monkeypatch, *, queue, card_exists=True, scraped=None, analysi
 def test_fetch_failure_writes_a_failed_card_with_the_reason_and_refunds(monkeypatch):
     card_ref, qref, refunds, _ = _drive_worker(
         monkeypatch,
-        queue={"uid": "u1", "url": "https://example.com/gone", "cardId": "c1", "body": ""},
+        queue={"uid": "u1", "url": "https://example.com/gone", "cardId": "c1", "body": "",
+               "charge": {"kind": "saves"}},
         scraped=scraper._fetch_failure("not_found"))
     written = card_ref.set.call_args[0][0]
     assert written["status"] == "failed"
@@ -436,7 +439,8 @@ def test_fetch_failure_writes_a_failed_card_with_the_reason_and_refunds(monkeypa
 def test_failed_import_refunds_the_import_unit(monkeypatch):
     _, _, refunds, _ = _drive_worker(
         monkeypatch,
-        queue={"uid": "u1", "url": "https://example.com/gone", "cardId": "c1", "source": "import"},
+        queue={"uid": "u1", "url": "https://example.com/gone", "cardId": "c1", "source": "import",
+               "charge": {"kind": "imports"}},
         scraped=scraper._fetch_failure("timeout"))
     assert refunds == ["imports"]
 
@@ -455,7 +459,7 @@ def test_success_never_resurrects_a_card_deleted_mid_processing(monkeypatch):
     _drive_worker(monkeypatch, queue={"uid": "u1", "url": "https://example.com/a", "cardId": "c1"})
     states = iter([True, False])
     card_ref = MagicMock()
-    card_ref.get.side_effect = lambda: types.SimpleNamespace(exists=next(states))
+    card_ref.get.side_effect = lambda **k: types.SimpleNamespace(exists=next(states), to_dict=dict)
     user_doc = MagicMock()
     user_doc.collection.return_value.document.return_value = card_ref
     db = MagicMock()
@@ -498,6 +502,7 @@ def _janitor(monkeypatch, cards):
             self.id, self._d = i, d
             self.reference = types.SimpleNamespace(
                 update=lambda f: updated.append(i),
+                get=lambda **k: types.SimpleNamespace(exists=True, to_dict=lambda: dict(d)),
                 parent=types.SimpleNamespace(parent=types.SimpleNamespace(id="u1")))
 
         def to_dict(self):
@@ -536,9 +541,20 @@ def test_janitor_leaves_a_queued_import_alone_and_fails_a_stuck_one(monkeypatch)
         "waiting": {"status": "processing", "queuedAt": now - 60 * 60 * 1000, "importedAt": now},
         "ancient": {"status": "processing", "queuedAt": now - 7 * 60 * 60 * 1000, "importedAt": now},
         "started": {"status": "processing", "queuedAt": now - 60 * 60 * 1000,
-                    "processingStartedAt": now - 20 * 60 * 1000, "importedAt": now},
-        "web": {"status": "processing", "processingStartedAt": now - 20 * 60 * 1000},
+                    "processingStartedAt": now - 20 * 60 * 1000, "importedAt": now,
+                    "charge": {"kind": "imports"}},
+        "web": {"status": "processing", "processingStartedAt": now - 20 * 60 * 1000,
+                "charge": {"kind": "saves"}},
         "fresh": {"status": "processing", "processingStartedAt": now - 60 * 1000},
+        # No charge token: an /api/analyze retry (refunds itself) and an
+        # offline placeholder that was never enqueued (never charged).
+        "analyze": {"status": "processing", "processingStartedAt": now - 20 * 60 * 1000,
+                    "importedAt": now},
+        "offline": {"status": "processing", "queuedAt": now - 7 * 60 * 60 * 1000,
+                    "pendingEnqueue": True},
     })
-    assert sorted(updated) == ["ancient", "started", "web"]
-    assert sorted(refunds) == ["imports", "imports", "saves"]
+    assert sorted(updated) == ["analyze", "ancient", "offline", "started", "web"]
+    # Refunded only where a token was on the card, as the kind charged. The
+    # never-started "ancient" import's token is still on its queue doc; the
+    # queue prune refunds it (test_capture_charge).
+    assert sorted(refunds) == ["imports", "saves"]
