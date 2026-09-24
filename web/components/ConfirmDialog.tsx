@@ -1,7 +1,7 @@
 'use client';
 
 import { X, AlertTriangle } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { hapticWarning, hapticMedium } from '@/lib/haptics';
 import { useScrollLock } from '@/lib/useScrollLock';
 
@@ -11,6 +11,8 @@ interface ConfirmDialogProps {
     onConfirm: () => void;
     title: string;
     message: string;
+    /** Optional content under the message (notes, secondary links). */
+    extra?: ReactNode;
     confirmLabel?: string;
     cancelLabel?: string;
     variant?: 'danger' | 'info';
@@ -26,6 +28,7 @@ export default function ConfirmDialog({
     onConfirm,
     title,
     message,
+    extra,
     confirmLabel = 'Confirm',
     cancelLabel = 'Cancel',
     variant = 'danger',
@@ -93,6 +96,7 @@ export default function ConfirmDialog({
                         <p className="mt-2 text-text-secondary text-sm leading-relaxed">
                             {message}
                         </p>
+                        {extra}
                     </div>
                     <button
                         onClick={onClose}

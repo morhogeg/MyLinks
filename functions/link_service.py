@@ -187,6 +187,9 @@ def create_workspace(auth_uid: str, email: Optional[str] = None) -> str:
             'settings': dict(DEFAULT_USER_SETTINGS),
             # First-run onboarding pending; the client flips this to True.
             'onboarded': False,
+            # The tombstone lookup above already ran (entitlement.py
+            # TRIAL_CLOCK_CHECKED): skip the fallback re-check.
+            'trialClockChecked': True,
         }
         if email:
             doc['email'] = email

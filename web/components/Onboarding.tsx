@@ -11,6 +11,8 @@ import ImportSheet from '@/components/ImportSheet';
 import { isNativeApp } from '@/lib/api';
 import { hapticLight } from '@/lib/haptics';
 import { useEntitlement } from '@/components/EntitlementProvider';
+import { useAuth } from '@/components/AuthProvider';
+import { linkedProviders } from '@/lib/auth';
 
 /**
  * First run, page two: "Bring what you've saved".
@@ -43,6 +45,14 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
     const [importing, setImporting] = useState(false);
     // One line, only for a reverse trial (never for founders or subscribers).
     const { isTrial, trialStarted, trialAnchorCards } = useEntitlement();
+    // This screen only ever shows for a library that was just created. The
+    // commonest way to land here by mistake: an existing user who signed up
+    // with Apple and today tapped Google (or the reverse) — Firebase then has
+    // two separate accounts, and this one is empty. Say so once, here, with
+    // the way back, before they start filling the wrong library.
+    const { authUid, signOut } = useAuth();
+    const current = authUid ? linkedProviders()[0] : undefined;
+    const otherName = current === 'apple' ? 'Google' : current === 'google' ? 'Apple' : 'Apple or Google';
 
     return (
         <>
@@ -67,8 +77,20 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
                                 <ArrowRight className="w-4 h-4 rtl:-scale-x-100" />
                             </Button>
                         )}
+                        {authUid && !showHow && (
+                            <p className="text-[12px] text-text-muted text-center leading-relaxed">
+                                This is a new, empty library. Used Machina before with {otherName}?{' '}
+                                <button
+                                    onClick={() => { void signOut(); }}
+                                    className="font-semibold text-accent hover:opacity-80 transition-opacity cursor-pointer"
+                                >
+                                    Sign out
+                                </button>{' '}
+                                and use the same method.
+                            </p>
+                        )}
                         {isTrial && (
-                            <p className={`${showHow ? 'mt-3' : ''} text-[12px] text-text-muted text-center leading-relaxed`}>
+                            <p className={`${showHow || authUid ? 'mt-3' : ''} text-[12px] text-text-muted text-center leading-relaxed`}>
                                 {trialStarted
                                     ? 'Pro is free for your first 14 days. Nothing to cancel.'
                                     : `Pro is free for your first 14 days. The clock starts once you’ve saved ${trialAnchorCards} things.`}
