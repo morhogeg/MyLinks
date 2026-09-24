@@ -798,6 +798,21 @@ def _parse_cited_marker(full_text: str) -> list:
     return [t.strip() for t in m.group(1).split(",") if t.strip()]
 
 
+_EMPTY_LIBRARY_ANSWER_EN = ("I couldn't find anything in your library about that yet. "
+                            "Try saving a few links on the topic, then ask me again.")
+_EMPTY_LIBRARY_ANSWER_HE = ("לא מצאתי עדיין שום דבר בספרייה שלך בנושא הזה. "
+                            "כדאי לשמור כמה קישורים בנושא ואז לשאול שוב.")
+
+
+def empty_library_answer(question: str, answer_language: str = None) -> str:
+    """The fixed reply when retrieval found no cards, in the user's language:
+    Hebrew when the question (or the conversation language) is Hebrew."""
+    lang = (answer_language or "").strip().lower()
+    if lang in ("hebrew", "he", "עברית") or any("\u0590" <= ch <= "\u05FF" for ch in (question or "")):
+        return _EMPTY_LIBRARY_ANSWER_HE
+    return _EMPTY_LIBRARY_ANSWER_EN
+
+
 class GeminiService:
     """
     Wrapper for Google Gemini AI.
@@ -1503,8 +1518,7 @@ Return JSON: {"platform": one of "x","instagram","threads","tiktok","youtube","l
 
         if not cards:
             return {
-                "answer": "I couldn't find anything in your library about that yet. "
-                          "Try saving a few links on the topic, then ask me again.",
+                "answer": empty_library_answer(question, answer_language),
                 "citedIds": [],
                 "ungrounded": False,
             }
@@ -1670,9 +1684,7 @@ Return JSON: {"platform": one of "x","instagram","threads","tiktok","youtube","l
             raise AnalysisError("Gemini API key is not configured (GEMINI_API_KEY).")
 
         if not cards:
-            yield ("token",
-                   "I couldn't find anything in your library about that yet. "
-                   "Try saving a few links on the topic, then ask me again.")
+            yield ("token", empty_library_answer(question, answer_language))
             yield ("citedIds", [])
             return
 

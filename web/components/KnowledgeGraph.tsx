@@ -263,7 +263,11 @@ export default function KnowledgeGraph({
         // when the library was already cached and the pool never changed.
         const keepId = selectedCardIdRef.current;
         setSelected(null);
-        buildGraphModel(links, signal).then((m) => {
+        const pins = [
+            ...(restoreRef.current?.citedIds ?? []),
+            restoreRef.current?.selectedId, keepId, pendingFocusIdRef.current,
+        ].filter((x): x is string => !!x);
+        buildGraphModel(links, signal, pins).then((m) => {
             if (signal.cancelled || !m) return;
             alphaRef.current = 1;
             autoFitRef.current = true;
@@ -991,6 +995,9 @@ export default function KnowledgeGraph({
                             )}
                             {model.isolatedCount > 0 && (
                                 <span className="text-text-muted"> · <span className="whitespace-nowrap">{model.isolatedCount} not yet connected</span></span>
+                            )}
+                            {model.omittedCount > 0 && (
+                                <span className="text-text-muted"> · <span className="whitespace-nowrap">showing {model.totalCards} of {model.totalCards + model.omittedCount}, filter to see the rest</span></span>
                             )}
                             {filtered && <span className="text-accent"> · filtered</span>}
                         </>

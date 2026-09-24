@@ -6,6 +6,7 @@ import { policyUrl, openExternal } from '@/lib/share';
 import { isNativeApp } from '@/lib/api';
 import ProfileAvatar from '../ProfileAvatar';
 import DataExport from './DataExport';
+import StopCardLinks from './StopCardLinks';
 import ImportSheet from '@/components/ImportSheet';
 import { useEntitlement } from '@/components/EntitlementProvider';
 import type { Settings, View } from './types';
@@ -178,6 +179,7 @@ export function MainView({
             <List>
                 <ExternalRow title="Privacy Policy" onClick={() => openExternal(policyUrl('/privacy'))} />
                 <ExternalRow title="Terms of Service" onClick={() => openExternal(policyUrl('/terms'))} />
+                <StopCardLinks />
             </List>
             <Footnote>
                 <b className="text-text-secondary font-semibold">Powered by Google Gemini.</b> Saved content and your questions are sent to Gemini for summaries and answers, on the paid tier, where Google&apos;s terms state your content is never used to train Google&apos;s models. Private cards are never sent. The Privacy Policy lists exactly what each feature sends.
@@ -196,7 +198,7 @@ export function MainView({
             <div className="pt-3.5">
                 <DataExport />
             </div>
-            <Footnote>Download everything you&apos;ve saved (cards and collections) as a full JSON backup plus a readable Markdown file. Your data is yours to take anywhere.</Footnote>
+            <Footnote>Everything you&apos;ve saved (cards with your notes, collections, and Ask chats) as a full JSON backup plus a readable Markdown file. Your data is yours to take anywhere.</Footnote>
 
             <SectionHeader>Advanced</SectionHeader>
             <List>

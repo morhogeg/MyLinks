@@ -1,7 +1,7 @@
 'use client';
 
-import { Link, StatusChangeHandler } from '@/lib/types';
-import { Archive, Star, Bell, Trash2, Circle, Check, X, ExternalLink, Layers, Share2, FolderMinus, Lock, ImageOff, Image as ImageIcon, Waypoints } from 'lucide-react';
+import { Link, StatusChangeHandler, CardShareMode } from '@/lib/types';
+import { Archive, Star, Bell, Trash2, Circle, Check, X, ExternalLink, Layers, Share2, FolderMinus, Lock, ImageOff, Image as ImageIcon, Waypoints, RefreshCw, Link2Off } from 'lucide-react';
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { IconButton } from './ui/Button';
@@ -9,6 +9,7 @@ import { useScrollLock } from '@/lib/useScrollLock';
 import { useSheetDrag, useIsMobile } from '@/lib/useSheetDrag';
 import { cardThumbnailUrl } from '@/lib/cardThumbnail';
 import { isHttpUrl } from '@/lib/url';
+import { isCardShareStale } from '@/lib/collections';
 
 interface CardActionSheetProps {
     link: Link;
@@ -19,7 +20,7 @@ interface CardActionSheetProps {
     onUpdateReminder: (link: Link) => void;
     onDelete: (id: string) => void;
     onAddToCollection?: (link: Link) => void;
-    onShare?: (link: Link) => void;
+    onShare?: (link: Link, mode?: CardShareMode) => void;
     /** Toggle the card's Private flag (parent owns PIN setup — lib/privacyLock). */
     onTogglePrivate?: (link: Link) => void;
     /** Toggle the card's thumbnail banner on/off. */
@@ -149,9 +150,24 @@ export default function CardActionSheet({
         }] : []),
         ...(onShare ? [{
             key: 'share',
-            label: 'Share',
+            // A card that already has a public page re-shares the SAME link.
+            label: link.shareId ? 'Share link' : 'Share',
             icon: <Share2 className="w-5 h-5" />,
             onClick: () => onShare(link),
+        }] : []),
+        // The public page is a snapshot: after an edit it can be refreshed in
+        // place (same URL), and it can always be taken down.
+        ...(onShare && isCardShareStale(link) ? [{
+            key: 'share-update',
+            label: 'Update public link',
+            icon: <RefreshCw className="w-5 h-5" />,
+            onClick: () => onShare(link, 'update'),
+        }] : []),
+        ...(onShare && link.shareId ? [{
+            key: 'share-stop',
+            label: 'Stop sharing',
+            icon: <Link2Off className="w-5 h-5" />,
+            onClick: () => onShare(link, 'stop'),
         }] : []),
         ...(onTogglePrivate ? [{
             key: 'private',

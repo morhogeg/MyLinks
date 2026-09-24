@@ -8,6 +8,8 @@ import { getColorStyleByKey } from '@/lib/colors';
 import {
     addLinkToCollection,
     removeLinkFromCollection,
+    addLinksToCollection,
+    removeLinksFromCollection,
     createCollection,
 } from '@/lib/collections';
 import { rankCollectionsForLink } from '@/lib/collectionSuggest';
@@ -21,6 +23,11 @@ import { hapticSelection } from '@/lib/haptics';
 interface AddToCollectionSheetProps {
     uid: string | null;
     link: Link;
+    /** Bulk mode (the selection toolbar): act on ALL these cards. A collection
+     *  reads as a member only when every card is in it; toggling adds the
+     *  missing ones, or removes all when every card is already in. `link` is
+     *  then only the ranking anchor for "Suggested". */
+    bulk?: Link[];
     collections: Collection[];
     /** The full feed — used to rank collections by topical affinity with the card. */
     links?: Link[];
@@ -50,6 +57,7 @@ interface AddToCollectionSheetProps {
 export default function AddToCollectionSheet({
     uid,
     link,
+    bulk,
     collections,
     links = [],
     privateCollectionIds,
@@ -94,7 +102,14 @@ export default function AddToCollectionSheet({
         }
     }, [isOpen]);
 
-    const memberIds = useMemo(() => new Set(link.collectionIds ?? []), [link.collectionIds]);
+    const memberIds = useMemo(() => {
+        if (!bulk || bulk.length === 0) return new Set(link.collectionIds ?? []);
+        const [first, ...rest] = bulk;
+        return new Set((first.collectionIds ?? []).filter((id) => rest.every((l) => (l.collectionIds ?? []).includes(id))));
+    }, [bulk, link.collectionIds]);
+    const bulkIds = useMemo(() => (bulk ?? []).map((l) => l.id), [bulk]);
+    const isBulk = bulkIds.length > 0;
+    const cardWord = isBulk ? `${bulkIds.length} card${bulkIds.length === 1 ? '' : 's'}` : 'this card';
 
     // Best-matching non-member collections for this card, shown first.
     const suggested = useMemo(
@@ -116,14 +131,18 @@ export default function AddToCollectionSheet({
         hapticSelection();
         try {
             if (memberIds.has(c.id)) {
-                await removeLinkFromCollection(uid, link.id, c.id);
+                if (isBulk) await removeLinksFromCollection(uid, bulkIds, c.id);
+                else await removeLinkFromCollection(uid, link.id, c.id);
+                if (isBulk) toast.success(`Removed ${cardWord} from ${c.name}`);
             } else {
-                await addLinkToCollection(uid, link.id, c.id);
+                if (isBulk) await addLinksToCollection(uid, bulkIds, c.id);
+                else await addLinkToCollection(uid, link.id, c.id);
                 // Joining a private collection makes the card private everywhere
                 // (library, search, suggestions), so say so at the moment it happens.
+                const added = isBulk ? `Added ${cardWord} to ${c.name}` : `Added to ${c.name}`;
                 toast.success(privateCollectionIds?.has(c.id)
-                    ? `Added to ${c.name}. This card is now private.`
-                    : `Added to ${c.name}`);
+                    ? `${added}. ${isBulk ? 'They are' : 'This card is'} now private.`
+                    : added);
             }
         } catch {
             toast.error("Couldn't update the collection. Please try again.");
@@ -146,8 +165,9 @@ export default function AddToCollectionSheet({
         setBusy(true);
         try {
             const id = await createCollection(uid, { name });
-            await addLinkToCollection(uid, link.id, id);
-            toast.success(`Created “${name}” and added this card`);
+            if (isBulk) await addLinksToCollection(uid, bulkIds, id);
+            else await addLinkToCollection(uid, link.id, id);
+            toast.success(`Created “${name}” and added ${cardWord}`);
             setNewName('');
             setCreating(false);
         } catch {
@@ -186,7 +206,7 @@ export default function AddToCollectionSheet({
                     {/* Header */}
                     <div className="flex items-center gap-3 px-5 pt-2 pb-3 border-b border-border-subtle">
                         <Layers className="w-4 h-4 text-accent shrink-0" />
-                        <p className="flex-1 text-sm font-semibold text-text truncate">Add to collection</p>
+                        <p className="flex-1 text-sm font-semibold text-text truncate">{isBulk ? `Add ${cardWord} to collection` : 'Add to collection'}</p>
                         <button
                             onClick={onClose}
                             aria-label="Close"

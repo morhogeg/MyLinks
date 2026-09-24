@@ -397,6 +397,22 @@ def run_reminder_check() -> dict:
         report["reminders_found"] += len(user_links)
         logger.info(f"Found {len(user_links)} reminders for user {mask_uid(uid)}")
 
+        # PRIVACY: a push lands on a locked phone, so a private card's title
+        # must never be its body (same rule as digest_service's candidate
+        # filter). Loaded once per user, and only when a push will be sent.
+        # Lazy import: `search` pulls in ai_service/genai (house pattern).
+        private_ids = set()
+        is_private_card = lambda _data: False  # noqa: E731
+        if wants_push:
+            try:
+                from search import is_effectively_private, private_collection_ids
+                private_ids = private_collection_ids(uid)
+                is_private_card = lambda data: is_effectively_private(data, private_ids)  # noqa: E731
+            except Exception as e:
+                # Fail CLOSED: without the privacy check every push goes generic.
+                logger.warning(f"Reminder privacy lookup failed for {mask_uid(uid)}: {e}")
+                is_private_card = lambda _data: True  # noqa: E731
+
         # Deliver at most REMINDER_PER_USER_LIMIT this tick; the rest stay pending
         # and fire on subsequent ticks (a big backlog can't flood one user with
         # pushes/writes at once). No starvation: delivered docs advance their
@@ -426,8 +442,14 @@ def run_reminder_check() -> dict:
 
                 pushed = False
                 if wants_push:
-                    push_title = "זמן לחזור אל" if is_he else "Time to revisit"
-                    push_body = title if not category else f"{title} · {category}"
+                    if is_private_card(link_data):
+                        # Generic copy; linkId stays so the tap still opens
+                        # the card (behind the privacy lock).
+                        push_title = "Time to revisit"
+                        push_body = "A private card is waiting for you."
+                    else:
+                        push_title = "זמן לחזור אל" if is_he else "Time to revisit"
+                        push_body = title if not category else f"{title} · {category}"
                     push_result = send_push(uid, push_title, push_body, {"linkId": link_id})
                     pushed = bool(push_result.get("sent"))
 

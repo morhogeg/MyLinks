@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { TagNode, buildTagTree } from '@/lib/tags';
-import { ChevronRight, ChevronDown, Tag, Hash, X, Search, ChevronLeft } from 'lucide-react';
+import { TagNode, buildTagTree, tagKey } from '@/lib/tags';
+import { ChevronRight, ChevronDown, Tag, Hash, X, Search, ChevronLeft, MoreHorizontal } from 'lucide-react';
 
 interface TagExplorerProps {
     tags: string[];
@@ -25,6 +25,11 @@ interface TagExplorerProps {
      * top and 0-count ones sink out of the way.
      */
     rankByCount?: boolean;
+    /** Library-wide tag management. When given, each tag row gets a ⋯ button
+     *  that opens Rename (renaming onto an existing tag merges the two) and
+     *  Delete. Both resolve once every card is rewritten. */
+    onRenameTag?: (from: string, to: string) => Promise<void>;
+    onDeleteTag?: (tag: string) => Promise<void>;
 }
 
 export default function TagExplorer({
@@ -36,10 +41,37 @@ export default function TagExplorer({
     onCollapse,
     className = "",
     variant = 'sidebar',
-    rankByCount = false
+    rankByCount = false,
+    onRenameTag,
+    onDeleteTag,
 }: TagExplorerProps) {
     const [searchQuery, setSearchQuery] = useState('');
     const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
+    // The tag whose manage row is open, its draft name, and a pending delete
+    // confirmation (a second tap), plus the in-flight guard.
+    const [editing, setEditing] = useState<string | null>(null);
+    const [draft, setDraft] = useState('');
+    const [confirmDelete, setConfirmDelete] = useState(false);
+    const [working, setWorking] = useState(false);
+    const canManage = !!(onRenameTag || onDeleteTag);
+
+    const openManage = (fullName: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setEditing(editing === fullName ? null : fullName);
+        setDraft(fullName);
+        setConfirmDelete(false);
+    };
+    const closeManage = () => { setEditing(null); setConfirmDelete(false); };
+    const runManage = async (fn: () => Promise<void>) => {
+        if (working) return;
+        setWorking(true);
+        try {
+            await fn();
+            closeManage();
+        } finally {
+            setWorking(false);
+        }
+    };
 
     const tagTree = useMemo(() => {
         // Only include tags that match the search query (and their parents)
@@ -73,6 +105,65 @@ export default function TagExplorer({
             newExpanded.add(fullName);
         }
         setExpandedNodes(newExpanded);
+    };
+
+    // Inline manage panel under a tag row: rename (→ merge when the new name
+    // is an existing tag) or delete from every card.
+    const renderManage = (node: TagNode) => {
+        const next = draft.trim();
+        const target = next ? tags.find((t) => tagKey(t) === tagKey(next) && tagKey(t) !== tagKey(node.fullName)) : undefined;
+        const unchanged = next === node.fullName;
+        const cards = `${node.count} card${node.count === 1 ? '' : 's'}`;
+        return (
+            <div className="mx-1 mt-1 mb-1.5 p-2.5 rounded-xl bg-fill-subtle border border-border-subtle flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
+                {onRenameTag && (
+                    <>
+                        <input
+                            type="text"
+                            value={draft}
+                            autoFocus
+                            dir="auto"
+                            onChange={(e) => { setDraft(e.target.value); setConfirmDelete(false); }}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Escape') closeManage();
+                                if (e.key === 'Enter' && next && !unchanged) void runManage(() => onRenameTag(node.fullName, target ?? next));
+                            }}
+                            aria-label="New tag name"
+                            className="w-full bg-card border border-border-subtle rounded-lg px-2.5 py-1.5 text-[13px] text-text focus:outline-none focus:ring-1 focus:ring-accent/30"
+                        />
+                        {target && (
+                            <p className="text-[11px] text-text-muted leading-snug">Merges into the existing tag “{target}”.</p>
+                        )}
+                    </>
+                )}
+                <div className="flex items-center gap-1.5">
+                    {onRenameTag && (
+                        <button
+                            disabled={working || !next || unchanged}
+                            onClick={() => void runManage(() => onRenameTag(node.fullName, target ?? next))}
+                            className="px-2.5 py-1 rounded-lg bg-accent text-accent-ink text-[12px] font-semibold disabled:opacity-40"
+                        >
+                            {target ? 'Merge' : 'Rename'}
+                        </button>
+                    )}
+                    {onDeleteTag && (
+                        <button
+                            disabled={working}
+                            onClick={() => confirmDelete ? void runManage(() => onDeleteTag(node.fullName)) : setConfirmDelete(true)}
+                            className="px-2.5 py-1 rounded-lg text-[12px] font-semibold text-red-500 hover:bg-red-500/10 disabled:opacity-40"
+                        >
+                            {confirmDelete ? `Remove from ${cards}?` : 'Delete'}
+                        </button>
+                    )}
+                    <button
+                        onClick={closeManage}
+                        className="ms-auto px-2 py-1 rounded-lg text-[12px] text-text-muted hover:text-text"
+                    >
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        );
     };
 
     const renderNode = (node: TagNode) => {
@@ -111,7 +202,19 @@ export default function TagExplorer({
                         }`}>
                         {node.count}
                     </span>
+                    {canManage && (
+                        <button
+                            onClick={(e) => openManage(node.fullName, e)}
+                            aria-label={`Manage tag ${node.fullName}`}
+                            title="Rename, merge or delete"
+                            className={`shrink-0 p-1 -me-1 rounded-md text-text-muted hover:text-text hover:bg-fill-strong transition-opacity ${variant === 'embedded' || editing === node.fullName ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'}`}
+                        >
+                            <MoreHorizontal className="w-3.5 h-3.5" />
+                        </button>
+                    )}
                 </div>
+
+                {editing === node.fullName && renderManage(node)}
 
                 {hasChildren && isExpanded && (
                     <div className="ms-3.5 ps-2.5 border-s border-border-subtle/70 mt-0.5 flex flex-col gap-0.5">

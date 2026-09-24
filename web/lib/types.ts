@@ -263,7 +263,19 @@ export interface Link {
   // stamped by every writer; where present it feeds collectionSignature so an
   // edited member marks a published collection stale (lib/collections.ts).
   updatedAt?: number;
+  // Public card page (/s?id=…) this card is published as. Written by the
+  // publish endpoint in the same batch as the snapshot, cleared by Stop
+  // sharing; the card-delete trigger uses it to take the page down. Re-sharing
+  // reuses it, so a card has one stable public URL.
+  shareId?: string | null;
+  // When that page was last (re)published — compared with `updatedAt` to offer
+  // "Update public link" after an edit.
+  sharePublishedAt?: number | null;
 }
+
+/** What a card share action does: open the share sheet (publishing or
+ *  republishing), republish in place, or take the public page down. */
+export type CardShareMode = 'share' | 'update' | 'stop';
 
 /**
  * A user-curated group of cards (e.g. "Russian literature", "Tesla").
@@ -302,6 +314,8 @@ export interface SharedCard {
   thumbnailUrl?: string;
   sourceName?: string;
   sourceType?: string;
+  // The owner hid this card's image ("Hide image"): the public page shows none.
+  hideThumbnail?: boolean;
 }
 
 /** A published collection snapshot — top-level, world-readable. shared_collections/{shareId}. */

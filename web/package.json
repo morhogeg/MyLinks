@@ -9,12 +9,14 @@
     "start": "next start",
     "lint": "eslint",
     "test:parsers": "node --test --experimental-strip-types lib/__tests__/importParsers.test.ts",
-    "test:takeaway": "node --test --experimental-strip-types lib/__tests__/takeaway.test.ts"
+    "test:takeaway": "node --test --experimental-strip-types lib/__tests__/takeaway.test.ts",
+    "test:tags": "node --test --experimental-strip-types lib/__tests__/tags.test.ts"
   },
   "dependencies": {
     "@capacitor-firebase/authentication": "^8.3.0",
     "@capacitor-firebase/messaging": "^8.3.0",
     "@capacitor/core": "^8.4.1",
+    "@capacitor/filesystem": "^8.1.3",
     "@capacitor/haptics": "^8.0.2",
     "@capacitor/ios": "^8.4.1",
     "@capacitor/share": "^8.0.1",

@@ -86,6 +86,7 @@ from entitlement import (
 # these helpers. share_service imports only db + stdlib (never main → no cycle).
 from share_service import (
     _publish_share_logic, _unpublish_share_logic, _delete_collection_logic,
+    _unpublish_all_card_shares_logic,
     _render_shared_card, _render_shared_collection, _render_shared_answer,
     _share_not_found_html, _valid_share_id,
 )
@@ -2429,6 +2430,13 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
                 "Machina couldn't search your library right now. Please try again in a minute.",
                 503, headers)
 
+        # 1k. Nothing retrieved (empty/off-topic library): the reply is the
+        #     fixed "nothing saved on that yet" line with no model call, so it
+        #     must not cost the user an ask either.
+        if not cards and charged:
+            refund_quota(*charged)
+            charged = None
+
         # 2. Slim the cards to what the model needs (bounded tokens/cost).
         #    Every card carries its headline fields; the FIRST few additionally
         #    carry their stored deep content — detailedSummary, structured
@@ -4418,7 +4426,7 @@ def publish_share_http(req: https_fn.Request) -> https_fn.Response:
     try:
         result = _publish_share_logic(
             uid, data.get("type"), data.get("shareId"), data.get("payload"),
-            collection=data.get("collection"),
+            collection=data.get("collection"), card=data.get("card"),
         )
         return https_fn.Response(json.dumps(result), status=200, headers=headers, mimetype='application/json')
     except PermissionError as e:
@@ -4455,8 +4463,16 @@ def unpublish_share_http(req: https_fn.Request) -> https_fn.Response:
     if auth_err:
         return auth_err
     try:
+        if data.get("all") is True:
+            # Settings → Privacy "Stop all public card links": every card share
+            # this account owns (shared_owners by owner + type 'card').
+            if data.get("type") != "card":
+                raise ValueError("all applies to card shares only")
+            result = _unpublish_all_card_shares_logic(uid)
+            return https_fn.Response(json.dumps(result), status=200, headers=headers, mimetype='application/json')
         result = _unpublish_share_logic(
             uid, data.get("type"), data.get("shareId"), collection_id=data.get("collectionId"),
+            card_id=data.get("cardId"),
         )
         return https_fn.Response(json.dumps(result), status=200, headers=headers, mimetype='application/json')
     except PermissionError as e:
@@ -4501,6 +4517,25 @@ def delete_collection_http(req: https_fn.Request) -> https_fn.Response:
         return _error_response(str(e), 400, headers)
     except Exception as e:
         return _server_error(headers, e, "Delete failed")
+
+
+@firestore_fn.on_document_deleted(document="users/{uid}/links/{linkId}")
+def cleanup_deleted_card(event: firestore_fn.Event[firestore_fn.DocumentSnapshot]) -> None:
+    """A card was deleted (client deleteDoc, single or bulk): take down its
+    public /s page and delete the screenshots / post thumbnail it stored under
+    the user's own Storage prefix (card_cleanup.py). Idempotent; never raises,
+    so a failed cleanup is logged instead of retried forever."""
+    try:
+        from card_cleanup import cleanup_deleted_card_logic
+        snap = event.data
+        data = snap.to_dict() if snap is not None else None
+        report = cleanup_deleted_card_logic(
+            event.params.get("uid"), event.params.get("linkId"), data,
+        )
+        if report.get("unpublished") or report.get("deleted_blobs"):
+            logger.info(f"Card cleanup: {report}")
+    except Exception as e:
+        logger.error(f"cleanup_deleted_card failed: {e}")
 
 
 @https_fn.on_request()

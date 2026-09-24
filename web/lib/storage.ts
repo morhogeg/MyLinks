@@ -1,4 +1,4 @@
-import { collection, addDoc, updateDoc, deleteDoc, deleteField, doc, query, where, limit, orderBy, getDocs, getDoc, serverTimestamp, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, deleteField, doc, query, where, limit, orderBy, getDocs, getDoc, serverTimestamp, QueryDocumentSnapshot, DocumentData, arrayUnion, arrayRemove, writeBatch, runTransaction } from 'firebase/firestore';
 import { db, appCheckHeaders } from './firebase';
 import { authHeaders } from './auth';
 import { apiUrl, fetchWithTimeout } from './api';
@@ -6,6 +6,7 @@ import { offerUpgradeFor } from './entitlement';
 
 import { AnalyzeResponse, Link, LinkMetadata, LinkStatus, User, UserNote } from './types';
 import { canonicalCategory } from './category';
+import { getNotes } from './notes';
 
 /**
  * Normalize a Firestore link doc into a safe `Link`.
@@ -626,11 +627,27 @@ export async function markTakeawayDone(uid: string, id: string, done: boolean): 
 }
 
 /**
- * Update a link's tags in Firestore
+ * Update a link's tags in Firestore.
+ *
+ * With `previous` (the list the editor started from) only the DIFFERENCE is
+ * written — arrayRemove for what was taken off, arrayUnion for what was added,
+ * in one batch — so two devices tagging the same card at once both keep their
+ * change instead of the later write replacing the whole array. Works offline
+ * (no transaction). Without `previous` the list is written as given.
  */
-export async function updateLinkTags(uid: string, id: string, tags: string[]): Promise<void> {
+export async function updateLinkTags(uid: string, id: string, tags: string[], previous?: string[]): Promise<void> {
     const linkRef = doc(db, 'users', uid, 'links', id);
-    await updateDoc(linkRef, { tags });
+    if (!previous) {
+        await updateDoc(linkRef, { tags });
+        return;
+    }
+    const removed = previous.filter((t) => !tags.includes(t));
+    const added = tags.filter((t) => !previous.includes(t));
+    if (removed.length === 0 && added.length === 0) return;
+    const batch = writeBatch(db);
+    if (removed.length) batch.update(linkRef, { tags: arrayRemove(...removed) });
+    if (added.length) batch.update(linkRef, { tags: arrayUnion(...added) });
+    await batch.commit();
 }
 
 /**
@@ -686,11 +703,11 @@ export async function updateLinkSummary(uid: string, id: string, summary: string
  * `sync_link_embedding` trigger only re-embeds when that flag (or a repair
  * condition) is set, so without it a note edit would never refresh the vector.
  */
-export async function updateLinkNotes(uid: string, id: string, notes: UserNote[]): Promise<void> {
+export async function updateLinkNotes(uid: string, id: string, notes: UserNote[], previous?: UserNote[]): Promise<void> {
     const linkRef = doc(db, 'users', uid, 'links', id);
     // Drop empties and strip undefined fields — Firestore rejects `undefined`,
     // so `updatedAt` is only included when present.
-    const clean = notes
+    const cleanList = (list: UserNote[]) => list
         .filter(n => n.text && n.text.trim())
         .map(n => ({
             id: n.id,
@@ -698,9 +715,38 @@ export async function updateLinkNotes(uid: string, id: string, notes: UserNote[]
             createdAt: n.createdAt,
             ...(n.updatedAt ? { updatedAt: n.updatedAt } : {}),
         }));
-    await updateDoc(linkRef, clean.length
+    const payload = (clean: ReturnType<typeof cleanList>) => clean.length
         ? { userNotes: clean, userNote: deleteField(), userNoteUpdatedAt: deleteField(), needsEmbedding: true }
-        : { userNotes: deleteField(), userNote: deleteField(), userNoteUpdatedAt: deleteField(), needsEmbedding: true });
+        : { userNotes: deleteField(), userNote: deleteField(), userNoteUpdatedAt: deleteField(), needsEmbedding: true };
+
+    if (previous) {
+        // Concurrent-safe path: apply only what THIS editor changed (by note
+        // id — removed, edited, added) onto the notes as they are on the
+        // server right now, inside a transaction. A note another device added
+        // meanwhile survives instead of being overwritten by a stale list.
+        const desired = new Map(notes.map(n => [n.id, n]));
+        const before = new Map(previous.map(n => [n.id, n]));
+        const removedIds = new Set(previous.filter(n => !desired.has(n.id)).map(n => n.id));
+        const added = notes.filter(n => !before.has(n.id));
+        try {
+            await runTransaction(db, async (tx) => {
+                const snap = await tx.get(linkRef);
+                if (!snap.exists()) return;
+                const server = getNotes({ ...(snap.data() as Link), id });
+                const merged = server
+                    .filter(n => !removedIds.has(n.id))
+                    .map(n => (before.has(n.id) && desired.has(n.id)) ? desired.get(n.id)! : n);
+                const have = new Set(merged.map(n => n.id));
+                for (const n of added) if (!have.has(n.id)) merged.push(n);
+                tx.update(linkRef, payload(cleanList(merged)));
+            });
+            return;
+        } catch {
+            // Offline (transactions need the server) or contention: fall back
+            // to the plain write below, which the offline cache can queue.
+        }
+    }
+    await updateDoc(linkRef, payload(cleanList(notes)));
 }
 
 /**
