@@ -650,8 +650,10 @@ a {
   -webkit-tap-highlight-color: rgba(140, 145, 160, 0.2);
 }
 
-/* Prevent zoom on input focus (iOS) */
-@media screen and (max-width: 768px) {
+/* Prevent zoom on input focus (iOS). Load-bearing since pinch-zoom was
+   re-enabled (no maximumScale in layout.tsx): Safari zooms into any focused
+   field under 16px. `pointer: coarse` covers iPads wider than 768px. */
+@media screen and (max-width: 768px), (pointer: coarse) {
 
   input,
   textarea,

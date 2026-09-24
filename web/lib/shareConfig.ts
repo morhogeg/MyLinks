@@ -2,6 +2,7 @@
 
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { apiUrl } from './api';
+import type { QuotaKind } from './entitlement';
 
 /**
  * Tiny native bridge implemented in ios/App/App/ShareConfigPlugin.swift.
@@ -14,6 +15,7 @@ interface ShareConfigPlugin {
     clear(): Promise<void>;
     clearWebsiteData(): Promise<void>;
     consumePendingShare(): Promise<{ pending: boolean; kind?: string; ageMs?: number; progress?: number; startedAt?: number }>;
+    consumePendingPaywall(): Promise<{ pending: boolean; kind?: string; ageMs?: number }>;
 }
 
 const ShareConfigNative = registerPlugin<ShareConfigPlugin>('ShareConfig');
@@ -67,6 +69,30 @@ export async function consumePendingShare(): Promise<PendingShare> {
     } catch {
         // Older builds without the native method, or no App Group — treat as none.
         return { pending: false, kind: 'link', ageMs: 0 };
+    }
+}
+
+/** Past this age a quota-wall hint is stale (the month may have rolled over,
+    or the user upgraded elsewhere) and is dropped silently. */
+const PAYWALL_HINT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Read (and clear) the "the share sheet hit the monthly quota" hint the iOS
+ * Share Extension leaves when the server answers a save with 429 +
+ * `upgrade: true`. The extension can't open the app, so the app opens the
+ * paywall for it on the next launch/foreground. Resolves the quota kind to
+ * open the paywall for, or null. Native iOS only; never throws (an older
+ * native build has no such method).
+ */
+export async function consumePendingPaywall(): Promise<QuotaKind | null> {
+    if (!isNativeIos()) return null;
+    try {
+        const res = await ShareConfigNative.consumePendingPaywall();
+        if (!res?.pending) return null;
+        if ((res.ageMs ?? 0) > PAYWALL_HINT_MAX_AGE_MS) return null;
+        return res.kind === 'asks' || res.kind === 'imports' ? res.kind : 'saves';
+    } catch {
+        return null;
     }
 }
 

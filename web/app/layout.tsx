@@ -49,8 +49,9 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  // No maximumScale / userScalable:false: blocking pinch-zoom fails WCAG 1.4.4
+  // for low-vision readers. The focus-zoom those were guarding against is
+  // handled by the 16px input/textarea/select rule in globals.css.
   themeColor: "#050505",
   viewportFit: "cover",
 };
@@ -61,6 +62,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthGate } from "@/lib/publicRoutes";
 import { ToastProvider } from "@/components/Toast";
 import OfflineBanner from "@/components/OfflineBanner";
+import NativeShell from "@/components/NativeShell";
 
 export default function RootLayout({
   children,
@@ -94,6 +96,9 @@ export default function RootLayout({
           {/* Global offline banner — mounted above the auth gate so it shows on
               every route (incl. the public legal pages) and both platforms. */}
           <OfflineBanner />
+          {/* Native-only: deep links + the forced-update screen. Above the
+              auth gate so an unsupported build is stopped even signed out. */}
+          <NativeShell />
           <AuthGate>
             <ToastProvider>
               {children}

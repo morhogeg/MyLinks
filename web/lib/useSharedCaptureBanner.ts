@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { AnalyzingState } from '@/components/AnalyzingBanner';
-import { consumePendingShare } from './shareConfig';
+import { consumePendingPaywall, consumePendingShare } from './shareConfig';
+import { requestPaywall } from './entitlement';
 import { progressFor, elapsedForProgress } from './shareProgress';
 import { beginShareCapture, finishShareCapture, isShareCaptureFinished } from './captureLifecycle';
 
@@ -103,6 +104,14 @@ export function useSharedCaptureBanner(
     useEffect(() => {
         let cancelled = false;
         const check = async () => {
+            // The other share-sheet hand-off: a save the free plan's monthly
+            // quota refused. The extension can't open the app, so it leaves a
+            // hint and the paywall opens here, on the next open/foreground.
+            // This hook only runs on the signed-in feed, inside
+            // EntitlementProvider, so the paywall listener is mounted.
+            void consumePendingPaywall().then((kind) => {
+                if (kind && !cancelled) requestPaywall(kind);
+            });
             const res = await consumePendingShare();
             if (cancelled || !res.pending) return;
             // The real card already covers this save — consume the flag but don't

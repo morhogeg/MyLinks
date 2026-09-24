@@ -166,6 +166,15 @@
         ]
       },
       {
+        "source": "/.well-known/apple-app-site-association",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ]
+      },
+      {
         "source": "**/*.@(js|css|png|jpg|jpeg|gif|ico|svg|webp|woff|woff2|ttf|eot)",
         "headers": [
           {

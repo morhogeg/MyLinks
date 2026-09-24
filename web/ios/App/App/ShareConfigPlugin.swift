@@ -21,7 +21,8 @@ public class ShareConfigPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "save", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "clear", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "clearWebsiteData", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "consumePendingShare", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "consumePendingShare", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "consumePendingPaywall", returnType: CAPPluginReturnPromise)
     ]
 
     /// Must match the App Group enabled on BOTH the app and the extension,
@@ -73,7 +74,9 @@ public class ShareConfigPlugin: CAPPlugin, CAPBridgedPlugin {
         defaults.removeObject(forKey: "shareEndpoint")
         // The "a capture is in flight" hint too, so the next account never
         // sees the departed one's Analyzing banner.
-        for key in ["pendingShareAt", "pendingShareKind", "pendingShareProgress", "pendingShareStartedAt"] {
+        // Same for a quota-wall paywall hint: it belongs to the departed account.
+        for key in ["pendingShareAt", "pendingShareKind", "pendingShareProgress", "pendingShareStartedAt",
+                    "pendingPaywallKind", "pendingPaywallAt"] {
             defaults.removeObject(forKey: key)
         }
         call.resolve()
@@ -132,5 +135,28 @@ public class ShareConfigPlugin: CAPPlugin, CAPBridgedPlugin {
             "progress": progress,
             "startedAt": startedAt,
         ])
+    }
+
+    /// Read (and clear) the "the share sheet hit the free plan's monthly quota"
+    /// hint ShareViewController.showQuotaResult leaves in the App Group. The
+    /// extension cannot open the app itself, so the app opens the paywall the
+    /// next time it comes to the foreground. Cleared on read so it fires once.
+    ///
+    /// Resolves `{ pending: Bool, kind: String, ageMs: Double }`.
+    @objc func consumePendingPaywall(_ call: CAPPluginCall) {
+        guard let defaults = UserDefaults(suiteName: ShareConfigPlugin.appGroup) else {
+            call.resolve(["pending": false])
+            return
+        }
+        let at = defaults.double(forKey: "pendingPaywallAt")
+        let kind = defaults.string(forKey: "pendingPaywallKind") ?? "saves"
+        defaults.removeObject(forKey: "pendingPaywallAt")
+        defaults.removeObject(forKey: "pendingPaywallKind")
+        guard at > 0 else {
+            call.resolve(["pending": false])
+            return
+        }
+        let ageMs = max(0, (Date().timeIntervalSince1970 - at) * 1000.0)
+        call.resolve(["pending": true, "kind": kind, "ageMs": ageMs])
     }
 }
