@@ -5,7 +5,7 @@ import {
 } from 'react';
 import { useAuth } from '@/components/AuthProvider';
 import {
-    Entitlement, PaywallReason, PAYWALL_EVENT, fetchEntitlement, daysUntil, isPaywallReason, requestPaywall,
+    Entitlement, PaywallReason, PAYWALL_EVENT, fetchEntitlement, daysUntil, isPaywallReason, requestPaywall, consumePendingPaywall,
 } from '@/lib/entitlement';
 import { configurePurchases, logOutPurchases } from '@/lib/purchases';
 import { track } from '@/lib/analytics';
@@ -136,6 +136,7 @@ export function EntitlementProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         const onRequest = (e: Event) => {
             const reason = (e as CustomEvent<PaywallReason>).detail || 'manual';
+            consumePendingPaywall(); // handled live; don't reopen after sign-in
             openPaywall(reason);
         };
         window.addEventListener(PAYWALL_EVENT, onRequest);
@@ -149,6 +150,10 @@ export function EntitlementProvider({ children }: { children: ReactNode }) {
     // renders a uid after sign-in, and the effect re-runs then.
     useEffect(() => {
         if (!uid || typeof window === 'undefined') return;
+        // A paywall request stashed before this provider mounted (the trial-
+        // ending push tapped from a cold start).
+        const pending = consumePendingPaywall();
+        if (pending) requestPaywall(pending);
         let url: URL;
         try { url = new URL(window.location.href); } catch { return; }
         const raw = url.searchParams.get('paywall');

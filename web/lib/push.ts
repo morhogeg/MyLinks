@@ -23,6 +23,7 @@
 import { apiUrl, fetchWithTimeout, isNativeApp } from './api';
 import { authHeaders } from './auth';
 import { appCheckHeaders } from './firebase';
+import { requestPaywallWhenReady } from './entitlement';
 
 /** Deep-link intent parsed from a tapped notification's data payload. */
 export interface PushIntent {
@@ -151,7 +152,14 @@ export async function initPushListeners(): Promise<void> {
 
         // Notification tapped (background/lock screen) → deep-link.
         await FirebaseMessaging.addListener('notificationActionPerformed', ({ notification }) => {
-            const intent = parseIntent(notification?.data);
+            const data = (notification?.data ?? {}) as Record<string, unknown>;
+            // Trial-ending push ({view: 'settings'}): the point of the tap is
+            // the upgrade, so open the paywall rather than landing on Home.
+            if (data.view === 'settings' || data.view === 'paywall') {
+                requestPaywallWhenReady('settings');
+                return;
+            }
+            const intent = parseIntent(data);
             if (intent) stashIntent(intent);
         });
     } catch (e) {
