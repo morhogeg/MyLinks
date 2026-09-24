@@ -238,7 +238,10 @@ The multi-user auth work described below **was** fully written but not live:
 > **SHIPPED 2026-09-24** as merge `18a304e`: TestFlight run #334 → **build
 > 1334** built + uploaded green (first compile of the Swift changes — it
 > compiled); deploy-rules #16, rules-tests #19, hosting #18, python-tests
-> #128 green; functions deploy #114 (unscoped "all") — see §9 for outcome.
+> #128 green. Functions: deploy #114 (unscoped) HUNG in "Deploy functions"
+> and was cancelled at the 30-min job timeout; re-run as #115 (commit
+> `205d1f9`, timeout raised to 90) deployed everything in 3.5 min and the
+> pipeline canary passed — **backend fully live**.
 >
 > ~38 realistic launch edge cases found by four read-only audits (capture,
 > account/billing, library/sharing, device/lifecycle) and fixed; see the
@@ -2395,7 +2398,8 @@ exact-match, capped.
   a11y:** real error mapping incl. quota → `?paywall=saves`; Settings
   toggles + icon buttons labelled; error screens offer Reload/Home.
   **SHIPPED** as merge `18a304e` (build 1334, deploy-rules #16, hosting
-  #18, functions deploy #114 unscoped).
+  #18; functions deploy #114 hung and was cancelled at the 30-min timeout —
+  #115 (`205d1f9`, timeout now 90) deployed all + canary green).
   **Known gaps:** `ß` IDN hosts can key differently TS vs Python; jobs in
   flight at deploy have no charge record (no refund on failure); nested
   button in DigestSettings curated row; pre-existing eslint errors in
