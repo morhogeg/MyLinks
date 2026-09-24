@@ -6,6 +6,8 @@
 // actually connected to Machina instead of looking saved and failing later.
 
 const DEFAULT_BASE_URL = "https://secondbrain-app-94da2.web.app";
+// Same as background.js: the web app's paywall for the monthly save wall.
+const UPGRADE_URL = "https://mymachina.app/?paywall=saves";
 
 const $ = (id) => document.getElementById(id);
 const tokenInput = $("token");
@@ -125,8 +127,19 @@ async function saveThisPage() {
   } else if (resp.status === 403) {
     setStatus("Invalid token.", "err");
     setConnection("err", "Invalid token, check it above.");
+  } else if (resp.action === "upgrade") {
+    // Free plan's monthly wall: the status line links to the upgrade sheet.
+    setStatus(resp.message || "Free plan limit reached. Upgrade in Machina.", "err");
+    const link = document.createElement("a");
+    link.href = UPGRADE_URL;
+    link.target = "_blank";
+    link.rel = "noopener";
+    link.textContent = " Upgrade";
+    statusEl.appendChild(link);
   } else {
-    setStatus("Couldn't save. Check your token and connection.", "err");
+    // background.js maps every failure to plain copy (rate limit, too large,
+    // server busy, offline); fall back only if it sent none.
+    setStatus(resp.message || "Couldn't save. Check your token and connection.", "err");
   }
 }
 

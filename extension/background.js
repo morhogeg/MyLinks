@@ -2,6 +2,10 @@
 // Service worker: all capture logic lives here. The popup only manages settings.
 
 const DEFAULT_BASE_URL = "https://secondbrain-app-94da2.web.app";
+// The Machina web app (Vercel). The backend URL above is only the API origin;
+// links that should land in the app (the upgrade sheet) go here.
+const WEB_URL = "https://mymachina.app";
+const UPGRADE_URL = `${WEB_URL}/?paywall=saves`;
 const CONTEXT_MENU_ID = "machina-save";
 const CONTEXT_SETTINGS_ID = "machina-settings";
 const BADGE_RESET_MS = 2000;
@@ -43,18 +47,95 @@ const badgeError = () => setBadge("✗", "#ef4444"); // ✗ red
 
 const NOTIF_ID = "machina-save";
 
-function notify(title, message) {
+// `action` is what a click on the toast does: "upgrade" opens the paywall in
+// the web app, "settings" opens the token popup, anything else does nothing.
+// It is kept in chrome.storage.session so a click still works after the
+// service worker has been suspended between the toast and the click.
+async function notify(title, message, action) {
   try {
-    chrome.notifications.create(NOTIF_ID, {
+    await chrome.storage.session.set({ notifAction: action || "" });
+  } catch (_) {
+    // storage.session is missing on very old Chromium; the click just no-ops.
+  }
+  try {
+    const opts = {
       type: "basic",
       iconUrl: chrome.runtime.getURL("icons/icon128.png"),
       title,
       message: message || "",
       priority: 0,
-    });
+    };
+    if (action === "upgrade") opts.buttons = [{ title: "Upgrade in Machina" }];
+    chrome.notifications.create(NOTIF_ID, opts);
   } catch (_) {
     // notifications can be unavailable in some contexts; the badge still fired.
   }
+}
+
+async function runNotifAction(id) {
+  if (id !== NOTIF_ID) return;
+  let action = "";
+  try {
+    ({ notifAction: action = "" } = await chrome.storage.session.get("notifAction"));
+  } catch (_) {
+    // no session storage: nothing remembered, nothing to do.
+  }
+  if (action === "upgrade") {
+    chrome.tabs.create({ url: UPGRADE_URL }).catch(() => {});
+  } else if (action === "settings") {
+    chrome.runtime.openOptionsPage().catch(() => {});
+  } else {
+    return;
+  }
+  chrome.notifications.clear(NOTIF_ID, () => {});
+}
+
+try {
+  chrome.notifications.onClicked.addListener(runNotifAction);
+  chrome.notifications.onButtonClicked.addListener((id) => runNotifAction(id));
+} catch (_) {
+  // Safari's wrapper may not expose notification events; the toast still shows.
+}
+
+// The server's own words, when it sent any, cleaned for a toast line. Strings
+// a user reads here never carry em dashes (house rule), so the server's are
+// softened to commas.
+function serverText(body) {
+  const t = body && typeof body.error === "string" ? body.error.trim() : "";
+  return t ? t.replace(EM_DASH_RE, ", ") : "";
+}
+const EM_DASH_RE = new RegExp("\\s*" + String.fromCharCode(0x2014) + "\\s*", "g");
+
+// Map a failed postShare result to { title, message, short?, action? }. Only a
+// real network failure (fetch threw, status 0) reads as a connection problem;
+// any HTTP status means the server was reached, so say what it said.
+function describeFailure(result) {
+  const { status, body } = result;
+  const fail = (message, action) => ({ title: "Couldn't save", message, action });
+  if (!status) return fail("Couldn't reach Machina. Check your connection.");
+  if (status === 403) return fail("Invalid token. Check it in settings.", "settings");
+  if (status === 401) return fail("No token sent. Check it in settings.", "settings");
+  if (status === 429) {
+    // Free-plan monthly wall: the body carries upgrade/kind/used/limit.
+    if (body && body.upgrade === true) {
+      const detail = serverText(body);
+      return {
+        title: "Free plan limit reached",
+        message: `${detail ? detail.replace(/[.!]?$/, ". ") : ""}Click to upgrade in Machina.`,
+        short: "Free plan limit reached. Upgrade in Machina.",
+        action: "upgrade",
+      };
+    }
+    // A Pro workspace's own monthly cap: a quota body without the upgrade offer.
+    if (body && body.kind) {
+      return { title: "Monthly limit reached", message: serverText(body) || "You've reached this month's save limit." };
+    }
+    return fail("Too many saves. Try again in a minute.");
+  }
+  if (status === 413) return fail("Too large to save.");
+  if (status === 400) return fail(serverText(body) || "That page can't be saved.");
+  if (status >= 500) return fail("Machina is busy. Try again shortly.");
+  return fail(serverText(body) || `Something went wrong (${status}). Try again.`);
 }
 
 // Trim a URL/title to something readable in a toast line.
@@ -114,26 +195,29 @@ async function saveAndReport({ url, note, label }) {
 
   if (result.error === "no-token") {
     await badgeError();
-    notify("Set your token first", "Click to open Machina settings and paste your ingest token.");
+    notify("Set your token first", "Click to open Machina settings and paste your ingest token.", "settings");
     chrome.runtime.openOptionsPage().catch(() => {});
     return result;
   }
   if (result.ok && result.body) {
+    // A server-sent `message` (e.g. a first-save hint) replaces the stock line.
+    // It is optional, so a server that sends none gets the usual copy.
+    const serverMsg = typeof result.body.message === "string" ? result.body.message.trim() : "";
     if (result.body.duplicate) {
       await badgeDuplicate();
-      notify("Already in Machina", name);
+      notify("Already in Machina", serverMsg || name);
     } else {
       await badgeSaved();
       const extra = note ? " (with your selection)" : "";
-      notify("Saved to Machina ✓", `${name}${extra}. Analyzing now, it'll appear in your app shortly.`);
+      notify("Saved to Machina ✓", serverMsg || `${name}${extra}. Analyzing now, it'll appear in your app shortly.`);
     }
   } else {
     await badgeError();
-    const reason =
-      result.status === 403 ? "Invalid token. Check it in settings." :
-      result.status === 401 ? "No token sent. Check it in settings." :
-      "Couldn't reach Machina. Check your connection.";
-    notify("Couldn't save", reason);
+    const failure = describeFailure(result);
+    notify(failure.title, failure.message, failure.action);
+    // The popup's one-line status reuses the same copy.
+    result.message = failure.short || failure.message;
+    result.action = failure.action || "";
   }
   return result;
 }
@@ -235,6 +319,7 @@ async function validateToken() {
   if (res.status === 401) return { ok: false, reason: "missing", message: "Server didn't see the token." };
   if (res.status === 403) return { ok: false, reason: "invalid", message: "Invalid token, double-check it." };
   if (res.status === 429) return { ok: false, reason: "rate-limited", message: "Too many requests. Try again in a minute." };
+  if (res.status >= 500) return { ok: false, reason: "server", message: "Machina is busy. Try again shortly." };
   return { ok: false, reason: "unexpected", message: `Unexpected response (${res.status}).` };
 }
 

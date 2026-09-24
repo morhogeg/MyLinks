@@ -22,7 +22,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
         <html lang="en">
             <body
                 className="bg-background text-text"
-                style={{ background: '#0a0a0f', color: '#ededed', margin: 0 }}
+                style={{ background: 'var(--background, #0a0a0f)', color: 'var(--text, #ededed)', margin: 0 }}
             >
                 <div className="min-h-screen flex items-center justify-center p-6">
                     <div className="w-full max-w-md rounded-2xl border border-border-subtle bg-card shadow-2xl p-8 text-center">
@@ -30,12 +30,32 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
                         <p className="mt-2 text-sm text-text-secondary leading-relaxed">
                             Machina hit an unexpected error and couldn&apos;t continue. Reloading usually fixes it.
                         </p>
+                        {/* A root-layout crash rarely clears on reset(), so the
+                            primary action is a real reload; "Go home" escapes a
+                            bad deep link. */}
                         <button
-                            onClick={() => (reset ? reset() : window.location.reload())}
+                            onClick={() => window.location.reload()}
                             className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-accent text-accent-ink font-medium hover:bg-accent/90 transition-colors cursor-pointer"
                         >
                             Reload
                         </button>
+                        <div className="mt-4 flex items-center justify-center gap-4 text-sm">
+                            <button
+                                onClick={() => reset()}
+                                className="text-text-secondary hover:text-text transition-colors cursor-pointer"
+                            >
+                                Try again
+                            </button>
+                            <span className="text-text-muted" aria-hidden="true">·</span>
+                            <button
+                                // A hard navigation on purpose: after a crash, start from clean state.
+                                // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+                                onClick={() => window.location.assign('/')}
+                                className="text-text-secondary hover:text-text transition-colors cursor-pointer"
+                            >
+                                Go home
+                            </button>
+                        </div>
                     </div>
                 </div>
             </body>

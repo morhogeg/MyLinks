@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Home } from 'lucide-react';
 
 /**
  * Route-level error boundary. Catches an uncaught render error in the page
  * subtree and shows a branded fallback instead of unmounting to Next's
- * unstyled default. `reset()` re-renders the segment; a full reload is the
- * fallback if the error persists.
+ * unstyled default. "Try again" calls `reset()` (re-renders the segment);
+ * if the error persists, "Reload" does a full page reload and "Go home" leaves
+ * the broken route (e.g. a bad `?linkId=` deep link) for the library root.
  */
 export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
     useEffect(() => {
@@ -30,8 +31,26 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
                     className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-accent text-accent-ink font-medium hover:bg-accent/90 transition-colors cursor-pointer"
                 >
                     <RefreshCw className="w-4 h-4" />
-                    Reload
+                    Try again
                 </button>
+                <div className="mt-4 flex items-center justify-center gap-4 text-sm">
+                    <button
+                        onClick={() => window.location.reload()}
+                        className="text-text-secondary hover:text-text transition-colors cursor-pointer"
+                    >
+                        Reload
+                    </button>
+                    <span className="text-text-muted" aria-hidden="true">·</span>
+                    <button
+                        // A hard navigation on purpose: after a crash, start from clean state.
+                        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+                        onClick={() => window.location.assign('/')}
+                        className="inline-flex items-center gap-1.5 text-text-secondary hover:text-text transition-colors cursor-pointer"
+                    >
+                        <Home className="w-3.5 h-3.5" />
+                        Go home
+                    </button>
+                </div>
             </div>
         </div>
     );

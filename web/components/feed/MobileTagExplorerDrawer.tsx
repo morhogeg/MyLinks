@@ -37,6 +37,7 @@ export default function MobileTagExplorerDrawer({
                     </h2>
                     <button
                         onClick={onClose}
+                        aria-label="Close"
                         className="p-2 hover:bg-fill-subtle rounded-full touch-manipulation"
                     >
                         <X className="w-5 h-5" />
