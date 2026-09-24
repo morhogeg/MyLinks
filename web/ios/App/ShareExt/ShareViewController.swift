@@ -1377,6 +1377,10 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
                 let body = (try? JSONSerialization.jsonObject(with: responseData)) as? [String: Any]
                 if (body?["duplicate"] as? Bool) == true {
                     showDuplicateResult()
+                } else if let total = body?["savedFirstOf"] as? Int, total > 1 {
+                    // Shared text held several links: only the first became a
+                    // card, the rest ride along in its note. Say so.
+                    showResult("Saved the first of \(total) links ✓", success: true)
                 } else {
                     showResult("Saved ✓ · Making your card", success: true)
                 }
