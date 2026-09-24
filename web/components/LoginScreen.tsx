@@ -42,10 +42,16 @@ export default function LoginScreen({
             // On the popup path the auth listener takes over from here. On the
             // redirect path the browser navigates away before this resolves.
         } catch (err) {
+            const name = (err as Error)?.name;
             setError(
-                (err as Error)?.name === 'PopupBlockedError'
+                name === 'PopupBlockedError'
                     ? 'Your browser blocked the sign-in window. Allow pop-ups for this site, then try again.'
-                    : 'Sign-in failed. Please try again.',
+                    // Same email, other provider: Firebase keeps one account
+                    // per email, so the only way into that library is the
+                    // button the user originally signed up with.
+                    : name === 'DifferentProviderError'
+                        ? (err as Error).message
+                        : 'Sign-in failed. Please try again.',
             );
             setBusy(null);
         }

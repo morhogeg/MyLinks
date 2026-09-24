@@ -3779,6 +3779,44 @@ def _provider_may_create_workspace(token_claims) -> bool:
     return isinstance(provider, str) and provider in _WORKSPACE_PROVIDERS
 
 
+def _session_revoked(claims) -> bool:
+    """True when the ID token's session was revoked, or its user disabled.
+
+    `verify_id_token` (and the callable framework) only checks the token's
+    signature and expiry, so a token minted before "sign out everywhere" /
+    admin revocation stays usable for up to an hour. This is the
+    `check_revoked=True` comparison done by hand (so it works for BOTH
+    transports: the callable hands us already-verified claims): the session's
+    `auth_time` must not predate the user's `tokens_valid_after_timestamp`.
+    Costs one Auth lookup, so it guards only the paths where a stale session
+    does lasting damage — deleting an account and minting/linking a workspace.
+    A user that no longer exists is NOT reported here; each caller already
+    handles that case its own way.
+    """
+    if not isinstance(claims, dict):
+        return True
+    uid = claims.get("uid") or claims.get("sub") or claims.get("user_id")
+    if not uid:
+        return True
+    try:
+        user = admin_auth.get_user(uid)
+    except admin_auth.UserNotFoundError:
+        return False
+    except Exception as e:
+        # Fail open on an Auth lookup outage: the token itself is verified,
+        # and refusing every sign-up during a blip is the worse failure.
+        logger.warning("Revocation check skipped: %s", e)
+        return False
+    if getattr(user, "disabled", False):
+        return True
+    valid_after_ms = getattr(user, "tokens_valid_after_timestamp", None) or 0
+    auth_time = claims.get("auth_time") or claims.get("iat") or 0
+    try:
+        return bool(valid_after_ms) and int(auth_time) * 1000 < int(valid_after_ms)
+    except (TypeError, ValueError):
+        return False
+
+
 @https_fn.on_call()
 def claim_workspace(req: https_fn.CallableRequest) -> dict:
     """Resolve (or set up) the data workspace for a signed-in account (callable).
@@ -3796,6 +3834,11 @@ def claim_workspace(req: https_fn.CallableRequest) -> dict:
         )
     auth_uid = req.auth.uid
     claims = getattr(req.auth, "token", None) or None
+    if _session_revoked({**(claims or {}), "uid": auth_uid}):
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="Session expired. Please sign in again.",
+        )
     email = claims.get("email") if claims else None
     return _claim_workspace_logic(auth_uid, email, claims)
 
@@ -3822,6 +3865,8 @@ def claim_workspace_http(req: https_fn.Request) -> https_fn.Response:
     decoded = _verify_bearer(req)
     if not decoded:
         return _error_response("User must be signed in", 401, headers)
+    if _session_revoked(decoded):
+        return _error_response("Session expired. Please sign in again.", 401, headers)
 
     try:
         auth_uid = decoded.get("uid")
@@ -3914,6 +3959,11 @@ def delete_account(req: https_fn.CallableRequest) -> dict:
             code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
             message="User must be signed in",
         )
+    if _session_revoked({**(req.auth.token or {}), "uid": req.auth.uid}):
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="Session expired. Please sign in again.",
+        )
     try:
         return _delete_account_logic(req.auth.uid, (req.auth.token or {}).get("email"))
     except _DeleteAccountError as e:
@@ -3940,6 +3990,8 @@ def delete_account_http(req: https_fn.Request) -> https_fn.Response:
     decoded = _verify_bearer(req)
     if not decoded:
         return _error_response("User must be signed in", 401, headers)
+    if _session_revoked(decoded):
+        return _error_response("Session expired. Please sign in again.", 401, headers)
 
     try:
         result = _delete_account_logic(decoded.get("uid"), decoded.get("email"))
@@ -3998,6 +4050,28 @@ def _device_token_request(req):
     return uid, token, None
 
 
+def _drop_token_from_other_workspaces(db, uid: str, token: str) -> int:
+    """ArrayRemove `token` from every users/ doc except `uid`. `fcmTokens` is
+    single-field auto-indexed (no fieldOverrides exemption), so the
+    array-contains query needs no composite index. Best-effort: a failure here
+    must not fail the registration. Returns how many docs were cleaned."""
+    removed = 0
+    try:
+        query = db.collection("users").where(
+            filter=FieldFilter("fcmTokens", "array_contains", token)
+        ).limit(20)
+        for other in query.stream():
+            if other.id == uid:
+                continue
+            other.reference.update({"fcmTokens": gc_firestore.ArrayRemove([token])})
+            removed += 1
+        if removed:
+            logger.info("Moved a device token off %d other workspace(s)", removed)
+    except Exception as e:
+        logger.warning("Device token dedupe skipped: %s", e)
+    return removed
+
+
 @https_fn.on_request()
 def register_device_token_http(req: https_fn.Request) -> https_fn.Response:
     """Register an FCM device token for the verified caller's workspace.
@@ -4016,8 +4090,15 @@ def register_device_token_http(req: https_fn.Request) -> https_fn.Response:
         return err
 
     try:
-        user_ref = get_db().collection("users").document(uid)
+        db = get_db()
+        user_ref = db.collection("users").document(uid)
         user_ref.set({"fcmTokens": gc_firestore.ArrayUnion([token])}, merge=True)
+        # One device, one account: a token is per app install, so when this
+        # phone signs into a different account the previous workspace must stop
+        # receiving its pushes (otherwise account A's digests land on the phone
+        # now signed in as B). Sign-out unregisters, but a delete-and-reinstall,
+        # a crash, or an offline sign-out never did.
+        _drop_token_from_other_workspaces(db, uid, token)
         # Trim the oldest entries if a workspace somehow accumulates too many.
         tokens = (user_ref.get().to_dict() or {}).get("fcmTokens") or []
         if len(tokens) > MAX_DEVICE_TOKENS:
@@ -4189,11 +4270,45 @@ def entitlement_sync_http(req: https_fn.Request) -> https_fn.Response:
 
 
 # RevenueCat event types that change whether the `pro` entitlement is active.
-# Anything else (TEST, TRANSFER, SUBSCRIBER_ALIAS, …) is acknowledged and ignored.
+# Anything else (TEST, SUBSCRIBER_ALIAS, …) is acknowledged and ignored.
+# TRANSFER: a restore on a device signed into a DIFFERENT account moved the
+# App Store purchase between app user ids — both sides must be re-synced (the
+# old one loses Pro, the new one gains it). Its body carries
+# `transferred_from` / `transferred_to` lists instead of `app_user_id`.
 _RC_EVENTS = frozenset((
     "INITIAL_PURCHASE", "RENEWAL", "PRODUCT_CHANGE", "CANCELLATION",
-    "EXPIRATION", "BILLING_ISSUE", "UNCANCELLATION",
+    "EXPIRATION", "BILLING_ISSUE", "UNCANCELLATION", "TRANSFER",
 ))
+
+
+def _rc_transfer(event: dict) -> https_fn.Response:
+    """Re-sync every known workspace on both sides of a TRANSFER event."""
+    ids = []
+    for key in ("transferred_from", "transferred_to"):
+        vals = event.get(key) or []
+        if isinstance(vals, str):
+            vals = [vals]
+        for v in vals if isinstance(vals, list) else []:
+            if isinstance(v, str) and v and not v.startswith("$RCAnonymousID") and v not in ids:
+                ids.append(v)
+    synced = []
+    for app_user_id in ids:
+        try:
+            uid = resolve_workspace_for_app_user(app_user_id, [])
+        except Exception as e:
+            logger.error("revenuecat_webhook: TRANSFER resolve failed: %s", e)
+            return _error_response("Lookup failed", 500)
+        if not uid:
+            continue
+        try:
+            doc = sync_from_revenuecat(uid, app_user_id)
+        except RevenueCatError as e:
+            logger.warning("revenuecat_webhook: TRANSFER sync failed for %s: %s", _mask_uid(uid), e)
+            return _error_response("Subscription service unavailable", 502)
+        synced.append(doc.get("plan"))
+        logger.info("revenuecat_webhook: TRANSFER re-synced %s (plan=%s)", _mask_uid(uid), doc.get("plan"))
+    return https_fn.Response(json.dumps({"ok": True, "synced": len(synced)}), status=200,
+                             mimetype='application/json')
 
 
 @https_fn.on_request(max_instances=2)
@@ -4228,6 +4343,12 @@ def revenuecat_webhook(req: https_fn.Request) -> https_fn.Response:
         logger.info("revenuecat_webhook: ignoring event type %s", etype or "?")
         return https_fn.Response(json.dumps({"ok": True, "ignored": etype}), status=200,
                                  mimetype='application/json')
+
+    if etype == "TRANSFER":
+        try:
+            return _rc_transfer(event)
+        except Exception as e:
+            return _server_error(None, e, "Webhook processing failed")
 
     app_user_id = event.get("app_user_id") or event.get("original_app_user_id")
     aliases = event.get("aliases") or []

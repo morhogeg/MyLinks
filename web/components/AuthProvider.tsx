@@ -5,10 +5,11 @@ import {
     collection, query, getDocs, limit, where, doc, getDoc, setDoc, updateDoc, arrayUnion,
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { db, functions } from '@/lib/firebase';
+import { db, functions, auth } from '@/lib/firebase';
 import { isNativeApp, REQUIRE_AUTH, apiUrl, fetchWithTimeout } from '@/lib/api';
 import {
     onAuthChange, completeRedirectSignIn, signIn, signOutUser, authHeaders,
+    PROFILE_UPDATED_EVENT,
 } from '@/lib/auth';
 import { syncShareConfigToNative } from '@/lib/shareConfig';
 import { readLocalAiConsent, writeLocalAiConsent } from '@/lib/aiConsent';
@@ -77,15 +78,34 @@ function attachUserDoc(docId: string, data: Record<string, unknown> | undefined)
     // (the callable is only a fallback for a token-less first launch).
     const docToken = typeof data?.ingestToken === 'string' ? data.ingestToken : undefined;
     syncShareConfigToNative(docId, docToken);
+    syncTimezone(docId, typeof data?.timezone === 'string' ? data.timezone : null);
+}
+
+/** Last timezone this tab knows is on the doc, so a resume only writes on a
+    real change. Module-scoped: one signed-in workspace per page. */
+let knownTimezone: string | null = null;
+
+/**
+ * Keep `users/{uid}.timezone` (what digests and reminders are scheduled in)
+ * pointing at where the PHONE is. The phone is the device that travels and
+ * receives the pushes; a desktop browser left open at home must not drag the
+ * schedule back to its zone. So native writes whenever the zone differs, and
+ * the web writes only to fill a doc that has no zone at all.
+ */
+function syncTimezone(docId: string, docTz: string | null) {
+    knownTimezone = docTz;
+    let tz: string | undefined;
     try {
-        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        if (tz && data?.timezone !== tz) {
-            updateDoc(doc(db, 'users', docId), { timezone: tz })
-                .catch((e) => reportError(e, 'auth-timezone-update'));
-        }
+        tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     } catch {
-        // Intl not available — skip.
+        return; // Intl not available — skip.
     }
+    if (!tz || tz === docTz) return;
+    if (!isNativeApp() && docTz) return;
+    const next = tz;
+    updateDoc(doc(db, 'users', docId), { timezone: next })
+        .then(() => { knownTimezone = next; })
+        .catch((e) => reportError(e, 'auth-timezone-update'));
 }
 
 /**
@@ -145,6 +165,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             flushBufferedReports();
         }
     }, [uid]);
+
+    // Native only: a trip across timezones happens with the app backgrounded,
+    // so the launch-time write alone would schedule digests in the departure
+    // zone until the next cold start. Re-check on every return to foreground.
+    useEffect(() => {
+        if (!uid || !native) return;
+        const onVisible = () => {
+            if (document.visibilityState === 'visible') syncTimezone(uid, knownTimezone);
+        };
+        document.addEventListener('visibilitychange', onVisible);
+        return () => document.removeEventListener('visibilitychange', onVisible);
+    }, [uid, native]);
+
+    // updateProfile (first Apple sign-in) and provider linking don't fire
+    // onAuthStateChanged, so re-read the profile when lib/auth says it changed.
+    useEffect(() => {
+        const onProfile = () => {
+            const u = auth.currentUser;
+            if (!u) return;
+            setDisplayName(u.displayName);
+            setEmail(u.email);
+            setPhotoURL(u.photoURL);
+        };
+        window.addEventListener(PROFILE_UPDATED_EVENT, onProfile);
+        return () => window.removeEventListener(PROFILE_UPDATED_EVENT, onProfile);
+    }, []);
 
     // Reconcile the two consent records once the data doc is known: a doc
     // timestamp wins (cache it locally); otherwise mirror a local acceptance

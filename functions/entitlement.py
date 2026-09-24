@@ -208,6 +208,52 @@ def _user_created_at(uid: str) -> Optional[int]:
     return _to_ms((snap.to_dict() or {}).get("createdAt"))
 
 
+# Marker on users/{uid}: the deleted-account tombstone lookup has been applied
+# to this workspace's createdAt. link_service.create_workspace stamps it at
+# birth (it applies the lookup itself); a workspace created by the client-side
+# fallback (AuthProvider.createWorkspaceClientSide, which cannot read the
+# functions-only tombstones) gets it here, once, before its first grant.
+TRIAL_CLOCK_CHECKED = "trialClockChecked"
+
+
+def _created_at_for_new_grant(uid: str) -> Optional[int]:
+    """`createdAt` to base a brand-new grant on. For a workspace that skipped
+    the server's creation path, first apply the deleted-account lookup
+    (link_service.inherited_created_at — the same rule create_workspace uses),
+    so deleting an account and signing up again through the client fallback
+    cannot restart the trial clock. Writes the corrected createdAt and the
+    marker back, so the lookup runs at most once per workspace."""
+    ref = get_db().collection("users").document(uid)
+    snap = ref.get()
+    if not snap.exists:
+        return None
+    data = snap.to_dict() or {}
+    created = _to_ms(data.get("createdAt"))
+    if data.get(TRIAL_CLOCK_CHECKED) or created is None:
+        return created
+    try:
+        # Same rule as link_service.inherited_created_at, read through this
+        # module's get_db so both stay on one client (and one test seam).
+        from link_service import email_tombstone_id, TOMBSTONE_COLLECTION  # lazy: avoids a cycle
+        inherited = created
+        tid = email_tombstone_id(data.get("email"))
+        if tid:
+            tomb = get_db().collection(TOMBSTONE_COLLECTION).document(tid).get()
+            first = (tomb.to_dict() or {}).get("firstCreatedAt") if tomb.exists else None
+            if isinstance(first, (int, float)) and 0 < first < created:
+                inherited = int(first)
+        update = {TRIAL_CLOCK_CHECKED: True}
+        if inherited < created:
+            update["createdAt"] = inherited
+            logger.info("Workspace %s inherits its trial clock from a deleted account",
+                        mask_uid(uid))
+            created = inherited
+        ref.set(update, merge=True)
+    except Exception as e:
+        logger.warning("Trial clock inheritance check failed for %s: %s", mask_uid(uid), e)
+    return created
+
+
 def get_entitlement(uid: str, user_created_at_ms: Optional[int] = None) -> dict:
     """The entitlement doc for `uid`, lazily creating the founder/trial grant.
 
@@ -223,7 +269,8 @@ def get_entitlement(uid: str, user_created_at_ms: Optional[int] = None) -> dict:
             data = snap.to_dict() or {}
             data.setdefault("plan", PLAN_FREE)
             return data
-        created = user_created_at_ms if user_created_at_ms is not None else _user_created_at(uid)
+        created = (user_created_at_ms if user_created_at_ms is not None
+                   else _created_at_for_new_grant(uid))
         # A brand-new trial has no anchor yet: the clock starts at the 10th card
         # (maybe_start_trial), not here.
         doc = dict(grant_for(created))

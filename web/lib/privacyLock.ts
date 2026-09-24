@@ -204,6 +204,12 @@ function recordAttempt(ok: boolean): void {
     emit({ lockedUntil: backoff.lockedUntil });
 }
 
+/** Forget wrong-PIN strikes once the user proved ownership another way
+    (Forgot PIN → fresh provider sign-in), so a new PIN isn't born locked. */
+export function clearPinBackoff(): void {
+    recordAttempt(true);
+}
+
 /** Pure helper for the modal's copy: the wait a given failure count earns. */
 export function backoffForAttempts(attempts: number): number {
     const over = attempts - FREE_ATTEMPTS;

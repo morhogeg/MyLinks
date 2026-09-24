@@ -284,7 +284,7 @@ export default function Paywall({
                                 <ProBadge /> Subscribe in the Machina app on iPhone
                             </div>
                             <p className="mt-1 text-[12.5px] text-text-muted leading-snug">
-                                Your plan applies everywhere you sign in, including here.
+                                Your plan applies everywhere you sign in with this same account, including here.
                             </p>
                         </div>
                     ) : (
