@@ -154,7 +154,13 @@ async function postShare({ url, note }) {
   }
 
   const payload = { url };
-  if (note) payload.note = note;
+  if (note) {
+    payload.note = note;
+    // The only note this extension sends is the page selection: a QUOTE, not
+    // an instruction. The server skips reminder parsing for it, so a quoted
+    // sentence containing "tomorrow" doesn't set a reminder on the card.
+    payload.noteKind = "quote";
+  }
 
   let res;
   try {

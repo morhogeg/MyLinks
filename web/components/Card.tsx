@@ -155,8 +155,17 @@ function Card({
         // affordance the `failed` branch renders, so a capture is never a
         // permanent "Saving…". Retry re-stamps processingStartedAt and re-runs.
         const STALE_PROCESSING_MS = 8 * 60 * 1000;
-        const startedMs =
-            typeof link.processingStartedAt === 'number'
+        // An imported card waiting for a worker carries only `queuedAt`: it is
+        // queued, not stuck, so it gets the backend's much longer queue window
+        // (main.py _QUEUED_TIMEOUT_MS) before it reads as failed.
+        const STALE_QUEUED_MS = 6 * 60 * 60 * 1000;
+        const queued =
+            link.status === 'processing' &&
+            typeof link.processingStartedAt !== 'number' &&
+            typeof link.queuedAt === 'number';
+        const startedMs = queued
+            ? (link.queuedAt as number)
+            : typeof link.processingStartedAt === 'number'
                 ? link.processingStartedAt
                 : typeof link.createdAt === 'number'
                     ? link.createdAt
@@ -165,7 +174,7 @@ function Card({
             link.status === 'processing' &&
             now > 0 &&
             startedMs > 0 &&
-            now - startedMs > STALE_PROCESSING_MS;
+            now - startedMs > (queued ? STALE_QUEUED_MS : STALE_PROCESSING_MS);
         const failed = link.status === 'failed' || staleProcessing;
         const host = (() => {
             try { return new URL(link.url).hostname.replace(/^www\./, ''); }
@@ -185,7 +194,7 @@ function Card({
                             <CitationMark state="working" size={20} />
                         )}
                         <span className={`text-[10px] uppercase font-black tracking-widest ${failed ? 'text-red-400' : 'text-accent'}`}>
-                            {failed ? 'Couldn’t analyze' : 'Saving…'}
+                            {failed ? 'Couldn’t analyze' : queued ? 'Queued' : 'Saving…'}
                         </span>
                     </div>
 

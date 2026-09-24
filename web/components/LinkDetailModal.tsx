@@ -141,7 +141,9 @@ function PartialCaptureNote({
     const failed = !reading && link.enrichStatus === 'failed';
     const line = isPdf
         ? (isRtl ? 'לא הצלחנו לקרוא את קובץ ה-PDF.' : 'Machina couldn’t read this PDF.')
-        : (isRtl ? 'לא הצלחנו לקרוא את הפוסט במלואו.' : 'Machina couldn’t read the full post.');
+        : link.captureReason === 'file'
+            ? (isRtl ? 'לא הצלחנו לקרוא את הקובץ.' : 'Machina couldn’t read this file.')
+            : (isRtl ? 'לא הצלחנו לקרוא את הפוסט במלואו.' : 'Machina couldn’t read the full post.');
     const hint = uid
         ? (isRtl ? 'הוסיפו צילום מסך שלו ונשלים את הכרטיס.' : 'Add a screenshot of it and Machina completes the card.')
         : (isRtl ? 'שתפו צילום מסך שלו כדי לקבל כרטיס מלא.' : 'Share a screenshot of it for the full card.');

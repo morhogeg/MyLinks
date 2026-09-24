@@ -1,4 +1,4 @@
-import { collection, addDoc, updateDoc, deleteDoc, deleteField, doc, query, where, limit, orderBy, getDocs, getDoc, serverTimestamp, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
+import { collection, addDoc, setDoc, updateDoc, deleteDoc, deleteField, doc, query, where, limit, orderBy, getDocs, getDoc, serverTimestamp, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import { db, appCheckHeaders } from './firebase';
 import { authHeaders } from './auth';
 import { apiUrl, fetchWithTimeout } from './api';
@@ -6,6 +6,7 @@ import { offerUpgradeFor } from './entitlement';
 
 import { AnalyzeResponse, Link, LinkMetadata, LinkStatus, User, UserNote } from './types';
 import { canonicalCategory } from './category';
+import { urlKey } from './urlKey';
 
 /**
  * Normalize a Firestore link doc into a safe `Link`.
@@ -96,15 +97,15 @@ export async function getUserCategories(uid: string): Promise<string[]> {
 }
 
 /**
- * Return the id of an existing saved link with this exact URL, or null.
+ * Return the id of an existing saved link for this URL, or null.
  *
- * Mirrors the iOS share path's dedup (functions/link_service.py
- * `link_exists_for_url`): an exact-equality match on the stored `url` field,
- * one indexed Firestore query, `limit(1)`. Firestore auto-indexes single
- * fields, so no composite index is required. The web analyze endpoint stores
- * `link.url` === the URL that was submitted, so a pre-analysis check on the
- * formatted URL agrees with what the share path writes — the two capture paths
- * dedup against the same value.
+ * Mirrors the backend dedup (functions/link_service.py `link_exists_for_url`):
+ * the canonical `urlKey` (lib/urlKey.ts ≡ functions/url_key.py, so http/https,
+ * www., tracking params and YouTube short forms are one page), then
+ * `finalUrlKey` (where a shortener/redirect landed), then — for cards saved
+ * before urlKey existed — the exact stored `url`. Single-field equality
+ * queries with `limit(1)`: Firestore auto-indexes single fields, so no
+ * composite index is required.
  *
  * Callers MUST treat a thrown error as "unknown" and fall through to saving —
  * a failed dedup probe (e.g. offline) must never block a capture.
@@ -112,9 +113,15 @@ export async function getUserCategories(uid: string): Promise<string[]> {
 export async function findLinkIdByUrl(uid: string, url: string): Promise<string | null> {
     if (!url) return null;
     const linksRef = collection(db, 'users', uid, 'links');
-    const q = query(linksRef, where('url', '==', url), limit(1));
-    const snapshot = await getDocs(q);
-    return snapshot.empty ? null : snapshot.docs[0].id;
+    const key = urlKey(url);
+    const probes: [string, string][] = key
+        ? [['urlKey', key], ['finalUrlKey', key], ['url', url]]
+        : [['url', url]];
+    for (const [field, value] of probes) {
+        const snapshot = await getDocs(query(linksRef, where(field, '==', value), limit(1)));
+        if (!snapshot.empty) return snapshot.docs[0].id;
+    }
+    return null;
 }
 
 /** Friendly placeholder title for an in-flight capture — the URL's host, or a
@@ -142,13 +149,28 @@ function placeholderTitle(url: string): string {
  * lose the capture. Returns the new card id.
  */
 export async function createProcessingPlaceholder(uid: string, url: string): Promise<string> {
-    const linksRef = collection(db, 'users', uid, 'links');
+    const { id, written } = startProcessingPlaceholder(uid, url);
+    await written;
+    return id;
+}
+
+/**
+ * The same placeholder, without waiting for the server. The id is minted
+ * client-side, so the caller has it at once; `written` resolves when the
+ * server acknowledges the write. OFFLINE that ack only comes on reconnect
+ * (Firestore queues the write and the card shows in the feed from its local
+ * cache right away), so the offline save path must not await it.
+ */
+export function startProcessingPlaceholder(uid: string, url: string): { id: string; written: Promise<void> } {
+    const ref = doc(collection(db, 'users', uid, 'links'));
     // A client ms clock (mirrors the trigger's int-ms writes) so feed ordering
     // and useProcessingBanner's ramp work the instant the card streams in — unlike
     // serverTimestamp(), which reads as 0 until the server resolves it.
     const now = Date.now();
-    const ref = await addDoc(linksRef, {
+    const key = urlKey(url);
+    const written = setDoc(ref, {
         url,
+        ...(key ? { urlKey: key } : {}),
         title: placeholderTitle(url),
         summary: '',
         tags: [],
@@ -161,7 +183,7 @@ export async function createProcessingPlaceholder(uid: string, url: string): Pro
         processingStartedAt: now,
         metadata: { originalTitle: '', estimatedReadTime: 0 },
     });
-    return ref.id;
+    return { id: ref.id, written };
 }
 
 /**
@@ -466,17 +488,20 @@ export async function retryFailedLink(uid: string, link: Link): Promise<void> {
     // original createdAt) if this attempt dies before completing.
     await updateDoc(linkRef, { status: 'processing', error: null, processingStartedAt: Date.now() });
 
-    // MULTI-IMAGE card: its images are already in Storage, so retry re-enqueues
-    // the ordered set through /api/share (imageUrls path) into the same
-    // background pipeline, targeting this same card via cardId. The synchronous
-    // /api/analyze below only knows single URLs — it would silently analyze the
-    // first image as a web page and drop the rest.
-    if (link.sourceType === 'image' && (link.imageUrls?.length ?? 0) > 1) {
+    // IMAGE card (one screenshot or several): its images are already in
+    // Storage, so retry re-enqueues them through /api/share (imageUrls path)
+    // into the same background pipeline, targeting this same card via cardId,
+    // and the worker writes it back as an image card. The synchronous
+    // /api/analyze below is the WEB-page path: it would scrape the Storage
+    // URL as a page and overwrite the card's sourceType to 'web'.
+    if (link.sourceType === 'image') {
+        const imageUrls = (link.imageUrls?.length ? link.imageUrls : [link.url]).filter(Boolean);
         try {
+            if (!imageUrls.length) throw new Error('This image is no longer available. Please add it again.');
             const response = await fetchWithTimeout(apiUrl('/api/share'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()), ...(await authHeaders()) },
-                body: JSON.stringify({ imageUrls: link.imageUrls, cardId: link.id, uid }),
+                body: JSON.stringify({ imageUrls, cardId: link.id, uid }),
             }, 30_000);
             const text = await response.text();
             let data: { success?: boolean; error?: string };
@@ -533,8 +558,11 @@ export async function retryFailedLink(uid: string, link: Link): Promise<void> {
         }
 
         const l = data.link;
+        const key = urlKey(l.url);
         await updateDoc(linkRef, {
             url: l.url,
+            // Dedupe key (lib/urlKey.ts); also backfills a legacy card on retry.
+            ...(key ? { urlKey: key } : {}),
             title: l.title,
             summary: l.summary,
             detailedSummary: l.detailedSummary ?? null,

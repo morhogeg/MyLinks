@@ -320,10 +320,62 @@ def _readable_len(text: Optional[str]) -> int:
 # Why a read came back partial. Rides alongside ``truncated`` so the card can
 # say something specific instead of a bare "this is incomplete":
 #   login_wall  the page (or post) is gated and served us nothing readable
+#               (also: a 401/403/429 refusal, or a cookie-consent wall)
 #   teaser      only the social preview text (og:description) came back
-#   pdf         a PDF or other non-HTML document the HTML scraper can't read
+#   pdf         a PDF the scraper (and the model) couldn't read
+#   file        some other non-HTML file (Word doc, video, archive, …)
 #   truncated   partial for a reason we didn't classify
-CAPTURE_REASONS = ("login_wall", "teaser", "pdf", "truncated")
+CAPTURE_REASONS = ("login_wall", "teaser", "pdf", "file", "truncated")
+
+# Why a fetch FAILED outright (no page at all). Unlike a partial read these are
+# not worth analyzing: the worker turns them into a retryable FAILED card with
+# this message instead of a "ready" card summarizing an error page.
+#   not_found  HTTP 404        gone     HTTP 410
+#   timeout    connect/read/wall-clock timeout
+#   dns        the host doesn't resolve
+#   network    connection refused/reset, TLS failure, …
+#   server     HTTP 5xx
+#   blocked    the URL points somewhere Machina won't fetch (private address)
+FETCH_ERROR_MESSAGES = {
+    "not_found": "This page doesn't exist (404). Check the link and try again.",
+    "gone": "This page has been removed (410).",
+    "timeout": "The site took too long to respond. Tap to retry.",
+    "dns": "Couldn't find this website. Check the address and try again.",
+    "network": "Couldn't connect to this website. Tap to retry.",
+    "server": "The website returned an error. Tap to retry.",
+    "blocked": "Machina can't open this address.",
+}
+
+# Largest article body handed to the model. ai_service caps its prompt input at
+# 30k characters; 25k leaves room for the shared caption and scaffolding.
+MAX_ARTICLE_CHARS = 25_000
+
+# A PDF up to this size is sent to Gemini as a native document part (safe_get's
+# MAX_RESPONSE_BYTES is the same ceiling, so anything bigger never arrives).
+MAX_PDF_BYTES = 10 * 1024 * 1024
+
+# Image types Gemini accepts as inline parts. A URL that serves one of these is
+# analyzed like a shared screenshot rather than decoded as HTML.
+_ANALYZABLE_IMAGE_TYPES = ("image/jpeg", "image/png", "image/webp", "image/heic", "image/heif")
+
+# Friendly titles for non-HTML files we can't read.
+_FILE_KINDS = (
+    ("wordprocessingml", "Word document"), ("msword", "Word document"),
+    ("spreadsheetml", "Spreadsheet"), ("ms-excel", "Spreadsheet"),
+    ("presentationml", "Presentation"), ("ms-powerpoint", "Presentation"),
+    ("zip", "ZIP archive"), ("x-rar", "Archive"), ("x-7z", "Archive"), ("gzip", "Archive"),
+    ("video/", "Video file"), ("audio/", "Audio file"), ("image/", "Image file"),
+    ("epub", "E-book"),
+)
+
+# Content types read as a web page. Anything else is a file.
+_TEXTUAL_TYPES = ("text/html", "application/xhtml+xml", "text/plain", "application/xml",
+                  "text/xml", "application/rss+xml", "application/atom+xml")
+
+# Consent / cookie walls: a short page whose readable text is mostly this.
+_COOKIE_WALL_RE = re.compile(
+    r"(cookie|consent|we value your privacy|accept all|manage (your )?preferences|"
+    r"gdpr|עוגיות|קובצי cookie)", re.I)
 
 
 def _unreadable_result(title: str, note: str = "[no text content available]",
@@ -340,6 +392,151 @@ def _unreadable_result(title: str, note: str = "[no text content available]",
             "truncated": True, "capture_reason": reason}
 
 
+def _fetch_failure(kind: str, detail: str = "") -> dict:
+    """A scrape that got NO page (404/410/timeout/DNS/…). ``fetch_error`` tells
+    the caller not to analyze it: the worker writes a retryable FAILED card
+    with ``fetch_error_message``, and /api/analyze returns that message."""
+    return {"html": "", "title": "", "text": "",
+            "fetch_error": kind,
+            "fetch_error_message": FETCH_ERROR_MESSAGES.get(kind, FETCH_ERROR_MESSAGES["network"]),
+            "fetch_error_detail": (detail or "")[:200]}
+
+
+def _classify_fetch_exception(exc: Exception) -> Optional[str]:
+    """Map a fetch exception to a FETCH_ERROR kind, or None when it isn't a
+    fetch failure (a parse bug, say) and the caller should degrade instead."""
+    if isinstance(exc, ResponseTooLargeError):
+        return "timeout" if "timed out" in str(exc) else None
+    if isinstance(exc, UnsafeURLError):
+        msg = str(exc)
+        if msg.startswith("Could not resolve host"):
+            return "dns"
+        if "time budget" in msg:
+            return "timeout"
+        if "Too many redirects" in msg:
+            return "network"
+        return "blocked"
+    if isinstance(exc, requests.exceptions.Timeout):
+        return "timeout"
+    if isinstance(exc, requests.exceptions.ConnectionError):
+        text = str(exc)
+        if "NameResolutionError" in text or "Name or service not known" in text \
+                or "getaddrinfo" in text or "nodename nor servname" in text:
+            return "dns"
+        return "network"
+    if isinstance(exc, requests.exceptions.RequestException):
+        return "network"
+    if isinstance(exc, socket.gaierror):
+        return "dns"
+    if isinstance(exc, (socket.timeout, TimeoutError)):
+        return "timeout"
+    return None
+
+
+def _og_bits(soup) -> list:
+    """og/twitter title + description, de-duplicated, in order."""
+    bits = []
+    for name in ('og:title', 'og:description', 'twitter:title', 'twitter:description', 'description'):
+        tag = soup.find('meta', property=name) or soup.find('meta', attrs={'name': name})
+        if tag and tag.get('content') and tag['content'].strip():
+            bits.append(tag['content'].strip())
+    return list(dict.fromkeys(bits))
+
+
+def _file_title(url: str, fallback: str) -> str:
+    name = (urlparse(url).path or '').rstrip('/').rsplit('/', 1)[-1]
+    try:
+        from urllib.parse import unquote
+        name = unquote(name)
+    except Exception:
+        pass
+    return name[:200] if name and '.' in name else fallback
+
+
+def _file_kind(ctype: str) -> str:
+    for needle, label in _FILE_KINDS:
+        if needle in ctype:
+            return label
+    return "File"
+
+
+def _sniff_type(content: bytes, ctype: str) -> str:
+    """Content-Type to act on: the header, corrected by magic bytes when the
+    header is missing or generic (octet-stream, binary/…)."""
+    head = content[:16] if content else b""
+    if head.startswith(b"%PDF-"):
+        return "application/pdf"
+    if not ctype or "octet-stream" in ctype or ctype.startswith("binary/"):
+        if head.startswith(b"\x89PNG"):
+            return "image/png"
+        if head.startswith(b"\xff\xd8\xff"):
+            return "image/jpeg"
+        if head[:4] == b"RIFF" and head[8:12] == b"WEBP":
+            return "image/webp"
+        if head.startswith(b"PK\x03\x04"):
+            return "application/zip"
+    return ctype
+
+
+def _response_bytes(response) -> bytes:
+    content = getattr(response, "content", None)
+    if isinstance(content, (bytes, bytearray)):
+        return bytes(content)
+    text = getattr(response, "text", "") or ""
+    return text.encode("utf-8", errors="replace")
+
+
+def _header_charset(ctype_raw: str) -> Optional[str]:
+    m = re.search(r"charset=[\"']?([A-Za-z0-9._:-]+)", ctype_raw or "", re.I)
+    return m.group(1) if m else None
+
+
+# Elements that are never article text.
+_STRIP_TAGS = ["script", "style", "noscript", "template", "nav", "footer", "aside",
+               "form", "iframe", "svg", "button", "dialog"]
+# Block elements whose text we collect (outermost only, so nothing is counted twice).
+_TEXT_BLOCKS = ["p", "h1", "h2", "h3", "h4", "li", "blockquote", "pre", "figcaption", "dd", "td"]
+
+
+def _article_root(soup):
+    """The element holding the article: the largest <article>, else <main> /
+    role=main, else <body>. Returns (root, is_whole_page)."""
+    articles = soup.find_all('article')
+    if articles:
+        best = max(articles, key=lambda a: len(a.get_text(" ", strip=True)))
+        if _readable_len(best.get_text(" ", strip=True)) >= _MIN_READABLE_CHARS:
+            return best, False
+    main_el = soup.find('main') or soup.find(attrs={'role': 'main'})
+    if main_el is not None and _readable_len(main_el.get_text(" ", strip=True)) >= _MIN_READABLE_CHARS:
+        return main_el, False
+    return (soup.body or soup), True
+
+
+def _extract_article_text(soup) -> str:
+    """Readable article text: boilerplate stripped, each block once."""
+    for tag in soup(_STRIP_TAGS):
+        tag.decompose()
+    root, whole_page = _article_root(soup)
+    if whole_page:
+        # Site chrome only; a <header> INSIDE an article carries its headline.
+        for tag in root.find_all('header'):
+            tag.decompose()
+    blocks = []
+    for el in root.find_all(_TEXT_BLOCKS):
+        if el.find_parent(_TEXT_BLOCKS) is not None:
+            continue  # nested block: its text is already in the outer one
+        t = " ".join(el.get_text(" ", strip=True).split())
+        if t:
+            blocks.append(t)
+    block_text = "\n\n".join(dict.fromkeys(blocks))
+    full_text = " ".join(root.get_text(" ", strip=True).split())
+    # Div-built pages keep most text outside <p>: prefer the whole root when the
+    # blocks caught only a sliver of it.
+    if len(block_text) < 1500 and len(block_text) < 0.5 * len(full_text):
+        return full_text
+    return block_text
+
+
 def scrape_url(url: str, message_body: Optional[str] = None) -> dict:
     """
     Fetch and extract content from a URL.
@@ -347,8 +544,30 @@ def scrape_url(url: str, message_body: Optional[str] = None) -> dict:
 
     Returns:
         dict with 'html', 'title', 'text' keys (plus 'truncated' when the
-        content could only be partially read, or not read at all).
+        content could only be partially read, or not read at all), always
+        'source_url', and on an outright fetch failure 'fetch_error' +
+        'fetch_error_message' (see _fetch_failure) — callers must not analyze
+        those.
     """
+    result = _scrape_url(url, message_body)
+    if not isinstance(result, dict):
+        return result
+    result.setdefault("source_url", url)
+    # A platform scraper (X, Instagram, LinkedIn…) or an unexpected parse error
+    # that came back with NOTHING used to reach the model as an empty prompt
+    # and produce a confident junk "ready" card. Make it the honest partial
+    # read instead: grounding placeholder + captureQuality so the card offers
+    # "add a screenshot". Fetch failures, YouTube and direct files are exempt.
+    if (not result.get("fetch_error") and not result.get("content_type")
+            and not result.get("image_bytes") and not result.get("document_bytes")
+            and _readable_len(result.get("text")) == 0 and _readable_len(result.get("html")) == 0):
+        result["text"] = "[no text content available]"
+        result["truncated"] = True
+        result.setdefault("capture_reason", "login_wall")
+    return result
+
+
+def _scrape_url(url: str, message_body: Optional[str] = None) -> dict:
     try:
         # SSRF guard: block private/internal/metadata targets before any fetch.
         validate_public_url(url)
@@ -363,15 +582,7 @@ def scrape_url(url: str, message_body: Optional[str] = None) -> dict:
         def _host_is(*domains: str) -> bool:
             return any(host == d or host.endswith('.' + d) for d in domains)
 
-        # PDFs (and other non-HTML documents) can't be read as text by the HTML
-        # scraper — the BeautifulSoup pass yields garbled bytes that the model
-        # then "summarizes" with confident nonsense. Detect a .pdf URL up front
-        # (cheap, no fetch) and degrade honestly. Content-Type is also checked
-        # after the fetch below for URLs that don't end in .pdf.
         path = (urlparse(url).path or '').lower()
-        if path.endswith('.pdf'):
-            logger.info(f"Unreadable content type (.pdf URL): {url}")
-            return _unreadable_result("PDF document", reason="pdf")
 
         # Special handling for Twitter/X URLs
         if _host_is('twitter.com', 'x.com'):
@@ -399,38 +610,100 @@ def scrape_url(url: str, message_body: Optional[str] = None) -> dict:
         headers = {
             "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1"
         }
-        response = safe_get(url, headers=headers, timeout=10)
-        response.raise_for_status()
+        try:
+            response = safe_get(url, headers=headers, timeout=10)
+        except ResponseTooLargeError as e:
+            if "timed out" in str(e):
+                return _fetch_failure("timeout", str(e))
+            # Over the 10 MB cap: a big file (or a monstrous page). Nothing to
+            # retry — say what it was rather than failing the save.
+            logger.info(f"Oversize response: {url}")
+            if path.endswith('.pdf'):
+                return _unreadable_result("PDF document", reason="pdf")
+            return _unreadable_result(_file_title(url, "Large file"), reason="file")
 
-        # Content-Type honesty: a URL that didn't end in .pdf can still serve a
-        # PDF (or other non-HTML document). Reading its bytes as HTML produces
-        # junk, so degrade honestly here too rather than hand garbage to the model.
-        ctype = (response.headers.get('Content-Type') or '').lower()
-        if 'application/pdf' in ctype:
+        status = getattr(response, "status_code", 200) or 200
+        final_url = getattr(response, "url", None) or url
+        if status in (404, 410):
+            return _fetch_failure("not_found" if status == 404 else "gone", f"HTTP {status}")
+        if status >= 500:
+            return _fetch_failure("server", f"HTTP {status}")
+
+        raw_ctype = response.headers.get('Content-Type') or ''
+        content = _response_bytes(response)
+        ctype = _sniff_type(content, raw_ctype.split(';')[0].strip().lower())
+
+        # Refused (401/403/429/451): the site wouldn't serve us the page. That is
+        # a login/bot wall, not a dead link — keep the card as a PARTIAL read
+        # (URL + whatever og tags the refusal page carries) so the "add a
+        # screenshot" affordance shows, rather than failing it.
+        if status in (401, 403, 429, 451) or status >= 400:
+            logger.info(f"Fetch refused (HTTP {status}): {url}")
+            og = []
+            title = ""
+            if "html" in ctype and content:
+                try:
+                    from bs4 import BeautifulSoup
+                    rsoup = BeautifulSoup(content, 'html.parser',
+                                          from_encoding=_header_charset(raw_ctype))
+                    og = _og_bits(rsoup)
+                    if rsoup.title and rsoup.title.string:
+                        title = rsoup.title.string.strip()
+                except Exception:
+                    og = []
+            if og:
+                return {"html": "", "title": og[0] if not title else title,
+                        "text": "\n".join(og)[:5000], "truncated": True,
+                        "capture_reason": "login_wall", "final_url": final_url}
+            result = _unreadable_result("", reason="login_wall")
+            result["final_url"] = final_url
+            return result
+
+        # ── Direct files ────────────────────────────────────────────────────
+        # A PDF goes to the model as a native document; an image is analyzed
+        # like a shared screenshot; any other binary is an honest "couldn't
+        # read this file" card — never its bytes decoded as HTML.
+        if ctype == 'application/pdf':
+            if not content or len(content) > MAX_PDF_BYTES:
+                return _unreadable_result("PDF document", reason="pdf")
+            return {"html": "", "title": _file_title(final_url, "PDF document"),
+                    "text": "[no text content available]",
+                    "content_type": "pdf",
+                    "document_bytes": content, "document_mime": "application/pdf",
+                    "final_url": final_url}
+        if ctype.startswith('image/'):
+            if ctype in _ANALYZABLE_IMAGE_TYPES and content:
+                return {"html": "", "title": _file_title(final_url, "Image"),
+                        "text": "", "content_type": "image_file",
+                        "image_bytes": content, "image_mime": ctype,
+                        "final_url": final_url}
+            return _unreadable_result(_file_title(final_url, "Image file"), reason="file")
+        if ctype and not any(ctype.startswith(t) for t in _TEXTUAL_TYPES) and not ctype.startswith("text/"):
             logger.info(f"Unreadable content type ({ctype}): {url}")
-            return _unreadable_result("PDF document", reason="pdf")
-
-        html = response.text
+            return _unreadable_result(_file_title(final_url, _file_kind(ctype)), reason="file")
 
         from bs4 import BeautifulSoup
-        soup = BeautifulSoup(html, 'html.parser')
+        # Decode from BYTES: `response.text` trusts only the HTTP header and
+        # falls back to ISO-8859-1, which mangles a UTF-8 Hebrew page that
+        # declares its charset only in <meta>. BeautifulSoup honours an explicit
+        # header charset, then the document's own <meta charset>, then sniffs.
+        soup = BeautifulSoup(content, 'html.parser', from_encoding=_header_charset(raw_ctype))
+        encoding = getattr(soup, "original_encoding", None) or "utf-8"
+        try:
+            html = content.decode(encoding, errors="replace")
+        except LookupError:
+            html = content.decode("utf-8", errors="replace")
 
         # Extract title
         title = ""
         if soup.title and soup.title.string:
             title = soup.title.string.strip()
+        og = _og_bits(soup)
+        source_name = _generic_source_name(soup, final_url)
 
-        # Extract text from paragraphs and main content
-        text_parts = []
-        for p in soup.find_all('p'):
-            text_parts.append(p.get_text().strip())
-
-        # Also try to get article content
-        article = soup.find('article')
-        if article:
-            text_parts.append(article.get_text().strip())
-
-        text = " ".join(text_parts).strip()[:5000]
+        text = _extract_article_text(soup)
+        text_truncated = len(text) > MAX_ARTICLE_CHARS
+        text = text[:MAX_ARTICLE_CHARS]
 
         # `truncated` = we could only read a partial preview, not the real body.
         # It rides the SAME channel Facebook uses; `capture_reason` names WHY, and
@@ -438,28 +711,20 @@ def scrape_url(url: str, message_body: Optional[str] = None) -> dict:
         truncated = False
         capture_reason = "truncated"
 
-        # Fallbacks for JS-gated pages (TikTok, JS shells, SPAs) that carry no
-        # <p>/<article> text. First try the body's visible text (scripts/styles
-        # stripped): a server-rendered page keeps its real content in divs, so if
-        # that's substantial we treat it as the genuine body (NOT truncated).
-        if not text:
-            for tag in soup(["script", "style", "noscript", "template"]):
-                tag.decompose()
-            body_text = " ".join(soup.get_text(" ", strip=True).split())[:5000]
-            if _readable_len(body_text) >= _MIN_READABLE_CHARS:
-                text = body_text
-            else:
-                # Only the social-preview meta tags are left — a teaser, never the
-                # real article. Use it (better than nothing) but flag it truncated
-                # so we don't present a preview as the whole thing.
-                og_bits = []
-                for name in ('og:title', 'og:description', 'twitter:title', 'twitter:description'):
-                    tag = soup.find('meta', property=name) or soup.find('meta', attrs={'name': name})
-                    if tag and tag.get('content'):
-                        og_bits.append(tag['content'].strip())
-                text = "\n".join(dict.fromkeys(b for b in og_bits if b))[:5000]
-                truncated = True
-                capture_reason = "teaser"
+        if _readable_len(text) < _MIN_READABLE_CHARS:
+            # Only the social-preview meta tags are left (JS shells, SPAs,
+            # TikTok) — a teaser, never the real article. Use it (better than
+            # nothing) but flag it truncated so we don't present a preview as
+            # the whole thing.
+            text = "\n".join(og)[:5000]
+            truncated = True
+            capture_reason = "teaser"
+        elif len(text) < 800 and _COOKIE_WALL_RE.search(text):
+            # A consent wall served in place of the article.
+            logger.info(f"Cookie/consent wall: {url}")
+            text = "\n".join(og)[:5000]
+            truncated = True
+            capture_reason = "login_wall"
 
         # Fold in any caption/text the share carried. For JS-gated pages the
         # on-page extraction is often empty, and this shared text is the only
@@ -477,7 +742,14 @@ def scrape_url(url: str, message_body: Optional[str] = None) -> dict:
         # exactly what the old `text or html[:5000]` fallback did.
         if _readable_len(text) < _MIN_READABLE_CHARS:
             logger.info(f"No readable content extracted: {url}")
-            return _unreadable_result(title or "")
+            result = _unreadable_result(title or "", reason="login_wall")
+            if truncated and text.strip():
+                # A short og headline is still the best signal there is: keep
+                # it (main._prompt_content adds the URL and the placeholder).
+                result["text"] = text.strip()
+                result["capture_reason"] = capture_reason
+            result["final_url"] = final_url
+            return result
 
         return {
             "html": html,
@@ -485,10 +757,16 @@ def scrape_url(url: str, message_body: Optional[str] = None) -> dict:
             "text": text,
             "truncated": truncated,
             "capture_reason": capture_reason,
-            "source_name": _generic_source_name(soup, url),
+            "text_truncated": text_truncated,
+            "source_name": source_name,
+            "final_url": final_url,
         }
 
     except Exception as e:
+        kind = _classify_fetch_exception(e)
+        if kind:
+            logger.warning(f"Fetch failed ({kind}) for {url}: {e}")
+            return _fetch_failure(kind, str(e))
         logger.error(f"Scrape error for {url}: {e}")
         return {"html": "", "title": "", "text": ""}
 

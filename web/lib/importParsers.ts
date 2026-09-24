@@ -32,6 +32,8 @@
  * client-side filter is a convenience, not a guarantee.
  */
 
+import { urlKey } from './urlKey.ts';
+
 /** One link recovered from an import file. */
 export interface ImportedLink {
     url: string;
@@ -153,20 +155,13 @@ export function parseImportDate(raw: string | number | undefined | null): number
 }
 
 /**
- * The key two entries in the SAME file are considered the same link by: scheme
- * and host lowercased, no trailing slash, no fragment. Deliberately NOT used
- * against the library, where the comparison is the exact stored `url` string
- * (`findLinkIdByUrl`), so an in-file near-duplicate is collapsed while a real
- * saved card is always matched exactly.
+ * The key two entries in the SAME file are considered the same link by: the
+ * canonical `urlKey` (lib/urlKey.ts, mirrored by the backend's url_key.py),
+ * the same key the library dedupe (`findLinkIdByUrl`) and /api/import match
+ * on, so http/https, www., tracking params and YouTube short forms collapse.
  */
 export function importDedupeKey(url: string): string {
-    try {
-        const u = new URL(url);
-        const path = u.pathname.length > 1 ? u.pathname.replace(/\/+$/, '') : '';
-        return `${u.protocol.toLowerCase()}//${u.host.toLowerCase()}${path}${u.search}`;
-    } catch {
-        return url.trim();
-    }
+    return urlKey(url) || url.trim();
 }
 
 /** Collapse repeats within one file, keeping the first (richest) occurrence. */

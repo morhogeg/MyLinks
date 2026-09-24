@@ -676,25 +676,39 @@ def find_user_by_ingest_token(token: str) -> Optional[str]:
 
 
 def link_exists_for_url(uid: str, url: str) -> bool:
-    """Return True if the user already has a saved link with this exact URL."""
+    """Return True if the user already has a saved link for this URL.
+
+    Matches on the canonical `urlKey` (url_key.py: scheme/host/tracking-param
+    variants of one page fold together), then on `finalUrlKey` (the page a
+    shortener or redirect landed on), then — for cards saved before urlKey
+    existed — on the exact stored `url`. All single-field equality queries on
+    the user's own subcollection: no composite index."""
     if not url:
         return False
+    from url_key import url_key
     db = get_db()
     links_ref = db.collection('users').document(uid).collection('links')
+    key = url_key(url)
+    if key:
+        for field in ('urlKey', 'finalUrlKey'):
+            if links_ref.where(filter=FieldFilter(field, '==', key)).limit(1).get():
+                return True
     docs = links_ref.where(filter=FieldFilter('url', '==', url)).limit(1).get()
     return len(docs) > 0
 
 
 def pending_exists_for_url(uid: str, url: str) -> bool:
-    """Return True if there's already a queued/processing item for this URL."""
+    """Return True if there's already a queued/processing item for this URL
+    (by `urlKey`, falling back to the exact `url` of queue docs written before
+    the key existed). Equality-only on two fields: served by merging the
+    single-field indexes, no composite index."""
     if not url:
         return False
+    from url_key import url_key
     db = get_db()
-    docs = (
-        db.collection('pending_processing')
-        .where(filter=FieldFilter('uid', '==', uid))
-        .where(filter=FieldFilter('url', '==', url))
-        .limit(1)
-        .get()
-    )
+    queue = db.collection('pending_processing').where(filter=FieldFilter('uid', '==', uid))
+    key = url_key(url)
+    if key and queue.where(filter=FieldFilter('urlKey', '==', key)).limit(1).get():
+        return True
+    docs = queue.where(filter=FieldFilter('url', '==', url)).limit(1).get()
     return len(docs) > 0

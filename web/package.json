@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "eslint",
     "test:parsers": "node --test --experimental-strip-types lib/__tests__/importParsers.test.ts",
-    "test:takeaway": "node --test --experimental-strip-types lib/__tests__/takeaway.test.ts"
+    "test:takeaway": "node --test --experimental-strip-types lib/__tests__/takeaway.test.ts",
+    "test:urlkey": "node --test --experimental-strip-types lib/__tests__/urlKey.test.ts"
   },
   "dependencies": {
     "@capacitor-firebase/authentication": "^8.3.0",

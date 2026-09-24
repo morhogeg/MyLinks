@@ -54,29 +54,37 @@ def test_unreadable_result_is_flagged_and_uses_grounding_placeholder():
 
 # ── PDF detection (no bs4 / no fetch needed) ─────────────────────────────────
 
-def test_pdf_url_degrades_before_any_fetch(monkeypatch):
-    # If we ever fetched, this would explode — proving .pdf is caught up front.
-    monkeypatch.setattr(scraper, "safe_get",
-                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("fetched a .pdf")))
-    result = scraper.scrape_url("https://example.com/reports/q3.pdf")
-    assert result["truncated"] is True
-    assert result["text"] == "[no text content available]"
-
-
-def test_pdf_url_with_query_and_caps_still_degrades(monkeypatch):
-    monkeypatch.setattr(scraper, "safe_get",
-                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("fetched a .pdf")))
-    result = scraper.scrape_url("https://example.com/DOC.PDF?download=1")
-    assert result["truncated"] is True
-
-
-def test_pdf_content_type_degrades(monkeypatch):
-    # URL doesn't end in .pdf, but the server serves application/pdf.
+def test_pdf_is_handed_to_the_model_as_a_document(monkeypatch):
+    # A PDF is no longer "unreadable": its bytes go to Gemini as a native
+    # document part (main._analyze_scraped → ai.analyze_document). The body
+    # stays the grounding placeholder, never decoded bytes.
     monkeypatch.setattr(scraper, "safe_get",
                         lambda *a, **k: _FakeResponse(text="%PDF-1.7 ...binary...",
                                                       content_type="application/pdf"))
+    result = scraper.scrape_url("https://example.com/reports/q3.pdf")
+    assert result["content_type"] == "pdf"
+    assert result["document_mime"] == "application/pdf"
+    assert result["document_bytes"].startswith(b"%PDF")
+    assert result["text"] == "[no text content available]"
+    assert not result.get("truncated")
+
+
+def test_pdf_served_as_octet_stream_is_sniffed(monkeypatch):
+    # URL doesn't end in .pdf and the header is generic: the magic bytes decide.
+    monkeypatch.setattr(scraper, "safe_get",
+                        lambda *a, **k: _FakeResponse(text="%PDF-1.7 ...binary...",
+                                                      content_type="application/octet-stream"))
     result = scraper.scrape_url("https://example.com/download?id=42")
+    assert result["content_type"] == "pdf"
+
+
+def test_oversize_pdf_degrades_honestly(monkeypatch):
+    def _too_big(*a, **k):
+        raise scraper.ResponseTooLargeError("Response exceeded 10485760 bytes")
+    monkeypatch.setattr(scraper, "safe_get", _too_big)
+    result = scraper.scrape_url("https://example.com/DOC.PDF?download=1")
     assert result["truncated"] is True
+    assert result["capture_reason"] == "pdf"
     assert result["text"] == "[no text content available]"
 
 

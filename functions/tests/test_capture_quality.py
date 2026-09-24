@@ -78,25 +78,53 @@ def test_missing_or_unknown_reason_falls_back_to_truncated():
 def test_every_reason_the_scraper_emits_is_a_known_value():
     # Guards the two files drifting apart: a new scraper reason with no client
     # copy would silently degrade to "truncated" instead of failing here.
-    assert set(scraper.CAPTURE_REASONS) == {"login_wall", "teaser", "pdf", "truncated"}
+    assert set(scraper.CAPTURE_REASONS) == {"login_wall", "teaser", "pdf", "file", "truncated"}
 
 
 # ── scraper.capture_reason — naming WHY ──────────────────────────────────────
 
-def test_pdf_url_reports_the_pdf_reason(monkeypatch):
-    monkeypatch.setattr(scraper, "safe_get",
-                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("fetched a .pdf")))
+def test_oversize_pdf_reports_the_pdf_reason(monkeypatch):
+    def _too_big(*a, **k):
+        raise scraper.ResponseTooLargeError("Response exceeded 10485760 bytes")
+    monkeypatch.setattr(scraper, "safe_get", _too_big)
     result = scraper.scrape_url("https://example.com/reports/q3.pdf")
     assert result["capture_reason"] == "pdf"
     assert main._capture_quality(result) == {"captureQuality": "partial", "captureReason": "pdf"}
 
 
-def test_pdf_content_type_reports_the_pdf_reason(monkeypatch):
+def test_pdf_the_model_could_not_read_reports_the_pdf_reason(monkeypatch):
     monkeypatch.setattr(scraper, "safe_get",
                         lambda *a, **k: _FakeResponse(text="%PDF-1.7 ...binary...",
                                                       content_type="application/pdf"))
     result = scraper.scrape_url("https://example.com/download?id=42")
+    assert result["document_bytes"].startswith(b"%PDF")
+
+    class _AI:
+        def analyze_document(self, *a, **k):
+            raise main.AnalysisError("unreadable")
+
+        def analyze_text(self, text, **k):
+            return {"title": "x", "summary": "could not be retrieved", "_text": text}
+
+    monkeypatch.setattr(main, "_fetch_post_images", lambda urls: [])
+    analysis = main._analyze_scraped(_AI(), result, [])
     assert result["capture_reason"] == "pdf"
+    assert main._capture_quality(result) == {"captureQuality": "partial", "captureReason": "pdf"}
+    # The fallback prompt still carries the source URL, and the placeholder
+    # the GROUNDING rule keys on.
+    assert "SOURCE URL: https://example.com/download?id=42" in analysis["_text"]
+    assert "[no text content available]" in analysis["_text"]
+
+
+def test_other_binaries_report_the_file_reason(monkeypatch):
+    monkeypatch.setattr(scraper, "safe_get",
+                        lambda *a, **k: _FakeResponse(
+                            text="PK\x03\x04 docx bytes",
+                            content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+    result = scraper.scrape_url("https://example.com/files/plan.docx")
+    assert result["capture_reason"] == "file"
+    assert result["title"] == "plan.docx"
+    assert result["text"] == "[no text content available]"
 
 
 def test_og_only_preview_reports_the_teaser_reason(monkeypatch):
@@ -155,11 +183,11 @@ def test_unreadable_result_defaults_to_login_wall_and_keeps_the_placeholder():
 def test_image_bytes_scraped_as_html_would_be_partial(monkeypatch):
     """Why process_link_background gates the stamp on `not is_image`.
 
-    Step 1 of the background pipeline scrapes unconditionally, including for an
-    image job whose `url` is the screenshot's Storage URL. Reading image bytes as
-    HTML always comes back unreadable, so WITHOUT that gate every screenshot card
-    would carry a "couldn't read the full post" line. This test documents the
-    trap rather than trusting a comment to hold.
+    The pipeline no longer scrapes image jobs at all, but the gate stays as a
+    second line of defence: image bytes mislabelled as HTML always come back
+    unreadable, so WITHOUT that gate a screenshot card would carry a "couldn't
+    read the full post" line. This test documents the trap rather than
+    trusting a comment to hold.
     """
     pytest.importorskip("bs4")
     monkeypatch.setattr(scraper, "safe_get",
