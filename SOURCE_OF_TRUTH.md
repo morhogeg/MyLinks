@@ -2400,6 +2400,12 @@ exact-match, capped.
   rows), harness removed. **NOT verified:** on device, the grouped
   Reminders view render, a live scheduler run. Deferred: actionable push
   (Done/Snooze on the lock screen) needs Swift + APNs categories.
+  **SHIPPED** as merge `a0ec2b1`: Vercel on push, functions deploy #118
+  (scoped `check_reminders,force_check_reminders`) green, Python tests #131
+  green. TestFlight run #337 failed at Archive on an infra error (GitHub
+  returned 500 downloading `FBSDKShareKit-Dynamic_XCFramework.zip` during SPM
+  resolve, before any compile); the re-run API 403s from the session, so the
+  build was re-triggered by pushing this docs commit to `trigger/testflight`.
 - **2026-09-25 — Tag round 5: screenshot/YouTube cards no longer end up
   with ZERO tags.** Owner's Hebrew screenshot card (baby-crying, Health)
   had a great analysis and no tags. Cause: `analyze_images` /
