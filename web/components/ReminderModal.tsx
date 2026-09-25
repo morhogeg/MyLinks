@@ -3,8 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from '@/lib/types';
-import { X, Calendar, CalendarClock, Clock, BellOff, Loader2, Check, ChevronDown } from 'lucide-react';
-import { CitationGlyph } from '@/components/ui/Wordmark';
+import { X, Calendar, CalendarClock, Clock, BellOff, Loader2, Check, Repeat, Sun, Sofa } from 'lucide-react';
 import { updateLinkReminder } from '@/lib/storage';
 import { isNativeApp } from '@/lib/api';
 import { trackReminderSet } from '@/lib/analytics';
@@ -22,7 +21,7 @@ interface ReminderModalProps {
 
 // The options are a radio group: tap around freely, commit with Save (device
 // QA on build 1136 — tap-to-commit closed the sheet under people's fingers).
-type Selection = 'smart' | 'tomorrow' | 'next-week' | 'custom';
+type Selection = 'smart' | 'later-today' | 'tomorrow' | 'weekend' | 'next-week' | 'custom';
 
 // Format a Date to a `YYYY-MM-DD` string in LOCAL time. Using toISOString() here
 // would emit the UTC date, which shifts by a day for users west of UTC.
@@ -44,20 +43,33 @@ const fmtDay = (d: Date) => d.toLocaleDateString([], { weekday: 'short', month: 
 const fmtTime = (d: Date) => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 const fmtDayTime = (d: Date) => `${fmtDay(d)} · ${fmtTime(d)}`;
 
+const atNine = (now: Date, addDays: number) => {
+    const d = new Date(now);
+    d.setDate(d.getDate() + addDays);
+    d.setHours(9, 0, 0, 0);
+    return d.getTime();
+};
+
 // Preset fire times, derived fresh per render so an open sheet never drifts
-// across midnight. Tomorrow / Next week land at 9:00 AM; Smart starts +24h
-// (matching the backend's smart profile, which then recurs at 1w and 1mo).
+// across midnight. Everything day-based lands at 9:00 AM local, Smart review
+// included: its first fire is tomorrow 9:00 and the backend keeps that time of
+// day for the 1-week and 1-month repeats (never a 2 AM push because the card
+// was saved at 2 AM).
+// - Later today: 3 hours out, on the hour. Hidden once that crosses 9 PM.
+// - This weekend: the coming Saturday. Hidden on Fri/Sat/Sun, where it would
+//   be tomorrow, today, or already past.
 function presetTimes(now: Date) {
-    const tomorrow = new Date(now);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(9, 0, 0, 0);
-    const nextWeek = new Date(now);
-    nextWeek.setDate(nextWeek.getDate() + 7);
-    nextWeek.setHours(9, 0, 0, 0);
+    const later = new Date(now);
+    later.setHours(later.getHours() + 3, 0, 0, 0);
+    const laterOk = later.getDate() === now.getDate() && later.getHours() <= 21;
+    const dow = now.getDay(); // 0 Sun … 6 Sat
+    const weekendOk = dow >= 1 && dow <= 4;
     return {
-        smart: now.getTime() + 24 * 60 * 60 * 1000,
-        tomorrow: tomorrow.getTime(),
-        nextWeek: nextWeek.getTime(),
+        smart: atNine(now, 1),
+        laterToday: laterOk ? later.getTime() : null,
+        tomorrow: atNine(now, 1),
+        weekend: weekendOk ? atNine(now, 6 - dow) : null,
+        nextWeek: atNine(now, 7),
     };
 }
 
@@ -106,17 +118,21 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
         } else {
             setCustomDate('');
             setCustomTime('09:00');
-            setSelected('smart');
+            // A card that just came due is being snoozed: the likely answer is
+            // "tomorrow", not a fresh three-step Smart series.
+            setSelected(link.reminderDue ? 'tomorrow' : 'smart');
         }
     }, [isOpen, link]);
 
     // Default the custom date the moment the picker is selected on a blank
-    // state. Late at night, start on tomorrow so 9:00 AM isn't in the past.
+    // state: two days out at 9:00 AM, so the picker never opens on a moment a
+    // preset row above already offers (Tomorrow is tomorrow 9:00).
     useEffect(() => {
         if (!isOpen || selected !== 'custom' || customDate) return;
         const base = new Date();
-        if (base.getHours() >= 21) base.setDate(base.getDate() + 1);
+        base.setDate(base.getDate() + 2);
         setCustomDate(formatLocalDate(base));
+        setCustomTime('09:00');
     }, [isOpen, selected, customDate]);
 
     // Bottom sheet on mobile with drag-to-dismiss; centered modal on desktop.
@@ -193,7 +209,9 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
             const t = presetTimes(new Date());
             const fireAt =
                 selected === 'smart' ? t.smart :
+                selected === 'later-today' ? t.laterToday :
                 selected === 'tomorrow' ? t.tomorrow :
+                selected === 'weekend' ? t.weekend :
                 selected === 'next-week' ? t.nextWeek :
                 customTs;
             // Hard invariant: a reminder can NEVER be created in the past.
@@ -240,14 +258,13 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
     // Quiet radio row (iOS-Settings grammar): plain icon, label, real fire time
     // right-aligned, accent check when selected. No fills or borders — hairline
     // dividers do the separation.
-    const OptionRow = ({ id, icon, label, caption, value, trailing }: {
+    const OptionRow = ({ id, icon, label, caption, value }: {
         id: Selection;
         icon: React.ReactNode;
         label: string;
         /** Second line under the label (used where a right value wouldn't fit). */
         caption?: string;
         value?: string;
-        trailing?: React.ReactNode;
     }) => {
         const isSelected = selected === id;
         return (
@@ -269,8 +286,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                         <span className="block text-[12.5px] text-text-muted leading-snug mt-0.5">{caption}</span>
                     )}
                 </span>
-                {value && <span className="shrink-0 text-[13px] text-text-muted">{value}</span>}
-                {trailing}
+                {value && <span className="shrink-0 text-[13px] text-text-muted tabular-nums">{value}</span>}
                 <span className="w-5 shrink-0 flex items-center justify-center">
                     {isSelected && <Check className="w-4 h-4 text-accent" />}
                 </span>
@@ -303,8 +319,11 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                     </div>
                     <div className="flex items-start gap-3 px-5 pt-2 pb-3.5 border-b border-border-subtle">
                         <div className="flex-1 min-w-0">
-                            <h2 className="text-[17px] font-bold text-text leading-tight">Remind me</h2>
-                            <p className="text-[13px] text-text-secondary leading-snug line-clamp-2 mt-0.5" dir="auto" title={link.title}>
+                            <h2 className="text-[17px] font-bold text-text leading-tight">{link.reminderDue ? 'Remind me again' : 'Remind me'}</h2>
+                            {/* dir=auto keeps a Hebrew title's word order right;
+                                text-left keeps it under the heading instead of
+                                flushing to the far edge of an English sheet. */}
+                            <p className="text-[13px] text-text-secondary leading-snug line-clamp-2 mt-0.5 text-left" dir="auto" title={link.title}>
                                 {link.title}
                             </p>
                         </div>
@@ -335,16 +354,32 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                     <div role="radiogroup" aria-label="When to remind" className="divide-y divide-border-subtle">
                         <OptionRow
                             id="smart"
-                            icon={<CitationGlyph className="w-5 h-5" />}
+                            icon={<Repeat className="w-5 h-5" />}
                             label="Smart review"
-                            caption="Tomorrow · then 1 week & 1 month"
+                            caption={`Tomorrow ${fmtTime(new Date(presets.smart))} · then 1 week & 1 month`}
                         />
+                        {presets.laterToday !== null && (
+                            <OptionRow
+                                id="later-today"
+                                icon={<Clock className="w-5 h-5" />}
+                                label="Later today"
+                                value={fmtTime(new Date(presets.laterToday))}
+                            />
+                        )}
                         <OptionRow
                             id="tomorrow"
-                            icon={<Clock className="w-5 h-5" />}
+                            icon={<Sun className="w-5 h-5" />}
                             label="Tomorrow"
                             value={fmtDayTime(new Date(presets.tomorrow))}
                         />
+                        {presets.weekend !== null && (
+                            <OptionRow
+                                id="weekend"
+                                icon={<Sofa className="w-5 h-5" />}
+                                label="This weekend"
+                                value={fmtDayTime(new Date(presets.weekend))}
+                            />
+                        )}
                         <OptionRow
                             id="next-week"
                             icon={<Calendar className="w-5 h-5" />}
@@ -358,9 +393,6 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                                 id="custom"
                                 icon={<CalendarClock className="w-5 h-5" />}
                                 label="Pick date & time"
-                                trailing={
-                                    <ChevronDown className={`w-4 h-4 shrink-0 text-text-muted transition-transform duration-200 ${selected === 'custom' ? 'rotate-180' : ''}`} />
-                                }
                             />
                             {selected === 'custom' && (
                                 <div className="px-1.5 pb-4 space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
@@ -388,7 +420,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                                         {customTs === null
                                             ? 'Pick a date to continue.'
                                             : customInPast
-                                                ? 'That moment has already passed. Pick a future time.'
+                                                ? 'That time has passed. Pick a later one.'
                                                 : `Will remind you ${fmtDayTime(new Date(customTs))}.`}
                                     </p>
                                 </div>
