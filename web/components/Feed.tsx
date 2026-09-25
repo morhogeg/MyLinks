@@ -59,7 +59,7 @@ import NotesView from './NotesView';
 import KnowledgeGraph from './KnowledgeGraph';
 import { getNoteGroups } from '@/lib/notes';
 import LoadMoreSentinel from './feed/LoadMoreSentinel';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, CheckCircle2, CheckSquare, CheckCheck, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, Share2, Globe, Plus, Pencil, Newspaper, CalendarCheck, Lock, BookOpenCheck, ChevronLeft, BarChart3, StickyNote, Waypoints, Upload } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, AlarmClock, CheckCircle2, CheckSquare, CheckCheck, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, Share2, Globe, Plus, Pencil, Newspaper, CalendarCheck, Lock, BookOpenCheck, ChevronLeft, BarChart3, StickyNote, Waypoints, Upload } from 'lucide-react';
 import { usePullToRefresh } from '@/lib/usePullToRefresh';
 import { useProcessingBanner } from '@/lib/useProcessingBanner';
 import { cardStartMs } from '@/lib/shareProgress';
@@ -217,8 +217,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // already stands for meaning search ("Searching by meaning…"); "Close
     // matches" says what the partial tier is: cards that carry SOME of the
     // query's words, shown because none carries all of them.
-    const sectionDivider = (key: string, label: string, mark: boolean) => (
-        <div key={key} className={`flex items-center gap-2 mb-3 ${key === 'close-matches' ? 'mt-1' : 'mt-6'}`}>
+    const sectionDivider = (key: string, label: string, mark: boolean, first = key === 'close-matches') => (
+        <div key={key} className={`flex items-center gap-2 mb-3 ${first ? 'mt-1' : 'mt-6'}`}>
             {mark && <CitationGlyph className="w-3 h-auto shrink-0 text-accent/70" />}
             <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-text-muted whitespace-nowrap">{label}</span>
             <span className="flex-1 h-px bg-border-subtle" />
@@ -226,13 +226,42 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     );
     const meaningDivider = sectionDivider('by-meaning', 'By meaning', true);
     const partialDivider = sectionDivider('close-matches', 'Close matches', false);
+    // The Reminders view reads as an agenda: the list is already sorted by
+    // fire time (useFeedFilters), so Today / This week / Later are just the
+    // indexes where each group starts. Today includes anything overdue. Off
+    // search only: a search re-sorts by match, which breaks the time order.
+    const reminderSplits = useMemo(() => {
+        if (filter !== 'reminders' || searchQuery.trim()) return [] as { idx: number; key: string; label: string }[];
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+        const endOfToday = startOfToday.getTime() + 24 * 60 * 60 * 1000;
+        const endOfWeek = startOfToday.getTime() + 7 * 24 * 60 * 60 * 1000;
+        const group = (l: Link) => {
+            const t = l.nextReminderAt ?? Number.MAX_SAFE_INTEGER;
+            return t < endOfToday ? 'Today' : t < endOfWeek ? 'This week' : 'Later';
+        };
+        const splits: { idx: number; key: string; label: string }[] = [];
+        filteredLinks.forEach((l, idx) => {
+            const label = group(l);
+            if (splits.length === 0 || splits[splits.length - 1].label !== label) {
+                splits.push({ idx, key: `reminders-${label}`, label });
+            }
+        });
+        // One group alone is a heading over the whole list: noise.
+        return splits.length > 1 ? splits : [];
+    }, [filter, searchQuery, filteredLinks]);
     /** Divider to render BEFORE the row at this index, if any. */
-    const dividerAt = (idx: number) => idx === partialSplit ? partialDivider : idx === meaningSplit ? meaningDivider : null;
+    const dividerAt = (idx: number) => {
+        if (idx === partialSplit) return partialDivider;
+        if (idx === meaningSplit) return meaningDivider;
+        const r = reminderSplits.find((s) => s.idx === idx);
+        return r ? sectionDivider(r.key, r.label, false, idx === 0) : null;
+    };
     /** The result list cut into segments, each with the divider that opens it
      *  (null for the leading segment when it has none). Off search this is
-     *  one undivided segment. */
+     *  one undivided segment (or the Reminders view's time groups). */
     const resultSegments = useMemo(() => {
-        const cuts = [partialSplit, meaningSplit].filter((i) => i >= 0).sort((a, b) => a - b);
+        const cuts = [partialSplit, meaningSplit, ...reminderSplits.map((r) => r.idx)].filter((i) => i >= 0).sort((a, b) => a - b);
         const segs: { start: number; links: Link[] }[] = [];
         let prev = 0;
         for (const c of cuts) {
@@ -241,7 +270,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         }
         segs.push({ start: prev, links: filteredLinks.slice(prev) });
         return segs;
-    }, [filteredLinks, partialSplit, meaningSplit]);
+    }, [filteredLinks, partialSplit, meaningSplit, reminderSplits]);
     // Card action handlers that depend only on [uid, toast] (R-3: useLinkActions).
     const {
         handleStatusChange,
@@ -825,6 +854,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                 >
                                     <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" aria-hidden />
                                     <span className="flex-grow min-w-0 truncate text-[14px] font-medium text-text" dir="auto">{l.title}</span>
+                                </button>
+                                <button
+                                    onClick={() => handleOpenReminderModal(l)}
+                                    aria-label={`Remind me again about “${l.title}”`}
+                                    title="Remind me again"
+                                    className="w-9 h-9 shrink-0 flex items-center justify-center rounded-lg text-text-muted hover:text-accent hover:bg-accent/10 transition-colors"
+                                >
+                                    <AlarmClock className="w-4 h-4" />
                                 </button>
                                 <button
                                     onClick={() => clearReminderDue(l.id)}

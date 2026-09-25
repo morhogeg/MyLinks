@@ -104,7 +104,47 @@ def set_reminder(uid: str, link_id: str, reminder_time: datetime, profile: str =
     })
 
 
-def calculate_next_reminder(reminder_count: int, profile: str = "smart") -> datetime:
+def _next_at_same_local_time(anchor_ms, days: int, tz_name: Optional[str], now: datetime) -> Optional[datetime]:
+    """`days` after the reminder's scheduled time, at the same local clock time.
+
+    A recurrence is measured from when the reminder was SCHEDULED to fire, not
+    from when the sweep got to it, so a Smart review set for tomorrow 9:00 AM
+    comes back at 9:00 AM a week later instead of drifting to whatever minute
+    the scheduler ran. The day math runs in the user's timezone so a DST change
+    doesn't move it to 8 or 10. Returns None when there's no usable anchor (the
+    caller falls back to `now + days`). If the anchor is so old that the result
+    is already past (a long backlog), the same clock time is rolled forward day
+    by day to the next future one.
+    """
+    if not isinstance(anchor_ms, (int, float)) or isinstance(anchor_ms, bool) or anchor_ms <= 0:
+        return None
+    try:
+        tz = timezone.utc
+        if tz_name:
+            from zoneinfo import ZoneInfo
+            tz = ZoneInfo(tz_name)
+        local = datetime.fromtimestamp(anchor_ms / 1000, tz=timezone.utc).astimezone(tz)
+        naive = local.replace(tzinfo=None) + timedelta(days=days)
+        result = naive.replace(tzinfo=tz).astimezone(timezone.utc)
+        if result <= now:
+            local_now = now.astimezone(tz).replace(tzinfo=None)
+            naive = local_now.replace(hour=naive.hour, minute=naive.minute, second=0, microsecond=0)
+            if naive.replace(tzinfo=tz).astimezone(timezone.utc) <= now:
+                naive += timedelta(days=1)
+            result = naive.replace(tzinfo=tz).astimezone(timezone.utc)
+        return result
+    except Exception as e:
+        logger.warning(f"Reminder anchor math failed ({tz_name!r}): {e}")
+        return None
+
+
+def calculate_next_reminder(
+    reminder_count: int,
+    profile: str = "smart",
+    anchor_ms=None,
+    tz_name: Optional[str] = None,
+    now: Optional[datetime] = None,
+) -> datetime:
     """
     Calculate the next reminder date using spaced repetition.
 
@@ -112,8 +152,14 @@ def calculate_next_reminder(reminder_count: int, profile: str = "smart") -> date
     - smart: 1, 7, 30, 90 days
     - spaced: initial (3), 5, 7 days
     - spaced-N: initial N, then progression
+
+    With `anchor_ms` (the fire time that just came due) the next one keeps its
+    local time of day; without it, it's `now` + the interval (legacy behavior).
     """
-    now = datetime.now(timezone.utc)
+    now = now or datetime.now(timezone.utc)
+
+    def _after(days: int) -> datetime:
+        return _next_at_same_local_time(anchor_ms, days, tz_name, now) or now + timedelta(days=days)
 
     if profile.startswith("spaced"):
         start_days = SPACED_START_DAYS
@@ -137,16 +183,11 @@ def calculate_next_reminder(reminder_count: int, profile: str = "smart") -> date
             if reminder_count == 1: days = 14
             elif reminder_count == 2: days = 30
 
-        return now + timedelta(days=days)
+        return _after(days)
 
     else:  # smart
-        intervals = {
-            0: timedelta(days=1),
-            1: timedelta(days=7),
-            2: timedelta(days=30),
-        }
-        interval = intervals.get(reminder_count, timedelta(days=90))
-        return now + interval
+        intervals = {0: 1, 1: 7, 2: 30}
+        return _after(intervals.get(reminder_count, 90))
 
 
 def should_complete_reminder(profile: str, new_reminder_count: int) -> bool:
@@ -473,7 +514,12 @@ def run_reminder_check() -> dict:
                         'nextReminderAt': None,
                     })
                 else:
-                    next_reminder = calculate_next_reminder(new_reminder_count, profile=profile)
+                    next_reminder = calculate_next_reminder(
+                        new_reminder_count,
+                        profile=profile,
+                        anchor_ms=link_data.get('nextReminderAt'),
+                        tz_name=user_data.get('timezone'),
+                    )
                     updates['reminderCount'] = new_reminder_count
                     updates['nextReminderAt'] = int(next_reminder.timestamp() * 1000)
 

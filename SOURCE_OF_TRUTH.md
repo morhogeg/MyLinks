@@ -2373,6 +2373,33 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-25 — REMINDERS ROUND 4: sheet presets, 9 AM recurrences,
+  snooze, agenda view.** Branch `claude/reminders-screen-overhaul-uz3vlu`.
+  **Backend** (`reminder_service.calculate_next_reminder`): a recurring
+  reminder (smart / spaced-N) is now scheduled from the fire time that just
+  came due (`nextReminderAt`), at the same LOCAL clock time in the user's
+  `timezone` (DST-safe), instead of `now + interval`. A stale anchor rolls
+  forward to the next future occurrence of that clock time; no/bad anchor or
+  timezone falls back to the old math. Known drift: the +10 min overflow and
+  +1 h reminders-off snoozes move the anchor. **Sheet** (`ReminderModal`):
+  Smart review's first fire is tomorrow 9:00 AM (was +24h from save, so a
+  1 AM save meant 1 AM pushes) and the caption states the time; new
+  **Later today** (+3h on the hour, hidden past 9 PM) and **This weekend**
+  (coming Sat 9:00, shown Mon–Thu only) rows; the Pick date & time picker
+  opens two days out (no longer a duplicate of Tomorrow); the chevron next
+  to the check is gone; Smart icon `Repeat` (the `[•]` glyph read as broken);
+  Hebrew titles left-aligned under the heading; a due card opens as
+  "Remind me again" with Tomorrow preselected. **Feed**: the Reminders due
+  strip rows get a Remind-me-again button (opens the sheet) beside Done
+  (Done still only clears the due flag, series continues); the Reminders
+  filter is grouped Today (incl. overdue) / This week / Later via the
+  existing section-divider segments (off search, only with 2+ groups).
+  **Verified:** tsc 0, eslint clean on touched files, pytest 1257 (4 new
+  recurrence tests), sheet rendered via throwaway harness at 390px light+
+  dark (new / edit / due / custom, plus a fake Tuesday clock for the new
+  rows), harness removed. **NOT verified:** on device, the grouped
+  Reminders view render, a live scheduler run. Deferred: actionable push
+  (Done/Snooze on the lock screen) needs Swift + APNs categories.
 - **2026-09-25 — Tag round 5: screenshot/YouTube cards no longer end up
   with ZERO tags.** Owner's Hebrew screenshot card (baby-crying, Health)
   had a great analysis and no tags. Cause: `analyze_images` /
