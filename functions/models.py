@@ -72,6 +72,12 @@ class ScreenshotPlatform(BaseModel):
     evidence: Optional[str] = Field(None, description="The interface element that identifies the app (e.g. 'X logo in the top bar'), or null")
 
 
+class TagSuggestion(BaseModel):
+    """Tags-only follow-up (ai_service._ensure_tags), asked when a vision/video
+    analysis came back with too few tags after the same-language backstop."""
+    tags: List[str] = Field(max_length=5, description="3-4 specific tags in the content's language")
+
+
 class BrainAnswer(BaseModel):
     """Structured output for the "Ask Your Brain" RAG endpoint.
 
