@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from typing import List, Optional
 from google import genai
 from google.cloud.firestore_v1.vector import Vector
-from models import AIAnalysis, BrainAnswer, WeeklySynthesis, ScreenshotPlatform
+from models import AIAnalysis, BrainAnswer, WeeklySynthesis, ScreenshotPlatform, TagSuggestion
 
 logger = logging.getLogger(__name__)
 
@@ -1010,6 +1010,64 @@ class GeminiService:
             if isinstance(t, str) and bool(has_hebrew(t)) == content_hebrew
         ]
 
+    # Below this many tags (after _enforce_tag_language) a vision/video card
+    # gets the tags-only follow-up in _ensure_tags.
+    _MIN_TAGS = 2
+
+    def _ensure_tags(self, data: dict, existing_tags: list = None) -> dict:
+        """Refill tags the same-language backstop stripped on the paths that
+        can't pre-filter vocabulary (screenshots, YouTube: no text exists
+        before the call, so _same_script_tags can't run). Seen 2026-09-25: a
+        Hebrew screenshot card with a great summary and ZERO tags — the model
+        reused English vocabulary and the backstop dropped all of it.
+
+        Only when the card ended up with fewer than _MIN_TAGS tags: one cheap
+        text-only call over the analysis' own title + summary, offered only
+        the vocabulary in the content's script, then the backstop again.
+        Never raises — a failed follow-up leaves the card as it was."""
+        if not isinstance(data, dict):
+            return data
+        tags = [t for t in (data.get("tags") or []) if isinstance(t, str) and t.strip()]
+        if len(tags) >= self._MIN_TAGS:
+            return data
+        title = str(data.get("title") or "").strip()
+        summary = str(data.get("summary") or "").strip()
+        if not (title or summary):
+            return data
+        lang = (data.get("language") or "").lower()
+        sample = f"{title}\n{summary}"
+        vocab = self._same_script_tags(existing_tags, sample) or []
+        vocab_context = (
+            f"\n\nExisting tags you may reuse when they genuinely fit (all in the content's language):\n{', '.join(vocab)}"
+            if vocab else ""
+        )
+        category = str(data.get("category") or "").strip()
+        prompt = f"""Give 3-4 specific tags for organizing this saved item.
+- Write every tag in the SAME language as the content below{f" (language: {lang})" if lang else ""}.
+- Prefer the specific topic, person, place, or technique actually named in the content; do not repeat the category{f' ("{category}")' if category else ""}.
+- Name only things the content states; do not invent specifics.{vocab_context}
+
+Title: {title}
+Summary: {summary}
+
+Return JSON: {{"tags": [...]}}"""
+        try:
+            extra = self._generate_json(
+                [prompt], "tag follow-up", attempts=1,
+                config_extra={"response_schema": TagSuggestion})
+        except Exception as e:
+            logger.warning(f"Tag follow-up failed (non-fatal): {e}")
+            return data
+        seen = {t.strip().casefold() for t in tags}
+        for t in (extra or {}).get("tags") or []:
+            if isinstance(t, str) and t.strip() and t.strip().casefold() not in seen:
+                tags.append(t.strip())
+                seen.add(t.strip().casefold())
+        data["tags"] = tags[:5]
+        data = self._enforce_tag_language(data)
+        logger.info(f"Tag follow-up: card now has {len(data.get('tags') or [])} tag(s)")
+        return data
+
     @staticmethod
     def _categories_context(existing_categories: list) -> str:
         """The "reuse these categories" half of the prompt (see SYSTEM_PROMPT rule 6).
@@ -1247,12 +1305,12 @@ Context:
         ]
         # Low media resolution (~100 tokens/sec) keeps cost and latency bounded
         # while remaining ample for understanding speech and on-screen content.
-        return self._enforce_tag_language(self._generate_json(
+        return self._ensure_tags(self._enforce_tag_language(self._generate_json(
             contents,
             "youtube video analysis",
             config_extra={"media_resolution": "MEDIA_RESOLUTION_LOW"},
             attempts=attempts,
-        ))
+        )), existing_tags)
 
     def analyze_image(self, image_bytes: bytes, mime_type: str, existing_tags: list = None,
                       attempts: int = _MAX_GENERATE_ATTEMPTS, existing_categories: list = None) -> dict:
@@ -1314,9 +1372,10 @@ WHERE THE SCREENSHOT WAS TAKEN (sourcePlatform / sourceHandle):
         # default is not a documented contract, and the Instagram path already
         # learned that low resolution misreads them. Do NOT borrow
         # analyze_text_with_images' script-conditional heuristic here.
-        return self._enforce_tag_language(
+        return self._ensure_tags(self._enforce_tag_language(
             self._generate_json(contents, "image analysis", attempts=attempts,
-                                config_extra={"media_resolution": "MEDIA_RESOLUTION_HIGH"}))
+                                config_extra={"media_resolution": "MEDIA_RESOLUTION_HIGH"})),
+            existing_tags)
 
     def classify_screenshot_platform(self, images: list) -> str:
         """Which app's own interface is visible in these screenshots? One

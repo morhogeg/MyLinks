@@ -2365,6 +2365,20 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-25 — Tag round 5: screenshot/YouTube cards no longer end up
+  with ZERO tags.** Owner's Hebrew screenshot card (baby-crying, Health)
+  had a great analysis and no tags. Cause: `analyze_images` /
+  `analyze_youtube` offer the whole mixed-language vocabulary (no text
+  exists before the call, so `_same_script_tags` can't run — the 07-28
+  round explicitly left them "backstop-only"); the model reused English
+  tags and `_enforce_tag_language` stripped them all. Fix:
+  `GeminiService._ensure_tags` — when a vision/video card has < 2 tags
+  after the backstop, ONE text-only follow-up (`TagSuggestion` schema,
+  attempts=1, never raises) over the analysis' title+summary, offered only
+  same-script vocabulary, then the backstop again. Zero extra cost on
+  normal saves. Tests `functions/tests/test_tag_followup.py` (pytest 1247
+  pass). Existing tagless cards are NOT backfilled — re-analyze to fix.
+  Not verified on a live Gemini call here.
 - **2026-09-25 — SCREENSHOT COMPLETION REBUILT (Facebook/LinkedIn partial
   cards).** Owner: no confirmation the card was saved, no sign it was being
   read, no "Analyze" step, nothing said several screenshots were allowed, and
