@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Check, CheckCircle2, EyeOff, ImagePlus, Loader2, RefreshCw, Sparkles } from 'lucide-react';
+import { Check, CheckCircle2, EyeOff, ImagePlus, RefreshCw } from 'lucide-react';
+import CitationMark, { type OrbState } from '@/components/ui/CitationMark';
 import type { Link } from '@/lib/types';
 import { addScreenshotsToCard, enrichScreenshots, enrichStep, MAX_CARD_SCREENSHOTS } from '@/lib/enrich';
 import { hapticSuccess } from '@/lib/haptics';
@@ -38,6 +39,11 @@ import ScreenshotStrip, { toPickedImages, type PickedImage } from '@/components/
  * it in the same slot for both), so the processing → done transition is seen
  * by the same component and can celebrate it. Follows the CARD's language.
  */
+/** The mark's motion per progress step (one verb, one motion, app-wide; see
+ *  lib/scanPhases.ts): sending is in flight, reading scans, rewriting shapes
+ *  the output, connections are worked out. */
+const STEP_ORBS: OrbState[] = ['working', 'searching', 'shaping', 'solving'];
+
 export default function ScreenshotEnrich({
     link,
     uid,
@@ -185,7 +191,9 @@ export default function ScreenshotEnrich({
             <div className={className} dir={isRtl ? 'rtl' : 'ltr'}>
                 <div className="rounded-2xl border border-accent/30 bg-accent/5 p-4" role="status" aria-live="polite">
                     <div className="flex items-center gap-2 text-[14px] font-semibold text-text">
-                        <Sparkles className="w-4 h-4 text-accent shrink-0" aria-hidden="true" />
+                        {/* The Machina mark, moving with the step's verb: the
+                            same mark and motions a capture shows while saving. */}
+                        <CitationMark state={STEP_ORBS[active]} size={20} className="text-accent" />
                         {t(
                             n > 1 ? `Machina is reading your ${n} screenshots` : 'Machina is reading your screenshot',
                             n > 1 ? `Machina קורא את ${n} צילומי המסך שלך` : 'Machina קורא את צילום המסך שלך',
@@ -216,7 +224,7 @@ export default function ScreenshotEnrich({
                                         {done ? (
                                             <Check className="w-3.5 h-3.5 text-accent" aria-hidden="true" />
                                         ) : current ? (
-                                            <Loader2 className="w-3.5 h-3.5 animate-spin text-accent" aria-hidden="true" />
+                                            <CitationMark state={STEP_ORBS[i]} size={16} className="text-accent" />
                                         ) : (
                                             <span className="w-1.5 h-1.5 rounded-full bg-border-strong" aria-hidden="true" />
                                         )}
@@ -264,7 +272,7 @@ export default function ScreenshotEnrich({
                             onClick={() => send(picks)}
                             className="flex-1 inline-flex items-center justify-center gap-2 h-11 px-3 whitespace-nowrap rounded-xl bg-accent text-accent-ink text-[14px] font-bold hover:bg-accent-hover active:scale-[0.98] transition-all shadow-lg shadow-accent/20"
                         >
-                            <Sparkles className="w-4 h-4" aria-hidden="true" />
+                            <CitationMark state="listening" size={18} />
                             {t(n > 1 ? `Analyze all ${n}` : 'Analyze', n > 1 ? `ניתוח כל ה-${n}` : 'ניתוח')}
                         </button>
                         <button
@@ -351,16 +359,26 @@ export default function ScreenshotEnrich({
         ? t('Add screenshots of it and Machina reads it in full, right into this card.', 'הוסיפו צילומי מסך שלו ו-Machina יקרא אותו במלואו, ישר לתוך הכרטיס.')
         : t('Share a screenshot of it for the full card.', 'שתפו צילום מסך שלו כדי לקבל כרטיס מלא.');
 
+    // One panel, read top to bottom: what's missing, how to fix it (with the
+    // long-post hint in the same paragraph), then the one action. Nothing sits
+    // under the button, so the copy never splits around it (owner, build 1335).
     return (
         <div className={className} dir={isRtl ? 'rtl' : 'ltr'}>
-            <p className="flex items-start gap-2 text-[13px] leading-relaxed text-text-muted">
-                <EyeOff className="w-3.5 h-3.5 mt-[3px] shrink-0" aria-hidden="true" />
-                <span className="min-w-0">{line} {hint}</span>
-            </p>
-            {failure && <div className="ms-[22px]">{failure}</div>}
-            {uid && (
-                <div className="mt-2.5 ms-[22px]">
-                    <div className="flex flex-wrap items-center gap-2">
+            <div className="rounded-2xl border border-border-subtle bg-card-hover p-4">
+                <p className="flex items-center gap-2 text-[14px] font-semibold text-text">
+                    <EyeOff className="w-4 h-4 shrink-0 text-text-muted" aria-hidden="true" />
+                    <span className="min-w-0">{line}</span>
+                </p>
+                <p className="mt-1.5 text-[13px] leading-relaxed text-text-muted">
+                    {hint}
+                    {uid && !failed && ' ' + t(
+                        `Long post? Take several as you scroll, up to ${MAX_CARD_SCREENSHOTS}; you'll review them before sending.`,
+                        `פוסט ארוך? צלמו כמה תוך כדי גלילה, עד ${MAX_CARD_SCREENSHOTS}. תוכלו לעבור עליהם לפני השליחה.`,
+                    )}
+                </p>
+                {failure}
+                {uid && (
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
                         {retryButtons}
                         <label htmlFor={inputId} className={pill}>
                             <ImagePlus className="w-3.5 h-3.5 shrink-0 text-accent" aria-hidden="true" />
@@ -372,18 +390,10 @@ export default function ScreenshotEnrich({
                                         : t('Try again', 'נסו שוב')}
                             </span>
                         </label>
+                        {fileInput}
                     </div>
-                    {!failed && (
-                        <p className="mt-1.5 text-[12px] text-text-muted/80 leading-snug">
-                            {t(
-                                `Long post? Take several as you scroll, up to ${MAX_CARD_SCREENSHOTS}. You'll review them before anything is sent.`,
-                                `פוסט ארוך? צלמו כמה תוך כדי גלילה, עד ${MAX_CARD_SCREENSHOTS}. תוכלו לעבור עליהם לפני השליחה.`,
-                            )}
-                        </p>
-                    )}
-                    {fileInput}
-                </div>
-            )}
+                )}
+            </div>
         </div>
     );
 }

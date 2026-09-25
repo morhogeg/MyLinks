@@ -6,9 +6,10 @@ import { getCategoryColorStyle } from '@/lib/colors';
 import { getDirection } from '@/lib/rtl';
 import { getPlatform, platformIcon, platformColor, PLATFORM_LABELS, xHandle, prettyHost } from '@/lib/platform';
 import { hapticLight, hapticMedium } from '@/lib/haptics';
-import { Star, Check, Trash2, StickyNote, Lock, MoreHorizontal, EyeOff, Loader2 } from 'lucide-react';
+import { Star, Check, Trash2, StickyNote, Lock, MoreHorizontal, EyeOff } from 'lucide-react';
 import { getNotes } from '@/lib/notes';
 import CardActionSheet from './CardActionSheet';
+import CitationMark from './ui/CitationMark';
 
 interface ListCardProps {
     link: Link;
@@ -238,7 +239,7 @@ function ListCard({
                             live in the open view, never on the face. */}
                         {link.enrichStatus === 'processing' ? (
                             <span className="shrink-0 inline-flex items-center text-accent" role="status" title="Updating from your screenshots" aria-label="Updating from your screenshots">
-                                <Loader2 className="w-3 h-3 animate-spin" />
+                                <CitationMark state="working" size={14} />
                             </span>
                         ) : link.captureQuality === 'partial'
                             && link.sourceType !== 'image'

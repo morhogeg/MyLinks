@@ -2388,6 +2388,14 @@ exact-match, capped.
   pass). Existing tagless cards are NOT backfilled — re-analyze to fix.
   Not verified on a live Gemini call here. **SHIPPED** as merge `6c463a9`,
   functions deploy #117 (unscoped, all) green; backend-only, no TestFlight.
+- **2026-09-25 (later) — SCREENSHOT COMPLETION, DEVICE ROUND 1 (build
+  1335 QA: "works very well").** The Machina mark (`CitationMark`) replaces
+  the sparkle icon (progress header, Analyze button) and the spinner (active
+  step, feed/list "Updating" marker), each step with its own verb motion
+  (working/searching/shaping/solving, `STEP_ORBS`). The first-open block on
+  a partial card is one panel: bold "couldn't read" line, one paragraph with
+  the fix + long-post hint, then the button; nothing splits around it.
+  Web + TestFlight only, no backend. Render-verified 390px light+dark, EN+HE.
 - **2026-09-25 — SCREENSHOT COMPLETION REBUILT (Facebook/LinkedIn partial
   cards).** Owner: no confirmation the card was saved, no sign it was being
   read, no "Analyze" step, nothing said several screenshots were allowed, and

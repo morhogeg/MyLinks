@@ -3,7 +3,7 @@
 
 
 import { Link, StatusChangeHandler, CardShareMode } from '@/lib/types';
-import { Archive, Star, Clock, Trash2, Bell, Pencil, Circle, Check, MoreHorizontal, ExternalLink, Layers, Share2, RotateCcw, AlertTriangle, StickyNote, Lock, ImageOff, Image as ImageIcon, Images, EyeOff, Loader2 } from 'lucide-react';
+import { Archive, Star, Clock, Trash2, Bell, Pencil, Circle, Check, MoreHorizontal, ExternalLink, Layers, Share2, RotateCcw, AlertTriangle, StickyNote, Lock, ImageOff, Image as ImageIcon, Images, EyeOff } from 'lucide-react';
 import { useState, memo } from 'react';
 import SourceByline from './SourceByline';
 import { cardThumbnailUrl } from '@/lib/cardThumbnail';
@@ -702,7 +702,7 @@ function Card({
                                    say so on the face, so the work is visible
                                    after the open card is closed. */
                                 <span role="status" className="flex items-center gap-1 text-accent">
-                                    <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" />
+                                    <CitationMark state="working" size={14} />
                                     {isRtl ? 'מתעדכן' : 'Updating'}
                                 </span>
                             ) : link.captureQuality === 'partial'
