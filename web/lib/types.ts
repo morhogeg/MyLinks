@@ -173,6 +173,12 @@ export interface Link {
   // short `enrichError` so the card can offer another try.
   enrichStatus?: 'processing' | 'failed';
   enrichError?: string;
+  // Which step the screenshot read is on while `enrichStatus` is 'processing'
+  // (written by the worker, cleared on either outcome), and how many
+  // screenshots the card is being / was completed from. Adding more to a
+  // completed card re-reads the earlier ones together with the new.
+  enrichStage?: 'queued' | 'reading' | 'analyzing' | 'connecting';
+  enrichCount?: number;
   // Bulk import provenance (POST /api/import, ImportSheet). `importedAt` is
   // when the import ran; `importedFromAt` is the ORIGINAL save date the export
   // carried (a bookmark's ADD_DATE, Pocket's time_added), kept beside

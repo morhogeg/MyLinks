@@ -1051,7 +1051,8 @@ class GeminiService:
                                  content_type: str = None, image_is_primary: bool = False,
                                  image_text_dense: bool = False,
                                  attempts: int = _MAX_GENERATE_ATTEMPTS,
-                                 existing_categories: list = None) -> dict:
+                                 existing_categories: list = None,
+                                 user_screenshots: bool = False) -> dict:
         """Analyze text PLUS the images embedded in it in a SINGLE multimodal Gemini
         call, so the resulting card reflects what the images show — not just the
         surrounding words.
@@ -1088,6 +1089,14 @@ class GeminiService:
         misread there fabricates specifics. Latin-script posts keep MEDIUM
         (adequate, and the cost difference is real); resolution is only ever
         raised by this check, never lowered.
+
+        `user_screenshots` is the "Add screenshots" path that completes a
+        partial card: the images are the USER'S OWN screenshots of the post,
+        in reading order, often several of one long post scrolled top to
+        bottom. It adds the reading-order / overlap / whole-text rules that
+        analyze_images uses for a screenshot save, and reads at HIGH
+        resolution unconditionally (the same reasoning as analyze_images: the
+        screenshot IS the content here, and MEDIUM misreads dense text).
 
         Raises AnalysisError on failure so the caller can fall back to text-only.
         """
@@ -1142,6 +1151,26 @@ gap with a place, name, or date from your own knowledge."""
                                     else "MEDIA_RESOLUTION_MEDIUM")
             else:
                 media_resolution = "MEDIA_RESOLUTION_LOW"
+
+        if user_screenshots:
+            n = len(images)
+            order = (f"""
+The {n} screenshots are IN READING ORDER: the user scrolled through ONE long post and
+captured it top to bottom (screenshot 1 is the top, screenshot {n} the end). They are
+not separate items: read them as one continuous text. Consecutive screenshots usually
+OVERLAP (the last lines of one repeat at the top of the next): count repeated lines
+once, never twice. The conclusion is often in the last screenshot, so a summary drawn
+only from the first ones is incomplete.""" if n > 1 else "")
+            image_guidance += f"""
+{order}
+These are the user's own screenshots, taken because the page could not be read. COVER
+THE WHOLE POST: the analysis must span its entire text, from the first line to the
+last, and carry its specific points (names, numbers, steps, the outcome), so the card
+says everything the post says that the preview above did not. The post is the content:
+ignore the app's interface, like/comment counts, ads, suggested posts and the comment
+thread below the post.
+Write the card in the post's own language."""
+            media_resolution = "MEDIA_RESOLUTION_HIGH"
 
         prompt = f"""{SYSTEM_PROMPT}{tags_context}{cats_context}
 

@@ -16,12 +16,13 @@ import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
 import { compressImage } from '@/lib/image';
-import { hapticSuccess, hapticLight, hapticSelection } from '@/lib/haptics';
+import { hapticSuccess } from '@/lib/haptics';
 import { offerUpgradeFor } from '@/lib/entitlement';
 import ImageScanProgress from '@/components/ImageScanProgress';
 import VideoScanProgress from '@/components/VideoScanProgress';
 import LinkScanProgress from '@/components/LinkScanProgress';
 import ImportSheet from '@/components/ImportSheet';
+import ScreenshotStrip, { toPickedImages, type PickedImage } from '@/components/ScreenshotStrip';
 import { enqueueOfflineSave } from '@/lib/offlineSave';
 
 interface AddLinkFormProps {
@@ -138,7 +139,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
     // ONE card. One image keeps today's fast sync path; 2+ go through the
     // background pipeline. The strip below is the ordering answer — the order is
     // visible and editable (drag to reorder), never whatever the OS handed back.
-    const [images, setImages] = useState<{ id: string; file: File; preview: string }[]>([]);
+    const [images, setImages] = useState<PickedImage[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     // Link-tab input that holds no URL (e.g. a pasted sentence): shown as a
@@ -364,8 +365,6 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
     // ── Image strip: add / remove / drag-to-reorder ──────────────────────────
     // Previews are object URLs — revoked on remove/clear/unmount so a long
     // session doesn't leak blobs.
-    const stripRef = useRef<HTMLDivElement>(null);
-    const [dragId, setDragId] = useState<string | null>(null);
     const imagesRef = useRef(images);
     imagesRef.current = images;
     useEffect(() => () => {
@@ -385,21 +384,9 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
         if (incoming.length > room) {
             toast.info(`Up to ${MAX_IMAGES} images per card. Kept the first ${room}.`);
         }
-        const added = incoming.slice(0, room).map((file) => ({
-            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            file,
-            preview: URL.createObjectURL(file),
-        }));
+        const added = toPickedImages(incoming.slice(0, room));
         if (added.length === 0) return;
         setImages((prev) => [...prev, ...added]);
-    };
-
-    const removeImage = (id: string) => {
-        setImages((prev) => {
-            const gone = prev.find((im) => im.id === id);
-            if (gone) URL.revokeObjectURL(gone.preview);
-            return prev.filter((im) => im.id !== id);
-        });
     };
 
     const clearImages = () => {
@@ -407,53 +394,6 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
             prev.forEach((im) => URL.revokeObjectURL(im.preview));
             return [];
         });
-    };
-
-    // Drag-to-reorder: pointer-based so it works identically for touch and
-    // mouse. The grid is a single row of MAX_IMAGES equal columns, so the
-    // target slot is pure x-position math; the array reorders LIVE under the
-    // finger (tiles are keyed by id, so React moves the nodes and pointer
-    // capture keeps the events flowing to the grabbed tile).
-    const slotFromX = (clientX: number) => {
-        const el = stripRef.current;
-        if (!el) return -1;
-        const rect = el.getBoundingClientRect();
-        const slot = Math.floor(((clientX - rect.left) / rect.width) * MAX_IMAGES);
-        return Math.max(0, Math.min(imagesRef.current.length - 1, slot));
-    };
-
-    const onTilePointerDown = (e: React.PointerEvent, id: string) => {
-        if (isLoading || images.length < 2) return;
-        e.currentTarget.setPointerCapture(e.pointerId);
-        // Pickup buzz: the tile is "lifted" (it also rings + scales) so the user
-        // knows the drag has started before they move a millimeter.
-        hapticLight();
-        setDragId(id);
-    };
-
-    const onTilePointerMove = (e: React.PointerEvent) => {
-        if (!dragId) return;
-        const to = slotFromX(e.clientX);
-        if (to < 0) return;
-        const from = imagesRef.current.findIndex((im) => im.id === dragId);
-        if (from === -1 || from === to) return;
-        // The reorder is otherwise easy to miss (tiles swap under the finger),
-        // so every crossed slot ticks — the same detent feel as an iOS picker.
-        hapticSelection();
-        setImages((prev) => {
-            const prevFrom = prev.findIndex((im) => im.id === dragId);
-            if (prevFrom === -1 || prevFrom === to) return prev;
-            const next = [...prev];
-            const [moved] = next.splice(prevFrom, 1);
-            next.splice(to, 0, moved);
-            return next;
-        });
-    };
-
-    const endImageDrag = () => {
-        // Drop buzz: confirms the new order is committed.
-        if (dragId) hapticLight();
-        setDragId(null);
     };
 
     // In-dialog ramp for the processing link: max(time-ramp, stage floor),
@@ -1087,51 +1027,12 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                                            drag to reorder — instead of trusting whatever
                                            order the OS handed the files back in. */
                                         <div className="flex flex-col justify-center gap-3">
-                                            <div ref={stripRef} className="grid grid-cols-5 gap-2">
-                                                {images.map((im, i) => (
-                                                    <div
-                                                        key={im.id}
-                                                        onPointerDown={(e) => onTilePointerDown(e, im.id)}
-                                                        onPointerMove={onTilePointerMove}
-                                                        onPointerUp={endImageDrag}
-                                                        onPointerCancel={endImageDrag}
-                                                        className={`relative aspect-[3/4] rounded-xl overflow-hidden border select-none touch-none transition-all duration-200 ${dragId === im.id
-                                                            ? 'border-transparent ring-2 ring-accent scale-105 shadow-xl z-10'
-                                                            : 'border-border-subtle'
-                                                            } ${images.length > 1 ? 'cursor-grab active:cursor-grabbing' : ''}`}
-                                                    >
-                                                        <img
-                                                            src={im.preview}
-                                                            alt={`Image ${i + 1}`}
-                                                            draggable={false}
-                                                            className="w-full h-full object-cover pointer-events-none"
-                                                        />
-                                                        {images.length > 1 && (
-                                                            <span className="absolute bottom-1 start-1 min-w-4 h-4 px-1 rounded-full bg-black/65 text-white text-[9px] font-bold flex items-center justify-center pointer-events-none">
-                                                                {i + 1}
-                                                            </span>
-                                                        )}
-                                                        <button
-                                                            type="button"
-                                                            aria-label={`Remove image ${i + 1}`}
-                                                            onPointerDown={(e) => e.stopPropagation()}
-                                                            onClick={() => removeImage(im.id)}
-                                                            className="absolute top-1 end-1 w-5 h-5 rounded-full bg-black/65 text-white flex items-center justify-center hover:bg-black/85 active:scale-90 transition-all"
-                                                        >
-                                                            <X className="w-3 h-3" />
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                                {images.length < MAX_IMAGES && (
-                                                    <label
-                                                        htmlFor="image-upload"
-                                                        aria-label="Add another image"
-                                                        className="aspect-[3/4] rounded-xl border-2 border-dashed border-border-strong flex items-center justify-center cursor-pointer text-text-muted transition-all hover:border-accent/50 hover:text-accent hover:bg-fill-subtle"
-                                                    >
-                                                        <Plus className="w-4 h-4" />
-                                                    </label>
-                                                )}
-                                            </div>
+                                            <ScreenshotStrip
+                                                images={images}
+                                                setImages={setImages}
+                                                max={MAX_IMAGES}
+                                                addInputId="image-upload"
+                                            />
                                             <p className="text-[11px] text-text-muted text-center leading-snug">
                                                 {images.length === 1
                                                     ? `Add up to ${MAX_IMAGES} screenshots of one post. They become a single card.`

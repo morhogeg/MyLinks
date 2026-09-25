@@ -454,6 +454,39 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [procSig]);
 
+    // SCREENSHOT READ LANDED WHILE ITS CARD WAS CLOSED. "Add screenshots"
+    // (ScreenshotEnrich) runs in the background and says "you can close the
+    // card"; this is the promise kept: when a card leaves enrichStatus
+    // 'processing', say how it went, with a way back to it. The open card
+    // announces its own outcome, so it is skipped here.
+    const enrichWatch = useRef<Map<string, true>>(new Map());
+    // Changes when a card enters or leaves processing; the effect reads the
+    // outcome off `links`.
+    const enrichSig = links
+        .filter((l) => l.enrichStatus === 'processing')
+        .map((l) => l.id)
+        .join(',');
+    useEffect(() => {
+        const watching = enrichWatch.current;
+        for (const l of links) {
+            if (l.enrichStatus === 'processing') { watching.set(l.id, true); continue; }
+            if (!watching.has(l.id)) continue;
+            watching.delete(l.id);
+            if (l.id === activeLinkId) continue;
+            const he = l.language === 'he';
+            const open = { label: he ? 'פתיחה' : 'Open', onClick: () => setActiveLinkId(l.id) };
+            if (l.enrichStatus === 'failed') {
+                toast.error(he ? 'לא הצלחנו לקרוא את צילומי המסך.' : 'Couldn’t read those screenshots.', open);
+            } else {
+                const n = l.enrichCount ?? 0;
+                toast.success(he
+                    ? (n > 1 ? `הכרטיס עודכן מ-${n} צילומי מסך` : 'הכרטיס עודכן מצילום המסך')
+                    : (n > 1 ? `Card updated from ${n} screenshots` : 'Card updated from your screenshot'), open);
+            }
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [enrichSig]);
+
     // EVIDENCE THAT A SHARED CAPTURE LANDED: the newest capture clock among cards
     // that are NOT processing — i.e. a save that is genuinely finished. The
     // optimistic Share-Extension bridge waits for this to reach its own capture's

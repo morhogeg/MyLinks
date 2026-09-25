@@ -1982,6 +1982,22 @@ PM-F. **[ ] Follow-ups from the 2026-09-03 product-review build (all small, none
     `_cap_list(c.get("videoHighlights"))` / `speakers`, and
     `search.py build_embedding_text` for the trigger/backfill callers.
 
+PM-H. **[ ] Owner QA for the 2026-09-25 screenshot-completion rebuild (see §9;
+    supersedes PM-G (a)):** on a Facebook partial card: (a) the line ends in
+    **"Add screenshots"** with "Long post? Take several as you scroll, up to 5";
+    (b) pick 3 screenshots of one long post: nothing is sent yet, a numbered
+    strip appears (drag to reorder, remove, +) with **"Analyze all 3"** and
+    Cancel; (c) tap Analyze: a progress block lists "3 screenshots sent →
+    Reading the post → Rewriting the card → Finding connections" with real
+    steps ticking; the feed card shows an "Updating" spinner; (d) close the
+    card mid-read: a toast "Card updated from 3 screenshots" with **Open**
+    arrives; open with the card still up: "Card updated. Read in full from
+    your 3 screenshots" + success haptic; (e) the new summary covers the END
+    of the post (not just screenshot 1) and repeats nothing from the overlap
+    between screenshots; (f) "Missed part of the post? Add more" with 1-2 more:
+    the card is re-read from ALL of them, earlier content kept; (g) free plan
+    at its limit: Analyze opens the paywall. Hebrew post: the whole block is
+    Hebrew/RTL.
 PM-G. **[ ] Owner QA for the 2026-09-04 card-trust round (see §9):** (a) open
     the Crispy Kitchens (Facebook) card → the partial line now ends in an
     **"Add a screenshot"** button (no trailing "How"); pick the post's
@@ -2349,6 +2365,39 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-25 — SCREENSHOT COMPLETION REBUILT (Facebook/LinkedIn partial
+  cards).** Owner: no confirmation the card was saved, no sign it was being
+  read, no "Analyze" step, nothing said several screenshots were allowed, and
+  the rewritten card must actually add the post's content. Branch
+  `claude/facebook-screenshot-flow-cemikm`. **Flow** (`web/components/
+  ScreenshotEnrich.tsx`, replaces `PartialCaptureNote` in LinkDetailModal):
+  ask ("Add screenshots", long-post hint) → review in the ordered strip, now
+  shared with the + Image tab (`ScreenshotStrip.tsx`, extracted from
+  AddLinkForm, RTL-aware drag math) → explicit **Analyze** → progress list
+  anchored to a new backend `enrichStage` (queued/reading/analyzing/
+  connecting) → "Card updated" + haptic, then a permanent "Read from your N
+  screenshots" line with **Add more** while under 5 → failure shows the
+  backend's user-worded `enrichError` + Try again with the same picks. One
+  instance spans partial→completed so it sees the transition. Feed/List
+  cards show an "Updating" spinner while `enrichStatus: 'processing'`; Feed
+  toasts the outcome (with Open) when the card isn't the open one. 429 on
+  enrich now opens the paywall (`lib/enrich.ts`). **Quality (backend):**
+  `analyze_text_with_images(user_screenshots=True)` always reads at HIGH
+  resolution (was MEDIUM for Latin posts) and adds the screenshot-save rules:
+  reading order, overlapping lines between scrolled screenshots counted
+  once, cover the whole post to the last line with its specifics, ignore UI/
+  comments/ads. **Add more keeps the earlier screenshots**
+  (`_card_enrich_screenshots`): `share_ingest` prepends the card's prior
+  enrich screenshots (cap `MAX_CARD_IMAGES`, 400 with "room for N more") so
+  the worker re-reads the full set together; context text says so. New card
+  fields `enrichStage`, `enrichCount`. **Verified:** tsc 0, eslint clean on
+  touched files (one pre-existing warning), em-dash gate clean, py_compile,
+  **pytest 1247 passed** (enrich suite 17→23), all five states rendered
+  via a throwaway harness at 390px light+dark (EN + HE) and read; the
+  Analyze label was shortened after it wrapped. **NOT verified:** on device,
+  the Gemini read quality on real Facebook screenshots, the live Firestore
+  stage writes. Needs a functions deploy (`share_ingest`,
+  `process_link_background`) + hosting; no Swift change. Owner QA: §4 PM-H.
 - **2026-09-24 — LAUNCH EDGE-CASE PASS (4 read-only audits → 5 parallel
   fix agents in worktrees → cross-agent review → fix round).** Branch
   `claude/onboarding-edge-cases-xn54vh`; verified tsc 0, pytest 1241 pass,
