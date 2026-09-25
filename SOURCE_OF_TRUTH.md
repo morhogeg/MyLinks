@@ -2405,7 +2405,8 @@ exact-match, capped.
   green. TestFlight run #337 failed at Archive on an infra error (GitHub
   returned 500 downloading `FBSDKShareKit-Dynamic_XCFramework.zip` during SPM
   resolve, before any compile); the re-run API 403s from the session, so the
-  build was re-triggered by pushing this docs commit to `trigger/testflight`.
+  build was re-triggered by pushing this docs commit to `trigger/testflight`:
+  run #338 → **build 1338** green (uploaded 20:41 UTC). Owner QA pending.
 - **2026-09-25 — Tag round 5: screenshot/YouTube cards no longer end up
   with ZERO tags.** Owner's Hebrew screenshot card (baby-crying, Health)
   had a great analysis and no tags. Cause: `analyze_images` /
