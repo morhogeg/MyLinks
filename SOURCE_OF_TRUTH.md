@@ -233,7 +233,15 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (2026-09-24): install build **1334** (launch edge-case pass), then the steps below
+> ## 🚨 OWNER ACTION (2026-09-25): install build **1335** (screenshot-completion rebuild), then the 1334 steps below if not yet done
+>
+> **1335** (run #335, merge `2cbfdbf`; backend live via functions #116/#117)
+> rebuilds "Add screenshots" on Facebook/LinkedIn partial cards: review strip
+> + **Analyze** button, real progress steps, "Card updated" confirmation,
+> feed "Updating" spinner + toast, "Add more" that re-reads all screenshots
+> together, and a stricter HIGH-resolution whole-post read. QA: §4 PM-H.
+>
+> ## (superseded) OWNER ACTION (2026-09-24): install build **1334** (launch edge-case pass), then the steps below
 >
 > **SHIPPED 2026-09-24** as merge `18a304e`: TestFlight run #334 → **build
 > 1334** built + uploaded green (first compile of the Swift changes — it
@@ -2410,8 +2418,12 @@ exact-match, capped.
   via a throwaway harness at 390px light+dark (EN + HE) and read; the
   Analyze label was shortened after it wrapped. **NOT verified:** on device,
   the Gemini read quality on real Facebook screenshots, the live Firestore
-  stage writes. Needs a functions deploy (`share_ingest`,
-  `process_link_background`) + hosting; no Swift change. Owner QA: §4 PM-H.
+  stage writes. **SHIPPED** as merge `2cbfdbf`: functions deploy #116
+  (scoped `share_ingest,process_link_background`) green, Python tests #129
+  green, Vercel on push, TestFlight run #335 → **build 1335** green. A
+  parallel session's merge `6c463a9` (contains `2cbfdbf`) then ran an
+  unscoped deploy #117, also green, so every function carries this code. No
+  Swift change. Owner QA: §4 PM-H.
 - **2026-09-24 — LAUNCH EDGE-CASE PASS (4 read-only audits → 5 parallel
   fix agents in worktrees → cross-agent review → fix round).** Branch
   `claude/onboarding-edge-cases-xn54vh`; verified tsc 0, pytest 1241 pass,
