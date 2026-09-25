@@ -2386,7 +2386,8 @@ exact-match, capped.
   same-script vocabulary, then the backstop again. Zero extra cost on
   normal saves. Tests `functions/tests/test_tag_followup.py` (pytest 1247
   pass). Existing tagless cards are NOT backfilled — re-analyze to fix.
-  Not verified on a live Gemini call here.
+  Not verified on a live Gemini call here. **SHIPPED** as merge `6c463a9`,
+  functions deploy #117 (unscoped, all) green; backend-only, no TestFlight.
 - **2026-09-25 — SCREENSHOT COMPLETION REBUILT (Facebook/LinkedIn partial
   cards).** Owner: no confirmation the card was saved, no sign it was being
   read, no "Analyze" step, nothing said several screenshots were allowed, and
