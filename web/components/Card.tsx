@@ -3,7 +3,7 @@
 
 
 import { Link, StatusChangeHandler, CardShareMode } from '@/lib/types';
-import { Archive, Star, Clock, Trash2, Bell, Pencil, Circle, Check, MoreHorizontal, ExternalLink, Layers, Share2, RotateCcw, AlertTriangle, StickyNote, Lock, ImageOff, Image as ImageIcon, Images, EyeOff } from 'lucide-react';
+import { Archive, Star, Clock, Trash2, Bell, Pencil, Circle, Check, MoreHorizontal, ExternalLink, Layers, Share2, RotateCcw, AlertTriangle, StickyNote, Lock, ImageOff, Image as ImageIcon, Images, EyeOff, Loader2 } from 'lucide-react';
 import { useState, memo } from 'react';
 import SourceByline from './SourceByline';
 import { cardThumbnailUrl } from '@/lib/cardThumbnail';
@@ -697,7 +697,15 @@ function Card({
                                 The card face stays clean and the honest sentence
                                 (plus the screenshot fix) lives in the open view.
                                 Never on notes or screenshots, which aren't scraped. */}
-                            {link.captureQuality === 'partial'
+                            {link.enrichStatus === 'processing' ? (
+                                /* Being completed from the user's screenshots:
+                                   say so on the face, so the work is visible
+                                   after the open card is closed. */
+                                <span role="status" className="flex items-center gap-1 text-accent">
+                                    <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" />
+                                    {isRtl ? 'מתעדכן' : 'Updating'}
+                                </span>
+                            ) : link.captureQuality === 'partial'
                                 && link.sourceType !== 'image'
                                 && link.sourceType !== 'note' && (
                                 <span title="Partial capture" aria-label="Partial capture" className="flex items-center">

@@ -203,6 +203,11 @@ def test_enrich_merges_the_screenshot_read_into_the_same_card(seams):
     # read as context.
     text, images, kw = ai.calls[0]
     assert kw["image_is_primary"] is True and kw["image_text_dense"] is True
+    assert kw["user_screenshots"] is True
+    # Stages written in order, then cleared with the count of screenshots read.
+    assert [u["enrichStage"] for u in card.updates[:-1]] == ["reading", "analyzing", "connecting"]
+    assert final["enrichStage"] is main.gc_firestore.DELETE_FIELD
+    assert final["enrichCount"] == 1
     assert len(images) == 1 and images[0][1] == "image/png"
     assert "SOURCE URL: https://www.facebook.com/crispy/posts/1" in text
     assert queue.deleted
@@ -216,7 +221,14 @@ def test_enrich_failure_leaves_the_card_untouched_and_retryable(seams):
 
     main._enrich_card_with_images(queue, "q1", "u1", card, queue.doc)
 
-    assert card.updates == [{"enrichStatus": "failed", "enrichError": "vision down"}]
+    # Progress stages, then the failure with a reason written for the user
+    # (never the raw exception text).
+    assert [u["enrichStage"] for u in card.updates[:-1]] == ["reading", "analyzing"]
+    final = card.updates[-1]
+    assert final["enrichStatus"] == "failed"
+    assert "vision down" not in final["enrichError"]
+    assert "screenshots" in final["enrichError"]
+    assert final["enrichStage"] is main.gc_firestore.DELETE_FIELD
     # Nothing else moved: summary, flags, tags all as they were.
     for key in ("title", "summary", "tags", "captureQuality", "captureReason"):
         assert card.doc[key] == before[key]
@@ -262,3 +274,68 @@ def test_worker_routes_enrich_jobs_before_any_placeholder_logic(monkeypatch):
     assert seen == {"uid": "u1", "card_id": "card-9", "data": queue_doc}
     # No status writes on the queue doc from the generic path (it returned first).
     assert snapshot.reference.updates == []
+
+
+# ── Adding MORE screenshots to an already-completed card ─────────────────────
+
+def test_prior_screenshots_only_come_from_an_earlier_enrich():
+    # A scraped card's own page images are not the user's screenshots.
+    assert main._card_enrich_screenshots({"imageUrls": ["https://img/og.jpg"]}) == []
+    assert main._card_enrich_screenshots(None) == []
+    card = {"enrichedAt": 1, "imageUrls": ["https://s/1.png", "https://s/2.png", None, ""]}
+    assert main._card_enrich_screenshots(card) == ["https://s/1.png", "https://s/2.png"]
+
+
+def test_context_for_a_completed_card_says_the_earlier_screenshots_ride_along():
+    ctx = main._enrich_context_text({"url": "https://www.facebook.com/p/1", "enrichedAt": 5,
+                                     "title": "T", "summary": "S"})
+    assert "earlier screenshots" in ctx
+    assert "partial preview" not in ctx
+
+
+def test_enrich_error_messages_are_for_the_user():
+    assert "clearer" in main._enrich_error_message(main.AnalysisError("x"))
+    assert main._enrich_error_message(ValueError("Card no longer exists")) == "This card was deleted."
+    assert "try again" in main._enrich_error_message(RuntimeError("boom")).lower()
+
+
+# ── the read itself: user screenshots get the screenshot-save rules ──────────
+
+def _prompt_capturing_service():
+    from ai_service import GeminiService
+    svc = GeminiService.__new__(GeminiService)  # skip __init__ (no API key needed)
+    captured = {}
+
+    def fake_generate_json(contents, what, config_extra=None, model=None, attempts=3):
+        captured["prompt"] = contents[0]
+        captured["media_resolution"] = (config_extra or {}).get("media_resolution")
+        return {"summary": "ok"}
+
+    svc._generate_json = fake_generate_json
+    return svc, captured
+
+
+def test_user_screenshots_read_at_high_resolution_even_for_latin_posts():
+    svc, captured = _prompt_capturing_service()
+    svc.analyze_text_with_images("SOURCE URL: https://facebook.com/p/1", [(b"x", "image/png")],
+                                 image_is_primary=True, image_text_dense=True, user_screenshots=True)
+    assert captured["media_resolution"] == "MEDIA_RESOLUTION_HIGH"
+    assert "COVER THE WHOLE POST" in captured["prompt"].replace("\n", " ")
+    # One screenshot: no reading-order paragraph.
+    assert "READING ORDER" not in captured["prompt"]
+
+
+def test_several_user_screenshots_are_read_as_one_post_with_overlaps_counted_once():
+    svc, captured = _prompt_capturing_service()
+    svc.analyze_text_with_images("ctx", [(b"a", "image/png"), (b"b", "image/png"), (b"c", "image/png")],
+                                 image_is_primary=True, image_text_dense=True, user_screenshots=True)
+    prompt = captured["prompt"].replace("\n", " ")
+    assert "The 3 screenshots are IN READING ORDER" in prompt
+    assert "count repeated lines once" in prompt
+
+
+def test_other_image_posts_are_unchanged():
+    svc, captured = _prompt_capturing_service()
+    svc.analyze_text_with_images("body", [(b"x", "image/jpeg")], image_is_primary=True)
+    assert captured["media_resolution"] == "MEDIA_RESOLUTION_MEDIUM"
+    assert "WHOLE POST" not in captured["prompt"]

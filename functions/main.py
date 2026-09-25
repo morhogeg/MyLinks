@@ -3336,6 +3336,17 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                 enrich_card = enrich_snap.to_dict() if enrich_snap.exists else None
                 if not _card_accepts_screenshots(enrich_card):
                     return _error_response("This card can't take a screenshot", 400, headers)
+                # ADDING TO an already-completed card keeps its earlier
+                # screenshots: the new ones continue the post (the rest of a long
+                # one), so the worker re-reads all of them together, in order,
+                # instead of replacing the first read with a read of the tail.
+                enrich_prior_urls = _card_enrich_screenshots(enrich_card)
+                room = MAX_CARD_IMAGES - len(enrich_prior_urls)
+                if len(decoded) > room:
+                    return _error_response(
+                        f"This card has room for {room} more screenshot{'' if room == 1 else 's'}"
+                        if room > 0 else f"This card already has {MAX_CARD_IMAGES} screenshots",
+                        400, headers)
                 # An enrich is a full vision analysis (up to five images at
                 # full legibility) plus an embed and a relate call: the same
                 # paid work as a save, so it is metered as one. It used to be
@@ -3368,12 +3379,14 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                 # Stamp the card first so the detail view shows "Reading your
                 # screenshot…" the moment the request returns; the worker
                 # clears it on either outcome.
+                all_urls = enrich_prior_urls + stored_urls
                 enrich_ref.update({"enrichStatus": "processing", "enrichStartedAt": now_ms,
+                                   "enrichStage": "queued", "enrichCount": len(all_urls),
                                    "enrichError": gc_firestore.DELETE_FIELD})
                 process_ref.set({
                     "uid": uid,
-                    "url": stored_urls[0],
-                    "imageUrls": stored_urls,
+                    "url": all_urls[0],
+                    "imageUrls": all_urls,
                     "isImage": True,
                     "enrich": True,
                     "cardId": enrich_card_id,
@@ -3387,7 +3400,7 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                 logger.info(f"Share ingest queued {len(stored_urls)}-screenshot enrich for {_mask_uid(uid)}")
                 return https_fn.Response(
                     json.dumps({"success": True, "queued": True, "id": process_ref.id,
-                                "enrich": True, "count": len(stored_urls)}),
+                                "enrich": True, "count": len(all_urls)}),
                     status=200, headers=headers, mimetype='application/json'
                 )
             queue_doc = {
@@ -5161,6 +5174,16 @@ def _card_accepts_screenshots(card) -> bool:
     return bool(card.get("url"))
 
 
+def _card_enrich_screenshots(card) -> list:
+    """The screenshots an earlier "Add screenshots" already put on this web
+    card (``enrichedAt`` + ``imageUrls``), in order. Empty for a card never
+    completed that way: a scraped card's own ``imageUrls`` are page images,
+    not the user's screenshots, and must not be re-read as the post."""
+    if not isinstance(card, dict) or not card.get("enrichedAt"):
+        return []
+    return [u for u in (card.get("imageUrls") or []) if isinstance(u, str) and u][:MAX_CARD_IMAGES]
+
+
 def _enrich_context_text(card: dict) -> str:
     """What the model is told about the card the screenshots complete: the
     source URL and the partial read it produced. The screenshots are the
@@ -5169,8 +5192,12 @@ def _enrich_context_text(card: dict) -> str:
     parts = [f"SOURCE URL: {card.get('url') or ''}"]
     if card.get("sourceName"):
         parts.append(f"POSTED BY: {card['sourceName']}")
-    parts.append("WHAT COULD BE READ FROM THE PAGE (a partial preview only; the screenshot(s) "
-                 "are the FULL post and take precedence wherever they differ):")
+    if card.get("enrichedAt"):
+        parts.append("WHAT THE CARD SAYS NOW (read from the user's earlier screenshots, which are "
+                     "attached again below together with the new ones; read them all as one post):")
+    else:
+        parts.append("WHAT COULD BE READ FROM THE PAGE (a partial preview only; the screenshot(s) "
+                     "are the FULL post and take precedence wherever they differ):")
     for key in ("title", "summary", "detailedSummary"):
         v = card.get(key)
         if isinstance(v, str) and v.strip():
@@ -5211,6 +5238,27 @@ def _merge_tags(existing, fresh) -> list:
     return out[:12]
 
 
+def _enrich_stage(card_ref, stage: str) -> None:
+    """Tell the open card which step the screenshot read is on ("reading" →
+    "analyzing" → "connecting"), so its progress is anchored to real work and
+    not a guess. Best effort: a missed stage write never fails the enrich."""
+    try:
+        card_ref.update({"enrichStage": stage})
+    except Exception as e:
+        logger.warning(f"Could not record enrich stage {stage}: {e}")
+
+
+def _enrich_error_message(e: Exception) -> str:
+    """The short reason the card shows when a screenshot read fails. Written
+    for the user (the raw exception goes to the log), so it says what to do."""
+    if isinstance(e, AnalysisError):
+        return "Machina couldn’t read the post in these screenshots. Try clearer ones that show the post’s text."
+    msg = str(e)
+    if "no longer exists" in msg:
+        return "This card was deleted."
+    return "Something went wrong reading the screenshots. Please try again."
+
+
 def _enrich_card_with_images(ref, task_id: str, uid: str, card_ref, data: dict) -> None:
     """Complete a partial card with the user's screenshots of the post.
 
@@ -5238,6 +5286,7 @@ def _enrich_card_with_images(ref, task_id: str, uid: str, card_ref, data: dict) 
             raise ValueError("No screenshots to read")
 
         ref.update({"status": "downloading_image"})
+        _enrich_stage(card_ref, "reading")
         image_parts = []
         for img_url in image_urls:
             img_response = safe_get(img_url, timeout=30)
@@ -5247,16 +5296,20 @@ def _enrich_card_with_images(ref, task_id: str, uid: str, card_ref, data: dict) 
         existing_tags, existing_categories = get_user_vocabulary(uid)
         ai = GeminiService()
         ref.update({"status": "analyzing_image"})
+        _enrich_stage(card_ref, "analyzing")
         analysis = ai.analyze_text_with_images(
             _enrich_context_text(card), image_parts,
             existing_tags=existing_tags, existing_categories=existing_categories,
             # The screenshot IS the post: read it at full legibility and trust
-            # it over the preview text (the Instagram rules, for the same reason).
-            image_is_primary=True, image_text_dense=True,
+            # it over the preview text (the Instagram rules, for the same
+            # reason), plus the reading-order / overlap / whole-post rules of
+            # a screenshot save (user_screenshots).
+            image_is_primary=True, image_text_dense=True, user_screenshots=True,
         )
         if not isinstance(analysis, dict) or not (analysis.get("summary") or "").strip():
             raise AnalysisError("Screenshot analysis returned nothing")
 
+        _enrich_stage(card_ref, "connecting")
         embedding = ai.embed_text(_embedding_text_from_analysis(analysis))
         related_links = GraphService(get_db()).find_related_links(
             new_link_id=card_id,
@@ -5285,8 +5338,10 @@ def _enrich_card_with_images(ref, task_id: str, uid: str, card_ref, data: dict) 
             "captureQuality": gc_firestore.DELETE_FIELD,
             "captureReason": gc_firestore.DELETE_FIELD,
             "enrichStatus": gc_firestore.DELETE_FIELD,
+            "enrichStage": gc_firestore.DELETE_FIELD,
             "enrichError": gc_firestore.DELETE_FIELD,
             "enrichedAt": now_ms,
+            "enrichCount": len(image_urls),
         }
         if embedding:
             update["embedding_vector"] = Vector(embedding)
@@ -5303,7 +5358,8 @@ def _enrich_card_with_images(ref, task_id: str, uid: str, card_ref, data: dict) 
         # share_ingest metered the enrich as a save; it produced nothing.
         refund_quota(uid, "saves")
         try:
-            card_ref.update({"enrichStatus": "failed", "enrichError": str(e)[:200]})
+            card_ref.update({"enrichStatus": "failed", "enrichError": _enrich_error_message(e),
+                             "enrichStage": gc_firestore.DELETE_FIELD})
         except Exception as write_err:
             logger.error(f"Could not record enrich failure: {write_err}")
         try:
