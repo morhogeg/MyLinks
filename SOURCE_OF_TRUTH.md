@@ -233,7 +233,7 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (2026-09-25): install build **1335** (screenshot-completion rebuild), then the 1334 steps below if not yet done
+> ## 🚨 OWNER ACTION (2026-09-25): install build **1336** (screenshot-completion rebuild + Machina-mark round; 1335 was the first cut), then the 1334 steps below if not yet done
 >
 > **1335** (run #335, merge `2cbfdbf`; backend live via functions #116/#117)
 > rebuilds "Add screenshots" on Facebook/LinkedIn partial cards: review strip
@@ -2396,6 +2396,8 @@ exact-match, capped.
   a partial card is one panel: bold "couldn't read" line, one paragraph with
   the fix + long-post hint, then the button; nothing splits around it.
   Web + TestFlight only, no backend. Render-verified 390px light+dark, EN+HE.
+  **SHIPPED** as merge `9b87842`: Vercel on push, TestFlight run #336 →
+  **build 1336** green (uploaded 08:38 UTC).
 - **2026-09-25 — SCREENSHOT COMPLETION REBUILT (Facebook/LinkedIn partial
   cards).** Owner: no confirmation the card was saved, no sign it was being
   read, no "Analyze" step, nothing said several screenshots were allowed, and
