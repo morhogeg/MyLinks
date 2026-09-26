@@ -2377,6 +2377,122 @@ Promise opens, loss-aversion closes. Same session: the recipe card became
 from books" still shares no word with it), the Manson title is shortened so
 the Ask chip never truncates, and two-sentence captions break at the sentence.
 
+*Short-form reels (PLANNED 2026-09-26, owner):* one 15–20s all-out motion
+graphics "highlight reel" (the PILOT), then five 15s single-feature clips
+(Save, Find, Ask, Connect, Revisit), all vertical 1080×1920, all built in
+`marketing/launch-clip/` so they share the film's code, look and **narrator**
+(Kokoro `af_heart`, default speed 0.95, "Machina" spoken "Makeena" via
+`SAY_NAME` in `audio/synth-vo.py`; it is synthesized, so an outside video
+tool such as Sora, Veo or Runway cannot reproduce it). **Order matters:** the pilot's job is
+to CREATE the shared motion system (a reel kit + a written "Motion language"
+section in `marketing/launch-clip/README.md`); the five feature clips must
+reuse it, which is how the series and every later video stay one design
+language. The feature prompts below are briefs, to be finalized once the
+pilot's kit and README section exist. The pilot's prompt, verbatim as sent
+to its session:
+
+> **Machina highlight reel (pilot).** Go all out: make a dynamic 15–20
+> second motion graphics reel for Machina that would sit at the top of a
+> world-class motion designer's showreel, and at the same time lay down the
+> design system every future Machina video will be built from. Think
+> Apple keynote product-reveal energy: kinetic type, match cuts, camera
+> moves through real UI, cuts locked to the beat.
+>
+> **Read first:** `CLAUDE.md`; `SOURCE_OF_TRUTH.md` §1 and §8 (the "Launch
+> film" + "Short-form reels" paragraphs); `docs/BRANDING.md` (D-1, D-3,
+> D-6); `marketing/launch-clip/README.md`; `timeline.mjs`; `src/theme.ts`;
+> `src/film/anim.ts`, `effects.tsx`, `format.ts`; `src/ui/*`;
+> `audio/synth-vo.py`, `mix-vo.mjs`, `score.mjs`, `verify.mjs`. Then skim
+> the shipped app (`web/components/`, `web/app/globals.css`) for the
+> surfaces you show, so nothing drifts from what users actually see.
+>
+> **Build it in `marketing/launch-clip/`, not a new project.** Add new
+> compositions `MachinaReel` (vertical 1080×1920, score + narrator +
+> captions, THE deliverable), `MachinaReelSilent` and `MachinaReelClean`.
+> The 80s launch film must render exactly as before; do not change its
+> timeline, captions or VO.
+>
+> **Content, one idea per beat, 15–20s total:** the hook (saves scattered
+> across apps, collapsing into one point, the brackets closing into the
+> `[ MACHINA ]` mark), then rapid-fire the five pillars in the app's real
+> UI: **Save** (share sheet → the real five-phase pipeline from
+> `web/lib/scanPhases.ts`), **Find** (a plain-words search landing on the
+> one card it means), **Ask** (a question → an answer with citation chips
+> from different platforms: the hero beat, give it the most time),
+> **Connect** (graph edges drawing / cards clustering into a collection),
+> **Revisit** (the Daily Brew review deck dealing today's cards), then the
+> lockup ending on the subtitle `Never lose another great find`. Script
+> the narrator for the ear: short lines, few of them, room to breathe;
+> the intro line is the tagline ("Machina. Everything you save, finally
+> useful."), the close is the subtitle.
+>
+> **Brand rules (non-negotiable):** light grade, ink on paper, Geist, colors
+> only from `src/theme.ts` (the ported `globals.css` tokens), the app's
+> real wordmark/glyph from `Brand.tsx`, and the app's own curves
+> (`EASE_MODAL`, `EASE_SPRING`) as the motion personality. Go all out
+> INSIDE that palette (depth, parallax, masks, kinetic type, light, texture,
+> precise timing); no neon, glitch, chromatic aberration, stock-template
+> look or dark-mode flip. **No literal "AI" and no "second brain" anywhere
+> on screen or in the voice** (D-3: the film's demo data has an "AI"
+> category and card, which is what keeps it off the landing page, §4 25c;
+> the reel must not inherit it, so pick or write demo cards that avoid it).
+> No em dashes in captions, VO or demo strings (`npm run verify` gates
+> this). Not a learning app; "search by meaning" is not the headline; the
+> word "library" appears nowhere. No copyrighted third-party frames or
+> thumbnails; platform logos only as the film already uses them. Nothing
+> claims App Store availability.
+>
+> **The narrator is the same voice:** generalize `audio/synth-vo.py` and
+> `audio/mix-vo.mjs` so they take a named script (film vs reel) while
+> sharing ONE voice config (`af_heart`, speed, `SAY_NAME`); captions and VO
+> mirror each other line for line (the `SAY_NAME` respelling and the
+> documented spoken-only connectors are the only allowed differences). The
+> score is synthesized by `audio/score.mjs`'s approach: give the reel its
+> own tempo/bar map (a reel timeline file next to `timeline.mjs`) so every
+> cut lands on the beat, and add the sound design (whooshes, ticks, sub hits
+> on card landings) to that same clock.
+>
+> **Make the language durable, this is half the job:** extract what you
+> build into a reusable reel kit (e.g. `src/reels/kit/`: transitions, the
+> kinetic-type component, camera moves, the beat/timeline helper, the
+> caption style, the lockup) that the five single-feature clips will import
+> unchanged. Then write a **"Motion language"** section in
+> `marketing/launch-clip/README.md`: palette and grade, type scale and
+> kinetic-type rules, the curves and when each is used, transition
+> vocabulary, pacing (frames per beat, hold times, max words on screen),
+> camera rules, sound-to-picture sync rules, narrator rules, and the
+> brand bans above, each with the kit component that implements it. A
+> future session should be able to make a new Machina video that matches
+> this one by reading that section and importing the kit.
+>
+> **Verify before calling it done:** `npx tsc --noEmit` in the project,
+> `npm run verify` (extend it to cover the reel: caption overlaps, VO lines
+> fitting their windows, no em dashes, no literal "AI" in reel captions,
+> VO or on-screen strings), stills of every beat rendered and actually
+> looked at, a full `MachinaReel` render exit 0, and a re-render
+> check that `MachinaLaunchVerticalVO` still builds. Send the owner the
+> rendered mp4 plus a contact sheet of stills. Say plainly what was
+> verified and what wasn't (e.g. nobody has listened to the mix).
+>
+> **Document + deliver:** commit and push to your branch (do NOT merge to
+> main; the owner reviews the cut first), update this §8 "Short-form reels"
+> paragraph with what exists and how to render it, finalize the five
+> feature-clip briefs below against the kit you built, and add a §9 entry.
+
+Feature-clip briefs (15s each, vertical, same kit + narrator + rules;
+finalize after the pilot; one idea per clip, ending on the same lockup):
+1. **Save**: one share sheet, any app (link, video, screenshot, note) →
+   the five-phase pipeline → a finished, summarized, tagged card. "One
+   tap, and it's saved, without leaving the app."
+2. **Find**: a plain-words query sharing no word with the card it lands
+   on; one result, not a filtered list.
+3. **Ask**: a question → a streamed answer → citation chips from three
+   platforms; "every answer comes straight from your saves."
+4. **Connect**: edges drawing between saves; related saves gathering into a
+   collection.
+5. **Revisit**: the Daily Brew push → the review deck dealing today's
+   cards (Keep / act on it); what you saved comes back when it matters.
+
 *Where to "advertise" for free:* X (primary), Product Hunt, Hacker News,
 r/PKMS + r/productivity (follow self-promo rules: give value first), Indie
 Hackers, a launch post on LinkedIn (the productivity-tools audience there is
@@ -2387,6 +2503,15 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-26 — Short-form reels planned; pilot handed to a new session.**
+  Branch `claude/app-feature-video-prompts-2mewy8`. Owner wants a 15–20s
+  all-out motion graphics reel plus a 5-clip feature series with the same
+  narrator. Decision: build them in `marketing/launch-clip/` (the narrator is
+  synthesized Kokoro `af_heart` via `audio/synth-vo.py`, so no external video
+  tool can match it), pilot first, and the pilot must leave a reusable reel
+  kit + a README "Motion language" section so later videos share one
+  design language. The pilot prompt and five feature briefs are in §8
+  "Short-form reels". Docs only; nothing under `web/` or `functions/` changed.
 - **2026-09-26 — DAILY BREW PUSH OPENS THE REVIEW DECK; library Review
   layout removed.** Branch `claude/ios-notification-review-flow-nppm2h`.
   Owner: tapping "Your Daily Brew" landed on the whole Revisit tab (40 "Do
