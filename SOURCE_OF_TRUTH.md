@@ -2420,7 +2420,10 @@ exact-match, capped.
   1258 pass (new `test_curate_rests_cards_handled_in_the_review_deck`).
   **NOT verified:** on device, any render of the new end screen / Revisit
   row, a live push payload, the `documentId() in` listener against the
-  rules. Owner QA: §4 PM-I.
+  rules. Owner QA: §4 PM-I. **SHIPPED** as merge `0893fc5`: Vercel on
+  push, functions deploy #119 (scoped `send_digests,force_send_digests,
+  send_digest_now`) green, Python tests #132 green, TestFlight run #339 →
+  **build 1339** green (uploaded 14:13 UTC).
 - **2026-09-25 — REMINDERS ROUND 4: sheet presets, 9 AM recurrences,
   snooze, agenda view.** Branch `claude/reminders-screen-overhaul-uz3vlu`.
   **Backend** (`reminder_service.calculate_next_reminder`): a recurring
