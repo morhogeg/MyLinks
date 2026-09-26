@@ -59,13 +59,14 @@ import NotesView from './NotesView';
 import KnowledgeGraph from './KnowledgeGraph';
 import { getNoteGroups } from '@/lib/notes';
 import LoadMoreSentinel from './feed/LoadMoreSentinel';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, AlarmClock, CheckCircle2, CheckSquare, CheckCheck, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, Share2, Globe, Plus, Pencil, Newspaper, CalendarCheck, Lock, BookOpenCheck, ChevronLeft, BarChart3, StickyNote, Waypoints, Upload } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, AlarmClock, CheckCircle2, CheckSquare, CheckCheck, Layers, List, Image as ImageIcon, Share2, Globe, Plus, Pencil, Newspaper, CalendarCheck, Lock, BookOpenCheck, ChevronLeft, BarChart3, StickyNote, Waypoints, Upload } from 'lucide-react';
 import { usePullToRefresh } from '@/lib/usePullToRefresh';
 import { useProcessingBanner } from '@/lib/useProcessingBanner';
 import { cardStartMs } from '@/lib/shareProgress';
 import { subscribeSyntheses, subscribeSynthesisNotes, saveSynthesisNotes } from '@/lib/synthesis';
 import { subscribeDigests, deleteDigest, TODAY_REVIEW_SIZE } from '@/lib/digest';
-import { reviewSessionQueue } from '@/lib/reviewQueue';
+import { isOpenInDigest } from '@/lib/reviewQueue';
+import { useDigestCards } from '@/lib/useDigestCards';
 import { PUSH_INTENT_EVENT, PUSH_FOREGROUND_EVENT, consumePendingPushIntent, readLocalPushPrompt, type PushIntent } from '@/lib/push';
 import { isNativeApp } from '@/lib/api';
 import { reportError } from '@/lib/errorReporter';
@@ -385,9 +386,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // (Task B); 'notes' is the central My Notes view. The detail places are
     // history-like: back returns to their parent list, never to the home library.
     const [viewMode, setViewMode] = useState<'grid' | 'list' | 'review' | 'graph' | 'ask' | 'collections' | 'collection' | 'digest' | 'digestDetail' | 'notes'>('grid');
-    // True while the review deck was opened from the Today tab: it deals a
-    // shorter session and its exit returns to Today instead of the library.
-    const [reviewFromToday, setReviewFromToday] = useState(false);
+    // The digest the review deck is dealing (viewMode 'review'): that digest's
+    // own card ids, its createdAt (a card kept after it counts as done) and
+    // where Done lands, Home for a push tap and Revisit for its row. Review is
+    // no longer a library layout, so the deck only ever opens with one.
+    const [reviewSession, setReviewSession] = useState<{ cardIds: string[]; since: number; returnTo: 'grid' | 'digest' } | null>(null);
+    // A push asked for a digest review before the feed or its digests loaded
+    // (cold start from the lock screen). Resolved once both are in.
+    const [pendingReview, setPendingReview] = useState<{ digestId?: string } | null>(null);
     // The collection currently open as a place (viewMode 'collection').
     const [openCollectionId, setOpenCollectionId] = useState<string | null>(null);
     // The digest currently open as a place (viewMode 'digestDetail'); a
@@ -602,14 +608,16 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     }, [uid]);
 
     // Push-notification deep links (native): a tapped notification carries
-    // {view: 'digest'} or {linkId}. Handle both the live event (app already
+    // {view: 'digest'} (plus review/digestId on the Daily Brew, which opens
+    // the review deck) or {linkId}. Handle both the live event (app already
     // running) and the intent stashed before this component mounted (cold
     // start from the lock screen). Foreground pushes surface as a toast —
     // iOS shows no OS banner while the app is frontmost.
     useEffect(() => {
         const applyIntent = (intent: PushIntent | null) => {
             if (!intent) return;
-            if (intent.view === 'digest') setViewMode('digest');
+            if (intent.review) setPendingReview({ digestId: intent.digestId });
+            else if (intent.view === 'digest') setViewMode('digest');
             else if (intent.linkId) setActiveLinkId(intent.linkId);
         };
         applyIntent(consumePendingPushIntent());
@@ -1099,9 +1107,35 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         [visibleLinks, isEffectivelyPrivateCard]
     );
 
-    // How many cards the review deck could deal right now. 0 hides Revisit's
-    // review row rather than sending the user into an empty deck.
-    const todayReviewCount = useMemo(() => reviewSessionQueue(visibleLinks).length, [visibleLinks]);
+    // Digest review. The deck deals the digest's OWN cards (the ones the push
+    // counted), not a fresh pick. A digest mostly picks old cards, which on a
+    // big library sit past the feed's loaded pages, so those few are listened
+    // to directly (useDigestCards) and merged in. Only while Revisit or the
+    // deck is on screen.
+    const latestDigest = digests[0] ?? null;
+    const reviewTargetIds = useMemo(() => {
+        if (reviewSession) return reviewSession.cardIds;
+        if (viewMode !== 'digest' || !latestDigest) return [];
+        return latestDigest.cards.map((c) => c.id).filter(Boolean);
+    }, [reviewSession, viewMode, latestDigest]);
+    const missingReviewIds = useMemo(() => {
+        const have = new Set(links.map((l) => l.id));
+        return reviewTargetIds.filter((id) => !have.has(id));
+    }, [links, reviewTargetIds]);
+    const { cards: extraReviewCards, ready: reviewCardsReady } = useDigestCards(uid ?? undefined, missingReviewIds);
+    const reviewLinks = useMemo(() => {
+        const extras = vaultLocked ? extraReviewCards.filter((l) => !isEffectivelyPrivateCard(l)) : extraReviewCards;
+        return extras.length ? [...visibleLinks, ...extras] : visibleLinks;
+    }, [visibleLinks, extraReviewCards, vaultLocked, isEffectivelyPrivateCard]);
+    // How many of the latest digest's cards are still waiting (Revisit's row).
+    const latestDigestLeft = useMemo(() => {
+        if (!latestDigest) return 0;
+        const byId = new Map(reviewLinks.map((l) => [l.id, l]));
+        return latestDigest.cards.filter((c) => {
+            const l = byId.get(c.id);
+            return !!l && isOpenInDigest(l, latestDigest.createdAt);
+        }).length;
+    }, [latestDigest, reviewLinks]);
 
     // Revisit's "Do this" list: every visible card whose takeaway is still
     // open. Derived from visibleLinks for the same reason the reminders are:
@@ -1145,19 +1179,40 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         if (link.reminderDue) void clearReminderDue(link.id);
     }, [uid, toast, clearReminderDue]);
 
-    // Today's "Review N cards" opens the same deck the library's Review mode
-    // opens, dealt a shorter session and pointed back at Today when it ends.
-    const startTodayReview = useCallback(() => {
-        setReviewFromToday(true);
+    // Open the deck on one digest's cards. Done returns to `returnTo`.
+    const startDigestReview = useCallback((digest: CuratedDigest, returnTo: 'grid' | 'digest') => {
+        setReviewSession({
+            cardIds: digest.cards.map((c) => c.id).filter(Boolean),
+            since: digest.createdAt,
+            returnTo,
+        });
         setViewMode('review');
     }, []);
-    // The deck's own exit clears the flag, but a push deep-link (or any other
-    // direct setViewMode) can leave review without passing through it. Reset on
-    // the way out so the NEXT session opened from the view switcher is a full
-    // library session again.
+    // A tab tap (or any other direct setViewMode) can leave review without the
+    // deck's Done. Drop the session on the way out so it never lingers.
     useEffect(() => {
-        if (viewMode !== 'review' && reviewFromToday) setReviewFromToday(false);
-    }, [viewMode, reviewFromToday]);
+        if (viewMode !== 'review' && reviewSession) setReviewSession(null);
+        else if (viewMode === 'review' && !reviewSession) setViewMode('grid');
+    }, [viewMode, reviewSession]);
+    // A push tap's review lands here first. Wait for the feed's first page and
+    // the digest the push named (or the newest, for a push without an id); if
+    // it never shows, fall back to Revisit rather than an empty deck.
+    useEffect(() => {
+        if (!pendingReview || isLoading) return;
+        const digest = pendingReview.digestId
+            ? digests.find((d) => d.id === pendingReview.digestId)
+            : digests[0];
+        if (digest) {
+            setPendingReview(null);
+            startDigestReview(digest, 'grid');
+            return;
+        }
+        const t = setTimeout(() => {
+            setPendingReview(null);
+            setViewMode('digest');
+        }, 4000);
+        return () => clearTimeout(t);
+    }, [pendingReview, isLoading, digests, startDigestReview]);
 
     // A pending capture (processing / failed) rendered with Card's dedicated
     // skeleton / retry treatment. Reused above both the grid and list layouts.
@@ -1826,15 +1881,12 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     const viewModes: { key: typeof viewMode; label: string; icon: React.ReactNode; hint: string }[] = [
         { key: 'grid', label: 'Card', icon: <LayoutGrid className="w-4 h-4" />, hint: 'Card' },
         { key: 'list', label: 'List', icon: <List className="w-4 h-4" />, hint: 'List' },
-        { key: 'review', label: 'Review', icon: <GalleryHorizontalEnd className="w-4 h-4" />, hint: 'Review' },
         { key: 'graph', label: 'Graph', icon: <Waypoints className="w-4 h-4" />, hint: 'Graph' },
     ];
     // The layout the Ask/Collections buttons return you to when you leave them.
-    const lastLayout = useRef<'grid' | 'list' | 'review' | 'graph'>('grid');
-    // A review session opened from Today is a detour, not a layout choice — it
-    // must never become the view the Home tab returns you to.
-    if (viewMode === 'grid' || viewMode === 'list' || viewMode === 'graph'
-        || (viewMode === 'review' && !reviewFromToday)) lastLayout.current = viewMode;
+    // A review session is a detour, never a layout the Home tab returns to.
+    const lastLayout = useRef<'grid' | 'list' | 'graph'>('grid');
+    if (viewMode === 'grid' || viewMode === 'list' || viewMode === 'graph') lastLayout.current = viewMode;
 
     // ---- Mobile v4 chrome (bottom tab bar + header glyphs) ----
     // Which bottom tab the current viewMode belongs to; detail places roll up
@@ -1859,7 +1911,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // places (ask/collections/digest) don't report — the glyph keeps showing
     // the layout you'd return to.
     useEffect(() => {
-        if (viewMode === 'grid' || viewMode === 'list' || viewMode === 'review' || viewMode === 'graph' || viewMode === 'notes') {
+        if (viewMode === 'grid' || viewMode === 'list' || viewMode === 'graph' || viewMode === 'notes') {
             onLibraryViewChange?.(viewMode);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2008,8 +2060,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
             onOpenReminderCard={(l) => { openLinkDetails(l); if (l.reminderDue) void clearReminderDue(l.id); }}
             onEditReminder={handleOpenReminderModal}
             onCompleteReminder={(l) => { void completeReminder(l); }}
-            reviewCount={todayReviewCount}
-            onStartReview={startTodayReview}
+            reviewDigest={latestDigest}
+            reviewLeft={latestDigestLeft}
+            onStartReview={latestDigest ? () => startDigestReview(latestDigest, 'digest') : undefined}
             takeawayCards={takeawayCards}
             onOpenTakeawayCard={openLinkDetails}
             onCompleteTakeaway={completeTakeaway}
@@ -3324,25 +3377,26 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             uid={uid}
                         />
                     ) : viewMode === 'review' ? (
-                        <SwipeDeck
-                            // From Today the deck is a short, unfiltered session
-                            // (the user came from Today, not from a filtered
-                            // library) and its exit returns there.
-                            links={reviewFromToday ? visibleLinks : filteredLinks}
-                            limit={reviewFromToday ? TODAY_REVIEW_SIZE : undefined}
-                            onKeep={swipeKeep}
-                            onArchive={swipeArchive}
-                            onRemind={handleOpenReminderModal}
-                            onOpen={openLinkDetails}
-                            onResetStatus={swipeResetStatus}
-                            onCancelRemind={swipeCancelRemind}
-                            onToggleFavorite={swipeToggleFavorite}
-                            remindSignal={remindSignal}
-                            onExit={() => {
-                                if (reviewFromToday) { setReviewFromToday(false); setViewMode('digest'); return; }
-                                setViewMode(lastLayout.current === 'review' ? 'grid' : lastLayout.current);
-                            }}
-                        />
+                        reviewSession && reviewCardsReady ? (
+                            <SwipeDeck
+                                // Keyed per digest so a second session starts
+                                // fresh instead of inheriting the last one's
+                                // pointer and tallies.
+                                key={`${reviewSession.since}:${reviewSession.cardIds.join(',')}`}
+                                links={reviewLinks}
+                                session={{ cardIds: reviewSession.cardIds, since: reviewSession.since }}
+                                limit={TODAY_REVIEW_SIZE}
+                                onKeep={swipeKeep}
+                                onArchive={swipeArchive}
+                                onRemind={handleOpenReminderModal}
+                                onOpen={openLinkDetails}
+                                onResetStatus={swipeResetStatus}
+                                onCancelRemind={swipeCancelRemind}
+                                onToggleFavorite={swipeToggleFavorite}
+                                remindSignal={remindSignal}
+                                onExit={() => setViewMode(reviewSession.returnTo)}
+                            />
+                        ) : null
                     ) : viewMode === 'list' ? (
                         <div className="flex flex-col gap-2 max-w-3xl mx-auto">
                             {feedModules}

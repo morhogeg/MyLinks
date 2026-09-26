@@ -9,7 +9,7 @@ import { hasHebrew } from '@/lib/rtl';
 import { hapticLight } from '@/lib/haptics';
 import { Check, Archive, Bell, RotateCcw, Info, X, Star } from 'lucide-react';
 import { CitationGlyph } from '@/components/ui/Wordmark';
-import { REVIEW_SESSION_SIZE, isOpen, reviewSessionQueue } from '@/lib/reviewQueue';
+import { REVIEW_SESSION_SIZE, isOpen, isOpenInDigest, reviewSessionQueue } from '@/lib/reviewQueue';
 
 type SwipeDir = 'left' | 'right' | 'up';
 type Phase = 'idle' | 'dragging' | 'exiting' | 'waiting';
@@ -42,6 +42,12 @@ interface SwipeDeckProps {
      *  REVIEW_SESSION_SIZE; the Today tab passes a shorter session so "Review 5
      *  cards" means exactly five. */
     limit?: number;
+    /** Deal exactly these cards, in this order, instead of the smart queue —
+     *  the digest a push notification (or Revisit) opened. A card counts as
+     *  handled once it's archived, has a reminder, or was kept after `since`
+     *  (the digest's createdAt), so reopening the same digest resumes it.
+     *  "Review more" at the end falls back to the smart queue. */
+    session?: { cardIds: string[]; since: number };
 }
 
 const THRESHOLD = 110; // px past which a drag commits to a swipe
@@ -67,9 +73,9 @@ const ACTION_HINTS = {
  * which rests the card from future sessions; favoriting lives in the card
  * detail view now.
  *
- * The session is dealt from ONE smart order (see lib/reviewQueue: forgotten
- * cards first, then newest unread, then the rest — no user-facing queue
- * selection), narrowed by the active feed filters. Card ORDER is snapshotted
+ * The session is a digest's own cards (`session`: what the Daily Brew push
+ * counted); "Review more" at the end deals from ONE smart order (see
+ * lib/reviewQueue: forgotten cards first, then newest unread, then the rest). Card ORDER is snapshotted
  * per session (no mid-session reshuffle) but every card face reads LIVE data
  * from the `links` prop, and cards deleted or already acted on drop out.
  * Every action is reversible via Undo — including an up-swipe reminder (F-29).
@@ -86,6 +92,7 @@ export default function SwipeDeck({
     remindSignal,
     onExit,
     limit,
+    session,
 }: SwipeDeckProps) {
     // Cards per session. Read once per render and used everywhere a window is
     // cut, so the deal, the re-deal and the "review more" offer can never
@@ -94,8 +101,11 @@ export default function SwipeDeck({
     // Ordered card ids for the current session window. Snapshotted so acting on a
     // card never reshuffles the stack mid-session (F-32 keeps order stable).
     const [sessionIds, setSessionIds] = useState<string[]>(
-        () => reviewSessionQueue(links).slice(0, sessionSize).map((l) => l.id),
+        () => session ? session.cardIds : reviewSessionQueue(links).slice(0, sessionSize).map((l) => l.id),
     );
+    // True while the deck is dealing a fixed digest session; the first
+    // "Review more" switches it to the smart queue for good.
+    const [fixedSince, setFixedSince] = useState<number | null>(session ? session.since : null);
     const [pos, setPos] = useState(0);
     const [drag, setDrag] = useState({ x: 0, y: 0 });
     const [phase, setPhase] = useState<Phase>('idle');
@@ -136,7 +146,8 @@ export default function SwipeDeck({
     // cards acted on OUTSIDE the deck's gestures mid-session (deleted, archived
     // elsewhere, reminder set from the detail modal) are skipped, not re-dealt.
     const isDealable = (l: Link | null): l is Link =>
-        !!l && (isOpen(l) || undoneIds.current.has(l.id) || favoritedIds.current.has(l.id));
+        !!l && ((fixedSince !== null ? isOpenInDigest(l, fixedSince) : isOpen(l))
+            || undoneIds.current.has(l.id) || favoritedIds.current.has(l.id));
 
     // First dealable card at/after the pointer.
     let currentIndex = pos;
@@ -159,6 +170,7 @@ export default function SwipeDeck({
     // Deal a fresh session window from the current live pool.
     const deal = () => {
         setSessionIds(reviewSessionQueue(links).slice(0, sessionSize).map((l) => l.id));
+        setFixedSince(null);
         setPos(0);
         setLastAction(null);
         setKept(0);
@@ -176,12 +188,14 @@ export default function SwipeDeck({
     // streamed in, or the feed filter changed under it and every dealt id
     // dropped out. Guarded to zero-activity states so a finished session's
     // summary (tallies or an undoable action present) is never skipped past.
+    // Never for a fixed digest session: an empty one means the digest is
+    // already done, and swapping in other cards would break its promise.
     const acted = kept + archived + reminders;
     useEffect(() => {
-        if (current || acted > 0 || lastAction || phase === 'waiting' || poolCount === 0) return;
+        if (fixedSince !== null || current || acted > 0 || lastAction || phase === 'waiting' || poolCount === 0) return;
         deal();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [current, acted, lastAction, phase, poolCount]);
+    }, [fixedSince, current, acted, lastAction, phase, poolCount]);
 
     // Size the deck to the space between its top and the viewport bottom so the
     // WHOLE deck (tabs + card + action buttons) fits on one screen with no page
@@ -395,28 +409,25 @@ export default function SwipeDeck({
     if (!current) {
         const acted = kept + archived + reminders;
         const moreAvailable = poolCount > 0;
+        const tally = [
+            kept > 0 ? `${kept} kept` : null,
+            archived > 0 ? `${archived} archived` : null,
+            reminders > 0 ? `${reminders} reminder${reminders === 1 ? '' : 's'} set` : null,
+        ].filter(Boolean).join(' · ');
         return (
             <div className="flex flex-col items-center justify-center text-center py-16 gap-4">
                 <div className="w-14 h-14 rounded-2xl bg-accent/10 flex items-center justify-center">
                     <CitationGlyph className="w-7 h-7 text-accent" />
                 </div>
                 <h3 className="text-lg font-bold text-text">{acted > 0 ? 'Session complete' : 'All caught up'}</h3>
-                {acted > 0 ? (
-                    <p className="text-sm text-text-muted max-w-xs">
-                        {[
-                            kept > 0 ? `${kept} kept` : null,
-                            archived > 0 ? `${archived} archived` : null,
-                            reminders > 0 ? `${reminders} reminder${reminders === 1 ? '' : 's'} set` : null,
-                        ]
-                            .filter(Boolean)
-                            .join(' · ') || 'All caught up.'}
-                    </p>
-                ) : (
-                    <p className="text-sm text-text-muted max-w-xs">
-                        Nothing to review right now. New saves show up here.
-                    </p>
-                )}
-                <div className="flex items-center gap-3 mt-1">
+                <p className="text-sm text-text-muted max-w-xs">
+                    {acted > 0
+                        ? tally
+                        : fixedSince !== null
+                            ? "You've already been through these cards."
+                            : 'Nothing to review right now. New saves show up here.'}
+                </p>
+                <div className="flex flex-wrap items-center justify-center gap-3 mt-1">
                     {lastAction && (
                         <button
                             onClick={undo}
@@ -425,18 +436,24 @@ export default function SwipeDeck({
                             <RotateCcw className="w-4 h-4" /> Undo last
                         </button>
                     )}
-                    {moreAvailable ? (
+                    {/* Keeping going is the side door; Done is the way out. A
+                        deck with no exit (no onExit) keeps the old primary. */}
+                    {moreAvailable && (
                         <button
                             onClick={deal}
-                            className="inline-flex items-center gap-2 h-10 px-5 rounded-full text-white transition-opacity hover:opacity-90 cursor-pointer text-sm font-semibold"
-                            style={{ backgroundImage: 'var(--accent-gradient)' }}
+                            className={onExit
+                                ? 'inline-flex items-center gap-2 h-10 px-4 rounded-full bg-card border border-border-subtle text-text-secondary hover:text-text hover:bg-card-hover transition-colors cursor-pointer text-sm font-semibold'
+                                : 'inline-flex items-center gap-2 h-10 px-5 rounded-full text-white transition-opacity hover:opacity-90 cursor-pointer text-sm font-semibold'}
+                            style={onExit ? undefined : { backgroundImage: 'var(--accent-gradient)' }}
                         >
                             Review {Math.min(sessionSize, poolCount)} more
                         </button>
-                    ) : onExit && (
+                    )}
+                    {onExit && (
                         <button
                             onClick={onExit}
-                            className="inline-flex items-center gap-2 h-10 px-5 rounded-full bg-accent text-accent-ink transition-opacity hover:opacity-90 cursor-pointer text-sm font-semibold"
+                            className="inline-flex items-center gap-2 h-10 px-5 rounded-full text-white transition-opacity hover:opacity-90 cursor-pointer text-sm font-semibold"
+                            style={{ backgroundImage: 'var(--accent-gradient)' }}
                         >
                             Done
                         </button>

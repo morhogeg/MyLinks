@@ -53,6 +53,21 @@ export function isOpen(link: Link, now: number = Date.now()): boolean {
         && getTimestampNumber(link.reviewedAt) <= now - REVIEWED_REST_DAYS * DAY_MS;
 }
 
+/**
+ * A card from a digest is still waiting in that digest's review session: it
+ * exists, isn't archived or mid-capture, has no reminder pending, and hasn't
+ * been kept since the digest was sent (`since` = the digest's createdAt).
+ * Looser than isOpen on purpose: the digest already picked these cards, so a
+ * favorite or a card kept last month still gets dealt. Tapping the push twice
+ * never re-deals the cards already handled.
+ */
+export function isOpenInDigest(link: Link, since: number): boolean {
+    return !isPending(link)
+        && link.status !== 'archived'
+        && link.reminderStatus !== 'pending'
+        && getTimestampNumber(link.reviewedAt) < since;
+}
+
 /** The full ordered candidate pool for review sessions. */
 export function reviewSessionQueue(links: Link[], now: number = Date.now()): Link[] {
     // Arrow fn, not a bare `isOpen` reference: filter passes the INDEX as the
