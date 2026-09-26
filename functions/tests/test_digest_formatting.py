@@ -107,6 +107,23 @@ def test_curate_handles_an_empty_library_and_clamps_the_count():
     assert len(ds.curate(_links(), None)) == 5
 
 
+def test_curate_rests_cards_handled_in_the_review_deck():
+    import time
+    now_ms = int(time.time() * 1000)
+    links = [
+        {"id": f"c{i}", "title": f"Card {i}", "status": "unread",
+         "createdAt": now_ms - (i + 20) * 86_400_000, "isRead": False}
+        for i in range(8)
+    ]
+    links[0]["reviewedAt"] = now_ms - 86_400_000          # kept yesterday
+    links[1]["reminderStatus"] = "pending"                # reminder on its way
+    links[2]["reviewedAt"] = now_ms - 60 * 86_400_000     # kept long ago: fair game
+    picks = {p["id"] for p in ds.curate(links, 5)}
+    assert "c0" not in picks and "c1" not in picks
+    # Backfill still reaches handled cards when nothing else is left.
+    assert len(ds.curate(links[:2], 2)) == 2
+
+
 # ── _to_ms coercion ───────────────────────────────────────────────────────
 
 def test_to_ms_handles_none_and_numbers():

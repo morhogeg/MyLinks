@@ -1990,6 +1990,19 @@ PM-F. **[ ] Follow-ups from the 2026-09-03 product-review build (all small, none
     `_cap_list(c.get("videoHighlights"))` / `speakers`, and
     `search.py build_embedding_text` for the trigger/backfill callers.
 
+PM-I. **[ ] Owner QA for the 2026-09-26 Daily Brew → review deck flow (see §9):**
+    needs a NEW digest push (sent after the functions deploy; the old pushes
+    in Notification Center still open Revisit). (a) the push reads "5 cards to
+    revisit" (no "new"); (b) tap it from the lock screen with the app killed:
+    it opens straight into the swipe deck on THAT digest's cards, "1 of 5";
+    (c) swipe all 5: "Session complete · N kept · N archived" with **Done**
+    (lands on Home) and a secondary "Review 5 more"; (d) tap the same push
+    again: "All caught up · You've already been through these cards", not
+    other cards; (e) Revisit's first row is "Review N cards · From today's
+    Daily Brew" while any are left and disappears once all are handled;
+    (f) Done from a Revisit-opened session returns to Revisit; (g) the library
+    view switcher shows Card / List / Graph only; (h) tomorrow's digest does
+    not repeat cards you kept or set reminders on today.
 PM-H. **[ ] Owner QA for the 2026-09-25 screenshot-completion rebuild (see §9;
     supersedes PM-G (a)):** on a Facebook partial card: (a) the line ends in
     **"Add screenshots"** with "Long post? Take several as you scroll, up to 5";
@@ -2063,8 +2076,9 @@ PM-G. **[ ] Owner QA for the 2026-09-04 card-trust round (see §9):** (a) open
   converter).
 - **Recall:** Ask Machina (hybrid RAG, streaming on web, chat history), semantic
   search, reminders, curated digest (3 modes: smart / rediscover / by-topic,
-  collapsed from 6 on 2026-07-10), weekly synthesis, Review mode (curated
-  bounded swipe sessions), collections + public share pages (server-rendered
+  collapsed from 6 on 2026-07-10), weekly synthesis, Review deck (the
+  Daily Brew's swipe session, opened by its push or Revisit's row; no longer
+  a library layout since 2026-09-26), collections + public share pages (server-rendered
   OG), reading view + TTS.
 - **CI:** iOS → TestFlight workflow green (UI-only build 1006, 2026-07-02);
   secrets configured; cloud-managed signing works.
@@ -2373,6 +2387,40 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-26 — DAILY BREW PUSH OPENS THE REVIEW DECK; library Review
+  layout removed.** Branch `claude/ios-notification-review-flow-nppm2h`.
+  Owner: tapping "Your Daily Brew" landed on the whole Revisit tab (40 "Do
+  this" rows above a buried "Review 5 cards"), and the deck behind that row
+  dealt its OWN 5 (`reviewSessionQueue`, 30d-forgotten first) rather than the
+  5 the push counted (server `curate()`). **Backend** (`digest_service`): the
+  digest push body is "N cards to revisit" (dropped "new") and its data is
+  `{view: 'digest', review: '1', digestId}` (older builds ignore the extra
+  keys and still open Revisit; the weekly synthesis push is unchanged);
+  `curate()` now rests cards handled in the deck (kept within
+  `REVIEWED_REST_DAYS` = 30, or reminder pending) so a Keep doesn't come back
+  tomorrow, and counts `reviewedAt` as "viewed" for the rediscover order
+  (backfill may still reach handled cards as a last resort). **App:**
+  `lib/push.ts` parses `review`/`digestId`; `Feed` holds a `reviewSession`
+  (digest card ids, digest `createdAt`, where Done returns) and resolves a
+  cold-start tap after the first feed page and the digest arrive (4s
+  fallback to Revisit). `SwipeDeck` gained `session`: deals exactly those
+  ids; a card counts as handled via new `isOpenInDigest` (archived, reminder
+  pending, or kept after the digest's `createdAt`), so re-tapping a done
+  digest shows "You've already been through these cards" instead of other
+  cards; no self-heal re-deal in that mode; the end screen always has Done
+  (primary) plus a secondary "Review N more" from the smart queue. Digest
+  cards older than the feed's loaded pages (150/page) are listened to
+  directly (`lib/useDigestCards.ts`, `documentId() in`, ≤10 ids, only while
+  Revisit or the deck is on screen). Revisit's row is now "Review N cards ·
+  From today's Daily Brew", moved to the top, shown while the newest digest
+  has cards left. The **Review layout is gone from the library view
+  switcher** (Card / List / Graph); `viewMode 'review'` only exists with a
+  session. **Verified:** tsc 0, eslint clean on touched files (one
+  pre-existing unused-disable warning in SwipeDeck), py_compile, pytest
+  1258 pass (new `test_curate_rests_cards_handled_in_the_review_deck`).
+  **NOT verified:** on device, any render of the new end screen / Revisit
+  row, a live push payload, the `documentId() in` listener against the
+  rules. Owner QA: §4 PM-I.
 - **2026-09-25 — REMINDERS ROUND 4: sheet presets, 9 AM recurrences,
   snooze, agenda view.** Branch `claude/reminders-screen-overhaul-uz3vlu`.
   **Backend** (`reminder_service.calculate_next_reminder`): a recurring

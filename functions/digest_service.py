@@ -42,6 +42,11 @@ logger = logging.getLogger(__name__)
 # curation for in-app Review mode — keep the SHAPE in sync (constants
 # intentionally differ: the deck uses 30d and no random backfill).
 REDISCOVER_MIN_AGE_DAYS = 14
+# A card kept in the review deck (reviewedAt) rests this long before a digest
+# may pick it again. The digest push opens the deck on the digest's own cards,
+# so without the rest a Keep would come straight back tomorrow. Mirrors
+# REVIEWED_REST_DAYS in web/lib/reviewQueue.ts.
+REVIEWED_REST_DAYS = 30
 # Cap how many links we pull per user when curating (keeps reads bounded).
 CANDIDATE_LIMIT = 500
 
@@ -207,13 +212,20 @@ def curate(links: List[dict], count: int) -> List[dict]:
         return _to_ms(l.get("createdAt"))
 
     def viewed(l):
-        return _to_ms(l.get("lastViewedAt"))
+        return max(_to_ms(l.get("lastViewedAt")), _to_ms(l.get("reviewedAt")))
+
+    # Already dealt with from the deck: kept recently, or a reminder is on its
+    # way. Only the random backfill may reach these, and only as a last resort.
+    rest_cutoff = now_ms - REVIEWED_REST_DAYS * 86_400_000
+
+    def handled(l):
+        return l.get("reminderStatus") == "pending" or _to_ms(l.get("reviewedAt")) > rest_cutoff
 
     unread = [l for l in links if l.get("status") not in ("archived", "favorite")
-              and not l.get("isRead")]
+              and not l.get("isRead") and not handled(l)]
     unread.sort(key=created)
 
-    old = [l for l in links if created(l) and created(l) < age_cutoff]
+    old = [l for l in links if created(l) and created(l) < age_cutoff and not handled(l)]
     old.sort(key=lambda l: max(viewed(l), created(l)))
 
     picks, seen = [], set()
@@ -233,6 +245,7 @@ def curate(links: List[dict], count: int) -> List[dict]:
     if len(picks) < count:
         rest = [l for l in links if l["id"] not in seen]
         random.shuffle(rest)
+        rest.sort(key=handled)  # stable: unhandled first, each half shuffled
         for l in rest:
             if len(picks) >= count:
                 break
@@ -631,8 +644,11 @@ def build_and_send_digest(uid: str, user_data: dict, force: bool = False) -> dic
                 push_result = send_push(
                     uid,
                     f"Your {period} Brew",
-                    f"{len(cards)} new card{'s' if len(cards) != 1 else ''} to revisit",
-                    {"view": "digest"},
+                    f"{len(cards)} card{'s' if len(cards) != 1 else ''} to revisit",
+                    # review=1: the tap opens the review deck on THIS digest's
+                    # cards (web/lib/push.ts). Older app builds ignore the extra
+                    # keys and open the Revisit tab as before.
+                    {"view": "digest", "review": "1", "digestId": digest_id},
                 )
                 if push_result.get("sent"):
                     result["channels"].append("push")

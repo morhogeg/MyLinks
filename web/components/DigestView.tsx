@@ -6,7 +6,7 @@ import { CalendarCheck, ChevronRight, ChevronDown, Bell, CheckCircle2, Circle, G
 import { CitationGlyph } from '@/components/ui/Wordmark';
 import type { CuratedDigest, WeeklySynthesis, DigestCardRef, UserNote, Link } from '@/lib/types';
 import { track } from '@/lib/analytics';
-import { digestDisplayTitle, digestKindLabel, TODAY_REVIEW_SIZE } from '@/lib/digest';
+import { digestDisplayTitle, digestKindLabel } from '@/lib/digest';
 import { synthesisWeekLabel } from '@/lib/synthesis';
 import { cardThumbnailUrl } from '@/lib/cardThumbnail';
 import { getActionableTakeaway } from '@/lib/takeaway';
@@ -110,8 +110,11 @@ interface Props {
     /** Mark the reminder handled: clears the due flag and stops a still-pending
      *  reminder from firing again. */
     onCompleteReminder?: (link: Link) => void;
-    /** How many cards the review deck could deal right now (0 hides the row). */
-    reviewCount?: number;
+    /** The newest digest, whose cards the review row deals (the same cards the
+     *  push counted). */
+    reviewDigest?: CuratedDigest | null;
+    /** How many of its cards are still waiting; 0 hides the row. */
+    reviewLeft?: number;
     onStartReview?: () => void;
     /** Cards whose "Do this" takeaway is still open, newest save first
      *  (lib/takeaway openTakeaways). Feed derives it from the visible cards, so
@@ -138,7 +141,7 @@ export default function DigestView({
     digests, syntheses, synthesisNotes, onSaveSynthesisNotes, onOpenCard, onOpenSynthesisCard,
     onOpenDigestSettings, onDeleteDigest, onOpenDigest,
     reminderCards = [], onOpenReminderCard, onEditReminder, onCompleteReminder,
-    reviewCount = 0, onStartReview,
+    reviewDigest = null, reviewLeft = 0, onStartReview,
     takeawayCards = [], onOpenTakeawayCard, onCompleteTakeaway,
 }: Props) {
     // The Revisit tab mounts only when the user opens it (Feed swaps it in),
@@ -190,8 +193,10 @@ export default function DigestView({
     const thisWeek = weekLabel ? syntheses[0] : null;
     const archivedSyntheses = thisWeek ? syntheses.slice(1) : syntheses;
 
-    const reviewSize = Math.min(TODAY_REVIEW_SIZE, reviewCount);
-    const showReview = reviewSize > 0 && !!onStartReview;
+    // The digest's review ritual, for when the push was swiped away. Gone once
+    // every card in it is handled; the next digest brings it back.
+    const showReview = !!reviewDigest && reviewLeft > 0 && !!onStartReview;
+    const reviewWhen = reviewDigest ? digestDisplayTitle(reviewDigest, { relative: true }) : '';
 
     const isEmpty = digests.length === 0 && syntheses.length === 0 && dueToday.length === 0
         && takeawayCards.length === 0 && !showReview;
@@ -243,6 +248,28 @@ export default function DigestView({
 
     const todayTop = (dueToday.length > 0 || takeawayCards.length > 0 || thisWeek || showReview) ? (
         <div className="flex flex-col gap-4">
+            {/* First: it's the one thing here with an end. */}
+            {showReview && (
+                <button
+                    onClick={onStartReview}
+                    className="w-full flex items-center gap-3 rounded-2xl border border-border-subtle bg-card px-3.5 py-3 text-start cursor-pointer transition-colors hover:bg-card-hover hover:border-text-muted/40"
+                >
+                    <span className="w-9 h-9 shrink-0 rounded-xl bg-accent/10 flex items-center justify-center text-accent">
+                        <GalleryHorizontalEnd className="w-[18px] h-[18px]" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                        <span className="block text-[15px] font-bold text-text">
+                            Review {reviewLeft} {reviewLeft === 1 ? 'card' : 'cards'}
+                        </span>
+                        <span className="block text-[13px] text-text-muted truncate">
+                            {reviewWhen === 'Today' || reviewWhen === 'Yesterday'
+                                ? `From ${reviewWhen.toLowerCase()}'s ${reviewDigest?.frequency === 'weekly' ? 'Weekly' : 'Daily'} Brew`
+                                : `From your Brew of ${reviewWhen}`}
+                        </span>
+                    </span>
+                    <ChevronRight className="w-4 h-4 text-text-muted shrink-0 rtl:rotate-180" />
+                </button>
+            )}
             {dueToday.length > 0 && (
                 <div className="flex flex-col gap-1.5">
                     <SectionHeader
@@ -348,20 +375,6 @@ export default function DigestView({
                 </div>
             )}
 
-            {showReview && (
-                <button
-                    onClick={onStartReview}
-                    className="w-full flex items-center gap-3 rounded-2xl border border-border-subtle bg-card px-3.5 py-3 text-start cursor-pointer transition-colors hover:bg-card-hover hover:border-text-muted/40"
-                >
-                    <span className="w-9 h-9 shrink-0 rounded-xl bg-accent/10 flex items-center justify-center text-accent">
-                        <GalleryHorizontalEnd className="w-[18px] h-[18px]" />
-                    </span>
-                    <span className="min-w-0 flex-1 text-[15px] font-bold text-text">
-                        Review {reviewSize} {reviewSize === 1 ? 'card' : 'cards'}
-                    </span>
-                    <ChevronRight className="w-4 h-4 text-text-muted shrink-0 rtl:rotate-180" />
-                </button>
-            )}
         </div>
     ) : null;
 

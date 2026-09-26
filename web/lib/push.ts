@@ -14,7 +14,8 @@
  * NEVER writes users/{uid}.fcmTokens directly (see firestore.rules).
  *
  * Deep-linking: a tapped notification carries string data — {view: 'digest'}
- * opens the Digest section, {linkId} opens that card. The intent is stashed in
+ * opens the Revisit tab, {view: 'digest', review: '1', digestId} (the Daily
+ * Brew) opens the review deck on that digest's cards, {linkId} opens that card. The intent is stashed in
  * sessionStorage AND broadcast as a window event, so it works both when the
  * app is already running (event) and on a cold start where the tap arrives
  * before the Feed mounts (storage, consumed on mount).
@@ -28,6 +29,10 @@ import { requestPaywallWhenReady } from './entitlement';
 /** Deep-link intent parsed from a tapped notification's data payload. */
 export interface PushIntent {
     view?: 'digest';
+    /** The digest push: open the review deck, not the Revisit tab. */
+    review?: boolean;
+    /** Which digest to review; absent = the newest one. */
+    digestId?: string;
     linkId?: string;
 }
 
@@ -86,6 +91,9 @@ export function consumePendingPushIntent(): PushIntent | null {
 
 function parseIntent(data: unknown): PushIntent | null {
     const d = (data ?? {}) as Record<string, unknown>;
+    if (d.view === 'digest' && d.review === '1') {
+        return { view: 'digest', review: true, digestId: typeof d.digestId === 'string' && d.digestId ? d.digestId : undefined };
+    }
     if (d.view === 'digest') return { view: 'digest' };
     if (typeof d.linkId === 'string' && d.linkId) return { linkId: d.linkId };
     return null;
