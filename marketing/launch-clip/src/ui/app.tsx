@@ -248,7 +248,7 @@ export const TagChip: React.FC<{ tag: string }> = ({ tag }) => {
  * "one place for all of it" promise instead of just captioning it. Hues are the
  * app's PLATFORM_RGB values.
  */
-const PLATFORM_INK: Record<string, string> = {
+export const PLATFORM_INK: Record<string, string> = {
   youtube: 'rgb(255, 0, 0)',
   instagram: 'rgb(225, 48, 108)',
   facebook: 'rgb(24, 119, 242)',
@@ -258,7 +258,7 @@ const PLATFORM_INK: Record<string, string> = {
 };
 
 /** The app's platform marks — the same lucide icons `platformIcon` returns. */
-const PlatformMark: React.FC<{ kind: string; size?: number }> = ({ kind, size = 12 }) => {
+export const PlatformMark: React.FC<{ kind: string; size?: number }> = ({ kind, size = 12 }) => {
   if (kind === 'youtube') return <Youtube size={size} strokeWidth={2} />;
   if (kind === 'instagram') return <Instagram size={size} strokeWidth={2} />;
   if (kind === 'facebook') return <Facebook size={size} strokeWidth={2} />;

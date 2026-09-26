@@ -1,11 +1,15 @@
 /**
- * Voice-over mix: score.wav + the Kokoro lines (out/vo/line-NN.wav, placed at
- * their caption bars from out/vo/manifest.json) → public/score-vo.wav.
+ * Voice-over mix: a score + its narrator lines (out/vo/…/line-NN.wav, placed
+ * at their start times from the script's manifest.json) → one wav.
+ *
+ *   node audio/mix-vo.mjs          # film: public/score.wav      → public/score-vo.wav
+ *   node audio/mix-vo.mjs reel     # reel: public/reel-score.wav → public/reel-score-vo.wav
  *
  * The music ducks under the voice — 35% down, 120ms ramps — which is what
- * keeps the VO effortless to hear without the score ever disappearing.
+ * keeps the VO effortless to hear without the score ever disappearing. One
+ * mix for every script, like one voice (audio/synth-vo.py).
  *
- *   node audio/mix-vo.mjs     (run AFTER `npm run score` and synth-vo.py)
+ * (run AFTER the score and synth-vo.py for the same script)
  */
 
 import fs from 'node:fs';
@@ -15,7 +19,19 @@ import { BAR } from '../timeline.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(here, '..');
-const voDir = path.join(root, 'out', 'vo');
+
+// `duck` is how far the music sits under a spoken line. The film's 0.65 is the
+// balance the owner has listened to; the reel's bed runs drums under almost
+// every line, so it ducks deeper to put the voice at the SAME level over its
+// music (npm run verify measures both and compares).
+const SCRIPTS = {
+  film: { vo: path.join(root, 'out', 'vo'), score: 'score.wav', out: 'score-vo.wav', duck: 0.65 },
+  reel: { vo: path.join(root, 'out', 'vo', 'reel'), score: 'reel-score.wav', out: 'reel-score-vo.wav', duck: 0.55 },
+};
+const name = process.argv[2] ?? 'film';
+const script = SCRIPTS[name];
+if (!script) throw new Error(`unknown script ${name}; one of ${Object.keys(SCRIPTS).join(', ')}`);
+const voDir = script.vo;
 
 const readWav = (p) => {
   const b = fs.readFileSync(p);
@@ -39,7 +55,7 @@ const readWav = (p) => {
   return { ...fmt, frames, samples: out };
 };
 
-const score = readWav(path.join(root, 'public', 'score.wav'));
+const score = readWav(path.join(root, 'public', script.score));
 const SR = score.rate;
 const N = score.frames;
 const L = new Float64Array(N);
@@ -52,14 +68,17 @@ for (let i = 0; i < N; i++) {
 const manifest = JSON.parse(fs.readFileSync(path.join(voDir, 'manifest.json'), 'utf8'));
 
 // duck envelope: 1 everywhere, dips to DUCK across each VO line
-const DUCK = 0.65;
+const DUCK = script.duck;
 const RAMP = Math.round(0.12 * SR);
 const duck = new Float64Array(N).fill(1);
 const voL = new Float64Array(N);
 
 for (const line of manifest) {
   const wav = readWav(path.join(voDir, line.file));
-  const start = Math.round(line.bar * BAR * SR);
+  // the film's manifest places lines by bar (kept exactly as it always was,
+  // so the film's mix stays bit-identical); other scripts carry seconds
+  const startSec = line.bar !== undefined ? line.bar * BAR : line.start;
+  const start = Math.round(startSec * SR);
   const ratio = wav.rate / SR;
   const outFrames = Math.floor(wav.frames / ratio);
   for (let i = 0; i < outFrames; i++) {
@@ -111,6 +130,6 @@ for (let i = 0; i < N; i++) {
   out.writeInt16LE(Math.round(Math.max(-1, Math.min(1, L[i] * g)) * 32767), 44 + i * 4);
   out.writeInt16LE(Math.round(Math.max(-1, Math.min(1, R[i] * g)) * 32767), 44 + i * 4 + 2);
 }
-const outPath = path.join(root, 'public', 'score-vo.wav');
+const outPath = path.join(root, 'public', script.out);
 fs.writeFileSync(outPath, out);
 console.log(`wrote ${outPath} — ${(bytes / 1e6).toFixed(1)}MB, peak gain ${g.toFixed(3)}, ${manifest.length} VO lines`);

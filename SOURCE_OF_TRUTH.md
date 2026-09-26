@@ -1842,6 +1842,21 @@ The multi-user auth work described below **was** fully written but not live:
     shell**, where there is no address bar. Post-launch; it is a routing refactor,
     not a rename.
 
+23b. **[ ] The app's text never renders in Geist** *(found 2026-09-26 while
+    capturing the reel; the mechanism is confirmed in the built CSS and in
+    Chromium's computed styles, NOT checked on a device).* `web/app/layout.tsx`
+    puts `GeistSans.variable` (which defines `--font-geist-sans`) on `<body>`,
+    but the `@theme inline` token `--font-sans: var(--font-geist-sans)` in
+    `globals.css` is emitted on `:root`, where that variable does not exist.
+    So `--font-sans` is invalid, body's `font-family: var(--font-sans), Arial,
+    …` is dropped, and the whole UI inherits Tailwind's preflight stack
+    (`ui-sans-serif, system-ui, …`): **SF Pro on iPhone**, the OS default
+    elsewhere. Only `font-mono` spans get their Geist face (that utility
+    resolves on the element). Likely fix: move the two `.variable` classes
+    from `<body>` to `<html>`. Decide first whether to fix it at all: the app
+    has shipped, and been QA'd, in SF, and fixing it changes every screen's
+    look. The reel's captures use Inter as the SF stand-in either way.
+
 ### 🟢 P3 — product roadmap (post-launch)
 
 G0. **[x] Launch film built** *(2026-07-29 — `marketing/launch-clip/`, 67s
@@ -2377,7 +2392,9 @@ Promise opens, loss-aversion closes. Same session: the recipe card became
 from books" still shares no word with it), the Manson title is shortened so
 the Ask chip never truncates, and two-sentence captions break at the sentence.
 
-*Short-form reels (PLANNED 2026-09-26, owner):* one 15–20s all-out motion
+*Short-form reels (PLANNED 2026-09-26, owner; the PILOT was built the same
+day on branch `claude/machina-reel-pilot`, NOT merged, see "What exists"
+below):* one 15–20s all-out motion
 graphics "highlight reel" (the PILOT), then five 15s single-feature clips
 (Save, Find, Ask, Connect, Revisit), all vertical 1080×1920, all built in
 `marketing/launch-clip/` so they share the film's code, look and **narrator**
@@ -2479,19 +2496,80 @@ to its session:
 > paragraph with what exists and how to render it, finalize the five
 > feature-clip briefs below against the kit you built, and add a §9 entry.
 
-Feature-clip briefs (15s each, vertical, same kit + narrator + rules;
-finalize after the pilot; one idea per clip, ending on the same lockup):
-1. **Save**: one share sheet, any app (link, video, screenshot, note) →
-   the five-phase pipeline → a finished, summarized, tagged card. "One
-   tap, and it's saved, without leaving the app."
-2. **Find**: a plain-words query sharing no word with the card it lands
-   on; one result, not a filtered list.
-3. **Ask**: a question → a streamed answer → citation chips from three
-   platforms; "every answer comes straight from your saves."
-4. **Connect**: edges drawing between saves; related saves gathering into a
-   collection.
-5. **Revisit**: the Daily Brew push → the review deck dealing today's
-   cards (Keep / act on it); what you saved comes back when it matters.
+**What exists (the pilot, 2026-09-26, branch `claude/machina-reel-pilot`,
+awaiting owner review, not merged):** `MachinaReel` (20.0s, 1080×1920, score
++ narrator + captions, the deliverable), `MachinaReelSilent` and
+`MachinaReelClean`, in `marketing/launch-clip/`. Hook (ten real saves
+collapse into the point, the brackets close, the narrator says the tagline)
+→ Save → Find → Ask (the hero) → Connect → Revisit → the lockup on "Never
+lose another great find". **Every frame of app UI is the real web app, not a
+mockup** (owner, mid-task): `capture/` builds `web/` as a static export with
+Firebase swapped for an in-memory stand-in seeded with a demo account of 24
+real, interesting saves (no "AI" anywhere), and Playwright records four
+takes on an iPhone-sized page with a stepped clock, so the app's own motion
+is recorded frame-exact. The backend's side is scripted (the Ask answer's
+text and citations, the search hit, when each phase completes); `web/` is
+untouched. The reusable **kit** is `src/reels/kit/` (curves, beat clock,
+camera, `AppShot`/`Lift`/`Tap`, `Paper`/`Lens`, kinetic type, captions, the
+lockup), and the launch-clip README's **"Motion language"** section is the
+rulebook, each rule mapped to the kit part that implements it. The reel's
+clock is `reel-timeline.mjs` (112.5 BPM = 16 frames a beat, so every cut is
+frame arithmetic). The synth's instruments moved to `audio/synth.mjs`
+(shared by film and reel; the film's `score.wav` and `score-vo.wav`
+re-render byte-identical), and `synth-vo.py` / `mix-vo.mjs` take `film` or
+`reel` with one voice config. **To render:** `npm ci` in `web/` once, then in
+`marketing/launch-clip/`: `npm run reel:app && npm run reel:capture && npm
+run verify && npm run reel:render` (→ `out/machina-reel.mp4`). The
+narrator, its word timings and the mixed audio are committed; `reel:vo` and
+`reel:score` are only needed after a script or timing change. Captures run
+in Inter as a stand-in for SF Pro, which is what the app actually renders in
+on iPhone (§4 23b).
+
+**Feature-clip briefs, FINAL against the pilot's kit (2026-09-26).** Shared
+by all five: **448 frames (7 bars at 112.5 BPM, 14.9s)**, vertical, built
+from `src/reels/kit/` imported unchanged and following the README's "Motion
+language" (if a clip needs a new primitive, add it to the kit and the README,
+not to the clip). Before the first clip, generalize the reel plumbing from
+the single `reel` to a clip name: one timeline file per clip (today's
+`reel-timeline.mjs` is the template), passed through `synth-vo.py`,
+`mix-vo.mjs`, `reel-score.mjs` and `verify.mjs`. Each clip opens on its
+kicker over the paper set, shows ONE feature in real captured app UI (reuse
+the pilot's takes where they fit; new states are new takes in
+`capture/shoot.mjs` with the same demo account), and ends on the pilot's
+`Lockup` (about the last 80 frames) with the narrator speaking the subtitle.
+At most three narrator lines, the last one the subtitle. The lines below are
+drafts; `npm run verify` has the final word on bans and fit.
+1. **Save** ("Save anything. A link, a screenshot, a thought." / "Machina
+   reads it, sums it up, and files it."). A link, a screenshot and a note
+   arrive as `SaveChip`s → the pilot's point-to-+ match cut → Add to Machina
+   → the five phases, each held a full beat (it is this clip's hero) → the
+   card lands (`Lift` + ring) and the camera reads its summary and tags. New
+   takes: the dialog's Image and Note tabs. The iOS **share sheet is native**
+   (the Share Extension) and cannot be captured by the web pipeline: either
+   keep the in-app + as the pilot does, or screen-record the extension on a
+   device and bring it in as a take (it is still the real app).
+2. **Find** ("Find it in your own words." / "Type what you remember. Get the
+   one you meant."). Two plain-words queries, each sharing no word with the
+   one card it lands on: the pilot's "easy dinner, empty fridge" → Marcella
+   Hazan's sauce, plus a new one (e.g. "that talk about putting things off"
+   → the TED procrastination talk; add it to `SEARCH` in
+   `capture/library.mjs`). One result each, never a filtered list; the rack
+   focus on the typed words is the signature shot.
+3. **Ask** ("Ask anything." / "Every answer comes straight from your
+   saves."). The pilot's hero at full length: question → streamed answer →
+   three chips from three platforms lifting on 8ths → tap one → the cited
+   card opens (new take). Never show the "Searching your …" thinking line.
+4. **Connect** ("See how it all connects." / a draft second line such as
+   "Every save finds the ones it belongs with."). The graph from Home (new
+   take): wide, then tap a node and its related saves light, then the
+   collection those saves sit in (Collections are made by the user; do not
+   imply the app files them into collections on its own).
+5. **Revisit** ("And the best ones come back to you." / "A few of your best
+   saves, back every day."). The Revisit tab's Daily Brew row → the deck
+   dealing, with each of the deck's actions (Keep, Remind, Archive) on its
+   own beat and the last card thrown into the lockup. The Daily Brew **push**
+   is native too: device-record it if the owner wants the notification in
+   shot, else open on the in-app row as the pilot does.
 
 *Where to "advertise" for free:* X (primary), Product Hunt, Hacker News,
 r/PKMS + r/productivity (follow self-promo rules: give value first), Indie
@@ -2503,6 +2581,35 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-26 — Machina highlight reel (pilot) BUILT; not merged, owner
+  reviews the cut first.** Branch `claude/machina-reel-pilot`.
+  `MachinaReel` (+ `Silent`, `Clean`) in `marketing/launch-clip/`: 20.0s
+  vertical, hook → Save → Find → Ask → Connect → Revisit → lockup on "Never
+  lose another great find", narrated by the film's Kokoro voice. Owner asked
+  mid-task for **the actual app, not mockups**, so every UI frame is the real
+  web app: `capture/` builds `web/` as a static export with Firebase swapped
+  for an in-memory stand-in (seeded with a 24-save demo account: Wait But
+  Why, Paul Graham, Dieter Rams, Marcella Hazan, the Webb telescope…; no
+  "AI"), and Playwright drives it on an iPhone-sized page with a stepped
+  clock, so the app's own animations are recorded frame-exact. Built the
+  reusable kit (`src/reels/kit/`) and the README's "Motion language"
+  section; moved the synth instruments to `audio/synth.mjs` (the film's
+  `score.wav` and `score-vo.wav` still re-render byte-identical);
+  `synth-vo.py` / `mix-vo.mjs` take `film` or `reel` with one voice config;
+  `npm run verify` now covers the reel (captions mirror the narrator and fit
+  their windows; no em dash, "AI", "second brain" or "library" in captions,
+  demo data, or the text of any captured frame the edit uses). §8 "Short-form
+  reels" has what exists, how to render, and the five feature-clip briefs
+  finalized against the kit. **Verified:** `npx tsc --noEmit`, `npm run
+  verify` OK, full `MachinaReel` render exit 0 (20.0s, h264 + aac), stills of
+  every beat and every cut looked at (a double exposure, blur on cut frames,
+  the tagline's last word barely landing and the point crossing the tagline
+  were found that way and fixed). **Not verified:** nobody has listened to
+  the reel mix (no audio device; balance only measured); the backend's side
+  is scripted (the Ask answer's text and citations, the search hit, when
+  each phase completes); captures run in Inter where an iPhone shows SF Pro.
+  **Found:** the web app never applies its Geist font (§4 23b). Nothing
+  under `web/` or `functions/` changed.
 - **2026-09-26 — Short-form reels planned; pilot handed to a new session.**
   Branch `claude/app-feature-video-prompts-2mewy8`. Owner wants a 15–20s
   all-out motion graphics reel plus a 5-clip feature series with the same

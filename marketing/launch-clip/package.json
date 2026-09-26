@@ -8,7 +8,13 @@
     "score": "node audio/score.mjs",
     "captions": "node audio/captions.mjs",
     "fonts": "node audio/embed-fonts.mjs",
-    "verify": "node audio/verify.mjs"
+    "verify": "node audio/verify.mjs",
+    "reel:app": "node capture/build-app.mjs",
+    "reel:capture": "node capture/shoot.mjs",
+    "reel:vo": "python3 audio/synth-vo.py reel",
+    "reel:score": "node audio/reel-score.mjs && node audio/mix-vo.mjs reel",
+    "reel:stills": "node scripts/reel-stills.mjs",
+    "reel:render": "remotion render src/index.ts MachinaReel out/machina-reel.mp4"
   },
   "dependencies": {
     "@remotion/bundler": "^4.0.501",
@@ -28,6 +34,9 @@
   "devDependencies": {
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
-    "typescript": "^5.9.3"
+    "inter-ui": "^4.1.1",
+    "playwright-core": "^1.56.1",
+    "typescript": "^5.9.3",
+    "wawoff2": "^2.0.1"
   }
 }

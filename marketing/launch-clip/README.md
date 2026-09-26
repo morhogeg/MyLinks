@@ -12,6 +12,10 @@ palette rather than the app's graphite ground, so the film opens and closes in
 the same light. Act one's loss reads in the same grade: the platform panels
 *bleach out* into the paper rather than sinking into black.
 
+The same project builds the **short-form reels** (1080×1920, 15–20s) from a
+shared kit; see [Reels](#reels) and [Motion language](#motion-language) at
+the end. The film's timeline, captions and voice are untouched by them.
+
 ```bash
 cd marketing/launch-clip
 npm install
@@ -295,3 +299,248 @@ the same words (owner call 2026-09-17; the tagline that used to sit under a rule
 beneath it was cut so screen and voice agree). The space under the subtitle is
 the slot for a real App Store badge or URL once the listing is live. Nothing else
 in the film claims availability.
+
+# Reels
+
+## The highlight reel (pilot)
+
+`MachinaReel` is a 20.0s vertical reel: hook → Save → Find → Ask → Connect →
+Revisit → lockup, with its own score, the film's narrator and word-timed
+captions. **Every pixel of app UI in it is the real, shipped web app**, driven
+and recorded frame by frame; nothing is a mockup or a rebuilt screen.
+
+| Frames | Time | Scene | What it does |
+|---|---|---|---|
+| 0–128 | 0:00 | `Hook` | Ten real saves from the demo account (a YouTube talk, an Instagram post, an X thread, a bookmarked essay, a screenshot…) hang in depth, collapse into one point of ink on beat 3, and the brackets snap shut around it. The narrator says the tagline ("Machina. Everything you save, finally useful.", set in the band above the mark); the point drops out of the mark to become the app's **+** button |
+| 128–208 | 4.3s | `Save` | The + irises open into Home → Add to Machina (lifted off its screen) → the five real phases from `web/lib/scanPhases.ts`, one per 8th note → the new card lands in the feed |
+| 208–272 | 6.9s | `Find` | "easy dinner, empty fridge" typed into the real search field (rack focus on the words) → the one card it means, Marcella Hazan's sauce, which shares no word with the query |
+| 272–416 | 9.1s | `Ask` | The hero: "What do my saves say about time?" → the streamed answer → three citation chips from three platforms (Wait But Why, a TED talk on YouTube, a thread on X), each lifting on its own 8th → the answer's Graph chip |
+| 416–464 | 13.9s | `Connect` | Cut on the downbeat to inside the real graph, the three cited saves lit and blooming; pull back to the whole graph |
+| 464–512 | 15.5s | `Revisit` | The Revisit tab → "Review 5 cards / From today's Daily Brew" → the review deck dealing: Keep, Keep, and the last card thrown out of frame |
+| 512–600 | 17.1s | `End` | The mark arrives with the app's own launch motion, the drawn wordmark, and the App Store subtitle "Never lose another great find" on the narrator's timing |
+
+Compositions: **`MachinaReel`** (score + narrator + captions, the
+deliverable), **`MachinaReelSilent`** (captions, no audio: stills and QA),
+**`MachinaReelClean`** (no captions or kickers; the lockup keeps its line).
+
+```bash
+cd web && npm ci && cd -          # once: the app's own dependencies
+cd marketing/launch-clip && npm install
+npm run reel:app      # the real app, built for capture          → out/capture/app
+npm run reel:capture  # shoot the four takes (DPR 4, ~150MB)     → public/reel/app/, src/reels/data/takes.json
+npm run reel:vo       # the narrator (local Kokoro, see above)   → out/vo/reel/, src/reels/data/reel-vo.json
+npm run reel:score    # score + sound design, then the voice mix → public/reel-score-vo.wav
+npm run verify        # film AND reel gates (below)
+npm run reel:stills   # review stills                            → out/reel-stills/
+npm run reel:render   # → out/machina-reel.mp4
+```
+
+The narrator's word timings, the takes' data and the mixed audio are
+committed, so on a fresh clone a render needs only `reel:app` + `reel:capture`
+(the PNGs are gitignored: they regenerate from the app, which is also what
+stops the reel drifting away from the shipped UI).
+
+### How the real app is captured
+
+- **`capture/build-app.mjs`** copies `web/` and builds it as a static export
+  with the `firebase/*` imports aliased to `capture/shims/`: an in-memory
+  Firestore (`store.ts`, reads and listeners resolve on a macrotask so a paused
+  clock cannot stall them), auth permanently signed in as a demo user, and
+  callables posted to the local server. `web/` itself is not modified.
+- **`capture/library.mjs`** is the demo account: 24 real, deliberately
+  interesting saves (Wait But Why's *The Tail End*, Paul Graham, Dieter Rams,
+  Marcella Hazan, the Webb telescope, a Piranesi screenshot…), 30 edges, five
+  collections and today's Daily Brew. No "AI" category or card anywhere.
+- **`capture/server.mjs`** serves the build and answers `/api/*` the way the
+  backend would: it streams the Ask answer word by word and sends its sources,
+  and returns the search hit.
+- **`capture/device.mjs`** is an iPhone-sized page: 393×852 points at DPR 4,
+  touch, safe-area insets, a 9:41 status bar.
+- **`capture/recorder.mjs` + `shoot.mjs`** record four takes (`save`, `find`,
+  `ask`, `revisit`). The page's clock is stepped one frame (33.3ms) at a time
+  and CSS animations are paused and seeked, so the app's own motion (the phases
+  ticking, the answer streaming, the graph laying itself out, the deck's fling
+  and KEEP stamp) is recorded frame-exact. Each frame also records the text on
+  screen and the boxes the camera aims at (`src/reels/data/takes.json`).
+
+**What is scripted, and what is not.** Every screen is the app rendering real
+data through its real code. What stands in for the backend is scripted: the
+answer's text and which cards it cites (`ASK`), the search hit (`SEARCH`),
+and the moment each phase completes. The reel shows each phase on its 8th note
+rather than at the capture's pace. The app's "Searching your …" thinking line
+is never shown, because its wording is banned for reels; `npm run verify`
+checks the frames the edit uses.
+
+**Font.** The app asks for `system-ui`, which is SF Pro on an iPhone. SF cannot
+be installed here, so fontconfig maps `system-ui` to Inter, the closest open
+face (`prepareFonts()` in `device.mjs`). This is a stand-in: on a real iPhone
+the same screens render in SF Pro. (While doing this we found that the web app
+never applies its self-hosted Geist: `--font-geist-sans` is set on `<body>`,
+but the Tailwind font token resolves at `:root`, where the variable doesn't
+exist. Logged in `SOURCE_OF_TRUTH.md` §9; `web/` was not changed.)
+
+### Gates (`npm run verify`, reel section)
+
+Fails on: overlapping captions or kickers; a caption the narrator doesn't say
+verbatim (or a word count that doesn't match its timing); a voice line that
+overruns its caption window; a lockup line that isn't the film's endcard
+subtitle, or a hook that doesn't carry the tagline; an em dash, a literal
+"AI", "second brain" or "library" in any caption, kicker, demo card,
+collection, Ask/search string, hook chip, or **any text on any captured frame
+the edit uses**; a clipped reel master or a hole in its per-bar level; a voice
+sitting more than 3dB lower over the music than it does in the film.
+
+Nobody has listened to the reel mix on speakers yet (the render box has no
+audio device); the balance is only measured.
+
+## Motion language
+
+The rules every Machina video follows, and the kit component that implements
+each (`src/reels/kit/`). A new reel is a timeline file, a set of takes and a
+few scenes built from these parts; it should not need new motion primitives.
+
+### Palette and grade
+
+Light only: **ink on paper**. The set is the film's paper (`SET_BG`, a shade
+under the app's `#F9FAFB` so a white screen still separates), lit by
+**`Paper`** (a daylight pool where the type lives, a lift behind the product,
+two slow cool pools) and finished by **`Lens`** (the film's grain and a whisper
+of vignette). Colour comes only from the app's own pixels (category pills,
+platform marks) and the app's tokens (`PLATFORM_INK` in `SaveChip`); the
+reel's own type is `INK`/`INK_SOFT`. Emphasis is a lift and an ink ring
+(**`Lift`**), never a recolour. Where the app itself would darken the frame
+(the Add dialog's black scrim), the element is **lifted off its screen**
+(`AppShot` `crop`) instead, so the grade never flips. Never: dark flips,
+neon, glow, glitch, chromatic aberration, colour casts.
+
+### Type
+
+One family, Geist. Two voices (**`Type.tsx`**):
+
+- **The line (`KineticLine`)** is what the narrator says: 56px, 1.12 leading,
+  weight 600, −0.028em, at most two lines in a 980px measure (about ten
+  words). Words rise out of a mask on the narrator's **measured** word timing
+  (`EASE_MODAL`, 9 frames) and leave together, upward, half a frame apart
+  (`EASE_FLING`), finishing exactly on the caption's end frame. `\n` is a hard
+  break; `sizes` sets a size per line (the hook's name over its promise:
+  96 / 52).
+- **The kicker (`Kicker`)** names the chapter (SAVE / FIND / ASK / CONNECT /
+  REVISIT): 25px, weight 650, uppercase, tracking settling 0.62→0.44em,
+  letters rising one frame apart behind a short ink rule. Restraint is the
+  point: the energy of a cut belongs to the picture.
+- **The lockup (`Lockup` in `Brand.tsx`)** uses the drawn wordmark, never typed
+  letters, and sets the subtitle uppercase at 0.36em tracking with 0.95em word
+  gaps (a word gap has to out-shout the tracking).
+
+Layout (**`Captions.tsx`**): `SLOTS` puts the kicker at 290px and the line at
+346px, in the upper band clear of Reels/TikTok chrome (which covers roughly
+the top 12% and the bottom quarter). Every line lives there, the hook's
+tagline included: it sits above the mark, because the mark's point leaves
+downward to become the + button and must not cross type. **Type never sits
+on UI:** `BandScrim` fades any app screen that rises into the band (opaque
+to 510px, clear by 720px), and shots aim their subjects below 720px.
+Anything that holds is rounded to whole pixels (the film's shimmer lesson).
+
+### Curves (`curves.ts`): each one has a job
+
+| Curve | Value | Job | In the pilot |
+|---|---|---|---|
+| `EASE_MODAL` | `cubic-bezier(0.32, 0.72, 0, 1)`, the app's `--ease-modal` | arriving and settling | caption words, camera landings, the dialog arriving, the wordmark wipe |
+| `EASE_SPRING` | `cubic-bezier(0.34, 1.56, 0.64, 1)`, the app's `--ease-spring` | physical arrivals (the only overshoot) | brackets snapping shut, the ink point, chips and the new card lifting |
+| `EASE_FLING` | `cubic-bezier(0.22, 1, 0.36, 1)`, the deck's own fling | things thrown | caption exits, the deck's follow-through, the dialog dropping away |
+| `EASE_IN_OUT` | `cubic-bezier(0.65, 0, 0.35, 1)` | travel between two holds | feed → search field, answer → sources, the iris, the point's travel |
+| `EASE_GATHER` | accelerating, cubic-in | moves that must end at speed | the saves collapsing; a camera diving into a hard cut |
+
+Linear is for one thing only: a slow drift under a hold, so a held shot is
+never dead still.
+
+### Transition vocabulary
+
+In order of appearance; nothing outside this list.
+
+1. **Match cut by shape.** The gathered point of ink travels to where the +
+   button will be and becomes it (`Hook` → `Save`, timed in
+   `scenes/handoff.ts`).
+2. **Iris.** The + button opens into its screen (`AppShot` `iris`).
+3. **Lift.** An element leaves its screen with its own depth: the Add dialog
+   (`AppShot` `crop`), the new card, the citation chips (`Lift`).
+4. **Same-pixels hand-over.** Two takes that show the same screen swap under
+   one camera, which makes the swap invisible (`Save` rides `findKeys` until the
+   search tap). **Never dissolve between two takes:** they double-expose.
+5. **Cut on the beat.** A hard cut on a beat line or an 8th (Find → Ask, the
+   composer, the answer, Connect → Revisit, the deck). `camVelocity` reads a
+   cut forward, so the first frame of a new shot is sharp.
+6. **Dive into a cut.** The camera accelerates into the tapped element
+   (`EASE_GATHER`) and cuts on the downbeat to *inside* the next screen, which
+   fills the frame and pulls back (`EASE_MODAL`): Ask's Graph chip → the graph.
+7. **Throw out.** The last card is flung and the camera goes with it
+   (directional motion blur) into the lockup (`Revisit` → `End`).
+
+Every change of screen is motivated by a finger: a `Tap` (the reel's one
+piece of added UI, since iOS draws no touches) lands on the element that
+causes it, and the cut lands on the touch.
+
+### Pacing (`clock.ts`, `reel-timeline.mjs`)
+
+112.5 BPM: 16 frames a beat, 64 a bar, 600 frames = 20.0s. **Cuts and taps land
+on beats; secondary events on 8ths** (the five phases, the three chips, the
+flings); only typing runs on 16ths. One idea per scene, and the hero (Ask)
+gets the longest (144 frames). A caption stays up until its line has been
+spoken and its last word has landed (verify fails a voice line that overruns
+its caption). Motion blur is what a 180° shutter would give (σ ≈ 0.14 × px
+per frame, directional, capped at 10px) and never appears on a hold.
+
+### Camera (`camera.ts`, `AppShot`)
+
+- **Aim by screen point.** A key names a point of the app's 393×852 screen
+  (`cx`, `cy`), where it goes in the frame (`fx`, `fy`) and the zoom `z` in px
+  per point. Boxes come from the capture (`rectOf`), so a shot targets "the
+  chips" or "the search field" by name. Zoom interpolates in log space and
+  stays at or under the capture's DPR (4), so the app is never upscaled soft.
+- **Close-ups are 2D.** 3D tilt (under 10°) is for establishing moves only:
+  Home after the iris, the graph pull-back, the Revisit screen. It settles out
+  before anything must be read.
+- **A dive lands inside the app.** The first frame after a dive's cut is
+  filled edge to edge by the next screen; the floating slab, its shadow and
+  its display radius (`SCREEN_RADIUS`, 55pt) appear as the camera pulls back.
+- **Rack focus** (`AppShot` `focus`) keeps the eye on what matters, e.g. the
+  typed query over the app's live suggestions.
+
+### Sound to picture (`HITS`, `audio/reel-score.mjs`)
+
+Every sound-design event is keyed to a named frame in `HITS` that the picture
+also uses: a tick on each tap, a whoosh on the dive, an impact where the point
+lands, on the cut into the graph and on the lockup's strike. **Risers end on
+the reveal they lead into** (`RISERS`). One chord per bar
+(`BAR_CHORDS`), from the film's instruments (`audio/synth.mjs`, shared), so the
+reels and the film sound like one brand. Move a `HITS` frame and the picture
+and the sound move together.
+
+### Narrator (`audio/synth-vo.py reel`)
+
+One voice config for everything Machina says (Kokoro `af_heart`, speed 0.95,
+"Machina" spoken "Makeena"). **The captions are the script:** the reel's lines
+are read from `CAPTIONS` in `reel-timeline.mjs` and spoken verbatim, one line
+per caption. The reel opens on the tagline and closes on the App Store subtitle
+in short lines with air around them. Word timings are measured from the
+synthesized audio (`src/reels/data/reel-vo.json`) and drive the kinetic type
+and the lockup's subtitle. The mix ducks the score to 0.55 under the voice
+(the film uses 0.65); that puts the reel's voice at the film's
+voice-over-music balance, which verify measures.
+
+### Brand bans
+
+Enforced by `npm run verify` where a machine can check:
+
+- no literal **"AI"**, no **"second brain"**, and never the word **"library"**,
+  on screen or in voice (verify);
+- no em dashes in captions, voice or demo strings (verify);
+- not a learning app, and "search by meaning" is not the headline (Find says
+  "in your own words");
+- **no mockups:** app pixels only come from captures (`AppShot` takes nothing
+  else); the only added UI is the `Tap`;
+- no third-party frames or thumbnails (demo cards hide thumbnails); platform
+  marks only as the app draws them;
+- the real wordmark and glyph only (`Brand.tsx` wraps `ui/Brand.tsx`'s shipped
+  path data);
+- nothing claims App Store availability.

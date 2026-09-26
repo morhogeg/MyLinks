@@ -18,6 +18,21 @@
  *    near-clip count. What to look for — a quiet cold open, a build through
  *    capture/library, the peak on Ask, and no bar sitting more than ~3dB below
  *    its neighbours (a bigger hole reads as "the music stopped").
+ *
+ * THE REEL (reel-timeline.mjs, src/reels, capture/) gets the same gates plus
+ * the ones a reel built from the real app needs:
+ * 3. Captions and kickers never overlap; the narrator mirrors the captions
+ *    line for line (only the SAY_NAME respelling may differ); every spoken
+ *    line fits its caption window; every caption word has a timing.
+ * 4. Banned on-screen strings: no em dash, no literal "AI", no "second
+ *    brain", no "library", in the captions, the kickers, the demo account
+ *    (capture/library.mjs), the hook's chips, AND the text the real app
+ *    showed on every captured frame the reel may use (src/reels/data/
+ *    takes.json). The one range the reel never shows (the app's own
+ *    "Searching your …" line) is declared below, and the scenes are checked
+ *    for never asking for it.
+ * 5. The reel's score dynamics, and its VOICE-OVER BALANCE measured against
+ *    the film's (the one mix the owner has listened to).
  */
 
 import fs from 'node:fs';
@@ -157,6 +172,180 @@ let failed = false;
       console.error(`✗ bar ${rows[i].bar} sits ${dip.toFixed(1)}dB below its neighbours`);
       failed = true;
     }
+  }
+}
+
+
+// ───────────────────────────────────────────────────────────────── THE REEL
+console.log('\n── reel');
+{
+  const R = await import('../reel-timeline.mjs');
+  const L = await import('../capture/library.mjs');
+  const root = path.join(here, '..');
+  const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
+  const bad = [];
+  const BANNED = [
+    [/—/, 'em dash'],
+    [/\bAI\b/, 'literal "AI"'],
+    [/second brain/i, '"second brain"'],
+    [/librar(y|ies)/i, '"library"'],
+  ];
+  const scan = (where, text) => {
+    for (const [re, what] of BANNED) if (re.test(text)) bad.push(`${what} in ${where}: ${JSON.stringify(text).slice(0, 110)}`);
+  };
+
+  // ── 3. captions, kickers, narrator
+  const caps = [...R.CAPTIONS].sort((a, b) => a.at - b.at);
+  caps.forEach((c, i) => {
+    if (c.to <= c.at) bad.push(`caption "${c.text}" ends before it starts`);
+    if (i && c.at < caps[i - 1].to) bad.push(`caption overlap: "${c.text}" starts at ${c.at}, "${caps[i - 1].text}" runs to ${caps[i - 1].to}`);
+    if (c.to > R.TOTAL_FRAMES) bad.push(`caption "${c.text}" runs past the reel (${c.to} > ${R.TOTAL_FRAMES})`);
+    scan(`caption ${i + 1}`, c.text);
+  });
+  const kick = [...R.KICKERS].sort((a, b) => a.at - b.at);
+  kick.forEach((k, i) => {
+    if (i && k.at < kick[i - 1].to) bad.push(`kicker overlap: ${k.text} / ${kick[i - 1].text}`);
+    scan(`kicker ${k.text}`, k.text);
+  });
+  const SAY_NAME = /SAY_NAME = "([^"]+)"/.exec(read('audio/synth-vo.py'))[1];
+  const spoken = (t) => t.split(/\s+/).join(' ').replaceAll('Machina', SAY_NAME);
+  const timing = JSON.parse(read('src/reels/data/reel-vo.json'));
+  caps.forEach((c) => {
+    const t = timing.find((x) => x.frame === c.at);
+    if (!t) return bad.push(`no narrator timing for caption at ${c.at} ("${c.text}"): run synth-vo.py reel`);
+    if (t.text !== spoken(c.text)) bad.push(`narrator ≠ caption at ${c.at}: said "${t.text}", shows "${c.text}"`);
+    const words = c.text.split(/\s+/).filter(Boolean).length;
+    if (t.words.length !== words) bad.push(`caption at ${c.at} has ${words} words but ${t.words.length} timings`);
+  });
+  const manifest = path.join(root, 'out', 'vo', 'reel', 'manifest.json');
+  if (fs.existsSync(manifest)) {
+    for (const line of JSON.parse(fs.readFileSync(manifest, 'utf8'))) {
+      const c = caps.find((x) => x.at === line.frame);
+      if (!c) continue;
+      const window = (c.to - c.at) / R.FPS;
+      if (line.spoken > window + 1e-6) bad.push(`VO "${line.text}" speaks ${line.spoken}s in a ${window.toFixed(2)}s caption`);
+    }
+  } else {
+    console.log('  (no out/vo/reel/manifest.json: VO fit not re-checked; run synth-vo.py reel)');
+  }
+  // the lines the reel shares with the brand: tagline in, subtitle out
+  const film = read('src/scenes/Endcard.tsx');
+  const close = caps.find((c) => c.place === 'lockup');
+  if (!close || !film.includes(close.text.replace(/\.$/, ''))) bad.push('the reel lockup line is not the film endcard subtitle');
+  const hook = caps.find((c) => c.place === 'hook');
+  if (!hook || !hook.text.includes('Everything you save, finally useful.')) bad.push('the reel does not open on the D-6 tagline');
+
+  // ── 4. banned strings, everywhere a viewer can read one
+  for (const c of L.CARDS) {
+    for (const k of ['title', 'summary', 'category', 'sourceName', 'youtubeChannel', 'note']) if (c[k]) scan(`card ${c.id}.${k}`, c[k]);
+    c.tags.forEach((t) => scan(`card ${c.id} tag`, t));
+  }
+  L.COLLECTIONS.forEach((c) => scan(`collection ${c.id}`, c.name));
+  scan('Ask question', L.ASK.question);
+  scan('Ask answer', L.ASK.answer);
+  scan('search query', L.SEARCH.query);
+  const hookSrc = read('src/reels/scenes/Hook.tsx');
+  const titles = [...hookSrc.matchAll(/title: (?:'([^']+)'|"([^"]+)")/g)].map((m) => m[1] ?? m[2]);
+  for (const t of titles) {
+    scan('hook chip', t);
+    if (!L.CARDS.some((c) => c.title === t)) bad.push(`hook chip "${t}" is not a save in the demo account`);
+  }
+  // the app's own text on the captured frames the reel may show
+  const takes = JSON.parse(read('src/reels/data/takes.json'));
+  const NEVER_SHOWN = { ask: ['sent', 'stream'] }; // [from mark, to mark): the thinking line
+  let seen = 0;
+  for (const [name, t] of Object.entries(takes)) {
+    const skip = NEVER_SHOWN[name];
+    t.frames.forEach((fr, i) => {
+      if (skip && i >= t.marks[skip[0]] && i < t.marks[skip[1]]) return;
+      seen++;
+      for (const k of fr.t) scan(`the app on ${name} frame ${i}`, t.texts[k]);
+    });
+  }
+  for (const f of fs.readdirSync(path.join(root, 'src', 'reels', 'scenes'))) {
+    if (/'sent'/.test(read(`src/reels/scenes/${f}`))) bad.push(`src/reels/scenes/${f} uses the never-shown 'sent' frames`);
+  }
+
+  if (bad.length) {
+    console.error('✗ reel:');
+    for (const b of bad) console.error('    ' + b);
+    failed = true;
+  } else {
+    console.log(`✓ ${caps.length} captions + ${kick.length} kickers, no overlaps; narrator mirrors every caption; timings for every word`);
+    console.log(`✓ no em dash / "AI" / "second brain" / "library" in captions, demo account, hook chips, or ${seen} captured app frames`);
+  }
+
+  // ── 5. the reel's score, and the voice sitting where the film's does
+  const wavPath = path.join(root, 'public', 'reel-score.wav');
+  if (!fs.existsSync(wavPath)) {
+    console.error('✗ public/reel-score.wav missing — run `npm run reel:score`');
+    failed = true;
+  } else {
+    const b = fs.readFileSync(wavPath);
+    const SR = b.readUInt32LE(24);
+    const n = (b.length - 44) / 4;
+    const at = (i) => b.readInt16LE(44 + i * 4) / 32768;
+    let clipped = 0;
+    for (let i = 0; i < n; i++) if (Math.abs(at(i)) > 0.995) clipped++;
+    const rows = [];
+    for (let k = 0; k * R.BAR * SR < n; k++) {
+      const s0 = Math.floor(k * R.BAR * SR);
+      const e = Math.min(n, Math.floor((k + 1) * R.BAR * SR));
+      let sum = 0;
+      for (let i = s0; i < e; i++) sum += at(i) ** 2;
+      rows.push(20 * Math.log10(Math.sqrt(sum / (e - s0)) || 1e-9));
+    }
+    console.log(`  reel bars (dB): ${rows.map((x) => x.toFixed(1)).join('  ')}`);
+    if (clipped) {
+      console.error(`✗ the reel master clips (${clipped} samples)`);
+      failed = true;
+    }
+    for (let i = 1; i < rows.length - 2; i++) {
+      const dip = Math.min(rows[i - 1], rows[i + 1]) - rows[i];
+      if (dip > 3.5) {
+        console.error(`✗ reel bar ${i} sits ${dip.toFixed(1)}dB below its neighbours`);
+        failed = true;
+      }
+    }
+  }
+  // voice-over balance: during each spoken line, how far the voice sits above
+  // the music bed, reel vs film (the film's is the owner-approved reference)
+  const balance = (mixFile, scoreFile, manifestFile, startOf, duck) => {
+    const P = (f) => path.join(root, f);
+    if (![mixFile, scoreFile, manifestFile].every((f) => fs.existsSync(P(f)))) return null;
+    const mix = fs.readFileSync(P(mixFile));
+    const bed = fs.readFileSync(P(scoreFile));
+    const SR = mix.readUInt32LE(24);
+    const ratios = [];
+    for (const line of JSON.parse(fs.readFileSync(P(manifestFile), 'utf8'))) {
+      const s0 = Math.round(startOf(line) * SR);
+      const e = s0 + Math.round((line.spoken ?? line.sec) * SR);
+      let v = 0;
+      let m = 0;
+      for (let i = s0; i < e; i++) {
+        const a = mix.readInt16LE(44 + i * 4) / 32768;
+        const c = bed.readInt16LE(44 + i * 4) / 32768;
+        // the mix minus the (ducked) bed is the voice; the bed under it is duck×
+        v += (a - c * duck) ** 2;
+        m += (c * duck) ** 2;
+      }
+      ratios.push(10 * Math.log10(v / m));
+    }
+    ratios.sort((a, b) => a - b);
+    return ratios[Math.floor(ratios.length / 2)];
+  };
+  const filmBal = balance('public/score-vo.wav', 'public/score.wav', 'out/vo/manifest.json', (l) => l.bar * 2.5, 0.65);
+  const reelBal = balance('public/reel-score-vo.wav', 'public/reel-score.wav', 'out/vo/reel/manifest.json', (l) => l.start, 0.55);
+  if (filmBal !== null && reelBal !== null) {
+    console.log(`  voice over music, median line: film ${filmBal.toFixed(1)}dB · reel ${reelBal.toFixed(1)}dB`);
+    if (reelBal < filmBal - 3) {
+      console.error('✗ the reel voice sits >3dB lower in its mix than the film\'s does');
+      failed = true;
+    } else {
+      console.log('✓ the reel voice sits at the film\'s balance (within 3dB)');
+    }
+  } else {
+    console.log('  (VO balance not measured: needs both mixes and out/vo manifests)');
   }
 }
 
