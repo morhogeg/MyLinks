@@ -2604,7 +2604,10 @@ exact-match, capped.
   verify` OK, full `MachinaReel` render exit 0 (20.0s, h264 + aac), stills of
   every beat and every cut looked at (a double exposure, blur on cut frames,
   the tagline's last word barely landing and the point crossing the tagline
-  were found that way and fixed). **Not verified:** nobody has listened to
+  were found that way and fixed); the film is intact: `MachinaLaunchVerticalVO`
+  re-rendered exit 0 (80.0s) and its `score.wav` / `score-vo.wav` regenerate
+  to the same hashes (no pixel diff against a main render was run).
+  **Not verified:** nobody has listened to
   the reel mix (no audio device; balance only measured); the backend's side
   is scripted (the Ask answer's text and citations, the search hit, when
   each phase completes); captures run in Inter where an iPhone shows SF Pro.
