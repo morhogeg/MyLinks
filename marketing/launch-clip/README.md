@@ -304,7 +304,7 @@ in the film claims availability.
 
 ## The highlight reel (pilot)
 
-`MachinaReel` is a 76.8s vertical reel: the problem → "Introducing Machina.
+`MachinaReel` is a 77.3s vertical reel: the problem → "Introducing Machina.
 All your saves, finally useful." → "Save anything, from anywhere." (shares
 from YouTube, Instagram and Safari into the mark) → "A link, a screenshot, or
 a note." (the Add dialog's tabs) → the new card, opened → Find → Ask → Connect
@@ -344,6 +344,15 @@ Round 8 (owner: sharing from any app is a key feature; no screen recording):
 a `share` hold after the name, three shares (YouTube, Instagram, Safari)
 pulled into the mark on "Save anything, from anywhere.", and the Add
 dialog's tab tour re-captioned "A link, a screenshot, or a note."
+
+Round 9 (owner QA on round 8): the first share card and the SAVE kicker
+arrived while "All your saves, finally useful." was still up; they now wait
+for it to leave (share hold 176 frames; `SHARE_STARTS` and the tour's `MODES`
+live in `reel-timeline.mjs`, read by the scenes and the score). Save is now
+tapped inside the tour (a light tap, visible on the dark button), so the
+source clock resumes straight into the phases; before, the tap fell after the
+hold and its ring drifted over the phases, and the camera jumped for one frame
+at the seam (the `dKeys` key now sits exactly at source 141).
 
 | Output frames | Scene | What it does |
 |---|---|---|

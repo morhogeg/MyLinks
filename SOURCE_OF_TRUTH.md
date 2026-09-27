@@ -2497,7 +2497,7 @@ to its session:
 > feature-clip briefs below against the kit you built, and add a §9 entry.
 
 **What exists (the pilot, 2026-09-26, branch `claude/machina-reel-pilot`,
-awaiting owner review, not merged):** `MachinaReel` (76.8s, round 8,
+awaiting owner review, not merged):** `MachinaReel` (77.3s, round 9,
 1080×1920, score + narrator + captions, the deliverable), `MachinaReelSilent`
 and `MachinaReelClean`, in `marketing/launch-clip/`. Script: the problem ("You
 save things everywhere." / "An article here. A recipe there. A video
@@ -2594,6 +2594,14 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-27 — Highlight reel round 9: share and tab-tour timing fixes.**
+  Branch `claude/machina-reel-pilot`, not merged. Owner QA: the YouTube card
+  and SAVE kicker overlapped "All your saves, finally useful."; the "A link,
+  a screenshot, or a note." tour looked broken. Share cards now start after
+  the line leaves (share hold 160 → 176); Save is tapped inside the tour, with
+  a light tap visible on the dark button; the one-frame camera jump at the
+  tour → phases seam is gone. Timings in `reel-timeline.mjs` (`SHARE_STARTS`,
+  `MODES`). 77.3s.
 - **2026-09-27 — Highlight reel round 8: sharing from any app.** Branch
   `claude/machina-reel-pilot`, not merged. Owner: show sharing from other
   apps (a key feature), without a screen recording. Added a `share` hold

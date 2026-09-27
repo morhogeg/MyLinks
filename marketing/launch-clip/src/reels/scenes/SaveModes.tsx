@@ -1,6 +1,6 @@
 import React from 'react';
 import { AbsoluteFill } from 'remotion';
-import { HOLDS } from '../../../reel-timeline.mjs';
+import { HOLDS, MODES } from '../../../reel-timeline.mjs';
 import { AppShot, Lift, Tap } from '../kit/AppShot';
 import { camAt, camVelocity, type Key } from '../kit/camera';
 import { EASE_MODAL, EASE_SPRING, mix, prog } from '../kit/curves';
@@ -27,11 +27,12 @@ const linear = (t: number) => t;
 
 /** the taps, on beats */
 const TAPS: [u: number, mark: string, tab: string][] = [
-  [16, 'modeImage', 'tabImage'],
-  [56, 'modeNote', 'tabNote'],
-  [96, 'modeLink', 'tabLink'],
+  [MODES.taps[0], 'modeImage', 'tabImage'],
+  [MODES.taps[1], 'modeNote', 'tabNote'],
+  [MODES.taps[2], 'modeLink', 'tabLink'],
 ];
-const PASTE = 128;
+const PASTE = MODES.paste;
+const SAVE = MODES.save; // Save is tapped here; the Save scene resumes on the phases
 
 const keys: Key[] = [
   // where the Save scene's lifted dialog is at this moment
@@ -48,6 +49,7 @@ export const SaveModes: React.FC<{ u: number }> = ({ u }) => {
 
   const cam = camAt(keys, u);
   const dialog = rectOf(T, i, 'dialog');
+  const save = center(rectOf(T, at(T, 'filled'), 'save'));
 
   return (
     <AbsoluteFill>
@@ -73,6 +75,7 @@ export const SaveModes: React.FC<{ u: number }> = ({ u }) => {
             </React.Fragment>
           );
         })}
+        <Tap x={save.x} y={save.y} tone="light" t={prog(u, SAVE - 5, SAVE + 9, linear)} />
       </AppShot>
     </AbsoluteFill>
   );

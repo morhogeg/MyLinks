@@ -19,7 +19,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
-import { BAR, BAR_FRAMES, BEAT, BAR_CHORDS, CAPTIONS, FPS, HITS, RISERS, TOTAL_FRAMES, TOTAL_SEC, holdStart, real, srcOf } from '../reel-timeline.mjs';
+import { BAR, BAR_FRAMES, BEAT, BAR_CHORDS, CAPTIONS, FPS, HITS, RISERS, TOTAL_FRAMES, TOTAL_SEC, MODES, SHARE_STARTS, holdStart, real, srcOf } from '../reel-timeline.mjs';
 import { createSynth } from './synth.mjs';
 
 // Round 5: the round-1 score, on the reel's steady clock (K = 2, 112.5 BPM:
@@ -160,7 +160,6 @@ sub(f(H.markLocked), 36, 0.22, 1.2);
 // save: tap, the dialog, the five phases climbing, saved, the card landing
 tick(f(H.plusTap), 0.1, 1.1);
 whoosh(f(H.dialog) - 0.08, 0.35, 0.05, 0.2);
-tick(f(H.saveTap), 0.1, 1.2);
 H.phases.forEach((fr, i) => {
   tick(f(fr), 0.075, 1.0 + i * 0.12);
   bell(f(fr), [72, 76, 79, 83, 84][i], 0.035, i % 2 ? 0.3 : -0.3, 0.9);
@@ -170,10 +169,10 @@ sub(f(H.cardLands), 43, 0.3, 0.32);
 tick(f(H.cardLands), 0.09, 0.9);
 
 // the share hold: three shares from three apps, each pulled into the mark
-// (output frames: scenes/ShareBeat.tsx, starts +8/+48/+88: tap +20, lands +38)
+// (output frames: SHARE_STARTS, scenes/ShareBeat.tsx: tap +20, lands +38)
 {
   const S0 = holdStart('share') / FPS;
-  [8, 48, 88].forEach((t0, i) => {
+  SHARE_STARTS.forEach((t0, i) => {
     tick(S0 + (t0 + 20) / FPS, 0.09, 1.15 + i * 0.1);
     whoosh(S0 + (t0 + 24) / FPS, 0.45, 0.07, [0.4, -0.4, 0.4][i]);
     bell(S0 + (t0 + 38) / FPS, [84, 88, 91][i], 0.055, 0, 1.6);
@@ -182,14 +181,15 @@ tick(f(H.cardLands), 0.09, 0.9);
 }
 
 // the modes hold: Link, Image, Note tapped on beats, then the link pasted
-// (output frames: scenes/SaveModes.tsx taps at +16, +56, +96, pastes at +128)
+// then Save tapped (output frames: MODES, scenes/SaveModes.tsx)
 {
   const M0 = holdStart('modes') / FPS;
-  [16, 56, 96].forEach((u, i) => {
+  MODES.taps.forEach((u, i) => {
     tick(M0 + u / FPS, 0.09, 1.1 + i * 0.1);
     bell(M0 + u / FPS, [79, 83, 86][i], 0.035, [-0.3, 0.3, 0][i], 1.1);
   });
-  tick(M0 + 128 / FPS, 0.08, 1.4);
+  tick(M0 + MODES.paste / FPS, 0.06, 1.4);
+  tick(M0 + MODES.save / FPS, 0.1, 1.2);
 }
 
 // the insert: the new card, tapped open, its Key Points arriving (output

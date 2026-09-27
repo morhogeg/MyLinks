@@ -1,7 +1,7 @@
 import React from 'react';
 import { AbsoluteFill } from 'remotion';
 import { Compass, Share } from 'lucide-react';
-import { HOLDS } from '../../../reel-timeline.mjs';
+import { HOLDS, SHARE_STARTS } from '../../../reel-timeline.mjs';
 import { sans } from '../../fonts';
 import { PLATFORM_INK, PlatformMark } from '../../ui/app';
 import { Tap } from '../kit/AppShot';
@@ -32,8 +32,7 @@ const SOURCES: Source[] = [
   { kind: 'safari', app: 'Safari', by: 'collaborativefund.com', title: 'The Psychology of Money' },
 ];
 
-/** each share: [arrives, tapped, pulled in, lands] relative to its start */
-export const SHARE_STARTS = [8, 48, 88];
+/** each share (starts: reel-timeline SHARE_STARTS): arrives, tapped, pulled in, lands */
 const ENTER = 12;
 const TAP = 20;
 const PULL = 26;

@@ -54,10 +54,22 @@ export const onBeat = (f) => Math.round(f / BEAT_FRAMES) * BEAT_FRAMES;
  *    moment worth reading; nothing freezes and the cut's pace is unchanged.
  * Every hold starts on a source 8th and lasts whole beats, so the grid holds.
  */
+/**
+ * Inside two scene holds, in OUTPUT frames from the hold's start (the scenes
+ * and the score both read these):
+ *  - SHARE: when each app's card arrives (scenes/ShareBeat.tsx); the first
+ *    waits for "All your saves, finally useful." to leave the screen;
+ *  - MODES: the tab taps, the paste and the Save tap (scenes/SaveModes.tsx);
+ *    Save is tapped INSIDE the hold, so the source clock resumes on the
+ *    tapped dialog and goes straight into the phases.
+ */
+export const SHARE_STARTS = [32, 72, 112];
+export const MODES = { taps: [16, 56, 96], paste: 112, save: 128 };
+
 export const HOLDS = [
   { id: 'problem', at: 32, len: 224, adv: 0 }, // the problem, named
   { id: 'name', at: 96, len: 32, adv: 0 }, // the name holds
-  { id: 'share', at: 100, len: 160, adv: 0 }, // shared from YouTube, Instagram, Safari into the mark
+  { id: 'share', at: 100, len: 176, adv: 0 }, // shared from YouTube, Instagram, Safari into the mark
   { id: 'modes', at: 141, len: 144, adv: 0 }, // Link, Image, Note
   { id: 'card', at: 208, len: 224, adv: 0 }, // the new card, opened
   { id: 'found', at: 248, len: 48, adv: 4 }, // linger: the one card it finds
@@ -166,9 +178,9 @@ export const CAPTIONS = [
   { at: real(56), to: 410, place: 'mark', text: 'Machina.', say: 'Introducing Machina.' },
   { at: 416, to: 476, text: 'All your saves,\nfinally useful.' },
   // the share hold: from any app, into Machina (scenes/ShareBeat.tsx)
-  { at: holdStart('share') + 24, to: holdStart('share') + 156, text: 'Save anything, from anywhere.' },
+  { at: holdStart('share') + 28, to: holdStart('share') + 168, text: 'Save anything, from anywhere.' },
   // the modes hold: the Add dialog's three ways in
-  { at: holdStart('modes') + 8, to: holdStart('modes') + 136, text: 'A link, a screenshot, or a note.' },
+  { at: holdStart('modes') + 8, to: holdStart('modes') + 124, text: 'A link, a screenshot, or a note.' },
   // the card hold: the new card, opened
   { at: holdStart('card') + 16, to: holdStart('card') + 212, text: 'Each save becomes a card,\nwith the key points pulled out.' },
   { at: onBeat(real(214)), to: real(262), text: 'Find it in your own words.' },
@@ -185,7 +197,7 @@ export const CAPTIONS = [
 /** The pillar word each product scene opens on (the kinetic kicker), in
  *  OUTPUT frames. */
 export const KICKERS = [
-  { at: holdStart('share'), to: holdStart('card') + 212, text: 'Save' },
+  { at: holdStart('share') + 24, to: holdStart('card') + 212, text: 'Save' },
   { at: onBeat(real(210)), to: real(268), text: 'Find' },
   { at: onBeat(real(274)), to: real(412), text: 'Ask' },
   { at: onBeat(real(418)), to: real(460), text: 'Connect' },
@@ -205,7 +217,7 @@ export const HITS = {
   toApp: 120, // the point becomes the + button
   plusTap: 132,
   dialog: 136,
-  saveTap: 142, // just after the modes hold (Link, Image, Note)
+  saveTap: 141, // tapped inside the modes hold (MODES.save); the phases follow
   phases: [144, 152, 160, 168, 176], // the five phases, an 8th apart
   saved: 184,
   cardLands: 200,

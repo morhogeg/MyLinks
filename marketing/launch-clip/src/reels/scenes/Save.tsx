@@ -67,10 +67,10 @@ export const Save: React.FC<{ f: number }> = ({ f }) => {
   // then dropping away into the feed
   const dKeys: Key[] = [
     { f: 136, cx: 196.5, cy: 426, z: 2.22, fx: 540, fy: 1236 },
-    { f: 141, z: 2.2486, ease: (t) => t },
-    // the modes hold happens here (scenes/SaveModes.tsx); the camera picks up
-    // exactly where that scene leaves it, on the tabs
-    { f: 141.01, cy: 458, z: 2.7, fy: 1230, ease: (t) => t },
+    { f: 140.99, z: 2.2486, ease: (t) => t },
+    // the modes hold happens at 141 (scenes/SaveModes.tsx); from its last
+    // frame on the camera is exactly where that scene leaves it, on the tabs
+    { f: 141, cy: 458, z: 2.7, fy: 1230, ease: (t) => t },
     { f: 160, cy: 500, z: 2.7, fy: 1160, ease: EASE_MODAL },
     { f: 184, cy: 510, z: 2.85, ease: (t) => t },
     { f: 189, cy: 520, z: 2.3, fy: 1130, ease: EASE_MODAL },
@@ -98,7 +98,6 @@ export const Save: React.FC<{ f: number }> = ({ f }) => {
   const plus = center(rectOf(T, 0, 'plus'));
   // the search field (Find's box: same pixels) for the tap that hands over
   const search = center(rectOf('find', at('find', 'focus', 4), 'search'));
-  const save = center(rectOf(T, at(T, 'filled'), 'save'));
   const card = rectOf(T, at(T, 'landed'), 'firstCard');
   const landT = prog(f, S.cardLands - 1, S.cardLands + 5, EASE_SPRING);
   // settled before the hand-over to Find
@@ -142,7 +141,6 @@ export const Save: React.FC<{ f: number }> = ({ f }) => {
           cropRadius={24}
           opacity={dialogIn * (1 - dialogOut)}
         >
-          <Tap x={save.x} y={save.y} t={prog(f, S.saveTap - 1, S.saveTap + 13, (t) => t)} />
         </AppShot>
       )}
 
