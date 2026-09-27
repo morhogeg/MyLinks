@@ -61,7 +61,7 @@ export const Recall: React.FC<{ u: number }> = ({ u }) => {
   const step = stepAt(u);
   const i =
     u < TAP
-      ? at(T, 'open', Math.min(9, 2 + u))
+      ? at(T, 'open', Math.min(9, 6 + u)) // from 6: the header's own crossfade (MACHINA → Revisit) has settled
       : step === 0
         ? at(T, 'expand', Math.min(31, u - TAP))
         : at(T, 'scroll', step - 1);

@@ -2497,7 +2497,7 @@ to its session:
 > feature-clip briefs below against the kit you built, and add a §9 entry.
 
 **What exists (the pilot, 2026-09-26, branch `claude/machina-reel-pilot`,
-awaiting owner review, not merged):** `MachinaReel` (77.3s, round 9,
+awaiting owner review, not merged):** `MachinaReel` (78.4s, round 10,
 1080×1920, score + narrator + captions, the deliverable), `MachinaReelSilent`
 and `MachinaReelClean`, in `marketing/launch-clip/`. Script: the problem ("You
 save things everywhere." / "An article here. A recipe there. A video
@@ -2594,6 +2594,12 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-27 — Highlight reel round 10: kickers without the rule; finishing
+  pass.** Branch `claude/machina-reel-pilot`, not merged. The chapter words
+  (SAVE, FIND…) lose their leading dash. From an every-beat review: no more
+  double "Saved to Machina" toast, no dark sliver on the floated toast,
+  Recall opens on a settled header, the end card holds ~2s (`end` linger).
+  78.4s.
 - **2026-09-27 — Highlight reel round 9: share and tab-tour timing fixes.**
   Branch `claude/machina-reel-pilot`, not merged. Owner QA: the YouTube card
   and SAVE kicker overlapped "All your saves, finally useful."; the "A link,

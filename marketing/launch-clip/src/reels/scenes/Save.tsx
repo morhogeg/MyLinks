@@ -82,7 +82,7 @@ export const Save: React.FC<{ f: number }> = ({ f }) => {
 
   // the toast: the app's own "Saved to Machina", floated under the dialog
   // the pill inside the toast's container (measured off the capture)
-  const toastPill: [number, number, number, number] = [16, 755, 361, 48];
+  const toastPill: [number, number, number, number] = [16, 755, 361, 46]; // 755–801, the white of the pill only
   const tKeys: Key[] = [
     { f: 184, cx: 196.5, cy: 779, z: 2.1, fx: 540, fy: 1720 },
     { f: 190, fy: 1640 },
@@ -145,14 +145,18 @@ export const Save: React.FC<{ f: number }> = ({ f }) => {
       )}
 
       {/* the toast */}
-      {f >= S.saved && f < 204 && (
+      {/* hands over to the app's own toast, in the feed behind, as the dialog
+          drops away (from 190 the screen shows it: never two at once) */}
+      {f >= S.saved && f < 191 && (
         <AppShot
           take={T}
-          i={walk(f, S.saved, 'done', 20)}
+          // the settled toast: the app's own slides up through the crop for its
+          // first frames (the dark backdrop would show); the float does the entrance
+          i={at(T, 'done', 12)}
           cam={tCam}
           crop={toastPill}
           cropRadius={12}
-          opacity={toastIn * (1 - prog(f, 196, 204, EASE_MODAL))}
+          opacity={toastIn * (1 - prog(f, 187, 190, EASE_MODAL))}
           shadow={0.7}
         />
       )}

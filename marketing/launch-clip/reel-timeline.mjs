@@ -76,6 +76,7 @@ export const HOLDS = [
   { id: 'sources', at: 372, len: 64, adv: 6 }, // linger: the answer and its sources
   { id: 'graph', at: 440, len: 48, adv: 6 }, // linger: the graph
   { id: 'recall', at: 464, len: 192, adv: 0 }, // this week's recap, read
+  { id: 'end', at: 584, len: 64, adv: 16 }, // linger: the end card holds ~2s once the line is whole
 ];
 
 /** source frame → output frame (at/after a scene hold → after it) */

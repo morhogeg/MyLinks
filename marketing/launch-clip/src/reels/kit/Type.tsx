@@ -128,36 +128,33 @@ export const Kicker: React.FC<{ text: string; frame: number; from: number; to: n
   const local = frame - from;
   const out = prog(frame, to, to + 8, EASE_MODAL);
   const track = mix(0.62, 0.44, prog(local, 0, 14, EASE_MODAL));
-  const rule = prog(local, 0, 10, EASE_MODAL);
+  const letters = text.toUpperCase().split('');
+  // the word alone, no rule beside it (owner, round 10)
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 18, opacity: 1 - out }}>
-      <div style={{ width: 34 * rule, height: 3, borderRadius: 2, background: INK, opacity: 0.85 }} />
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', opacity: 1 - out }}>
       <div style={{ display: 'flex' }}>
-        {text
-          .toUpperCase()
-          .split('')
-          .map((ch, k) => {
-            const t = prog(local, k * 0.8, k * 0.8 + 7, EASE_MODAL);
-            return (
-              <span
-                key={k}
-                style={{
-                  display: 'inline-block',
-                  fontFamily: sans,
-                  fontSize: 25,
-                  fontWeight: 650,
-                  letterSpacing: `${track}em`,
-                  color: INK_SOFT,
-                  opacity: Math.min(1, t * 1.6),
-                  filter: t < 0.999 ? `blur(${((1 - t) * 6).toFixed(2)}px)` : undefined,
-                }}
-              >
-                {ch}
-              </span>
-            );
-          })}
+        {letters.map((ch, k) => {
+          const t = prog(local, k * 0.8, k * 0.8 + 7, EASE_MODAL);
+          return (
+            <span
+              key={k}
+              style={{
+                display: 'inline-block',
+                fontFamily: sans,
+                fontSize: 25,
+                fontWeight: 650,
+                // no tracking after the last letter, so the word sits centred
+                letterSpacing: k === letters.length - 1 ? 0 : `${track}em`,
+                color: INK_SOFT,
+                opacity: Math.min(1, t * 1.6),
+                filter: t < 0.999 ? `blur(${((1 - t) * 6).toFixed(2)}px)` : undefined,
+              }}
+            >
+              {ch}
+            </span>
+          );
+        })}
       </div>
-      <div style={{ width: 34 * rule, height: 3, borderRadius: 2, background: INK, opacity: 0 }} />
     </div>
   );
 };

@@ -304,7 +304,7 @@ in the film claims availability.
 
 ## The highlight reel (pilot)
 
-`MachinaReel` is a 77.3s vertical reel: the problem → "Introducing Machina.
+`MachinaReel` is a 78.4s vertical reel: the problem → "Introducing Machina.
 All your saves, finally useful." → "Save anything, from anywhere." (shares
 from YouTube, Instagram and Safari into the mark) → "A link, a screenshot, or
 a note." (the Add dialog's tabs) → the new card, opened → Find → Ask → Connect
@@ -353,6 +353,16 @@ tapped inside the tour (a light tap, visible on the dark button), so the
 source clock resumes straight into the phases; before, the tap fell after the
 hold and its ring drifted over the phases, and the camera jumped for one frame
 at the seam (the `dKeys` key now sits exactly at source 141).
+
+Round 10 (owner: drop the rule beside the chapter words; a finishing pass):
+the kickers (SAVE, FIND, ASK, CONNECT, REVISIT) are the word alone, centred
+optically (no tracking after the last letter). Finishing fixes from an
+every-beat still review: the floated "Saved to Machina" toast no longer
+overlaps the app's own (it hands over as the dialog drops) and floats the
+settled capture frame with a tight crop (no dark backdrop sliver); Recall
+opens on a settled header (the capture's MACHINA → Revisit crossfade was
+visible for its first frames); an `end` linger holds the finished end card
+~2s instead of ~1s.
 
 | Output frames | Scene | What it does |
 |---|---|---|
