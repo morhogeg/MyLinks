@@ -63,18 +63,21 @@ export const onBeat = (f) => Math.round(f / BEAT_FRAMES) * BEAT_FRAMES;
  *    Save is tapped INSIDE the hold, so the source clock resumes on the
  *    tapped dialog and goes straight into the phases.
  */
-export const SHARE_STARTS = [32, 72, 112];
+export const SHARE_STARTS = [40, 84, 128];
 export const MODES = { taps: [16, 56, 96], paste: 112, save: 128 };
 
+// Round 11: the card hold (224 → 192) and the found / graph lingers (48 → 32)
+// were trimmed once their lines stopped lingering: each still shows its
+// subject for ~1.2–1.5s after the line leaves, without a dead static stretch.
 export const HOLDS = [
   { id: 'problem', at: 32, len: 224, adv: 0 }, // the problem, named
   { id: 'name', at: 96, len: 32, adv: 0 }, // the name holds
-  { id: 'share', at: 100, len: 176, adv: 0 }, // shared from YouTube, Instagram, Safari into the mark
+  { id: 'share', at: 100, len: 192, adv: 0 }, // shared from YouTube, Instagram, Safari into the mark
   { id: 'modes', at: 141, len: 144, adv: 0 }, // Link, Image, Note
-  { id: 'card', at: 208, len: 224, adv: 0 }, // the new card, opened
-  { id: 'found', at: 248, len: 48, adv: 4 }, // linger: the one card it finds
+  { id: 'card', at: 208, len: 192, adv: 0 }, // the new card, opened
+  { id: 'found', at: 248, len: 32, adv: 4 }, // linger: the one card it finds
   { id: 'sources', at: 372, len: 64, adv: 6 }, // linger: the answer and its sources
-  { id: 'graph', at: 440, len: 48, adv: 6 }, // linger: the graph
+  { id: 'graph', at: 440, len: 32, adv: 6 }, // linger: the graph
   { id: 'recall', at: 464, len: 192, adv: 0 }, // this week's recap, read
   { id: 'end', at: 584, len: 64, adv: 16 }, // linger: the end card holds ~2s once the line is whole
 ];
@@ -166,45 +169,6 @@ export const sceneAt = (id) => {
  * A "\n" is a hard line break on screen only (the voice reads straight on).
  * NO em dashes, no literal "AI", no "second brain", no "library" (verify).
  */
-export const CAPTIONS = [
-  // the problem, as the launch film opens: the saves hang where they were
-  // kept while the narrator names it
-  { at: 16, to: 88, text: 'You save things everywhere.' },
-  { at: 96, to: 216, text: 'An article here. A recipe there.\nA video somewhere else.' },
-  { at: 224, to: 304, text: 'Saved, and rarely seen again.' },
-  // the answer: the saves collapse into the point, the brackets snap, and
-  // the narrator introduces it. The screen shows only the NAME (the drawn
-  // wordmark wipes in under the mark on "Machina"; scenes/Hook.tsx); the
-  // spoken lead-in "Introducing" is voice only (`say`)
-  { at: real(56), to: 410, place: 'mark', text: 'Machina.', say: 'Introducing Machina.' },
-  { at: 416, to: 476, text: 'All your saves,\nfinally useful.' },
-  // the share hold: from any app, into Machina (scenes/ShareBeat.tsx)
-  { at: holdStart('share') + 28, to: holdStart('share') + 168, text: 'Save anything, from anywhere.' },
-  // the modes hold: the Add dialog's three ways in
-  { at: holdStart('modes') + 8, to: holdStart('modes') + 124, text: 'A link, a screenshot, or a note.' },
-  // the card hold: the new card, opened
-  { at: holdStart('card') + 16, to: holdStart('card') + 212, text: 'Each save becomes a card,\nwith the key points pulled out.' },
-  { at: onBeat(real(214)), to: real(262), text: 'Find it in your own words.' },
-  { at: onBeat(real(278)), to: real(380), text: 'Ask anything. Every answer comes straight from your saves.' },
-  { at: onBeat(real(420)), to: real(463), text: 'See how it all connects.' },
-  // recall: the weekly recap, read slowly (scenes/Recall.tsx)
-  { at: holdStart('recall') + 24, to: holdStart('recall') + 124, text: 'Every week, Machina brings back\nwhat’s worth remembering.' },
-  { at: holdStart('recall') + 136, to: holdStart('recall') + 272, text: 'The themes of your week,\nand the one save worth rereading.' },
-  // the close: the name (the drawn wordmark wipes in as it is said), then
-  // the App Store subtitle, set big in the serif
-  { at: onBeat(real(542)), to: real(600), place: 'lockup', text: 'Machina.\nNever lose another great find.' },
-];
-
-/** The pillar word each product scene opens on (the kinetic kicker), in
- *  OUTPUT frames. */
-export const KICKERS = [
-  { at: holdStart('share') + 24, to: holdStart('card') + 212, text: 'Save' },
-  { at: onBeat(real(210)), to: real(268), text: 'Find' },
-  { at: onBeat(real(274)), to: real(412), text: 'Ask' },
-  { at: onBeat(real(418)), to: real(460), text: 'Connect' },
-  { at: holdStart('recall') + 8, to: holdStart('recall') + 272, text: 'Revisit' },
-];
-
 /**
  * Picture events the score must acknowledge, in frames. Taps and landings
  * sit on the grid; the scenes read these same numbers, so moving a hit here
@@ -239,6 +203,71 @@ export const HITS = {
   lockup: 512,
   markStrike: 534,
 };
+
+/**
+ * THE DWELL RULE (round 11, owner: a line that "lingered"): a line leaves
+ * 0.3–1.2s after the narrator finishes it. A line may stay longer only while
+ * the action it names is still playing on screen, and says so (`until`,
+ * at most 4s past the voice). `npm run verify` enforces both.
+ */
+export const CAPTIONS = [
+  // the problem, as the launch film opens: the saves hang where they were
+  // kept while the narrator names it
+  { at: 16, to: 88, text: 'You save things everywhere.' },
+  { at: 96, to: 216, text: 'An article here. A recipe there.\nA video somewhere else.' },
+  { at: 224, to: 304, text: 'Saved, and rarely seen again.' },
+  // the answer: the saves collapse into the point, the brackets snap, and
+  // the narrator introduces it. The screen shows only the NAME (the drawn
+  // wordmark wipes in under the mark on "Machina"; scenes/Hook.tsx); the
+  // spoken lead-in "Introducing" is voice only (`say`)
+  { at: real(56), to: 410, place: 'mark', text: 'Machina.', say: 'Introducing Machina.' },
+  { at: 416, to: 488, text: 'All your saves,\nfinally useful.' },
+  // the share hold: from any app, into Machina (scenes/ShareBeat.tsx)
+  { at: holdStart('share') + 40, to: holdStart('share') + 176, text: 'Save anything, from anywhere.', until: 'the third share lands in the mark' },
+  // the modes hold: the Add dialog's three ways in
+  { at: holdStart('modes') + 8, to: holdStart('modes') + 116, text: 'A link, a screenshot, or a note.', until: 'the tour is back on Link, the link pasted' },
+  // the card hold: the new card, opened
+  { at: holdStart('card') + 16, to: holdStart('card') + 152, text: 'Each save becomes a card,\nwith the key points pulled out.', until: 'the Key Points are highlighted' },
+  { at: onBeat(real(214)), to: real(HITS.found) + 24, text: 'Find it in your own words.' },
+  { at: onBeat(real(278)), to: real(HITS.chips[2]) + 16, text: 'Ask anything. Every answer comes straight from your saves.', until: 'the third source lands' },
+  { at: onBeat(real(420)), to: holdStart('graph') + 28, text: 'See how it all connects.' },
+  // recall: the weekly recap, read slowly (scenes/Recall.tsx)
+  { at: holdStart('recall') + 24, to: holdStart('recall') + 130, text: 'Every week, Machina brings back\nwhat’s worth remembering.' },
+  { at: holdStart('recall') + 136, to: holdStart('recall') + 256, text: 'The themes of your week,\nand the one save worth rereading.' },
+  // the close: the name (the drawn wordmark wipes in as it is said), then
+  // the App Store subtitle, set big in the serif
+  { at: onBeat(real(542)), to: real(600), place: 'lockup', text: 'Machina.\nNever lose another great find.' },
+];
+
+/**
+ * The chapter word (the kinetic kicker) above the line, in OUTPUT frames.
+ * Round 11 (owner: writing that "lingered"): the label is on screen only
+ * while its chapter's narration is, arriving a beat-fraction before each line
+ * and leaving WITH it; silent stretches are pure picture. Lines closer than
+ * KICKER_BRIDGE frames share one label (no flicker between them).
+ */
+const CHAPTERS = [
+  ['Save', 'Save anything'],
+  ['Find', 'Find it'],
+  ['Ask', 'Ask anything'],
+  ['Connect', 'See how'],
+  ['Revisit', 'Every week'],
+];
+const KICKER_LEAD = 4;
+export const KICKER_BRIDGE = 24;
+const narrated = CAPTIONS.filter((c) => !c.place);
+export const KICKERS = CHAPTERS.flatMap(([text, opens], i) => {
+  const from = narrated.findIndex((c) => c.text.startsWith(opens));
+  const next = i + 1 < CHAPTERS.length ? narrated.findIndex((c) => c.text.startsWith(CHAPTERS[i + 1][1])) : narrated.length;
+  const spans = [];
+  for (const c of narrated.slice(from, next)) {
+    const last = spans[spans.length - 1];
+    if (last && c.at - last.to < KICKER_BRIDGE) last.to = c.to;
+    else spans.push({ at: c.at - KICKER_LEAD, to: c.to, text });
+  }
+  return spans;
+});
+
 
 /** HITS in OUTPUT frames (the score's clock). */
 export const REAL_HITS = Object.fromEntries(

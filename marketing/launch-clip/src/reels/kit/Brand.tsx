@@ -130,6 +130,9 @@ export const Lockup: React.FC<{
           lineHeight: 0,
           filter: `drop-shadow(0 ${10 + bloom * 10}px ${34 + bloom * 40}px rgba(24,32,48,${0.2 + bloom * 0.18}))`,
           transform: `scale(${mix(0.96, 1, prog(frame, start, strike + 10))})`,
+          // nothing waits on screen: the mark's first state (four corner
+          // ticks) appears only as its launch begins (round 11)
+          opacity: prog(frame, start - 6, start, EASE_MODAL),
         }}
       >
         <AnimatedMark id="reel-end" u={u} style={{ width: '100%', height: 'auto' }} />

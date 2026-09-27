@@ -2497,7 +2497,7 @@ to its session:
 > feature-clip briefs below against the kit you built, and add a §9 entry.
 
 **What exists (the pilot, 2026-09-26, branch `claude/machina-reel-pilot`,
-awaiting owner review, not merged):** `MachinaReel` (78.4s, round 10,
+awaiting owner review, not merged):** `MachinaReel` (76.8s, round 11,
 1080×1920, score + narrator + captions, the deliverable), `MachinaReelSilent`
 and `MachinaReelClean`, in `marketing/launch-clip/`. Script: the problem ("You
 save things everywhere." / "An article here. A recipe there. A video
@@ -2594,6 +2594,14 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-27 — Highlight reel round 11: timing polish.** Branch
+  `claude/machina-reel-pilot`, not merged. Owner: the last SAVE line lingered;
+  asked for a comprehensive polish. Measured every line's dwell after its
+  voice (five sat 3–5.6s past it); new dwell rule (0.3–1.2s, or ≤4s with an
+  `until` for a line whose action is still playing), enforced by verify.
+  Chapter words show only with their narration and leave with the line.
+  Trimmed the dead holds this exposed (card, found, graph), and the end mark
+  no longer hangs as static ticks. 76.8s.
 - **2026-09-27 — Highlight reel round 10: kickers without the rule; finishing
   pass.** Branch `claude/machina-reel-pilot`, not merged. The chapter words
   (SAVE, FIND…) lose their leading dash. From an every-beat review: no more

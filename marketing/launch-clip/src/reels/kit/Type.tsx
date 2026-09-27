@@ -120,18 +120,29 @@ export const KineticLine: React.FC<{
  * The pillar word (SAVE / FIND / ASK / CONNECT / REVISIT): a small
  * letterspaced label above the line. It arrives on the scene's first beat,
  * letter by letter coming into focus (0.8 frames apart), while its tracking
- * settles; it leaves with a fade. Restraint is the point: the energy of a
+ * settles; it leaves with its line, in the line's own gesture. Restraint is the point: the energy of a
  * cut belongs to the picture, the label only names the chapter.
  */
 export const Kicker: React.FC<{ text: string; frame: number; from: number; to: number }> = ({ text, frame, from, to }) => {
-  if (frame < from || frame > to + 8) return null;
+  if (frame < from || frame > to) return null;
   const local = frame - from;
-  const out = prog(frame, to, to + 8, EASE_MODAL);
+  // leaves WITH its line (round 11): the same 6-frame blur-and-rise, ending
+  // on the same frame, so label and line go as one
+  const out = prog(frame, to - LINE_OUT, to, EASE_MODAL);
   const track = mix(0.62, 0.44, prog(local, 0, 14, EASE_MODAL));
   const letters = text.toUpperCase().split('');
   // the word alone, no rule beside it (owner, round 10)
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', opacity: 1 - out }}>
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        opacity: 1 - out,
+        filter: out > 0.01 ? `blur(${(out * 8).toFixed(2)}px)` : undefined,
+        transform: `translateY(${Math.round(-out * 10)}px)`,
+      }}
+    >
       <div style={{ display: 'flex' }}>
         {letters.map((ch, k) => {
           const t = prog(local, k * 0.8, k * 0.8 + 7, EASE_MODAL);

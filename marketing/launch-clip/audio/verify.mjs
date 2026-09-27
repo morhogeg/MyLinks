@@ -206,6 +206,8 @@ console.log('\n── reel');
   const kick = [...R.KICKERS].sort((a, b) => a.at - b.at);
   kick.forEach((k, i) => {
     if (i && k.at < kick[i - 1].to) bad.push(`kicker overlap: ${k.text} / ${kick[i - 1].text}`);
+    // a chapter's label is up only with its narration: it ends on a line's end
+    if (!caps.some((c) => !c.place && c.to === k.to && c.at >= k.at)) bad.push(`kicker ${k.text} (${k.at}–${k.to}) does not leave with a line`);
     scan(`kicker ${k.text}`, k.text);
   });
   const SAY_NAME = /SAY_NAME = "([^"]+)"/.exec(read('audio/synth-vo.py'))[1];
@@ -228,6 +230,13 @@ console.log('\n── reel');
       if (!c) continue;
       const window = (c.to - c.at) / R.FPS;
       if (line.spoken > window + 1e-6) bad.push(`VO "${line.text}" speaks ${line.spoken}s in a ${window.toFixed(2)}s caption`);
+      // the dwell rule (reel-timeline.mjs): off 0.3–1.2s after the voice, or
+      // up to 4s while the action it names plays (`until`); the end card holds
+      if (c.place === 'lockup') continue;
+      const dwell = window - line.spoken;
+      const max = c.until ? 4 : 1.2;
+      if (dwell < 0.3) bad.push(`caption "${c.text}" leaves ${dwell.toFixed(2)}s after its voice (min 0.3s)`);
+      if (dwell > max) bad.push(`caption "${c.text}" lingers ${dwell.toFixed(2)}s after its voice (max ${max}s${c.until ? '' : '; set `until` if its action is still playing'})`);
     }
   } else {
     console.log('  (no out/vo/reel/manifest.json: VO fit not re-checked; run synth-vo.py reel)');

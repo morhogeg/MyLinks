@@ -304,7 +304,7 @@ in the film claims availability.
 
 ## The highlight reel (pilot)
 
-`MachinaReel` is a 78.4s vertical reel: the problem → "Introducing Machina.
+`MachinaReel` is a 76.8s vertical reel: the problem → "Introducing Machina.
 All your saves, finally useful." → "Save anything, from anywhere." (shares
 from YouTube, Instagram and Safari into the mark) → "A link, a screenshot, or
 a note." (the Add dialog's tabs) → the new card, opened → Find → Ask → Connect
@@ -363,6 +363,17 @@ settled capture frame with a tight crop (no dark backdrop sliver); Recall
 opens on a settled header (the capture's MACHINA → Revisit crossfade was
 visible for its first frames); an `end` linger holds the finished end card
 ~2s instead of ~1s.
+
+Round 11 (owner: the last SAVE line "lingered"; a comprehensive polish):
+text is timed to the voice, not to the picture's length. **The dwell rule**:
+a line leaves 0.3–1.2s after the narrator finishes it, or up to 4s when it
+names an action still playing (`until`); `npm run verify` enforces it with
+the synthesized line lengths. Chapter words (kickers) are on screen only with
+their chapter's narration, arrive 4 frames before each line, leave in the
+line's own 6-frame blur-and-rise on the same frame, and bridge gaps under 24
+frames. With the lines no longer covering dead picture, the card hold
+(224 → 192) and the found and graph lingers (48 → 32) were trimmed; the end
+mark no longer waits as four static corner ticks before its launch.
 
 | Output frames | Scene | What it does |
 |---|---|---|
@@ -497,8 +508,18 @@ One family, Geist. Two voices (**`Type.tsx`**):
   `\n` is a hard break; `sizes` sets a size per line.
 - **The kicker (`Kicker`)** names the chapter (SAVE / FIND / ASK / CONNECT /
   REVISIT): 25px, weight 650, uppercase, tracking settling 0.62→0.44em,
-  letters rising one frame apart behind a short ink rule. Restraint is the
-  point: the energy of a cut belongs to the picture.
+  letters coming into focus 0.8 frames apart, the word alone (no rule).
+  It is on screen only while its chapter's narration is: in 4 frames before
+  each line, out WITH the line in the line's own gesture, gaps under 24
+  frames bridged. Restraint is the point: the energy of a cut belongs to the
+  picture.
+- **The dwell rule.** Text is timed to the voice, never stretched to fill a
+  shot: a line leaves 0.3–1.2s after the narrator finishes it. A line that
+  names an action still playing may stay until that action lands, at most
+  4s past the voice, and says so in the timeline (`until`). When the words
+  are done the picture carries on alone; if that leaves a dead stretch, the
+  shot is too long, so trim the hold rather than keep the text. `npm run
+  verify` enforces the rule.
 - **The lockup (`Lockup` in `Brand.tsx`)** uses the drawn wordmark, never typed
   letters. The closing line is a statement (`lineStyle="statement"`): the
   subtitle in Instrument Serif at 78px, words coming into focus on the
