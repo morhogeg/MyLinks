@@ -13,6 +13,7 @@ import { Ask } from './scenes/Ask';
 import { Connect } from './scenes/Connect';
 import { Recall } from './scenes/Recall';
 import { SaveModes } from './scenes/SaveModes';
+import { ShareBeat } from './scenes/ShareBeat';
 import { CardDetail } from './scenes/CardDetail';
 import { CLOCK } from './kit/camera';
 import { End } from './scenes/End';
@@ -57,6 +58,7 @@ export const MachinaReel: React.FC<{
           <Connect f={src} />
         </>
       )}
+      {hold === 'share' && <ShareBeat u={u} />}
       <Recall u={f - holdStart('recall')} />
       <End f={f} />
 

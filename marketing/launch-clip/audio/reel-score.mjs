@@ -169,6 +169,18 @@ shimmer(f(H.saved), [84, 88, 91], 0.045);
 sub(f(H.cardLands), 43, 0.3, 0.32);
 tick(f(H.cardLands), 0.09, 0.9);
 
+// the share hold: three shares from three apps, each pulled into the mark
+// (output frames: scenes/ShareBeat.tsx, starts +8/+48/+88: tap +20, lands +38)
+{
+  const S0 = holdStart('share') / FPS;
+  [8, 48, 88].forEach((t0, i) => {
+    tick(S0 + (t0 + 20) / FPS, 0.09, 1.15 + i * 0.1);
+    whoosh(S0 + (t0 + 24) / FPS, 0.45, 0.07, [0.4, -0.4, 0.4][i]);
+    bell(S0 + (t0 + 38) / FPS, [84, 88, 91][i], 0.055, 0, 1.6);
+    sub(S0 + (t0 + 38) / FPS, 43, 0.16, 0.25);
+  });
+}
+
 // the modes hold: Link, Image, Note tapped on beats, then the link pasted
 // (output frames: scenes/SaveModes.tsx taps at +16, +56, +96, pastes at +128)
 {

@@ -57,6 +57,7 @@ export const onBeat = (f) => Math.round(f / BEAT_FRAMES) * BEAT_FRAMES;
 export const HOLDS = [
   { id: 'problem', at: 32, len: 224, adv: 0 }, // the problem, named
   { id: 'name', at: 96, len: 32, adv: 0 }, // the name holds
+  { id: 'share', at: 100, len: 160, adv: 0 }, // shared from YouTube, Instagram, Safari into the mark
   { id: 'modes', at: 141, len: 144, adv: 0 }, // Link, Image, Note
   { id: 'card', at: 208, len: 224, adv: 0 }, // the new card, opened
   { id: 'found', at: 248, len: 48, adv: 4 }, // linger: the one card it finds
@@ -163,9 +164,11 @@ export const CAPTIONS = [
   // wordmark wipes in under the mark on "Machina"; scenes/Hook.tsx); the
   // spoken lead-in "Introducing" is voice only (`say`)
   { at: real(56), to: 410, place: 'mark', text: 'Machina.', say: 'Introducing Machina.' },
-  { at: 416, to: real(118), text: 'All your saves,\nfinally useful.' },
+  { at: 416, to: 476, text: 'All your saves,\nfinally useful.' },
+  // the share hold: from any app, into Machina (scenes/ShareBeat.tsx)
+  { at: holdStart('share') + 24, to: holdStart('share') + 156, text: 'Save anything, from anywhere.' },
   // the modes hold: the Add dialog's three ways in
-  { at: holdStart('modes') + 8, to: holdStart('modes') + 136, text: 'Save anything, from anywhere.' },
+  { at: holdStart('modes') + 8, to: holdStart('modes') + 136, text: 'A link, a screenshot, or a note.' },
   // the card hold: the new card, opened
   { at: holdStart('card') + 16, to: holdStart('card') + 212, text: 'Each save becomes a card,\nwith the key points pulled out.' },
   { at: onBeat(real(214)), to: real(262), text: 'Find it in your own words.' },
@@ -182,7 +185,7 @@ export const CAPTIONS = [
 /** The pillar word each product scene opens on (the kinetic kicker), in
  *  OUTPUT frames. */
 export const KICKERS = [
-  { at: holdStart('modes'), to: holdStart('card') + 212, text: 'Save' },
+  { at: holdStart('share'), to: holdStart('card') + 212, text: 'Save' },
   { at: onBeat(real(210)), to: real(268), text: 'Find' },
   { at: onBeat(real(274)), to: real(412), text: 'Ask' },
   { at: onBeat(real(418)), to: real(460), text: 'Connect' },

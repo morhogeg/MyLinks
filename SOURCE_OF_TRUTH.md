@@ -2497,14 +2497,17 @@ to its session:
 > feature-clip briefs below against the kit you built, and add a §9 entry.
 
 **What exists (the pilot, 2026-09-26, branch `claude/machina-reel-pilot`,
-awaiting owner review, not merged):** `MachinaReel` (71.5s, round 7,
+awaiting owner review, not merged):** `MachinaReel` (76.8s, round 8,
 1080×1920, score + narrator + captions, the deliverable), `MachinaReelSilent`
 and `MachinaReelClean`, in `marketing/launch-clip/`. Script: the problem ("You
 save things everywhere." / "An article here. A recipe there. A video
 somewhere else." / "Saved, and rarely seen again."), "Introducing Machina."
 (the screen shows the drawn wordmark) "All your saves, finally useful.",
-"Save anything, from anywhere." (the Add dialog's Link, Image and Note tabs,
-each tapped), "Each save becomes a card, with the key points pulled out.",
+"Save anything, from anywhere." (a motion-graphics beat: saves shared from
+YouTube, Instagram and Safari, each card's Share button tapped and pulled
+into the mark; the native share sheet cannot be captured from the web build
+and the owner chose not to record it), "A link, a screenshot, or a note."
+(the Add dialog's real Link, Image and Note tabs, each tapped), "Each save becomes a card, with the key points pulled out.",
 Find, Ask, Connect, the weekly recap read slowly ("Every week, Machina brings
 back what's worth remembering." / "The themes of your week, and the one save
 worth rereading."), and the close "Machina. Never lose another great find."
@@ -2591,6 +2594,14 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-27 — Highlight reel round 8: sharing from any app.** Branch
+  `claude/machina-reel-pilot`, not merged. Owner: show sharing from other
+  apps (a key feature), without a screen recording. Added a `share` hold
+  after the name (`scenes/ShareBeat.tsx`): YouTube, Instagram and Safari
+  saves as cards in the app's platform-mark style, each Share button tapped
+  and pulled into the Machina mark (brand motion graphics; no iOS UI rebuilt,
+  no third-party images). The in-app tab tour is now captioned "A link, a
+  screenshot, or a note." 76.8s.
 - **2026-09-27 — Highlight reel round 7.** Branch `claude/machina-reel-pilot`,
   not merged. Owner: the weekly-recap slide was far too fast; "Save
   anything, from anywhere" with the Link/Image/Note options shown (the

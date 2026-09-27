@@ -304,13 +304,20 @@ in the film claims availability.
 
 ## The highlight reel (pilot)
 
-`MachinaReel` is a 71.5s vertical reel: the problem → "Introducing Machina.
-All your saves, finally useful." → Save anything, from anywhere (Link, Image,
-Note) → the new card, opened → Find → Ask → Connect → the weekly recap, read →
-"Machina. Never lose another great find." It has its own score, the film's
-narrator and word-timed captions. **Every pixel of app UI in it is the real,
-shipped web app**, driven and recorded frame by frame; nothing is a mockup or
-a rebuilt screen.
+`MachinaReel` is a 76.8s vertical reel: the problem → "Introducing Machina.
+All your saves, finally useful." → "Save anything, from anywhere." (shares
+from YouTube, Instagram and Safari into the mark) → "A link, a screenshot, or
+a note." (the Add dialog's tabs) → the new card, opened → Find → Ask → Connect
+→ the weekly recap, read → "Machina. Never lose another great find." It has
+its own score, the film's narrator and word-timed captions. **Every pixel of
+app UI in it is the real, shipped web app**, driven and recorded frame by
+frame; nothing is a mockup or a rebuilt screen. The one exception is not
+app UI: the share beat (`scenes/ShareBeat.tsx`) is a brand motion graphic,
+because the iOS share sheet and the share extension are native and cannot
+be captured from the web build. It shows each save as a card wearing its
+app's mark (the app's own lucide marks; a compass for Safari) with an iOS
+Share button that is tapped, and the card is pulled into the Machina mark.
+It rebuilds no iOS UI and shows no third-party image.
 
 **How it got here.** Round 1 (20s) was too fast; round 2 changed too much;
 round 3 played round 1 slower with the owner's asks in place; round 4's
@@ -332,6 +339,11 @@ wordmark, a serif close, focus-in captions). Round 7 (this one, owner):
   let a shot keep drifting slowly on the search result, the answer and its
   sources, and the graph, and the card hold is longer; the cut's pace is
   unchanged.
+
+Round 8 (owner: sharing from any app is a key feature; no screen recording):
+a `share` hold after the name, three shares (YouTube, Instagram, Safari)
+pulled into the mark on "Save anything, from anywhere.", and the Add
+dialog's tab tour re-captioned "A link, a screenshot, or a note."
 
 | Output frames | Scene | What it does |
 |---|---|---|
