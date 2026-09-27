@@ -304,35 +304,37 @@ in the film claims availability.
 
 ## The highlight reel (pilot)
 
-`MachinaReel` is a 53.9s vertical reel: the problem → "Introducing Machina"
+`MachinaReel` is a 54.9s vertical reel: the problem → "Introducing Machina"
 and what it solves → Save (and the new card, opened) → Find → Ask → Connect →
 Recall → "Machina. Never lose another great find." It has its own score, the
 film's narrator and word-timed captions. **Every pixel of app UI in it is the
 real, shipped web app**, driven and recorded frame by frame; nothing is a
 mockup or a rebuilt screen.
 
-**How it got here.** Round 1 (20s) was too fast. Round 2 changed too much.
-Round 3 played round 1 2.5× slower with the owner's asks in place. Round 4
-varied the speed by content, which the owner rejected in round 5: **keep a
-steady pace**. Round 5 (this one):
-- one constant speed, `K = 2`: every source 8th of the round-1 cut lands on
-  a beat of the same 112.5 BPM score, so cuts, taps and sound design sit on
-  the music; every narrator line starts on a beat;
-- the script: the problem ("You save things everywhere." / "An article here.
-  A recipe there. A video somewhere else." / "Saved, and rarely seen
-  again."), then "Introducing Machina." as the saves collapse into the mark,
-  then what it solves ("All your saves in one place, ready when you need
-  them."); the tagline stays out; the close is "Machina. Never lose another
-  great find.";
-- smoother app motion: the graph opening, the card's detail opening and the
-  recap opening are captured at 60fps (`roll(…, { step: 1000 / 60 })`), so
-  at K = 2 there is a new app frame on every output frame instead of each
-  frame held twice (the graph read as laggy).
+**How it got here.** Round 1 (20s) was too fast; round 2 changed too much;
+round 3 played round 1 2.5× slower with the owner's asks in place; round 4's
+variable speed was rejected for a steady pace (round 5: constant 2×, on the
+beat, "Introducing Machina", 60fps graph). Round 6 (this one), the owner's
+Apple-level pass:
+- the name: the voice says "Introducing Machina."; the screen shows only the
+  drawn wordmark, wiping in under the mark on "Machina" and holding (a
+  two-beat `name` hold) before the solution line;
+- the close keeps "Never lose another great find." (it answers the opening's
+  "Saved, and rarely seen again"; the tagline stays out) and sets it in a
+  display serif, Instrument Serif (OFL, inlined in `src/serifFontData.ts`),
+  under the drawn wordmark;
+- captions no longer rise word by word out of a mask (owner: "dated and
+  sluggish"): each LINE arrives when the narrator reaches it, its words
+  cascading 1.5 frames apart and each coming into focus (blur → sharp, a
+  small lift) over 7 frames; lines leave together with a quick soft-focus
+  fade. Kickers come into focus the same way;
+- lighter tap ripples; the voice lands a beat after the impact, not on it;
+  a shimmer on the spoken name.
 
 | Output frames | Scene | What it does |
 |---|---|---|
 | 0–320 | `Hook` | The problem over ten real saves (the `problem` hold): each named save lifts on its word, a bell on each; all bleach on "rarely seen again"; they collapse into the point |
-| 320–464 | `Hook` | "Introducing Machina." as the point lands and the brackets close; "All your saves in one place, ready when you need them."; the point drops to become the **+** |
+| 320–496 | `Hook` | The point lands, the brackets close, "Introducing Machina." with the drawn wordmark wiping in under the mark; "All your saves in one place, ready when you need them."; the point drops to become the **+** |
 | 464–640 | `Save` | The + irises open → Add to Machina → the five real phases → the card lands |
 | 640–832 | `CardDetail` | The `card` hold: the new card opened, its summary, **Key Points** and **Do this** line |
 | 832–960 | `Find` | "easy dinner, empty fridge" → the one card it means → tap Ask |
@@ -452,18 +454,20 @@ One family, Geist. Two voices (**`Type.tsx`**):
 
 - **The line (`KineticLine`)** is what the narrator says: 56px, 1.12 leading,
   weight 600, −0.028em, at most two lines in a 980px measure (about ten
-  words). Words rise out of a mask on the narrator's **measured** word timing
-  (`EASE_MODAL`, 9 frames) and leave together, upward, half a frame apart
-  (`EASE_FLING`), finishing exactly on the caption's end frame. `\n` is a hard
-  break; `sizes` sets a size per line (the hook's name over its promise:
-  96 / 52).
+  words). Each LINE arrives when the narrator reaches its first word (the
+  measured timing); its words cascade 1.5 frames apart, each coming into
+  focus (12px blur → sharp, a 0.28em lift, `EASE_MODAL`, 7 frames). The line
+  leaves as one, a 6-frame soft-focus fade, finishing on the caption's end
+  frame. Never a mask rise, never a lone word parked at the left edge.
+  `\n` is a hard break; `sizes` sets a size per line.
 - **The kicker (`Kicker`)** names the chapter (SAVE / FIND / ASK / CONNECT /
   REVISIT): 25px, weight 650, uppercase, tracking settling 0.62→0.44em,
   letters rising one frame apart behind a short ink rule. Restraint is the
   point: the energy of a cut belongs to the picture.
 - **The lockup (`Lockup` in `Brand.tsx`)** uses the drawn wordmark, never typed
-  letters, and sets the subtitle uppercase at 0.36em tracking with 0.95em word
-  gaps (a word gap has to out-shout the tracking).
+  letters. The closing line is a statement (`lineStyle="statement"`): the
+  subtitle in Instrument Serif at 78px, words coming into focus on the
+  narrator's timing, the wordmark wiping in as "Machina" is said.
 
 Layout (**`Captions.tsx`**): `SLOTS` puts the kicker at 290px and the line at
 346px, in the upper band clear of Reels/TikTok chrome (which covers roughly

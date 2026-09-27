@@ -1,4 +1,5 @@
 import { GEIST_MONO_WOFF2, GEIST_SANS_WOFF2 } from './fontData';
+import { INSTRUMENT_SERIF_WOFF2 } from './serifFontData';
 
 /**
  * Geist — the app's typeface, from the same `geist` npm package `web/` uses, so
@@ -23,6 +24,8 @@ import { GEIST_MONO_WOFF2, GEIST_SANS_WOFF2 } from './fontData';
 
 export const sans = 'Geist';
 export const mono = 'Geist Mono';
+/** the reel's closing line (a display serif against Geist) */
+export const serif = 'Instrument Serif';
 
 const register = () => {
   if (typeof document === 'undefined') return;
@@ -35,6 +38,13 @@ const register = () => {
       font-family: 'Geist';
       src: url(data:font/woff2;base64,${GEIST_SANS_WOFF2}) format('woff2-variations');
       font-weight: 100 900;
+      font-style: normal;
+      font-display: block;
+    }
+    @font-face {
+      font-family: 'Instrument Serif';
+      src: url(data:font/woff2;base64,${INSTRUMENT_SERIF_WOFF2}) format('woff2');
+      font-weight: 400;
       font-style: normal;
       font-display: block;
     }
@@ -54,6 +64,7 @@ const register = () => {
       void document.fonts.load(`${w} 40px Geist`);
     });
     void document.fonts.load('500 40px "Geist Mono"');
+    void document.fonts.load('400 40px "Instrument Serif"');
   } catch {
     /* a browser without the CSS Font Loading API still gets the @font-face */
   }

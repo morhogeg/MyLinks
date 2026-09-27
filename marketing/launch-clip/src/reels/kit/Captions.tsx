@@ -17,7 +17,7 @@ import { KineticLine, Kicker } from './Type';
  *
  * Kickers sit in the same band, one label above the line.
  */
-export type ReelCaption = { at: number; to: number; text: string; place?: 'top' | 'hook' | 'lockup'; sizes?: number[] };
+export type ReelCaption = { at: number; to: number; text: string; say?: string; place?: 'top' | 'hook' | 'lockup' | 'mark'; sizes?: number[] };
 export type ReelKicker = { at: number; to: number; text: string };
 export type WordTiming = { frame: number | null; words: number[] }[];
 
@@ -60,7 +60,8 @@ export const Captions: React.FC<{
     {showCaptions &&
       captions.map((c, i) => {
         // a `lockup` line is set by the lockup itself, in its own type
-        if (c.place === 'lockup') return null;
+        // `lockup` and `mark` lines are set by the brand pieces themselves
+        if (c.place === 'lockup' || c.place === 'mark') return null;
         const t = timing.find((x) => x.frame === c.at) ?? timing[i];
         const starts = t?.words.map((s) => Math.round(s * fps));
         return (

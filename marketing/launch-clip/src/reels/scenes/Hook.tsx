@@ -4,6 +4,7 @@ import { CAPTIONS, FPS, HITS, HOLDS, holdStart } from '../../../reel-timeline.mj
 import VO from '../data/reel-vo.json';
 import { EASE_GATHER, EASE_IN_OUT, EASE_MODAL, EASE_SPRING, mix, prog } from '../kit/curves';
 import { MarkAssembly, SaveChip, type SaveKind } from '../kit/Brand';
+import { Wordmark } from '../../ui/Brand';
 import { HANDOFF } from './handoff';
 
 /**
@@ -41,6 +42,13 @@ const wordFrame = (caption: number, word: number) => {
   return c.at + Math.round((t?.words[word] ?? 0) * FPS);
 };
 const BLEACH_FROM = CAPTIONS[2].at + 6;
+
+/** "Introducing Machina.": the drawn wordmark wipes in on the spoken name */
+const NAME = CAPTIONS.find((c) => c.place === 'mark')!;
+const NAME_AT = (() => {
+  const t = VO.find((v) => v.frame === NAME.at);
+  return NAME.at + Math.round((t?.words[1] ?? 0.7) * FPS);
+})();
 
 /**
  * Three depths: far (small, a little soft), mid (the readable ones), near
@@ -114,7 +122,11 @@ export const Hook: React.FC<{ f: number; out: number }> = ({ f, out }) => {
   // travels to where the app's + button will be
   const part = prog(f, HANDOFF.part, HANDOFF.part + 10, EASE_MODAL);
   const travel = prog(f, HANDOFF.travel, HANDOFF.iris, EASE_IN_OUT);
-  const markY = C.y;
+  // the name: the wordmark wipes in under the mark and the pair eases up into
+  // one centred lockup; both part before the point drops
+  const wm = prog(out, NAME_AT, NAME_AT + 16, EASE_MODAL);
+  const lift = prog(out, NAME_AT - 4, NAME_AT + 20, EASE_MODAL);
+  const markY = C.y - 70 * lift * (1 - part);
   const markScale = mix(1, 0.86, form);
   const MARK_W = 300;
   const dotR = 52 * (MARK_W / 448) * markScale; // the point's radius, px
@@ -170,6 +182,26 @@ export const Hook: React.FC<{ f: number; out: number }> = ({ f, out }) => {
           }}
         >
           <MarkAssembly close={Math.max(0, close * (1 - part * 0.35))} dot={0} width={MARK_W} />
+        </div>
+      )}
+
+      {/* the name, under the mark */}
+      {wm > 0 && part < 1 && (
+        <div
+          style={{
+            position: 'absolute',
+            left: C.x,
+            top: markY + 190,
+            width: 460,
+            transform: `translate(-50%, 0) translateY(${Math.round((1 - wm) * 10)}px)`,
+            clipPath: `inset(-20% ${((1 - wm) * 100).toFixed(2)}% -20% 0)`,
+            opacity: 1 - part,
+            color: '#14141B',
+            lineHeight: 0,
+            filter: `drop-shadow(0 4px 24px rgba(24,32,48,0.14))${wm < 0.999 ? ` blur(${((1 - wm) * 4).toFixed(2)}px)` : ''}`,
+          }}
+        >
+          <Wordmark style={{ width: '100%', height: 'auto' }} />
         </div>
       )}
 

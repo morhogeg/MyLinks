@@ -2497,18 +2497,19 @@ to its session:
 > feature-clip briefs below against the kit you built, and add a §9 entry.
 
 **What exists (the pilot, 2026-09-26, branch `claude/machina-reel-pilot`,
-awaiting owner review, not merged):** `MachinaReel` (53.9s, round 5,
+awaiting owner review, not merged):** `MachinaReel` (54.9s, round 6,
 1080×1920, score + narrator + captions, the deliverable), `MachinaReelSilent`
 and `MachinaReelClean`, in `marketing/launch-clip/`. Script: the problem
 ("You save things everywhere." / "An article here. A recipe there. A video
-somewhere else." / "Saved, and rarely seen again."), "Introducing Machina.",
-what it solves ("All your saves in one place, ready when you need them."),
-"Save anything.", the new card opened ("Each save becomes a card, with the
-key points pulled out."), Find, Ask, Connect, the weekly recap ("Every week,
-Machina brings back what's worth remembering."), and the close "Machina.
-Never lose another great find." (no tagline). One steady speed (2× the
-round-1 cut, on the 112.5 BPM score's beats); the graph, card and recap
-openings captured at 60fps so they play smoothly. **Every frame of app UI is the real web app, not a
+somewhere else." / "Saved, and rarely seen again."), "Introducing Machina."
+(voice; the screen shows the drawn wordmark under the mark), "All your saves
+in one place, ready when you need them.", "Save anything.", the new card
+opened ("Each save becomes a card, with the key points pulled out."), Find,
+Ask, Connect, the weekly recap ("Every week, Machina brings back what's
+worth remembering."), and the close "Machina. Never lose another great
+find." with the subtitle in Instrument Serif (owner asked for a different
+font; the tagline stays out: the subtitle answers the opening). One steady
+speed on the 112.5 BPM beat; line-by-line focus-in captions. **Every frame of app UI is the real web app, not a
 mockup** (owner, mid-task): `capture/` builds `web/` as a static export with
 Firebase swapped for an in-memory stand-in seeded with a demo account of 24
 real, interesting saves (no "AI" anywhere), and Playwright records four
@@ -2590,6 +2591,17 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-27 — Highlight reel round 6 (Apple-level pass).** Branch
+  `claude/machina-reel-pilot`, not merged. Owner: hold the name longer and
+  don't show the word "Introducing"; pick between the subtitle and the
+  tagline, in a different font; the word animation is dated. Done: the name
+  is the drawn wordmark wiping in under the mark on the spoken "Machina"
+  (voice-only lead-in via a caption `say`, verify checks the shown text is
+  the end of what's said) with a two-beat `name` hold; kept "Never lose
+  another great find", set in Instrument Serif (`@fontsource/instrument-serif`,
+  inlined in `src/serifFontData.ts`; the film's fonts untouched); captions
+  rebuilt as line-by-line focus-in (blur to sharp, fast cascade) instead of
+  a word-by-word mask rise; lighter taps; voice a beat after the impact.
 - **2026-09-27 — Highlight reel round 5 (full refinement).** Branch
   `claude/machina-reel-pilot`, not merged. Owner: keep a steady pace (the
   round-4 variable speed rejected), say "Introducing Machina" after the

@@ -273,7 +273,7 @@ export const Lift: React.FC<{
  * ripple. iOS draws no touches, so this is the reel's one piece of added UI,
  * kept deliberately neutral: ink at low alpha, the app's own tap shape.
  */
-export const Tap: React.FC<{ x: number; y: number; t: number; size?: number }> = ({ x, y, t, size = 42 }) => {
+export const Tap: React.FC<{ x: number; y: number; t: number; size?: number }> = ({ x, y, t, size = 34 }) => {
   if (t <= 0 || t >= 1) return null;
   const down = Math.min(1, t / 0.35);
   const up = Math.max(0, (t - 0.35) / 0.65);
@@ -288,7 +288,7 @@ export const Tap: React.FC<{ x: number; y: number; t: number; size?: number }> =
           width: size,
           height: size,
           borderRadius: size,
-          background: `rgba(20,20,27,${0.2 * down * (1 - up)})`,
+          background: `rgba(20,20,27,${0.13 * down * (1 - up)})`,
           transform: `scale(${0.72 + ease(down) * 0.28 - up * 0.1})`,
         }}
       />
@@ -300,8 +300,8 @@ export const Tap: React.FC<{ x: number; y: number; t: number; size?: number }> =
           width: size,
           height: size,
           borderRadius: size,
-          border: `1.5px solid rgba(20,20,27,${0.32 * (1 - up)})`,
-          transform: `scale(${1 + ease(up) * 1.1})`,
+          border: `1.25px solid rgba(20,20,27,${0.24 * (1 - up)})`,
+          transform: `scale(${1 + ease(up) * 0.9})`,
           opacity: up > 0 ? 1 : 0,
         }}
       />

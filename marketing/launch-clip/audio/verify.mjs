@@ -197,6 +197,7 @@ console.log('\n── reel');
   // ── 3. captions, kickers, narrator
   const caps = [...R.CAPTIONS].sort((a, b) => a.at - b.at);
   caps.forEach((c, i) => {
+    if (c.say) scan(`caption ${i + 1} (spoken)`, c.say);
     if (c.to <= c.at) bad.push(`caption "${c.text}" ends before it starts`);
     if (i && c.at < caps[i - 1].to) bad.push(`caption overlap: "${c.text}" starts at ${c.at}, "${caps[i - 1].text}" runs to ${caps[i - 1].to}`);
     if (c.to > R.TOTAL_FRAMES) bad.push(`caption "${c.text}" runs past the reel (${c.to} > ${R.TOTAL_FRAMES})`);
@@ -213,8 +214,11 @@ console.log('\n── reel');
   caps.forEach((c) => {
     const t = timing.find((x) => x.frame === c.at);
     if (!t) return bad.push(`no narrator timing for caption at ${c.at} ("${c.text}"): run synth-vo.py reel`);
-    if (t.text !== spoken(c.text)) bad.push(`narrator ≠ caption at ${c.at}: said "${t.text}", shows "${c.text}"`);
-    const words = c.text.split(/\s+/).filter(Boolean).length;
+    // a caption may carry a voice-only lead-in (`say`); what it SHOWS must
+    // still be the end of what is said
+    if (t.text !== spoken(c.say ?? c.text)) bad.push(`narrator ≠ caption at ${c.at}: said "${t.text}", scripted "${c.say ?? c.text}"`);
+    if (c.say && !spoken(c.say).endsWith(spoken(c.text).replace(/\s+/g, ' '))) bad.push(`caption at ${c.at} shows "${c.text}", which is not the end of what is said`);
+    const words = (c.say ?? c.text).split(/\s+/).filter(Boolean).length;
     if (t.words.length !== words) bad.push(`caption at ${c.at} has ${words} words but ${t.words.length} timings`);
   });
   const manifest = path.join(root, 'out', 'vo', 'reel', 'manifest.json');

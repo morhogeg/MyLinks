@@ -1,6 +1,6 @@
 import React from 'react';
 import { Bookmark, Image as ImageIcon } from 'lucide-react';
-import { sans } from '../../fonts';
+import { sans, serif } from '../../fonts';
 import { AnimatedMark, CitationGlyph, MARK_LAUNCH_FRAMES, Wordmark } from '../../ui/Brand';
 import { PLATFORM_INK, PlatformMark } from '../../ui/app';
 import { EASE_MODAL, mix, prog } from './curves';
@@ -154,29 +154,30 @@ export const Lockup: React.FC<{
             display: 'flex',
             justifyContent: 'center',
             // a word gap has to out-shout the tracking (0.36em between letters)
-            columnGap: big ? '0.26em' : '0.95em',
-            fontFamily: sans,
-            fontSize: big ? 50 : 25,
-            fontWeight: 600,
-            letterSpacing: big ? '-0.02em' : '0.36em',
+            columnGap: big ? '0.24em' : '0.95em',
+            fontFamily: big ? serif : sans,
+            fontSize: big ? 78 : 25,
+            fontWeight: big ? 400 : 600,
+            letterSpacing: big ? '-0.01em' : '0.36em',
             textTransform: big ? undefined : 'uppercase',
             color: big ? INK : INK_SOFT,
             whiteSpace: 'nowrap',
           }}
         >
           {line
-            .replace(/[.]$/, '')
+            .replace(big ? /$^/ : /[.]$/, '')
             .split(' ')
             .map((w, k) => {
               const s0 = lineStarts?.[k] ?? strike + 20 + k * 3;
-              const t = prog(frame, s0, s0 + 10, EASE_MODAL);
+              const t = prog(frame, s0, s0 + (big ? 8 : 10), EASE_MODAL);
               return (
                 <span
                   key={k}
                   style={{
                     display: 'inline-block',
-                    opacity: t,
+                    opacity: big ? Math.min(1, t * 1.6) : t,
                     transform: `translateY(${Math.round((1 - t) * 12)}px)`,
+                    filter: big && t < 0.999 ? `blur(${((1 - t) * 12).toFixed(2)}px)` : undefined,
                     marginRight: big ? 0 : '-0.36em',
                   }}
                 >

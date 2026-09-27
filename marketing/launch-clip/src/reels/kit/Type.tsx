@@ -22,14 +22,21 @@ import { EASE_FLING, EASE_MODAL, mix, prog } from './curves';
 export const INK = 'rgba(17,24,39,0.96)';
 export const INK_SOFT = 'rgba(75,85,99,0.82)';
 
-const WORD_IN = 9;
-const WORD_OUT = 7;
+/** frames a word takes to come into focus; frames between words in a line */
+const WORD_IN = 7;
+const CASCADE = 1.5;
+/** frames the whole line takes to leave */
+const LINE_OUT = 6;
 
 /**
- * One narrated line, word by word. `starts` are frames relative to `from`,
- * one per word. A "\n" in `text` is a hard break (the film's rule: a caption
- * holding two sentences starts the second on its own line); `sizes` sets a
- * size per line (a name over its promise), else every line is `size`.
+ * One narrated line, LINE BY LINE (round 6, owner: the word-by-word mask
+ * rise read "dated and sluggish"). Each line arrives when the narrator
+ * reaches its first word (`starts`, frames relative to `from`, one per
+ * word); its words then cascade in 1.5 frames apart, each coming into focus
+ * (blur → sharp) with a small lift: the line lands as one gesture, centred,
+ * and never sits half-built at the left edge. It leaves the same way,
+ * together, in 6 frames, finishing on `to`. A "\n" is a hard break; `sizes`
+ * sets a size per line (a name over its promise), else every line is `size`.
  */
 export const KineticLine: React.FC<{
   text: string;
@@ -43,53 +50,68 @@ export const KineticLine: React.FC<{
   align?: 'center' | 'left';
   color?: string;
   weight?: number;
-}> = ({ text, frame, from, to, starts, size = 64, sizes, width = 940, align = 'center', color = INK, weight = 600 }) => {
+  font?: string;
+  tracking?: string;
+}> = ({ text, frame, from, to, starts, size = 64, sizes, width = 940, align = 'center', color = INK, weight = 600, font = sans, tracking = '-0.028em' }) => {
   if (frame < from - 2 || frame > to + 2) return null;
   const local = frame - from;
   const lines = text.split('\n').map((l) => l.split(' ').filter(Boolean));
-  const count = lines.reduce((n, l) => n + l.length, 0);
-  // the whole line leaves together, a hair apart, finishing on `to`
-  const outStart = to - from - WORD_OUT - (count - 1) * 0.5;
+  const out = prog(local, to - from - LINE_OUT, to - from, EASE_MODAL);
   let w = -1;
   return (
-    <div style={{ width, display: 'flex', flexDirection: 'column', alignItems: align === 'center' ? 'center' : 'flex-start', gap: 6 }}>
-      {lines.map((words, li) => (
-        <div
-          key={li}
-          style={{
-            fontFamily: sans,
-            fontSize: sizes?.[li] ?? size,
-            fontWeight: weight,
-            lineHeight: 1.12,
-            letterSpacing: '-0.028em',
-            color,
-            textAlign: align,
-            display: 'flex',
-            flexWrap: 'wrap',
-            justifyContent: align === 'center' ? 'center' : 'flex-start',
-            columnGap: '0.25em',
-          }}
-        >
-          {words.map((word) => {
-            w += 1;
-            const s = starts?.[w] ?? w * 3;
-            const tin = prog(local, s, s + WORD_IN, EASE_MODAL);
-            const o0 = outStart + w * 0.5;
-            const tout = prog(local, o0, o0 + WORD_OUT, EASE_FLING);
-            const y = Math.round((1 - tin) * 105 - tout * 105);
-            return (
-              <span
-                key={w}
-                style={{ display: 'inline-block', overflow: 'hidden', paddingBottom: '0.12em', marginBottom: '-0.12em', verticalAlign: 'top' }}
-              >
-                <span style={{ display: 'inline-block', transform: `translateY(${y}%)`, opacity: Math.min(1, tin * 2.2) * (1 - tout) }}>
+    <div
+      style={{
+        width,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: align === 'center' ? 'center' : 'flex-start',
+        gap: 6,
+        opacity: 1 - out,
+        filter: out > 0.01 ? `blur(${(out * 8).toFixed(2)}px)` : undefined,
+        transform: `translateY(${Math.round(-out * 10)}px)`,
+      }}
+    >
+      {lines.map((words, li) => {
+        const first = w + 1;
+        const lineStart = starts?.[first] ?? first * 3;
+        return (
+          <div
+            key={li}
+            style={{
+              fontFamily: font,
+              fontSize: sizes?.[li] ?? size,
+              fontWeight: weight,
+              lineHeight: 1.12,
+              letterSpacing: tracking,
+              color,
+              textAlign: align,
+              display: 'flex',
+              flexWrap: 'wrap',
+              justifyContent: align === 'center' ? 'center' : 'flex-start',
+              columnGap: '0.25em',
+            }}
+          >
+            {words.map((word, k) => {
+              w += 1;
+              const s0 = lineStart + k * CASCADE;
+              const t = prog(local, s0, s0 + WORD_IN, EASE_MODAL);
+              return (
+                <span
+                  key={w}
+                  style={{
+                    display: 'inline-block',
+                    opacity: Math.min(1, t * 1.6),
+                    transform: `translateY(${((1 - t) * 0.28).toFixed(3)}em)`,
+                    filter: t < 0.999 ? `blur(${((1 - t) * 12).toFixed(2)}px)` : undefined,
+                  }}
+                >
                   {word}
                 </span>
-              </span>
-            );
-          })}
-        </div>
-      ))}
+              );
+            })}
+          </div>
+        );
+      })}
     </div>
   );
 };
@@ -97,7 +119,7 @@ export const KineticLine: React.FC<{
 /**
  * The pillar word (SAVE / FIND / ASK / CONNECT / REVISIT): a small
  * letterspaced label above the line. It arrives on the scene's first beat,
- * letter by letter out of a mask (one frame apart), while its tracking
+ * letter by letter coming into focus (0.8 frames apart), while its tracking
  * settles; it leaves with a fade. Restraint is the point: the energy of a
  * cut belongs to the picture, the label only names the chapter.
  */
@@ -110,12 +132,12 @@ export const Kicker: React.FC<{ text: string; frame: number; from: number; to: n
   return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 18, opacity: 1 - out }}>
       <div style={{ width: 34 * rule, height: 3, borderRadius: 2, background: INK, opacity: 0.85 }} />
-      <div style={{ overflow: 'hidden', paddingBottom: 3, display: 'flex' }}>
+      <div style={{ display: 'flex' }}>
         {text
           .toUpperCase()
           .split('')
           .map((ch, k) => {
-            const t = prog(local, k, k + 8, EASE_MODAL);
+            const t = prog(local, k * 0.8, k * 0.8 + 7, EASE_MODAL);
             return (
               <span
                 key={k}
@@ -126,7 +148,8 @@ export const Kicker: React.FC<{ text: string; frame: number; from: number; to: n
                   fontWeight: 650,
                   letterSpacing: `${track}em`,
                   color: INK_SOFT,
-                  transform: `translateY(${Math.round((1 - t) * 110)}%)`,
+                  opacity: Math.min(1, t * 1.6),
+                  filter: t < 0.999 ? `blur(${((1 - t) * 6).toFixed(2)}px)` : undefined,
                 }}
               >
                 {ch}

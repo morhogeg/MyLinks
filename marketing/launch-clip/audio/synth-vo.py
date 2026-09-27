@@ -96,7 +96,9 @@ def reel_script():
     out = []
     for c in data["captions"]:
         # a "\n" is a line break on screen only; the voice reads straight on
-        spoken = c.get("say") or " ".join(c["text"].split()).replace("Machina", SAY_NAME)
+        # `say` is the spoken form when it differs (a voice-only lead-in such
+        # as "Introducing"); either way "Machina" is respelled for the voice
+        spoken = " ".join((c.get("say") or c["text"]).split()).replace("Machina", SAY_NAME)
         # a reel line must be finished before its caption leaves the screen
         out.append({
             "frame": c["at"],

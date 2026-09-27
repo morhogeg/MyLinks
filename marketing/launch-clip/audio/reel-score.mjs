@@ -136,6 +136,10 @@ const H = HITS;
   const t = VO.find((v) => v.frame === named.at);
   [[1, 84], [4, 88], [7, 91]].forEach(([w, m], i) => bell(named.at / FPS + t.words[w], m, 0.05, [-0.35, 0.35, 0][i], 1.6));
   whoosh(CAPTIONS[2].at / FPS + 0.2, 1.2, 0.05, 0);
+  // the name: a soft shimmer as the wordmark wipes in on "Machina"
+  const name = CAPTIONS.find((c) => c.place === 'mark');
+  const nt = VO.find((v) => v.frame === name.at);
+  shimmer(name.at / FPS + nt.words[1], [79, 84, 88, 91], 0.045);
 }
 
 // the hook: saves appearing as scattered glints, the rush, the point, the snap

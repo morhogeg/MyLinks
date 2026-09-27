@@ -48,6 +48,7 @@ export const onBeat = (f) => Math.round(f / BEAT_FRAMES) * BEAT_FRAMES;
 /** The holds: at source frame `at` the source clock stops for `len` output frames. */
 export const HOLDS = [
   { id: 'problem', at: 32, len: 224 }, // 14 beats
+  { id: 'name', at: 96, len: 32 }, // 2 beats: the name holds (owner, round 6)
   { id: 'card', at: 208, len: 192 }, // 12 beats
 ];
 
@@ -120,9 +121,12 @@ export const CAPTIONS = [
   { at: 16, to: 88, text: 'You save things everywhere.' },
   { at: 96, to: 216, text: 'An article here. A recipe there.\nA video somewhere else.' },
   { at: 224, to: 304, text: 'Saved, and rarely seen again.' },
-  // the answer: the saves collapse into the point, the name lands with it
-  { at: real(48), to: real(70), place: 'hook', sizes: [52, 104], text: 'Introducing\nMachina.' },
-  { at: onBeat(real(74)), to: real(146), text: 'All your saves in one place,\nready when you need them.' },
+  // the answer: the saves collapse into the point, the brackets snap, and
+  // the narrator introduces it. The screen shows only the NAME (the drawn
+  // wordmark wipes in under the mark on "Machina"; scenes/Hook.tsx); the
+  // spoken lead-in "Introducing" is voice only (`say`)
+  { at: real(56), to: 410, place: 'mark', text: 'Machina.', say: 'Introducing Machina.' },
+  { at: 416, to: real(146), text: 'All your saves in one place,\nready when you need them.' },
   { at: onBeat(real(150)), to: real(180), text: 'Save anything.' },
   // the card hold: the new card, opened
   { at: holdStart('card') + 16, to: holdStart('card') + 184, text: 'Each save becomes a card,\nwith the key points pulled out.' },
