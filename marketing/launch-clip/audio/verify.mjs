@@ -237,8 +237,7 @@ console.log('\n── reel');
   const close = caps.find((c) => c.place === 'lockup');
   const closeLine = close?.text.split('\n').slice(-1)[0].replace(/\.$/, '');
   if (!close || !film.includes(closeLine)) bad.push('the reel lockup line is not the film endcard subtitle');
-  // round 4 (owner): the reel opens on the problem and keeps only the subtitle
-  if (caps.some((c) => /finally useful/i.test(c.text))) bad.push('the tagline is back in the reel (owner round 4: subtitle only)');
+  // round 7 (owner): "Introducing Machina. All your saves, finally useful." after the problem
 
   // ── 4. banned strings, everywhere a viewer can read one
   for (const c of L.CARDS) {

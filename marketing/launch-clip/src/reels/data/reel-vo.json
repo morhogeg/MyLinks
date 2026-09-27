@@ -46,31 +46,27 @@
  },
  {
   "frame": 416,
-  "text": "All your saves in one place, ready when you need them.",
+  "text": "All your saves, finally useful.",
   "words": [
-   0.1,
-   0.285,
-   0.516,
-   0.793,
-   0.932,
-   1.117,
-   1.71,
-   1.95,
-   2.15,
-   2.31,
-   2.51
+   0.08,
+   0.268,
+   0.502,
+   1.06,
+   1.465
   ]
  },
  {
-  "frame": 560,
-  "text": "Save anything.",
+  "frame": 546,
+  "text": "Save anything, from anywhere.",
   "words": [
    0.03,
-   0.307
+   0.297,
+   0.95,
+   1.147
   ]
  },
  {
-  "frame": 688,
+  "frame": 832,
   "text": "Each save becomes a card, with the key points pulled out.",
   "words": [
    0.03,
@@ -87,7 +83,7 @@
   ]
  },
  {
-  "frame": 880,
+  "frame": 1056,
   "text": "Find it in your own words.",
   "words": [
    0.14,
@@ -99,7 +95,7 @@
   ]
  },
  {
-  "frame": 1008,
+  "frame": 1216,
   "text": "Ask anything. Every answer comes straight from your saves.",
   "words": [
    0.04,
@@ -114,7 +110,7 @@
   ]
  },
  {
-  "frame": 1296,
+  "frame": 1552,
   "text": "See how it all connects.",
   "words": [
    0.08,
@@ -125,7 +121,7 @@
   ]
  },
  {
-  "frame": 1376,
+  "frame": 1704,
   "text": "Every week, Makeena brings back what\u2019s worth remembering.",
   "words": [
    0.03,
@@ -139,7 +135,24 @@
   ]
  },
  {
-  "frame": 1536,
+  "frame": 1816,
+  "text": "The themes of your week, and the one save worth rereading.",
+  "words": [
+   0.04,
+   0.202,
+   0.484,
+   0.606,
+   0.808,
+   1.38,
+   1.562,
+   1.745,
+   1.927,
+   2.155,
+   2.429
+  ]
+ },
+ {
+  "frame": 2032,
   "text": "Makeena. Never lose another great find.",
   "words": [
    0.03,

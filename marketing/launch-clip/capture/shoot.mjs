@@ -154,6 +154,23 @@ const takes = {
     await t.roll(10, { rects: { dialog: R.dialog } });
     await t.thaw();
 
+    // "Save anything, from anywhere" (owner, round 7): the dialog's three real
+    // ways in, each tapped, recorded at 60fps (the reel lingers on each)
+    const MODES = {
+      dialog: R.dialog,
+      tabLink: ['[role=dialog] button', 'Link'],
+      tabImage: ['[role=dialog] button', 'Image'],
+      tabNote: ['[role=dialog] button', 'Note'],
+    };
+    for (const [mark, name] of [['modeImage', 'Image'], ['modeNote', 'Note'], ['modeLink', 'Link']]) {
+      await page.waitForTimeout(250);
+      await t.freeze();
+      await visible(page.locator('[role=dialog]').getByRole('button', { name, exact: true })).click();
+      t.mark(mark);
+      await t.roll(24, { rects: MODES, step: 1000 / 60 });
+      await t.thaw();
+    }
+
     // the link arrives (a paste is instant)
     await visible(page.getByPlaceholder('example.com or https://...')).fill(SAVE.url);
     await page.waitForTimeout(200);

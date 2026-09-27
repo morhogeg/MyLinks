@@ -304,44 +304,48 @@ in the film claims availability.
 
 ## The highlight reel (pilot)
 
-`MachinaReel` is a 54.9s vertical reel: the problem → "Introducing Machina"
-and what it solves → Save (and the new card, opened) → Find → Ask → Connect →
-Recall → "Machina. Never lose another great find." It has its own score, the
-film's narrator and word-timed captions. **Every pixel of app UI in it is the
-real, shipped web app**, driven and recorded frame by frame; nothing is a
-mockup or a rebuilt screen.
+`MachinaReel` is a 71.5s vertical reel: the problem → "Introducing Machina.
+All your saves, finally useful." → Save anything, from anywhere (Link, Image,
+Note) → the new card, opened → Find → Ask → Connect → the weekly recap, read →
+"Machina. Never lose another great find." It has its own score, the film's
+narrator and word-timed captions. **Every pixel of app UI in it is the real,
+shipped web app**, driven and recorded frame by frame; nothing is a mockup or
+a rebuilt screen.
 
 **How it got here.** Round 1 (20s) was too fast; round 2 changed too much;
-round 3 played round 1 2.5× slower with the owner's asks in place; round 4's
-variable speed was rejected for a steady pace (round 5: constant 2×, on the
-beat, "Introducing Machina", 60fps graph). Round 6 (this one), the owner's
-Apple-level pass:
-- the name: the voice says "Introducing Machina."; the screen shows only the
-  drawn wordmark, wiping in under the mark on "Machina" and holding (a
-  two-beat `name` hold) before the solution line;
-- the close keeps "Never lose another great find." (it answers the opening's
-  "Saved, and rarely seen again"; the tagline stays out) and sets it in a
-  display serif, Instrument Serif (OFL, inlined in `src/serifFontData.ts`),
-  under the drawn wordmark;
-- captions no longer rise word by word out of a mask (owner: "dated and
-  sluggish"): each LINE arrives when the narrator reaches it, its words
-  cascading 1.5 frames apart and each coming into focus (blur → sharp, a
-  small lift) over 7 frames; lines leave together with a quick soft-focus
-  fade. Kickers come into focus the same way;
-- lighter tap ripples; the voice lands a beat after the impact, not on it;
-  a shimmer on the spoken name.
+round 3 played round 1 slower with the owner's asks in place; round 4's
+variable speed was rejected for a steady pace (round 5: constant 2× on the
+beat, 60fps graph); round 6 was the Apple-level pass (the name on the drawn
+wordmark, a serif close, focus-in captions). Round 7 (this one, owner):
+- the weekly recap was "way too fast": it is now its own 9.6s scene
+  (`scenes/Recall.tsx`, output frames) that opens the recap and reads it,
+  pausing on the write-up, the themes, the Standout and the closing
+  question, with a second line: "The themes of your week, and the one save
+  worth rereading.";
+- "Save anything, from anywhere.": the Add dialog walks its three real tabs,
+  Link → Image ("Up to 5 screenshots become one card") → Note → Link, each
+  tapped on a beat, before the link is pasted (`scenes/SaveModes.tsx`, the
+  `modes` hold; the save take now records the tabs at 60fps);
+- "Introducing Machina. All your saves, finally useful." after the problem
+  (the close stays the subtitle);
+- key features stay on screen longer: LINGER holds (`adv > 0` in `HOLDS`)
+  let a shot keep drifting slowly on the search result, the answer and its
+  sources, and the graph, and the card hold is longer; the cut's pace is
+  unchanged.
 
 | Output frames | Scene | What it does |
 |---|---|---|
-| 0–320 | `Hook` | The problem over ten real saves (the `problem` hold): each named save lifts on its word, a bell on each; all bleach on "rarely seen again"; they collapse into the point |
-| 320–496 | `Hook` | The point lands, the brackets close, "Introducing Machina." with the drawn wordmark wiping in under the mark; "All your saves in one place, ready when you need them."; the point drops to become the **+** |
-| 464–640 | `Save` | The + irises open → Add to Machina → the five real phases → the card lands |
-| 640–832 | `CardDetail` | The `card` hold: the new card opened, its summary, **Key Points** and **Do this** line |
-| 832–960 | `Find` | "easy dinner, empty fridge" → the one card it means → tap Ask |
-| 960–1248 | `Ask` | The question → the streamed answer and three sources → the dive into the Graph chip |
-| 1248–1344 | `Connect` | The real graph (60fps), the three cited saves lit; tap Revisit |
-| 1344–1440 | `Recall` | "This week in Machina", the weekly recap, opened and read to its Standout |
-| 1440–1616 | `End` | The mark, "Machina" (the wordmark), "Never lose another great find." |
+| 0–320 | `Hook` | The problem over ten real saves; each named save lifts on its word; all bleach; they collapse into the point |
+| 320–496 | `Hook` | "Introducing Machina." (the drawn wordmark under the mark), "All your saves, finally useful."; the point drops to become the **+** |
+| 496–538 | `Save` | The + irises open; Add to Machina |
+| 538–682 | `SaveModes` | "Save anything, from anywhere.": Link, Image, Note, back to Link, the link pasted |
+| 682–848 | `Save` | The five real phases; the card lands |
+| 848–1072 | `CardDetail` | The new card opened: summary, **Key Points**, **Do this** |
+| 1072–1296 | `Find` | "easy dinner, empty fridge" → the one card it means (lingers) → tap Ask |
+| 1296–1600 | `Ask` | The question → the answer and three sources (lingers) → the dive into the Graph chip |
+| 1600–1680 | `Connect` | The real graph (60fps, lingers); tap Revisit |
+| 1680–1968 | `Recall` | "This week in Machina", opened and read slowly: write-up, themes, Standout, question |
+| 1968–2144 | `End` | The mark, "Machina" (the wordmark), "Never lose another great find." in the serif |
 
 **The clock.** Scenes are written in SOURCE frames (the round-1 cut, 600
 frames). `MachinaReel` plays them at `K = 2` via `clockAt(frame)`; `HOLDS`

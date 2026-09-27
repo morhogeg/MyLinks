@@ -169,6 +169,17 @@ shimmer(f(H.saved), [84, 88, 91], 0.045);
 sub(f(H.cardLands), 43, 0.3, 0.32);
 tick(f(H.cardLands), 0.09, 0.9);
 
+// the modes hold: Link, Image, Note tapped on beats, then the link pasted
+// (output frames: scenes/SaveModes.tsx taps at +16, +56, +96, pastes at +128)
+{
+  const M0 = holdStart('modes') / FPS;
+  [16, 56, 96].forEach((u, i) => {
+    tick(M0 + u / FPS, 0.09, 1.1 + i * 0.1);
+    bell(M0 + u / FPS, [79, 83, 86][i], 0.035, [-0.3, 0.3, 0][i], 1.1);
+  });
+  tick(M0 + 128 / FPS, 0.08, 1.4);
+}
+
 // the insert: the new card, tapped open, its Key Points arriving (output
 // frames: scenes/CardDetail.tsx taps at +20 and lands the Key Points at +130)
 const I0 = holdStart('card') / FPS;
@@ -200,11 +211,15 @@ impact(f(H.graph), 0.24);
 shimmer(f(H.graph) + 0.05, [72, 76, 79, 84], 0.045);
 
 // recall (the review deck's slot): the tab, this week's recap, its standout
-tick(f(H.revisitTap), 0.09, 1.15);
-tick(f(H.recapTap), 0.09, 1.3);
-shimmer(f(H.recapTap) + 0.05, [72, 76, 79], 0.035);
-bell(f(H.standout), 88, 0.05, 0.2, 1.8);
-sub(f(H.standout), 48, 0.2, 0.3);
+// (output frames: scenes/Recall.tsx taps at +16, lifts the standout at +208)
+{
+  const R0 = holdStart('recall') / FPS;
+  tick(R0, 0.09, 1.15);
+  tick(R0 + 16 / FPS, 0.09, 1.3);
+  shimmer(R0 + 20 / FPS, [72, 76, 79], 0.035);
+  bell(R0 + 208 / FPS, 88, 0.05, 0.2, 1.8);
+  sub(R0 + 208 / FPS, 48, 0.2, 0.3);
+}
 
 // the lockup: the last card leaves, the mark strikes into air
 whoosh(f(H.lockup) - 0.1, 0.7, 0.09, 0);

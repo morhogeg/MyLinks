@@ -30,9 +30,13 @@ export const Save: React.FC<{ f: number }> = ({ f }) => {
 
   // ── which real frame is on the dialog
   const phase = S.phases.findIndex((p, k) => f >= p && (k === S.phases.length - 1 || f < S.phases[k + 1]));
+  // before the modes hold the dialog is as it opened (empty, on Link); the
+  // hold (scenes/SaveModes.tsx) walks Link, Image, Note and pastes the link
   const dialogFrame =
-    f < S.phases[0]
-      ? at(T, 'filled')
+    f < 141
+      ? at(T, 'modeImage') - 1
+      : f < S.phases[0]
+        ? at(T, 'filled')
       : f < S.saved
         ? walk(f, S.phases[phase], `phase${phase}`, 7)
         : walk(f, S.saved, 'done', 20);
@@ -63,7 +67,10 @@ export const Save: React.FC<{ f: number }> = ({ f }) => {
   // then dropping away into the feed
   const dKeys: Key[] = [
     { f: 136, cx: 196.5, cy: 426, z: 2.22, fx: 540, fy: 1236 },
-    { f: 150, z: 2.3, ease: (t) => t },
+    { f: 141, z: 2.2486, ease: (t) => t },
+    // the modes hold happens here (scenes/SaveModes.tsx); the camera picks up
+    // exactly where that scene leaves it, on the tabs
+    { f: 141.01, cy: 458, z: 2.7, fy: 1230, ease: (t) => t },
     { f: 160, cy: 500, z: 2.7, fy: 1160, ease: EASE_MODAL },
     { f: 184, cy: 510, z: 2.85, ease: (t) => t },
     { f: 189, cy: 520, z: 2.3, fy: 1130, ease: EASE_MODAL },
@@ -135,7 +142,7 @@ export const Save: React.FC<{ f: number }> = ({ f }) => {
           cropRadius={24}
           opacity={dialogIn * (1 - dialogOut)}
         >
-          <Tap x={save.x} y={save.y} t={prog(f, S.saveTap - 5, S.saveTap + 9, (t) => t)} />
+          <Tap x={save.x} y={save.y} t={prog(f, S.saveTap - 1, S.saveTap + 13, (t) => t)} />
         </AppShot>
       )}
 

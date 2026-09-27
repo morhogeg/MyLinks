@@ -2497,19 +2497,19 @@ to its session:
 > feature-clip briefs below against the kit you built, and add a §9 entry.
 
 **What exists (the pilot, 2026-09-26, branch `claude/machina-reel-pilot`,
-awaiting owner review, not merged):** `MachinaReel` (54.9s, round 6,
+awaiting owner review, not merged):** `MachinaReel` (71.5s, round 7,
 1080×1920, score + narrator + captions, the deliverable), `MachinaReelSilent`
-and `MachinaReelClean`, in `marketing/launch-clip/`. Script: the problem
-("You save things everywhere." / "An article here. A recipe there. A video
+and `MachinaReelClean`, in `marketing/launch-clip/`. Script: the problem ("You
+save things everywhere." / "An article here. A recipe there. A video
 somewhere else." / "Saved, and rarely seen again."), "Introducing Machina."
-(voice; the screen shows the drawn wordmark under the mark), "All your saves
-in one place, ready when you need them.", "Save anything.", the new card
-opened ("Each save becomes a card, with the key points pulled out."), Find,
-Ask, Connect, the weekly recap ("Every week, Machina brings back what's
-worth remembering."), and the close "Machina. Never lose another great
-find." with the subtitle in Instrument Serif (owner asked for a different
-font; the tagline stays out: the subtitle answers the opening). One steady
-speed on the 112.5 BPM beat; line-by-line focus-in captions. **Every frame of app UI is the real web app, not a
+(the screen shows the drawn wordmark) "All your saves, finally useful.",
+"Save anything, from anywhere." (the Add dialog's Link, Image and Note tabs,
+each tapped), "Each save becomes a card, with the key points pulled out.",
+Find, Ask, Connect, the weekly recap read slowly ("Every week, Machina brings
+back what's worth remembering." / "The themes of your week, and the one save
+worth rereading."), and the close "Machina. Never lose another great find."
+in Instrument Serif. One steady speed on the 112.5 BPM beat; key features
+linger. **Every frame of app UI is the real web app, not a
 mockup** (owner, mid-task): `capture/` builds `web/` as a static export with
 Firebase swapped for an in-memory stand-in seeded with a demo account of 24
 real, interesting saves (no "AI" anywhere), and Playwright records four
@@ -2591,6 +2591,16 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-27 — Highlight reel round 7.** Branch `claude/machina-reel-pilot`,
+  not merged. Owner: the weekly-recap slide was far too fast; "Save
+  anything, from anywhere" with the Link/Image/Note options shown (the
+  screenshot path is a strong feature); "Introducing Machina, all your saves,
+  finally useful"; show key features longer. Done: Recall rebuilt as a 9.6s
+  output-frame scene that reads the recap (+ a second line); a `modes` hold
+  (`scenes/SaveModes.tsx`) walking the dialog's real tabs (save take
+  re-shot with them at 60fps); the tagline line restored after the name (the
+  close stays the subtitle); linger holds (`adv`) on the search result, the
+  answer and sources, and the graph; longer card hold. 71.5s.
 - **2026-09-27 — Highlight reel round 6 (Apple-level pass).** Branch
   `claude/machina-reel-pilot`, not merged. Owner: hold the name longer and
   don't show the word "Introducing"; pick between the subtitle and the

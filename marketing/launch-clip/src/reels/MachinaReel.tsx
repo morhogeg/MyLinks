@@ -1,6 +1,6 @@
 import React from 'react';
 import { AbsoluteFill, Audio, staticFile, useCurrentFrame } from 'remotion';
-import { CAPTIONS, FPS, KICKERS, clockAt } from '../../reel-timeline.mjs';
+import { CAPTIONS, FPS, KICKERS, clockAt, holdStart } from '../../reel-timeline.mjs';
 import { sans } from '../fonts';
 import VO from './data/reel-vo.json';
 import { BandScrim, Captions, type ReelCaption } from './kit/Captions';
@@ -12,6 +12,7 @@ import { Find } from './scenes/Find';
 import { Ask } from './scenes/Ask';
 import { Connect } from './scenes/Connect';
 import { Recall } from './scenes/Recall';
+import { SaveModes } from './scenes/SaveModes';
 import { CardDetail } from './scenes/CardDetail';
 import { CLOCK } from './kit/camera';
 import { End } from './scenes/End';
@@ -45,6 +46,8 @@ export const MachinaReel: React.FC<{
 
       {hold === 'card' ? (
         <CardDetail u={u} />
+      ) : hold === 'modes' ? (
+        <SaveModes u={u} />
       ) : (
         <>
           <Hook f={src} out={f} />
@@ -52,9 +55,9 @@ export const MachinaReel: React.FC<{
           <Find f={src} />
           <Ask f={src} />
           <Connect f={src} />
-          <Recall f={src} />
         </>
       )}
+      <Recall u={f - holdStart('recall')} />
       <End f={f} />
 
       {/* type never sits on UI: the app fades out under the caption band */}

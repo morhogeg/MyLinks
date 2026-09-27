@@ -45,36 +45,73 @@ export const bar = (n) => Math.round(n * BAR_FRAMES);
 /** the nearest output beat */
 export const onBeat = (f) => Math.round(f / BEAT_FRAMES) * BEAT_FRAMES;
 
-/** The holds: at source frame `at` the source clock stops for `len` output frames. */
+/**
+ * The holds. At source frame `at` the reel spends `len` output frames while
+ * the source clock advances only `adv` source frames:
+ *  - adv 0: a SCENE hold; an output-frame scene plays (reel-timeline `hold`);
+ *  - adv > 0: a LINGER (round 7, owner: "show things a bit longer when
+ *    discussing key features"): the same shot keeps drifting, slowly, on a
+ *    moment worth reading; nothing freezes and the cut's pace is unchanged.
+ * Every hold starts on a source 8th and lasts whole beats, so the grid holds.
+ */
 export const HOLDS = [
-  { id: 'problem', at: 32, len: 224 }, // 14 beats
-  { id: 'name', at: 96, len: 32 }, // 2 beats: the name holds (owner, round 6)
-  { id: 'card', at: 208, len: 192 }, // 12 beats
+  { id: 'problem', at: 32, len: 224, adv: 0 }, // the problem, named
+  { id: 'name', at: 96, len: 32, adv: 0 }, // the name holds
+  { id: 'modes', at: 141, len: 144, adv: 0 }, // Link, Image, Note
+  { id: 'card', at: 208, len: 224, adv: 0 }, // the new card, opened
+  { id: 'found', at: 248, len: 48, adv: 4 }, // linger: the one card it finds
+  { id: 'sources', at: 372, len: 64, adv: 6 }, // linger: the answer and its sources
+  { id: 'graph', at: 440, len: 48, adv: 6 }, // linger: the graph
+  { id: 'recall', at: 464, len: 192, adv: 0 }, // this week's recap, read
 ];
 
-/** source frame → output frame (a source frame at/after a hold lands after it) */
+/** source frame → output frame (at/after a scene hold → after it) */
 export const real = (src) => {
-  let out = src * K;
-  for (const h of HOLDS) if (src >= h.at) out += h.len;
-  return Math.round(out);
+  let out = 0;
+  let s = 0;
+  for (const h of HOLDS) {
+    if (src < h.at) break;
+    out += (h.at - s) * K;
+    s = h.at;
+    if (h.adv > 0 && src < h.at + h.adv) return Math.round(out + (src - h.at) * (h.len / h.adv));
+    out += h.len;
+    s = h.at + h.adv;
+  }
+  return Math.round(out + (src - s) * K);
 };
 
 /** the output frame a hold starts on */
 export const holdStart = (id) => {
-  const h = HOLDS.find((x) => x.id === id);
-  return real(h.at) - h.len;
+  let out = 0;
+  let s = 0;
+  for (const h of HOLDS) {
+    out += (h.at - s) * K;
+    if (h.id === id) return Math.round(out);
+    out += h.len;
+    s = h.at + h.adv;
+  }
+  throw new Error(`no hold ${id}`);
 };
 
-/** output frame → { src, hold, u, k }: the source frame, and if a hold is
- *  playing, which one and how far into it (output frames) */
+/** output frame → { src, hold, u, k }: the source frame; for a scene hold,
+ *  which one and how far into it (output frames); k = output frames per
+ *  source frame right now (motion blur) */
 export const clockAt = (f) => {
-  let src = f / K;
+  let out = 0;
+  let s = 0;
   for (const h of HOLDS) {
-    const h0 = holdStart(h.id);
-    if (f >= h0 && f < h0 + h.len) return { src: h.at, hold: h.id, u: f - h0, k: K };
-    if (f >= h0 + h.len) src -= h.len / K;
+    const seg = (h.at - s) * K;
+    if (f < out + seg) return { src: s + (f - out) / K, hold: null, u: 0, k: K };
+    out += seg;
+    if (f < out + h.len) {
+      const u = f - out;
+      if (h.adv > 0) return { src: h.at + (u * h.adv) / h.len, hold: null, u, k: h.len / h.adv };
+      return { src: h.at, hold: h.id, u, k: K };
+    }
+    out += h.len;
+    s = h.at + h.adv;
   }
-  return { src, hold: null, u: 0, k: K };
+  return { src: s + (f - out) / K, hold: null, u: 0, k: K };
 };
 
 /** output frame → source frame */
@@ -126,28 +163,30 @@ export const CAPTIONS = [
   // wordmark wipes in under the mark on "Machina"; scenes/Hook.tsx); the
   // spoken lead-in "Introducing" is voice only (`say`)
   { at: real(56), to: 410, place: 'mark', text: 'Machina.', say: 'Introducing Machina.' },
-  { at: 416, to: real(146), text: 'All your saves in one place,\nready when you need them.' },
-  { at: onBeat(real(150)), to: real(180), text: 'Save anything.' },
+  { at: 416, to: real(118), text: 'All your saves,\nfinally useful.' },
+  // the modes hold: the Add dialog's three ways in
+  { at: holdStart('modes') + 8, to: holdStart('modes') + 136, text: 'Save anything, from anywhere.' },
   // the card hold: the new card, opened
-  { at: holdStart('card') + 16, to: holdStart('card') + 184, text: 'Each save becomes a card,\nwith the key points pulled out.' },
+  { at: holdStart('card') + 16, to: holdStart('card') + 212, text: 'Each save becomes a card,\nwith the key points pulled out.' },
   { at: onBeat(real(214)), to: real(262), text: 'Find it in your own words.' },
   { at: onBeat(real(278)), to: real(380), text: 'Ask anything. Every answer comes straight from your saves.' },
-  { at: onBeat(real(420)), to: real(464), text: 'See how it all connects.' },
-  // recall: the weekly recap
-  { at: onBeat(real(466)), to: real(519), text: 'Every week, Machina brings back\nwhat’s worth remembering.' },
+  { at: onBeat(real(420)), to: real(463), text: 'See how it all connects.' },
+  // recall: the weekly recap, read slowly (scenes/Recall.tsx)
+  { at: holdStart('recall') + 24, to: holdStart('recall') + 124, text: 'Every week, Machina brings back\nwhat’s worth remembering.' },
+  { at: holdStart('recall') + 136, to: holdStart('recall') + 272, text: 'The themes of your week,\nand the one save worth rereading.' },
   // the close: the name (the drawn wordmark wipes in as it is said), then
-  // the App Store subtitle, set big
+  // the App Store subtitle, set big in the serif
   { at: onBeat(real(542)), to: real(600), place: 'lockup', text: 'Machina.\nNever lose another great find.' },
 ];
 
 /** The pillar word each product scene opens on (the kinetic kicker), in
  *  OUTPUT frames. */
 export const KICKERS = [
-  { at: onBeat(real(148)), to: holdStart('card') + 184, text: 'Save' },
+  { at: holdStart('modes'), to: holdStart('card') + 212, text: 'Save' },
   { at: onBeat(real(210)), to: real(268), text: 'Find' },
   { at: onBeat(real(274)), to: real(412), text: 'Ask' },
   { at: onBeat(real(418)), to: real(460), text: 'Connect' },
-  { at: onBeat(real(464)), to: real(510), text: 'Revisit' },
+  { at: holdStart('recall') + 8, to: holdStart('recall') + 272, text: 'Revisit' },
 ];
 
 /**
@@ -163,7 +202,7 @@ export const HITS = {
   toApp: 120, // the point becomes the + button
   plusTap: 132,
   dialog: 136,
-  saveTap: 140,
+  saveTap: 142, // just after the modes hold (Link, Image, Note)
   phases: [144, 152, 160, 168, 176], // the five phases, an 8th apart
   saved: 184,
   cardLands: 200,
