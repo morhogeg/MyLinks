@@ -18,10 +18,12 @@
 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BAR, BAR_FRAMES, BEAT, BAR_CHORDS, FPS, HITS, RISERS, TOTAL_FRAMES, TOTAL_SEC, holdStart, real, srcOf } from '../reel-timeline.mjs';
+import fs from 'node:fs';
+import { BAR, BAR_FRAMES, BEAT, BAR_CHORDS, CAPTIONS, FPS, HITS, RISERS, TOTAL_FRAMES, TOTAL_SEC, holdStart, real, srcOf } from '../reel-timeline.mjs';
 import { createSynth } from './synth.mjs';
 
-// Round 3/4: the round-1 score, on the reel's variable-speed clock. Everything is
+// Round 5: the round-1 score, on the reel's steady clock (K = 2, 112.5 BPM:
+// every source 8th is an output beat). Everything is
 // written against SOURCE frames (the round-1 cut) and placed where that
 // moment now falls in the output (real()); the groove runs at 90 BPM, so a
 // round-1 bar is two bars here.
@@ -125,6 +127,16 @@ for (const [from, to] of RISERS) riser(f(from), f(to) - f(from), 0.09);
 
 // ── sound design, on the picture's frames
 const H = HITS;
+
+// the problem (output frames): a bell as each named save lifts on its word,
+// and a soft fall as they all bleach on "rarely seen again"
+{
+  const VO = JSON.parse(fs.readFileSync(new URL('../src/reels/data/reel-vo.json', import.meta.url), 'utf8'));
+  const named = CAPTIONS[1];
+  const t = VO.find((v) => v.frame === named.at);
+  [[1, 84], [4, 88], [7, 91]].forEach(([w, m], i) => bell(named.at / FPS + t.words[w], m, 0.05, [-0.35, 0.35, 0][i], 1.6));
+  whoosh(CAPTIONS[2].at / FPS + 0.2, 1.2, 0.05, 0);
+}
 
 // the hook: saves appearing as scattered glints, the rush, the point, the snap
 [4, 8, 12, 16, 20, 24, 28].forEach((fr, i) => bell(f(fr), [84, 88, 91, 86, 89, 93, 95][i], 0.028, i % 2 ? 0.45 : -0.45, 1.2));

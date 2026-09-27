@@ -236,7 +236,8 @@ const takes = {
     await t.freeze();
     await visible(page.locator(R.firstCard[0])).click({ position: { x: 120, y: 40 } });
     t.mark('detail');
-    await t.roll(18, { rects: DETAIL });
+    // at 60fps: the reel plays this transition slowed, and it must stay smooth
+    await t.roll(36, { rects: DETAIL, step: 1000 / 60 });
     await t.thaw();
     await page.waitForTimeout(500);
     await t.freeze();
@@ -333,7 +334,9 @@ const takes = {
     // the answer's Graph chip: where these three live
     await visible(page.getByText('Graph', { exact: true })).click();
     t.mark('graph');
-    await t.roll(60, { rects: { canvas: ['canvas'], revisitTab: R.revisitTab } });
+    // at 60fps (2.5s of the app's own graph opening): the reel plays it
+    // slowed, and 30fps frames held twice read as lag (owner, round 5)
+    await t.roll(150, { rects: { canvas: ['canvas'], revisitTab: R.revisitTab }, step: 1000 / 60 });
     await t.thaw();
     return t.save();
   },
@@ -374,7 +377,7 @@ const takes = {
     await t.freeze();
     await visible(page.getByText('This week in Machina')).click();
     t.mark('expand');
-    await t.roll(16, { rects: RECAP });
+    await t.roll(32, { rects: RECAP, step: 1000 / 60 });
     await t.thaw();
     await page.waitForTimeout(300);
 

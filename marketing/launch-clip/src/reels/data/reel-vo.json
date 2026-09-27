@@ -1,6 +1,6 @@
 [
  {
-  "frame": 10,
+  "frame": 16,
   "text": "You save things everywhere.",
   "words": [
    0.05,
@@ -10,7 +10,7 @@
   ]
  },
  {
-  "frame": 80,
+  "frame": 96,
   "text": "An article here. A recipe there. A video somewhere else.",
   "words": [
    0.08,
@@ -26,7 +26,7 @@
   ]
  },
  {
-  "frame": 206,
+  "frame": 224,
   "text": "Saved, and rarely seen again.",
   "words": [
    0.05,
@@ -37,7 +37,32 @@
   ]
  },
  {
-  "frame": 450,
+  "frame": 320,
+  "text": "Introducing Makeena.",
+  "words": [
+   0.04,
+   0.743
+  ]
+ },
+ {
+  "frame": 368,
+  "text": "All your saves in one place, ready when you need them.",
+  "words": [
+   0.1,
+   0.285,
+   0.516,
+   0.793,
+   0.932,
+   1.117,
+   1.71,
+   1.95,
+   2.15,
+   2.31,
+   2.51
+  ]
+ },
+ {
+  "frame": 528,
   "text": "Save anything.",
   "words": [
    0.03,
@@ -45,7 +70,7 @@
   ]
  },
  {
-  "frame": 587,
+  "frame": 656,
   "text": "Each save becomes a card, with the key points pulled out.",
   "words": [
    0.03,
@@ -62,7 +87,7 @@
   ]
  },
  {
-  "frame": 789,
+  "frame": 848,
   "text": "Find it in your own words.",
   "words": [
    0.14,
@@ -74,7 +99,7 @@
   ]
  },
  {
-  "frame": 929,
+  "frame": 976,
   "text": "Ask anything. Every answer comes straight from your saves.",
   "words": [
    0.04,
@@ -89,7 +114,7 @@
   ]
  },
  {
-  "frame": 1277,
+  "frame": 1264,
   "text": "See how it all connects.",
   "words": [
    0.08,
@@ -100,7 +125,7 @@
   ]
  },
  {
-  "frame": 1381,
+  "frame": 1344,
   "text": "Every week, Makeena brings back what\u2019s worth remembering.",
   "words": [
    0.03,
@@ -114,7 +139,7 @@
   ]
  },
  {
-  "frame": 1562,
+  "frame": 1504,
   "text": "Makeena. Never lose another great find.",
   "words": [
    0.03,

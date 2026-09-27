@@ -173,12 +173,13 @@ export class Take {
     await this.page.evaluate((dt) => window.__rec.step(dt), ms);
   }
 
-  /** Record `n` frames of the app's own motion at 30fps. */
-  async roll(n, { rects, every } = {}) {
+  /** Record `n` frames of the app's own motion, `step` ms apart (30fps by
+   *  default; DT / 2 records at 60fps, for motion the reel plays slowed). */
+  async roll(n, { rects, every, step = DT } = {}) {
     await this.freeze();
     const first = this.frames.length;
     for (let k = 0; k < n; k++) {
-      if (k > 0) await this.advance(DT);
+      if (k > 0) await this.advance(step);
       else await this.page.evaluate(() => window.__rec.adopt());
       await every?.(k);
       await this.snap({ rects });

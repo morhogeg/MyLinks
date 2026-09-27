@@ -43,7 +43,7 @@ export const CardDetail: React.FC<{ u: number }> = ({ u }) => {
     u < TAP
       ? at(T, 'landed')
       : u < SCROLL[0]
-        ? at(T, 'detail', Math.min(17, (u - TAP) / 2.5))
+        ? at(T, 'detail', Math.min(35, u - TAP)) // captured at 60fps: one per output frame at K = 2
         : at(T, 'detailScroll', Math.round(prog(u, SCROLL[0], SCROLL[1], EASE_IN_OUT) * 10));
 
   const card = rectOf(T, at(T, 'landed'), 'firstCard');

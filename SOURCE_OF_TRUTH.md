@@ -2497,20 +2497,18 @@ to its session:
 > feature-clip briefs below against the kit you built, and add a §9 entry.
 
 **What exists (the pilot, 2026-09-26, branch `claude/machina-reel-pilot`,
-awaiting owner review, not merged):** `MachinaReel` (56.3s, round 4,
+awaiting owner review, not merged):** `MachinaReel` (53.9s, round 5,
 1080×1920, score + narrator + captions, the deliverable), `MachinaReelSilent`
-and `MachinaReelClean`, in `marketing/launch-clip/`. It opens on the problem,
-as the launch film does ("You save things everywhere." / "An article here. A
-recipe there. A video somewhere else." / "Saved, and rarely seen again."),
-over ten real saves that then collapse into the mark; then Save and the new
-card opened to its Key Points ("Each save becomes a card, with the key
-points pulled out."), Find, Ask, Connect, the weekly recap ("Every week,
-Machina brings back what's worth remembering."), and a last slide that says
-"Machina. Never lose another great find." (the wordmark, then the subtitle
-set big). The tagline "Everything you save, finally useful." is NOT in the
-reel (owner, round 4: subtitle only). Pacing varies with content: slow where
-the viewer reads, faster through transitions (`SPEED` in
-`reel-timeline.mjs`). **Every frame of app UI is the real web app, not a
+and `MachinaReelClean`, in `marketing/launch-clip/`. Script: the problem
+("You save things everywhere." / "An article here. A recipe there. A video
+somewhere else." / "Saved, and rarely seen again."), "Introducing Machina.",
+what it solves ("All your saves in one place, ready when you need them."),
+"Save anything.", the new card opened ("Each save becomes a card, with the
+key points pulled out."), Find, Ask, Connect, the weekly recap ("Every week,
+Machina brings back what's worth remembering."), and the close "Machina.
+Never lose another great find." (no tagline). One steady speed (2× the
+round-1 cut, on the 112.5 BPM score's beats); the graph, card and recap
+openings captured at 60fps so they play smoothly. **Every frame of app UI is the real web app, not a
 mockup** (owner, mid-task): `capture/` builds `web/` as a static export with
 Firebase swapped for an in-memory stand-in seeded with a demo account of 24
 real, interesting saves (no "AI" anywhere), and Playwright records four
@@ -2592,6 +2590,16 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-27 — Highlight reel round 5 (full refinement).** Branch
+  `claude/machina-reel-pilot`, not merged. Owner: keep a steady pace (the
+  round-4 variable speed rejected), say "Introducing Machina" after the
+  problem and then that it solves it, fit timings to the music and sound
+  effects, smooth the laggy graph. Done: constant K = 2 on the 112.5 BPM
+  grid (holds of whole beats, every line on a beat); script adds
+  "Introducing Machina." and "All your saves in one place, ready when you
+  need them."; graph/card/recap openings recaptured at 60fps (recorder
+  `roll` `step`); bells on the named saves and a soft fall on the bleach.
+  53.9s.
 - **2026-09-27 — Highlight reel round 4.** Branch `claude/machina-reel-pilot`,
   not merged. Owner: open on the problem like the launch film, drop the
   tagline (keep only "Never lose another great find"), make the last slide

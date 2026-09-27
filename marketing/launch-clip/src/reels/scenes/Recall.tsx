@@ -47,7 +47,7 @@ export const Recall: React.FC<{ f: number }> = ({ f }) => {
     f < S.recapTap
       ? at(T, 'open', Math.min(9, 3 + (f - S.revisitTap)))
       : step === 0
-        ? at(T, 'expand', Math.min(15, f - S.recapTap))
+        ? at(T, 'expand', Math.min(31, (f - S.recapTap) * 2)) // captured at 60fps
         : at(T, 'scroll', step - 1);
 
   const cam = camAt(recallKeys, f);

@@ -18,76 +18,42 @@ export const WIDTH = 1080;
 export const HEIGHT = 1920;
 
 /**
- * ROUND 4 (owner, 2026-09-27): the round-1 cut, written in its own frames
- * (SOURCE frames: 600 of them, 16 a beat), played at a speed that CHANGES
- * with what is on screen: "slower when it's important the user actually
- * reads what's on the screen, faster for cool transitions". SPEED lists how
- * many output frames each source frame lasts, by source range. The narrator
- * is never slowed: captions and voice are placed in OUTPUT frames.
+ * ROUND 5 (owner, 2026-09-27): "keep a steady pace". The round-1 cut, written
+ * in its own frames (SOURCE frames: 600, 16 a beat at 112.5 BPM), is played
+ * at ONE constant speed, K = 2: every source 8th lands exactly on an output
+ * beat of the same 112.5 BPM score, so cuts, taps and sound design sit on
+ * the music. The narrator is never slowed: captions and voice are placed in
+ * OUTPUT frames, each starting on a beat.
  *
- * Two HOLDS stop the source clock while an output-frame scene plays:
+ * Two HOLDS stop the source clock while an output-frame scene plays; both
+ * start on a source 8th and last a whole number of beats, so the grid holds:
  *  - `problem`: the opening, the saves hanging where they were kept while
- *    the narrator names the problem (scenes/Hook.tsx reads `hold`);
+ *    the narrator names the problem (scenes/Hook.tsx);
  *  - `card`: the new card, opened to its Key Points (scenes/CardDetail.tsx).
- *
- * The music runs at 90 BPM on the output clock; its sound design is placed
- * where each picture event lands (`real`).
  */
-export const BPM = 90;
-export const BEAT_FRAMES = 20;
-export const BAR_FRAMES = BEAT_FRAMES * 4; // 80
-export const BEAT = BEAT_FRAMES / FPS; // 0.6667s
-export const BAR = BAR_FRAMES / FPS; // 2.6667s
+export const K = 2;
+export const BPM = 112.5;
+export const BEAT_FRAMES = 16;
+export const BAR_FRAMES = BEAT_FRAMES * 4; // 64
+export const BEAT = BEAT_FRAMES / FPS; // 0.5333s
+export const BAR = BAR_FRAMES / FPS; // 2.1333s
 
 /** Beat (quarter note, may be fractional) → output frame. */
 export const beat = (n) => Math.round(n * BEAT_FRAMES);
 /** Bar → output frame. */
 export const bar = (n) => Math.round(n * BAR_FRAMES);
-
-/** [from source frame, output frames per source frame] — read ↔ move */
-export const SPEED = [
-  [0, 1.5], //    the saves arrive
-  [31, 2.0], //   …collapse into the point, the brackets snap shut
-  [64, 1.2], //   the mark, whole
-  [104, 1.5], //  the point drops, the + irises open
-  [136, 2.0], //  Add to Machina, the Save tap
-  [144, 2.6], //  READ: the five phases
-  [184, 1.6], //  the dialog drops, the card lands
-  [208, 2.0], //  the search tap, the query typed
-  [240, 2.8], //  READ: the one card it finds
-  [264, 1.5], //  whip into Ask, the hero
-  [284, 2.0], //  the question typed
-  [316, 3.0], //  READ: the answer and its three sources
-  [392, 1.6], //  the dive into the Graph chip
-  [416, 2.2], //  the graph
-  [464, 1.6], //  the Revisit tab
-  [474, 3.0], //  READ: this week's recap, down to its standout
-  [506, 1.6], //  thrown out of frame
-  [512, 2.2], //  the lockup
-];
+/** the nearest output beat */
+export const onBeat = (f) => Math.round(f / BEAT_FRAMES) * BEAT_FRAMES;
 
 /** The holds: at source frame `at` the source clock stops for `len` output frames. */
 export const HOLDS = [
-  { id: 'problem', at: 31, len: 210 },
-  { id: 'card', at: 208, len: 200 },
+  { id: 'problem', at: 32, len: 224 }, // 14 beats
+  { id: 'card', at: 208, len: 192 }, // 12 beats
 ];
-export const INSERT = HOLDS[1];
-
-const speedAt = (src) => {
-  let k = SPEED[0][1];
-  for (const [from, v] of SPEED) if (src >= from) k = v;
-  return k;
-};
 
 /** source frame → output frame (a source frame at/after a hold lands after it) */
 export const real = (src) => {
-  let out = 0;
-  for (let i = 0; i < SPEED.length; i++) {
-    const [from, k] = SPEED[i];
-    const to = i + 1 < SPEED.length ? SPEED[i + 1][0] : Infinity;
-    if (src <= from) break;
-    out += (Math.min(src, to) - from) * k;
-  }
+  let out = src * K;
   for (const h of HOLDS) if (src >= h.at) out += h.len;
   return Math.round(out);
 };
@@ -98,35 +64,16 @@ export const holdStart = (id) => {
   return real(h.at) - h.len;
 };
 
-/** output frame → { src, hold, u }: the source frame, and if a hold is
+/** output frame → { src, hold, u, k }: the source frame, and if a hold is
  *  playing, which one and how far into it (output frames) */
 export const clockAt = (f) => {
+  let src = f / K;
   for (const h of HOLDS) {
     const h0 = holdStart(h.id);
-    if (f >= h0 && f < h0 + h.len) return { src: h.at, hold: h.id, u: f - h0, k: speedAt(h.at) };
+    if (f >= h0 && f < h0 + h.len) return { src: h.at, hold: h.id, u: f - h0, k: K };
+    if (f >= h0 + h.len) src -= h.len / K;
   }
-  // invert real() by walking the source range
-  let lo = 0;
-  let hi = SOURCE_FRAMES;
-  for (let i = 0; i < 40; i++) {
-    const mid = (lo + hi) / 2;
-    if (realExact(mid) <= f) lo = mid;
-    else hi = mid;
-  }
-  return { src: lo, hold: null, u: 0, k: speedAt(lo) };
-};
-
-/** real() without rounding, for the inverse */
-const realExact = (src) => {
-  let out = 0;
-  for (let i = 0; i < SPEED.length; i++) {
-    const [from, k] = SPEED[i];
-    const to = i + 1 < SPEED.length ? SPEED[i + 1][0] : Infinity;
-    if (src <= from) break;
-    out += (Math.min(src, to) - from) * k;
-  }
-  for (const h of HOLDS) if (src >= h.at) out += h.len;
-  return out;
+  return { src, hold: null, u: 0, k: K };
 };
 
 /** output frame → source frame */
@@ -168,32 +115,35 @@ export const sceneAt = (id) => {
  * NO em dashes, no literal "AI", no "second brain", no "library" (verify).
  */
 export const CAPTIONS = [
-  // the problem, as the launch film opens (owner, round 4): the saves hang
-  // where they were kept while the narrator names it
-  { at: 10, to: 70, text: 'You save things everywhere.' },
-  { at: 80, to: 200, text: 'An article here. A recipe there.\nA video somewhere else.' },
-  { at: 206, to: 290, text: 'Saved, and rarely seen again.' },
-  { at: real(150), to: real(180), text: 'Save anything.' },
+  // the problem, as the launch film opens: the saves hang where they were
+  // kept while the narrator names it
+  { at: 16, to: 88, text: 'You save things everywhere.' },
+  { at: 96, to: 216, text: 'An article here. A recipe there.\nA video somewhere else.' },
+  { at: 224, to: 304, text: 'Saved, and rarely seen again.' },
+  // the answer: the saves collapse into the point, the name lands with it
+  { at: real(48), to: real(70), place: 'hook', sizes: [52, 104], text: 'Introducing\nMachina.' },
+  { at: onBeat(real(74)), to: real(146), text: 'All your saves in one place,\nready when you need them.' },
+  { at: onBeat(real(150)), to: real(180), text: 'Save anything.' },
   // the card hold: the new card, opened
-  { at: holdStart('card') + 10, to: holdStart('card') + 192, text: 'Each save becomes a card,\nwith the key points pulled out.' },
-  { at: real(214), to: real(262), text: 'Find it in your own words.' },
-  { at: real(278), to: real(380), text: 'Ask anything. Every answer comes straight from your saves.' },
-  { at: real(420), to: real(464), text: 'See how it all connects.' },
+  { at: holdStart('card') + 16, to: holdStart('card') + 184, text: 'Each save becomes a card,\nwith the key points pulled out.' },
+  { at: onBeat(real(214)), to: real(262), text: 'Find it in your own words.' },
+  { at: onBeat(real(278)), to: real(380), text: 'Ask anything. Every answer comes straight from your saves.' },
+  { at: onBeat(real(420)), to: real(464), text: 'See how it all connects.' },
   // recall: the weekly recap
-  { at: real(468), to: real(518), text: 'Every week, Machina brings back\nwhat’s worth remembering.' },
-  // the close: the name, then the App Store subtitle, set by the lockup
-  // (the name is the drawn wordmark, which wipes in as it is said)
-  { at: real(542), to: real(600), place: 'lockup', text: 'Machina.\nNever lose another great find.' },
+  { at: onBeat(real(466)), to: real(519), text: 'Every week, Machina brings back\nwhat’s worth remembering.' },
+  // the close: the name (the drawn wordmark wipes in as it is said), then
+  // the App Store subtitle, set big
+  { at: onBeat(real(542)), to: real(600), place: 'lockup', text: 'Machina.\nNever lose another great find.' },
 ];
 
 /** The pillar word each product scene opens on (the kinetic kicker), in
  *  OUTPUT frames. */
 export const KICKERS = [
-  { at: real(148), to: holdStart('card') + 192, text: 'Save' },
-  { at: real(210), to: real(268), text: 'Find' },
-  { at: real(274), to: real(412), text: 'Ask' },
-  { at: real(418), to: real(460), text: 'Connect' },
-  { at: real(466), to: real(510), text: 'Revisit' },
+  { at: onBeat(real(148)), to: holdStart('card') + 184, text: 'Save' },
+  { at: onBeat(real(210)), to: real(268), text: 'Find' },
+  { at: onBeat(real(274)), to: real(412), text: 'Ask' },
+  { at: onBeat(real(418)), to: real(460), text: 'Connect' },
+  { at: onBeat(real(464)), to: real(510), text: 'Revisit' },
 ];
 
 /**

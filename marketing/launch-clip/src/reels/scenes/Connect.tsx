@@ -34,7 +34,9 @@ export const connectKeys: Key[] = [
 export const Connect: React.FC<{ f: number }> = ({ f }) => {
   if (f < S.graph || f >= S.revisitTap) return null;
   const last = takeOf(T).count - 1;
-  const i = Math.min(last, at(T, 'graph') + JOIN + (f - S.graph));
+  // the graph opening is captured at 60fps: two captured frames per source
+  // frame, one per output frame at K = 2, so it plays without stepping
+  const i = Math.min(last, at(T, 'graph') + Math.round((JOIN + (f - S.graph)) * 2));
   const cam = camAt(connectKeys, f);
   const v = camVelocity(connectKeys, f);
   const tab = center(rectOf(T, i, 'revisitTab'));

@@ -304,47 +304,52 @@ in the film claims availability.
 
 ## The highlight reel (pilot)
 
-`MachinaReel` is a 56.3s vertical reel: the problem → the mark → Save (and
-the new card, opened) → Find → Ask → Connect → Recall → "Machina. Never lose
-another great find." It has its own score, the film's narrator and word-timed
-captions. **Every pixel of app UI in it is the real, shipped web app**, driven
-and recorded frame by frame; nothing is a mockup or a rebuilt screen.
+`MachinaReel` is a 53.9s vertical reel: the problem → "Introducing Machina"
+and what it solves → Save (and the new card, opened) → Find → Ask → Connect →
+Recall → "Machina. Never lose another great find." It has its own score, the
+film's narrator and word-timed captions. **Every pixel of app UI in it is the
+real, shipped web app**, driven and recorded frame by frame; nothing is a
+mockup or a rebuilt screen.
 
-**How it got here.** Round 1 was a 20s cut. Round 2 changed too much and was
-rejected. Round 3 was the round-1 cut played 2.5× slower, with the owner's
-asks applied in place (the card opened to its Key Points, the weekly recap in
-the review deck's slot, a recall line). Round 4 (owner):
-- open on the PROBLEM, like the launch film ("You save things everywhere." /
-  "An article here. A recipe there. A video somewhere else." / "Saved, and
-  rarely seen again."): each named save lifts as it is spoken, then all of
-  them bleach into the paper before they collapse into the mark;
-- the tagline "Everything you save, finally useful." is gone; the only line
-  kept is the subtitle, and the last slide says it: the drawn wordmark wipes
-  in as the narrator says "Machina", then "Never lose another great find."
-  set big (`Lockup` `lineStyle="statement"`);
-- pacing that changes with the content: slow where the viewer must read
-  (the phases, the card's Key Points, the search result, the answer and its
-  sources, the recap), faster through transitions and camera moves.
+**How it got here.** Round 1 (20s) was too fast. Round 2 changed too much.
+Round 3 played round 1 2.5× slower with the owner's asks in place. Round 4
+varied the speed by content, which the owner rejected in round 5: **keep a
+steady pace**. Round 5 (this one):
+- one constant speed, `K = 2`: every source 8th of the round-1 cut lands on
+  a beat of the same 112.5 BPM score, so cuts, taps and sound design sit on
+  the music; every narrator line starts on a beat;
+- the script: the problem ("You save things everywhere." / "An article here.
+  A recipe there. A video somewhere else." / "Saved, and rarely seen
+  again."), then "Introducing Machina." as the saves collapse into the mark,
+  then what it solves ("All your saves in one place, ready when you need
+  them."); the tagline stays out; the close is "Machina. Never lose another
+  great find.";
+- smoother app motion: the graph opening, the card's detail opening and the
+  recap opening are captured at 60fps (`roll(…, { step: 1000 / 60 })`), so
+  at K = 2 there is a new app frame on every output frame instead of each
+  frame held twice (the graph read as laggy).
 
 | Output frames | Scene | What it does |
 |---|---|---|
-| 0–323 | `Hook` | The problem, over ten real saves (the `problem` hold), then the collapse into the point and the brackets snapping shut |
-| 323–577 | `Hook` → `Save` | The mark holds; the point drops to become the **+**; Add to Machina; the five real phases (slow); the card lands |
-| 577–777 | `CardDetail` | The `card` hold: the new card opened, its summary, **Key Points** and **Do this** line |
-| 777–925 | `Find` | "easy dinner, empty fridge" → the one card it means (slow) → tap Ask |
-| 925–1270 | `Ask` | The question → the streamed answer and three sources (slow) → the dive into the Graph chip |
-| 1270–1376 | `Connect` | The real graph, the three cited saves lit; tap Revisit |
-| 1376–1508 | `Recall` | "This week in Machina", the weekly recap, opened and read to its Standout (slow) |
-| 1508–1689 | `End` | The mark, "Machina" (the wordmark), "Never lose another great find." |
+| 0–320 | `Hook` | The problem over ten real saves (the `problem` hold): each named save lifts on its word, a bell on each; all bleach on "rarely seen again"; they collapse into the point |
+| 320–464 | `Hook` | "Introducing Machina." as the point lands and the brackets close; "All your saves in one place, ready when you need them."; the point drops to become the **+** |
+| 464–640 | `Save` | The + irises open → Add to Machina → the five real phases → the card lands |
+| 640–832 | `CardDetail` | The `card` hold: the new card opened, its summary, **Key Points** and **Do this** line |
+| 832–960 | `Find` | "easy dinner, empty fridge" → the one card it means → tap Ask |
+| 960–1248 | `Ask` | The question → the streamed answer and three sources → the dive into the Graph chip |
+| 1248–1344 | `Connect` | The real graph (60fps), the three cited saves lit; tap Revisit |
+| 1344–1440 | `Recall` | "This week in Machina", the weekly recap, opened and read to its Standout |
+| 1440–1616 | `End` | The mark, "Machina" (the wordmark), "Never lose another great find." |
 
 **The clock.** Scenes are written in SOURCE frames (the round-1 cut, 600
-frames). `SPEED` in `reel-timeline.mjs` says how many output frames each
-source range lasts (1.2–3.0; high where the viewer reads), and `HOLDS` stop
-the source clock while an output-frame scene plays (`problem`, `card`).
-`clockAt(frame)` gives the source frame and any hold; `real(src)` places a
-source event in the output, which is how the score's sound design follows
-the picture. Captions, kickers, the narrator and the lockup are in output
-frames. `CLOCK.perFrame` in `camera.ts` keeps motion blur per output frame.
+frames). `MachinaReel` plays them at `K = 2` via `clockAt(frame)`; `HOLDS`
+stop the source clock while an output-frame scene plays (`problem`,
+`card`), each starting on a source 8th and lasting whole beats so the grid
+holds. `real(src)` places a source event in the output, which is how the
+score's sound design follows the picture. Captions, kickers, the narrator
+and the lockup are in output frames, each line starting on a beat
+(`onBeat`). `CLOCK.perFrame` in `camera.ts` keeps motion blur per output
+frame.
 
 Compositions: **`MachinaReel`** (score + narrator + captions, the
 deliverable), **`MachinaReelSilent`** (captions, no audio: stills and QA),
@@ -512,12 +517,12 @@ causes it, and the cut lands on the touch.
 
 ### Pacing (`clock.ts`, `reel-timeline.mjs`)
 
-The cut is written at 112.5 BPM (16 frames a beat) and played through a
-variable-speed map (`SPEED`): **slow when the viewer must read what is on
-screen, fast for transitions and camera moves** (owner, round 4). Reading
-ranges run at 2.6–3.0 output frames per source frame, moves at 1.2–1.6.
-Cuts and taps land on source beats; secondary events on 8ths. One idea per
-scene; the hero (Ask) gets the longest. A caption stays up until its line has been
+The cut is written at 112.5 BPM (16 frames a beat) and played at ONE steady
+speed, 2× (owner, round 5: "keep a steady pace"; a variable speed was
+rejected). The score runs at the same 112.5 BPM on the output clock, so a
+source 8th is an output beat: **cuts, taps and sound design land on the
+beat, and every narrator line starts on one.** Any app motion the reel
+shows must be captured at 60fps so it does not step at this speed. A caption stays up until its line has been
 spoken and its last word has landed (verify fails a voice line that overruns
 its caption). Motion blur is what a 180° shutter would give (σ ≈ 0.14 × px
 per frame, directional, capped at 10px) and never appears on a hold.
