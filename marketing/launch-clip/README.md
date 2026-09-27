@@ -307,7 +307,8 @@ in the film claims availability.
 `MachinaReel` is an 81.6s vertical reel: the problem → "Introducing Machina.
 All your saves, finally useful." → "Save anything, from anywhere." (shares
 from YouTube, Instagram and Safari into the mark) → "A link, a screenshot, or
-a note." (the Add dialog's tabs) → the new card, opened → Find → Ask → Connect
+a note." (the Add dialog's tabs) → "Machina reads it, summarizes it, and files
+it." (the five phases) → the new card, opened → Find → Ask → Connect
 → the weekly recap, read → "Machina. Never lose another great find." It has
 its own score, the film's narrator and word-timed captions. **Every pixel of
 app UI in it is the real, shipped web app**, driven and recorded frame by
@@ -457,6 +458,17 @@ strips at every transition, the mix in the speech band), not by eye:
   −15.8 LUFS), a gain and a look-ahead limiter in `mix-vo.mjs` (at most 2dB on
   a few transients); the film's mix is byte-identical.
 
+Round 14 (owner: "perfect"; one note, say what Machina does while the phases
+tick, using the launch film's line): "Machina reads it, summarizes it, and
+files it." now plays over the five phases, the film's own take reused byte
+for byte (same voice, same text) and the app's own words in the Add dialog.
+It starts on the first phase, so "reads" lands on "Reading the page" and
+"summarizes" on "Writing the summary", and "files it" ends as the save
+completes; it leaves 1.1s after the voice, as the card settles. The tour's
+line stays 6 frames longer so SAVE stays on screen from the tour through the
+card (no blink between lines). Measured: the line sits 4.8dB over the music
+in the speech band; every gate passes.
+
 | Output frames | Scene | What it does |
 |---|---|---|
 | 0–288 | `Hook` | Ten real saves come into focus (0–64); the problem is named over them (the `problem` hold, 64–288): each named save lifts on its word, then all bleach |
@@ -464,7 +476,7 @@ strips at every transition, the mix in the speech band), not by eye:
 | 456–648 | `ShareBeat` | "Save anything, from anywhere.": YouTube, Instagram and Safari saves shared into the mark (the `share` hold) |
 | 648–736 | `Hook` → `Save` | The point drops to become the **+** (the iris opens at 688), the + is tapped, Add to Machina |
 | 736–880 | `SaveModes` | "A link, a screenshot, or a note.": Link, Image, Note, back to Link, the link pasted, Save tapped |
-| 880–1008 | `Save` | The five real phases, an 8th apart; saved; the dialog drops; the card lands (992) |
+| 880–1008 | `Save` | "Machina reads it, summarizes it, and files it." over the five real phases, an 8th apart; saved; the dialog drops; the card lands (992) |
 | 1008–1200 | `CardDetail` | The new card opened: summary, **Key Points** (the `card` hold) |
 | 1200–1360 | `Find` | "easy dinner, empty fridge" → the one card it means (1264; lingers 1280–1320) → tap Ask |
 | 1360–1696 | `Ask` | The question → the answer and three sources (1504–1552; lingers 1560–1620) → the dive into the Graph chip |

@@ -2497,7 +2497,7 @@ to its session:
 > feature-clip briefs below against the kit you built, and add a §9 entry.
 
 **What exists (the pilot, 2026-09-26, branch `claude/machina-reel-pilot`,
-awaiting owner review, not merged):** `MachinaReel` (81.6s, round 13,
+awaiting owner review, not merged):** `MachinaReel` (81.6s, round 14,
 1080×1920, score + narrator + captions, the deliverable; mastered to −14
 LUFS, true peak ≤ −1 dBTP), `MachinaReelSilent`
 and `MachinaReelClean`, in `marketing/launch-clip/`. Script: the problem ("You
@@ -2508,7 +2508,7 @@ somewhere else." / "Saved, and rarely seen again."), "Introducing Machina."
 YouTube, Instagram and Safari, each card's Share button tapped and pulled
 into the mark; the native share sheet cannot be captured from the web build
 and the owner chose not to record it), "A link, a screenshot, or a note."
-(the Add dialog's real Link, Image and Note tabs, each tapped), "Each save becomes a card, with the key points pulled out.",
+(the Add dialog's real Link, Image and Note tabs, each tapped), "Machina reads it, summarizes it, and files it." (the launch film's line, over the five phases), "Each save becomes a card, with the key points pulled out.",
 Find, Ask, Connect, the weekly recap read slowly ("Every week, Machina brings
 back what's worth remembering." / "The themes of your week, and the one save
 worth rereading."), and the close "Machina. Never lose another great find."
@@ -2595,6 +2595,15 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-27 — Highlight reel round 14: the phases narrated.** Branch
+  `claude/machina-reel-pilot`, not merged. Owner on round 13: "perfect", one
+  note: say what Machina does during the save phases, with the launch film's
+  line. "Machina reads it, summarizes it, and files it." (the film's own take,
+  byte for byte; also the Add dialog's own copy) now starts on the first
+  phase: "reads" lands on "Reading the page", "summarizes" on "Writing the
+  summary", "files it" as the save completes. SAVE stays up from the tour
+  through the card. 4.8dB over the music in the speech band; verify passes.
+  81.6s.
 - **2026-09-27 — Highlight reel round 13: a measured finishing pass.** Branch
   `claude/machina-reel-pilot`, not merged; script, order, lines and length
   (81.6s) unchanged. Found by measuring the render, not by eye: Ask's two hard

@@ -248,7 +248,13 @@ export const CAPTIONS = [
   // the share hold: from any app, into Machina (scenes/ShareBeat.tsx)
   { at: holdStart('share') + 40, to: holdStart('share') + 176, text: 'Save anything, from anywhere.', until: 'the third share lands in the mark' },
   // the modes hold: the Add dialog's three ways in
-  { at: holdStart('modes'), to: holdStart('modes') + 116, text: 'A link, a screenshot, or a note.', until: 'the tour is back on Link, the link pasted' },
+  // (to +122: within KICKER_BRIDGE of the next line, so SAVE stays up)
+  { at: holdStart('modes'), to: holdStart('modes') + 122, text: 'A link, a screenshot, or a note.', until: 'the tour is back on Link, the link pasted' },
+  // the phases (round 14, owner: say what Machina does while they tick; the
+  // launch film's line, word for word, and the app's own words in the Add
+  // dialog): on the first phase, so "reads" lands on "Reading the page" and
+  // "summarizes" on "Writing the summary"
+  { at: real(HITS.phases[0]), to: real(HITS.cardLands) + 12, text: 'Machina reads it,\nsummarizes it, and files it.' },
   // the card hold: the new card, opened
   { at: holdStart('card') + 16, to: holdStart('card') + 152, text: 'Each save becomes a card,\nwith the key points pulled out.', until: 'the Key Points are highlighted' },
   { at: onBeat(real(214)), to: real(HITS.found) + 24, text: 'Find it in your own words.' },
