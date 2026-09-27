@@ -131,11 +131,11 @@ export class Take {
    * One frame. `rects` maps names → [selector, textFilter?]: each is measured
    * on this frame and stored in CSS pixels of the 393×852 screen.
    */
-  async snap({ rects = {}, note } = {}) {
+  async snap({ rects = {}, note, caret = 'initial' } = {}) {
     await this.helpers();
     const i = this.frames.length;
     const file = `${String(i).padStart(4, '0')}.png`;
-    await this.page.screenshot({ path: path.join(this.dir, file), animations: 'allow', caret: 'initial' });
+    await this.page.screenshot({ path: path.join(this.dir, file), animations: 'allow', caret });
     const text = await this.page.evaluate(() => window.__rec.visibleText());
     const measured = {};
     for (const [k, [sel, txt]] of Object.entries(rects)) {
@@ -182,7 +182,12 @@ export class Take {
       if (k > 0) await this.advance(step);
       else await this.page.evaluate(() => window.__rec.adopt());
       await every?.(k);
-      await this.snap({ rects });
+      // (round 15) the text caret blinks on the browser's REAL clock, not the
+      // stepped one, so across rolled frames it was on or off at random: a
+      // 30Hz flicker in any focused field (the Add dialog's tabs, Find).
+      // Rolled frames hide it; a typed character's frame keeps it (a
+      // keystroke restarts the blink, so it is reliably on right after one)
+      await this.snap({ rects, caret: 'hide' });
     }
     return [first, this.frames.length - 1];
   }

@@ -2497,7 +2497,7 @@ to its session:
 > feature-clip briefs below against the kit you built, and add a §9 entry.
 
 **What exists (the pilot, 2026-09-26, branch `claude/machina-reel-pilot`,
-awaiting owner review, not merged):** `MachinaReel` (81.6s, round 14,
+awaiting owner review, not merged):** `MachinaReel` (81.6s, round 15,
 1080×1920, score + narrator + captions, the deliverable; mastered to −14
 LUFS, true peak ≤ −1 dBTP), `MachinaReelSilent`
 and `MachinaReelClean`, in `marketing/launch-clip/`. Script: the problem ("You
@@ -2512,7 +2512,7 @@ and the owner chose not to record it), "A link, a screenshot, or a note."
 Find, Ask, Connect, the weekly recap read slowly ("Every week, Machina brings
 back what's worth remembering." / "The themes of your week, and the one save
 worth rereading."), and the close "Machina. Never lose another great find."
-in Instrument Serif. One steady speed on the 112.5 BPM beat; key features
+in Geist (the serif retired in round 15). One steady speed on the 112.5 BPM beat; key features
 linger. **Every frame of app UI is the real web app, not a
 mockup** (owner, mid-task): `capture/` builds `web/` as a static export with
 Firebase swapped for an in-memory stand-in seeded with a demo account of 24
@@ -2595,6 +2595,15 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-27 — Highlight reel round 15: caret, shares, one face.** Branch
+  `claude/machina-reel-pilot`, not merged. Owner on round 14: the input
+  caret was jittery (0:26–0:28): it blinks on the browser's real clock, so
+  captured frames caught it at random; rolled frames now hide it (typed
+  frames keep it) and the takes are re-captured, the flicker measured gone
+  (also in Find). The three shares now enter from the left, the right and
+  the bottom into three parts of the frame. The closing line moved from
+  Instrument Serif to Geist (owner asked for a call: one face reads as one
+  voice). 81.6s.
 - **2026-09-27 — Highlight reel round 14: the phases narrated.** Branch
   `claude/machina-reel-pilot`, not merged. Owner on round 13: "perfect", one
   note: say what Machina does during the save phases, with the launch film's

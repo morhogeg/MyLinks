@@ -1,6 +1,6 @@
 import React from 'react';
 import { Bookmark, Image as ImageIcon } from 'lucide-react';
-import { sans, serif } from '../../fonts';
+import { sans } from '../../fonts';
 import { AnimatedMark, CitationGlyph, MARK_LAUNCH_FRAMES, Wordmark } from '../../ui/Brand';
 import { PLATFORM_INK, PlatformMark } from '../../ui/app';
 import { EASE_MODAL, mix, prog } from './curves';
@@ -153,15 +153,19 @@ export const Lockup: React.FC<{
       {showLine && (
         <div
           style={{
-            marginTop: big ? 64 : 46,
+            marginTop: big ? 58 : 46,
             display: 'flex',
             justifyContent: 'center',
             // a word gap has to out-shout the tracking (0.36em between letters)
-            columnGap: big ? '0.24em' : '0.95em',
-            fontFamily: big ? serif : sans,
-            fontSize: big ? 78 : 25,
-            fontWeight: big ? 400 : 600,
-            letterSpacing: big ? '-0.01em' : '0.36em',
+            columnGap: big ? '0.25em' : '0.95em',
+            // the statement is set in the reel's one voice, Geist, a touch
+            // bigger than the lines (round 15: the display serif was the only
+            // other face in 81 seconds and read as a font change, not as
+            // emphasis; the end card's size and isolation are the emphasis)
+            fontFamily: sans,
+            fontSize: big ? 60 : 25,
+            fontWeight: 600,
+            letterSpacing: big ? '-0.028em' : '0.36em',
             textTransform: big ? undefined : 'uppercase',
             color: big ? INK : INK_SOFT,
             whiteSpace: 'nowrap',

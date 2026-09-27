@@ -469,6 +469,21 @@ line stays 6 frames longer so SAVE stays on screen from the tour through the
 card (no blink between lines). Measured: the line sits 4.8dB over the music
 in the speech band; every gate passes.
 
+Round 15 (owner, on round 14):
+- **The caret flickered** in the Add dialog's fields (0:26–0:28) and in
+  Find's search field: the text caret blinks on the browser's real clock, not
+  the capture's stepped one, so across rolled frames it was on or off at
+  random (measured: it toggled on half of the 24 frames after each tab tap).
+  `capture/recorder.mjs` now hides the caret in rolled frames; a typed
+  character's frame keeps it (a keystroke restarts the blink). Re-captured;
+  measured after: the caret region is constant through every roll.
+- **Shares come from anywhere.** Each share enters from its own edge and rests
+  in its own part of the frame: YouTube from the left to the upper left,
+  Instagram from the right to the lower right, Safari up from the bottom to
+  below the name (`SOURCES` in `ShareBeat.tsx`); timing and sound unchanged.
+- **One face.** The closing line is set in Geist, like every other line (the
+  owner asked for a call; see the lockup under "Motion language").
+
 | Output frames | Scene | What it does |
 |---|---|---|
 | 0–288 | `Hook` | Ten real saves come into focus (0–64); the problem is named over them (the `problem` hold, 64–288): each named save lifts on its word, then all bleach |
@@ -482,7 +497,7 @@ in the speech band; every gate passes.
 | 1360–1696 | `Ask` | The question → the answer and three sources (1504–1552; lingers 1560–1620) → the dive into the Graph chip |
 | 1696–1808 | `Connect` | The real graph (60fps; lingers 1744–1772); tap Revisit |
 | 1808–2254 | `Recall` | "Do this" (to 1952), then "This week in Machina", opened (1968) and read slowly: write-up, themes, Standout, question; thrown out into the lockup |
-| 2240–2448 | `End` | The mark launches (strike 2284), "Machina" (the wordmark), "Never lose another great find." in the serif, held |
+| 2240–2448 | `End` | The mark launches (strike 2284), "Machina" (the wordmark), "Never lose another great find." in Geist, held |
 
 **The clock.** Scenes are written in SOURCE frames (the round-1 cut, 600
 frames). `MachinaReel` plays them at `K = 2` via `clockAt(frame)`; `HOLDS`
@@ -623,8 +638,10 @@ One family, Geist. Two voices (**`Type.tsx`**):
   verify` enforces the rule.
 - **The lockup (`Lockup` in `Brand.tsx`)** uses the drawn wordmark, never typed
   letters. The closing line is a statement (`lineStyle="statement"`): the
-  subtitle in Instrument Serif at 78px, words coming into focus on the
-  narrator's timing, the wordmark wiping in as "Machina" is said.
+  subtitle in Geist at 60px (round 15: the reel's one face; the round-6
+  display serif was the only other face in 81 seconds and read as a font
+  change, not as emphasis), words coming into focus on the narrator's
+  timing, the wordmark wiping in as "Machina" is said.
 
 Layout (**`Captions.tsx`**): `SLOTS` puts the kicker at 290px and the line at
 346px, in the upper band clear of Reels/TikTok chrome (which covers roughly

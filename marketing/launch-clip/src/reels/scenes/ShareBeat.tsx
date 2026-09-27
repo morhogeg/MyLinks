@@ -24,13 +24,31 @@ const HOLD = HOLDS.find((h) => h.id === 'share')!;
  * the wordmark underneath (scenes/Hook.tsx, source frame HOLD.at).
  */
 
-type Source = { kind: 'youtube' | 'instagram' | 'safari'; app: string; by: string; title: string };
+/** where each share comes from (round 15, owner: "each from a different
+ *  part of the screen", so it reads as saving from anywhere): it enters from
+ *  its own edge (`from`, px from its resting place), rests in its own part of
+ *  the frame (x, y: clear of the line above and of the mark and name), tilted
+ *  its own way (r), then is pulled into the point */
+type Source = {
+  kind: 'youtube' | 'instagram' | 'safari';
+  app: string;
+  by: string;
+  title: string;
+  x: number;
+  y: number;
+  r: number;
+  from: [number, number];
+};
 
 const SOURCES: Source[] = [
-  { kind: 'youtube', app: 'YouTube', by: 'TED', title: 'Inside the mind of a master procrastinator' },
-  { kind: 'instagram', app: 'Instagram', by: '@slowcoasts', title: 'Cala Goloritzé, Sardinia' },
-  { kind: 'safari', app: 'Safari', by: 'collaborativefund.com', title: 'The Psychology of Money' },
+  // from the left, to the upper left (under the line, above the mark)
+  { kind: 'youtube', app: 'YouTube', by: 'TED', title: 'Inside the mind of a master procrastinator', x: 420, y: 650, r: -3, from: [-620, -40] },
+  // from the right, to the lower right
+  { kind: 'instagram', app: 'Instagram', by: '@slowcoasts', title: 'Cala Goloritzé, Sardinia', x: 660, y: 1430, r: 2.5, from: [620, 30] },
+  // up from the bottom, below the name
+  { kind: 'safari', app: 'Safari', by: 'collaborativefund.com', title: 'The Psychology of Money', x: 500, y: 1300, r: -1.5, from: [0, 700] },
 ];
+const SCALE = 0.8;
 
 /** each share (starts: reel-timeline SHARE_STARTS): arrives, tapped, pulled
  *  in, lands. The tap and the landing sit on beats (round 13), a beat apart:
@@ -40,7 +58,6 @@ const { tap: TAP, pull: PULL, land: LAND } = SHARE_BEAT;
 
 /** where the mark's point is while the Hook holds (C.y 1000, lifted 70) */
 const MARK = { x: 540, y: 930 };
-const CARD_Y = 1430;
 const SAFARI_INK = 'rgb(0, 122, 255)';
 
 const ink = (s: Source) => (s.kind === 'safari' ? SAFARI_INK : PLATFORM_INK[s.kind]);
@@ -112,14 +129,18 @@ export const ShareBeat: React.FC<{ u: number }> = ({ u }) => {
         const t0 = SHARE_STARTS[k];
         const t = u - t0;
         if (t < 0 || t > LAND + 30) return null;
-        const side = k % 2 ? -1 : 1;
+        // bows out on the side it came from as it is pulled in
+        const side = s.from[0] < 0 ? -1 : s.from[0] > 0 ? 1 : k % 2 ? -1 : 1;
         const enter = prog(t, 0, ENTER, EASE_MODAL);
         const share = prog(t, TAP - 2, TAP + 4, EASE_MODAL);
         const pull = prog(t, PULL, LAND, EASE_GATHER);
-        // an arc up into the point: out to the side a little, then in
-        const x = mix(540 + side * 420 * (1 - enter), MARK.x, pull) + side * 60 * Math.sin(pull * Math.PI);
-        const y = mix(CARD_Y + 40 * (1 - enter), MARK.y, pull);
-        const scale = mix(1, 0.05, Math.pow(pull, 0.8)) * mix(0.94, 1, enter);
+        // in from its edge, then an arc into the point: out to the side a
+        // little, then in
+        const x = mix(s.x + s.from[0] * (1 - enter), MARK.x, pull) + side * 60 * Math.sin(pull * Math.PI);
+        const y = mix(s.y + s.from[1] * (1 - enter), MARK.y, pull);
+        const scale = SCALE * mix(1, 0.05, Math.pow(pull, 0.8)) * mix(0.94, 1, enter);
+        // blur along the way in, while it still travels fast
+        const inBlur = (1 - enter) * 6;
         const ring = prog(t, LAND, LAND + 22, EASE_MODAL);
         return (
           <React.Fragment key={s.kind}>
@@ -129,9 +150,9 @@ export const ShareBeat: React.FC<{ u: number }> = ({ u }) => {
                   position: 'absolute',
                   left: x,
                   top: y,
-                  transform: `translate(-50%, -50%) scale(${scale}) rotate(${side * 4 * pull}deg)`,
-                  opacity: enter * (1 - prog(t, LAND - 3, LAND, EASE_MODAL)),
-                  filter: pull > 0.05 ? `blur(${(pull * 5).toFixed(2)}px)` : undefined,
+                  transform: `translate(-50%, -50%) scale(${scale}) rotate(${s.r * (1 - pull) + side * 4 * pull}deg)`,
+                  opacity: Math.min(1, enter * 1.4) * (1 - prog(t, LAND - 3, LAND, EASE_MODAL)),
+                  filter: pull > 0.05 || inBlur > 0.2 ? `blur(${(pull * 5 + inBlur).toFixed(2)}px)` : undefined,
                 }}
               >
                 <Card s={s} share={share} />
