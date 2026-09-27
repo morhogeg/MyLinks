@@ -366,12 +366,23 @@ const takes = {
     });
     await fresh(async () => {
       await page.evaluate(
-        ([uid, syn]) => {
+        ([uid, syn, todos]) => {
           // the recap is the Revisit tab's lead: no review row above it
           for (const p of window.__capture.list(`users/${uid}/digests/`)) window.__capture.remove(p);
           window.__capture.set(`users/${uid}/syntheses/${syn.weekId}`, syn);
+          // the saves that call for an action carry their "Do this" (the app
+          // writes one only then); Revisit lists the open ones above the recap
+          for (const [id, text] of todos) {
+            const p = `users/${uid}/links/${id}`;
+            const cur = window.__capture.get(p);
+            if (cur) window.__capture.set(p, { ...cur, actionableTakeaway: text });
+          }
         },
-        [UID, { ...SYNTHESIS, weekId: isoWeekId(new Date()), cards: refs, createdAt: Date.now() - 3_600_000 }],
+        [
+          UID,
+          { ...SYNTHESIS, weekId: isoWeekId(new Date()), cards: refs, createdAt: Date.now() - 3_600_000 },
+          CARDS.filter((c) => c.takeaway).map((c) => [c.id, c.takeaway]),
+        ],
       );
     });
     const RECAP = {
@@ -381,6 +392,8 @@ const takes = {
       theme2: ['section', 'Somewhere to be slow'],
       standout: ['button', 'Standout'],
       question: ['div[class*="bg-card-hover"]', 'Worth sitting with'],
+      todo: ['div[class*="divide-y"]', 'Call your parents'],
+      todoFirst: ['div[class*="ps-1.5"]', 'Call your parents'],
       revisitTab: R.revisitTab,
     };
     const t = new Take(dev, OUT, 'recall');

@@ -133,6 +133,9 @@ export const CARDS = [
     age: 12,
     status: 'favorite',
     note: 'Make this Sunday. Double it.',
+    // the card's "Do this" (only saves that call for an action carry one,
+    // as in the app; the Revisit beat lists the open ones)
+    takeaway: 'Make it this Sunday: one can of tomatoes, five tablespoons of butter, one onion.',
     recipe: {
       ingredients: [
         '1 can (28 oz) whole peeled tomatoes',
@@ -378,6 +381,7 @@ export const CARDS = [
     readTime: 9,
     age: 19,
     status: 'unread',
+    takeaway: 'Tomorrow morning, try the two-stage pour with a 45-second bloom.',
   },
   {
     id: 'money',

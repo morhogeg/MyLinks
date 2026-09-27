@@ -19,6 +19,9 @@ import { SCREEN, frameSrc, type Rect } from './takes';
 /** iPhone 15/16 Pro display corner radius, in points. */
 export const SCREEN_RADIUS = 55;
 
+/** the zoom the slab is laid out at; the camera's zoom is a transform on it */
+const LAYOUT_Z = 3;
+
 let uid = 0;
 
 export const AppShot: React.FC<{
@@ -62,7 +65,15 @@ export const AppShot: React.FC<{
   sheen = 0,
 }) => {
   const id = useMemo(() => `ms${uid++}`, []);
-  const { cx, cy, z, fx, fy, rx, ry, rz } = cam;
+  const { cx, cy, z: zoom, fx, fy, rx, ry, rz } = cam;
+  // The slab is LAID OUT at a fixed zoom (LAYOUT_Z) and brought to the
+  // camera's zoom with a transform (round 12). Resizing the element each frame
+  // instead let Chromium snap the image's painted size to whole pixels, so a
+  // slow push rescaled it in 1px jumps every few frames: visible judder (the
+  // Add dialog's Link / Image / Note tour). A transform is not pixel-snapped.
+  // Everything below is in LAYOUT px; screen-px effects divide by `s`.
+  const z = LAYOUT_Z;
+  const s = zoom / LAYOUT_Z;
   const W = SCREEN.w * z;
   const H = SCREEN.h * z;
   const left = fx - cx * z;
@@ -74,6 +85,7 @@ export const AppShot: React.FC<{
   // never a smudge, and only when it is real motion
   const mb = motion ? { x: Math.min(10, Math.abs(motion.x) * 0.14), y: Math.min(10, Math.abs(motion.y) * 0.14) } : null;
   const useMb = !!mb && (mb.x > 1 || mb.y > 1);
+  // (a blur inside the transform is scaled by it: set it in layout px)
 
   // what shows: the whole slab, an iris circle, or a cropped element box
   const box = crop
@@ -86,7 +98,7 @@ export const AppShot: React.FC<{
       : undefined;
 
   const filters = [
-    blur > 0.05 ? `blur(${blur}px)` : '',
+    blur > 0.05 ? `blur(${(blur / s).toFixed(3)}px)` : '',
     useMb ? `url(#${id})` : '',
     dim > 0 ? `brightness(${1 - dim * 0.5})` : '',
   ]
@@ -100,22 +112,30 @@ export const AppShot: React.FC<{
       {useMb && (
         <svg width="0" height="0" style={{ position: 'absolute' }}>
           <filter id={id} x="-10%" y="-10%" width="120%" height="120%">
-            <feGaussianBlur stdDeviation={`${mb!.x.toFixed(2)} ${mb!.y.toFixed(2)}`} />
+            <feGaussianBlur stdDeviation={`${(mb!.x / s).toFixed(2)} ${(mb!.y / s).toFixed(2)}`} />
           </filter>
         </svg>
       )}
       <div
         style={{
           position: 'absolute',
-          left,
-          top,
+          left: 0,
+          top: 0,
           width: W,
           height: H,
           opacity,
-          transform:
-            [rz ? `rotateZ(${rz}deg)` : '', is3d ? `rotateX(${rx}deg) rotateY(${ry}deg)` : '']
-              .filter(Boolean)
-              .join(' ') || undefined,
+          // the camera point stays at (fx, fy): rotations and the zoom both
+          // pivot on it, exactly as when the slab was sized by the zoom. The
+          // offset is a translate, not left/top: layout offsets snap to whole
+          // pixels too (a slow drift then hops 1px every few frames)
+          transform: [
+            `translate(${left}px, ${top}px)`,
+            rz ? `rotateZ(${rz}deg)` : '',
+            is3d ? `rotateX(${rx}deg) rotateY(${ry}deg)` : '',
+            `scale(${s})`,
+          ]
+            .filter(Boolean)
+            .join(' '),
           transformOrigin: `${cx * z}px ${cy * z}px`,
         }}
       >
@@ -189,7 +209,7 @@ export const AppShot: React.FC<{
               width: box.w,
               height: box.h,
               borderRadius: box.r,
-              boxShadow: `inset 0 0 0 ${Math.max(1, 0.6 * z)}px rgba(16,24,40,0.10)`,
+              boxShadow: `inset 0 0 0 ${Math.max(1, 0.6 * zoom) / s}px rgba(16,24,40,0.10)`,
             }}
           />
         )}

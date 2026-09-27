@@ -304,7 +304,7 @@ in the film claims availability.
 
 ## The highlight reel (pilot)
 
-`MachinaReel` is a 76.8s vertical reel: the problem → "Introducing Machina.
+`MachinaReel` is an 81.6s vertical reel: the problem → "Introducing Machina.
 All your saves, finally useful." → "Save anything, from anywhere." (shares
 from YouTube, Instagram and Safari into the mark) → "A link, a screenshot, or
 a note." (the Add dialog's tabs) → the new card, opened → Find → Ask → Connect
@@ -374,6 +374,31 @@ line's own 6-frame blur-and-rise on the same frame, and bridge gaps under 24
 frames. With the lines no longer covering dead picture, the card hold
 (224 → 192) and the found and graph lingers (48 → 32) were trimmed; the end
 mark no longer waits as four static corner ticks before its launch.
+
+Round 12 (owner: Revisit should say the app makes an action item where one
+is relevant; Connect should say it connects on its own; the Link / Image /
+Note tour was jittery):
+- **Jitter, found and fixed in the kit.** `AppShot` used to size the slab by
+  the zoom (width = 393 × z); Chromium snaps a replaced element's painted size
+  to whole pixels, so a slow push rescaled the capture in 1px jumps every few
+  frames (measured: the tour changed on alternate frames only). The slab is
+  now laid out at a fixed zoom and placed and scaled with ONE transform
+  (translate + scale): its left/top offset snapped the same way, a 1px hop
+  every ~7 frames on a slow drift. Measured after: the tour changes evenly on
+  every frame. Every slow move in the reel is smoother; a frame at rest looks
+  the same as before (checked against the previous render).
+- **Revisit opens on "Do this"**, the app's own to-do list of the steps it
+  wrote for saves that call for one (`web/lib/takeaway.ts`: written only when
+  the content supports a concrete action). The recall take is re-shot with
+  three such saves carrying their step (the Tail End's, plus the tomato
+  sauce and the V60 method; `capture/library.mjs` `takeaway`), and the Tail
+  End's row lifts on "When a save calls for action, Machina turns it into a
+  to-do." The recap then plays as before (`TODO_LEN` frames later; the first
+  read scrolls away the 294pt the list adds).
+- The recap's 6pt scroll steps no longer hop: the camera takes up each step's
+  rounding, and motion blur follows the NET motion on screen (camera + scroll),
+  so text that is barely moving is no longer smeared.
+- Connect: "Related saves find each other, all on their own."
 
 | Output frames | Scene | What it does |
 |---|---|---|

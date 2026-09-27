@@ -69,6 +69,9 @@ export const MODES = { taps: [16, 56, 96], paste: 112, save: 128 };
 // Round 11: the card hold (224 → 192) and the found / graph lingers (48 → 32)
 // were trimmed once their lines stopped lingering: each still shows its
 // subject for ~1.2–1.5s after the line leaves, without a dead static stretch.
+/** Revisit's opening "Do this" beat, in output frames (scenes/Recall.tsx) */
+export const TODO_LEN = 144;
+
 export const HOLDS = [
   { id: 'problem', at: 32, len: 224, adv: 0 }, // the problem, named
   { id: 'name', at: 96, len: 32, adv: 0 }, // the name holds
@@ -78,7 +81,7 @@ export const HOLDS = [
   { id: 'found', at: 248, len: 32, adv: 4 }, // linger: the one card it finds
   { id: 'sources', at: 372, len: 64, adv: 6 }, // linger: the answer and its sources
   { id: 'graph', at: 440, len: 32, adv: 6 }, // linger: the graph
-  { id: 'recall', at: 464, len: 192, adv: 0 }, // this week's recap, read
+  { id: 'recall', at: 464, len: 192 + 144, adv: 0 }, // Revisit: the "Do this" list (TODO_LEN), then this week's recap, read
   { id: 'end', at: 584, len: 64, adv: 16 }, // linger: the end card holds ~2s once the line is whole
 ];
 
@@ -204,6 +207,10 @@ export const HITS = {
   markStrike: 534,
 };
 
+/** Recall's length in output frames: its hold, then the source frames up to
+ *  the lockup (scenes/Recall.tsx) */
+export const RECALL_LEN = real(HITS.lockup) - holdStart('recall');
+
 /**
  * THE DWELL RULE (round 11, owner: a line that "lingered"): a line leaves
  * 0.3–1.2s after the narrator finishes it. A line may stay longer only while
@@ -230,10 +237,14 @@ export const CAPTIONS = [
   { at: holdStart('card') + 16, to: holdStart('card') + 152, text: 'Each save becomes a card,\nwith the key points pulled out.', until: 'the Key Points are highlighted' },
   { at: onBeat(real(214)), to: real(HITS.found) + 24, text: 'Find it in your own words.' },
   { at: onBeat(real(278)), to: real(HITS.chips[2]) + 16, text: 'Ask anything. Every answer comes straight from your saves.', until: 'the third source lands' },
-  { at: onBeat(real(420)), to: holdStart('graph') + 28, text: 'See how it all connects.' },
-  // recall: the weekly recap, read slowly (scenes/Recall.tsx)
-  { at: holdStart('recall') + 24, to: holdStart('recall') + 130, text: 'Every week, Machina brings back\nwhat’s worth remembering.' },
-  { at: holdStart('recall') + 136, to: holdStart('recall') + 256, text: 'The themes of your week,\nand the one save worth rereading.' },
+  // (round 12, owner: say the app connects them ON ITS OWN)
+  { at: onBeat(real(420)), to: holdStart('graph') + 56, text: 'Related saves find each other,\nall on their own.' },
+  // recall (scenes/Recall.tsx): the "Do this" list (round 12, owner: say the
+  // app makes an action item where one is relevant; it writes one only for a
+  // save that calls for an action), then the weekly recap, read slowly
+  { at: holdStart('recall') + 16, to: holdStart('recall') + TODO_LEN - 4, text: 'When a save calls for action,\nMachina turns it into a to-do.' },
+  { at: holdStart('recall') + TODO_LEN + 24, to: holdStart('recall') + TODO_LEN + 130, text: 'Every week, Machina brings back\nwhat’s worth remembering.' },
+  { at: holdStart('recall') + TODO_LEN + 136, to: holdStart('recall') + TODO_LEN + 256, text: 'The themes of your week,\nand the one save worth rereading.' },
   // the close: the name (the drawn wordmark wipes in as it is said), then
   // the App Store subtitle, set big in the serif
   { at: onBeat(real(542)), to: real(600), place: 'lockup', text: 'Machina.\nNever lose another great find.' },
@@ -250,8 +261,8 @@ const CHAPTERS = [
   ['Save', 'Save anything'],
   ['Find', 'Find it'],
   ['Ask', 'Ask anything'],
-  ['Connect', 'See how'],
-  ['Revisit', 'Every week'],
+  ['Connect', 'Related saves'],
+  ['Revisit', 'When a save'],
 ];
 const KICKER_LEAD = 4;
 export const KICKER_BRIDGE = 24;

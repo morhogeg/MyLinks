@@ -19,7 +19,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
-import { BAR, BAR_FRAMES, BEAT, BAR_CHORDS, CAPTIONS, FPS, HITS, RISERS, TOTAL_FRAMES, TOTAL_SEC, MODES, SHARE_STARTS, holdStart, real, srcOf } from '../reel-timeline.mjs';
+import { BAR, BAR_FRAMES, BEAT, BAR_CHORDS, CAPTIONS, FPS, HITS, RISERS, TOTAL_FRAMES, TOTAL_SEC, MODES, SHARE_STARTS, TODO_LEN, holdStart, real, srcOf } from '../reel-timeline.mjs';
 import { createSynth } from './synth.mjs';
 
 // Round 5: the round-1 score, on the reel's steady clock (K = 2, 112.5 BPM:
@@ -222,15 +222,17 @@ whoosh(f(H.graphTap) + 0.03, 0.5, 0.07, -0.2);
 impact(f(H.graph), 0.24);
 shimmer(f(H.graph) + 0.05, [72, 76, 79, 84], 0.045);
 
-// recall (the review deck's slot): the tab, this week's recap, its standout
-// (output frames: scenes/Recall.tsx taps at +16, lifts the standout at +208)
+// recall: the tab opens on "Do this" (its first row lifts), then this week's
+// recap is tapped open and its standout lifts (output frames, scenes/Recall.tsx:
+// row at +40, recap tap at TODO_LEN + 16, standout at TODO_LEN + 208)
 {
   const R0 = holdStart('recall') / FPS;
   tick(R0, 0.09, 1.15);
-  tick(R0 + 16 / FPS, 0.09, 1.3);
-  shimmer(R0 + 20 / FPS, [72, 76, 79], 0.035);
-  bell(R0 + 208 / FPS, 88, 0.05, 0.2, 1.8);
-  sub(R0 + 208 / FPS, 48, 0.2, 0.3);
+  bell(R0 + 40 / FPS, 84, 0.04, -0.2, 1.4);
+  tick(R0 + (TODO_LEN + 16) / FPS, 0.09, 1.3);
+  shimmer(R0 + (TODO_LEN + 20) / FPS, [72, 76, 79], 0.035);
+  bell(R0 + (TODO_LEN + 208) / FPS, 88, 0.05, 0.2, 1.8);
+  sub(R0 + (TODO_LEN + 208) / FPS, 48, 0.2, 0.3);
 }
 
 // the lockup: the last card leaves, the mark strikes into air

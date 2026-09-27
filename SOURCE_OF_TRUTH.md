@@ -2497,7 +2497,7 @@ to its session:
 > feature-clip briefs below against the kit you built, and add a §9 entry.
 
 **What exists (the pilot, 2026-09-26, branch `claude/machina-reel-pilot`,
-awaiting owner review, not merged):** `MachinaReel` (76.8s, round 11,
+awaiting owner review, not merged):** `MachinaReel` (81.6s, round 12,
 1080×1920, score + narrator + captions, the deliverable), `MachinaReelSilent`
 and `MachinaReelClean`, in `marketing/launch-clip/`. Script: the problem ("You
 save things everywhere." / "An article here. A recipe there. A video
@@ -2594,6 +2594,14 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-27 — Highlight reel round 12: Do this, connections, jitter.**
+  Branch `claude/machina-reel-pilot`, not merged. Revisit now opens on the
+  app's real "Do this" list (recall take re-shot with three saves carrying
+  their step) with "When a save calls for action, Machina turns it into a
+  to-do."; Connect says "Related saves find each other, all on their own."
+  The Link/Image/Note jitter was Chromium pixel-snapping the resized capture
+  on slow zooms: `AppShot` now zooms with a transform (smoother everywhere,
+  identical at rest). The recap scroll no longer hops or over-blurs. 81.6s.
 - **2026-09-27 — Highlight reel round 11: timing polish.** Branch
   `claude/machina-reel-pilot`, not merged. Owner: the last SAVE line lingered;
   asked for a comprehensive polish. Measured every line's dwell after its
