@@ -304,27 +304,40 @@ in the film claims availability.
 
 ## The highlight reel (pilot)
 
-`MachinaReel` is a 42.7s vertical reel: hook → Save (and what a save
-becomes) → Find → Ask → Connect → Recall → lockup, with its own score, the
+`MachinaReel` is a 56.7s vertical reel: hook → Save (and the new card,
+opened) → Find → Ask → Connect → Recall → lockup, with its own score, the
 film's narrator and word-timed captions. **Every pixel of app UI in it is the
 real, shipped web app**, driven and recorded frame by frame; nothing is a
 mockup or a rebuilt screen.
 
-The first cut ran 20s and the owner found it "way too fast, almost
-impossible to follow". Round 2 kept the grid and doubled the room: a phase
-per beat instead of per 8th, typing and streaming at reading pace, every
-caption held until it has been read, a card beat that shows what a save
-becomes, and a Recall beat (the weekly recap) in place of the review deck.
+**How it got here.** Round 1 was a 20s cut. The owner asked for four
+changes and nothing else: slow it down, replace the review deck with
+something more interesting, make clear that each save becomes a card with
+the key info, and replace "And the best ones come back to you" with a line
+about recall and the weekly recap. Round 2 changed more than that and was
+rejected. Round 3 (this one) is **the round-1 cut, unchanged, played 2.5×
+slower** (`K` in `reel-timeline.mjs`; the narrator is not slowed), with two
+swaps in place: a card insert after the save lands (`INSERT`,
+`scenes/CardDetail.tsx`) and the weekly recap in the review deck's slot
+(`scenes/Recall.tsx`).
 
-| Frames | Time | Scene | What it does |
+| Output frames | Time | Scene | What it does |
 |---|---|---|---|
-| 0–208 | 0:00 | `Hook` | Ten real saves from the demo account hang in depth under the first line ("You save great finds everywhere. Then they're gone."), collapse into one point of ink, and the brackets snap shut around it. The narrator says the tagline, set in the band above the mark; the point drops out of the mark to become the app's **+** button |
-| 208–464 | 6.9s | `Save` | The + irises open into Home → Add to Machina (lifted off its screen) → the five real phases from `web/lib/scanPhases.ts`, one per beat → the new card lands → it is opened: the gist, its **Key Points** and its **Do this** line ("Each save becomes a card, with the key points pulled out.") |
-| 464–608 | 15.5s | `Find` | "easy dinner, empty fridge" typed into the real search field (rack focus on the words) → the one card it means, Marcella Hazan's sauce, which shares no word with the query → pull back, tap Ask |
-| 608–832 | 20.3s | `Ask` | The hero: "What do my saves say about time?" → the streamed answer → three citation chips from three platforms, each lifting on its own beat → the answer's Graph chip |
-| 832–928 | 27.7s | `Connect` | Cut on the downbeat to inside the real graph, the three cited saves lit; pull back to the whole graph; tap Revisit |
-| 928–1184 | 30.9s | `Recall` | The Revisit tab's "This week in Machina", the app's weekly recap, opened and read: the write-up, two themes linking back to their saves, the Standout to reread, and the question it leaves you with ("Every week, Machina writes up what you saved." / "So what you save stays with you.") |
-| 1184–1280 | 39.5s | `End` | The mark arrives with the app's own launch motion, the drawn wordmark, and the App Store subtitle "Never lose another great find" on the narrator's timing |
+| 0–320 | 0:00 | `Hook` | Ten real saves hang in depth, collapse into one point of ink, the brackets snap shut around it; the narrator says the tagline; the point drops to become the app's **+** button |
+| 320–520 | 10.7s | `Save` | The + irises open into Home → Add to Machina (lifted off its screen) → the five real phases from `web/lib/scanPhases.ts` → the new card lands in the feed |
+| 520–720 | 17.3s | `CardDetail` | The insert: the new card is tapped open, its summary, **Key Points** and **Do this** line ("Each save becomes a card, with the key points pulled out.") |
+| 720–880 | 24.0s | `Find` | "easy dinner, empty fridge" typed into the real search field → the one card it means → tap Ask |
+| 880–1240 | 29.3s | `Ask` | The hero: question → streamed answer → three citation chips from three platforms → the Graph chip |
+| 1240–1360 | 41.3s | `Connect` | Cut to inside the real graph, the three cited saves lit; pull back; tap Revisit |
+| 1360–1480 | 45.3s | `Recall` | The Revisit tab's "This week in Machina", the weekly recap, tapped open and read down to its Standout ("Every week, Machina brings back what's worth remembering.") |
+| 1480–1700 | 49.3s | `End` | The mark, the drawn wordmark, the App Store subtitle on the narrator's timing |
+
+**Two clocks.** Scenes are written in SOURCE frames (the round-1 cut, 600
+frames, 16 a beat) and `MachinaReel` feeds them `srcOf(frame)`; captions,
+kickers, the narrator, the insert and the lockup are in OUTPUT frames (90
+BPM, 20 a beat, so every source 8th lands on an output beat). The score
+places each round-1 event at `real(src)`. `CLOCK.perFrame` in `camera.ts`
+keeps motion blur measured per output frame.
 
 Compositions: **`MachinaReel`** (score + narrator + captions, the
 deliverable), **`MachinaReelSilent`** (captions, no audio: stills and QA),
@@ -472,11 +485,13 @@ In order of appearance; nothing outside this list.
 2. **Iris.** The + button opens into its screen (`AppShot` `iris`).
 3. **Lift.** An element leaves its screen with its own depth: the Add dialog
    (`AppShot` `crop`), the new card, the citation chips (`Lift`).
-4. **Open the thing.** A tap on an element and the app's own transition
-   into it (the new card → its detail view; the recap banner → the recap).
-   **Never dissolve between two takes:** they double-expose.
+4. **Same-pixels hand-over.** Two takes that show the same screen swap under
+   one camera, which makes the swap invisible (`Save` rides `findKeys` until the
+   search tap). **Never dissolve between two takes:** they double-expose.
+   **Open the thing:** a tap on an element and the app's own transition into
+   it (the new card → its detail view; the recap banner → the recap).
 5. **Cut on the beat.** A hard cut on a beat line or an 8th (Find → Ask, the
-   composer, the answer, Connect → Recall, the card's detail → Find). `camVelocity` reads a
+   composer, the answer, Connect → Recall, the card's detail back to the feed). `camVelocity` reads a
    cut forward, so the first frame of a new shot is sharp.
 6. **Dive into a cut.** The camera accelerates into the tapped element
    (`EASE_GATHER`) and cuts on the downbeat to *inside* the next screen, which
@@ -490,14 +505,14 @@ causes it, and the cut lands on the touch.
 
 ### Pacing (`clock.ts`, `reel-timeline.mjs`)
 
-112.5 BPM: 16 frames a beat, 64 a bar, 1280 frames = 42.7s. **Cuts and taps
-land on beats, and so do the events you must read** (the five phases, the
-three chips); typing and streaming run at reading pace, not capture pace.
-One idea per scene; the hero (Ask), the card and the recap get the most time
-(224–256 frames each). **Give every beat room:** a 20s cut of the same story
-was "almost impossible to follow" (owner), so the rule is at least a beat of
-hold on anything the narrator points at, and at least two seconds of screen
-for any line of app text the viewer should read. A caption stays up until its line has been
+The cut is written at 112.5 BPM (16 frames a beat) and played 2.5× slower,
+so on screen a beat is 40 frames (90 BPM with events on its 8ths); 1700
+output frames = 56.7s. **Cuts and taps land on beats; secondary events on
+8ths** (the five phases, the three chips); only typing runs on 16ths. One
+idea per scene; the hero (Ask) gets the longest. **Slow is the rule:** the
+owner found a 20s cut "way too fast, almost impossible to follow", then a
+42.7s cut still too fast; the pilot now plays every camera move and every
+app animation at 0.4× the round-1 speed, and the voice at normal speed. A caption stays up until its line has been
 spoken and its last word has landed (verify fails a voice line that overruns
 its caption). Motion blur is what a 180° shutter would give (σ ≈ 0.14 × px
 per frame, directional, capped at 10px) and never appears on a hold.

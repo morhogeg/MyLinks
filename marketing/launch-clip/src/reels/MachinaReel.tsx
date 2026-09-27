@@ -1,6 +1,6 @@
 import React from 'react';
 import { AbsoluteFill, Audio, staticFile, useCurrentFrame } from 'remotion';
-import { CAPTIONS, FPS, KICKERS } from '../../reel-timeline.mjs';
+import { CAPTIONS, FPS, INSERT, K, KICKERS, srcOf } from '../../reel-timeline.mjs';
 import { sans } from '../fonts';
 import VO from './data/reel-vo.json';
 import { BandScrim, Captions, type ReelCaption } from './kit/Captions';
@@ -12,17 +12,19 @@ import { Find } from './scenes/Find';
 import { Ask } from './scenes/Ask';
 import { Connect } from './scenes/Connect';
 import { Recall } from './scenes/Recall';
+import { CardDetail } from './scenes/CardDetail';
+import { CLOCK } from './kit/camera';
 import { End } from './scenes/End';
 
 /**
- * Machina highlight reel (the pilot): 42.7s, 1080 × 1920, built from the reel
+ * Machina highlight reel (the pilot): 20s, 1080 × 1920, built from the reel
  * kit (src/reels/kit) on the reel's own clock (reel-timeline.mjs). Every
  * frame of app UI is the real app, captured by capture/shoot.mjs.
  *
  * Scenes read the GLOBAL frame (not Sequence-local time): they hand off on
- * shared frame numbers (the hook's point becomes the + button; Ask's dive
- * into the Graph chip cuts on the downbeat to inside the graph; the recap is
- * thrown out of frame into the lockup). Each scene draws only its own
+ * shared frame numbers (the hook's point becomes the + button; Save's screen
+ * rides Find's camera until the search tap; Ask's dive into the Graph chip
+ * cuts on the downbeat to inside the graph). Each scene draws only its own
  * frames, so no two app takes are ever on screen as a dissolve.
  */
 export const MachinaReel: React.FC<{
@@ -31,21 +33,33 @@ export const MachinaReel: React.FC<{
   audioFile?: string;
 }> = ({ withAudio = true, withCaptions = true, audioFile = 'reel-score-vo.wav' }) => {
   const f = useCurrentFrame();
+  // the round-1 cut, played K times slower (reel-timeline.mjs); the scenes
+  // run on SOURCE frames, captions and the lockup on output frames
+  const src = srcOf(f);
+  CLOCK.perFrame = 1 / K;
+  const i0 = Math.round(INSERT.at * K);
+  const inInsert = f >= i0 && f < i0 + INSERT.len;
   return (
     <AbsoluteFill style={{ fontFamily: sans }}>
       {withAudio && <Audio src={staticFile(audioFile)} />}
       <Paper drift={Math.sin(f / 180) * 0.5} />
 
-      <Hook f={f} />
-      <Save f={f} />
-      <Find f={f} />
-      <Ask f={f} />
-      <Connect f={f} />
-      <Recall f={f} />
+      {inInsert ? (
+        <CardDetail u={f - i0} />
+      ) : (
+        <>
+          <Hook f={src} />
+          <Save f={src} />
+          <Find f={src} />
+          <Ask f={src} />
+          <Connect f={src} />
+          <Recall f={src} />
+        </>
+      )}
       <End f={f} />
 
       {/* type never sits on UI: the app fades out under the caption band */}
-      <BandScrim opacity={prog(f, 184, 192) * (1 - prog(f, 1180, 1188))} />
+      <BandScrim opacity={prog(src, 112, 120) * (1 - prog(src, 510, 518))} />
       <Captions
         frame={f}
         fps={FPS}

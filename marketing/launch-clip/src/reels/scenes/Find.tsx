@@ -7,7 +7,7 @@ import { EASE_IN_OUT, EASE_MODAL, EASE_SPRING, prog } from '../kit/curves';
 import { at, center, rectOf } from '../kit/takes';
 
 /**
- * 15.5s – 20.3s. FIND: "easy dinner, empty fridge" typed into the real search
+ * 6.9s – 9.1s. FIND: "easy dinner, empty fridge" typed into the real search
  * field, landing on the ONE card it means (Marcella Hazan's sauce, which
  * shares no word with the query).
  *
@@ -20,39 +20,30 @@ import { at, center, rectOf } from '../kit/takes';
  */
 
 const T = 'find';
-/** keystrokes the capture recorded (one frame each) */
-const TAKE_TYPED = at(T, 'result') - at(T, 'typing');
 const S = HITS;
 
-/** Cut in on the beat from the card's detail view to the feed */
+/** From the new card's landing (Save hands its screen to this camera) */
 export const findKeys: Key[] = [
-  { f: 464, cx: 196.5, cy: 300, z: 2.3, fx: 540, fy: 1080 },
-  { f: 468, cy: 298, z: 2.32, ease: (t) => t },
+  { f: 200, cx: 196.5, cy: 300, z: 2.3, fx: 540, fy: 1080 },
+  { f: 206, cy: 298, z: 2.32, ease: (t) => t },
   // up to the search field as the thumb comes down on it
-  { f: 480, cx: 196.5, cy: 144, z: 2.7, fx: 540, fy: 772, ease: EASE_IN_OUT },
-  { f: 526, z: 2.8, ease: (t) => t },
-  { f: 536, cx: 196.5, cy: 322, z: 2.35, fy: 1104, ease: EASE_MODAL },
-  { f: 584, cy: 332, z: 2.44, ease: (t) => t },
+  { f: 216, cx: 196.5, cy: 144, z: 2.7, fx: 540, fy: 772, ease: EASE_IN_OUT },
+  { f: 238, z: 2.78, ease: (t) => t },
+  { f: 246, cx: 196.5, cy: 322, z: 2.35, fy: 1104, ease: EASE_MODAL },
+  { f: 256, cy: 326, z: 2.38, ease: (t) => t },
   // back to the whole screen as the thumb goes to Ask
-  { f: 600, cx: 196.5, cy: 440, z: 1.6, fx: 540, fy: 1180, ease: EASE_IN_OUT },
+  { f: 270, cx: 196.5, cy: 440, z: 1.6, fx: 540, fy: 1180, ease: EASE_IN_OUT },
 ];
-
-/** typed at the pace a person types (the capture typed 30 characters a
- *  second; the reel shows each keystroke for about two frames) */
-const TYPE_FRAMES = HITS.found - HITS.typeFrom;
 
 export const Find: React.FC<{ f: number }> = ({ f }) => {
   // takes the screen over from Save on the tap; hard cut to Ask on the beat
-  if (f < 464 || f >= S.askTap) return null;
-  const typed = TAKE_TYPED;
+  if (f < S.searchTap || f >= S.askTap) return null;
 
   const i =
-    f < S.searchTap
-      ? at(T, 'home')
-      : f < S.typeFrom
-        ? at(T, 'focus', Math.min(7, f - S.searchTap))
+    f < S.typeFrom
+        ? at(T, 'focus', f - S.searchTap)
         : f < S.found
-          ? at(T, 'typing', Math.min(typed - 1, Math.floor(((f - S.typeFrom) * typed) / TYPE_FRAMES)))
+          ? at(T, 'typing', f - S.typeFrom)
           : at(T, 'result', f - S.found);
 
   const cam = camAt(findKeys, f);
@@ -65,7 +56,7 @@ export const Find: React.FC<{ f: number }> = ({ f }) => {
   const askTab = center(rectOf('ask', 0, 'askTab'));
 
   const land = prog(f, S.found, S.found + 6, EASE_SPRING);
-  const settle = prog(f, S.found + 10, S.found + 32, EASE_MODAL);
+  const settle = prog(f, S.found + 6, S.found + 18, EASE_MODAL);
 
   return (
     <AbsoluteFill>

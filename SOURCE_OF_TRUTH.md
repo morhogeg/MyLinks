@@ -2497,20 +2497,18 @@ to its session:
 > feature-clip briefs below against the kit you built, and add a §9 entry.
 
 **What exists (the pilot, 2026-09-26, branch `claude/machina-reel-pilot`,
-awaiting owner review, not merged):** `MachinaReel` (42.7s after round 2,
+awaiting owner review, not merged):** `MachinaReel` (56.7s, round 3,
 1080×1920, score + narrator + captions, the deliverable), `MachinaReelSilent`
-and `MachinaReelClean`, in `marketing/launch-clip/`. Hook ("You save great
-finds everywhere. Then they're gone." over ten real saves, which collapse
-into the point; the brackets close; the narrator says the tagline) → Save,
-then the new card OPENED to show what a save becomes (the gist, Key Points,
-a "Do this" line) → Find → Ask (the hero) → Connect → **Recall** (the
-Revisit tab's weekly recap, "This week in Machina", read down to its
-Standout and its question: "Every week, Machina writes up what you saved. So
-what you save stays with you.") → the lockup on "Never lose another great
-find". Round 2 (owner, 2026-09-27, on the 20s cut): too fast to follow, the
-review deck not interesting enough, say what a card holds, lean on recall;
-the answer was twice the length on the same beat grid (a phase per beat,
-reading-pace typing and streaming, longer holds). **Every frame of app UI is the real web app, not a
+and `MachinaReelClean`, in `marketing/launch-clip/`. It is the round-1 cut
+(hook → Save → Find → Ask → Connect → the lockup on "Never lose another great
+find") **played 2.5× slower** (the narrator at normal speed), with exactly
+the owner's round-2 asks applied: the new card is opened after it lands to
+show its Key Points and "Do this" line ("Each save becomes a card, with the
+key points pulled out."), and the review deck's slot now holds the weekly
+recap, "This week in Machina" ("Every week, Machina brings back what's worth
+remembering."). A round-2 cut (42.7s) that also rewrote the hook, lines,
+music and framing was rejected: "You changed too many things. Do only what I
+asked for, and slow it down more." **Every frame of app UI is the real web app, not a
 mockup** (owner, mid-task): `capture/` builds `web/` as a static export with
 Firebase swapped for an in-memory stand-in seeded with a demo account of 24
 real, interesting saves (no "AI" anywhere), and Playwright records four
@@ -2592,6 +2590,14 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-27 — Highlight reel round 3: only the asked changes, slower.**
+  Branch `claude/machina-reel-pilot`, not merged. Owner rejected round 2 for
+  changing too much. Round 3 restores the round-1 scenes, lines, hook and
+  score and plays that cut 2.5× slower (`K`, `real()`/`srcOf()` in
+  `reel-timeline.mjs`; narrator not slowed), plus the three asked content
+  changes: a card insert (`scenes/CardDetail.tsx`: Key Points + "Do this"),
+  the weekly recap in the review deck's slot (`scenes/Recall.tsx`), and the
+  recall line replacing "And the best ones come back to you". 56.7s.
 - **2026-09-27 — Highlight reel round 2 (owner notes on the 20s cut); still
   NOT merged.** Branch `claude/machina-reel-pilot`. Owner: too fast to follow;
   the review deck is not interesting enough; say that each save becomes a

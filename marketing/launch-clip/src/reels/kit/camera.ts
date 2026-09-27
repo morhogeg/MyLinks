@@ -84,7 +84,14 @@ export const aim = (
  * is not motion: on the cut frame the speed is read forward instead, so the
  * first frame of a new shot is as sharp as the shot.
  */
-export const camVelocity = (keys: Key[], frame: number) => {
+/**
+ * How many units of a scene's clock pass per OUTPUT frame. A reel that plays
+ * its cut slower (reel-timeline.mjs K) sets this to 1 / K, so motion blur
+ * stays what the viewer actually sees move in one frame.
+ */
+export const CLOCK = { perFrame: 1 };
+
+export const camVelocity = (keys: Key[], frame: number, perFrame = CLOCK.perFrame) => {
   const cut = keys.some(
     (k, j) => j > 0 && k.f === frame && keys[j - 1].f >= frame - 1 && FIELDS.some((field) => k[field] !== undefined),
   );
@@ -95,5 +102,6 @@ export const camVelocity = (keys: Key[], frame: number) => {
   // the screen point under the frame's centre, and where it is one frame on
   const sx = a.cx + (FX - a.fx) / a.z;
   const sy = a.cy + (FY - a.fy) / a.z;
-  return { x: b.fx + (sx - b.cx) * b.z - FX, y: b.fy + (sy - b.cy) * b.z - FY, z: b.z / a.z };
+  const k = perFrame;
+  return { x: (b.fx + (sx - b.cx) * b.z - FX) * k, y: (b.fy + (sy - b.cy) * b.z - FY) * k, z: Math.pow(b.z / a.z, k) };
 };
