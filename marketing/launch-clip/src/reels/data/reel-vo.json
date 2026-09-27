@@ -1,18 +1,43 @@
 [
  {
-  "frame": 110,
-  "text": "Makeena. Everything you save, finally useful.",
+  "frame": 10,
+  "text": "You save things everywhere.",
   "words": [
    0.05,
-   0.93,
-   1.375,
-   1.537,
-   2.01,
-   2.425
+   0.239,
+   0.474,
+   0.804
   ]
  },
  {
-  "frame": 375,
+  "frame": 80,
+  "text": "An article here. A recipe there. A video somewhere else.",
+  "words": [
+   0.08,
+   0.221,
+   0.598,
+   1.22,
+   1.325,
+   1.692,
+   2.27,
+   2.367,
+   2.657,
+   3.14
+  ]
+ },
+ {
+  "frame": 206,
+  "text": "Saved, and rarely seen again.",
+  "words": [
+   0.05,
+   0.71,
+   0.9,
+   1.231,
+   1.468
+  ]
+ },
+ {
+  "frame": 450,
   "text": "Save anything.",
   "words": [
    0.03,
@@ -20,7 +45,7 @@
   ]
  },
  {
-  "frame": 530,
+  "frame": 587,
   "text": "Each save becomes a card, with the key points pulled out.",
   "words": [
    0.03,
@@ -37,7 +62,7 @@
   ]
  },
  {
-  "frame": 735,
+  "frame": 789,
   "text": "Find it in your own words.",
   "words": [
    0.14,
@@ -49,7 +74,7 @@
   ]
  },
  {
-  "frame": 895,
+  "frame": 929,
   "text": "Ask anything. Every answer comes straight from your saves.",
   "words": [
    0.04,
@@ -64,7 +89,7 @@
   ]
  },
  {
-  "frame": 1250,
+  "frame": 1277,
   "text": "See how it all connects.",
   "words": [
    0.08,
@@ -75,7 +100,7 @@
   ]
  },
  {
-  "frame": 1370,
+  "frame": 1381,
   "text": "Every week, Makeena brings back what\u2019s worth remembering.",
   "words": [
    0.03,
@@ -89,14 +114,15 @@
   ]
  },
  {
-  "frame": 1565,
-  "text": "Never lose another great find.",
+  "frame": 1562,
+  "text": "Makeena. Never lose another great find.",
   "words": [
-   0.04,
-   0.367,
-   0.64,
-   1.076,
-   1.403
+   0.03,
+   0.83,
+   1.145,
+   1.408,
+   1.829,
+   2.145
   ]
  }
 ]

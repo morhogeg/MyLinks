@@ -231,9 +231,10 @@ console.log('\n── reel');
   // the lines the reel shares with the brand: tagline in, subtitle out
   const film = read('src/scenes/Endcard.tsx');
   const close = caps.find((c) => c.place === 'lockup');
-  if (!close || !film.includes(close.text.replace(/\.$/, ''))) bad.push('the reel lockup line is not the film endcard subtitle');
-  const hook = caps.find((c) => c.place === 'hook');
-  if (!hook || !hook.text.includes('Everything you save, finally useful.')) bad.push('the reel does not open on the D-6 tagline');
+  const closeLine = close?.text.split('\n').slice(-1)[0].replace(/\.$/, '');
+  if (!close || !film.includes(closeLine)) bad.push('the reel lockup line is not the film endcard subtitle');
+  // round 4 (owner): the reel opens on the problem and keeps only the subtitle
+  if (caps.some((c) => /finally useful/i.test(c.text))) bad.push('the tagline is back in the reel (owner round 4: subtitle only)');
 
   // ── 4. banned strings, everywhere a viewer can read one
   for (const c of L.CARDS) {

@@ -105,14 +105,21 @@ export const Lockup: React.FC<{
   markWidth?: number;
   wordWidth?: number;
   showLine?: boolean;
-}> = ({ frame, strike, line, lineStarts, markWidth = 262, wordWidth = 660, showLine = true }) => {
+  /** the frame the wordmark starts its wipe (default: just after the strike);
+   *  pass the frame the narrator says the name */
+  wordAt?: number;
+  /** 'label': the small letterspaced subtitle; 'statement': the line set
+   *  big enough to read as the last thing the reel says (owner, round 4) */
+  lineStyle?: 'label' | 'statement';
+}> = ({ frame, strike, line, lineStarts, markWidth = 262, wordWidth = 660, showLine = true, wordAt, lineStyle = 'label' }) => {
   // AnimatedMark's point strikes at u ≈ 0.56 of its launch, which runs at the
   // app's own pace (LAUNCH_MS 1300 = 39 frames)
   const LAUNCH = MARK_LAUNCH_FRAMES;
   const start = strike - LAUNCH * 0.56;
   const u = prog(frame, start, start + LAUNCH, (t) => t);
   const bloom = Math.max(0, 1 - Math.max(0, frame - strike) / 30);
-  const word = prog(frame, strike + 2, strike + 16, EASE_MODAL);
+  const word = prog(frame, wordAt ?? strike + 2, (wordAt ?? strike + 2) + 14, EASE_MODAL);
+  const big = lineStyle === 'statement';
   const sub = prog(frame, strike + 20, strike + 40, EASE_MODAL);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -143,17 +150,17 @@ export const Lockup: React.FC<{
       {showLine && (
         <div
           style={{
-            marginTop: 46,
+            marginTop: big ? 64 : 46,
             display: 'flex',
             justifyContent: 'center',
             // a word gap has to out-shout the tracking (0.36em between letters)
-            columnGap: '0.95em',
+            columnGap: big ? '0.26em' : '0.95em',
             fontFamily: sans,
-            fontSize: 25,
+            fontSize: big ? 50 : 25,
             fontWeight: 600,
-            letterSpacing: '0.36em',
-            textTransform: 'uppercase',
-            color: INK_SOFT,
+            letterSpacing: big ? '-0.02em' : '0.36em',
+            textTransform: big ? undefined : 'uppercase',
+            color: big ? INK : INK_SOFT,
             whiteSpace: 'nowrap',
           }}
         >
@@ -170,7 +177,7 @@ export const Lockup: React.FC<{
                     display: 'inline-block',
                     opacity: t,
                     transform: `translateY(${Math.round((1 - t) * 12)}px)`,
-                    marginRight: '-0.36em',
+                    marginRight: big ? 0 : '-0.36em',
                   }}
                 >
                   {w}

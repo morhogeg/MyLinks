@@ -1,6 +1,7 @@
 import React from 'react';
 import { AbsoluteFill } from 'remotion';
-import { HITS } from '../../../reel-timeline.mjs';
+import { CAPTIONS, FPS, HITS, HOLDS, holdStart } from '../../../reel-timeline.mjs';
+import VO from '../data/reel-vo.json';
 import { EASE_GATHER, EASE_IN_OUT, EASE_MODAL, EASE_SPRING, mix, prog } from '../kit/curves';
 import { MarkAssembly, SaveChip, type SaveKind } from '../kit/Brand';
 import { HANDOFF } from './handoff';
@@ -18,7 +19,28 @@ import { HANDOFF } from './handoff';
  * for the lockup), and the point drops to become the app's own + button.
  */
 
-const C = { x: 540, y: 760 }; // where everything gathers (and the mark stays)
+// where everything gathers (and the mark stays). The saves hang BELOW the
+// caption band: the narrator names the problem over them.
+const C = { x: 540, y: 1000 };
+
+/**
+ * The problem (owner, round 4: open like the launch film). While the source
+ * clock holds, the narrator says "An article here. A recipe there. A video
+ * somewhere else.": each named save lifts forward as its word is spoken,
+ * then "Saved, and rarely seen again." bleaches them all into the paper,
+ * and they only come back to full ink as they are pulled into the point.
+ */
+const NAMED: [chip: number, caption: number, word: number][] = [
+  [4, 1, 1], // "article" → The Tail End
+  [6, 1, 4], // "recipe" → Marcella Hazan's tomato sauce
+  [0, 1, 7], // "video" → the TED talk on YouTube
+];
+const wordFrame = (caption: number, word: number) => {
+  const c = CAPTIONS[caption];
+  const t = VO.find((v) => v.frame === c.at);
+  return c.at + Math.round((t?.words[word] ?? 0) * FPS);
+};
+const BLEACH_FROM = CAPTIONS[2].at + 6;
 
 /**
  * Three depths: far (small, a little soft), mid (the readable ones), near
@@ -26,43 +48,57 @@ const C = { x: 540, y: 760 }; // where everything gathers (and the mark stays)
  * real saves from the demo account.
  */
 const CHIPS: { kind: SaveKind; title: string; x: number; y: number; s: number; r: number; blur: number }[] = [
-  { kind: 'youtube', title: 'Inside the mind of a master procrastinator', x: 600, y: 210, s: 1.05, r: -3, blur: 0 },
-  { kind: 'web', title: 'Four Thousand Weeks', x: 900, y: 370, s: 0.74, r: 5, blur: 1.6 },
-  { kind: 'instagram', title: 'Cala Goloritzé, Sardinia', x: 250, y: 410, s: 1.2, r: -4, blur: 0 },
-  { kind: 'x', title: 'How to Get Rich (without getting lucky)', x: 640, y: 570, s: 0.96, r: 2.5, blur: 0 },
-  { kind: 'web', title: 'The Tail End', x: 130, y: 730, s: 1.75, r: -6, blur: 4 },
-  { kind: 'screenshot', title: 'Read Piranesi, and go in blind', x: 760, y: 800, s: 1.02, r: 3.5, blur: 0 },
-  { kind: 'web', title: "Marcella Hazan's tomato sauce", x: 380, y: 970, s: 1.18, r: -2.5, blur: 0 },
-  { kind: 'youtube', title: 'The Ultimate V60 Technique', x: 880, y: 1090, s: 0.72, r: 4, blur: 1.6 },
-  { kind: 'instagram', title: 'Cosmic Cliffs in the Carina Nebula', x: 520, y: 1250, s: 1.0, r: -3, blur: 0 },
-  { kind: 'x', title: 'You do not rise to the level of your goals', x: 820, y: 1420, s: 1.7, r: 5, blur: 4 },
+  { kind: 'youtube', title: 'Inside the mind of a master procrastinator', x: 600, y: 690, s: 1.05, r: -3, blur: 0 },
+  { kind: 'web', title: 'Four Thousand Weeks', x: 900, y: 817, s: 0.74, r: 5, blur: 1.6 },
+  { kind: 'instagram', title: 'Cala Goloritzé, Sardinia', x: 250, y: 849, s: 1.2, r: -4, blur: 0 },
+  { kind: 'x', title: 'How to Get Rich (without getting lucky)', x: 640, y: 976, s: 0.96, r: 2.5, blur: 0 },
+  { kind: 'web', title: 'The Tail End', x: 130, y: 1103, s: 1.75, r: -6, blur: 4 },
+  { kind: 'screenshot', title: 'Read Piranesi, and go in blind', x: 760, y: 1159, s: 1.02, r: 3.5, blur: 0 },
+  { kind: 'web', title: "Marcella Hazan's tomato sauce", x: 380, y: 1293, s: 1.18, r: -2.5, blur: 0 },
+  { kind: 'youtube', title: 'The Ultimate V60 Technique', x: 880, y: 1388, s: 0.72, r: 4, blur: 1.6 },
+  { kind: 'instagram', title: 'Cosmic Cliffs in the Carina Nebula', x: 520, y: 1515, s: 1.0, r: -3, blur: 0 },
+  { kind: 'x', title: 'You do not rise to the level of your goals', x: 820, y: 1650, s: 1.7, r: 5, blur: 4 },
 ];
 
-/** Where chip k is at frame f (without trails). */
-const chipAt = (k: number, f: number) => {
+const H0 = holdStart('problem');
+const HLEN = HOLDS.find((h) => h.id === 'problem')!.len;
+
+/** Where chip k is at source frame f, output frame `out` (without trails). */
+const chipAt = (k: number, f: number, out: number) => {
   const c = CHIPS[k];
-  const t0 = 1 + k * 3; // they arrive on a rolling 16th-note cascade
+  const t0 = 1 + k * 2; // they arrive on a rolling cascade
   const arrive = prog(f, t0, t0 + 12, EASE_MODAL);
   // the hang: a slow push-in (near ones faster: parallax) and a drift apart
   const hang = prog(f, 0, HITS.collapse, (t) => t);
   const depth = c.s; // bigger = nearer
-  const push = 1 + hang * 0.05 * depth;
-  const ox = (c.x - C.x) * push;
+  // …which keeps going, slowly, while the narrator holds the clock
+  const drift = prog(out, H0, H0 + HLEN, (t) => t);
+  const push = 1 + (hang * 0.05 + drift * 0.06) * depth;
+  // named by the narrator: this save lifts forward on its word
+  const e = NAMED.filter(([chip]) => chip === k).reduce((acc, [, cap, word]) => {
+    const w = wordFrame(cap, word);
+    return acc + prog(out, w - 2, w + 6, EASE_SPRING) * (1 - prog(out, w + 34, w + 50, EASE_MODAL));
+  }, 0);
+  const ox = (c.x - C.x) * push * (1 - 0.35 * e);
   const oy = (c.y - C.y) * push + (1 - arrive) * 50 * depth;
   // the gather
   const g = prog(f, HITS.collapse - 8, HITS.dotLands, EASE_GATHER);
+  // "rarely seen again": bleached into the paper, back to ink as it is gathered
+  const b = prog(out, BLEACH_FROM, BLEACH_FROM + 36, EASE_MODAL) * (1 - prog(f, HITS.collapse - 2, HITS.dotLands - 2, EASE_MODAL));
   return {
     x: C.x + ox * (1 - g),
     y: C.y + oy * (1 - g),
-    s: c.s * push * mix(0.9, 1, arrive) * mix(1, 0.06, Math.pow(g, 0.7)),
-    r: c.r * (1 - g) + g * (k % 2 ? 16 : -16),
-    o: arrive * (1 - Math.pow(g, 5)),
-    blur: (1 - arrive) * 14 + c.blur * (1 - g) + g * 2,
+    s: c.s * push * (1 + 0.14 * e) * mix(0.9, 1, arrive) * mix(1, 0.06, Math.pow(g, 0.7)),
+    r: c.r * (1 - g) * (1 - 0.5 * e) + g * (k % 2 ? 16 : -16),
+    o: arrive * (1 - Math.pow(g, 5)) * (1 - 0.72 * b),
+    blur: (1 - arrive) * 14 + c.blur * (1 - g) * (1 - e) + g * 2 + 3 * b,
+    grey: b,
+    e,
     g,
   };
 };
 
-export const Hook: React.FC<{ f: number }> = ({ f }) => {
+export const Hook: React.FC<{ f: number; out: number }> = ({ f, out }) => {
   if (f > HANDOFF.end) return null;
 
   // ── the point, the flash, the snap
@@ -71,7 +107,7 @@ export const Hook: React.FC<{ f: number }> = ({ f }) => {
   // brackets: in from wide, a spring overshoot inward, settle
   const close = prog(f, HITS.dotLands + 1, HITS.bracketsClose + 4, EASE_SPRING);
 
-  // ── the mark settles a touch smaller over the name and promise (the caption)
+  // ── the mark settles a touch smaller as it holds
   const form = prog(f, HITS.markLocked - 6, HITS.markLocked + 12, EASE_MODAL);
 
   // ── the hand-off: brackets part and fade, the name leaves, the point
@@ -92,7 +128,7 @@ export const Hook: React.FC<{ f: number }> = ({ f }) => {
       {f < HITS.dotLands + 1 &&
         CHIPS.map((c, k) =>
           [3, 2, 1, 0].map((lag) => {
-            const p = chipAt(k, f - lag * 1.2);
+            const p = chipAt(k, f - lag * 1.2, out);
             if (lag > 0 && p.g < 0.08) return null;
             const alpha = lag === 0 ? 1 : [0, 0.28, 0.16, 0.08][lag];
             return (
@@ -104,7 +140,8 @@ export const Hook: React.FC<{ f: number }> = ({ f }) => {
                   top: p.y,
                   transform: `translate(-50%, -50%) rotate(${p.r}deg) scale(${p.s})`,
                   opacity: p.o * alpha,
-                  filter: p.blur > 0.2 ? `blur(${p.blur}px)` : undefined,
+                  zIndex: p.e > 0.01 ? 2 : 1,
+                  filter: [p.blur > 0.2 ? `blur(${p.blur}px)` : '', p.grey > 0.01 ? `grayscale(${p.grey})` : ''].join(' ').trim() || undefined,
                 }}
               >
                 <SaveChip kind={c.kind} title={c.title} />

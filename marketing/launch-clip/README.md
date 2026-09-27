@@ -304,40 +304,47 @@ in the film claims availability.
 
 ## The highlight reel (pilot)
 
-`MachinaReel` is a 56.7s vertical reel: hook → Save (and the new card,
-opened) → Find → Ask → Connect → Recall → lockup, with its own score, the
-film's narrator and word-timed captions. **Every pixel of app UI in it is the
-real, shipped web app**, driven and recorded frame by frame; nothing is a
-mockup or a rebuilt screen.
+`MachinaReel` is a 56.3s vertical reel: the problem → the mark → Save (and
+the new card, opened) → Find → Ask → Connect → Recall → "Machina. Never lose
+another great find." It has its own score, the film's narrator and word-timed
+captions. **Every pixel of app UI in it is the real, shipped web app**, driven
+and recorded frame by frame; nothing is a mockup or a rebuilt screen.
 
-**How it got here.** Round 1 was a 20s cut. The owner asked for four
-changes and nothing else: slow it down, replace the review deck with
-something more interesting, make clear that each save becomes a card with
-the key info, and replace "And the best ones come back to you" with a line
-about recall and the weekly recap. Round 2 changed more than that and was
-rejected. Round 3 (this one) is **the round-1 cut, unchanged, played 2.5×
-slower** (`K` in `reel-timeline.mjs`; the narrator is not slowed), with two
-swaps in place: a card insert after the save lands (`INSERT`,
-`scenes/CardDetail.tsx`) and the weekly recap in the review deck's slot
-(`scenes/Recall.tsx`).
+**How it got here.** Round 1 was a 20s cut. Round 2 changed too much and was
+rejected. Round 3 was the round-1 cut played 2.5× slower, with the owner's
+asks applied in place (the card opened to its Key Points, the weekly recap in
+the review deck's slot, a recall line). Round 4 (owner):
+- open on the PROBLEM, like the launch film ("You save things everywhere." /
+  "An article here. A recipe there. A video somewhere else." / "Saved, and
+  rarely seen again."): each named save lifts as it is spoken, then all of
+  them bleach into the paper before they collapse into the mark;
+- the tagline "Everything you save, finally useful." is gone; the only line
+  kept is the subtitle, and the last slide says it: the drawn wordmark wipes
+  in as the narrator says "Machina", then "Never lose another great find."
+  set big (`Lockup` `lineStyle="statement"`);
+- pacing that changes with the content: slow where the viewer must read
+  (the phases, the card's Key Points, the search result, the answer and its
+  sources, the recap), faster through transitions and camera moves.
 
-| Output frames | Time | Scene | What it does |
-|---|---|---|---|
-| 0–320 | 0:00 | `Hook` | Ten real saves hang in depth, collapse into one point of ink, the brackets snap shut around it; the narrator says the tagline; the point drops to become the app's **+** button |
-| 320–520 | 10.7s | `Save` | The + irises open into Home → Add to Machina (lifted off its screen) → the five real phases from `web/lib/scanPhases.ts` → the new card lands in the feed |
-| 520–720 | 17.3s | `CardDetail` | The insert: the new card is tapped open, its summary, **Key Points** and **Do this** line ("Each save becomes a card, with the key points pulled out.") |
-| 720–880 | 24.0s | `Find` | "easy dinner, empty fridge" typed into the real search field → the one card it means → tap Ask |
-| 880–1240 | 29.3s | `Ask` | The hero: question → streamed answer → three citation chips from three platforms → the Graph chip |
-| 1240–1360 | 41.3s | `Connect` | Cut to inside the real graph, the three cited saves lit; pull back; tap Revisit |
-| 1360–1480 | 45.3s | `Recall` | The Revisit tab's "This week in Machina", the weekly recap, tapped open and read down to its Standout ("Every week, Machina brings back what's worth remembering.") |
-| 1480–1700 | 49.3s | `End` | The mark, the drawn wordmark, the App Store subtitle on the narrator's timing |
+| Output frames | Scene | What it does |
+|---|---|---|
+| 0–323 | `Hook` | The problem, over ten real saves (the `problem` hold), then the collapse into the point and the brackets snapping shut |
+| 323–577 | `Hook` → `Save` | The mark holds; the point drops to become the **+**; Add to Machina; the five real phases (slow); the card lands |
+| 577–777 | `CardDetail` | The `card` hold: the new card opened, its summary, **Key Points** and **Do this** line |
+| 777–925 | `Find` | "easy dinner, empty fridge" → the one card it means (slow) → tap Ask |
+| 925–1270 | `Ask` | The question → the streamed answer and three sources (slow) → the dive into the Graph chip |
+| 1270–1376 | `Connect` | The real graph, the three cited saves lit; tap Revisit |
+| 1376–1508 | `Recall` | "This week in Machina", the weekly recap, opened and read to its Standout (slow) |
+| 1508–1689 | `End` | The mark, "Machina" (the wordmark), "Never lose another great find." |
 
-**Two clocks.** Scenes are written in SOURCE frames (the round-1 cut, 600
-frames, 16 a beat) and `MachinaReel` feeds them `srcOf(frame)`; captions,
-kickers, the narrator, the insert and the lockup are in OUTPUT frames (90
-BPM, 20 a beat, so every source 8th lands on an output beat). The score
-places each round-1 event at `real(src)`. `CLOCK.perFrame` in `camera.ts`
-keeps motion blur measured per output frame.
+**The clock.** Scenes are written in SOURCE frames (the round-1 cut, 600
+frames). `SPEED` in `reel-timeline.mjs` says how many output frames each
+source range lasts (1.2–3.0; high where the viewer reads), and `HOLDS` stop
+the source clock while an output-frame scene plays (`problem`, `card`).
+`clockAt(frame)` gives the source frame and any hold; `real(src)` places a
+source event in the output, which is how the score's sound design follows
+the picture. Captions, kickers, the narrator and the lockup are in output
+frames. `CLOCK.perFrame` in `camera.ts` keeps motion blur per output frame.
 
 Compositions: **`MachinaReel`** (score + narrator + captions, the
 deliverable), **`MachinaReelSilent`** (captions, no audio: stills and QA),
@@ -505,14 +512,12 @@ causes it, and the cut lands on the touch.
 
 ### Pacing (`clock.ts`, `reel-timeline.mjs`)
 
-The cut is written at 112.5 BPM (16 frames a beat) and played 2.5× slower,
-so on screen a beat is 40 frames (90 BPM with events on its 8ths); 1700
-output frames = 56.7s. **Cuts and taps land on beats; secondary events on
-8ths** (the five phases, the three chips); only typing runs on 16ths. One
-idea per scene; the hero (Ask) gets the longest. **Slow is the rule:** the
-owner found a 20s cut "way too fast, almost impossible to follow", then a
-42.7s cut still too fast; the pilot now plays every camera move and every
-app animation at 0.4× the round-1 speed, and the voice at normal speed. A caption stays up until its line has been
+The cut is written at 112.5 BPM (16 frames a beat) and played through a
+variable-speed map (`SPEED`): **slow when the viewer must read what is on
+screen, fast for transitions and camera moves** (owner, round 4). Reading
+ranges run at 2.6–3.0 output frames per source frame, moves at 1.2–1.6.
+Cuts and taps land on source beats; secondary events on 8ths. One idea per
+scene; the hero (Ask) gets the longest. A caption stays up until its line has been
 spoken and its last word has landed (verify fails a voice line that overruns
 its caption). Motion blur is what a 180° shutter would give (σ ≈ 0.14 × px
 per frame, directional, capped at 10px) and never appears on a hold.

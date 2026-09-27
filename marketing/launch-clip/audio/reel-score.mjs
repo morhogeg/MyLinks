@@ -18,10 +18,10 @@
 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BAR, BAR_FRAMES, BEAT, BAR_CHORDS, FPS, HITS, RISERS, TOTAL_FRAMES, TOTAL_SEC, INSERT, K, real, srcOf } from '../reel-timeline.mjs';
+import { BAR, BAR_FRAMES, BEAT, BAR_CHORDS, FPS, HITS, RISERS, TOTAL_FRAMES, TOTAL_SEC, holdStart, real, srcOf } from '../reel-timeline.mjs';
 import { createSynth } from './synth.mjs';
 
-// Round 3: the round-1 score, on the reel's slowed clock. Everything is
+// Round 3/4: the round-1 score, on the reel's variable-speed clock. Everything is
 // written against SOURCE frames (the round-1 cut) and placed where that
 // moment now falls in the output (real()); the groove runs at 90 BPM, so a
 // round-1 bar is two bars here.
@@ -136,6 +136,10 @@ tick(f(H.bracketsClose), 0.11, 0.85);
 sub(f(H.bracketsClose), 43, 0.18, 0.25);
 shimmer(f(H.markLocked), [72, 79, 84, 88], 0.05);
 whoosh(f(H.toApp) - 0.1, 0.5, 0.08, 0);
+// the mark holds on its own now (no tagline over it): a held, lifting chord
+// under it so the music does not drop out
+[60, 64, 67, 71].forEach((m, i) => pad(f(H.markLocked) - 0.2, f(H.toApp) - f(H.markLocked) + 0.4, m, 0.13, (i / 3) * 1.1 - 0.55));
+sub(f(H.markLocked), 36, 0.22, 1.2);
 
 // save: tap, the dialog, the five phases climbing, saved, the card landing
 tick(f(H.plusTap), 0.1, 1.1);
@@ -151,7 +155,7 @@ tick(f(H.cardLands), 0.09, 0.9);
 
 // the insert: the new card, tapped open, its Key Points arriving (output
 // frames: scenes/CardDetail.tsx taps at +20 and lands the Key Points at +130)
-const I0 = Math.round(INSERT.at * K) / FPS;
+const I0 = holdStart('card') / FPS;
 tick(I0 + 20 / FPS, 0.09, 1.2);
 whoosh(I0 + 22 / FPS, 0.35, 0.05, -0.15);
 shimmer(I0 + 130 / FPS, [79, 84, 88], 0.035);

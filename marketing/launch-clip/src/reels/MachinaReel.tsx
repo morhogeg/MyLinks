@@ -1,6 +1,6 @@
 import React from 'react';
 import { AbsoluteFill, Audio, staticFile, useCurrentFrame } from 'remotion';
-import { CAPTIONS, FPS, INSERT, K, KICKERS, srcOf } from '../../reel-timeline.mjs';
+import { CAPTIONS, FPS, KICKERS, clockAt } from '../../reel-timeline.mjs';
 import { sans } from '../fonts';
 import VO from './data/reel-vo.json';
 import { BandScrim, Captions, type ReelCaption } from './kit/Captions';
@@ -33,22 +33,21 @@ export const MachinaReel: React.FC<{
   audioFile?: string;
 }> = ({ withAudio = true, withCaptions = true, audioFile = 'reel-score-vo.wav' }) => {
   const f = useCurrentFrame();
-  // the round-1 cut, played K times slower (reel-timeline.mjs); the scenes
-  // run on SOURCE frames, captions and the lockup on output frames
-  const src = srcOf(f);
-  CLOCK.perFrame = 1 / K;
-  const i0 = Math.round(INSERT.at * K);
-  const inInsert = f >= i0 && f < i0 + INSERT.len;
+  // the round-1 cut on a variable-speed clock (reel-timeline.mjs SPEED,
+  // HOLDS); the scenes run on SOURCE frames, captions and the lockup on
+  // output frames
+  const { src, hold, u, k } = clockAt(f);
+  CLOCK.perFrame = hold ? 0 : 1 / k;
   return (
     <AbsoluteFill style={{ fontFamily: sans }}>
       {withAudio && <Audio src={staticFile(audioFile)} />}
       <Paper drift={Math.sin(f / 180) * 0.5} />
 
-      {inInsert ? (
-        <CardDetail u={f - i0} />
+      {hold === 'card' ? (
+        <CardDetail u={u} />
       ) : (
         <>
-          <Hook f={src} />
+          <Hook f={src} out={f} />
           <Save f={src} />
           <Find f={src} />
           <Ask f={src} />

@@ -1,11 +1,13 @@
 import React from 'react';
 import { AbsoluteFill } from 'remotion';
-import { INSERT } from '../../../reel-timeline.mjs';
+import { HOLDS } from '../../../reel-timeline.mjs';
 import { AppShot, Lift, Tap } from '../kit/AppShot';
 import { camAt, camVelocity, type Key } from '../kit/camera';
 import { EASE_IN_OUT, EASE_MODAL, EASE_SPRING, prog } from '../kit/curves';
 import { at, rectOf } from '../kit/takes';
 import { findKeys } from './Find';
+
+const INSERT = HOLDS.find((h) => h.id === 'card')!;
 
 /**
  * The insert (round 3, owner: "clarify that each save gets turned into a card

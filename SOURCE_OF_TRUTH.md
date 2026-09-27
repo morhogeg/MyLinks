@@ -2497,18 +2497,20 @@ to its session:
 > feature-clip briefs below against the kit you built, and add a §9 entry.
 
 **What exists (the pilot, 2026-09-26, branch `claude/machina-reel-pilot`,
-awaiting owner review, not merged):** `MachinaReel` (56.7s, round 3,
+awaiting owner review, not merged):** `MachinaReel` (56.3s, round 4,
 1080×1920, score + narrator + captions, the deliverable), `MachinaReelSilent`
-and `MachinaReelClean`, in `marketing/launch-clip/`. It is the round-1 cut
-(hook → Save → Find → Ask → Connect → the lockup on "Never lose another great
-find") **played 2.5× slower** (the narrator at normal speed), with exactly
-the owner's round-2 asks applied: the new card is opened after it lands to
-show its Key Points and "Do this" line ("Each save becomes a card, with the
-key points pulled out."), and the review deck's slot now holds the weekly
-recap, "This week in Machina" ("Every week, Machina brings back what's worth
-remembering."). A round-2 cut (42.7s) that also rewrote the hook, lines,
-music and framing was rejected: "You changed too many things. Do only what I
-asked for, and slow it down more." **Every frame of app UI is the real web app, not a
+and `MachinaReelClean`, in `marketing/launch-clip/`. It opens on the problem,
+as the launch film does ("You save things everywhere." / "An article here. A
+recipe there. A video somewhere else." / "Saved, and rarely seen again."),
+over ten real saves that then collapse into the mark; then Save and the new
+card opened to its Key Points ("Each save becomes a card, with the key
+points pulled out."), Find, Ask, Connect, the weekly recap ("Every week,
+Machina brings back what's worth remembering."), and a last slide that says
+"Machina. Never lose another great find." (the wordmark, then the subtitle
+set big). The tagline "Everything you save, finally useful." is NOT in the
+reel (owner, round 4: subtitle only). Pacing varies with content: slow where
+the viewer reads, faster through transitions (`SPEED` in
+`reel-timeline.mjs`). **Every frame of app UI is the real web app, not a
 mockup** (owner, mid-task): `capture/` builds `web/` as a static export with
 Firebase swapped for an in-memory stand-in seeded with a demo account of 24
 real, interesting saves (no "AI" anywhere), and Playwright records four
@@ -2590,6 +2592,16 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-27 — Highlight reel round 4.** Branch `claude/machina-reel-pilot`,
+  not merged. Owner: open on the problem like the launch film, drop the
+  tagline (keep only "Never lose another great find"), make the last slide
+  say "Machina, never lose another great find", and pace it fast for
+  transitions and slow where the viewer reads. Done via a variable-speed
+  clock (`SPEED`, `HOLDS`, `clockAt` in `reel-timeline.mjs`) over the round-1
+  cut, a `problem` hold in `Hook.tsx` (named saves lift on their words, all
+  bleach on "rarely seen again"), and `Lockup` `lineStyle="statement"`.
+  verify: the tagline must not reappear; the lockup's last line must be the
+  film's subtitle. 56.3s.
 - **2026-09-27 — Highlight reel round 3: only the asked changes, slower.**
   Branch `claude/machina-reel-pilot`, not merged. Owner rejected round 2 for
   changing too much. Round 3 restores the round-1 scenes, lines, hook and

@@ -18,17 +18,21 @@ export const WIDTH = 1080;
 export const HEIGHT = 1920;
 
 /**
- * ROUND 3 (owner, 2026-09-27): "slow it down more", and change only what was
- * asked. So the cut below is the round-1 cut, unchanged, written in its own
- * frames (SOURCE frames: 600 of them, 16 a beat), and the reel plays it
- * K = 2.5 times slower. The narrator is NOT slowed: captions and voice are
- * placed in OUTPUT frames. One insert is added (INSERT): after the new card
- * lands, it is opened to show what a save becomes (its Key Points).
+ * ROUND 4 (owner, 2026-09-27): the round-1 cut, written in its own frames
+ * (SOURCE frames: 600 of them, 16 a beat), played at a speed that CHANGES
+ * with what is on screen: "slower when it's important the user actually
+ * reads what's on the screen, faster for cool transitions". SPEED lists how
+ * many output frames each source frame lasts, by source range. The narrator
+ * is never slowed: captions and voice are placed in OUTPUT frames.
  *
- * OUTPUT grid: 90 BPM, 20 frames a beat, so every source 8th lands on an
- * output beat. `real(src)` maps a source frame to its output frame.
+ * Two HOLDS stop the source clock while an output-frame scene plays:
+ *  - `problem`: the opening, the saves hanging where they were kept while
+ *    the narrator names the problem (scenes/Hook.tsx reads `hold`);
+ *  - `card`: the new card, opened to its Key Points (scenes/CardDetail.tsx).
+ *
+ * The music runs at 90 BPM on the output clock; its sound design is placed
+ * where each picture event lands (`real`).
  */
-export const K = 2.5;
 export const BPM = 90;
 export const BEAT_FRAMES = 20;
 export const BAR_FRAMES = BEAT_FRAMES * 4; // 80
@@ -40,24 +44,97 @@ export const beat = (n) => Math.round(n * BEAT_FRAMES);
 /** Bar → output frame. */
 export const bar = (n) => Math.round(n * BAR_FRAMES);
 
-/** The card insert: at source frame `at` the source clock holds for `len`
- *  output frames while the new card is opened (scenes/CardDetail.tsx). */
-export const INSERT = { at: 208, len: 200 };
+/** [from source frame, output frames per source frame] — read ↔ move */
+export const SPEED = [
+  [0, 1.5], //    the saves arrive
+  [31, 2.0], //   …collapse into the point, the brackets snap shut
+  [64, 1.2], //   the mark, whole
+  [104, 1.5], //  the point drops, the + irises open
+  [136, 2.0], //  Add to Machina, the Save tap
+  [144, 2.6], //  READ: the five phases
+  [184, 1.6], //  the dialog drops, the card lands
+  [208, 2.0], //  the search tap, the query typed
+  [240, 2.8], //  READ: the one card it finds
+  [264, 1.5], //  whip into Ask, the hero
+  [284, 2.0], //  the question typed
+  [316, 3.0], //  READ: the answer and its three sources
+  [392, 1.6], //  the dive into the Graph chip
+  [416, 2.2], //  the graph
+  [464, 1.6], //  the Revisit tab
+  [474, 3.0], //  READ: this week's recap, down to its standout
+  [506, 1.6], //  thrown out of frame
+  [512, 2.2], //  the lockup
+];
 
-/** source frame → output frame */
-export const real = (src) => Math.round(src * K) + (src >= INSERT.at ? INSERT.len : 0);
+/** The holds: at source frame `at` the source clock stops for `len` output frames. */
+export const HOLDS = [
+  { id: 'problem', at: 31, len: 210 },
+  { id: 'card', at: 208, len: 200 },
+];
+export const INSERT = HOLDS[1];
 
-/** output frame → source frame (held at INSERT.at during the insert) */
-export const srcOf = (f) => {
-  const i0 = Math.round(INSERT.at * K);
-  if (f < i0) return f / K;
-  if (f < i0 + INSERT.len) return INSERT.at;
-  return (f - INSERT.len) / K;
+const speedAt = (src) => {
+  let k = SPEED[0][1];
+  for (const [from, v] of SPEED) if (src >= from) k = v;
+  return k;
 };
 
+/** source frame → output frame (a source frame at/after a hold lands after it) */
+export const real = (src) => {
+  let out = 0;
+  for (let i = 0; i < SPEED.length; i++) {
+    const [from, k] = SPEED[i];
+    const to = i + 1 < SPEED.length ? SPEED[i + 1][0] : Infinity;
+    if (src <= from) break;
+    out += (Math.min(src, to) - from) * k;
+  }
+  for (const h of HOLDS) if (src >= h.at) out += h.len;
+  return Math.round(out);
+};
+
+/** the output frame a hold starts on */
+export const holdStart = (id) => {
+  const h = HOLDS.find((x) => x.id === id);
+  return real(h.at) - h.len;
+};
+
+/** output frame → { src, hold, u }: the source frame, and if a hold is
+ *  playing, which one and how far into it (output frames) */
+export const clockAt = (f) => {
+  for (const h of HOLDS) {
+    const h0 = holdStart(h.id);
+    if (f >= h0 && f < h0 + h.len) return { src: h.at, hold: h.id, u: f - h0, k: speedAt(h.at) };
+  }
+  // invert real() by walking the source range
+  let lo = 0;
+  let hi = SOURCE_FRAMES;
+  for (let i = 0; i < 40; i++) {
+    const mid = (lo + hi) / 2;
+    if (realExact(mid) <= f) lo = mid;
+    else hi = mid;
+  }
+  return { src: lo, hold: null, u: 0, k: speedAt(lo) };
+};
+
+/** real() without rounding, for the inverse */
+const realExact = (src) => {
+  let out = 0;
+  for (let i = 0; i < SPEED.length; i++) {
+    const [from, k] = SPEED[i];
+    const to = i + 1 < SPEED.length ? SPEED[i + 1][0] : Infinity;
+    if (src <= from) break;
+    out += (Math.min(src, to) - from) * k;
+  }
+  for (const h of HOLDS) if (src >= h.at) out += h.len;
+  return out;
+};
+
+/** output frame → source frame */
+export const srcOf = (f) => clockAt(f).src;
+
 export const SOURCE_FRAMES = 600;
-export const TOTAL_FRAMES = real(SOURCE_FRAMES); // 1700
-export const TOTAL_SEC = TOTAL_FRAMES / FPS; // 56.7s
+export const TOTAL_FRAMES = real(SOURCE_FRAMES);
+export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 
 /**
  * The cut, in SOURCE frames. One idea per scene; the hero (Ask) gets the
@@ -91,29 +168,32 @@ export const sceneAt = (id) => {
  * NO em dashes, no literal "AI", no "second brain", no "library" (verify).
  */
 export const CAPTIONS = [
-  // the tagline introduces the product (D-6), spoken as the mark locks; it
-  // holds over the + tap and the Add dialog so its last word can land
-  { at: 110, to: 365, place: 'hook', text: 'Machina.\nEverything you save, finally useful.' },
-  { at: 375, to: 450, text: 'Save anything.' },
-  // the insert: the new card, opened
-  { at: 530, to: 712, text: 'Each save becomes a card,\nwith the key points pulled out.' },
-  { at: 735, to: 855, text: 'Find it in your own words.' },
-  { at: 895, to: 1150, text: 'Ask anything. Every answer comes straight from your saves.' },
-  { at: 1250, to: 1360, text: 'See how it all connects.' },
-  // recall: the weekly recap (replaces the review deck and its line)
-  { at: 1370, to: 1510, text: 'Every week, Machina brings back\nwhat’s worth remembering.' },
-  // the close is the App Store subtitle, the same words the lockup sets
-  { at: 1565, to: 1700, place: 'lockup', text: 'Never lose another great find.' },
+  // the problem, as the launch film opens (owner, round 4): the saves hang
+  // where they were kept while the narrator names it
+  { at: 10, to: 70, text: 'You save things everywhere.' },
+  { at: 80, to: 200, text: 'An article here. A recipe there.\nA video somewhere else.' },
+  { at: 206, to: 290, text: 'Saved, and rarely seen again.' },
+  { at: real(150), to: real(180), text: 'Save anything.' },
+  // the card hold: the new card, opened
+  { at: holdStart('card') + 10, to: holdStart('card') + 192, text: 'Each save becomes a card,\nwith the key points pulled out.' },
+  { at: real(214), to: real(262), text: 'Find it in your own words.' },
+  { at: real(278), to: real(380), text: 'Ask anything. Every answer comes straight from your saves.' },
+  { at: real(420), to: real(464), text: 'See how it all connects.' },
+  // recall: the weekly recap
+  { at: real(468), to: real(518), text: 'Every week, Machina brings back\nwhat’s worth remembering.' },
+  // the close: the name, then the App Store subtitle, set by the lockup
+  // (the name is the drawn wordmark, which wipes in as it is said)
+  { at: real(542), to: real(600), place: 'lockup', text: 'Machina.\nNever lose another great find.' },
 ];
 
 /** The pillar word each product scene opens on (the kinetic kicker), in
  *  OUTPUT frames. */
 export const KICKERS = [
-  { at: 370, to: 712, text: 'Save' },
-  { at: 725, to: 870, text: 'Find' },
-  { at: 885, to: 1230, text: 'Ask' },
-  { at: 1245, to: 1350, text: 'Connect' },
-  { at: 1365, to: 1475, text: 'Revisit' },
+  { at: real(148), to: holdStart('card') + 192, text: 'Save' },
+  { at: real(210), to: real(268), text: 'Find' },
+  { at: real(274), to: real(412), text: 'Ask' },
+  { at: real(418), to: real(460), text: 'Connect' },
+  { at: real(466), to: real(510), text: 'Revisit' },
 ];
 
 /**
@@ -159,7 +239,7 @@ export const REAL_HITS = Object.fromEntries(
 /** Risers END on the reveal they lead into. [from, to] in SOURCE frames. */
 export const RISERS = [
   [16, 48],
-  [96, 128],
+  [64, 128], // the mark holds, then the app: one long lift (round 4, no tagline over it)
   [384, 416],
   [500, 534],
 ];
