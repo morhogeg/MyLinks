@@ -20,13 +20,13 @@ fs.mkdirSync(out, { recursive: true });
 
 const COMP = process.env.COMP ?? 'MachinaReelSilent';
 const REVIEW = [
-  6, 20, 36, 46, 52, 60, 76, 100, 116, 124, // hook
-  130, 138, 150, 170, 186, 194, 200, // save
-  210, 226, 244, 258, 268, // find
-  276, 290, 312, 322, 334, 348, 360, 372, 392, 402, // ask
-  408, 420, 440, 460, // connect
-  466, 474, 482, 488, 500, // revisit
-  516, 532, 546, 566, 599, // lockup
+  20, 50, 80, 96, 120, 160, 196, 208, // hook
+  220, 236, 250, 280, 310, 330, 345, 362, 376, 392, 420, 450, // save + the card
+  468, 476, 500, 530, 560, 590, 604, // find
+  614, 636, 660, 700, 730, 756, 772, 790, 812, 826, // ask
+  836, 860, 900, 924, // connect
+  932, 950, 970, 1010, 1050, 1075, 1095, 1130, 1160, 1175, 1188, // recall
+  1200, 1230, 1279, // lockup
 ];
 const frames = process.argv.slice(2).map(Number).filter((n) => !Number.isNaN(n));
 const list = frames.length ? frames : REVIEW;

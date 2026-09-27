@@ -10,13 +10,13 @@ const plusY = SAVE_OPEN_CAM.fy + (811 - SAVE_OPEN_CAM.cy) * SAVE_OPEN_CAM.z;
 
 export const HANDOFF = {
   /** the brackets part and the tagline leaves */
-  part: 104,
+  part: 184,
   /** the point starts its drop */
-  travel: 106,
+  travel: 186,
   /** it lands on the + button: the iris starts opening around it */
-  iris: 120,
+  iris: 200,
   /** fully open: the hook is gone */
-  end: 136,
+  end: 216,
   /** the + button in frame pixels (its radius: 20pt at the opening zoom) */
   plus: { x: SAVE_OPEN_CAM.fx, y: plusY, r: 20 * SAVE_OPEN_CAM.z },
 };

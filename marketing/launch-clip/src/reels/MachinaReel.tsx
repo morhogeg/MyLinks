@@ -11,18 +11,18 @@ import { Save } from './scenes/Save';
 import { Find } from './scenes/Find';
 import { Ask } from './scenes/Ask';
 import { Connect } from './scenes/Connect';
-import { Revisit } from './scenes/Revisit';
+import { Recall } from './scenes/Recall';
 import { End } from './scenes/End';
 
 /**
- * Machina highlight reel (the pilot): 20s, 1080 × 1920, built from the reel
+ * Machina highlight reel (the pilot): 42.7s, 1080 × 1920, built from the reel
  * kit (src/reels/kit) on the reel's own clock (reel-timeline.mjs). Every
  * frame of app UI is the real app, captured by capture/shoot.mjs.
  *
  * Scenes read the GLOBAL frame (not Sequence-local time): they hand off on
- * shared frame numbers (the hook's point becomes the + button; Save's screen
- * rides Find's camera until the search tap; Ask's dive into the Graph chip
- * cuts on the downbeat to inside the graph). Each scene draws only its own
+ * shared frame numbers (the hook's point becomes the + button; Ask's dive
+ * into the Graph chip cuts on the downbeat to inside the graph; the recap is
+ * thrown out of frame into the lockup). Each scene draws only its own
  * frames, so no two app takes are ever on screen as a dissolve.
  */
 export const MachinaReel: React.FC<{
@@ -41,11 +41,11 @@ export const MachinaReel: React.FC<{
       <Find f={f} />
       <Ask f={f} />
       <Connect f={f} />
-      <Revisit f={f} />
+      <Recall f={f} />
       <End f={f} />
 
       {/* type never sits on UI: the app fades out under the caption band */}
-      <BandScrim opacity={prog(f, 112, 120) * (1 - prog(f, 510, 518))} />
+      <BandScrim opacity={prog(f, 184, 192) * (1 - prog(f, 1180, 1188))} />
       <Captions
         frame={f}
         fps={FPS}

@@ -7,11 +7,12 @@ import { EASE_MODAL } from '../kit/curves';
 import { at, center, rectOf, takeOf } from '../kit/takes';
 
 /**
- * 13.9s – 15.5s. CONNECT: the answer's Graph chip opens the real graph with
+ * 27.7s – 30.9s. CONNECT: the answer's Graph chip opens the real graph with
  * the three cited saves lit (the app's own Ask → Graph hand-off). The dive
  * into the chip cuts, on the downbeat the riser lands on, to INSIDE the
  * graph, close on the three while the app's own layout is still blooming;
- * the camera pulls back to the whole graph. Then the Revisit tab.
+ * the camera pulls back to the whole graph. Then the Revisit tab, where the
+ * weekly recap lives.
  */
 
 const T = 'ask';
@@ -26,8 +27,8 @@ export const connectKeys: Key[] = [
   // cited saves (and their two edges) in view
   { f: S.graph, cx: 188, cy: 590, z: 3.0, fx: 540, fy: 1140 },
   // pull back to the whole graph, with a breath of tilt that settles out
-  { f: S.graph + 12, cx: 197.5, cy: 600, z: 2.5, fx: 540, fy: 1150, ry: -2, rx: 1.5, ease: EASE_MODAL },
-  { f: 444, ry: 0, rx: 0, ease: EASE_MODAL },
+  { f: S.graph + 14, cx: 197.5, cy: 600, z: 2.5, fx: 540, fy: 1150, ry: -2, rx: 1.5, ease: EASE_MODAL },
+  { f: S.graph + 44, ry: 0, rx: 0, ease: EASE_MODAL },
   { f: S.revisitTap, cx: 190, cy: 585, z: 2.95, ease: (t) => t },
 ];
 

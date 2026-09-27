@@ -6,7 +6,7 @@ import { MarkAssembly, SaveChip, type SaveKind } from '../kit/Brand';
 import { HANDOFF } from './handoff';
 
 /**
- * 0:00 – 4.3s. Saves everywhere → one point → the mark.
+ * 0:00 – 6.9s. Saves everywhere, then gone → one point → the mark.
  *
  * Ten real saves from the demo account (the same cards the app shows later),
  * each where it was kept: a YouTube video, an Instagram post, an X thread, a
@@ -18,7 +18,9 @@ import { HANDOFF } from './handoff';
  * for the lockup), and the point drops to become the app's own + button.
  */
 
-const C = { x: 540, y: 760 }; // where everything gathers (and the mark stays)
+// where everything gathers (and the mark stays). The saves hang BELOW the
+// caption band: the narrator's first line is read over them.
+const C = { x: 540, y: 1000 };
 
 /**
  * Three depths: far (small, a little soft), mid (the readable ones), near
@@ -26,22 +28,22 @@ const C = { x: 540, y: 760 }; // where everything gathers (and the mark stays)
  * real saves from the demo account.
  */
 const CHIPS: { kind: SaveKind; title: string; x: number; y: number; s: number; r: number; blur: number }[] = [
-  { kind: 'youtube', title: 'Inside the mind of a master procrastinator', x: 600, y: 210, s: 1.05, r: -3, blur: 0 },
-  { kind: 'web', title: 'Four Thousand Weeks', x: 900, y: 370, s: 0.74, r: 5, blur: 1.6 },
-  { kind: 'instagram', title: 'Cala Goloritzé, Sardinia', x: 250, y: 410, s: 1.2, r: -4, blur: 0 },
-  { kind: 'x', title: 'How to Get Rich (without getting lucky)', x: 640, y: 570, s: 0.96, r: 2.5, blur: 0 },
-  { kind: 'web', title: 'The Tail End', x: 130, y: 730, s: 1.75, r: -6, blur: 4 },
-  { kind: 'screenshot', title: 'Read Piranesi, and go in blind', x: 760, y: 800, s: 1.02, r: 3.5, blur: 0 },
-  { kind: 'web', title: "Marcella Hazan's tomato sauce", x: 380, y: 970, s: 1.18, r: -2.5, blur: 0 },
-  { kind: 'youtube', title: 'The Ultimate V60 Technique', x: 880, y: 1090, s: 0.72, r: 4, blur: 1.6 },
-  { kind: 'instagram', title: 'Cosmic Cliffs in the Carina Nebula', x: 520, y: 1250, s: 1.0, r: -3, blur: 0 },
-  { kind: 'x', title: 'You do not rise to the level of your goals', x: 820, y: 1420, s: 1.7, r: 5, blur: 4 },
+  { kind: 'youtube', title: 'Inside the mind of a master procrastinator', x: 600, y: 690, s: 1.05, r: -3, blur: 0 },
+  { kind: 'web', title: 'Four Thousand Weeks', x: 900, y: 817, s: 0.74, r: 5, blur: 1.6 },
+  { kind: 'instagram', title: 'Cala Goloritzé, Sardinia', x: 250, y: 849, s: 1.2, r: -4, blur: 0 },
+  { kind: 'x', title: 'How to Get Rich (without getting lucky)', x: 640, y: 976, s: 0.96, r: 2.5, blur: 0 },
+  { kind: 'web', title: 'The Tail End', x: 130, y: 1103, s: 1.75, r: -6, blur: 4 },
+  { kind: 'screenshot', title: 'Read Piranesi, and go in blind', x: 760, y: 1159, s: 1.02, r: 3.5, blur: 0 },
+  { kind: 'web', title: "Marcella Hazan's tomato sauce", x: 380, y: 1293, s: 1.18, r: -2.5, blur: 0 },
+  { kind: 'youtube', title: 'The Ultimate V60 Technique', x: 880, y: 1388, s: 0.72, r: 4, blur: 1.6 },
+  { kind: 'instagram', title: 'Cosmic Cliffs in the Carina Nebula', x: 520, y: 1515, s: 1.0, r: -3, blur: 0 },
+  { kind: 'x', title: 'You do not rise to the level of your goals', x: 820, y: 1650, s: 1.7, r: 5, blur: 4 },
 ];
 
 /** Where chip k is at frame f (without trails). */
 const chipAt = (k: number, f: number) => {
   const c = CHIPS[k];
-  const t0 = 1 + k * 3; // they arrive on a rolling 16th-note cascade
+  const t0 = 2 + k * 4; // they arrive on a rolling cascade, a 16th apart
   const arrive = prog(f, t0, t0 + 12, EASE_MODAL);
   // the hang: a slow push-in (near ones faster: parallax) and a drift apart
   const hang = prog(f, 0, HITS.collapse, (t) => t);

@@ -2497,16 +2497,24 @@ to its session:
 > feature-clip briefs below against the kit you built, and add a §9 entry.
 
 **What exists (the pilot, 2026-09-26, branch `claude/machina-reel-pilot`,
-awaiting owner review, not merged):** `MachinaReel` (20.0s, 1080×1920, score
-+ narrator + captions, the deliverable), `MachinaReelSilent` and
-`MachinaReelClean`, in `marketing/launch-clip/`. Hook (ten real saves
-collapse into the point, the brackets close, the narrator says the tagline)
-→ Save → Find → Ask (the hero) → Connect → Revisit → the lockup on "Never
-lose another great find". **Every frame of app UI is the real web app, not a
+awaiting owner review, not merged):** `MachinaReel` (42.7s after round 2,
+1080×1920, score + narrator + captions, the deliverable), `MachinaReelSilent`
+and `MachinaReelClean`, in `marketing/launch-clip/`. Hook ("You save great
+finds everywhere. Then they're gone." over ten real saves, which collapse
+into the point; the brackets close; the narrator says the tagline) → Save,
+then the new card OPENED to show what a save becomes (the gist, Key Points,
+a "Do this" line) → Find → Ask (the hero) → Connect → **Recall** (the
+Revisit tab's weekly recap, "This week in Machina", read down to its
+Standout and its question: "Every week, Machina writes up what you saved. So
+what you save stays with you.") → the lockup on "Never lose another great
+find". Round 2 (owner, 2026-09-27, on the 20s cut): too fast to follow, the
+review deck not interesting enough, say what a card holds, lean on recall;
+the answer was twice the length on the same beat grid (a phase per beat,
+reading-pace typing and streaming, longer holds). **Every frame of app UI is the real web app, not a
 mockup** (owner, mid-task): `capture/` builds `web/` as a static export with
 Firebase swapped for an in-memory stand-in seeded with a demo account of 24
 real, interesting saves (no "AI" anywhere), and Playwright records four
-takes on an iPhone-sized page with a stepped clock, so the app's own motion
+takes (save, find, ask, recall) on an iPhone-sized page with a stepped clock, so the app's own motion
 is recorded frame-exact. The backend's side is scripted (the Ask answer's
 text and citations, the search hit, when each phase completes); `web/` is
 untouched. The reusable **kit** is `src/reels/kit/` (curves, beat clock,
@@ -2564,12 +2572,15 @@ drafts; `npm run verify` has the final word on bans and fit.
    take): wide, then tap a node and its related saves light, then the
    collection those saves sit in (Collections are made by the user; do not
    imply the app files them into collections on its own).
-5. **Revisit** ("And the best ones come back to you." / "A few of your best
-   saves, back every day."). The Revisit tab's Daily Brew row → the deck
-   dealing, with each of the deck's actions (Keep, Remind, Archive) on its
-   own beat and the last card thrown into the lockup. The Daily Brew **push**
-   is native too: device-record it if the owner wants the notification in
-   shot, else open on the in-app row as the pilot does.
+5. **Recall** ("Every week, Machina writes up what you saved." / "So what
+   you save stays with you."). The pilot's Recall beat at full length: the
+   weekly recap opened and read (write-up, themes linking back to saves, the
+   Standout, "Worth sitting with"), then a theme's save tapped open. Add the
+   other ways saves come back as short inserts if they earn it: a reminder
+   coming due, a card's "Do this" line in the Revisit tab. The owner judged
+   the Daily Brew review deck "not interesting enough" for the highlight
+   reel; do not lead with it. The recap **push** is native: device-record it
+   if the notification should be in shot.
 
 *Where to "advertise" for free:* X (primary), Product Hunt, Hacker News,
 r/PKMS + r/productivity (follow self-promo rules: give value first), Indie
@@ -2581,6 +2592,22 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-27 — Highlight reel round 2 (owner notes on the 20s cut); still
+  NOT merged.** Branch `claude/machina-reel-pilot`. Owner: too fast to follow;
+  the review deck is not interesting enough; say that each save becomes a
+  card with its key info; "And the best ones come back to you" is not good
+  enough, lean on recall and the weekly recap. Now 42.7s on the same grid:
+  a problem line opens ("You save great finds everywhere. Then they're
+  gone."), Save opens the new card to its Key Points and "Do this" line
+  ("Each save becomes a card, with the key points pulled out."), and a new
+  **Recall** beat replaces Revisit: the real weekly recap ("This week in
+  Machina") seeded for the demo account and read down to its Standout and
+  question ("Every week, Machina writes up what you saved." / "So what you
+  save stays with you."). New takes: the save take now opens the card; a
+  `recall` take. Score re-arranged for 20 bars with an 8th-note groove.
+  README reel table + pacing rule updated, §8 status and the Recall brief
+  rewritten. Verified/not verified: see the delivery message and the
+  commit; nobody has listened to the mix.
 - **2026-09-26 — Machina highlight reel (pilot) BUILT; not merged, owner
   reviews the cut first.** Branch `claude/machina-reel-pilot`.
   `MachinaReel` (+ `Silent`, `Clean`) in `marketing/launch-clip/`: 20.0s

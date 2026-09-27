@@ -8,7 +8,13 @@
  * one beat is exactly 16 frames at 30fps, an 8th is 8, a 16th is 4, a bar is
  * 64. Every cut, tap, card landing and caption is placed on that grid in
  * FRAMES, which is how the edit and the synthesized score stay locked.
- * 600 frames = 9.375 bars = 20.0s.
+ * 1280 frames = 20 bars = 42.7s.
+ *
+ * ROUND 2 (owner, after the 20s cut): "way too fast, almost impossible to
+ * follow". Same grid, twice the room: a phase per BEAT (not per 8th), the
+ * app typing and streaming at the pace a person reads, and every caption
+ * held until it has been read. The cut's rhythm stays on the beat; only
+ * the distance between events grew.
  *
  * Every frame of app UI in the reel is the real app, captured by
  * capture/shoot.mjs; scenes refer to those takes by their marks.
@@ -29,21 +35,22 @@ export const beat = (n) => Math.round(n * BEAT_FRAMES);
 /** Bar → frame. */
 export const bar = (n) => Math.round(n * BAR_FRAMES);
 
-export const TOTAL_FRAMES = 600;
+export const TOTAL_FRAMES = 1280;
 export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 
 /**
- * The cut, in frames. One idea per scene; the hero (Ask) gets the most time.
- * Every boundary is a beat line (a multiple of 16).
+ * The cut, in frames. One idea per scene; the hero (Ask) and the two things
+ * people most need explained (what a save becomes, and how it comes back)
+ * get the most time. Every boundary is a beat line (a multiple of 16).
  */
 export const SCENES = [
-  { id: 'hook', from: 0, dur: 128 }, //  0.00  saves everywhere → one point → [ • ]
-  { id: 'save', from: 128, dur: 80 }, //  4.27  + → the five-phase pipeline → a card
-  { id: 'find', from: 208, dur: 64 }, //  6.93  plain words → the one card
-  { id: 'ask', from: 272, dur: 144 }, //  9.07  question → answer → three sources
-  { id: 'connect', from: 416, dur: 48 }, // 13.87  the graph lights those three
-  { id: 'revisit', from: 464, dur: 48 }, // 15.47  today's Daily Brew deals
-  { id: 'lockup', from: 512, dur: 88 }, // 17.07  the mark, the name, the subtitle
+  { id: 'hook', from: 0, dur: 208 }, //  0.0   saves everywhere, lost → one point → [ • ]
+  { id: 'save', from: 208, dur: 256 }, //  6.9   + → the five phases → the card → what it holds
+  { id: 'find', from: 464, dur: 144 }, // 15.5   plain words → the one card
+  { id: 'ask', from: 608, dur: 224 }, // 20.3   question → answer → three sources
+  { id: 'connect', from: 832, dur: 96 }, // 27.7   the graph lights those three
+  { id: 'recall', from: 928, dur: 256 }, // 30.9   this week's recap: themes, a standout, a question
+  { id: 'lockup', from: 1184, dur: 96 }, // 39.5   the mark, the name, the subtitle
 ];
 
 export const sceneAt = (id) => {
@@ -57,32 +64,40 @@ export const sceneAt = (id) => {
  * voice as the film: audio/synth-vo.py speaks `say` when present, else
  * `text`; the only allowed differences are the SAY_NAME respelling of
  * "Machina"). `at` is the frame the voice starts; `to` the frame the caption
- * leaves. Short lines, one per pillar, with air between them: the reel is
- * narrated by its pictures first.
+ * leaves. Short lines with air between them: the reel is narrated by its
+ * pictures first, and every line is on screen until it has been read.
+ *
+ * The arc: the problem (saved everywhere, then gone) → the promise (the
+ * tagline) → what a save becomes → finding it → asking it → how it comes
+ * back to you (recall) → the subtitle, which answers the first line.
  *
  * A "\n" is a hard line break on screen only (the voice reads straight on).
  * NO em dashes, no literal "AI", no "second brain", no "library" (verify).
  */
 export const CAPTIONS = [
+  { at: 4, to: 108, text: 'You save great finds everywhere.\nThen they’re gone.' },
   // the tagline introduces the product (D-6), spoken as the mark locks; it
   // holds over the + tap and the Add dialog so its last word can land
-  { at: 44, to: 146, place: 'hook', text: 'Machina.\nEverything you save, finally useful.' },
-  { at: 150, to: 180, text: 'Save anything.' },
-  { at: 214, to: 262, text: 'Find it in your own words.' },
-  { at: 278, to: 380, text: 'Ask anything. Every answer comes straight from your saves.' },
-  { at: 420, to: 464, text: 'See how it all connects.' },
-  { at: 468, to: 524, text: 'And the best ones come back to you.' },
+  { at: 112, to: 226, place: 'hook', text: 'Machina.\nEverything you save, finally useful.' },
+  { at: 236, to: 316, text: 'Save anything.' },
+  { at: 344, to: 452, text: 'Each save becomes a card,\nwith the key points pulled out.' },
+  { at: 484, to: 572, text: 'Find it in your own words.' },
+  { at: 640, to: 712, text: 'Ask anything.' },
+  { at: 736, to: 812, text: 'Every answer comes straight from your saves.' },
+  { at: 840, to: 916, text: 'See how it all connects.' },
+  { at: 952, to: 1040, text: 'Every week, Machina writes up what you saved.' },
+  { at: 1060, to: 1160, text: 'So what you save stays with you.' },
   // the close is the App Store subtitle, the same words the lockup sets
-  { at: 546, to: 600, place: 'lockup', text: 'Never lose another great find.' },
+  { at: 1218, to: 1280, place: 'lockup', text: 'Never lose another great find.' },
 ];
 
 /** The pillar word each product scene opens on (the kinetic kicker). */
 export const KICKERS = [
-  { at: 148, to: 204, text: 'Save' },
-  { at: 210, to: 268, text: 'Find' },
-  { at: 274, to: 412, text: 'Ask' },
-  { at: 418, to: 460, text: 'Connect' },
-  { at: 466, to: 510, text: 'Revisit' },
+  { at: 232, to: 452, text: 'Save' },
+  { at: 470, to: 596, text: 'Find' },
+  { at: 612, to: 822, text: 'Ask' },
+  { at: 836, to: 916, text: 'Connect' },
+  { at: 934, to: 1164, text: 'Recall' },
 ];
 
 /**
@@ -91,45 +106,51 @@ export const KICKERS = [
  * moves the picture and the sound together.
  */
 export const HITS = {
-  collapse: 40, // the saves rush together…
-  dotLands: 48, // …and land as one point (beat 3)
-  bracketsClose: 56, // the brackets snap shut around it (the app's spring)
-  markLocked: 64, // bar 1: the mark, whole
-  toApp: 120, // the point becomes the + button
-  plusTap: 132,
-  dialog: 136,
-  saveTap: 140,
-  phases: [144, 152, 160, 168, 176], // the five phases, an 8th apart
-  saved: 184,
-  cardLands: 200,
-  searchTap: 212,
-  typeFrom: 216,
-  found: 240,
-  askTap: 272,
-  askTypeFrom: 284,
-  send: 316,
-  answerFrom: 320,
-  sources: 344,
-  chips: [352, 360, 368],
-  graphTap: 400,
-  graph: 416,
-  revisitTap: 464,
-  reviewTap: 472,
-  flings: [480, 496],
-  lockup: 512,
-  markStrike: 534,
+  collapse: 88, // the saves rush together…
+  dotLands: 96, // …and land as one point (bar 1, beat 3)
+  bracketsClose: 104, // the brackets snap shut around it (the app's spring)
+  markLocked: 128, // bar 2: the mark, whole
+  toApp: 200, // the point becomes the + button
+  plusTap: 212,
+  dialog: 216,
+  saveTap: 232,
+  phases: [240, 256, 272, 288, 304], // the five phases, a beat apart
+  saved: 320,
+  cardLands: 336,
+  cardTap: 368, // open the new card: what it holds
+  keyPoints: 400, // …read down to its Key Points
+  searchTap: 472,
+  typeFrom: 480,
+  found: 528,
+  askTap: 608,
+  askTypeFrom: 640,
+  send: 688,
+  answerFrom: 696,
+  sources: 736,
+  chips: [752, 768, 784],
+  graphTap: 816,
+  graph: 832,
+  revisitTap: 928,
+  recapTap: 944, // open this week's recap
+  standout: 1088, // the standout arrives in view
+  lockup: 1184,
+  markStrike: 1206,
 };
 
 /** Risers END on the reveal they lead into. [from, to] in frames. */
 export const RISERS = [
-  [16, 48],
-  [96, 128],
-  [384, 416],
-  [500, 534],
+  [48, 96],
+  [168, 200],
+  [800, 832],
+  [1150, 1206],
 ];
 
 /**
- * Harmony, one chord per bar (the film's C-major vocabulary, walked brighter
- * and faster): the hook hangs on IV until the mark resolves home on I.
+ * Harmony, one chord per bar (the film's C-major vocabulary): the hook hangs
+ * on IV until the mark resolves home on I at bar 2, then I–V–IV walks under
+ * the product, settling home for the recap and the lockup.
  */
-export const BAR_CHORDS = ['Fmaj7', 'Cmaj7', 'Cmaj7', 'G6', 'Fmaj7', 'Cmaj7', 'G6', 'Fmaj7', 'Cmaj7', 'Cmaj7'];
+export const BAR_CHORDS = [
+  'Fmaj7', 'Fmaj7', 'Cmaj7', 'Cmaj7', 'G6', 'Fmaj7', 'Cmaj7', 'G6', 'Fmaj7', 'Cmaj7',
+  'G6', 'Fmaj7', 'Cmaj7', 'G6', 'Fmaj7', 'Cmaj7', 'Fmaj7', 'G6', 'Cmaj7', 'Cmaj7',
+];

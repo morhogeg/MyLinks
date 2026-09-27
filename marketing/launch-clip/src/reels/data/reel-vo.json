@@ -1,6 +1,20 @@
 [
  {
-  "frame": 44,
+  "frame": 4,
+  "text": "You save great finds everywhere. Then they\u2019re gone.",
+  "words": [
+   0.06,
+   0.255,
+   0.499,
+   0.792,
+   1.085,
+   2.03,
+   2.219,
+   2.523
+  ]
+ },
+ {
+  "frame": 112,
   "text": "Makeena. Everything you save, finally useful.",
   "words": [
    0.05,
@@ -12,7 +26,7 @@
   ]
  },
  {
-  "frame": 150,
+  "frame": 236,
   "text": "Save anything.",
   "words": [
    0.03,
@@ -20,7 +34,24 @@
   ]
  },
  {
-  "frame": 214,
+  "frame": 344,
+  "text": "Each save becomes a card, with the key points pulled out.",
+  "words": [
+   0.03,
+   0.295,
+   0.561,
+   0.985,
+   1.092,
+   1.71,
+   1.926,
+   2.098,
+   2.271,
+   2.572,
+   2.874
+  ]
+ },
+ {
+  "frame": 484,
   "text": "Find it in your own words.",
   "words": [
    0.14,
@@ -32,22 +63,28 @@
   ]
  },
  {
-  "frame": 278,
-  "text": "Ask anything. Every answer comes straight from your saves.",
+  "frame": 640,
+  "text": "Ask anything.",
   "words": [
    0.04,
-   0.246,
-   1.11,
-   1.374,
-   1.682,
-   1.946,
-   2.342,
-   2.562,
-   2.782
+   0.263
   ]
  },
  {
-  "frame": 420,
+  "frame": 736,
+  "text": "Every answer comes straight from your saves.",
+  "words": [
+   0.03,
+   0.302,
+   0.619,
+   0.891,
+   1.299,
+   1.526,
+   1.753
+  ]
+ },
+ {
+  "frame": 840,
   "text": "See how it all connects.",
   "words": [
    0.08,
@@ -58,21 +95,34 @@
   ]
  },
  {
-  "frame": 468,
-  "text": "And the best ones come back to you.",
+  "frame": 952,
+  "text": "Every week, Makeena writes up what you saved.",
   "words": [
-   0.07,
-   0.238,
-   0.406,
-   0.615,
-   0.825,
-   1.035,
-   1.244,
-   1.37
+   0.03,
+   0.305,
+   0.79,
+   1.171,
+   1.505,
+   1.648,
+   1.886,
+   2.076
   ]
  },
  {
-  "frame": 546,
+  "frame": 1060,
+  "text": "So what you save stays with you.",
+  "words": [
+   0.05,
+   0.186,
+   0.414,
+   0.595,
+   0.823,
+   1.095,
+   1.323
+  ]
+ },
+ {
+  "frame": 1218,
   "text": "Never lose another great find.",
   "words": [
    0.04,

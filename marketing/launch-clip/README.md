@@ -304,20 +304,27 @@ in the film claims availability.
 
 ## The highlight reel (pilot)
 
-`MachinaReel` is a 20.0s vertical reel: hook → Save → Find → Ask → Connect →
-Revisit → lockup, with its own score, the film's narrator and word-timed
-captions. **Every pixel of app UI in it is the real, shipped web app**, driven
-and recorded frame by frame; nothing is a mockup or a rebuilt screen.
+`MachinaReel` is a 42.7s vertical reel: hook → Save (and what a save
+becomes) → Find → Ask → Connect → Recall → lockup, with its own score, the
+film's narrator and word-timed captions. **Every pixel of app UI in it is the
+real, shipped web app**, driven and recorded frame by frame; nothing is a
+mockup or a rebuilt screen.
+
+The first cut ran 20s and the owner found it "way too fast, almost
+impossible to follow". Round 2 kept the grid and doubled the room: a phase
+per beat instead of per 8th, typing and streaming at reading pace, every
+caption held until it has been read, a card beat that shows what a save
+becomes, and a Recall beat (the weekly recap) in place of the review deck.
 
 | Frames | Time | Scene | What it does |
 |---|---|---|---|
-| 0–128 | 0:00 | `Hook` | Ten real saves from the demo account (a YouTube talk, an Instagram post, an X thread, a bookmarked essay, a screenshot…) hang in depth, collapse into one point of ink on beat 3, and the brackets snap shut around it. The narrator says the tagline ("Machina. Everything you save, finally useful.", set in the band above the mark); the point drops out of the mark to become the app's **+** button |
-| 128–208 | 4.3s | `Save` | The + irises open into Home → Add to Machina (lifted off its screen) → the five real phases from `web/lib/scanPhases.ts`, one per 8th note → the new card lands in the feed |
-| 208–272 | 6.9s | `Find` | "easy dinner, empty fridge" typed into the real search field (rack focus on the words) → the one card it means, Marcella Hazan's sauce, which shares no word with the query |
-| 272–416 | 9.1s | `Ask` | The hero: "What do my saves say about time?" → the streamed answer → three citation chips from three platforms (Wait But Why, a TED talk on YouTube, a thread on X), each lifting on its own 8th → the answer's Graph chip |
-| 416–464 | 13.9s | `Connect` | Cut on the downbeat to inside the real graph, the three cited saves lit and blooming; pull back to the whole graph |
-| 464–512 | 15.5s | `Revisit` | The Revisit tab → "Review 5 cards / From today's Daily Brew" → the review deck dealing: Keep, Keep, and the last card thrown out of frame |
-| 512–600 | 17.1s | `End` | The mark arrives with the app's own launch motion, the drawn wordmark, and the App Store subtitle "Never lose another great find" on the narrator's timing |
+| 0–208 | 0:00 | `Hook` | Ten real saves from the demo account hang in depth under the first line ("You save great finds everywhere. Then they're gone."), collapse into one point of ink, and the brackets snap shut around it. The narrator says the tagline, set in the band above the mark; the point drops out of the mark to become the app's **+** button |
+| 208–464 | 6.9s | `Save` | The + irises open into Home → Add to Machina (lifted off its screen) → the five real phases from `web/lib/scanPhases.ts`, one per beat → the new card lands → it is opened: the gist, its **Key Points** and its **Do this** line ("Each save becomes a card, with the key points pulled out.") |
+| 464–608 | 15.5s | `Find` | "easy dinner, empty fridge" typed into the real search field (rack focus on the words) → the one card it means, Marcella Hazan's sauce, which shares no word with the query → pull back, tap Ask |
+| 608–832 | 20.3s | `Ask` | The hero: "What do my saves say about time?" → the streamed answer → three citation chips from three platforms, each lifting on its own beat → the answer's Graph chip |
+| 832–928 | 27.7s | `Connect` | Cut on the downbeat to inside the real graph, the three cited saves lit; pull back to the whole graph; tap Revisit |
+| 928–1184 | 30.9s | `Recall` | The Revisit tab's "This week in Machina", the app's weekly recap, opened and read: the write-up, two themes linking back to their saves, the Standout to reread, and the question it leaves you with ("Every week, Machina writes up what you saved." / "So what you save stays with you.") |
+| 1184–1280 | 39.5s | `End` | The mark arrives with the app's own launch motion, the drawn wordmark, and the App Store subtitle "Never lose another great find" on the narrator's timing |
 
 Compositions: **`MachinaReel`** (score + narrator + captions, the
 deliverable), **`MachinaReelSilent`** (captions, no audio: stills and QA),
@@ -357,7 +364,8 @@ stops the reel drifting away from the shipped UI).
 - **`capture/device.mjs`** is an iPhone-sized page: 393×852 points at DPR 4,
   touch, safe-area insets, a 9:41 status bar.
 - **`capture/recorder.mjs` + `shoot.mjs`** record four takes (`save`, `find`,
-  `ask`, `revisit`). The page's clock is stepped one frame (33.3ms) at a time
+  `ask`, `recall`; `revisit`, the review deck, is kept for the feature
+  clips). The page's clock is stepped one frame (33.3ms) at a time
   and CSS animations are paused and seeked, so the app's own motion (the phases
   ticking, the answer streaming, the graph laying itself out, the deck's fling
   and KEEP stamp) is recorded frame-exact. Each frame also records the text on
@@ -447,7 +455,7 @@ Anything that holds is rounded to whole pixels (the film's shimmer lesson).
 |---|---|---|---|
 | `EASE_MODAL` | `cubic-bezier(0.32, 0.72, 0, 1)`, the app's `--ease-modal` | arriving and settling | caption words, camera landings, the dialog arriving, the wordmark wipe |
 | `EASE_SPRING` | `cubic-bezier(0.34, 1.56, 0.64, 1)`, the app's `--ease-spring` | physical arrivals (the only overshoot) | brackets snapping shut, the ink point, chips and the new card lifting |
-| `EASE_FLING` | `cubic-bezier(0.22, 1, 0.36, 1)`, the deck's own fling | things thrown | caption exits, the deck's follow-through, the dialog dropping away |
+| `EASE_FLING` | `cubic-bezier(0.22, 1, 0.36, 1)`, the deck's own fling | things thrown | caption exits, the dialog dropping away into the feed |
 | `EASE_IN_OUT` | `cubic-bezier(0.65, 0, 0.35, 1)` | travel between two holds | feed → search field, answer → sources, the iris, the point's travel |
 | `EASE_GATHER` | accelerating, cubic-in | moves that must end at speed | the saves collapsing; a camera diving into a hard cut |
 
@@ -464,17 +472,17 @@ In order of appearance; nothing outside this list.
 2. **Iris.** The + button opens into its screen (`AppShot` `iris`).
 3. **Lift.** An element leaves its screen with its own depth: the Add dialog
    (`AppShot` `crop`), the new card, the citation chips (`Lift`).
-4. **Same-pixels hand-over.** Two takes that show the same screen swap under
-   one camera, which makes the swap invisible (`Save` rides `findKeys` until the
-   search tap). **Never dissolve between two takes:** they double-expose.
+4. **Open the thing.** A tap on an element and the app's own transition
+   into it (the new card → its detail view; the recap banner → the recap).
+   **Never dissolve between two takes:** they double-expose.
 5. **Cut on the beat.** A hard cut on a beat line or an 8th (Find → Ask, the
-   composer, the answer, Connect → Revisit, the deck). `camVelocity` reads a
+   composer, the answer, Connect → Recall, the card's detail → Find). `camVelocity` reads a
    cut forward, so the first frame of a new shot is sharp.
 6. **Dive into a cut.** The camera accelerates into the tapped element
    (`EASE_GATHER`) and cuts on the downbeat to *inside* the next screen, which
    fills the frame and pulls back (`EASE_MODAL`): Ask's Graph chip → the graph.
-7. **Throw out.** The last card is flung and the camera goes with it
-   (directional motion blur) into the lockup (`Revisit` → `End`).
+7. **Throw out.** The camera throws the last screen out of frame
+   (directional motion blur) into the lockup (`Recall` → `End`).
 
 Every change of screen is motivated by a finger: a `Tap` (the reel's one
 piece of added UI, since iOS draws no touches) lands on the element that
@@ -482,10 +490,14 @@ causes it, and the cut lands on the touch.
 
 ### Pacing (`clock.ts`, `reel-timeline.mjs`)
 
-112.5 BPM: 16 frames a beat, 64 a bar, 600 frames = 20.0s. **Cuts and taps land
-on beats; secondary events on 8ths** (the five phases, the three chips, the
-flings); only typing runs on 16ths. One idea per scene, and the hero (Ask)
-gets the longest (144 frames). A caption stays up until its line has been
+112.5 BPM: 16 frames a beat, 64 a bar, 1280 frames = 42.7s. **Cuts and taps
+land on beats, and so do the events you must read** (the five phases, the
+three chips); typing and streaming run at reading pace, not capture pace.
+One idea per scene; the hero (Ask), the card and the recap get the most time
+(224–256 frames each). **Give every beat room:** a 20s cut of the same story
+was "almost impossible to follow" (owner), so the rule is at least a beat of
+hold on anything the narrator points at, and at least two seconds of screen
+for any line of app text the viewer should read. A caption stays up until its line has been
 spoken and its last word has landed (verify fails a voice line that overruns
 its caption). Motion blur is what a 180° shutter would give (σ ≈ 0.14 × px
 per frame, directional, capped at 10px) and never appears on a hold.
@@ -498,7 +510,7 @@ per frame, directional, capped at 10px) and never appears on a hold.
   chips" or "the search field" by name. Zoom interpolates in log space and
   stays at or under the capture's DPR (4), so the app is never upscaled soft.
 - **Close-ups are 2D.** 3D tilt (under 10°) is for establishing moves only:
-  Home after the iris, the graph pull-back, the Revisit screen. It settles out
+  Home after the iris, the graph pull-back, the Revisit tab. It settles out
   before anything must be read.
 - **A dive lands inside the app.** The first frame after a dive's cut is
   filled edge to edge by the next screen; the floating slab, its shadow and

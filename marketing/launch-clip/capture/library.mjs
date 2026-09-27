@@ -61,6 +61,15 @@ export const CARDS = [
     // saved moments ago: the Save beat saves it, every later beat sees it new
     age: 0,
     status: 'unread',
+    // what the card holds once it is read: the open view's Key Points and
+    // its one "Do this" line (the Save beat opens it to show that)
+    detail: [
+      '## Key Points',
+      '- Counted in visits, most people have spent over 90% of their in-person time with their parents by the end of high school.',
+      '- The same math holds for siblings and old friends once you no longer share a city.',
+      '- So: live near the people you love, and treat time together as the scarce thing it is.',
+    ].join('\n'),
+    takeaway: 'Call your parents this week, and put the next visit on the calendar.',
   },
   {
     id: 'piranesi',
@@ -527,6 +536,36 @@ export const ASK = {
 export const SEARCH = {
   query: 'easy dinner, empty fridge',
   hits: ['marcella'],
+};
+
+/**
+ * This week's "This week in Machina" recap (the app's weekly synthesis,
+ * users/{uid}/syntheses/{weekId}): what the server writes on the user's
+ * recap day. The Recall beat opens it. Written from the week's real saves
+ * (ages 0–7 above); no "learned" framing, it is a recap, not a lesson.
+ */
+export const SYNTHESIS = {
+  title: 'Your week kept coming back to time',
+  narrative: [
+    'Five saves this week, and three of them are about the same thing: how little time there is, and how to spend it.',
+    'The Tail End counts it in visits with your parents. Four Thousand Weeks counts it in weeks, and argues for doing fewer things on purpose. Perfect Days shows what that looks like on an ordinary Tuesday.',
+  ].join('\n'),
+  themes: [
+    {
+      title: 'Counting the time that is left',
+      insight: 'Two very different writers land on the same arithmetic, and the same answer: spend it on the people and things you would miss.',
+      cardIds: ['tailend', 'fourthousand'],
+    },
+    {
+      title: 'Somewhere to be slow',
+      insight: 'A film about one quiet routine, a beach you can only reach by boat, and a novel to read in one sitting.',
+      cardIds: ['perfectdays', 'goloritze', 'piranesi'],
+    },
+  ],
+  standoutCardId: 'tailend',
+  standoutReason: 'The one to reread. It turns an abstract number into Sunday lunches you can still plan.',
+  openQuestion: 'If you counted the visits you have left, who would you call this week?',
+  cardCount: 5,
 };
 
 /** The card the Save beat captures (it is also the first Ask source). */

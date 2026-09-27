@@ -71,7 +71,7 @@ export function seedEntries(now: number): [string, Data][] {
       url: c.url,
       title: c.title,
       summary: c.summary,
-      detailedSummary: c.summary,
+      detailedSummary: (c as { detail?: string }).detail ?? c.summary,
       tags: c.tags,
       category: c.category,
       status: c.status,

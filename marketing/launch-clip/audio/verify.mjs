@@ -244,6 +244,11 @@ console.log('\n── reel');
   scan('Ask question', L.ASK.question);
   scan('Ask answer', L.ASK.answer);
   scan('search query', L.SEARCH.query);
+  for (const c of L.CARDS) for (const k of ['detail', 'takeaway']) if (c[k]) scan(`card ${c.id}.${k}`, c[k]);
+  const Y = L.SYNTHESIS;
+  [Y.title, Y.narrative, Y.standoutReason, Y.openQuestion, ...Y.themes.flatMap((x) => [x.title, x.insight])].forEach((x) =>
+    scan('weekly recap', x),
+  );
   const hookSrc = read('src/reels/scenes/Hook.tsx');
   const titles = [...hookSrc.matchAll(/title: (?:'([^']+)'|"([^"]+)")/g)].map((m) => m[1] ?? m[2]);
   for (const t of titles) {
