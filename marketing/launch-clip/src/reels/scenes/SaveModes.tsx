@@ -3,8 +3,9 @@ import { AbsoluteFill } from 'remotion';
 import { HOLDS, MODES } from '../../../reel-timeline.mjs';
 import { AppShot, Lift, Tap } from '../kit/AppShot';
 import { camAt, camVelocity, type Key } from '../kit/camera';
-import { EASE_MODAL, EASE_SPRING, mix, prog } from '../kit/curves';
+import { EASE_IN_OUT, EASE_MODAL, EASE_SPRING, mix, prog } from '../kit/curves';
 import { at, center, rectOf } from '../kit/takes';
+import { saveBaseCam, saveDialogCam } from './Save';
 
 const HOLD = HOLDS.find((h) => h.id === 'modes')!;
 
@@ -36,9 +37,10 @@ const SAVE = MODES.save; // Save is tapped here; the Save scene resumes on the p
 
 const keys: Key[] = [
   // where the Save scene's lifted dialog is at this moment
-  { f: 0, cx: 196.5, cy: 426, z: 2.22 + 0.08 * ((HOLD.at - 136) / 14), fx: 540, fy: 1236 },
-  // in onto the tabs and what each one takes
-  { f: 16, cy: 452, z: 2.62, fy: 1230, ease: EASE_MODAL },
+  { f: 0, ...saveDialogCam(HOLD.at - 0.01) },
+  // in onto the tabs and what each one takes: eased in AND out (round 13:
+  // from a camera at rest, EASE_MODAL's fast start was a lunge on frame 1)
+  { f: 16, cy: 452, z: 2.62, fy: 1230, ease: EASE_IN_OUT },
   { f: HOLD.len, cy: 458, z: 2.7, ease: linear },
 ];
 
@@ -57,8 +59,8 @@ export const SaveModes: React.FC<{ u: number }> = ({ u }) => {
       <AppShot
         take={T}
         i={at(T, 'home')}
-        cam={{ cx: 196.5, cy: 430, z: 1.38, fx: 540, fy: 1190, rx: 0, ry: 0, rz: 0 }}
         // exactly where the Save scene's back-screen is at the hold's frame
+        cam={saveBaseCam(HOLD.at)}
         blur={mix(0, 16, prog(HOLD.at, 136, 146, EASE_MODAL))}
         dim={0.12 * prog(HOLD.at, 136, 146)}
       />

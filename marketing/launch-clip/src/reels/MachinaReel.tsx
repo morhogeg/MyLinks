@@ -75,8 +75,9 @@ export const MachinaReel: React.FC<{
       />
       <Lens />
 
-      {/* the first breath: the reel opens out of white */}
-      <AbsoluteFill style={{ background: '#FFFFFF', opacity: Math.max(0, 1 - f / 7), pointerEvents: 'none' }} />
+      {/* (round 13: no white first breath. The first frame is the one a feed
+          or a link preview shows before anything plays; it is the scatter of
+          saves coming into focus, not a blank page) */}
     </AbsoluteFill>
   );
 };

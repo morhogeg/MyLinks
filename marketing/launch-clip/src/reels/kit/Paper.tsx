@@ -61,8 +61,39 @@ export const Paper: React.FC<{ drift?: number; lift?: number; children?: React.R
         filter: 'blur(36px)',
       }}
     />
+    {/* on the paper only: the app's screens and the type sit on top of it */}
+    <Dither />
     {children}
   </AbsoluteFill>
+);
+
+/**
+ * Dither (round 13). The set is a few very soft gradients on a light ground,
+ * and Chromium draws gradients in 8 bits: the pools and the vignette stepped
+ * into faint concentric rings, one code value apart, visible at 1:1 on a
+ * phone and made blocky by every re-encode. The grain cannot help (an overlay
+ * barely touches light tones). This is a fixed, fine noise of about one code
+ * value either way: a white speck lifts, a black speck lowers, from the SAME
+ * noise so a pixel only ever moves one way, so the steps dissolve without
+ * greying or flattening the grade. It does not move: it costs the encoder
+ * nothing from frame to frame. It lives in the Paper, UNDER the app and the
+ * type: a white speck's lift grows with how dark the tone is, so on ink it
+ * would sparkle.
+ */
+const DITHER_TILE = (() => {
+  // alpha = a × (2·noise − 1) for the white specks, a × (1 − 2·noise) for the
+  // black ones (clamped at 0, so each pixel gets one or the other). Strengths
+  // sized for the set's tones (about 0.9–0.99): ~1 code value on average
+  const tile = (rgb: number, a: number) =>
+    `url("data:image/svg+xml;utf8,${encodeURIComponent(
+      `<svg xmlns='http://www.w3.org/2000/svg' width='256' height='256'><filter id='d' x='0' y='0' width='100%' height='100%' color-interpolation-filters='sRGB'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' seed='7' stitchTiles='stitch'/><feColorMatrix type='matrix' values='0 0 0 0 ${rgb}  0 0 0 0 ${rgb}  0 0 0 0 ${rgb}  ${2 * a} 0 0 0 ${-a}'/></filter><rect width='256' height='256' filter='url(#d)'/></svg>`,
+    )}")`;
+  const b = 0.023;
+  return `${tile(1, 0.43)}, ${tile(0, -b)}`;
+})();
+
+export const Dither: React.FC = () => (
+  <AbsoluteFill style={{ backgroundImage: DITHER_TILE, pointerEvents: 'none' }} />
 );
 
 /** The lens over everything: grain + the lightest vignette. */

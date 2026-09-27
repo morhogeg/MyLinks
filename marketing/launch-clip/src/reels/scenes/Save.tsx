@@ -1,6 +1,6 @@
 import React from 'react';
 import { AbsoluteFill } from 'remotion';
-import { HITS } from '../../../reel-timeline.mjs';
+import { HITS, HOLDS } from '../../../reel-timeline.mjs';
 import { AppShot, Lift, Tap } from '../kit/AppShot';
 import { camAt, camVelocity, type Key } from '../kit/camera';
 import { EASE_FLING, EASE_IN_OUT, EASE_MODAL, EASE_SPRING, mix, prog } from '../kit/curves';
@@ -25,6 +25,38 @@ const S = HITS;
 /** frame of the take for this reel frame, walking `mark` from `from` */
 const walk = (f: number, from: number, mark: string, len = 9) => at(T, mark, Math.min(len, Math.max(0, f - from)));
 
+// the establishing camera (the + button, from the match cut) → pushed back
+// behind the dialog → forward onto the feed as the card lands (see below)
+const baseKeys: Key[] = [
+  { f: HANDOFF.iris, ...SAVE_OPEN_CAM, rx: 9 },
+  { f: 134, z: 1.56, rx: 0, ease: EASE_MODAL },
+  { f: 140, cx: 196.5, cy: 430, z: 1.38, fx: 540, fy: 1190, ease: EASE_IN_OUT },
+  { f: 184, z: 1.42, ease: (t) => t },
+  { ...findKeys[0], ease: EASE_IN_OUT },
+];
+
+/** the modes hold (scenes/SaveModes.tsx) starts on the phases' first frame */
+const TOUR = HOLDS.find((h) => h.id === 'modes')!.at;
+
+// the dialog, lifted: aimed at the filled dialog's box, pushing in slowly,
+// then dropping away into the feed
+const dKeys: Key[] = [
+  { f: 136, cx: 196.5, cy: 426, z: 2.22, fx: 540, fy: 1236 },
+  { f: TOUR - 0.01, z: 2.22 + 0.08 * ((TOUR - 0.01 - 136) / 14), ease: (t) => t },
+  // the modes hold happens here (scenes/SaveModes.tsx); from its last frame
+  // on the camera is exactly where that scene leaves it, on the tabs
+  { f: TOUR, cy: 458, z: 2.7, fy: 1230, ease: (t) => t },
+  { f: 160, cy: 500, z: 2.7, fy: 1160, ease: EASE_MODAL },
+  { f: 184, cy: 510, z: 2.85, ease: (t) => t },
+  { f: 189, cy: 520, z: 2.3, fy: 1130, ease: EASE_MODAL },
+  { f: 194, cy: 330, z: 1.1, fy: 1000, ease: EASE_FLING },
+];
+
+/** where the Save scene's screen and lifted dialog are at a source frame
+ *  (SaveModes starts from exactly these, so the hold's seams are invisible) */
+export const saveBaseCam = (f: number) => camAt(baseKeys, f);
+export const saveDialogCam = (f: number) => camAt(dKeys, f);
+
 export const Save: React.FC<{ f: number }> = ({ f }) => {
   if (f < HANDOFF.iris || f >= S.searchTap) return null;
 
@@ -33,10 +65,8 @@ export const Save: React.FC<{ f: number }> = ({ f }) => {
   // before the modes hold the dialog is as it opened (empty, on Link); the
   // hold (scenes/SaveModes.tsx) walks Link, Image, Note and pastes the link
   const dialogFrame =
-    f < 141
+    f < S.phases[0]
       ? at(T, 'modeImage') - 1
-      : f < S.phases[0]
-        ? at(T, 'filled')
       : f < S.saved
         ? walk(f, S.phases[phase], `phase${phase}`, 7)
         : walk(f, S.saved, 'done', 20);
@@ -51,34 +81,19 @@ export const Save: React.FC<{ f: number }> = ({ f }) => {
   // landing on, the screen rides FIND's camera: the two takes show the same
   // feed pixel for pixel, so Find takes the screen over on the search tap
   // with no seam (no dissolve, no double image).
-  const baseKeys: Key[] = [
-    { f: HANDOFF.iris, ...SAVE_OPEN_CAM, rx: 9 },
-    { f: 134, z: 1.56, rx: 0, ease: EASE_MODAL },
-    { f: 140, cx: 196.5, cy: 430, z: 1.38, fx: 540, fy: 1190, ease: EASE_IN_OUT },
-    { f: 184, z: 1.42, ease: (t) => t },
-    { ...findKeys[0], ease: EASE_IN_OUT },
-  ];
   const onFind = f >= findKeys[0].f;
   const base = onFind ? camAt(findKeys, f) : camAt(baseKeys, f);
-  const backBlur = mix(0, 16, prog(f, 136, 146, EASE_MODAL)) * (1 - prog(f, 186, 198, EASE_MODAL));
-  const backDim = 0.12 * prog(f, 136, 146) * (1 - prog(f, 186, 198));
+  // the screen behind stays out of focus until the dialog has gone, then
+  // racks into focus on the feed as the card lands (round 13: it sharpened
+  // while the fading dialog was still over it, a few frames of text on text)
+  const backBlur = mix(0, 16, prog(f, 136, 146, EASE_MODAL)) * (1 - prog(f, 190, 199, EASE_IN_OUT));
+  const backDim = 0.12 * prog(f, 136, 146) * (1 - prog(f, 190, 199));
 
   // the dialog, lifted: aimed at the filled dialog's box, pushing in slowly,
   // then dropping away into the feed
-  const dKeys: Key[] = [
-    { f: 136, cx: 196.5, cy: 426, z: 2.22, fx: 540, fy: 1236 },
-    { f: 140.99, z: 2.2486, ease: (t) => t },
-    // the modes hold happens at 141 (scenes/SaveModes.tsx); from its last
-    // frame on the camera is exactly where that scene leaves it, on the tabs
-    { f: 141, cy: 458, z: 2.7, fy: 1230, ease: (t) => t },
-    { f: 160, cy: 500, z: 2.7, fy: 1160, ease: EASE_MODAL },
-    { f: 184, cy: 510, z: 2.85, ease: (t) => t },
-    { f: 189, cy: 520, z: 2.3, fy: 1130, ease: EASE_MODAL },
-    { f: 194, cy: 330, z: 1.1, fy: 1000, ease: EASE_FLING },
-  ];
   const dCam = camAt(dKeys, f);
   const dialogIn = prog(f, 136, 141, EASE_MODAL);
-  const dialogOut = prog(f, 188, 193, EASE_MODAL);
+  const dialogOut = prog(f, 188, 191, EASE_IN_OUT);
 
   // the toast: the app's own "Saved to Machina", floated under the dialog
   // the pill inside the toast's container (measured off the capture)
@@ -119,7 +134,9 @@ export const Save: React.FC<{ f: number }> = ({ f }) => {
       >
         <Tap x={plus.x} y={plus.y} t={prog(f, S.plusTap - 5, S.plusTap + 9, (t) => t)} />
         <Tap x={search.x} y={search.y} t={prog(f, S.searchTap - 5, S.searchTap + 9, (t) => t)} />
-        {landed && (
+        {/* (from the landing only: a Lift is a sharp copy of its box, and the
+            feed is still coming into focus before it) */}
+        {f >= S.cardLands - 1 && (
           <Lift
             take={T}
             i={baseFrame}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { AbsoluteFill } from 'remotion';
-import { CAPTIONS, FPS, HITS, HOLDS, holdStart } from '../../../reel-timeline.mjs';
+import { CAPTIONS, FPS, HITS, HOLDS, holdStart, real } from '../../../reel-timeline.mjs';
 import VO from '../data/reel-vo.json';
 import { EASE_GATHER, EASE_IN_OUT, EASE_MODAL, EASE_SPRING, mix, prog } from '../kit/curves';
 import { MarkAssembly, SaveChip, type SaveKind } from '../kit/Brand';
@@ -12,7 +12,8 @@ import { HANDOFF } from './handoff';
  *
  * Ten real saves from the demo account (the same cards the app shows later),
  * each where it was kept: a YouTube video, an Instagram post, an X thread, a
- * bookmarked page, a screenshot. They arrive on 16ths, hang in depth, then
+ * bookmarked page, a screenshot. They come into focus on 16ths (a soft
+ * scatter is already there on frame 0, the reel's poster), hang in depth, then
  * collapse on an ACCELERATING curve (EASE_GATHER, the one move that ends at
  * speed) into a single point of ink on beat 3. The brackets snap shut around
  * it on the app's spring, the narrator names it (the caption sets "Machina."
@@ -75,6 +76,8 @@ const HLEN = HOLDS.find((h) => h.id === 'problem')!.len;
 const chipAt = (k: number, f: number, out: number) => {
   const c = CHIPS[k];
   const t0 = 1 + k * 2; // they arrive on a rolling cascade
+  // (round 13: they come INTO FOCUS rather than out of nothing, so the very
+  // first frame, the one a feed shows before it plays, is already the scatter)
   const arrive = prog(f, t0, t0 + 12, EASE_MODAL);
   // the hang: a slow push-in (near ones faster: parallax) and a drift apart
   const hang = prog(f, 0, HITS.collapse, (t) => t);
@@ -88,18 +91,20 @@ const chipAt = (k: number, f: number, out: number) => {
     return acc + prog(out, w - 2, w + 6, EASE_SPRING) * (1 - prog(out, w + 34, w + 50, EASE_MODAL));
   }, 0);
   const ox = (c.x - C.x) * push * (1 - 0.35 * e);
-  const oy = (c.y - C.y) * push + (1 - arrive) * 50 * depth;
+  const oy = (c.y - C.y) * push + (1 - arrive) * 28 * depth;
   // the gather
   const g = prog(f, HITS.collapse - 8, HITS.dotLands, EASE_GATHER);
   // "rarely seen again": bleached into the paper, back to ink as it is gathered
-  const b = prog(out, BLEACH_FROM, BLEACH_FROM + 36, EASE_MODAL) * (1 - prog(f, HITS.collapse - 2, HITS.dotLands - 2, EASE_MODAL));
+  // (the ink comes back eased in and out as they accelerate inward; on
+  // EASE_MODAL it came back in two frames, a pop)
+  const b = prog(out, BLEACH_FROM, BLEACH_FROM + 36, EASE_MODAL) * (1 - prog(f, HITS.collapse - 4, HITS.dotLands - 2, EASE_IN_OUT));
   return {
     x: C.x + ox * (1 - g),
     y: C.y + oy * (1 - g),
-    s: c.s * push * (1 + 0.14 * e) * mix(0.9, 1, arrive) * mix(1, 0.06, Math.pow(g, 0.7)),
+    s: c.s * push * (1 + 0.14 * e) * mix(0.95, 1, arrive) * mix(1, 0.06, Math.pow(g, 0.7)),
     r: c.r * (1 - g) * (1 - 0.5 * e) + g * (k % 2 ? 16 : -16),
-    o: arrive * (1 - Math.pow(g, 5)) * (1 - 0.72 * b),
-    blur: (1 - arrive) * 14 + c.blur * (1 - g) * (1 - e) + g * 2 + 3 * b,
+    o: mix(0.5, 1, arrive) * (1 - Math.pow(g, 5)) * (1 - 0.72 * b),
+    blur: (1 - arrive) * 8 + c.blur * (1 - g) * (1 - e) + g * 2 + 3 * b,
     grey: b,
     e,
     g,
@@ -125,14 +130,21 @@ export const Hook: React.FC<{ f: number; out: number }> = ({ f, out }) => {
   // the name: the wordmark wipes in under the mark and the pair eases up into
   // one centred lockup; both part before the point drops
   const wm = prog(out, NAME_AT, NAME_AT + 16, EASE_MODAL);
-  const lift = prog(out, NAME_AT - 4, NAME_AT + 20, EASE_MODAL);
-  const markY = C.y - 70 * lift * (1 - part);
+  // (round 13: the pair glides up, eased in and out, instead of jumping off
+  // the mark's rest at EASE_MODAL speed; and it stays up while the brackets
+  // part, so the point leaves in ONE move instead of dropping 70px first)
+  const lift = prog(out, NAME_AT - 8, NAME_AT + 22, EASE_IN_OUT);
+  const markY = C.y - 70 * lift;
+  // while the name and the shares hold, the lockup is never dead still: a
+  // slow push around the point (the shares aim at the point, which stays put)
+  const push = 1 + 0.04 * prog(out, NAME_AT + 22, real(HANDOFF.part), (t) => t);
   const markScale = mix(1, 0.86, form);
   const MARK_W = 300;
   const dotR = 52 * (MARK_W / 448) * markScale; // the point's radius, px
   const dotX = mix(C.x, HANDOFF.plus.x, travel);
   const dotY = mix(markY, HANDOFF.plus.y, travel);
-  const dotScale = mix(1, HANDOFF.plus.r / dotR, travel);
+  // the point grows with the push, and is exactly the + button's size on arrival
+  const dotScale = mix(push, HANDOFF.plus.r / dotR, travel);
 
   return (
     <AbsoluteFill style={{ pointerEvents: 'none' }}>
@@ -176,7 +188,7 @@ export const Hook: React.FC<{ f: number; out: number }> = ({ f, out }) => {
             position: 'absolute',
             left: C.x,
             top: markY,
-            transform: `translate(-50%, -50%) scale(${markScale})`,
+            transform: `translate(-50%, -50%) scale(${markScale * push})`,
             opacity: 1 - part,
             filter: `drop-shadow(0 ${10 + flash * 10}px ${30 + flash * 40}px rgba(24,32,48,${0.22 + flash * 0.2}))`,
           }}
@@ -191,8 +203,8 @@ export const Hook: React.FC<{ f: number; out: number }> = ({ f, out }) => {
           style={{
             position: 'absolute',
             left: C.x,
-            top: markY + 190,
-            width: 460,
+            top: markY + 190 * push,
+            width: 460 * push,
             transform: `translate(-50%, 0) translateY(${Math.round((1 - wm) * 10)}px)`,
             clipPath: `inset(-20% ${((1 - wm) * 100).toFixed(2)}% -20% 0)`,
             opacity: 1 - part,

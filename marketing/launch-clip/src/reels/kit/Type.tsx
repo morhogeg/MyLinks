@@ -1,6 +1,6 @@
 import React from 'react';
 import { sans } from '../../fonts';
-import { EASE_FLING, EASE_MODAL, mix, prog } from './curves';
+import { EASE_IN_OUT, EASE_MODAL, mix, prog } from './curves';
 
 /**
  * Kinetic type. Two voices, one family (Geist, the brand face):
@@ -25,8 +25,11 @@ export const INK_SOFT = 'rgba(75,85,99,0.82)';
 /** frames a word takes to come into focus; frames between words in a line */
 const WORD_IN = 7;
 const CASCADE = 1.5;
-/** frames the whole line takes to leave */
-const LINE_OUT = 6;
+/** frames the whole line takes to leave, and its curve: eased in AND out
+ *  (round 13: on EASE_MODAL half the fade happened on the first frame, so a
+ *  line blinked out instead of leaving) */
+const LINE_OUT = 8;
+const EXIT = EASE_IN_OUT;
 
 /**
  * One narrated line, LINE BY LINE (round 6, owner: the word-by-word mask
@@ -56,7 +59,7 @@ export const KineticLine: React.FC<{
   if (frame < from - 2 || frame > to + 2) return null;
   const local = frame - from;
   const lines = text.split('\n').map((l) => l.split(' ').filter(Boolean));
-  const out = prog(local, to - from - LINE_OUT, to - from, EASE_MODAL);
+  const out = prog(local, to - from - LINE_OUT, to - from, EXIT);
   let w = -1;
   return (
     <div
@@ -126,9 +129,9 @@ export const KineticLine: React.FC<{
 export const Kicker: React.FC<{ text: string; frame: number; from: number; to: number }> = ({ text, frame, from, to }) => {
   if (frame < from || frame > to) return null;
   const local = frame - from;
-  // leaves WITH its line (round 11): the same 6-frame blur-and-rise, ending
-  // on the same frame, so label and line go as one
-  const out = prog(frame, to - LINE_OUT, to, EASE_MODAL);
+  // leaves WITH its line (round 11): the same blur-and-rise, ending on the
+  // same frame, so label and line go as one
+  const out = prog(frame, to - LINE_OUT, to, EXIT);
   const track = mix(0.62, 0.44, prog(local, 0, 14, EASE_MODAL));
   const letters = text.toUpperCase().split('');
   // the word alone, no rule beside it (owner, round 10)

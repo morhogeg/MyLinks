@@ -16,6 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BAR } from '../timeline.mjs';
+import { limit, lufs, truePeak } from './loudness.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(here, '..');
@@ -66,6 +67,12 @@ for (let i = 0; i < N; i++) {
 }
 
 const manifest = JSON.parse(fs.readFileSync(path.join(voDir, 'manifest.json'), 'utf8'));
+// a reel line may duck the music further than the rest (`duck` on its caption
+// in reel-timeline.mjs, keyed by the frame the line starts on)
+const lineDuck =
+  name === 'reel'
+    ? Object.fromEntries((await import('../reel-timeline.mjs')).CAPTIONS.filter((c) => c.duck).map((c) => [c.at, c.duck]))
+    : {};
 
 // duck envelope: 1 everywhere, dips to DUCK across each VO line
 const DUCK = script.duck;
@@ -93,10 +100,11 @@ for (const line of manifest) {
   }
   const d0 = Math.max(0, start - RAMP);
   const d1 = Math.min(N, start + outFrames + RAMP);
+  const D = lineDuck[line.frame] ?? DUCK;
   for (let i = d0; i < d1; i++) {
-    let g = DUCK;
-    if (i < start) g = 1 - (1 - DUCK) * ((i - d0) / RAMP);
-    else if (i > start + outFrames) g = DUCK + (1 - DUCK) * ((i - start - outFrames) / RAMP);
+    let g = D;
+    if (i < start) g = 1 - (1 - D) * ((i - d0) / RAMP);
+    else if (i > start + outFrames) g = D + (1 - D) * ((i - start - outFrames) / RAMP);
     duck[i] = Math.min(duck[i], g);
   }
 }
@@ -109,7 +117,43 @@ for (let i = 0; i < N; i++) {
   R[i] = r;
   peak = Math.max(peak, Math.abs(l), Math.abs(r));
 }
-const g = peak > 0.98 ? 0.98 / peak : 1;
+let g = peak > 0.98 ? 0.98 / peak : 1;
+
+// The reel is mastered for the feeds it plays in (round 13): −14 LUFS
+// integrated, true peaks at or under −1 dBTP, which is where Reels, TikTok,
+// Shorts and YouTube expect a finished mix (the round-12 mix measured −15.8).
+// A global gain, then a look-ahead limiter on the few transients that would
+// pass the ceiling. The film's mix is untouched (it has no MASTER).
+const MASTER = { reel: { lufs: -14, truePeak: -1 } }[name];
+if (MASTER) {
+  let gain = 10 ** ((MASTER.lufs - lufs(L, R, SR)) / 20);
+  let ceiling = 10 ** ((MASTER.truePeak - 0.3) / 20);
+  let out = null;
+  for (let pass = 0; pass < 6; pass++) {
+    const l = L.map((v) => v * gain);
+    const r = R.map((v) => v * gain);
+    limit(l, r, SR, ceiling);
+    const I = lufs(l, r, SR);
+    const tp = truePeak(l, r);
+    out = { l, r, I, tp };
+    // (0.2 dB under the spec: meters and the render's AAC encode disagree by
+    // about that much on inter-sample peaks)
+    const tpMax = MASTER.truePeak - 0.2;
+    if (Math.abs(I - MASTER.lufs) < 0.05 && tp <= tpMax) break;
+    gain *= 10 ** ((MASTER.lufs - I) / 20);
+    if (tp > tpMax) ceiling *= 10 ** ((tpMax - tp - 0.05) / 20);
+  }
+  L.set(out.l);
+  R.set(out.r);
+  g = 1;
+  // verify.mjs measures the voice against the bed by subtracting the ducked
+  // bed from this mix; it needs the gain the whole mix was given
+  fs.writeFileSync(
+    path.join(voDir, 'mix.json'),
+    JSON.stringify({ gain, lufs: +out.I.toFixed(2), truePeak: +out.tp.toFixed(2) }, null, 1),
+  );
+  console.log(`mastered: gain ${(20 * Math.log10(gain)).toFixed(2)}dB → ${out.I.toFixed(2)} LUFS, ${out.tp.toFixed(2)} dBTP`);
+}
 
 const bytes = N * 4;
 const out = Buffer.alloc(44 + bytes);

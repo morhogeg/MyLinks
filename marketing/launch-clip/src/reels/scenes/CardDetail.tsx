@@ -3,8 +3,8 @@ import { AbsoluteFill } from 'remotion';
 import { HOLDS } from '../../../reel-timeline.mjs';
 import { AppShot, Lift, Tap } from '../kit/AppShot';
 import { camAt, camVelocity, type Key } from '../kit/camera';
-import { EASE_IN_OUT, EASE_MODAL, EASE_SPRING, prog } from '../kit/curves';
-import { at, rectOf } from '../kit/takes';
+import { EASE_IN_OUT, EASE_MODAL, EASE_SPRING, mix, prog } from '../kit/curves';
+import { at, rectOf, takeOf } from '../kit/takes';
 import { findKeys } from './Find';
 
 const INSERT = HOLDS.find((h) => h.id === 'card')!;
@@ -24,8 +24,25 @@ const INSERT = HOLDS.find((h) => h.id === 'card')!;
 const T = 'save';
 const linear = (t: number) => t;
 
-const TAP = 20; // the card is tapped
+const TAP = 20; // the card is tapped (the app opens it on this frame)
 const SCROLL: [number, number] = [90, 130]; // down to the Key Points
+
+/** The capture scrolls the detail view in ~5pt steps (`detailScroll`); step 0
+ *  is the unscrolled view the open transition ends on. Where the Key Points
+ *  sit on each step, in screen points: the camera takes up the difference
+ *  between the step on screen and the position the scroll curve wants, so
+ *  the read-down glides instead of hopping 12px every few frames (round 13;
+ *  Recall's recap does the same). */
+const STEPS = takeOf(T).count - at(T, 'detailScroll');
+const stepFrame = (k: number) => (k <= 0 ? at(T, 'detail', 35) : at(T, 'detailScroll', k - 1));
+const stepY = (k: number) => rectOf(T, stepFrame(k), 'points')[1];
+const scrollAt = (u: number) => prog(u, SCROLL[0], SCROLL[1], EASE_IN_OUT) * STEPS;
+/** where the scroll curve wants the Key Points (fractional steps interpolate) */
+const wantY = (u: number) => {
+  const e = scrollAt(u);
+  const k = Math.min(STEPS - 1, Math.floor(e));
+  return mix(stepY(k), stepY(k + 1), e - k);
+};
 
 const keys: Key[] = [
   { f: 0, ...camAt(findKeys, INSERT.at) },
@@ -39,12 +56,20 @@ const keys: Key[] = [
 ];
 
 export const CardDetail: React.FC<{ u: number }> = ({ u }) => {
+  const step = Math.round(scrollAt(u));
   const i =
     u < TAP
       ? at(T, 'landed')
       : u < SCROLL[0]
         ? at(T, 'detail', Math.min(35, u - TAP)) // captured at 60fps: one per output frame at K = 2
-        : at(T, 'detailScroll', Math.round(prog(u, SCROLL[0], SCROLL[1], EASE_IN_OUT) * 10));
+        : stepFrame(step);
+  const cam = camAt(keys, u);
+  const scrolling = u >= SCROLL[0];
+  // the step on screen vs the scroll the curve wants (points)
+  const view = scrolling ? { ...cam, cy: cam.cy + (stepY(step) - wantY(u)) } : cam;
+  // motion blur from what moves on screen: the camera and the scroll together
+  const camV = camVelocity(keys, u, 1);
+  const motion = scrolling ? { x: camV.x, y: camV.y + (wantY(u) - wantY(u - 1)) * cam.z } : camV;
 
   const card = rectOf(T, at(T, 'landed'), 'firstCard');
   const kp = u >= SCROLL[0] ? rectOf(T, i, 'points') : null;
@@ -52,8 +77,10 @@ export const CardDetail: React.FC<{ u: number }> = ({ u }) => {
 
   return (
     <AbsoluteFill>
-      <AppShot take={T} i={i} cam={camAt(keys, u)} motion={camVelocity(keys, u, 1)}>
-        <Tap x={card[0] + 120} y={card[1] + 40} t={prog(u, TAP - 8, TAP + 27, linear)} />
+      <AppShot take={T} i={i} cam={view} motion={motion}>
+        {/* the pad lands (t 0.35) on TAP, the frame the app opens the card
+            and the tick sounds (it used to land 4 frames after both) */}
+        <Tap x={card[0] + 120} y={card[1] + 40} t={prog(u, TAP - 12, TAP + 23, linear)} />
         {kp && kpIn > 0.01 && (
           <Lift
             take={T}

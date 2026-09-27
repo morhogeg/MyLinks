@@ -52,7 +52,8 @@ export const onBeat = (f) => Math.round(f / BEAT_FRAMES) * BEAT_FRAMES;
  *  - adv > 0: a LINGER (round 7, owner: "show things a bit longer when
  *    discussing key features"): the same shot keeps drifting, slowly, on a
  *    moment worth reading; nothing freezes and the cut's pace is unchanged.
- * Every hold starts on a source 8th and lasts whole beats, so the grid holds.
+ * Every hold starts on an output 8th and ADDS whole beats (len − adv × K,
+ * round 13), so the grid holds; `npm run verify` checks both.
  */
 /**
  * Inside two scene holds, in OUTPUT frames from the hold's start (the scenes
@@ -63,12 +64,25 @@ export const onBeat = (f) => Math.round(f / BEAT_FRAMES) * BEAT_FRAMES;
  *    Save is tapped INSIDE the hold, so the source clock resumes on the
  *    tapped dialog and goes straight into the phases.
  */
-export const SHARE_STARTS = [40, 84, 128];
-export const MODES = { taps: [16, 56, 96], paste: 112, save: 128 };
+export const SHARE_STARTS = [36, 84, 132];
+/** each share, from its start: the Share button is tapped, the card is
+ *  pulled, it lands in the mark (scenes/ShareBeat.tsx and the score) */
+export const SHARE_BEAT = { tap: 20, pull: 24, land: 36 };
+export const MODES = { taps: [16, 56, 96], paste: 112, save: 136 };
 
 // Round 11: the card hold (224 → 192) and the found / graph lingers (48 → 32)
 // were trimmed once their lines stopped lingering: each still shows its
 // subject for ~1.2–1.5s after the line leaves, without a dead static stretch.
+//
+// Round 13: THE GRID. A hold may start on an 8th, but the output frames it
+// ADDS (len − adv × K) must be whole beats, or every cut, tap and sound after
+// it slides off the beat. Round 11's lingers added 24, 52 and 20 frames: the
+// whole Ask hero (the three sources, the Graph tap, the cut into the graph)
+// sat on 8ths and 16ths between the kicks. Now 32, 48 and 16 (the same 96 in
+// total, so nothing after the graph moves). The modes hold moved from source
+// 141 (a 16th) to 144, the frame the phases start on: the tour and its taps
+// are back on the grid and the phases still start on the same output frame.
+// `npm run verify` checks the grid.
 /** Revisit's opening "Do this" beat, in output frames (scenes/Recall.tsx) */
 export const TODO_LEN = 144;
 
@@ -76,11 +90,11 @@ export const HOLDS = [
   { id: 'problem', at: 32, len: 224, adv: 0 }, // the problem, named
   { id: 'name', at: 96, len: 32, adv: 0 }, // the name holds
   { id: 'share', at: 100, len: 192, adv: 0 }, // shared from YouTube, Instagram, Safari into the mark
-  { id: 'modes', at: 141, len: 144, adv: 0 }, // Link, Image, Note
+  { id: 'modes', at: 144, len: 144, adv: 0 }, // Link, Image, Note
   { id: 'card', at: 208, len: 192, adv: 0 }, // the new card, opened
-  { id: 'found', at: 248, len: 32, adv: 4 }, // linger: the one card it finds
-  { id: 'sources', at: 372, len: 64, adv: 6 }, // linger: the answer and its sources
-  { id: 'graph', at: 440, len: 32, adv: 6 }, // linger: the graph
+  { id: 'found', at: 248, len: 40, adv: 4 }, // linger: the one card it finds
+  { id: 'sources', at: 372, len: 60, adv: 6 }, // linger: the answer and its sources
+  { id: 'graph', at: 440, len: 28, adv: 6 }, // linger: the graph
   { id: 'recall', at: 464, len: 192 + 144, adv: 0 }, // Revisit: the "Do this" list (TODO_LEN), then this week's recap, read
   { id: 'end', at: 584, len: 64, adv: 16 }, // linger: the end card holds ~2s once the line is whole
 ];
@@ -185,7 +199,7 @@ export const HITS = {
   toApp: 120, // the point becomes the + button
   plusTap: 132,
   dialog: 136,
-  saveTap: 141, // tapped inside the modes hold (MODES.save); the phases follow
+  saveTap: 144, // tapped inside the modes hold (MODES.save); the phases follow
   phases: [144, 152, 160, 168, 176], // the five phases, an 8th apart
   saved: 184,
   cardLands: 200,
@@ -227,18 +241,22 @@ export const CAPTIONS = [
   // the narrator introduces it. The screen shows only the NAME (the drawn
   // wordmark wipes in under the mark on "Machina"; scenes/Hook.tsx); the
   // spoken lead-in "Introducing" is voice only (`say`)
-  { at: real(56), to: 410, place: 'mark', text: 'Machina.', say: 'Introducing Machina.' },
+  // (`duck`: the music steps further back under the two brand lines, the
+  // name and the promise; round 13, measured masked in the speech band)
+  { at: real(56), to: 410, place: 'mark', text: 'Machina.', say: 'Introducing Machina.', duck: 0.4 },
   { at: 416, to: 488, text: 'All your saves,\nfinally useful.' },
   // the share hold: from any app, into Machina (scenes/ShareBeat.tsx)
   { at: holdStart('share') + 40, to: holdStart('share') + 176, text: 'Save anything, from anywhere.', until: 'the third share lands in the mark' },
   // the modes hold: the Add dialog's three ways in
-  { at: holdStart('modes') + 8, to: holdStart('modes') + 116, text: 'A link, a screenshot, or a note.', until: 'the tour is back on Link, the link pasted' },
+  { at: holdStart('modes'), to: holdStart('modes') + 116, text: 'A link, a screenshot, or a note.', until: 'the tour is back on Link, the link pasted' },
   // the card hold: the new card, opened
   { at: holdStart('card') + 16, to: holdStart('card') + 152, text: 'Each save becomes a card,\nwith the key points pulled out.', until: 'the Key Points are highlighted' },
   { at: onBeat(real(214)), to: real(HITS.found) + 24, text: 'Find it in your own words.' },
-  { at: onBeat(real(278)), to: real(HITS.chips[2]) + 16, text: 'Ask anything. Every answer comes straight from your saves.', until: 'the third source lands' },
+  // (round 13: the Ask and Connect chapter words land ON their cut, which is
+  // on the beat again, and the line follows KICKER_LEAD frames later)
+  { at: real(HITS.askTap) + 4, to: real(HITS.chips[2]) + 8, text: 'Ask anything. Every answer comes straight from your saves.', until: 'the third source lands' },
   // (round 12, owner: say the app connects them ON ITS OWN)
-  { at: onBeat(real(420)), to: holdStart('graph') + 56, text: 'Related saves find each other,\nall on their own.' },
+  { at: real(HITS.graph) + 4, to: holdStart('graph') + 56, text: 'Related saves find each other,\nall on their own.' },
   // recall (scenes/Recall.tsx): the "Do this" list (round 12, owner: say the
   // app makes an action item where one is relevant; it writes one only for a
   // save that calls for an action), then the weekly recap, read slowly
@@ -247,7 +265,7 @@ export const CAPTIONS = [
   { at: holdStart('recall') + TODO_LEN + 136, to: holdStart('recall') + TODO_LEN + 256, text: 'The themes of your week,\nand the one save worth rereading.' },
   // the close: the name (the drawn wordmark wipes in as it is said), then
   // the App Store subtitle, set big in the serif
-  { at: onBeat(real(542)), to: real(600), place: 'lockup', text: 'Machina.\nNever lose another great find.' },
+  { at: onBeat(real(542)), to: real(600), place: 'lockup', text: 'Machina.\nNever lose another great find.', duck: 0.4 },
 ];
 
 /**

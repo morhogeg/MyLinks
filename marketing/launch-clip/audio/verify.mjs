@@ -33,12 +33,19 @@
  *    for never asking for it.
  * 5. The reel's score dynamics, and its VOICE-OVER BALANCE measured against
  *    the film's (the one mix the owner has listened to).
+ * 6. (round 13) THE GRID: every hold starts on an 8th and adds whole beats,
+ *    so the cuts, taps and sound design stay on the score's beat. The
+ *    NARRATOR'S CLARITY: every line sits at least 3dB over the music in the
+ *    speech band (500 Hz – 4 kHz), where masking actually happens (a
+ *    full-band median hid a closing line the music covered). The DELIVERY:
+ *    the reel's mix is −14 LUFS ±0.5 with true peaks at or under −1 dBTP.
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BAR, SUBTITLES, TOTAL_BARS } from '../timeline.mjs';
+import { lufs, powerDb, speechBand, truePeak } from './loudness.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 let failed = false;
@@ -210,6 +217,14 @@ console.log('\n── reel');
     if (!caps.some((c) => !c.place && c.to === k.to && c.at >= k.at)) bad.push(`kicker ${k.text} (${k.at}–${k.to}) does not leave with a line`);
     scan(`kicker ${k.text}`, k.text);
   });
+  // the grid (round 13): a hold may start on an 8th, but what it ADDS to the
+  // output must be whole beats, or everything after it slides off the beat
+  for (const h of R.HOLDS) {
+    const start = R.holdStart(h.id);
+    const adds = h.len - h.adv * R.K;
+    if (start % (R.BEAT_FRAMES / 2)) bad.push(`hold ${h.id} starts at ${start}, not on an 8th`);
+    if (adds % R.BEAT_FRAMES) bad.push(`hold ${h.id} adds ${adds} frames, not whole beats (${(adds / R.BEAT_FRAMES).toFixed(2)})`);
+  }
   const SAY_NAME = /SAY_NAME = "([^"]+)"/.exec(read('audio/synth-vo.py'))[1];
   const spoken = (t) => t.split(/\s+/).join(' ').replaceAll('Machina', SAY_NAME);
   const timing = JSON.parse(read('src/reels/data/reel-vo.json'));
@@ -290,6 +305,7 @@ console.log('\n── reel');
     failed = true;
   } else {
     console.log(`✓ ${caps.length} captions + ${kick.length} kickers, no overlaps; narrator mirrors every caption; timings for every word`);
+    console.log(`✓ ${R.HOLDS.length} holds, each on an 8th and adding whole beats: the cut stays on the score's grid`);
     console.log(`✓ no em dash / "AI" / "second brain" / "library" in captions, demo account, hook chips, or ${seen} captured app frames`);
   }
 
@@ -328,32 +344,40 @@ console.log('\n── reel');
   }
   // voice-over balance: during each spoken line, how far the voice sits above
   // the music bed, reel vs film (the film's is the owner-approved reference)
-  const balance = (mixFile, scoreFile, manifestFile, startOf, duck) => {
+  // (the reel's mix is mastered: mix-vo.mjs writes the gain it applied, and a
+  // line may duck the music further than the rest, `duck` on its caption)
+  const reelMaster = path.join(root, 'out', 'vo', 'reel', 'mix.json');
+  const reelGain = fs.existsSync(reelMaster) ? JSON.parse(fs.readFileSync(reelMaster, 'utf8')).gain : 1;
+  const reelDuck = Object.fromEntries(R.CAPTIONS.filter((c) => c.duck).map((c) => [c.at, c.duck]));
+  const lines = (mixFile, scoreFile, manifestFile, startOf, duckOf, gain = 1) => {
     const P = (f) => path.join(root, f);
     if (![mixFile, scoreFile, manifestFile].every((f) => fs.existsSync(P(f)))) return null;
     const mix = fs.readFileSync(P(mixFile));
     const bed = fs.readFileSync(P(scoreFile));
     const SR = mix.readUInt32LE(24);
-    const ratios = [];
-    for (const line of JSON.parse(fs.readFileSync(P(manifestFile), 'utf8'))) {
+    return JSON.parse(fs.readFileSync(P(manifestFile), 'utf8')).map((line) => {
       const s0 = Math.round(startOf(line) * SR);
       const e = s0 + Math.round((line.spoken ?? line.sec) * SR);
-      let v = 0;
-      let m = 0;
+      const duck = duckOf(line);
+      const voice = new Float64Array(e - s0);
+      const music = new Float64Array(e - s0);
+      // the mid channel (L+R)/2: the voice is centred, the music spread wide
+      const mid = (buf, i) => (buf.readInt16LE(44 + i * 4) + buf.readInt16LE(46 + i * 4)) / 65536;
       for (let i = s0; i < e; i++) {
-        const a = mix.readInt16LE(44 + i * 4) / 32768;
-        const c = bed.readInt16LE(44 + i * 4) / 32768;
+        const a = mid(mix, i) / gain;
+        const c = mid(bed, i);
         // the mix minus the (ducked) bed is the voice; the bed under it is duck×
-        v += (a - c * duck) ** 2;
-        m += (c * duck) ** 2;
+        voice[i - s0] = a - c * duck;
+        music[i - s0] = c * duck;
       }
-      ratios.push(10 * Math.log10(v / m));
-    }
-    ratios.sort((a, b) => a - b);
-    return ratios[Math.floor(ratios.length / 2)];
+      return { line, SR, voice, music, ratio: powerDb(voice) - powerDb(music) };
+    });
   };
-  const filmBal = balance('public/score-vo.wav', 'public/score.wav', 'out/vo/manifest.json', (l) => l.bar * 2.5, 0.65);
-  const reelBal = balance('public/reel-score-vo.wav', 'public/reel-score.wav', 'out/vo/reel/manifest.json', (l) => l.start, 0.55);
+  const median = (xs) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
+  const filmLines = lines('public/score-vo.wav', 'public/score.wav', 'out/vo/manifest.json', (l) => l.bar * 2.5, () => 0.65);
+  const reelLines = lines('public/reel-score-vo.wav', 'public/reel-score.wav', 'out/vo/reel/manifest.json', (l) => l.start, (l) => reelDuck[l.frame] ?? 0.55, reelGain);
+  const filmBal = filmLines && median(filmLines.map((x) => x.ratio));
+  const reelBal = reelLines && median(reelLines.map((x) => x.ratio));
   if (filmBal !== null && reelBal !== null) {
     console.log(`  voice over music, median line: film ${filmBal.toFixed(1)}dB · reel ${reelBal.toFixed(1)}dB`);
     if (reelBal < filmBal - 3) {
@@ -364,6 +388,40 @@ console.log('\n── reel');
     }
   } else {
     console.log('  (VO balance not measured: needs both mixes and out/vo manifests)');
+  }
+  // the narrator's clarity: each line against the music in the speech band
+  if (reelLines) {
+    const clear = reelLines.map(({ line, SR, voice, music }) => ({
+      text: line.text,
+      db: powerDb(speechBand(voice, SR)) - powerDb(speechBand(music, SR)),
+    }));
+    const worst = clear.reduce((a, b) => (b.db < a.db ? b : a));
+    console.log(`  voice over music in the speech band: min ${worst.db.toFixed(1)}dB ("${worst.text.slice(0, 32)}…"), median ${median(clear.map((c) => c.db)).toFixed(1)}dB`);
+    const masked = clear.filter((c) => c.db < 3);
+    if (masked.length) {
+      for (const c of masked) console.error(`✗ the music masks "${c.text}": ${c.db.toFixed(1)}dB over it in the speech band (min 3dB)`);
+      failed = true;
+    } else {
+      console.log('✓ every reel line sits 3dB or more over the music where speech is heard');
+    }
+  }
+  // the delivery: loudness and true peak of the finished reel mix
+  const mixPath = path.join(root, 'public', 'reel-score-vo.wav');
+  if (fs.existsSync(mixPath)) {
+    const b = fs.readFileSync(mixPath);
+    const SR = b.readUInt32LE(24);
+    const n = (b.length - 44) / 4;
+    const L = new Float64Array(n);
+    const Rr = new Float64Array(n);
+    for (let i = 0; i < n; i++) {
+      L[i] = b.readInt16LE(44 + i * 4) / 32768;
+      Rr[i] = b.readInt16LE(44 + i * 4 + 2) / 32768;
+    }
+    const I = lufs(L, Rr, SR);
+    const tp = truePeak(L, Rr);
+    const okLoud = Math.abs(I + 14) <= 0.5 && tp <= -1;
+    (okLoud ? console.log : console.error)(`${okLoud ? '✓' : '✗'} the reel mix: ${I.toFixed(1)} LUFS integrated, ${tp.toFixed(2)} dBTP (spec −14 ±0.5 LUFS, ≤ −1 dBTP)`);
+    if (!okLoud) failed = true;
   }
 }
 

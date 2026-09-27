@@ -39,10 +39,14 @@ export const askKeys: Key[] = [
   // the travel down onto the three sources (hold to hold)
   { f: 352, cx: 175, cy: 492, z: 2.85, fy: 1160, ease: EASE_IN_OUT },
   { f: 380, cy: 497, z: 2.95, ease: linear },
-  { f: 392, cx: 170, cy: 532, z: 2.5, fy: 1140, ease: EASE_IN_OUT },
-  { f: 400, cx: 160, cy: 548, z: 2.55, ease: linear },
-  // the dive into the Graph chip, accelerating into the cut to Connect
-  { f: S.graph - 1, cx: 52.75, cy: 606.5, z: 3.5, fx: 540, fy: 1120, ease: EASE_GATHER },
+  // back and onto the Graph chip in ONE move that comes to rest as the finger
+  // lands (round 13: a pull-back, then a linear drift, then the dive started
+  // and stopped the camera twice in a second)
+  { f: 400, cx: 160, cy: 548, z: 2.55, fy: 1140, ease: EASE_IN_OUT },
+  // the dive into the Graph chip, accelerating into the cut to Connect: it is
+  // still at full speed on the last frame before the cut (the key sits ON the
+  // cut; one frame short, the dive froze for a frame before it)
+  { f: S.graph, cx: 52.75, cy: 606.5, z: 3.5, fx: 540, fy: 1120, ease: EASE_GATHER },
 ];
 
 export const Ask: React.FC<{ f: number }> = ({ f }) => {

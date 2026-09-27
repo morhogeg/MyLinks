@@ -1,7 +1,7 @@
 import React from 'react';
 import { AbsoluteFill } from 'remotion';
 import { Compass, Share } from 'lucide-react';
-import { HOLDS, SHARE_STARTS } from '../../../reel-timeline.mjs';
+import { HOLDS, SHARE_BEAT, SHARE_STARTS } from '../../../reel-timeline.mjs';
 import { sans } from '../../fonts';
 import { PLATFORM_INK, PlatformMark } from '../../ui/app';
 import { Tap } from '../kit/AppShot';
@@ -32,11 +32,11 @@ const SOURCES: Source[] = [
   { kind: 'safari', app: 'Safari', by: 'collaborativefund.com', title: 'The Psychology of Money' },
 ];
 
-/** each share (starts: reel-timeline SHARE_STARTS): arrives, tapped, pulled in, lands */
+/** each share (starts: reel-timeline SHARE_STARTS): arrives, tapped, pulled
+ *  in, lands. The tap and the landing sit on beats (round 13), a beat apart:
+ *  the score's tick and bell land with them (reel-timeline SHARE_BEAT). */
 const ENTER = 12;
-const TAP = 20;
-const PULL = 26;
-const LAND = 38;
+const { tap: TAP, pull: PULL, land: LAND } = SHARE_BEAT;
 
 /** where the mark's point is while the Hook holds (C.y 1000, lifted 70) */
 const MARK = { x: 540, y: 930 };

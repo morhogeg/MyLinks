@@ -400,19 +400,77 @@ Note tour was jittery):
   so text that is barely moving is no longer smeared.
 - Connect: "Related saves find each other, all on their own."
 
+Round 13 (a finishing pass with fresh eyes; the script, the order, the
+lines and the length are unchanged). Everything below was found by
+measuring the render (frame-to-frame differences, phase correlation, 4-frame
+strips at every transition, the mix in the speech band), not by eye:
+- **Clean cuts.** Ask's two hard cuts (to the composer, to the answer) each
+  drew a smeared in-between frame, and the first frame after them was
+  motion-blurred too: two camera keys a frame apart were interpolated at the
+  half-frames a 2× clock samples, and the velocity for motion blur spanned the
+  cut. In the kit now: keys at most a frame apart are a cut (the camera holds,
+  then jumps), and `camVelocity` measures the last OUTPUT frame, reading a cut
+  forward. Measured after: each cut changes on exactly one frame.
+- **The dive keeps its speed.** The dive into the Graph chip froze for one
+  frame just before the cut (its last key sat a frame short of it); it now
+  ends on the cut. The pull-back, drift and dive before it are one move that
+  comes to rest as the finger lands, then accelerates (it used to stop and
+  start twice in a second).
+- **The card's read-down glides.** The detail view's scroll is captured in
+  5pt steps; it hopped 12px on its first frame and then every few frames. The
+  camera now takes up each step's rounding, as Recall's recap does.
+- **Back on the beat.** Round 11's lingers added 24, 52 and 20 frames, which
+  slid everything after them off the grid: the whole Ask hero (the sources,
+  the three citation bells, the Graph tap, the impact on the cut into the
+  graph) sat on 8ths and 16ths between the kicks, and the Link / Image / Note
+  hold started on a 16th (source 141), so its taps did too. The lingers now
+  add 32, 48 and 16 (the same total: nothing after the graph moves) and the
+  modes hold sits at source 144, where the phases start (they still start on
+  the same frame). The share beat's taps and landings are on beats
+  (`SHARE_BEAT`). `npm run verify` checks the grid.
+- **Taps that cause things.** The card's tap now lands on the frame the app
+  opens it and the tick sounds (it landed 4 frames after both). Save is tapped
+  8 frames before the phases appear (it was 22: a visible lag).
+- **Lines leave, they don't blink.** A line's exit put half its fade on the
+  first frame (EASE_MODAL); it is now an 8-frame fade eased in and out.
+- **The name breathes.** The mark and wordmark glide up together (eased in and
+  out, not a jump off the rest), the lockup pushes in 4% while the name and
+  the shares hold (it sat dead still for seconds), and when the brackets part
+  the point leaves in one move instead of dropping 70px first.
+- **The dialog drop.** The screen behind now stays out of focus until the
+  dialog has gone and racks into focus on the feed as the card lands (for
+  three frames the fading dialog's text sat over the sharpening feed).
+- **The first frame is a picture.** It was white (the reel "opened out of
+  white"), which is what a feed or a link preview shows before playing; the
+  saves now come into focus from a soft scatter that is already on frame 0.
+- **No banding.** The set's soft gradients stepped into faint concentric rings
+  one code value apart (Chromium draws gradients in 8 bits), visible at 1:1
+  and made blocky by the encoder. A fixed fine dither on the paper (`Dither`
+  in `Paper.tsx`, under the app and the type) dissolves them.
+- **The sound.** The narrator is now at least 3dB over the music in the
+  speech band on every line (500 Hz – 4 kHz, where masking happens). The
+  closing line was 3dB UNDER it (the melody's last note landed on "find.") and
+  the name barely over it (a shimmer on the word "Machina"): the last note now
+  lands after the line, the shimmer after the name, and the music ducks
+  further under the two brand lines (`duck` on their captions). The mix is
+  mastered for the feeds: −14 LUFS integrated, true peak −1.25 dBTP (it was
+  −15.8 LUFS), a gain and a look-ahead limiter in `mix-vo.mjs` (at most 2dB on
+  a few transients); the film's mix is byte-identical.
+
 | Output frames | Scene | What it does |
 |---|---|---|
-| 0–320 | `Hook` | The problem over ten real saves; each named save lifts on its word; all bleach; they collapse into the point |
-| 320–496 | `Hook` | "Introducing Machina." (the drawn wordmark under the mark), "All your saves, finally useful."; the point drops to become the **+** |
-| 496–538 | `Save` | The + irises open; Add to Machina |
-| 538–682 | `SaveModes` | "Save anything, from anywhere.": Link, Image, Note, back to Link, the link pasted |
-| 682–848 | `Save` | The five real phases; the card lands |
-| 848–1072 | `CardDetail` | The new card opened: summary, **Key Points**, **Do this** |
-| 1072–1296 | `Find` | "easy dinner, empty fridge" → the one card it means (lingers) → tap Ask |
-| 1296–1600 | `Ask` | The question → the answer and three sources (lingers) → the dive into the Graph chip |
-| 1600–1680 | `Connect` | The real graph (60fps, lingers); tap Revisit |
-| 1680–1968 | `Recall` | "This week in Machina", opened and read slowly: write-up, themes, Standout, question |
-| 1968–2144 | `End` | The mark, "Machina" (the wordmark), "Never lose another great find." in the serif |
+| 0–288 | `Hook` | Ten real saves come into focus (0–64); the problem is named over them (the `problem` hold, 64–288): each named save lifts on its word, then all bleach |
+| 288–456 | `Hook` | They collapse into the point (320), the brackets snap (336); "Introducing Machina." (the drawn wordmark under the mark), the `name` hold (416–448), "All your saves, finally useful." |
+| 456–648 | `ShareBeat` | "Save anything, from anywhere.": YouTube, Instagram and Safari saves shared into the mark (the `share` hold) |
+| 648–736 | `Hook` → `Save` | The point drops to become the **+** (the iris opens at 688), the + is tapped, Add to Machina |
+| 736–880 | `SaveModes` | "A link, a screenshot, or a note.": Link, Image, Note, back to Link, the link pasted, Save tapped |
+| 880–1008 | `Save` | The five real phases, an 8th apart; saved; the dialog drops; the card lands (992) |
+| 1008–1200 | `CardDetail` | The new card opened: summary, **Key Points** (the `card` hold) |
+| 1200–1360 | `Find` | "easy dinner, empty fridge" → the one card it means (1264; lingers 1280–1320) → tap Ask |
+| 1360–1696 | `Ask` | The question → the answer and three sources (1504–1552; lingers 1560–1620) → the dive into the Graph chip |
+| 1696–1808 | `Connect` | The real graph (60fps; lingers 1744–1772); tap Revisit |
+| 1808–2254 | `Recall` | "Do this" (to 1952), then "This week in Machina", opened (1968) and read slowly: write-up, themes, Standout, question; thrown out into the lockup |
+| 2240–2448 | `End` | The mark launches (strike 2284), "Machina" (the wordmark), "Never lose another great find." in the serif, held |
 
 **The clock.** Scenes are written in SOURCE frames (the round-1 cut, 600
 frames). `MachinaReel` plays them at `K = 2` via `clockAt(frame)`; `HOLDS`
@@ -494,10 +552,14 @@ subtitle, or a hook that doesn't carry the tagline; an em dash, a literal
 "AI", "second brain" or "library" in any caption, kicker, demo card,
 collection, Ask/search string, hook chip, or **any text on any captured frame
 the edit uses**; a clipped reel master or a hole in its per-bar level; a voice
-sitting more than 3dB lower over the music than it does in the film.
+sitting more than 3dB lower over the music than it does in the film. Round
+13 added: a hold that doesn't start on an 8th or doesn't add whole beats (the
+grid); a narrator line less than 3dB over the music in the speech band
+(500 Hz – 4 kHz); a reel mix off −14 LUFS by more than 0.5 LU, or with true
+peaks over −1 dBTP (`audio/loudness.mjs` measures both, BS.1770).
 
 Nobody has listened to the reel mix on speakers yet (the render box has no
-audio device); the balance is only measured.
+audio device); the balance, the clarity and the loudness are only measured.
 
 ## Motion language
 
@@ -510,7 +572,8 @@ few scenes built from these parts; it should not need new motion primitives.
 Light only: **ink on paper**. The set is the film's paper (`SET_BG`, a shade
 under the app's `#F9FAFB` so a white screen still separates), lit by
 **`Paper`** (a daylight pool where the type lives, a lift behind the product,
-two slow cool pools) and finished by **`Lens`** (the film's grain and a whisper
+two slow cool pools, dithered by **`Dither`** so its soft gradients never band
+into rings) and finished by **`Lens`** (the film's grain and a whisper
 of vignette). Colour comes only from the app's own pixels (category pills,
 platform marks) and the app's tokens (`PLATFORM_INK` in `SaveChip`); the
 reel's own type is `INK`/`INK_SOFT`. Emphasis is a lift and an ink ring
@@ -528,7 +591,8 @@ One family, Geist. Two voices (**`Type.tsx`**):
   words). Each LINE arrives when the narrator reaches its first word (the
   measured timing); its words cascade 1.5 frames apart, each coming into
   focus (12px blur → sharp, a 0.28em lift, `EASE_MODAL`, 7 frames). The line
-  leaves as one, a 6-frame soft-focus fade, finishing on the caption's end
+  leaves as one, an 8-frame soft-focus fade eased in and out (round 13: never
+  a fast-start curve on an exit, it reads as a blink), finishing on the caption's end
   frame. Never a mask rise, never a lone word parked at the left edge.
   `\n` is a hard break; `sizes` sets a size per line.
 - **The kicker (`Kicker`)** names the chapter (SAVE / FIND / ASK / CONNECT /
@@ -588,8 +652,9 @@ In order of appearance; nothing outside this list.
    **Open the thing:** a tap on an element and the app's own transition into
    it (the new card → its detail view; the recap banner → the recap).
 5. **Cut on the beat.** A hard cut on a beat line or an 8th (Find → Ask, the
-   composer, the answer, Connect → Recall, the card's detail back to the feed). `camVelocity` reads a
-   cut forward, so the first frame of a new shot is sharp.
+   composer, the answer, Connect → Recall, the card's detail back to the feed). Two camera
+   keys at most a frame apart are the cut: nothing is drawn between them, and
+   `camVelocity` reads a cut forward, so the first frame of a new shot is sharp.
 6. **Dive into a cut.** The camera accelerates into the tapped element
    (`EASE_GATHER`) and cuts on the downbeat to *inside* the next screen, which
    fills the frame and pulls back (`EASE_MODAL`): Ask's Graph chip → the graph.
@@ -612,6 +677,13 @@ spoken and its last word has landed (verify fails a voice line that overruns
 its caption). Motion blur is what a 180° shutter would give (σ ≈ 0.14 × px
 per frame, directional, capped at 10px) and never appears on a hold.
 
+**The grid rule (round 13).** A hold (`HOLDS`) may start on an 8th, but what
+it adds to the output (`len − adv × K`) must be whole beats, or everything
+after it slides off the beat while still looking "in sync" with the sound
+design (which follows the picture). A linger that shows a moment longer is
+lengthened by a beat, never by a few frames. `npm run verify` fails a hold
+that breaks it.
+
 ### Camera (`camera.ts`, `AppShot`)
 
 - **Aim by screen point.** A key names a point of the app's 393×852 screen
@@ -627,6 +699,17 @@ per frame, directional, capped at 10px) and never appears on a hold.
   its display radius (`SCREEN_RADIUS`, 55pt) appear as the camera pulls back.
 - **Rack focus** (`AppShot` `focus`) keeps the eye on what matters, e.g. the
   typed query over the app's live suggestions.
+- **A cut is two keys at most a frame apart** (round 13): `camAt` holds the
+  first and jumps to the second, never interpolating between them (a slowed
+  clock samples half-frames), and `camVelocity` measures what moved since the
+  last OUTPUT frame, reading a cut forward. A dive's last key sits ON its cut,
+  so it is still at speed on the frame before it.
+- **A move that starts from rest eases in** (EASE_IN_OUT); EASE_MODAL's fast
+  start is for arrivals that already carry speed, or a camera answering a tap
+  on the frame the app responds.
+- **A stepped capture never hops.** When the app scrolls in captured steps
+  (the card's read-down, the recap), the camera takes up each step's rounding
+  and motion blur follows the net motion (camera + scroll).
 
 ### Sound to picture (`HITS`, `audio/reel-score.mjs`)
 
@@ -636,7 +719,11 @@ lands, on the cut into the graph and on the lockup's strike. **Risers end on
 the reveal they lead into** (`RISERS`). One chord per bar
 (`BAR_CHORDS`), from the film's instruments (`audio/synth.mjs`, shared), so the
 reels and the film sound like one brand. Move a `HITS` frame and the picture
-and the sound move together.
+and the sound move together (the share beat's `SHARE_BEAT` and the tour's
+`MODES` work the same way inside their holds). **A tap lands on the frame the
+app responds and the tick sounds** (the pad touches at 35% of the `Tap`
+gesture). **Nothing sounds on a word the narrator has to land:** a melody note
+or a shimmer goes after the word, not on it (round 13).
 
 ### Narrator (`audio/synth-vo.py reel`)
 
@@ -648,7 +735,11 @@ in short lines with air around them. Word timings are measured from the
 synthesized audio (`src/reels/data/reel-vo.json`) and drive the kinetic type
 and the lockup's subtitle. The mix ducks the score to 0.55 under the voice
 (the film uses 0.65); that puts the reel's voice at the film's
-voice-over-music balance, which verify measures.
+voice-over-music balance, which verify measures. The two brand lines (the
+name and the promise) duck it to 0.4 (`duck` on their captions). Verify also
+holds every line at least 3dB over the music in the speech band, and the
+finished mix is mastered to the feeds' −14 LUFS, true peak ≤ −1 dBTP
+(`mix-vo.mjs reel`: a gain, then a look-ahead limiter; `audio/loudness.mjs`).
 
 ### Brand bans
 

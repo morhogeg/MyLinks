@@ -2497,8 +2497,9 @@ to its session:
 > feature-clip briefs below against the kit you built, and add a §9 entry.
 
 **What exists (the pilot, 2026-09-26, branch `claude/machina-reel-pilot`,
-awaiting owner review, not merged):** `MachinaReel` (81.6s, round 12,
-1080×1920, score + narrator + captions, the deliverable), `MachinaReelSilent`
+awaiting owner review, not merged):** `MachinaReel` (81.6s, round 13,
+1080×1920, score + narrator + captions, the deliverable; mastered to −14
+LUFS, true peak ≤ −1 dBTP), `MachinaReelSilent`
 and `MachinaReelClean`, in `marketing/launch-clip/`. Script: the problem ("You
 save things everywhere." / "An article here. A recipe there. A video
 somewhere else." / "Saved, and rarely seen again."), "Introducing Machina."
@@ -2594,6 +2595,21 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-27 — Highlight reel round 13: a measured finishing pass.** Branch
+  `claude/machina-reel-pilot`, not merged; script, order, lines and length
+  (81.6s) unchanged. Found by measuring the render, not by eye: Ask's two hard
+  cuts drew a smeared in-between frame (the kit's camera now treats keys a
+  frame apart as a cut); the dive into the graph froze a frame before its
+  cut; the card's read-down hopped 12px; round 11's lingers had pushed the
+  whole Ask hero off the beat (lingers now add whole beats, the Link / Image /
+  Note hold moved to source 144, share taps on beats, `verify` checks the
+  grid); lines blinked out (now an 8-frame eased fade); the closing line sat
+  3dB UNDER the music in the speech band (the last melody note moved after
+  "find.", brand lines duck deeper; `verify` now holds every line ≥3dB). Also:
+  the card tap lands on the app's response, Save answers in 8 frames not 22,
+  the name breathes, no text-on-text in the dialog drop, frame 0 is the
+  scatter instead of white, a dither ends the paper's banding, and the mix is
+  mastered to −14 LUFS / −1.25 dBTP (was −15.8). Not listened to on speakers.
 - **2026-09-27 — Highlight reel round 12: Do this, connections, jitter.**
   Branch `claude/machina-reel-pilot`, not merged. Revisit now opens on the
   app's real "Do this" list (recall take re-shot with three saves carrying

@@ -19,7 +19,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
-import { BAR, BAR_FRAMES, BEAT, BAR_CHORDS, CAPTIONS, FPS, HITS, RISERS, TOTAL_FRAMES, TOTAL_SEC, MODES, SHARE_STARTS, TODO_LEN, holdStart, real, srcOf } from '../reel-timeline.mjs';
+import { BAR, BAR_FRAMES, BEAT, BAR_CHORDS, CAPTIONS, FPS, HITS, RISERS, TOTAL_FRAMES, TOTAL_SEC, MODES, SHARE_BEAT, SHARE_STARTS, TODO_LEN, holdStart, real, srcOf } from '../reel-timeline.mjs';
 import { createSynth } from './synth.mjs';
 
 // Round 5: the round-1 score, on the reel's steady clock (K = 2, 112.5 BPM:
@@ -115,11 +115,14 @@ const MELODY = [
   [4, 0, 64], [4, 1.5, 65], [4, 3, 67], // Ask: E F G
   [5, 0, 72], [5, 1.5, 71], [5, 2, 72], [5, 3, 74], // the chips: C B C D
   [6, 0, 71], [6, 2, 67], [7, 0, 69], [7, 2, 71], // connect → revisit: B G A B
-  [8, 1, 72], [8, 2.5, 76], [9, 0, 79], // home: C E G
+  // home: C as the mark draws, E (softer) in the breath after its name, and
+  // the G AFTER the last word (round 13: it landed on "find.", the one word
+  // the reel has to land, and masked the whole closing line)
+  [8, 1, 72], [8, 2.5, 76, 0.12], [9, 0.5, 79],
 ];
-for (const [bar, bt, m] of MELODY) {
+for (const [bar, bt, m, level] of MELODY) {
   const lead = bar < 4;
-  keys(f(bar * 64 + bt * 16), m, lead ? 0.11 : bar >= 8 ? 0.19 : 0.16, bar % 2 ? 0.2 : -0.2, bar >= 8 ? 2.8 : 2);
+  keys(f(bar * 64 + bt * 16), m, level ?? (lead ? 0.11 : bar >= 8 ? 0.19 : 0.16), bar % 2 ? 0.2 : -0.2, bar >= 8 ? 2.8 : 2);
 }
 
 // ── risers, each ENDING on the reveal it leads into
@@ -136,10 +139,11 @@ const H = HITS;
   const t = VO.find((v) => v.frame === named.at);
   [[1, 84], [4, 88], [7, 91]].forEach(([w, m], i) => bell(named.at / FPS + t.words[w], m, 0.05, [-0.35, 0.35, 0][i], 1.6));
   whoosh(CAPTIONS[2].at / FPS + 0.2, 1.2, 0.05, 0);
-  // the name: a soft shimmer as the wordmark wipes in on "Machina"
+  // the name: a soft shimmer as the wordmark's wipe completes, just after
+  // "Machina" is said (round 13: on the word itself it masked the name)
   const name = CAPTIONS.find((c) => c.place === 'mark');
   const nt = VO.find((v) => v.frame === name.at);
-  shimmer(name.at / FPS + nt.words[1], [79, 84, 88, 91], 0.045);
+  shimmer(name.at / FPS + nt.words[1] + 0.4, [79, 84, 88, 91], 0.035);
 }
 
 // the hook: saves appearing as scattered glints, the rush, the point, the snap
@@ -169,14 +173,14 @@ sub(f(H.cardLands), 43, 0.3, 0.32);
 tick(f(H.cardLands), 0.09, 0.9);
 
 // the share hold: three shares from three apps, each pulled into the mark
-// (output frames: SHARE_STARTS, scenes/ShareBeat.tsx: tap +20, lands +38)
+// (output frames: SHARE_STARTS + SHARE_BEAT, scenes/ShareBeat.tsx)
 {
   const S0 = holdStart('share') / FPS;
   SHARE_STARTS.forEach((t0, i) => {
-    tick(S0 + (t0 + 20) / FPS, 0.09, 1.15 + i * 0.1);
-    whoosh(S0 + (t0 + 24) / FPS, 0.45, 0.07, [0.4, -0.4, 0.4][i]);
-    bell(S0 + (t0 + 38) / FPS, [84, 88, 91][i], 0.055, 0, 1.6);
-    sub(S0 + (t0 + 38) / FPS, 43, 0.16, 0.25);
+    tick(S0 + (t0 + SHARE_BEAT.tap) / FPS, 0.09, 1.15 + i * 0.1);
+    whoosh(S0 + (t0 + SHARE_BEAT.pull - 2) / FPS, 0.45, 0.07, [0.4, -0.4, 0.4][i]);
+    bell(S0 + (t0 + SHARE_BEAT.land) / FPS, [84, 88, 91][i], 0.055, 0, 1.6);
+    sub(S0 + (t0 + SHARE_BEAT.land) / FPS, 43, 0.16, 0.25);
   });
 }
 

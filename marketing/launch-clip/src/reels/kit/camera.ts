@@ -49,13 +49,21 @@ export function camAt(keys: Key[], frame: number): Cam {
     full.push({ ...c, f: k.f, ease: k.ease });
     prev = c;
   }
-  if (frame <= full[0].f) return full[0];
+  // (always a bare Cam: callers spread it into new keys, where a key's own
+  // `f` and `ease` riding along would silently replace theirs)
+  const bare = (c: Cam): Cam => ({ cx: c.cx, cy: c.cy, z: c.z, fx: c.fx, fy: c.fy, rx: c.rx, ry: c.ry, rz: c.rz });
+  if (frame <= full[0].f) return bare(full[0]);
   const last = full[full.length - 1];
-  if (frame >= last.f) return last;
+  if (frame >= last.f) return bare(last);
   let i = 0;
   while (full[i + 1].f < frame) i++;
   const a = full[i];
   const b = full[i + 1];
+  // Two keys at most a frame apart are a CUT, not a very fast move: hold the
+  // first until the second (round 13). A reel that plays its cut slower
+  // samples half-frames, and interpolating there drew one smeared in-between
+  // frame on every hard cut (Ask's composer and answer cuts).
+  if (b.f - a.f <= 1) return bare(frame >= b.f ? b : a);
   const t = (b.ease ?? EASE_MODAL)(Math.min(1, Math.max(0, (frame - a.f) / (b.f - a.f))));
   const out = {} as Cam;
   for (const field of FIELDS) {
@@ -92,16 +100,20 @@ export const aim = (
 export const CLOCK = { perFrame: 1 };
 
 export const camVelocity = (keys: Key[], frame: number, perFrame = CLOCK.perFrame) => {
+  // what moved since the previous OUTPUT frame (`perFrame` scene frames ago).
+  // A cut between that frame and this one reads forward instead (round 13:
+  // on a slowed clock the frame after a cut used to measure the jump itself
+  // as speed, and came out smeared)
+  const prev = frame - perFrame;
   const cut = keys.some(
-    (k, j) => j > 0 && k.f === frame && keys[j - 1].f >= frame - 1 && FIELDS.some((field) => k[field] !== undefined),
+    (k, j) => j > 0 && k.f > prev && k.f <= frame && k.f - keys[j - 1].f <= 1 && FIELDS.some((field) => k[field] !== undefined),
   );
-  const a = camAt(keys, cut ? frame : frame - 1);
-  const b = camAt(keys, cut ? frame + 1 : frame);
+  const a = camAt(keys, cut ? frame : prev);
+  const b = camAt(keys, cut ? frame + perFrame : frame);
   const FX = 540;
   const FY = 960;
   // the screen point under the frame's centre, and where it is one frame on
   const sx = a.cx + (FX - a.fx) / a.z;
   const sy = a.cy + (FY - a.fy) / a.z;
-  const k = perFrame;
-  return { x: (b.fx + (sx - b.cx) * b.z - FX) * k, y: (b.fy + (sy - b.cy) * b.z - FY) * k, z: Math.pow(b.z / a.z, k) };
+  return { x: b.fx + (sx - b.cx) * b.z - FX, y: b.fy + (sy - b.cy) * b.z - FY, z: b.z / a.z };
 };
