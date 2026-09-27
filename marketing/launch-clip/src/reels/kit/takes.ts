@@ -48,6 +48,9 @@ export const frameSrc = (name: string, i: number) =>
 /** An element's box on a frame (or the nearest frame that measured it). */
 export const rectOf = (name: string, i: number, key: string): Rect => {
   const t = takeOf(name);
+  // a scene on a slowed clock can ask for a fractional frame: the same one
+  // frameSrc shows
+  i = Math.max(0, Math.min(t.count - 1, Math.round(i)));
   for (let d = 0; d < t.count; d++) {
     for (const j of [i - d, i + d]) {
       const r = j >= 0 && j < t.count ? t.frames[j].r[key] : undefined;
@@ -60,7 +63,7 @@ export const rectOf = (name: string, i: number, key: string): Rect => {
 /** The text visible on a frame (verify reads the same data). */
 export const textOf = (name: string, i: number) => {
   const t = takeOf(name);
-  return t.frames[i].t.map((k) => t.texts[k]);
+  return t.frames[Math.max(0, Math.min(t.count - 1, Math.round(i)))].t.map((k) => t.texts[k]);
 };
 
 export const center = (r: Rect) => ({ x: r[0] + r[2] / 2, y: r[1] + r[3] / 2 });
