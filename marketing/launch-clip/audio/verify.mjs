@@ -125,6 +125,41 @@ let failed = false;
   if (!failed) console.log(`✓ ${SUBTITLES.length} captions, no overlaps, last ends bar ${prevEnd.toFixed(2)}`);
 }
 
+// ── 1b. the brand lines (owner call 2026-09-28): the film ENDS on the tagline,
+// exactly as written, once; the endcard shows it and the closing voice line
+// says it word for word, nothing else; the introduction carries "Never lose
+// another great find", which appears nowhere at the end
+{
+  const TAGLINE = 'Everything you save, finally useful.';
+  const SUBTITLE = 'Never lose another great find';
+  const bad = [];
+  const endcard = fs.readFileSync(path.join(here, '..', 'src', 'scenes', 'Endcard.tsx'), 'utf8');
+  const jsx = endcard.slice(endcard.indexOf('return ('));
+  const vo = fs.readFileSync(path.join(here, 'synth-vo.py'), 'utf8');
+  const film = vo.slice(vo.indexOf('FILM_LINES = ['), vo.indexOf('def film_script'));
+  const spoken = [...film.matchAll(/^\s*\(([\d.]+), [\d.]+, f?"([^"]+)"/gm)].map((m) => ({ bar: Number(m[1]), text: m[2] }));
+  const last = spoken[spoken.length - 1];
+  const count = (hay, needle) => hay.split(needle).length - 1;
+  if (count(jsx, TAGLINE) !== 1) bad.push(`the endcard shows the tagline ${count(jsx, TAGLINE)} times (want once, exactly "${TAGLINE}")`);
+  if (/textTransform:\s*'uppercase'/.test(jsx.slice(jsx.indexOf(TAGLINE) - 600, jsx.indexOf(TAGLINE)))) bad.push('the endcard tagline is set in caps (it is kept exactly as written)');
+  if (jsx.includes(SUBTITLE)) bad.push(`the endcard still shows "${SUBTITLE}"`);
+  if (!last || last.text !== TAGLINE) bad.push(`the closing voice line is "${last?.text}", not the endcard's "${TAGLINE}" word for word`);
+  const inCaptions = SUBTITLES.filter((c) => c.text.replace(/\n/g, ' ').includes(TAGLINE));
+  if (inCaptions.length) bad.push(`the tagline also appears in a caption (bar ${inCaptions.map((c) => c.bar).join(', ')}): once per film, at the end`);
+  if (spoken.slice(0, -1).some((l) => l.text.includes(TAGLINE))) bad.push('the tagline is spoken before the close');
+  const intro = SUBTITLES.find((c) => c.kicker === 'Introducing');
+  if (!intro || !intro.text.includes(SUBTITLE)) bad.push(`the introduction does not carry "${SUBTITLE}"`);
+  const introVo = spoken.find((l) => intro && l.bar === intro.bar);
+  if (intro && (!introVo || !introVo.text.endsWith(intro.text.split('\n').slice(-1)[0]))) bad.push(`the introduction's voice line does not say its caption ("${introVo?.text}")`);
+  if (bad.length) {
+    console.error('✗ film brand lines:');
+    for (const b of bad) console.error('    ' + b);
+    failed = true;
+  } else {
+    console.log(`✓ the film ends on the tagline, once, screen and voice word for word; the introduction says "${SUBTITLE}."`);
+  }
+}
+
 // ── 2. score
 {
   const wav = path.join(here, '..', 'public', 'score.wav');
@@ -256,11 +291,13 @@ console.log('\n── reel');
   } else {
     console.log('  (no out/vo/reel/manifest.json: VO fit not re-checked; run synth-vo.py reel)');
   }
-  // the lines the reel shares with the brand: tagline in, subtitle out
-  const film = read('src/scenes/Endcard.tsx');
+  // the reel's lockup line is the App Store subtitle (docs/APP_STORE.md §2).
+  // (Until 2026-09-28 this compared it with the film's endcard; the film now
+  // ends on the tagline, owner call, and the reel was left as approved.)
+  const subtitle = /\| \*\*Subtitle\*\* \| `([^`]+)`/.exec(fs.readFileSync(path.join(root, '..', '..', 'docs', 'APP_STORE.md'), 'utf8'))?.[1];
   const close = caps.find((c) => c.place === 'lockup');
   const closeLine = close?.text.split('\n').slice(-1)[0].replace(/\.$/, '');
-  if (!close || !film.includes(closeLine)) bad.push('the reel lockup line is not the film endcard subtitle');
+  if (!close || !subtitle || closeLine !== subtitle) bad.push(`the reel lockup line "${closeLine}" is not the App Store subtitle "${subtitle}"`);
   // round 7 (owner): "Introducing Machina. All your saves, finally useful." after the problem
 
   // ── 4. banned strings, everywhere a viewer can read one

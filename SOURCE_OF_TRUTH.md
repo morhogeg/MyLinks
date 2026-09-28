@@ -2382,7 +2382,7 @@ same words; the tagline line under the rule was cut so screen and voice agree.
 So the "one slot to swap for a badge" note above is now the empty space under
 the subtitle, and the tagline's best-placed appearance is the promotional text,
 not the film. The library caption reads "From now on, lose nothing." (comma).
-**Slogan roles settled 2026-09-19 (owner, after asking "which one is it?"):**
+**Slogan roles settled 2026-09-19 (SUPERSEDED 2026-09-28, below; owner, after asking "which one is it?"):**
 the film's introduction line is the TAGLINE ("Machina. / Everything you save,
 finally useful.", replacing "one place for all your saved links", which
 volunteered Machina into the link-saver category and undersold screenshots
@@ -2391,6 +2391,21 @@ Promise opens, loss-aversion closes. Same session: the recipe card became
 "Why you forget most of what you read" (Science; the query "remembering more
 from books" still shares no word with it), the Manson title is shortened so
 the Ask chip never truncates, and two-sentence captions break at the sentence.
+**Slogan roles flipped 2026-09-28 (owner decision): every launch film ENDS on
+the tagline.** The endcard's one line is "Everything you save, finally
+useful." (exact wording, comma included, set in sentence case), and the
+closing voice line says those words and nothing else; the introduction is now
+"Machina. / Never lose another great find." (voice: "Introducing Machina.
+Never lose another great find."). The tagline appears once per film, at the
+end. Why: the tagline is the brand line and stays fixed; the subtitle is App
+Store copy that can change with search tests and would date every posted film;
+and problem → Machina → payoff ends on the payoff. `npm run verify` holds it
+(tagline once, on the endcard, screen = voice word for word; the introduction
+carries the subtitle). All seven editions re-rendered. NOT changed: the
+highlight reel (`MachinaReel`, branch `claude/machina-reel-pilot`) still
+closes on "Machina. Never lose another great find."; it needs its own owner
+call and round (its verify gate now checks that line against the App Store
+subtitle rather than the film's endcard).
 
 *Short-form reels (PLANNED 2026-09-26, owner; the PILOT was built the same
 day on branch `claude/machina-reel-pilot`, NOT merged, see "What exists"
@@ -2619,6 +2634,20 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-28 — Launch film ends on the tagline (owner decision).** Branch
+  `claude/clip-save`, not merged. `MachinaLaunch` now ends on "Everything you
+  save, finally useful." (endcard line and closing voice, word for word,
+  nothing else) and the introduction reads "Machina. / Never lose another great
+  find." (the subtitle's words; the tagline is said once, at the end). Why:
+  the tagline is fixed brand copy, the subtitle can change with App Store search
+  tests. Captions, `audio/synth-vo.py`, the endcard, the voice lines and the
+  mix regenerated; verify gains a brand-lines gate; all seven editions
+  (landscape, vertical, silent, clean, vertical silent, VO, vertical VO)
+  re-rendered, and the introduction and endcard frames were read in both
+  formats. The reel's lockup line gate now checks the App Store subtitle, and
+  the reel itself is unchanged (it still ends on the subtitle: flagged for the
+  owner). The closing voice was checked by its synthesized text and timing,
+  not by ear: no audio playback here.
 - **2026-09-28 — Feature clip: SAVE, round 2 (finishing pass).** Branch
   `claude/clip-save`, not merged. A measured review of the 32s render (frame
   differences, phase correlation, strips at every seam), no re-concept: script,

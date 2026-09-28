@@ -66,8 +66,11 @@ into one point of light that the brackets close around, and the middle acts
 follow what the product actually does, in order: **saving was never the hard part → Machina reads
 what you save → summarized, tagged and filed → so you can find it again → then
 ask it anything → answers built from what you saved → every save connects to the
-rest → nothing worth keeping stays buried.** The film closes on the subtitle,
-"Never lose another great find." It deliberately avoids two framings the
+rest → nothing worth keeping stays buried.** The introduction names the product
+and the problem it ends ("Machina. Never lose another great find."), and the
+film closes on the payoff, the tagline, "Everything you save, finally useful."
+(owner call 2026-09-28: problem → Machina → payoff; the tagline is said once,
+at the end). It deliberately avoids two framings the
 owner ruled out: it is **not** a learning app, and it does **not** sell
 "search by meaning" as the headline. The word *library* appears nowhere.
 
@@ -84,12 +87,13 @@ owner ruled out: it is **not** a learning app, and it does **not** sell
 | 20–23 | 0:50 | `GraphScene` | Edges draw in staggered — connections being found, not a diagram revealed |
 | 23–26 | 0:57.5 | `CollectionsScene` | The organising that is yours |
 | 26–29 | 1:05 | `DigestScene` | The weekly write-up, then the resurfaced save as its own beat |
-| 29–32 | 1:12.5 | `Endcard` | The bare mark, the wordmark, the App Store subtitle (`Never lose another great find`), which the voice-over also speaks |
+| 29–32 | 1:12.5 | `Endcard` | The bare mark, the wordmark, the tagline (`Everything you save, finally useful.`), which the voice-over speaks word for word |
 
 `Capture` / `Ask` / `Connect` print as a letterspaced kicker above the line on
 their own beats, so a viewer can place each act inside the film's three acts
 without being told. (They were the App Store subtitle until 2026-08-26; the
-endcard now carries the current subtitle, the kickers keep the act names.)
+kickers keep the act names. The current subtitle's words, "Never lose another
+great find", are the introduction's line; the endcard carries the tagline.)
 
 **No em dashes anywhere a viewer can read** — the app-wide ban
 (`web/scripts/check-em-dash.mjs`) applies to burned-in captions, demo cards and
@@ -294,11 +298,21 @@ The endcard is the **bare** Citation mark — not the app-icon tile.
 there reads as a shrunken app icon rather than as the brand mark"), and full-frame
 the grey squircle read as a screenshot of an icon instead of as an identity.
 
-The endcard carries one line, the App Store subtitle, and the voice-over speaks
-the same words (owner call 2026-09-17; the tagline that used to sit under a rule
-beneath it was cut so screen and voice agree). The space under the subtitle is
-the slot for a real App Store badge or URL once the listing is live. Nothing else
-in the film claims availability.
+The endcard carries one line, the tagline, **"Everything you save, finally
+useful."**, exactly as written (comma and full stop, sentence case, Geist 600),
+and the closing voice line speaks those words and nothing else (owner calls
+2026-09-17: screen and voice agree; 2026-09-28: every launch film ends on the
+tagline). Why the tagline and not the App Store subtitle: the tagline is the
+brand line and stays fixed, while the subtitle ("Never lose another great find")
+is listing copy that can change with search tests, which would date every posted
+film. The subtitle's words moved to the introduction. To change the ending line:
+edit `src/scenes/Endcard.tsx` and the last line of `FILM_LINES` in
+`audio/synth-vo.py` together, re-run `python3 audio/synth-vo.py` and `node
+audio/mix-vo.mjs`, and re-render every edition; `npm run verify` fails if the
+screen and the voice differ, if the tagline appears anywhere else in the film,
+or if the endcard still shows the subtitle. The space under the line is the slot
+for a real App Store badge or URL once the listing is live. Nothing else in the
+film claims availability.
 
 # Reels
 

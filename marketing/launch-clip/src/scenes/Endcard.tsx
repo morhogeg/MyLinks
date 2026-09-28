@@ -7,13 +7,16 @@ import { drift, prog, ramp, EASE_MODAL, EASE_OUT } from '../film/anim';
 import { sans } from '../fonts';
 
 /**
- * The endcard: the bare mark, the drawn wordmark, the App Store subtitle —
- * ink on paper, the light grade's closing statement.
+ * The endcard: the bare mark, the drawn wordmark, the tagline — ink on paper,
+ * the light grade's closing statement.
  *
- * The letterspaced line IS the listing's subtitle, so it tracks
- * `docs/APP_STORE.md` §2: `Never lose another great find` since 2026-08-26
- * (it was `Capture. Ask. Connect.` until then; the act kickers keep those
- * three words, this line does not).
+ * The line is the TAGLINE, `Everything you save, finally useful.`, exactly as
+ * written (owner call 2026-09-28: every launch film ends on it; it is the brand
+ * line and stays fixed, while the App Store subtitle, `Never lose another great
+ * find`, can change with search tests and would date every posted film). The
+ * subtitle's words now sit in the introduction (timeline.mjs). The line is set
+ * as a statement in sentence case, not the old letterspaced caps label, so it
+ * reads with its comma and full stop as written.
  *
  * The mark is the BARE glyph, not the app-icon tile — `docs/BRANDING.md` makes
  * the same call for the header ("a rounded container there reads as a shrunken
@@ -27,11 +30,10 @@ import { sans } from '../fonts';
  *
  * No price, no urgency, no "download now" — the film's whole argument is that
  * the product is quiet and confident, and a hard sell in the last four seconds
- * would retract it. The endcard closes on ONE line, the subtitle, and the voice
- * says the same words (owner call 2026-09-17; the tagline `Everything you save,
- * finally useful.` used to sit under a rule below it and was cut so the screen
- * and the voice agree). The space under the subtitle is the slot for a real App
- * Store badge or URL once the listing is live. (It deliberately does NOT claim
+ * would retract it. The endcard closes on ONE line, the tagline, and the voice
+ * says exactly those words and nothing else (owner call 2026-09-17: the screen
+ * and the voice agree; `npm run verify` holds it). The space under the line is
+ * the slot for a real App Store badge or URL once the listing is live. (It deliberately does NOT claim
  * anything about learning: Machina is not a learning app.)
  */
 export const Endcard: React.FC = () => {
@@ -105,18 +107,18 @@ export const Endcard: React.FC = () => {
 
         <div
           style={{
-            marginTop: 34,
+            marginTop: 40,
             fontFamily: sans,
-            fontSize: 18,
+            fontSize: 34,
             fontWeight: 600,
-            letterSpacing: '0.36em',
-            textTransform: 'uppercase',
-            color: 'rgba(75,85,99,0.85)',
+            letterSpacing: '-0.015em',
+            color: '#14141B',
+            whiteSpace: 'nowrap',
             opacity: tag,
             transform: `translateY(${(1 - tag) * 8}px)`,
           }}
         >
-          Never lose another great find
+          Everything you save, finally useful.
         </div>
       </AbsoluteFill>
     </AbsoluteFill>
