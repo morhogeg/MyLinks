@@ -2556,7 +2556,9 @@ returned card are scripted in `capture/clip-save.mjs`). Clock
 `reel:app` + `reel:capture` (or `CAPTURE_ONLY=saveclip node
 capture/shoot.mjs`), `npx remotion render src/index.ts MachinaClipSave
 out/clips/machina-clip-save.mp4`; the launch-clip README's "Feature clip:
-SAVE" has the audio commands.
+SAVE" has the audio commands. Finishing pass done (round 2: the Add dialog's
+open and close, the pick, the card landing, the tags, the poster frame; three
+new verify gates).
 
 **Feature-clip briefs, FINAL against the pilot's kit (2026-09-26).** Shared
 by all five: **448 frames (7 bars at 112.5 BPM, 14.9s)**, vertical, built
@@ -2617,6 +2619,25 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-28 — Feature clip: SAVE, round 2 (finishing pass).** Branch
+  `claude/clip-save`, not merged. A measured review of the 32s render (frame
+  differences, phase correlation, strips at every seam), no re-concept: script,
+  order, lines, mix and length unchanged. Fixed: the Add dialog opened as a
+  double exposure (the app's own entrance fades it in over its scrim, so the
+  lifted frames showed the feed's text through it: it now rises from a settled
+  frame over a screen already out of focus); the camera zoomed through the
+  pick, smearing the screenshots as they arrived (it now reframes first and
+  holds for the pick); Save showed two dialogs at once (the lifted one shrank
+  over the screen: it now settles away while the screen is still soft); the
+  landed card's lift flickered a pixel a frame (it followed the app's spring;
+  held on the settled box); the mark's exit blinked (fast-start fade); three
+  taps touched a frame or two late. Added: the tags lift as the read-down
+  settles (the line says "tags it"; only the Related cards were lifted); frame
+  0, the poster, now reads. Verify gains three gates (taps touch on their hit,
+  no fast-start exits, a lift's box within 2pt of the app's). Reel, film and
+  their mixes unchanged (compared). Not changed: faint 1-level rings in the
+  kit's `Paper` under a 12× contrast stretch (shared by the reel and the film).
+  Not listened to on speakers.
 - **2026-09-28 — Feature clip: SAVE (rebuilt to the owner's brief).**
   Branch `claude/clip-save`, not merged. The first cut re-edited the reel's
   Save chapter; the owner rejected it ("expand on the save feature, not just

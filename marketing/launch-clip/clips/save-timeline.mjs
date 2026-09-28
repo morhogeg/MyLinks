@@ -64,7 +64,9 @@ export const HITS = {
   cardDone: 536,
   cardTap: 584,
   keyPoints: 672,
-  // tags & links: read down to the "Do this", the tags and the Related cards
+  // tags & links: read down to the "Do this"; as the scroll settles the tags
+  // lift, then the Related cards
+  tags: 744,
   related: [752, 768],
   // the close: thrown into the lockup; the takeaway starts as the mark strikes
   throw: 800,
@@ -94,7 +96,7 @@ export const PLAY = {
  *  to the Key Points, then on to the tags and the Related cards */
 export const SCROLLS = [
   [HITS.cardTap + 40, HITS.keyPoints - 4, 'keyPoints'],
-  [HITS.keyPoints + 24, HITS.related[0] - 8, 'end'],
+  [HITS.keyPoints + 24, HITS.tags, 'end'],
 ];
 
 /**

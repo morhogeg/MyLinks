@@ -601,10 +601,25 @@ the reel. One save is carried through it: a recipe post someone screenshotted.
 |---|---|---|
 | 0–152 | the problem | saves where they were kept (open tabs, screenshots, bookmarks) bleach out; each named place lifts ("Great finds get lost in open tabs, screenshots and bookmarks.") |
 | 136–320 | the name, ANY APP | they collapse into the mark, the wordmark wipes in on "Machina"; YouTube, Instagram and Safari shares fly in ("Machina saves from any app. No copying, no pasting.") |
-| 304–488 | SCREENSHOTS | the point becomes the +, the app irises open; the real Add dialog, Image tab, three screens of one post picked, numbered, Save ("Even screenshots get analyzed. Up to five become one card.") |
+| 304–496 | SCREENSHOTS | the point becomes the + (304–336), the app irises open, + tapped (360); the real Add dialog rises (368), Image tab (400), the camera reframes, three screens of one post picked on a still frame (432), numbered, Save (472), the dialog settles away ("Even screenshots get analyzed. Up to five become one card.") |
 | 496–680 | KEY POINTS | the feed's own "Reading 3 screenshots…" card and "Reading text…" banner, the card it becomes, opened: the screenshots, the gist, the Key Points lifted ("It reads the text in them and pulls out the key points.") |
-| 680–800 | TAGS & LINKS | read on down: the "Do this", the tags, the two Related cards (Marcella Hazan's sauce, Samin Nosrat's chicken) lifted ("Then it tags it, and links it to what you already saved.") |
+| 680–800 | TAGS & LINKS | read on down past the "Do this"; as it settles (744) the tags lift, then the two Related cards (Marcella Hazan's sauce 752, Samin Nosrat's chicken 768) ("Then it tags it, and links it to what you already saved.") |
 | 800–960 | the takeaway | thrown into the lockup: the mark strikes, MACHINA wipes in on the spoken name, "Save it once. Machina does the rest." |
+
+**How it got here.** Round 1 rebuilt the clip to the owner's brief (the
+first cut, a re-edit of the reel's Save chapter, was rejected), then took the
+owner's line notes (no "share sheet"; screenshots "get analyzed"). Round 2 was
+a measured finishing pass, no re-concept: the Add dialog opened as a double
+exposure (the app fades its dialog in over its own scrim, so a lifted crop of
+those frames shows the feed's type through it; it now rises from the settled
+frame over a screen already racked out); the camera zoomed through the pick
+and smeared the screenshots arriving (it reframes first, the pick lands on a
+still frame); Save showed two dialogs (the lift now settles away while the
+screen is soft); the landed card's lift hopped a pixel a frame (it followed
+the app's arrival spring: held on the settled box); the mark's exit blinked
+(EASE_MODAL fade → EASE_IN_OUT, every lift exit too); three taps touched a
+frame or two late; the tags got their own lift (the line says "tags it");
+frame 0 (the poster) now reads. Verify gained a gate for each new class.
 
 **What is real and what is scripted.** Every app frame is the real app, a new
 take `saveclip` (`capture/shoot.mjs`, same demo account): the screenshots are
@@ -646,7 +661,8 @@ Also `MachinaClipSaveSilent` and `MachinaClipSaveClean`. Verify's clip section
 holds the reel's caption, dwell, grid, banned-word and loudness gates to the
 clip, and adds: Machina named in a line and in the close, about 30s, no plain
 space in a kicker, the saves shown are real demo saves, the take has every
-mark the cut plays.
+mark the cut plays, every tap's pad touches on its hit, no exit on a
+fast-start curve, and the landed card's lift box within 2pt of the app's.
 
 ## Motion language
 
@@ -807,6 +823,15 @@ that breaks it.
   and snaps back on removal (measured: the reel's Key Points sink 3px over
   reel frames 1176–1190 and snap back at 1192; the kit is unchanged so the
   reel renders as approved).
+- **Lift a settled frame, and hold a lift on a settled box** (SAVE round 2).
+  An element the app animates in (a dialog fading in over its scrim) is lifted
+  from its settled frame and given its own arrival, or its see-through
+  in-between frames double-expose whatever sits behind the crop; and the
+  screen behind racks out before it arrives, so it never fades in over sharp
+  type. A `Lift` on something the app is still springing into place uses the
+  settled box, not each frame's measured one, which moves by half points and
+  makes the copy hop a pixel a frame. Never show a lifted copy and its screen's
+  own copy at once: the lift leaves while the screen is still soft.
 
 ### Sound to picture (`HITS`, `audio/reel-score.mjs`)
 

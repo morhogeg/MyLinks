@@ -10,7 +10,7 @@ import { HANDOFF } from '../../scenes/handoff';
 /**
  * The hook and the name. The problem, shown: great finds, each where it was
  * kept (open tabs, screenshots, bookmarks), come into focus (frame 0, the
- * poster, is already the scatter). "Great finds get lost": they bleach into
+ * poster, already reads). "Great finds get lost": they bleach into
  * the paper; each place is lifted back as the narrator names it. Then they
  * collapse into one point of ink (EASE_GATHER), the brackets snap shut around
  * it (the app's spring), and the drawn wordmark wipes in as "Machina" is said.
@@ -47,8 +47,10 @@ const CHIPS: { kind: SaveKind; title: string; x: number; y: number; s: number; r
 
 const chipAt = (k: number, f: number) => {
   const c = CHIPS[k];
-  const t0 = k * 1.5; // a rolling cascade into focus from frame 0
-  const arrive = prog(f, t0, t0 + 20, EASE_MODAL);
+  // a rolling cascade into focus, already under way on frame 0 (the poster
+  // feeds and link previews show): the first saves read, the rest settle
+  const t0 = k * 1.5 - 17;
+  const arrive = prog(f, t0, t0 + 24, EASE_IN_OUT);
   const push = 1 + 0.05 * prog(f, 0, HITS.collapse, (t) => t) * c.s;
   // named: lifts on its word, and stays lifted until the collapse
   const w = c.named !== undefined ? wordAt(HOOK, c.named) : Infinity;
@@ -78,7 +80,8 @@ export const Hook: React.FC<{ f: number }> = ({ f }) => {
   const flash = f < HITS.dotLands ? Math.pow(prog(f, HITS.collapse, HITS.dotLands, (t) => t), 3) * 0.5 : Math.max(0, 1 - (f - HITS.dotLands) / 18);
   const close = prog(f, HITS.dotLands + 1, HITS.bracketsClose + 4, EASE_SPRING);
   const form = prog(f, HITS.bracketsClose - 6, HITS.bracketsClose + 12, EASE_MODAL);
-  const part = prog(f, HITS.part, HITS.part + 10, EASE_MODAL);
+  // an exit eases in and out (a fast-start fade reads as a blink)
+  const part = prog(f, HITS.part, HITS.part + 16, EASE_IN_OUT);
   const travel = prog(f, HITS.part + 2, HITS.toApp, EASE_IN_OUT);
   const wm = prog(f, NAME_AT, NAME_AT + 16, EASE_MODAL);
   const lift = prog(f, NAME_AT - 8, NAME_AT + 22, EASE_IN_OUT);

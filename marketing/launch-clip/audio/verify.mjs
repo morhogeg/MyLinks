@@ -525,6 +525,33 @@ console.log('\n── clip: save');
     void p;
   }
 
+  // round 2 (finishing pass) gates. Taps: the pad touches (35% of the Tap
+  // gesture) on the frame of its hit, where the app responds and the tick sounds
+  const appSrc = read('src/reels/clips/save/App.tsx');
+  let taps = 0;
+  for (const [, hit, a, b] of appSrc.matchAll(/<Tap [^>]*t=\{prog\(f, HITS\.(\w+) - (\d+), HITS\.\1 \+ (\d+)/g)) {
+    taps++;
+    // the first whole frame drawn at or past the touch
+    const touch = Math.ceil(-Number(a) + 0.35 * (Number(a) + Number(b)) - 1e-9);
+    if (touch !== 0) bad.push(`the tap on ${hit} first shows its touch ${touch} frames off its hit`);
+  }
+  if (taps < 5) bad.push(`found ${taps} taps in App.tsx (expected 5): the tap gate no longer reads it`);
+  // exits ease in and out: a fast-start curve on a fade-out reads as a blink
+  for (const file of ['Hook.tsx', 'App.tsx', 'Shares.tsx', 'End.tsx']) {
+    for (const [, name, curve] of read(`src/reels/clips/save/${file}`).matchAll(/const (\w*Out|part) = prog\([^;]*(EASE_MODAL|EASE_SPRING|EASE_FLING)\)/g))
+      bad.push(`${file}: exit ${name} uses ${curve} (a fast start reads as a blink: EASE_IN_OUT)`);
+  }
+  // a lift on an element the app is still animating sits on its settled box:
+  // the landed card's measured box may differ from it by at most 2pt while the
+  // lift is up (else the copy and the app's card visibly part)
+  if (take) {
+    const landed = take.frames[take.marks.landed].r.firstCard;
+    for (let i = take.marks.done + 8; i < take.marks.landed; i++) {
+      const r = take.frames[i].r.firstCard;
+      if (r && r.some((v, k) => Math.abs(v - landed[k]) > 2)) bad.push(`saveclip frame ${i}: the new card's box is ${JSON.stringify(r)}, > 2pt off its settled box`);
+    }
+  }
+
   if (bad.length) {
     console.error('✗ clip save:');
     for (const b of bad) console.error('    ' + b);
