@@ -91,7 +91,7 @@ export const MarkAssembly: React.FC<{ close: number; dot: number; width: number;
 /**
  * The reel's closing lockup: the mark ARRIVES with the app's own launch
  * motion (AnimatedMark: arms draw, brackets close, the point strikes last),
- * the drawn wordmark wipes in under it, then the subtitle. `strike` is the
+ * the drawn wordmark wipes in under it, then the line. `strike` is the
  * frame the point should land on (the score's impact); everything is timed
  * back from it.
  */
@@ -150,10 +150,17 @@ export const Lockup: React.FC<{
       >
         <Wordmark style={{ width: '100%', height: 'auto' }} />
       </div>
-      {showLine && (
+      {showLine &&
+        // a "\n" in `line` starts a new row (the tagline breaks at its comma:
+        // "Everything you save," / "finally useful."); words keep one running
+        // index across rows, so `lineStarts` still lines up with the voice
+        line.split('\n').map((row, r, rows) => {
+          const first = rows.slice(0, r).reduce((n, x) => n + x.split(' ').length, 0);
+          return (
         <div
+          key={r}
           style={{
-            marginTop: big ? 58 : 46,
+            marginTop: r > 0 ? (big ? 4 : 10) : big ? 58 : 46,
             display: 'flex',
             justifyContent: 'center',
             // a word gap has to out-shout the tracking (0.36em between letters)
@@ -171,10 +178,11 @@ export const Lockup: React.FC<{
             whiteSpace: 'nowrap',
           }}
         >
-          {line
-            .replace(big ? /$^/ : /[.]$/, '')
+          {row
+            .replace(big || r < rows.length - 1 ? /$^/ : /[.]$/, '')
             .split(' ')
-            .map((w, k) => {
+            .map((w, j) => {
+              const k = first + j;
               const s0 = lineStarts?.[k] ?? strike + 20 + k * 3;
               const t = prog(frame, s0, s0 + (big ? 8 : 10), EASE_MODAL);
               return (
@@ -193,7 +201,8 @@ export const Lockup: React.FC<{
               );
             })}
         </div>
-      )}
+          );
+        })}
     </div>
   );
 };

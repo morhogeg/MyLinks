@@ -182,6 +182,52 @@ let failed = false;
   }
 }
 
+// ── the tagline ends every film (owner call 2026-09-28). It is the fixed
+// brand line; the App Store subtitle can change with search tests, so it is
+// never a film's last word. Once per film, at the end, never earlier, and the
+// voice says exactly what the screen shows: the film's endcard line and its
+// closing voice line are the tagline alone; the reel and the clips close on
+// "Machina." (the drawn wordmark) and then the tagline.
+{
+  const TAGLINE = 'Everything you save, finally useful.';
+  const SUBTITLE = /never lose another great find/i;
+  const echo = /finally useful/i;
+  const root = path.join(here, '..');
+  const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
+  const bad = [];
+  // the film: the captions, the endcard, and the voice (synth-vo.py FILM_LINES)
+  SUBTITLES.forEach((c) => {
+    if (echo.test(c.text)) bad.push(`film caption "${c.text}" says the tagline before the end`);
+  });
+  const endcard = read('src/scenes/Endcard.tsx').split('\n').filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l)).join('\n');
+  if (!endcard.includes(TAGLINE)) bad.push('the film endcard does not show the tagline, word for word');
+  if (SUBTITLE.test(endcard)) bad.push('the film endcard still shows the App Store subtitle');
+  const film = read('audio/synth-vo.py').split('FILM_LINES = [')[1].split('\n]')[0];
+  const spoken = [...film.matchAll(/^\s*\(\s*[\d.]+,\s*[\d.]+,\s*f?"([^"]*)"/gm)].map((m) => m[1]);
+  if (spoken.at(-1) !== TAGLINE) bad.push(`the film's closing voice line is "${spoken.at(-1)}", not the tagline alone`);
+  spoken.slice(0, -1).forEach((s) => {
+    if (echo.test(s)) bad.push(`film voice line "${s}" says the tagline before the end`);
+  });
+  // the reel and every clip: the last caption is the lockup, "Machina." + the tagline
+  for (const [name, file] of [['reel', '../reel-timeline.mjs'], ['find clip', '../clips/find-timeline.mjs']]) {
+    const caps = [...(await import(file)).CAPTIONS].sort((a, b) => a.at - b.at);
+    const last = caps.at(-1);
+    const line = last.text.split('\n');
+    if (last.place !== 'lockup' || line[0] !== 'Machina.' || line.slice(1).join(' ') !== TAGLINE || (last.say && last.say !== last.text)) {
+      bad.push(`the ${name} does not end on "Machina." and the tagline (it ends "${last.text.replace(/\n/g, ' ')}")`);
+    }
+    caps.slice(0, -1).forEach((c) => {
+      if (echo.test(c.text) || echo.test(c.say ?? '')) bad.push(`${name} caption "${c.text.replace(/\n/g, ' ')}" says the tagline before the end`);
+    });
+  }
+  if (bad.length) {
+    console.error('✗ the tagline:');
+    for (const b of bad) console.error('    ' + b);
+    failed = true;
+  } else {
+    console.log('✓ every film ends on the tagline, once, and the voice says it word for word');
+  }
+}
 
 // ───────────────────────────────────────────────────────────────── THE REEL
 console.log('\n── reel');
@@ -256,12 +302,11 @@ console.log('\n── reel');
   } else {
     console.log('  (no out/vo/reel/manifest.json: VO fit not re-checked; run synth-vo.py reel)');
   }
-  // the lines the reel shares with the brand: tagline in, subtitle out
+  // the line the reel shares with the film: its endcard line, the tagline
   const film = read('src/scenes/Endcard.tsx');
   const close = caps.find((c) => c.place === 'lockup');
-  const closeLine = close?.text.split('\n').slice(-1)[0].replace(/\.$/, '');
-  if (!close || !film.includes(closeLine)) bad.push('the reel lockup line is not the film endcard subtitle');
-  // round 7 (owner): "Introducing Machina. All your saves, finally useful." after the problem
+  const closeLine = close?.text.split('\n').slice(1).join(' ');
+  if (!close || !film.includes(closeLine)) bad.push('the reel lockup line is not the film endcard line');
 
   // ── 4. banned strings, everywhere a viewer can read one
   for (const c of L.CARDS) {
@@ -497,8 +542,8 @@ console.log('\n── find clip');
     console.log('  (no out/vo/find/manifest.json: VO fit not re-checked; run synth-vo.py find)');
   }
   const close = caps.find((c) => c.place === 'lockup');
-  if (!close || !read('src/scenes/Endcard.tsx').includes(close.text.split('\n').slice(-1)[0].replace(/\.$/, ''))) {
-    bad.push('the clip lockup line is not the film endcard subtitle');
+  if (!close || !read('src/scenes/Endcard.tsx').includes(close.text.split('\n').slice(1).join(' '))) {
+    bad.push('the clip lockup line is not the film endcard line');
   }
 
   // the searches, element by element

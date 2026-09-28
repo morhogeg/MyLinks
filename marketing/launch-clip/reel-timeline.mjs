@@ -59,7 +59,7 @@ export const onBeat = (f) => Math.round(f / BEAT_FRAMES) * BEAT_FRAMES;
  * Inside two scene holds, in OUTPUT frames from the hold's start (the scenes
  * and the score both read these):
  *  - SHARE: when each app's card arrives (scenes/ShareBeat.tsx); the first
- *    waits for "All your saves, finally useful." to leave the screen;
+ *    waits for "Never lose another great find." to leave the screen;
  *  - MODES: the tab taps, the paste and the Save tap (scenes/SaveModes.tsx);
  *    Save is tapped INSIDE the hold, so the source clock resumes on the
  *    tapped dialog and goes straight into the phases.
@@ -244,7 +244,10 @@ export const CAPTIONS = [
   // (`duck`: the music steps further back under the two brand lines, the
   // name and the promise; round 13, measured masked in the speech band)
   { at: real(56), to: 410, place: 'mark', text: 'Machina.', say: 'Introducing Machina.', duck: 0.4 },
-  { at: 416, to: 488, text: 'All your saves,\nfinally useful.' },
+  // (2026-09-28, owner: the tagline is said once, at the end, so the promise
+  // after the name is the App Store subtitle; it was "All your saves,
+  // finally useful.")
+  { at: 416, to: 488, text: 'Never lose\nanother great find.' },
   // the share hold: from any app, into Machina (scenes/ShareBeat.tsx)
   { at: holdStart('share') + 40, to: holdStart('share') + 176, text: 'Save anything, from anywhere.', until: 'the third share lands in the mark' },
   // the modes hold: the Add dialog's three ways in
@@ -270,8 +273,9 @@ export const CAPTIONS = [
   { at: holdStart('recall') + TODO_LEN + 24, to: holdStart('recall') + TODO_LEN + 130, text: 'Every week, Machina brings back\nwhat’s worth remembering.' },
   { at: holdStart('recall') + TODO_LEN + 136, to: holdStart('recall') + TODO_LEN + 256, text: 'The themes of your week,\nand the one save worth rereading.' },
   // the close: the name (the drawn wordmark wipes in as it is said), then
-  // the App Store subtitle, set big in the serif
-  { at: onBeat(real(542)), to: real(600), place: 'lockup', text: 'Machina.\nNever lose another great find.', duck: 0.4 },
+  // the tagline, set big in Geist and broken at its comma (owner call
+  // 2026-09-28: every launch film ends on the tagline)
+  { at: onBeat(real(542)), to: real(600), place: 'lockup', text: 'Machina.\nEverything you save,\nfinally useful.', duck: 0.4 },
 ];
 
 /**

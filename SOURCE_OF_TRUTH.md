@@ -2391,6 +2391,21 @@ Promise opens, loss-aversion closes. Same session: the recipe card became
 "Why you forget most of what you read" (Science; the query "remembering more
 from books" still shares no word with it), the Manson title is shortened so
 the Ask chip never truncates, and two-sentence captions break at the sentence.
+**Slogan roles FLIPPED 2026-09-28 (owner decision, supersedes 09-19):** every
+launch film ENDS on the tagline **`Everything you save, finally useful.`**
+(wording and comma exact), said ONCE per film, never at both ends. Why: the
+tagline is the fixed brand line; `Never lose another great find` is App Store
+Subtitle copy that can change with search tests, which would date every posted
+film; and ending on the promise follows the story (problem → Machina →
+payoff). The film's introduction now reads "Machina. / Never lose another
+great find." (voice: "Introducing Machina. Never lose another great find."),
+the endcard's one line is the tagline in sentence-case Geist (it was the
+letterspaced uppercase subtitle), and the closing voice line is the tagline
+word for word and nothing else. The reel follows (its "All your saves,
+finally useful." after the name became "Never lose another great find."; its
+lockup is "Machina." + the tagline on two rows), and so does the FIND clip's
+lockup. `npm run verify` fails if any film ends on anything else or says the
+tagline earlier. The badge slot is still the space under the endcard line.
 
 *Short-form reels (PLANNED 2026-09-26, owner; the PILOT was built the same
 day on branch `claude/machina-reel-pilot`, NOT merged, see "What exists"
@@ -2503,7 +2518,8 @@ LUFS, true peak ≤ −1 dBTP), `MachinaReelSilent`
 and `MachinaReelClean`, in `marketing/launch-clip/`. Script: the problem ("You
 save things everywhere." / "An article here. A recipe there. A video
 somewhere else." / "Saved, and rarely seen again."), "Introducing Machina."
-(the screen shows the drawn wordmark) "All your saves, finally useful.",
+(the screen shows the drawn wordmark) "Never lose another great find." (was
+"All your saves, finally useful." until 2026-09-28),
 "Save anything, from anywhere." (a motion-graphics beat: saves shared from
 YouTube, Instagram and Safari, each card's Share button tapped and pulled
 into the mark; the native share sheet cannot be captured from the web build
@@ -2511,8 +2527,8 @@ and the owner chose not to record it), "A link, a screenshot, or a note."
 (the Add dialog's real Link, Image and Note tabs, each tapped), "Machina reads it, summarizes it, and files it." (the launch film's line, over the five phases), "Each save becomes a card, with the key points pulled out.",
 Find, Ask, Connect, the weekly recap read slowly ("Every week, Machina brings
 back what's worth remembering." / "The themes of your week, and the one save
-worth rereading."), and the close "Machina. Never lose another great find."
-in Geist (the serif retired in round 15). One steady speed on the 112.5 BPM beat; key features
+worth rereading."), and the close "Machina. Everything you save, finally
+useful." (the tagline since 2026-09-28) in Geist (the serif retired in round 15). One steady speed on the 112.5 BPM beat; key features
 linger. **Every frame of app UI is the real web app, not a
 mockup** (owner, mid-task): `capture/` builds `web/` as a static export with
 Firebase swapped for an in-memory stand-in seeded with a demo account of 24
@@ -2550,7 +2566,8 @@ what's close." (sardinia swim spot → Cala Goloritzé under the app's "Close
 matches") / "Type where you saw it, and get everything from there." (youtube
 → the Sources row → every saved video) / "Open it for the summary, and everything it
 connects to." / "Type what you remember. Get the one you meant." / "Machina.
-Never lose another great find." (the reel's lockup). All real captured app UI
+Everything you save, finally useful." (the reel's lockup; the tagline since
+2026-09-28). All real captured app UI
 (new take `findClip`); the clip keeps its own timeline, scenes, take data
 (beside the clip, registered with the kit's new `addTakes`, so the reel's
 `takes.json` is untouched), narrator dir and word timings, score, mix and
@@ -2620,6 +2637,18 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-28 — Every film ends on the tagline (owner decision).** Branch
+  `claude/clip-find`, not merged. The film's introduction is now "Machina. /
+  Never lose another great find."; its endcard line and closing voice line
+  are "Everything you save, finally useful." (voice: those words alone). The
+  reel's line after the name became the subtitle and its lockup, like the
+  FIND clip's, is "Machina." + the tagline on two rows (`Lockup` breaks rows
+  at a `\n`). New verify gate: every film ends on the tagline, says it once,
+  and the voice matches. All voice lines re-synthesized (all fit), all three
+  mixes rebuilt (reel and FIND −14.0 LUFS / −1.25 dBTP), `.srt` re-emitted,
+  every edition of all three films re-rendered. Verified: `tsc`, `npm run
+  verify` OK; intro and endcard frames read in landscape and vertical, reel
+  and FIND lockups read. Not verified by ear: nobody has listened.
 - **2026-09-28 — FIND clip finishing pass.** Branch `claude/clip-find`, not
   merged. Fresh measured review of the full render: the one real defect was
   the hook's scroll (full speed from rest, an instant reversal, a dead stop:

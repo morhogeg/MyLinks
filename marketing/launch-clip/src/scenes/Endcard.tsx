@@ -7,13 +7,15 @@ import { drift, prog, ramp, EASE_MODAL, EASE_OUT } from '../film/anim';
 import { sans } from '../fonts';
 
 /**
- * The endcard: the bare mark, the drawn wordmark, the App Store subtitle —
+ * The endcard: the bare mark, the drawn wordmark, the product tagline —
  * ink on paper, the light grade's closing statement.
  *
- * The letterspaced line IS the listing's subtitle, so it tracks
- * `docs/APP_STORE.md` §2: `Never lose another great find` since 2026-08-26
- * (it was `Capture. Ask. Connect.` until then; the act kickers keep those
- * three words, this line does not).
+ * The line IS the tagline, `Everything you save, finally useful.`
+ * (`docs/BRANDING.md` D-6), word for word and comma included, in sentence
+ * case as the brand writes it. Owner call 2026-09-28: every launch film ENDS
+ * on the tagline, because it is the fixed brand line, while the App Store
+ * subtitle (`Never lose another great find`) can change with search tests and
+ * would date every posted film. The subtitle moved to the introduction.
  *
  * The mark is the BARE glyph, not the app-icon tile — `docs/BRANDING.md` makes
  * the same call for the header ("a rounded container there reads as a shrunken
@@ -27,10 +29,9 @@ import { sans } from '../fonts';
  *
  * No price, no urgency, no "download now" — the film's whole argument is that
  * the product is quiet and confident, and a hard sell in the last four seconds
- * would retract it. The endcard closes on ONE line, the subtitle, and the voice
- * says the same words (owner call 2026-09-17; the tagline `Everything you save,
- * finally useful.` used to sit under a rule below it and was cut so the screen
- * and the voice agree). The space under the subtitle is the slot for a real App
+ * would retract it. The endcard closes on ONE line, the tagline, and the voice
+ * says exactly those words and nothing else (owner call 2026-09-17: screen and
+ * voice agree). The space under the line is the slot for a real App
  * Store badge or URL once the listing is live. (It deliberately does NOT claim
  * anything about learning: Machina is not a learning app.)
  */
@@ -39,7 +40,7 @@ export const Endcard: React.FC = () => {
   const fr = useFraming();
 
   // Slowed in round 13b (owner: the last slide was a bit fast) — each element
-  // gets its own breath, and the frame holds after the subtitle lands.
+  // gets its own breath, and the frame holds after the tagline lands.
   const icon = prog(f, 2, 30, EASE_OUT);
   const word = prog(f, 56, 96, EASE_MODAL);
   const tag = prog(f, 94, 130, EASE_MODAL);
@@ -105,18 +106,18 @@ export const Endcard: React.FC = () => {
 
         <div
           style={{
-            marginTop: 34,
+            marginTop: 30,
             fontFamily: sans,
-            fontSize: 18,
-            fontWeight: 600,
-            letterSpacing: '0.36em',
-            textTransform: 'uppercase',
-            color: 'rgba(75,85,99,0.85)',
+            fontSize: 34,
+            fontWeight: 500,
+            letterSpacing: '-0.01em',
+            whiteSpace: 'nowrap',
+            color: 'rgba(20,20,27,0.78)',
             opacity: tag,
             transform: `translateY(${(1 - tag) * 8}px)`,
           }}
         >
-          Never lose another great find
+          Everything you save, finally useful.
         </div>
       </AbsoluteFill>
     </AbsoluteFill>

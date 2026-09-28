@@ -103,8 +103,9 @@ export const CAPTIONS = [
   // the takeaway
   { at: 688, to: 776, text: 'Type what you remember.\nGet the one you meant.' },
   // the close: the name (the drawn wordmark wipes in as it is said), then
-  // the App Store subtitle, as the reel closes
-  { at: onBeat(HITS.lockup + 60), to: TOTAL_FRAMES, place: 'lockup', text: 'Machina.\nNever lose another great find.', duck: 0.4 },
+  // the tagline, as the reel closes (owner call 2026-09-28: every launch
+  // film ends on it; it appears nowhere earlier in this clip)
+  { at: onBeat(HITS.lockup + 60), to: TOTAL_FRAMES, place: 'lockup', text: 'Machina.\nEverything you save,\nfinally useful.', duck: 0.4 },
 ];
 
 /**
