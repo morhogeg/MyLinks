@@ -2642,7 +2642,12 @@ exact-match, capped.
   the full render (960 frames) scanned frame to frame, the mp4 at −14 LUFS /
   ≤ −1.3 dBTP, every line ≥3.4dB over the music in the speech band;
   `MachinaReel` (50 frames) and `MachinaLaunch` (18) pixel-identical before
-  and after. **Not verified:** nobody has listened on speakers.
+  and after. Owner rounds 2–3 the same day: the hook moved off the search
+  angle to the knowledge Ask reaches ("Your saves hold more knowledge than
+  you remember."), and "One tap asks the next question" now shows a tap on
+  one of the app's suggested continuation chips, in close (the close tap's
+  ripple no longer lingers on the chat's "+ New"). **Not verified:** nobody
+  has listened on speakers.
 - **2026-09-27 — Highlight reel round 15: caret, shares, one face.** Branch
   `claude/machina-reel-pilot`, not merged. Owner on round 14: the input
   caret was jittery (0:26–0:28): it blinks on the browser's real clock, so

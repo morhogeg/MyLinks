@@ -828,8 +828,8 @@ the same instruments on the same 112.5 BPM grid, and the reel's lockup.
 | 192–272 | 1. your own words | The question types: "Ask in your own words. No keywords, no folders." |
 | 272–384 | 2. from your saves | Send; the answer streams in: "The answer is written from your own saves." |
 | 384–528 | 3. sources | The three sources lift on beats; the first is tapped and The Tail End's own card opens on the passage the answer drew on, which lifts: "Every answer shows its sources. Tap one to check it." |
-| 528–672 | 4. follow-ups | The card closes; the answer's own suggested follow-up ("What else did I save on time?") is tapped; a second answer and its sources: "Keep going. One tap asks the next question." |
-| 672–800 | 5. connections | Its Graph chip: the two cited saves lit and linked among the rest: "Then see how those saves connect." Then the takeaway: "Ask once. Get the answer, and the proof." |
+| 528–688 | 4. follow-ups | The card closes (the finger leaves with it), then the line starts and the camera moves in close on the continuations the app suggests under the answer ("Compare the Time saves", "More on 'The Tail End'", "What else did I save on time?"); the chosen one lifts and is tapped on "asks the next question"; a second answer and its sources: "Keep going. One tap asks the next question." (owner, round 3: the old cut left the close tap's ripple on the chat's "+ New", which read as the tap the line meant) |
+| 688–800 | 5. connections | Its Graph chip: the two cited saves lit and linked among the rest: "Then see how those saves connect." Then the takeaway: "Ask once. Get the answer, and the proof." |
 | 800–960 | close | Thrown out into the lockup: "Machina. Never lose another great find." |
 
 **One take, one clock.** Every app frame is one continuous use of the real

@@ -118,6 +118,9 @@ const wholePoints = ([x, y, w, h]: Rect): Rect => {
 
 /** the follow-up's framing: the chip in reach, the conversation above it */
 const MORE = { cx: 196.5, cy: 560, z: 2.4, fx: 540, fy: 1000 };
+/** close on the continuations the app suggests under the answer ("Compare the
+ *  Time saves", "More on 'The Tail End'", "What else did I save on time?") */
+const SUGGEST = { cx: 196.5, cy: 672, z: 2.9, fx: 540, fy: 1180 };
 
 export const askKeys: Key[] = [
   // the hook: the feed, the camera pushing with the scroll, at speed into the cut
@@ -141,9 +144,12 @@ export const askKeys: Key[] = [
   { f: S.summary + 16, cy: 316, z: 2.58, ease: linear },
   // out to the card's top, its close button in reach as the finger lands
   { f: S.closeTap, cx: 196.5, cy: 330, z: 2.2, fx: 540, fy: 1440, ease: EASE_IN_OUT },
-  { f: S.closeTap + 8, ease: linear },
   // down to the answer's suggested follow-ups, at rest for the tap
-  { f: S.followTap, ...MORE, ease: EASE_IN_OUT },
+  // in close on the suggested continuations, at rest as the finger lands
+  { f: S.followTap - 24, ...SUGGEST, ease: EASE_IN_OUT },
+  { f: S.followTap - 1, cy: 674, z: 2.96, ease: linear },
+  // CUT on the touch: the second answer arrives
+  { f: S.followTap, ...MORE },
   // the second answer arrives in the same frame; the camera rides its scroll
   { f: S.scroll2, cy: 562, ease: linear },
   { f: SCROLL2_END, cy: 540, fy: 1060, ease: EASE_IN_OUT },
@@ -195,8 +201,8 @@ export const AskScene: React.FC<{ f: number }> = ({ f }) => {
   // the summary the answer drew on lifts once the card has opened, and is
   // flat again before the card closes
   const proof = prog(f, S.summary - 4, S.summary + 12, EASE_SPRING) * (1 - prog(f, S.closeTap - 26, S.closeTap - 10, EASE_MODAL));
-  // the follow-up chip lifts a beat before it is tapped
-  const offer = f < S.followTap ? prog(f, S.followTap - 18, S.followTap - 8, EASE_SPRING) * (1 - prog(f, S.followTap - 6, S.followTap - 1, EASE_MODAL)) : 0;
+  // the chosen continuation lifts, with its ring, just before it is tapped
+  const offer = f < S.followTap ? prog(f, S.followTap - 22, S.followTap - 10, EASE_SPRING) * (1 - prog(f, S.followTap - 6, S.followTap - 1, EASE_MODAL)) : 0;
 
   return (
     <AbsoluteFill>
@@ -236,7 +242,9 @@ export const AskScene: React.FC<{ f: number }> = ({ f }) => {
             ring={0.55 * proof}
           />
         )}
-        <Tap x={close.x} y={close.y} t={tapAt(f, S.closeTap)} />
+        {/* the finger leaves with the card (its ripple used to linger on the
+            chat's "+ New", which read as starting a new chat) */}
+        <Tap x={close.x} y={close.y} t={f <= S.closeTap + 1 ? tapAt(f, S.closeTap) : 0} />
         {offer > 0.01 && (
           <Lift take={T} i={i} rect={wholePoints(rectOf(T, i, 'followUp'))} radius={16} lift={offer * 0.6} rise={2} grow={0.03} ring={0.6 * offer} />
         )}

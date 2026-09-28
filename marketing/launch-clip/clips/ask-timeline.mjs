@@ -56,9 +56,9 @@ export const HITS = {
   citeTap: beat(29), // the first source is tapped: the card it cites opens
   summary: beat(30), // its summary, the passage the answer drew on, lifts
   closeTap: beat(33), // the card is closed
-  followTap: beat(36), // the answer's own suggested follow-up is tapped: a second answer
-  scroll2: beat(38), // its sources scroll into view
-  graphTap: beat(42), // its Graph chip: the cited saves lit among the rest
+  followTap: beat(37), // one of the continuations the app suggests under the answer is tapped: a second answer
+  scroll2: beat(39), // its sources scroll into view
+  graphTap: beat(43), // its Graph chip: the cited saves lit among the rest
   lockup: beat(50), // the graph is thrown out; the mark launches as it leaves
   markStrike: beat(52), // the mark's point strikes
 };
@@ -86,7 +86,10 @@ export const CAPTIONS = [
   // 3. sources: so it can be trusted, and checked
   { at: beat(25), to: beat(31) + 8, text: 'Every answer shows its sources.\nTap one to check it.' },
   // 4. follow-ups: go deeper without starting over
-  { at: beat(32), to: beat(37) + 8, text: 'Keep going. One tap asks\nthe next question.' },
+  // (owner, round 3: this line is about the continuation chips the app
+  // suggests under an answer; it starts once the card has closed, so no
+  // other tap is on screen while it plays)
+  { at: beat(34), to: beat(39) + 8, text: 'Keep going. One tap asks\nthe next question.' },
   // 5. connections: what else those saves sit next to
   { at: beat(41), to: beat(45), text: 'Then see how\nthose saves connect.' },
   // the takeaway
