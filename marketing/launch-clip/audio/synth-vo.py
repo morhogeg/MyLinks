@@ -117,6 +117,33 @@ SCRIPTS = {"film": (film_script, VO), "reel": (reel_script, os.path.join(VO, "re
 WORD_TIMING = {"reel": os.path.join(ROOT, "src", "reels", "data", "reel-vo.json")}
 
 
+# ── the SAVE feature clip ────────────────────────────────────────────────────
+#   python3 audio/synth-vo.py save  →  out/vo/save/line-NN.wav + manifest.json,
+#                                      src/reels/clips/save/vo.json
+# Read from CAPTIONS in clips/save-timeline.mjs and spoken as written, exactly
+# as the reel's lines are (same voice, same respelling, same timing measure).
+def timeline_script(module):
+    """(start, window, spoken text) for each caption of a clip timeline."""
+    js = f"import('{module}').then(m => console.log(JSON.stringify({{ fps: m.FPS, captions: m.CAPTIONS }})))"
+    raw = subprocess.run(["node", "-e", js], cwd=ROOT, check=True, capture_output=True, text=True).stdout
+    data = json.loads(raw)
+    fps = data["fps"]
+    return [
+        {
+            "frame": c["at"],
+            "start": c["at"] / fps,
+            "window": (c["to"] - c["at"]) / fps,
+            "text": " ".join((c.get("say") or c["text"]).split()).replace("Machina", SAY_NAME),
+            "speed": SPEED,
+        }
+        for c in data["captions"]
+    ]
+
+
+SCRIPTS["save"] = (lambda: timeline_script("./clips/save-timeline.mjs"), os.path.join(VO, "save"))
+WORD_TIMING["save"] = os.path.join(ROOT, "src", "reels", "clips", "save", "vo.json")
+
+
 def speech_runs(samples, sr, gap=0.09):
     """[start, end] seconds of each run of speech, split at pauses >= gap."""
     import numpy as np

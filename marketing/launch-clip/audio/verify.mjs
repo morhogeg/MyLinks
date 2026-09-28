@@ -425,5 +425,197 @@ console.log('\n── reel');
   }
 }
 
+// ─────────────────────────────────────────────────────── THE SAVE CLIP
+// clips/save-timeline.mjs, src/reels/clips/save: the reel's gates, held to
+// the clip's own clock, plus the ones a clip adds (at most three lines and
+// the subtitle; the shots it borrows from the reel start on the reel's grid)
+console.log('\n── clip: save');
+{
+  const C = await import('../clips/save-timeline.mjs');
+  const L = await import('../capture/library.mjs');
+  const root = path.join(here, '..');
+  const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
+  const exists = (p) => fs.existsSync(path.join(root, p));
+  const bad = [];
+  const BANNED = [
+    [/—/, 'em dash'],
+    [/\bAI\b/, 'literal "AI"'],
+    [/second brain/i, '"second brain"'],
+    [/librar(y|ies)/i, '"library"'],
+  ];
+  const scan = (where, text) => {
+    for (const [re, what] of BANNED) if (re.test(text)) bad.push(`${what} in ${where}: ${JSON.stringify(text).slice(0, 110)}`);
+  };
+
+  // captions and kickers: no overlaps, inside the clip, at most three lines
+  // and the closing subtitle, which is the film's endcard line
+  const caps = [...C.CAPTIONS].sort((a, b) => a.at - b.at);
+  caps.forEach((c, i) => {
+    scan(`caption ${i + 1}`, c.text);
+    if (c.say) scan(`caption ${i + 1} (spoken)`, c.say);
+    if (c.to <= c.at) bad.push(`caption "${c.text}" ends before it starts`);
+    if (i && c.at < caps[i - 1].to) bad.push(`caption overlap: "${c.text}" / "${caps[i - 1].text}"`);
+    if (c.to > C.TOTAL_FRAMES) bad.push(`caption "${c.text}" runs past the clip`);
+    if (c.at % C.BEAT_FRAMES) bad.push(`caption "${c.text}" starts at ${c.at}, not on a beat`);
+  });
+  const lines = caps.filter((c) => !c.place);
+  if (lines.length > 3) bad.push(`${lines.length} narrator lines (at most three, plus the closing subtitle)`);
+  const close = caps.find((c) => c.place === 'lockup');
+  const closeLine = close?.text.split('\n').slice(-1)[0].replace(/\.$/, '');
+  if (!close || close !== caps[caps.length - 1] || !read('src/scenes/Endcard.tsx').includes(closeLine)) {
+    bad.push('the clip does not close on the film endcard subtitle');
+  }
+  const kick = [...C.KICKERS].sort((a, b) => a.at - b.at);
+  kick.forEach((k, i) => {
+    scan(`kicker ${k.text}`, k.text);
+    if (i && k.at < kick[i - 1].to) bad.push(`kicker overlap: ${k.text}`);
+    if (!lines.some((c) => c.to === k.to && c.at >= k.at)) bad.push(`kicker ${k.text} (${k.at}–${k.to}) does not leave with a line`);
+  });
+
+  // the grid: the reel's shots start on one of the reel's beat lines, the
+  // clip's own beats start on beats and last whole beats, the lockup starts on
+  // a bar, and every tap, landing and phase is on the beat or an 8th
+  if (C.REEL_FROM % C.BEAT_FRAMES) bad.push(`REEL_FROM ${C.REEL_FROM} is not on a reel beat line`);
+  if (C.CARD_AT % C.BEAT_FRAMES || C.CARD_LEN % C.BEAT_FRAMES) bad.push(`the card beat (${C.CARD_AT}, ${C.CARD_LEN} frames) is off the beat`);
+  if (C.LOCKUP % C.BAR_FRAMES) bad.push(`the lockup starts at ${C.LOCKUP}, not on a bar`);
+  // (a share's pull is not a landing: it is the card starting to move, 4
+  // frames after its tap, as in the reel; its tap and its landing are checked)
+  for (const [k, v] of Object.entries(C.HITS)) {
+    if (k === 'sharePulls') continue;
+    for (const fr of [v].flat()) if (fr % (C.BEAT_FRAMES / 2)) bad.push(`hit ${k} at ${fr} is not on an 8th`);
+  }
+
+  // the narrator mirrors the captions, every word timed; each line fits its
+  // window and leaves by the dwell rule (0.3–1.2s after its voice, ≤ 4s with
+  // `until`; the lockup holds)
+  const SAY_NAME = /SAY_NAME = "([^"]+)"/.exec(read('audio/synth-vo.py'))[1];
+  const spoken = (t) => t.split(/\s+/).join(' ').replaceAll('Machina', SAY_NAME);
+  const timing = JSON.parse(read('src/reels/clips/save/vo.json'));
+  caps.forEach((c) => {
+    const t = timing.find((x) => x.frame === c.at);
+    if (!t) return bad.push(`no narrator timing for "${c.text}" at ${c.at}: run synth-vo.py save`);
+    if (t.text !== spoken(c.say ?? c.text)) bad.push(`narrator ≠ caption at ${c.at}: said "${t.text}"`);
+    if (t.words.length !== (c.say ?? c.text).split(/\s+/).filter(Boolean).length) bad.push(`caption at ${c.at}: word timings don't match its words`);
+  });
+  const manifestPath = 'out/vo/save/manifest.json';
+  const manifest = exists(manifestPath) ? JSON.parse(read(manifestPath)) : null;
+  if (manifest) {
+    for (const line of manifest) {
+      const c = caps.find((x) => x.at === line.frame);
+      if (!c) continue;
+      const window = (c.to - c.at) / C.FPS;
+      if (line.spoken > window + 1e-6) bad.push(`VO "${line.text}" speaks ${line.spoken}s in a ${window.toFixed(2)}s caption`);
+      if (c.place === 'lockup') continue;
+      const dwell = window - line.spoken;
+      const max = c.until ? 4 : 1.2;
+      if (dwell < 0.3 || dwell > max) bad.push(`caption "${c.text}" leaves ${dwell.toFixed(2)}s after its voice (0.3–${max}s)`);
+    }
+  } else {
+    console.log('  (no out/vo/save/manifest.json: VO fit not re-checked; run synth-vo.py save)');
+  }
+
+  // what a viewer can read: the share cards are real saves from the demo
+  // account, and the app's own text on every frame of the take the clip uses
+  const shareSrc = read('src/reels/scenes/ShareBeat.tsx');
+  for (const [, title] of shareSrc.matchAll(/title: '([^']+)'/g)) {
+    scan('share card', title);
+    if (!L.CARDS.some((c) => c.title === title)) bad.push(`share card "${title}" is not a save in the demo account`);
+  }
+  const take = JSON.parse(read('src/reels/data/takes.json')).save;
+  take.frames.forEach((fr, i) => fr.t.forEach((k) => scan(`the app on save frame ${i}`, take.texts[k])));
+
+  if (bad.length) {
+    console.error('✗ clip save:');
+    for (const b of bad) console.error('    ' + b);
+    failed = true;
+  } else {
+    console.log(`✓ ${caps.length} captions (${lines.length} lines + the subtitle) + ${kick.length} kickers, no overlaps; narrator mirrors every caption; dwell rule holds`);
+    console.log(`✓ on the grid: the reel's shots from reel frame ${C.REEL_FROM}, the card beat, the lockup on bar ${C.LOCKUP / C.BAR_FRAMES}, ${Object.values(C.HITS).flat().length} hits on beats or 8ths`);
+    console.log(`✓ no em dash / "AI" / "second brain" / "library" in the clip's captions, share cards, or ${take.frames.length} captured save frames`);
+  }
+
+  // the score: no clipping, no hole; the voice where the reel's sits, 3dB+
+  // over the music in the speech band on every line, mastered for the feeds
+  const scorePath = 'public/clips/save/score.wav';
+  const mixPath = 'public/clips/save/score-vo.wav';
+  if (!exists(scorePath) || !exists(mixPath)) {
+    console.error('✗ public/clips/save/score.wav or score-vo.wav missing: run node audio/clips/save-score.mjs && node audio/mix-vo.mjs save');
+    failed = true;
+  } else {
+    const wav = (p) => {
+      const b = fs.readFileSync(path.join(root, p));
+      const n = (b.length - 44) / 4;
+      const l = new Float64Array(n);
+      const r = new Float64Array(n);
+      for (let i = 0; i < n; i++) {
+        l[i] = b.readInt16LE(44 + i * 4) / 32768;
+        r[i] = b.readInt16LE(46 + i * 4) / 32768;
+      }
+      return { SR: b.readUInt32LE(24), n, l, r };
+    };
+    const bed = wav(scorePath);
+    const mix = wav(mixPath);
+    let clipped = 0;
+    for (let i = 0; i < bed.n; i++) if (Math.abs(bed.l[i]) > 0.995 || Math.abs(bed.r[i]) > 0.995) clipped++;
+    const rows = [];
+    for (let k = 0; k * C.BAR * bed.SR < bed.n; k++) {
+      const s0 = Math.floor(k * C.BAR * bed.SR);
+      const e = Math.min(bed.n, Math.floor((k + 1) * C.BAR * bed.SR));
+      let sum = 0;
+      for (let i = s0; i < e; i++) sum += (bed.l[i] ** 2 + bed.r[i] ** 2) / 2;
+      rows.push(20 * Math.log10(Math.sqrt(sum / (e - s0)) || 1e-9));
+    }
+    console.log(`  clip bars (dB): ${rows.map((x) => x.toFixed(1)).join('  ')}`);
+    if (clipped) {
+      console.error(`✗ the clip's score clips (${clipped} samples)`);
+      failed = true;
+    }
+    for (let i = 1; i < rows.length - 2; i++) {
+      const dip = Math.min(rows[i - 1], rows[i + 1]) - rows[i];
+      if (dip > 3.5) {
+        console.error(`✗ clip bar ${i} sits ${dip.toFixed(1)}dB below its neighbours`);
+        failed = true;
+      }
+    }
+    if (manifest) {
+      const gain = exists('out/vo/save/mix.json') ? JSON.parse(read('out/vo/save/mix.json')).gain : 1;
+      const duckOf = Object.fromEntries(C.CAPTIONS.filter((c) => c.duck).map((c) => [c.at, c.duck]));
+      const per = manifest.map((line) => {
+        const s0 = Math.round(line.start * mix.SR);
+        const e = s0 + Math.round(line.spoken * mix.SR);
+        const duck = duckOf[line.frame] ?? 0.55;
+        const voice = new Float64Array(e - s0);
+        const music = new Float64Array(e - s0);
+        for (let i = s0; i < e; i++) {
+          const m = (mix.l[i] + mix.r[i]) / 2 / gain;
+          const c = ((bed.l[i] + bed.r[i]) / 2) * duck;
+          voice[i - s0] = m - c;
+          music[i - s0] = c;
+        }
+        return {
+          text: line.text,
+          full: powerDb(voice) - powerDb(music),
+          band: powerDb(speechBand(voice, mix.SR)) - powerDb(speechBand(music, mix.SR)),
+        };
+      });
+      const median = (xs) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
+      const worst = per.reduce((a, b) => (b.band < a.band ? b : a));
+      console.log(`  voice over music: median line ${median(per.map((x) => x.full)).toFixed(1)}dB; speech band min ${worst.band.toFixed(1)}dB ("${worst.text.slice(0, 32)}…"), median ${median(per.map((x) => x.band)).toFixed(1)}dB`);
+      const masked = per.filter((x) => x.band < 3);
+      if (masked.length) {
+        for (const x of masked) console.error(`✗ the music masks "${x.text}": ${x.band.toFixed(1)}dB over it in the speech band (min 3dB)`);
+        failed = true;
+      } else {
+        console.log('✓ every clip line sits 3dB or more over the music where speech is heard');
+      }
+    }
+    const I = lufs(mix.l, mix.r, mix.SR);
+    const tp = truePeak(mix.l, mix.r);
+    const okLoud = Math.abs(I + 14) <= 0.5 && tp <= -1;
+    (okLoud ? console.log : console.error)(`${okLoud ? '✓' : '✗'} the clip mix: ${I.toFixed(1)} LUFS integrated, ${tp.toFixed(2)} dBTP (spec −14 ±0.5 LUFS, ≤ −1 dBTP)`);
+    if (!okLoud) failed = true;
+  }
+}
+
 console.log(failed ? '\nFAILED' : '\nOK');
 process.exit(failed ? 1 : 0);

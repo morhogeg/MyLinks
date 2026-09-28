@@ -4,6 +4,8 @@ import { FPS, HEIGHT, TOTAL_FRAMES, WIDTH } from '../timeline.mjs';
 import * as REEL from '../reel-timeline.mjs';
 import { Film } from './Film';
 import { MachinaReel } from './reels/MachinaReel';
+import * as SAVE from '../clips/save-timeline.mjs';
+import { SaveClip } from './reels/clips/save/SaveClip';
 
 /**
  * Compositions:
@@ -113,6 +115,36 @@ export const RemotionRoot: React.FC = () => (
       fps={REEL.FPS}
       width={REEL.WIDTH}
       height={REEL.HEIGHT}
+      defaultProps={{ withAudio: false, withCaptions: false }}
+    />
+    {/* the SAVE feature clip (src/reels/clips/save, clips/save-timeline.mjs):
+        MachinaClipSave (score + narrator + captions, the deliverable), Silent
+        (captions, no sound), Clean (no sound, no captions or kickers) */}
+    <Composition
+      id="MachinaClipSave"
+      component={SaveClip}
+      durationInFrames={SAVE.TOTAL_FRAMES}
+      fps={SAVE.FPS}
+      width={SAVE.WIDTH}
+      height={SAVE.HEIGHT}
+      defaultProps={{ withAudio: true, withCaptions: true, audioFile: 'clips/save/score-vo.wav' }}
+    />
+    <Composition
+      id="MachinaClipSaveSilent"
+      component={SaveClip}
+      durationInFrames={SAVE.TOTAL_FRAMES}
+      fps={SAVE.FPS}
+      width={SAVE.WIDTH}
+      height={SAVE.HEIGHT}
+      defaultProps={{ withAudio: false, withCaptions: true }}
+    />
+    <Composition
+      id="MachinaClipSaveClean"
+      component={SaveClip}
+      durationInFrames={SAVE.TOTAL_FRAMES}
+      fps={SAVE.FPS}
+      width={SAVE.WIDTH}
+      height={SAVE.HEIGHT}
       defaultProps={{ withAudio: false, withCaptions: false }}
     />
   </>

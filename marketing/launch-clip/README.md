@@ -588,6 +588,72 @@ peaks over −1 dBTP (`audio/loudness.mjs` measures both, BS.1770).
 Nobody has listened to the reel mix on speakers yet (the render box has no
 audio device); the balance, the clarity and the loudness are only measured.
 
+## Feature clip: SAVE
+
+`MachinaClipSave` is a 29.9s vertical clip on one feature, "save anything,
+from anywhere, and Machina does the rest". It is the reel's Save chapter made
+to stand alone, with the reel's narrator, lines and lockup:
+
+| Clip frames | What |
+|---|---|
+| 0–16 | the mark and its name come into focus on the paper (frame 0, the poster, is the brand) |
+| 12–168 | "Save anything, from anywhere.": YouTube, Instagram and Safari saves shared into the mark |
+| 168–256 | the point becomes the +, the app irises open around it, + tapped, Add to Machina |
+| 256–400 | "A link, a screenshot, or a note.": the dialog's Link / Image / Note tour, the link pasted, Save |
+| 400–528 | "Machina reads it, summarizes it, and files it." over the five phases; the card lands (512) |
+| 528–704 | the card tapped open (544), read down to its Key Points (lifted on 640), no line: the proof of "summarizes it" |
+| 704–896 | thrown out into the lockup: the mark strikes (752), "Machina. Never lose another great find." (768), held |
+
+**A re-edit, not a rebuild.** `clips/save-timeline.mjs` is the clip's one
+clock (the reel's grid: 112.5 BPM, K = 2). For its first 528 frames the clip
+PLAYS THE REEL: `SaveClip.tsx` draws the reel's own scenes (`Hook`,
+`ShareBeat`, `Save`, `SaveModes`, imported unchanged) at `reelFrame(f)` =
+f + 480 (`REEL_FROM`: 24 frames into the reel's share hold, a whole number of
+beats, so every tap and landing keeps its beat). Those 17.6 seconds are the
+approved reel's shots; measured against the reel's own frames they differ only
+by the film grain (it is keyed to the composition's frame) and, before frame 16,
+the focus-in. Then two clip scenes in `src/reels/clips/save/`: `Card.tsx` (the
+reel's card insert re-timed: the tap on a beat, the Key Points on the downbeat
+of bar 10, then the reel's throw out of frame) and `End.tsx` (the reel's
+lockup on the clip's clock). Three lines, all the reel's own, at the frames
+the reel says them; the card beat has none.
+
+Found by measuring the render, and fixed in the clip's own scenes: the reel's
+card insert starts by drifting AGAINST the camera it takes over from (the feed
+is moving down ~2px a frame as the reel heads for the search field; the
+insert moves it up at once), so the clip's card camera carries that velocity
+and coasts to rest by the tap (`EASE_FLING`); and the Key Points `Lift`, a
+sharp copy outside the screen's motion blur, fades before the throw instead
+of flying out crisp over a smeared page. It fades at full lift, because any
+lift above 0 draws the kit's copy ~1pt below its own pixels (the 0.35 lift's
+rise cancels it: measured +0.2px), so a lift easing down to 0 sagged 2.5px and
+snapped back when it was removed. The reel itself is unchanged: its card
+insert still has the reversal (reel frame 1008), and its lifts that ease out
+still sag (measured: its Key Points sink 3px over reel frames 1176–1190 and
+snap back at 1192, just before the cut to Find).
+
+The sound is its own arrangement from the shared instruments
+(`audio/clips/save-score.mjs`): the reel's cues for the same moments, drums in
+on the tour's downbeat and out for the lockup, the melody only where no one
+speaks. Every line sits ≥ 4.8dB over the music in the speech band (at the
+reel's register; an octave-up opening pad cost the first line 6dB there), and
+the mix is mastered like the reel's (−14 LUFS, true peak −1.25 dBTP).
+
+```bash
+python3 audio/synth-vo.py save      # the narrator → out/vo/save/, src/reels/clips/save/vo.json
+node audio/clips/save-score.mjs     # the score   → public/clips/save/score.wav
+node audio/mix-vo.mjs save          # the mix     → public/clips/save/score-vo.wav (committed)
+npm run verify                      # the clip has its own section ("── clip: save")
+npx remotion render src/index.ts MachinaClipSave out/clips/machina-clip-save.mp4
+```
+
+Also `MachinaClipSaveSilent` (captions, no sound) and `MachinaClipSaveClean`
+(no sound, no captions or kickers). The captures are the reel's (`save` take;
+`npm run reel:app && npm run reel:capture`): no new take was needed. Verify's
+clip section holds the reel's gates to the clip's clock and adds: at most
+three lines plus the subtitle, the borrowed stretch starting on a reel beat
+line, every hit on a beat or an 8th, and the share cards being real saves.
+
 ## Motion language
 
 The rules every Machina video follows, and the kit component that implements
@@ -739,6 +805,18 @@ that breaks it.
 - **A stepped capture never hops.** When the app scrolls in captured steps
   (the card's read-down, the recap), the camera takes up each step's rounding
   and motion blur follows the net motion (camera + scroll).
+- **A camera that takes over a moving shot keeps its velocity** (the SAVE
+  clip): it never reverses on the seam; it carries the move on and coasts to
+  rest (EASE_FLING, whose speed only decays; EASE_MODAL surges to 4× its
+  average in its third frame), with its first frame moving as far as the last
+  frame before the seam did (`clips/save/Card.tsx`).
+- **Lifts are gone before their screen moves fast.** A `Lift` is a sharp
+  copy outside the screen's motion blur: thrown with its screen, it stays
+  crisp over a smeared page. Take it away with `opacity` at full lift, not by
+  easing `lift` to 0: any lift above 0 draws the copy ~1pt below its own
+  pixels (at the usual 0.35 the rise cancels it), so a lift easing down sags
+  and snaps back on removal (measured in the SAVE clip; the kit is unchanged
+  so the reel renders as approved).
 
 ### Sound to picture (`HITS`, `audio/reel-score.mjs`)
 

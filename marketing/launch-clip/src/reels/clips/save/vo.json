@@ -1,0 +1,51 @@
+[
+ {
+  "frame": 16,
+  "text": "Save anything, from anywhere.",
+  "words": [
+   0.03,
+   0.297,
+   0.95,
+   1.147
+  ]
+ },
+ {
+  "frame": 256,
+  "text": "A link, a screenshot, or a note.",
+  "words": [
+   0.06,
+   0.163,
+   0.62,
+   0.716,
+   1.38,
+   1.525,
+   1.621
+  ]
+ },
+ {
+  "frame": 400,
+  "text": "Makeena reads it, summarizes it, and files it.",
+  "words": [
+   0.06,
+   0.469,
+   0.776,
+   1.32,
+   2.075,
+   2.45,
+   2.601,
+   2.829
+  ]
+ },
+ {
+  "frame": 768,
+  "text": "Makeena. Never lose another great find.",
+  "words": [
+   0.03,
+   0.83,
+   1.145,
+   1.408,
+   1.829,
+   2.145
+  ]
+ }
+]

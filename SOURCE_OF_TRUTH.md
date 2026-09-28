@@ -2536,6 +2536,27 @@ narrator, its word timings and the mixed audio are committed; `reel:vo` and
 in Inter as a stand-in for SF Pro, which is what the app actually renders in
 on iPhone (§4 23b).
 
+**What exists (feature clip: SAVE, 2026-09-28, branch `claude/clip-save`,
+awaiting owner review, not merged):** `MachinaClipSave` (29.9s, 1080×1920,
+score + narrator + captions; mastered −14 LUFS, true peak −1.25 dBTP), plus
+`MachinaClipSaveSilent` and `MachinaClipSaveClean`, in
+`marketing/launch-clip/`. "Save anything, from anywhere, and Machina does the
+rest": the brand focuses in, "Save anything, from anywhere." (the three
+shares into the mark), the point becomes the +, "A link, a screenshot, or a
+note." (the Add dialog's real tabs), "Machina reads it, summarizes it, and
+files it." (the five phases, the card lands), the card opened to its Key
+Points (no line), thrown into the lockup, "Machina. Never lose another great
+find." It is a RE-EDIT of the reel's Save chapter: for its first 17.6s it
+drives the reel's own scenes, unchanged, on the reel's clock
+(`clips/save-timeline.mjs`, `reelFrame`), then two clip scenes
+(`src/reels/clips/save/Card.tsx`, `End.tsx`). Same captures (no new take),
+same narrator (the reel's three Save lines), its own score
+(`audio/clips/save-score.mjs`). `npm run verify` has a clip section. **To
+render:** after the reel's `reel:app` + `reel:capture`, `npx remotion render
+src/index.ts MachinaClipSave out/clips/machina-clip-save.mp4` (narrator, word
+timings and the mix are committed; the launch-clip README's "Feature clip:
+SAVE" has the audio commands).
+
 **Feature-clip briefs, FINAL against the pilot's kit (2026-09-26).** Shared
 by all five: **448 frames (7 bars at 112.5 BPM, 14.9s)**, vertical, built
 from `src/reels/kit/` imported unchanged and following the README's "Motion
@@ -2595,6 +2616,23 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-28 — Feature clip: SAVE.** Branch `claude/clip-save`, not merged
+  (three sibling sessions make Ask, Revisit and Find on their own branches).
+  `MachinaClipSave`, 29.9s: the reel's Save chapter made to stand alone (see
+  §8 "What exists"), a re-edit that drives the reel's own scenes on the reel's
+  clock, then the card opened to its Key Points and the reel's lockup. Found
+  by measuring the render and fixed in the clip's own scenes: the reel's card
+  insert reverses the camera it takes over (~2px/frame down, then up; the
+  reel still has it, at reel frame 1008), and a Key Points lift thrown with
+  its screen stayed crisp over the motion blur. Also found: the kit's `Lift`
+  draws its copy ~1pt low whenever lift > 0 (the usual 0.35 rise hides it), so
+  a lift that eases out sags ~3px and snaps back (the reel's Key Points, reel
+  frames 1176–1192); the clip fades its lift at full lift instead, and the
+  kit is unchanged so the reel stays as approved. Plumbing is additive: a clip
+  timeline, scenes and score of its own, `save` entries in `synth-vo.py` and
+  `mix-vo.mjs`, a verify section, one `Root.tsx` block; `MachinaReel` and the
+  film render as before (stills compared pixel for pixel; their mixes and the
+  reel's word timings regenerate byte-identical). Not listened to on speakers.
 - **2026-09-27 — Highlight reel round 15: caret, shares, one face.** Branch
   `claude/machina-reel-pilot`, not merged. Owner on round 14: the input
   caret was jittery (0:26–0:28): it blinks on the browser's real clock, so
