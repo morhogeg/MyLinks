@@ -1,6 +1,6 @@
 import React from 'react';
 import { AbsoluteFill } from 'remotion';
-import { GLIDE, HITS, READS, TAKE } from '../../../../clips/revisit-timeline.mjs';
+import { CREEP, GLIDE, HITS, READS, TAKE } from '../../../../clips/revisit-timeline.mjs';
 import { AppShot, Lift, Tap } from '../../kit/AppShot';
 import { camAt, camVelocity, type Key } from '../../kit/camera';
 import { EASE_IN_OUT, EASE_MODAL, EASE_SPRING, mix, prog } from '../../kit/curves';
@@ -41,13 +41,17 @@ const recap = steppedScroll({ take: T, mark: 'scroll', steps: at(T, 'card') - at
 /** THE GLIDE (clips/revisit-timeline.mjs GLIDE): one eased motion of
  *  PAGE + CAMERA points, the page taking the first part until it runs out
  *  and the camera the rest (see the key that ends the glide) */
-const GLIDE_PAGE = recap.end - READS[READS.length - 1][3];
+/** the page's drift while a read is held (clips/revisit-timeline.mjs CREEP) */
+const creepAt = (u: number) =>
+  CREEP.reduce((sum, [a, b, pts]) => sum + (pts * (1 - Math.cos(Math.PI * prog(u, a, b, linear)))) / 2, 0);
+const GLIDE_PAGE = recap.end - READS[READS.length - 1][3] - creepAt(GLIDE[0]);
 const glided = (u: number) => prog(u, GLIDE[0], GLIDE[1], EASE_IN_OUT);
 
 /** how far the choreography wants the recap scrolled, in points */
 const scrollAt = (u: number) => {
   let p = 0;
   for (const [a, b, p0, p1] of READS) if (u >= a) p = mix(p0, p1, prog(u, a, b, EASE_IN_OUT));
+  p += creepAt(u);
   if (u >= GLIDE[0]) p += Math.min(GLIDE_PAGE, glided(u) * (GLIDE_PAGE + GLIDE_CAMERA));
   return p;
 };

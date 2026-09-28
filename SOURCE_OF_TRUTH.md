@@ -2559,7 +2559,9 @@ four clips merge without touching each other: `clips/revisit-timeline.mjs`,
 `synth-vo.py`, `mix-vo.mjs`, `verify.mjs` and `Root.tsx`. One new kit
 primitive, `src/reels/kit/scroll.ts` (reading a stepped scroll without
 hops). `MachinaReel` and `MachinaLaunch` render pixel-identical to before
-(checked). How to render: the launch-clip README, "Feature clip: REVISIT".
+(checked). Round 2 (2026-09-28, a finishing pass): the recap's holds no
+longer sit dead still (the page creeps while a read is held); nothing else
+moved. How to render: the launch-clip README, "Feature clip: REVISIT".
 
 **Feature-clip briefs, FINAL against the pilot's kit (2026-09-26).** Shared
 by all five: **448 frames (7 bars at 112.5 BPM, 14.9s)**, vertical, built
@@ -2620,6 +2622,18 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-28 — Feature clip REVISIT, round 2: a finishing pass.** Branch
+  `claude/clip-revisit`, not merged. Reviewed with fresh eyes by measuring
+  the render (motion trace, 4-frame strips, dwell per line, banding at 1:1,
+  loudness and speech band). One defect: the themes hold was dead still for
+  a second (the reading window's zoom breath measured as zero); the page now
+  creeps a few points, rest to rest, while each read is held (`CREEP`), and
+  verify fails a hold without one. Script, lines, frames and length (29.3s)
+  unchanged. Verified: tsc, verify, full render, the holds now move 0.7 and
+  0.9px a frame with no new hitch; reel and film pixel-identical, film mix
+  byte-identical. Left as is (shared with the approved reel): the still end
+  card and faint paper rings under a tenfold contrast stretch. Not verified:
+  nobody has listened on speakers.
 - **2026-09-28 — Feature clip: REVISIT.** Branch `claude/clip-revisit`, not
   merged. `MachinaClipRevisit` (+ Silent, Clean), 29.3s, the reel's
   companion (§8 "What exists"): opens on REVISIT, the "Do this" list (a row

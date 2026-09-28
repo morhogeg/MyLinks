@@ -96,6 +96,17 @@ for (const [k, v] of Object.entries({ todoLift: H.todoLift, recapTap: H.recapTap
   if (v % (C.BEAT_FRAMES / 2)) bad.push(`${k} at ${v} is not on an 8th`);
 }
 if (C.TOTAL_FRAMES % C.BEAT_FRAMES) bad.push(`the clip ends at ${C.TOTAL_FRAMES}, not on a beat`);
+// no dead-still hold while the recap is read (round 2: the themes hold
+// measured still for a second): a creep must cover every hold between reads
+// from the end of each read to the start of the next (the glide included)
+{
+  const starts = [...C.READS.slice(1).map((r) => r[0]), C.GLIDE[0]];
+  C.READS.forEach((r, k) => {
+    const hold = [r[1], starts[k]];
+    if (!(C.CREEP ?? []).some(([a, b, pts]) => pts > 0 && a <= hold[0] && b >= hold[1]))
+      bad.push(`the recap holds dead still from ${hold[0]} to ${hold[1]}: give it a CREEP`);
+  });
+}
 
 // ── the app's own text, on every frame of the take
 const takes = JSON.parse(read('src/reels/data/takes.json'));

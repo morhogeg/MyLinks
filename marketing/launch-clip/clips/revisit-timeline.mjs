@@ -62,7 +62,18 @@ export const HITS = {
  */
 export const READS = [
   [HITS.rise[0], HITS.rise[1], 0, 194], // the write-up rises into view
-  [320, 368, 194, 548], // → the two themes and the saves they link to
+  [320, 368, 194, 527], // → the two themes and the saves they link to (548 with the creeps)
+];
+/**
+ * THE CREEPS (clip round 2: the themes hold measured dead still for a full
+ * second). While a read is held the page never quite stops: it drifts on a
+ * few points, the way a reader's thumb does, on a curve that starts and ends
+ * at rest, so the reads before and after it start and end exactly as before
+ * (no kick). About 0.3pt (0.7px) a frame at the fastest. [from, to, points]
+ */
+export const CREEP = [
+  [HITS.rise[1], 320, 12], // the write-up
+  [368, 416, 9], // the themes
 ];
 /**
  * The last read is ONE glide onto the Standout and its question: the page

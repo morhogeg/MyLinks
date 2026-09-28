@@ -599,7 +599,7 @@ continuous use of the real app (take `revisitClip`):
 |---|---|
 | 0–160 | The Revisit tab's "Do this" list (the steps the app writes only for saves that call for one); "When a save calls for action, Machina turns it into a to-do."; The Tail End's row lifts in the pause after "action," |
 | 160–320 | "This week in Machina" tapped open in the silence between the lines; it unfolds on "Every week," and the write-up rises into view on "Machina brings back what's worth remembering." |
-| 320–480 | The recap READ (never rushed): the write-up held ~2.7s, the two themes and the saves they link to on "The themes of your week,", then ONE glide onto the Standout on "and the one save worth rereading." |
+| 320–480 | The recap READ (never rushed): the write-up held ~2.7s, the two themes and the saves they link to on "The themes of your week," (each hold drifts: `CREEP`), then ONE glide onto the Standout on "and the one save worth rereading." |
 | 480–592 | The Standout lifts; its question ("who would you call this week?") is read in silence |
 | 592–688 | The Standout tapped: The Tail End opens (the app's own transition), its "Do this" line (the first row of the list the clip opened on) passing as the camera eases up to its title |
 | 688–880 | Thrown out into the reel's lockup: "Machina. Never lose another great find." |
@@ -650,6 +650,24 @@ capture, not by hand.
   the first 293pt and the camera the rest.
 - **The first frame after a click is unchanged.** The Standout's tap now
   lands on the next one, the first frame the app visibly answers.
+
+**Round 2 (a finishing pass with fresh eyes; script, order, lines, length
+and every frame boundary unchanged).** Measured on the render:
+- **The themes hold was dead still for a full second** (frames 380–409, no
+  frame-to-frame change): the reading window's "breath" was 0.03 of zoom
+  over nine seconds. Widening the zoom would bring the app's chrome into the
+  window, so the PAGE drifts instead: while a read is held it creeps on a
+  few points (`CREEP`: 12 under the write-up, 9 under the themes), rest to
+  rest, so the reads around it start and end exactly as before. Measured
+  after: the holds move up to 0.7 and 0.9px a frame, nothing is still
+  outside the end card. `npm run verify` now fails a hold between reads with
+  no creep.
+- **Left as they are, deliberately:** the end card's last 1.7s is still, as
+  the reel's is (the lockup is shared and owner-approved); the paper's soft
+  pools show faint one-code-value rings when a still is contrast-stretched
+  tenfold, in the render and slightly blockier in the encode. That is the
+  shared `Paper` (round 13's dither), and changing it would change the
+  reel's pixels, which this pass must not.
 
 ## Motion language
 
