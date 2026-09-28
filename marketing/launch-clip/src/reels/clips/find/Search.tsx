@@ -110,9 +110,9 @@ export const searchKeys: Key[] = [
   { f: S.cardTap, cy: 396, z: 2.2, ease: linear },
   // the card opened: its gist…
   { f: S.cardTap + 24, cx: 196.5, cy: 360, z: 2.25, fx: 540, fy: 1180, ease: EASE_MODAL },
-  { f: RELATED - 8, cy: 366, ease: linear },
   // …then down to the saves it connects to, as the narrator says so
-  { f: RELATED + 24, cy: 640, z: 2.25, fy: 1230, ease: EASE_IN_OUT },
+  // (slow enough to read through: a 32-frame move smeared the card)
+  { f: RELATED + 36, cy: 640, z: 2.25, fy: 1230, ease: EASE_IN_OUT },
   { f: S.throwOut, cy: 648, z: 2.3, ease: linear },
   // thrown out of frame, into the lockup
   { f: S.lockup + 14, fx: -760, z: 2.36, ease: EASE_IN_OUT },

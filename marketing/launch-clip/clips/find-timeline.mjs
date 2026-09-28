@@ -99,7 +99,7 @@ export const CAPTIONS = [
   { at: 128, to: 208, text: 'Machina finds it\nin your own words.', kicker: 'Your own words', duck: 0.4 },
   { at: 304, to: 416, text: 'Only half remember it?\nYou still get what’s close.', kicker: 'Close matches' },
   { at: 448, to: 560, text: 'Type where you saw it,\nand get everything from there.', kicker: 'Where you saw it' },
-  { at: 576, to: 688, text: 'Open it. The gist,\nand the saves it connects to.', kicker: 'Open it' },
+  { at: 576, to: 688, text: 'Open it for the summary,\nand everything it connects to.', kicker: 'Open it' },
   // the takeaway
   { at: 688, to: 776, text: 'Type what you remember.\nGet the one you meant.' },
   // the close: the name (the drawn wordmark wipes in as it is said), then

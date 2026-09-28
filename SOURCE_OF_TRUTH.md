@@ -2548,7 +2548,7 @@ concrete takeaway). Script: "You saved it. But what was it called?" /
 Hazan's sauce, no shared word) / "Only half remember it? You still get
 what's close." (sardinia swim spot → Cala Goloritzé under the app's "Close
 matches") / "Type where you saw it, and get everything from there." (youtube
-→ the Sources row → every saved video) / "Open it. The gist, and the saves it
+→ the Sources row → every saved video) / "Open it for the summary, and everything it
 connects to." / "Type what you remember. Get the one you meant." / "Machina.
 Never lose another great find." (the reel's lockup). All real captured app UI
 (new take `findClip`); the clip keeps its own timeline, scenes, take data
