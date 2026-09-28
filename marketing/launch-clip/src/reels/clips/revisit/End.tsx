@@ -31,6 +31,7 @@ export const End: React.FC<{ f: number }> = ({ f }) => {
           line={line}
           lineStarts={starts.slice(1)}
           lineStyle="statement"
+          lineSize={50}
           wordWidth={620}
         />
       </div>

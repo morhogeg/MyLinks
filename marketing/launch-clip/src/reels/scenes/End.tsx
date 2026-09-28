@@ -17,7 +17,7 @@ const timing = VO.find((v) => v.frame === LINE.at);
 
 export const End: React.FC<{ f: number }> = ({ f }) => {
   if (f < real(HITS.lockup)) return null;
-  // "Machina. Never lose another great find.": the first word is the drawn
+  // "Machina. Everything you save, finally useful.": the first word is the drawn
   // wordmark (it wipes in as the name is said), the rest is the line
   const starts = timing?.words.map((s) => LINE.at + Math.round(s * FPS)) ?? [];
   const line = LINE.text.split('\n').slice(-1)[0];
@@ -32,6 +32,7 @@ export const End: React.FC<{ f: number }> = ({ f }) => {
           line={line}
           lineStarts={starts.slice(1)}
           lineStyle="statement"
+          lineSize={50}
           wordWidth={620}
         />
       </div>

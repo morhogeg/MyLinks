@@ -31,12 +31,14 @@ export const SLOTS = { kicker: 290, top: 346 };
  */
 export const BAND = { solid: 510, clear: 720 };
 
-export const BandScrim: React.FC<{ opacity?: number }> = ({ opacity = 1 }) => (
+/** `band`: a video that sets its type higher (a feature clip, `slots` on
+ *  Captions) moves its scrim up with it; the default is the reel's */
+export const BandScrim: React.FC<{ opacity?: number; band?: { solid: number; clear: number } }> = ({ opacity = 1, band = BAND }) => (
   <AbsoluteFill
     style={{
       pointerEvents: 'none',
       opacity,
-      background: `linear-gradient(180deg, #EEF0F4 0px, #EEF0F4 ${BAND.solid}px, rgba(238,240,244,0) ${BAND.clear}px)`,
+      background: `linear-gradient(180deg, #EEF0F4 0px, #EEF0F4 ${band.solid}px, rgba(238,240,244,0) ${band.clear}px)`,
     }}
   />
 );
@@ -49,11 +51,13 @@ export const Captions: React.FC<{
   kickers?: ReelKicker[];
   showCaptions?: boolean;
   showKickers?: boolean;
-}> = ({ frame, fps, captions, timing, kickers = [], showCaptions = true, showKickers = true }) => (
+  /** where the kicker and the line sit (default: the reel's SLOTS) */
+  slots?: { kicker: number; top: number };
+}> = ({ frame, fps, captions, timing, kickers = [], showCaptions = true, showKickers = true, slots = SLOTS }) => (
   <AbsoluteFill style={{ pointerEvents: 'none' }}>
     {showKickers &&
       kickers.map((k) => (
-        <div key={k.at} style={{ position: 'absolute', left: 0, right: 0, top: SLOTS.kicker }}>
+        <div key={k.at} style={{ position: 'absolute', left: 0, right: 0, top: slots.kicker }}>
           <Kicker text={k.text} frame={frame} from={k.at} to={k.to} />
         </div>
       ))}
@@ -71,7 +75,7 @@ export const Captions: React.FC<{
               position: 'absolute',
               left: 0,
               right: 0,
-              top: SLOTS.top,
+              top: slots.top,
               display: 'flex',
               justifyContent: 'center',
             }}

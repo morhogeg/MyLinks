@@ -66,8 +66,10 @@ into one point of light that the brackets close around, and the middle acts
 follow what the product actually does, in order: **saving was never the hard part → Machina reads
 what you save → summarized, tagged and filed → so you can find it again → then
 ask it anything → answers built from what you saved → every save connects to the
-rest → nothing worth keeping stays buried.** The film closes on the subtitle,
-"Never lose another great find." It deliberately avoids two framings the
+rest → nothing worth keeping stays buried.** The film introduces Machina with
+the App Store subtitle ("Machina. Never lose another great find.") and closes
+on the tagline, "Everything you save, finally useful.": problem → Machina →
+payoff (owner, 2026-09-28: every launch film ENDS on the tagline, once). It deliberately avoids two framings the
 owner ruled out: it is **not** a learning app, and it does **not** sell
 "search by meaning" as the headline. The word *library* appears nowhere.
 
@@ -84,12 +86,13 @@ owner ruled out: it is **not** a learning app, and it does **not** sell
 | 20–23 | 0:50 | `GraphScene` | Edges draw in staggered — connections being found, not a diagram revealed |
 | 23–26 | 0:57.5 | `CollectionsScene` | The organising that is yours |
 | 26–29 | 1:05 | `DigestScene` | The weekly write-up, then the resurfaced save as its own beat |
-| 29–32 | 1:12.5 | `Endcard` | The bare mark, the wordmark, the App Store subtitle (`Never lose another great find`), which the voice-over also speaks |
+| 29–32 | 1:12.5 | `Endcard` | The bare mark, the wordmark, the tagline (`Everything you save, finally useful.`), which the voice-over also speaks after the name |
 
 `Capture` / `Ask` / `Connect` print as a letterspaced kicker above the line on
 their own beats, so a viewer can place each act inside the film's three acts
 without being told. (They were the App Store subtitle until 2026-08-26; the
-endcard now carries the current subtitle, the kickers keep the act names.)
+kickers keep the act names. The subtitle is now the introduction's line and
+the endcard carries the tagline, 2026-09-28.)
 
 **No em dashes anywhere a viewer can read** — the app-wide ban
 (`web/scripts/check-em-dash.mjs`) applies to burned-in captions, demo cards and
@@ -294,10 +297,17 @@ The endcard is the **bare** Citation mark — not the app-icon tile.
 there reads as a shrunken app icon rather than as the brand mark"), and full-frame
 the grey squircle read as a screenshot of an icon instead of as an identity.
 
-The endcard carries one line, the App Store subtitle, and the voice-over speaks
-the same words (owner call 2026-09-17; the tagline that used to sit under a rule
-beneath it was cut so screen and voice agree). The space under the subtitle is
-the slot for a real App Store badge or URL once the listing is live. Nothing else
+The endcard carries one line, the TAGLINE, `Everything you save, finally
+useful.` (exact wording, comma and period; set in the endcard's letterspaced
+capitals), and the voice-over says the name and then the same words, nothing
+else under it (owner calls 2026-09-17 and 2026-09-28). Why the tagline and not
+the App Store subtitle: the tagline is the fixed brand line, while the
+subtitle is store copy that can change with search tests and would leave every
+posted film out of date. The subtitle, "Never lose another great find.", is
+the introduction's line instead; the tagline appears ONCE, at the end
+(`npm run verify` fails a film, reel or clip that repeats it earlier or ends
+on anything else). The space under the line is the slot for a real App Store
+badge or URL once the listing is live. Nothing else
 in the film claims availability.
 
 # Reels
@@ -305,11 +315,13 @@ in the film claims availability.
 ## The highlight reel (pilot)
 
 `MachinaReel` is an 81.6s vertical reel: the problem → "Introducing Machina.
-All your saves, finally useful." → "Save anything, from anywhere." (shares
+Never lose another great find." → "Save anything, from anywhere." (shares
 from YouTube, Instagram and Safari into the mark) → "A link, a screenshot, or
 a note." (the Add dialog's tabs) → "Machina reads it, summarizes it, and files
 it." (the five phases) → the new card, opened → Find → Ask → Connect
-→ the weekly recap, read → "Machina. Never lose another great find." It has
+→ the weekly recap, read → "Machina. Everything you save, finally useful."
+(2026-09-28, owner: every launch film ends on the tagline, once; the reel's
+earlier "All your saves, finally useful." became the subtitle). It has
 its own score, the film's narrator and word-timed captions. **Every pixel of
 app UI in it is the real, shipped web app**, driven and recorded frame by
 frame; nothing is a mockup or a rebuilt screen. The one exception is not
@@ -487,7 +499,7 @@ Round 15 (owner, on round 14):
 | Output frames | Scene | What it does |
 |---|---|---|
 | 0–288 | `Hook` | Ten real saves come into focus (0–64); the problem is named over them (the `problem` hold, 64–288): each named save lifts on its word, then all bleach |
-| 288–456 | `Hook` | They collapse into the point (320), the brackets snap (336); "Introducing Machina." (the drawn wordmark under the mark), the `name` hold (416–448), "All your saves, finally useful." |
+| 288–456 | `Hook` | They collapse into the point (320), the brackets snap (336); "Introducing Machina." (the drawn wordmark under the mark), the `name` hold (416–448), "Never lose another great find." |
 | 456–648 | `ShareBeat` | "Save anything, from anywhere.": YouTube, Instagram and Safari saves shared into the mark (the `share` hold) |
 | 648–736 | `Hook` → `Save` | The point drops to become the **+** (the iris opens at 688), the + is tapped, Add to Machina |
 | 736–880 | `SaveModes` | "A link, a screenshot, or a note.": Link, Image, Note, back to Link, the link pasted, Save tapped |
@@ -497,7 +509,7 @@ Round 15 (owner, on round 14):
 | 1360–1696 | `Ask` | The question → the answer and three sources (1504–1552; lingers 1560–1620) → the dive into the Graph chip |
 | 1696–1808 | `Connect` | The real graph (60fps; lingers 1744–1772); tap Revisit |
 | 1808–2254 | `Recall` | "Do this" (to 1952), then "This week in Machina", opened (1968) and read slowly: write-up, themes, Standout, question; thrown out into the lockup |
-| 2240–2448 | `End` | The mark launches (strike 2284), "Machina" (the wordmark), "Never lose another great find." in Geist, held |
+| 2240–2448 | `End` | The mark launches (strike 2284), "Machina" (the wordmark), "Everything you save, finally useful." in Geist (50px, one line), held |
 
 **The clock.** Scenes are written in SOURCE frames (the round-1 cut, 600
 frames). `MachinaReel` plays them at `K = 2` via `clockAt(frame)`; `HOLDS`
@@ -575,7 +587,7 @@ exist. Logged in `SOURCE_OF_TRUTH.md` §9; `web/` was not changed.)
 Fails on: overlapping captions or kickers; a caption the narrator doesn't say
 verbatim (or a word count that doesn't match its timing); a voice line that
 overruns its caption window; a lockup line that isn't the film's endcard
-subtitle, or a hook that doesn't carry the tagline; an em dash, a literal
+line, the tagline, or a tagline used anywhere before the end; an em dash, a literal
 "AI", "second brain" or "library" in any caption, kicker, demo card,
 collection, Ask/search string, hook chip, or **any text on any captured frame
 the edit uses**; a clipped reel master or a hole in its per-bar level; a voice
@@ -590,19 +602,20 @@ audio device); the balance, the clarity and the loudness are only measured.
 
 ## Feature clip: REVISIT ("what you save comes back to you")
 
-`MachinaClipRevisit` is a 29.3s vertical clip, the reel's companion, built
-from the kit unchanged plus one new kit primitive (`kit/scroll.ts`, below).
-It opens ON its chapter word (REVISIT, formed on frame 0), then one
-continuous use of the real app (take `revisitClip`):
+`MachinaClipRevisit` is a 36.3s vertical clip, the reel's companion, built
+from the kit plus one new kit primitive (`kit/scroll.ts`, below) and two
+optional kit props (round 3). It opens ON its chapter word (REVISIT, formed
+on frame 0), then one continuous use of the real app (take `revisitClip`):
 
 | Frames | What it does |
 |---|---|
-| 0–160 | The Revisit tab's "Do this" list (the steps the app writes only for saves that call for one); "When a save calls for action, Machina turns it into a to-do."; The Tail End's row lifts in the pause after "action," |
-| 160–320 | "This week in Machina" tapped open in the silence between the lines; it unfolds on "Every week," and the write-up rises into view on "Machina brings back what's worth remembering." |
-| 320–480 | The recap READ (never rushed): the write-up held ~2.7s, the two themes and the saves they link to on "The themes of your week," (each hold drifts: `CREEP`), then ONE glide onto the Standout on "and the one save worth rereading." |
-| 480–592 | The Standout lifts; its question ("who would you call this week?") is read in silence |
-| 592–688 | The Standout tapped: The Tail End opens (the app's own transition), its "Do this" line (the first row of the list the clip opened on) passing as the camera eases up to its title |
-| 688–880 | Thrown out into the reel's lockup: "Machina. Never lose another great find." |
+| 0–124 | The Revisit tab opens on what is asking for you: "Due now", a reminder set on Four Thousand Weeks, lifts after "Set a reminder," ("…and a save comes back when it's due.") |
+| 128–320 | The "Do this" list: "When a save calls for action, Machina turns it into a to-do."; The Tail End's row lifts after "action,"; the camera steps back and the V60 step is ticked off at 272, the app's own "Marked as done" toast in frame |
+| 320–448 | Into the reading window; "This week in Machina" tapped open at 368 in the silence between lines; it unfolds on "Every week," and the write-up rises into view on "Machina brings back what's worth remembering." |
+| 448–688 | The recap READ (never rushed): the write-up held, the two themes and the saves they link to on "The themes of your week," (each hold drifts: `CREEP`), then ONE glide onto the Standout on "and the one save worth rereading." |
+| 688–800 | The Standout lifts; its question ("who would you call this week?") is read in silence |
+| 800–896 | The Standout tapped: The Tail End opens (the app's own transition), its "Do this" line passing as the camera eases up to its title |
+| 896–1088 | Thrown out into the reel's lockup: "Machina. Everything you save, finally useful." |
 
 Everything is in OUTPUT frames on the reel's grid (112.5 BPM, 16 frames a
 beat); 60fps app motion plays one captured frame per output frame (the
@@ -669,6 +682,26 @@ and every frame boundary unchanged).** Measured on the render:
   shared `Paper` (round 13's dither), and changing it would change the
   reel's pixels, which this pass must not.
 
+**Round 3 (owner, on round 2: "too thin, expand a bit more about this
+feature"; "why is there a huge white gap at the top?"; then, 2026-09-28,
+every launch film ends on the tagline).**
+- **More of the feature, all real.** Revisit now opens on "Due now": a
+  reminder the user set (the app's Remind me: Smart review, or a day) comes
+  back under it ("Set a reminder, and a save comes back when it's due.", a
+  new line), and after the to-do line a step is ticked off: the app removes
+  the row and shows its own "Marked as done" toast, framed in shot. The recap
+  and the Standout opening its save follow unchanged (+208 frames).
+- **The gap.** The reel keeps its type at 290 / 346px so Reels and TikTok's
+  top UI never covers it, and scrims the app to 720px; played anywhere else
+  that reads as a dead band. The clip sets its own, higher: kicker 200, line
+  256, scrim solid to 420 and clear by 600, the app aimed just under it (the
+  kit's `Captions` take `slots` and `BandScrim` a `band`; the defaults are
+  the reel's, which renders exactly as before for this change). The kicker
+  still sits below the top ~10% those apps cover.
+- **The tagline close.** The lockup's line is now "Everything you save,
+  finally useful.", set at 50px (`Lockup` `lineSize`) so it stays on one
+  line; the last melody note moved after "useful.".
+
 ## Motion language
 
 The rules every Machina video follows, and the kit component that implements
@@ -722,12 +755,15 @@ One family, Geist. Two voices (**`Type.tsx`**):
   verify` enforces the rule.
 - **The lockup (`Lockup` in `Brand.tsx`)** uses the drawn wordmark, never typed
   letters. The closing line is a statement (`lineStyle="statement"`): the
-  subtitle in Geist at 60px (round 15: the reel's one face; the round-6
+  TAGLINE (every launch film ends on it, 2026-09-28) in Geist at 60px, or
+  smaller when the line is long (`lineSize`: the tagline is set at 50 so it
+  stays on one line) (round 15: the reel's one face; the round-6
   display serif was the only other face in 81 seconds and read as a font
   change, not as emphasis), words coming into focus on the narrator's
   timing, the wordmark wiping in as "Machina" is said.
 
-Layout (**`Captions.tsx`**): `SLOTS` puts the kicker at 290px and the line at
+Layout (**`Captions.tsx`**; a video may pass its own `slots` and `band`, as
+the Revisit clip does to sit higher): `SLOTS` puts the kicker at 290px and the line at
 346px, in the upper band clear of Reels/TikTok chrome (which covers roughly
 the top 12% and the bottom quarter). Every line lives there, the hook's
 tagline included: it sits above the mark, because the mark's point leaves
@@ -855,10 +891,10 @@ or a shimmer goes after the word, not on it (round 13).
 One voice config for everything Machina says (Kokoro `af_heart`, speed 0.95,
 "Machina" spoken "Makeena"). **The captions are the script:** the reel's lines
 are read from `CAPTIONS` in `reel-timeline.mjs` and spoken verbatim, one line
-per caption. The reel opens on the tagline and closes on the App Store subtitle
-in short lines with air around them. Word timings are measured from the
+per caption. The reel introduces Machina with the App Store subtitle and
+closes on the tagline, once, in short lines with air around them. Word timings are measured from the
 synthesized audio (`src/reels/data/reel-vo.json`) and drive the kinetic type
-and the lockup's subtitle. The mix ducks the score to 0.55 under the voice
+and the lockup's line. The mix ducks the score to 0.55 under the voice
 (the film uses 0.65); that puts the reel's voice at the film's
 voice-over-music balance, which verify measures. The two brand lines (the
 name and the promise) duck it to 0.4 (`duck` on their captions). Verify also

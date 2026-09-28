@@ -38,8 +38,8 @@ const CHORDS = {
 
 const BARS = Math.ceil(TOTAL_FRAMES / BAR_FRAMES);
 /** how much of the band plays, per bar: light under the reading */
-const DENSITY = [0.34, 0.46, 0.6, 0.66, 0.68, 0.7, 0.72, 0.74, 0.68, 0.7, 0.62, 0.42, 0.36, 0.32];
-const DRUMS = [s(HITS.travel[0]), s(HITS.out)]; // the travel to the recap … the throw into the lockup
+const DENSITY = [0.34, 0.42, 0.5, 0.56, 0.62, 0.66, 0.68, 0.7, 0.72, 0.74, 0.68, 0.7, 0.66, 0.62, 0.42, 0.36, 0.32];
+const DRUMS = [s(HITS.wide[0]), s(HITS.out)]; // from the tick (round 3) … the throw into the lockup
 
 for (let bar = 0; bar < BARS; bar++) {
   const ch = CHORDS[BAR_CHORDS[bar]];
@@ -101,13 +101,15 @@ for (const m of [48, 64, 67, 72]) pad(s(HITS.out), TOTAL_SEC - s(HITS.out) - 0.2
 // are measured in src/reels/clips/revisit/vo.json), never on a word.
 const MELODY = [
   // [frame, midi, level?]
-  [272, 67], [288, 69], [304, 71], // the write-up, after its line
-  [320, 72], [336, 69], // read → the themes
-  [488, 64], [504, 65], [520, 67], // the Standout and its question
-  [544, 72], [560, 71], [576, 72], // (the tap)
-  [616, 74], [648, 69], // the save, opened
+  [104, 64], [120, 67], // after "when it's due."
+  [240, 69], [256, 71], [288, 72], // after the to-do line; the tick
+  [480, 67], [496, 69], [512, 71], // the write-up, after its line
+  [528, 72], [544, 69], // read → the themes
+  [696, 64], [712, 65], [728, 67], // the Standout and its question
+  [752, 72], [768, 71], [784, 72], // (the tap)
+  [824, 74], [856, 69], // the save, opened
   // home: C as the mark draws, E after its name, G after the last word
-  [708, 72, 0.19], [768, 76, 0.12], [832, 79, 0.19],
+  [916, 72, 0.19], [976, 76, 0.12], [1056, 79, 0.19],
 ];
 for (const [fr, m, level] of MELODY) keys(s(fr), m, level ?? 0.14, (fr / 16) % 2 ? 0.2 : -0.2, fr >= HITS.out ? 2.8 : 2);
 
@@ -118,6 +120,12 @@ for (const [from, to] of RISERS) riser(s(from), s(to) - s(from), 0.09);
 const H = HITS;
 // the clip opens: a soft glint as the chapter word and the tab are already there
 bell(s(8), 84, 0.03, 0.3, 1.4);
+// (round 3) the reminder that came due lifts (in the pause after "reminder,")
+bell(s(H.dueLift), 79, 0.045, 0.2, 1.4);
+sub(s(H.dueLift), 43, 0.14, 0.3);
+// (round 3) the V60 step ticked off: the tap, and the toast's confirmation
+tick(s(H.tick), 0.09, 1.25);
+shimmer(s(H.tick + 6), [76, 79, 84], 0.03);
 // the "Do this" row lifts (in the pause after "action,")
 bell(s(H.todoLift), 84, 0.045, -0.2, 1.4);
 sub(s(H.todoLift), 48, 0.14, 0.3);

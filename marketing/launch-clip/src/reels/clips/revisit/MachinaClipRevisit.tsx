@@ -1,6 +1,6 @@
 import React from 'react';
 import { AbsoluteFill, Audio, staticFile, useCurrentFrame } from 'remotion';
-import { CAPTIONS, FPS, HITS, KICKERS } from '../../../../clips/revisit-timeline.mjs';
+import { BAND, CAPTIONS, FPS, HITS, KICKERS, SLOTS } from '../../../../clips/revisit-timeline.mjs';
 import { sans } from '../../../fonts';
 import VO from './vo.json';
 import { BandScrim, Captions, type ReelCaption } from '../../kit/Captions';
@@ -28,7 +28,7 @@ export const MachinaClipRevisit: React.FC<{
       <Revisit f={f} />
       <End f={f} />
       {/* type never sits on UI: the app fades out under the caption band */}
-      <BandScrim opacity={1 - prog(f, HITS.out, HITS.out + 8)} />
+      <BandScrim band={BAND} opacity={1 - prog(f, HITS.out, HITS.out + 8)} />
       <Captions
         frame={f}
         fps={FPS}
@@ -37,6 +37,7 @@ export const MachinaClipRevisit: React.FC<{
         kickers={KICKERS}
         showCaptions={withCaptions}
         showKickers={withCaptions}
+        slots={SLOTS}
       />
       <Lens />
     </AbsoluteFill>

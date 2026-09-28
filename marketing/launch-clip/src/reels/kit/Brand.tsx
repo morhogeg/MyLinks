@@ -111,7 +111,10 @@ export const Lockup: React.FC<{
   /** 'label': the small letterspaced subtitle; 'statement': the line set
    *  big enough to read as the last thing the reel says (owner, round 4) */
   lineStyle?: 'label' | 'statement';
-}> = ({ frame, strike, line, lineStarts, markWidth = 262, wordWidth = 660, showLine = true, wordAt, lineStyle = 'label' }) => {
+  /** the statement's size in px (default 60); a longer line, such as the
+   *  tagline, sets it smaller so it stays on one line inside the frame */
+  lineSize?: number;
+}> = ({ frame, strike, line, lineStarts, markWidth = 262, wordWidth = 660, showLine = true, wordAt, lineStyle = 'label', lineSize = 60 }) => {
   // AnimatedMark's point strikes at u ≈ 0.56 of its launch, which runs at the
   // app's own pace (LAUNCH_MS 1300 = 39 frames)
   const LAUNCH = MARK_LAUNCH_FRAMES;
@@ -163,7 +166,7 @@ export const Lockup: React.FC<{
             // other face in 81 seconds and read as a font change, not as
             // emphasis; the end card's size and isolation are the emphasis)
             fontFamily: sans,
-            fontSize: big ? 60 : 25,
+            fontSize: big ? lineSize : 25,
             fontWeight: 600,
             letterSpacing: big ? '-0.028em' : '0.36em',
             textTransform: big ? undefined : 'uppercase',

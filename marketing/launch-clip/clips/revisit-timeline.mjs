@@ -40,29 +40,32 @@ export const TAKE = 'revisitClip';
  */
 export const HITS = {
   settle: 16, // the establishing tilt has settled (the first line starts)
-  todoLift: 64, // the first "Do this" row lifts, in the pause after "action,"
-  todoDrop: 104, // …and settles back
-  travel: [112, 144], // down to "This week in Machina" (the reading window)
-  recapTap: 160, // tapped open, in the silence between the first two lines
-  rise: [192, 240], // the recap scrolls up into the reading window
-  standout: 480, // the Standout lifts as the glide onto it lands
-  standoutDrop: 544, // …and settles back before it is tapped
-  cardTap: 592, // the Standout, tapped: its save opens
-  out: 688, // the save is thrown out of frame; the lockup begins
-  markStrike: 728, // the mark's point strikes (the impact)
+  dueLift: 48, // (round 3) the reminder that came due lifts, in the pause after "reminder,"
+  dueDrop: 104, // …and settles back
+  todoLift: 176, // the first "Do this" row lifts, in the pause after "action,"
+  todoDrop: 216, // …and settles back
+  wide: [224, 256], // (round 3) back a little: the list, the recap and the toast in frame
+  tick: 272, // (round 3) the V60 step ticked off: "Marked as done"
+  travel: [320, 352], // into the reading window, the toast left below the frame
+  recapTap: 368, // tapped open, in the silence between the lines
+  rise: [400, 448], // the recap scrolls up into the reading window
+  standout: 688, // the Standout lifts as the glide onto it lands
+  standoutDrop: 752, // …and settles back before it is tapped
+  cardTap: 800, // the Standout, tapped: its save opens
+  out: 896, // the save is thrown out of frame; the lockup begins
+  markStrike: 936, // the mark's point strikes (the impact)
 };
 
 /**
  * The recap, read. The capture scrolls it in ~3pt steps (take mark `scroll`,
- * one frame a step, 841pt to the end of the page); each read eases the page
- * from one scroll position to the next, in POINTS, and the camera takes up
- * the difference to the nearest captured step (kit/scroll.ts). [from, to,
- * from pt, to pt]: 194 and 548 put the write-up, then the two themes, in the
- * reading window.
+ * one frame a step); each read eases the page from one scroll position to
+ * the next, in POINTS, and the camera takes up the difference to the nearest
+ * captured step (kit/scroll.ts). [from, to, from pt, to pt]: 293 and 660 put
+ * the write-up, then the two themes, at the top of the reading window.
  */
 export const READS = [
-  [HITS.rise[0], HITS.rise[1], 0, 194], // the write-up rises into view
-  [320, 368, 194, 527], // → the two themes and the saves they link to (548 with the creeps)
+  [HITS.rise[0], HITS.rise[1], 0, 293], // the write-up rises into view
+  [528, 576, 293, 660], // → the two themes and the saves they link to (681 with the creeps)
 ];
 /**
  * THE CREEPS (clip round 2: the themes hold measured dead still for a full
@@ -72,20 +75,30 @@ export const READS = [
  * (no kick). About 0.3pt (0.7px) a frame at the fastest. [from, to, points]
  */
 export const CREEP = [
-  [HITS.rise[1], 320, 12], // the write-up
-  [368, 416, 9], // the themes
+  [HITS.rise[1], 528, 12], // the write-up
+  [576, 624, 9], // the themes
 ];
 /**
  * The last read is ONE glide onto the Standout and its question: the page
- * scrolls on until it runs out (841pt, the end of the recap) and the camera
- * carries the same eased motion on down the screen, so nothing stops and
- * starts again, and the tab bar comes into frame only after the page has
- * stopped (its camera correction never shows on the fixed chrome).
+ * scrolls on until it runs out (the end of the recap) and the camera carries
+ * the same eased motion on down the screen, so nothing stops and starts
+ * again, and the tab bar comes into frame only after the page has stopped
+ * (its camera correction never shows on the fixed chrome).
  */
-export const GLIDE = [416, 480];
+export const GLIDE = [624, 688];
+
+/**
+ * (round 3, owner: "a huge white gap at the top") The clip sets its type
+ * higher than the reel's (SLOTS 290 / 346 in kit/Captions.tsx) and the app
+ * comes up under it: the scrim is solid to 420px and clear by 600px (the
+ * reel's: 510 / 720). The kicker still clears the top ~10% that Reels and
+ * TikTok cover with their own UI.
+ */
+export const SLOTS = { kicker: 200, top: 256 };
+export const BAND = { solid: 420, clear: 600 };
 
 /** the end: the finished lockup holds ~1.8s once its line is whole */
-export const TOTAL_FRAMES = 880;
+export const TOTAL_FRAMES = 1088;
 export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 
 /**
@@ -98,18 +111,23 @@ export const TOTAL_SEC = TOTAL_FRAMES / FPS;
  * "second brain", no "library" (verify).
  */
 export const CAPTIONS = [
+  // (round 3, owner: "too thin, expand on the feature") Revisit opens on
+  // what has come due: a reminder the user set (the app's Remind me: Smart
+  // review, or a day) lands under "Due now"; its row lifts after "reminder,"
+  { at: 16, to: 124, text: 'Set a reminder, and a save\ncomes back when it’s due.' },
   // the "Do this" list: the app writes a step only for a save that calls for
-  // one (web/lib/takeaway.ts); its first row lifts in the pause after "action,"
-  { at: 16, to: 154, text: 'When a save calls for action,\nMachina turns it into a to-do.' },
+  // one (web/lib/takeaway.ts); its first row lifts in the pause after
+  // "action,", then the V60 step is ticked off (the app's "Marked as done")
+  { at: 128, to: 256, text: 'When a save calls for action,\nMachina turns it into a to-do.' },
   // "This week in Machina" is tapped open in the silence before this line;
   // it unfolds on "Every week," and rises into view on "Machina brings back"
-  { at: 176, to: 288, text: 'Every week, Machina brings back\nwhat’s worth remembering.' },
+  { at: 384, to: 496, text: 'Every week, Machina brings back\nwhat’s worth remembering.' },
   // the themes land as "themes" is said; the Standout rises into view on
-  // "the one save worth rereading" and lifts after it
-  { at: 368, to: 480, text: 'The themes of your week,\nand the one save worth rereading.' },
+  // "the one save worth rereading" and lifts as the glide lands
+  { at: 576, to: 688, text: 'The themes of your week,\nand the one save worth rereading.' },
   // the close: the name (the drawn wordmark wipes in as it is said), then
-  // the App Store subtitle (the reel's lockup, the reel's words)
-  { at: 752, to: TOTAL_FRAMES, place: 'lockup', text: 'Machina.\nNever lose another great find.', duck: 0.4 },
+  // the tagline (owner, 2026-09-28: every launch film ends on it, once)
+  { at: 960, to: TOTAL_FRAMES, place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4 },
 ];
 
 /**
@@ -134,7 +152,7 @@ export const KICKERS = (() => {
 })();
 
 /** Risers END on the reveal they lead into. [from, to] in frames. */
-export const RISERS = [[656, HITS.markStrike]];
+export const RISERS = [[864, HITS.markStrike]];
 
 /** one chord per bar (the reel's C-major vocabulary); the last is the lockup */
-export const BAR_CHORDS = ['Fmaj7', 'Cmaj7', 'Fmaj7', 'Cmaj7', 'G6', 'Fmaj7', 'Cmaj7', 'Fmaj7', 'G6', 'Cmaj7', 'Fmaj7', 'Cmaj7', 'Cmaj7', 'Cmaj7'];
+export const BAR_CHORDS = ['Fmaj7', 'Cmaj7', 'G6', 'Cmaj7', 'Fmaj7', 'Cmaj7', 'Fmaj7', 'Cmaj7', 'G6', 'Fmaj7', 'Cmaj7', 'Fmaj7', 'G6', 'Cmaj7', 'Fmaj7', 'Cmaj7', 'Cmaj7'];

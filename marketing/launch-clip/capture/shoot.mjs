@@ -433,7 +433,7 @@ const takes = {
     });
     await fresh(async () => {
       await page.evaluate(
-        ([uid, syn, todos]) => {
+        ([uid, syn, todos, due]) => {
           for (const p of window.__capture.list(`users/${uid}/digests/`)) window.__capture.remove(p);
           window.__capture.set(`users/${uid}/syntheses/${syn.weekId}`, syn);
           for (const [id, text] of todos) {
@@ -441,11 +441,25 @@ const takes = {
             const cur = window.__capture.get(p);
             if (cur) window.__capture.set(p, { ...cur, actionableTakeaway: text });
           }
+          // (clip round 3) a reminder the user set on Four Thousand Weeks has
+          // come due: Revisit lists it first, under "Due now" (the app's own
+          // Smart review, the Remind me sheet's default)
+          const d = `users/${uid}/links/${due}`;
+          const cur = window.__capture.get(d);
+          if (cur)
+            window.__capture.set(d, {
+              ...cur,
+              reminderStatus: 'pending',
+              reminderProfile: 'smart',
+              reminderCount: 1,
+              nextReminderAt: Date.now() - 1_800_000,
+            });
         },
         [
           UID,
           { ...SYNTHESIS, weekId: isoWeekId(new Date()), cards: refs, createdAt: Date.now() - 3_600_000 },
           CARDS.filter((c) => c.takeaway).map((c) => [c.id, c.takeaway]),
+          'fourthousand',
         ],
       );
     });
@@ -461,6 +475,11 @@ const takes = {
       todo: ['div[class*="divide-y"]', 'Call your parents'],
       todoFirst: ['div[class*="ps-1.5"]', 'Call your parents'],
       todoHeader: ['button', 'Do this'],
+      due: ['button', 'Four Thousand Weeks'],
+      dueRow: ['div[class*="rounded-2xl"][class*="border-border-subtle"]', 'Four Thousand Weeks'],
+      doneToast: ['[role=status]', 'Marked as done'],
+      dueHeader: ['button', 'Due now'],
+      todoLast: ['div[class*="ps-1.5"]', 'Tomorrow morning'],
       revisitTab: R.revisitTab,
     };
     const CARD = {
@@ -473,6 +492,18 @@ const takes = {
     await tab('Revisit').click();
     await page.waitForTimeout(700);
     t.mark('tab');
+    await t.snap({ rects: RECAP });
+
+    // (clip round 3) the V60 step, ticked off: the app's own "Marked as done"
+    // (the row leaves the list, the step stays on its card)
+    await t.freeze();
+    await visible(page.locator('div[class*="ps-1.5"]', { hasText: 'Tomorrow morning' }).getByRole('button', { name: 'Mark as done' })).click();
+    t.mark('tick');
+    await t.roll(40, { rects: RECAP, step: 1000 / 60 });
+    await t.thaw();
+    // (the toast has gone before the recap is opened)
+    await page.waitForTimeout(6000);
+    t.mark('ticked');
     await t.snap({ rects: RECAP });
 
     await t.freeze();

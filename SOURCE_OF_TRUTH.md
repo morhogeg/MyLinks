@@ -2391,6 +2391,17 @@ Promise opens, loss-aversion closes. Same session: the recipe card became
 "Why you forget most of what you read" (Science; the query "remembering more
 from books" still shares no word with it), the Manson title is shortened so
 the Ask chip never truncates, and two-sentence captions break at the sentence.
+**Slogan roles FLIPPED 2026-09-28 (owner):** every launch film ENDS on the
+tagline, "Everything you save, finally useful." (exact wording and comma),
+once, and nothing ends on "Never lose another great find" any more: the
+tagline is the fixed brand line, while the subtitle is App Store copy that can
+change with search tests and would date every posted film; ending on the
+promise also follows the story (problem → Machina → payoff). The film's
+introduction now reads "Machina. / Never lose another great find." and its
+endcard carries the tagline, which the voice says after the name; the reel
+and the REVISIT clip close on it too (the reel's early "All your saves,
+finally useful." became the subtitle). `npm run verify` fails any of them that
+repeats the tagline before the end or ends on anything else.
 
 *Short-form reels (PLANNED 2026-09-26, owner; the PILOT was built the same
 day on branch `claude/machina-reel-pilot`, NOT merged, see "What exists"
@@ -2503,7 +2514,7 @@ LUFS, true peak ≤ −1 dBTP), `MachinaReelSilent`
 and `MachinaReelClean`, in `marketing/launch-clip/`. Script: the problem ("You
 save things everywhere." / "An article here. A recipe there. A video
 somewhere else." / "Saved, and rarely seen again."), "Introducing Machina."
-(the screen shows the drawn wordmark) "All your saves, finally useful.",
+(the screen shows the drawn wordmark) "Never lose another great find." (was "All your saves, finally useful." until 2026-09-28),
 "Save anything, from anywhere." (a motion-graphics beat: saves shared from
 YouTube, Instagram and Safari, each card's Share button tapped and pulled
 into the mark; the native share sheet cannot be captured from the web build
@@ -2511,8 +2522,8 @@ and the owner chose not to record it), "A link, a screenshot, or a note."
 (the Add dialog's real Link, Image and Note tabs, each tapped), "Machina reads it, summarizes it, and files it." (the launch film's line, over the five phases), "Each save becomes a card, with the key points pulled out.",
 Find, Ask, Connect, the weekly recap read slowly ("Every week, Machina brings
 back what's worth remembering." / "The themes of your week, and the one save
-worth rereading."), and the close "Machina. Never lose another great find."
-in Geist (the serif retired in round 15). One steady speed on the 112.5 BPM beat; key features
+worth rereading."), and the close "Machina. Everything you save, finally
+useful." (the tagline since 2026-09-28) in Geist (the serif retired in round 15). One steady speed on the 112.5 BPM beat; key features
 linger. **Every frame of app UI is the real web app, not a
 mockup** (owner, mid-task): `capture/` builds `web/` as a static export with
 Firebase swapped for an in-memory stand-in seeded with a demo account of 24
@@ -2538,20 +2549,23 @@ on iPhone (§4 23b).
 
 **What exists: the REVISIT feature clip (2026-09-28, branch
 `claude/clip-revisit`, not merged; the owner reviews the cut):**
-`MachinaClipRevisit` (29.3s, 1080×1920, score + narrator + captions,
+`MachinaClipRevisit` (36.3s since round 3, 1080×1920, score + narrator + captions,
 mastered to −14 LUFS / −1.25 dBTP), `MachinaClipRevisitSilent` and
 `MachinaClipRevisitClean`, in `marketing/launch-clip/`. Brief 5 below
 ("Recall"), built as REVISIT, "what you save comes back to you": it opens
 on its chapter word, then one continuous use of the real app (a new take,
-`revisitClip`): the Revisit tab's "Do this" list ("When a save calls for
-action, Machina turns it into a to-do."; The Tail End's row lifts), "This
+`revisitClip`): the Revisit tab's "Due now" (a reminder the user set comes
+back: "Set a reminder, and a save comes back when it's due."), its "Do this"
+list ("When a save calls for action, Machina turns it into a to-do."; The
+Tail End's row lifts, then a step is ticked off, the app's "Marked as
+done"), "This
 week in Machina" tapped open and READ slowly ("Every week, Machina brings
 back what's worth remembering." / "The themes of your week, and the one
 save worth rereading."): the write-up, the two themes and the saves they
 link to, the Standout (it lifts) and its question, read in silence; then the
 Standout is tapped and the save it names opens (The Tail End, whose "Do
 this" is the first row of the list the clip opened on); then the reel's
-lockup, "Machina. Never lose another great find." The Daily Brew deck is
+lockup, "Machina. Everything you save, finally useful." The Daily Brew deck is
 not used (owner: not interesting enough). The plumbing is per clip so the
 four clips merge without touching each other: `clips/revisit-timeline.mjs`,
 `src/reels/clips/revisit/`, `audio/clips/revisit-score.mjs` and
@@ -2561,7 +2575,9 @@ primitive, `src/reels/kit/scroll.ts` (reading a stepped scroll without
 hops). `MachinaReel` and `MachinaLaunch` render pixel-identical to before
 (checked). Round 2 (2026-09-28, a finishing pass): the recap's holds no
 longer sit dead still (the page creeps while a read is held); nothing else
-moved. How to render: the launch-clip README, "Feature clip: REVISIT".
+moved. Round 3 (owner: "too thin", "a huge white gap at the top"): Due now
+and the tick-off added; the clip's type and app sit higher than the reel's
+(new optional kit props, the reel unchanged by them). How to render: the launch-clip README, "Feature clip: REVISIT".
 
 **Feature-clip briefs, FINAL against the pilot's kit (2026-09-26).** Shared
 by all five: **448 frames (7 bars at 112.5 BPM, 14.9s)**, vertical, built
@@ -2622,6 +2638,24 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-28 — Every launch film ends on the tagline; REVISIT round 3.**
+  Branch `claude/clip-revisit`, not merged. Owner decision: films END on
+  "Everything you save, finally useful.", once; the App Store subtitle moves
+  to the introduction. Main film: the "Introducing" cue is now "Machina. /
+  Never lose another great find.", the endcard and the closing voice line
+  the tagline (the voice keeps the name before it: "Machina. Everything you
+  save, finally useful.", as the endcard shows the wordmark). The reel (same
+  commit as its pilot branch) and the REVISIT clip close on it too; the reel's
+  early "All your saves, finally useful." became the subtitle. The lockup's
+  line is 50px for the longer line (`Lockup` `lineSize`); the last melody
+  note in the reel and the clip moved after "useful.". verify fails a film,
+  reel or clip that repeats the tagline or ends on anything else (the reel's
+  old gate would have passed on a comment in `Endcard.tsx`). All narrators
+  re-synthesized, all mixes re-mastered, every edition re-rendered. REVISIT
+  round 3 (owner: "too thin", "a huge white gap at the top"): Due now and a
+  step ticked off added (36.3s), the clip's type and app raised (kit
+  `Captions` `slots`, `BandScrim` `band`, defaults unchanged). Not verified:
+  nobody has listened on speakers, including the new closing lines.
 - **2026-09-28 — Feature clip REVISIT, round 2: a finishing pass.** Branch
   `claude/clip-revisit`, not merged. Reviewed with fresh eyes by measuring
   the render (motion trace, 4-frame strips, dwell per line, banding at 1:1,

@@ -8,7 +8,7 @@
  *    every narrator line starts on a beat; the narrator speaks every caption
  *    verbatim (only the SAY_NAME respelling differs) and fits its window;
  *    THE DWELL RULE (a line leaves 0.3–1.2s after its voice, ≤4s with
- *    `until`); the lockup's line is the film's endcard subtitle;
+ *    `until`); the lockup's line is the film's endcard line, the tagline, once;
  *  - the grid: taps, lifts and the strike on 8ths, the end on a beat;
  *  - no em dash, literal "AI", "second brain" or "library" in any caption,
  *    kicker, or text the app shows on ANY frame of the take (the clip uses
@@ -88,11 +88,14 @@ if (fs.existsSync(manifestPath)) {
 }
 const close = caps.find((c) => c.place === 'lockup');
 const closeLine = close?.text.split('\n').slice(-1)[0].replace(/\.$/, '');
-if (!close || !read('src/scenes/Endcard.tsx').includes(closeLine)) bad.push('the lockup line is not the film endcard subtitle');
+if (!close || !read('src/scenes/Endcard.tsx').includes(closeLine)) bad.push('the lockup line is not the film endcard line (the tagline)');
+// (2026-09-28, owner) the clip ends on the tagline, once
+if (!close?.text.endsWith('Everything you save, finally useful.')) bad.push('the clip does not end on the tagline');
+for (const c of caps) if (c !== close && /finally useful/i.test(c.text)) bad.push(`the tagline appears before the end: "${c.text}"`);
 
 // ── the grid
 const H = C.HITS;
-for (const [k, v] of Object.entries({ todoLift: H.todoLift, recapTap: H.recapTap, standout: H.standout, cardTap: H.cardTap, markStrike: H.markStrike })) {
+for (const [k, v] of Object.entries({ dueLift: H.dueLift, tick: H.tick, todoLift: H.todoLift, recapTap: H.recapTap, standout: H.standout, cardTap: H.cardTap, markStrike: H.markStrike })) {
   if (v % (C.BEAT_FRAMES / 2)) bad.push(`${k} at ${v} is not on an 8th`);
 }
 if (C.TOTAL_FRAMES % C.BEAT_FRAMES) bad.push(`the clip ends at ${C.TOTAL_FRAMES}, not on a beat`);

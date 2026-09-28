@@ -118,7 +118,9 @@ const MELODY = [
   // home: C as the mark draws, E (softer) in the breath after its name, and
   // the G AFTER the last word (round 13: it landed on "find.", the one word
   // the reel has to land, and masked the whole closing line)
-  [8, 1, 72], [8, 2.5, 76, 0.12], [9, 0.5, 79],
+  // (2026-09-28: the closing line is now the longer tagline; the G moved
+  // half a beat later so it still lands after "useful.")
+  [8, 1, 72], [8, 2.5, 76, 0.12], [9, 1, 79],
 ];
 for (const [bar, bt, m, level] of MELODY) {
   const lead = bar < 4;

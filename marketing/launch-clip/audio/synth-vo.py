@@ -51,7 +51,7 @@ FILM_LINES = [
     # a deliberate beat of silence before this one — the first wrong pile
     # opens wordless (owner note, round 13c)
     (4.8, 1.3, "Saved, and rarely seen again.", 0.9),
-    (6.45, 1.35, f"Introducing {SAY_NAME}. Everything you save, finally useful."),
+    (6.45, 1.35, f"Introducing {SAY_NAME}. Never lose another great find."),
     (8.35, 1.25, "Save anything, from anywhere."),
     (9.95, 2.4, f"{SAY_NAME} reads it, summarizes it, and files it."),
     # Spoken with the dichotomy CARVED (owner note, 13f): a full stop after
@@ -67,9 +67,10 @@ FILM_LINES = [
     # Spoken-only "And" (owner call, 13l): conversational lead-in the caption
     # deliberately doesn't carry — same precedent as the SAY_NAME respelling.
     (26.1, 2.6, f"And behind the scenes, {SAY_NAME} pieces it all together. Ready when you are."),
-    # the closing statement = the endcard's one line, the App Store subtitle
-    # (owner call 2026-09-17: the voice says what the screen shows)
-    (30.1, 1.6, f"{SAY_NAME}. Never lose another great find."),
+    # the closing statement = the endcard: the wordmark and its one line, the
+    # tagline (owner call 2026-09-28: every film ends on it; 2026-09-17: the
+    # voice says what the screen shows)
+    (30.1, 1.6, f"{SAY_NAME}. Everything you save, finally useful."),
 ]
 
 

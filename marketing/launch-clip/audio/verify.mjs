@@ -256,12 +256,22 @@ console.log('\n── reel');
   } else {
     console.log('  (no out/vo/reel/manifest.json: VO fit not re-checked; run synth-vo.py reel)');
   }
-  // the lines the reel shares with the brand: tagline in, subtitle out
+  // the line the reel shares with the film: its endcard's, the tagline (2026-09-28)
   const film = read('src/scenes/Endcard.tsx');
   const close = caps.find((c) => c.place === 'lockup');
   const closeLine = close?.text.split('\n').slice(-1)[0].replace(/\.$/, '');
-  if (!close || !film.includes(closeLine)) bad.push('the reel lockup line is not the film endcard subtitle');
-  // round 7 (owner): "Introducing Machina. All your saves, finally useful." after the problem
+  if (!close || !film.includes(closeLine)) bad.push('the reel lockup line is not the film endcard line (the tagline)');
+  // (2026-09-28, owner) every launch film ENDS on the tagline, once, word for
+  // word; the film's endcard carries it, and no earlier line repeats it
+  {
+    const TAGLINE = 'Everything you save, finally useful.';
+    if (!film.includes(TAGLINE)) bad.push(`the film endcard does not carry the tagline "${TAGLINE}"`);
+    if (!close || !close.text.endsWith(TAGLINE)) bad.push('the reel does not end on the tagline');
+    for (const c of caps) if (c !== close && /finally useful/i.test(`${c.text} ${c.say ?? ''}`)) bad.push(`the tagline appears before the end: "${c.text}"`);
+    for (const c of SUBTITLES) if (/finally useful/i.test(c.text)) bad.push(`the film repeats the tagline before its endcard: "${c.text}"`);
+    const filmVo = read('audio/synth-vo.py');
+    if (!filmVo.includes(`f"{SAY_NAME}. ${TAGLINE}"`)) bad.push('the film\'s closing voice line is not the tagline');
+  }
 
   // ── 4. banned strings, everywhere a viewer can read one
   for (const c of L.CARDS) {
