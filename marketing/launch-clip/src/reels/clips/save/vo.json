@@ -1,51 +1,98 @@
 [
  {
   "frame": 16,
-  "text": "Save anything, from anywhere.",
+  "text": "Great finds get lost in open tabs, screenshots and bookmarks.",
   "words": [
    0.03,
-   0.297,
-   0.95,
-   1.147
+   0.405,
+   0.781,
+   1.031,
+   1.344,
+   1.532,
+   1.845,
+   2.57,
+   3.228,
+   3.447
   ]
  },
  {
-  "frame": 256,
-  "text": "A link, a screenshot, or a note.",
+  "frame": 176,
+  "text": "Makeena saves them straight from the share sheet, in any app.",
   "words": [
-   0.06,
-   0.163,
-   0.62,
-   0.716,
-   1.38,
-   1.525,
-   1.621
+   0.05,
+   0.4,
+   0.663,
+   0.882,
+   1.276,
+   1.495,
+   1.671,
+   1.933,
+   2.54,
+   2.683,
+   2.873
   ]
  },
  {
-  "frame": 400,
-  "text": "Makeena reads it, summarizes it, and files it.",
-  "words": [
-   0.06,
-   0.469,
-   0.776,
-   1.32,
-   2.075,
-   2.45,
-   2.601,
-   2.829
-  ]
- },
- {
-  "frame": 768,
-  "text": "Makeena. Never lose another great find.",
+  "frame": 384,
+  "text": "Screenshots too. Up to five become one card.",
   "words": [
    0.03,
-   0.83,
-   1.145,
-   1.408,
-   1.829,
-   2.145
+   0.729,
+   1.34,
+   1.508,
+   1.676,
+   1.957,
+   2.349,
+   2.574
+  ]
+ },
+ {
+  "frame": 496,
+  "text": "It reads the text in them and pulls out the key points.",
+  "words": [
+   0.04,
+   0.19,
+   0.49,
+   0.69,
+   0.94,
+   1.09,
+   1.34,
+   1.54,
+   1.84,
+   2.04,
+   2.24,
+   2.44
+  ]
+ },
+ {
+  "frame": 688,
+  "text": "Then it tags it, and links it to what you already saved.",
+  "words": [
+   0.07,
+   0.276,
+   0.399,
+   0.605,
+   1.12,
+   1.299,
+   1.568,
+   1.702,
+   1.836,
+   2.06,
+   2.239,
+   2.597
+  ]
+ },
+ {
+  "frame": 864,
+  "text": "Save it once. Makeena does the rest.",
+  "words": [
+   0.05,
+   0.329,
+   0.496,
+   1.12,
+   1.534,
+   1.793,
+   2.0
   ]
  }
 ]

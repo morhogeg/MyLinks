@@ -1,0 +1,204 @@
+import React from 'react';
+import { AbsoluteFill } from 'remotion';
+import { HITS, PLAY, SCROLLS, THROW_LEN } from '../../../../clips/save-timeline.mjs';
+import { AppShot, Lift, Tap } from '../../kit/AppShot';
+import { camAt, camVelocity, type Key } from '../../kit/camera';
+import { EASE_FLING, EASE_IN_OUT, EASE_MODAL, EASE_SPRING, mix, prog } from '../../kit/curves';
+import { at, center, rectOf, takeOf, type Rect } from '../../kit/takes';
+import { SAVE_OPEN_CAM } from '../../scenes/handoff';
+
+/**
+ * The feature in the real app (take "saveclip", capture/shoot.mjs), from the
+ * + button the mark's point became to the throw into the lockup:
+ *
+ *  SCREENSHOTS  Add to Machina, lifted off its screen (the app darkens the
+ *               screen behind it; the reel's grade never flips): the Image
+ *               tab tapped, three screens of one post picked ("Screens of one
+ *               post, read in this order."), Save tapped; the dialog drops
+ *               away into the feed.
+ *  KEY POINTS   the feed's own working card, "Reading 3 screenshots…", with
+ *               the app's banner reading the text; the card it becomes; the
+ *               card opened (its screenshots, the gist) and read down to its
+ *               Key Points, lifted.
+ *  TAGS & LINKS read on down to the "Do this", the tags and the Related cards,
+ *               each lifted on a beat.
+ *
+ * Every pixel of the app is the capture; the added things are the camera,
+ * the taps and the lifts (the reel kit). OUTPUT frames; rolls were captured at
+ * 60fps and play one frame per output frame.
+ */
+
+const T = 'saveclip';
+const linear = (t: number) => t;
+type Seg = keyof typeof PLAY;
+const seg = (mark: Seg, f: number) => at(T, mark, Math.min(PLAY[mark].n - 1, Math.max(0, f - PLAY[mark].at)));
+
+// ── the read-down: the capture scrolls the detail view in 5pt steps; step 0
+// is the opened view. The camera takes up each step's rounding (the reel's
+// round-13 fix), measured on the Key Points list, which every step measures.
+const STEPS = takeOf(T).count - at(T, 'detailScroll');
+const stepFrame = (k: number) => (k <= 0 ? at(T, 'detail', PLAY.detail.n - 1) : at(T, 'detailScroll', k - 1));
+const refY = (k: number) => rectOf(T, stepFrame(k), 'points')[1];
+/** the step that puts the Key Points heading at 250pt, under the caption band */
+const KP_STEP = (() => {
+  let best = 0;
+  for (let k = 0; k <= STEPS; k++) if (Math.abs(rectOf(T, stepFrame(k), 'keyPoints')[1] - 250) < Math.abs(rectOf(T, stepFrame(best), 'keyPoints')[1] - 250)) best = k;
+  return best;
+})();
+const TARGET: Record<string, number> = { keyPoints: KP_STEP, end: STEPS };
+const scrollAt = (f: number) => {
+  let s = 0;
+  for (const [a, b, to] of SCROLLS as [number, number, string][]) if (f >= a) s = mix(s, TARGET[to], prog(f, a, b, EASE_IN_OUT));
+  return s;
+};
+const wantY = (s: number) => {
+  const k = Math.min(STEPS - 1, Math.floor(s));
+  return mix(refY(k), refY(k + 1), s - k);
+};
+
+const [S1a, S1b] = SCROLLS[0] as [number, number, string];
+const [S2a, S2b] = SCROLLS[1] as [number, number, string];
+
+/** the capture frame on the screen behind (or, once saved, the screen) */
+const screenFrame = (f: number) => {
+  if (f < PLAY.saving.at) return at(T, 'home');
+  if (f < PLAY.reading.at) return seg('saving', f);
+  if (f < PLAY.done.at) return seg('reading', f);
+  if (f < PLAY.detail.at) return seg('done', f);
+  if (f < S1a) return seg('detail', f);
+  return stepFrame(Math.round(scrollAt(f)));
+};
+/** the capture frame the lifted dialog shows */
+const dialogFrame = (f: number) =>
+  f < PLAY.modeImage.at ? seg('dialogOpen', f) : f < PLAY.picked.at ? seg('modeImage', f) : seg('picked', f);
+
+// ── the screen's camera
+const keys: Key[] = [
+  // the + button, exactly where the mark's point lands (the match cut)
+  { f: HITS.toApp, ...SAVE_OPEN_CAM, rx: 9 },
+  { f: HITS.toApp + 14, z: 1.56, rx: 0, ease: EASE_MODAL },
+  // pushed back behind the lifted dialog
+  { f: HITS.dialog, cx: 196.5, cy: 430, z: 1.38, fx: 540, fy: 1190, ease: EASE_IN_OUT },
+  { f: HITS.saveTap, z: 1.42, ease: linear },
+  // the feed: the working card and the app's banner, answering the Save tap
+  { f: HITS.saveTap + 16, cy: 451, z: 2.0, fy: 1300, ease: EASE_MODAL },
+  { f: HITS.cardTap, cy: 448, z: 2.04, ease: linear },
+  // opened: the screenshots, the title, the gist
+  { f: HITS.cardTap + 28, cy: 395, z: 2.1, fy: 1290, ease: EASE_MODAL },
+  { f: S1a, cy: 396, z: 2.12, ease: linear },
+  // down to the Key Points, with the scroll
+  { f: S1b, cy: 400, z: 2.3, fy: 1310, ease: EASE_IN_OUT },
+  { f: S2a, cy: 402, z: 2.32, ease: linear },
+  // on down to the tags and the Related cards
+  { f: S2b, cy: 552, z: 2.2, fy: 1304, ease: EASE_IN_OUT },
+  { f: HITS.throw, cy: 556, z: 2.25, ease: linear },
+  // thrown out of frame, into the lockup
+  { f: HITS.throw + THROW_LEN, fx: -760, z: 2.3, ease: EASE_IN_OUT },
+];
+
+// ── the lifted dialog's camera: framed whole, then onto the screens picked,
+// then dropped away into the feed as Save is answered
+const dKeys: Key[] = [
+  { f: HITS.dialog, cx: 196.5, cy: 426, z: 2.4, fx: 540, fy: 1300 },
+  { f: HITS.pick - 12, cy: 428, z: 2.44, ease: linear },
+  { f: HITS.pick + 10, cy: 520, z: 2.8, fy: 1300, ease: EASE_IN_OUT },
+  { f: HITS.saveTap, cy: 522, z: 2.86, ease: linear },
+  { f: HITS.saveTap + 5, cy: 530, z: 2.4, fy: 1260, ease: EASE_MODAL },
+  { f: HITS.saveTap + 12, cy: 330, z: 1.1, fy: 1000, ease: EASE_FLING },
+];
+
+/** the two Related cards, whole (the capture measures their titles; the card
+ *  runs 13pt above the title, 82pt and 87pt tall) */
+const relatedBox = (i: number, k: 1 | 2): Rect => {
+  const r = rectOf(T, i, `related${k}`);
+  return k === 1 ? [16, r[1] - 13, 361, 82] : [16, r[1] - 12.5, 361, 87];
+};
+
+export const App: React.FC<{ f: number }> = ({ f }) => {
+  if (f < HITS.toApp || f > HITS.throw + THROW_LEN) return null;
+
+  const i = screenFrame(f);
+  const s = scrollAt(f);
+  const scrolling = f >= S1a;
+  const cam = camAt(keys, f);
+  const step = Math.round(s);
+  // the step on screen vs where the scroll curve wants it (points)
+  const view = scrolling ? { ...cam, cy: cam.cy + (refY(step) - wantY(s)) } : cam;
+  const camV = camVelocity(keys, f, 1);
+  const motion = scrolling ? { x: camV.x, y: camV.y + (wantY(s) - wantY(scrollAt(f - 1))) * cam.z } : camV;
+
+  // the iris: the + button opens into its screen
+  const iris = f < HITS.dialog ? { x: 196.5, y: 811, r: mix(20, 980, prog(f, HITS.toApp, HITS.dialog - 8, EASE_IN_OUT)) } : null;
+  // behind the dialog: out of focus, racking into focus as it drops away
+  const behind = prog(f, HITS.dialog, HITS.dialog + 10, EASE_MODAL) * (1 - prog(f, HITS.saveTap + 4, HITS.saveTap + 16, EASE_IN_OUT));
+
+  // the dialog, lifted
+  const di = dialogFrame(f);
+  const dRect = rectOf(T, di, 'dialog');
+  const dIn = prog(f, HITS.dialog, HITS.dialog + 5, EASE_MODAL);
+  const dOut = prog(f, HITS.saveTap + 4, HITS.saveTap + 10, EASE_IN_OUT);
+
+  const plus = center(rectOf(T, 0, 'plus'));
+  const tabImage = rectOf(T, at(T, 'modeImage', 23), 'tabImage');
+  const dropzone = center(rectOf(T, at(T, 'modeImage', 23), 'dropzone'));
+  const strip = rectOf(T, at(T, 'picked', 23), 'strip');
+  const save = center(rectOf(T, at(T, 'picked', 23), 'save'));
+  const card = rectOf(T, at(T, 'landed'), 'firstCard');
+
+  // lifts, each on its beat, each gone before its screen moves fast
+  const tabRing = prog(f, HITS.imageTap + 1, HITS.imageTap + 7, EASE_SPRING) * (1 - prog(f, HITS.imageTap + 22, HITS.imageTap + 32, EASE_MODAL));
+  const stripIn = prog(f, HITS.pick + 8, HITS.pick + 20, EASE_SPRING);
+  const stripOut = prog(f, HITS.saveTap - 14, HITS.saveTap - 4, EASE_MODAL);
+  const landIn = prog(f, HITS.cardDone + 8, HITS.cardDone + 20, EASE_SPRING);
+  const landOut = prog(f, HITS.cardTap - 14, HITS.cardTap - 4, EASE_MODAL);
+  const kpIn = prog(f, HITS.keyPoints, HITS.keyPoints + 16, EASE_SPRING);
+  const kpOut = prog(f, S2a - 14, S2a - 2, EASE_MODAL);
+  const relIn = HITS.related.map((h) => prog(f, h, h + 16, EASE_SPRING));
+  const relOut = prog(f, HITS.throw - 14, HITS.throw - 2, EASE_MODAL);
+
+  return (
+    <AbsoluteFill>
+      {/* the screen */}
+      <AppShot
+        take={T}
+        i={i}
+        cam={view}
+        iris={iris}
+        blur={16 * behind}
+        dim={0.12 * behind}
+        shadow={iris ? 0 : 1}
+        motion={motion}
+        sheen={f < HITS.dialog + 8 ? prog(f, HITS.toApp, HITS.dialog + 8, EASE_MODAL) : 0}
+      >
+        <Tap x={plus.x} y={plus.y} t={prog(f, HITS.plusTap - 5, HITS.plusTap + 9, linear)} />
+        <Tap x={card[0] + 120} y={card[1] + 60} t={prog(f, HITS.cardTap - 12, HITS.cardTap + 23, linear)} />
+        {landIn > 0.01 && landOut < 1 && f < HITS.cardTap && (
+          <Lift take={T} i={i} rect={rectOf(T, i, 'firstCard')} radius={20} lift={landIn * 0.5} rise={3} grow={0.01} ring={0.55 * landIn} opacity={1 - landOut} />
+        )}
+        {scrolling && kpIn > 0.01 && kpOut < 1 && (() => {
+          const kp = rectOf(T, i, 'points');
+          return <Lift take={T} i={i} rect={[kp[0] - 6, kp[1] - 6, kp[2] + 12, kp[3] + 12]} radius={12} lift={kpIn * 0.35} rise={2} grow={0.01} ring={0.55 * kpIn} opacity={1 - kpOut} />;
+        })()}
+        {scrolling &&
+          ([1, 2] as const).map((k) =>
+            relIn[k - 1] > 0.01 && relOut < 1 ? (
+              <Lift key={k} take={T} i={i} rect={relatedBox(i, k)} radius={14} lift={relIn[k - 1] * 0.35} rise={2} grow={0.01} ring={0.55 * relIn[k - 1]} opacity={1 - relOut} />
+            ) : null,
+          )}
+      </AppShot>
+
+      {/* the dialog, lifted off its screen */}
+      {f >= HITS.dialog && dOut < 1 && (
+        <AppShot take={T} i={di} cam={camAt(dKeys, f)} motion={camVelocity(dKeys, f, 1)} crop={dRect} cropRadius={24} opacity={dIn * (1 - dOut)}>
+          <Tap x={center(tabImage).x} y={center(tabImage).y} t={prog(f, HITS.imageTap - 5, HITS.imageTap + 13, linear)} />
+          {tabRing > 0.01 && <Lift take={T} i={di} rect={tabImage} radius={9} lift={tabRing * 0.4} rise={1} grow={0.04} ring={0.5 * tabRing} />}
+          <Tap x={dropzone.x} y={dropzone.y} t={prog(f, HITS.pick - 5, HITS.pick + 13, linear)} />
+          {f >= HITS.pick && stripIn > 0.01 && stripOut < 1 && (
+            <Lift take={T} i={di} rect={[strip[0] - 4, strip[1] - 4, strip[2] + 8, strip[3] + 8]} radius={14} lift={stripIn * 0.35} rise={2} grow={0.015} ring={0.5 * stripIn} opacity={1 - stripOut} />
+          )}
+          <Tap x={save.x} y={save.y} tone="light" t={prog(f, HITS.saveTap - 5, HITS.saveTap + 9, linear)} />
+        </AppShot>
+      )}
+    </AbsoluteFill>
+  );
+};

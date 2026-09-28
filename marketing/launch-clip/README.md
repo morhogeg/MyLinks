@@ -590,69 +590,63 @@ audio device); the balance, the clarity and the loudness are only measured.
 
 ## Feature clip: SAVE
 
-`MachinaClipSave` is a 29.9s vertical clip on one feature, "save anything,
-from anywhere, and Machina does the rest". It is the reel's Save chapter made
-to stand alone, with the reel's narrator, lines and lockup:
+`MachinaClipSave` is a 32s vertical video about one feature, saving, for
+someone seeing Machina for the first time (owner brief, 2026-09-28: the
+feature as the sole subject, the app named, a hook on the problem, three to
+five elements each shown doing its job and why it matters, a concrete
+takeaway). It is a new video in the reel's design language, not a cut of
+the reel. One save is carried through it: a recipe post someone screenshotted.
 
-| Clip frames | What |
-|---|---|
-| 0–16 | the mark and its name come into focus on the paper (frame 0, the poster, is the brand) |
-| 12–168 | "Save anything, from anywhere.": YouTube, Instagram and Safari saves shared into the mark |
-| 168–256 | the point becomes the +, the app irises open around it, + tapped, Add to Machina |
-| 256–400 | "A link, a screenshot, or a note.": the dialog's Link / Image / Note tour, the link pasted, Save |
-| 400–528 | "Machina reads it, summarizes it, and files it." over the five phases; the card lands (512) |
-| 528–704 | the card tapped open (544), read down to its Key Points (lifted on 640), no line: the proof of "summarizes it" |
-| 704–896 | thrown out into the lockup: the mark strikes (752), "Machina. Never lose another great find." (768), held |
+| Frames | Element | What is shown (the line) |
+|---|---|---|
+| 0–152 | the problem | saves where they were kept (open tabs, screenshots, bookmarks) bleach out; each named place lifts ("Great finds get lost in open tabs, screenshots and bookmarks.") |
+| 136–320 | the name, ANY APP | they collapse into the mark, the wordmark wipes in on "Machina"; YouTube, Instagram and Safari shares fly in ("Machina saves them straight from the share sheet, in any app.") |
+| 304–488 | SCREENSHOTS | the point becomes the +, the app irises open; the real Add dialog, Image tab, three screens of one post picked, numbered, Save ("Screenshots too. Up to five become one card.") |
+| 472–680 | KEY POINTS | the feed's own "Reading 3 screenshots…" card and "Reading text…" banner, the card it becomes, opened: the screenshots, the gist, the Key Points lifted ("It reads the text in them and pulls out the key points.") |
+| 680–800 | TAGS & LINKS | read on down: the "Do this", the tags, the two Related cards (Marcella Hazan's sauce, Samin Nosrat's chicken) lifted ("Then it tags it, and links it to what you already saved.") |
+| 800–960 | the takeaway | thrown into the lockup: the mark strikes, MACHINA wipes in on the spoken name, "Save it once. Machina does the rest." |
 
-**A re-edit, not a rebuild.** `clips/save-timeline.mjs` is the clip's one
-clock (the reel's grid: 112.5 BPM, K = 2). For its first 528 frames the clip
-PLAYS THE REEL: `SaveClip.tsx` draws the reel's own scenes (`Hook`,
-`ShareBeat`, `Save`, `SaveModes`, imported unchanged) at `reelFrame(f)` =
-f + 480 (`REEL_FROM`: 24 frames into the reel's share hold, a whole number of
-beats, so every tap and landing keeps its beat). Those 17.6 seconds are the
-approved reel's shots; measured against the reel's own frames they differ only
-by the film grain (it is keyed to the composition's frame) and, before frame 16,
-the focus-in. Then two clip scenes in `src/reels/clips/save/`: `Card.tsx` (the
-reel's card insert re-timed: the tap on a beat, the Key Points on the downbeat
-of bar 10, then the reel's throw out of frame) and `End.tsx` (the reel's
-lockup on the clip's clock). Three lines, all the reel's own, at the frames
-the reel says them; the card beat has none.
+**What is real and what is scripted.** Every app frame is the real app, a new
+take `saveclip` (`capture/shoot.mjs`, same demo account): the screenshots are
+picked into the Image tab's real file input, the app writes its real
+placeholder card and banner, and `/api/share` is held until the clock is frozen
+so the close is recorded. Scripted, as for the reel: the three screenshots
+(`capture/clip-save.mjs`: an invented cook's post, no platform chrome or
+third-party image) and the card the backend returns for them, written the way
+the backend writes a recipe (Key Points, Ingredients, Steps, tags, a "Do this",
+Related cards pointing at two real demo saves). The share sheet is native (the
+iOS Share Extension takes a link, text or up to five images), so it is the
+reel's share gesture, not rebuilt iOS UI. Nothing claims collections are filled
+automatically (they are not).
 
-Found by measuring the render, and fixed in the clip's own scenes: the reel's
-card insert starts by drifting AGAINST the camera it takes over from (the feed
-is moving down ~2px a frame as the reel heads for the search field; the
-insert moves it up at once), so the clip's card camera carries that velocity
-and coasts to rest by the tap (`EASE_FLING`); and the Key Points `Lift`, a
-sharp copy outside the screen's motion blur, fades before the throw instead
-of flying out crisp over a smeared page. It fades at full lift, because any
-lift above 0 draws the kit's copy ~1pt below its own pixels (the 0.35 lift's
-rise cancels it: measured +0.2px), so a lift easing down to 0 sagged 2.5px and
-snapped back when it was removed. The reel itself is unchanged: its card
-insert still has the reversal (reel frame 1008), and its lifts that ease out
-still sag (measured: its Key Points sink 3px over reel frames 1176–1190 and
-snap back at 1192, just before the cut to Find).
+**Built from the kit.** `clips/save-timeline.mjs` is the clock (the reel's
+grid, 112.5 BPM; app rolls captured at 60fps and played one per output frame,
+the reel's half speed). Scenes in `src/reels/clips/save/`: `Hook.tsx`,
+`Shares.tsx`, `App.tsx`, `End.tsx` (the kit's `Lockup` plus a `KineticLine`
+for the two-line takeaway). Kickers name the four elements; multi-word
+kickers use non-breaking spaces (the kit's `Kicker` sets each letter as an
+inline block, where a plain space collapses: "ANYAPP"). Lifts leave by fading
+at full lift (see Camera below).
 
-The sound is its own arrangement from the shared instruments
-(`audio/clips/save-score.mjs`): the reel's cues for the same moments, drums in
-on the tour's downbeat and out for the lockup, the melody only where no one
-speaks. Every line sits ≥ 4.8dB over the music in the speech band (at the
-reel's register; an octave-up opening pad cost the first line 6dB there), and
-the mix is mastered like the reel's (−14 LUFS, true peak −1.25 dBTP).
+Sound: `audio/clips/save-score.mjs`, from the shared instruments; nothing
+lands on a word (bells on the Related cards masked their line to 2.4dB and
+were moved after it). Every line ≥ 6.1dB over the music in the speech band;
+mastered −14 LUFS, true peak −1.25 dBTP (the encoded mp4: −14.2, −1.24).
 
 ```bash
+CAPTURE_ONLY=saveclip node capture/shoot.mjs   # the take (after reel:app)
 python3 audio/synth-vo.py save      # the narrator → out/vo/save/, src/reels/clips/save/vo.json
 node audio/clips/save-score.mjs     # the score   → public/clips/save/score.wav
 node audio/mix-vo.mjs save          # the mix     → public/clips/save/score-vo.wav (committed)
-npm run verify                      # the clip has its own section ("── clip: save")
+npm run verify                      # "── clip: save"
 npx remotion render src/index.ts MachinaClipSave out/clips/machina-clip-save.mp4
 ```
 
-Also `MachinaClipSaveSilent` (captions, no sound) and `MachinaClipSaveClean`
-(no sound, no captions or kickers). The captures are the reel's (`save` take;
-`npm run reel:app && npm run reel:capture`): no new take was needed. Verify's
-clip section holds the reel's gates to the clip's clock and adds: at most
-three lines plus the subtitle, the borrowed stretch starting on a reel beat
-line, every hit on a beat or an 8th, and the share cards being real saves.
+Also `MachinaClipSaveSilent` and `MachinaClipSaveClean`. Verify's clip section
+holds the reel's caption, dwell, grid, banned-word and loudness gates to the
+clip, and adds: Machina named in a line and in the close, about 30s, no plain
+space in a kicker, the saves shown are real demo saves, the take has every
+mark the cut plays.
 
 ## Motion language
 
@@ -805,18 +799,14 @@ that breaks it.
 - **A stepped capture never hops.** When the app scrolls in captured steps
   (the card's read-down, the recap), the camera takes up each step's rounding
   and motion blur follows the net motion (camera + scroll).
-- **A camera that takes over a moving shot keeps its velocity** (the SAVE
-  clip): it never reverses on the seam; it carries the move on and coasts to
-  rest (EASE_FLING, whose speed only decays; EASE_MODAL surges to 4× its
-  average in its third frame), with its first frame moving as far as the last
-  frame before the seam did (`clips/save/Card.tsx`).
 - **Lifts are gone before their screen moves fast.** A `Lift` is a sharp
   copy outside the screen's motion blur: thrown with its screen, it stays
   crisp over a smeared page. Take it away with `opacity` at full lift, not by
   easing `lift` to 0: any lift above 0 draws the copy ~1pt below its own
   pixels (at the usual 0.35 the rise cancels it), so a lift easing down sags
-  and snaps back on removal (measured in the SAVE clip; the kit is unchanged
-  so the reel renders as approved).
+  and snaps back on removal (measured: the reel's Key Points sink 3px over
+  reel frames 1176–1190 and snap back at 1192; the kit is unchanged so the
+  reel renders as approved).
 
 ### Sound to picture (`HITS`, `audio/reel-score.mjs`)
 

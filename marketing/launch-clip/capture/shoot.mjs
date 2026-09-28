@@ -34,6 +34,7 @@ import { startServer } from './server.mjs';
 import { openDevice } from './device.mjs';
 import { Take } from './recorder.mjs';
 import { ASK, CAPTURE_USER, CARDS, SAVE, SEARCH, SYNTHESIS } from './library.mjs';
+import { SHOTS_DIR, renderShots, shotsCard } from './clip-save.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.join(here, '..', 'public', 'reel', 'app');
@@ -442,6 +443,127 @@ const takes = {
       t.mark(`fling${k}`);
       await t.roll(16, { rects: { card: ['.surface-card', ['How to Do Great Work', 'Dieter Rams', 'Steve Jobs'][k]] } });
     }
+    await t.thaw();
+    return t.save();
+  },
+
+  // ─────────────────────────────────────────────────────────── saveclip
+  // The SAVE feature clip (clips/save-timeline.mjs): three screenshots of one
+  // recipe post picked in the Add dialog's Image tab, saved as ONE card, read
+  // in the background (the feed's own "Saving…" card), opened, and read down
+  // to its Key Points, tags and Related cards. Rolls at 60fps: the clip plays
+  // the app at half speed, like the reel. (capture/clip-save.mjs has the
+  // screenshots and the card the backend returns.)
+  async saveclip() {
+    const shotsDir = path.join(here, '..', 'out', 'capture', 'app', 'out', SHOTS_DIR);
+    const files = await renderShots(dev.browser, shotsDir);
+    const urls = files.map((f) => `${server.url}/${SHOTS_DIR}/${path.basename(f)}`);
+    await fresh();
+    const t = new Take(dev, OUT, 'saveclip');
+    const F60 = 1000 / 60;
+    const D = {
+      dialog: R.dialog,
+      tabImage: ['[role=dialog] button', 'Image'],
+      dropzone: ['[role=dialog] label, [role=dialog] div', 'Tap to add images'],
+      hint: ['[role=dialog] p, [role=dialog] div', 'Screens of one post'],
+      strip: ['[role=dialog] ol, [role=dialog] ul, [role=dialog] div', 'Screens of one post'],
+      save: ['[role=dialog] button', 'Save'],
+    };
+    t.mark('home');
+    await t.snap({ rects: { plus: R.plus } });
+
+    // + : the dialog's own entrance
+    await t.freeze();
+    await visible(page.locator(R.plus[0])).click();
+    t.mark('dialogOpen');
+    await t.roll(20, { rects: { dialog: R.dialog }, step: F60 });
+    await t.thaw();
+
+    // the Image tab
+    await page.waitForTimeout(250);
+    await t.freeze();
+    await visible(page.locator('[role=dialog]').getByRole('button', { name: 'Image', exact: true })).click();
+    t.mark('modeImage');
+    await t.roll(24, { rects: D, step: F60 });
+    await t.thaw();
+
+    // three screens of one post, picked (the photo picker is native; the
+    // dialog shows them the moment they are chosen)
+    await page.locator('#image-upload').setInputFiles(files);
+    await until('Screens of one post');
+    await page.waitForTimeout(600);
+    t.mark('picked');
+    await t.roll(24, { rects: D, step: F60 });
+    await t.thaw();
+
+    // Save: the placeholder card is written; /api/share is held until time
+    // is frozen, so the dialog's close is recorded from its first frame
+    let held = null;
+    await page.route('**/api/share', (route) => {
+      held = route;
+    });
+    await visible(page.getByRole('button', { name: 'Save', exact: true })).click();
+    for (let k = 0; k < 200 && !held; k++) await page.waitForTimeout(50);
+    if (!held) throw new Error('saveclip: /api/share was never called');
+    const cardPath = await page.evaluate(
+      (uid) =>
+        window.__capture
+          .list(`users/${uid}/links/`)
+          .find((p) => window.__capture.get(p)?.status === 'processing') ?? null,
+      UID,
+    );
+    if (!cardPath) throw new Error('saveclip: no processing card was written');
+    await t.freeze();
+    t.mark('saving');
+    await held.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, cardId: cardPath.split('/').pop() }) });
+    await page.unroute('**/api/share');
+    await t.roll(60, { rects: { dialog: R.dialog, toast: ['[role=status]'], firstCard: R.firstCard }, step: F60 });
+    // the feed's own working card while the screenshots are read
+    t.mark('reading');
+    await t.roll(60, { rects: { toast: ['[role=status]'], firstCard: R.firstCard }, step: F60 });
+
+    // the backend finishes: the placeholder becomes the card
+    await page.evaluate(
+      ([p, card]) => {
+        const cur = window.__capture.get(p) ?? {};
+        const { processingStartedAt, ...rest } = cur;
+        void processingStartedAt;
+        window.__capture.set(p, { ...rest, ...card });
+      },
+      [cardPath, shotsCard(urls)],
+    );
+    await page.waitForTimeout(150);
+    t.mark('done');
+    await t.roll(48, { rects: { toast: ['[role=status]'], firstCard: R.firstCard }, step: F60 });
+    await t.thaw();
+    await page.waitForTimeout(800);
+    t.mark('landed');
+    await t.snap({ rects: { firstCard: R.firstCard } });
+
+    // open it, then read down: the screenshots, the gist, the Key Points, the
+    // recipe, the "Do this", the tags and the Related cards
+    const DETAIL = {
+      gallery: ['[aria-label^="Screenshots"]'],
+      detailTitle: ['h2', 'Crispy smashed potatoes'],
+      keyPoints: ['h1,h2,h3,h4', 'Key Points'],
+      points: ['ul', 'Boil first'],
+      ingredients: ['ul', 'small waxy potatoes'],
+      takeaway: ['div', 'Make them this week'],
+      tags: ['div', 'side dish'],
+      related: ['h1,h2,h3,h4,div,span', 'Related cards'],
+      related1: ['button,a,div', "Marcella Hazan"],
+      related2: ['button,a,div', 'Samin Nosrat'],
+    };
+    await t.freeze();
+    await visible(page.locator(R.firstCard[0]).first()).click({ position: { x: 120, y: 40 } });
+    t.mark('detail');
+    await t.roll(40, { rects: DETAIL, step: F60 });
+    await t.thaw();
+    await page.waitForTimeout(500);
+    await t.freeze();
+    await tagScroller('Key Points');
+    t.mark('detailScroll');
+    await rollScroll(t, await scrollTargetFor('Samin Nosrat', 760), 5, DETAIL);
     await t.thaw();
     return t.save();
   },

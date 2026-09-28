@@ -1,21 +1,19 @@
 /**
  * The SAVE clip's score: the film's instruments (audio/synth.mjs, shared by
  * every Machina score), its own arrangement on the clip's clock
- * (clips/save-timeline.mjs: 112.5 BPM, 16 frames a beat, 14 bars).
+ * (clips/save-timeline.mjs: 112.5 BPM, 16 frames a beat, 15 bars).
  *
- * The arrangement follows the cut (the reel's Save chapter, then the card and
- * the lockup): the shares arrive over an open pad, each one rung in with a
- * bell as it lands in the mark; a riser carries the point into the app; the
- * drums come in on the downbeat the Add dialog's tour starts and run through
- * the phases and the card; the melody sings only
- * where the narrator is silent (the card's Key Points); the drums drop out
- * for the lockup so the mark strikes into air, and the last note lands after
- * the last word.
+ * The arrangement follows the cut: the problem floats on an open IV with no
+ * drums, bells as the named places lift, a soft fall as the saves are lost;
+ * a riser into the point, the mark resolving to I; bells as the shares land
+ * in it; a riser carries the point into the app, and the drums come in with
+ * the Add dialog and run through the screenshots, the reading and the card;
+ * the melody sings where the narrator is silent; the drums drop out for the
+ * lockup, the mark strikes into air, the last note after the last word.
  *
  * Sound design sits on the frames the picture uses (HITS, read by the scenes
- * too): a tap is a tick, a phase is a rising tick and bell, a landing is a
- * sub, a throw is a whoosh, the strike an impact. The reel's cues for the
- * same moments (audio/reel-score.mjs) are reused note for note.
+ * too): a tap is a tick, a landing a sub and a bell, a lift a shimmer, a
+ * throw a whoosh, the strike an impact.
  *
  *   node audio/clips/save-score.mjs   →   public/clips/save/score.wav
  *   node audio/mix-vo.mjs save        →   public/clips/save/score-vo.wav (+ the narrator, mastered)
@@ -44,7 +42,7 @@ const CHORDS = {
 const BARS = Math.ceil(TOTAL_FRAMES / BAR_FRAMES);
 const LOCKUP_BAR = Math.round(HITS.lockup / BAR_FRAMES);
 /** how much of the band is playing, per clip bar */
-const DENSITY = [0.34, 0.44, 0.5, 0.62, 0.9, 0.95, 1.0, 1.0, 0.92, 0.88, 0.84, 0.5, 0.45, 0.45];
+const DENSITY = [0.3, 0.34, 0.5, 0.56, 0.62, 0.9, 0.95, 1.0, 0.95, 0.92, 0.9, 0.72, 0.7, 0.45, 0.45];
 
 for (let bar = 0; bar < BARS; bar++) {
   const ch = CHORDS[BAR_CHORDS[bar]];
@@ -103,23 +101,17 @@ for (let bar = 0; bar < BARS; bar++) {
 // ── the lockup: one held voicing under the end, a single breath (the reel's)
 for (const m of [48, 64, 67, 72]) pad(t(HITS.lockup), TOTAL_SEC - t(HITS.lockup) - 0.2, m, 0.08, m === 64 ? -0.4 : 0.35);
 
-// ── melody (FM keys), only where no one is speaking: over the card's read-down
-// and Key Points (IV → V → IV), then home on C for the lockup: C as the mark
-// draws, E (softer) in the breath after its name, G AFTER the last word (the
-// reel's round-13 rule: nothing sounds on a word the narrator has to land)
-// (the closing notes sit where the reel's do against the same take of the
-// line: E a beat after the line starts, G five beats after, both on beats)
+// ── melody (FM keys), only where no one is speaking: the breath after the
+// shares, under the card's read-down between the lines, then home on C for
+// the lockup: C as the mark draws, E and G after the words (the reel's
+// round-13 rule: nothing sounds on a word the narrator has to land)
 const closing = CAPTIONS.find((c) => c.place === 'lockup');
 const MELODY = [
-  [t(HITS.cardLands) + 1 * BEAT, 69, 0.14], // A, the card settled
-  [t(HITS.cardLands) + 2.5 * BEAT, 72, 0.14], // C
-  [t(HITS.cardTap) + 3.5 * BEAT, 71, 0.15], // B, the detail open
-  [t(HITS.cardTap) + 5 * BEAT, 74, 0.15], // D
-  [t(HITS.keyPoints), 76, 0.16], // E, the Key Points lift
-  [t(HITS.keyPoints) + 2 * BEAT, 72, 0.15], // C
+  [t(HITS.part), 72, 0.13], // C, the mark lets go
+  [t(HITS.part) + 1.5 * BEAT, 76, 0.12], // E, the point drops
+  [t(HITS.keyPoints - 8), 76, 0.13], // E, the Key Points lift (the next line starts a beat later)
   [t(HITS.markStrike) - BEAT, 72, 0.19], // C, the mark draws
-  [t(closing.at + 16), 76, 0.12], // E, in the breath after "Machina."
-  [t(closing.at + 80), 79, 0.19], // G, after "find." (spoken by +2.47s)
+  [t(closing.to - 20), 79, 0.16], // G, after the last word
 ];
 MELODY.forEach(([sec, m, level], i) => keys(sec, m, level, i % 2 ? 0.2 : -0.2, sec >= t(HITS.lockup) ? 2.8 : 2));
 
@@ -129,13 +121,28 @@ for (const [from, to] of RISERS) riser(t(from), t(to) - t(from), 0.09);
 // ── sound design, on the picture's frames
 const H = HITS;
 
-// the opening: the mark and its name come into focus
-shimmer(0.12, [79, 84, 88], 0.03);
+// the hook: the saves come into focus (glints), the named places lift (bells
+// on their words), the rest are lost (a soft fall), the rush, the point, the snap
+{
+  const VO = JSON.parse(fs.readFileSync(new URL('../../src/reels/clips/save/vo.json', import.meta.url), 'utf8'));
+  const hook = CAPTIONS[0];
+  const w = VO.find((v) => v.frame === hook.at).words;
+  [6, 7, 9].forEach((k, i) => bell(t(hook.at) + w[k] + 0.12, [84, 88, 91][i], 0.045, [-0.35, 0.35, 0][i], 1.6));
+  whoosh(t(hook.at) + w[3] + 0.9, 1.2, 0.045, 0);
+}
+[2, 5, 8, 11, 14].forEach((fr, i) => bell(t(fr), [84, 88, 91, 86, 89][i], 0.025, i % 2 ? 0.45 : -0.45, 1.2));
+whoosh(t(H.collapse) - 0.1, 0.55, 0.1, -0.35);
+whoosh(t(H.collapse) - 0.05, 0.5, 0.1, 0.35);
+impact(t(H.dotLands), 0.34);
+sub(t(H.dotLands), 36, 0.3, 0.6);
+tick(t(H.bracketsClose), 0.11, 0.85);
+sub(t(H.bracketsClose), 43, 0.18, 0.25);
+shimmer(t(H.bracketsClose) + 0.5, [72, 79, 84, 88], 0.04);
 
-// the shares (the reel's cues): each Share button tapped, pulled, landing
+// any app: each Share button tapped, pulled, landing in the mark
 H.shareTaps.forEach((fr, i) => {
   tick(t(fr), 0.09, 1.15 + i * 0.1);
-  whoosh(t(H.sharePulls[i] - 2), 0.45, 0.07, [0.4, -0.4, 0.4][i]);
+  whoosh(t(fr + 2), 0.45, 0.07, [0.4, -0.4, 0.4][i]);
   bell(t(H.shareLands[i]), [84, 88, 91][i], 0.055, 0, 1.6);
   sub(t(H.shareLands[i]), 43, 0.16, 0.25);
 });
@@ -145,28 +152,30 @@ whoosh(t(H.toApp) - 0.1, 0.5, 0.08, 0);
 tick(t(H.plusTap), 0.1, 1.1);
 whoosh(t(H.dialog) - 0.08, 0.35, 0.05, 0.2);
 
-// the tour: Image, Note, Link tapped on beats, the link pasted, Save tapped
-H.modeTaps.forEach((fr, i) => {
-  tick(t(fr), 0.09, 1.1 + i * 0.1);
-  bell(t(fr), [79, 83, 86][i], 0.035, [-0.3, 0.3, 0][i], 1.1);
-});
-tick(t(H.paste), 0.06, 1.4);
+// screenshots: the Image tab, three screens picked (a bell each, as they sit
+// in order), Save
+tick(t(H.imageTap), 0.09, 1.1);
+bell(t(H.imageTap), 79, 0.035, -0.3, 1.1);
+tick(t(H.pick), 0.08, 1.2);
+[0, 1, 2].forEach((k) => bell(t(H.pick + 8 + k * 4), [83, 86, 91][k], 0.035, [-0.3, 0, 0.3][k], 1.0));
 tick(t(H.saveTap), 0.1, 1.2);
+whoosh(t(H.saveTap) + 0.1, 0.4, 0.05, 0);
 
-// the five phases climbing, saved, the card landing
-H.phases.forEach((fr, i) => {
-  tick(t(fr), 0.075, 1.0 + i * 0.12);
-  bell(t(fr), [72, 76, 79, 83, 84][i], 0.035, i % 2 ? 0.3 : -0.3, 0.9);
-});
-shimmer(t(H.saved), [84, 88, 91], 0.045);
-sub(t(H.cardLands), 43, 0.3, 0.32);
-tick(t(H.cardLands), 0.09, 0.9);
-
-// the card: tapped open, its Key Points lifting
+// key points: the working card read (soft rising ticks), the card it
+// becomes, the tap, the Key Points lifting
+[0, 1, 2, 3].forEach((k) => tick(t(H.reading + k * 8), 0.05, 1.0 + k * 0.12));
+shimmer(t(H.cardDone), [84, 88, 91], 0.045);
+sub(t(H.cardDone + 8), 43, 0.3, 0.32);
 tick(t(H.cardTap), 0.09, 1.2);
 whoosh(t(H.cardTap) + 0.07, 0.35, 0.05, -0.15);
 shimmer(t(H.keyPoints), [79, 84, 88], 0.035);
 sub(t(H.keyPoints), 41, 0.18, 0.3);
+
+// tags & links: the Related cards lift silently under the line (bells on
+// them masked "…what you already saved." to 2.4dB in the speech band), and
+// one chime answers after the last word
+bell(t(H.throw - 16), 88, 0.05, 0.2, 1.4);
+shimmer(t(H.throw - 16) + 0.05, [79, 84, 91], 0.03);
 
 // thrown out into the lockup; the mark strikes into air
 whoosh(t(H.throw) - 0.1, 0.7, 0.09, 0);

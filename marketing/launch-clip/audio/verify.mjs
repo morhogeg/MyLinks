@@ -447,8 +447,9 @@ console.log('\n── clip: save');
     for (const [re, what] of BANNED) if (re.test(text)) bad.push(`${what} in ${where}: ${JSON.stringify(text).slice(0, 110)}`);
   };
 
-  // captions and kickers: no overlaps, inside the clip, at most three lines
-  // and the closing subtitle, which is the film's endcard line
+  // captions and kickers: no overlaps, inside the clip, every line on a
+  // beat; the clip names the app in its voice and closes on the lockup
+  // (the owner's brief: the video must stand on its own)
   const caps = [...C.CAPTIONS].sort((a, b) => a.at - b.at);
   caps.forEach((c, i) => {
     scan(`caption ${i + 1}`, c.text);
@@ -456,32 +457,24 @@ console.log('\n── clip: save');
     if (c.to <= c.at) bad.push(`caption "${c.text}" ends before it starts`);
     if (i && c.at < caps[i - 1].to) bad.push(`caption overlap: "${c.text}" / "${caps[i - 1].text}"`);
     if (c.to > C.TOTAL_FRAMES) bad.push(`caption "${c.text}" runs past the clip`);
-    if (c.at % C.BEAT_FRAMES) bad.push(`caption "${c.text}" starts at ${c.at}, not on a beat`);
+    if (c.at % (C.BEAT_FRAMES / 2)) bad.push(`caption "${c.text}" starts at ${c.at}, not on an 8th`);
   });
   const lines = caps.filter((c) => !c.place);
-  if (lines.length > 3) bad.push(`${lines.length} narrator lines (at most three, plus the closing subtitle)`);
   const close = caps.find((c) => c.place === 'lockup');
-  const closeLine = close?.text.split('\n').slice(-1)[0].replace(/\.$/, '');
-  if (!close || close !== caps[caps.length - 1] || !read('src/scenes/Endcard.tsx').includes(closeLine)) {
-    bad.push('the clip does not close on the film endcard subtitle');
-  }
+  if (!close || close !== caps[caps.length - 1]) bad.push('the clip does not close on its lockup line');
+  if (!lines.some((c) => /\bMachina\b/.test(c.text))) bad.push('no narrator line names Machina before the close');
+  if (!close || !/\bMachina\b/.test(close.text)) bad.push('the closing line does not name Machina');
+  if (Math.abs(C.TOTAL_SEC - 30) > 3) bad.push(`the clip runs ${C.TOTAL_SEC.toFixed(1)}s (brief: about 30s)`);
   const kick = [...C.KICKERS].sort((a, b) => a.at - b.at);
   kick.forEach((k, i) => {
     scan(`kicker ${k.text}`, k.text);
+    if (/ /.test(k.text)) bad.push(`kicker "${k.text}" has a plain space (the Kicker collapses it: use \\u00a0)`);
     if (i && k.at < kick[i - 1].to) bad.push(`kicker overlap: ${k.text}`);
     if (!lines.some((c) => c.to === k.to && c.at >= k.at)) bad.push(`kicker ${k.text} (${k.at}–${k.to}) does not leave with a line`);
   });
 
-  // the grid: the reel's shots start on one of the reel's beat lines, the
-  // clip's own beats start on beats and last whole beats, the lockup starts on
-  // a bar, and every tap, landing and phase is on the beat or an 8th
-  if (C.REEL_FROM % C.BEAT_FRAMES) bad.push(`REEL_FROM ${C.REEL_FROM} is not on a reel beat line`);
-  if (C.CARD_AT % C.BEAT_FRAMES || C.CARD_LEN % C.BEAT_FRAMES) bad.push(`the card beat (${C.CARD_AT}, ${C.CARD_LEN} frames) is off the beat`);
-  if (C.LOCKUP % C.BAR_FRAMES) bad.push(`the lockup starts at ${C.LOCKUP}, not on a bar`);
-  // (a share's pull is not a landing: it is the card starting to move, 4
-  // frames after its tap, as in the reel; its tap and its landing are checked)
+  // the grid: every tap, landing, lift and phase on the beat or an 8th
   for (const [k, v] of Object.entries(C.HITS)) {
-    if (k === 'sharePulls') continue;
     for (const fr of [v].flat()) if (fr % (C.BEAT_FRAMES / 2)) bad.push(`hit ${k} at ${fr} is not on an 8th`);
   }
 
@@ -514,24 +507,32 @@ console.log('\n── clip: save');
     console.log('  (no out/vo/save/manifest.json: VO fit not re-checked; run synth-vo.py save)');
   }
 
-  // what a viewer can read: the share cards are real saves from the demo
-  // account, and the app's own text on every frame of the take the clip uses
-  const shareSrc = read('src/reels/scenes/ShareBeat.tsx');
-  for (const [, title] of shareSrc.matchAll(/title: '([^']+)'/g)) {
-    scan('share card', title);
-    if (!L.CARDS.some((c) => c.title === title)) bad.push(`share card "${title}" is not a save in the demo account`);
+  // what a viewer can read: the hook's saves and the share cards are real
+  // saves from the demo account, and the app's own text on every frame of
+  // the take the clip plays
+  for (const file of ['src/reels/clips/save/Hook.tsx', 'src/reels/clips/save/Shares.tsx']) {
+    for (const [, title] of read(file).matchAll(/title: '([^']+)'/g)) {
+      scan(file, title);
+      if (!L.CARDS.some((c) => c.title === title)) bad.push(`"${title}" (${file}) is not a save in the demo account`);
+    }
   }
-  const take = JSON.parse(read('src/reels/data/takes.json')).save;
-  take.frames.forEach((fr, i) => fr.t.forEach((k) => scan(`the app on save frame ${i}`, take.texts[k])));
+  const takes = JSON.parse(read('src/reels/data/takes.json'));
+  const take = takes.saveclip;
+  if (!take) bad.push('no "saveclip" take: run CAPTURE_ONLY=saveclip node capture/shoot.mjs');
+  else take.frames.forEach((fr, i) => fr.t.forEach((k) => scan(`the app on saveclip frame ${i}`, take.texts[k])));
+  for (const [k, p] of Object.entries(C.PLAY)) {
+    if (take && take.marks[k] === undefined) bad.push(`the saveclip take has no mark "${k}"`);
+    void p;
+  }
 
   if (bad.length) {
     console.error('✗ clip save:');
     for (const b of bad) console.error('    ' + b);
     failed = true;
   } else {
-    console.log(`✓ ${caps.length} captions (${lines.length} lines + the subtitle) + ${kick.length} kickers, no overlaps; narrator mirrors every caption; dwell rule holds`);
-    console.log(`✓ on the grid: the reel's shots from reel frame ${C.REEL_FROM}, the card beat, the lockup on bar ${C.LOCKUP / C.BAR_FRAMES}, ${Object.values(C.HITS).flat().length} hits on beats or 8ths`);
-    console.log(`✓ no em dash / "AI" / "second brain" / "library" in the clip's captions, share cards, or ${take.frames.length} captured save frames`);
+    console.log(`✓ ${caps.length} captions (${lines.length} lines + the close) + ${kick.length} kickers, no overlaps; Machina named in the voice and on the close; ${C.TOTAL_SEC.toFixed(1)}s`);
+    console.log(`✓ narrator mirrors every caption; dwell rule holds; ${Object.values(C.HITS).flat().length} hits on beats or 8ths`);
+    console.log(`✓ no em dash / "AI" / "second brain" / "library" in the clip's captions, kickers, saves shown, or ${take.frames.length} captured saveclip frames`);
   }
 
   // the score: no clipping, no hole; the voice where the reel's sits, 3dB+

@@ -1,36 +1,24 @@
 import React from 'react';
 import { AbsoluteFill, Audio, staticFile, useCurrentFrame } from 'remotion';
-import { clockAt } from '../../../../reel-timeline.mjs';
-import { CAPTIONS, CARD_AT, FPS, HITS, KICKERS, reelFrame } from '../../../../clips/save-timeline.mjs';
+import { CAPTIONS, FPS, HITS, KICKERS, THROW_LEN } from '../../../../clips/save-timeline.mjs';
 import { sans } from '../../../fonts';
 import VO from './vo.json';
-import { BandScrim, Captions, type ReelCaption } from '../../kit/Captions';
+import { BandScrim, Captions, type ReelCaption, type ReelKicker } from '../../kit/Captions';
 import { CLOCK } from '../../kit/camera';
-import { EASE_MODAL, mix, prog } from '../../kit/curves';
+import { prog } from '../../kit/curves';
 import { Lens, Paper } from '../../kit/Paper';
-import { Hook } from '../../scenes/Hook';
-import { Save } from '../../scenes/Save';
-import { SaveModes } from '../../scenes/SaveModes';
-import { ShareBeat } from '../../scenes/ShareBeat';
-import { Card } from './Card';
+import { Hook } from './Hook';
+import { Shares } from './Shares';
+import { App } from './App';
 import { End } from './End';
 
 /**
- * SAVE, the feature clip: 29.9s, 1080 × 1920, on its own clock
- * (clips/save-timeline.mjs), from the reel kit (src/reels/kit).
- *
- * Until CARD_AT it PLAYS THE REEL: the reel's own scenes, imported unchanged,
- * driven by the reel's clock at `reelFrame(f)`, so the shares pulled into the
- * mark, the point becoming the +, the Add dialog's Link / Image / Note tour,
- * the five phases and the card landing are the approved reel's shots, frame
- * for frame (MachinaReel.tsx draws them the same way). One liberty, at the
- * very start: the reel's mark and name come into focus over the first beat
- * (the reel's own entrance for things on frame 0), so the first frame, the
- * one a feed shows before it plays, is the brand on paper.
- *
- * Then the clip's own beats: the card opened to its Key Points and thrown
- * out (Card.tsx), and the reel's lockup (End.tsx). Every frame of app UI is
- * the real app, captured by capture/shoot.mjs (take "save").
+ * SAVE, the feature clip: ~31s, 1080 × 1920, on its own clock
+ * (clips/save-timeline.mjs), built from the reel kit (src/reels/kit) in the
+ * reel's design language. The problem (Hook), the name, then the feature's
+ * four parts: from any app (Shares), screenshots, key points, tags and links
+ * (App: the real app, take "saveclip"), and the takeaway on the lockup (End).
+ * Scenes read the global frame and each draws only its own frames.
  */
 export const SaveClip: React.FC<{
   withAudio?: boolean;
@@ -38,48 +26,24 @@ export const SaveClip: React.FC<{
   audioFile?: string;
 }> = ({ withAudio = true, withCaptions = true, audioFile = 'clips/save/score-vo.wav' }) => {
   const f = useCurrentFrame();
-  const reel = f < CARD_AT ? clockAt(reelFrame(f)) : null;
-  // motion blur per OUTPUT frame, as MachinaReel sets it
-  CLOCK.perFrame = reel && !reel.hold ? 1 / reel.k : 0;
-  const focus = prog(f, 0, 16, EASE_MODAL);
+  // every scene here runs on output frames: motion blur per output frame
+  CLOCK.perFrame = 1;
   return (
     <AbsoluteFill style={{ fontFamily: sans }}>
       {withAudio && <Audio src={staticFile(audioFile)} />}
-      {/* (the set drifts on the reel's clock: through the borrowed stretch the
-          light is the reel's too) */}
-      <Paper drift={Math.sin(reelFrame(f) / 180) * 0.5} />
-
-      {reel &&
-        (reel.hold === 'modes' ? (
-          <SaveModes u={reel.u} />
-        ) : (
-          <>
-            {/* the mark and the name, held by the reel's hook; in focus by the first beat */}
-            <AbsoluteFill
-              style={{
-                opacity: mix(0.55, 1, focus),
-                filter: focus < 0.999 ? `blur(${((1 - focus) * 7).toFixed(2)}px)` : undefined,
-              }}
-            >
-              <Hook f={reel.src} out={reelFrame(f)} />
-            </AbsoluteFill>
-            <Save f={reel.src} />
-          </>
-        ))}
-      {reel?.hold === 'share' && <ShareBeat u={reel.u} />}
-      <Card u={f - CARD_AT} />
+      <Paper drift={Math.sin(f / 180) * 0.5} />
+      <App f={f} />
+      <Hook f={f} />
+      <Shares f={f} />
       <End f={f} />
-
-      {/* type never sits on UI: the app fades out under the caption band (the
-          reel's scrim, off while the screen is thrown into the lockup, 12–28
-          frames into the throw as in the reel) */}
-      <BandScrim opacity={(reel ? prog(reel.src, 112, 120) : 1) * (1 - prog(f, HITS.throw + 12, HITS.throw + 28))} />
+      {/* type never sits on UI: the app fades out under the caption band */}
+      <BandScrim opacity={prog(f, HITS.toApp - 8, HITS.toApp) * (1 - prog(f, HITS.throw + 12, HITS.throw + THROW_LEN - 2))} />
       <Captions
         frame={f}
         fps={FPS}
         captions={CAPTIONS as ReelCaption[]}
         timing={VO}
-        kickers={KICKERS}
+        kickers={KICKERS as ReelKicker[]}
         showCaptions={withCaptions}
         showKickers={withCaptions}
       />
