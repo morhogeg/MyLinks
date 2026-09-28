@@ -3,11 +3,12 @@
  * reel's arrangement language, on the clip's clock (clips/ask-timeline.mjs:
  * 112.5 BPM, 16 frames a beat, written straight in output frames).
  *
- * It follows the cut: the empty Ask screen floats on a held IV with no drums;
- * the question types over 16th-note clicks; the drums come in on the Send
- * downbeat and run through the answer, its three sources (a bell on each, as
- * in the reel) and the card they cite opening; they drop out for the lockup
- * so the mark strikes into air.
+ * It follows the cut: the hook floats on a held IV with no drums while the
+ * feed flies past under a long whoosh and a riser; the drums come in on the
+ * beat Ask arrives and run through the feature (a tick on every tap, a bell
+ * on each source, as in the reel); they drop out for the lockup so the mark
+ * strikes into air. The narrator talks through most of it, so the melody
+ * is sparse and never lands on a word.
  *
  *   node audio/clips/ask-score.mjs && node audio/mix-vo.mjs ask
  *        → public/ask-score.wav → public/ask-score-vo.wav
@@ -36,20 +37,22 @@ const CHORDS = {
 };
 
 const BARS = Math.ceil(TOTAL_FRAMES / BAR_FRAMES);
-/** How much of the band is playing, per bar. */
-const DENSITY = [0.3, 0.42, 0.86, 0.92, 1.0, 0.96, 0.9, 0.5, 0.45, 0.45, 0.45];
-const DRUMS = [f(H.send), f(H.lockup)]; // Send … the lockup breathes
+/** How much of the band is playing, per bar: the hook thin, the feature full,
+ *  the lockup a breath. */
+const DENSITY = [0.3, 0.45, 0.8, 0.86, 0.9, 0.95, 1.0, 0.95, 0.9, 0.95, 1.0, 0.92, 0.6, 0.45, 0.45];
+const DRUMS = [f(H.open), f(H.lockup)]; // Ask arrives … the lockup breathes
 
 for (let n = 0; n < BARS; n++) {
   const ch = CHORDS[BAR_CHORDS[Math.min(n, BAR_CHORDS.length - 1)]];
   const d = DENSITY[Math.min(n, DENSITY.length - 1)];
   const t0 = b(n);
   const len = Math.min(BAR, TOTAL_SEC - t0);
-  const drums = t0 >= DRUMS[0] - 0.01 && t0 < DRUMS[1] - 0.01;
+  const drumsFrom = Math.max(t0, DRUMS[0]);
+  const drums = t0 + BAR > DRUMS[0] + 0.01 && t0 < DRUMS[1] - 0.01;
 
-  // ── pad: the empty screen is voiced high and open (air before the question)
+  // ── pad: the hook is voiced high and open (air before the product)
   const padLevel = 0.1 + 0.08 * d;
-  const lift = n < 1 ? 12 : 0;
+  const lift = n < 2 ? 12 : 0;
   ch.upper.forEach((m, i) => {
     const panPos = ((i / (ch.upper.length - 1)) * 2 - 1) * 0.55;
     pad(t0, len, m + lift, padLevel * (i === 0 ? 1 : 0.85), panPos);
@@ -57,7 +60,7 @@ for (let n = 0; n < BARS; n++) {
   pad(t0, len, ch.bass + 12, padLevel * 0.6, 0);
   if (drums) pad(t0, len, ch.upper[3] + 12, padLevel * 0.34, n % 2 ? 0.35 : -0.35);
 
-  // ── bass: a moving line once the question is being asked
+  // ── bass: a moving line once the band is in
   if (n >= 1) sub(t0, ch.bass, 0.34 + 0.26 * d, d >= 0.7 ? 0.55 : 1.6);
   if (d >= 0.7) {
     sub(at(n, 1.5), ch.bass + 7, 0.2 + 0.1 * d, 0.36);
@@ -66,17 +69,20 @@ for (let n = 0; n < BARS; n++) {
   }
 
   // ── drums: four on the floor, backbeat claps, 16th hats, off-beat opens
+  // (from the beat Ask arrives, which may fall inside a bar)
   if (drums) {
-    for (let k = 0; k < 4; k++) kick(at(n, k), (k % 2 ? 0.34 : 0.42) + 0.2 * d);
-    clap(at(n, 1), 0.17 + 0.05 * d);
-    clap(at(n, 3), 0.17 + 0.05 * d);
-    rim(at(n, 2.75), 0.08 + 0.04 * d);
+    const on = (beats) => at(n, beats) >= drumsFrom - 0.01 && at(n, beats) < DRUMS[1] - 0.01;
+    for (let k = 0; k < 4; k++) if (on(k)) kick(at(n, k), (k % 2 ? 0.34 : 0.42) + 0.2 * d);
+    if (on(1)) clap(at(n, 1), 0.17 + 0.05 * d);
+    if (on(3)) clap(at(n, 3), 0.17 + 0.05 * d);
+    if (on(2.75)) rim(at(n, 2.75), 0.08 + 0.04 * d);
     for (let k = 0; k < 16; k++) {
+      if (!on(k / 4)) continue;
       const accent = k % 4 === 0 ? 0.9 : k % 2 ? 1 : 0.55;
       hat(at(n, k / 4), 0.034 * accent * d, k % 2 ? 0.22 : -0.18);
       shaker(at(n, k / 4), 0.02 * d, k % 2 ? 0.34 : -0.3);
     }
-    for (let k = 0; k < 4; k++) hat(at(n, k + 0.5), 0.03 * d, 0.1, true);
+    for (let k = 0; k < 4; k++) if (on(k + 0.5)) hat(at(n, k + 0.5), 0.03 * d, 0.1, true);
   }
 
   // ── the pulse figure: the film's scale walk (degrees 0-2-3-4-6)
@@ -84,11 +90,11 @@ for (let n = 0; n < BARS; n++) {
     const SCALE = [0, 2, 4, 5, 7, 9, 11];
     const shape = [0, 2, 3, 4, 6, 4, 3, 2];
     const onsets = drums ? [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5] : [0, 0.75, 1.5, 2, 2.75, 3.5];
-    onsets.forEach((on, k) => {
-      if (at(n, on) >= TOTAL_SEC) return;
+    onsets.forEach((o, k) => {
+      if (at(n, o) >= f(H.lockup)) return;
       const step = shape[(k + n) % shape.length];
-      const m = ch.upper[0] + SCALE[step % 7] + Math.floor(step / 7) * 12 + (on >= 2.5 ? 12 : 0);
-      pulse(at(n, on), m, (drums ? 0.1 : 0.12) * (0.62 + 0.38 * d), ((k % 4) / 3) * 1.1 - 0.55, drums ? 0.3 : 0.4);
+      const m = ch.upper[0] + SCALE[step % 7] + Math.floor(step / 7) * 12 + (o >= 2.5 ? 12 : 0);
+      pulse(at(n, o), m, (drums ? 0.09 : 0.11) * (0.62 + 0.38 * d), ((k % 4) / 3) * 1.1 - 0.55, drums ? 0.3 : 0.4);
     });
   }
 }
@@ -96,59 +102,60 @@ for (let n = 0; n < BARS; n++) {
 // ── the lockup: one held voicing under the end, a single breath
 for (const m of [48, 64, 67, 72]) pad(f(H.lockup), TOTAL_SEC - f(H.lockup) - 0.2, m, 0.08, m === 64 ? -0.4 : 0.35);
 
-// ── melody (FM keys): a lead-in under the question, the tune over the
-// answer and its sources, home on C for the lockup. Stepwise, E→F and B→C.
+// ── melody (FM keys), sparse: the narrator talks through most of the clip,
+// so the tune answers in the gaps and lands home on C for the lockup (the
+// reel's round-13 rule: never a note on a word the narrator has to land)
 const LINE = CAPTIONS.find((c) => c.place === 'lockup');
 const MELODY = [
-  [1, 0, 67], [1, 2, 69], // the question (quiet)
-  [2, 0, 64], [2, 1.5, 65], [2, 3, 67], // the answer: E F G
-  [4, 1.5, 72], [4, 2, 71], [4, 3, 72], // after the sources: C B C
-  [5, 0, 74], [5, 2, 71], [6, 0, 69], [6, 2, 71], // the card: D B A B
-  // home: C a beat before the mark strikes, E (softer) in the breath after
-  // its name, and the G AFTER the last word (the reel's round-13 rule: never
-  // a note on a word the narrator has to land)
-  [f(H.markStrike) / BAR - 1 / 4, 0, 72],
-  [f(LINE.at + 16) / BAR, 0, 76, 0.12],
-  [f(LINE.at + 80) / BAR, 0, 79],
+  [f(H.open) / BAR, 0, 72, 0.13], // Ask arrives
+  [f(H.chips[0]) / BAR, 0, 76, 0.1], [f(H.chips[1]) / BAR, 0, 79, 0.1], [f(H.chips[2]) / BAR, 0, 84, 0.1],
+  [f(H.markStrike) / BAR - 1 / 4, 0, 72, 0.17], // a beat before the mark strikes
+  [f(LINE.at + 16) / BAR, 0, 76, 0.12], // in the breath after the name
+  [f(LINE.at + 80) / BAR, 0, 79, 0.17], // AFTER the last word
 ];
-for (const [n, bt, m, level] of MELODY) {
-  const lead = n < 2;
-  const home = n >= 7;
-  keys(at(n, bt), m, level ?? (lead ? 0.11 : home ? 0.19 : 0.16), Math.floor(n) % 2 ? 0.2 : -0.2, home ? 2.8 : 2);
-}
+for (const [n, bt, m, level] of MELODY) keys(at(n, bt), m, level, Math.floor(n) % 2 ? 0.2 : -0.2, n >= 12 ? 2.8 : 1.8);
 
 // ── risers, each ENDING on the reveal it leads into
 for (const [from, to] of RISERS) riser(f(from), f(to) - f(from), 0.09);
 
 // ── sound design, on the picture's frames
 
-// Ask opens: a glint as the screen comes into focus
-bell(f(H.open) + 0.05, 84, 0.03, -0.3, 1.4);
-shimmer(f(H.open) + 0.1, [72, 79, 84], 0.03);
+// the hook: the feed flying past (a long whoosh with the scroll), then Ask
+whoosh(f(H.hook + 48), f(H.open - H.hook - 48), 0.05, -0.2);
+impact(f(H.open), 0.22);
+shimmer(f(H.appMark), [79, 84, 88], 0.03); // the app's own mark strikes
 
 // the question: typing on 16ths (a character lands every K frames)
-for (let fr = H.typeFrom; fr < H.send - 16; fr += 4) tick(f(fr), 0.035, 1.6 + ((fr / 4) % 3) * 0.08);
+for (let fr = H.typeFrom; fr < H.typeFrom + 64; fr += 4) tick(f(fr), 0.035, 1.6 + ((fr / 4) % 3) * 0.08);
 
-// send, and the answer arriving
+// send, and the answer arriving on the touch
 tick(f(H.send), 0.11, 1.3);
 whoosh(f(H.send), 0.4, 0.06, 0.25);
-shimmer(f(H.answerFrom), [79, 84], 0.03);
 
 // the three sources, each on its beat (the reel's citation bells)
 H.chips.forEach((fr, i) => {
   sub(f(fr), [48, 52, 55][i], 0.22, 0.26);
-  bell(f(fr), [84, 88, 91][i], 0.06, [-0.35, 0, 0.35][i], 1.6);
+  bell(f(fr), [84, 88, 91][i], 0.05, [-0.35, 0, 0.35][i], 1.6);
 });
 
-// the first source tapped: its card opens
+// a source tapped: its card opens; its passage lifts; the card closes
 tick(f(H.citeTap), 0.1, 1.2);
 whoosh(f(H.citeTap) + 0.03, 0.45, 0.06, -0.2);
 sub(f(H.citeTap), 43, 0.2, 0.3);
-// its summary, the passage the answer drew on, lifts
-bell(f(H.summary), 88, 0.05, 0.2, 1.8);
-shimmer(f(H.summary) + 0.04, [76, 83, 88], 0.035);
+bell(f(H.summary), 88, 0.045, 0.2, 1.8);
+tick(f(H.closeTap), 0.09, 1.1);
+whoosh(f(H.closeTap), 0.3, 0.04, 0.2);
 
-// the lockup: the card is thrown out, the mark strikes into air
+// the follow-up tapped: the second answer
+tick(f(H.followTap), 0.1, 1.25);
+whoosh(f(H.followTap), 0.4, 0.05, -0.25);
+
+// the graph
+tick(f(H.graphTap), 0.1, 1.2);
+// (soft: the narrator is mid-line; round 13's rule, nothing loud on a word)
+impact(f(H.graphTap), 0.1);
+
+// the lockup: the graph is thrown out, the mark strikes into air
 whoosh(f(H.lockup) - 0.6, 0.7, 0.09, 0);
 impact(f(H.markStrike), 0.34);
 shimmer(f(H.markStrike) + 0.08, [79, 84, 88, 91], 0.055);

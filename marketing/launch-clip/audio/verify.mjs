@@ -427,7 +427,7 @@ console.log('\n── reel');
 
 // ─────────────────────────────────────────────────────── THE ASK CLIP
 // The feature clip (clips/ask-timeline.mjs, src/reels/clips/ask/, capture
-// take `askcite`) under the reel's gates, on its own clock: captions and
+// take `askfull`) under the reel's gates, on its own clock: captions and
 // kickers, the narrator mirroring them and fitting them, the dwell rule, the
 // closing subtitle, banned strings on screen and in the voice, the score, the
 // voice over the music, the delivery loudness. Plus what a clip written
@@ -463,17 +463,20 @@ console.log('\n── clip: ask');
     if (c.at % C.BEAT_FRAMES) bad.push(`caption "${c.text}" starts at ${c.at}, not on a beat`);
   });
   const lines = caps.filter((c) => !c.place);
-  if (lines.length > 3) bad.push(`${lines.length} narrator lines before the close (at most 3)`);
+  // it stands on its own: the product is named before the close
+  if (!lines.some((c) => /\bMachina\b/.test(c.say ?? c.text))) bad.push('no line before the close names Machina');
+  // it opens on the problem (a hook line, before any chapter word)
+  if (!caps[0]?.hook) bad.push('the clip does not open on its hook line');
   const kick = [...C.KICKERS].sort((a, b) => a.at - b.at);
   kick.forEach((k, i) => {
     if (i && k.at < kick[i - 1].to) bad.push(`kicker overlap: ${k.text} / ${kick[i - 1].text}`);
-    if (!lines.some((c) => c.to === k.to && c.at >= k.at)) bad.push(`kicker ${k.text} (${k.at}–${k.to}) does not leave with a line`);
+    if (!lines.some((c) => !c.hook && c.to === k.to && c.at >= k.at)) bad.push(`kicker ${k.text} (${k.at}–${k.to}) does not leave with a line`);
     scan(`kicker ${k.text}`, k.text);
   });
-  if (!kick.length || kick[0].at > C.BEAT_FRAMES) bad.push('the clip does not open on its kicker');
+  if (kick.some((k) => k.at < caps[0].to)) bad.push('a chapter word sits on the hook');
 
   // the grid: cuts and taps on beats, every other picture event on an 8th
-  const ON_BEAT = ['typeFrom', 'send', 'citeTap', 'summary', 'lockup', 'markStrike'];
+  const ON_BEAT = ['open', 'appMark', 'typeFrom', 'send', 'citeTap', 'summary', 'closeTap', 'followTap', 'scroll2', 'graphTap', 'lockup', 'markStrike'];
   for (const [k, v] of Object.entries(C.HITS)) {
     for (const fr of [v].flat()) {
       const step = ON_BEAT.includes(k) || k === 'chips' ? C.BEAT_FRAMES : C.BEAT_FRAMES / 2;
@@ -516,6 +519,7 @@ console.log('\n── clip: ask');
   // banned strings on every frame of the take, and the thinking line nowhere
   scan('Ask question', LIB.ASK.question);
   scan('Ask answer', LIB.ASK.answer);
+  scan('Ask follow-up answer', LIB.ASK_MORE.answer);
   const takes = JSON.parse(read('src/reels/data/takes.json'));
   const t = takes[C.TAKE];
   if (!t) bad.push(`no capture take "${C.TAKE}": run \`npm run reel:capture\``);
@@ -529,7 +533,8 @@ console.log('\n── clip: ask');
     // each captured run fits the window the clip plays it in (at K frames each)
     const runs = [
       ['typing', 'stream', C.HITS.send - C.HITS.typeFrom],
-      ['stream', 'sources', C.HITS.sources - C.HITS.answerFrom],
+      ['stream', 'sources', C.HITS.sources - C.HITS.send],
+      ['stream2', 'sources2', C.HITS.scroll2 - C.HITS.followTap],
     ];
     for (const [a, b2, window] of runs) {
       const n = t.marks[b2] - t.marks[a];
@@ -542,7 +547,7 @@ console.log('\n── clip: ask');
     for (const b of bad) console.error('    ' + b);
     failed = true;
   } else {
-    console.log(`✓ ${caps.length} captions + ${kick.length} kickers, no overlaps, lines on beats; narrator mirrors, fits and leaves on time`);
+    console.log(`✓ ${caps.length} captions + ${kick.length} kickers, no overlaps, lines on beats, opens on its hook, names Machina; narrator mirrors, fits and leaves on time`);
     console.log('✓ every cut and tap on a beat, every other picture event on an 8th');
     console.log(`✓ no em dash / "AI" / "second brain" / "library", and no thinking line, on any of the ${t.count} frames of ${C.TAKE}`);
   }

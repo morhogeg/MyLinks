@@ -11,11 +11,11 @@ import { AskScene } from './AskScene';
 import { End } from './End';
 
 /**
- * The ASK feature clip (≈22s, 1080 × 1920): "ask your saves anything; every
+ * The ASK feature clip (32s, 1080 × 1920): an explainer of Ask for a first-time viewer, "ask your saves anything; every
  * answer shows its sources". The highlight reel's design language, built
  * from the reel kit (src/reels/kit) unchanged, on the clip's own clock
  * (clips/ask-timeline.mjs). Every frame of app UI is the real app, one
- * continuous take (capture/shoot.mjs `askcite`).
+ * continuous take (capture/shoot.mjs `askfull`).
  */
 export const MachinaAsk: React.FC<{
   withAudio?: boolean;

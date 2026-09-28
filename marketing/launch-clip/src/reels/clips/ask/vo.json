@@ -1,39 +1,119 @@
 [
  {
   "frame": 16,
-  "text": "Ask anything.",
-  "words": [
-   0.04,
-   0.263
-  ]
- },
- {
-  "frame": 144,
-  "text": "Every answer comes straight from your saves,",
+  "text": "You save great finds every day. Finding them again is hard.",
   "words": [
    0.03,
-   0.302,
-   0.619,
-   0.891,
-   1.299,
-   1.526,
-   1.753
+   0.25,
+   0.525,
+   0.855,
+   1.185,
+   1.515,
+   2.27,
+   2.647,
+   2.883,
+   3.166,
+   3.307
   ]
  },
  {
-  "frame": 240,
-  "text": "with the sources to prove it.",
+  "frame": 160,
+  "text": "With Makeena, you just ask.",
+  "words": [
+   0.06,
+   0.314,
+   0.91,
+   1.116,
+   1.373
+  ]
+ },
+ {
+  "frame": 224,
+  "text": "Ask in your own words. No keywords, no folders.",
+  "words": [
+   0.04,
+   0.274,
+   0.45,
+   0.743,
+   0.977,
+   1.386,
+   1.562,
+   2.147,
+   2.323
+  ]
+ },
+ {
+  "frame": 320,
+  "text": "The answer is written from your own saves.",
+  "words": [
+   0.03,
+   0.225,
+   0.567,
+   0.714,
+   1.104,
+   1.349,
+   1.593,
+   1.788
+  ]
+ },
+ {
+  "frame": 400,
+  "text": "Every answer shows its sources. Tap one to check it.",
+  "words": [
+   0.03,
+   0.339,
+   0.7,
+   1.01,
+   1.216,
+   2.05,
+   2.227,
+   2.404,
+   2.537,
+   2.803
+  ]
+ },
+ {
+  "frame": 512,
+  "text": "Keep going. One tap asks the next question.",
+  "words": [
+   0.03,
+   0.292,
+   0.85,
+   1.055,
+   1.26,
+   1.516,
+   1.721,
+   1.978
+  ]
+ },
+ {
+  "frame": 656,
+  "text": "Then see how those saves connect.",
+  "words": [
+   0.06,
+   0.294,
+   0.481,
+   0.668,
+   0.949,
+   1.229
+  ]
+ },
+ {
+  "frame": 720,
+  "text": "Ask once. Get the answer, and the proof.",
   "words": [
    0.05,
-   0.267,
-   0.44,
-   0.787,
-   0.917,
-   1.177
+   0.268,
+   0.594,
+   0.811,
+   1.029,
+   1.464,
+   1.682,
+   1.899
   ]
  },
  {
-  "frame": 496,
+  "frame": 848,
   "text": "Makeena. Never lose another great find.",
   "words": [
    0.03,

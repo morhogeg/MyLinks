@@ -17,8 +17,9 @@
  *            (not in the pilot reel; kept for the feature clips)
  *   recall   Revisit → "This week in Machina", the weekly recap, opened and
  *            read down to its standout and its question
- *   askcite  (the ASK feature clip) Ask opening → the question → the answer
- *            → its sources → the first source tapped, its card opening
+ *   askfull  (the ASK feature clip) the feed → Ask → the question → the
+ *            answer and its sources → a source opened and closed → the
+ *            suggested follow-up → its answer → its Graph chip
  *
  * What the backend would do (finish analysing a card, answer a question) is
  * driven through the capture server and `window.__capture`, so the app
@@ -448,19 +449,26 @@ const takes = {
     return t.save();
   },
 
-  // ─────────────────────────────────────────────────────────── askcite
+  // ─────────────────────────────────────────────────────────── askfull
   // The ASK feature clip (clips/ask-timeline.mjs), in ONE continuous take so
-  // the clip never swaps takes: Ask opening (the screen's fade and its mark's
-  // own launch, all of it, at 60fps), the question typed, the answer streamed
-  // a few words a frame, its three sources, then the first source tapped and
-  // the cited card opening (the app's own transition, at 60fps).
-  // The thinking line the app shows between send and the first words
+  // the clip never swaps takes:
+  //   hook     the Home feed scrolled through (many saves, the one you need
+  //            somewhere in there), 60fps steps
+  //   open     the Ask tab: the screen's fade and its mark's own launch, 60fps
+  //   typing   the question, typed
+  //   stream   the answer, a few words a frame; `sources` its three sources
+  //   card     the first source tapped: the card it cites opens (60fps);
+  //   close    and is closed again (60fps)
+  //   stream2  the answer's own suggested follow-up tapped, the new answer;
+  //            `sources2` its sources
+  //   graph    that answer's Graph chip: the cited saves lit in the graph (60fps)
+  // The thinking line the app shows between a question and its first words
   // ("Searching your …", banned wording for reels) is never recorded: the
-  // first words are released before the first frame after send, so no frame
-  // of this take can show it (verify checks).
-  async askcite() {
+  // first words are released before the first frame after each send, so no
+  // frame of this take can show it (verify checks).
+  async askfull() {
     await fresh();
-    const t = new Take(dev, OUT, 'askcite');
+    const t = new Take(dev, OUT, 'askfull');
     const ASKING = {
       composer: R.composer,
       send: R.send,
@@ -469,29 +477,68 @@ const takes = {
       promise: ['p', 'Answers come only from'],
     };
     const ANSWER = {
-      bubble: ['div', ASK.question],
       lead: ['p', 'Your saves keep circling'],
       body: ['p', 'The Tail End counts'],
       chip1: ['button[title="The Tail End"]'],
       chip2: ['button[title="Inside the mind of a master procrastinator"]'],
       chip3: ['button[title="How to Get Rich (without getting lucky)"]'],
-      graphChip: ['button', 'Graph'],
+      followUp: ['button', 'What else did I save on time?'],
     };
     const CARD = {
       title: ['h2', 'The Tail End'],
       summary: ['p', 'Counted in visits instead of years'],
-      keyPoints: ['h1,h2,h3,h4', 'Key Points'],
-      points: ['ul', 'Counted in visits'],
+      close: ['button[aria-label="Close"]'],
+    };
+    const ANSWER2 = {
+      lead2: ['p', 'Two more saves on time'],
+      chipA: ['button[title="Four Thousand Weeks"]'],
+      chipB: ['button[title="Perfect Days"]'],
+      followUp: ['button', 'What else did I save on time?'],
     };
     // characters released per captured frame (whole words; ~1.5 words)
     const STREAM = 8;
+    // (follow: keep the conversation bottom-anchored every frame, as the app's
+    // own auto-scroll does in real time; it is a smooth scroll the stepped
+    // clock would otherwise freeze)
+    const toBottom = () =>
+      page.evaluate(() => {
+        const sc = document.querySelector('[data-capture-scroller]');
+        sc.scrollTo({ top: sc.scrollHeight, behavior: 'instant' });
+      });
+    const stream = async (first, rects, follow = false) => {
+      let done = server.advanceChat(STREAM);
+      await until(first);
+      await page.waitForTimeout(90);
+      if (follow) await toBottom();
+      await t.freeze();
+      await t.snap({ rects });
+      while (!done) {
+        done = server.advanceChat(STREAM);
+        await page.waitForTimeout(90);
+        await t.advance();
+        if (follow) await toBottom();
+        await t.snap({ rects });
+      }
+      server.finishChat();
+      await page.waitForTimeout(400);
+    };
 
-    t.mark('home');
-    await t.snap({ rects: { askTab: R.askTab } });
+    // the hook: the feed, scrolled through at an even pace
+    await t.freeze();
+    await tagScroller('Read Piranesi');
+    t.mark('hook');
+    const feedEnd = await page.evaluate(() => {
+      const sc = document.querySelector('[data-capture-scroller]');
+      return Math.min(2600, sc.scrollHeight - sc.clientHeight);
+    });
+    await rollScroll(t, feedEnd, 12, {});
+    await t.thaw();
+    // (unrecorded: back to the top, where the tab bar the scroll hid returns;
+    // the clip cuts from the feed to Ask opening)
+    await page.evaluate(() => document.querySelector('[data-capture-scroller]').scrollTo({ top: 0, behavior: 'instant' }));
+    await page.waitForTimeout(900);
 
     // Ask opens: the screen fades in and its mark plays the app's own launch
-    // (CitationMark LAUNCH_MS, 1.3s) to the end, at 60fps (the clip plays it
-    // at half speed, one captured frame per output frame)
     await t.freeze();
     await tab('Ask').click();
     t.mark('open');
@@ -510,35 +557,59 @@ const takes = {
     }
     await t.thaw();
 
-    // send: the first words are already on screen when the first frame is
-    // taken (the thinking line lives only in the untaken moment before them)
+    // send: the first words are on screen before the first frame is taken
     await page.keyboard.press('Enter');
     for (let k = 0; k < 40 && !server.chatOpen(); k++) await page.waitForTimeout(25);
-    let done = server.advanceChat(STREAM);
-    await until('Your saves');
-    await page.waitForTimeout(90);
-    await t.freeze();
     t.mark('stream');
-    await t.snap({ rects: ANSWER });
-    while (!done) {
-      done = server.advanceChat(STREAM);
-      await page.waitForTimeout(90); // the chunk crosses the (real) network
-      await t.advance();
-      await t.snap({ rects: ANSWER });
-    }
-    server.finishChat();
-    await page.waitForTimeout(400);
+    await stream('Your saves', ANSWER);
     t.mark('sources');
     await t.roll(24, { rects: ANSWER });
     await t.thaw();
     await page.waitForTimeout(600);
 
-    // the first source, tapped: the card it cites opens (LinkDetailModal,
-    // the same view a card opens into from the feed)
+    // the first source, tapped: the card it cites opens, then is closed
     await t.freeze();
     await visible(page.locator(ANSWER.chip1[0])).click();
     t.mark('card');
     await t.roll(48, { rects: CARD, step: 1000 / 60 });
+    await t.thaw();
+    await page.waitForTimeout(500);
+    await t.freeze();
+    await visible(page.locator(CARD.close[0])).click();
+    t.mark('close');
+    await t.roll(36, { rects: ANSWER, step: 1000 / 60 });
+    await t.thaw();
+    await page.waitForTimeout(500);
+
+    // the answer's own suggested follow-up, tapped: a second answer
+    await visible(page.getByRole('button', { name: 'What else did I save on time?' })).click();
+    for (let k = 0; k < 200 && !server.chatOpen(); k++) await page.waitForTimeout(25);
+    if (!server.chatOpen()) throw new Error(`the follow-up never reached /api/chat: ${JSON.stringify(server.log.slice(-4))}`);
+    await tagScroller('Your saves keep circling');
+    t.mark('stream2');
+    await stream('Two more', ANSWER2, true);
+    t.mark('sources2');
+    // (two answers, two Graph chips: tag the second one's)
+    await page.evaluate(() => {
+      const all = [...document.querySelectorAll('button[title="See these cards in the graph"]')];
+      all[all.length - 1]?.setAttribute('data-capture', 'graph2');
+    });
+    const ANSWER2G = { ...ANSWER2, graph2: ['[data-capture="graph2"]'] };
+    await t.roll(24, { rects: ANSWER2G });
+    // the sources arrived below the fold: scroll them into view (4pt steps)
+    t.mark('scroll2');
+    await rollScroll(t, await page.evaluate(() => {
+      const sc = document.querySelector('[data-capture-scroller]');
+      return sc.scrollHeight - sc.clientHeight;
+    }), 4, ANSWER2G);
+    await t.thaw();
+    await page.waitForTimeout(600);
+
+    // its Graph chip: where these saves sit among the rest
+    await t.freeze();
+    await visible(page.locator('[data-capture="graph2"]')).click();
+    t.mark('graph');
+    await t.roll(150, { rects: { canvas: ['canvas'] }, step: 1000 / 60 });
     await t.thaw();
     return t.save();
   },

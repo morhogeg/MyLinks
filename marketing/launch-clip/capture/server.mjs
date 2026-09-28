@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ASK, CAPTURE_USER, CARDS, SEARCH } from './library.mjs';
+import { ASK, ASK_MORE, CAPTURE_USER, CARDS, SEARCH } from './library.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(here, '..', 'out', 'capture', 'app', 'out');
@@ -100,7 +100,9 @@ export function startServer(port = 4600) {
           Connection: 'keep-alive',
         });
         res.flushHeaders?.();
-        chat = { res, sent: 0, text: ASK.answer, sourcesSent: false };
+        // (the ASK clip's follow-up: any other question gets ASK_MORE)
+        const reply = body.question === undefined || body.question === ASK.question ? ASK : ASK_MORE;
+        chat = { res, sent: 0, text: reply.answer, sources: reply.sources, sourcesSent: false };
         return;
       }
       case '/api/client-error':
@@ -150,7 +152,7 @@ export function startServer(port = 4600) {
         finishChat: () => {
           if (!chat) return;
           if (chat.sent < chat.text.length) sse(chat.res, { type: 'token', text: chat.text.slice(chat.sent) });
-          sse(chat.res, { type: 'sources', sources: ASK.sources.map(cardSource) });
+          sse(chat.res, { type: 'sources', sources: (chat.sources ?? ASK.sources).map(cardSource) });
           sse(chat.res, { type: 'done' });
           chat.res.end();
           chat = null;

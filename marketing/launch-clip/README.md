@@ -743,6 +743,10 @@ that breaks it.
 - **A stepped capture never hops.** When the app scrolls in captured steps
   (the card's read-down, the recap), the camera takes up each step's rounding
   and motion blur follows the net motion (camera + scroll).
+- **A pinned scroll rises; it doesn't jump** (Ask clip). A capture that keeps
+  a chat pinned to its bottom (the app's own auto-scroll, done per frame)
+  lifts everything a line at a time: the camera takes each jump up and gives
+  it back over a few frames (`pinned`/`eased` in the Ask clip's scene).
 - **A tap that opens a screen plays in a still frame** (Ask clip): frame the
   tapped element and the space the new screen opens into, in one move that
   comes to rest as the finger lands, and let the app's own transition play
@@ -808,64 +812,57 @@ Enforced by `npm run verify` where a machine can check:
 
 ## Feature clip: Ask (`MachinaAsk`)
 
-`MachinaAsk` is a 21.3s vertical clip of the hero feature, **ask your saves
-anything; every answer shows its sources**, in the highlight reel's design
-language: the paper set, Geist kinetic type, the kit's camera, `AppShot`,
+`MachinaAsk` is a 32s vertical explainer of Ask for someone seeing it for the
+first time (owner brief, 2026-09-28: the feature as the sole subject, a hook
+that frames the problem, Machina named, three to five elements each shown in
+action with why it matters, a concrete takeaway, a light nod to Machina). It
+is the highlight reel's design language, built from `src/reels/kit/`
+unchanged: the paper set, Geist kinetic type, the kit's camera, `AppShot`,
 `Lift` and `Tap`, the reel's curves and cuts, the same narrator, a score from
-the same instruments on the same 112.5 BPM grid, and the reel's lockup. It is
-built from `src/reels/kit/` unchanged. The story is the claim and its proof:
-the answer says "The Tail End counts what is left in visits, not years"; the
-first source is tapped and The Tail End's own card opens on "Counted in visits
-instead of years", which lifts.
+the same instruments on the same 112.5 BPM grid, and the reel's lockup.
 
-| Frames | What it does |
-|---|---|
-| 0–48 | Ask opens: the empty screen ("What do you want to recall?", and the app's own promise, "Answers come only from your 24 saves, with sources you can open.") comes into focus while its mark plays the app's own launch; the point strikes on beat 2. ASK, "Ask anything." |
-| 48–128 | Cut on the beat to the composer: "What do my saves say about time?" types; Send is tapped on the bar, and the cut to the answer lands on the touch |
-| 128–216 | The answer streams in; "Every answer comes straight from your saves," |
-| 216–320 | The sources arrive under it; the camera travels down onto them and each lifts on its beat (240, 256, 272): "with the sources to prove it."; then one move back up onto the first source and the space its card opens into, at rest as the finger lands |
-| 320–448 | The first source is tapped: The Tail End opens (the app's own transition, the view a card opens into from the feed) in a still frame; its summary lifts (352) |
-| 448–640 | Thrown out into the lockup: the mark strikes on beat 30, "Machina. Never lose another great find." |
+| Frames | Beat | What it shows, and the line |
+|---|---|---|
+| 0–144 | hook | The Home feed, scrolling ever faster (the saves pile up), cut at speed: "You save great finds every day. Finding them again is hard." |
+| 144–192 | the name | Ask opens, its mark plays the app's own launch (the point strikes on a beat), under the app's promise "Answers come only from your 24 saves, with sources you can open": "With Machina, you just ask." |
+| 192–272 | 1. your own words | The question types: "Ask in your own words. No keywords, no folders." |
+| 272–384 | 2. from your saves | Send; the answer streams in: "The answer is written from your own saves." |
+| 384–528 | 3. sources | The three sources lift on beats; the first is tapped and The Tail End's own card opens on the passage the answer drew on, which lifts: "Every answer shows its sources. Tap one to check it." |
+| 528–672 | 4. follow-ups | The card closes; the answer's own suggested follow-up ("What else did I save on time?") is tapped; a second answer and its sources: "Keep going. One tap asks the next question." |
+| 672–800 | 5. connections | Its Graph chip: the two cited saves lit and linked among the rest: "Then see how those saves connect." Then the takeaway: "Ask once. Get the answer, and the proof." |
+| 800–960 | close | Thrown out into the lockup: "Machina. Never lose another great find." |
 
-**One clock, in output frames.** The reel wrote its cut in source frames and
-played it at K = 2; the clip is written straight in output frames on the same
-grid (`clips/ask-timeline.mjs`, `reel-timeline.mjs` its template), so there
-are no holds: every cut and tap sits on a beat and every other picture event
-on an 8th (verify checks). K = 2 still means the reel's steady pace: the app's
-motion always plays at half speed, a frame captured at 30fps (typing, the
-stream, the sources) lasting two output frames and one captured at 60fps (the
-opening, the card) lasting one.
+**One take, one clock.** Every app frame is one continuous use of the real
+app, `askfull` in `capture/shoot.mjs` (the same demo account; the capture
+server answers the follow-up with `ASK_MORE` from `capture/library.mjs`, and
+any other question exactly as before, so the reel's takes are unchanged). The
+app's thinking line ("Searching your …", banned wording) is not in the take:
+the first words of each answer are released before its first frame. The
+clip is written in output frames on the reel's grid (`clips/ask-timeline.mjs`,
+`reel-timeline.mjs` its template): every cut and tap on a beat, each tap on
+the frame the app answers it (measured per tap). K = 2 still means the reel's
+steady pace: a frame captured at 30fps lasts two output frames, one captured
+at 60fps lasts one.
 
-**One take.** Everything on screen is one continuous use of the real app,
-`askcite` in `capture/shoot.mjs` (same demo account, same backend stand-in),
-so the clip never swaps takes. The app's thinking line ("Searching your …",
-banned wording) is not in the take at all: the first words are released
-before the first frame after send, so no frame can show it, and the reel's own
-banned-string scan (which reads every take) stays green.
-
-**Lines.** Three, then the close, every one starting on a beat and leaving
-0.8–1.0s after its voice. "Every answer comes straight from your saves, with
-the sources to prove it." is carried across two lines, the claim while the
-answer streams and the proof as the sources lift, so each half lands on its
-picture.
-
-**Found by measuring the render** (frame-to-frame differences, phase
-correlation, full-resolution crops), each fixed in the clip and written into
-the Motion language above:
-- a camera glide started on the source tap smeared the app's own crossfade:
-  the card now opens in a still frame;
-- the summary's lift hopped 2.5px as it appeared and again as it left (a
-  half-point box);
-- the lockup's line stepped a pixel every ~28 frames under the slow push-in
-  (text snaps; the reel's `End.tsx` uses the same push, not measured there);
-- the opening settled and then drifted (a stop and a start): one move now,
-  in 2D (its breath of tilt popped every line of text on the frame it
-  reached 0);
-- 12 frames of empty paper between the throw and the mark: the strike moved
-  to beat 30.
+**Found by measuring the render** (frame differences, phase correlation,
+full-resolution crops), fixed in the clip, the general ones written into the
+Motion language above:
+- a camera glide over the app's crossfade smeared both: the card opens in a
+  still frame, on the touch;
+- a half-point `Lift` box hopped 2.5px as the passage lifted and settled;
+- the lockup's line stepped a pixel every ~28 frames under the slow push:
+  the mark and wordmark keep the push, the line holds (the reel's `End.tsx`
+  uses the same push; not measured there);
+- a settling tilt popped every line of text on the frame it reached 0;
+- the second answer streams with the conversation pinned to its bottom (the
+  app's auto-scroll, which the stepped clock would freeze), so each new line
+  lifted everything 24pt at once: the camera takes each jump up and gives it
+  back over 8 frames;
+- the graph view draws its nodes over its first frames: the cut joins it 8
+  frames in, while the layout is still blooming.
 
 ```bash
-npm run reel:app && CAPTURE_ONLY=askcite npm run reel:capture   # the take (or all takes)
+npm run reel:app && CAPTURE_ONLY=askfull npm run reel:capture   # the take (or all takes)
 python3 audio/synth-vo.py ask                                   # → out/vo/ask/, src/reels/clips/ask/vo.json
 node audio/clips/ask-score.mjs && node audio/mix-vo.mjs ask     # → public/ask-score-vo.wav (−14 LUFS)
 npm run verify                                                  # the reel's gates + "clip: ask"
@@ -874,8 +871,10 @@ npx remotion render src/index.ts MachinaAsk out/machina-ask.mp4 # also MachinaAs
 
 Its parts: `clips/ask-timeline.mjs` (the clock, lines, hits), `src/reels/clips/ask/`
 (`MachinaAsk.tsx`, `AskScene.tsx`, `End.tsx`, `vo.json`), `audio/clips/ask-score.mjs`,
-the `askcite` take, and one entry each in `synth-vo.py`, `mix-vo.mjs`,
-`verify.mjs` and `Root.tsx`. The narrator's word timings and the mixed audio
-are committed; the take's PNGs regenerate from the app like the reel's. Nobody
-has listened to the mix on speakers; its balance, clarity and loudness are
-measured.
+the `askfull` take, `ASK_MORE` in the demo account, and one entry each in
+`synth-vo.py`, `mix-vo.mjs`, `verify.mjs` and `Root.tsx`. The "clip: ask"
+gates add: it opens on its hook, names Machina before the close, puts every
+cut and tap on a beat, and has no banned word or thinking line on any frame
+of its take. The narrator's word timings and the mixed audio are committed;
+the take's PNGs regenerate from the app like the reel's. Nobody has listened
+to the mix on speakers; its balance, clarity and loudness are measured.

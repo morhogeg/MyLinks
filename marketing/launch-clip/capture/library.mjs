@@ -536,6 +536,18 @@ export const ASK = {
   sources: ['tailend', 'procrastinator', 'naval'],
 };
 
+/**
+ * The ASK clip's follow-up: the answer's own suggested next question ("What
+ * else did I save on time?", a chip the app builds from the cited cards),
+ * tapped. Any question other than ASK.question gets this answer, so the
+ * reel's takes are unchanged. Written from the demo account's real saves.
+ */
+export const ASK_MORE = {
+  answer:
+    'Two more saves on time. Four Thousand Weeks argues for doing fewer things, on purpose. Perfect Days shows what that looks like on an ordinary Tuesday.',
+  sources: ['fourthousand', 'perfectdays'],
+};
+
 /** The Find beat. The query shares no word with the one card it lands on. */
 export const SEARCH = {
   query: 'easy dinner, empty fridge',
