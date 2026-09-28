@@ -2536,6 +2536,31 @@ narrator, its word timings and the mixed audio are committed; `reel:vo` and
 in Inter as a stand-in for SF Pro, which is what the app actually renders in
 on iPhone (§4 23b).
 
+**What exists: the REVISIT feature clip (2026-09-28, branch
+`claude/clip-revisit`, not merged; the owner reviews the cut):**
+`MachinaClipRevisit` (29.3s, 1080×1920, score + narrator + captions,
+mastered to −14 LUFS / −1.25 dBTP), `MachinaClipRevisitSilent` and
+`MachinaClipRevisitClean`, in `marketing/launch-clip/`. Brief 5 below
+("Recall"), built as REVISIT, "what you save comes back to you": it opens
+on its chapter word, then one continuous use of the real app (a new take,
+`revisitClip`): the Revisit tab's "Do this" list ("When a save calls for
+action, Machina turns it into a to-do."; The Tail End's row lifts), "This
+week in Machina" tapped open and READ slowly ("Every week, Machina brings
+back what's worth remembering." / "The themes of your week, and the one
+save worth rereading."): the write-up, the two themes and the saves they
+link to, the Standout (it lifts) and its question, read in silence; then the
+Standout is tapped and the save it names opens (The Tail End, whose "Do
+this" is the first row of the list the clip opened on); then the reel's
+lockup, "Machina. Never lose another great find." The Daily Brew deck is
+not used (owner: not interesting enough). The plumbing is per clip so the
+four clips merge without touching each other: `clips/revisit-timeline.mjs`,
+`src/reels/clips/revisit/`, `audio/clips/revisit-score.mjs` and
+`revisit-verify.mjs`, `public/clips/revisit/`, and one entry each in
+`synth-vo.py`, `mix-vo.mjs`, `verify.mjs` and `Root.tsx`. One new kit
+primitive, `src/reels/kit/scroll.ts` (reading a stepped scroll without
+hops). `MachinaReel` and `MachinaLaunch` render pixel-identical to before
+(checked). How to render: the launch-clip README, "Feature clip: REVISIT".
+
 **Feature-clip briefs, FINAL against the pilot's kit (2026-09-26).** Shared
 by all five: **448 frames (7 bars at 112.5 BPM, 14.9s)**, vertical, built
 from `src/reels/kit/` imported unchanged and following the README's "Motion
@@ -2595,6 +2620,24 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-28 — Feature clip: REVISIT.** Branch `claude/clip-revisit`, not
+  merged. `MachinaClipRevisit` (+ Silent, Clean), 29.3s, the reel's
+  companion (§8 "What exists"): opens on REVISIT, the "Do this" list (a row
+  lifts), this week's recap tapped open and read slowly (write-up, themes
+  and their saves, the Standout, its question), the Standout tapped to open
+  The Tail End, the reel's lockup; three of the reel's lines plus the close.
+  A new take (`revisitClip`), per-clip plumbing, one new kit primitive
+  (`kit/scroll.ts`). Measured, not eyeballed: the capture's scroll snaps to
+  whole points (uneven steps made a 2.3px hop) and the last read stopped and
+  restarted; both fixed, no hitch left in the frame-to-frame trace. Verified:
+  `tsc`, `npm run verify` (the clip's gates included), full render, 4-frame
+  strips at every transition, taps' sounds within 6ms of their frames, −14.0
+  LUFS / −1.25 dBTP, every line ≥4.4dB over the music in the speech band;
+  `MachinaReel` and `MachinaLaunch` pixel-identical to before, their audio
+  byte-identical. Not verified: nobody has listened on speakers. Found, left
+  as is: the reel's recap read has five 2.3px hitches (its take's 5pt steps
+  among 6pt ones; `scenes/Recall.tsx` assumes 6pt). `takes.json` is
+  generated: merge sibling clips' takes by re-running the capture.
 - **2026-09-27 — Highlight reel round 15: caret, shares, one face.** Branch
   `claude/machina-reel-pilot`, not merged. Owner on round 14: the input
   caret was jittery (0:26–0:28): it blinks on the browser's real clock, so

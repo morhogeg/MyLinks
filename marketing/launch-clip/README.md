@@ -588,6 +588,69 @@ peaks over −1 dBTP (`audio/loudness.mjs` measures both, BS.1770).
 Nobody has listened to the reel mix on speakers yet (the render box has no
 audio device); the balance, the clarity and the loudness are only measured.
 
+## Feature clip: REVISIT ("what you save comes back to you")
+
+`MachinaClipRevisit` is a 29.3s vertical clip, the reel's companion, built
+from the kit unchanged plus one new kit primitive (`kit/scroll.ts`, below).
+It opens ON its chapter word (REVISIT, formed on frame 0), then one
+continuous use of the real app (take `revisitClip`):
+
+| Frames | What it does |
+|---|---|
+| 0–160 | The Revisit tab's "Do this" list (the steps the app writes only for saves that call for one); "When a save calls for action, Machina turns it into a to-do."; The Tail End's row lifts in the pause after "action," |
+| 160–320 | "This week in Machina" tapped open in the silence between the lines; it unfolds on "Every week," and the write-up rises into view on "Machina brings back what's worth remembering." |
+| 320–480 | The recap READ (never rushed): the write-up held ~2.7s, the two themes and the saves they link to on "The themes of your week,", then ONE glide onto the Standout on "and the one save worth rereading." |
+| 480–592 | The Standout lifts; its question ("who would you call this week?") is read in silence |
+| 592–688 | The Standout tapped: The Tail End opens (the app's own transition), its "Do this" line (the first row of the list the clip opened on) passing as the camera eases up to its title |
+| 688–880 | Thrown out into the reel's lockup: "Machina. Never lose another great find." |
+
+Everything is in OUTPUT frames on the reel's grid (112.5 BPM, 16 frames a
+beat); 60fps app motion plays one captured frame per output frame (the
+reel's K = 2). Lines start on beats; taps, lifts and the strike on 8ths.
+
+**Its own files** (so the four clips merge without touching each other):
+the clock `clips/revisit-timeline.mjs`; the scenes
+`src/reels/clips/revisit/` (registered in `src/Root.tsx` by one line); the
+take `revisitClip` in `capture/shoot.mjs`; the narrator
+`python3 audio/synth-vo.py revisit` (→ `out/vo/revisit/`,
+`src/reels/clips/revisit/vo.json`); the score
+`audio/clips/revisit-score.mjs` (→ `public/clips/revisit/score.wav`,
+gitignored) and `node audio/mix-vo.mjs revisit` (→
+`public/clips/revisit/score-vo.wav`, committed, mastered to −14 LUFS);
+the gates `audio/clips/revisit-verify.mjs` (run by `npm run verify`).
+
+```bash
+CAPTURE_ONLY=revisitClip npm run reel:capture    # after reel:app; the take (~130MB PNGs)
+python3 audio/synth-vo.py revisit                # only after a line or its timing changes
+node audio/clips/revisit-score.mjs && node audio/mix-vo.mjs revisit
+npm run verify
+npx remotion render src/index.ts MachinaClipRevisit out/machina-clip-revisit.mp4
+```
+
+`src/reels/data/takes.json` is generated: `npm run reel:capture` rewrites it
+from every take on disk. If two clip branches both add a take, resolve the
+merge by keeping both takes in `capture/shoot.mjs` and re-running the
+capture, not by hand.
+
+**Found while making it (measured, not eyeballed):**
+- **The capture's scroll snaps to whole points.** Its even 2.99pt steps land
+  as 3pt with two 2pt steps in 281, and a camera correction that assumes
+  even steps hops 2.3px at each (the first cut had one on the rise). The
+  reel's own recall take has five 5pt steps among its 6pt ones and
+  `scenes/Recall.tsx` assumes 6pt, so the reel's recap read carries five such
+  hitches; the reel was left exactly as it is (the clip's rule), and
+  `kit/scroll.ts` is the fix if a later round wants it.
+- **The camera's correction moves the fixed chrome too.** So the recap is read
+  from a window where the app's header sits under the band's solid paper and
+  its tab bar below the frame, and the camera only leaves it once the page
+  has stopped.
+- **One motion, not two.** The last read and the move onto the Standout first
+  ran as a scroll that decelerated to ~5px a frame and a camera move that
+  accelerated again; they are now one eased glide (`GLIDE`), the page taking
+  the first 293pt and the camera the rest.
+- **The first frame after a click is unchanged.** The Standout's tap now
+  lands on the next one, the first frame the app visibly answers.
+
 ## Motion language
 
 The rules every Machina video follows, and the kit component that implements
@@ -628,7 +691,10 @@ One family, Geist. Two voices (**`Type.tsx`**):
   It is on screen only while its chapter's narration is: in 4 frames before
   each line, out WITH the line in the line's own gesture, gaps under 24
   frames bridged. Restraint is the point: the energy of a cut belongs to the
-  picture.
+  picture. A feature clip OPENS on its chapter word: already formed on
+  frame 0 (its letters came into focus over the 12 frames before), a beat
+  before the first line, then the rule above (`KICKERS` in
+  `clips/revisit-timeline.mjs`).
 - **The dwell rule.** Text is timed to the voice, never stretched to fill a
   shot: a line leaves 0.3–1.2s after the narrator finishes it. A line that
   names an action still playing may stay until that action lands, at most
@@ -738,7 +804,19 @@ that breaks it.
   on the frame the app responds.
 - **A stepped capture never hops.** When the app scrolls in captured steps
   (the card's read-down, the recap), the camera takes up each step's rounding
-  and motion blur follows the net motion (camera + scroll).
+  and motion blur follows the net motion (camera + scroll). **`steppedScroll`**
+  (`kit/scroll.ts`) does it: ease the read in page POINTS and it returns the
+  nearest captured step and the correction, from each step's MEASURED
+  position (a capture's steps are not even: the browser snaps a scroll to
+  whole points, and assuming even steps hops 2.3px at each short one).
+- **Read with the chrome out of frame.** The correction moves the whole
+  captured screen, the app's fixed header and tab bar included, so a stepped
+  read is framed with the header under the band's solid paper and the tab
+  bar below the frame (the Revisit clip's reading window); the camera leaves
+  that window only once the page has stopped.
+- **A read that runs out of page hands its motion to the camera** in one
+  eased curve (the Revisit clip's `GLIDE`): the page scrolls until it ends
+  and the camera carries the same motion on. Never a stop and a second start.
 
 ### Sound to picture (`HITS`, `audio/reel-score.mjs`)
 

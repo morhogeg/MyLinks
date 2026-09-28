@@ -419,6 +419,88 @@ const takes = {
     return t.save();
   },
 
+  // ─────────────────────────────────────────────────────── revisitClip
+  // The REVISIT feature clip (clips/revisit-timeline.mjs). The same week as
+  // `recall`, seeded the same way, recorded for a slower read: the Revisit
+  // tab settled on its "Do this" list, the recap opened (60fps), read down in
+  // 3pt steps (half the camera's rounding correction of the reel's 6pt), and
+  // then the recap's Standout TAPPED: the save it points to opens, the app's
+  // own transition at 60fps. `recall` itself is untouched (the reel's take).
+  async revisitClip() {
+    const refs = [...new Set([...SYNTHESIS.themes.flatMap((x) => x.cardIds), SYNTHESIS.standoutCardId])].map((id) => {
+      const c = CARDS.find((x) => x.id === id);
+      return { id, title: c.title, category: c.category };
+    });
+    await fresh(async () => {
+      await page.evaluate(
+        ([uid, syn, todos]) => {
+          for (const p of window.__capture.list(`users/${uid}/digests/`)) window.__capture.remove(p);
+          window.__capture.set(`users/${uid}/syntheses/${syn.weekId}`, syn);
+          for (const [id, text] of todos) {
+            const p = `users/${uid}/links/${id}`;
+            const cur = window.__capture.get(p);
+            if (cur) window.__capture.set(p, { ...cur, actionableTakeaway: text });
+          }
+        },
+        [
+          UID,
+          { ...SYNTHESIS, weekId: isoWeekId(new Date()), cards: refs, createdAt: Date.now() - 3_600_000 },
+          CARDS.filter((c) => c.takeaway).map((c) => [c.id, c.takeaway]),
+        ],
+      );
+    });
+    const RECAP = {
+      recap: ['div[class*="border-accent/25"]'],
+      narrative: ['p', 'Five saves this week'],
+      recapTitle: ['div', SYNTHESIS.title],
+      theme1: ['section', 'Counting the time'],
+      theme2: ['section', 'Somewhere to be slow'],
+      theme1Link: ['section button', 'Four Thousand Weeks'],
+      standout: ['button', 'Standout'],
+      question: ['div[class*="bg-card-hover"]', 'Worth sitting with'],
+      todo: ['div[class*="divide-y"]', 'Call your parents'],
+      todoFirst: ['div[class*="ps-1.5"]', 'Call your parents'],
+      todoHeader: ['button', 'Do this'],
+      revisitTab: R.revisitTab,
+    };
+    const CARD = {
+      dialog: R.dialog,
+      detailTitle: ['h2', 'The Tail End'],
+      back: ['button[aria-label="Back to Revisit"]'],
+    };
+    const t = new Take(dev, OUT, 'revisitClip');
+    // the Revisit tab, settled (the clip opens on it; no tab switch in shot)
+    await tab('Revisit').click();
+    await page.waitForTimeout(700);
+    t.mark('tab');
+    await t.snap({ rects: RECAP });
+
+    await t.freeze();
+    await visible(page.getByText('This week in Machina')).click();
+    t.mark('expand');
+    await t.roll(36, { rects: RECAP, step: 1000 / 60 });
+    await t.thaw();
+    await page.waitForTimeout(300);
+
+    await t.freeze();
+    await tagScroller('Counting the time');
+    t.mark('scroll');
+    await rollScroll(t, await scrollTargetFor('who would you call', 720), 3, RECAP);
+    await t.thaw();
+    await page.waitForTimeout(300);
+
+    // the Standout, tapped: the save it names opens over Revisit
+    await t.freeze();
+    await visible(page.locator('button', { hasText: 'Standout' })).click();
+    t.mark('card');
+    await t.roll(40, { rects: CARD, step: 1000 / 60 });
+    await t.thaw();
+    await page.waitForTimeout(600);
+    t.mark('cardSettled');
+    await t.snap({ rects: CARD });
+    return t.save();
+  },
+
   // ─────────────────────────────────────────────────────────── revisit
   async revisit() {
     await fresh();

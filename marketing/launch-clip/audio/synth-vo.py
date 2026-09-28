@@ -117,6 +117,33 @@ SCRIPTS = {"film": (film_script, VO), "reel": (reel_script, os.path.join(VO, "re
 WORD_TIMING = {"reel": os.path.join(ROOT, "src", "reels", "data", "reel-vo.json")}
 
 
+def clip_script(name):
+    """A feature clip's captions, read from clips/<name>-timeline.mjs and
+    spoken as written (the reel's rules: `say` when it differs, "\\n" on screen
+    only, "Machina" respelled for the voice)."""
+    js = (
+        f"import('./clips/{name}-timeline.mjs').then(m => console.log(JSON.stringify("
+        "{ fps: m.FPS, captions: m.CAPTIONS })))"
+    )
+    raw = subprocess.run(["node", "-e", js], cwd=ROOT, check=True, capture_output=True, text=True).stdout
+    data = json.loads(raw)
+    return [
+        {
+            "frame": c["at"],
+            "start": c["at"] / data["fps"],
+            "window": (c["to"] - c["at"]) / data["fps"],
+            "text": " ".join((c.get("say") or c["text"]).split()).replace("Machina", SAY_NAME),
+            "speed": SPEED,
+        }
+        for c in data["captions"]
+    ]
+
+
+# the REVISIT feature clip (clips/revisit-timeline.mjs): its own lines, the one voice
+SCRIPTS["revisit"] = (lambda: clip_script("revisit"), os.path.join(VO, "revisit"))
+WORD_TIMING["revisit"] = os.path.join(ROOT, "src", "reels", "clips", "revisit", "vo.json")
+
+
 def speech_runs(samples, sr, gap=0.09):
     """[start, end] seconds of each run of speech, split at pauses >= gap."""
     import numpy as np
