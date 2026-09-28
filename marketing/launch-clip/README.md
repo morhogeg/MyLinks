@@ -601,12 +601,31 @@ Every pixel of app UI is the real app. `MachinaFindSilent` (no sound) and
 
 | Frames | Element (kicker) | What it shows, and the line |
 |---|---|---|
-| 0–144 | the hook | The feed scrolls past at speed and back: "You saved it. But what was it called?"; the camera goes to the field as the narrator names the app: "Machina finds it in your own words." |
-| 144–288 | Your own words | "easy dinner, empty fridge" types under a rack focus and ONE card lands: Marcella Hazan's tomato sauce, which shares no word with it |
-| 288–432 | Close matches | "sardinia swim spot": no save says "swim", and the app's "Close matches" offers the one that has the rest (Cala Goloritzé). "Only half remember it? You still get what's close." |
-| 432–576 | Where you saw it | "youtube": the Sources row offers YouTube (7) as it types; one tap and the feed is every video saved. "Type where you saw it, and get everything from there." |
-| 576–784 | Open it | The first video opened: "Open it for the summary, and everything it connects to.", the camera moving down to its related saves. Then a cut on the beat back to the empty search field for the takeaway: "Type what you remember. Get the one you meant." |
-| 784–976 | the close | The reel's lockup: "Machina. Never lose another great find." |
+| 0–144 | the hook | Home comes into focus; the feed is flicked down (24–84) and back up (84–114), both eased: "You saved it. But what was it called?" (16–100); the camera goes to the field as the narrator names the app, "Machina finds it in your own words." (128–208), the thumb taps it (144) |
+| 144–288 | Your own words | "easy dinner, empty fridge" types (160–208) under a rack focus, holds a beat whole, and ONE card lands (224): Marcella Hazan's tomato sauce, which shares no word with it; its ink ring on the next beat |
+| 288–432 | Close matches | deleted a word at a time (300); "sardinia swim spot" (320–354): no save says "swim", and the app's "Close matches" offers the one that has the rest, Cala Goloritzé (368). "Only half remember it? You still get what's close." (304–416) |
+| 432–576 | Where you saw it | "youtube" (464–476): the Sources row offers YouTube (7) as it types; one tap (496) and the feed is every video saved. "Type where you saw it, and get everything from there." (448–560) |
+| 576–688 | Open it | The first video tapped open (576): "Open it for the summary, and everything it connects to." (576–688); on "and" the camera travels down to its related saves (600–660) |
+| 688–784 | the takeaway | A cut on the beat to the empty search field: "Type what you remember. Get the one you meant." (688–776); thrown out of frame (768) |
+| 784–976 | the close | The reel's lockup: the mark strikes (832), "Machina. Never lose another great find." (848) |
+
+**Finishing pass (2026-09-28).** Measured the full render again (frame
+differences, phase-correlation shifts, 4-frame strips at every transition,
+caret regions per captured frame, the paper under a contrast stretch, the
+mix). One real defect: the hook's scroll started at full speed from rest,
+reversed on a single frame and stopped dead at the top (three velocity
+kicks). It is now a flick down and back, each eased in and out. The first
+try took up the capture's 45pt step rounding with the camera, as Recall
+does, and measured as the whole device jiggling ~45px, because here the
+fixed chrome is in frame; the scroll is instead re-captured in 5pt steps
+(540 frames) and shown at the nearest step: after, the shift per frame
+ramps 0 → 5 → 10 → 16px and back with no hop or hold. Checked and left
+alone: the one flagged jump is the intended cut to the takeaway (one frame,
+the next steady); the other phase-correlation flags sit inside zooms, where
+the estimator is unreliable and the frame difference is smooth; the
+paper's faint 1-code terraces match the approved reel's exactly (the
+dither survives the encode); the caret region is constant across every
+rolled frame.
 
 **What the searches claim is checked** (`npm run verify`, against the demo
 data and the captured frames): the own-words query shares no word with its
@@ -808,6 +827,11 @@ that breaks it.
 - **A stepped capture never hops.** When the app scrolls in captured steps
   (the card's read-down, the recap), the camera takes up each step's rounding
   and motion blur follows the net motion (camera + scroll).
+- **A stepped scroll with chrome in frame is captured fine** (the FIND
+  clip, measured). The camera can take up a stepped capture's rounding only
+  in a close-up: with the header or the device's edge in frame, the whole
+  device jiggles by up to a step. There, capture in steps small enough
+  (5pt) that the nearest step never shows as a hop at the ease's slow ends.
 - **A tilt ends on a change** (the FIND clip, measured). The frame a 3D tilt
   reaches 0 the slab re-rasters as 2D: on a still shot that is a visible
   one-frame change across the whole screen. Let the tilt finish on a frame

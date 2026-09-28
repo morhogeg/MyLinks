@@ -542,6 +542,18 @@ console.log('\n── find clip');
     const other = shown.filter((c) => c.sourceName !== Q.source.source && c.sourceType !== Q.source.source.toLowerCase());
     if (!shown.length || other.length) bad.push(`after the ${Q.source.source} tap the feed shows ${JSON.stringify(other.map((c) => c.title))}`);
   }
+  // the hook's scroll is eased, and shown at the nearest captured step with
+  // the chrome in frame (the camera cannot take up the rounding): its steps
+  // must stay fine, or the slow ends alternate a hop and a hold (measured)
+  {
+    let worst = 0;
+    for (let i = T.marks.scroll + 1; i < T.marks.top; i++) {
+      const a = T.frames[i - 1].r.firstCard;
+      const b = T.frames[i].r.firstCard;
+      if (a && b) worst = Math.max(worst, Math.abs(b[1] - a[1]));
+    }
+    if (worst > 6) bad.push(`the hook's scroll was captured in ${worst}pt steps (max 6: coarser steps judder at the ease's slow ends)`);
+  }
   // the app's own text on every frame of the take (the clip uses all of it)
   T.frames.forEach((fr, i) => fr.t.forEach((k) => scan(`the app on the find take, frame ${i}`, T.texts[k])));
 

@@ -2539,7 +2539,7 @@ on iPhone (§4 23b).
 **What exists (the FIND clip, 2026-09-28, branch `claude/clip-find`, built
 on the pilot branch, awaiting owner review, not merged):** `MachinaFind`
 (32.5s, 1080×1920, score + narrator + captions; mastered to −14 LUFS, true
-peak ≤ −1 dBTP), `MachinaFindSilent`, `MachinaFindClean`, in
+peak ≤ −1 dBTP; one finishing pass done), `MachinaFindSilent`, `MachinaFindClean`, in
 `marketing/launch-clip/`. Built to the owner's feature-video brief (the
 feature as the sole subject for a first-time viewer; a problem hook; three to
 five elements, each shown doing its job and why it matters; Machina named; a
@@ -2620,6 +2620,19 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-28 — FIND clip finishing pass.** Branch `claude/clip-find`, not
+  merged. Fresh measured review of the full render: the one real defect was
+  the hook's scroll (full speed from rest, an instant reversal, a dead stop:
+  three velocity kicks); now an eased flick down and back, re-captured in
+  5pt steps (taking up the rounding with the camera jiggled the whole
+  device, the chrome being in frame; rule added to Motion language).
+  Earlier owner rounds today: "Open it" re-voiced ("Open it for the summary,
+  and everything it connects to."), its camera move slowed, the takeaway
+  moved off the card onto the empty search field. Verified: `tsc`, `npm run
+  verify` OK, no hop/stall in the render outside the intended cut, −14.0
+  LUFS, reel and film stills byte-identical (one film still flaked once at
+  61 px, then matched twice on re-render), film mix hashes unchanged. Not
+  verified: nobody has listened on speakers.
 - **2026-09-28 — FIND feature clip (second cut, owner brief).** Branch
   `claude/clip-find`, not merged. Owner rejected the first cut (a trim of
   the reel's Find beat) and gave a feature-video brief. Rebuilt as a 32.5s

@@ -484,7 +484,10 @@ const takes = {
     await t.freeze();
     await tagScroller('Read Piranesi');
     t.mark('scroll');
-    await rollScroll(t, 2700, 45, RECTS);
+    // (5pt steps: the clip eases this flick, and at its slow ends coarser
+    // steps alternated a hop and a hold; the camera cannot take up the
+    // rounding, the fixed chrome is in frame)
+    await rollScroll(t, 2700, 5, RECTS);
     await page.evaluate(() => document.querySelector('[data-capture-scroller]').scrollTo({ top: 0, behavior: 'instant' }));
     await t.advance();
     t.mark('top');

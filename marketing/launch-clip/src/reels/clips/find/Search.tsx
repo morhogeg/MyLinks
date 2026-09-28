@@ -54,9 +54,12 @@ const typed3 = S.type3 + (CHARS3 - 1) * TYPE_FRAMES + 2;
 /** the take's frame for an output frame */
 const frameAt = (f: number) => {
   if (f < S.scroll) return at(T, 'home');
-  // the hook: down the feed a step a frame, then back up twice as fast
-  if (f < S.scrollBack) return at(T, 'scroll', Math.min(SCROLL - 1, f - S.scroll));
-  if (f < S.scrollBack + SCROLL / 2) return at(T, 'scroll', Math.max(0, SCROLL - 1 - 2 * (f - S.scrollBack)));
+  // the hook: the captured scroll step nearest the eased position (the
+  // camera takes up the rest, see `scrollY`)
+  if (f < S.scrollBack + BACK) {
+    const j = Math.round(scrollY(f) / STEP);
+    return j === 0 ? at(T, 'home') : at(T, 'scroll', j - 1);
+  }
   if (f < S.fieldTap) return at(T, 'top');
   if (f < S.type1) return at(T, 'focus', f - S.fieldTap); // 60fps: one a frame
   if (f < S.found1) return at(T, 'typing1', Math.min(CHARS1 - 1, (f - S.type1) / TYPE_FRAMES));
@@ -73,11 +76,23 @@ const frameAt = (f: number) => {
   return at(T, 'focus', 15);
 };
 
-/** how far the capture has scrolled at an output frame (points), for the
- *  motion blur of the hook's scroll */
-const STEP = 45;
-const scrolled = (f: number) =>
-  f < S.scroll ? 0 : f < S.scrollBack ? Math.min(SCROLL - 1, f - S.scroll) * STEP : Math.max(0, SCROLL - 1 - 2 * (f - S.scrollBack)) * STEP;
+/**
+ * The hook's scroll, in points: a flick down the feed and back, each eased
+ * in and out (it used to start at full speed from rest, reverse on one frame
+ * and stop dead at the top: three velocity kicks). The capture scrolls in
+ * fine STEP-point steps and the frame shown is the nearest one. (The camera
+ * must NOT take up the rounding here, as Recall's close-up does: the fixed
+ * chrome is in frame, and the whole device measured as jiggling ~45px.)
+ */
+const STEP = 5;
+const BACK = 30; // frames for the flick back up
+const scrollY = (f: number) =>
+  f < S.scroll
+    ? 0
+    : f < S.scrollBack
+      ? SCROLL * STEP * prog(f, S.scroll, S.scrollBack, EASE_IN_OUT)
+      : SCROLL * STEP * (1 - prog(f, S.scrollBack, S.scrollBack + BACK, EASE_IN_OUT));
+
 
 /** the beat the narrator reaches "and the saves it connects to" */
 const RELATED = 624;
@@ -99,7 +114,7 @@ export const searchKeys: Key[] = [
   // the scroll's first: the rule "a tilt ends on a change")
   { f: 0, cx: 196.5, cy: 330, z: 2.0, fx: 540, fy: 1180, rx: 7 },
   { f: S.scroll, cy: 320, z: 2.1, rx: 0, ease: EASE_MODAL },
-  { f: S.scrollBack + SCROLL / 2, cy: 316, z: 2.14, ease: linear },
+  { f: S.scrollBack + BACK, cy: 316, z: 2.14, ease: linear },
   // down onto the field as Machina is named, arriving with the tap
   { f: S.fieldTap, ...TYPE_CAM, ease: EASE_IN_OUT },
   { f: S.found1, z: 2.76, ease: linear },
@@ -138,7 +153,7 @@ export const Search: React.FC<{ f: number }> = ({ f }) => {
   const cam = camAt(searchKeys, f);
   // motion blur from what moves on screen: the camera, and the hook's scroll
   const camV = camVelocity(searchKeys, f, 1);
-  const motion = { x: camV.x, y: camV.y - (scrolled(f) - scrolled(f - 1)) * cam.z };
+  const motion = { x: camV.x, y: camV.y - (scrollY(f) - scrollY(f - 1)) * cam.z };
 
   // the rack focus: the field (and in 3, the Sources row) sharp while a
   // query types; eased in and out, released as the result arrives
