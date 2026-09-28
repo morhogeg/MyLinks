@@ -2544,8 +2544,9 @@ unchanged. Rebuilt to the owner's explainer brief (the first cut was rejected
 as "just a part of the original"): ~30s, Ask as the sole subject for a
 first-time viewer, a hook that frames the problem, Machina named, the key
 elements each shown in action with why they matter, a concrete takeaway and
-a light nod to Machina. Hook: the Home feed flying past ("You save great finds
-every day. Finding them again is hard."); "With Machina, you just ask."; then
+a light nod to Machina. Hook: the Home feed flying past ("Your saves hold more
+knowledge than you remember.", owner round 2: the knowledge Ask reaches,
+not search); "With Machina, you just ask."; then
 five elements: your own words ("No keywords, no folders."), an answer written
 from your own saves, sources you can open (The Tail End's card opens on the
 passage the answer quoted), one-tap follow-ups (the answer's own suggested
@@ -2626,7 +2627,8 @@ exact-match, capped.
   not merged.** Branch `claude/clip-ask`. Owner rejected the first cut (21s,
   a longer version of the reel's Ask beat) and gave an explainer brief: ~30s,
   hook on the problem, name Machina, 3–5 elements each shown with why it
-  matters, a takeaway. Now 32s: the feed flying past (the problem), "With
+  matters, a takeaway. Now 32s: the feed flying past ("Your saves hold more knowledge than you
+  remember."; owner round 2 moved the hook off the search angle), "With
   Machina, you just ask.", own words, an answer from your saves, sources you
   can open, one-tap follow-ups, the graph of how those saves connect, "Ask
   once. Get the answer, and the proof.", the reel's lockup. New take

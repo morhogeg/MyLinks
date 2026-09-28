@@ -1,7 +1,7 @@
 /**
  * The ASK feature clip's single source of truth for time: a ~30s explainer
  * of Ask for someone seeing it for the first time. A hook that frames the
- * problem (the saves pile up; finding one again is the hard part), Machina
+ * promise (your saves hold more knowledge than you remember; Ask reaches it), Machina
  * named, then five things Ask does, each shown in the real app with why it
  * matters, a concrete takeaway, and the reel's lockup. Picture
  * (src/reels/clips/ask/), score (audio/clips/ask-score.mjs), narrator
@@ -46,7 +46,7 @@ export const TAKE = 'askfull';
  * lands on the frame the app answers it.
  */
 export const HITS = {
-  hook: 0, // the feed, scrolling ever faster: saves piling up
+  hook: 0, // the feed, scrolling ever faster: everything you have saved
   open: beat(9), // CUT, at speed, to Ask opening; its mark launches…
   appMark: beat(11), // …and its point strikes (the app's own launch)
   typeFrom: beat(12), // CUT to the composer: the question types, a character every K frames
@@ -74,8 +74,9 @@ export const HITS = {
  * does, and why that matters.
  */
 export const CAPTIONS = [
-  // the hook: the problem, over the feed flying past (no chapter word yet)
-  { at: beat(1), to: beat(9) + 8, hook: true, text: 'You save great finds every day.\nFinding them again is hard.' },
+  // the hook: what your saves add up to, over the feed flying past (owner,
+  // round 2: frame the knowledge Ask reaches, not the search; no chapter word)
+  { at: beat(3), to: beat(9) + 8, hook: true, text: 'Your saves hold more knowledge\nthan you remember.' },
   // the name, on Ask opening
   { at: beat(10), to: beat(14), text: 'With Machina, you just ask.' },
   // 1. plain words: no remembering where, or what it was called

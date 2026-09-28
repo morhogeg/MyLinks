@@ -814,7 +814,7 @@ Enforced by `npm run verify` where a machine can check:
 
 `MachinaAsk` is a 32s vertical explainer of Ask for someone seeing it for the
 first time (owner brief, 2026-09-28: the feature as the sole subject, a hook
-that frames the problem, Machina named, three to five elements each shown in
+that frames what Ask unlocks, Machina named, three to five elements each shown in
 action with why it matters, a concrete takeaway, a light nod to Machina). It
 is the highlight reel's design language, built from `src/reels/kit/`
 unchanged: the paper set, Geist kinetic type, the kit's camera, `AppShot`,
@@ -823,7 +823,7 @@ the same instruments on the same 112.5 BPM grid, and the reel's lockup.
 
 | Frames | Beat | What it shows, and the line |
 |---|---|---|
-| 0–144 | hook | The Home feed, scrolling ever faster (the saves pile up), cut at speed: "You save great finds every day. Finding them again is hard." |
+| 0–144 | hook | The Home feed, scrolling ever faster (everything you have saved), cut at speed: "Your saves hold more knowledge than you remember." (owner, round 2: the hook frames the knowledge Ask reaches, not search) |
 | 144–192 | the name | Ask opens, its mark plays the app's own launch (the point strikes on a beat), under the app's promise "Answers come only from your 24 saves, with sources you can open": "With Machina, you just ask." |
 | 192–272 | 1. your own words | The question types: "Ask in your own words. No keywords, no folders." |
 | 272–384 | 2. from your saves | Send; the answer streams in: "The answer is written from your own saves." |
