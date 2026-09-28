@@ -2391,6 +2391,19 @@ Promise opens, loss-aversion closes. Same session: the recipe card became
 "Why you forget most of what you read" (Science; the query "remembering more
 from books" still shares no word with it), the Manson title is shortened so
 the Ask chip never truncates, and two-sentence captions break at the sentence.
+**Slogan roles FLIPPED 2026-09-28 (owner; supersedes the 2026-09-19 note
+above and the 2026-09-17 endcard wording):** every launch film ENDS on the
+tagline "Everything you save, finally useful." (exact wording, comma
+included), said once, at the end only. The subtitle "Never lose another great
+find" is App Store copy that can change with search tests and would date every
+posted film, so the main film now carries it in the introduction ("Machina. /
+Never lose another great find.") and the endcard's one line is the tagline,
+set in sentence case (`TAGLINE` in `src/scenes/Endcard.tsx`), which the voice
+speaks word for word with nothing under it. `npm run verify` gates it (the
+endcard line, the closing voice line, no caption repeating the tagline, the
+introduction carrying the subtitle; the subtitle itself is now read from
+`docs/APP_STORE.md`). MachinaReel and MachinaAsk still end on the subtitle
+(the decision named the main film only).
 
 *Short-form reels (PLANNED 2026-09-26, owner; the PILOT was built the same
 day on branch `claude/machina-reel-pilot`, NOT merged, see "What exists"
@@ -2623,6 +2636,16 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-28 — Launch film ends on the tagline (owner decision).** Branch
+  `claude/clip-ask`, not merged. Endcard line + closing voice line are now
+  "Everything you save, finally useful." (sentence case, 30px); the
+  "Introducing" cue became "Machina.\nNever lose another great find." and
+  its voice line matches. New verify gates (tagline once, at the end; voice =
+  endcard word for word; intro carries the subtitle). Voice regenerated,
+  `score-vo.wav` re-mixed, all seven film editions re-rendered, intro and
+  endcard frames read in landscape and vertical. **Not verified:** nobody has
+  listened to the audio. Reel and Ask clip still end on the subtitle (out of
+  scope: "main film only").
 - **2026-09-28 — Ask clip: finishing pass (fresh eyes, measured).** Branch
   `claude/clip-ask`, not merged; script, order and lines unchanged. The hook
   now speaks from 0.5s (it was wordless for 1.6s) and leaves a beat before

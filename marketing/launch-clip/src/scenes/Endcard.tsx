@@ -7,33 +7,38 @@ import { drift, prog, ramp, EASE_MODAL, EASE_OUT } from '../film/anim';
 import { sans } from '../fonts';
 
 /**
- * The endcard: the bare mark, the drawn wordmark, the App Store subtitle —
- * ink on paper, the light grade's closing statement.
+ * The endcard: the bare mark, the drawn wordmark, the TAGLINE, ink on paper,
+ * the light grade's closing statement.
  *
- * The letterspaced line IS the listing's subtitle, so it tracks
- * `docs/APP_STORE.md` §2: `Never lose another great find` since 2026-08-26
- * (it was `Capture. Ask. Connect.` until then; the act kickers keep those
- * three words, this line does not).
+ * The line is the product tagline, `Everything you save, finally useful.`
+ * (`docs/BRANDING.md` D-6), word for word and comma included, and the voice
+ * says exactly it (owner 2026-09-28: every launch film ends on the tagline,
+ * the brand line that stays fixed; the App Store subtitle `Never lose another
+ * great find` can change with search tests and would date every posted film,
+ * so it moved to the introduction. Owner 2026-09-17: screen and voice match,
+ * nothing else under it). It is set in sentence case, not the tracked capitals
+ * the short subtitle wore: a 36-character sentence with a comma and a period
+ * reads as a statement, not a label.
  *
- * The mark is the BARE glyph, not the app-icon tile — `docs/BRANDING.md` makes
+ * The mark is the BARE glyph, not the app-icon tile: `docs/BRANDING.md` makes
  * the same call for the header ("a rounded container there reads as a shrunken
  * app icon rather than as the brand mark"), and on a full-frame endcard the grey
  * squircle read as a screenshot of an icon instead of as an identity.
  *
  * And it ARRIVES rather than appearing: `AnimatedMark` runs the app's own
- * `launch` motion (ported from `CitationMark`) — the arms draw out from corner
- * ticks, the brackets close, the point strikes last — played slower than the
+ * `launch` motion (ported from `CitationMark`): the arms draw out from corner
+ * ticks, the brackets close, the point strikes last, played slower than the
  * boot's 39 frames, because this is the closing statement rather than a launch.
  *
- * No price, no urgency, no "download now" — the film's whole argument is that
+ * No price, no urgency, no "download now": the film's whole argument is that
  * the product is quiet and confident, and a hard sell in the last four seconds
- * would retract it. The endcard closes on ONE line, the subtitle, and the voice
- * says the same words (owner call 2026-09-17; the tagline `Everything you save,
- * finally useful.` used to sit under a rule below it and was cut so the screen
- * and the voice agree). The space under the subtitle is the slot for a real App
- * Store badge or URL once the listing is live. (It deliberately does NOT claim
+ * would retract it. The space under the line is the slot for a real App Store
+ * badge or URL once the listing is live. (It deliberately does NOT claim
  * anything about learning: Machina is not a learning app.)
  */
+/** the product tagline, exactly (verify checks the voice says the same) */
+export const TAGLINE = 'Everything you save, finally useful.';
+
 export const Endcard: React.FC = () => {
   const f = useCurrentFrame();
   const fr = useFraming();
@@ -107,16 +112,16 @@ export const Endcard: React.FC = () => {
           style={{
             marginTop: 34,
             fontFamily: sans,
-            fontSize: 18,
+            fontSize: 30,
             fontWeight: 600,
-            letterSpacing: '0.36em',
-            textTransform: 'uppercase',
-            color: 'rgba(75,85,99,0.85)',
+            letterSpacing: '-0.012em',
+            color: 'rgba(55,65,81,0.9)',
+            whiteSpace: 'nowrap',
             opacity: tag,
             transform: `translateY(${(1 - tag) * 8}px)`,
           }}
         >
-          Never lose another great find
+          {TAGLINE}
         </div>
       </AbsoluteFill>
     </AbsoluteFill>
