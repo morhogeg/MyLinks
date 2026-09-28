@@ -588,6 +588,68 @@ peaks over −1 dBTP (`audio/loudness.mjs` measures both, BS.1770).
 Nobody has listened to the reel mix on speakers yet (the render box has no
 audio device); the balance, the clarity and the loudness are only measured.
 
+## The FIND clip
+
+`MachinaFind` is a 20.8s vertical feature clip, "type what you remember, get
+the one you meant": the reel's set, type, camera, narrator and lockup, on its
+own clock (`clips/find-timeline.mjs`, output frames, the reel's 112.5 BPM and
+K = 2). Every pixel of app UI is the real app. `MachinaFindSilent` (no sound)
+and `MachinaFindClean` (no captions or kicker) sit beside it.
+
+| Frames | What it shows |
+|---|---|
+| 0–64 | Home settles; FIND and "Find it in your own words."; the thumb taps "Search your saves" (64) |
+| 64–208 | "easy dinner, empty fridge" types under a rack focus, holds a beat whole, and its ONE card lands on the beat (144): Marcella Hazan's tomato sauce; the ink ring on the next beat; read |
+| 208–400 | Back to the field; the query deleted a word at a time; "video about putting things off" types as the narrator says "Type what you remember."; the TED talk lands on the downbeat (320) under "Get the one you meant."; read |
+| 400–624 | Thrown out into the reel's lockup: the mark strikes on the beat (464), "Machina. Never lose another great find.", held |
+
+**The two searches** each share no word with their card and land on it
+alone, never a list (`npm run verify` checks both claims against the demo
+data and the captured frames). The brief's example, "that talk about putting
+things off", failed both: "that" is in the card's summary, and the app's own
+matcher (`web/lib/searchMatch.ts`) pulls in the one save tagged "talks" as a
+"Close match". "video about putting things off" passes both and fits the
+field (223 of its 234pt). "Search by meaning" stays off the headline; the
+app's own "Meaning" badge on the found card is the app speaking.
+
+**One take, beside the clip.** `findClip` in `capture/shoot.mjs` is one
+continuous use of the search field: focus, type, the result, the query
+deleted a word at a time (the app's × moves focus in the capture browser and
+would need a second tap), type, the result; each result's own card-enter
+spring rolled at 60fps. Its frames go under `public/reel/app/clips/find/` and
+its data beside the clip, `src/reels/clips/find/takes.json`, not into the
+reel's `takes.json` (one generated JSON line cannot merge across the parallel
+clip branches); the clip hands it to the kit with `addTakes`
+(`kit/takes.ts`). The second query is `SEARCH.also` in `capture/library.mjs`.
+
+**Its own files** (the shared scripts only gained a `find` entry):
+`clips/find-timeline.mjs`; `src/reels/clips/find/` (`FindClip`, `Search`,
+`End`, the take data, `find-vo.json`); `audio/find-score.mjs` →
+`public/clips/find/score.wav` (regenerable, ignored); `node audio/mix-vo.mjs
+find` → `public/clips/find/score-vo.wav` (committed, mastered like the reel);
+`python3 audio/synth-vo.py find` → `out/vo/find/`; `scripts/find-stills.mjs`;
+the "find clip" section of `npm run verify`.
+
+```bash
+npm run reel:app && CAPTURE_ONLY=findClip npm run reel:capture   # the clip's take (the others keep theirs)
+python3 audio/synth-vo.py find                                    # after a line changes
+node audio/find-score.mjs && node audio/mix-vo.mjs find           # after a timing change
+npm run verify
+npx remotion render src/index.ts MachinaFind out/machina-find.mp4
+node scripts/find-stills.mjs                                      # review stills → out/find-stills/
+```
+
+**Measured, not eyeballed.** Frame-to-frame differences over the whole render
+and 4-frame strips at every transition. Three things were found that way and
+fixed (the camera rules below): a drift that stopped dead for the push to the
+field (a one-frame hitch), the rack focus snapping 2px on a fast-start curve,
+and the Lift fighting the app's own spring (a one-frame hang at its overshoot,
+then a 1.4px hop on alternate frames). After: no one-frame freeze or jump
+anywhere outside the typing. The tap's pad lands on the frame the app focuses
+the field and the tick sounds (onset 64.1); the narrator sits 4.7–6.3dB over
+the music in the speech band; the mix is −14.0 LUFS, −1.25 dBTP (−1.10 after
+the render's AAC). Nobody has listened to it on speakers.
+
 ## Motion language
 
 The rules every Machina video follows, and the kit component that implements
@@ -739,6 +801,21 @@ that breaks it.
 - **A stepped capture never hops.** When the app scrolls in captured steps
   (the card's read-down, the recap), the camera takes up each step's rounding
   and motion blur follows the net motion (camera + scroll).
+- **A tilt ends on a change** (the FIND clip, measured). The frame a 3D tilt
+  reaches 0 the slab re-rasters as 2D: on a still shot that is a visible
+  one-frame change across the whole screen. Let the tilt finish on a frame
+  that already changes (a tap, a cut) or mid-move, not as the camera comes to
+  rest.
+- **Rack focus eases in and out.** Pulling focus onto a field is travel
+  between two states (EASE_IN_OUT); on a fast-start curve the rest of the
+  screen lost 2px of focus in one frame. Letting go of it as a result lands
+  is an arrival, and may be quick.
+- **Emphasis waits for the app's own arrival.** When the app animates an
+  element in (a result's card-enter spring), that IS the landing; the Lift
+  and ink ring follow on the next beat, once it has settled, on its settled
+  box. A second spring on top hung a frame at its overshoot, and a Lift that
+  followed the settling element hopped: capture boxes are measured to half a
+  point.
 
 ### Sound to picture (`HITS`, `audio/reel-score.mjs`)
 

@@ -17,6 +17,9 @@
  *            (not in the pilot reel; kept for the feature clips)
  *   recall   Revisit → "This week in Machina", the weekly recap, opened and
  *            read down to its standout and its question
+ *   findClip the FIND feature clip: two plain-words searches in one use of
+ *            the field, each landing on its one card (data beside the
+ *            clip, see writeClipTakesData)
  *
  * What the backend would do (finish analysing a card, answer a question) is
  * driven through the capture server and `window.__capture`, so the app
@@ -445,6 +448,73 @@ const takes = {
     await t.thaw();
     return t.save();
   },
+
+  // ─────────────────────────────────────────────────────────── findClip
+  // The FIND feature clip (clips/find-timeline.mjs): two plain-words
+  // searches in ONE continuous use of the search field, each landing on the
+  // one card it means (SEARCH, then SEARCH.also[0]). Between them the first
+  // query is deleted a word at a time, as a held delete key does, so the
+  // field keeps its focus (the app's × moves focus to itself in this
+  // browser, which would need a second tap to type again). Each result's
+  // arrival, the app's own card-enter spring, is rolled at 60fps: the clip
+  // plays it at K = 2. Its frames go under clips/find/ and its data beside
+  // the clip's scenes (writeClipTakesData), not into the reel's takes.json.
+  async findClip() {
+    await fresh();
+    const t = new Take(dev, OUT, 'clips/find/search');
+    const RECTS = {
+      search: R.search,
+      firstCard: R.firstCard,
+      marcella: ['main article.surface-card', 'Marcella'],
+      marcellaTitle: ['main article.surface-card h3', 'Marcella'],
+      talk: ['main article.surface-card', 'procrastinator'],
+      talkTitle: ['main article.surface-card h3', 'procrastinator'],
+    };
+    t.mark('home');
+    await t.snap({ rects: RECTS });
+
+    await t.freeze();
+    await visible(page.getByPlaceholder('Search your saves')).click();
+    t.mark('focus');
+    await t.roll(16, { rects: RECTS, step: 1000 / 60 });
+
+    /** Type `query` on the frozen clock, one frame a character (the search
+     *  debounce cannot fire mid-word), then step the clock through the
+     *  debounce and the request until the card titled `title` is in the
+     *  feed, and roll its entrance from its first frame. */
+    const search = async (n, query, title) => {
+      t.mark(`typing${n}`);
+      for (const ch of query) {
+        await page.keyboard.type(ch);
+        await t.advance();
+        await t.snap({ rects: RECTS });
+      }
+      for (let k = 0; ; k++) {
+        const landed = await page.evaluate(
+          (s) => [...document.querySelectorAll('main article.surface-card h3')].some((h) => h.textContent.includes(s)),
+          title,
+        );
+        if (landed) break;
+        if (k > 300) throw new Error(`findClip: "${query}" never showed "${title}"`);
+        await page.waitForTimeout(20); // the request crosses the (real) network
+        await t.advance(1000 / 60);
+      }
+      t.mark(`result${n}`);
+      await t.roll(24, { rects: RECTS, step: 1000 / 60 });
+    };
+
+    await search(1, SEARCH.query, 'Marcella');
+    // cleared the way a held delete key clears it: a word at a time
+    t.mark('clear');
+    while (await page.evaluate(() => document.activeElement?.value?.length ?? 0)) {
+      await page.keyboard.press('Control+Backspace');
+      await t.advance();
+      await t.snap({ rects: RECTS });
+    }
+    await search(2, SEARCH.also[0].query, 'procrastinator');
+    await t.thaw();
+    return t.save();
+  },
 };
 
 /**
@@ -491,6 +561,53 @@ function writeTakesData() {
   console.log(`wrote ${path.relative(path.join(here, '..'), dest)} (${Object.keys(out).join(', ')})`);
 }
 
+/**
+ * A feature clip's own takes (named `clips/<clip>/<take>`, so their frames
+ * sit under public/reel/app/clips/, where writeTakesData does not look)
+ * keep their data BESIDE the clip: src/reels/clips/<clip>/takes.json, in the
+ * same format as the reel's. The clips are built on parallel branches, and
+ * one generated file shared by all of them could not merge. The clip hands
+ * its file to the kit (`addTakes`, src/reels/kit/takes.ts).
+ */
+function writeClipTakesData() {
+  const dir = path.join(OUT, 'clips');
+  if (!fs.existsSync(dir)) return;
+  for (const clip of fs.readdirSync(dir).sort()) {
+    const out = {};
+    for (const take of fs.readdirSync(path.join(dir, clip)).sort()) {
+      const f = path.join(dir, clip, take, 'manifest.json');
+      if (!fs.existsSync(f)) continue;
+      const m = JSON.parse(fs.readFileSync(f, 'utf8'));
+      // (the same summary writeTakesData makes: texts de-duplicated, rects
+      // in points rounded to half a point)
+      const texts = [];
+      const id = new Map();
+      const tid = (s) => (id.has(s) ? id.get(s) : (id.set(s, texts.length), texts.push(s) - 1));
+      const r1 = (v) => Math.round(v * 2) / 2;
+      out[`clips/${clip}/${take}`] = {
+        dpr: m.dpr,
+        fps: m.fps,
+        count: m.frames.length,
+        marks: m.marks,
+        texts,
+        frames: m.frames.map((fr) => ({
+          t: fr.text.map(tid),
+          r: Object.fromEntries(
+            Object.entries(fr.rects)
+              .filter(([, v]) => v)
+              .map(([k, v]) => [k, [r1(v.x), r1(v.y), r1(v.w), r1(v.h)]]),
+          ),
+        })),
+      };
+    }
+    if (!Object.keys(out).length) continue;
+    const dest = path.join(here, '..', 'src', 'reels', 'clips', clip, 'takes.json');
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.writeFileSync(dest, JSON.stringify(out) + '\n');
+    console.log(`wrote ${path.relative(path.join(here, '..'), dest)} (${Object.keys(out).join(', ')})`);
+  }
+}
+
 const results = {};
 for (const [name, run] of Object.entries(takes)) {
   if (ONLY && !ONLY.includes(name)) continue;
@@ -500,6 +617,7 @@ for (const [name, run] of Object.entries(takes)) {
   console.log(`✓ ${name}: ${m.frames.length} frames in ${((Date.now() - t0) / 1000).toFixed(0)}s`, JSON.stringify(m.marks));
 }
 writeTakesData();
+writeClipTakesData();
 if (dev.errors.length) console.log('page errors:', dev.errors.slice(0, 10));
 await dev.browser.close();
 await server.close();

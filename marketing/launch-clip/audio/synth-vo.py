@@ -117,6 +117,32 @@ SCRIPTS = {"film": (film_script, VO), "reel": (reel_script, os.path.join(VO, "re
 WORD_TIMING = {"reel": os.path.join(ROOT, "src", "reels", "data", "reel-vo.json")}
 
 
+# ── the FIND feature clip ────────────────────────────────────────────────────
+# Its captions, read from clips/find-timeline.mjs exactly as the reel's are
+# (same voice, same respelling): out/vo/find/ + src/reels/clips/find/find-vo.json
+def find_script():
+    js = (
+        "import('./clips/find-timeline.mjs').then(m => console.log(JSON.stringify("
+        "{ fps: m.FPS, captions: m.CAPTIONS })))"
+    )
+    raw = subprocess.run(["node", "-e", js], cwd=ROOT, check=True, capture_output=True, text=True).stdout
+    data = json.loads(raw)
+    return [
+        {
+            "frame": c["at"],
+            "start": c["at"] / data["fps"],
+            "window": (c["to"] - c["at"]) / data["fps"],
+            "text": " ".join((c.get("say") or c["text"]).split()).replace("Machina", SAY_NAME),
+            "speed": SPEED,
+        }
+        for c in data["captions"]
+    ]
+
+
+SCRIPTS["find"] = (find_script, os.path.join(VO, "find"))
+WORD_TIMING["find"] = os.path.join(ROOT, "src", "reels", "clips", "find", "find-vo.json")
+
+
 def speech_runs(samples, sr, gap=0.09):
     """[start, end] seconds of each run of speech, split at pauses >= gap."""
     import numpy as np

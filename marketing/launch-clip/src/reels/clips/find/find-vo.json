@@ -1,0 +1,41 @@
+[
+ {
+  "frame": 16,
+  "text": "Find it in your own words.",
+  "words": [
+   0.14,
+   0.373,
+   0.513,
+   0.653,
+   0.887,
+   1.073
+  ]
+ },
+ {
+  "frame": 272,
+  "text": "Type what you remember. Get the one you meant.",
+  "words": [
+   0.04,
+   0.273,
+   0.507,
+   0.693,
+   1.48,
+   1.63,
+   1.779,
+   1.929,
+   2.078
+  ]
+ },
+ {
+  "frame": 480,
+  "text": "Makeena. Never lose another great find.",
+  "words": [
+   0.03,
+   0.83,
+   1.145,
+   1.408,
+   1.829,
+   2.145
+  ]
+ }
+]

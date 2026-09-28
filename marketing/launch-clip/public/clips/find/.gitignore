@@ -1,0 +1,3 @@
+# Regenerable like public/reel-score.wav (`node audio/find-score.mjs` rewrites it
+# byte-identically); the narrated mix beside it, score-vo.wav, is committed.
+score.wav

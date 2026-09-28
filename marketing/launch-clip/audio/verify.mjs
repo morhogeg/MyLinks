@@ -425,5 +425,196 @@ console.log('\n── reel');
   }
 }
 
+// ─────────────────────────────────────────────────────── THE FIND CLIP
+// (clips/find-timeline.mjs, src/reels/clips/find/, the take clips/find/search):
+// the reel's gates on the clip's own files, plus the clip's own claims. Each
+// search shares no word with its card, and each lands on ONE card (no other
+// save's title on screen), never a filtered list.
+console.log('\n── find clip');
+{
+  const F = await import('../clips/find-timeline.mjs');
+  const L = await import('../capture/library.mjs');
+  const root = path.join(here, '..');
+  const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
+  const bad = [];
+  const BANNED = [
+    [/—/, 'em dash'],
+    [/\bAI\b/, 'literal "AI"'],
+    [/second brain/i, '"second brain"'],
+    [/librar(y|ies)/i, '"library"'],
+  ];
+  const scan = (where, text) => {
+    for (const [re, what] of BANNED) if (re.test(text)) bad.push(`${what} in ${where}: ${JSON.stringify(text).slice(0, 110)}`);
+  };
+
+  // captions and the chapter word: no overlaps, lines on the beat, in the clip
+  const caps = [...F.CAPTIONS].sort((a, b) => a.at - b.at);
+  caps.forEach((c, i) => {
+    scan(`caption ${i + 1}`, c.text);
+    if (c.say) scan(`caption ${i + 1} (spoken)`, c.say);
+    if (c.to <= c.at) bad.push(`caption "${c.text}" ends before it starts`);
+    if (i && c.at < caps[i - 1].to) bad.push(`caption overlap: "${c.text}" / "${caps[i - 1].text}"`);
+    if (c.to > F.TOTAL_FRAMES) bad.push(`caption "${c.text}" runs past the clip`);
+    if (c.at % F.BEAT_FRAMES) bad.push(`caption "${c.text}" starts at ${c.at}, not on a beat`);
+  });
+  const kick = [...F.KICKERS].sort((a, b) => a.at - b.at);
+  kick.forEach((k, i) => {
+    scan(`kicker ${k.text}`, k.text);
+    if (i && k.at < kick[i - 1].to) bad.push(`kicker overlap at ${k.at}`);
+    if (!caps.some((c) => !c.place && c.to === k.to && c.at >= k.at)) bad.push(`kicker ${k.text} (${k.at}–${k.to}) does not leave with a line`);
+  });
+  // the grid: every tap, landing and cut on a beat (typing and the delete run
+  // between beats; the only things allowed to)
+  for (const k of ['fieldTap', 'type1', 'found1', 'back', 'found2', 'throwOut', 'lockup', 'markStrike']) {
+    if (F.HITS[k] % F.BEAT_FRAMES) bad.push(`HITS.${k} = ${F.HITS[k]} is not on a beat`);
+  }
+  // the narrator mirrors the captions, and every line fits and leaves in time
+  const SAY_NAME = /SAY_NAME = "([^"]+)"/.exec(read('audio/synth-vo.py'))[1];
+  const spoken = (t) => t.split(/\s+/).join(' ').replaceAll('Machina', SAY_NAME);
+  const timing = JSON.parse(read('src/reels/clips/find/find-vo.json'));
+  caps.forEach((c) => {
+    const t = timing.find((x) => x.frame === c.at);
+    if (!t) return bad.push(`no narrator timing for "${c.text}": run synth-vo.py find`);
+    if (t.text !== spoken(c.say ?? c.text)) bad.push(`narrator ≠ caption at ${c.at}: said "${t.text}"`);
+    if (t.words.length !== (c.say ?? c.text).split(/\s+/).filter(Boolean).length) bad.push(`caption at ${c.at}: words ≠ timings`);
+  });
+  const manifest = path.join(root, 'out', 'vo', 'find', 'manifest.json');
+  if (fs.existsSync(manifest)) {
+    for (const line of JSON.parse(fs.readFileSync(manifest, 'utf8'))) {
+      const c = caps.find((x) => x.at === line.frame);
+      if (!c) continue;
+      const window = (c.to - c.at) / F.FPS;
+      if (line.spoken > window + 1e-6) bad.push(`VO "${line.text}" speaks ${line.spoken}s in a ${window.toFixed(2)}s caption`);
+      if (c.place === 'lockup') continue;
+      const dwell = window - line.spoken;
+      if (dwell < 0.3) bad.push(`caption "${c.text}" leaves ${dwell.toFixed(2)}s after its voice (min 0.3s)`);
+      if (dwell > (c.until ? 4 : 1.2)) bad.push(`caption "${c.text}" lingers ${dwell.toFixed(2)}s after its voice`);
+    }
+  } else {
+    console.log('  (no out/vo/find/manifest.json: VO fit not re-checked; run synth-vo.py find)');
+  }
+  const close = caps.find((c) => c.place === 'lockup');
+  if (!close || !read('src/scenes/Endcard.tsx').includes(close.text.split('\n').slice(-1)[0].replace(/\.$/, ''))) {
+    bad.push('the clip lockup line is not the film endcard subtitle');
+  }
+
+  // the two searches: their words are not the card's words, and the one card
+  // is all the result shows
+  const takes = JSON.parse(read('src/reels/clips/find/takes.json'));
+  const T = takes['clips/find/search'];
+  const words = (s) => (s.toLowerCase().match(/[\p{L}\p{N}']+/gu) ?? []).map((w) => w.replace(/'s$/, '').replace(/'/g, ''));
+  const SEARCHES = [
+    { ...L.SEARCH, mark: 'result1', typed: 'typing1' },
+    { ...L.SEARCH.also[0], mark: 'result2', typed: 'typing2' },
+  ];
+  const titles = L.CARDS.map((c) => c.title);
+  for (const s of SEARCHES) {
+    scan('search query', s.query);
+    const card = L.CARDS.find((c) => c.id === s.hits[0]);
+    if (s.hits.length !== 1) bad.push(`"${s.query}" must land on one card, has ${s.hits.length}`);
+    const cardWords = new Set(words([card.title, card.summary, card.tags.join(' '), card.category, card.sourceName, card.youtubeChannel ?? '', card.note ?? ''].join(' ')));
+    const shared = words(s.query).filter((w) => cardWords.has(w));
+    if (shared.length) bad.push(`"${s.query}" shares ${shared.join(', ')} with "${card.title}"`);
+    const last = T.marks[s.mark] - 1;
+    if (!T.frames[last].t.map((k) => T.texts[k]).includes(s.query)) bad.push(`the take never shows "${s.query}" typed whole`);
+    const end = s.mark === 'result1' ? T.marks.clear : T.count;
+    for (let i = T.marks[s.mark] + 1; i < end; i++) {
+      const on = T.frames[i].t.map((k) => T.texts[k]);
+      const shown = titles.filter((x) => on.includes(x));
+      if (shown.length !== 1 || shown[0] !== card.title) bad.push(`"${s.query}" frame ${i} shows ${JSON.stringify(shown)}, not only "${card.title}"`);
+    }
+  }
+  // the app's own text on every frame of the take (the clip uses all of it)
+  T.frames.forEach((fr, i) => fr.t.forEach((k) => scan(`the app on the find take, frame ${i}`, T.texts[k])));
+
+  if (bad.length) {
+    console.error('✗ find clip:');
+    for (const b of bad) console.error('    ' + b);
+    failed = true;
+  } else {
+    console.log(`✓ ${caps.length} captions + ${kick.length} kickers, no overlaps, each on a beat; narrator mirrors every caption; each leaves in time`);
+    console.log('✓ taps, landings and cuts on the beat');
+    console.log(`✓ both searches share no word with their card and land on it alone; no banned string in captions or ${T.count} captured frames`);
+  }
+
+  // the score and the mix: no clipping or holes, the voice clear of the music
+  // in the speech band, mastered like the reel
+  const wav = (p) => {
+    const b = fs.readFileSync(path.join(root, p));
+    const n = (b.length - 44) / 4;
+    const L2 = new Float64Array(n);
+    const R2 = new Float64Array(n);
+    for (let i = 0; i < n; i++) {
+      L2[i] = b.readInt16LE(44 + i * 4) / 32768;
+      R2[i] = b.readInt16LE(46 + i * 4) / 32768;
+    }
+    return { SR: b.readUInt32LE(24), n, L: L2, R: R2 };
+  };
+  const scorePath = 'public/clips/find/score.wav';
+  const mixPath = 'public/clips/find/score-vo.wav';
+  if (!fs.existsSync(path.join(root, scorePath)) || !fs.existsSync(path.join(root, mixPath))) {
+    console.error('✗ the find score or mix is missing: run `node audio/find-score.mjs && node audio/mix-vo.mjs find`');
+    failed = true;
+  } else {
+    const score = wav(scorePath);
+    const mix = wav(mixPath);
+    let clipped = 0;
+    for (let i = 0; i < score.n; i++) if (Math.abs(score.L[i]) > 0.995 || Math.abs(score.R[i]) > 0.995) clipped++;
+    const rows = [];
+    for (let k = 0; k * F.BAR * score.SR < score.n; k++) {
+      const s0 = Math.floor(k * F.BAR * score.SR);
+      const e = Math.min(score.n, Math.floor((k + 1) * F.BAR * score.SR));
+      let sum = 0;
+      for (let i = s0; i < e; i++) sum += ((score.L[i] + score.R[i]) / 2) ** 2;
+      rows.push(10 * Math.log10(sum / (e - s0) || 1e-18));
+    }
+    console.log(`  find bars (dB): ${rows.map((x) => x.toFixed(1)).join('  ')}`);
+    if (clipped) {
+      console.error(`✗ the find score clips (${clipped} samples)`);
+      failed = true;
+    }
+    for (let i = 1; i < rows.length - 2; i++) {
+      const dip = Math.min(rows[i - 1], rows[i + 1]) - rows[i];
+      if (dip > 3.5) {
+        console.error(`✗ find bar ${i} sits ${dip.toFixed(1)}dB below its neighbours`);
+        failed = true;
+      }
+    }
+    // each line: the mix minus the ducked bed is the voice (mix-vo.mjs writes
+    // the gain the master applied), measured where speech is heard
+    const master = path.join(root, 'out', 'vo', 'find', 'mix.json');
+    const gain = fs.existsSync(master) ? JSON.parse(fs.readFileSync(master, 'utf8')).gain : 1;
+    if (fs.existsSync(manifest)) {
+      const clear = JSON.parse(fs.readFileSync(manifest, 'utf8')).map((line) => {
+        const duck = caps.find((c) => c.at === line.frame)?.duck ?? 0.55;
+        const s0 = Math.round(line.start * mix.SR);
+        const e = Math.min(mix.n, s0 + Math.round(line.spoken * mix.SR));
+        const voice = new Float64Array(e - s0);
+        const music = new Float64Array(e - s0);
+        for (let i = s0; i < e; i++) {
+          const m = (mix.L[i] + mix.R[i]) / 2 / gain;
+          const b = ((score.L[i] + score.R[i]) / 2) * duck;
+          voice[i - s0] = m - b;
+          music[i - s0] = b;
+        }
+        return { text: line.text, all: powerDb(voice) - powerDb(music), db: powerDb(speechBand(voice, mix.SR)) - powerDb(speechBand(music, mix.SR)) };
+      });
+      for (const c of clear) console.log(`  "${c.text.slice(0, 34)}…": ${c.db.toFixed(1)}dB over the music in the speech band (${c.all.toFixed(1)}dB full band)`);
+      const masked = clear.filter((c) => c.db < 3);
+      if (masked.length) {
+        for (const c of masked) console.error(`✗ the music masks "${c.text}": ${c.db.toFixed(1)}dB (min 3dB)`);
+        failed = true;
+      } else {
+        console.log('✓ every find line sits 3dB or more over the music where speech is heard');
+      }
+    }
+    const I = lufs(mix.L, mix.R, mix.SR);
+    const tp = truePeak(mix.L, mix.R);
+    const ok = Math.abs(I + 14) <= 0.5 && tp <= -1;
+    (ok ? console.log : console.error)(`${ok ? '✓' : '✗'} the find mix: ${I.toFixed(1)} LUFS integrated, ${tp.toFixed(2)} dBTP (spec −14 ±0.5 LUFS, ≤ −1 dBTP)`);
+    if (!ok) failed = true;
+  }
+}
+
 console.log(failed ? '\nFAILED' : '\nOK');
 process.exit(failed ? 1 : 0);

@@ -4,6 +4,8 @@ import { FPS, HEIGHT, TOTAL_FRAMES, WIDTH } from '../timeline.mjs';
 import * as REEL from '../reel-timeline.mjs';
 import { Film } from './Film';
 import { MachinaReel } from './reels/MachinaReel';
+import * as FIND from '../clips/find-timeline.mjs';
+import { FindClip } from './reels/clips/find/FindClip';
 
 /**
  * Compositions:
@@ -113,6 +115,36 @@ export const RemotionRoot: React.FC = () => (
       fps={REEL.FPS}
       width={REEL.WIDTH}
       height={REEL.HEIGHT}
+      defaultProps={{ withAudio: false, withCaptions: false }}
+    />
+    {/* the FIND feature clip (src/reels/clips/find, clips/find-timeline.mjs):
+        MachinaFind is the deliverable (score + narrator + captions);
+        Silent has no sound (stills, QA); Clean has no captions or kicker */}
+    <Composition
+      id="MachinaFind"
+      component={FindClip}
+      durationInFrames={FIND.TOTAL_FRAMES}
+      fps={FIND.FPS}
+      width={FIND.WIDTH}
+      height={FIND.HEIGHT}
+      defaultProps={{ withAudio: true, withCaptions: true }}
+    />
+    <Composition
+      id="MachinaFindSilent"
+      component={FindClip}
+      durationInFrames={FIND.TOTAL_FRAMES}
+      fps={FIND.FPS}
+      width={FIND.WIDTH}
+      height={FIND.HEIGHT}
+      defaultProps={{ withAudio: false, withCaptions: true }}
+    />
+    <Composition
+      id="MachinaFindClean"
+      component={FindClip}
+      durationInFrames={FIND.TOTAL_FRAMES}
+      fps={FIND.FPS}
+      width={FIND.WIDTH}
+      height={FIND.HEIGHT}
       defaultProps={{ withAudio: false, withCaptions: false }}
     />
   </>

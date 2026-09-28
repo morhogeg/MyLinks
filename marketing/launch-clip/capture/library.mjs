@@ -540,6 +540,12 @@ export const ASK = {
 export const SEARCH = {
   query: 'easy dinner, empty fridge',
   hits: ['marcella'],
+  // The FIND clip's second search (clips/find-timeline.mjs): what someone
+  // remembers of a talk, sharing no word with its card either. Not "that
+  // talk about putting things off": "that" is in the card's summary, and
+  // the app's own matcher pulls in the one save tagged "talks" as a "Close
+  // match", so the search would show a list instead of the one card.
+  also: [{ query: 'video about putting things off', hits: ['procrastinator'] }],
 };
 
 /**
