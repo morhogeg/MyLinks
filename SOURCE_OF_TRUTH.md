@@ -2647,8 +2647,12 @@ exact-match, capped.
   and the voice matches. All voice lines re-synthesized (all fit), all three
   mixes rebuilt (reel and FIND −14.0 LUFS / −1.25 dBTP), `.srt` re-emitted,
   every edition of all three films re-rendered. Verified: `tsc`, `npm run
-  verify` OK; intro and endcard frames read in landscape and vertical, reel
-  and FIND lockups read. Not verified by ear: nobody has listened.
+  verify` OK; intro and endcard frames read in landscape and vertical (from
+  the rendered VO editions), reel and FIND lockups read; the tagline's voice
+  line cross-correlates with each VO edition's last 10s at exactly its
+  scheduled start (film 75.25s at 0.75, reel 76.80s at 0.79, FIND 28.27s at
+  0.91; the intro line and the score-only edition as controls: 0.05, 0.06).
+  Not verified by ear: nobody has listened.
 - **2026-09-28 — FIND clip finishing pass.** Branch `claude/clip-find`, not
   merged. Fresh measured review of the full render: the one real defect was
   the hook's scroll (full speed from rest, an instant reversal, a dead stop:
