@@ -600,9 +600,9 @@ the reel. One save is carried through it: a recipe post someone screenshotted.
 | Frames | Element | What is shown (the line) |
 |---|---|---|
 | 0–152 | the problem | saves where they were kept (open tabs, screenshots, bookmarks) bleach out; each named place lifts ("Great finds get lost in open tabs, screenshots and bookmarks.") |
-| 136–320 | the name, ANY APP | they collapse into the mark, the wordmark wipes in on "Machina"; YouTube, Instagram and Safari shares fly in ("Machina saves them straight from the share sheet, in any app.") |
-| 304–488 | SCREENSHOTS | the point becomes the +, the app irises open; the real Add dialog, Image tab, three screens of one post picked, numbered, Save ("Screenshots too. Up to five become one card.") |
-| 472–680 | KEY POINTS | the feed's own "Reading 3 screenshots…" card and "Reading text…" banner, the card it becomes, opened: the screenshots, the gist, the Key Points lifted ("It reads the text in them and pulls out the key points.") |
+| 136–320 | the name, ANY APP | they collapse into the mark, the wordmark wipes in on "Machina"; YouTube, Instagram and Safari shares fly in ("Machina saves from any app. No copying, no pasting.") |
+| 304–488 | SCREENSHOTS | the point becomes the +, the app irises open; the real Add dialog, Image tab, three screens of one post picked, numbered, Save ("Even screenshots get analyzed. Up to five become one card.") |
+| 496–680 | KEY POINTS | the feed's own "Reading 3 screenshots…" card and "Reading text…" banner, the card it becomes, opened: the screenshots, the gist, the Key Points lifted ("It reads the text in them and pulls out the key points.") |
 | 680–800 | TAGS & LINKS | read on down: the "Do this", the tags, the two Related cards (Marcella Hazan's sauce, Samin Nosrat's chicken) lifted ("Then it tags it, and links it to what you already saved.") |
 | 800–960 | the takeaway | thrown into the lockup: the mark strikes, MACHINA wipes in on the spoken name, "Save it once. Machina does the rest." |
 
@@ -630,7 +630,7 @@ at full lift (see Camera below).
 
 Sound: `audio/clips/save-score.mjs`, from the shared instruments; nothing
 lands on a word (bells on the Related cards masked their line to 2.4dB and
-were moved after it). Every line ≥ 6.1dB over the music in the speech band;
+were moved after it). Every line ≥ 5.5dB over the music in the speech band;
 mastered −14 LUFS, true peak −1.25 dBTP (the encoded mp4: −14.2, −1.24).
 
 ```bash

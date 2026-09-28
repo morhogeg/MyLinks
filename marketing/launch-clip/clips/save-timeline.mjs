@@ -109,9 +109,9 @@ export const CAPTIONS = [
   // the hook: the problem, over the saves where they were kept
   { at: 16, to: 152, text: 'Great finds get lost in open tabs,\nscreenshots and bookmarks.' },
   // the name, and the first thing it does
-  { at: 176, to: 296, kicker: 'Any\u00a0app', text: 'Machina saves them straight from\nthe share sheet, in any app.', until: 'the third share lands in the mark' },
-  { at: 384, to: 488, kicker: 'Screenshots', text: 'Screenshots too. Up to five\nbecome one card.', until: 'the screens are picked and saved' },
-  { at: 496, to: 680, kicker: 'Key\u00a0points', text: 'It reads the text in them and\npulls out the key points.', until: 'the card opens on its Key Points' },
+  { at: 176, to: 296, kicker: 'Any\u00a0app', text: 'Machina saves from any app.\nNo copying, no pasting.', until: 'the third share lands in the mark' },
+  { at: 368, to: 504, kicker: 'Screenshots', text: 'Even screenshots get analyzed.\nUp to five become one card.', until: 'the screens are picked and saved' },
+  { at: 512, to: 680, kicker: 'Key\u00a0points', text: 'It reads the text in them and\npulls out the key points.', until: 'the card opens on its Key Points' },
   { at: 688, to: 800, kicker: 'Tags\u00a0&\u00a0links', text: 'Then it tags it, and links it to\nwhat you already saved.', until: 'the Related cards lift' },
   // the close, on the lockup: the takeaway, and the name that ties it together
   { at: HITS.markStrike + 8, to: TOTAL_FRAMES, place: 'lockup', text: 'Save it once.\nMachina does the rest.', duck: 0.4 },

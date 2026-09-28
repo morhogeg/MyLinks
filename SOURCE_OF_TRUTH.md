@@ -2544,8 +2544,9 @@ score + narrator + captions; mastered −14 LUFS, true peak −1.25 dBTP), plus
 subject, first-time viewer, Machina named, problem hook, 3–5 elements each
 shown working, concrete takeaway), not cut from the reel. Hook: "Great finds
 get lost in open tabs, screenshots and bookmarks." → the name → ANY APP
-(shares into the mark) → SCREENSHOTS (the real Add dialog's Image tab, three
-screens of one recipe post → one card) → KEY POINTS (the feed's real "Reading
+(shares into the mark: "Machina saves from any app. No copying, no pasting.")
+→ SCREENSHOTS ("Even screenshots get analyzed. Up to five become one card.":
+the real Add dialog's Image tab, three screens of one recipe post → one card) → KEY POINTS (the feed's real "Reading
 3 screenshots…" card, the card opened to its Key Points) → TAGS & LINKS (tags,
 "Do this", Related cards) → "Save it once. Machina does the rest." on the
 lockup. New take `saveclip` (`capture/shoot.mjs`; the screenshots and the
@@ -2630,7 +2631,11 @@ exact-match, capped.
   ~1pt low whenever lift > 0, so lifts that ease out sag ~3px and snap back
   (the reel's Key Points, reel frames 1176–1192); the clip fades its lifts at
   full lift instead, kit and reel unchanged. The reel's other takes and its
-  frames and mixes are unchanged (compared). Not listened to on speakers.
+  frames and mixes are unchanged (compared). Owner refinement: no "share
+  sheet" in the voice ("Machina saves from any app. No copying, no
+  pasting."), and the screenshot line leads into the reading ("Even
+  screenshots get analyzed. Up to five become one card." → "It reads the
+  text in them…"). Not listened to on speakers.
 - **2026-09-27 — Highlight reel round 15: caret, shares, one face.** Branch
   `claude/machina-reel-pilot`, not merged. Owner on round 14: the input
   caret was jittery (0:26–0:28): it blinks on the browser's real clock, so

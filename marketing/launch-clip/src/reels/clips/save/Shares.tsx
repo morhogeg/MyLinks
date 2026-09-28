@@ -9,7 +9,7 @@ import { EASE_GATHER, EASE_MODAL, EASE_SPRING, mix, prog } from '../../kit/curve
 import { INK, INK_SOFT } from '../../kit/Type';
 
 /**
- * ANY APP: "Machina saves them straight from the share sheet, in any app."
+ * ANY APP: "Machina saves from any app. No copying, no pasting."
  * The reel's share gesture (scenes/ShareBeat.tsx) on the clip's own beats: a
  * save from YouTube, one from Instagram, one from Safari, each entering from
  * its own edge, its Share button tapped, pulled into the Machina mark, which
