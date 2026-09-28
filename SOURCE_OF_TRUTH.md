@@ -2387,7 +2387,16 @@ the film's introduction line is the TAGLINE ("Machina. / Everything you save,
 finally useful.", replacing "one place for all your saved links", which
 volunteered Machina into the link-saver category and undersold screenshots
 and notes), and the endcard is the SUBTITLE ("Never lose another great find").
-Promise opens, loss-aversion closes. Same session: the recipe card became
+Promise opens, loss-aversion closes. **FLIPPED 2026-09-28 (owner): every film
+ENDS on the tagline, "Everything you save, finally useful." (exact wording,
+comma included), used ONCE per film; nothing ends on "Never lose another great
+find" any more.** The tagline is the fixed brand line; the subtitle is App
+Store copy that can change with search tests, which would date every posted
+film; and ending on the promise follows the story (problem → Machina →
+payoff). The introduction now reads "Machina. / Never lose another great
+find.", the endcard shows the tagline in sentence case, and the closing voice
+line is the tagline word for word, nothing else. The reel follows the same
+rule; `npm run verify` checks it. Same session (2026-09-19): the recipe card became
 "Why you forget most of what you read" (Science; the query "remembering more
 from books" still shares no word with it), the Manson title is shortened so
 the Ask chip never truncates, and two-sentence captions break at the sentence.
@@ -2503,7 +2512,7 @@ LUFS, true peak ≤ −1 dBTP), `MachinaReelSilent`
 and `MachinaReelClean`, in `marketing/launch-clip/`. Script: the problem ("You
 save things everywhere." / "An article here. A recipe there. A video
 somewhere else." / "Saved, and rarely seen again."), "Introducing Machina."
-(the screen shows the drawn wordmark) "All your saves, finally useful.",
+(the screen shows the drawn wordmark) "Never lose another great find.",
 "Save anything, from anywhere." (a motion-graphics beat: saves shared from
 YouTube, Instagram and Safari, each card's Share button tapped and pulled
 into the mark; the native share sheet cannot be captured from the web build
@@ -2511,8 +2520,9 @@ and the owner chose not to record it), "A link, a screenshot, or a note."
 (the Add dialog's real Link, Image and Note tabs, each tapped), "Machina reads it, summarizes it, and files it." (the launch film's line, over the five phases), "Each save becomes a card, with the key points pulled out.",
 Find, Ask, Connect, the weekly recap read slowly ("Every week, Machina brings
 back what's worth remembering." / "The themes of your week, and the one save
-worth rereading."), and the close "Machina. Never lose another great find."
-in Geist (the serif retired in round 15). One steady speed on the 112.5 BPM beat; key features
+worth rereading."), and the close, the tagline "Everything you save, finally
+useful." (2026-09-28: every film ends on it, once), in Geist (the serif
+retired in round 15). One steady speed on the 112.5 BPM beat; key features
 linger. **Every frame of app UI is the real web app, not a
 mockup** (owner, mid-task): `capture/` builds `web/` as a static export with
 Firebase swapped for an in-memory stand-in seeded with a demo account of 24
@@ -2595,6 +2605,18 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-28 — Every film ends on the tagline.** Branch
+  `claude/machina-reel-pilot`, not merged. Owner decision: the tagline
+  "Everything you save, finally useful." ends every film, once; nothing ends
+  on the App Store subtitle (search-test copy that would date posted films).
+  Launch film: the introduction cue is now "Machina. / Never lose another
+  great find.", the endcard shows the tagline (sentence case, its own comma
+  and stop) and the closing voice line is the tagline word for word; both
+  lines re-synthesized and re-mixed, every edition re-rendered. Reel: the
+  intro's tagline variant became "Never lose another great find." and the
+  lockup ends on the tagline, spoken alone. `npm run verify` now checks the
+  tagline ends the reel, appears once, and appears in the film only on the
+  endcard. §8's 2026-09-19 slogan-roles note is marked flipped.
 - **2026-09-27 — Highlight reel round 15: caret, shares, one face.** Branch
   `claude/machina-reel-pilot`, not merged. Owner on round 14: the input
   caret was jittery (0:26–0:28): it blinks on the browser's real clock, so

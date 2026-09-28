@@ -108,9 +108,11 @@ export const SUBTITLES = [
   // describing and presents the product by name. 2026-09-19 (owner): the line
   // after the name is the PROMISE (the product tagline), not "one place for
   // all your saved links", which volunteered Machina into the link-saver
-  // category and undersold screenshots and notes. The tagline lives here now;
-  // the endcard carries the App Store subtitle. Two roles, two lines.
-  { bar: 6.45, bars: 1.35, place: 'bottom', kicker: 'Introducing', text: 'Machina.\nEverything you save, finally useful.' },
+  // category and undersold screenshots and notes.
+  // 2026-09-28 (owner): the roles FLIP. Every film ENDS on the tagline
+  // ("Everything you save, finally useful.", the fixed brand line), once;
+  // the App Store subtitle, which can change with search tests, moves here.
+  { bar: 6.45, bars: 1.35, place: 'bottom', kicker: 'Introducing', text: 'Machina.\nNever lose another great find.' },
   // Value first (owner note, round 13c): anything + anywhere. No tap-count
   // claim — the share sheet is two touches (owner correction).
   { bar: 8.35, bars: 1.25, place: 'left', kicker: 'Capture', text: 'Save anything, from anywhere.' },

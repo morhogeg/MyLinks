@@ -163,7 +163,8 @@ export const Lockup: React.FC<{
             // other face in 81 seconds and read as a font change, not as
             // emphasis; the end card's size and isolation are the emphasis)
             fontFamily: sans,
-            fontSize: big ? 60 : 25,
+            // (52: the tagline, 36 characters, fits the 1080 frame with air)
+            fontSize: big ? 52 : 25,
             fontWeight: 600,
             letterSpacing: big ? '-0.028em' : '0.36em',
             textTransform: big ? undefined : 'uppercase',

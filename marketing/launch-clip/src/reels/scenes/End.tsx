@@ -17,10 +17,10 @@ const timing = VO.find((v) => v.frame === LINE.at);
 
 export const End: React.FC<{ f: number }> = ({ f }) => {
   if (f < real(HITS.lockup)) return null;
-  // "Machina. Never lose another great find.": the first word is the drawn
-  // wordmark (it wipes in as the name is said), the rest is the line
+  // the tagline, every word on the narrator's timing; the wordmark wipes in
+  // after the strike on its own (2026-09-28: nothing but the line is spoken)
   const starts = timing?.words.map((s) => LINE.at + Math.round(s * FPS)) ?? [];
-  const line = LINE.text.split('\n').slice(-1)[0];
+  const line = LINE.text;
   const drift = prog(f, real(HITS.markStrike) + 6, real(600), (t) => t);
   return (
     <AbsoluteFill style={{ alignItems: 'center' }}>
@@ -28,9 +28,8 @@ export const End: React.FC<{ f: number }> = ({ f }) => {
         <Lockup
           frame={f}
           strike={real(HITS.markStrike)}
-          wordAt={starts[0]}
           line={line}
-          lineStarts={starts.slice(1)}
+          lineStarts={starts}
           lineStyle="statement"
           wordWidth={620}
         />

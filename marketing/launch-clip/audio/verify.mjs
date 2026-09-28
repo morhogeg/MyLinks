@@ -260,8 +260,17 @@ console.log('\n── reel');
   const film = read('src/scenes/Endcard.tsx');
   const close = caps.find((c) => c.place === 'lockup');
   const closeLine = close?.text.split('\n').slice(-1)[0].replace(/\.$/, '');
-  if (!close || !film.includes(closeLine)) bad.push('the reel lockup line is not the film endcard subtitle');
-  // round 7 (owner): "Introducing Machina. All your saves, finally useful." after the problem
+  if (!close || !film.includes(closeLine)) bad.push('the reel lockup line is not the film endcard line');
+  // 2026-09-28 (owner): every film ENDS on the tagline, word for word, and
+  // uses it ONCE; the voice says the endcard line and nothing else
+  const TAGLINE = 'Everything you save, finally useful.';
+  if (close?.text !== TAGLINE) bad.push(`the reel does not end on the tagline "${TAGLINE}"`);
+  if (close?.say) bad.push('the reel closing line has a voice-only lead-in; it must be spoken word for word');
+  const tagCount = caps.filter((c) => (c.say ?? c.text).replace(/\s+/g, ' ').includes(TAGLINE)).length;
+  if (tagCount !== 1) bad.push(`the tagline appears ${tagCount} times in the reel (exactly once, at the end)`);
+  if (!film.includes(TAGLINE)) bad.push('the film endcard is not the tagline');
+  const { SUBTITLES: FILM_SUBS } = await import('../timeline.mjs');
+  if (FILM_SUBS.some((c) => c.text.replace(/\s+/g, ' ').includes(TAGLINE))) bad.push('the film uses the tagline before its endcard');
 
   // ── 4. banned strings, everywhere a viewer can read one
   for (const c of L.CARDS) {
