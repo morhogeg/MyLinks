@@ -2538,27 +2538,28 @@ on iPhone (§4 23b).
 
 **What exists (the FIND clip, 2026-09-28, branch `claude/clip-find`, built
 on the pilot branch, awaiting owner review, not merged):** `MachinaFind`
-(20.8s, 1080×1920, score + narrator + captions; mastered to −14 LUFS, true
-peak ≤ −1 dBTP), `MachinaFindSilent` and `MachinaFindClean`, in
-`marketing/launch-clip/`. Script: "Find it in your own words." / "Type what
-you remember. Get the one you meant." / "Machina. Never lose another great
-find." (the reel's lockup). Two plain-words searches in one continuous use of
-the real search field, each landing on ONE card that shares no word with it:
-"easy dinner, empty fridge" → Marcella Hazan's tomato sauce, and "video about
-putting things off" → the TED procrastination talk. The brief's "that talk
-about putting things off" was dropped: "that" is in the card's summary, and
-the app's own matcher shows the save tagged "talks" as a "Close match" (a
-list, not the one card). The rack focus on the typed words is the signature
-shot; each card lands on the beat with the app's own entrance, the ink ring
-on the next. New take `findClip` (`capture/shoot.mjs`); the clip keeps its
-own timeline (`clips/find-timeline.mjs`), scenes (`src/reels/clips/find/`),
-take data (beside the clip, registered with the kit's new `addTakes`, so the
-reel's `takes.json` is untouched), narrator dir and word timings, score
-(`audio/find-score.mjs`), mix and verify section; the shared scripts and
-`Root.tsx` only gained a `find` entry. `MachinaReel` and `MachinaLaunch`
-render exactly as before (24 stills byte-identical, their audio hashes
-unchanged). To render and the measurements: launch-clip README, "The FIND
-clip".
+(32.5s, 1080×1920, score + narrator + captions; mastered to −14 LUFS, true
+peak ≤ −1 dBTP), `MachinaFindSilent`, `MachinaFindClean`, in
+`marketing/launch-clip/`. Built to the owner's feature-video brief (the
+feature as the sole subject for a first-time viewer; a problem hook; three to
+five elements, each shown doing its job and why it matters; Machina named; a
+concrete takeaway). Script: "You saved it. But what was it called?" /
+"Machina finds it in your own words." (easy dinner, empty fridge → Marcella
+Hazan's sauce, no shared word) / "Only half remember it? You still get
+what's close." (sardinia swim spot → Cala Goloritzé under the app's "Close
+matches") / "Type where you saw it, and get everything from there." (youtube
+→ the Sources row → every saved video) / "Open it: the gist, and the saves it
+connects to." / "Type what you remember. Get the one you meant." / "Machina.
+Never lose another great find." (the reel's lockup). All real captured app UI
+(new take `findClip`); the clip keeps its own timeline, scenes, take data
+(beside the clip, registered with the kit's new `addTakes`, so the reel's
+`takes.json` is untouched), narrator dir and word timings, score, mix and
+verify section; the shared scripts and `Root.tsx` only gained a `find`
+entry. `MachinaReel` and `MachinaLaunch` render exactly as before (stills
+byte-identical, audio hashes unchanged). Details: launch-clip README, "The
+FIND clip". Found in the app while building it: a source typed into search
+(e.g. "youtube") shows its Sources chip over a "No matches" panel, because
+cards match on title, tags and summary but not on the source name.
 
 **Feature-clip briefs, FINAL against the pilot's kit (2026-09-26).** Shared
 by all five: **448 frames (7 bars at 112.5 BPM, 14.9s)**, vertical, built
@@ -2619,21 +2620,19 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-09-28 — FIND feature clip built.** Branch `claude/clip-find`, not
-  merged (siblings make Save, Ask and Revisit in parallel). `MachinaFind`,
-  20.8s on the reel's kit, clock and narrator: two searches in the real app,
-  each landing on one card that shares no word with it ("easy dinner, empty
-  fridge" → Marcella Hazan's sauce; "video about putting things off" → the
-  TED procrastination talk; the brief's example query failed both checks),
-  then the reel's lockup. Per-clip plumbing (own timeline, scenes, take data,
-  VO, score, mix, verify section; shared files only gained a `find` entry).
-  Verified: `npx tsc --noEmit`, `npm run verify` OK (both claims about the
-  searches are now gates), a full render studied frame to frame and in
-  4-frame strips (three one-frame faults found and fixed; the camera rules
-  learned went into the README's Motion language), −14.0 LUFS / −1.10 dBTP
-  after the AAC, the reel and film byte-identical (stills and audio). Not
-  verified: nobody has listened on speakers; captures run in Inter where an
-  iPhone shows SF Pro; the backend's search hits are scripted.
+- **2026-09-28 — FIND feature clip (second cut, owner brief).** Branch
+  `claude/clip-find`, not merged. Owner rejected the first cut (a trim of
+  the reel's Find beat) and gave a feature-video brief. Rebuilt as a 32.5s
+  explainer: a problem hook (the feed scrolled, "But what was it called?"),
+  Machina named, four elements of the real search (own words, close matches,
+  jump to a source, open the card with its related saves), a takeaway, the
+  reel's lockup. New `findClip` take; verify checks each search's claim from
+  the captured frames. Verified: `tsc`, `npm run verify` OK, the render
+  studied frame to frame and in transition strips (four one-frame faults
+  fixed; rules added to Motion language), −14.0 LUFS / −1.33 dBTP after
+  AAC, reel and film byte-identical. Not verified: nobody has listened on
+  speakers; Inter stands in for SF Pro; backend search hits are scripted.
+  Found: typing a source name shows "No matches" under its Sources chip.
 - **2026-09-27 — Highlight reel round 15: caret, shares, one face.** Branch
   `claude/machina-reel-pilot`, not merged. Owner on round 14: the input
   caret was jittery (0:26–0:28): it blinks on the browser's real clock, so

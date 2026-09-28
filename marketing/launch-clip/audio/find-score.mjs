@@ -3,15 +3,15 @@
  * every Machina score), its own arrangement on the clip's clock
  * (clips/find-timeline.mjs: 112.5 BPM, 16 frames a beat, output frames).
  *
- * The arrangement follows the cut: pad, sub and the pulse under the promise
- * and the first search, the typing ticking on 8ths; the band comes in ON the
- * first card's landing and runs under the second search; it drops out for
- * the lockup, so the mark strikes into air. Sound design sits on the frames
- * the picture uses (HITS): a tap is a tick, a card landing is a sub, a found
- * card answers with the same small falling figure both times. Nothing bright
- * sounds on a word the narrator has to land (the reel's round-13 rule): the
- * second card's shimmer and figure wait for "meant.", the last note for
- * "find."
+ * The arrangement follows the cut: the hook floats (pad, sub, a soft pulse)
+ * under the feed scrolling past; the band comes in ON the first card's
+ * landing and runs under the four elements; it drops out for the lockup, so
+ * the mark strikes into air. Sound design sits on the frames the picture
+ * uses (HITS): a tap is a tick, the typing ticks on 8ths, a delete falls, a
+ * card landing is a sub and a shimmer, and each found thing answers with the
+ * same small falling figure. Nothing bright sounds on a word the narrator
+ * has to land (the reel's round-13 rule): a figure that would fall inside a
+ * line waits for it.
  *
  *   node audio/find-score.mjs   →   public/clips/find/score.wav
  *   (then `node audio/mix-vo.mjs find` for the narrated, mastered mix)
@@ -51,10 +51,15 @@ const t = (frame) => frame / FPS;
 const TAKE = JSON.parse(fs.readFileSync(path.join(root, 'src', 'reels', 'clips', 'find', 'takes.json'), 'utf8'))['clips/find/search'];
 const run = (from, to) => TAKE.marks[to] - TAKE.marks[from];
 const CHARS1 = run('typing1', 'result1');
-const STEPS = run('clear', 'typing2');
+const STEPS1 = run('clear1', 'typing2');
 const CHARS2 = run('typing2', 'result2');
-const lastChar1 = H.type1 + (CHARS1 - 1) * TYPE_FRAMES;
-const lastChar2 = H.type2 + (CHARS2 - 1) * TYPE_FRAMES;
+const STEPS2 = run('clear2', 'typing3');
+const CHARS3 = run('typing3', 'sources');
+const typing = [
+  [H.type1, CHARS1],
+  [H.type2, CHARS2],
+  [H.type3, CHARS3],
+].map(([from, n]) => [from, from + (n - 1) * TYPE_FRAMES]);
 
 // the reel's voicings
 const VOICINGS = {
@@ -66,8 +71,7 @@ const chordAt = (frame) => VOICINGS[CHORDS.filter(([f]) => f <= frame).at(-1)[1]
 
 /** how much of the band is playing: the promise, the first search, then the
  *  band from the first card, fullest around the second */
-const density = (frame) =>
-  frame < H.fieldTap ? 0.3 : frame < H.found1 ? 0.55 : frame < H.back ? 0.85 : frame < H.found2 ? 0.9 : 1.0;
+const density = (frame) => (frame < H.fieldTap ? 0.3 : frame < H.found1 ? 0.55 : frame < H.found2 ? 0.85 : 0.95);
 const DRUMS = [H.found1, H.lockup];
 
 // ── pad: one voicing per chord span, up to the lockup (its own voicing below);
@@ -130,46 +134,53 @@ for (let fr = DRUMS[0]; fr < DRUMS[1]; fr += BEAT_FRAMES) {
 // ── the lockup: one held voicing under the end, a single breath (the reel's)
 for (const m of [48, 64, 67, 72]) pad(t(H.lockup), TOTAL_SEC - t(H.lockup) - 0.2, m, 0.08, m === 64 ? -0.4 : 0.35);
 
-// ── melody (FM keys): the same small falling figure answers each found card
-// (G6: D, B, G on beats), the first from its ink ring, the second AFTER
-// "…the one you meant."; home on C for the lockup, its last note AFTER the
-// last word (the reel's close)
-const FOUND_FIGURE = [[0, 74], [16, 71], [32, 67]]; // [frames after its start, midi]
-const VOICE = (line) => {
-  const c = CAPTIONS[line];
-  const m = JSON.parse(fs.readFileSync(path.join(root, 'out', 'vo', 'find', 'manifest.json'), 'utf8')).find((x) => x.frame === c.at);
-  return { from: c.at, to: c.at + Math.round((m?.spoken ?? 0) * FPS) };
+// ── melody (FM keys): the same small falling figure (D, B, G) answers each
+// thing found, from its beat; a figure that would land inside a narrator
+// line waits for the beat after it. Home on C for the lockup, its last note
+// AFTER the last word (the reel's close)
+const MANIFEST = JSON.parse(fs.readFileSync(path.join(root, 'out', 'vo', 'find', 'manifest.json'), 'utf8'));
+const spoken = CAPTIONS.map((c) => {
+  const m = MANIFEST.find((x) => x.frame === c.at);
+  return [c.at, c.at + Math.round((m?.spoken ?? 0) * FPS)];
+});
+const clearOfVoice = (from, len) => {
+  let f = from;
+  for (const [a, b] of spoken) if (f < b + 2 && f + len > a) f = Math.ceil((b + 2) / BEAT_FRAMES) * BEAT_FRAMES;
+  return f;
 };
-const said2 = VOICE(1); // "Type what you remember. Get the one you meant."
-const said3 = VOICE(2); // "Machina. Never lose another great find."
-const after2 = Math.ceil((said2.to + 2) / BEAT_FRAMES) * BEAT_FRAMES; // the beat after "meant."
-for (const [dt, m] of FOUND_FIGURE) keys(t(H.found1 + 16 + dt), m, 0.12, dt === 16 ? 0.2 : -0.2, 2);
-for (const [dt, m] of FOUND_FIGURE) keys(t(after2 + dt), m, 0.13, dt === 16 ? 0.2 : -0.2, 2);
+const FOUND_FIGURE = [[0, 74], [16, 71], [32, 67]]; // [frames after its start, midi]
+for (const found of [H.found1, H.found2, H.chipTap + 16, H.cardTap + 16]) {
+  const from = clearOfVoice(found + 16, 40);
+  if (from + 40 < H.throwOut) for (const [dt, m] of FOUND_FIGURE) keys(t(from + dt), m, 0.12, dt === 16 ? 0.2 : -0.2, 2);
+}
+const lastWord = spoken[spoken.length - 1][1];
 keys(t(H.lockup + 32), 72, 0.19, -0.2, 2.8); // C as the mark draws
 keys(t(H.lockup + 80), 76, 0.12, 0.2, 2.8); // E, softer, in the breath after the name
-keys(t(Math.ceil((said3.to + 4) / 8) * 8), 79, 0.19, -0.2, 2.8); // G after "find."
+keys(t(Math.ceil((lastWord + 4) / 8) * 8), 79, 0.19, -0.2, 2.8); // G after "find."
 
 // ── risers, each ENDING on the reveal it leads into
 for (const [from, to] of RISERS) riser(t(from), t(to - from), 0.09);
 
 // ── sound design, on the picture's frames
-// the open: a glint as the kicker arrives
-bell(t(12), 84, 0.035, -0.3, 1.6);
-// the tap on the field, the typing on 8ths
-tick(t(H.fieldTap), 0.1, 1.2);
-for (let fr = H.type1; fr <= lastChar1; fr += 8) tick(t(fr), 0.035, 1.6 + ((fr / 8) % 3) * 0.08);
-// the first card lands: the band comes in on it
-sub(t(H.found1), 48, 0.3, 0.34);
-shimmer(t(H.found1), [76, 83, 88], 0.045);
-// back to the field; the query deleted a word at a time (falling ticks)
-whoosh(t(H.back) - 0.05, 0.45, 0.04, 0.2);
-for (let k = 0; k < STEPS; k++) tick(t(H.clear + k * DELETE_FRAMES), 0.03, 1.5 - k * 0.07);
-// the second query, on 8ths
-for (let fr = Math.ceil(H.type2 / 8) * 8; fr <= lastChar2; fr += 8) tick(t(fr), 0.035, 1.6 + ((fr / 8) % 3) * 0.08);
-// the second card lands on the downbeat under "Get the one you meant.": the
-// weight on the landing (a sub sits under the speech band), the shimmer after
-sub(t(H.found2), 48, 0.32, 0.34);
-shimmer(t(after2), [76, 83, 88], 0.04);
+// the hook: the feed flying past, and back
+whoosh(t(H.scroll), 1.0, 0.025, -0.3);
+whoosh(t(H.scrollBack), 0.6, 0.025, 0.3);
+// the taps
+for (const f of [H.fieldTap, H.chipTap, H.cardTap]) tick(t(f), 0.1, 1.2);
+// the typing, on 8ths
+for (const [a, b] of typing) for (let fr = Math.ceil(a / 8) * 8; fr <= b; fr += 8) tick(t(fr), 0.035, 1.6 + ((fr / 8) % 3) * 0.08);
+// each query deleted a word at a time (falling ticks)
+for (const [from, n] of [[H.clear1, STEPS1], [H.clear2, STEPS2]]) for (let k = 0; k < n; k++) tick(t(from + k * DELETE_FRAMES), 0.03, 1.5 - k * 0.07);
+for (const f of [H.back1, H.back2]) whoosh(t(f) - 0.05, 0.45, 0.04, 0.2);
+// each thing found: weight on the landing (a sub sits under the speech
+// band), the shimmer clear of the voice
+for (const f of [H.found1, H.found2]) {
+  sub(t(f), 48, 0.3, 0.34);
+  shimmer(t(clearOfVoice(f, 12)), [76, 83, 88], 0.045);
+}
+// the source tapped: every video lands
+sub(t(H.chipTap), 43, 0.26, 0.3);
+whoosh(t(H.cardTap), 0.35, 0.05, -0.15);
 // thrown out into the lockup; the mark strikes into air
 whoosh(t(H.lockup) - 0.1, 0.7, 0.09, 0);
 impact(t(H.markStrike), 0.34);

@@ -24,12 +24,12 @@ const BIN = '/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless
 // the review set, read off the timeline so it cannot go stale
 const H = HITS;
 const REVIEW = [
-  0, CAPTIONS[0].at + 30, // the poster frame; the promise over Home
-  H.fieldTap, H.type1 + 30, H.found1 - 4, // the tap, the first query typing, whole
-  H.found1 + 20, H.back - 8, // the one card, with its ring; read
-  H.clear + 6, H.type2 + 40, H.found2 - 4, // the delete, the second query, whole
-  H.found2 + 24, H.throwOut - 8, // the one card, with its ring; read
-  H.lockup, H.markStrike + 4, CAPTIONS[2].at + 40, TOTAL_FRAMES - 1, // the throw, the strike, the close, the last frame
+  0, 60, 90, H.fieldTap + 6, // the poster, the hook's scroll, the problem, the tap
+  H.type1 + 40, H.found1 + 38, // 1. your own words: typing, the one card
+  H.type2 + 32, H.found2 + 32, // 2. close matches
+  H.chipTap - 18, H.chipTap + 44, // 3. the source offered, every video
+  H.cardTap + 24, H.cardTap + 84, CAPTIONS[5].at + 42, // 4. opened, related saves; the takeaway
+  H.markStrike + 18, CAPTIONS[6].at + 52, TOTAL_FRAMES - 1, // the strike, the close, the last frame
 ];
 const frames = process.argv.slice(2).map(Number).filter((n) => !Number.isNaN(n));
 const list = frames.length ? frames : REVIEW;

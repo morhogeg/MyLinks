@@ -540,12 +540,20 @@ export const ASK = {
 export const SEARCH = {
   query: 'easy dinner, empty fridge',
   hits: ['marcella'],
-  // The FIND clip's second search (clips/find-timeline.mjs): what someone
-  // remembers of a talk, sharing no word with its card either. Not "that
-  // talk about putting things off": "that" is in the card's summary, and
-  // the app's own matcher pulls in the one save tagged "talks" as a "Close
-  // match", so the search would show a list instead of the one card.
-  also: [{ query: 'video about putting things off', hits: ['procrastinator'] }],
+  // The FIND feature clip's searches (clips/find-timeline.mjs), each checked
+  // by `npm run verify` against the app's own matcher (web/lib/searchMatch.ts):
+  //  - words: shares no word with its one card (the reel's query);
+  //  - close: one word ("swim") is on no card, so no card has them all, and
+  //    the app's "Close matches" tier offers the one that has the rest (no
+  //    other save's title or tags carries any of its words);
+  //  - source: where it was saved; the Sources row offers it as you type
+  //    (sources match by name only, so the card grid under it is empty),
+  //    and one tap shows every save from there.
+  clip: {
+    words: { query: 'easy dinner, empty fridge', hits: ['marcella'] },
+    close: { query: 'sardinia swim spot', card: 'goloritze' },
+    source: { query: 'youtube', source: 'YouTube' },
+  },
 };
 
 /**

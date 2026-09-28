@@ -590,37 +590,44 @@ audio device); the balance, the clarity and the loudness are only measured.
 
 ## The FIND clip
 
-`MachinaFind` is a 20.8s vertical feature clip, "type what you remember, get
-the one you meant": the reel's set, type, camera, narrator and lockup, on its
-own clock (`clips/find-timeline.mjs`, output frames, the reel's 112.5 BPM and
-K = 2). Every pixel of app UI is the real app. `MachinaFindSilent` (no sound)
-and `MachinaFindClean` (no captions or kicker) sit beside it.
+`MachinaFind` is a 32.5s vertical feature clip that explains Find to someone
+seeing it for the first time (owner brief, 2026-09-28: the feature as the
+sole subject, a hook on the problem, three to five elements each shown doing
+its job and why it matters, Machina named, a concrete takeaway). The reel's
+set, type, camera, narrator and lockup, on its own clock
+(`clips/find-timeline.mjs`: output frames, the reel's 112.5 BPM and K = 2).
+Every pixel of app UI is the real app. `MachinaFindSilent` (no sound) and
+`MachinaFindClean` (no captions or kickers) sit beside it.
 
-| Frames | What it shows |
-|---|---|
-| 0–64 | Home settles; FIND and "Find it in your own words."; the thumb taps "Search your saves" (64) |
-| 64–208 | "easy dinner, empty fridge" types under a rack focus, holds a beat whole, and its ONE card lands on the beat (144): Marcella Hazan's tomato sauce; the ink ring on the next beat; read |
-| 208–400 | Back to the field; the query deleted a word at a time; "video about putting things off" types as the narrator says "Type what you remember."; the TED talk lands on the downbeat (320) under "Get the one you meant."; read |
-| 400–624 | Thrown out into the reel's lockup: the mark strikes on the beat (464), "Machina. Never lose another great find.", held |
+| Frames | Element (kicker) | What it shows, and the line |
+|---|---|---|
+| 0–144 | the hook | The feed scrolls past at speed and back: "You saved it. But what was it called?"; the camera goes to the field as the narrator names the app: "Machina finds it in your own words." |
+| 144–288 | Your own words | "easy dinner, empty fridge" types under a rack focus and ONE card lands: Marcella Hazan's tomato sauce, which shares no word with it |
+| 288–432 | Close matches | "sardinia swim spot": no save says "swim", and the app's "Close matches" offers the one that has the rest (Cala Goloritzé). "Only half remember it? You still get what's close." |
+| 432–576 | Where you saw it | "youtube": the Sources row offers YouTube (7) as it types; one tap and the feed is every video saved. "Type where you saw it, and get everything from there." |
+| 576–784 | Open it | The first video opened: its gist, then down to the saves it connects to. Then the takeaway: "Type what you remember. Get the one you meant." |
+| 784–976 | the close | The reel's lockup: "Machina. Never lose another great find." |
 
-**The two searches** each share no word with their card and land on it
-alone, never a list (`npm run verify` checks both claims against the demo
-data and the captured frames). The brief's example, "that talk about putting
-things off", failed both: "that" is in the card's summary, and the app's own
-matcher (`web/lib/searchMatch.ts`) pulls in the one save tagged "talks" as a
-"Close match". "video about putting things off" passes both and fits the
-field (223 of its 234pt). "Search by meaning" stays off the headline; the
-app's own "Meaning" badge on the found card is the app speaking.
+**What the searches claim is checked** (`npm run verify`, against the demo
+data and the captured frames): the own-words query shares no word with its
+card and finds it alone; the close-match query is answered with its one
+card under "Close matches"; the source is offered and one tap shows only its
+saves. Two honest limits of the app shaped the choices: sources match by
+publisher name only, so the card grid under the Sources row is empty (the app
+shows "No matches" there 11 captured frames after the typing; the tap lands
+before it), and the opened card shows the summary and related saves (the
+detail view has no recipe section). "Search by meaning" stays off the
+headline; the app's own "Meaning" badge on the found card is the app
+speaking. The queries are `SEARCH.clip` in `capture/library.mjs`.
 
 **One take, beside the clip.** `findClip` in `capture/shoot.mjs` is one
-continuous use of the search field: focus, type, the result, the query
-deleted a word at a time (the app's × moves focus in the capture browser and
-would need a second tap), type, the result; each result's own card-enter
-spring rolled at 60fps. Its frames go under `public/reel/app/clips/find/` and
-its data beside the clip, `src/reels/clips/find/takes.json`, not into the
-reel's `takes.json` (one generated JSON line cannot merge across the parallel
-clip branches); the clip hands it to the kit with `addTakes`
-(`kit/takes.ts`). The second query is `SEARCH.also` in `capture/library.mjs`.
+continuous use of Home: the feed scrolled, then the three searches (each
+cleared a word at a time, as a held delete key does), the source tapped and
+the first video opened; the app's own motion rolled at 60fps. Its frames go
+under `public/reel/app/clips/find/` and its data beside the clip,
+`src/reels/clips/find/takes.json`, not into the reel's `takes.json` (one
+generated JSON line cannot merge across the parallel clip branches); the clip
+hands it to the kit with `addTakes` (`kit/takes.ts`).
 
 **Its own files** (the shared scripts only gained a `find` entry):
 `clips/find-timeline.mjs`; `src/reels/clips/find/` (`FindClip`, `Search`,
@@ -640,15 +647,15 @@ node scripts/find-stills.mjs                                      # review still
 ```
 
 **Measured, not eyeballed.** Frame-to-frame differences over the whole render
-and 4-frame strips at every transition. Three things were found that way and
-fixed (the camera rules below): a drift that stopped dead for the push to the
-field (a one-frame hitch), the rack focus snapping 2px on a fast-start curve,
-and the Lift fighting the app's own spring (a one-frame hang at its overshoot,
-then a 1.4px hop on alternate frames). After: no one-frame freeze or jump
-anywhere outside the typing. The tap's pad lands on the frame the app focuses
-the field and the tick sounds (onset 64.1); the narrator sits 4.7–6.3dB over
-the music in the speech band; the mix is −14.0 LUFS, −1.25 dBTP (−1.10 after
-the render's AAC). Nobody has listened to it on speakers.
+and 4-frame strips at every transition. Found that way and fixed (the camera
+rules below): a drift that stopped dead for a push, a rack focus that lost
+2px of focus in one frame, a Lift fighting the app's own spring, and a Lift
+whose removal (or whose lift reaching exactly 0) re-rastered the card on a
+still frame. After: no one-frame freeze or jump anywhere outside the typing
+and the scroll. Each tap's pad lands on the frame the app responds and its
+tick sounds; the narrator sits 4.2–7.1dB over the music in the speech band;
+the mix is −14.0 LUFS, −1.25 dBTP (−1.33 after the render's AAC). Nobody has
+listened to it on speakers.
 
 ## Motion language
 
@@ -815,7 +822,9 @@ that breaks it.
   and ink ring follow on the next beat, once it has settled, on its settled
   box. A second spring on top hung a frame at its overshoot, and a Lift that
   followed the settling element hopped: capture boxes are measured to half a
-  point.
+  point. A Lift is its own raster: keep it mounted (at a lift of at least
+  0.002) until the screen changes anyway; removing it, or letting it reach
+  exactly 0, re-rasters the element on a still frame.
 
 ### Sound to picture (`HITS`, `audio/reel-score.mjs`)
 

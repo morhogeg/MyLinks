@@ -17,9 +17,9 @@
  *            (not in the pilot reel; kept for the feature clips)
  *   recall   Revisit → "This week in Machina", the weekly recap, opened and
  *            read down to its standout and its question
- *   findClip the FIND feature clip: two plain-words searches in one use of
- *            the field, each landing on its one card (data beside the
- *            clip, see writeClipTakesData)
+ *   findClip the FIND feature clip: the feed, then search in your own words,
+ *            close matches, a source jump, and the card opened (data
+ *            beside the clip, see writeClipTakesData)
  *
  * What the backend would do (finish analysing a card, answer a question) is
  * driven through the capture server and `window.__capture`, so the app
@@ -450,68 +450,107 @@ const takes = {
   },
 
   // ─────────────────────────────────────────────────────────── findClip
-  // The FIND feature clip (clips/find-timeline.mjs): two plain-words
-  // searches in ONE continuous use of the search field, each landing on the
-  // one card it means (SEARCH, then SEARCH.also[0]). Between them the first
-  // query is deleted a word at a time, as a held delete key does, so the
-  // field keeps its focus (the app's × moves focus to itself in this
-  // browser, which would need a second tap to type again). Each result's
-  // arrival, the app's own card-enter spring, is rolled at 60fps: the clip
-  // plays it at K = 2. Its frames go under clips/find/ and its data beside
-  // the clip's scenes (writeClipTakesData), not into the reel's takes.json.
+  // The FIND feature clip (clips/find-timeline.mjs), one continuous use of
+  // Home and its search: the feed scrolled (too many saves to scan), then
+  // the search's four sides, each on its own query from SEARCH.clip:
+  //  1. your own words: a card that shares no word with the query (meaning);
+  //  2. close matches: a query with a word no card has still gets the card
+  //     that has the others, under "Close matches", never a dead end;
+  //  3. a source, typed: the Sources row offers it, one tap shows every
+  //     save from there;
+  //  4. the first of them opened: its summary, right there.
+  // Queries are cleared a word at a time, as a held delete key does (the
+  // app's × moves focus in this browser and would need a second tap). App
+  // motion the clip plays at K = 2 is rolled at 60fps. Frames go under
+  // clips/find/, data beside the clip (writeClipTakesData), not into the
+  // reel's takes.json.
   async findClip() {
     await fresh();
+    const Q = SEARCH.clip;
     const t = new Take(dev, OUT, 'clips/find/search');
     const RECTS = {
       search: R.search,
       firstCard: R.firstCard,
       marcella: ['main article.surface-card', 'Marcella'],
-      marcellaTitle: ['main article.surface-card h3', 'Marcella'],
-      talk: ['main article.surface-card', 'procrastinator'],
-      talkTitle: ['main article.surface-card h3', 'procrastinator'],
+      goloritze: ['main article.surface-card', 'Goloritz'],
+      closeMatches: ['main span', 'Close matches'],
+      sourceChip: ['main div[class*="mb-5"] button', Q.source.source],
+      sourcesRow: ['main div[class*="mb-5"]', 'Sources'],
     };
     t.mark('home');
     await t.snap({ rects: RECTS });
 
+    // the hook: the feed, scrolled at speed (every save, too many to scan)
     await t.freeze();
+    await tagScroller('Read Piranesi');
+    t.mark('scroll');
+    await rollScroll(t, 2700, 45, RECTS);
+    await page.evaluate(() => document.querySelector('[data-capture-scroller]').scrollTo({ top: 0, behavior: 'instant' }));
+    await t.advance();
+    t.mark('top');
+    await t.snap({ rects: RECTS });
+
     await visible(page.getByPlaceholder('Search your saves')).click();
     t.mark('focus');
     await t.roll(16, { rects: RECTS, step: 1000 / 60 });
 
-    /** Type `query` on the frozen clock, one frame a character (the search
-     *  debounce cannot fire mid-word), then step the clock through the
-     *  debounce and the request until the card titled `title` is in the
-     *  feed, and roll its entrance from its first frame. */
-    const search = async (n, query, title) => {
-      t.mark(`typing${n}`);
+    const type = async (mark, query) => {
+      t.mark(mark);
       for (const ch of query) {
         await page.keyboard.type(ch);
         await t.advance();
         await t.snap({ rects: RECTS });
       }
-      for (let k = 0; ; k++) {
-        const landed = await page.evaluate(
-          (s) => [...document.querySelectorAll('main article.surface-card h3')].some((h) => h.textContent.includes(s)),
-          title,
-        );
-        if (landed) break;
-        if (k > 300) throw new Error(`findClip: "${query}" never showed "${title}"`);
-        await page.waitForTimeout(20); // the request crosses the (real) network
+    };
+    /** step the frozen clock (debounce, request) until `ready` holds */
+    const until = async (what, ready, arg) => {
+      for (let k = 0; !(await page.evaluate(ready, arg)); k++) {
+        if (k > 300) throw new Error(`findClip: never ${what}`);
+        await page.waitForTimeout(20);
         await t.advance(1000 / 60);
       }
-      t.mark(`result${n}`);
-      await t.roll(24, { rects: RECTS, step: 1000 / 60 });
+    };
+    const clear = async (mark) => {
+      t.mark(mark);
+      while (await page.evaluate(() => document.activeElement?.value?.length ?? 0)) {
+        await page.keyboard.press('Control+Backspace');
+        await t.advance();
+        await t.snap({ rects: RECTS });
+      }
     };
 
-    await search(1, SEARCH.query, 'Marcella');
-    // cleared the way a held delete key clears it: a word at a time
-    t.mark('clear');
-    while (await page.evaluate(() => document.activeElement?.value?.length ?? 0)) {
-      await page.keyboard.press('Control+Backspace');
-      await t.advance();
-      await t.snap({ rects: RECTS });
-    }
-    await search(2, SEARCH.also[0].query, 'procrastinator');
+    // 1. your own words
+    await type('typing1', Q.words.query);
+    await until('showed the meaning card', () =>
+      [...document.querySelectorAll('main article.surface-card h3')].some((h) => h.textContent.includes('Marcella')),
+    );
+    t.mark('result1');
+    await t.roll(24, { rects: RECTS, step: 1000 / 60 });
+
+    // 2. close matches (the literal tiers answer as it types; no request)
+    await clear('clear1');
+    await type('typing2', Q.close.query);
+    t.mark('result2');
+    await t.roll(24, { rects: RECTS, step: 1000 / 60 });
+
+    // 3. a source, typed, then tapped: the Sources row's own entrance, rolled
+    await clear('clear2');
+    await type('typing3', Q.source.query);
+    await until('offered the source', (name) => [...document.querySelectorAll('main div[class*="mb-5"] button')].some((b) => b.textContent.includes(name)), Q.source.source);
+    t.mark('sources');
+    await t.roll(24, { rects: RECTS, step: 1000 / 60 });
+    await visible(page.locator('main div[class*="mb-5"] button', { hasText: Q.source.source })).click();
+    t.mark('filtered');
+    await t.roll(36, { rects: RECTS, step: 1000 / 60 });
+    await t.thaw();
+    await page.waitForTimeout(400);
+
+    // 4. the first of them opened: the app's own open transition
+    const DETAIL = { ...RECTS, detailTitle: ['h2', ''] };
+    await t.freeze();
+    await visible(page.locator(R.firstCard[0])).click({ position: { x: 120, y: 40 } });
+    t.mark('detail');
+    await t.roll(40, { rects: DETAIL, step: 1000 / 60 });
     await t.thaw();
     return t.save();
   },

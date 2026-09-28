@@ -2,7 +2,7 @@ import React from 'react';
 import { AbsoluteFill, Audio, staticFile, useCurrentFrame } from 'remotion';
 import { CAPTIONS, FPS, HITS, KICKERS } from '../../../../clips/find-timeline.mjs';
 import { sans } from '../../../fonts';
-import { BandScrim, Captions, type ReelCaption } from '../../kit/Captions';
+import { BandScrim, Captions, type ReelCaption, type ReelKicker } from '../../kit/Captions';
 import { CLOCK } from '../../kit/camera';
 import { prog } from '../../kit/curves';
 import { Lens, Paper } from '../../kit/Paper';
@@ -39,7 +39,7 @@ export const FindClip: React.FC<{
         fps={FPS}
         captions={CAPTIONS as ReelCaption[]}
         timing={VO}
-        kickers={KICKERS}
+        kickers={KICKERS as ReelKicker[]}
         showCaptions={withCaptions}
         showKickers={withCaptions}
       />

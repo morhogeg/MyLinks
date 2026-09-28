@@ -427,9 +427,12 @@ console.log('\n── reel');
 
 // ─────────────────────────────────────────────────────── THE FIND CLIP
 // (clips/find-timeline.mjs, src/reels/clips/find/, the take clips/find/search):
-// the reel's gates on the clip's own files, plus the clip's own claims. Each
-// search shares no word with its card, and each lands on ONE card (no other
-// save's title on screen), never a filtered list.
+// the reel's gates on the clip's own files, plus what the clip claims about
+// the search, checked against the demo data and the frames it shows: the
+// own-words query shares no word with its card and finds it alone; the
+// close-match query is answered under "Close matches" with its one card; the
+// source is offered (never over "No matches" in the frames used) and one tap
+// shows only saves from it.
 console.log('\n── find clip');
 {
   const F = await import('../clips/find-timeline.mjs');
@@ -465,7 +468,7 @@ console.log('\n── find clip');
   });
   // the grid: every tap, landing and cut on a beat (typing and the delete run
   // between beats; the only things allowed to)
-  for (const k of ['fieldTap', 'type1', 'found1', 'back', 'found2', 'throwOut', 'lockup', 'markStrike']) {
+  for (const k of ['fieldTap', 'type1', 'found1', 'back1', 'type2', 'found2', 'back2', 'type3', 'chipTap', 'cardTap', 'throwOut', 'lockup', 'markStrike']) {
     if (F.HITS[k] % F.BEAT_FRAMES) bad.push(`HITS.${k} = ${F.HITS[k]} is not on a beat`);
   }
   // the narrator mirrors the captions, and every line fits and leaves in time
@@ -498,31 +501,46 @@ console.log('\n── find clip');
     bad.push('the clip lockup line is not the film endcard subtitle');
   }
 
-  // the two searches: their words are not the card's words, and the one card
-  // is all the result shows
+  // the searches, element by element
   const takes = JSON.parse(read('src/reels/clips/find/takes.json'));
   const T = takes['clips/find/search'];
+  const Q = L.SEARCH.clip;
   const words = (s) => (s.toLowerCase().match(/[\p{L}\p{N}']+/gu) ?? []).map((w) => w.replace(/'s$/, '').replace(/'/g, ''));
-  const SEARCHES = [
-    { ...L.SEARCH, mark: 'result1', typed: 'typing1' },
-    { ...L.SEARCH.also[0], mark: 'result2', typed: 'typing2' },
-  ];
+  const onFrame = (i) => T.frames[i].t.map((k) => T.texts[k]);
   const titles = L.CARDS.map((c) => c.title);
-  for (const s of SEARCHES) {
-    scan('search query', s.query);
-    const card = L.CARDS.find((c) => c.id === s.hits[0]);
-    if (s.hits.length !== 1) bad.push(`"${s.query}" must land on one card, has ${s.hits.length}`);
-    const cardWords = new Set(words([card.title, card.summary, card.tags.join(' '), card.category, card.sourceName, card.youtubeChannel ?? '', card.note ?? ''].join(' ')));
-    const shared = words(s.query).filter((w) => cardWords.has(w));
-    if (shared.length) bad.push(`"${s.query}" shares ${shared.join(', ')} with "${card.title}"`);
-    const last = T.marks[s.mark] - 1;
-    if (!T.frames[last].t.map((k) => T.texts[k]).includes(s.query)) bad.push(`the take never shows "${s.query}" typed whole`);
-    const end = s.mark === 'result1' ? T.marks.clear : T.count;
-    for (let i = T.marks[s.mark] + 1; i < end; i++) {
-      const on = T.frames[i].t.map((k) => T.texts[k]);
-      const shown = titles.filter((x) => on.includes(x));
-      if (shown.length !== 1 || shown[0] !== card.title) bad.push(`"${s.query}" frame ${i} shows ${JSON.stringify(shown)}, not only "${card.title}"`);
+  const shownTitles = (i) => titles.filter((x) => onFrame(i).includes(x));
+  for (const q of [Q.words, Q.close, Q.source]) scan('search query', q.query);
+  // 1. your own words
+  {
+    const card = L.CARDS.find((c) => c.id === Q.words.hits[0]);
+    const cardWords = new Set(words([card.title, card.summary, card.tags.join(' '), card.category, card.sourceName, card.note ?? ''].join(' ')));
+    const shared = words(Q.words.query).filter((w) => cardWords.has(w));
+    if (shared.length) bad.push(`"${Q.words.query}" shares ${shared.join(', ')} with "${card.title}"`);
+    if (!onFrame(T.marks.result1 - 1).includes(Q.words.query)) bad.push(`the take never shows "${Q.words.query}" typed whole`);
+    for (let i = T.marks.result1 + 1; i < T.marks.clear1; i++) {
+      const shown = shownTitles(i);
+      if (shown.length !== 1 || shown[0] !== card.title) bad.push(`"${Q.words.query}" frame ${i} shows ${JSON.stringify(shown)}`);
     }
+  }
+  // 2. close matches
+  {
+    const card = L.CARDS.find((c) => c.id === Q.close.card);
+    for (let i = T.marks.result2; i < T.marks.clear2; i++) {
+      const shown = shownTitles(i);
+      if (!onFrame(i).includes('Close matches') || shown.length !== 1 || shown[0] !== card.title) bad.push(`"${Q.close.query}" frame ${i}: not "${card.title}" alone under Close matches`);
+    }
+  }
+  // 3. the source: offered (never over "No matches" in the frames the clip
+  // plays: the scene holds at most OFFERED = 10 frames of the roll), then only its saves
+  {
+    for (let i = T.marks.sources; i <= T.marks.sources + 10; i++) {
+      if (!onFrame(i).includes(Q.source.source)) bad.push(`frame ${i} does not offer ${Q.source.source}`);
+      if (onFrame(i).includes('No matches')) bad.push(`frame ${i} shows "No matches" under the source (the clip plays it)`);
+    }
+    const last = T.marks.detail - 1;
+    const shown = L.CARDS.filter((c) => onFrame(last).includes(c.title));
+    const other = shown.filter((c) => c.sourceName !== Q.source.source && c.sourceType !== Q.source.source.toLowerCase());
+    if (!shown.length || other.length) bad.push(`after the ${Q.source.source} tap the feed shows ${JSON.stringify(other.map((c) => c.title))}`);
   }
   // the app's own text on every frame of the take (the clip uses all of it)
   T.frames.forEach((fr, i) => fr.t.forEach((k) => scan(`the app on the find take, frame ${i}`, T.texts[k])));
@@ -534,7 +552,7 @@ console.log('\n── find clip');
   } else {
     console.log(`✓ ${caps.length} captions + ${kick.length} kickers, no overlaps, each on a beat; narrator mirrors every caption; each leaves in time`);
     console.log('✓ taps, landings and cuts on the beat');
-    console.log(`✓ both searches share no word with their card and land on it alone; no banned string in captions or ${T.count} captured frames`);
+    console.log(`✓ own words: no shared word, one card; close matches: one card under the label; the source offered, then only its saves; no banned string in captions or ${T.count} captured frames`);
   }
 
   // the score and the mix: no clipping or holes, the voice clear of the music

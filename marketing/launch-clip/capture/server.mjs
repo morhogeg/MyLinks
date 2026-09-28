@@ -88,8 +88,7 @@ export function startServer(port = 4600) {
           return res.end();
         }
         const q = String(body.query ?? '').trim().toLowerCase();
-        const also = SEARCH.also?.find((s) => s.query.toLowerCase() === q);
-        const hits = q === SEARCH.query.toLowerCase() ? SEARCH.hits : (also?.hits ?? []);
+        const hits = q === SEARCH.query.toLowerCase() ? SEARCH.hits : [];
         return json(res, 200, { links: hits.map((id) => ({ id })), mode: 'judge' });
       }
       case '/api/share':

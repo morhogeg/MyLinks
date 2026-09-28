@@ -1,18 +1,80 @@
 [
  {
   "frame": 16,
-  "text": "Find it in your own words.",
+  "text": "You saved it. But what was it called?",
   "words": [
-   0.14,
-   0.373,
-   0.513,
-   0.653,
-   0.887,
-   1.073
+   0.04,
+   0.246,
+   0.554,
+   0.95,
+   1.097,
+   1.28,
+   1.427,
+   1.537
   ]
  },
  {
-  "frame": 272,
+  "frame": 128,
+  "text": "Makeena finds it in your own words.",
+  "words": [
+   0.07,
+   0.47,
+   0.77,
+   0.92,
+   1.07,
+   1.32,
+   1.52
+  ]
+ },
+ {
+  "frame": 304,
+  "text": "Only half remember it? You still get what\u2019s close.",
+  "words": [
+   0.06,
+   0.288,
+   0.517,
+   0.927,
+   1.46,
+   1.626,
+   1.874,
+   2.04,
+   2.33
+  ]
+ },
+ {
+  "frame": 448,
+  "text": "Type where you saw it, and get everything from there.",
+  "words": [
+   0.04,
+   0.262,
+   0.528,
+   0.705,
+   0.883,
+   1.33,
+   1.493,
+   1.655,
+   2.102,
+   2.305
+  ]
+ },
+ {
+  "frame": 576,
+  "text": "Open it: the gist, and the saves it connects to.",
+  "words": [
+   0.04,
+   0.343,
+   0.585,
+   0.827,
+   1.46,
+   1.637,
+   1.815,
+   2.081,
+   2.214,
+   2.613
+  ]
+ },
+ {
+  "frame": 688,
   "text": "Type what you remember. Get the one you meant.",
   "words": [
    0.04,
@@ -27,7 +89,7 @@
   ]
  },
  {
-  "frame": 480,
+  "frame": 848,
   "text": "Makeena. Never lose another great find.",
   "words": [
    0.03,
