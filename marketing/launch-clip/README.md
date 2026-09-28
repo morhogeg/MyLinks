@@ -605,7 +605,7 @@ Every pixel of app UI is the real app. `MachinaFindSilent` (no sound) and
 | 144–288 | Your own words | "easy dinner, empty fridge" types under a rack focus and ONE card lands: Marcella Hazan's tomato sauce, which shares no word with it |
 | 288–432 | Close matches | "sardinia swim spot": no save says "swim", and the app's "Close matches" offers the one that has the rest (Cala Goloritzé). "Only half remember it? You still get what's close." |
 | 432–576 | Where you saw it | "youtube": the Sources row offers YouTube (7) as it types; one tap and the feed is every video saved. "Type where you saw it, and get everything from there." |
-| 576–784 | Open it | The first video opened: its gist, then down to the saves it connects to. Then the takeaway: "Type what you remember. Get the one you meant." |
+| 576–784 | Open it | The first video opened: "Open it for the summary, and everything it connects to.", the camera moving down to its related saves. Then a cut on the beat back to the empty search field for the takeaway: "Type what you remember. Get the one you meant." |
 | 784–976 | the close | The reel's lockup: "Machina. Never lose another great find." |
 
 **What the searches claim is checked** (`npm run verify`, against the demo

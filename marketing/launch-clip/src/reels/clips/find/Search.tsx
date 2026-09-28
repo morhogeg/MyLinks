@@ -68,7 +68,9 @@ const frameAt = (f: number) => {
   if (f < typed3) return at(T, 'typing3', Math.min(CHARS3 - 1, (f - S.type3) / TYPE_FRAMES));
   if (f < S.chipTap) return at(T, 'sources', Math.min(OFFERED, f - typed3));
   if (f < S.cardTap) return at(T, 'filtered', Math.min(35, f - S.chipTap));
-  return at(T, 'detail', Math.min(39, f - S.cardTap));
+  if (f < TAKEAWAY) return at(T, 'detail', Math.min(39, f - S.cardTap));
+  // the takeaway: back on the empty search field ("Type what you remember")
+  return at(T, 'focus', 15);
 };
 
 /** how far the capture has scrolled at an output frame (points), for the
@@ -79,6 +81,10 @@ const scrolled = (f: number) =>
 
 /** the beat the narrator reaches "and the saves it connects to" */
 const RELATED = 624;
+/** the takeaway line's first frame: a cut on the beat, from the opened card
+ *  back to the empty field it was found from (owner: the takeaway must not
+ *  sit on the card) */
+const TAKEAWAY = 688;
 
 /** the typing framing: the field just under the caption band, big, with
  *  Done in frame; what each query finds lands whole below it */
@@ -113,7 +119,10 @@ export const searchKeys: Key[] = [
   // …then down to the saves it connects to, as the narrator says so
   // (slow enough to read through: a 32-frame move smeared the card)
   { f: RELATED + 36, cy: 640, z: 2.25, fy: 1230, ease: EASE_IN_OUT },
-  { f: S.throwOut, cy: 648, z: 2.3, ease: linear },
+  { f: TAKEAWAY - 1, cy: 646, z: 2.28, ease: linear },
+  // CUT (on the beat, with the takeaway line) to the empty search field
+  { f: TAKEAWAY, ...TYPE_CAM, ease: linear },
+  { f: S.throwOut, z: 2.78, ease: linear },
   // thrown out of frame, into the lockup
   { f: S.lockup + 14, fx: -760, z: 2.36, ease: EASE_IN_OUT },
 ];
@@ -137,11 +146,12 @@ export const Search: React.FC<{ f: number }> = ({ f }) => {
     prog(f, S.fieldTap - 8, S.fieldTap + 8, EASE_IN_OUT) * (1 - prog(f, S.found1, S.found1 + 10, EASE_MODAL)),
     prog(f, S.back1 + 4, S.back1 + 20, EASE_IN_OUT) * (1 - prog(f, S.found2, S.found2 + 10, EASE_MODAL)),
     prog(f, S.back2 + 4, S.back2 + 20, EASE_IN_OUT) * (1 - prog(f, S.chipTap, S.chipTap + 10, EASE_MODAL)),
+    f >= TAKEAWAY ? 1 : 0, // the takeaway's field: sharp from the cut, the feed soft
   );
   const open = 1 - prog(f, 0, 16, EASE_MODAL);
   const field = rectOf(T, at(T, 'focus', 8), 'search');
   const chip = rectOf(T, at(T, 'sources', 2), 'sourceChip');
-  const bandTo = f >= S.back2 ? chip[1] + chip[3] : field[1] + field[3];
+  const bandTo = f >= S.back2 && f < S.cardTap ? chip[1] + chip[3] : field[1] + field[3];
   const tapField = center(rectOf(T, at(T, 'home'), 'search'));
   const card = rectOf(T, at(T, 'filtered', 35), 'firstCard');
 
