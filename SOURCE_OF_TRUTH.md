@@ -2536,6 +2536,28 @@ narrator, its word timings and the mixed audio are committed; `reel:vo` and
 in Inter as a stand-in for SF Pro, which is what the app actually renders in
 on iPhone (§4 23b).
 
+**What exists (feature clip: Ask, 2026-09-28, branch `claude/clip-ask`,
+awaiting owner review, not merged):** `MachinaAsk` (21.3s, 1080×1920, score +
+narrator + captions, the deliverable; mastered to −14 LUFS, true peak ≤ −1
+dBTP), `MachinaAskSilent` and `MachinaAskClean`, built from the reel kit
+unchanged. It shows the hero feature as a claim and its proof: the empty Ask
+screen opening ("Ask anything."), "What do my saves say about time?" typed and
+sent, the answer streaming in ("Every answer comes straight from your
+saves,"), its three sources from three platforms lifting on beats ("with the
+sources to prove it."), then the first source tapped and The Tail End's own
+card opening on the passage the answer drew on, which lifts; the reel's
+lockup closes on "Machina. Never lose another great find." Every app frame is
+ONE continuous take of the real app (`askcite` in `capture/shoot.mjs`, same
+demo account), which never records the app's "Searching your …" thinking
+line. The clip's clock is `clips/ask-timeline.mjs`, written in output frames
+on the reel's grid (verify checks every cut and tap sits on a beat); its
+scenes are `src/reels/clips/ask/`, its score `audio/clips/ask-score.mjs`, and
+`synth-vo.py`, `mix-vo.mjs`, `verify.mjs` and `Root.tsx` each gained one `ask`
+entry (the reel and the film render pixel-identical before and after). **To
+render:** after `reel:app` + `reel:capture`, `npx remotion render src/index.ts
+MachinaAsk out/machina-ask.mp4` (commands in the launch-clip README, "Feature
+clip: Ask").
+
 **Feature-clip briefs, FINAL against the pilot's kit (2026-09-26).** Shared
 by all five: **448 frames (7 bars at 112.5 BPM, 14.9s)**, vertical, built
 from `src/reels/kit/` imported unchanged and following the README's "Motion
@@ -2595,6 +2617,32 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-28 — Feature clip: Ask (`MachinaAsk`), built; not merged.** Branch
+  `claude/clip-ask`, owner reviews the cut first. 21.3s vertical: the empty
+  Ask screen opening ("Ask anything."), the question typed and sent, the
+  answer streaming ("Every answer comes straight from your saves,"), its
+  three sources lifting on beats ("with the sources to prove it."), the first
+  source tapped and The Tail End's card opening on the passage the answer drew
+  on, then the reel's lockup. One continuous take (`askcite`) of the real app
+  that never records the "Searching your …" line; the clip's own clock
+  (`clips/ask-timeline.mjs`, output frames on the reel's grid), scenes, score
+  and verify section; `synth-vo.py`, `mix-vo.mjs`, `verify.mjs`, `Root.tsx`
+  only gained an `ask` entry. Found by measuring the render and fixed in the
+  clip: a camera glide over the app's crossfade (the card now opens in a still
+  frame), a 2.5px hop on a half-point `Lift` box, the lockup line stepping a
+  pixel every ~28 frames under the slow push (the line now holds; the reel's
+  `End.tsx` has the same push, not measured there), a stop-and-start opening
+  whose settling tilt popped every line of text as it reached 0 (now one 2D
+  move), 12 frames of empty paper before the mark. **Verified:** tsc, `npm run
+  verify` (reel and clip sections), the full render (h264 + aac, 640 frames),
+  frame-to-frame differences and 4-frame strips at every transition, −14.0
+  LUFS / −1.25 dBTP, every line ≥4.6dB over the music in the speech band;
+  `MachinaReel` (50 frames) and `MachinaLaunch` (18 frames) pixel-identical
+  before and after (one reel frame first differed by 11 pixels at 2/255; it
+  matched exactly on three re-renders, and the renderer itself varies by a
+  few pixels between identical runs on that iris transition), and the
+  committed mixes regenerate byte-identical.
+  **Not verified:** nobody has listened on speakers.
 - **2026-09-27 — Highlight reel round 15: caret, shares, one face.** Branch
   `claude/machina-reel-pilot`, not merged. Owner on round 14: the input
   caret was jittery (0:26–0:28): it blinks on the browser's real clock, so

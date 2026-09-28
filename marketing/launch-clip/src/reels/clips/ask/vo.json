@@ -1,0 +1,47 @@
+[
+ {
+  "frame": 16,
+  "text": "Ask anything.",
+  "words": [
+   0.04,
+   0.263
+  ]
+ },
+ {
+  "frame": 144,
+  "text": "Every answer comes straight from your saves,",
+  "words": [
+   0.03,
+   0.302,
+   0.619,
+   0.891,
+   1.299,
+   1.526,
+   1.753
+  ]
+ },
+ {
+  "frame": 240,
+  "text": "with the sources to prove it.",
+  "words": [
+   0.05,
+   0.267,
+   0.44,
+   0.787,
+   0.917,
+   1.177
+  ]
+ },
+ {
+  "frame": 496,
+  "text": "Makeena. Never lose another great find.",
+  "words": [
+   0.03,
+   0.83,
+   1.145,
+   1.408,
+   1.829,
+   2.145
+  ]
+ }
+]

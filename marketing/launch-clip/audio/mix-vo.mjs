@@ -28,6 +28,8 @@ const root = path.join(here, '..');
 const SCRIPTS = {
   film: { vo: path.join(root, 'out', 'vo'), score: 'score.wav', out: 'score-vo.wav', duck: 0.65 },
   reel: { vo: path.join(root, 'out', 'vo', 'reel'), score: 'reel-score.wav', out: 'reel-score-vo.wav', duck: 0.55 },
+  // the ASK feature clip (clips/ask-timeline.mjs): the reel's balance and master
+  ask: { vo: path.join(root, 'out', 'vo', 'ask'), score: 'ask-score.wav', out: 'ask-score-vo.wav', duck: 0.55 },
 };
 const name = process.argv[2] ?? 'film';
 const script = SCRIPTS[name];
@@ -73,6 +75,8 @@ const lineDuck =
   name === 'reel'
     ? Object.fromEntries((await import('../reel-timeline.mjs')).CAPTIONS.filter((c) => c.duck).map((c) => [c.at, c.duck]))
     : {};
+// (the ASK clip's lines duck the same way, keyed by its own timeline)
+if (name === 'ask') Object.assign(lineDuck, Object.fromEntries((await import('../clips/ask-timeline.mjs')).CAPTIONS.filter((c) => c.duck).map((c) => [c.at, c.duck])));
 
 // duck envelope: 1 everywhere, dips to DUCK across each VO line
 const DUCK = script.duck;
@@ -124,7 +128,7 @@ let g = peak > 0.98 ? 0.98 / peak : 1;
 // Shorts and YouTube expect a finished mix (the round-12 mix measured −15.8).
 // A global gain, then a look-ahead limiter on the few transients that would
 // pass the ceiling. The film's mix is untouched (it has no MASTER).
-const MASTER = { reel: { lufs: -14, truePeak: -1 } }[name];
+const MASTER = { reel: { lufs: -14, truePeak: -1 }, ask: { lufs: -14, truePeak: -1 } }[name];
 if (MASTER) {
   let gain = 10 ** ((MASTER.lufs - lufs(L, R, SR)) / 20);
   let ceiling = 10 ** ((MASTER.truePeak - 0.3) / 20);

@@ -17,6 +17,8 @@
  *            (not in the pilot reel; kept for the feature clips)
  *   recall   Revisit → "This week in Machina", the weekly recap, opened and
  *            read down to its standout and its question
+ *   askcite  (the ASK feature clip) Ask opening → the question → the answer
+ *            → its sources → the first source tapped, its card opening
  *
  * What the backend would do (finish analysing a card, answer a question) is
  * driven through the capture server and `window.__capture`, so the app
@@ -442,6 +444,101 @@ const takes = {
       t.mark(`fling${k}`);
       await t.roll(16, { rects: { card: ['.surface-card', ['How to Do Great Work', 'Dieter Rams', 'Steve Jobs'][k]] } });
     }
+    await t.thaw();
+    return t.save();
+  },
+
+  // ─────────────────────────────────────────────────────────── askcite
+  // The ASK feature clip (clips/ask-timeline.mjs), in ONE continuous take so
+  // the clip never swaps takes: Ask opening (the screen's fade and its mark's
+  // own launch, all of it, at 60fps), the question typed, the answer streamed
+  // a few words a frame, its three sources, then the first source tapped and
+  // the cited card opening (the app's own transition, at 60fps).
+  // The thinking line the app shows between send and the first words
+  // ("Searching your …", banned wording for reels) is never recorded: the
+  // first words are released before the first frame after send, so no frame
+  // of this take can show it (verify checks).
+  async askcite() {
+    await fresh();
+    const t = new Take(dev, OUT, 'askcite');
+    const ASKING = {
+      composer: R.composer,
+      send: R.send,
+      mark: ['[aria-label="Machina is ready"]'],
+      heading: ['h2', 'What do you want to recall?'],
+      promise: ['p', 'Answers come only from'],
+    };
+    const ANSWER = {
+      bubble: ['div', ASK.question],
+      lead: ['p', 'Your saves keep circling'],
+      body: ['p', 'The Tail End counts'],
+      chip1: ['button[title="The Tail End"]'],
+      chip2: ['button[title="Inside the mind of a master procrastinator"]'],
+      chip3: ['button[title="How to Get Rich (without getting lucky)"]'],
+      graphChip: ['button', 'Graph'],
+    };
+    const CARD = {
+      title: ['h2', 'The Tail End'],
+      summary: ['p', 'Counted in visits instead of years'],
+      keyPoints: ['h1,h2,h3,h4', 'Key Points'],
+      points: ['ul', 'Counted in visits'],
+    };
+    // characters released per captured frame (whole words; ~1.5 words)
+    const STREAM = 8;
+
+    t.mark('home');
+    await t.snap({ rects: { askTab: R.askTab } });
+
+    // Ask opens: the screen fades in and its mark plays the app's own launch
+    // (CitationMark LAUNCH_MS, 1.3s) to the end, at 60fps (the clip plays it
+    // at half speed, one captured frame per output frame)
+    await t.freeze();
+    await tab('Ask').click();
+    t.mark('open');
+    await t.roll(90, { rects: ASKING, step: 1000 / 60 });
+    await t.thaw();
+
+    // the question, typed at 30 characters a second on the frozen clock
+    await visible(page.locator('textarea')).click();
+    await page.waitForTimeout(150);
+    await t.freeze();
+    t.mark('typing');
+    for (const ch of ASK.question) {
+      await page.keyboard.type(ch);
+      await t.advance();
+      await t.snap({ rects: ASKING });
+    }
+    await t.thaw();
+
+    // send: the first words are already on screen when the first frame is
+    // taken (the thinking line lives only in the untaken moment before them)
+    await page.keyboard.press('Enter');
+    for (let k = 0; k < 40 && !server.chatOpen(); k++) await page.waitForTimeout(25);
+    let done = server.advanceChat(STREAM);
+    await until('Your saves');
+    await page.waitForTimeout(90);
+    await t.freeze();
+    t.mark('stream');
+    await t.snap({ rects: ANSWER });
+    while (!done) {
+      done = server.advanceChat(STREAM);
+      await page.waitForTimeout(90); // the chunk crosses the (real) network
+      await t.advance();
+      await t.snap({ rects: ANSWER });
+    }
+    server.finishChat();
+    await page.waitForTimeout(400);
+    t.mark('sources');
+    await t.roll(24, { rects: ANSWER });
+    await t.thaw();
+    await page.waitForTimeout(600);
+
+    // the first source, tapped: the card it cites opens (LinkDetailModal,
+    // the same view a card opens into from the feed)
+    await t.freeze();
+    await visible(page.locator(ANSWER.chip1[0])).click();
+    t.mark('card');
+    await t.roll(48, { rects: CARD, step: 1000 / 60 });
     await t.thaw();
     return t.save();
   },

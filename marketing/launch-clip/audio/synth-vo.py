@@ -117,6 +117,37 @@ SCRIPTS = {"film": (film_script, VO), "reel": (reel_script, os.path.join(VO, "re
 WORD_TIMING = {"reel": os.path.join(ROOT, "src", "reels", "data", "reel-vo.json")}
 
 
+# ── feature clip: ASK (clips/ask-timeline.mjs) ──────────────────────────────
+# Spoken exactly like the reel: the clip's CAPTIONS are its script, read as
+# written by the same narrator; its own folder (out/vo/ask/) and its own word
+# timings (src/reels/clips/ask/vo.json).
+#
+#   python3 audio/synth-vo.py ask
+def ask_script():
+    """The ASK clip's captions, read from clips/ask-timeline.mjs."""
+    js = (
+        "import('./clips/ask-timeline.mjs').then(m => console.log(JSON.stringify("
+        "{ fps: m.FPS, captions: m.CAPTIONS })))"
+    )
+    raw = subprocess.run(["node", "-e", js], cwd=ROOT, check=True, capture_output=True, text=True).stdout
+    data = json.loads(raw)
+    fps = data["fps"]
+    return [
+        {
+            "frame": c["at"],
+            "start": c["at"] / fps,
+            "window": (c["to"] - c["at"]) / fps,
+            "text": " ".join((c.get("say") or c["text"]).split()).replace("Machina", SAY_NAME),
+            "speed": SPEED,
+        }
+        for c in data["captions"]
+    ]
+
+
+SCRIPTS["ask"] = (ask_script, os.path.join(VO, "ask"))
+WORD_TIMING["ask"] = os.path.join(ROOT, "src", "reels", "clips", "ask", "vo.json")
+
+
 def speech_runs(samples, sr, gap=0.09):
     """[start, end] seconds of each run of speech, split at pauses >= gap."""
     import numpy as np

@@ -4,6 +4,8 @@ import { FPS, HEIGHT, TOTAL_FRAMES, WIDTH } from '../timeline.mjs';
 import * as REEL from '../reel-timeline.mjs';
 import { Film } from './Film';
 import { MachinaReel } from './reels/MachinaReel';
+import * as ASK from '../clips/ask-timeline.mjs';
+import { MachinaAsk } from './reels/clips/ask/MachinaAsk';
 
 /**
  * Compositions:
@@ -115,5 +117,36 @@ export const RemotionRoot: React.FC = () => (
       height={REEL.HEIGHT}
       defaultProps={{ withAudio: false, withCaptions: false }}
     />
+    {/* feature clip: ASK (src/reels/clips/ask, its clock in clips/ask-timeline.mjs):
+        MachinaAsk (score + narrator + captions, the deliverable), Silent (stills/QA), Clean */}
+    <>
+      <Composition
+        id="MachinaAsk"
+        component={MachinaAsk}
+        durationInFrames={ASK.TOTAL_FRAMES}
+        fps={ASK.FPS}
+        width={ASK.WIDTH}
+        height={ASK.HEIGHT}
+        defaultProps={{ withAudio: true, withCaptions: true, audioFile: 'ask-score-vo.wav' }}
+      />
+      <Composition
+        id="MachinaAskSilent"
+        component={MachinaAsk}
+        durationInFrames={ASK.TOTAL_FRAMES}
+        fps={ASK.FPS}
+        width={ASK.WIDTH}
+        height={ASK.HEIGHT}
+        defaultProps={{ withAudio: false, withCaptions: true }}
+      />
+      <Composition
+        id="MachinaAskClean"
+        component={MachinaAsk}
+        durationInFrames={ASK.TOTAL_FRAMES}
+        fps={ASK.FPS}
+        width={ASK.WIDTH}
+        height={ASK.HEIGHT}
+        defaultProps={{ withAudio: false, withCaptions: false }}
+      />
+    </>
   </>
 );

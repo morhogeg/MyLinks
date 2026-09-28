@@ -651,6 +651,10 @@ downward to become the + button and must not cross type. **Type never sits
 on UI:** `BandScrim` fades any app screen that rises into the band (opaque
 to 510px, clear by 720px), and shots aim their subjects below 720px.
 Anything that holds is rounded to whole pixels (the film's shimmer lesson).
+**Text never drifts slower than a pixel a frame** (Ask clip): Chromium lays
+glyphs on whole pixels, so a line under a slow push steps a pixel at a time
+(the lockup's 2.5% push measured ~5,000 pixels of the line jumping at once
+every ~28 frames). Push the paths (the mark, the wordmark) and hold the text.
 
 ### Curves (`curves.ts`): each one has a job
 
@@ -739,6 +743,21 @@ that breaks it.
 - **A stepped capture never hops.** When the app scrolls in captured steps
   (the card's read-down, the recap), the camera takes up each step's rounding
   and motion blur follows the net motion (camera + scroll).
+- **A tap that opens a screen plays in a still frame** (Ask clip): frame the
+  tapped element and the space the new screen opens into, in one move that
+  comes to rest as the finger lands, and let the app's own transition play
+  with the camera still. A camera move over the app's crossfade smears both.
+- **A tilt never settles inside a shot** (Ask clip). On the frame `rx`/`ry`
+  reach 0 the slab switches from a 3D to a 2D transform and re-rasters: every
+  line of text on it pops at once (measured: four times the change of the
+  frames around it). Settle a tilt under a cut, or don't tilt a shot whose
+  text is read. (The reel's Revisit and Connect openings settle a tilt this
+  way; not measured in the reel.)
+- **Lift a whole-point box** (Ask clip). Capture boxes are measured to half a
+  point; Chromium snaps the lifted box and the image inside it to whole pixels
+  separately, so a half-point box draws the lifted copy up to a point off its
+  own pixels: a hop as the lift appears and again as it leaves (measured
+  2.5px). Round the box outward to whole points before passing it to `Lift`.
 
 ### Sound to picture (`HITS`, `audio/reel-score.mjs`)
 
@@ -786,3 +805,77 @@ Enforced by `npm run verify` where a machine can check:
 - the real wordmark and glyph only (`Brand.tsx` wraps `ui/Brand.tsx`'s shipped
   path data);
 - nothing claims App Store availability.
+
+## Feature clip: Ask (`MachinaAsk`)
+
+`MachinaAsk` is a 21.3s vertical clip of the hero feature, **ask your saves
+anything; every answer shows its sources**, in the highlight reel's design
+language: the paper set, Geist kinetic type, the kit's camera, `AppShot`,
+`Lift` and `Tap`, the reel's curves and cuts, the same narrator, a score from
+the same instruments on the same 112.5 BPM grid, and the reel's lockup. It is
+built from `src/reels/kit/` unchanged. The story is the claim and its proof:
+the answer says "The Tail End counts what is left in visits, not years"; the
+first source is tapped and The Tail End's own card opens on "Counted in visits
+instead of years", which lifts.
+
+| Frames | What it does |
+|---|---|
+| 0–48 | Ask opens: the empty screen ("What do you want to recall?", and the app's own promise, "Answers come only from your 24 saves, with sources you can open.") comes into focus while its mark plays the app's own launch; the point strikes on beat 2. ASK, "Ask anything." |
+| 48–128 | Cut on the beat to the composer: "What do my saves say about time?" types; Send is tapped on the bar, and the cut to the answer lands on the touch |
+| 128–216 | The answer streams in; "Every answer comes straight from your saves," |
+| 216–320 | The sources arrive under it; the camera travels down onto them and each lifts on its beat (240, 256, 272): "with the sources to prove it."; then one move back up onto the first source and the space its card opens into, at rest as the finger lands |
+| 320–448 | The first source is tapped: The Tail End opens (the app's own transition, the view a card opens into from the feed) in a still frame; its summary lifts (352) |
+| 448–640 | Thrown out into the lockup: the mark strikes on beat 30, "Machina. Never lose another great find." |
+
+**One clock, in output frames.** The reel wrote its cut in source frames and
+played it at K = 2; the clip is written straight in output frames on the same
+grid (`clips/ask-timeline.mjs`, `reel-timeline.mjs` its template), so there
+are no holds: every cut and tap sits on a beat and every other picture event
+on an 8th (verify checks). K = 2 still means the reel's steady pace: the app's
+motion always plays at half speed, a frame captured at 30fps (typing, the
+stream, the sources) lasting two output frames and one captured at 60fps (the
+opening, the card) lasting one.
+
+**One take.** Everything on screen is one continuous use of the real app,
+`askcite` in `capture/shoot.mjs` (same demo account, same backend stand-in),
+so the clip never swaps takes. The app's thinking line ("Searching your …",
+banned wording) is not in the take at all: the first words are released
+before the first frame after send, so no frame can show it, and the reel's own
+banned-string scan (which reads every take) stays green.
+
+**Lines.** Three, then the close, every one starting on a beat and leaving
+0.8–1.0s after its voice. "Every answer comes straight from your saves, with
+the sources to prove it." is carried across two lines, the claim while the
+answer streams and the proof as the sources lift, so each half lands on its
+picture.
+
+**Found by measuring the render** (frame-to-frame differences, phase
+correlation, full-resolution crops), each fixed in the clip and written into
+the Motion language above:
+- a camera glide started on the source tap smeared the app's own crossfade:
+  the card now opens in a still frame;
+- the summary's lift hopped 2.5px as it appeared and again as it left (a
+  half-point box);
+- the lockup's line stepped a pixel every ~28 frames under the slow push-in
+  (text snaps; the reel's `End.tsx` uses the same push, not measured there);
+- the opening settled and then drifted (a stop and a start): one move now,
+  in 2D (its breath of tilt popped every line of text on the frame it
+  reached 0);
+- 12 frames of empty paper between the throw and the mark: the strike moved
+  to beat 30.
+
+```bash
+npm run reel:app && CAPTURE_ONLY=askcite npm run reel:capture   # the take (or all takes)
+python3 audio/synth-vo.py ask                                   # → out/vo/ask/, src/reels/clips/ask/vo.json
+node audio/clips/ask-score.mjs && node audio/mix-vo.mjs ask     # → public/ask-score-vo.wav (−14 LUFS)
+npm run verify                                                  # the reel's gates + "clip: ask"
+npx remotion render src/index.ts MachinaAsk out/machina-ask.mp4 # also MachinaAskSilent, MachinaAskClean
+```
+
+Its parts: `clips/ask-timeline.mjs` (the clock, lines, hits), `src/reels/clips/ask/`
+(`MachinaAsk.tsx`, `AskScene.tsx`, `End.tsx`, `vo.json`), `audio/clips/ask-score.mjs`,
+the `askcite` take, and one entry each in `synth-vo.py`, `mix-vo.mjs`,
+`verify.mjs` and `Root.tsx`. The narrator's word timings and the mixed audio
+are committed; the take's PNGs regenerate from the app like the reel's. Nobody
+has listened to the mix on speakers; its balance, clarity and loudness are
+measured.

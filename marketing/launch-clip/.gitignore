@@ -9,3 +9,6 @@ public/score.wav
 public/reel/
 # Regenerable like score.wav (`npm run reel:score` rewrites it byte-identically).
 public/reel-score.wav
+# The ASK feature clip's score, regenerable the same way
+# (`node audio/clips/ask-score.mjs` rewrites it byte-identically).
+public/ask-score.wav

@@ -425,5 +425,238 @@ console.log('\n── reel');
   }
 }
 
+// ─────────────────────────────────────────────────────── THE ASK CLIP
+// The feature clip (clips/ask-timeline.mjs, src/reels/clips/ask/, capture
+// take `askcite`) under the reel's gates, on its own clock: captions and
+// kickers, the narrator mirroring them and fitting them, the dwell rule, the
+// closing subtitle, banned strings on screen and in the voice, the score, the
+// voice over the music, the delivery loudness. Plus what a clip written
+// straight in output frames needs: every picture event on the grid (cuts and
+// taps on beats, the rest on 8ths), every line starting on a beat, at most
+// three lines before the close, and the app's thinking line on NO frame of
+// its take (the clip never has to skip a range).
+console.log('\n── clip: ask');
+{
+  const C = await import('../clips/ask-timeline.mjs');
+  const LIB = await import('../capture/library.mjs');
+  const root = path.join(here, '..');
+  const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
+  const bad = [];
+  const BANNED = [
+    [/—/, 'em dash'],
+    [/\bAI\b/, 'literal "AI"'],
+    [/second brain/i, '"second brain"'],
+    [/librar(y|ies)/i, '"library"'],
+  ];
+  const scan = (where, text) => {
+    for (const [re, what] of BANNED) if (re.test(text)) bad.push(`${what} in ${where}: ${JSON.stringify(text).slice(0, 110)}`);
+  };
+
+  // captions and kickers
+  const caps = [...C.CAPTIONS].sort((a, b) => a.at - b.at);
+  caps.forEach((c, i) => {
+    scan(`caption ${i + 1}`, c.text);
+    if (c.say) scan(`caption ${i + 1} (spoken)`, c.say);
+    if (c.to <= c.at) bad.push(`caption "${c.text}" ends before it starts`);
+    if (i && c.at < caps[i - 1].to) bad.push(`caption overlap: "${c.text}" starts at ${c.at}, "${caps[i - 1].text}" runs to ${caps[i - 1].to}`);
+    if (c.to > C.TOTAL_FRAMES) bad.push(`caption "${c.text}" runs past the clip (${c.to} > ${C.TOTAL_FRAMES})`);
+    if (c.at % C.BEAT_FRAMES) bad.push(`caption "${c.text}" starts at ${c.at}, not on a beat`);
+  });
+  const lines = caps.filter((c) => !c.place);
+  if (lines.length > 3) bad.push(`${lines.length} narrator lines before the close (at most 3)`);
+  const kick = [...C.KICKERS].sort((a, b) => a.at - b.at);
+  kick.forEach((k, i) => {
+    if (i && k.at < kick[i - 1].to) bad.push(`kicker overlap: ${k.text} / ${kick[i - 1].text}`);
+    if (!lines.some((c) => c.to === k.to && c.at >= k.at)) bad.push(`kicker ${k.text} (${k.at}–${k.to}) does not leave with a line`);
+    scan(`kicker ${k.text}`, k.text);
+  });
+  if (!kick.length || kick[0].at > C.BEAT_FRAMES) bad.push('the clip does not open on its kicker');
+
+  // the grid: cuts and taps on beats, every other picture event on an 8th
+  const ON_BEAT = ['typeFrom', 'send', 'citeTap', 'summary', 'lockup', 'markStrike'];
+  for (const [k, v] of Object.entries(C.HITS)) {
+    for (const fr of [v].flat()) {
+      const step = ON_BEAT.includes(k) || k === 'chips' ? C.BEAT_FRAMES : C.BEAT_FRAMES / 2;
+      if (fr % step) bad.push(`hit ${k} at ${fr} is not on ${step === C.BEAT_FRAMES ? 'a beat' : 'an 8th'}`);
+    }
+  }
+
+  // the narrator mirrors the captions, fits them, and obeys the dwell rule
+  const SAY_NAME = /SAY_NAME = "([^"]+)"/.exec(read('audio/synth-vo.py'))[1];
+  const spoken = (t) => t.split(/\s+/).join(' ').replaceAll('Machina', SAY_NAME);
+  const timing = JSON.parse(read('src/reels/clips/ask/vo.json'));
+  caps.forEach((c) => {
+    const t = timing.find((x) => x.frame === c.at);
+    if (!t) return bad.push(`no narrator timing for caption at ${c.at} ("${c.text}"): run synth-vo.py ask`);
+    if (t.text !== spoken(c.say ?? c.text)) bad.push(`narrator ≠ caption at ${c.at}: said "${t.text}", scripted "${c.say ?? c.text}"`);
+    const words = (c.say ?? c.text).split(/\s+/).filter(Boolean).length;
+    if (t.words.length !== words) bad.push(`caption at ${c.at} has ${words} words but ${t.words.length} timings`);
+  });
+  const manifestPath = path.join(root, 'out', 'vo', 'ask', 'manifest.json');
+  const manifest = fs.existsSync(manifestPath) ? JSON.parse(fs.readFileSync(manifestPath, 'utf8')) : null;
+  if (manifest) {
+    for (const line of manifest) {
+      const c = caps.find((x) => x.at === line.frame);
+      if (!c) continue;
+      const window = (c.to - c.at) / C.FPS;
+      if (line.spoken > window + 1e-6) bad.push(`VO "${line.text}" speaks ${line.spoken}s in a ${window.toFixed(2)}s caption`);
+      if (c.place === 'lockup') continue;
+      const dwell = window - line.spoken;
+      const max = c.until ? 4 : 1.2;
+      if (dwell < 0.3) bad.push(`caption "${c.text}" leaves ${dwell.toFixed(2)}s after its voice (min 0.3s)`);
+      if (dwell > max) bad.push(`caption "${c.text}" lingers ${dwell.toFixed(2)}s after its voice (max ${max}s)`);
+    }
+  } else {
+    console.log('  (no out/vo/ask/manifest.json: VO fit not re-checked; run synth-vo.py ask)');
+  }
+  const close = caps.find((c) => c.place === 'lockup');
+  const closeLine = close?.text.split('\n').slice(-1)[0].replace(/\.$/, '');
+  if (!close || !read('src/scenes/Endcard.tsx').includes(closeLine)) bad.push('the clip lockup line is not the film endcard subtitle');
+
+  // banned strings on every frame of the take, and the thinking line nowhere
+  scan('Ask question', LIB.ASK.question);
+  scan('Ask answer', LIB.ASK.answer);
+  const takes = JSON.parse(read('src/reels/data/takes.json'));
+  const t = takes[C.TAKE];
+  if (!t) bad.push(`no capture take "${C.TAKE}": run \`npm run reel:capture\``);
+  else {
+    t.frames.forEach((fr, i) =>
+      fr.t.forEach((k) => {
+        scan(`the app on ${C.TAKE} frame ${i}`, t.texts[k]);
+        if (/Searching your/i.test(t.texts[k])) bad.push(`the app's thinking line is on ${C.TAKE} frame ${i}`);
+      }),
+    );
+    // each captured run fits the window the clip plays it in (at K frames each)
+    const runs = [
+      ['typing', 'stream', C.HITS.send - C.HITS.typeFrom],
+      ['stream', 'sources', C.HITS.sources - C.HITS.answerFrom],
+    ];
+    for (const [a, b2, window] of runs) {
+      const n = t.marks[b2] - t.marks[a];
+      if (n * C.K > window) bad.push(`the ${a} run (${n} frames × ${C.K}) overruns its ${window}-frame window`);
+    }
+  }
+
+  if (bad.length) {
+    console.error('✗ ask clip:');
+    for (const b of bad) console.error('    ' + b);
+    failed = true;
+  } else {
+    console.log(`✓ ${caps.length} captions + ${kick.length} kickers, no overlaps, lines on beats; narrator mirrors, fits and leaves on time`);
+    console.log('✓ every cut and tap on a beat, every other picture event on an 8th');
+    console.log(`✓ no em dash / "AI" / "second brain" / "library", and no thinking line, on any of the ${t.count} frames of ${C.TAKE}`);
+  }
+
+  // the score, the voice over it, the delivery
+  const P = (f) => path.join(root, f);
+  const wavOf = (f) => {
+    const b = fs.readFileSync(P(f));
+    const SR = b.readUInt32LE(24);
+    const n = (b.length - 44) / 4;
+    const L = new Float64Array(n);
+    const Rr = new Float64Array(n);
+    for (let i = 0; i < n; i++) {
+      L[i] = b.readInt16LE(44 + i * 4) / 32768;
+      Rr[i] = b.readInt16LE(46 + i * 4) / 32768;
+    }
+    return { SR, n, L, R: Rr };
+  };
+  if (!fs.existsSync(P('public/ask-score.wav')) || !fs.existsSync(P('public/ask-score-vo.wav'))) {
+    console.error('✗ public/ask-score.wav or ask-score-vo.wav missing: run `node audio/clips/ask-score.mjs && node audio/mix-vo.mjs ask`');
+    failed = true;
+  } else {
+    const bed = wavOf('public/ask-score.wav');
+    const mix = wavOf('public/ask-score-vo.wav');
+    let clipped = 0;
+    for (let i = 0; i < bed.n; i++) if (Math.abs(bed.L[i]) > 0.995 || Math.abs(bed.R[i]) > 0.995) clipped++;
+    const rows = [];
+    for (let k = 0; k * C.BAR * bed.SR < bed.n; k++) {
+      const s0 = Math.floor(k * C.BAR * bed.SR);
+      const e = Math.min(bed.n, Math.floor((k + 1) * C.BAR * bed.SR));
+      let sum = 0;
+      for (let i = s0; i < e; i++) sum += ((bed.L[i] + bed.R[i]) / 2) ** 2;
+      rows.push(20 * Math.log10(Math.sqrt(sum / (e - s0)) || 1e-9));
+    }
+    console.log(`  ask bars (dB): ${rows.map((x) => x.toFixed(1)).join('  ')}`);
+    if (clipped) {
+      console.error(`✗ the ask score clips (${clipped} samples)`);
+      failed = true;
+    }
+    for (let i = 1; i < rows.length - 2; i++) {
+      const dip = Math.min(rows[i - 1], rows[i + 1]) - rows[i];
+      if (dip > 3.5) {
+        console.error(`✗ ask bar ${i} sits ${dip.toFixed(1)}dB below its neighbours`);
+        failed = true;
+      }
+    }
+    // the voice: the mix (un-mastered) minus the ducked bed, per line
+    const mixInfo = path.join(root, 'out', 'vo', 'ask', 'mix.json');
+    const gain = fs.existsSync(mixInfo) ? JSON.parse(fs.readFileSync(mixInfo, 'utf8')).gain : 1;
+    const duckOf = Object.fromEntries(C.CAPTIONS.filter((c) => c.duck).map((c) => [c.at, c.duck]));
+    const perLine = (manifest ?? []).map((line) => {
+      const s0 = Math.round(line.start * mix.SR);
+      const e = s0 + Math.round(line.spoken * mix.SR);
+      const duck = duckOf[line.frame] ?? 0.55;
+      const voice = new Float64Array(e - s0);
+      const music = new Float64Array(e - s0);
+      for (let i = s0; i < e; i++) {
+        const m = (mix.L[i] + mix.R[i]) / 2 / gain;
+        const c = ((bed.L[i] + bed.R[i]) / 2) * duck;
+        voice[i - s0] = m - c;
+        music[i - s0] = c;
+      }
+      return {
+        text: line.text,
+        ratio: powerDb(voice) - powerDb(music),
+        speech: powerDb(speechBand(voice, mix.SR)) - powerDb(speechBand(music, mix.SR)),
+      };
+    });
+    if (perLine.length) {
+      const median = (xs) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
+      // the film's balance, the one mix the owner has listened to
+      let filmBal = null;
+      if (['public/score-vo.wav', 'public/score.wav', 'out/vo/manifest.json'].every((f) => fs.existsSync(P(f)))) {
+        const fmix = fs.readFileSync(P('public/score-vo.wav'));
+        const fbed = fs.readFileSync(P('public/score.wav'));
+        const FSR = fmix.readUInt32LE(24);
+        const mid = (buf, i) => (buf.readInt16LE(44 + i * 4) + buf.readInt16LE(46 + i * 4)) / 65536;
+        filmBal = median(
+          JSON.parse(fs.readFileSync(P('out/vo/manifest.json'), 'utf8')).map((line) => {
+            const s0 = Math.round(line.bar * 2.5 * FSR);
+            const e = s0 + Math.round((line.spoken ?? line.sec) * FSR);
+            const voice = new Float64Array(e - s0);
+            const music = new Float64Array(e - s0);
+            for (let i = s0; i < e; i++) {
+              voice[i - s0] = mid(fmix, i) - mid(fbed, i) * 0.65;
+              music[i - s0] = mid(fbed, i) * 0.65;
+            }
+            return powerDb(voice) - powerDb(music);
+          }),
+        );
+      }
+      const bal = median(perLine.map((x) => x.ratio));
+      console.log(`  voice over music, median line: ${filmBal === null ? '' : `film ${filmBal.toFixed(1)}dB · `}ask ${bal.toFixed(1)}dB`);
+      if (filmBal !== null && bal < filmBal - 3) {
+        console.error("✗ the ask clip's voice sits >3dB lower in its mix than the film's does");
+        failed = true;
+      }
+      const worst = perLine.reduce((a, b) => (b.speech < a.speech ? b : a));
+      console.log(`  voice over music in the speech band: min ${worst.speech.toFixed(1)}dB ("${worst.text.slice(0, 32)}…"), median ${median(perLine.map((x) => x.speech)).toFixed(1)}dB`);
+      const masked = perLine.filter((x) => x.speech < 3);
+      if (masked.length) {
+        for (const x of masked) console.error(`✗ the music masks "${x.text}": ${x.speech.toFixed(1)}dB over it in the speech band (min 3dB)`);
+        failed = true;
+      } else {
+        console.log('✓ every ask line sits 3dB or more over the music where speech is heard');
+      }
+    }
+    const I = lufs(mix.L, mix.R, mix.SR);
+    const tp = truePeak(mix.L, mix.R);
+    const okLoud = Math.abs(I + 14) <= 0.5 && tp <= -1;
+    (okLoud ? console.log : console.error)(`${okLoud ? '✓' : '✗'} the ask mix: ${I.toFixed(1)} LUFS integrated, ${tp.toFixed(2)} dBTP (spec −14 ±0.5 LUFS, ≤ −1 dBTP)`);
+    if (!okLoud) failed = true;
+  }
+}
+
 console.log(failed ? '\nFAILED' : '\nOK');
 process.exit(failed ? 1 : 0);
