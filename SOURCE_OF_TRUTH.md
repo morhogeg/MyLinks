@@ -2537,7 +2537,7 @@ in Inter as a stand-in for SF Pro, which is what the app actually renders in
 on iPhone (§4 23b).
 
 **What exists (feature clip: Ask, 2026-09-28, branch `claude/clip-ask`,
-awaiting owner review, not merged):** `MachinaAsk` (32s, 1080×1920, score +
+awaiting owner review, not merged):** `MachinaAsk` (32.5s, 1080×1920, score +
 narrator + captions, the deliverable; mastered to −14 LUFS, true peak ≤ −1
 dBTP), `MachinaAskSilent` and `MachinaAskClean`, built from the reel kit
 unchanged. Rebuilt to the owner's explainer brief (the first cut was rejected
@@ -2623,6 +2623,17 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-28 — Ask clip: finishing pass (fresh eyes, measured).** Branch
+  `claude/clip-ask`, not merged; script, order and lines unchanged. The hook
+  now speaks from 0.5s (it was wordless for 1.6s) and leaves a beat before
+  the cut; the end card holds 1.8s after "find." (was 1.3s; one beat, 32.5s,
+  new verify gate ≥1.6s); the take's streamed frames no longer carry a
+  real-clock caret (hidden at capture; it toggled every frame, off-frame in
+  this cut). Measured clean: single-frame cuts, taps on the app's response
+  frame, no dead frames, speech band ≥3.4dB, −14 LUFS. Found, not fixed:
+  banding rings in the kit `Paper`'s cool pools (also in the reel's end frame;
+  the fix changes the approved reel, queued as its own task). **Not
+  verified:** nobody has listened on speakers.
 - **2026-09-28 — Feature clip: Ask (`MachinaAsk`), rebuilt as an explainer;
   not merged.** Branch `claude/clip-ask`. Owner rejected the first cut (21s,
   a longer version of the reel's Ask beat) and gave an explainer brief: ~30s,

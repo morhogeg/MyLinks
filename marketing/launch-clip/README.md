@@ -812,7 +812,7 @@ Enforced by `npm run verify` where a machine can check:
 
 ## Feature clip: Ask (`MachinaAsk`)
 
-`MachinaAsk` is a 32s vertical explainer of Ask for someone seeing it for the
+`MachinaAsk` is a 32.5s vertical explainer of Ask for someone seeing it for the
 first time (owner brief, 2026-09-28: the feature as the sole subject, a hook
 that frames what Ask unlocks, Machina named, three to five elements each shown in
 action with why it matters, a concrete takeaway, a light nod to Machina). It
@@ -823,14 +823,30 @@ the same instruments on the same 112.5 BPM grid, and the reel's lockup.
 
 | Frames | Beat | What it shows, and the line |
 |---|---|---|
-| 0–144 | hook | The Home feed, scrolling ever faster (everything you have saved), cut at speed: "Your saves hold more knowledge than you remember." (owner, round 2: the hook frames the knowledge Ask reaches, not search) |
+| 0–144 | hook | The Home feed, scrolling ever faster (everything you have saved), cut at speed; the line speaks from 0.5s and leaves at 120, so the last rush into Ask plays clean: "Your saves hold more knowledge than you remember." (owner, round 2: the hook frames the knowledge Ask reaches, not search) |
 | 144–192 | the name | Ask opens, its mark plays the app's own launch (the point strikes on a beat), under the app's promise "Answers come only from your 24 saves, with sources you can open": "With Machina, you just ask." |
 | 192–272 | 1. your own words | The question types: "Ask in your own words. No keywords, no folders." |
 | 272–384 | 2. from your saves | Send; the answer streams in: "The answer is written from your own saves." |
 | 384–528 | 3. sources | The three sources lift on beats; the first is tapped and The Tail End's own card opens on the passage the answer drew on, which lifts: "Every answer shows its sources. Tap one to check it." |
 | 528–688 | 4. follow-ups | The card closes (the finger leaves with it), then the line starts and the camera moves in close on the continuations the app suggests under the answer ("Compare the Time saves", "More on 'The Tail End'", "What else did I save on time?"); the chosen one lifts and is tapped on "asks the next question"; a second answer and its sources: "Keep going. One tap asks the next question." (owner, round 3: the old cut left the close tap's ripple on the chat's "+ New", which read as the tap the line meant) |
 | 688–800 | 5. connections | Its Graph chip: the two cited saves lit and linked among the rest: "Then see how those saves connect." Then the takeaway: "Ask once. Get the answer, and the proof." |
-| 800–960 | close | Thrown out into the lockup: "Machina. Never lose another great find." |
+| 800–976 | close | Thrown out into the lockup: "Machina. Never lose another great find.", the end card held 1.8s after the last word |
+
+**Finishing pass (2026-09-28, fresh eyes, measured).** The script, order
+and lines are unchanged. Three fixes: the hook was wordless for its first
+1.6s, so it now speaks from 0.5s (a feed decides in the first second) and
+leaves a beat before the cut; the end card held 1.3s after its last word, so
+it now holds 1.8s (one beat longer; the owner's ~2s rule for the reel), with a
+verify gate (≥1.6s); and the take's streamed frames carried a caret blinking
+on the real clock (measured: on and off by turns), off-frame in this cut but
+now hidden at capture. Measured clean and left alone: every cut changes on
+one frame, every tap lands on the frame the app answers, no dead frames
+before the lockup, every line ≥3.4dB over the music in the speech band.
+Found and NOT fixed here: faint banding rings in the paper's cool pools
+(lossless stills show 11–12 levels when contrast-stretched; the reel's end
+frame shows the same). It is the kit's `Paper`, shared with the approved
+reel, and the fix (dither before quantization) changes the reel's pixels, so
+it is left for its own round.
 
 **One take, one clock.** Every app frame is one continuous use of the real
 app, `askfull` in `capture/shoot.mjs` (the same demo account; the capture

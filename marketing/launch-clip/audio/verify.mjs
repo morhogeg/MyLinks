@@ -515,6 +515,11 @@ console.log('\n── clip: ask');
   const close = caps.find((c) => c.place === 'lockup');
   const closeLine = close?.text.split('\n').slice(-1)[0].replace(/\.$/, '');
   if (!close || !read('src/scenes/Endcard.tsx').includes(closeLine)) bad.push('the clip lockup line is not the film endcard subtitle');
+  // the end card holds (finishing pass: it held 1.3s; the owner's rule for
+  // the reel is ~2s): at least 1.6s from the last spoken word to the end
+  const closeVo = manifest?.find((l) => l.frame === close?.at);
+  if (closeVo && C.TOTAL_FRAMES / C.FPS - (closeVo.start + closeVo.spoken) < 1.6)
+    bad.push(`the end card holds ${(C.TOTAL_FRAMES / C.FPS - (closeVo.start + closeVo.spoken)).toFixed(2)}s after its last word (min 1.6s)`);
 
   // banned strings on every frame of the take, and the thinking line nowhere
   scan('Ask question', LIB.ASK.question);

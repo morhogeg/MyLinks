@@ -74,9 +74,12 @@ export const HITS = {
  * does, and why that matters.
  */
 export const CAPTIONS = [
+  // (finishing pass: the hook speaks from 0.5s, since a feed decides in the
+  // first second, and leaves a beat before the cut so the feed's last rush
+  // into Ask plays clean)
   // the hook: what your saves add up to, over the feed flying past (owner,
   // round 2: frame the knowledge Ask reaches, not the search; no chapter word)
-  { at: beat(3), to: beat(9) + 8, hook: true, text: 'Your saves hold more knowledge\nthan you remember.' },
+  { at: beat(1), to: beat(7) + 8, hook: true, text: 'Your saves hold more knowledge\nthan you remember.' },
   // the name, on Ask opening
   { at: beat(10), to: beat(14), text: 'With Machina, you just ask.' },
   // 1. plain words: no remembering where, or what it was called
@@ -94,9 +97,11 @@ export const CAPTIONS = [
   { at: beat(41), to: beat(45), text: 'Then see how\nthose saves connect.' },
   // the takeaway
   { at: beat(45), to: beat(50), text: 'Ask once. Get the answer,\nand the proof.' },
+  // (finishing pass: the end card holds ~2s after the last word, the owner's
+  // rule for the reel; it held 1.3s)
   // the close: the name (the drawn wordmark wipes in as it is said), then
   // the App Store subtitle; the music steps back under both
-  { at: beat(53), to: beat(60), place: 'lockup', text: 'Machina.\nNever lose another great find.', duck: 0.4 },
+  { at: beat(53), to: beat(61), place: 'lockup', text: 'Machina.\nNever lose another great find.', duck: 0.4 },
 ];
 
 export const TOTAL_FRAMES = CAPTIONS[CAPTIONS.length - 1].to;

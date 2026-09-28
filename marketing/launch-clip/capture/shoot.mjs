@@ -510,14 +510,17 @@ const takes = {
       await until(first);
       await page.waitForTimeout(90);
       if (follow) await toBottom();
+      // (caret hidden: the composer keeps focus after send, and its caret
+      // blinks on the browser's real clock, so across these frames it was on
+      // and off by turns, measured; the reel's round-15 rule for rolls)
       await t.freeze();
-      await t.snap({ rects });
+      await t.snap({ rects, caret: 'hide' });
       while (!done) {
         done = server.advanceChat(STREAM);
         await page.waitForTimeout(90);
         await t.advance();
         if (follow) await toBottom();
-        await t.snap({ rects });
+        await t.snap({ rects, caret: 'hide' });
       }
       server.finishChat();
       await page.waitForTimeout(400);
