@@ -602,20 +602,23 @@ audio device); the balance, the clarity and the loudness are only measured.
 
 ## Feature clip: REVISIT ("what you save comes back to you")
 
-`MachinaClipRevisit` is a 36.3s vertical clip, the reel's companion, built
-from the kit plus one new kit primitive (`kit/scroll.ts`, below) and two
-optional kit props (round 3). It opens ON its chapter word (REVISIT, formed
-on frame 0), then one continuous use of the real app (take `revisitClip`):
+`MachinaClipRevisit` is a 44.8s vertical clip, the reel's companion, built
+from the kit plus one new kit primitive (`kit/scroll.ts`, below) and optional
+kit props (rounds 3 and 4). It opens on the PROBLEM (round 4), then one
+continuous use of the real app (take `revisitClip`), whose clock starts at
+`OPEN` (256): the scenes read `f - OPEN`, captions and the score are absolute.
 
 | Frames | What it does |
 |---|---|
-| 0–124 | The Revisit tab opens on what is asking for you: "Due now", a reminder set on Four Thousand Weeks, lifts after "Set a reminder," ("…and a save comes back when it's due.") |
-| 128–320 | The "Do this" list: "When a save calls for action, Machina turns it into a to-do."; The Tail End's row lifts after "action,"; the camera steps back and the V60 step is ticked off at 272, the app's own "Marked as done" toast in frame |
-| 320–448 | Into the reading window; "This week in Machina" tapped open at 368 in the silence between lines; it unfolds on "Every week," and the write-up rises into view on "Machina brings back what's worth remembering." |
-| 448–688 | The recap READ (never rushed): the write-up held, the two themes and the saves they link to on "The themes of your week," (each hold drifts: `CREEP`), then ONE glide onto the Standout on "and the one save worth rereading." |
-| 688–800 | The Standout lifts; its question ("who would you call this week?") is read in silence |
-| 800–896 | The Standout tapped: The Tail End opens (the app's own transition), its "Do this" line passing as the camera eases up to its title |
-| 896–1088 | Thrown out into the reel's lockup: "Machina. Everything you save, finally useful." |
+| 0–176 | THE PROBLEM (`Opening.tsx`): ten real saves where they were kept, legible from frame 0; "You save things to come back to later." / "But you rarely go back to them.", and they bleach into the paper on "rarely" |
+| 176–256 | THE TURN: "Machina brings them back to you.": they gather into one point just after the name, the brackets snap round it (the mark), and the point opens as an iris onto the Revisit tab |
+| 256–380 | "Due now": a reminder set on Four Thousand Weeks lifts after "Set a reminder," ("…and a save comes back when it's due."); the chapter word REVISIT arrives with this line |
+| 384–576 | The "Do this" list: "When a save calls for action, Machina turns it into a to-do."; The Tail End's row lifts; a step is ticked off at 528, the app's "Marked as done" toast in frame |
+| 576–704 | Into the reading window; "This week in Machina" tapped open at 624; it unfolds on "Every week," and rises on "Machina brings back what's worth remembering." |
+| 704–944 | The recap READ: the write-up held, the two themes and their saves on "The themes of your week," (each hold drifts: `CREEP`), then ONE glide onto the Standout |
+| 944–1056 | The Standout lifts; its question is read in silence |
+| 1056–1152 | The Standout tapped: The Tail End opens, the camera easing up to its title |
+| 1152–1344 | Thrown out into the lockup: "Machina. Everything you save, finally useful." |
 
 Everything is in OUTPUT frames on the reel's grid (112.5 BPM, 16 frames a
 beat); 60fps app motion plays one captured frame per output frame (the
@@ -701,6 +704,19 @@ every launch film ends on the tagline).**
 - **The tagline close.** The lockup's line is now "Everything you save,
   finally useful.", set at 50px (`Lockup` `lineSize`) so it stays on one
   line; the last melody note moved after "useful.".
+
+**Round 4 (owner: "the current one is good, but there is no proper opening:
+present the issue, then our solutions").** An 8.5s opening in the reel's hook
+language (kit `SaveChip` and `MarkAssembly`; `Opening.tsx`): the habit ("You
+save things to come back to later."), the problem ("But you rarely go back
+to them.", the film's honest "rarely", not "never"), and the turn ("Machina
+brings them back to you."), the saves gathering into the mark whose point
+opens as the iris onto the app. The saves shown are the ones Revisit brings
+back later (Four Thousand Weeks, The Tail End, the tomato sauce, the V60
+video, Piranesi). Frame 0, the poster a feed shows, already reads (the
+cascade into focus began before it). The app part is unchanged, 256 frames
+later. verify now requires the clip to open on the problem, with the chapter
+word only after it.
 
 ## Motion language
 

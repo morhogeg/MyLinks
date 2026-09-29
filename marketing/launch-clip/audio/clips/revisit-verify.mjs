@@ -57,7 +57,10 @@ kick.forEach((k, i) => {
   if (i && k.at < kick[i - 1].to) bad.push(`kicker overlap at ${k.at}`);
   if (!caps.some((c) => !c.place && c.to === k.to && c.at >= k.at)) bad.push(`kicker ${k.at}–${k.to} does not leave with a line`);
 });
-if (!kick.length || kick[0].at > -8) bad.push('the clip does not open on its chapter word (formed on frame 0)');
+// (round 4, owner) the clip opens on the PROBLEM: its first lines come before
+// the app and carry no chapter word; the chapter word arrives with the app
+if (!caps[0]?.open) bad.push('the clip does not open on the problem (its first line must be an `open` line)');
+if (kick.length && kick[0].at < Math.max(...caps.filter((c) => c.open).map((c) => c.to))) bad.push('the chapter word arrives before the opening is over');
 const SAY_NAME = /SAY_NAME = "([^"]+)"/.exec(read('audio/synth-vo.py'))[1];
 const spoken = (t) => t.split(/\s+/).join(' ').replaceAll('Machina', SAY_NAME);
 const timing = JSON.parse(read('src/reels/clips/revisit/vo.json'));
@@ -122,7 +125,7 @@ if (bad.length) {
   console.error('✗ clip revisit:');
   for (const b of bad) console.error('    ' + b);
 } else {
-  console.log(`✓ ${caps.length} lines + ${kick.length} kickers, no overlaps; opens on its chapter word; lines on beats; narrator mirrors every line, inside the dwell rule`);
+  console.log(`✓ ${caps.length} lines + ${kick.length} kickers, no overlaps; opens on the problem; lines on beats; narrator mirrors every line, inside the dwell rule`);
   console.log(`✓ taps, lifts and the strike on 8ths; no em dash / "AI" / "second brain" / "library" in captions or ${take.count} captured frames`);
 }
 

@@ -2549,7 +2549,7 @@ on iPhone (§4 23b).
 
 **What exists: the REVISIT feature clip (2026-09-28, branch
 `claude/clip-revisit`, not merged; the owner reviews the cut):**
-`MachinaClipRevisit` (36.3s since round 3, 1080×1920, score + narrator + captions,
+`MachinaClipRevisit` (44.8s since round 4, 1080×1920, score + narrator + captions,
 mastered to −14 LUFS / −1.25 dBTP), `MachinaClipRevisitSilent` and
 `MachinaClipRevisitClean`, in `marketing/launch-clip/`. Brief 5 below
 ("Recall"), built as REVISIT, "what you save comes back to you": it opens
@@ -2577,7 +2577,11 @@ hops). `MachinaReel` and `MachinaLaunch` render pixel-identical to before
 longer sit dead still (the page creeps while a read is held); nothing else
 moved. Round 3 (owner: "too thin", "a huge white gap at the top"): Due now
 and the tick-off added; the clip's type and app sit higher than the reel's
-(new optional kit props, the reel unchanged by them). How to render: the launch-clip README, "Feature clip: REVISIT".
+(new optional kit props, the reel unchanged by them). Round 4 (owner: "no
+proper opening"): it now opens on the problem ("You save things to come back
+to later." / "But you rarely go back to them."), then the turn ("Machina
+brings them back to you.": the saves gather into the mark, which irises open
+onto Revisit); 44.8s. How to render: the launch-clip README, "Feature clip: REVISIT".
 
 **Feature-clip briefs, FINAL against the pilot's kit (2026-09-26).** Shared
 by all five: **448 frames (7 bars at 112.5 BPM, 14.9s)**, vertical, built
@@ -2638,6 +2642,16 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-29 — REVISIT round 4: an opening that states the problem.**
+  Branch `claude/clip-revisit`, not merged. Owner: the clip was good but had
+  no proper opening. It now opens on real saves where they were kept, "You
+  save things to come back to later." / "But you rarely go back to them."
+  (they bleach), then "Machina brings them back to you." (they gather into
+  the mark, whose point irises open onto the Revisit tab); the app part plays
+  as before, 256 frames later. 44.8s. Verified: tsc, verify (a new gate: the
+  clip opens on the problem), full render, strips across the opening, poster
+  frame legible, every line 5.3dB+ over the music in the speech band, −14.0
+  LUFS. Not verified: nobody has listened on speakers.
 - **2026-09-28 — Every launch film ends on the tagline; REVISIT round 3.**
   Branch `claude/clip-revisit`, not merged. Owner decision: films END on
   "Everything you save, finally useful.", once; the App Store subtitle moves

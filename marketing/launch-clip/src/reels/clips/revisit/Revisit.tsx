@@ -1,6 +1,7 @@
 import React from 'react';
 import { AbsoluteFill } from 'remotion';
-import { BAND, CREEP, GLIDE, HITS, READS, TAKE } from '../../../../clips/revisit-timeline.mjs';
+import { BAND, CREEP, GLIDE, HITS, OPEN, OPENING, READS, TAKE } from '../../../../clips/revisit-timeline.mjs';
+import { POINT_R } from './Opening';
 import { AppShot, Lift, Tap } from '../../kit/AppShot';
 import { camAt, camVelocity, type Key } from '../../kit/camera';
 import { EASE_IN_OUT, EASE_MODAL, EASE_SPRING, mix, prog } from '../../kit/curves';
@@ -11,6 +12,9 @@ import { at, center, rectOf } from '../../kit/takes';
  * REVISIT, what you save comes back to you. One continuous use of the real
  * app (take `revisitClip`, capture/shoot.mjs), in OUTPUT frames:
  *
+ *  0. (round 4) It arrives through the opening's point as an iris
+ *     (Opening.tsx: the problem, then the turn). APP frames: `f` is the
+ *     clip's frame minus OPEN.
  *  1. The Revisit tab, as it opens on what is asking for you (round 3):
  *     "Due now", a reminder the user set on Four Thousand Weeks, lifts after
  *     "reminder,"; then the "Do this" list, the steps the app writes only for
@@ -117,7 +121,12 @@ const keys: Key[] = [
 ];
 
 export const Revisit: React.FC<{ f: number }> = ({ f }) => {
-  if (f > HITS.out + 15) return null;
+  if (f > HITS.out + 15 || f < OPENING.iris[0] - OPEN) return null;
+  // (round 4) the tab arrives through the opening's point: an iris from the
+  // point's own size, centred on the screen point the first camera puts
+  // under it (Opening.tsx POINT)
+  const opened = prog(f + OPEN, OPENING.iris[0], OPENING.iris[1], EASE_IN_OUT);
+  const iris = opened < 1 ? { x: 196.5, y: 340, r: mix(POINT_R / 2.4, 980, opened) } : null;
 
   // which real frame: the tab; the recap opening (60fps: one captured frame
   // per output frame); the page, scrolled; the save, opening (60fps)
@@ -167,7 +176,7 @@ export const Revisit: React.FC<{ f: number }> = ({ f }) => {
 
   return (
     <AbsoluteFill>
-      <AppShot take={T} i={i} cam={view} motion={motion}>
+      <AppShot take={T} i={i} cam={view} motion={motion} iris={iris}>
         {f < HITS.tick && due > 0.01 && (
           <Lift take={T} i={i} rect={dueRow} radius={16} lift={due * 0.7} rise={3} grow={0.02} ring={0.55 * due} />
         )}

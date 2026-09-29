@@ -1,6 +1,45 @@
 [
  {
   "frame": 16,
+  "text": "You save things to come back to later.",
+  "words": [
+   0.05,
+   0.231,
+   0.456,
+   0.772,
+   0.907,
+   1.133,
+   1.359,
+   1.494
+  ]
+ },
+ {
+  "frame": 112,
+  "text": "But you rarely go back to them.",
+  "words": [
+   0.1,
+   0.276,
+   0.453,
+   0.761,
+   0.893,
+   1.113,
+   1.246
+  ]
+ },
+ {
+  "frame": 192,
+  "text": "Makeena brings them back to you.",
+  "words": [
+   0.07,
+   0.436,
+   0.756,
+   0.985,
+   1.214,
+   1.351
+  ]
+ },
+ {
+  "frame": 272,
   "text": "Set a reminder, and a save comes back when it\u2019s due.",
   "words": [
    0.03,
@@ -17,7 +56,7 @@
   ]
  },
  {
-  "frame": 128,
+  "frame": 384,
   "text": "When a save calls for action, Makeena turns it into a to-do.",
   "words": [
    0.05,
@@ -35,7 +74,7 @@
   ]
  },
  {
-  "frame": 384,
+  "frame": 640,
   "text": "Every week, Makeena brings back what\u2019s worth remembering.",
   "words": [
    0.03,
@@ -49,7 +88,7 @@
   ]
  },
  {
-  "frame": 576,
+  "frame": 832,
   "text": "The themes of your week, and the one save worth rereading.",
   "words": [
    0.04,
@@ -66,7 +105,7 @@
   ]
  },
  {
-  "frame": 960,
+  "frame": 1216,
   "text": "Makeena. Everything you save, finally useful.",
   "words": [
    0.05,

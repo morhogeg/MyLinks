@@ -34,7 +34,29 @@ export const onBeat = (f) => Math.round(f / BEAT_FRAMES) * BEAT_FRAMES;
 export const TAKE = 'revisitClip';
 
 /**
- * Picture events, in frames. The scene and the score read these same
+ * THE OPENING (round 4, owner: "no proper opening: present the issue, then
+ * our solutions"). Before the app: the problem, then the turn. Ten real saves
+ * from the demo account (the ones Revisit brings back later among them) come
+ * into focus where they were kept; the narrator names the habit ("You save
+ * things to come back to later.") and the problem ("But you rarely go back to
+ * them."; rarely, not never: the film's honest word), and they bleach into
+ * the paper; on "Machina brings them back to you." they gather into the
+ * point, the brackets snap round it (the mark), and the point opens as an
+ * iris onto the Revisit tab. OPEN frames (4 bars); everything after it is
+ * the app clip, whose clock (HITS, READS, CREEP, GLIDE below) starts at OPEN:
+ * the scenes read `f - OPEN`, captions and the score are absolute.
+ */
+export const OPEN = 256;
+export const OPENING = {
+  focus: [0, 24], // the saves come into focus (a soft scatter is already there on frame 0)
+  bleach: 128, // …bleach into the paper on "rarely"
+  gather: [176, 200], // …gather into one point, landing just after "Machina"
+  snap: 208, // the brackets snap round it: the mark
+  iris: [224, 256], // the point opens onto the Revisit tab
+};
+
+/**
+ * Picture events, in APP frames (add OPEN for the clip's). The scene and the score read these same
  * numbers, so moving one moves the picture and its sound together. Taps and
  * lifts sit on beats or 8ths; a tap lands on the frame the app responds.
  */
@@ -98,7 +120,7 @@ export const SLOTS = { kicker: 200, top: 256 };
 export const BAND = { solid: 420, clear: 600 };
 
 /** the end: the finished lockup holds ~1.8s once its line is whole */
-export const TOTAL_FRAMES = 1088;
+export const TOTAL_FRAMES = OPEN + 1088;
 export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 
 /**
@@ -111,48 +133,56 @@ export const TOTAL_SEC = TOTAL_FRAMES / FPS;
  * "second brain", no "library" (verify).
  */
 export const CAPTIONS = [
+  // THE OPENING: the habit, then the problem (no chapter word: `open`)
+  { at: 16, to: 96, open: true, text: 'You save things\nto come back to later.' },
+  { at: 112, to: 176, open: true, text: 'But you rarely\ngo back to them.' },
+  // the turn: the saves gather into the point as the name is said
+  { at: 192, to: 256, open: true, text: 'Machina brings them\nback to you.' },
   // (round 3, owner: "too thin, expand on the feature") Revisit opens on
   // what has come due: a reminder the user set (the app's Remind me: Smart
   // review, or a day) lands under "Due now"; its row lifts after "reminder,"
-  { at: 16, to: 124, text: 'Set a reminder, and a save\ncomes back when it’s due.' },
+  { at: OPEN + 16, to: OPEN + 124, text: 'Set a reminder, and a save\ncomes back when it’s due.' },
   // the "Do this" list: the app writes a step only for a save that calls for
   // one (web/lib/takeaway.ts); its first row lifts in the pause after
   // "action,", then the V60 step is ticked off (the app's "Marked as done")
-  { at: 128, to: 256, text: 'When a save calls for action,\nMachina turns it into a to-do.' },
+  { at: OPEN + 128, to: OPEN + 256, text: 'When a save calls for action,\nMachina turns it into a to-do.' },
   // "This week in Machina" is tapped open in the silence before this line;
   // it unfolds on "Every week," and rises into view on "Machina brings back"
-  { at: 384, to: 496, text: 'Every week, Machina brings back\nwhat’s worth remembering.' },
+  { at: OPEN + 384, to: OPEN + 496, text: 'Every week, Machina brings back\nwhat’s worth remembering.' },
   // the themes land as "themes" is said; the Standout rises into view on
   // "the one save worth rereading" and lifts as the glide lands
-  { at: 576, to: 688, text: 'The themes of your week,\nand the one save worth rereading.' },
+  { at: OPEN + 576, to: OPEN + 688, text: 'The themes of your week,\nand the one save worth rereading.' },
   // the close: the name (the drawn wordmark wipes in as it is said), then
   // the tagline (owner, 2026-09-28: every launch film ends on it, once)
-  { at: 960, to: TOTAL_FRAMES, place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4 },
+  { at: OPEN + 960, to: TOTAL_FRAMES, place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4 },
 ];
 
 /**
- * The chapter word, REVISIT, in the band above the lines. The clip OPENS on
- * it: it is already formed on frame 0 (its letters came into focus over the
- * 12 frames before), a beat before the first line; after that it follows the
- * reel's rule: on screen only with its narration, arriving 4 frames before a
- * line, leaving with it, gaps under KICKER_BRIDGE frames bridged.
+ * The chapter word, REVISIT, in the band above the lines: from the app on
+ * (round 4: the opening's problem lines carry none), on the reel's rule: on
+ * screen only with its narration, arriving 4 frames before a line, leaving
+ * with it, gaps under KICKER_BRIDGE frames bridged.
  */
 export const KICKER = 'Revisit';
-const OPEN = -12;
 const KICKER_LEAD = 4;
 export const KICKER_BRIDGE = 24;
 export const KICKERS = (() => {
   const spans = [];
-  for (const c of CAPTIONS.filter((x) => !x.place)) {
+  for (const c of CAPTIONS.filter((x) => !x.place && !x.open)) {
     const last = spans[spans.length - 1];
     if (last && c.at - last.to < KICKER_BRIDGE) last.to = c.to;
-    else spans.push({ at: spans.length ? c.at - KICKER_LEAD : OPEN, to: c.to, text: KICKER });
+    else spans.push({ at: c.at - KICKER_LEAD, to: c.to, text: KICKER });
   }
   return spans;
 })();
 
 /** Risers END on the reveal they lead into. [from, to] in frames. */
-export const RISERS = [[864, HITS.markStrike]];
+export const RISERS = [
+  [144, OPENING.snap], // into the mark
+  [OPEN + 864, OPEN + HITS.markStrike], // into the lockup's strike
+];
 
 /** one chord per bar (the reel's C-major vocabulary); the last is the lockup */
-export const BAR_CHORDS = ['Fmaj7', 'Cmaj7', 'G6', 'Cmaj7', 'Fmaj7', 'Cmaj7', 'Fmaj7', 'Cmaj7', 'G6', 'Fmaj7', 'Cmaj7', 'Fmaj7', 'G6', 'Cmaj7', 'Fmaj7', 'Cmaj7', 'Cmaj7'];
+/** (the first four bars are the opening: the problem hangs on IV, the mark
+ *  resolves home) */
+export const BAR_CHORDS = ['Fmaj7', 'Fmaj7', 'G6', 'Cmaj7', 'Fmaj7', 'Cmaj7', 'G6', 'Cmaj7', 'Fmaj7', 'Cmaj7', 'Fmaj7', 'Cmaj7', 'G6', 'Fmaj7', 'Cmaj7', 'Fmaj7', 'G6', 'Cmaj7', 'Fmaj7', 'Cmaj7', 'Cmaj7'];

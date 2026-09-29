@@ -19,13 +19,14 @@
 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BAR, BAR_CHORDS, BAR_FRAMES, BEAT, FPS, HITS, RISERS, TOTAL_FRAMES, TOTAL_SEC } from '../../clips/revisit-timeline.mjs';
+import { BAR, BAR_CHORDS, BAR_FRAMES, BEAT, FPS, HITS, OPEN, OPENING, RISERS, TOTAL_FRAMES, TOTAL_SEC } from '../../clips/revisit-timeline.mjs';
 import { createSynth } from '../synth.mjs';
 
 const S = createSynth({ seconds: TOTAL_SEC, beat: BEAT });
 const { pad, sub, pulse, keys, bell, kick, hat, rim, shaker, clap, riser, whoosh, impact, tick, shimmer } = S;
 
-const s = (frame) => frame / FPS; // frame → seconds
+const s = (frame) => frame / FPS; // clip frame → seconds
+const a = (frame) => (frame + OPEN) / FPS; // APP frame (HITS, MELODY) → seconds
 const b = (bar) => bar * BAR;
 const at = (bar, beats) => b(bar) + beats * BEAT;
 
@@ -38,8 +39,8 @@ const CHORDS = {
 
 const BARS = Math.ceil(TOTAL_FRAMES / BAR_FRAMES);
 /** how much of the band plays, per bar: light under the reading */
-const DENSITY = [0.34, 0.42, 0.5, 0.56, 0.62, 0.66, 0.68, 0.7, 0.72, 0.74, 0.68, 0.7, 0.66, 0.62, 0.42, 0.36, 0.32];
-const DRUMS = [s(HITS.wide[0]), s(HITS.out)]; // from the tick (round 3) … the throw into the lockup
+const DENSITY = [0.18, 0.22, 0.28, 0.34, 0.34, 0.42, 0.5, 0.56, 0.62, 0.66, 0.68, 0.7, 0.72, 0.74, 0.68, 0.7, 0.66, 0.62, 0.42, 0.36, 0.32];
+const DRUMS = [a(HITS.wide[0]), a(HITS.out)]; // from the tick (round 3) … the throw into the lockup
 
 for (let bar = 0; bar < BARS; bar++) {
   const ch = CHORDS[BAR_CHORDS[bar]];
@@ -47,7 +48,7 @@ for (let bar = 0; bar < BARS; bar++) {
   const t0 = b(bar);
   const len = Math.min(BAR, TOTAL_SEC - t0);
   const drums = t0 >= DRUMS[0] - 0.01 && t0 < DRUMS[1] - 0.01;
-  const lockup = t0 >= s(HITS.out) - 0.01;
+  const lockup = t0 >= a(HITS.out) - 0.01;
 
   // ── pad
   const padLevel = 0.1 + 0.08 * d;
@@ -79,8 +80,9 @@ for (let bar = 0; bar < BARS; bar++) {
     for (let k = 0; k < 4; k++) hat(at(bar, k + 0.5), 0.026 * d, 0.1, true);
   }
 
-  // ── the pulse figure: the film's scale walk (degrees 0-2-3-4-6)
-  if (!lockup) {
+  // ── the pulse figure: the film's scale walk (degrees 0-2-3-4-6); the
+  // problem (bars 0-1) is pad and air only
+  if (!lockup && bar >= 2) {
     const SCALE = [0, 2, 4, 5, 7, 9, 11];
     const shape = [0, 2, 3, 4, 6, 4, 3, 2];
     const onsets = drums ? [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5] : [0, 0.75, 1.5, 2, 2.75, 3.5];
@@ -94,7 +96,7 @@ for (let bar = 0; bar < BARS; bar++) {
 }
 
 // ── the lockup: one held voicing under the end, a single breath
-for (const m of [48, 64, 67, 72]) pad(s(HITS.out), TOTAL_SEC - s(HITS.out) - 0.2, m, 0.08, m === 64 ? -0.4 : 0.35);
+for (const m of [48, 64, 67, 72]) pad(a(HITS.out), TOTAL_SEC - a(HITS.out) - 0.2, m, 0.08, m === 64 ? -0.4 : 0.35);
 
 // ── melody (FM keys): quiet over the recap, home on C for the lockup. Placed
 // in the narrator's pauses (clips/revisit-timeline.mjs CAPTIONS; the words
@@ -111,40 +113,52 @@ const MELODY = [
   // home: C as the mark draws, E after its name, G after the last word
   [916, 72, 0.19], [976, 76, 0.12], [1056, 79, 0.19],
 ];
-for (const [fr, m, level] of MELODY) keys(s(fr), m, level ?? 0.14, (fr / 16) % 2 ? 0.2 : -0.2, fr >= HITS.out ? 2.8 : 2);
+for (const [fr, m, level] of MELODY) keys(a(fr), m, level ?? 0.14, (fr / 16) % 2 ? 0.2 : -0.2, fr >= HITS.out ? 2.8 : 2);
 
 // ── risers, each ENDING on the reveal it leads into
 for (const [from, to] of RISERS) riser(s(from), s(to) - s(from), 0.09);
 
 // ── sound design, on the picture's frames (HITS)
 const H = HITS;
-// the clip opens: a soft glint as the chapter word and the tab are already there
-bell(s(8), 84, 0.03, 0.3, 1.4);
+// THE OPENING (round 4, absolute frames): the saves come into focus as soft
+// glints; a fall as they bleach on "rarely"; they rush together into the
+// point (the riser above ends on the snap); the brackets snap; the point
+// opens as an iris; a shimmer after the line ("…back to you.")
+[2, 6, 10, 14, 18, 22].forEach((fr, i) => bell(s(fr), [84, 88, 91, 86, 89, 93][i], 0.026, i % 2 ? 0.45 : -0.45, 1.2));
+whoosh(s(OPENING.bleach) + 0.1, 1.2, 0.05, 0);
+whoosh(s(OPENING.gather[0]) + 0.1, 0.55, 0.09, -0.35);
+whoosh(s(OPENING.gather[0]) + 0.15, 0.5, 0.09, 0.35);
+impact(s(OPENING.gather[1]), 0.26);
+sub(s(OPENING.gather[1]), 36, 0.26, 0.6);
+tick(s(OPENING.snap), 0.1, 0.85);
+sub(s(OPENING.snap), 43, 0.16, 0.25);
+whoosh(s(OPENING.iris[0]) - 0.05, 0.5, 0.07, 0);
+shimmer(s(OPEN - 12), [72, 79, 84, 88], 0.04);
 // (round 3) the reminder that came due lifts (in the pause after "reminder,")
-bell(s(H.dueLift), 79, 0.045, 0.2, 1.4);
-sub(s(H.dueLift), 43, 0.14, 0.3);
+bell(a(H.dueLift), 79, 0.045, 0.2, 1.4);
+sub(a(H.dueLift), 43, 0.14, 0.3);
 // (round 3) the V60 step ticked off: the tap, and the toast's confirmation
-tick(s(H.tick), 0.09, 1.25);
-shimmer(s(H.tick + 6), [76, 79, 84], 0.03);
+tick(a(H.tick), 0.09, 1.25);
+shimmer(a(H.tick + 6), [76, 79, 84], 0.03);
 // the "Do this" row lifts (in the pause after "action,")
-bell(s(H.todoLift), 84, 0.045, -0.2, 1.4);
-sub(s(H.todoLift), 48, 0.14, 0.3);
+bell(a(H.todoLift), 84, 0.045, -0.2, 1.4);
+sub(a(H.todoLift), 48, 0.14, 0.3);
 // down to the recap
-whoosh(s(H.travel[0]) + 0.05, 0.9, 0.045, 0.2);
+whoosh(a(H.travel[0]) + 0.05, 0.9, 0.045, 0.2);
 // "This week in Machina", tapped open
-tick(s(H.recapTap), 0.09, 1.3);
-shimmer(s(H.recapTap + 4), [72, 76, 79], 0.035);
+tick(a(H.recapTap), 0.09, 1.3);
+shimmer(a(H.recapTap + 4), [72, 76, 79], 0.035);
 // the Standout lifts (after "rereading.")
-bell(s(H.standout), 88, 0.05, 0.2, 1.8);
-sub(s(H.standout), 48, 0.2, 0.3);
+bell(a(H.standout), 88, 0.05, 0.2, 1.8);
+sub(a(H.standout), 48, 0.2, 0.3);
 // the Standout, tapped: its save opens
-tick(s(H.cardTap), 0.09, 1.2);
-whoosh(s(H.cardTap) + 0.07, 0.35, 0.05, -0.15);
-shimmer(s(H.cardTap + 14), [79, 84, 88], 0.03);
+tick(a(H.cardTap), 0.09, 1.2);
+whoosh(a(H.cardTap) + 0.07, 0.35, 0.05, -0.15);
+shimmer(a(H.cardTap + 14), [79, 84, 88], 0.03);
 // the save is thrown out, the mark strikes into air
-whoosh(s(H.out) - 0.1, 0.7, 0.09, 0);
-impact(s(H.markStrike), 0.34);
-shimmer(s(H.markStrike) + 0.08, [79, 84, 88, 91], 0.055);
+whoosh(a(H.out) - 0.1, 0.7, 0.09, 0);
+impact(a(H.markStrike), 0.34);
+shimmer(a(H.markStrike) + 0.08, [79, 84, 88, 91], 0.055);
 
 S.master({ fadeInSec: 0.25, fadeOutSec: 1.1 });
 
