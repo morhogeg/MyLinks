@@ -509,7 +509,9 @@ console.log('\n── clip: save');
   if (!close || !flat(close.text).endsWith(TAGLINE) || !/^(Machina\.\s+)?$/.test(flat(close.text).slice(0, -TAGLINE.length))) bad.push(`the close is "${flat(close?.text ?? '')}", not the tagline "${TAGLINE}" (optionally led by "Machina.")`);
   if (lines.some((c) => flat(c.say ?? c.text).includes(TAGLINE))) bad.push('the tagline also appears before the close');
   if (caps.some((c) => /never lose another great find/i.test(c.text))) bad.push('the clip says the App Store subtitle');
-  if (Math.abs(C.TOTAL_SEC - 30) > 3) bad.push(`the clip runs ${C.TOTAL_SEC.toFixed(1)}s (brief: about 30s)`);
+  // (owner, 2026-09-29: saving is a core feature, show every kind of save; the
+  // clip may run longer than the first brief's 30s)
+  if (C.TOTAL_SEC < 45 || C.TOTAL_SEC > 75) bad.push(`the clip runs ${C.TOTAL_SEC.toFixed(1)}s (brief: about a minute)`);
   const kick = [...C.KICKERS].sort((a, b) => a.at - b.at);
   kick.forEach((k, i) => {
     scan(`kicker ${k.text}`, k.text);
@@ -552,16 +554,33 @@ console.log('\n── clip: save');
     console.log('  (no out/vo/save/manifest.json: VO fit not re-checked; run synth-vo.py save)');
   }
 
-  // what a viewer can read: the hook's saves and the share cards are real
-  // saves from the demo account, and the app's own text on every frame of
-  // the take the clip plays
-  for (const file of ['src/reels/clips/save/Hook.tsx', 'src/reels/clips/save/Shares.tsx']) {
-    for (const [, title] of read(file).matchAll(/title: '([^']+)'/g)) {
-      scan(file, title);
-      if (!L.CARDS.some((c) => c.title === title)) bad.push(`"${title}" (${file}) is not a save in the demo account`);
-    }
+  // what a viewer can read: the hook's saves are real saves from the demo
+  // account; the share cards are the cards the source tour opens (or the
+  // montage's one Facebook post); the tour's scripted cards pass the same
+  // bans; and the app's own text on every frame of both takes the clip plays
+  const CS = await import('../capture/clip-save.mjs');
+  const tour = CS.sourceCards('');
+  for (const c of tour) {
+    const d = c.doc;
+    [d.title, d.summary, d.detailedSummary, d.actionableTakeaway, ...(d.tags ?? []), ...(d.metadata?.videoHighlights ?? [])].filter(Boolean).forEach((x) => scan(`source card ${c.id}`, x));
+  }
+  Object.values(CS.NOTE_READ).forEach((x) => scan('the note read', x));
+  for (const [, title] of read('src/reels/clips/save/Hook.tsx').matchAll(/title: '([^']+)'/g)) {
+    scan('Hook.tsx', title);
+    if (!L.CARDS.some((c) => c.title === title)) bad.push(`"${title}" (Hook.tsx) is not a save in the demo account`);
+  }
+  for (const [, title] of read('src/reels/clips/save/Shares.tsx').matchAll(/title: '([^']+)'/g)) {
+    scan('Shares.tsx', title);
+    if (!tour.some((c) => c.doc.title === title) && title !== CS.FACEBOOK_SHARE.title) bad.push(`"${title}" (Shares.tsx) is not a card the source tour opens`);
   }
   const takes = JSON.parse(read('src/reels/data/takes.json'));
+  const src = takes.sources;
+  if (!src) bad.push('no "sources" take: run CAPTURE_ONLY=sources node capture/shoot.mjs');
+  else {
+    src.frames.forEach((fr, i) => fr.t.forEach((k) => scan(`the app on sources frame ${i}`, src.texts[k])));
+    for (const k of C.SOURCES.flatMap((b) => [`${b.key}Land`, `${b.key}Landed`, `${b.key}Open`, `${b.key}Scroll`]).concat(['noteTap', 'noteRead', 'noteReadScroll']))
+      if (src.marks[k] === undefined) bad.push(`the sources take has no mark "${k}"`);
+  }
   const take = takes.saveclip;
   if (!take) bad.push('no "saveclip" take: run CAPTURE_ONLY=saveclip node capture/shoot.mjs');
   else take.frames.forEach((fr, i) => fr.t.forEach((k) => scan(`the app on saveclip frame ${i}`, take.texts[k])));
@@ -572,17 +591,23 @@ console.log('\n── clip: save');
 
   // round 2 (finishing pass) gates. Taps: the pad touches (35% of the Tap
   // gesture) on the frame of its hit, where the app responds and the tick sounds
-  const appSrc = read('src/reels/clips/save/App.tsx');
-  let taps = 0;
-  for (const [, hit, a, b] of appSrc.matchAll(/<Tap [^>]*t=\{prog\(f, HITS\.(\w+) - (\d+), HITS\.\1 \+ (\d+)/g)) {
-    taps++;
-    // the first whole frame drawn at or past the touch
-    const touch = Math.ceil(-Number(a) + 0.35 * (Number(a) + Number(b)) - 1e-9);
-    if (touch !== 0) bad.push(`the tap on ${hit} first shows its touch ${touch} frames off its hit`);
+  for (const [file, want] of [['App.tsx', 5], ['Sources.tsx', 2]]) {
+    let taps = 0;
+    for (const [, hit, a, b] of read(`src/reels/clips/save/${file}`).matchAll(/<Tap [^>]*t=\{prog\(f, ([\w.]+) - (\d+), \1 \+ (\d+)/g)) {
+      taps++;
+      // the first whole frame drawn at or past the touch
+      const touch = Math.ceil(-Number(a) + 0.35 * (Number(a) + Number(b)) - 1e-9);
+      if (touch !== 0) bad.push(`${file}: the tap on ${hit} first shows its touch ${touch} frames off its hit`);
+    }
+    if (taps < want) bad.push(`found ${taps} taps in ${file} (expected ${want}): the tap gate no longer reads it`);
   }
-  if (taps < 5) bad.push(`found ${taps} taps in App.tsx (expected 5): the tap gate no longer reads it`);
+  // the source tour's taps are ALSO where the score ticks: its card taps and
+  // the Summarize tap are hits
+  C.SOURCES.forEach((b, n) => {
+    if (C.HITS.srcTaps[n] !== b.at + 40) bad.push(`HITS.srcTaps[${n}] is ${C.HITS.srcTaps[n]}, not the ${b.key} card's touch (${b.at + 40})`);
+  });
   // exits ease in and out: a fast-start curve on a fade-out reads as a blink
-  for (const file of ['Hook.tsx', 'App.tsx', 'Shares.tsx', 'End.tsx']) {
+  for (const file of ['Hook.tsx', 'App.tsx', 'Sources.tsx', 'Shares.tsx', 'End.tsx']) {
     for (const [, name, curve] of read(`src/reels/clips/save/${file}`).matchAll(/const (\w*Out|part) = prog\([^;]*(EASE_MODAL|EASE_SPRING|EASE_FLING)\)/g))
       bad.push(`${file}: exit ${name} uses ${curve} (a fast start reads as a blink: EASE_IN_OUT)`);
   }

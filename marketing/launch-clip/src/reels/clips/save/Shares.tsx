@@ -10,21 +10,28 @@ import { INK, INK_SOFT } from '../../kit/Type';
 
 /**
  * ANY APP: "Machina saves from any app. No copying, no pasting."
- * The reel's share gesture (scenes/ShareBeat.tsx) on the clip's own beats: a
- * save from YouTube, one from Instagram, one from Safari, each entering from
- * its own edge, its Share button tapped, pulled into the Machina mark, which
- * answers with a ring. The share sheet itself is native (the iOS Share
- * Extension, which takes a link, text or up to five images), so it is shown
- * as this gesture, not rebuilt: no iOS UI, no third-party image.
- * Titles are real saves from the demo account (verify checks).
+ * The reel's share gesture (scenes/ShareBeat.tsx) on the clip's own beats,
+ * five a beat apart: a YouTube video, an Instagram post, an X Article, a
+ * Facebook post and a page in Safari, each entering from its own edge, its
+ * Share button tapped, pulled into the Machina mark, which answers with a
+ * ring. The share sheet itself is native (the iOS Share Extension), so it is
+ * shown as this gesture, not rebuilt: no iOS UI, no third-party image.
+ * Titles are the cards the source tour then opens (capture/clip-save.mjs
+ * sourceCards) and the montage's one Facebook post (FACEBOOK_SHARE); verify
+ * checks them.
  */
 
-type Source = { kind: 'youtube' | 'instagram' | 'safari'; app: string; by: string; title: string; x: number; y: number; r: number; from: [number, number] };
+type Kind = 'youtube' | 'instagram' | 'x' | 'facebook' | 'safari';
+type Source = { kind: Kind; app: string; by: string; title: string; x: number; y: number; r: number; from: [number, number] };
 
+// placed so no card crosses the wordmark (mark at y 930, the name under it):
+// two above the mark, two below the name, and each pair a beat or more apart
 const SOURCES: Source[] = [
-  { kind: 'youtube', app: 'YouTube', by: 'TED', title: 'Inside the mind of a master procrastinator', x: 420, y: 650, r: -3, from: [-620, -40] },
-  { kind: 'instagram', app: 'Instagram', by: '@slowcoasts', title: 'Cala Goloritzé, Sardinia', x: 660, y: 1430, r: 2.5, from: [620, 30] },
-  { kind: 'safari', app: 'Safari', by: 'collaborativefund.com', title: 'The Psychology of Money', x: 500, y: 1300, r: -1.5, from: [0, 700] },
+  { kind: 'youtube', app: 'YouTube', by: 'Big Think Clips', title: 'How to overcome your addiction to technology', x: 430, y: 640, r: -3, from: [-620, -40] },
+  { kind: 'instagram', app: 'Instagram', by: '@slowcoasts', title: 'One week, one small bag', x: 650, y: 1440, r: 2.5, from: [620, 30] },
+  { kind: 'x', app: 'X', by: '@marginalia', title: 'How I read 40 books a year without speed reading', x: 440, y: 1630, r: -2, from: [-620, 20] },
+  { kind: 'facebook', app: 'Facebook', by: 'Riverside Market', title: 'The Saturday market is back, 8 to 1', x: 640, y: 700, r: 2, from: [620, -30] },
+  { kind: 'safari', app: 'Safari', by: 'paulgraham.com', title: 'How to Do Great Work', x: 470, y: 555, r: -1.5, from: [0, -700] },
 ];
 const SCALE = 0.8;
 const ENTER = 12;

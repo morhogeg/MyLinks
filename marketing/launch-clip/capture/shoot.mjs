@@ -34,7 +34,7 @@ import { startServer } from './server.mjs';
 import { openDevice } from './device.mjs';
 import { Take } from './recorder.mjs';
 import { ASK, CAPTURE_USER, CARDS, SAVE, SEARCH, SYNTHESIS } from './library.mjs';
-import { SHOTS_DIR, renderShots, shotsCard } from './clip-save.mjs';
+import { NOTE_READ, SHOTS_DIR, renderPost, renderShots, shotsCard, sourceCards } from './clip-save.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.join(here, '..', 'public', 'reel', 'app');
@@ -565,6 +565,115 @@ const takes = {
     t.mark('detailScroll');
     await rollScroll(t, await scrollTargetFor('Samin Nosrat', 760), 5, DETAIL);
     await t.thaw();
+    return t.save();
+  },
+
+  // ─────────────────────────────────────────────────────────── sources
+  // The SAVE clip's source tour: a YouTube video, a long-form X Article, an
+  // Instagram photo post, an article and a typed note, each arriving at the
+  // top of the feed, opened, and read down to what the app made of it (the
+  // Key moments with their timestamps, the Key Points, the "Do this"); the
+  // note is kept verbatim and summarized on demand ("Summarize with
+  // Machina"). The finished cards are written onto the store the way the
+  // backend writes them (capture/clip-save.mjs sourceCards). 60fps rolls.
+  async sources() {
+    const shotsDir = path.join(here, '..', 'out', 'capture', 'app', 'out', SHOTS_DIR);
+    await renderPost(dev.browser, shotsDir);
+    const postUrl = `${server.url}/${SHOTS_DIR}/post-1.png`;
+    await fresh();
+    const t = new Take(dev, OUT, 'sources');
+    const F60 = 1000 / 60;
+    const DETAIL = {
+      title: ['h2'],
+      moments: ['div', 'Explains that dopamine'],
+      moment1: ['li', '2:24'],
+      moment2: ['li', '6:44'],
+      moment3: ['li', '19:20'],
+      moment4: ['li', '26:20'],
+      keyPoints: ['h1,h2,h3,h4', 'Key Points'],
+      points: ['ul', ['Twenty pages a day', 'Pack for four days', 'Pick a field from aptitude', 'Dopamine is not a pleasure']],
+      takeaway: ['div', ['Read twenty pages tonight', 'Lay out four days', 'Spend an hour this week', 'Pick one tech-free zone']],
+      photo: ['img[src*="post-1"]'],
+      noteBody: ['div,p', 'Marco came by'],
+      summarize: ['button', ['Summarize with Machina', 'Reading your text']],
+      read: ['div', 'beam checks out'],
+      readPoints: ['ul', 'Cabinets and counters'],
+      tags: ['div', ['screen time', 'reading', 'carry-on', 'ambition', 'renovation']],
+    };
+    t.mark('home');
+    await t.snap({ rects: { firstCard: R.firstCard } });
+
+    // where each card's read-down stops: the bottom of this text at y (pt)
+    const STOP = {
+      youtube: ['Suggests turning off color', 720],
+      x: ['Write three lines', 740],
+      instagram: ['The caption adds', 760],
+      article: ['Spend an hour this week', 760],
+      note: ['Summarize with Machina', 740],
+    };
+    for (const { id, doc } of sourceCards(postUrl)) {
+      const key = id.replace('src-', '');
+      // it arrives at the top of the feed
+      await t.freeze();
+      await page.evaluate(([p, d]) => window.__capture.set(p, { ...d, createdAt: Date.now() }), [linkPath(id), doc]);
+      t.mark(`${key}Land`);
+      await t.roll(36, { rects: { firstCard: R.firstCard }, step: F60 });
+      await t.thaw();
+      await page.waitForTimeout(600);
+      t.mark(`${key}Landed`);
+      await t.snap({ rects: { firstCard: R.firstCard } });
+
+      // opened
+      await t.freeze();
+      await visible(page.locator(R.firstCard[0]).first()).click({ position: { x: 120, y: 40 } });
+      t.mark(`${key}Open`);
+      await t.roll(40, { rects: DETAIL, step: F60 });
+      await t.thaw();
+      await page.waitForTimeout(500);
+
+      // read down to what the app made of it
+      await t.freeze();
+      // (the scroller is found from text only the open card shows: its title
+      // is also on the feed card behind it, which would scroll the feed)
+      const [txt, y] = STOP[key];
+      await tagScroller(txt);
+      t.mark(`${key}Scroll`);
+      await rollScroll(t, await scrollTargetFor(txt, y), 4, DETAIL);
+      await t.snap({ rects: DETAIL });
+      await t.thaw();
+
+      if (key === 'note') {
+        // "Summarize with Machina": the words stay; the read is asked for
+        let held = null;
+        await page.route('**/api/analyze', (route) => {
+          held = route;
+        });
+        await t.freeze();
+        await visible(page.getByRole('button', { name: /Summarize with Machina/ })).click();
+        t.mark('noteTap');
+        await t.roll(30, { rects: DETAIL, step: F60 });
+        await t.thaw();
+        for (let k = 0; k < 200 && !held; k++) await page.waitForTimeout(50);
+        if (!held) throw new Error('sources: /api/analyze was never called');
+        await t.freeze();
+        await held.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, link: NOTE_READ }) });
+        await page.unroute('**/api/analyze');
+        t.mark('noteRead');
+        await t.roll(48, { rects: DETAIL, step: F60 });
+        await t.thaw();
+        await page.waitForTimeout(500);
+        await t.freeze();
+        await tagScroller('Earliest start');
+        t.mark('noteReadScroll');
+        await rollScroll(t, await scrollTargetFor('Earliest start', 760), 4, DETAIL);
+        await t.snap({ rects: DETAIL });
+        await t.thaw();
+      }
+
+      // back to the feed for the next one
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(900);
+    }
     return t.save();
   },
 };

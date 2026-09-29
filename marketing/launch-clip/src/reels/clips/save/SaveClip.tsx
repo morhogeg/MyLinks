@@ -10,14 +10,16 @@ import { Lens, Paper } from '../../kit/Paper';
 import { Hook } from './Hook';
 import { Shares } from './Shares';
 import { App } from './App';
+import { Sources } from './Sources';
 import { End } from './End';
 
 /**
- * SAVE, the feature clip: ~31s, 1080 × 1920, on its own clock
+ * SAVE, the feature clip: ~63s, 1080 × 1920, on its own clock
  * (clips/save-timeline.mjs), built from the reel kit (src/reels/kit) in the
- * reel's design language. The problem (Hook), the name, then the feature's
- * four parts: from any app (Shares), screenshots, key points, tags and links
- * (App: the real app, take "saveclip"), and the takeaway on the lockup (End).
+ * reel's design language. The problem (Hook), the name, from any app
+ * (Shares), what each kind of save becomes (Sources: YouTube, X, Instagram,
+ * an article, a note; take "sources"), screenshots, key points, tags and
+ * links (App: take "saveclip"), and the tagline on the lockup (End).
  * Scenes read the global frame and each draws only its own frames.
  */
 export const SaveClip: React.FC<{
@@ -32,6 +34,7 @@ export const SaveClip: React.FC<{
     <AbsoluteFill style={{ fontFamily: sans }}>
       {withAudio && <Audio src={staticFile(audioFile)} />}
       <Paper drift={Math.sin(f / 180) * 0.5} />
+      <Sources f={f} />
       <App f={f} />
       <Hook f={f} />
       <Shares f={f} />

@@ -9,7 +9,8 @@ import { SAVE_OPEN_CAM } from '../../scenes/handoff';
 
 /**
  * The feature in the real app (take "saveclip", capture/shoot.mjs), from the
- * + button the mark's point became to the throw into the lockup:
+ * cut to the feed after the source tour (Sources.tsx) to the throw into the
+ * lockup:
  *
  *  SCREENSHOTS  Add to Machina, lifted off its screen (the app darkens the
  *               screen behind it; the reel's grade never flips): the Image
@@ -74,9 +75,9 @@ const dialogFrame = (f: number) =>
 
 // ── the screen's camera
 const keys: Key[] = [
-  // the + button, exactly where the mark's point lands (the match cut)
-  { f: HITS.toApp, ...SAVE_OPEN_CAM, rx: 9 },
-  { f: HITS.toApp + 14, z: 1.56, rx: 0, ease: EASE_MODAL },
+  // a cut on the beat from the source tour to the feed, framed on the +
+  // (the framing the iris opened on)
+  { f: HITS.shots, ...SAVE_OPEN_CAM, z: 1.56, rx: 0 },
   { f: HITS.plusTap, z: 1.54, ease: linear },
   // pushed back behind the lifted dialog, answering the + tap
   { f: HITS.dialog + 8, cx: 196.5, cy: 430, z: 1.38, fx: 540, fy: 1190, ease: EASE_IN_OUT },
@@ -124,7 +125,7 @@ const relatedBox = (i: number, k: 1 | 2): Rect => {
 };
 
 export const App: React.FC<{ f: number }> = ({ f }) => {
-  if (f < HITS.toApp || f > HITS.throw + THROW_LEN) return null;
+  if (f < HITS.shots || f > HITS.throw + THROW_LEN) return null;
 
   const i = screenFrame(f);
   const s = scrollAt(f);
@@ -136,8 +137,6 @@ export const App: React.FC<{ f: number }> = ({ f }) => {
   const camV = camVelocity(keys, f, 1);
   const motion = scrolling ? { x: camV.x, y: camV.y + (wantY(s) - wantY(scrollAt(f - 1))) * cam.z } : camV;
 
-  // the iris: the + button opens into its screen
-  const iris = f < HITS.dialog ? { x: 196.5, y: 811, r: mix(20, 980, prog(f, HITS.toApp, HITS.dialog - 8, EASE_IN_OUT)) } : null;
   // behind the dialog: out of focus, racking into focus as it drops away
   // (it racks out ahead of the dialog, so the dialog never fades in over sharp type)
   const behind = prog(f, HITS.plusTap + 1, HITS.dialog + 4, EASE_IN_OUT) * (1 - prog(f, HITS.saveTap + 8, HITS.saveTap + 20, EASE_IN_OUT));
@@ -174,12 +173,9 @@ export const App: React.FC<{ f: number }> = ({ f }) => {
         take={T}
         i={i}
         cam={view}
-        iris={iris}
         blur={16 * behind}
         dim={0.12 * behind}
-        shadow={iris ? 0 : 1}
         motion={motion}
-        sheen={f < HITS.dialog + 8 ? prog(f, HITS.toApp, HITS.dialog + 8, EASE_MODAL) : 0}
       >
         <Tap x={plus.x} y={plus.y} t={prog(f, HITS.plusTap - 5, HITS.plusTap + 9, linear)} />
         <Tap x={card[0] + 120} y={card[1] + 60} t={prog(f, HITS.cardTap - 12, HITS.cardTap + 22, linear)} />

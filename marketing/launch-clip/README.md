@@ -604,21 +604,26 @@ audio device); the balance, the clarity and the loudness are only measured.
 
 ## Feature clip: SAVE
 
-`MachinaClipSave` is a 32.8s vertical video about one feature, saving, for
+`MachinaClipSave` is a 62.7s vertical video about one feature, saving, for
 someone seeing Machina for the first time (owner brief, 2026-09-28: the
-feature as the sole subject, the app named, a hook on the problem, three to
-five elements each shown doing its job and why it matters, a concrete
-takeaway). It is a new video in the reel's design language, not a cut of
-the reel. One save is carried through it: a recipe post someone screenshotted.
+feature as the sole subject, the app named, a hook on the problem, each
+element shown doing its job, a concrete close; owner, 2026-09-29: saving is a
+CORE feature, show what EVERY kind of save becomes, the clip may run longer).
+It is a new video in the reel's design language, not a cut of the reel.
 
 | Frames | Element | What is shown (the line) |
 |---|---|---|
 | 0–152 | the problem | saves where they were kept (open tabs, screenshots, bookmarks) bleach out; each named place lifts ("Great finds get lost in open tabs, screenshots and bookmarks.") |
-| 136–320 | the name, ANY APP | they collapse into the mark, the wordmark wipes in on "Machina"; YouTube, Instagram and Safari shares fly in ("Machina saves from any app. No copying, no pasting.") |
-| 304–496 | SCREENSHOTS | the point becomes the + (304–336), the app irises open, + tapped (360); the real Add dialog rises (368), Image tab (400), the camera reframes, three screens of one post picked on a still frame (432), numbered, Save (472), the dialog settles away ("Even screenshots get analyzed. Up to five become one card.") |
-| 496–680 | KEY POINTS | the feed's own "Reading 3 screenshots…" card and "Reading text…" banner, the card it becomes, opened: the screenshots, the gist, the Key Points lifted ("It reads the text in them and pulls out the key points.") |
-| 680–800 | TAGS & LINKS | read on down past the "Do this"; as it settles (744) the tags lift, then the two Related cards (Marcella Hazan's sauce 752, Samin Nosrat's chicken 768) ("Then it tags it, and links it to what you already saved.") |
-| 800–984 | the close | thrown into the lockup: the mark strikes (856), MACHINA wipes in on the spoken name, then the tagline, "Everything you save, / finally useful.", word by word on the voice, held 1.2s ("Machina. Everything you save, finally useful.") |
+| 136–336 | the name, ANY APP | they collapse into the mark, the wordmark wipes in on "Machina"; five shares a beat apart (YouTube, Instagram, X, Facebook, Safari) fly in (192–288) ("Machina saves from any app. No copying, no pasting.") |
+| 304–512 | YOUTUBE | the point becomes the +, the app irises open (336); the video's card lands at the top of the feed, tapped open (392): its Key moments, each timestamp lifted in turn (440–464) ("Share a YouTube video. Get its key moments, with timestamps.") |
+| 512–672 | X | a long-form X Article lands, opened (552), its Key Points lifted (608) ("A post on X, even a long article, comes back as the key points.") |
+| 672–832 | INSTAGRAM & FACEBOOK | an Instagram photo post lands, opened (712): the photo, read along with the caption, lifted (760) ("From Instagram or Facebook, it reads the caption and the photo.") |
+| 832–992 | ARTICLES | Paul Graham's essay lands, opened (872), read down to its Key Points; its "Do this" lifted (968) ("An article becomes a summary you can act on.") |
+| 992–1232 | NOTES | a typed note lands, opened (1032), verbatim; "Summarize with Machina" tapped (1088), "Reading your text…", Machina's read opens under the untouched note (1120) and is read down ("Your notes stay as you wrote them. Summarize them when you want.") |
+| 1232–1392 | SCREENSHOTS | a cut to the feed, + tapped (1256); the real Add dialog rises (1264), Image tab (1296), three screens of one recipe post picked (1328), Save (1368) ("Even screenshots get analyzed. Up to five become one card.") |
+| 1392–1576 | KEY POINTS | the feed's own "Reading 3 screenshots…" card, the card it becomes (1432), opened (1480): the screenshots, the gist, the Key Points lifted (1568) ("It reads the text in them and pulls out the key points.") |
+| 1576–1696 | TAGS & LINKS | read on down past the "Do this"; the tags lift (1640), then the two Related cards (1648, 1664) ("Then it tags it, and links it to what you already saved.") |
+| 1696–1880 | the close | thrown into the lockup: the mark strikes (1752), MACHINA wipes in on the spoken name, then the tagline, word by word, held 1.2s ("Machina. Everything you save, finally useful.") |
 
 **How it got here.** Round 1 rebuilt the clip to the owner's brief (the
 first cut, a re-edit of the reel's Save chapter, was rejected), then took the
@@ -642,8 +647,32 @@ about 34s), the clip grew 24 frames so the tagline holds 1.2s, and verify
 checks the close is the tagline, exactly, said nowhere earlier, and that the
 clip never says the App Store subtitle. The close is a `KineticLine`, not the
 `Lockup`'s own line: that one splits on spaces only and drops a row break.
+Round 3 (owner, 2026-09-29: "not detailed enough … we have a ton of great
+abilities, SHOW THEM") added the source tour, one real-app card per kind of
+save, each opened on what the app made of it: the YouTube card's Key moments
+with timestamps (copied from a real card on the owner's phone), a long-form X
+Article's Key Points, an Instagram photo post read from caption and photo, an
+essay's Key Points and "Do this", and a note kept verbatim and summarized on
+request. The shares montage grew to five (Facebook and X added). Notes come
+before Screenshots (the owner's plan had them after) so the tour is one
+continuous take and the clip still ends on the recipe card's tags and links.
+Two script lines were fitted to what the app does: X is "a post on X, even a
+long article" (the app reads X Articles; it does not unroll whole threads),
+and YouTube's key moments need Pro (free cards are filed from the title and
+description; the clip names no plan). 62.7s.
 
-**What is real and what is scripted.** Every app frame is the real app, a new
+**What is real and what is scripted.** Every app frame is the real app. The
+source tour is take `sources` (`capture/shoot.mjs`): each finished card is
+written onto the store the way the backend writes it and opened in the real
+detail view; the note's "Summarize with Machina" is really tapped and
+`/api/analyze` answers with a scripted read (`capture/clip-save.mjs`
+`sourceCards`, `NOTE_READ`). The YouTube card is the app's own output for a
+real video (Big Think Clips, "How to overcome your addiction to technology"),
+copied from the owner's phone; the X Article's author, the Instagram handle,
+the Facebook page in the montage and the note are invented (as the demo
+invents its Instagram handles); the essay is Paul Graham's, summarized true to
+it; the Instagram photo is a text graphic drawn for the clip, no third-party
+image. The screenshots section is a new
 take `saveclip` (`capture/shoot.mjs`, same demo account): the screenshots are
 picked into the Image tab's real file input, the app writes its real
 placeholder card and banner, and `/api/share` is held until the clock is frozen
@@ -659,19 +688,22 @@ automatically (they are not).
 **Built from the kit.** `clips/save-timeline.mjs` is the clock (the reel's
 grid, 112.5 BPM; app rolls captured at 60fps and played one per output frame,
 the reel's half speed). Scenes in `src/reels/clips/save/`: `Hook.tsx`,
-`Shares.tsx`, `App.tsx`, `End.tsx` (the kit's `Lockup` plus a `KineticLine`
-for the two-line takeaway). Kickers name the four elements; multi-word
+`Shares.tsx`, `Sources.tsx` (the source tour: landings, the app's own opens,
+lifts on each card's key part, stepped scrolls compensated like the reel's),
+`App.tsx`, `End.tsx` (the kit's `Lockup` plus a `KineticLine` for the
+tagline). Kickers name each element; multi-word
 kickers use non-breaking spaces (the kit's `Kicker` sets each letter as an
 inline block, where a plain space collapses: "ANYAPP"). Lifts leave by fading
 at full lift (see Camera below).
 
 Sound: `audio/clips/save-score.mjs`, from the shared instruments; nothing
 lands on a word (bells on the Related cards masked their line to 2.4dB and
-were moved after it). Every line ≥ 5.5dB over the music in the speech band;
-mastered −14 LUFS, true peak −1.25 dBTP (the encoded mp4: −14.2, −1.24).
+were moved after it; the tour's lifts are silent, its taps tick). Every line
+≥ 5.3dB over the music in the speech band; mastered −14 LUFS, true peak
+−1.25 dBTP.
 
 ```bash
-CAPTURE_ONLY=saveclip node capture/shoot.mjs   # the take (after reel:app)
+CAPTURE_ONLY=sources,saveclip node capture/shoot.mjs   # the takes (after reel:app)
 python3 audio/synth-vo.py save      # the narrator → out/vo/save/, src/reels/clips/save/vo.json
 node audio/clips/save-score.mjs     # the score   → public/clips/save/score.wav
 node audio/mix-vo.mjs save          # the mix     → public/clips/save/score-vo.wav (committed)

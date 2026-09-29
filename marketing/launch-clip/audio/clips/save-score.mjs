@@ -1,13 +1,14 @@
 /**
  * The SAVE clip's score: the film's instruments (audio/synth.mjs, shared by
  * every Machina score), its own arrangement on the clip's clock
- * (clips/save-timeline.mjs: 112.5 BPM, 16 frames a beat, 15 bars).
+ * (clips/save-timeline.mjs: 112.5 BPM, 16 frames a beat, 30 bars).
  *
  * The arrangement follows the cut: the problem floats on an open IV with no
  * drums, bells as the named places lift, a soft fall as the saves are lost;
  * a riser into the point, the mark resolving to I; bells as the shares land
  * in it; a riser carries the point into the app, and the drums come in with
- * the Add dialog and run through the screenshots, the reading and the card;
+ * the source tour (a tick as each card is tapped open, a soft bell as each
+ * lands) and run through the screenshots, the reading and the card;
  * the melody sings where the narrator is silent; the drums drop out for the
  * lockup, the mark strikes into air, the last note after the last word.
  *
@@ -22,7 +23,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BAR, BAR_CHORDS, BAR_FRAMES, BEAT, CAPTIONS, DRUMS, FPS, HITS, RISERS, TOTAL_FRAMES, TOTAL_SEC } from '../../clips/save-timeline.mjs';
+import { BAR, BAR_CHORDS, BAR_FRAMES, BEAT, CAPTIONS, DRUMS, FPS, HITS, RISERS, SOURCES, TOTAL_FRAMES, TOTAL_SEC } from '../../clips/save-timeline.mjs';
 import { createSynth } from '../synth.mjs';
 
 const S = createSynth({ seconds: TOTAL_SEC, beat: BEAT });
@@ -42,7 +43,13 @@ const CHORDS = {
 const BARS = Math.ceil(TOTAL_FRAMES / BAR_FRAMES);
 const LOCKUP_BAR = Math.round(HITS.lockup / BAR_FRAMES);
 /** how much of the band is playing, per clip bar */
-const DENSITY = [0.3, 0.34, 0.5, 0.56, 0.62, 0.9, 0.95, 1.0, 0.95, 0.92, 0.9, 0.72, 0.7, 0.45, 0.45];
+const DENSITY = [
+  0.3, 0.34, 0.5, 0.56, 0.62,
+  // the source tour: the band in, a touch under full so the lines sit clear
+  0.78, 0.82, 0.84, 0.84, 0.84, 0.84, 0.84, 0.84, 0.84, 0.84, 0.82, 0.8, 0.8, 0.82,
+  // screenshots → the card → the lockup
+  0.9, 0.95, 1.0, 0.95, 0.92, 0.9, 0.72, 0.7, 0.45, 0.45, 0.45,
+];
 
 for (let bar = 0; bar < BARS; bar++) {
   const ch = CHORDS[BAR_CHORDS[bar]];
@@ -142,13 +149,27 @@ shimmer(t(H.bracketsClose) + 0.5, [72, 79, 84, 88], 0.04);
 // any app: each Share button tapped, pulled, landing in the mark
 H.shareTaps.forEach((fr, i) => {
   tick(t(fr), 0.09, 1.15 + i * 0.1);
-  whoosh(t(fr + 2), 0.45, 0.07, [0.4, -0.4, 0.4][i]);
-  bell(t(H.shareLands[i]), [84, 88, 91][i], 0.055, 0, 1.6);
+  whoosh(t(fr + 2), 0.45, 0.07, [0.4, -0.4, 0.4, -0.4, 0][i]);
+  bell(t(H.shareLands[i]), [84, 86, 88, 91, 96][i], 0.05, 0, 1.4);
   sub(t(H.shareLands[i]), 43, 0.16, 0.25);
 });
 
-// the point becomes the + and the app opens around it; + tapped, the dialog
+// the point becomes the + and the app opens around it
 whoosh(t(H.toApp) - 0.1, 0.5, 0.08, 0);
+
+// the source tour: each card lands (a soft sub, off the lines), is tapped
+// open (a tick on the touch, a small whoosh with the app's own open); the
+// lifts are silent (bells on them sat on the narrator's words)
+SOURCES.forEach((b, n) => {
+  sub(t(b.at + 8), 43, 0.14, 0.25);
+  tick(t(H.srcTaps[n]), 0.09, 1.1 + n * 0.05);
+  whoosh(t(H.srcTaps[n]) + 0.07, 0.35, 0.045, n % 2 ? 0.15 : -0.15);
+});
+tick(t(H.summarizeTap), 0.09, 1.25);
+// Machina's read arrives after the last word of the Notes line
+shimmer(t(H.noteRead + 16), [79, 84, 88], 0.035);
+
+// screenshots: a cut to the feed; + tapped, the dialog
 tick(t(H.plusTap), 0.1, 1.1);
 whoosh(t(H.dialog) - 0.08, 0.35, 0.05, 0.2);
 

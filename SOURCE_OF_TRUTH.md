@@ -2551,31 +2551,27 @@ narrator, its word timings and the mixed audio are committed; `reel:vo` and
 in Inter as a stand-in for SF Pro, which is what the app actually renders in
 on iPhone (§4 23b).
 
-**What exists (feature clip: SAVE, 2026-09-28, branch `claude/clip-save`,
-awaiting owner review, not merged):** `MachinaClipSave` (32.8s, 1080×1920,
+**What exists (feature clip: SAVE, 2026-09-29, branch `claude/clip-save`,
+awaiting owner review, not merged):** `MachinaClipSave` (62.7s, 1080×1920,
 score + narrator + captions; mastered −14 LUFS, true peak −1.25 dBTP), plus
 `MachinaClipSaveSilent` and `MachinaClipSaveClean`, in
-`marketing/launch-clip/`. Built to the owner's feature-video brief (sole
-subject, first-time viewer, Machina named, problem hook, 3–5 elements each
-shown working, concrete takeaway), not cut from the reel. Hook: "Great finds
-get lost in open tabs, screenshots and bookmarks." → the name → ANY APP
-(shares into the mark: "Machina saves from any app. No copying, no pasting.")
-→ SCREENSHOTS ("Even screenshots get analyzed. Up to five become one card.":
-the real Add dialog's Image tab, three screens of one recipe post → one card) → KEY POINTS (the feed's real "Reading
-3 screenshots…" card, the card opened to its Key Points) → TAGS & LINKS (tags,
-"Do this", Related cards) → "Machina. Everything you save, finally useful."
-(the tagline, owner call 2026-09-28; was "Save it once. Machina does the
-rest.") on the
-lockup. New take `saveclip` (`capture/shoot.mjs`; the screenshots and the
-returned card are scripted in `capture/clip-save.mjs`). Clock
+`marketing/launch-clip/`. Built to the owner's feature-video brief, then
+widened (2026-09-29: saving is a core feature, show every kind of save).
+Hook: "Great finds get lost in open tabs, screenshots and bookmarks." → the
+name → ANY APP (five shares into the mark) → the SOURCE TOUR, one real-app
+card each: YouTube (Key moments with timestamps), X (a long-form X Article's
+Key Points), Instagram & Facebook (a photo post read from caption and photo),
+Articles (Key Points and a "Do this"), Notes (kept verbatim, "Summarize with
+Machina" on request) → SCREENSHOTS (the real Add dialog's Image tab, three
+screens → one card) → KEY POINTS → TAGS & LINKS → "Machina. Everything you
+save, finally useful." on the lockup. Takes `sources` and `saveclip`
+(`capture/shoot.mjs`; scripted cards in `capture/clip-save.mjs`). Clock
 `clips/save-timeline.mjs`, scenes `src/reels/clips/save/`, score
 `audio/clips/save-score.mjs`; verify has a clip section. **To render:** after
-`reel:app` + `reel:capture` (or `CAPTURE_ONLY=saveclip node
-capture/shoot.mjs`), `npx remotion render src/index.ts MachinaClipSave
+`reel:app`, `CAPTURE_ONLY=sources,saveclip node capture/shoot.mjs`, then
+`npx remotion render src/index.ts MachinaClipSave
 out/clips/machina-clip-save.mp4`; the launch-clip README's "Feature clip:
-SAVE" has the audio commands. Finishing pass done (round 2: the Add dialog's
-open and close, the pick, the card landing, the tags, the poster frame; three
-new verify gates).
+SAVE" has the audio commands and the frame table.
 
 **Feature-clip briefs, FINAL against the pilot's kit (2026-09-26).** Shared
 by all five: **448 frames (7 bars at 112.5 BPM, 14.9s)**, vertical, built
@@ -2636,6 +2632,22 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-29 — SAVE clip round 3: every kind of save, shown.** Branch
+  `claude/clip-save`, not merged. Owner: "not detailed enough … this is a CORE
+  feature … SHOW THEM", with a YouTube card from the phone (Key moments with
+  timestamps). The clip is now 62.7s: after the name and five shares, a source
+  tour opens one real-app card per kind of save (YouTube Key moments lifted
+  one by one; an X Article's Key Points; an Instagram photo post read from
+  caption and photo; Paul Graham's essay down to its "Do this"; a note kept
+  verbatim, "Summarize with Machina" tapped, Machina's read opening under it),
+  then the screenshots, key points, tags and links as before, and the tagline.
+  New take `sources`; the other takes are byte-identical in `takes.json`.
+  Fitted to the code: X Articles yes, whole-thread unrolling no (the line
+  says "a post on X, even a long article"); YouTube key moments are Pro (the
+  clip names no plan). Notes moved before Screenshots so the tour is one take.
+  Verify: the duration gate is now 45–75s; share titles must be tour cards;
+  the tour's cards, note read and every captured frame pass the bans; taps
+  in `Sources.tsx` are gated too. Not listened to on speakers.
 - **2026-09-29 — SAVE clip ends on the tagline.** Branch `claude/clip-save`,
   not merged. The 2026-09-28 tagline decision was first applied only to the
   80s launch film (below) and those renders were sent, when the owner meant
