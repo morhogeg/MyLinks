@@ -2402,8 +2402,11 @@ set in sentence case (`TAGLINE` in `src/scenes/Endcard.tsx`), which the voice
 speaks word for word with nothing under it. `npm run verify` gates it (the
 endcard line, the closing voice line, no caption repeating the tagline, the
 introduction carrying the subtitle; the subtitle itself is now read from
-`docs/APP_STORE.md`). MachinaReel and MachinaAsk still end on the subtitle
-(the decision named the main film only).
+`docs/APP_STORE.md`). The Ask clip followed on 2026-09-29 (owner: "as
+updated in all the other videos"): its lockup is "Machina. / Everything you
+save, / finally useful.", as on the Find, Revisit and Save branches. On this
+branch MachinaReel still ends on the subtitle; `claude/clip-find` and
+`claude/clip-revisit` carry the reel's switch.
 
 *Short-form reels (PLANNED 2026-09-26, owner; the PILOT was built the same
 day on branch `claude/machina-reel-pilot`, NOT merged, see "What exists"
@@ -2550,7 +2553,7 @@ in Inter as a stand-in for SF Pro, which is what the app actually renders in
 on iPhone (§4 23b).
 
 **What exists (feature clip: Ask, 2026-09-28, branch `claude/clip-ask`,
-awaiting owner review, not merged):** `MachinaAsk` (32.5s, 1080×1920, score +
+awaiting owner review, not merged):** `MachinaAsk` (33.1s, 1080×1920, score +
 narrator + captions, the deliverable; mastered to −14 LUFS, true peak ≤ −1
 dBTP), `MachinaAskSilent` and `MachinaAskClean`, built from the reel kit
 unchanged. Rebuilt to the owner's explainer brief (the first cut was rejected
@@ -2636,6 +2639,14 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-29 — Ask clip ends on the tagline.** Branch `claude/clip-ask`,
+  not merged. The lockup is "Machina. / Everything you save, / finally
+  useful.", the voice word for word, matching the Find, Revisit and Save
+  clips; the kit `Lockup` takes the Find branch's identical "\n" row break
+  (the reel renders pixel-identical: lockup frames 2320/2400/2447 checked).
+  The clip grew one beat to 33.1s so the card holds 1.96s. Verify: the close
+  is the tagline exactly, said nowhere earlier, the subtitle never said.
+  Voice, score and mix regenerated. **Not verified:** nobody has listened.
 - **2026-09-28 — Launch film ends on the tagline (owner decision).** Branch
   `claude/clip-ask`, not merged. Endcard line + closing voice line are now
   "Everything you save, finally useful." (sentence case, 30px); the

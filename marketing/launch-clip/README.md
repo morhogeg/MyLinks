@@ -825,7 +825,7 @@ Enforced by `npm run verify` where a machine can check:
 
 ## Feature clip: Ask (`MachinaAsk`)
 
-`MachinaAsk` is a 32.5s vertical explainer of Ask for someone seeing it for the
+`MachinaAsk` is a 33.1s vertical explainer of Ask for someone seeing it for the
 first time (owner brief, 2026-09-28: the feature as the sole subject, a hook
 that frames what Ask unlocks, Machina named, three to five elements each shown in
 action with why it matters, a concrete takeaway, a light nod to Machina). It
@@ -843,7 +843,7 @@ the same instruments on the same 112.5 BPM grid, and the reel's lockup.
 | 384–528 | 3. sources | The three sources lift on beats; the first is tapped and The Tail End's own card opens on the passage the answer drew on, which lifts: "Every answer shows its sources. Tap one to check it." |
 | 528–688 | 4. follow-ups | The card closes (the finger leaves with it), then the line starts and the camera moves in close on the continuations the app suggests under the answer ("Compare the Time saves", "More on 'The Tail End'", "What else did I save on time?"); the chosen one lifts and is tapped on "asks the next question"; a second answer and its sources: "Keep going. One tap asks the next question." (owner, round 3: the old cut left the close tap's ripple on the chat's "+ New", which read as the tap the line meant) |
 | 688–800 | 5. connections | Its Graph chip: the two cited saves lit and linked among the rest: "Then see how those saves connect." Then the takeaway: "Ask once. Get the answer, and the proof." |
-| 800–976 | close | Thrown out into the lockup: "Machina. Never lose another great find.", the end card held 1.8s after the last word |
+| 800–992 | close | Thrown out into the lockup: "Machina." then the tagline on two rows, "Everything you save, / finally useful." (owner 2026-09-28: every launch film ends on the tagline; the clip never says the App Store subtitle), the end card held 1.96s after the last word |
 
 **Finishing pass (2026-09-28, fresh eyes, measured).** The script, order
 and lines are unchanged. Three fixes: the hook was wordless for its first

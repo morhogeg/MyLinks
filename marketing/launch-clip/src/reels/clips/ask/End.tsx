@@ -8,8 +8,8 @@ import { prog } from '../../kit/curves';
 /**
  * The reel's close, on this clip's clock: the mark arrives with the app's own
  * launch motion (the point strikes on the score's impact, on a beat), the
- * drawn wordmark wipes in as "Machina" is said, and the App Store subtitle
- * arrives word by word on the narrator's timing, set in Geist. The clip ends
+ * drawn wordmark wipes in as "Machina" is said, and the tagline "Everything
+ * you save, finally useful." (two rows) arrives word by word on the narrator's timing, set in Geist. The clip ends
  * ON the lockup: the last frame is the one a paused player shows.
  *
  * The reel's slow push-in (2.5% over the hold) stays on the mark and the
@@ -30,10 +30,10 @@ const LINE_BAND = 380;
 
 export const End: React.FC<{ f: number }> = ({ f }) => {
   if (f < HITS.lockup) return null;
-  // "Machina. Never lose another great find.": the first word is the drawn
-  // wordmark, the rest is the line
+  // "Machina. Everything you save, finally useful.": the first word is the
+  // drawn wordmark, the rest is the line, with its own row break
   const starts = timing?.words.map((s) => LINE.at + Math.round(s * FPS)) ?? [];
-  const line = LINE.text.split('\n').slice(-1)[0];
+  const line = LINE.text.split('\n').slice(1).join('\n');
   const drift = prog(f, HITS.markStrike + 6, TOTAL_FRAMES, (t) => t);
   const lockup = (
     <Lockup

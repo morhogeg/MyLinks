@@ -458,7 +458,7 @@ console.log('\n── reel');
 // The feature clip (clips/ask-timeline.mjs, src/reels/clips/ask/, capture
 // take `askfull`) under the reel's gates, on its own clock: captions and
 // kickers, the narrator mirroring them and fitting them, the dwell rule, the
-// closing subtitle, banned strings on screen and in the voice, the score, the
+// closing tagline, banned strings on screen and in the voice, the score, the
 // voice over the music, the delivery loudness. Plus what a clip written
 // straight in output frames needs: every picture event on the grid (cuts and
 // taps on beats, the rest on 8ths), every line starting on a beat, at most
@@ -542,8 +542,13 @@ console.log('\n── clip: ask');
     console.log('  (no out/vo/ask/manifest.json: VO fit not re-checked; run synth-vo.py ask)');
   }
   const close = caps.find((c) => c.place === 'lockup');
-  const closeLine = close?.text.split('\n').slice(-1)[0].replace(/\.$/, '');
-  if (!close || !fs.readFileSync(path.join(root, '..', '..', 'docs', 'APP_STORE.md'), 'utf8').includes(closeLine)) bad.push('the clip lockup line is not the App Store subtitle');
+  // the close is the tagline, exactly, and said nowhere earlier; the App
+  // Store subtitle is never said (owner 2026-09-28: every launch film ends on
+  // the tagline)
+  const closeLine = close?.text.split('\n').slice(1).join(' ');
+  if (closeLine !== 'Everything you save, finally useful.') bad.push(`the clip does not end on the tagline: "${closeLine}"`);
+  for (const c of caps) if (c !== close && /finally useful/i.test(`${c.text} ${c.say ?? ''}`)) bad.push(`the tagline appears before the end: "${c.text}"`);
+  if (caps.some((c) => /great find/i.test(`${c.text} ${c.say ?? ''}`))) bad.push('the clip says the App Store subtitle');
   // the end card holds (finishing pass: it held 1.3s; the owner's rule for
   // the reel is ~2s): at least 1.6s from the last spoken word to the end
   const closeVo = manifest?.find((l) => l.frame === close?.at);
