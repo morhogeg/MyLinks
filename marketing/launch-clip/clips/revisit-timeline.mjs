@@ -38,8 +38,8 @@ export const TAKE = 'revisitClip';
  * our solutions"). Before the app: the problem, then the turn. Ten real saves
  * from the demo account (the ones Revisit brings back later among them) come
  * into focus where they were kept; the narrator names the habit ("You save
- * things to come back to later.") and the problem ("But you rarely go back to
- * them."; rarely, not never: the film's honest word), and they bleach into
+ * things to come back to later.") and the problem ("But most of them, you
+ * never open again."; round 6, owner: "fix the writing"), and they bleach into
  * the paper; on "Machina brings them back to you." they gather into the
  * point, the brackets snap round it (the mark), and the point opens as an
  * iris onto the Revisit tab. OPEN frames (4 bars); everything after it is
@@ -49,7 +49,7 @@ export const TAKE = 'revisitClip';
 export const OPEN = 256;
 export const OPENING = {
   focus: [0, 24], // the saves come into focus (a soft scatter is already there on frame 0)
-  bleach: 128, // …bleach into the paper on "rarely"
+  bleach: 152, // …bleach into the paper on "never" (round 6)
   gather: [176, 200], // …gather into one point, landing just after "Machina"
   snap: 208, // the brackets snap round it: the mark
   iris: [224, 256], // the point opens onto the Revisit tab
@@ -63,10 +63,11 @@ export const OPENING = {
 /**
  * (round 5, owner: "add a bit more info, to show the usefulness") USE: two
  * beats spliced in after "Due now", 5 bars, every later event moved by
- * USE.len. The due save's bell opens its reminder's own sheet: Smart review,
- * "Tomorrow · then 1 week & 1 month" ("…after a day, a week, and a month.");
- * closed; then the save itself, opened: its summary and Key Points ("It
- * comes back as the point, not just a link."); back to Revisit.
+ * USE.len. The due save's bell opens its reminder's own sheet ("Later
+ * today, this weekend, or three times, so it sticks."; round 6: the choices
+ * in plain words, no menu names); closed; then the save itself, opened: its
+ * summary and Key Points ("Open one, and the key points are already
+ * there."); back to Revisit.
  */
 export const USE = { at: 128, len: 320 };
 const U = USE.len;
@@ -76,8 +77,8 @@ export const HITS = {
   dueLift: 48, // (round 3) the reminder that came due lifts, in the pause after "reminder,"
   dueDrop: 104, // …and settles back
   bell: 128, // (round 5) its bell, tapped: the reminder's sheet slides up
-  smartLift: 168, // Smart review lifts, after its name is said
-  smartDrop: 240, // …and settles back
+  smartLift: 200, // the top row (Smart review) lifts on "three times"
+  smartDrop: 248, // …and settles back
   cancel: 264, // its X: the sheet goes
   openTap: 304, // the due save, tapped: it opens on its summary
   keyPoints: [360, 392], // down to its Key Points
@@ -153,18 +154,20 @@ export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 export const CAPTIONS = [
   // THE OPENING: the habit, then the problem (no chapter word: `open`)
   { at: 16, to: 96, open: true, text: 'You save things\nto come back to later.' },
-  { at: 112, to: 176, open: true, text: 'But you rarely\ngo back to them.' },
+  { at: 112, to: 188, open: true, text: 'But most of them,\nyou never open again.' },
   // the turn: the saves gather into the point as the name is said
   { at: 192, to: 256, open: true, text: 'Machina brings them\nback to you.' },
   // (round 3, owner: "too thin, expand on the feature") Revisit opens on
   // what has come due: a reminder the user set (the app's Remind me: Smart
   // review, or a day) lands under "Due now"; its row lifts after "reminder,"
-  { at: OPEN + 16, to: OPEN + 124, text: 'Set a reminder, and a save\ncomes back when it’s due.' },
-  // (round 5) USE: the reminder's own sheet; Smart review lifts after its
-  // name ("Tomorrow · then 1 week & 1 month" on screen)
-  { at: OPEN + 144, to: OPEN + 256, text: 'Smart review brings it back after\na day, a week, and a month.' },
+  { at: OPEN + 16, to: OPEN + 104, text: 'Your saves come back\nwhen you want them.' },
+  // (round 5, reworded round 6: owner, "why focus on smart review?") USE:
+  // the reminder's own sheet, its choices named plainly; the top row (the
+  // app's "Smart review": tomorrow, then 1 week and 1 month) lifts on "three
+  // times"
+  { at: OPEN + 144, to: OPEN + 256, text: 'Later today, this weekend,\nor three times, so it sticks.' },
   // the save opens on its summary, then down to its Key Points
-  { at: OPEN + 320, to: OPEN + 408, text: 'It comes back as the point,\nnot just a link.' },
+  { at: OPEN + 320, to: OPEN + 408, text: 'Open one, and the key points\nare already there.' },
   // the "Do this" list: the app writes a step only for a save that calls for
   // one (web/lib/takeaway.ts); its first row lifts in the pause after
   // "action,", then the V60 step is ticked off (the app's "Marked as done")

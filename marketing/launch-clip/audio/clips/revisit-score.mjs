@@ -126,7 +126,7 @@ for (const [from, to] of RISERS) riser(s(from), s(to) - s(from), 0.09);
 // ── sound design, on the picture's frames (HITS)
 const H = HITS;
 // THE OPENING (round 4, absolute frames): the saves come into focus as soft
-// glints; a fall as they bleach on "rarely"; they rush together into the
+// glints; a fall as they bleach on "never"; they rush together into the
 // point (the riser above ends on the snap); the brackets snap; the point
 // opens as an iris; a shimmer after the line ("…back to you.")
 [2, 6, 10, 14, 18, 22].forEach((fr, i) => bell(s(fr), [84, 88, 91, 86, 89, 93][i], 0.026, i % 2 ? 0.45 : -0.45, 1.2));

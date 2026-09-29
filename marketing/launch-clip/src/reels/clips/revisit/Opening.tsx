@@ -13,8 +13,8 @@ import { EASE_GATHER, EASE_IN_OUT, EASE_MODAL, EASE_SPRING, mix, prog } from '..
  * post, a thread, a bookmarked page, a screenshot), come into focus; the
  * saves Revisit brings back later are among them (Four Thousand Weeks, The
  * Tail End, the tomato sauce, the V60 video, Piranesi). "You save things to
- * come back to later." "But you rarely go back to them.": they bleach into
- * the paper on "rarely". "Machina brings them back to you.": they come back
+ * come back to later." "But most of them, you never open again.": they bleach
+ * into the paper on "never". "Machina brings them back to you.": they come back
  * to ink as they GATHER (EASE_GATHER, the one move that ends at speed) into a
  * single point just after the name, the brackets snap round it (the app's
  * spring), and the point opens as the iris onto the Revisit tab (Revisit.tsx
@@ -54,7 +54,7 @@ const chipAt = (k: number, f: number) => {
   const hang = prog(f, 0, O.gather[0], (t) => t);
   const push = 1 + hang * 0.09 * c.s;
   const g = prog(f, O.gather[0] - 6, O.gather[1], EASE_GATHER);
-  // rarely seen again: bleached into the paper, back to ink as they gather
+  // never opened again: bleached into the paper, back to ink as they gather
   const b = prog(f, O.bleach, O.bleach + 30, EASE_MODAL) * (1 - prog(f, O.gather[0] - 8, O.gather[1] - 4, EASE_IN_OUT));
   return {
     x: POINT.x + (c.x - POINT.x) * push * (1 - g),

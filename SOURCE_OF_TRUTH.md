@@ -2582,9 +2582,11 @@ proper opening"): it now opens on the problem ("You save things to come back
 to later." / "But you rarely go back to them."), then the turn ("Machina
 brings them back to you.": the saves gather into the mark, which irises open
 onto Revisit). Round 5 (owner: "show the usefulness"): after "Due now" the
-due save's bell opens its Smart review sheet ("…after a day, a week, and a
-month.") and the save opens on its Key Points ("It comes back as the point,
-not just a link."); 55.5s. How to render: the launch-clip README, "Feature clip: REVISIT".
+due save's bell opens its reminder sheet and the save opens on its Key
+Points. Round 6 rewrote the beginning's lines in plain words ("But most of
+them, you never open again." / "Your saves come back when you want them." /
+"Later today, this weekend, or three times, so it sticks." / "Open one, and
+the key points are already there."); 55.5s. How to render: the launch-clip README, "Feature clip: REVISIT".
 
 **Feature-clip briefs, FINAL against the pilot's kit (2026-09-26).** Shared
 by all five: **448 frames (7 bars at 112.5 BPM, 14.9s)**, vertical, built
@@ -2645,6 +2647,13 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-29 — REVISIT round 6: the beginning rewritten.** Owner: the
+  round 5 lines were bad ("Smart review" is a menu name, "comes back as the
+  point" meant nothing). Same shots; new lines: "But most of them, you never
+  open again."; "Your saves come back when you want them."; "Later today,
+  this weekend, or three times, so it sticks."; "Open one, and the key points
+  are already there." Verified: tsc, verify, render, frames at each line.
+  Not verified: nobody has listened on speakers.
 - **2026-09-29 — REVISIT round 5: two beats that show the usefulness.**
   Branch `claude/clip-revisit`, not merged. Owner approved both: after "Due
   now", the due save's bell opens its reminder sheet, Smart review lifting

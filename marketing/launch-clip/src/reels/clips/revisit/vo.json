@@ -15,15 +15,16 @@
  },
  {
   "frame": 112,
-  "text": "But you rarely go back to them.",
+  "text": "But most of them, you never open again.",
   "words": [
-   0.1,
-   0.276,
-   0.453,
-   0.761,
-   0.893,
-   1.113,
-   1.246
+   0.05,
+   0.217,
+   0.425,
+   0.55,
+   1.05,
+   1.252,
+   1.555,
+   1.807
   ]
  },
  {
@@ -40,54 +41,47 @@
  },
  {
   "frame": 272,
-  "text": "Set a reminder, and a save comes back when it\u2019s due.",
+  "text": "Your saves come back when you want them.",
   "words": [
-   0.03,
-   0.242,
-   0.349,
-   1.18,
+   0.06,
+   0.277,
+   0.538,
+   0.755,
+   0.972,
+   1.189,
    1.362,
-   1.452,
-   1.679,
-   1.952,
-   2.179,
-   2.406,
-   2.633
+   1.58
   ]
  },
  {
   "frame": 400,
-  "text": "Smart review brings it back after a day, a week, and a month.",
+  "text": "Later today, this weekend, or three times, so it sticks.",
   "words": [
-   0.03,
-   0.304,
-   0.623,
-   0.942,
-   1.079,
-   1.307,
-   1.581,
-   1.672,
-   2.26,
-   2.378,
-   2.89,
-   3.007,
-   3.065
+   0.05,
+   0.336,
+   0.9,
+   1.146,
+   1.75,
+   1.984,
+   2.453,
+   3.09,
+   3.12,
+   3.15
   ]
  },
  {
   "frame": 576,
-  "text": "It comes back as the point, not just a link.",
+  "text": "Open one, and the key points are already there.",
   "words": [
    0.04,
-   0.184,
-   0.471,
-   0.71,
-   0.854,
-   1.045,
-   1.61,
-   1.786,
-   2.007,
-   2.095
+   0.4,
+   1.01,
+   1.163,
+   1.315,
+   1.468,
+   1.735,
+   1.888,
+   2.193
   ]
  },
  {

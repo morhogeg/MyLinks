@@ -610,10 +610,10 @@ continuous use of the real app (take `revisitClip`), whose clock starts at
 
 | Frames | What it does |
 |---|---|
-| 0–176 | THE PROBLEM (`Opening.tsx`): ten real saves where they were kept, legible from frame 0; "You save things to come back to later." / "But you rarely go back to them.", and they bleach into the paper on "rarely" |
+| 0–176 | THE PROBLEM (`Opening.tsx`): ten real saves where they were kept, legible from frame 0; "You save things to come back to later." / "But most of them, you never open again.", and they bleach into the paper on "never" |
 | 176–256 | THE TURN: "Machina brings them back to you.": they gather into one point just after the name, the brackets snap round it (the mark), and the point opens as an iris onto the Revisit tab |
-| 256–380 | "Due now": a reminder set on Four Thousand Weeks lifts after "Set a reminder," ("…and a save comes back when it's due."); the chapter word REVISIT arrives with this line |
-| 384–704 | (round 5) USE: its bell opens the reminder's own sheet and Smart review lifts ("Smart review brings it back after a day, a week, and a month.", the sheet itself saying "Tomorrow · then 1 week & 1 month"); closed with its X; the save opens on its summary and the camera goes down to its Key Points ("It comes back as the point, not just a link."); back to the list |
+| 256–380 | "Due now": a reminder set on Four Thousand Weeks lifts on "when you want them" ("Your saves come back when you want them."); the chapter word REVISIT arrives with this line |
+| 384–704 | (round 5) USE: its bell opens the reminder's own sheet ("Later today, this weekend, or three times, so it sticks."; the top row, the app's tomorrow / 1 week / 1 month, lifts on "three times"); closed with its X; the save opens on its summary and the camera goes down to its Key Points ("Open one, and the key points are already there."); back to the list |
 | 704–896 | The "Do this" list: "When a save calls for action, Machina turns it into a to-do."; The Tail End's row lifts; a step is ticked off at 848, the app's "Marked as done" toast in frame |
 | 896–1024 | Into the reading window; "This week in Machina" tapped open at 944; it unfolds on "Every week," and rises on "Machina brings back what's worth remembering." |
 | 1024–1264 | The recap READ: the write-up held, the two themes and their saves on "The themes of your week," (each hold drifts: `CREEP`), then ONE glide onto the Standout |
@@ -731,6 +731,14 @@ the band, so no drawn tap). The demo card Four Thousand Weeks now carries
 three Key Points (`capture/library.mjs`, no "Do this": the list is
 unchanged). The camera's return to the list is 48 frames (32 peaked at
 47px/frame).
+
+**Round 6 (owner: "the beginning is terrible… why focus on smart review? What
+is 'it comes back as a point'? Fix the entire beginning").** Same shots, the
+writing redone in plain, benefit-first words: no menu names, nothing a
+viewer has to decode. "But most of them, you never open again." (they bleach
+on "never"); "Your saves come back when you want them."; "Later today, this
+weekend, or three times, so it sticks." (the three-times row lifts on "three
+times"); "Open one, and the key points are already there."
 
 ## Motion language
 
