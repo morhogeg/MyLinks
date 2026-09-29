@@ -2403,8 +2403,8 @@ speaks word for word with nothing under it. `npm run verify` gates it (the
 endcard line, the closing voice line, no caption repeating the tagline, the
 introduction carrying the subtitle; the subtitle itself is now read from
 `docs/APP_STORE.md`). The Ask clip followed on 2026-09-29 (owner: "as
-updated in all the other videos"): its lockup is "Machina. / Everything you
-save, / finally useful.", as on the Find, Revisit and Save branches. On this
+updated in all the other videos"): its lockup is "Machina." and the tagline on
+one line (50px, the Revisit clip's setting; owner 2026-09-29). On this
 branch MachinaReel still ends on the subtitle; `claude/clip-find` and
 `claude/clip-revisit` carry the reel's switch.
 
@@ -2639,6 +2639,14 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-29 — Ask clip: tagline on one line, hook voice without the
+  pause.** Branch `claude/clip-ask`, not merged. Owner QA: the close sets the
+  tagline on ONE line (kit `Lockup` gains the Revisit branch's identical
+  `lineSize` prop, default 60 so the reel is pixel-identical; Ask uses 50).
+  The hook's voice paused 0.22s after "knowledge" (Kokoro does it for every
+  spelling tried); a caption marked `tight` now has pauses inside its line
+  closed to 0.05s in `synth-vo.py` (hook now 2.38s spoken, was 2.56s).
+  **Not verified:** nobody has listened.
 - **2026-09-29 — Ask clip ends on the tagline.** Branch `claude/clip-ask`,
   not merged. The lockup is "Machina. / Everything you save, / finally
   useful.", the voice word for word, matching the Find, Revisit and Save

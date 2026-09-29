@@ -79,7 +79,9 @@ export const CAPTIONS = [
   // into Ask plays clean)
   // the hook: what your saves add up to, over the feed flying past (owner,
   // round 2: frame the knowledge Ask reaches, not the search; no chapter word)
-  { at: beat(1), to: beat(7) + 8, hook: true, text: 'Your saves hold more knowledge\nthan you remember.' },
+  // (`tight`, owner 2026-09-29: the voice paused 0.22s after "knowledge"
+  // on its own; synth-vo.py closes pauses inside the line)
+  { at: beat(1), to: beat(7) + 8, hook: true, tight: true, text: 'Your saves hold more knowledge\nthan you remember.' },
   // the name, on Ask opening
   { at: beat(10), to: beat(14), text: 'With Machina, you just ask.' },
   // 1. plain words: no remembering where, or what it was called
@@ -101,10 +103,11 @@ export const CAPTIONS = [
   // rule for the reel; it held 1.3s. The tagline runs longer than the
   // subtitle did, so the close grew one beat: 33.1s, a 1.96s hold)
   // the close: the name (the drawn wordmark wipes in as it is said), then
-  // the tagline, broken at its comma (owner 2026-09-28: every launch film
-  // ends on "Everything you save, finally useful."); the music steps back
+  // the tagline on ONE line (owner 2026-09-28: every launch film ends on
+  // "Everything you save, finally useful."; 2026-09-29: one line, as the
+  // Revisit clip sets it); the music steps back
   // under both
-  { at: beat(53), to: beat(62), place: 'lockup', text: 'Machina.\nEverything you save,\nfinally useful.', duck: 0.4 },
+  { at: beat(53), to: beat(62), place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4 },
 ];
 
 export const TOTAL_FRAMES = CAPTIONS[CAPTIONS.length - 1].to;

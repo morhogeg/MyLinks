@@ -140,6 +140,7 @@ def ask_script():
             "window": (c["to"] - c["at"]) / fps,
             "text": " ".join((c.get("say") or c["text"]).split()).replace("Machina", SAY_NAME),
             "speed": SPEED,
+            "tight": bool(c.get("tight")),
         }
         for c in data["captions"]
     ]
@@ -147,6 +148,33 @@ def ask_script():
 
 SCRIPTS["ask"] = (ask_script, os.path.join(VO, "ask"))
 WORD_TIMING["ask"] = os.path.join(ROOT, "src", "reels", "clips", "ask", "vo.json")
+
+
+def tighten(samples, sr, keep=0.05, fade=0.01):
+    """Close the pauses INSIDE a line to `keep` seconds. Kokoro sometimes
+    breathes mid-sentence where the text has no comma ("...more knowledge
+    [0.22s] than you remember."), and no respelling moves it; a line marked
+    `tight` has each inner pause >= 0.09s cut in its middle, with a short
+    crossfade so the cut is silent. Lead-in and tail are left alone."""
+    import numpy as np
+
+    runs = speech_runs(samples, sr)
+    out, pos = [], 0
+    for (_, end), (nxt, _) in zip(runs, runs[1:]):
+        a, b = int(end * sr), int(nxt * sr)
+        cut = (b - a) - int(keep * sr)
+        if cut <= 0:
+            continue
+        mid = (a + b) // 2
+        x0, x1 = mid - cut // 2, mid - cut // 2 + cut
+        n = int(fade * sr)
+        head, tail = samples[pos:x0].copy(), samples[x1:x1 + n].copy()
+        ramp = np.linspace(0, 1, n)
+        head[-n:] = head[-n:] * (1 - ramp) + tail * ramp
+        out.append(head)
+        pos = x1 + n
+    out.append(samples[pos:])
+    return np.concatenate(out)
 
 
 def speech_runs(samples, sr, gap=0.09):
@@ -220,6 +248,8 @@ def main():
     ok = True
     for i, line in enumerate(make()):
         samples, sr = k.create(line["text"], voice=VOICE, speed=line["speed"])
+        if line.get("tight"):
+            samples = tighten(samples, sr)
         path = os.path.join(out_dir, f"line-{i:02d}.wav")
         sf.write(path, samples, sr)
         dur = len(samples) / sr
