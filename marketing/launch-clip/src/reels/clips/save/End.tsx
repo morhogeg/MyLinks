@@ -7,18 +7,23 @@ import { KineticLine } from '../../kit/Type';
 import { prog } from '../../kit/curves';
 
 /**
- * The close: the takeaway, and the name that ties it together. The reel's
- * lockup (the mark arrives with the app's launch motion and strikes on the
- * score's impact; the drawn wordmark wipes in as the narrator says
- * "Machina"), and under it the line, "Save it once. / Machina does the
- * rest.", in the reel's line voice (KineticLine at the statement's 60px),
- * each line arriving on the narrator's words. The clip ends on it.
+ * The close: the reel's lockup on the clip's clock. The mark arrives with the
+ * app's launch motion and strikes on the score's impact, the drawn wordmark
+ * wipes in as the narrator says "Machina", then the tagline, "Everything you
+ * save, / finally useful.", in the reel's line voice (KineticLine at the
+ * statement's 60px, two rows, each word arriving on the narrator's timing),
+ * and the end card holds. The clip ends ON it (owner call 2026-09-28: every
+ * launch film ends on the tagline). The line is a KineticLine, not the
+ * Lockup's own line, because that one splits on spaces only and would lose
+ * the row break.
  */
 const LINE = CAPTIONS.find((c) => c.place === 'lockup')!;
 const timing = VO.find((v) => v.frame === LINE.at);
 const starts = timing?.words.map((s) => Math.round(s * FPS)) ?? [];
-// "Save it once. Machina does the rest.": the wordmark wipes on "Machina"
-const NAME_WORD = LINE.text.split(/\s+/).indexOf('Machina');
+// "Machina. Everything you save, finally useful.": the first word is the drawn
+// wordmark (wiping in as it is said), the rest is the line
+const [, ...rows] = LINE.text.split('\n');
+const TAG = rows.join('\n');
 
 export const End: React.FC<{ f: number }> = ({ f }) => {
   if (f < HITS.lockup) return null;
@@ -26,9 +31,9 @@ export const End: React.FC<{ f: number }> = ({ f }) => {
   return (
     <AbsoluteFill style={{ alignItems: 'center' }}>
       <div style={{ position: 'absolute', top: 560, transform: `scale(${1 + drift * 0.025})`, transformOrigin: '50% 40%' }}>
-        <Lockup frame={f} strike={HITS.markStrike} wordAt={LINE.at + (starts[NAME_WORD] ?? 30)} line="" showLine={false} wordWidth={620} />
+        <Lockup frame={f} strike={HITS.markStrike} wordAt={LINE.at + (starts[0] ?? 0)} line="" showLine={false} wordWidth={620} />
         <div style={{ marginTop: 64, display: 'flex', justifyContent: 'center' }}>
-          <KineticLine text={LINE.text} frame={f} from={LINE.at} to={TOTAL_FRAMES + 30} starts={starts} size={60} width={1000} />
+          <KineticLine text={TAG} frame={f} from={LINE.at} to={TOTAL_FRAMES + 30} starts={starts.slice(1)} size={60} width={1000} />
         </div>
       </div>
     </AbsoluteFill>

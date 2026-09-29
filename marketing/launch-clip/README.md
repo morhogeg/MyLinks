@@ -604,7 +604,7 @@ audio device); the balance, the clarity and the loudness are only measured.
 
 ## Feature clip: SAVE
 
-`MachinaClipSave` is a 32s vertical video about one feature, saving, for
+`MachinaClipSave` is a 32.8s vertical video about one feature, saving, for
 someone seeing Machina for the first time (owner brief, 2026-09-28: the
 feature as the sole subject, the app named, a hook on the problem, three to
 five elements each shown doing its job and why it matters, a concrete
@@ -618,7 +618,7 @@ the reel. One save is carried through it: a recipe post someone screenshotted.
 | 304–496 | SCREENSHOTS | the point becomes the + (304–336), the app irises open, + tapped (360); the real Add dialog rises (368), Image tab (400), the camera reframes, three screens of one post picked on a still frame (432), numbered, Save (472), the dialog settles away ("Even screenshots get analyzed. Up to five become one card.") |
 | 496–680 | KEY POINTS | the feed's own "Reading 3 screenshots…" card and "Reading text…" banner, the card it becomes, opened: the screenshots, the gist, the Key Points lifted ("It reads the text in them and pulls out the key points.") |
 | 680–800 | TAGS & LINKS | read on down past the "Do this"; as it settles (744) the tags lift, then the two Related cards (Marcella Hazan's sauce 752, Samin Nosrat's chicken 768) ("Then it tags it, and links it to what you already saved.") |
-| 800–960 | the takeaway | thrown into the lockup: the mark strikes, MACHINA wipes in on the spoken name, "Save it once. Machina does the rest." |
+| 800–984 | the close | thrown into the lockup: the mark strikes (856), MACHINA wipes in on the spoken name, then the tagline, "Everything you save, / finally useful.", word by word on the voice, held 1.2s ("Machina. Everything you save, finally useful.") |
 
 **How it got here.** Round 1 rebuilt the clip to the owner's brief (the
 first cut, a re-edit of the reel's Save chapter, was rejected), then took the
@@ -634,6 +634,14 @@ the app's arrival spring: held on the settled box); the mark's exit blinked
 (EASE_MODAL fade → EASE_IN_OUT, every lift exit too); three taps touched a
 frame or two late; the tags got their own lift (the line says "tags it");
 frame 0 (the poster) now reads. Verify gained a gate for each new class.
+Then the owner's tagline decision (2026-09-28: every launch film ends on
+"Everything you save, finally useful."): the close became "Machina. /
+Everything you save, / finally useful." in place of "Save it once. Machina
+does the rest." (a takeaway line before the lockup would have run the clip to
+about 34s), the clip grew 24 frames so the tagline holds 1.2s, and verify
+checks the close is the tagline, exactly, said nowhere earlier, and that the
+clip never says the App Store subtitle. The close is a `KineticLine`, not the
+`Lockup`'s own line: that one splits on spaces only and drops a row break.
 
 **What is real and what is scripted.** Every app frame is the real app, a new
 take `saveclip` (`capture/shoot.mjs`, same demo account): the screenshots are

@@ -2552,7 +2552,7 @@ in Inter as a stand-in for SF Pro, which is what the app actually renders in
 on iPhone (§4 23b).
 
 **What exists (feature clip: SAVE, 2026-09-28, branch `claude/clip-save`,
-awaiting owner review, not merged):** `MachinaClipSave` (32.0s, 1080×1920,
+awaiting owner review, not merged):** `MachinaClipSave` (32.8s, 1080×1920,
 score + narrator + captions; mastered −14 LUFS, true peak −1.25 dBTP), plus
 `MachinaClipSaveSilent` and `MachinaClipSaveClean`, in
 `marketing/launch-clip/`. Built to the owner's feature-video brief (sole
@@ -2563,7 +2563,9 @@ get lost in open tabs, screenshots and bookmarks." → the name → ANY APP
 → SCREENSHOTS ("Even screenshots get analyzed. Up to five become one card.":
 the real Add dialog's Image tab, three screens of one recipe post → one card) → KEY POINTS (the feed's real "Reading
 3 screenshots…" card, the card opened to its Key Points) → TAGS & LINKS (tags,
-"Do this", Related cards) → "Save it once. Machina does the rest." on the
+"Do this", Related cards) → "Machina. Everything you save, finally useful."
+(the tagline, owner call 2026-09-28; was "Save it once. Machina does the
+rest.") on the
 lockup. New take `saveclip` (`capture/shoot.mjs`; the screenshots and the
 returned card are scripted in `capture/clip-save.mjs`). Clock
 `clips/save-timeline.mjs`, scenes `src/reels/clips/save/`, score
@@ -2634,6 +2636,17 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-29 — SAVE clip ends on the tagline.** Branch `claude/clip-save`,
+  not merged. The 2026-09-28 tagline decision was first applied only to the
+  80s launch film (below) and those renders were sent, when the owner meant
+  this session's video: the SAVE clip. Its close is now "Machina. /
+  Everything you save, / finally useful." (voice word for word; was "Save it
+  once. Machina does the rest."), the clip is 32.8s (+24 frames so the line
+  holds 1.2s), voice, score and mix regenerated, and verify fails if the close
+  is not the tagline, if the tagline is said earlier, or if the clip says the
+  App Store subtitle. The other feature clips and the reel are on their own
+  branches (`claude/clip-ask`, `clip-find`, `clip-revisit`,
+  `machina-reel-pilot`), none merged. Not listened to on speakers.
 - **2026-09-28 — Launch film ends on the tagline (owner decision).** Branch
   `claude/clip-save`, not merged. `MachinaLaunch` now ends on "Everything you
   save, finally useful." (endcard line and closing voice, word for word,

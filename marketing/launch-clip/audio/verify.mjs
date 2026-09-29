@@ -501,6 +501,14 @@ console.log('\n── clip: save');
   if (!close || close !== caps[caps.length - 1]) bad.push('the clip does not close on its lockup line');
   if (!lines.some((c) => /\bMachina\b/.test(c.text))) bad.push('no narrator line names Machina before the close');
   if (!close || !/\bMachina\b/.test(close.text)) bad.push('the closing line does not name Machina');
+  // owner call 2026-09-28: every launch film ENDS on the tagline, exactly as
+  // written, and says it nowhere earlier (the name may lead it, as the drawn
+  // wordmark); nothing ends on the App Store subtitle
+  const TAGLINE = 'Everything you save, finally useful.';
+  const flat = (t) => t.split(/\s+/).join(' ');
+  if (!close || !flat(close.text).endsWith(TAGLINE) || !/^(Machina\.\s+)?$/.test(flat(close.text).slice(0, -TAGLINE.length))) bad.push(`the close is "${flat(close?.text ?? '')}", not the tagline "${TAGLINE}" (optionally led by "Machina.")`);
+  if (lines.some((c) => flat(c.say ?? c.text).includes(TAGLINE))) bad.push('the tagline also appears before the close');
+  if (caps.some((c) => /never lose another great find/i.test(c.text))) bad.push('the clip says the App Store subtitle');
   if (Math.abs(C.TOTAL_SEC - 30) > 3) bad.push(`the clip runs ${C.TOTAL_SEC.toFixed(1)}s (brief: about 30s)`);
   const kick = [...C.KICKERS].sort((a, b) => a.at - b.at);
   kick.forEach((k, i) => {

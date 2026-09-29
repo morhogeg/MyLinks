@@ -14,7 +14,7 @@
  *   KEY POINTS   the feed's own "Reading 3 screenshots…" card, the card it
  *                becomes, opened: the screenshots, the gist, the Key Points
  *   TAGS & LINKS read on down: the "Do this", its tags, its Related cards
- *   CLOSE        thrown into the lockup: "Save it once. Machina does the rest."
+ *   CLOSE        thrown into the lockup: "Machina. Everything you save, finally useful."
  *
  * Everything is in OUTPUT frames at 30fps on the reel's grid (112.5 BPM, 16
  * frames a beat). The app is take "saveclip" (capture/shoot.mjs), recorded at
@@ -75,7 +75,7 @@ export const HITS = {
 };
 
 export const THROW_LEN = 30;
-export const TOTAL_FRAMES = 960;
+export const TOTAL_FRAMES = 984; // the tagline holds 1.2s after its last word
 export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 
 /**
@@ -115,8 +115,10 @@ export const CAPTIONS = [
   { at: 368, to: 504, kicker: 'Screenshots', text: 'Even screenshots get analyzed.\nUp to five become one card.', until: 'the screens are picked and saved' },
   { at: 512, to: 680, kicker: 'Key\u00a0points', text: 'It reads the text in them and\npulls out the key points.', until: 'the card opens on its Key Points' },
   { at: 688, to: 800, kicker: 'Tags\u00a0&\u00a0links', text: 'Then it tags it, and links it to\nwhat you already saved.', until: 'the Related cards lift' },
-  // the close, on the lockup: the takeaway, and the name that ties it together
-  { at: HITS.markStrike + 8, to: TOTAL_FRAMES, place: 'lockup', text: 'Save it once.\nMachina does the rest.', duck: 0.4 },
+  // the close, on the lockup: the name (the drawn wordmark wipes in as it is
+  // said), then the tagline, exactly as written (owner call 2026-09-28: every
+  // launch film ends on it; it appears nowhere earlier in this clip)
+  { at: HITS.markStrike + 8, to: TOTAL_FRAMES, place: 'lockup', text: 'Machina.\nEverything you save,\nfinally useful.', duck: 0.4 },
 ];
 
 /** the element words above the lines: 4 frames before each, leaving with it
