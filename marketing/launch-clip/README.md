@@ -602,7 +602,7 @@ audio device); the balance, the clarity and the loudness are only measured.
 
 ## Feature clip: REVISIT ("what you save comes back to you")
 
-`MachinaClipRevisit` is a 44.8s vertical clip, the reel's companion, built
+`MachinaClipRevisit` is a 55.5s vertical clip, the reel's companion, built
 from the kit plus one new kit primitive (`kit/scroll.ts`, below) and optional
 kit props (rounds 3 and 4). It opens on the PROBLEM (round 4), then one
 continuous use of the real app (take `revisitClip`), whose clock starts at
@@ -613,12 +613,13 @@ continuous use of the real app (take `revisitClip`), whose clock starts at
 | 0–176 | THE PROBLEM (`Opening.tsx`): ten real saves where they were kept, legible from frame 0; "You save things to come back to later." / "But you rarely go back to them.", and they bleach into the paper on "rarely" |
 | 176–256 | THE TURN: "Machina brings them back to you.": they gather into one point just after the name, the brackets snap round it (the mark), and the point opens as an iris onto the Revisit tab |
 | 256–380 | "Due now": a reminder set on Four Thousand Weeks lifts after "Set a reminder," ("…and a save comes back when it's due."); the chapter word REVISIT arrives with this line |
-| 384–576 | The "Do this" list: "When a save calls for action, Machina turns it into a to-do."; The Tail End's row lifts; a step is ticked off at 528, the app's "Marked as done" toast in frame |
-| 576–704 | Into the reading window; "This week in Machina" tapped open at 624; it unfolds on "Every week," and rises on "Machina brings back what's worth remembering." |
-| 704–944 | The recap READ: the write-up held, the two themes and their saves on "The themes of your week," (each hold drifts: `CREEP`), then ONE glide onto the Standout |
-| 944–1056 | The Standout lifts; its question is read in silence |
-| 1056–1152 | The Standout tapped: The Tail End opens, the camera easing up to its title |
-| 1152–1344 | Thrown out into the lockup: "Machina. Everything you save, finally useful." |
+| 384–704 | (round 5) USE: its bell opens the reminder's own sheet and Smart review lifts ("Smart review brings it back after a day, a week, and a month.", the sheet itself saying "Tomorrow · then 1 week & 1 month"); closed with its X; the save opens on its summary and the camera goes down to its Key Points ("It comes back as the point, not just a link."); back to the list |
+| 704–896 | The "Do this" list: "When a save calls for action, Machina turns it into a to-do."; The Tail End's row lifts; a step is ticked off at 848, the app's "Marked as done" toast in frame |
+| 896–1024 | Into the reading window; "This week in Machina" tapped open at 944; it unfolds on "Every week," and rises on "Machina brings back what's worth remembering." |
+| 1024–1264 | The recap READ: the write-up held, the two themes and their saves on "The themes of your week," (each hold drifts: `CREEP`), then ONE glide onto the Standout |
+| 1264–1376 | The Standout lifts; its question is read in silence |
+| 1376–1472 | The Standout tapped: The Tail End opens, the camera easing up to its title |
+| 1472–1664 | Thrown out into the lockup: "Machina. Everything you save, finally useful." |
 
 Everything is in OUTPUT frames on the reel's grid (112.5 BPM, 16 frames a
 beat); 60fps app motion plays one captured frame per output frame (the
@@ -717,6 +718,19 @@ video, Piranesi). Frame 0, the poster a feed shows, already reads (the
 cascade into focus began before it). The app part is unchanged, 256 frames
 later. verify now requires the clip to open on the problem, with the chapter
 word only after it.
+
+**Round 5 (owner: "add a bit more info, to show the usefulness"; both beats
+approved).** USE, 5 bars spliced in after "Due now" (`USE` in the timeline;
+every later event moved by `USE.len`): the due save's bell opens its
+reminder's own sheet, where Smart review lifts ("Smart review brings it back
+after a day, a week, and a month.", matching the app's "Tomorrow · then 1
+week & 1 month"); its X closes it (in frame, where Cancel is not); the save
+opens on its summary and the camera goes down to its Key Points ("It comes
+back as the point, not just a link."); "‹ Revisit" back to the list (under
+the band, so no drawn tap). The demo card Four Thousand Weeks now carries
+three Key Points (`capture/library.mjs`, no "Do this": the list is
+unchanged). The camera's return to the list is 48 frames (32 peaked at
+47px/frame).
 
 ## Motion language
 

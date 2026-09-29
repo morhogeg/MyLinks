@@ -1,6 +1,6 @@
 import React from 'react';
 import { AbsoluteFill } from 'remotion';
-import { BAND, CREEP, GLIDE, HITS, OPEN, OPENING, READS, TAKE } from '../../../../clips/revisit-timeline.mjs';
+import { BAND, CREEP, GLIDE, HITS, OPEN, OPENING, READS, TAKE, USE } from '../../../../clips/revisit-timeline.mjs';
 import { POINT_R } from './Opening';
 import { AppShot, Lift, Tap } from '../../kit/AppShot';
 import { camAt, camVelocity, type Key } from '../../kit/camera';
@@ -21,6 +21,10 @@ import { at, center, rectOf } from '../../kit/takes';
  *     saves that call for one (web/lib/takeaway.ts): The Tail End's row lifts
  *     after "action,", and the V60 step is ticked off (the app's own "Marked
  *     as done": the row leaves the list, the toast confirms it).
+ *     (round 5, USE) Between the two: the due save's bell opens its
+ *     reminder's own sheet, Smart review lifting ("Tomorrow · then 1 week &
+ *     1 month"); closed (its X); then the save itself opens on its summary and the
+ *     camera goes down to its Key Points; "‹ Revisit" back to the list.
  *  2. "This week in Machina", tapped open (the app's own expand), and READ,
  *     slowly (owner: the recap is never rushed): the write-up rises into the
  *     reading window, then the two themes and the saves they link to, then
@@ -66,6 +70,16 @@ const scrollAt = (u: number) => {
 /** where things are on the screens the camera aims at */
 const TAB = at(T, 'tab');
 const dueRow = rectOf(T, TAB, 'dueRow');
+/** (round 5) the reminder's sheet and the opened save */
+const SHEET = at(T, 'sheet');
+const bellBtn = rectOf(T, SHEET, 'bell');
+const smartRow = rectOf(T, SHEET, 'smart');
+const closeBtn = rectOf(T, SHEET, 'close');
+const OPENED = at(T, 'opened');
+const dueTitle = rectOf(T, OPENED, 'dueTitle');
+const keyPoints = rectOf(T, OPENED, 'keyPoints');
+const dueOpen = rectOf(T, TAB, 'due');
+const TAB2 = at(T, 'tab2');
 const todoRow = rectOf(T, TAB, 'todoFirst');
 const tickRow = rectOf(T, TAB, 'todoLast');
 const TICKED = at(T, 'ticked');
@@ -91,11 +105,32 @@ const GLIDE_CAMERA = standout[1] + (WINDOW.fy - TOP) / WINDOW_END.z - WINDOW_END
 /** (round 3) the list, the recap and the toast in one frame, for the tick */
 const WIDE = { cx: 196.5, cy: 560, z: 2.3, fx: 540, fy: TOP - 20 + (560 - 280) * 2.3 };
 
+/** (round 5) the tab's framing, and the two USE framings: the sheet's
+ *  header, its current reminder and Smart review just under the band; the
+ *  opened save from its title, then its Key Points */
+const BASE = { cx: 196.5, cy: 340, z: 2.4, fx: 540, fy: TOP - 30 + (340 - 124) * 2.4 };
+const SHEET_CAM = { cx: 196.5, cy: 340, z: 2.5, fx: 540, fy: TOP + (340 - 200) * 2.5 };
+const SAVE_CAM = { cx: 196.5, cy: 300, z: 2.2, fx: 540, fy: TOP + 10 + (300 - dueTitle[1]) * 2.2 };
+const POINTS_CAM = { cx: 196.5, cy: 480, z: 2.3, fx: 540, fy: TOP + 40 + (480 - keyPoints[1]) * 2.3 };
+
 const keys: Key[] = [
   // the Revisit tab on "Due now" and "Do this", a breath of tilt that
   // settles before the first line (the reel's establishing move for this tab)
-  { f: 0, cx: 196.5, cy: 340, z: 2.4, fx: 540, fy: TOP - 30 + (340 - 124) * 2.4, rx: -4 },
+  { f: 0, ...BASE, rx: -4 },
   { f: HITS.settle, rx: 0, ease: EASE_MODAL },
+  // (round 5) USE: up to the sheet as it slides in; it holds (a slow push)
+  { f: HITS.bell, cy: 342, z: 2.42, ease: linear },
+  { f: HITS.bell + 32, ...SHEET_CAM, ease: EASE_IN_OUT },
+  { f: HITS.cancel, z: 2.56, ease: linear },
+  // the sheet goes: back to the list
+  { f: HITS.openTap - 8, ...BASE, ease: EASE_IN_OUT },
+  // the save opens: its title and summary, then down to its Key Points
+  { f: HITS.openTap + 40, ...SAVE_CAM, ease: EASE_IN_OUT },
+  { f: HITS.keyPoints[0], cy: SAVE_CAM.cy + 4, z: 2.24, ease: linear },
+  { f: HITS.keyPoints[1], ...POINTS_CAM, ease: EASE_IN_OUT },
+  { f: HITS.back, cy: POINTS_CAM.cy + 6, z: 2.34, ease: linear },
+  // back to the list
+  { f: HITS.back + 48, ...BASE, ease: EASE_IN_OUT },
   { f: HITS.wide[0], cy: 344, z: 2.44, ease: linear },
   // back a little: the list, the recap below it and where the toast will be
   { f: HITS.wide[1], ...WIDE, ease: EASE_IN_OUT },
@@ -132,9 +167,22 @@ export const Revisit: React.FC<{ f: number }> = ({ f }) => {
   // per output frame); the page, scrolled; the save, opening (60fps)
   const scrolled = scrollAt(f);
   const scroll = recap.view(scrolled);
+  // (round 5) USE: each app transition plays from the frame the app first
+  // answers the tap (+1), one captured 60fps frame per output frame
+  const use = (mark: string, hit: number, n: number) => at(T, mark, Math.min(n - 1, f - hit + 1));
   const i =
-    f < HITS.tick
+    f < HITS.bell
       ? TAB
+      : f < HITS.cancel
+        ? use('bell', HITS.bell, 41)
+        : f < HITS.openTap
+          ? use('sheetClose', HITS.cancel, 30)
+          : f < HITS.back
+            ? use('open', HITS.openTap, 41)
+            : f < USE.at + USE.len
+              ? use('back', HITS.back, 41)
+              : f < HITS.tick
+      ? TAB2
       : f < HITS.travel[1]
         ? // the tick (60fps); its last frame, the toast still up, holds until
           // the camera has left the toast below the frame
@@ -164,6 +212,8 @@ export const Revisit: React.FC<{ f: number }> = ({ f }) => {
   // the reminder that came due: up in the pause after "reminder,"
   const due = prog(f, HITS.dueLift, HITS.dueLift + 8, EASE_SPRING) * (1 - prog(f, HITS.dueDrop, HITS.dueDrop + 12, EASE_MODAL));
   // the "Do this" row: up in the pause after "action,", down before the tick
+  // (round 5) Smart review: up after its name, down before Cancel
+  const smart = prog(f, HITS.smartLift, HITS.smartLift + 8, EASE_SPRING) * (1 - prog(f, HITS.smartDrop, HITS.smartDrop + 12, EASE_MODAL));
   const todo = prog(f, HITS.todoLift, HITS.todoLift + 8, EASE_SPRING) * (1 - prog(f, HITS.todoDrop, HITS.todoDrop + 12, EASE_MODAL));
   // the Standout: up as the glide lands on it, down before it is tapped
   const up = prog(f, HITS.standout - 1, HITS.standout + 7, EASE_SPRING) * (1 - prog(f, HITS.standoutDrop, HITS.standoutDrop + 14, EASE_MODAL));
@@ -180,6 +230,12 @@ export const Revisit: React.FC<{ f: number }> = ({ f }) => {
         {f < HITS.tick && due > 0.01 && (
           <Lift take={T} i={i} rect={dueRow} radius={16} lift={due * 0.7} rise={3} grow={0.02} ring={0.55 * due} />
         )}
+        {f >= HITS.bell && f < HITS.cancel && smart > 0.01 && (
+          <Lift take={T} i={i} rect={smartRow} radius={10} lift={smart * 0.7} rise={3} grow={0.02} ring={0.55 * smart} />
+        )}
+        <Tap x={center(bellBtn).x} y={center(bellBtn).y} t={tap(HITS.bell)} />
+        <Tap x={center(closeBtn).x} y={center(closeBtn).y} t={tap(HITS.cancel)} />
+        <Tap x={dueOpen[0] + 70} y={dueOpen[1] + 22} t={tap(HITS.openTap)} />
         {f < HITS.tick && todo > 0.01 && (
           <Lift take={T} i={i} rect={todoRow} radius={14} lift={todo * 0.7} rise={3} grow={0.02} ring={0.55 * todo} />
         )}

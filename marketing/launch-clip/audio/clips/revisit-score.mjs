@@ -19,7 +19,7 @@
 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BAR, BAR_CHORDS, BAR_FRAMES, BEAT, FPS, HITS, OPEN, OPENING, RISERS, TOTAL_FRAMES, TOTAL_SEC } from '../../clips/revisit-timeline.mjs';
+import { BAR, BAR_CHORDS, BAR_FRAMES, BEAT, FPS, HITS, OPEN, OPENING, RISERS, TOTAL_FRAMES, TOTAL_SEC, USE } from '../../clips/revisit-timeline.mjs';
 import { createSynth } from '../synth.mjs';
 
 const S = createSynth({ seconds: TOTAL_SEC, beat: BEAT });
@@ -39,7 +39,8 @@ const CHORDS = {
 
 const BARS = Math.ceil(TOTAL_FRAMES / BAR_FRAMES);
 /** how much of the band plays, per bar: light under the reading */
-const DENSITY = [0.18, 0.22, 0.28, 0.34, 0.34, 0.42, 0.5, 0.56, 0.62, 0.66, 0.68, 0.7, 0.72, 0.74, 0.68, 0.7, 0.66, 0.62, 0.42, 0.36, 0.32];
+// (round 5: bars 6–10 are USE, the band still out)
+const DENSITY = [0.18, 0.22, 0.28, 0.34, 0.34, 0.42, 0.44, 0.46, 0.46, 0.48, 0.48, 0.5, 0.56, 0.62, 0.66, 0.68, 0.7, 0.72, 0.74, 0.68, 0.7, 0.66, 0.62, 0.42, 0.36, 0.32];
 const DRUMS = [a(HITS.wide[0]), a(HITS.out)]; // from the tick (round 3) … the throw into the lockup
 
 for (let bar = 0; bar < BARS; bar++) {
@@ -101,17 +102,21 @@ for (const m of [48, 64, 67, 72]) pad(a(HITS.out), TOTAL_SEC - a(HITS.out) - 0.2
 // ── melody (FM keys): quiet over the recap, home on C for the lockup. Placed
 // in the narrator's pauses (clips/revisit-timeline.mjs CAPTIONS; the words
 // are measured in src/reels/clips/revisit/vo.json), never on a word.
+const U = USE.len;
 const MELODY = [
   // [frame, midi, level?]
   [104, 64], [120, 67], // after "when it's due."
-  [240, 69], [256, 71], [288, 72], // after the to-do line; the tick
-  [480, 67], [496, 69], [512, 71], // the write-up, after its line
-  [528, 72], [544, 69], // read → the themes
-  [696, 64], [712, 65], [728, 67], // the Standout and its question
-  [752, 72], [768, 71], [784, 72], // (the tap)
-  [824, 74], [856, 69], // the save, opened
+  // (round 5) USE: after "…and a month."; after "…not just a link."
+  [264, 69], [280, 67], [296, 72],
+  [416, 67], [432, 71],
+  [240 + U, 69], [256 + U, 71], [288 + U, 72], // after the to-do line; the tick
+  [480 + U, 67], [496 + U, 69], [512 + U, 71], // the write-up, after its line
+  [528 + U, 72], [544 + U, 69], // read → the themes
+  [696 + U, 64], [712 + U, 65], [728 + U, 67], // the Standout and its question
+  [752 + U, 72], [768 + U, 71], [784 + U, 72], // (the tap)
+  [824 + U, 74], [856 + U, 69], // the save, opened
   // home: C as the mark draws, E after its name, G after the last word
-  [916, 72, 0.19], [976, 76, 0.12], [1056, 79, 0.19],
+  [916 + U, 72, 0.19], [976 + U, 76, 0.12], [1056 + U, 79, 0.19],
 ];
 for (const [fr, m, level] of MELODY) keys(a(fr), m, level ?? 0.14, (fr / 16) % 2 ? 0.2 : -0.2, fr >= HITS.out ? 2.8 : 2);
 
@@ -137,6 +142,18 @@ shimmer(s(OPEN - 12), [72, 79, 84, 88], 0.04);
 // (round 3) the reminder that came due lifts (in the pause after "reminder,")
 bell(a(H.dueLift), 79, 0.045, 0.2, 1.4);
 sub(a(H.dueLift), 43, 0.14, 0.3);
+// (round 5) USE: the bell, tapped (the sheet slides up); Smart review lifts
+// after its name; the X; the save opens (a lift as its Key Points come up);
+// back to the list
+tick(a(H.bell), 0.08, 1.2);
+whoosh(a(H.bell) + 0.05, 0.45, 0.04, 0.2);
+bell(a(H.smartLift), 81, 0.045, -0.2, 1.4);
+sub(a(H.smartLift), 45, 0.14, 0.3);
+tick(a(H.cancel), 0.07, 1.1);
+tick(a(H.openTap), 0.09, 1.25);
+whoosh(a(H.openTap) + 0.07, 0.35, 0.045, -0.15);
+shimmer(a(H.keyPoints[1]) - 0.1, [76, 79, 84], 0.03);
+whoosh(a(H.back) + 0.05, 0.4, 0.04, 0.15);
 // (round 3) the V60 step ticked off: the tap, and the toast's confirmation
 tick(a(H.tick), 0.09, 1.25);
 shimmer(a(H.tick + 6), [76, 79, 84], 0.03);

@@ -494,6 +494,57 @@ const takes = {
     t.mark('tab');
     await t.snap({ rects: RECAP });
 
+    // (clip round 5, owner: "show the usefulness") the due save's bell: its
+    // reminder's own sheet, Smart review (a day, a week, a month: "1 of 3"),
+    // then closed with its X (in frame, where Cancel is not)
+    const SHEET = {
+      sheet: ['[role=dialog]'],
+      current: ['[role=dialog] div[class*="bg-accent/10"]'],
+      smart: ['[role=dialog] button[role=radio]', 'Smart review'],
+      close: ['[role=dialog] button[aria-label="Close"]'],
+      bell: ['button[aria-label^="Change the reminder"]'],
+    };
+    await t.freeze();
+    await visible(page.locator('button[aria-label^="Change the reminder"]')).click();
+    t.mark('bell');
+    await t.roll(40, { rects: SHEET, step: 1000 / 60 });
+    await t.thaw();
+    await page.waitForTimeout(600);
+    t.mark('sheet');
+    await t.snap({ rects: SHEET });
+    await t.freeze();
+    await visible(page.locator('[role=dialog] button[aria-label="Close"]')).click();
+    t.mark('sheetClose');
+    await t.roll(30, { rects: SHEET, step: 1000 / 60 });
+    await t.thaw();
+    await page.waitForTimeout(700);
+
+    // …and the save itself, opened: it comes back as its point (the summary,
+    // the key points), then back to Revisit
+    const DUE = {
+      dialog: R.dialog,
+      dueTitle: ['h2', 'Four Thousand Weeks'],
+      keyPoints: ['h2, h3, h4, strong, p', 'Key Points'],
+      back: ['button[aria-label="Back to Revisit"]'],
+      due: ['button', 'Four Thousand Weeks'],
+    };
+    await t.freeze();
+    await visible(page.locator('button', { hasText: 'Four Thousand Weeks' })).click();
+    t.mark('open');
+    await t.roll(40, { rects: DUE, step: 1000 / 60 });
+    await t.thaw();
+    await page.waitForTimeout(600);
+    t.mark('opened');
+    await t.snap({ rects: DUE });
+    await t.freeze();
+    await visible(page.locator('button[aria-label="Back to Revisit"]')).click();
+    t.mark('back');
+    await t.roll(40, { rects: { ...DUE, ...RECAP }, step: 1000 / 60 });
+    await t.thaw();
+    await page.waitForTimeout(700);
+    t.mark('tab2');
+    await t.snap({ rects: RECAP });
+
     // (clip round 3) the V60 step, ticked off: the app's own "Marked as done"
     // (the row leaves the list, the step stays on its card)
     await t.freeze();

@@ -98,7 +98,7 @@ for (const c of caps) if (c !== close && /finally useful/i.test(c.text)) bad.pus
 
 // ── the grid
 const H = C.HITS;
-for (const [k, v] of Object.entries({ dueLift: H.dueLift, tick: H.tick, todoLift: H.todoLift, recapTap: H.recapTap, standout: H.standout, cardTap: H.cardTap, markStrike: H.markStrike })) {
+for (const [k, v] of Object.entries({ dueLift: H.dueLift, bell: H.bell, smartLift: H.smartLift, cancel: H.cancel, openTap: H.openTap, back: H.back, tick: H.tick, todoLift: H.todoLift, recapTap: H.recapTap, standout: H.standout, cardTap: H.cardTap, markStrike: H.markStrike })) {
   if (v % (C.BEAT_FRAMES / 2)) bad.push(`${k} at ${v} is not on an 8th`);
 }
 if (C.TOTAL_FRAMES % C.BEAT_FRAMES) bad.push(`the clip ends at ${C.TOTAL_FRAMES}, not on a beat`);

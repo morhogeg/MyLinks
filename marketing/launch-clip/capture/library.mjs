@@ -334,6 +334,14 @@ export const CARDS = [
     readTime: 5,
     age: 4,
     status: 'unread',
+    // (REVISIT clip round 5) what it holds when its reminder brings it back:
+    // the open view's Key Points (no "Do this": the clip's list stays as is)
+    detail: [
+      '## Key Points',
+      '- Four thousand weeks is about eighty years: finite enough that you will never get to all of it.',
+      '- Getting more efficient only fills the time it frees. The list never empties.',
+      '- So decide what to neglect on purpose, and give your time to fewer things, fully.',
+    ].join('\n'),
   },
   {
     id: 'perfectdays',

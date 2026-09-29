@@ -2549,7 +2549,7 @@ on iPhone (§4 23b).
 
 **What exists: the REVISIT feature clip (2026-09-28, branch
 `claude/clip-revisit`, not merged; the owner reviews the cut):**
-`MachinaClipRevisit` (44.8s since round 4, 1080×1920, score + narrator + captions,
+`MachinaClipRevisit` (55.5s since round 5, 1080×1920, score + narrator + captions,
 mastered to −14 LUFS / −1.25 dBTP), `MachinaClipRevisitSilent` and
 `MachinaClipRevisitClean`, in `marketing/launch-clip/`. Brief 5 below
 ("Recall"), built as REVISIT, "what you save comes back to you": it opens
@@ -2581,7 +2581,10 @@ and the tick-off added; the clip's type and app sit higher than the reel's
 proper opening"): it now opens on the problem ("You save things to come back
 to later." / "But you rarely go back to them."), then the turn ("Machina
 brings them back to you.": the saves gather into the mark, which irises open
-onto Revisit); 44.8s. How to render: the launch-clip README, "Feature clip: REVISIT".
+onto Revisit). Round 5 (owner: "show the usefulness"): after "Due now" the
+due save's bell opens its Smart review sheet ("…after a day, a week, and a
+month.") and the save opens on its Key Points ("It comes back as the point,
+not just a link."); 55.5s. How to render: the launch-clip README, "Feature clip: REVISIT".
 
 **Feature-clip briefs, FINAL against the pilot's kit (2026-09-26).** Shared
 by all five: **448 frames (7 bars at 112.5 BPM, 14.9s)**, vertical, built
@@ -2642,6 +2645,18 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-29 — REVISIT round 5: two beats that show the usefulness.**
+  Branch `claude/clip-revisit`, not merged. Owner approved both: after "Due
+  now", the due save's bell opens its reminder sheet, Smart review lifting
+  ("Smart review brings it back after a day, a week, and a month.", the
+  sheet's own "Tomorrow · then 1 week & 1 month"), then the save opens on
+  its summary and Key Points ("It comes back as the point, not just a
+  link."). Real app, recaptured (take `revisitClip` now 577 frames); the demo
+  card Four Thousand Weeks gained three Key Points. 55.5s. Verified: tsc,
+  verify (new taps on the grid), full render, frames across the new beats,
+  motion measured (the return to the list slowed to peak ~32px/frame),
+  speech band min 5.0dB, −14.0 LUFS. Not verified: nobody has listened on
+  speakers.
 - **2026-09-29 — REVISIT round 4: an opening that states the problem.**
   Branch `claude/clip-revisit`, not merged. Owner: the clip was good but had
   no proper opening. It now opens on real saves where they were kept, "You
