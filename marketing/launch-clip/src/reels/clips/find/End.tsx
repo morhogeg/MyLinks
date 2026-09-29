@@ -19,7 +19,7 @@ const timing = VO.find((v) => v.frame === LINE.at);
 export const End: React.FC<{ f: number }> = ({ f }) => {
   if (f < HITS.lockup) return null;
   // "Machina. Everything you save, finally useful.": the first word is the
-  // drawn wordmark, the rest is the line, with its own row break
+  // drawn wordmark, the rest is the line, on one row
   const starts = timing?.words.map((s) => LINE.at + Math.round(s * FPS)) ?? [];
   const line = LINE.text.split('\n').slice(1).join('\n');
   const drift = prog(f, HITS.markStrike + 6, TOTAL_FRAMES, (t) => t);
@@ -33,6 +33,7 @@ export const End: React.FC<{ f: number }> = ({ f }) => {
           line={line}
           lineStarts={starts.slice(1)}
           lineStyle="statement"
+          lineSize={48}
           wordWidth={620}
         />
       </div>

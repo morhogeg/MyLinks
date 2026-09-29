@@ -2637,6 +2637,15 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-29 — FIND clip: the tagline on one row.** Branch
+  `claude/clip-find`, not merged. Owner (phone screenshot): the final frame
+  should carry the tagline on ONE line under the wordmark. The FIND lockup
+  caption is now "Machina.\nEverything you save, finally useful." and its
+  statement is set at 48px (`Lockup` gained `lineSize`, default 60, so the
+  reel's two-row lockup is unchanged: its last frame re-rendered
+  byte-identical). Voice unchanged (the spoken words are the same). FIND
+  editions re-rendered; `tsc` and `npm run verify` OK; the last frame read
+  (the row spans 765px of 1080). Only the FIND clip was touched.
 - **2026-09-28 — Every film ends on the tagline (owner decision).** Branch
   `claude/clip-find`, not merged. The film's introduction is now "Machina. /
   Never lose another great find."; its endcard line and closing voice line

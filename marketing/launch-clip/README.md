@@ -624,7 +624,7 @@ Every pixel of app UI is the real app. `MachinaFindSilent` (no sound) and
 | 432–576 | Where you saw it | "youtube" (464–476): the Sources row offers YouTube (7) as it types; one tap (496) and the feed is every video saved. "Type where you saw it, and get everything from there." (448–560) |
 | 576–688 | Open it | The first video tapped open (576): "Open it for the summary, and everything it connects to." (576–688); on "and" the camera travels down to its related saves (600–660) |
 | 688–784 | the takeaway | A cut on the beat to the empty search field: "Type what you remember. Get the one you meant." (688–776); thrown out of frame (768) |
-| 784–976 | the close | The reel's lockup: the mark strikes (832), "Machina. Everything you save, finally useful." (848; the tagline, said only here) |
+| 784–976 | the close | The reel's lockup: the mark strikes (832), "Machina. Everything you save, finally useful." (848; the tagline, said only here, on ONE row at 48px under the wordmark: owner, 2026-09-29; the reel sets it on two rows at 60px) |
 
 **Finishing pass (2026-09-28).** Measured the full render again (frame
 differences, phase-correlation shifts, 4-frame strips at every transition,
