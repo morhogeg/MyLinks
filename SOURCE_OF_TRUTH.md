@@ -2557,8 +2557,10 @@ score + narrator + captions; mastered −14 LUFS, true peak −1.25 dBTP), plus
 `MachinaClipSaveSilent` and `MachinaClipSaveClean`, in
 `marketing/launch-clip/`. Built to the owner's feature-video brief, then
 widened (2026-09-29: saving is a core feature, show every kind of save).
-Hook: "Great finds get lost in open tabs, screenshots and bookmarks." → the
-name → ANY APP (five shares into the mark) → the SOURCE TOUR, one real-app
+Hook (round 4, owner 2026-09-30): six apps' own save lists, each with its
+mark (YouTube Watch later, Instagram Saved, X Bookmarks, Safari Reading List,
+Facebook Saved, Photos Screenshots), "You save things in every app. Then you
+can never find them." → the name → ANY APP (five shares into the mark) → the SOURCE TOUR, one real-app
 card each: YouTube (Key moments with timestamps), X (a long-form X Article's
 Key Points), Instagram & Facebook (a photo post read from caption and photo),
 Articles (Key Points and a "Do this"), Notes (kept verbatim, "Summarize with
@@ -2632,6 +2634,16 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-30 — SAVE clip round 4: the opening says the problem.** Branch
+  `claude/clip-save`, not merged. Owner: the first frame must convey saves
+  scattered across apps and impossible to find, with YouTube, Instagram,
+  Facebook and the rest shown, not a generic save icon. The hook's generic
+  chips became six piles, each an app's own save list with its mark and real
+  demo saves; a new save drops into each on "every app", and they blur away
+  on "never find them". New line: "You save things in every app. Then you can
+  never find them." (was "Great finds get lost in open tabs, screenshots and
+  bookmarks."). The hook's bells (on the old line's words) became soft ticks
+  on the drops. Verify reads the piles' titles. Not listened to on speakers.
 - **2026-09-29 — SAVE clip round 3: every kind of save, shown.** Branch
   `claude/clip-save`, not merged. Owner: "not detailed enough … this is a CORE
   feature … SHOW THEM", with a YouTube card from the phone (Key moments with

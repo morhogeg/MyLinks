@@ -613,7 +613,7 @@ It is a new video in the reel's design language, not a cut of the reel.
 
 | Frames | Element | What is shown (the line) |
 |---|---|---|
-| 0–152 | the problem | saves where they were kept (open tabs, screenshots, bookmarks) bleach out; each named place lifts ("Great finds get lost in open tabs, screenshots and bookmarks.") |
+| 0–152 | the problem | six apps' own save lists, each with its mark: YouTube · Watch later, Instagram · Saved, X · Bookmarks, Safari · Reading List, Facebook · Saved, Photos · Screenshots (frame 0, the poster); a new save drops into each on "every app"; on "never find them" they blur and bleach ("You save things in every app. Then you can never find them.") |
 | 136–336 | the name, ANY APP | they collapse into the mark, the wordmark wipes in on "Machina"; five shares a beat apart (YouTube, Instagram, X, Facebook, Safari) fly in (192–288) ("Machina saves from any app. No copying, no pasting.") |
 | 304–512 | YOUTUBE | the point becomes the +, the app irises open (336); the video's card lands at the top of the feed, tapped open (392): its Key moments, each timestamp lifted in turn (440–464) ("Share a YouTube video. Get its key moments, with timestamps.") |
 | 512–672 | X | a long-form X Article lands, opened (552), its Key Points lifted (608) ("A post on X, even a long article, comes back as the key points.") |
@@ -660,6 +660,12 @@ Two script lines were fitted to what the app does: X is "a post on X, even a
 long article" (the app reads X Articles; it does not unroll whole threads),
 and YouTube's key moments need Pro (free cards are filed from the title and
 description; the clip names no plan). 62.7s.
+Round 4 (owner, 2026-09-30: the first frame must say the problem, saves
+scattered across apps and impossible to find, and show YouTube, Instagram,
+Facebook and the rest, not a generic save icon): the hook is now six piles,
+each an app's own save list with its mark and four real demo saves, and the
+line is "You save things in every app. Then you can never find them." Frame 0
+is the six piles, full and legible. Verify reads the piles' title lists.
 
 **What is real and what is scripted.** Every app frame is the real app. The
 source tour is take `sources` (`capture/shoot.mjs`): each finished card is

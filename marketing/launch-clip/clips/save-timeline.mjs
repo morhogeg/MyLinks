@@ -8,8 +8,9 @@
  * (owner, 2026-09-29: saving is a CORE feature, show what every kind of save
  * becomes; the clip may run longer):
  *
- *   HOOK         great finds get lost in tabs, screenshots and bookmarks; they
- *                collapse into one point, the Machina mark, and the name
+ *   HOOK         your saves, in every app's own save list (Watch later, Saved,
+ *                Bookmarks, Reading List, Screenshots), never found again;
+ *                they collapse into one point, the Machina mark, and the name
  *   ANY APP      shares from YouTube, Instagram, X, Facebook and Safari fly into it
  *   YOUTUBE      a video's card opens on its Key moments, with timestamps
  *   X            a long-form X Article, back as its Key Points
@@ -139,8 +140,9 @@ export const SCROLLS = [
  * "AI", no "second brain", no "library".
  */
 export const CAPTIONS = [
-  // the hook: the problem, over the saves where they were kept
-  { at: 16, to: 152, text: 'Great finds get lost in open tabs,\nscreenshots and bookmarks.' },
+  // the hook: the problem, over each app's own save list (owner, 2026-09-30:
+  // the opening must say it plainly, saves scattered across apps, lost)
+  { at: 16, to: 144, text: 'You save things in every app.\nThen you can never find them.' },
   // the name, and the first thing it does
   { at: 176, to: 296, kicker: 'Any app', text: 'Machina saves from any app.\nNo copying, no pasting.', until: 'the fifth share lands in the mark' },
   // the source tour (owner, 2026-09-29: show what each kind of save becomes)

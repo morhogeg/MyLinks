@@ -128,14 +128,18 @@ for (const [from, to] of RISERS) riser(t(from), t(to) - t(from), 0.09);
 // ── sound design, on the picture's frames
 const H = HITS;
 
-// the hook: the saves come into focus (glints), the named places lift (bells
-// on their words), the rest are lost (a soft fall), the rush, the point, the snap
+// the hook: each app's pile gets a new save (ticks), they are lost (a soft
+// fall), the rush, the point, the snap
 {
   const VO = JSON.parse(fs.readFileSync(new URL('../../src/reels/clips/save/vo.json', import.meta.url), 'utf8'));
   const hook = CAPTIONS[0];
   const w = VO.find((v) => v.frame === hook.at).words;
-  [6, 7, 9].forEach((k, i) => bell(t(hook.at) + w[k] + 0.12, [84, 88, 91][i], 0.045, [-0.35, 0.35, 0][i], 1.6));
-  whoosh(t(hook.at) + w[3] + 0.9, 1.2, 0.045, 0);
+  // "every app": a soft tick as a new save drops into each app's pile
+  // (Hook.tsx: from "every" − 6 frames, 5 apart)
+  const every = hook.at + Math.round(w[4] * FPS);
+  for (let k = 0; k < 6; k++) tick(t(every - 6 + k * 5 + 4), 0.035, 1.3 + k * 0.06);
+  // "never find them": the piles blur away, after the last word
+  whoosh(t(hook.at) + w[11] + 0.35, 1.0, 0.045, 0);
 }
 [2, 5, 8, 11, 14].forEach((fr, i) => bell(t(fr), [84, 88, 91, 86, 89][i], 0.025, i % 2 ? 0.45 : -0.45, 1.2));
 whoosh(t(H.collapse) - 0.1, 0.55, 0.1, -0.35);

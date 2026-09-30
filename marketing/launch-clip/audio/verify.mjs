@@ -565,10 +565,15 @@ console.log('\n── clip: save');
     [d.title, d.summary, d.detailedSummary, d.actionableTakeaway, ...(d.tags ?? []), ...(d.metadata?.videoHighlights ?? [])].filter(Boolean).forEach((x) => scan(`source card ${c.id}`, x));
   }
   Object.values(CS.NOTE_READ).forEach((x) => scan('the note read', x));
-  for (const [, title] of read('src/reels/clips/save/Hook.tsx').matchAll(/title: '([^']+)'/g)) {
+  // the hook's piles: each app's save list holds titles of real demo saves
+  const hookSrc = read('src/reels/clips/save/Hook.tsx');
+  const hookTitles = [...hookSrc.matchAll(/titles: \[([^\]]+)\]/g)].flatMap(([, list]) => [...list.matchAll(/'([^']+)'|"([^"]+)"/g)].map((m) => m[1] ?? m[2]));
+  if (hookTitles.length < 12) bad.push(`found ${hookTitles.length} titles in the hook's piles: the gate no longer reads Hook.tsx`);
+  for (const title of hookTitles) {
     scan('Hook.tsx', title);
     if (!L.CARDS.some((c) => c.title === title)) bad.push(`"${title}" (Hook.tsx) is not a save in the demo account`);
   }
+  for (const [, list] of hookSrc.matchAll(/list: '([^']+)'/g)) scan('Hook.tsx', list);
   for (const [, title] of read('src/reels/clips/save/Shares.tsx').matchAll(/title: '([^']+)'/g)) {
     scan('Shares.tsx', title);
     if (!tour.some((c) => c.doc.title === title) && title !== CS.FACEBOOK_SHARE.title) bad.push(`"${title}" (Shares.tsx) is not a card the source tour opens`);

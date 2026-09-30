@@ -3,21 +3,29 @@ import { AbsoluteFill } from 'remotion';
 import { CAPTIONS, FPS, HITS } from '../../../../clips/save-timeline.mjs';
 import VO from './vo.json';
 import { EASE_GATHER, EASE_IN_OUT, EASE_MODAL, EASE_SPRING, mix, prog } from '../../kit/curves';
-import { MarkAssembly, SaveChip, type SaveKind } from '../../kit/Brand';
+import { MarkAssembly } from '../../kit/Brand';
+import { Compass, Image as ImageIcon } from 'lucide-react';
+import { PLATFORM_INK, PlatformMark } from '../../../ui/app';
+import { sans } from '../../../fonts';
+import { INK, INK_SOFT } from '../../kit/Type';
 import { Wordmark } from '../../../ui/Brand';
 import { HANDOFF } from '../../scenes/handoff';
 
 /**
- * The hook and the name. The problem, shown: great finds, each where it was
- * kept (open tabs, screenshots, bookmarks), come into focus (frame 0, the
- * poster, already reads). "Great finds get lost": they bleach into
- * the paper; each place is lifted back as the narrator names it. Then they
- * collapse into one point of ink (EASE_GATHER), the brackets snap shut around
- * it (the app's spring), and the drawn wordmark wipes in as "Machina" is said.
- * The shares arrive into this mark (Shares.tsx); then its point drops to
- * become the app's + button (the reel's match cut, handoff.ts).
+ * The hook and the name. The problem, shown: your saves live in every app's
+ * own save list (YouTube's Watch later, Instagram's Saved, X's Bookmarks,
+ * Facebook's Saved, Safari's Reading List, the screenshots in Photos), six
+ * piles, each with its app's mark; frame 0, the poster, already shows them.
+ * "You save things in every app": a new save drops into each pile, one after
+ * another. "Then you can never find them": the piles blur and bleach into the
+ * paper. Then they collapse into one point of ink (EASE_GATHER), the brackets
+ * snap shut around it (the app's spring), and the drawn wordmark wipes in as
+ * "Machina" is said. The shares arrive into this mark (Shares.tsx); then its
+ * point drops to become the app's + button (the reel's match cut, handoff.ts).
  *
- * Titles are real saves from the demo account (verify checks).
+ * The piles are the clip's own cards, not rebuilt app UI: an app's mark as
+ * the Machina app draws it, the name of that app's save list, and titles of
+ * real saves from the demo account (verify checks).
  */
 
 const C = { x: 540, y: 1000 };
@@ -27,49 +35,87 @@ const wordAt = (c: { at: number }, k: number) => {
   const t = VO.find((v) => v.frame === c.at);
   return c.at + Math.round((t?.words[k] ?? 0) * FPS);
 };
-// "Great finds get lost in open tabs, screenshots and bookmarks."
-const LOST = wordAt(HOOK, 3);
+// "You save things in every app. Then you can never find them."
+const EVERY = wordAt(HOOK, 4);
+const NEVER = wordAt(HOOK, 9);
 const NAME_AT = wordAt(NAME, 0);
 
-/** where each was kept: web pages left open (tabs), screenshots, bookmarks */
-const CHIPS: { kind: SaveKind; title: string; x: number; y: number; s: number; r: number; blur: number; named?: number }[] = [
-  { kind: 'web', title: 'How to Do Great Work', x: 560, y: 700, s: 1.05, r: -3, blur: 0, named: 6 },
-  { kind: 'youtube', title: 'The Ultimate V60 Technique', x: 880, y: 820, s: 0.74, r: 5, blur: 1.6 },
-  { kind: 'screenshot', title: 'Read Piranesi, and go in blind', x: 330, y: 880, s: 1.16, r: -4, blur: 0, named: 7 },
-  { kind: 'instagram', title: 'Fushimi Inari at dawn', x: 150, y: 1060, s: 1.7, r: -6, blur: 4 },
-  { kind: 'x', title: 'You do not rise to the level of your goals', x: 650, y: 1010, s: 0.94, r: 2.5, blur: 0 },
-  { kind: 'web', title: 'Laws of UX', x: 760, y: 1190, s: 1.1, r: 3.5, blur: 0, named: 9 },
-  { kind: 'web', title: 'Four Thousand Weeks', x: 360, y: 1320, s: 1.0, r: -2.5, blur: 0 },
-  { kind: 'youtube', title: 'Inventing on Principle', x: 900, y: 1420, s: 0.72, r: 4, blur: 1.6 },
-  { kind: 'instagram', title: 'Tour du Mont Blanc', x: 520, y: 1540, s: 1.0, r: -3, blur: 0 },
-  { kind: 'x', title: 'How to Get Rich (without getting lucky)', x: 830, y: 1660, s: 1.6, r: 5, blur: 4 },
+type Pile = { kind: 'youtube' | 'instagram' | 'x' | 'facebook' | 'safari' | 'photos'; app: string; list: string; titles: string[]; x: number; y: number; s: number; r: number };
+/** where people keep what they save: each app's own save list */
+// (titles[0] is the save that drops in on "every app"; the rest are already there)
+const PILES: Pile[] = [
+  { kind: 'youtube', app: 'YouTube', list: 'Watch later', titles: ['The Ultimate V60 Technique', 'Inside the mind of a master procrastinator', 'Optimistic Nihilism', "Steve Jobs' 2005 Stanford Commencement Address"], x: 300, y: 820, s: 1.0, r: -3 },
+  { kind: 'instagram', app: 'Instagram', list: 'Saved', titles: ['Fushimi Inari at dawn', 'Cala Goloritzé, Sardinia', 'Cosmic Cliffs in the Carina Nebula', 'Tour du Mont Blanc'], x: 790, y: 780, s: 0.96, r: 3 },
+  { kind: 'x', app: 'X', list: 'Bookmarks', titles: ['You do not rise to the level of your goals', 'How to Get Rich (without getting lucky)', 'Four Thousand Weeks', 'Inventing on Principle'], x: 265, y: 1195, s: 0.98, r: 2 },
+  { kind: 'safari', app: 'Safari', list: 'Reading List', titles: ['How to Do Great Work', 'The Tail End', 'Laws of UX', 'Dieter Rams: ten principles for good design'], x: 805, y: 1160, s: 1.02, r: -2.5 },
+  { kind: 'facebook', app: 'Facebook', list: 'Saved', titles: ['The Psychology of Money', 'Perfect Days', 'Anderson .Paak & The Free Nationals: Tiny Desk Concert', "Samin Nosrat's buttermilk-brined roast chicken"], x: 320, y: 1570, s: 0.96, r: -2 },
+  { kind: 'photos', app: 'Photos', list: 'Screenshots', titles: ['Read Piranesi, and go in blind', "Marcella Hazan's tomato sauce", 'Birthday idea for Dana', 'Yoga For Complete Beginners, 20 Minute Home Yoga Workout'], x: 790, y: 1540, s: 1.0, r: 3 },
 ];
+const SAFARI_INK = 'rgb(0, 122, 255)';
+const PHOTOS_INK = 'rgb(245, 158, 11)';
+const inkOf = (k: Pile['kind']) => (k === 'safari' ? SAFARI_INK : k === 'photos' ? PHOTOS_INK : PLATFORM_INK[k]);
+const tint = (rgb: string, a: number) => rgb.replace('rgb(', 'rgba(').replace(')', `, ${a})`);
+const ROW = 64;
 
-const chipAt = (k: number, f: number) => {
-  const c = CHIPS[k];
-  // a rolling cascade into focus, already under way on frame 0 (the poster
-  // feeds and link previews show): the first saves read, the rest settle
-  const t0 = k * 1.5 - 17;
-  const arrive = prog(f, t0, t0 + 24, EASE_IN_OUT);
-  const push = 1 + 0.05 * prog(f, 0, HITS.collapse, (t) => t) * c.s;
-  // named: lifts on its word, and stays lifted until the collapse
-  const w = c.named !== undefined ? wordAt(HOOK, c.named) : Infinity;
-  const e = prog(f, w - 2, w + 6, EASE_SPRING);
-  // "lost": after the word, they bleach into the paper (the places named stay
-  // in ink), back to ink only as they are gathered
-  const b = prog(f, LOST + 20, LOST + 60, EASE_IN_OUT) * (1 - prog(f, HITS.collapse - 4, HITS.dotLands - 2, EASE_IN_OUT));
+const PileCard: React.FC<{ p: Pile; drop: number; grey: number }> = ({ p, drop, grey }) => {
+  const ink = inkOf(p.kind);
+  return (
+    <div
+      style={{
+        width: 440,
+        padding: '26px 26px 20px',
+        borderRadius: 34,
+        background: '#FFFFFF',
+        border: '1px solid rgba(16,24,40,0.07)',
+        boxShadow: '0 1px 2px rgba(16,24,40,0.06), 0 22px 52px -18px rgba(24,32,48,0.3), 0 44px 80px -40px rgba(24,32,48,0.2)',
+        fontFamily: sans,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
+        <span style={{ width: 66, height: 66, borderRadius: 19, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: ink, background: tint(ink, 0.12) }}>
+          {p.kind === 'safari' ? <Compass size={38} strokeWidth={1.9} /> : p.kind === 'photos' ? <ImageIcon size={36} strokeWidth={1.9} /> : <PlatformMark kind={p.kind} size={38} />}
+        </span>
+        <span style={{ minWidth: 0 }}>
+          <span style={{ display: 'block', fontSize: 31, fontWeight: 700, letterSpacing: '-0.02em', color: INK }}>{p.app}</span>
+          <span style={{ display: 'block', marginTop: 2, fontSize: 23, fontWeight: 560, color: INK_SOFT }}>{p.list}</span>
+        </span>
+      </div>
+      {/* the list: a new save drops in at the top, pushing the rest down */}
+      <div style={{ marginTop: 16, height: ROW * 3, overflow: 'hidden', filter: grey > 0.01 ? `blur(${(grey * 5).toFixed(2)}px) grayscale(${grey.toFixed(3)})` : undefined, opacity: 1 - 0.55 * grey }}>
+        <div style={{ transform: `translateY(${Math.round(-ROW * (1 - drop))}px)` }}>
+          {p.titles.map((t, k) => (
+            <div key={k} style={{ height: ROW, display: 'flex', alignItems: 'center', gap: 14, borderTop: '1px solid rgba(16,24,40,0.06)', opacity: k === 0 ? drop : 1 }}>
+              <span style={{ width: 38, height: 38, borderRadius: 10, flexShrink: 0, background: tint(ink, 0.1) }} />
+              <span style={{ fontSize: 23, fontWeight: 560, color: INK, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const pileAt = (k: number, f: number) => {
+  const c = PILES[k];
+  // a gentle push in from frame 0 (the poster is already the six piles)
+  const push = 1 + 0.04 * prog(f, 0, HITS.collapse, (t) => t);
+  // "every app": a new save drops into each pile in turn
+  const d0 = EVERY - 6 + k * 5;
+  const drop = prog(f, d0, d0 + 14, EASE_SPRING);
+  // "never find them": the lists blur and bleach, the piles drift apart
+  const lost = prog(f, NEVER, NEVER + 26, EASE_IN_OUT);
   const g = prog(f, HITS.collapse, HITS.dotLands, EASE_GATHER);
-  const ox = (c.x - C.x) * push * (1 - 0.3 * e);
-  const oy = (c.y - C.y) * push + (1 - arrive) * 28 * c.s;
+  const ox = (c.x - C.x) * push * (1 + 0.06 * lost);
+  const oy = (c.y - C.y) * push * (1 + 0.04 * lost);
   return {
     x: C.x + ox * (1 - g),
     y: C.y + oy * (1 - g),
-    s: c.s * push * (1 + 0.14 * e) * mix(0.95, 1, arrive) * mix(1, 0.06, Math.pow(g, 0.7)),
-    r: c.r * (1 - g) * (1 - 0.5 * e) + g * (k % 2 ? 16 : -16),
-    o: mix(0.75, 1, arrive) * (1 - Math.pow(g, 5)) * (1 - 0.72 * b * (1 - e)),
-    blur: (1 - arrive) * 5 + c.blur * (1 - g) * (1 - e) + g * 2 + 3 * b * (1 - e),
-    grey: b * (1 - e),
-    e,
+    s: c.s * push * mix(1, 0.05, Math.pow(g, 0.7)),
+    r: c.r * (1 - g) + g * (k % 2 ? 16 : -16),
+    o: (1 - Math.pow(g, 5)) * (1 - 0.35 * lost * (1 - g)),
+    blur: g * 2 + 1.2 * lost * (1 - g),
+    drop,
+    grey: lost,
     g,
   };
 };
@@ -97,9 +143,9 @@ export const Hook: React.FC<{ f: number }> = ({ f }) => {
   return (
     <AbsoluteFill style={{ pointerEvents: 'none' }}>
       {f < HITS.dotLands + 1 &&
-        CHIPS.map((c, k) =>
+        PILES.map((c, k) =>
           [3, 2, 1, 0].map((lag) => {
-            const p = chipAt(k, f - lag * 1.2);
+            const p = pileAt(k, f - lag * 1.2);
             if (lag > 0 && p.g < 0.08) return null;
             const alpha = lag === 0 ? 1 : [0, 0.28, 0.16, 0.08][lag];
             return (
@@ -111,11 +157,10 @@ export const Hook: React.FC<{ f: number }> = ({ f }) => {
                   top: p.y,
                   transform: `translate(-50%, -50%) rotate(${p.r}deg) scale(${p.s})`,
                   opacity: p.o * alpha,
-                  zIndex: p.e > 0.01 ? 2 : 1,
-                  filter: [p.blur > 0.2 ? `blur(${p.blur.toFixed(2)}px)` : '', p.grey > 0.01 ? `grayscale(${p.grey.toFixed(3)})` : ''].join(' ').trim() || undefined,
+                  filter: p.blur > 0.2 ? `blur(${p.blur.toFixed(2)}px)` : undefined,
                 }}
               >
-                <SaveChip kind={c.kind} title={c.title} />
+                <PileCard p={c} drop={p.drop} grey={p.grey} />
               </div>
             );
           }),
