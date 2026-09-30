@@ -16,9 +16,9 @@ import { HANDOFF } from '../../scenes/handoff';
  * own save list (YouTube's Watch later, Instagram's Saved, X's Bookmarks,
  * Facebook's Saved, Safari's Reading List, the screenshots in Photos), six
  * piles, each with its app's mark; frame 0, the poster, already shows them.
- * "You save things in every app": a new save drops into each pile, one after
- * another. "Then you can never find them": the piles blur and bleach into the
- * paper. Then they collapse into one point of ink (EASE_GATHER), the brackets
+ * "Your saves are scattered across countless apps": a new save drops into
+ * each pile, one after another. "…and impossible to find": the
+ * piles blur and bleach into the paper. Then they collapse into one point of ink (EASE_GATHER), the brackets
  * snap shut around it (the app's spring), and the drawn wordmark wipes in as
  * "Machina" is said. The shares arrive into this mark (Shares.tsx); then its
  * point drops to become the app's + button (the reel's match cut, handoff.ts).
@@ -35,14 +35,14 @@ const wordAt = (c: { at: number }, k: number) => {
   const t = VO.find((v) => v.frame === c.at);
   return c.at + Math.round((t?.words[k] ?? 0) * FPS);
 };
-// "You save things in every app. Then you can never find them."
-const EVERY = wordAt(HOOK, 4);
-const NEVER = wordAt(HOOK, 9);
+// "Your saves are scattered across countless apps, and impossible to find."
+const EVERY = wordAt(HOOK, 3); // "scattered"
+const NEVER = wordAt(HOOK, 8); // "impossible"
 const NAME_AT = wordAt(NAME, 0);
 
 type Pile = { kind: 'youtube' | 'instagram' | 'x' | 'facebook' | 'safari' | 'photos'; app: string; list: string; titles: string[]; x: number; y: number; s: number; r: number };
 /** where people keep what they save: each app's own save list */
-// (titles[0] is the save that drops in on "every app"; the rest are already there)
+// (titles[0] is the save that drops in on "scattered"; the rest are already there)
 const PILES: Pile[] = [
   { kind: 'youtube', app: 'YouTube', list: 'Watch later', titles: ['The Ultimate V60 Technique', 'Inside the mind of a master procrastinator', 'Optimistic Nihilism', "Steve Jobs' 2005 Stanford Commencement Address"], x: 300, y: 820, s: 1.0, r: -3 },
   { kind: 'instagram', app: 'Instagram', list: 'Saved', titles: ['Fushimi Inari at dawn', 'Cala Goloritzé, Sardinia', 'Cosmic Cliffs in the Carina Nebula', 'Tour du Mont Blanc'], x: 790, y: 780, s: 0.96, r: 3 },
@@ -99,10 +99,10 @@ const pileAt = (k: number, f: number) => {
   const c = PILES[k];
   // a gentle push in from frame 0 (the poster is already the six piles)
   const push = 1 + 0.04 * prog(f, 0, HITS.collapse, (t) => t);
-  // "every app": a new save drops into each pile in turn
+  // "scattered": a new save drops into each pile in turn
   const d0 = EVERY - 6 + k * 5;
   const drop = prog(f, d0, d0 + 14, EASE_SPRING);
-  // "never find them": the lists blur and bleach, the piles drift apart
+  // "impossible to find": the lists blur and bleach, the piles drift apart
   const lost = prog(f, NEVER, NEVER + 26, EASE_IN_OUT);
   const g = prog(f, HITS.collapse, HITS.dotLands, EASE_GATHER);
   const ox = (c.x - C.x) * push * (1 + 0.06 * lost);

@@ -613,11 +613,11 @@ It is a new video in the reel's design language, not a cut of the reel.
 
 | Frames | Element | What is shown (the line) |
 |---|---|---|
-| 0–152 | the problem | six apps' own save lists, each with its mark: YouTube · Watch later, Instagram · Saved, X · Bookmarks, Safari · Reading List, Facebook · Saved, Photos · Screenshots (frame 0, the poster); a new save drops into each on "every app"; on "never find them" they blur and bleach ("You save things in every app. Then you can never find them.") |
+| 0–152 | the problem | six apps' own save lists, each with its mark: YouTube · Watch later, Instagram · Saved, X · Bookmarks, Safari · Reading List, Facebook · Saved, Photos · Screenshots (frame 0, the poster); a new save drops into each on "scattered"; on "impossible to find" they blur and bleach ("Your saves are scattered across countless apps, and impossible to find.") |
 | 136–336 | the name, ANY APP | they collapse into the mark, the wordmark wipes in on "Machina"; five shares a beat apart (YouTube, Instagram, X, Facebook, Safari) fly in (192–288) ("Machina saves from any app. No copying, no pasting.") |
 | 304–512 | YOUTUBE | the point becomes the +, the app irises open (336); the video's card lands at the top of the feed, tapped open (392): its Key moments, each timestamp lifted in turn (440–464) ("Share a YouTube video. Get its key moments, with timestamps.") |
-| 512–672 | X | a long-form X Article lands, opened (552), its Key Points lifted (608) ("A post on X, even a long article, comes back as the key points.") |
-| 672–832 | INSTAGRAM & FACEBOOK | an Instagram photo post lands, opened (712): the photo, read along with the caption, lifted (760) ("From Instagram or Facebook, it reads the caption and the photo.") |
+| 512–672 | X | a long-form X Article lands, opened (552), its Key Points lifted (608) ("A long read on X, boiled down to the points that matter.") |
+| 672–832 | INSTAGRAM & FACEBOOK | an Instagram photo post lands, opened (712): the post's photo lifted over its summary (760) ("Instagram and Facebook posts, saved and summarized too.") |
 | 832–992 | ARTICLES | Paul Graham's essay lands, opened (872), read down to its Key Points; its "Do this" lifted (968) ("An article becomes a summary you can act on.") |
 | 992–1232 | NOTES | a typed note lands, opened (1032), verbatim; "Summarize with Machina" tapped (1088), "Reading your text…", Machina's read opens under the untouched note (1120) and is read down ("Your notes stay as you wrote them. Summarize them when you want.") |
 | 1232–1392 | SCREENSHOTS | a cut to the feed, + tapped (1256); the real Add dialog rises (1264), Image tab (1296), three screens of one recipe post picked (1328), Save (1368) ("Even screenshots get analyzed. Up to five become one card.") |
@@ -666,6 +666,13 @@ Facebook and the rest, not a generic save icon): the hook is now six piles,
 each an app's own save list with its mark and four real demo saves, and the
 line is "You save things in every app. Then you can never find them." Frame 0
 is the six piles, full and legible. Verify reads the piles' title lists.
+Round 5 (owner line notes, 2026-09-30: say it with value, well phrased): the
+hook became "Your saves are scattered across countless apps, and impossible
+to find." (set at 54px so it keeps two lines); X, "A long read on X, boiled
+down to the points that matter." (was "…even a long article, comes back as the
+key points."); Instagram & Facebook, "Instagram and Facebook posts, saved and
+summarized too." (was "…it reads the caption and the photo.", which states
+a given, not a benefit). Picture unchanged.
 
 **What is real and what is scripted.** Every app frame is the real app. The
 source tour is take `sources` (`capture/shoot.mjs`): each finished card is

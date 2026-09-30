@@ -142,13 +142,13 @@ export const SCROLLS = [
 export const CAPTIONS = [
   // the hook: the problem, over each app's own save list (owner, 2026-09-30:
   // the opening must say it plainly, saves scattered across apps, lost)
-  { at: 16, to: 144, text: 'You save things in every app.\nThen you can never find them.' },
+  { at: 16, to: 152, text: 'Your saves are scattered across\ncountless apps, and impossible to find.', sizes: [54, 54] },
   // the name, and the first thing it does
   { at: 176, to: 296, kicker: 'Any app', text: 'Machina saves from any app.\nNo copying, no pasting.', until: 'the fifth share lands in the mark' },
   // the source tour (owner, 2026-09-29: show what each kind of save becomes)
   { at: 368, to: 504, kicker: 'YouTube', text: 'Share a YouTube video. Get its\nkey moments, with timestamps.', until: 'the four Key moments lift' },
-  { at: 528, to: 664, kicker: 'X', text: 'A post on X, even a long article,\ncomes back as the key points.', until: 'its Key Points lift' },
-  { at: 688, to: 824, kicker: 'Instagram & Facebook', text: 'From Instagram or Facebook,\nit reads the caption and the photo.', until: 'the photo lifts over its read' },
+  { at: 528, to: 664, kicker: 'X', text: 'A long read on X, boiled down\nto the points that matter.', until: 'its Key Points lift' },
+  { at: 688, to: 824, kicker: 'Instagram & Facebook', text: 'Instagram and Facebook posts,\nsaved and summarized too.', until: 'the post lifts over its summary' },
   { at: 848, to: 984, kicker: 'Articles', text: 'An article becomes\na summary you can act on.', until: 'its "Do this" lifts' },
   { at: 1008, to: 1224, kicker: 'Notes', text: 'Your notes stay as you wrote them.\nSummarize them when you want.', until: "Machina's read opens under the note" },
   // screenshots, then the card they become, read down

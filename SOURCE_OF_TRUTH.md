@@ -2559,8 +2559,8 @@ score + narrator + captions; mastered −14 LUFS, true peak −1.25 dBTP), plus
 widened (2026-09-29: saving is a core feature, show every kind of save).
 Hook (round 4, owner 2026-09-30): six apps' own save lists, each with its
 mark (YouTube Watch later, Instagram Saved, X Bookmarks, Safari Reading List,
-Facebook Saved, Photos Screenshots), "You save things in every app. Then you
-can never find them." → the name → ANY APP (five shares into the mark) → the SOURCE TOUR, one real-app
+Facebook Saved, Photos Screenshots), "Your saves are scattered across
+countless apps, and impossible to find." → the name → ANY APP (five shares into the mark) → the SOURCE TOUR, one real-app
 card each: YouTube (Key moments with timestamps), X (a long-form X Article's
 Key Points), Instagram & Facebook (a photo post read from caption and photo),
 Articles (Key Points and a "Do this"), Notes (kept verbatim, "Summarize with
@@ -2634,6 +2634,12 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-09-30 — SAVE clip round 5: lines that say the value.** Branch
+  `claude/clip-save`, not merged. Owner line notes: the hook is now "Your
+  saves are scattered across countless apps, and impossible to find."; X is
+  "A long read on X, boiled down to the points that matter."; Instagram &
+  Facebook is "Instagram and Facebook posts, saved and summarized too." Voice,
+  score and mix regenerated; picture unchanged. Not listened to on speakers.
 - **2026-09-30 — SAVE clip round 4: the opening says the problem.** Branch
   `claude/clip-save`, not merged. Owner: the first frame must convey saves
   scattered across apps and impossible to find, with YouTube, Instagram,

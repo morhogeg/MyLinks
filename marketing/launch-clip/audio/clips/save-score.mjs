@@ -134,12 +134,12 @@ const H = HITS;
   const VO = JSON.parse(fs.readFileSync(new URL('../../src/reels/clips/save/vo.json', import.meta.url), 'utf8'));
   const hook = CAPTIONS[0];
   const w = VO.find((v) => v.frame === hook.at).words;
-  // "every app": a soft tick as a new save drops into each app's pile
-  // (Hook.tsx: from "every" − 6 frames, 5 apart)
-  const every = hook.at + Math.round(w[4] * FPS);
+  // "scattered": a soft tick as a new save drops into each app's pile
+  // (Hook.tsx: from "scattered" − 6 frames, 5 apart)
+  const every = hook.at + Math.round(w[3] * FPS);
   for (let k = 0; k < 6; k++) tick(t(every - 6 + k * 5 + 4), 0.035, 1.3 + k * 0.06);
-  // "never find them": the piles blur away, after the last word
-  whoosh(t(hook.at) + w[11] + 0.35, 1.0, 0.045, 0);
+  // "impossible to find": the piles blur away, after the last word
+  whoosh(t(hook.at) + w[10] + 0.35, 1.0, 0.045, 0);
 }
 [2, 5, 8, 11, 14].forEach((fr, i) => bell(t(fr), [84, 88, 91, 86, 89][i], 0.025, i % 2 ? 0.45 : -0.45, 1.2));
 whoosh(t(H.collapse) - 0.1, 0.55, 0.1, -0.35);
