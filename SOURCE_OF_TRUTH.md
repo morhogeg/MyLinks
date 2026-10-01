@@ -2412,7 +2412,10 @@ exact-match, capped.
   `lnkd.in` card and a stamped card. **NOT verified:** the stored URL of the
   owner's card (no Firestore access here): if it is `lnkd.in` the existing card
   is fixed on deploy; if it is some other redirect host, only re-saves get the
-  stamp; on device.
+  stamp; on device. **Shipped:** fix `7e70665`, merge `7ebcaec` → `main`
+  (Vercel); functions deploy run **#120** green (scoped
+  `Deploy-Functions: analyze_link,process_link_background`); Python tests #133
+  green; TestFlight run **#340** → build **1340**.
 
 - **2026-09-26 — DAILY BREW PUSH OPENS THE REVIEW DECK; library Review
   layout removed.** Branch `claude/ios-notification-review-flow-nppm2h`.
