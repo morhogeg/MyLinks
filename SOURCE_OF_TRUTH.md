@@ -2634,6 +2634,14 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-01 — SAVE clip: no Paul Graham.** Branch `claude/clip-save`, not
+  merged. Owner: remove Paul Graham, use Mark Manson. The Articles card is now
+  Mark Manson's "The Most Important Question of Your Life" (key points and "Do
+  this" true to the essay), the Safari share is the same essay, and Safari's
+  Reading List in the hook no longer lists "How to Do Great Work". Take
+  `sources` re-captured: his name is on no frame of the clip. NOT changed:
+  the demo account still has a Paul Graham card (`greatwork`), which other
+  videos on other branches show (the Revisit clip's deck, the reel's feed).
 - **2026-10-01 — SAVE clip round 6.** Branch `claude/clip-save`, not merged.
   Owner: the tagline on the end card on one line (now 52px, one row); the
   hook's Photos · Screenshots pile shows screenshot pictures instead of titles
@@ -2663,7 +2671,7 @@ exact-match, capped.
   timestamps). The clip is now 62.7s: after the name and five shares, a source
   tour opens one real-app card per kind of save (YouTube Key moments lifted
   one by one; an X Article's Key Points; an Instagram photo post read from
-  caption and photo; Paul Graham's essay down to its "Do this"; a note kept
+  caption and photo; an essay down to its "Do this"; a note kept
   verbatim, "Summarize with Machina" tapped, Machina's read opening under it),
   then the screenshots, key points, tags and links as before, and the tagline.
   New take `sources`; the other takes are byte-identical in `takes.json`.

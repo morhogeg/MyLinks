@@ -160,8 +160,9 @@ export const shotsCard = (imageUrls) => ({
  *    show that the photo was read as well as the caption (the backend reads a
  *    photo post's cover image, scraper.py `best_image`). The image is drawn
  *    here (renderPost), invented handle, no third-party image.
- *  - ARTICLE: Paul Graham's "How to Do Great Work", a real essay, with key
- *    points and a "Do this" true to it.
+ *  - ARTICLE: Mark Manson's "The Most Important Question of Your Life", a real
+ *    essay, with key points and a "Do this" true to it (owner, 2026-10-01:
+ *    no Paul Graham anywhere in the clip).
  *  - NOTE: a note typed in the Note tab. The app keeps the words verbatim;
  *    "Summarize with Machina" asks /api/analyze for a read on demand
  *    (web/lib/storage.ts generateCardSummary). NOTE_READ is that answer.
@@ -294,25 +295,24 @@ export const sourceCards = (postUrl) => [
   {
     id: 'src-article',
     doc: card({
-      url: 'https://paulgraham.com/greatwork.html',
-      title: 'How to Do Great Work',
+      url: 'https://markmanson.net/question',
+      title: 'The Most Important Question of Your Life',
       summary:
-        'Choose work you have a natural aptitude for and a **deep interest** in, learn enough to reach the frontier, then notice the gaps. Curiosity, delight and the desire to do something impressive, in that order.',
+        'Everybody wants the rewards. Mark Manson argues the question that shapes a life is **what pain you are willing to sustain**: choose the struggle you can live with, and the result follows.',
       detailedSummary: [
         '## Key Points',
-        '- Pick a field from aptitude and interest, not from what seems prestigious.',
-        '- Learn enough to reach the frontier, where the gaps become visible.',
-        '- Curiosity is the engine: follow the questions you cannot stop asking.',
-        '- Work on your own projects; great work often starts as something that looks like play.',
-        '- Consistency beats bursts: small daily progress compounds.',
+        '- Wanting the good things (the job, the body, the relationship) is universal, so it says little about you.',
+        '- The better question: what struggle do you want, and what pain are you willing to keep choosing?',
+        '- The people who get the result are the ones who enjoy the work it takes.',
+        '- Wanting the reward without the struggle keeps you wanting it.',
       ].join('\n'),
-      actionableTakeaway: 'Spend an hour this week on the question you are most curious about.',
-      category: 'Career',
-      tags: ['curiosity', 'ambition', 'work'],
-      concepts: ['work', 'curiosity', 'career'],
+      actionableTakeaway: 'Name one goal, write down the daily struggle it takes, and ask if you want that struggle.',
+      category: 'Psychology',
+      tags: ['motivation', 'purpose', 'habits'],
+      concepts: ['motivation', 'purpose'],
       sourceType: 'web',
-      sourceName: 'Paul Graham',
-      metadata: { originalTitle: 'How to Do Great Work', estimatedReadTime: 45 },
+      sourceName: 'Mark Manson',
+      metadata: { originalTitle: 'The Most Important Question of Your Life', estimatedReadTime: 8 },
     }),
   },
   {

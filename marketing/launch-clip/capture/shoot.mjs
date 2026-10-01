@@ -591,14 +591,14 @@ const takes = {
       moment3: ['li', '19:20'],
       moment4: ['li', '26:20'],
       keyPoints: ['h1,h2,h3,h4', 'Key Points'],
-      points: ['ul', ['Twenty pages a day', 'Pack for four days', 'Pick a field from aptitude', 'Dopamine is not a pleasure']],
-      takeaway: ['div', ['Read twenty pages tonight', 'Lay out four days', 'Spend an hour this week', 'Pick one tech-free zone']],
+      points: ['ul', ['Twenty pages a day', 'Pack for four days', 'Wanting the good things', 'Dopamine is not a pleasure']],
+      takeaway: ['div', ['Read twenty pages tonight', 'Lay out four days', 'Name one goal', 'Pick one tech-free zone']],
       photo: ['img[src*="post-1"]'],
       noteBody: ['div,p', 'Marco came by'],
       summarize: ['button', ['Summarize with Machina', 'Reading your text']],
       read: ['div', 'beam checks out'],
       readPoints: ['ul', 'Cabinets and counters'],
-      tags: ['div', ['screen time', 'reading', 'carry-on', 'ambition', 'renovation']],
+      tags: ['div', ['screen time', 'reading', 'carry-on', 'purpose', 'renovation']],
     };
     t.mark('home');
     await t.snap({ rects: { firstCard: R.firstCard } });
@@ -608,7 +608,7 @@ const takes = {
       youtube: ['Suggests turning off color', 720],
       x: ['Write three lines', 740],
       instagram: ['The caption adds', 760],
-      article: ['Spend an hour this week', 760],
+      article: ['Name one goal', 760],
       note: ['Summarize with Machina', 740],
     };
     for (const { id, doc } of sourceCards(postUrl)) {

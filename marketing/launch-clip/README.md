@@ -618,7 +618,7 @@ It is a new video in the reel's design language, not a cut of the reel.
 | 304–512 | YOUTUBE | the point becomes the +, the app irises open (336); the video's card lands at the top of the feed, tapped open (392): its Key moments, each timestamp lifted in turn (440–464) ("Share a YouTube video. Get its key moments, with timestamps.") |
 | 512–672 | X | a long-form X Article lands, opened (552), its Key Points lifted (608) ("A long read on X, boiled down to the points that matter.") |
 | 672–832 | INSTAGRAM & FACEBOOK | an Instagram photo post lands, opened (712): the post's photo lifted over its summary (760) ("Instagram and Facebook posts, saved and summarized too.") |
-| 832–992 | ARTICLES | Paul Graham's essay lands, opened (872), read down to its Key Points; its "Do this" lifted (968) ("An article becomes a summary you can act on.") |
+| 832–992 | ARTICLES | Mark Manson's essay ("The Most Important Question of Your Life") lands, opened (872), read down to its Key Points; its "Do this" lifted (968) ("An article becomes a summary you can act on.") |
 | 992–1232 | NOTES | a typed note lands, opened (1032), verbatim; "Summarize with Machina" tapped (1088), "Reading your text…", Machina's read opens under the untouched note (1120) and is read down ("Your notes stay as you wrote them. Summarize them when you want.") |
 | 1232–1392 | SCREENSHOTS | a cut to the feed, + tapped (1256); the real Add dialog rises (1264), Image tab (1296), three screens of one recipe post picked (1328), Save (1368) ("Even screenshots get analyzed. Up to five become one card.") |
 | 1392–1576 | KEY POINTS | the feed's own "Reading 3 screenshots…" card, the card it becomes (1432), opened (1480): the screenshots, the gist, the Key Points lifted (1568) ("It reads the text in them and pulls out the key points.") |
@@ -681,6 +681,12 @@ Then the YouTube line broke mid-sentence ("Share a YouTube video. Get its /
 key moments…"), so "Get its" arrived with the first sentence (a row arrives
 whole on its first spoken word); it now breaks at the sentence, and verify
 fails any caption row that starts a new sentence mid-row.
+Owner (2026-10-01): no Paul Graham in the clip. The Articles card is now Mark
+Manson's "The Most Important Question of Your Life" (key points and "Do this"
+true to it; take `sources` re-captured, his name gone from every frame), the
+Safari share is that essay, and Safari's Reading List in the hook leads with
+Marcella Hazan's sauce. The demo account's `greatwork` card is untouched (other
+videos use it).
 
 **What is real and what is scripted.** Every app frame is the real app. The
 source tour is take `sources` (`capture/shoot.mjs`): each finished card is
@@ -691,7 +697,7 @@ detail view; the note's "Summarize with Machina" is really tapped and
 real video (Big Think Clips, "How to overcome your addiction to technology"),
 copied from the owner's phone; the X Article's author, the Instagram handle,
 the Facebook page in the montage and the note are invented (as the demo
-invents its Instagram handles); the essay is Paul Graham's, summarized true to
+invents its Instagram handles); the essay is Mark Manson's, summarized true to
 it; the Instagram photo is a text graphic drawn for the clip, no third-party
 image. The screenshots section is a new
 take `saveclip` (`capture/shoot.mjs`, same demo account): the screenshots are

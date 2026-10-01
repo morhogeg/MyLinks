@@ -47,7 +47,7 @@ const PILES: Pile[] = [
   { kind: 'youtube', app: 'YouTube', list: 'Watch later', titles: ['The Ultimate V60 Technique', 'Inside the mind of a master procrastinator', 'Optimistic Nihilism', "Steve Jobs' 2005 Stanford Commencement Address"], x: 300, y: 820, s: 1.0, r: -3 },
   { kind: 'instagram', app: 'Instagram', list: 'Saved', titles: ['Fushimi Inari at dawn', 'Cala Goloritzé, Sardinia', 'Cosmic Cliffs in the Carina Nebula', 'Tour du Mont Blanc'], x: 790, y: 780, s: 0.96, r: 3 },
   { kind: 'x', app: 'X', list: 'Bookmarks', titles: ['You do not rise to the level of your goals', 'How to Get Rich (without getting lucky)', 'Four Thousand Weeks', 'Inventing on Principle'], x: 265, y: 1195, s: 0.98, r: 2 },
-  { kind: 'safari', app: 'Safari', list: 'Reading List', titles: ['How to Do Great Work', 'The Tail End', 'Laws of UX', 'Dieter Rams: ten principles for good design'], x: 805, y: 1160, s: 1.02, r: -2.5 },
+  { kind: 'safari', app: 'Safari', list: 'Reading List', titles: ["Marcella Hazan's tomato sauce", 'The Tail End', 'Laws of UX', 'Dieter Rams: ten principles for good design'], x: 805, y: 1160, s: 1.02, r: -2.5 },
   { kind: 'facebook', app: 'Facebook', list: 'Saved', titles: ['The Psychology of Money', 'Perfect Days', 'Anderson .Paak & The Free Nationals: Tiny Desk Concert', "Samin Nosrat's buttermilk-brined roast chicken"], x: 320, y: 1570, s: 0.96, r: -2 },
   // screenshots are pictures, not titles: the clip's own invented posts (the
   // recipe the clip saves later, the packing post), drawn by

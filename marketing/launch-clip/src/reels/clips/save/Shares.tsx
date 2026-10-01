@@ -31,7 +31,7 @@ const SOURCES: Source[] = [
   { kind: 'instagram', app: 'Instagram', by: '@slowcoasts', title: 'One week, one small bag', x: 650, y: 1440, r: 2.5, from: [620, 30] },
   { kind: 'x', app: 'X', by: '@marginalia', title: 'How I read 40 books a year without speed reading', x: 440, y: 1630, r: -2, from: [-620, 20] },
   { kind: 'facebook', app: 'Facebook', by: 'Riverside Market', title: 'The Saturday market is back, 8 to 1', x: 640, y: 700, r: 2, from: [620, -30] },
-  { kind: 'safari', app: 'Safari', by: 'paulgraham.com', title: 'How to Do Great Work', x: 470, y: 555, r: -1.5, from: [0, -700] },
+  { kind: 'safari', app: 'Safari', by: 'markmanson.net', title: 'The Most Important Question of Your Life', x: 470, y: 555, r: -1.5, from: [0, -700] },
 ];
 const SCALE = 0.8;
 const ENTER = 12;
