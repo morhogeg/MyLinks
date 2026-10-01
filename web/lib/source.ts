@@ -19,7 +19,7 @@
 //   6. Anything else     → the pretty hostname (ynet.co.il)
 
 import {
-    getPlatform,
+    linkPlatform,
     PLATFORM_LABELS,
     xHandle,
     instagramHandle,
@@ -53,7 +53,7 @@ function cleanSourceName(sourceName?: string | null): string {
 export type SourceLink = Pick<Link, 'url' | 'sourceName' | 'sourceType' | 'sourceHandle' | 'sourcePlatform'>;
 
 export function getSourceInfo(link: SourceLink): SourceInfo {
-    const platform = getPlatform(link.url);
+    const platform = linkPlatform(link);
     const isScreenshot = link.sourceType === 'image';
 
     // 0. A screenshot whose author handle was read off the image. With the app
