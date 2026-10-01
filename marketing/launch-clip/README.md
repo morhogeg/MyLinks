@@ -677,6 +677,10 @@ Round 6 (owner, 2026-10-01): the Photos · Screenshots pile shows pictures, not
 titles (three screenshot thumbnails, the clip's own invented posts copied
 small into `public/clips/save/hook/`; a new one slides in on "scattered"),
 and the tagline sits on ONE line under the wordmark (52px), as in the reel.
+Then the YouTube line broke mid-sentence ("Share a YouTube video. Get its /
+key moments…"), so "Get its" arrived with the first sentence (a row arrives
+whole on its first spoken word); it now breaks at the sentence, and verify
+fails any caption row that starts a new sentence mid-row.
 
 **What is real and what is scripted.** Every app frame is the real app. The
 source tour is take `sources` (`capture/shoot.mjs`): each finished card is

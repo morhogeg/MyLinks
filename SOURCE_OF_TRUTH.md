@@ -2638,6 +2638,8 @@ exact-match, capped.
   Owner: the tagline on the end card on one line (now 52px, one row); the
   hook's Photos · Screenshots pile shows screenshot pictures instead of titles
   (the clip's own invented posts, small copies in `public/clips/save/hook/`).
+  The YouTube line breaks at its sentence ("Get its" was showing before it
+  was said); verify fails a caption row that starts a new sentence mid-row.
   Not listened to on speakers.
 - **2026-09-30 — SAVE clip round 5: lines that say the value.** Branch
   `claude/clip-save`, not merged. Owner line notes: the hook is now "Your

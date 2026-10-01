@@ -498,6 +498,14 @@ console.log('\n── clip: save');
   });
   const lines = caps.filter((c) => !c.place);
   const close = caps.find((c) => c.place === 'lockup');
+  // a row of a line arrives whole when its first word is spoken, so a row
+  // must never start the NEXT sentence too (owner, 2026-10-01: "Get its"
+  // appeared with "Share a YouTube video.", before it was said)
+  caps.forEach((c) => {
+    c.text.split('\n').forEach((row) => {
+      if (/[.?!]\s+\S/.test(row)) bad.push(`caption row "${row}" starts a new sentence mid-row (break the line there)`);
+    });
+  });
   if (!close || close !== caps[caps.length - 1]) bad.push('the clip does not close on its lockup line');
   if (!lines.some((c) => /\bMachina\b/.test(c.text))) bad.push('no narrator line names Machina before the close');
   if (!close || !/\bMachina\b/.test(close.text)) bad.push('the closing line does not name Machina');
