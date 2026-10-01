@@ -2421,7 +2421,12 @@ exact-match, capped.
   the 5 members + frames the island, second tap clears both. **NOT
   verified:** light theme render (ThemeProvider kept the harness dark; chip
   classes are the old legend's, unchanged), on device. New bug logged as
-  §4 G2c (category color hash collisions).
+  §4 G2c (category color hash collisions). **SHIPPED** as merge `79deb19`
+  (frontend only, no functions): Vercel on push; TestFlight run #342 →
+  **build 1342** (queued behind another session's run #340 / build 1340;
+  an accidental early trigger of pre-merge main, run #341, was superseded
+  and cancelled, no build). Owner QA: Graph → tap each cluster chip → its
+  card list opens and the island is framed; tap again → clears.
 - **2026-10-01 — LINKEDIN BYLINE ICON: DETECTION, NOT DRAWING, WAS THE BUG
   (owner: "for the Nth time", a share-sheet save of a Pilipda Samattanawin
   post showed the author name with no "in" mark).** Branch
