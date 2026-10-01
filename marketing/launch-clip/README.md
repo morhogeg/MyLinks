@@ -548,7 +548,7 @@ stops the reel drifting away from the shipped UI).
   clock cannot stall them), auth permanently signed in as a demo user, and
   callables posted to the local server. `web/` itself is not modified.
 - **`capture/library.mjs`** is the demo account: 24 real, deliberately
-  interesting saves (Wait But Why's *The Tail End*, Paul Graham, Dieter Rams,
+  interesting saves (Wait But Why's *The Tail End*, Mark Manson, Dieter Rams,
   Marcella Hazan, the Webb telescope, a Piranesi screenshot…), 30 edges, five
   collections and today's Daily Brew. No "AI" category or card anywhere.
 - **`capture/server.mjs`** serves the build and answers `/api/*` the way the
