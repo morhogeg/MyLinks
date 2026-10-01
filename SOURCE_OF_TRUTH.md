@@ -2647,6 +2647,14 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-01 — Demo account: Mark Manson's essay replaces the old essay card.**
+  Branch `claude/clip-revisit`, not merged. Owner: no mentions of the previous author
+  anywhere. The demo account's essay card (`capture/library.mjs`) is now Mark
+  Manson's "The Most Important Question of Your Life" (same age and topic
+  cluster; its Related links and the Daily Brew deck follow), the capture
+  script's titles follow, the docs name Manson, and the `revisit` take's data
+  is re-captured (shared with `claude/clip-save`, where it was shot; no other
+  take changes). No rendered video showed the old card.
 - **2026-09-29 — REVISIT round 6: the beginning rewritten.** Owner: the
   round 5 lines were bad ("Smart review" is a menu name, "comes back as the
   point" meant nothing). Same shots; new lines: "But most of them, you never
@@ -2868,7 +2876,7 @@ exact-match, capped.
   mid-task for **the actual app, not mockups**, so every UI frame is the real
   web app: `capture/` builds `web/` as a static export with Firebase swapped
   for an in-memory stand-in (seeded with a 24-save demo account: Wait But
-  Why, Paul Graham, Dieter Rams, Marcella Hazan, the Webb telescope…; no
+  Why, Mark Manson, Dieter Rams, Marcella Hazan, the Webb telescope…; no
   "AI"), and Playwright drives it on an iPhone-sized page with a stepped
   clock, so the app's own animations are recorded frame-exact. Built the
   reusable kit (`src/reels/kit/`) and the README's "Motion language"
