@@ -1871,6 +1871,18 @@ G2. **[ ] Graph next levers (from the round-3 product pass):** (a) search/
     age) to show how knowledge grew; (d) cluster-level "synthesize this"
     (reuse M12 machinery scoped to a cluster's cards). Build in this order —
     each is independent.
+    **(e) [x] Cluster chips (2026-10-01):** the chip row above the canvas
+    now names the captioned clusters (biggest first, count, dot = the
+    island's most common category color) instead of categories; a chip tap
+    = a caption tap (spotlight + frame + "Cards in this cluster" panel), tap
+    again clears. Category filtering still lives in the library filter
+    sheet, which scopes the graph.
+
+G2c. **[ ] Category colors collide.** `getCategoryColorStyle` (`lib/colors.ts`)
+    picks a color by string hash mod the palette size, so two categories can
+    share a color (owner screenshot 2026-10-01: Tech and Health both orange
+    in the graph). Fix: assign distinct colors per user's category set
+    (stable order, hash only as the tiebreak), used everywhere the dot shows.
 
 G2b. **[x] Screenshot cards name who posted them (2026-09-08).** A screenshot
     of a post used to read "Screenshot" as its source. The vision pass now
@@ -2387,6 +2399,29 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-01 — GRAPH: CLUSTER CHIPS REPLACE CATEGORY CHIPS.** Branch
+  `claude/graph-cluster-chips`. Owner: each cluster name on the canvas
+  (e.g. LONGEVITY) should have a chip above the graph that opens the same
+  card list as tapping the caption. `KnowledgeGraph.tsx`: the category
+  legend row (a category FILTER, a different grouping than the islands) is
+  replaced by one chip per captioned cluster (uncaptioned clusters get
+  none), sorted by size, dot in the island's dominant category color,
+  label `dir="auto"` + truncated. `toggleClusterFocus` does what the
+  caption tap does (clears selection/cited set/pending focus, toggles
+  `clusterFocus`), so the existing frame-the-cluster camera and cluster
+  panel are reused, and the lit chip mirrors `clusterFocus` both ways. The
+  whole `categoryFocus` state + its draw-path dimming are deleted (no other
+  caller). Category filtering remains via the library filter sheet
+  (`selectedCategory` scopes the graph, `graphFiltersActive` in Feed).
+  **Verified:** tsc 0; eslint on the file shows one error that is
+  pre-existing on main (`modelRef.current = model`, react-hooks/immutability)
+  and unchanged; rendered via a throwaway harness (deleted, plus a temporary
+  `PUBLIC_ROUTES` entry, reverted) at 390px with Playwright: 3 chips
+  matching the 3 captions, chip tap lights the chip + opens the panel with
+  the 5 members + frames the island, second tap clears both. **NOT
+  verified:** light theme render (ThemeProvider kept the harness dark; chip
+  classes are the old legend's, unchanged), on device. New bug logged as
+  §4 G2c (category color hash collisions).
 - **2026-10-01 — LINKEDIN BYLINE ICON: DETECTION, NOT DRAWING, WAS THE BUG
   (owner: "for the Nth time", a share-sheet save of a Pilipda Samattanawin
   post showed the author name with no "in" mark).** Branch
