@@ -161,8 +161,7 @@ export const shotsCard = (imageUrls) => ({
  *    photo post's cover image, scraper.py `best_image`). The image is drawn
  *    here (renderPost), invented handle, no third-party image.
  *  - ARTICLE: Mark Manson's "The Most Important Question of Your Life", a real
- *    essay, with key points and a "Do this" true to it (owner, 2026-10-01:
- *    no Paul Graham anywhere in the clip).
+ *    essay, with key points and a "Do this" true to it (owner, 2026-10-01).
  *  - NOTE: a note typed in the Note tab. The app keeps the words verbatim;
  *    "Summarize with Machina" asks /api/analyze for a read on demand
  *    (web/lib/storage.ts generateCardSummary). NOTE_READ is that answer.

@@ -552,7 +552,7 @@ stops the reel drifting away from the shipped UI).
   clock cannot stall them), auth permanently signed in as a demo user, and
   callables posted to the local server. `web/` itself is not modified.
 - **`capture/library.mjs`** is the demo account: 24 real, deliberately
-  interesting saves (Wait But Why's *The Tail End*, Paul Graham, Dieter Rams,
+  interesting saves (Wait But Why's *The Tail End*, Mark Manson, Dieter Rams,
   Marcella Hazan, the Webb telescope, a Piranesi screenshot…), 30 edges, five
   collections and today's Daily Brew. No "AI" category or card anywhere.
 - **`capture/server.mjs`** serves the build and answers `/api/*` the way the
@@ -681,11 +681,12 @@ Then the YouTube line broke mid-sentence ("Share a YouTube video. Get its /
 key moments…"), so "Get its" arrived with the first sentence (a row arrives
 whole on its first spoken word); it now breaks at the sentence, and verify
 fails any caption row that starts a new sentence mid-row.
-Owner (2026-10-01): no Paul Graham in the clip. The Articles card is now Mark
+Owner (2026-10-01): the Articles card is now Mark
 Manson's "The Most Important Question of Your Life" (key points and "Do this"
 true to it; take `sources` re-captured, his name gone from every frame), the
 Safari share is that essay, and Safari's Reading List in the hook leads with
-Marcella Hazan's sauce. The demo account's `greatwork` card is untouched (other
+Marcella Hazan's sauce. (The demo account's old essay card was then replaced
+everywhere: see the next entry.) The demo account's card was untouched (other
 videos use it).
 
 **What is real and what is scripted.** Every app frame is the real app. The

@@ -2634,14 +2634,15 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-10-01 — SAVE clip: no Paul Graham.** Branch `claude/clip-save`, not
-  merged. Owner: remove Paul Graham, use Mark Manson. The Articles card is now
+- **2026-10-01 — SAVE clip: Mark Manson's essay.** Branch `claude/clip-save`,
+  not merged. Owner: replace the previous essay's author with Mark Manson. The Articles card is now
   Mark Manson's "The Most Important Question of Your Life" (key points and "Do
   this" true to the essay), the Safari share is the same essay, and Safari's
-  Reading List in the hook no longer lists "How to Do Great Work". Take
+  Reading List in the hook no longer lists the old essay. Take
   `sources` re-captured: his name is on no frame of the clip. NOT changed:
-  the demo account still has a Paul Graham card (`greatwork`), which other
-  videos on other branches show (the Revisit clip's deck, the reel's feed).
+  the demo account still had the old essay's card (the next entry replaces
+  it everywhere; checked: no rendered video ever showed it, only the unused
+  `revisit` take's data).
 - **2026-10-01 — SAVE clip round 6.** Branch `claude/clip-save`, not merged.
   Owner: the tagline on the end card on one line (now 52px, one row); the
   hook's Photos · Screenshots pile shows screenshot pictures instead of titles
@@ -2888,7 +2889,7 @@ exact-match, capped.
   mid-task for **the actual app, not mockups**, so every UI frame is the real
   web app: `capture/` builds `web/` as a static export with Firebase swapped
   for an in-memory stand-in (seeded with a 24-save demo account: Wait But
-  Why, Paul Graham, Dieter Rams, Marcella Hazan, the Webb telescope…; no
+  Why, Mark Manson, Dieter Rams, Marcella Hazan, the Webb telescope…; no
   "AI"), and Playwright drives it on an iPhone-sized page with a stepped
   clock, so the app's own animations are recorded frame-exact. Built the
   reusable kit (`src/reels/kit/`) and the README's "Motion language"
