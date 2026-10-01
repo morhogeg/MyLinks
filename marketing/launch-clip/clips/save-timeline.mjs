@@ -158,7 +158,7 @@ export const CAPTIONS = [
   // the close, on the lockup: the name (the drawn wordmark wipes in as it is
   // said), then the tagline, exactly as written (owner call 2026-09-28: every
   // launch film ends on it; it appears nowhere earlier in this clip)
-  { at: HITS.markStrike + 8, to: TOTAL_FRAMES, place: 'lockup', text: 'Machina.\nEverything you save,\nfinally useful.', duck: 0.4 },
+  { at: HITS.markStrike + 8, to: TOTAL_FRAMES, place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4 },
 ];
 
 /** the element words above the lines: 4 frames before each, leaving with it

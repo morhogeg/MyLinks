@@ -1,5 +1,5 @@
 import React from 'react';
-import { AbsoluteFill } from 'remotion';
+import { AbsoluteFill, Img, staticFile } from 'remotion';
 import { CAPTIONS, FPS, HITS } from '../../../../clips/save-timeline.mjs';
 import VO from './vo.json';
 import { EASE_GATHER, EASE_IN_OUT, EASE_MODAL, EASE_SPRING, mix, prog } from '../../kit/curves';
@@ -40,7 +40,7 @@ const EVERY = wordAt(HOOK, 3); // "scattered"
 const NEVER = wordAt(HOOK, 8); // "impossible"
 const NAME_AT = wordAt(NAME, 0);
 
-type Pile = { kind: 'youtube' | 'instagram' | 'x' | 'facebook' | 'safari' | 'photos'; app: string; list: string; titles: string[]; x: number; y: number; s: number; r: number };
+type Pile = { kind: 'youtube' | 'instagram' | 'x' | 'facebook' | 'safari' | 'photos'; app: string; list: string; titles: string[]; shots?: string[]; x: number; y: number; s: number; r: number };
 /** where people keep what they save: each app's own save list */
 // (titles[0] is the save that drops in on "scattered"; the rest are already there)
 const PILES: Pile[] = [
@@ -49,13 +49,18 @@ const PILES: Pile[] = [
   { kind: 'x', app: 'X', list: 'Bookmarks', titles: ['You do not rise to the level of your goals', 'How to Get Rich (without getting lucky)', 'Four Thousand Weeks', 'Inventing on Principle'], x: 265, y: 1195, s: 0.98, r: 2 },
   { kind: 'safari', app: 'Safari', list: 'Reading List', titles: ['How to Do Great Work', 'The Tail End', 'Laws of UX', 'Dieter Rams: ten principles for good design'], x: 805, y: 1160, s: 1.02, r: -2.5 },
   { kind: 'facebook', app: 'Facebook', list: 'Saved', titles: ['The Psychology of Money', 'Perfect Days', 'Anderson .Paak & The Free Nationals: Tiny Desk Concert', "Samin Nosrat's buttermilk-brined roast chicken"], x: 320, y: 1570, s: 0.96, r: -2 },
-  { kind: 'photos', app: 'Photos', list: 'Screenshots', titles: ['Read Piranesi, and go in blind', "Marcella Hazan's tomato sauce", 'Birthday idea for Dana', 'Yoga For Complete Beginners, 20 Minute Home Yoga Workout'], x: 790, y: 1540, s: 1.0, r: 3 },
+  // screenshots are pictures, not titles: the clip's own invented posts (the
+  // recipe the clip saves later, the packing post), drawn by
+  // capture/clip-save.mjs and copied small into public/clips/save/hook/
+  { kind: 'photos', app: 'Photos', list: 'Screenshots', titles: [], shots: ['shot-1.jpg', 'post-1.jpg', 'shot-2.jpg', 'shot-3.jpg'], x: 790, y: 1540, s: 1.0, r: 3 },
 ];
 const SAFARI_INK = 'rgb(0, 122, 255)';
 const PHOTOS_INK = 'rgb(245, 158, 11)';
 const inkOf = (k: Pile['kind']) => (k === 'safari' ? SAFARI_INK : k === 'photos' ? PHOTOS_INK : PLATFORM_INK[k]);
 const tint = (rgb: string, a: number) => rgb.replace('rgb(', 'rgba(').replace(')', `, ${a})`);
 const ROW = 64;
+const SHOT_W = 120; // three fill the row; the fourth is pushed out as the new one slides in
+const SHOT_GAP = 14;
 
 const PileCard: React.FC<{ p: Pile; drop: number; grey: number }> = ({ p, drop, grey }) => {
   const ink = inkOf(p.kind);
@@ -80,8 +85,20 @@ const PileCard: React.FC<{ p: Pile; drop: number; grey: number }> = ({ p, drop, 
           <span style={{ display: 'block', marginTop: 2, fontSize: 23, fontWeight: 560, color: INK_SOFT }}>{p.list}</span>
         </span>
       </div>
-      {/* the list: a new save drops in at the top, pushing the rest down */}
+      {/* the list: a new save drops in at the top, pushing the rest down
+          (screenshots: a new one slides in at the left) */}
       <div style={{ marginTop: 16, height: ROW * 3, overflow: 'hidden', filter: grey > 0.01 ? `blur(${(grey * 5).toFixed(2)}px) grayscale(${grey.toFixed(3)})` : undefined, opacity: 1 - 0.55 * grey }}>
+        {p.shots ? (
+          <div style={{ display: 'flex', gap: SHOT_GAP, paddingTop: 8, transform: `translateX(${Math.round(-(SHOT_W + SHOT_GAP) * (1 - drop))}px)` }}>
+            {p.shots.map((f, k) => (
+              <Img
+                key={f}
+                src={staticFile(`clips/save/hook/${f}`)}
+                style={{ width: SHOT_W, height: ROW * 3 - 16, flexShrink: 0, objectFit: 'cover', objectPosition: 'left top', borderRadius: 10, border: '1px solid rgba(16,24,40,0.08)', opacity: k === 0 ? drop : 1 }}
+              />
+            ))}
+          </div>
+        ) : (
         <div style={{ transform: `translateY(${Math.round(-ROW * (1 - drop))}px)` }}>
           {p.titles.map((t, k) => (
             <div key={k} style={{ height: ROW, display: 'flex', alignItems: 'center', gap: 14, borderTop: '1px solid rgba(16,24,40,0.06)', opacity: k === 0 ? drop : 1 }}>
@@ -90,6 +107,7 @@ const PileCard: React.FC<{ p: Pile; drop: number; grey: number }> = ({ p, drop, 
             </div>
           ))}
         </div>
+        )}
       </div>
     </div>
   );

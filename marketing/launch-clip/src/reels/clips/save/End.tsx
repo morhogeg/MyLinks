@@ -10,8 +10,8 @@ import { prog } from '../../kit/curves';
  * The close: the reel's lockup on the clip's clock. The mark arrives with the
  * app's launch motion and strikes on the score's impact, the drawn wordmark
  * wipes in as the narrator says "Machina", then the tagline, "Everything you
- * save, / finally useful.", in the reel's line voice (KineticLine at the
- * statement's 60px, two rows, each word arriving on the narrator's timing),
+ * save, finally useful.", in the reel's line voice (KineticLine, ONE row at
+ * 52px, owner 2026-10-01, each word arriving on the narrator's timing),
  * and the end card holds. The clip ends ON it (owner call 2026-09-28: every
  * launch film ends on the tagline). The line is a KineticLine, not the
  * Lockup's own line, because that one splits on spaces only and would lose
@@ -33,7 +33,7 @@ export const End: React.FC<{ f: number }> = ({ f }) => {
       <div style={{ position: 'absolute', top: 560, transform: `scale(${1 + drift * 0.025})`, transformOrigin: '50% 40%' }}>
         <Lockup frame={f} strike={HITS.markStrike} wordAt={LINE.at + (starts[0] ?? 0)} line="" showLine={false} wordWidth={620} />
         <div style={{ marginTop: 64, display: 'flex', justifyContent: 'center' }}>
-          <KineticLine text={TAG} frame={f} from={LINE.at} to={TOTAL_FRAMES + 30} starts={starts.slice(1)} size={60} width={1000} />
+          <KineticLine text={TAG} frame={f} from={LINE.at} to={TOTAL_FRAMES + 30} starts={starts.slice(1)} size={52} width={1040} />
         </div>
       </div>
     </AbsoluteFill>

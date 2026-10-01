@@ -623,7 +623,7 @@ It is a new video in the reel's design language, not a cut of the reel.
 | 1232–1392 | SCREENSHOTS | a cut to the feed, + tapped (1256); the real Add dialog rises (1264), Image tab (1296), three screens of one recipe post picked (1328), Save (1368) ("Even screenshots get analyzed. Up to five become one card.") |
 | 1392–1576 | KEY POINTS | the feed's own "Reading 3 screenshots…" card, the card it becomes (1432), opened (1480): the screenshots, the gist, the Key Points lifted (1568) ("It reads the text in them and pulls out the key points.") |
 | 1576–1696 | TAGS & LINKS | read on down past the "Do this"; the tags lift (1640), then the two Related cards (1648, 1664) ("Then it tags it, and links it to what you already saved.") |
-| 1696–1880 | the close | thrown into the lockup: the mark strikes (1752), MACHINA wipes in on the spoken name, then the tagline, word by word, held 1.2s ("Machina. Everything you save, finally useful.") |
+| 1696–1880 | the close | thrown into the lockup: the mark strikes (1752), MACHINA wipes in on the spoken name, then the tagline on one line, word by word, held 1.2s ("Machina. Everything you save, finally useful.") |
 
 **How it got here.** Round 1 rebuilt the clip to the owner's brief (the
 first cut, a re-edit of the reel's Save chapter, was rejected), then took the
@@ -673,6 +673,10 @@ down to the points that matter." (was "…even a long article, comes back as the
 key points."); Instagram & Facebook, "Instagram and Facebook posts, saved and
 summarized too." (was "…it reads the caption and the photo.", which states
 a given, not a benefit). Picture unchanged.
+Round 6 (owner, 2026-10-01): the Photos · Screenshots pile shows pictures, not
+titles (three screenshot thumbnails, the clip's own invented posts copied
+small into `public/clips/save/hook/`; a new one slides in on "scattered"),
+and the tagline sits on ONE line under the wordmark (52px), as in the reel.
 
 **What is real and what is scripted.** Every app frame is the real app. The
 source tour is take `sources` (`capture/shoot.mjs`): each finished card is

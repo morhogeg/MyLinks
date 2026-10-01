@@ -2634,6 +2634,11 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-01 — SAVE clip round 6.** Branch `claude/clip-save`, not merged.
+  Owner: the tagline on the end card on one line (now 52px, one row); the
+  hook's Photos · Screenshots pile shows screenshot pictures instead of titles
+  (the clip's own invented posts, small copies in `public/clips/save/hook/`).
+  Not listened to on speakers.
 - **2026-09-30 — SAVE clip round 5: lines that say the value.** Branch
   `claude/clip-save`, not merged. Owner line notes: the hook is now "Your
   saves are scattered across countless apps, and impossible to find."; X is
