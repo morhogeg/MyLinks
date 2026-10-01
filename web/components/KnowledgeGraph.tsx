@@ -150,8 +150,8 @@ export default function KnowledgeGraph({
     const [model, setModel] = useState<GraphModel | null>(null);
     const [building, setBuilding] = useState(true);
     const [selected, setSelected] = useState<number | null>(null);
-    const [categoryFocus, setCategoryFocus] = useState<string | null>(null);
-    // A tapped island caption spotlights that cluster and opens its panel.
+    // A tapped island caption (or its chip above the canvas) spotlights that
+    // cluster and opens its panel.
     const [clusterFocus, setClusterFocus] = useState<number | null>(null);
     // The cards an Ask answer cited, held as IDS. Deliberately not indices:
     // indices die on every rebuild, so storing ids means the highlight survives
@@ -180,7 +180,6 @@ export default function KnowledgeGraph({
     const hoverRef = useRef<number | null>(null);
     const paletteRef = useRef<Palette | null>(null);
     const selectedRef = useRef<number | null>(null);
-    const focusRef = useRef<string | null>(null);
     const reducedMotionRef = useRef(false);
     // While set, the camera glides to keep this node framed clear of the panel —
     // how "tap a connection in the list" visibly walks the graph. Any user
@@ -197,7 +196,6 @@ export default function KnowledgeGraph({
     const onRestoreConsumedRef = useRef(onRestoreConsumed);
     onRestoreConsumedRef.current = onRestoreConsumed;
     selectedRef.current = selected;
-    focusRef.current = categoryFocus;
     clusterFocusRef.current = clusterFocus;
     openRef.current = onOpenCard;
 
@@ -379,7 +377,7 @@ export default function KnowledgeGraph({
     // Selection changes re-light the canvas and give the sim a nudge redraw.
     useEffect(() => {
         drawPendingRef.current = true;
-    }, [selected, categoryFocus, model]);
+    }, [selected, model]);
 
     // ── The rAF loop: physics + draw ─────────────────────────────────────────
     useEffect(() => {
@@ -515,7 +513,6 @@ export default function KnowledgeGraph({
                 captionRectsRef.current = draw(canvas, model, camRef.current, paletteRef.current ?? readPalette(), {
                     selected: selectedRef.current,
                     hover: hoverRef.current,
-                    categoryFocus: focusRef.current,
                     clusterFocus: clusterFocusRef.current,
                     cited: citedRef.current,
                 });
@@ -869,18 +866,42 @@ export default function KnowledgeGraph({
         if (ok) setSavedClusters((prev) => new Set(prev).add(clusterPanel.index));
     }, [clusterPanel, onSaveCluster, savingCluster]);
 
-    // ── Legend (top categories among connected nodes) ────────────────────────
-    const legend = useMemo(() => {
+    // ── Cluster chips (one per captioned island) ─────────────────────────────
+    // The row above the canvas names the same islands the canvas captions —
+    // it used to be a category legend, which named a different grouping than
+    // the one the user sees (owner call, 2026-10-01). Category filtering still
+    // lives in the library filter sheet, which scopes the graph. Uncaptioned
+    // clusters get no chip: a chip must match a word on the canvas.
+    const clusterChips = useMemo(() => {
         if (!model) return [];
-        const counts = new Map<string, number>();
-        for (const n of model.nodes) {
-            counts.set(n.category, (counts.get(n.category) ?? 0) + 1);
-        }
-        return [...counts.entries()]
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 8)
-            .map(([category, count]) => ({ category, count, color: getCategoryColorStyle(category).color }));
+        return model.clusters
+            .map((cluster, index) => {
+                // The dot takes the island's most common category color, so the
+                // chip and the dots it names read as the same thing.
+                const counts = new Map<string, number>();
+                for (const i of cluster.nodeIndices) {
+                    const c = model.nodes[i].category;
+                    counts.set(c, (counts.get(c) ?? 0) + 1);
+                }
+                let top = '';
+                let topCount = 0;
+                for (const [c, n] of counts) if (n > topCount) { top = c; topCount = n; }
+                return { index, label: cluster.label, count: cluster.nodeIndices.length, color: getCategoryColorStyle(top).color };
+            })
+            .filter((c): c is typeof c & { label: string } => !!c.label)
+            .sort((a, b) => b.count - a.count);
     }, [model]);
+
+    // A chip does exactly what tapping that island's caption does: spotlight
+    // + frame the cluster and open its card list; tapping the lit chip clears.
+    const toggleClusterFocus = useCallback((index: number) => {
+        hapticLight();
+        pendingFocusIdRef.current = null;
+        setUnmappedCard(null);
+        setSelected(null);
+        setCitedIds(null);
+        setClusterFocus((cur) => (cur === index ? null : index));
+    }, []);
 
     const refit = useCallback(() => {
         autoFitRef.current = true;
@@ -897,8 +918,8 @@ export default function KnowledgeGraph({
     return (
         <div className="space-y-3 animate-fade-in">
             {/* Back to the Ask conversation that opened this view. TOP-LEFT,
-                above the stats and the category legend — it is NAVIGATION (it
-                leaves the view), while the legend chips are FILTERS that act on
+                above the stats and the cluster chips — it is NAVIGATION (it
+                leaves the view), while the cluster chips act ON
                 the view, so it must not sit below them (owner call; same rule as
                 round 3's desktop toolbar). Styled as the app's existing
                 in-content return control — see "Back to Insights"
@@ -923,7 +944,7 @@ export default function KnowledgeGraph({
                     ) : (
                         // Same control, same slot, same grammar — only the
                         // destination differs (see the comment above: this row
-                        // is NAVIGATION, which is why it sits above the legend).
+                        // is NAVIGATION, which is why it sits above the chips).
                         <button
                             onClick={onBackToCard}
                             aria-label="Back to the card"
@@ -986,7 +1007,7 @@ export default function KnowledgeGraph({
                 </div>
             )}
 
-            {/* Stats + legend header */}
+            {/* Stats header */}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-0.5">
                 <div className="text-[13px] font-medium text-text-secondary tabular-nums">
                     {model && !showLoading ? (
@@ -1017,18 +1038,18 @@ export default function KnowledgeGraph({
                     Tap a card to explore · tap it again to open · drag to pan · scroll to zoom
                 </div>
             </div>
-            {/* Category legend. On a phone this WRAPPED to three rows and ate
-                ~110px of the canvas (owner mobile QA) — it's one horizontally
-                scrollable row there, and only wraps from sm up where there's
-                width to spare. */}
-            {legend.length > 1 && (
+            {/* Cluster chips. One horizontally scrollable row on a phone (a
+                wrapped row ate ~110px of the canvas in owner mobile QA); wraps
+                from sm up where there's width to spare. The lit chip mirrors
+                clusterFocus, so a caption tap lights its chip too. */}
+            {clusterChips.length > 0 && (
                 <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap sm:overflow-visible">
-                    {legend.map(({ category, count, color }) => {
-                        const active = categoryFocus === category;
+                    {clusterChips.map(({ index, label, count, color }) => {
+                        const active = clusterFocus === index;
                         return (
                             <button
-                                key={category}
-                                onClick={() => setCategoryFocus(active ? null : category)}
+                                key={`${index}-${label}`}
+                                onClick={() => toggleClusterFocus(index)}
                                 aria-pressed={active}
                                 className={`inline-flex shrink-0 items-center gap-1.5 h-7 px-2.5 rounded-full border text-[12px] font-medium transition-colors cursor-pointer ${active
                                     ? 'bg-fill-strong border-border-strong text-text'
@@ -1036,7 +1057,7 @@ export default function KnowledgeGraph({
                                     }`}
                             >
                                 <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
-                                {category}
+                                <span dir="auto" className="max-w-[14rem] truncate">{label}</span>
                                 <span className="text-text-muted tabular-nums">{count}</span>
                             </button>
                         );
@@ -1047,7 +1068,7 @@ export default function KnowledgeGraph({
             {/* The constellation */}
             <div
                 ref={containerRef}
-                /* Mobile reserves less chrome now that the legend is one row.
+                /* Mobile reserves less chrome now that the chip row is one row.
                    The Back-to-Ask row exists ONLY on the Ask → Graph path, so
                    its ~40px (28px control + the 12px space-y gap) is reserved
                    only then — a flat bump would shorten the graph for everyone
@@ -1116,7 +1137,7 @@ export default function KnowledgeGraph({
                     <div className={`absolute inset-x-2 bottom-2 sm:inset-x-auto sm:bottom-auto sm:top-3 sm:end-3 ${PANEL_CLASS_W} max-h-[66%] sm:max-h-[calc(100%-24px)] flex flex-col rounded-2xl bg-card/95 backdrop-blur-xl border border-border-subtle shadow-[var(--shadow-card)] animate-fade-in`}>
                         {/* Minimal, intentional hierarchy: TITLE → one action
                             row → connections. The category dot is the only
-                            metadata (its color already matches the legend);
+                            metadata (its color is the node's own);
                             the old POLITICS row and the cluster chip stacked
                             two grey layers here and buried the Ask route one
                             panel deeper (owner QA). */}
@@ -1346,7 +1367,7 @@ function draw(
     model: GraphModel,
     cam: Camera,
     palette: Palette,
-    state: { selected: number | null; hover: number | null; categoryFocus: string | null; clusterFocus: number | null; cited?: Set<number> | null },
+    state: { selected: number | null; hover: number | null; clusterFocus: number | null; cited?: Set<number> | null },
 ): CaptionRect[] {
     const ctx = canvas.getContext('2d');
     if (!ctx) return [];
@@ -1382,14 +1403,11 @@ function draw(
             if (lit.has(edges[ei].a) && lit.has(edges[ei].b)) litEdges.add(ei);
         }
     }
-    const inFocusCategory = (i: number) =>
-        !state.categoryFocus || nodes[i].category === state.categoryFocus;
     const inFocusCluster = (i: number) =>
         state.clusterFocus === null || nodes[i].cluster === state.clusterFocus;
     /** 1 when a node is fully lit, 0.14 when the current focus pushes it back. */
     const dimOf = (i: number) => {
         if (lit) return lit.has(i) ? 1 : 0.14;
-        if (state.categoryFocus) return inFocusCategory(i) ? 1 : 0.14;
         if (state.clusterFocus !== null) return inFocusCluster(i) ? 1 : 0.14;
         return 1;
     };
@@ -1402,7 +1420,6 @@ function draw(
         const emphasized = litEdges?.has(ei) ?? false;
         let alpha: number;
         if (litEdges) alpha = emphasized ? 0.85 : 0.05;
-        else if (state.categoryFocus) alpha = inFocusCategory(e.a) && inFocusCategory(e.b) ? 0.45 : 0.05;
         else if (state.clusterFocus !== null) alpha = inFocusCluster(e.a) ? 0.4 : 0.05;
         else alpha = 0.13 + Math.max(0, Math.min(1, (e.weight - 0.7) / 0.3)) * 0.22;
 
@@ -1515,7 +1532,6 @@ function draw(
         let alpha = 0.75;
         if (lit) alpha = 0.12;
         else if (state.clusterFocus !== null) alpha = c === state.clusterFocus ? 0.95 : 0.12;
-        else if (state.categoryFocus) alpha = 0.15;
         const focusedCaption = state.clusterFocus === c;
         const label = cluster.label.toUpperCase();
         const tw = ctx.measureText(label).width;
@@ -1553,11 +1569,9 @@ function draw(
         if (isFocused) candidates.push({ i, alpha: 1, tier: 0, focused: true });
         else if (inLit) candidates.push({ i, alpha: 0.9, tier: 1, focused: false });
         else if (!lit && labelAlpha > 0 && (hubs.has(i) || (cam.k >= 1.05 && n.r * cam.k >= 7))) {
-            const focusDim = state.categoryFocus
-                ? (inFocusCategory(i) ? 0.85 : 0.06)
-                : state.clusterFocus !== null
-                    ? (inFocusCluster(i) ? 0.85 : 0.06)
-                    : 0.85;
+            const focusDim = state.clusterFocus !== null
+                ? (inFocusCluster(i) ? 0.85 : 0.06)
+                : 0.85;
             const alpha = labelAlpha * focusDim;
             if (alpha > 0.02) candidates.push({ i, alpha, tier: hubs.has(i) ? 2 : 3, focused: false });
         }
