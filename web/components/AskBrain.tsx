@@ -9,7 +9,7 @@ import remarkBreaks from 'remark-breaks';
 import { getDominantDirection } from '@/lib/rtl';
 import { breakIntoParagraphs, normalizeListMarkers } from '@/lib/answerLayout';
 import SourceByline from '@/components/SourceByline';
-import { getPlatform, platformIcon, platformColor, screenshotSource } from '@/lib/platform';
+import { linkPlatform, platformIcon, platformColor, screenshotSource } from '@/lib/platform';
 import { appCheckHeaders } from '@/lib/firebase';
 import { authHeaders } from '@/lib/auth';
 import { apiUrl, isNativeApp, fetchWithTimeout } from '@/lib/api';
@@ -1499,7 +1499,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                                                         // (owner QA ×3). The byline draws no icon of its own.
                                                         // A screenshot whose author was read off the image carries
                                                         // that app's mark, like a saved link from it would.
-                                                        const platform = getPlatform(s.url || undefined)
+                                                        const platform = linkPlatform({ url: s.url || undefined, sourceType: live?.sourceType, sourcePlatform: live?.sourcePlatform })
                                                             ?? (live ? screenshotSource(live)?.platform ?? null : null);
                                                         const shot = !platform && live?.sourceType === 'image';
                                                         const note = !platform && live?.sourceType === 'note';

@@ -2387,6 +2387,33 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-01 — LINKEDIN BYLINE ICON: DETECTION, NOT DRAWING, WAS THE BUG
+  (owner: "for the Nth time", a share-sheet save of a Pilipda Samattanawin
+  post showed the author name with no "in" mark).** Branch
+  `claude/linkedin-byline-icon`. The `SourceByline` LinkedIn branch was intact;
+  it only runs when the card's URL host reads as LinkedIn, and `getPlatform`
+  knew only `linkedin.com`. Since 2026-08-22 the backend routes `lnkd.in` short
+  links to the LinkedIn scraper (so the real author name arrives) but the card
+  keeps the URL as shared, so such cards fell to the plain-publisher byline:
+  name, no icon. Every past fix patched the drawing, never the detection, which
+  is why it kept coming back. **Fix, two layers:** (1) web `getPlatform` maps
+  `lnkd.in` to LinkedIn; detection moved to JSX-free `web/lib/platformKey.ts`
+  (re-exported from `platform.tsx`) with a new `linkPlatform(link)` = URL host,
+  else the backend stamp; used by `SourceByline`, `ListCard`, the Ask citation
+  chip and `getSourceInfo` (Sources facet). (2) backend `_scrape_extras` stamps
+  `sourcePlatform` on WEB cards from the scrape's landing URL
+  (`_platform_for_url`), and `_scrape_linkedin_url` now returns `final_url`, so
+  any future short/redirect form still gets the mark. Screenshot cards ignore
+  the stamp (their `sourcePlatform` means the app read off the image).
+  **Guard:** `npm run test:platform` (fails if any LinkedIn URL form loses the
+  mark; confirmed failing with the `lnkd.in` line removed) + 6 backend tests in
+  `test_linkedin_author.py`. **Verified:** tsc clean, 5/5 web tests, 1266/1266
+  backend tests, server-rendered `SourceByline` draws the LinkedIn mark for an
+  `lnkd.in` card and a stamped card. **NOT verified:** the stored URL of the
+  owner's card (no Firestore access here): if it is `lnkd.in` the existing card
+  is fixed on deploy; if it is some other redirect host, only re-saves get the
+  stamp; on device.
+
 - **2026-09-26 — DAILY BREW PUSH OPENS THE REVIEW DECK; library Review
   layout removed.** Branch `claude/ios-notification-review-flow-nppm2h`.
   Owner: tapping "Your Daily Brew" landed on the whole Revisit tab (40 "Do
