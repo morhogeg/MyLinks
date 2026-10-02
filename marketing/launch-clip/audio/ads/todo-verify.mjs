@@ -7,12 +7,14 @@
  *
  *  - captions never overlap; lines start on beats or 8ths; the narrator speaks
  *    every caption verbatim and fits it; THE DWELL RULE (0.3–1.2s after the
- *    voice, ≤4s with `until`); at most 8 words on screen at once (the hook,
- *    the owner's 10-word line, is the one exception, ≤10);
+ *    voice, ≤4s with `until`); at most 8 words on screen at once;
+ *  - (round 3) the pace: until the lockup, something new on screen at least
+ *    every 3s;
  *  - THE FIRST SECOND: the hook is the first caption, on screen whole from
  *    frame 0, its voice heard by 0.5s; the mark has formed by ~3.5s;
- *  - the close: the film's endcard line (the tagline), exactly, once, at the
- *    end, its last word landed at least 1.6s before the last frame;
+ *  - the close: "Download Machina." then the film's endcard line (the
+ *    tagline), exactly, once, at the end, its last word landed at least 1.6s
+ *    before the last frame;
  *  - length ≤ 30s;
  *  - bans, on every caption, the voice, and every frame of the take: em dash,
  *    literal "AI", "second brain", "library"; in the captions and voice also
@@ -74,8 +76,11 @@ caps.forEach((c, i) => {
   if (i && c.at < caps[i - 1].to) bad.push(`caption overlap: "${c.text}" starts at ${c.at}, "${caps[i - 1].text}" runs to ${caps[i - 1].to}`);
   if (c.to > C.TOTAL_FRAMES) bad.push(`caption "${c.text}" runs past the ad (${c.to} > ${C.TOTAL_FRAMES})`);
   if (c.at % (C.BEAT_FRAMES / 2)) bad.push(`line "${c.text}" starts at ${c.at}, not on an 8th`);
-  const max = c.hook ? 10 : c.place === 'lockup' ? 6 : 8;
-  const n = c.place === 'lockup' ? words(c.text.split('\n').slice(-1)[0]) : words(c.text);
+  // (round 3) 8 words at most for every line, the hook included; the close's
+  // two lines ("Download Machina." in the band, the tagline in the lockup)
+  // are on screen together, so they count together
+  const max = 8;
+  const n = words(c.text);
   if (n > max) bad.push(`"${c.text}" puts ${n} words on screen (max ${max})`);
 });
 // the first second
@@ -120,14 +125,25 @@ if (fs.existsSync(manifestPath)) {
 const close = caps.find((c) => c.place === 'lockup');
 const closeLine = close?.text.split('\n').slice(-1)[0].replace(/\.$/, '');
 if (!close || !read('src/scenes/Endcard.tsx').includes(closeLine)) bad.push('the lockup line is not the film endcard line (the tagline)');
-if (close?.text !== 'Machina.\nEverything you save, finally useful.') bad.push('the ad does not close on "Machina." and the tagline, exactly');
+// (round 3, owner: end on a clear call to download) the close asks, then
+// the tagline closes (owner, 2026-09-28: every film ends on it)
+if (close?.text !== 'Download Machina.\nEverything you save, finally useful.') bad.push('the ad does not close on "Download Machina." and the tagline, exactly');
 if (close?.to !== C.TOTAL_FRAMES) bad.push('the tagline is not the last thing on screen');
 for (const c of caps) if (c !== close && /finally useful/i.test(c.text)) bad.push(`the tagline appears before the end: "${c.text}"`);
 
 // ── the grid
 const H = C.HITS;
-for (const k of ['snap', 'plusTap', 'imageTap', 'pick', 'saveTap', 'cardDone', 'cardTap', 'keyPoints', 'cardTodo', 'revisit', 'todoLift', 'tick', 'out', 'markStrike']) {
+for (const k of ['snap', 'plusTap', 'imageTap', 'pick', 'saveTap', 'cardDone', 'cardTap', 'keyPoints', 'cardTodo', 'revisit', 'tick', 'out', 'markStrike']) {
   if (H[k] % (C.BEAT_FRAMES / 2)) bad.push(`${k} at ${H[k]} is not on an 8th`);
+}
+// (round 3, owner: "a new visual or cut every two to three seconds") until
+// the lockup, no stretch of more than 3s passes without a new event on
+// screen (a landing, a tap, a lift, a cut, a line)
+{
+  const events = [...new Set([0, ...Object.values(H).flat(), ...caps.map((c) => c.at)])].filter((x) => x <= H.markStrike).sort((a, b) => a - b);
+  for (let k = 1; k < events.length; k++) {
+    if (events[k] - events[k - 1] > 3 * C.FPS) bad.push(`nothing new on screen from ${events[k - 1]} to ${events[k]} (${((events[k] - events[k - 1]) / C.FPS).toFixed(1)}s; max 3s)`);
+  }
 }
 if (C.TOTAL_FRAMES % (C.BEAT_FRAMES / 2)) bad.push(`the ad ends at ${C.TOTAL_FRAMES}, not on an 8th`);
 
@@ -153,7 +169,7 @@ if (bad.length) {
   console.error('✗ ad todo:');
   for (const b of bad) console.error('    ' + b);
 } else {
-  console.log(`✓ ${caps.length} lines, no overlaps, ≤8 words on screen (hook 10); hook on screen from frame 0, voice by 0.5s, mark by ${(C.HITS.snap / C.FPS).toFixed(1)}s; ${C.TOTAL_SEC.toFixed(1)}s long`);
+  console.log(`✓ ${caps.length} lines, no overlaps, ≤8 words on screen; hook on screen from frame 0, voice by 0.5s, mark by ${(C.HITS.snap / C.FPS).toFixed(1)}s; something new every ≤3s; ${C.TOTAL_SEC.toFixed(1)}s long`);
   console.log(`✓ narrator mirrors every line inside the dwell rule; the tagline closes, held 1.6s+; no banned word, recipe, plan or Pro surface in captions, voice or ${take.count} captured frames`);
 }
 

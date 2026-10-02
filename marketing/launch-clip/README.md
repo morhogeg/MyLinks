@@ -750,21 +750,57 @@ that you tick off. Both features are free (up to 5 screenshots a card; "Do
 this"); the ad names no plan, says no price and no "free", and shows no Pro
 surface (no Daily Brew, no weekly recap).
 
-**28.5s** (856 frames). The brief aimed for 15 to 20s; with every beat kept,
-and the app at the kit's steady half speed, it would not breathe in less.
+**22.9s** (688 frames), round 3. Three features, pain to payoff, something
+new on screen at least every 3s (verify checks the pace), the app at its real
+speed except for the tick.
 
-| Frames | Beat | Line (burned in and spoken) |
+| Time | Picture | Line (spoken, and burned in) |
 |---|---|---|
-| 0–104 | **Hook.** A pile of screenshots, on frame 0 (the poster): the ad's invented carousel "How to ask for a raise" on top, a slide from a talk, a "Sunday reset" note and a packing list under it. They rush into one point; the brackets snap round it: the mark, at 3.5s | "Your camera roll is full of advice you never took." (on screen whole from frame 0; the voice starts at 0.33s) |
-| 104–232 | **Save.** The point drops onto the + (the reel's match cut) and Home irises open round it; + tapped; the real Add dialog, lifted off its screen: Image tab, the three slides picked ("Screens of one post, read in this order."), Save | "Save up to five screenshots as one card." (the Image tab's own "Up to 5 screenshots become one card") |
-| 216–400 | **Read.** The dialog drops away; the feed's own "Reading 3 screenshots…" card becomes the card; tapped open on the screenshots, the title and the gist, read down to the Key Points, which lift and are held to be read (the page creeps on a few points) | "It reads every slide for its key points." |
-| 400–488 | **The step.** (round 2) On down the card to its own "Do this", the step the analysis wrote, which lifts on "action," | "When a save calls for action," |
-| 488–576 | **Do this.** A cut on the beat to Revisit as its rows arrive: the same step now leads the to-do list, above The Tail End's and Mark Manson's; it lifts on "to-do" | "Machina turns it into a to-do." |
-| 576–672 | **Tick.** The ring is tapped on "tick": it fills with the accent and a check, the task strikes, holds ~650ms, the row folds (the shipped round-4 motion, frame for frame, at half speed); "Marked as done" with Undo is lifted off the bottom of the screen into the frame, over the new "Done 1" | "Then do it, and tick it off." |
-| 672–856 | **Close.** Thrown out into the kit's lockup: the mark strikes, the wordmark wipes in on "Machina", the tagline on one line, held 1.7s. Nothing under it: the slot for the App Store badge once the listing is live | "Machina." / "Everything you save, finally useful." |
+| 0.0–3.2s | **Hook, the pain.** Frame 0 is the poster: a pile of advice screenshots, "How to ask for a raise" on top. Three more land on it, one after another (the app's spring, a lift of light where each lands, a shutter click each); on "You never use it." the whole pile sinks grey. It rushes into one point and the brackets snap round it: the mark at 3.2s | "You screenshot the advice. You never use it." (whole on frame 0; the voice starts at 0.33s) |
+| 3.2–6.4s | **Feature 1, save.** The point drops onto the + and Home irises open round it; the real Add dialog, at real speed: Image, the three slides land, Save | "Save them to Machina instead." |
+| 6.4–10.4s | **Feature 2, read.** The feed's own "Reading 3 screenshots…" card becomes the card; tapped open; read down to the Key Points, which lift | "It reads every slide," / "and pulls out the key points." |
+| 10.4–12.8s | **Feature 3, the standout.** On down the card to its own "Do this", which lifts on "becomes"; on "to-do" a MATCH CUT: the step's words hold their place in the frame while the screen around them turns into Revisit's to-do list, where they are now the first task | "Then the advice becomes a to-do." |
+| 12.8–16.3s | **The payoff.** The ring is tapped on "Tick", and this beat alone plays at half speed: it fills with the accent and a check, the task strikes, holds, the row folds; "Marked as done" is lifted into the frame | "Do it. Tick it off." |
+| 16.3–22.9s | **CTA and close.** Thrown into the kit's lockup: "Download Machina." set in the caption band as it is said, held to the last frame; the mark strikes, the wordmark wipes in on "Machina", the tagline on one line, held 1.8s. Nothing under it (the slot for the App Store badge) | "Download Machina. Everything you save, finally useful." |
+
+**Round 3 (owner: "the pacing feels off and it doesn't grab attention";
+rewrite it as a scroll-stopping app promo that drives downloads, a hook in
+the first two seconds, each feature shown, one "I need this" moment, a clear
+call to download).**
+- **The three features**, picked from rounds 1–2 and ordered pain to payoff:
+  save screenshots in a tap; it reads them for the key points; the advice
+  becomes a to-do you tick off. Cut as secondary: the five-screenshot limit,
+  the gist, the Done list, "Not for me".
+- **The hook names the pain in the viewer's own act** ("You screenshot the
+  advice. You never use it.") and acts it out: screenshots landing, then
+  sinking. The first line was a statement about a camera roll; this one is
+  something the viewer did this week.
+- **The app plays at its real speed** (two captured 60fps frames per output
+  frame, `rate: 2` in `PLAY`), so it feels as quick as it is; rounds 1–2 played
+  everything at the kit's half speed. **The tick alone stays at half speed**:
+  the one moment the ad slows down for.
+- **The standout is a match cut**, the kit's same-pixels hand-over: the card's
+  lifted "Do this" and Revisit's lifted first task are put on the same frame
+  point at the same zoom (`CUT_FROM` / `CUT_TO` in `App.tsx`, computed from the
+  capture's boxes), so the words stay and the world changes. The cut is
+  framed 100px higher than the read-down, and Revisit's 54pt status bar is
+  cropped, so no "9:41" appears under the band in either shape.
+- **The call to action is said and shown**: "Download Machina." Then the
+  tagline closes the ad, as every film does (owner, 2026-09-28). There is
+  still no badge, no "available now", no "free" and no price. **This cut asks
+  people to download, so it must not be posted, paid or organic, before the
+  App Store listing is live.**
+- **Mix:** the hook's shutter clicks and landings, a riser that ends on the
+  match cut, and the tick's sparkle after "…tick it off." (it masked the line).
+  The standout line ducks the music to 0.45. Speech band: every line 3.6dB+
+  over the music.
+- **Gates:** every line is at most 8 words (the hook's exception is gone);
+  the close must be "Download Machina." then the tagline, exactly; and the
+  new pace gate fails any stretch over 3s with nothing new on screen before
+  the lockup.
 
 **Round 2 (owner: "maybe it needs to be a bit more detailed, with more
-info").** Inside the 30s limit (27.5 → 28.5s): the card is read on past its
+info"); superseded by round 3.** Inside the 30s limit (27.5 → 28.5s): the card is read on past its
 Key Points to its own "Do this", so the viewer sees where the to-do comes
 from before Revisit shows it as one (the take's read-down now ends there);
 the Key Points are held long enough to read; and two lines now carry facts
@@ -790,7 +826,7 @@ it. Checked on stills of every beat with the zones drawn
 **What is real and what is scripted.** Every pixel of app UI is the shipped
 web app (merged with `main` on 2026-10-02, so Revisit is the round-4 "Do
 this" with its Done list), captured as take `adTodo`. Scripted, in
-`capture/ad-todo.mjs`: the three slides and the three other screenshots (an
+`capture/ad-todo.mjs`: the three slides and the six other screenshots (an
 original typographic design made for the ad: no creator, no handle, no
 platform chrome, no third-party image; rendered by the capture browser and
 copied small into `public/ads/todo/hook/`); the card the backend returns for
@@ -836,13 +872,14 @@ in `shoot.mjs` and re-capture, as the clips' rule says.
 
 **The ad's gates** (`npm run verify`, on top of the clip rules): the hook is
 the first caption, whole on frame 0, its voice heard by 0.5s; the mark by
-~3.5s; at most 8 words on screen at once (the hook, the owner's 10-word line,
-is the one exception); the close is "Machina." and the tagline exactly, last,
-its final word landed 1.6s+ before the end; ≤ 30s; no "share sheet",
-"bookmarks", "free", a price, "App Store", "available" or a plan name in what
-the ad says; no recipe card, Pro surface or plan legible on any captured frame;
-the slides, the card and the tasks pass the same scan, and the card's "Do this"
-keeps rule 8; both mixes at −14 LUFS ±0.5, true peak ≤ −1 dBTP.
+~3.5s; at most 8 words on screen at once; until the lockup, something new on
+screen at least every 3s; the close is "Download Machina." then the tagline,
+exactly, last, its final word landed 1.6s+ before the end; ≤ 30s; no "share
+sheet", "bookmarks", "free", a price, "App Store", "available" or a plan name
+in what the ad says; no recipe card, Pro surface or plan legible on any
+captured frame; the screenshots, the card and the tasks pass the same scan,
+and the card's "Do this" keeps rule 8; both mixes at −14 LUFS ±0.5, true peak
+≤ −1 dBTP.
 
 **Not verified:** nobody has listened to either mix on speakers (measured
 only); the ad has not been through Meta's ad review; the app's font here is

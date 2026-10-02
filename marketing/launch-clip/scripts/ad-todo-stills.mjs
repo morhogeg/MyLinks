@@ -21,14 +21,14 @@ const BROWSER = '/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/head
 
 /** the review set, read off the timeline so it cannot go stale */
 export const REVIEW = [
-  0, 60, // the poster (frame 0), the pile under the hook
-  HITS.gather[1] + 2, HITS.snap + 12, // the point, the mark
-  HITS.iris[1] + 4, HITS.dialog + 18, HITS.pick + 22, HITS.saveTap - 2, // the +, the dialog, Image, the slides, Save
-  HITS.saveTap + 30, HITS.cardDone + 30, // "Reading 3 screenshots…", the card
-  HITS.cardTap + 32, HITS.keyPoints + 14, HITS.cardTodo + 16, // opened, the Key Points, the card's own "Do this"
-  HITS.revisit + 40, HITS.todoLift + 10, // "Do this", the task lifts
-  HITS.tick + 10, HITS.tick + 34, HITS.tick + 76, // the ring fills, struck, folded + toast
-  HITS.out + 12, HITS.markStrike + 60, TOTAL_FRAMES - 1, // thrown, the name, the tagline held
+  0, HITS.drops[0] + 4, HITS.drops[2] + 10, HITS.bleach + 14, // the poster, a screenshot landing, the pile, sunk grey
+  HITS.snap + 2, HITS.iris[0] + 8, // the mark, the point opening onto Home
+  HITS.dialog + 8, HITS.imageTap + 6, HITS.pick + 8, // the dialog, Image, the slides
+  HITS.saveTap + 16, HITS.cardDone + 8, // "Reading 3 screenshots…", the card
+  HITS.cardTap + 12, HITS.keyPoints + 12, // opened, the Key Points
+  HITS.cardTodo + 12, HITS.revisit - 1, HITS.revisit, HITS.revisit + 24, // the step lifts, THE MATCH CUT, the list
+  HITS.tick + 10, HITS.tick + 40, HITS.tick + 66, // the ring fills, struck, folded + toast
+  HITS.out + 12, HITS.markStrike + 30, TOTAL_FRAMES - 1, // thrown, "Download Machina.", the tagline held
 ];
 const args = process.argv.slice(2).map(Number).filter((n) => !Number.isNaN(n));
 const list = args.length ? args : REVIEW;

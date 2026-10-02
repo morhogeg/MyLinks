@@ -40,7 +40,7 @@ export const AdTodo: React.FC<{
       <Paper drift={Math.sin(f / 180) * 0.5} />
       <Hook f={f} />
       <App f={f} />
-      <End f={f} />
+      <End f={f} withCaptions={withCaptions} />
       {/* type never sits on UI: the app fades out under the caption band */}
       <BandScrim band={band} opacity={prog(f, HITS.iris[0], HITS.iris[1]) * (1 - prog(f, HITS.out + THROW_LEN - 8, HITS.out + THROW_LEN))} />
       <Captions

@@ -2720,6 +2720,24 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-02 — META AD 3, round 3: rewritten to stop the scroll and ask
+  for the download.** Branch `claude/ad-todo`. Owner: "the pacing feels off
+  and it doesn't grab attention"; rewrite it as an app promo built to drive
+  downloads. New script (22.9s, under the 30s ceiling): "You screenshot the
+  advice. You never use it." (screenshots land on the pile, then it sinks
+  grey; the mark at 3.2s) / "Save them to Machina instead." / "It reads every
+  slide," / "and pulls out the key points." / "Then the advice becomes a
+  to-do." (the standout: a match cut, the card's "Do this" holding its place
+  as the screen becomes Revisit's list) / "Do it. Tick it off." (the only
+  half-speed beat) / "Download Machina. Everything you save, finally useful."
+  The app now plays at its real speed everywhere else. **Verified:** `tsc`
+  clean; `npm run verify` exit 0 (gates now: 8 words max for every line,
+  something new on screen every ≤3s, the close "Download Machina." + the
+  tagline); stills of every beat in both shapes; both mixes −14.0 LUFS, every
+  line 3.6dB+ over the music in the speech band. **Open:** the cut says
+  "Download Machina.", so it must not be posted (paid or organic) before the
+  App Store listing is live; nobody has listened on speakers; not through
+  Meta's ad review; `takes.json` re-capture at merge.
 - **2026-10-02 — META AD 3, round 2: more detail.** Branch
   `claude/ad-todo`. Owner on the first cut: "a bit more detailed, with more
   info". Inside the 30s limit (27.5 → 28.5s): the card is now read on past

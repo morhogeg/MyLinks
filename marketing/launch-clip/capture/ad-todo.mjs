@@ -8,8 +8,9 @@
  *    handle, no platform chrome, no third-party image). Rendered to PNGs and
  *    picked in the Add dialog's real Image tab, which reads up to five
  *    screens of one post into one card, in order.
- *  - OTHERS: a few more screenshots for the hook's pile (a slide from a talk,
- *    a plain note, a packing list), same rules: invented, typographic only.
+ *  - OTHERS: more screenshots for the hook's pile (a slide from a talk, a
+ *    plain note, a packing list; round 3: three that land on it), same
+ *    rules: invented, typographic only.
  *  - RAISE_CARD: what the backend returns for the slides (functions
  *    ai_service.analyze_images: a gist, "## Key Points", tags, and a "Do
  *    this" only because the content calls for an action). The "Do this"
@@ -91,6 +92,10 @@ export const OTHERS = [
   plain('#FFF8D9', '#3B3418', `<h1>Sunday reset</h1><ul style="margin-top:22px"><li>Plan the week in 10 minutes</li><li>Clear the inbox to five</li><li>One call you keep putting off</li></ul>`),
   // a packing list
   plain('#E8F1EE', '#173A33', `<div class="k">Carry-on only</div><h1>Pack for four days. Wash once.</h1><p>Every top goes with every bottom.</p>`),
+  // (round 3) three more that land on the pile in the hook
+  plain('#EDE7FB', '#2E2457', `<div class="k">Tip 3 of 7</div><h1>Batch the small stuff.</h1><p>Errands, emails, calls: one block, once a day.</p>`),
+  plain('#FFE9E3', '#4A1F14', `<h1>Before you say yes</h1><ul style="margin-top:22px"><li>Does it move a goal forward?</li><li>Would I do it tomorrow?</li><li>What do I drop for it?</li></ul>`),
+  plain('#E6F0FA', '#12324F', `<div class="k">Note to self</div><h1>Leave room in the day.</h1><p>Plan most of it. The rest is for what comes up.</p>`),
 ];
 
 /** Render the slides and the others to PNGs (an iPhone's 3× screenshot). */
