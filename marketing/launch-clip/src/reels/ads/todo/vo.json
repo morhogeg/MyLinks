@@ -15,54 +15,40 @@
  },
  {
   "frame": 80,
-  "text": "Share it to Makeena instead.",
+  "text": "Share anything to Makeena.",
   "words": [
    0.04,
    0.336,
-   0.484,
-   0.632,
-   1.026
+   0.779,
+   0.927
   ]
  },
  {
   "frame": 136,
-  "text": "Screenshots, articles, posts, videos.",
+  "text": "From any app. Even screenshots.",
+  "words": [
+   0.09,
+   0.294,
+   0.456,
+   0.88,
+   1.174
+  ]
+ },
+ {
+  "frame": 208,
+  "text": "Analyzed, summarized, and linked to related saves.",
   "words": [
    0.05,
-   0.857,
-   1.478,
-   1.913
+   0.87,
+   1.78,
+   1.957,
+   2.266,
+   2.398,
+   2.751
   ]
  },
  {
-  "frame": 232,
-  "text": "A whole video, down to its key moments.",
-  "words": [
-   0.1,
-   0.2,
-   0.5,
-   1.11,
-   1.36,
-   1.51,
-   1.71,
-   1.91
-  ]
- },
- {
-  "frame": 328,
-  "text": "Sorted by topic, all on its own.",
-  "words": [
-   0.04,
-   0.464,
-   0.646,
-   1.27,
-   1.455,
-   1.594,
-   1.779
-  ]
- },
- {
-  "frame": 448,
+  "frame": 384,
   "text": "Download Makeena. Everything you save, finally useful.",
   "words": [
    0.09,

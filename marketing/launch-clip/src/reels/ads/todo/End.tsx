@@ -10,9 +10,8 @@ import { useShape } from './frame';
 /**
  * 6 CTA (round 3, owner: end on a clear, confident call to download). The
  * narrator says "Download Machina. Everything you save, finally useful.":
- *  - "Download Machina." is set in the caption band, the kit's line, as it is
- *    said, and stays to the last frame (the ask is on screen as long as the
- *    ad is);
+ *  - "Download Machina." is SAID; on screen it is set in the caption band
+ *    only if the caption allows it (`showFirstLine`; round 5: it does not);
  *  - the kit's lockup, unchanged (kit/Brand.tsx `Lockup`): the mark launches
  *    and strikes on the score's impact, the drawn wordmark wipes in as
  *    "Machina" is said, and the tagline arrives on the narrator's timing on
@@ -25,6 +24,9 @@ const LINE = CAPTIONS.find((c) => c.place === 'lockup')!;
 const timing = VO.find((v) => v.frame === LINE.at);
 const [CTA, TAGLINE] = LINE.text.split('\n');
 const CTA_WORDS = CTA.split(' ').length;
+/** (round 5, owner: "I don't want to see the words Download Machina": the
+ *  narrator still says them; the screen holds only the lockup) */
+const SHOW_CTA = (LINE as { showFirstLine?: boolean }).showFirstLine !== false;
 
 export const End: React.FC<{ f: number; withCaptions?: boolean }> = ({ f, withCaptions = true }) => {
   const { lockupTop, slots } = useShape();
@@ -33,7 +35,7 @@ export const End: React.FC<{ f: number; withCaptions?: boolean }> = ({ f, withCa
   const drift = prog(f, HITS.markStrike + 6, TOTAL_FRAMES, (t) => t);
   return (
     <AbsoluteFill style={{ alignItems: 'center' }}>
-      {withCaptions && (
+      {withCaptions && SHOW_CTA && (
         <div style={{ position: 'absolute', left: 0, right: 0, top: slots.top, display: 'flex', justifyContent: 'center' }}>
           <KineticLine
             text={CTA}

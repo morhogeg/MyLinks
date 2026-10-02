@@ -23,10 +23,10 @@ const BROWSER = '/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/head
 export const REVIEW = [
   0, 30, HITS.bleach + 20, // the poster, the saves, bleached
   HITS.gather[1] - 4, HITS.snap + 4, HITS.iris[0] + 8, // the gather, the mark, the iris
-  ...HITS.lands.map((l) => l + 14), // each save landed
-  HITS.cardTap + 20, HITS.moments + 24, // the video opened, its Key moments lifted
-  HITS.list + 4, HITS.rows + 30, // the list, the new rows lifted
-  HITS.out + 12, HITS.markStrike + 30, TOTAL_FRAMES - 1, // thrown, "Download Machina.", the tagline held
+  ...HITS.lands.map((l) => l + 12), // each save landed
+  HITS.glide[0] + 24, HITS.glide[1] - 8, // the glide down the summarized feed
+  HITS.graph + 2, HITS.graph + 20, HITS.out - 4, // the cut into the lit cluster, its zoom, the hold
+  HITS.out + 12, HITS.markStrike + 30, TOTAL_FRAMES - 1, // thrown, the name, the tagline held
 ];
 const args = process.argv.slice(2).map(Number).filter((n) => !Number.isNaN(n));
 const list = args.length ? args : REVIEW;

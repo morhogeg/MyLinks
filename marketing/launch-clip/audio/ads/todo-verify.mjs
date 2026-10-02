@@ -81,7 +81,9 @@ caps.forEach((c, i) => {
   // two lines ("Download Machina." in the band, the tagline in the lockup)
   // are on screen together, so they count together
   const max = 8;
-  const n = words(c.text);
+  // (round 5: the close's first line, "Download Machina.", is said but not
+  // shown: `showFirstLine: false`)
+  const n = c.place === 'lockup' && c.showFirstLine === false ? words(c.text.split('\n').slice(-1)[0]) : words(c.text);
   if (n > max) bad.push(`"${c.text}" puts ${n} words on screen (max ${max})`);
 });
 // the first second
@@ -134,7 +136,7 @@ for (const c of caps) if (c !== close && /finally useful/i.test(c.text)) bad.pus
 
 // ── the grid
 const H = C.HITS;
-for (const k of ['snap', 'cardTap', 'moments', 'list', 'rows', 'out', 'markStrike']) {
+for (const k of ['snap', 'graph', 'out', 'markStrike']) {
   if (H[k] % (C.BEAT_FRAMES / 2)) bad.push(`${k} at ${H[k]} is not on an 8th`);
 }
 // (round 3, owner: "a new visual or cut every two to three seconds") until
@@ -153,15 +155,16 @@ const takes = JSON.parse(read('src/reels/data/takes.json'));
 const take = takes[C.TAKE];
 if (!take) bad.push(`no take "${C.TAKE}" in takes.json: run \`CAPTURE_ONLY=${C.TAKE} npm run reel:capture\``);
 else take.frames.forEach((fr, i) => fr.t.forEach((k) => scan(`the app on ${C.TAKE} frame ${i}`, take.texts[k], SHOWN)));
-for (const m of ['home', ...C.LANDS.map((k) => `${k}Land`), 'landed', 'open', 'list']) if (take && take.marks[m] === undefined) bad.push(`take ${C.TAKE} has no mark ${m}`);
-// the capture material the ad seeds (capture/ad-todo.mjs): the four saves
+for (const m of ['home', ...C.LANDS.map((k) => `${k}Land`), 'landed', 'glide', 'graph', 'graphSettled', 'cluster', 'clusterSettled']) if (take && take.marks[m] === undefined) bad.push(`take ${C.TAKE} has no mark ${m}`);
+// the capture material the ad seeds (capture/ad-todo.mjs): the new saves
+// and their links
 {
   const M = await import('../../capture/ad-todo.mjs');
-  const L = await import('../../capture/library.mjs');
-  const piranesi = L.CARDS.find((c) => c.id === 'piranesi');
-  for (const { key, doc } of M.sourceCards('x', piranesi)) {
+  for (const { key, doc } of M.sourceCards('x')) {
+    if (!doc) continue;
     for (const v of [doc.title, doc.summary, doc.detailedSummary ?? '', ...(doc.tags ?? []), ...(doc.metadata?.videoHighlights ?? [])]) scan(`the ${key} save`, v, SHOWN);
   }
+  for (const [, , reason] of M.LINKS) scan('a link reason', reason, SHOWN);
 }
 
 if (bad.length) {

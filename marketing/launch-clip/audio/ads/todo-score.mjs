@@ -3,12 +3,14 @@
  * its own arrangement on the ad's clock (clips/ad-todo-timeline.mjs: 112.5
  * BPM, 16 frames a beat, OUTPUT frames).
  *
- * Round 4 ("save anything, and Machina makes sense of it"). A feed ad starts
- * mid-scroll, so the music is already playing on frame 0. The saves bleach on
- * a falling whoosh and rush into the mark (whooshes, the impact, the snap);
- * the band comes in as the app opens and each save lands with a soft thud
- * under its word; a riser ends on the cut to the list; the band drops out for
- * the lockup, so the mark strikes into air under "Download Machina." The
+ * Round 5 (the owner's approved script: save from anywhere; analyzed,
+ * summarized, linked). A feed ad starts mid-scroll, so the music is already
+ * playing on frame 0. The saves bleach on a falling whoosh and rush into the
+ * mark (whooshes, the impact, the snap); the band comes in as the app opens
+ * and each save lands with a soft thud under its word; the feed glides on a
+ * long whoosh; a riser ends on the cut to the lit cluster, and once "…related
+ * saves." has landed, a shimmer; the band drops out
+ * for the lockup, so the mark strikes into air under "Download Machina." The
  * kit's rules: one chord a bar, risers END on the reveal they lead into, a tap
  * is a tick on the frame the app responds, nothing pitched sounds on a word
  * the narrator has to land (notes and shimmers sit in the gaps).
@@ -39,7 +41,7 @@ const CHORDS = {
 
 const BARS = Math.ceil(TOTAL_FRAMES / BAR_FRAMES);
 /** how much of the band plays, per bar */
-const DENSITY = [0.34, 0.4, 0.58, 0.62, 0.66, 0.68, 0.7, 0.42, 0.34, 0.3];
+const DENSITY = [0.34, 0.42, 0.6, 0.64, 0.68, 0.62, 0.4, 0.34, 0.3];
 const LOCKUP = s(HITS.out);
 
 for (let bar = 0; bar < BARS; bar++) {
@@ -100,9 +102,9 @@ for (const m of [48, 64, 67, 72]) pad(LOCKUP, TOTAL_SEC - LOCKUP - 0.1, m, 0.08,
 // never on a word
 const MELODY = [
   // [frame, midi, level?]
-  [212, 67], [220, 72], // after "…posts, videos."
-  [306, 69], [314, 72], // after "…its key moments."
-  [392, 76], [400, 79], // after "…all on its own."
+  [124, 72], // after "…to Machina."
+  [196, 67], [202, 72], // after "…Even screenshots."
+  [312, 76], [320, 79], [328, 84], // after "…related saves.", the cluster lit
   // home: C as the mark draws, G after the last word
   [HITS.markStrike - 8, 72, 0.17], [TOTAL_FRAMES - 44, 79, 0.17],
 ];
@@ -127,12 +129,13 @@ for (const [k, l] of H.lands.entries()) {
   sub(s(l + 2), 40 + k * 2, 0.16, 0.22);
   tick(s(l + 2), 0.05, 0.8 + k * 0.1);
 }
-// the video's card, tapped and opened
-tick(s(H.cardTap), 0.09, 1.25);
-whoosh(s(H.cardTap) + 0.05, 0.3, 0.045, -0.15);
-shimmer(s(H.moments + 26), [76, 79, 84], 0.035); // after "…key moments."
-// the cut to the list (the riser ends on it)
-sub(s(H.list), 48, 0.2, 0.4);
+// the feed glides
+whoosh(s(H.glide[0]) + 0.05, 1.8, 0.035, 0.1);
+// the cut to the graph (the riser ends on it)
+sub(s(H.graph), 48, 0.2, 0.4);
+// the cluster lit: a shimmer once "…related saves." has landed
+whoosh(s(H.graph) + 0.05, 0.6, 0.04, -0.1);
+shimmer(s(304), [79, 84, 88, 91], 0.045);
 // thrown out; the mark strikes into air
 whoosh(s(H.out) - 0.1, 0.6, 0.09, 0);
 impact(s(H.markStrike), 0.34);

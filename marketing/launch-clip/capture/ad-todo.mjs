@@ -1,26 +1,22 @@
 /**
  * Meta ad 3's capture material (the take itself is `adTodo` in shoot.mjs).
- * Round 4 (owner: "why are we focusing on advice? Machina saves articles,
- * YouTube videos, Instagram posts, any post, screenshots, and they are saved,
- * categorized, analyzed and summarized: focus on that"). Everything the app
- * shows is the app; what stands in for the outside world and the backend is
- * here:
+ * Round 5 (owner-approved script: "Share anything to Machina." / "From any
+ * app. Even screenshots." / "Analyzed, summarized, and linked to related
+ * saves."). Everything the app shows is the app; what stands in for the
+ * outside world and the backend is here:
  *
- *  - SOURCES: four saves of four kinds, each written the way the backend
- *    writes that kind, landing at the top of the feed one after another:
- *     - a SCREENSHOT: the demo account's own "Read Piranesi, and go in blind"
- *       (library.mjs), re-saved now;
- *     - an ARTICLE: Mark Manson's "The Most Important Question of Your Life",
- *       a real essay, Key Points true to it (owner, 2026-10-01);
- *     - an INSTAGRAM post whose photo is a text graphic (drawn here,
- *       renderPost; invented handle, the demo's @slowcoasts; no third-party
- *       image), read from its caption AND its photo;
+ *  - SOURCES: four saves from four places, landing at the top of the feed one
+ *    after another, the screenshot last (on "Even screenshots"):
  *     - a YOUTUBE video: the app's own output for a real video, copied from
- *       the owner's phone (2026-09-29, the SAVE clip's card): title, channel,
- *       category, gist and the four Key moments with their timestamps,
- *       verbatim. `videoId` is a stand-in (the card hides its thumbnail and
- *       nothing plays). Video key moments are a Pro feature: the ad names no
- *       plan and never says "free".
+ *       the owner's phone (2026-09-29, the SAVE clip's card), verbatim.
+ *       `videoId` is a stand-in (the card hides its thumbnail; nothing plays);
+ *     - an INSTAGRAM post whose photo is a text graphic (drawn here,
+ *       renderPost; the demo's invented @slowcoasts; no third-party image);
+ *     - an ARTICLE and a SCREENSHOT: the demo account's own cards (Mark
+ *       Manson's essay, "Read Piranesi, and go in blind"), RE-SAVED: the take
+ *       moves them to the top with their links intact.
+ *  - LINKS: the two new saves' related saves, both ways, each with the reason
+ *    the app shows (the graph draws them).
  *  - HIDDEN: taken out of the take's store: the recipe cards and their
  *    collection (owner, 2026-10-02), and, for Meta's ad review, the money and
  *    workout cards. No Daily Brew or weekly recap is seeded.
@@ -73,71 +69,9 @@ const card = (c) => ({
   ...c,
 });
 
-/** the four saves, in the order they land (the last lands on top) */
-export const sourceCards = (postUrl, piranesi) => [
-  {
-    key: 'screenshot',
-    id: 'piranesi',
-    doc: card({
-      url: piranesi.url,
-      title: piranesi.title,
-      summary: piranesi.summary,
-      category: piranesi.category,
-      tags: piranesi.tags,
-      concepts: piranesi.concepts,
-      sourceType: piranesi.sourceType,
-      sourceName: piranesi.sourceName,
-      note: piranesi.note,
-      metadata: { originalTitle: piranesi.title, estimatedReadTime: piranesi.readTime },
-    }),
-  },
-  {
-    key: 'article',
-    id: 'src-article',
-    doc: card({
-      url: 'https://markmanson.net/question',
-      title: 'The Most Important Question of Your Life',
-      summary:
-        'Everybody wants the rewards. Mark Manson argues the question that shapes a life is **what pain you are willing to sustain**: choose the struggle you can live with, and the result follows.',
-      detailedSummary: [
-        '## Key Points',
-        '- Wanting the good things (the job, the body, the relationship) is universal, so it says little about you.',
-        '- The better question: what struggle do you want, and what pain are you willing to keep choosing?',
-        '- The people who get the result are the ones who enjoy the work it takes.',
-        '- Wanting the reward without the struggle keeps you wanting it.',
-      ].join('\n'),
-      category: 'Psychology',
-      tags: ['motivation', 'purpose', 'habits'],
-      concepts: ['motivation', 'purpose'],
-      sourceType: 'web',
-      sourceName: 'Mark Manson',
-      metadata: { originalTitle: 'The Most Important Question of Your Life', estimatedReadTime: 8 },
-    }),
-  },
-  {
-    key: 'instagram',
-    id: 'src-instagram',
-    doc: card({
-      url: 'https://www.instagram.com/p/slowcoasts-carry-on/',
-      title: 'One week, one small bag',
-      summary:
-        'A carry-on packing system from the post and its caption: pack for **four days and wash once**, choose clothes that all mix, wear the bulkiest layers on the plane, and decant liquids into 100 ml bottles.',
-      detailedSummary: [
-        '## Key Points',
-        '- Pack for four days and do one wash, however long the trip.',
-        '- Every top should go with every bottom.',
-        '- Wear the heaviest shoes and jacket on the plane.',
-        '- The caption adds: roll clothes, and keep one outfit in your personal bag.',
-      ].join('\n'),
-      category: 'Travel',
-      tags: ['packing', 'carry-on', 'travel tips'],
-      concepts: ['travel', 'packing'],
-      sourceType: 'web',
-      sourceName: '@slowcoasts',
-      hideThumbnail: false,
-      metadata: { originalTitle: 'One week, one small bag', estimatedReadTime: 1, thumbnailUrl: postUrl },
-    }),
-  },
+/** the four saves, in the order they land (the last lands on top). `reuse`:
+ *  a card the demo account already has, re-saved (its doc is kept) */
+export const sourceCards = (postUrl) => [
   {
     key: 'youtube',
     id: 'src-youtube',
@@ -172,6 +106,41 @@ export const sourceCards = (postUrl, piranesi) => [
       },
     }),
   },
+  {
+    key: 'instagram',
+    id: 'src-instagram',
+    doc: card({
+      url: 'https://www.instagram.com/p/slowcoasts-carry-on/',
+      title: 'One week, one small bag',
+      summary:
+        'A carry-on packing system from the post and its caption: pack for **four days and wash once**, choose clothes that all mix, wear the bulkiest layers on the plane, and decant liquids into 100 ml bottles.',
+      detailedSummary: [
+        '## Key Points',
+        '- Pack for four days and do one wash, however long the trip.',
+        '- Every top should go with every bottom.',
+        '- Wear the heaviest shoes and jacket on the plane.',
+        '- The caption adds: roll clothes, and keep one outfit in your personal bag.',
+      ].join('\n'),
+      category: 'Travel',
+      tags: ['packing', 'carry-on', 'travel tips'],
+      concepts: ['travel', 'packing'],
+      sourceType: 'web',
+      sourceName: '@slowcoasts',
+      hideThumbnail: false,
+      metadata: { originalTitle: 'One week, one small bag', estimatedReadTime: 1, thumbnailUrl: postUrl },
+    }),
+  },
+  { key: 'article', id: 'question', reuse: true },
+  { key: 'screenshot', id: 'piranesi', reuse: true },
+];
+
+/** the new saves' related saves, drawn both ways: [new, demo card, reason,
+ *  common concepts] */
+export const LINKS = [
+  ['src-youtube', 'procrastinator', 'Why the easy thing wins over the thing you meant to do.', ['attention', 'habits']],
+  ['src-youtube', 'systems', 'Habits that run on autopilot, and how to change them.', ['habits']],
+  ['src-instagram', 'goloritze', 'The same traveller, the same way of travelling.', ['travel']],
+  ['src-instagram', 'tmb', 'Packing light for days on the move.', ['travel', 'packing']],
 ];
 
 /** taken out of the take's store: the recipe cards (owner, 2026-10-02: no

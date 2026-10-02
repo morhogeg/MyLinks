@@ -585,28 +585,33 @@ const takes = {
   },
 
   // ─────────────────────────────────────────────────────────── adTodo
-  // Meta ad 3 (clips/ad-todo-timeline.mjs), round 4: "save anything, and it
-  // is summarized and sorted". Four saves of four kinds land at the top of
-  // the feed one after another (a screenshot, an article, an Instagram post,
-  // a YouTube video: capture/ad-todo.mjs); the video's card is opened and
-  // read down to its Key moments; then the feed as a list, every save with
-  // its source and its topic. Rolls at 60fps. No recipe, money or workout
-  // card is in the store, and no Pro surface is seeded.
+  // Meta ad 3 (clips/ad-todo-timeline.mjs), round 5: "Share anything to
+  // Machina. From any app. Even screenshots. Analyzed, summarized, and linked
+  // to related saves." Four saves from four places land at the top of the
+  // feed (a YouTube video, an Instagram post, an article, a screenshot:
+  // capture/ad-todo.mjs); the feed is glided down, every card summarized;
+  // then the Graph view lays itself out, the saves linked. Rolls at 60fps. No
+  // recipe, money or workout card is in the store, and no Pro surface is
+  // seeded.
   async adTodo() {
     const shotsDir = path.join(here, '..', 'out', 'capture', 'app', 'out', AD_TODO.SHOTS_DIR);
     await AD_TODO.renderPost(dev.browser, shotsDir);
     const postUrl = `${server.url}/${AD_TODO.SHOTS_DIR}/post-1.png`;
-    const piranesi = CARDS.find((c) => c.id === 'piranesi');
-    const sources = AD_TODO.sourceCards(postUrl, piranesi);
+    const sources = AD_TODO.sourceCards(postUrl);
     await fresh(async () => {
       await page.evaluate(
-        ([uid, hidden, hiddenCols, landing]) => {
+        ([uid, hidden, hiddenCols]) => {
           for (const p of window.__capture.list(`users/${uid}/digests/`)) window.__capture.remove(p);
           for (const p of window.__capture.list(`users/${uid}/syntheses/`)) window.__capture.remove(p);
-          for (const id of [...hidden, ...landing]) window.__capture.remove(`users/${uid}/links/${id}`);
+          for (const id of hidden) window.__capture.remove(`users/${uid}/links/${id}`);
           for (const id of hiddenCols) window.__capture.remove(`users/${uid}/collections/${id}`);
+          // (the hidden cards leave no dangling links behind)
+          for (const p of window.__capture.list(`users/${uid}/links/`)) {
+            const cur = window.__capture.get(p);
+            if (cur?.relatedLinks) window.__capture.set(p, { ...cur, relatedLinks: cur.relatedLinks.filter((r) => !hidden.includes(r.id)) });
+          }
         },
-        [UID, AD_TODO.HIDDEN, AD_TODO.HIDDEN_COLLECTIONS, sources.map((x) => x.id)],
+        [UID, AD_TODO.HIDDEN, AD_TODO.HIDDEN_COLLECTIONS],
       );
     });
     const t = new Take(dev, OUT, 'adTodo');
@@ -614,53 +619,77 @@ const takes = {
     t.mark('home');
     await t.snap({ rects: { firstCard: R.firstCard } });
 
-    // the four saves land at the top of the feed, one after another
-    for (const { key, id, doc } of sources) {
+    // the four saves land at the top of the feed, one after another (a
+    // re-saved card keeps its doc and its links; a new one brings its links)
+    const linksOf = (id) =>
+      AD_TODO.LINKS.filter(([a]) => a === id).map(([, b, reason, common], k) => ({
+        id: b,
+        title: CARDS.find((c) => c.id === b).title,
+        reason,
+        similarity: 0.86 - k * 0.03,
+        commonConcepts: common,
+      }));
+    for (const { key, id, doc, reuse } of sources) {
       await t.freeze();
-      await page.evaluate(([p, d]) => window.__capture.set(p, { ...d, createdAt: Date.now() }), [linkPath(id), doc]);
+      await page.evaluate(
+        ([p, d, reuse, links]) => {
+          const cur = window.__capture.get(p);
+          window.__capture.set(p, reuse ? { ...cur, createdAt: Date.now() } : { ...d, relatedLinks: links, createdAt: Date.now() });
+        },
+        [linkPath(id), doc ?? null, !!reuse, linksOf(id)],
+      );
       t.mark(`${key}Land`);
       await t.roll(36, { rects: { firstCard: R.firstCard }, step: F60 });
       await t.thaw();
       await page.waitForTimeout(500);
     }
+    // …and their related saves link back to them (the app links both ways)
+    await page.evaluate(
+      ([uid, links]) => {
+        for (const [a, b, reason, common] of links) {
+          const p = `users/${uid}/links/${b}`;
+          const cur = window.__capture.get(p);
+          const title = window.__capture.get(`users/${uid}/links/${a}`)?.title;
+          if (cur) window.__capture.set(p, { ...cur, relatedLinks: [...(cur.relatedLinks ?? []), { id: a, title, reason, similarity: 0.84, commonConcepts: common }] });
+        }
+      },
+      [UID, AD_TODO.LINKS],
+    );
+    await page.waitForTimeout(500);
     t.mark('landed');
     await t.snap({ rects: { firstCard: R.firstCard } });
 
-    // the video's card, opened, read down to its Key moments
-    const DETAIL = {
-      title: ['h2', 'How to overcome your addiction'],
-      gist: ['p,div', 'hijack the brain'],
-      moments: ['div', 'Explains that dopamine'],
-      moment1: ['li', '2:24'],
-      moment2: ['li', '6:44'],
-      moment3: ['li', '19:20'],
-      moment4: ['li', '26:20'],
-      keyPoints: ['h1,h2,h3,h4', 'Key Points'],
-    };
+    // the feed, glided down: every save already summarized
     await t.freeze();
-    await visible(page.locator(R.firstCard[0]).first()).click({ position: { x: 120, y: 40 } });
-    t.mark('open');
-    await t.roll(40, { rects: DETAIL, step: F60 });
+    await tagScroller('How to overcome your addiction');
+    t.mark('glide');
+    await rollScroll(t, 1500, 4, { firstCard: R.firstCard });
     await t.thaw();
-    await page.waitForTimeout(500);
-    await t.freeze();
-    await tagScroller('Explains that dopamine');
-    t.mark('scroll');
-    await rollScroll(t, await scrollTargetFor('Suggests turning off color', 700), 4, DETAIL);
-    await t.thaw();
+    await page.evaluate(() => document.querySelector('[data-capture-scroller]')?.scrollTo({ top: 0, behavior: 'instant' }));
+    await page.waitForTimeout(400);
 
-    // back to the feed, shown as a list: every save with its source and topic
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(900);
+    // the Graph view: every save, linked to the ones it relates to
     await visible(page.locator('button[aria-label^="View:"]')).click();
-    await page.waitForTimeout(600);
-    await page.locator('[role=radio]', { hasText: 'List' }).first().click();
-    await page.waitForTimeout(1200);
-    const LIST = Object.fromEntries(
-      [...sources.map((x) => [x.key, x.doc.title]), ['tailend', 'The Tail End'], ['weeks', 'Four Thousand Weeks']].map(([k, title]) => [k, ['div.surface-card', title]]),
-    );
-    t.mark('list');
-    await t.snap({ rects: LIST });
+    await page.waitForTimeout(700);
+    await t.freeze();
+    await page.locator('[role=radio]', { hasText: 'Graph' }).first().click();
+    t.mark('graph');
+    await t.roll(150, { rects: { canvas: ['canvas'] }, step: F60 });
+    await t.thaw();
+    await page.waitForTimeout(1500);
+    t.mark('graphSettled');
+    await t.snap({ rects: { canvas: ['canvas'], chip: ['button[aria-pressed]', 'time'] } });
+
+    // its largest cluster, tapped: the saves it links light up together, the
+    // links between them drawn in colour (the app's own cluster focus)
+    await t.freeze();
+    await visible(page.locator('button[aria-pressed]', { hasText: 'time' })).click();
+    t.mark('cluster');
+    await t.roll(60, { rects: { canvas: ['canvas'], chip: ['button[aria-pressed]', 'time'] }, step: F60 });
+    await t.thaw();
+    await page.waitForTimeout(800);
+    t.mark('clusterSettled');
+    await t.snap({ rects: { canvas: ['canvas'] } });
     return t.save();
   },
 

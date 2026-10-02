@@ -2720,6 +2720,23 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-02 — META AD 3, round 5: the owner's script, every place,
+  nothing singled out.** Branch `claude/ad-todo`. Owner on round 4: it is
+  about saving from all places, so a video-first beat "sounds weird"; replace
+  "categorized" with linked to related saves; never show "Download Machina."
+  Approved script (18.1s): "You save it. You never see it again." / "Share
+  anything to Machina." / "From any app. Even screenshots." (a video, a post,
+  an article and a screenshot land in the feed) / "Analyzed, summarized, and
+  linked to related saves." (a glide down the summarized feed, then the Graph
+  view zooming onto a lit cluster) / "Download Machina. Everything you save,
+  finally useful." (the first sentence spoken only). Take re-shot (733
+  frames): the article and screenshot are the demo's own cards re-saved (no
+  duplicate Manson card), the two new saves carry real links both ways.
+  **Verified:** `tsc` clean; `npm run verify` exit 0; stills of every beat in
+  both shapes; both mixes −14.0 LUFS, every line 5.7dB+ over the music in the
+  speech band. **Open:** must not be posted before the App Store listing is
+  live (the narrator says "Download Machina."); nobody has listened on
+  speakers; not through Meta's ad review; `takes.json` re-capture at merge.
 - **2026-10-02 — META AD 3, round 4: "save anything", the to-do story
   dropped.** Branch `claude/ad-todo`. Owner: "why are we focusing on advice?
   It sounds absurd. Machina saves articles, YouTube videos, Instagram posts,
