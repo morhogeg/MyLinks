@@ -5,13 +5,13 @@
 
 import { Fragment, useState, useEffect, useRef, useMemo, useCallback, cloneElement, type ReactElement } from 'react';
 import { Link, Collection, WeeklySynthesis, CuratedDigest, DigestCardRef, UserNote } from '@/lib/types';
-import { getColorStyleByKey, getCategoryColorStyle } from '@/lib/colors';
+import { getColorStyleByKey, getCategoryColorStyle, assignCategoryColors } from '@/lib/colors';
 import { platformIcon, platformColor, type PlatformKey } from '@/lib/platform';
 import DigestView from './DigestView';
 import DigestCard from './DigestCard';
 import Dropdown from './Dropdown';
-import { deleteLink, updateLinkReminder, markLinkReviewed, markTakeawayDone, toLink } from '@/lib/storage';
-import { openTakeaways } from '@/lib/takeaway';
+import { deleteLink, updateLinkReminder, markLinkReviewed, markTakeawayDone, markTakeawayDismissed, toLink } from '@/lib/storage';
+import { closedTakeaways, isTakeawayDismissed, isTakeawayDone, openTakeaways } from '@/lib/takeaway';
 import { track } from '@/lib/analytics';
 import { collection, onSnapshot, doc, getDoc, updateDoc, arrayUnion, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -195,6 +195,10 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // LIVE query in — literal matching is instant per keystroke; the semantic
     // ids arrive debounced and append below the literal tiers.
     } = useFeedFilters(visibleLinks, searchQuery, libraryLinks, privateCollectionIds, semanticIds);
+    // Give each of this library's categories its own color (lib/colors, G2c)
+    // BEFORE the children render, so every chip, dot and graph node reads the
+    // same assignment. Sticky per device: a new save never recolors the rest.
+    useMemo(() => assignCategoryColors(visibleLinks.map((l) => l.category)), [visibleLinks]);
     // Where the literal hits end and the meaning-only hits begin. useFeedFilters
     // sorts literal matches first and meaning-only ones last, so the boundary is
     // one index — but ONLY under the default sort, the only one that tiers by
@@ -1141,6 +1145,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // open. Derived from visibleLinks for the same reason the reminders are:
     // a locked private card must never surface a line of its content here.
     const takeawayCards = useMemo(() => openTakeaways(visibleLinks), [visibleLinks]);
+    const closedTakeawayCards = useMemo(() => closedTakeaways(visibleLinks), [visibleLinks]);
 
     // Ticking a takeaway off is one field on the card (lib/storage). The live
     // subscription carries it back, so the row leaves the list on its own. The
@@ -1161,6 +1166,43 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
             },
             () => { toast.error('Could not save that. Try again.'); },
         );
+    }, [uid, toast]);
+
+    // "Not for me" (a swipe in Revisit): the row leaves the list without
+    // counting as done. Same toast beat as done, so Undo is one tap away.
+    const dismissTakeaway = useCallback((link: Link) => {
+        if (!uid) return;
+        markTakeawayDismissed(uid, link.id, true).then(
+            () => {
+                track('takeaway_dismissed');
+                toast.success('Removed from Do this', {
+                    label: 'Undo',
+                    onClick: () => { void markTakeawayDismissed(uid, link.id, false); },
+                });
+            },
+            () => { toast.error('Could not save that. Try again.'); },
+        );
+    }, [uid, toast]);
+
+    // Revisit's Done list: put a done or "Not for me" task back on the list.
+    // Clears whichever marker the card carries (both, if both are set).
+    const reopenTakeaway = useCallback((link: Link) => {
+        if (!uid) return;
+        const writes: Promise<void>[] = [];
+        if (isTakeawayDone(link)) writes.push(markTakeawayDone(uid, link.id, false));
+        if (isTakeawayDismissed(link)) writes.push(markTakeawayDismissed(uid, link.id, false));
+        Promise.all(writes).then(
+            () => { track('takeaway_reopened'); },
+            () => { toast.error('Could not save that. Try again.'); },
+        );
+    }, [uid, toast]);
+
+    // The card detail's "Not for me" label puts the task back on the list.
+    const restoreTakeaway = useCallback((link: Link) => {
+        if (!uid) return;
+        markTakeawayDismissed(uid, link.id, false).catch(() => {
+            toast.error('Could not save that. Try again.');
+        });
     }, [uid, toast]);
 
     // "Done" on a due card: stop a still-pending reminder from coming back, and
@@ -2066,6 +2108,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
             takeawayCards={takeawayCards}
             onOpenTakeawayCard={openLinkDetails}
             onCompleteTakeaway={completeTakeaway}
+            onDismissTakeaway={dismissTakeaway}
+            closedTakeawayCards={closedTakeawayCards}
+            onReopenTakeaway={reopenTakeaway}
         />
     );
 
@@ -3609,6 +3654,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                     allCategories={categories}
                     uid={uid}
                     onToggleTakeawayDone={completeTakeaway}
+                    onRestoreTakeaway={restoreTakeaway}
                     isOpen={!!activeLink}
                     onClose={closeActiveLinkStack}
                     onBack={goBackOrClose}

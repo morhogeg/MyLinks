@@ -1886,6 +1886,19 @@ G2. **[ ] Graph next levers (from the round-3 product pass):** (a) search/
     age) to show how knowledge grew; (d) cluster-level "synthesize this"
     (reuse M12 machinery scoped to a cluster's cards). Build in this order —
     each is independent.
+    **(e) [x] Cluster chips (2026-10-01):** the chip row above the canvas
+    now names the captioned clusters (biggest first, count, dot = the
+    island's most common category color) instead of categories; a chip tap
+    = a caption tap (spotlight + frame + "Cards in this cluster" panel), tap
+    again clears. Category filtering still lives in the library filter
+    sheet, which scopes the graph.
+
+G2c. **[x] Category colors collide — FIXED 2026-10-02** (per-library
+    assignment in `lib/colors.ts`, see §9). Original report: `getCategoryColorStyle` (`lib/colors.ts`)
+    picks a color by string hash mod the palette size, so two categories can
+    share a color (owner screenshot 2026-10-01: Tech and Health both orange
+    in the graph). Fix: assign distinct colors per user's category set
+    (stable order, hash only as the tiebreak), used everywhere the dot shows.
 
 G2b. **[x] Screenshot cards name who posted them (2026-09-08).** A screenshot
     of a post used to read "Screenshot" as its source. The vision pass now
@@ -2633,6 +2646,167 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-10-02 — Category colors no longer collide (G2c) + Revisit "Done"
+  list + whole tasks.** Branch `claude/revisit-done-and-colors`. Owner on
+  build 1344: should Do this be color-coded like the list view, and can done
+  items be seen? **Colors (decision):** not the list view's stripe/chip yet;
+  the real defect was that colors didn't distinguish categories (Tech/Health
+  both orange, Career/Travel both red: `getCategoryColorStyle` was a name
+  hash mod 10). Now each of the library's categories gets its own slot:
+  `assignCategoryColors` (called by Feed during render with every visible
+  card's category, before children paint) gives new categories the next free
+  slot in a hue-spread order (blue, orange, green, pink, yellow, teal, red,
+  indigo, cyan; most-used first; graphite last; past 10 categories they share
+  by hash). Sticky per device in localStorage `machina.categoryColors.v1`, so
+  a new save never recolors the library; case-insensitive keys; a stored
+  collision is repaired in favor of the more-used category. Every existing
+  call site (cards, list, chips, filters, graph, Revisit dots) picks it up
+  unchanged. Landing page + onboarding mocks use the new
+  `getStaticCategoryColorStyle` (pure hash) so SSR/signed-out renders stay
+  identical. **Known limits:** colors are per device (web vs phone can
+  differ; syncing would need a user-doc field + rules allowlist entry); a
+  server-rendered page using the per-library function would hydrate with
+  hash colors (React doesn't patch style attrs), which is why the static
+  variant exists, and why Feed's client-only render is fine. **Done list
+  (reverses the 2026-09-11 "no aggregated done list" call, owner asked):**
+  under the open tasks, a collapsed "Done N" toggle lists done and "Not for
+  me" takeaways most recently closed first (`lib/takeaway closedTakeaways`,
+  `takeawayClosedAt`), newest 10 then "Show all"; done rows keep the filled
+  check + strike, skipped rows show the slash and "· Not for me"; tapping the
+  mark puts the task back (Feed `reopenTakeaway` clears whichever marker is
+  set; analytics `takeaway_reopened`), tapping the text opens the card. The
+  Do this section now also shows when every task is closed ("All done. New
+  tasks arrive with your saves."). **Whole tasks:** the 4-line clamp is gone
+  (owner's 1344 screenshot still cut two older long tasks). **Verified:**
+  tsc 0; eslint clean on touched files except a pre-existing
+  `react-hooks/set-state-in-effect` error in `landing/parts.tsx` (present on
+  main); `test:colors` 4/4 (new), `test:takeaway` 5/5. Rendered via a
+  throwaway harness (client-only; deleted with its `PUBLIC_ROUTES` edit) at
+  390px light + dark: 5 categories → 5 distinct colors, Done list open with
+  done/skipped/Hebrew rows, reopening the skipped task returns it to the
+  open list; no console errors. **NOT verified:** on device; how an existing
+  library's first assignment looks. **SHIPPED** as merge `f82dbca` (frontend only):
+  Vercel on push; TestFlight run #345 → **build 1345 green**. Owner QA: library
+  list chips + graph dots now one color per category; Revisit → "Done N"
+  opens the look-back list, tapping a mark puts the task back.
+- **2026-10-02 — REVISIT "DO THIS" ROUND 4: whole tasks, a real checkbox,
+  category dots, swipe "Not for me", shorter tasks for new saves.** Branch
+  `claude/revisit-do-this-polish`. Owner on build 1343 (screenshot): "find
+  the best way to show these, this is not good enough". Diagnosis: every
+  task was cut at 2 lines exactly where the instruction was ("…use a
+  Suica…"), because `actionableTakeaway` had no length rule (stored up to
+  1000 chars) and `TakeawayRow` clamped at 2; the check ring was a faint
+  50%-opacity icon and a tick just made the row vanish; rows had no
+  identity. **App (`DigestView.tsx` `TakeawayRow`):** the task shows whole
+  (clamp 4); a 22px ring checkbox (`role=checkbox`) that fills with the
+  accent + check, strikes the task, holds 650ms, folds the row (grid-rows
+  1fr→0fr, 280ms, `--ease-modal`), THEN writes (Feed's "Marked as done" +
+  Undo toast unchanged); leaving the screen mid-animation flushes the write
+  on unmount; a failed write un-folds after 1.5s. Card line gets the
+  card's category dot (`getCategoryColorStyle`). Press state, hover guarded
+  by `[@media(hover:hover)]`, `hapticLight` on tick, staggered
+  `animate-card-enter`. Divider moved from the list's `divide-y` onto each
+  row (the swipe layer painted over the hairline). **"Not for me"
+  (owner-approved round 2):** swipe a row left past 35% of its width
+  (haptic when armed; shorter swipes snap back; only leftward,
+  mostly-horizontal drags are claimed, so page scroll and the app's
+  rightward edge-swipe-back are untouched) → new field
+  `takeawayDismissedAt` (`storage.markTakeawayDismissed`; links rules
+  already allow any owner field), toast "Removed from Do this" + Undo,
+  analytics `takeaway_dismissed`. `openTakeaways` skips dismissed cards.
+  Pointer devices get a hover button; touch screen readers get it as an
+  sr-only button. A one-line hint "Swipe left on a task that isn't for
+  you." shows on touch until the first dismissal (localStorage
+  `machina.takeawaySwipeLearned`). The card detail's label reads "Not for
+  me / לא בשבילי" for a dismissed task; tapping it puts the task back.
+  Backend: `takeawayDismissedAt` added to `_USER_OWNED_CARD_FIELDS` so a
+  re-analysis keeps it. **Shorter tasks (new saves only):** analysis prompt
+  rule 8 now asks for ONE sentence of at most 20 words, verb first, one
+  action; existing cards keep their text (the clamp-4 handles them).
+  **Verified:** tsc 0; eslint clean on touched files (pre-existing
+  `isYouTube` warning only); `test:takeaway` 4/4 (new dismissed test);
+  pytest 1266 passed; py_compile. Rendered via a throwaway harness
+  (deleted, `PUBLIC_ROUTES` edit reverted) at 390px light + dark with
+  English + Hebrew fixtures and Playwright driving it: tick → filled check +
+  strike → row folds → `done`; short swipe snaps back; full swipe →
+  `dismiss` and the hint disappears; tap opens the card; no console
+  errors; 1280px desktop shows the hover button and hides the hint.
+  **NOT verified:** on device (swipe feel inside WKWebView, haptics), a
+  live re-analysis keeping `takeawayDismissedAt`, the new prompt's output
+  length on real saves. **SHIPPED** as merge `46f068e`: Vercel on push;
+  functions deploy #121 (unscoped, on purpose) **green**; TestFlight run
+  #344 → **build 1344 green** (owner confirmed on device). Owner QA: Revisit → tick a task (fills, strikes, folds,
+  Undo toast); swipe one left (Not for me, Undo); open that card → label
+  reads "Not for me", tap puts it back.
+- **2026-10-02 — GRAPH: "Mapping your knowledge…" no longer shows twice.**
+  Branch `claude/graph-cluster-chips`. Owner device QA on build 1342 (cluster
+  chips confirmed good; TestFlight run #342 green): opening the Graph showed
+  the loading line in the stats header AND centered in the canvas.
+  `KnowledgeGraph.tsx`: the header's loading branch is now a blank
+  `&nbsp;` line (keeps the row height so the canvas doesn't jump when the
+  stats land); the canvas loader is the only message. **Verified:** tsc 0;
+  loading state rendered via a throwaway harness (deleted, temporary
+  `PUBLIC_ROUTES` entry reverted) at 390px: one "Mapping your knowledge…".
+  **NOT verified:** on device. **SHIPPED** as merge `8898ca2` (frontend only):
+  Vercel on push; TestFlight run #343 → **build 1343**.
+- **2026-10-01 — GRAPH: CLUSTER CHIPS REPLACE CATEGORY CHIPS.** Branch
+  `claude/graph-cluster-chips`. Owner: each cluster name on the canvas
+  (e.g. LONGEVITY) should have a chip above the graph that opens the same
+  card list as tapping the caption. `KnowledgeGraph.tsx`: the category
+  legend row (a category FILTER, a different grouping than the islands) is
+  replaced by one chip per captioned cluster (uncaptioned clusters get
+  none), sorted by size, dot in the island's dominant category color,
+  label `dir="auto"` + truncated. `toggleClusterFocus` does what the
+  caption tap does (clears selection/cited set/pending focus, toggles
+  `clusterFocus`), so the existing frame-the-cluster camera and cluster
+  panel are reused, and the lit chip mirrors `clusterFocus` both ways. The
+  whole `categoryFocus` state + its draw-path dimming are deleted (no other
+  caller). Category filtering remains via the library filter sheet
+  (`selectedCategory` scopes the graph, `graphFiltersActive` in Feed).
+  **Verified:** tsc 0; eslint on the file shows one error that is
+  pre-existing on main (`modelRef.current = model`, react-hooks/immutability)
+  and unchanged; rendered via a throwaway harness (deleted, plus a temporary
+  `PUBLIC_ROUTES` entry, reverted) at 390px with Playwright: 3 chips
+  matching the 3 captions, chip tap lights the chip + opens the panel with
+  the 5 members + frames the island, second tap clears both. **NOT
+  verified:** light theme render (ThemeProvider kept the harness dark; chip
+  classes are the old legend's, unchanged), on device. New bug logged as
+  §4 G2c (category color hash collisions). **SHIPPED** as merge `79deb19`
+  (frontend only, no functions): Vercel on push; TestFlight run #342 →
+  **build 1342** (queued behind another session's run #340 / build 1340;
+  an accidental early trigger of pre-merge main, run #341, was superseded
+  and cancelled, no build). Owner QA: Graph → tap each cluster chip → its
+  card list opens and the island is framed; tap again → clears.
+- **2026-10-01 — LINKEDIN BYLINE ICON: DETECTION, NOT DRAWING, WAS THE BUG
+  (owner: "for the Nth time", a share-sheet save of a Pilipda Samattanawin
+  post showed the author name with no "in" mark).** Branch
+  `claude/linkedin-byline-icon`. The `SourceByline` LinkedIn branch was intact;
+  it only runs when the card's URL host reads as LinkedIn, and `getPlatform`
+  knew only `linkedin.com`. Since 2026-08-22 the backend routes `lnkd.in` short
+  links to the LinkedIn scraper (so the real author name arrives) but the card
+  keeps the URL as shared, so such cards fell to the plain-publisher byline:
+  name, no icon. Every past fix patched the drawing, never the detection, which
+  is why it kept coming back. **Fix, two layers:** (1) web `getPlatform` maps
+  `lnkd.in` to LinkedIn; detection moved to JSX-free `web/lib/platformKey.ts`
+  (re-exported from `platform.tsx`) with a new `linkPlatform(link)` = URL host,
+  else the backend stamp; used by `SourceByline`, `ListCard`, the Ask citation
+  chip and `getSourceInfo` (Sources facet). (2) backend `_scrape_extras` stamps
+  `sourcePlatform` on WEB cards from the scrape's landing URL
+  (`_platform_for_url`), and `_scrape_linkedin_url` now returns `final_url`, so
+  any future short/redirect form still gets the mark. Screenshot cards ignore
+  the stamp (their `sourcePlatform` means the app read off the image).
+  **Guard:** `npm run test:platform` (fails if any LinkedIn URL form loses the
+  mark; confirmed failing with the `lnkd.in` line removed) + 6 backend tests in
+  `test_linkedin_author.py`. **Verified:** tsc clean, 5/5 web tests, 1266/1266
+  backend tests, server-rendered `SourceByline` draws the LinkedIn mark for an
+  `lnkd.in` card and a stamped card. **NOT verified:** the stored URL of the
+  owner's card (no Firestore access here): if it is `lnkd.in` the existing card
+  is fixed on deploy; if it is some other redirect host, only re-saves get the
+  stamp; on device. **Shipped:** fix `7e70665`, merge `7ebcaec` → `main`
+  (Vercel); functions deploy run **#120** green (scoped
+  `Deploy-Functions: analyze_link,process_link_background`); Python tests #133
+  green; TestFlight run **#340** → build **1340**.
 
 - **2026-10-01 — SAVE clip: Mark Manson's essay.** Branch `claude/clip-save`,
   not merged. Owner: replace the previous essay's author with Mark Manson. The Articles card is now

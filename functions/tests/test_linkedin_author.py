@@ -237,3 +237,42 @@ def test_wrapped_name_is_the_last_resort():
             '{"author": {"name": "See Stanford Law School\'s activity"}}</script>')
     assert scraper._linkedin_wrapped_name(html) == "Stanford Law School"
     assert scraper._linkedin_wrapped_name("<html></html>") is None
+
+
+# ── main._scrape_extras: the byline's platform stamp ────────────────────────
+# A card keeps the URL the share sheet handed over. When that is a short or
+# redirect form (lnkd.in/…), its host names no platform and the web byline
+# dropped the LinkedIn mark (owner, repeatedly). The stamp records where the
+# scrape LANDED so the mark no longer depends on the URL's shape.
+
+def test_short_link_card_is_stamped_linkedin():
+    scraped = {"final_url": "https://www.linkedin.com/posts/someone_x-activity-1-a"}
+    assert main._scrape_extras("lnkd.in/e5zrabam", scraped)["sourcePlatform"] == "linkedin"
+
+
+@pytest.mark.parametrize("final_url", [
+    "https://lnkd.in/e5zrAbaM",
+    "https://il.linkedin.com/feed/update/urn:li:activity:1/",
+])
+def test_every_linkedin_landing_is_stamped(final_url):
+    assert main._scrape_extras("", {"final_url": final_url})["sourcePlatform"] == "linkedin"
+
+
+@pytest.mark.parametrize("final_url", [
+    "https://example.com/a",
+    "https://linkedin.com.evil.test/posts/x",
+    "",
+    "not a url",
+])
+def test_non_platform_landing_is_not_stamped(final_url):
+    assert "sourcePlatform" not in main._scrape_extras("", {"final_url": final_url})
+
+
+def test_linkedin_scrape_reports_where_it_landed(monkeypatch):
+    class _Resp:
+        text = "<html><head><title>x</title></head><body></body></html>"
+        url = "https://www.linkedin.com/posts/someone_x-activity-1-a"
+    monkeypatch.setattr(scraper, "safe_get", lambda *a, **k: _Resp())
+    r = scraper._scrape_linkedin_url("https://lnkd.in/e5zrAbaM")
+    assert r["final_url"] == "https://www.linkedin.com/posts/someone_x-activity-1-a"
+    assert main._scrape_extras("lnkd.in/e5zrabam", r)["sourcePlatform"] == "linkedin"
