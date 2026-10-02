@@ -2408,7 +2408,8 @@ exact-match, capped.
   stats land); the canvas loader is the only message. **Verified:** tsc 0;
   loading state rendered via a throwaway harness (deleted, temporary
   `PUBLIC_ROUTES` entry reverted) at 390px: one "Mapping your knowledge…".
-  **NOT verified:** on device.
+  **NOT verified:** on device. **SHIPPED** as merge `8898ca2` (frontend only):
+  Vercel on push; TestFlight run #343 → **build 1343**.
 - **2026-10-01 — GRAPH: CLUSTER CHIPS REPLACE CATEGORY CHIPS.** Branch
   `claude/graph-cluster-chips`. Owner: each cluster name on the canvas
   (e.g. LONGEVITY) should have a chip above the graph that opens the same
