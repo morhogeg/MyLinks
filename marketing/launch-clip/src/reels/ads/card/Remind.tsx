@@ -61,10 +61,10 @@ const keysFor = (dy: number): Key[] =>
 // the lifted sheet: it rises into place, Smart review framed; then on down to Save
 const dKeysFor = (dy: number): Key[] =>
   [
-    { f: HITS.bellTap, cx: 196.5, cy: 470, z: 2.4, fx: 540, fy: 1150 },
+    { f: HITS.bellTap, cx: 196.5, cy: 520, z: 2.4, fx: 540, fy: 1150 },
     { f: HITS.bellTap + 12, fy: 1000, ease: EASE_MODAL },
-    { f: HITS.smart + 16, cy: 472, z: 2.42, ease: linear },
-    { f: HITS.saveTap - 2, cy: 660, fy: HERO, z: 2.4, ease: EASE_IN_OUT },
+    { f: HITS.smart + 24, cy: 522, z: 2.42, ease: linear },
+    { f: HITS.saveTap - 8, cy: 660, fy: HERO, z: 2.4, ease: EASE_IN_OUT },
     { f: HITS.saveTap + 10, z: 2.3, fy: HERO + 60, ease: EASE_IN_OUT },
   ].map((k) => (k.fy !== undefined ? { ...k, fy: k.fy + dy } : k)) as Key[];
 
@@ -90,7 +90,7 @@ export const Remind: React.FC<{ f: number }> = ({ f }) => {
 
   // lifts, each on its beat, each gone before its screen moves
   const smartIn = prog(f, HITS.smart, HITS.smart + 14, EASE_SPRING);
-  const smartOut = prog(f, HITS.saveTap - 16, HITS.saveTap - 8, EASE_IN_OUT);
+  const smartOut = prog(f, HITS.smart + 16, HITS.smart + 24, EASE_IN_OUT);
   const setIn = prog(f, HITS.reminderSet, HITS.reminderSet + 14, EASE_SPRING);
   const setOut = prog(f, HITS.due - 8, HITS.due - 1, EASE_IN_OUT);
   const dueIn = prog(f, HITS.dueLift, HITS.dueLift + 16, EASE_SPRING);

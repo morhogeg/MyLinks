@@ -14,7 +14,8 @@ import { MARK, PILE, TALK, TALK_ROW } from './Hook';
  * "Share it to Machina." The kit's share gesture (the reel's ShareBeat, the
  * SAVE clip's Shares), for one save: the talk lifts out of the fading Watch
  * later list as a card wearing YouTube's mark (as the Machina app draws it),
- * its Share button is tapped on the word "Share", and it is pulled into the
+ * as the narrator says "Share it to Machina" (never before its line), its
+ * Share button is tapped once the name has wiped in, and it is pulled into the
  * Machina mark, which answers with a ring.
  *
  * THE SLOT. The iOS share sheet is native and cannot be captured from the web

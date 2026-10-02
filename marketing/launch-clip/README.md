@@ -748,7 +748,7 @@ fast-start curve, and the landed card's lift box within 2pt of the app's.
 
 ## Meta ad 1: "What one save becomes"
 
-`MachinaAdCard` is a 26.3s vertical ad for Instagram and Facebook (Reels,
+`MachinaAdCard` is a 29.3s vertical ad for Instagram and Facebook (Reels,
 Stories, Feed) and an organic Reel: one save, fully read, and brought back
 (owner concept, 2026-10-02). The save everyone has is the long video in Watch
 later they never get to. Shared once, Machina makes it a card you take in at a
@@ -761,15 +761,15 @@ Branch `claude/ad-card`.
 | Frames | Beat | What is shown (the line) |
 |---|---|---|
 | 0–48 | the hook | frame 0 is the poster: YouTube · Watch later, the video on top (Big Think Clips, "How to overcome your addiction to technology") and three real demo saves under it, the line already set ("Saved for later?"); the voice starts at 0.27s |
-| 48–96 | | "Later never comes.": the list bleaches (56), the video lifts out of it (64); the Machina mark's point strikes (72), the brackets snap (80, 2.7s) |
-| 64–152 | the share (the slot) | the video as a card wearing YouTube's mark, its Share tapped on "Share" (96), pulled into the mark (112); MACHINA wipes in as the name is said ("Share it to Machina instead.") |
-| 144–200 | into the app | the point drops to become the + (the reel's match cut), the app irises open (168); the video lands at the top of the feed and is tapped open (200) |
-| 200–280 | the peak | its four Key moments lift one by one, each timestamp first (216, 224, 232, 240) ("Get the moments that matter, timestamped.") |
-| 256–328 | key points | one scroll down; the Key Points lift (296) ("Get the key points.") |
-| 328–456 | links | on down: the three Related cards lift as one block (368); "See in graph" is tapped (408) and the cut lands in the real graph, the video in focus, its three ties lit ("Linked to what you already saved.") |
-| 456–552 | the reminder | a cut back to the card; its bell tapped (472); the app's "Remind me" sheet rises, lifted off its screen, Smart review (preselected: "Tomorrow 9:00 AM · then 1 week & 1 month") ringed (488); Save tapped (520); the app's "Reminder set for …" lifted (536) ("Pick a time. Machina brings it back.") |
-| 552–616 | tomorrow | a cut to the feed, "TOMORROW, 9:00 AM" above the line: the feed's own "Reminders due" strip, the video in it, lifted (576) ("Ready when you are.") |
-| 616–790 | the close | thrown into the lockup: the mark strikes (656), MACHINA wipes in on the spoken name, then the tagline on one line, exactly "Everything you save, finally useful.", held 1.6s after the voice |
+| 48–96 | | "Later never comes.": the rest of the list bleaches (56); the video stays sharp, still in the list |
+| 96–160 | the share (the slot) | only as the line is said ("Share it to Machina instead."): the video lifts out as a card wearing YouTube's mark, the mark assembles below it (104, 112: 3.7s), MACHINA wipes in on the spoken name, Share is tapped (128) and the card is pulled into the mark (144) |
+| 168–232 | into the app | the point drops to become the + (the reel's match cut), the app irises open (192); the video lands at the top of the feed, the camera settles, and it is tapped open (232) |
+| 232–320 | the peak | its four Key moments lift a beat apart, each timestamp first (256, 272, 288, 304), under one slow drift ("Get the moments that matter, timestamped.") |
+| 320–416 | key points | one scroll down (2.1s); the Key Points lift (384) ("Get the key points.") |
+| 416–536 | links | on down (1.6s): the three Related cards lift as one block (464); "See in graph" is tapped (496) and the cut lands in the real graph, the video in focus, its three ties lit ("Linked to what you already saved.") |
+| 536–656 | the reminder | a cut back to the card; its bell tapped (552); the app's "Remind me" sheet rises, lifted off its screen, Smart review (preselected: "Tomorrow 9:00 AM · then 1 week & 1 month") ringed (568); down to Save, tapped (624); the app's "Reminder set for …" lifted (632) ("Pick a time. Machina brings it back.") |
+| 656–704 | tomorrow | a cut to the feed, "TOMORROW, 9:00 AM" above the line: the feed's own "Reminders due" strip, the video in it, lifted (680) ("Ready when you are.") |
+| 704–878 | the close | thrown into the lockup: the mark strikes (744), MACHINA wipes in on the spoken name, then the tagline on one line, exactly "Everything you save, finally useful.", held 1.6s after the voice |
 
 **How it got here.** Round 1 (21.0s) read the card down section by section
 ("Get the key moments, with timestamps." / "The whole talk, down to what
@@ -781,10 +781,20 @@ the share line, "Get … / Get the key points." for the card, the video never
 called a "talk" (verify fails the word), and, the key note, the payoff answers
 the pain: the reminder and its return, in the launch films' words ("brings it
 back", "Ready when you are."). The card is open by 6.7s (was 7.2s with a
-longer hook).
+longer hook). Round 4 (owner, on device: the share card appeared before its
+line; "pacing is too fast and jittery"): the card now lifts out only on "Share
+it to Machina instead.", and the cut was re-timed from a frame-by-frame
+measure of the render (the mean change between frames): a camera key out of
+time order had snapped the Key moments shot mid-move (verify now fails any
+key out of order); the camera braked into the card's tap (it now settles
+first); the Key moments lift a beat apart, not an 8th; the two scrolls and the
+pan down the reminder sheet take 1.6s (the Key Points scroll, ~570pt, 2.1s;
+it was 1.1s). Measured after: no jump between frames except the four cuts.
+29.3s.
 
-**The Meta spec, and how the ad meets it.** 26.3s (the aim was 15–20s; the
-graph and the reminder, both owner asks, cost the time; never over 30s).
+**The Meta spec, and how the ad meets it.** 29.3s (the aim was 15–20s; the
+graph, the reminder and a calmer pace, all owner asks, cost the time; never
+over 30s).
 Frame 0 is a legible picture with the hook line set on it (a `poster` line,
 arriving before the ad starts), so the hook lands with the sound off. At most
 8 words on screen at once (the "Tomorrow, 9:00 AM" kicker counts). Safe zones

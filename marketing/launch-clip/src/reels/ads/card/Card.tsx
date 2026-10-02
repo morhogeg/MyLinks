@@ -84,26 +84,26 @@ const keysFor = (dy: number): Key[] =>
     // onto the video landing at the top of the feed
     { f: HITS.toApp + 30, cx: 196.5, cy: 328, z: 2.0, fy: HERO, ease: EASE_IN_OUT },
     { f: HITS.cardTap, z: 2.03, ease: linear },
-    // opened: the Key moments' heading and the first moments
-    { f: HITS.cardTap + 24, cy: 262, z: 2.35, ease: EASE_MODAL },
+    // opened: the Key moments' heading and the first moments (settled before
+    // the first lift; every key here is in time order)
+    { f: HITS.cardTap + 20, cy: 262, z: 2.35, ease: EASE_MODAL },
     { f: HITS.moments[0], cy: 264, z: 2.36, ease: linear },
-    // down the moments as each lifts
-    { f: HITS.moments[3] + 8, cy: 350, z: 2.36, ease: EASE_IN_OUT },
-    { f: S0, cy: 352, z: 2.37, ease: linear },
+    // one slow drift down the moments as each lifts, a beat apart
+    { f: HITS.moments[3] + 12, cy: 350, z: 2.37, ease: EASE_IN_OUT },
     // one scroll down: the Key Points
     { f: SCROLLS[0][1] as number, cy: 382, z: 2.05, ease: EASE_IN_OUT },
     { f: SCROLLS[1][0] as number, cy: 383, z: 2.07, ease: linear },
     // on down: the Related cards
     { f: SCROLLS[1][1] as number, cy: 664, z: 2.05, ease: EASE_IN_OUT },
-    { f: HITS.related + 22, cy: 664, z: 2.06, ease: linear },
+    { f: HITS.related + 24, cy: 664, z: 2.06, ease: linear },
     // up a little, so the section's "See in graph" clears the band, as the finger comes
     // (its last key ON the frame before the cut: a key between would read the cut as speed)
-    { f: HITS.graphTap - 1, cy: 604, z: 2.1, ease: EASE_IN_OUT },
+    { f: HITS.graphTap - 1, cy: 620, z: 2.1, ease: EASE_IN_OUT },
     // a cut on the tap (two keys a frame apart: nothing drawn between) to the
     // graph: the video in focus, its three ties lit, the app's panel naming it
     // (framed under the legend chips), then a slow push onto the ties
     { f: HITS.graphTap, cy: 462, z: 2.25 },
-    { f: HITS.back, cy: 440, z: 2.5, ease: EASE_IN_OUT },
+    { f: HITS.back, cy: 445, z: 2.45, ease: EASE_IN_OUT },
   ].map((k) => (k.fy !== undefined ? { ...k, fy: k.fy + dy } : k)) as Key[];
 
 const MOMENTS = ['moment1', 'moment2', 'moment3', 'moment4'];
@@ -134,11 +134,11 @@ export const Card: React.FC<{ f: number }> = ({ f }) => {
   const card = rectOf(T, at(T, 'landed'), 'firstCard');
 
   // lifts, each on its beat, each gone before its screen moves
-  const momOut = prog(f, HITS.moments[3] + 8, S0, EASE_IN_OUT);
+  const momOut = prog(f, HITS.moments[3] + 10, S0 + 2, EASE_IN_OUT);
   const kpIn = prog(f, HITS.keyPoints, HITS.keyPoints + 16, EASE_SPRING);
   const kpOut = prog(f, (SCROLLS[1][0] as number) - 8, (SCROLLS[1][0] as number) + 2, EASE_IN_OUT);
   const relIn = prog(f, HITS.related, HITS.related + 16, EASE_SPRING);
-  const relOut = prog(f, HITS.related + 20, HITS.related + 28, EASE_IN_OUT);
+  const relOut = prog(f, HITS.related + 16, HITS.related + 24, EASE_IN_OUT);
   const seeGraph = rectOf(T, stepFrame(STEPS), 'seeGraph');
 
   return (

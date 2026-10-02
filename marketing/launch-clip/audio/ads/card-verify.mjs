@@ -84,7 +84,9 @@ export default async function verifyAdCard() {
   if (!caps[0].poster || caps[0].at > 15) bad.push('the first line is not set on frame 0 (`poster`) with its voice by 0.5s');
   if (C.TOTAL_SEC > 30 || C.TOTAL_SEC < 15) bad.push(`the ad runs ${C.TOTAL_SEC.toFixed(1)}s (Meta spec: 15–30s, aim ≤ 20s)`);
   else if (C.TOTAL_SEC > 20) console.log(`  (note: ${C.TOTAL_SEC.toFixed(1)}s, over the 20s aim)`);
-  if (C.HITS.bracketsClose > 105) bad.push(`the mark closes at ${C.HITS.bracketsClose} (spec: by about 3s)`);
+  // (spec: the mark by about 3s; owner, round 4: the share card waits for
+  // its line, so the mark assembles with it, at about 3.7s)
+  if (C.HITS.bracketsClose > 120) bad.push(`the mark closes at ${C.HITS.bracketsClose} (spec: by about 3s, 4s at most)`);
 
   // ── the grid
   for (const [k, v] of Object.entries(C.HITS)) for (const fr of [v].flat()) if (fr % (C.BEAT_FRAMES / 2)) bad.push(`hit ${k} at ${fr} is not on an 8th`);
@@ -166,6 +168,23 @@ export default async function verifyAdCard() {
   if (plusY > 1250) bad.push(`the + sits at ${plusY.toFixed(0)}px, inside Meta's bottom 670px`);
   const hero = Number(/const HERO = (\d+)/.exec(read('src/reels/ads/card/Card.tsx'))?.[1]);
   if (!(hero >= 720 && hero <= 1240)) bad.push(`the app's hero line is ${hero}px (aim between 720 and 1240)`);
+
+  // ── camera keys in time order (round 4: a key out of order snapped the
+  // camera mid-move in the Key moments shot). Each key's frame is evaluated
+  // from the timeline's numbers, in the order the scene lists them
+  {
+    const env = { HITS: C.HITS, SCROLLS: C.SCROLLS, THROW_LEN: C.THROW_LEN };
+    for (const file of ['Card.tsx', 'Remind.tsx']) {
+      const src = read(`src/reels/ads/card/${file}`);
+      for (const [, body] of src.matchAll(/const \w*[kK]eysFor = \(dy: number\): Key\[\] =>\s*\[([\s\S]*?)\]\.map/g)) {
+        const fs = [...body.matchAll(/\{ f: ([^,]+),/g)].map(([, e]) => Function(...Object.keys(env), `return (${e.replace(/ as number/g, '')});`)(...Object.values(env)));
+        fs.forEach((f, k) => {
+          if (k && f < fs[k - 1]) bad.push(`${file}: camera key ${k} at frame ${f} comes after a key at ${fs[k - 1]} (keys must be in time order)`);
+        });
+        if (fs.length < 4) bad.push(`${file}: found ${fs.length} camera keys: the key-order gate no longer reads it`);
+      }
+    }
+  }
 
   // ── taps touch on their hits; exits ease in and out
   for (const [file, want] of [['Card.tsx', 2], ['Share.tsx', 1], ['Remind.tsx', 2]]) {

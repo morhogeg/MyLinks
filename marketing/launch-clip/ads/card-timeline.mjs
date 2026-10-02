@@ -38,41 +38,43 @@ export const BAR = BAR_FRAMES / FPS;
 
 /** THE CUT: every scene reads these, and so does the score */
 export const HITS = {
-  // the hook: on "never" the list bleaches; the video lifts out of it
+  // the hook: on "never" the list bleaches (the video stays sharp); the
+  // video lifts out of it only as the narrator says "Share it to Machina"
+  // (owner, round 4: the card waited for its line)
   lost: 56,
-  talkLifts: 64,
-  // the mark assembles where the share will land (by ~2.7s)
-  dotLands: 72,
-  bracketsClose: 80,
-  // the share: tapped on "Share", pulled into the mark
-  shareTap: 96,
-  shareLands: 112,
+  talkLifts: 96,
+  // the mark assembles where the share will land (3.7s), the name wipes in on "Machina"
+  dotLands: 104,
+  bracketsClose: 112,
+  // the share: tapped after the name, pulled into the mark
+  shareTap: 128,
+  shareLands: 144,
   // the point drops to become the + button; the app irises open around it
-  part: 144,
-  toApp: 168,
+  part: 168,
+  toApp: 192,
   // the card lands at the top of the feed (from toApp) and is tapped open
-  cardTap: 200,
+  cardTap: 232,
   // the peak: its Key moments, one by one, timestamps first
-  moments: [216, 224, 232, 240],
+  moments: [256, 272, 288, 304],
   // one scroll down: the Key Points, lifted
-  keyPoints: 296,
+  keyPoints: 384,
   // on down: the three Related cards, lifted as one block
-  related: 368,
+  related: 464,
   // the app's own "See in graph": the same ties, as a map
-  graphTap: 408,
+  graphTap: 496,
   // a cut back to the card: its bell, "Remind me", Save
-  back: 456,
-  bellTap: 472,
-  smart: 488, // the Smart review row (preselected: tomorrow 9:00 AM, then 1 week & 1 month), lifted
-  saveTap: 520,
-  reminderSet: 536, // the app's "Reminder set for …", lifted
+  back: 536,
+  bellTap: 552,
+  smart: 568, // the Smart review row (preselected: tomorrow 9:00 AM, then 1 week & 1 month), lifted
+  saveTap: 624,
+  reminderSet: 632, // the app's "Reminder set for …", lifted
   // tomorrow, 9:00 AM: the feed's "Reminders due" strip
-  due: 552,
-  dueLift: 576,
+  due: 656,
+  dueLift: 680,
   // the close
-  throw: 616,
-  lockup: 632,
-  markStrike: 656,
+  throw: 704,
+  lockup: 720,
+  markStrike: 744,
 };
 
 /**
@@ -94,12 +96,12 @@ export const PUSH_SLOT = [HITS.due, HITS.throw];
 /** the card's read-down (the app's scroll, captured in 3pt steps): [from, to,
  *  target] in output frames; targets are named in Card.tsx */
 export const SCROLLS = [
-  [256, 288, 'keyPoints'],
-  [328, 360, 'related'],
+  [320, 384, 'keyPoints'],
+  [416, 464, 'related'],
 ];
 
 export const THROW_LEN = 30;
-export const TOTAL_FRAMES = 790; // the tagline holds 1.6s after the voice ends
+export const TOTAL_FRAMES = 878; // the tagline holds 1.6s after the voice ends
 export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 
 /**
@@ -115,12 +117,12 @@ export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 export const CAPTIONS = [
   { at: 8, to: 48, text: 'Saved for later?', size: 80, poster: true },
   { at: 48, to: 92, text: 'Later never comes.', size: 80 },
-  { at: 96, to: 152, text: 'Share it to Machina instead.', size: 64 },
-  { at: 200, to: 280, text: 'Get the moments that matter,\ntimestamped.', size: 60, until: 'the four Key moments lift' },
-  { at: 280, to: 328, text: 'Get the key points.', size: 64, until: 'the Key Points lift' },
-  { at: 336, to: 456, text: 'Linked to what you\nalready saved.', size: 60, until: 'the Related cards lift, then the graph opens on their ties' },
-  { at: 464, to: 544, text: 'Pick a time.\nMachina brings it back.', size: 60, until: 'the reminder is set' },
-  { at: 560, to: 616, text: 'Ready when you are.', size: 64, kicker: 'Tomorrow,\u00a09:00\u00a0AM', until: 'the Reminders due strip lifts' },
+  { at: 96, to: 160, text: 'Share it to Machina instead.', size: 64, until: 'the share lands in the mark' },
+  { at: 232, to: 320, text: 'Get the moments that matter,\ntimestamped.', size: 60, until: 'the four Key moments lift, a beat apart' },
+  { at: 368, to: 416, text: 'Get the key points.', size: 64, until: 'the Key Points lift' },
+  { at: 432, to: 536, text: 'Linked to what you\nalready saved.', size: 60, until: 'the Related cards lift, then the graph opens on their ties' },
+  { at: 544, to: 648, text: 'Pick a time.\nMachina brings it back.', size: 60, until: 'the reminder is set' },
+  { at: 664, to: 704, text: 'Ready when you are.', size: 64, kicker: 'Tomorrow,\u00a09:00\u00a0AM', until: 'the Reminders due strip lifts' },
   // the close, on the lockup: the name (the drawn wordmark wipes in as it is
   // said), then the tagline, exactly as written (owner call 2026-09-28)
   { at: HITS.markStrike, to: TOTAL_FRAMES, place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4 },
@@ -131,13 +133,13 @@ export const CAPTIONS = [
 export const KICKERS = CAPTIONS.filter((c) => c.kicker).map((c) => ({ at: c.at - 4, to: c.to, text: c.kicker }));
 
 /**
- * THE SCORE's map (audio/ads/card-score.mjs), one chord per bar (13 bars):
+ * THE SCORE's map (audio/ads/card-score.mjs), one chord per bar (14 bars):
  * the hook hangs on IV, the mark resolves to I, the card walks I V IV I,
  * the reminder leans on V, home for "Ready when you are." and the lockup.
  */
-export const BAR_CHORDS = ['Fmaj7', 'Fmaj7', 'Cmaj7', 'G6', 'Cmaj7', 'G6', 'Fmaj7', 'Cmaj7', 'G6', 'Cmaj7', 'Cmaj7', 'Cmaj7', 'Cmaj7'];
-/** the drums: in with the card (bar 2), out for the lockup */
-export const DRUMS = [2 * BAR_FRAMES, HITS.lockup];
+export const BAR_CHORDS = ['Fmaj7', 'Fmaj7', 'Cmaj7', 'G6', 'Cmaj7', 'G6', 'Fmaj7', 'Cmaj7', 'G6', 'Fmaj7', 'Cmaj7', 'Cmaj7', 'Cmaj7', 'Cmaj7'];
+/** the drums: in with the app (bar 3), out for the lockup */
+export const DRUMS = [3 * BAR_FRAMES, HITS.lockup];
 /** risers END on the reveal they lead into: the mark, the app, the strike */
 export const RISERS = [
   [HITS.dotLands - 32, HITS.dotLands],

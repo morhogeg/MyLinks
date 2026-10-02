@@ -2707,6 +2707,17 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-02 — META AD 1, ROUND 4: THE CARD WAITS FOR ITS LINE; CALMER,
+  SMOOTH PACING.** Branch `claude/ad-card`, not merged. Owner on device: the
+  share card appeared during "Later never comes." (now only on "Share it to
+  Machina instead."), and the cut was "too fast and jittery". Measured the
+  render frame by frame: a camera key out of time order snapped the Key
+  moments shot (fixed; verify gate added), the camera braked into the card's
+  tap, lifts popped 8 frames apart, the Key Points scroll and the sheet pan
+  were too fast. Re-timed: lifts a beat apart, 1.6–2.1s scrolls, every move at
+  rest before the next tap. 29.3s (under Meta's 30s cap); the mark now
+  assembles at 3.7s, with the card. Verify clean. Open: nobody has listened on
+  speakers.
 - **2026-10-02 — META AD 1, ROUND 3: NEW SCRIPT, THE REMINDER IS THE
   PAYOFF.** Branch `claude/ad-card`, not merged. Owner rewrote the script
   with me: "Saved for later? / Later never comes. / Share it to Machina
