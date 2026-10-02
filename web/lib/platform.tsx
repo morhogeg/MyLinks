@@ -12,39 +12,10 @@ function XLogo({ className = 'w-3 h-3' }: { className?: string }) {
     );
 }
 
-/**
- * Recognized content platforms we can detect from a link's URL. Generic web
- * pages return null — their publisher name already conveys origin.
- */
-export type PlatformKey = 'youtube' | 'x' | 'instagram' | 'linkedin' | 'facebook' | 'github';
-
-export const PLATFORM_LABELS: Record<PlatformKey, string> = {
-    youtube: 'YouTube',
-    x: 'X',
-    instagram: 'Instagram',
-    linkedin: 'LinkedIn',
-    facebook: 'Facebook',
-    github: 'GitHub',
-};
-
-/** Map a link URL to its platform via the hostname (null = generic web). */
-export function getPlatform(url?: string): PlatformKey | null {
-    if (!url) return null;
-    let host = '';
-    try {
-        host = new URL(url).hostname.replace(/^www\./, '').toLowerCase();
-    } catch {
-        return null;
-    }
-    const is = (d: string) => host === d || host.endsWith(`.${d}`);
-    if (is('youtube.com') || is('youtu.be')) return 'youtube';
-    if (is('twitter.com') || is('x.com')) return 'x';
-    if (is('instagram.com')) return 'instagram';
-    if (is('linkedin.com')) return 'linkedin';
-    if (is('facebook.com') || is('fb.com') || is('fb.watch')) return 'facebook';
-    if (is('github.com')) return 'github';
-    return null;
-}
+// Pure URL → platform detection lives in platformKey.ts (no JSX, so the
+// node:test suite can import it); re-exported here for existing callers.
+export { PLATFORM_LABELS, getPlatform, linkPlatform, type PlatformKey } from './platformKey';
+import { type PlatformKey } from './platformKey';
 
 /**
  * Render the icon element for a platform. Returns a JSX element (not a

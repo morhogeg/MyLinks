@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { CitationGlyph } from './ui/Wordmark';
 import { FlowScreen } from './onboarding/FlowScreen';
-import { getCategoryColorStyle } from '@/lib/colors';
+import { getStaticCategoryColorStyle } from '@/lib/colors';
 import { isNativeApp } from '@/lib/api';
 import { hapticSelection, hapticLight } from '@/lib/haptics';
 
@@ -178,12 +178,12 @@ function CaptureMock({ native }: { native: boolean }) {
     time), so the tour shows the product, not a generic mock-up. The connections
     strip below it is the other half of the same step: a card is understood AND
     placed among everything else, so both belong in one frame. Related cards
-    wear their category's app-wide identity color (the same
-    `getCategoryColorStyle` hash the graph, the cards and the filters use). */
+    wear a category color from the app's palette (`getStaticCategoryColorStyle`:
+    the name hash, since a mock must not depend on the user's own library). */
 function StructuredCardMock() {
-    // The chip wears the category's app-wide colour, as on every real card
-    // (Card.tsx uses the same getCategoryColorStyle hash), not the accent.
-    const chip = getCategoryColorStyle('Productivity');
+    // The chip wears a category colour from the app's palette, as on every
+    // real card (Card.tsx), not the accent.
+    const chip = getStaticCategoryColorStyle('Productivity');
     const related = [
         { title: 'Morning routines that stick', category: 'Health' },
         { title: 'Attention is a trainable skill', category: 'Science' },
@@ -237,7 +237,7 @@ function StructuredCardMock() {
                         <div key={r.title} className="flex items-center gap-2 rounded-lg bg-fill-subtle px-2 py-1.5">
                             <span
                                 className="w-2 h-2 rounded-full shrink-0"
-                                style={{ background: getCategoryColorStyle(r.category).color }}
+                                style={{ background: getStaticCategoryColorStyle(r.category).color }}
                             />
                             <span className="text-[10.5px] text-text-secondary truncate">{r.title}</span>
                         </div>
@@ -296,7 +296,7 @@ function AskMock() {
     mock here was an invented digest ("3 threads came together") that matched
     no screen in the app. */
 function RevisitMock() {
-    const chip = getCategoryColorStyle('Productivity');
+    const chip = getStaticCategoryColorStyle('Productivity');
     const section = (label: string) => (
         <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-text-muted">{label}</p>
     );

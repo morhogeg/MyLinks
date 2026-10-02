@@ -254,6 +254,10 @@ export interface Link {
   // card detail). Absent means still open; the takeaway text itself is never
   // touched, so a done card still shows what it asked for.
   takeawayDoneAt?: number; // Unix timestamp (ms)
+  // When the user swiped the takeaway away as "Not for me" in Revisit. It
+  // leaves the "Do this" list without counting as done; the card detail's
+  // label can put it back. Absent means not dismissed.
+  takeawayDismissedAt?: number; // Unix timestamp (ms)
   language?: string;
   isRead?: boolean;
 

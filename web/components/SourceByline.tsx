@@ -1,7 +1,7 @@
 'use client';
 
 import { Youtube, Image as ImageIcon, StickyNote, Quote } from 'lucide-react';
-import { getPlatform, platformIcon, platformColor, xHandle, instagramHandle, linkedinDisplayName, prettyHost, screenshotSource } from '@/lib/platform';
+import { linkPlatform, platformIcon, platformColor, xHandle, instagramHandle, linkedinDisplayName, prettyHost, screenshotSource } from '@/lib/platform';
 import { CitationGlyph } from '@/components/ui/Wordmark';
 
 /** Machina's own hosts — the ONLY place a "Machina" source name is legitimate
@@ -83,7 +83,7 @@ export default function SourceByline({
         );
     }
 
-    const platform = getPlatform(link.url);
+    const platform = linkPlatform(link);
     const isYouTube = platform === 'youtube' || link.sourceType === 'youtube';
     const youtubeChannel = link.metadata?.youtubeChannel || link.sourceName;
     const xAuthor = platform === 'x' ? xHandle(link.url) : null;

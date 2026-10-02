@@ -671,6 +671,16 @@ export async function markTakeawayDone(uid: string, id: string, done: boolean): 
 }
 
 /**
+ * Say the card's "Do this" takeaway is not for the user (or take that back).
+ * Like done, it only removes the row from the Revisit list; the takeaway text
+ * stays on the card, and it does not count as done.
+ */
+export async function markTakeawayDismissed(uid: string, id: string, dismissed: boolean): Promise<void> {
+    const linkRef = doc(db, 'users', uid, 'links', id);
+    await updateDoc(linkRef, { takeawayDismissedAt: dismissed ? Date.now() : deleteField() });
+}
+
+/**
  * Update a link's tags in Firestore.
  *
  * With `previous` (the list the editor started from) only the DIFFERENCE is

@@ -920,6 +920,30 @@ def _capture_quality(scraped: dict) -> dict:
     return {"captureQuality": "partial", "captureReason": reason}
 
 
+# Hosts the web byline draws a brand mark for (web/lib/platform.tsx
+# getPlatform). Exact domain or a subdomain of it, never a substring.
+_PLATFORM_HOSTS = (
+    ("linkedin", ("linkedin.com", "lnkd.in")),
+    ("x", ("x.com", "twitter.com")),
+    ("instagram", ("instagram.com",)),
+    ("facebook", ("facebook.com", "fb.com", "fb.watch")),
+    ("youtube", ("youtube.com", "youtu.be")),
+)
+
+
+def _platform_for_url(url: str):
+    """The platform a URL belongs to by its parsed host, or None."""
+    from urllib.parse import urlparse
+    try:
+        host = (urlparse(url).hostname or "").lower() if url else ""
+    except ValueError:
+        return None
+    for platform, domains in _PLATFORM_HOSTS:
+        if any(host == d or host.endswith("." + d) for d in domains):
+            return platform
+    return None
+
+
 def _scrape_extras(key, scraped: dict) -> dict:
     """Fields a scrape adds to a web card beyond the analysis:
     - `finalUrlKey`: the dedupe key of the page a shortener/redirect landed on,
@@ -927,11 +951,19 @@ def _scrape_extras(key, scraped: dict) -> dict:
       later is caught as a duplicate).
     - `contentTruncated`: the article was longer than the scraper's cap
       (scraper.MAX_ARTICLE_CHARS) and only its first part was analyzed. Not a
-      partial capture (no "couldn't read" line): the page read fine."""
+      partial capture (no "couldn't read" line): the page read fine.
+    - `sourcePlatform`: the social platform the scrape LANDED on. The card keeps
+      the URL the user shared, and that is often a short or redirect form
+      (lnkd.in/…) whose host names no platform; this stamp lets the byline draw
+      the brand mark regardless of which URL form the share sheet handed over."""
     out = {}
-    final_key = url_key(scraped.get("final_url") or "")
+    final_url = scraped.get("final_url") or ""
+    final_key = url_key(final_url)
     if final_key and final_key != key:
         out["finalUrlKey"] = final_key
+    platform = _platform_for_url(final_url)
+    if platform:
+        out["sourcePlatform"] = platform
     if scraped.get("text_truncated"):
         out["contentTruncated"] = True
     return out
@@ -5383,6 +5415,7 @@ _USER_OWNED_CARD_FIELDS = (
     "isPrivate", "hideThumbnail", "shareId", "sharePublishedAt",
     "reminderStatus", "nextReminderAt", "reminderCount", "reminderProfile",
     "reminderDue", "reminderDueAt", "lastViewedAt", "reviewedAt", "takeawayDoneAt",
+    "takeawayDismissedAt",
     "archived", "isRead", "importedAt", "importedFromAt", "importedTags",
 )
 
