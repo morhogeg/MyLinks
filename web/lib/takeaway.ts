@@ -81,3 +81,22 @@ export function openTakeaways<T extends TakeawayCard>(links: readonly T[]): T[] 
         .filter((l) => !!getActionableTakeaway(l) && String(l.captureType) !== 'answer' && !isTakeawayDone(l) && !isTakeawayDismissed(l))
         .sort((a, b) => createdMs(b.createdAt) - createdMs(a.createdAt));
 }
+
+/** When the takeaway left the open list (done or "Not for me"), 0 if open. */
+export function takeawayClosedAt(link: Pick<TakeawayCard, 'takeawayDoneAt' | 'takeawayDismissedAt'>): number {
+    return Math.max(
+        isTakeawayDone(link) ? (link.takeawayDoneAt as number) : 0,
+        isTakeawayDismissed(link) ? (link.takeawayDismissedAt as number) : 0,
+    );
+}
+
+/**
+ * The cards whose "Do this" is closed, done or "Not for me", most recently
+ * closed first: Revisit's collapsed Done list, where either can be put back.
+ * Same eligibility as openTakeaways (a takeaway, not an Ask answer).
+ */
+export function closedTakeaways<T extends TakeawayCard>(links: readonly T[]): T[] {
+    return links
+        .filter((l) => !!getActionableTakeaway(l) && String(l.captureType) !== 'answer' && takeawayClosedAt(l) > 0)
+        .sort((a, b) => takeawayClosedAt(b) - takeawayClosedAt(a));
+}
