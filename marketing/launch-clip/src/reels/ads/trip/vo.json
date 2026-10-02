@@ -1,0 +1,95 @@
+[
+ {
+  "frame": 8,
+  "text": "You already planned this trip.",
+  "words": [
+   0.06,
+   0.22,
+   0.54,
+   0.86,
+   1.06
+  ]
+ },
+ {
+  "frame": 64,
+  "text": "It's just scattered across five apps.",
+  "words": [
+   0.05,
+   0.275,
+   0.5,
+   0.95,
+   1.265,
+   1.49
+  ]
+ },
+ {
+  "frame": 128,
+  "text": "Makeena keeps it all in one place.",
+  "words": [
+   0.05,
+   0.464,
+   0.774,
+   0.929,
+   1.136,
+   1.291,
+   1.498
+  ]
+ },
+ {
+  "frame": 224,
+  "text": "Then you just ask.",
+  "words": [
+   0.05,
+   0.316,
+   0.528,
+   0.794
+  ]
+ },
+ {
+  "frame": 272,
+  "text": "The answer comes only from your saves.",
+  "words": [
+   0.07,
+   0.266,
+   0.609,
+   0.903,
+   1.147,
+   1.392,
+   1.637
+  ]
+ },
+ {
+  "frame": 352,
+  "text": "Every answer shows its sources.",
+  "words": [
+   0.03,
+   0.338,
+   0.696,
+   1.004,
+   1.209
+  ]
+ },
+ {
+  "frame": 416,
+  "text": "Tap one to check it.",
+  "words": [
+   0.06,
+   0.27,
+   0.479,
+   0.636,
+   0.95
+  ]
+ },
+ {
+  "frame": 544,
+  "text": "Makeena. Everything you save, finally useful.",
+  "words": [
+   0.05,
+   0.93,
+   1.375,
+   1.537,
+   2.01,
+   2.425
+  ]
+ }
+]

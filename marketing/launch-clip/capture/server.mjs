@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ASK, ASK_MORE, CAPTURE_USER, CARDS, SEARCH } from './library.mjs';
+import { ASK, ASK_MORE, CAPTURE_USER, CARDS, SEARCH, TRIP_ASK, TRIP_CARDS } from './library.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(here, '..', 'out', 'capture', 'app', 'out');
@@ -53,7 +53,8 @@ const json = (res, code, body) => {
 };
 
 const cardSource = (id) => {
-  const c = CARDS.find((x) => x.id === id);
+  // (the trip ad's cards are written by its own take, not seeded)
+  const c = CARDS.find((x) => x.id === id) ?? TRIP_CARDS.find((x) => x.id === id);
   return { id, title: c.title, category: c.category, sourceName: c.sourceName ?? null, url: c.url || null };
 };
 
@@ -101,7 +102,9 @@ export function startServer(port = 4600) {
         });
         res.flushHeaders?.();
         // (the ASK clip's follow-up: any other question gets ASK_MORE)
-        const reply = body.question === undefined || body.question === ASK.question ? ASK : ASK_MORE;
+        // (the trip ad's question gets its own answer)
+        const reply =
+          body.question === TRIP_ASK.question ? TRIP_ASK : body.question === undefined || body.question === ASK.question ? ASK : ASK_MORE;
         chat = { res, sent: 0, text: reply.answer, sources: reply.sources, sourcesSent: false };
         return;
       }

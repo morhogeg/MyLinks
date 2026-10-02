@@ -702,5 +702,8 @@ console.log('\n── clip: ask');
   }
 }
 
+// ─────────────────────────────────────────────────────── THE TRIP AD
+if (!(await (await import('./ads/trip-verify.mjs')).default())) failed = true;
+
 console.log(failed ? '\nFAILED' : '\nOK');
 process.exit(failed ? 1 : 0);

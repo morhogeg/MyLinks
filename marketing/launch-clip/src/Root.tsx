@@ -6,6 +6,8 @@ import { Film } from './Film';
 import { MachinaReel } from './reels/MachinaReel';
 import * as ASK from '../clips/ask-timeline.mjs';
 import { MachinaAsk } from './reels/clips/ask/MachinaAsk';
+import * as TRIP from '../ads/trip-timeline.mjs';
+import { MachinaAdTrip } from './reels/ads/trip/MachinaAdTrip';
 
 /**
  * Compositions:
@@ -146,6 +148,38 @@ export const RemotionRoot: React.FC = () => (
         width={ASK.WIDTH}
         height={ASK.HEIGHT}
         defaultProps={{ withAudio: false, withCaptions: false }}
+      />
+    </>
+    {/* Meta ad: THE TRIP (src/reels/ads/trip, its clock in ads/trip-timeline.mjs):
+        MachinaAdTrip (9:16, the main cut), MachinaAdTripMusic (9:16, no
+        narrator), MachinaAdTripFeed (4:5, reframed) */}
+    <>
+      <Composition
+        id="MachinaAdTrip"
+        component={MachinaAdTrip}
+        durationInFrames={TRIP.TOTAL_FRAMES}
+        fps={TRIP.FPS}
+        width={TRIP.WIDTH}
+        height={TRIP.HEIGHT}
+        defaultProps={{ shape: 'story' as const, audioFile: 'ads/trip/score-vo.wav', withCaptions: true }}
+      />
+      <Composition
+        id="MachinaAdTripMusic"
+        component={MachinaAdTrip}
+        durationInFrames={TRIP.TOTAL_FRAMES}
+        fps={TRIP.FPS}
+        width={TRIP.WIDTH}
+        height={TRIP.HEIGHT}
+        defaultProps={{ shape: 'story' as const, audioFile: 'ads/trip/score-music.wav', withCaptions: true }}
+      />
+      <Composition
+        id="MachinaAdTripFeed"
+        component={MachinaAdTrip}
+        durationInFrames={TRIP.TOTAL_FRAMES}
+        fps={TRIP.FPS}
+        width={TRIP.WIDTH}
+        height={TRIP.FEED_HEIGHT}
+        defaultProps={{ shape: 'feed' as const, audioFile: 'ads/trip/score-vo.wav', withCaptions: true }}
       />
     </>
   </>

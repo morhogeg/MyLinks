@@ -150,6 +150,38 @@ SCRIPTS["ask"] = (ask_script, os.path.join(VO, "ask"))
 WORD_TIMING["ask"] = os.path.join(ROOT, "src", "reels", "clips", "ask", "vo.json")
 
 
+# ── Meta ad: THE TRIP (ads/trip-timeline.mjs) ──────────────────────────────
+# Spoken exactly like the Ask clip: the ad's CAPTIONS are its script, same
+# narrator; its own folder (out/vo/trip/) and word timings
+# (src/reels/ads/trip/vo.json).
+#
+#   python3 audio/synth-vo.py trip
+def trip_script():
+    """The trip ad's captions, read from ads/trip-timeline.mjs."""
+    js = (
+        "import('./ads/trip-timeline.mjs').then(m => console.log(JSON.stringify("
+        "{ fps: m.FPS, captions: m.CAPTIONS })))"
+    )
+    raw = subprocess.run(["node", "-e", js], cwd=ROOT, check=True, capture_output=True, text=True).stdout
+    data = json.loads(raw)
+    fps = data["fps"]
+    return [
+        {
+            "frame": c["at"],
+            "start": c["at"] / fps,
+            "window": (c["to"] - c["at"]) / fps,
+            "text": " ".join((c.get("say") or c["text"]).split()).replace("Machina", SAY_NAME),
+            "speed": SPEED,
+            "tight": bool(c.get("tight")),
+        }
+        for c in data["captions"]
+    ]
+
+
+SCRIPTS["trip"] = (trip_script, os.path.join(VO, "trip"))
+WORD_TIMING["trip"] = os.path.join(ROOT, "src", "reels", "ads", "trip", "vo.json")
+
+
 def tighten(samples, sr, keep=0.05, fade=0.01):
     """Close the pauses INSIDE a line to `keep` seconds. Kokoro sometimes
     breathes mid-sentence where the text has no comma ("...more knowledge

@@ -907,3 +907,117 @@ cut and tap on a beat, and has no banned word or thinking line on any frame
 of its take. The narrator's word timings and the mixed audio are committed;
 the take's PNGs regenerate from the app like the reel's. Nobody has listened
 to the mix on speakers; its balance, clarity and loudness are measured.
+
+## Meta ad: The trip (`MachinaAdTrip`)
+
+Meta ad 2 of 3 (Instagram and Facebook: Reels, Stories, Feed; doubles as an
+organic Reel), concept approved by the owner on 2026-10-02. **The idea:** a
+trip gets researched in five apps and nobody can pull it together; with
+Machina it is all in one place, and you just ask. The feature is Ask,
+answered only from your saves, with sources you can open (the app's own
+promise line, on screen in the cut). 22.9s, 9:16 and 4:5.
+
+| Frames | Beat | What it shows, and the line |
+|---|---|---|
+| 0–120 | hook | Frame 0 is the poster: five piles, each an app's own save list with its mark (Instagram · Saved, YouTube · Watch later, Safari · Reading List, Facebook · Saved, Photos · Screenshots), the trip's save on top, an older unrelated one under it; the line is up, whole, from frame 0 and spoken from 0.27s: "You already planned this trip." On "scattered" the piles drift apart and go soft: "It's just scattered across five apps." |
+| 104–208 | the name | The piles gather into the point (120), the brackets snap (128, 4.3s), the wordmark wipes in on the spoken name: "Machina keeps it all in one place." The wordmark leaves and the mark shrinks onto the size and place of the Ask screen's own mark |
+| 208–272 | Ask | Match cut on the mark into the real Ask screen, which pulls back onto its promise, "Answers come only from your 29 saves, with sources you can open."; down to the composer as "What should we do in Sardinia?" types: "Then you just ask." |
+| 272–352 | the answer | Send is tapped; the answer streams in: "The answer comes only from your saves." |
+| 352–496 | sources | The three sources (Instagram, YouTube, a screenshot: three different marks) lift on beats: "Every answer shows its sources." The first is tapped, Cala Goloritzé's card opens in a still frame, and its summary, the passage the answer drew on, lifts: "Tap one to check it." (the Ask clip's owner-approved line, set as two captions to stay under 8 words on screen) |
+| 496–688 | close | Thrown out into the lockup: "Machina." then the tagline on one line, exactly `Everything you save, finally useful.`, held 1.97s after the last word. Nothing under it: that space is kept clear for the App Store badge once the listing is live (Meta's Install button carries the call to action until then) |
+
+**The answer** (`TRIP_ASK` in `capture/library.mjs`): "Three of your saves
+make a plan for the east coast. / Cala Goloritzé, Sardinia: the trail down
+from the Golgo plateau takes about an hour, so start early. A boat day on the
+Gulf of Orosei leaves Cala Gonone for Cala Luna and the Bue Marino sea cave.
+And Dana's Sardinia tips: in Ogliastra, order culurgiones. They come from
+there." Each sentence states only what its cited card says, and names it by
+its title. Culurgiones appear only as a place to eat; no recipe card is in the
+take (verify checks every frame).
+
+**What is real and what is scripted.** Every app frame is the real, shipped
+web app (the same code the iPhone app runs), one continuous take, `adtrip`
+(`capture/shoot.mjs`): the Ask tab opened, the question typed, the answer
+streamed, the first source tapped. Scripted, as for the Ask clip: the answer
+and its sources (`TRIP_ASK`, answered by the capture server), and the trip's
+five saves (`TRIP_CARDS` in `capture/library.mjs`, written onto the store by
+the take as the backend writes finished cards, `capture/ad-trip.mjs`; they
+are NOT in the seeded account, so no other video's take changes). With the
+demo account's existing `goloritze` they are the trip: Bosa (Instagram,
+invented handle `@pastelrivertowns`), "A boat day on the Gulf of Orosei"
+(YouTube, invented channel "Footpath & Ferry", no thumbnail), Wikipedia's Su
+Nuraxi di Barumini (Safari), "Alghero, Sardinia's Catalan town" (Facebook,
+invented page "Two Coasts Postcards") and "Dana's Sardinia tips" (a
+screenshot of an invented message; Dana is the demo account's friend from
+"Birthday idea for Dana"). No images of any kind. Facts checked on
+2026-10-02 (Wikipedia itself is blocked from this container, so through
+search results from the official Sardinia tourism site, UNESCO and travel
+sources): the Goloritzé trail (3.5km from Su Porteddu on the Golgo plateau,
+about an hour down); Bosa's pastel houses under the 12th-century Malaspina
+castle, on the Temo, Sardinia's only navigable river; boat trips from Cala
+Gonone to Cala Luna and the Bue Marino cave (a guided ~800m walk; monk seals
+lived there until a few decades ago); Su Nuraxi (a 17th-century BC tower,
+four corner towers and a village; UNESCO 1997); Alghero (Catalan settlers in
+1372, Algherese still spoken, bilingual street signs, sea walls); culurgiones
+(from Ogliastra, potato, pecorino and mint; PGI since 2015). The invented
+handle, channel and page were searched for and no account by those exact
+names turned up; that is not proof none exists.
+
+The piles are the ad's own graphic (the SAVE clip's hook-pile pattern), not
+rebuilt app UI: a mark as the Machina app draws it, the list's name, and
+titles of real demo saves (verify checks). No other app's UI is drawn. The
+app's thinking line is not in the take. No plan is named (Ask is free up to
+20 questions a month), no price, no "free", no availability claim.
+
+**Two shapes, one scene** (`src/reels/ads/trip/format.ts`, the film's
+`useFraming()` idea in the ad's own folder): 9:16 keeps every line, logo and
+key app moment inside Meta's safe zone (nothing in the top 270px, the bottom
+670px or 65px from a side; the line at 346px, the app's hero moments between
+about 720 and 1240px, checked on stills with the zone drawn over them); 4:5
+moves the line to 120px and every camera aim up by 170px, piles and lockup
+re-laid for the shape. The share sheet does not appear in this ad, so there is
+no share-beat slot to replace.
+
+Compositions: **`MachinaAdTrip`** (9:16, score + narrator + captions, the
+main cut), **`MachinaAdTripMusic`** (9:16, score + captions, no narrator; its
+own −14 LUFS master of the bed), **`MachinaAdTripFeed`** (4:5, score +
+narrator + captions). The poster is frame 0 of the 9:16 cut, cropped square
+from the line through the piles.
+
+```bash
+npm run reel:app && CAPTURE_ONLY=adtrip node capture/shoot.mjs   # the take
+python3 audio/synth-vo.py trip                 # narrator → out/vo/trip/, src/reels/ads/trip/vo.json
+node audio/ads/trip-score.mjs                  # bed + music-only master → public/ads/trip/
+node audio/mix-vo.mjs trip                     # narrator mix → public/ads/trip/score-vo.wav (committed)
+npm run verify                                 # "── ad: trip"
+node scripts/ad-trip-stills.mjs && python3 scripts/ad-trip-sheet.py [--safe]   # stills, contact sheets, poster
+npx remotion render src/index.ts MachinaAdTrip out/ads/trip/machina-ad-trip.mp4
+npx remotion render src/index.ts MachinaAdTripMusic out/ads/trip/machina-ad-trip-music.mp4
+npx remotion render src/index.ts MachinaAdTripFeed out/ads/trip/machina-ad-trip-feed.mp4
+```
+
+Note: `shoot.mjs` rewrites `src/reels/data/takes.json` from the takes on
+disk only; with just `adtrip` captured it drops the others' data. This
+branch's `takes.json` is the committed file with the `adtrip` entry added by
+script; on merge, regenerate it by capturing every take.
+
+Its parts: `ads/trip-timeline.mjs`, `src/reels/ads/trip/` (`MachinaAdTrip`,
+`Piles`, `AskTrip`, `End`, `AdCaptions`, `format`, `vo.json`),
+`audio/ads/trip-score.mjs`, `audio/ads/trip-verify.mjs`,
+`capture/ad-trip.mjs`, `scripts/ad-trip-stills.mjs`, `scripts/ad-trip-sheet.py`,
+`TRIP_CARDS`/`TRIP_ASK` in the demo account, and one entry each in
+`shoot.mjs`, `server.mjs`, `synth-vo.py`, `mix-vo.mjs`, `verify.mjs` and
+`Root.tsx`. The "ad: trip" gates: no caption overlap, at most 8 words up at
+once, the hook up from frame 0 and spoken by 0.5s, the mark formed by 4.5s,
+Machina named, the close exactly the tagline and held ≥ 1.6s, at most 30s;
+the narrator mirrors, fits and leaves on time; no em dash, "AI", "second
+brain", "library", "share sheet", "bookmarks", price, "free", plan or
+availability claim; the piles are real demo saves; the answer cites three
+cards from three platforms, each by its title; no banned word, thinking line
+or recipe on any frame of the take; both mixes at −14 LUFS ±0.5 and ≤ −1
+dBTP; every line ≥ 3dB over the music in the speech band.
+
+**Open, for the owner:** it runs 22.9s, over the 15–20s aim (each beat holds
+its line; cutting one would cut a beat of the script); the mark forms at
+4.3s, not ~3s (the gather waits for "five apps" to be heard); nobody has
+listened to the mix on speakers (measured only).

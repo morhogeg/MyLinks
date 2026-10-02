@@ -20,6 +20,9 @@
  *   askfull  (the ASK feature clip) the feed → Ask → the question → the
  *            answer and its sources → a source opened and closed → the
  *            suggested follow-up → its answer → its Graph chip
+ *   adtrip   (the trip ad) the trip's saves written in → Ask → "What should
+ *            we do in Sardinia?" → the answer and its three sources → the
+ *            first source opened
  *
  * What the backend would do (finish analysing a card, answer a question) is
  * driven through the capture server and `window.__capture`, so the app
@@ -36,7 +39,8 @@ import { fileURLToPath } from 'node:url';
 import { startServer } from './server.mjs';
 import { openDevice } from './device.mjs';
 import { Take } from './recorder.mjs';
-import { ASK, CAPTURE_USER, CARDS, SAVE, SEARCH, SYNTHESIS } from './library.mjs';
+import { ASK, CAPTURE_USER, CARDS, SAVE, SEARCH, SYNTHESIS, TRIP_ASK } from './library.mjs';
+import { tripDocs } from './ad-trip.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.join(here, '..', 'public', 'reel', 'app');
@@ -613,6 +617,98 @@ const takes = {
     await visible(page.locator('[data-capture="graph2"]')).click();
     t.mark('graph');
     await t.roll(150, { rects: { canvas: ['canvas'] }, step: 1000 / 60 });
+    await t.thaw();
+    return t.save();
+  },
+
+  // ─────────────────────────────────────────────────────────── adtrip
+  // The trip ad (ads/trip-timeline.mjs), one continuous take:
+  //   open     the Ask tab: the screen's fade and its mark's own launch,
+  //            then its promise, settled (60fps)
+  //   typing   "What should we do in Sardinia?", a character a frame
+  //   stream   the answer, a few words a frame; `sources` its three sources
+  //   card     the first source (Cala Goloritzé) tapped: its card opens (60fps)
+  // The trip's saves are written onto the store first, as the backend writes
+  // finished cards (capture/ad-trip.mjs), so Ask's promise counts them. As in
+  // askfull, the thinking line is never recorded (verify checks).
+  async adtrip() {
+    await fresh(async () => {
+      const docs = tripDocs(Date.now());
+      await page.evaluate((d) => d.forEach(([p, v]) => window.__capture.set(p, v)), docs);
+    });
+    const t = new Take(dev, OUT, 'adtrip');
+    const ASKING = {
+      composer: R.composer,
+      send: R.send,
+      mark: ['[aria-label="Machina is ready"]'],
+      heading: ['h2', 'What do you want to recall?'],
+      promise: ['p', 'Answers come only from'],
+    };
+    const ANSWER = {
+      question: ['p', TRIP_ASK.question],
+      lead: ['p', 'Three of your saves'],
+      body: ['p', 'Cala Goloritzé, Sardinia: the trail'],
+      chip1: ['button[title="Cala Goloritzé, Sardinia"]'],
+      chip2: ['button[title="A boat day on the Gulf of Orosei"]'],
+      chip3: ['button[title="Dana\'s Sardinia tips"]'],
+    };
+    const CARD = {
+      title: ['h2', 'Cala Goloritzé, Sardinia'],
+      summary: ['p', 'A white-pebble cove'],
+      close: ['button[aria-label="Close"]'],
+    };
+    // characters released per captured frame (whole words)
+    const STREAM = 10;
+
+    // Ask opens: the screen fades in, its mark plays the app's own launch and
+    // settles under its promise
+    await t.freeze();
+    await tab('Ask').click();
+    t.mark('open');
+    await t.roll(120, { rects: ASKING, step: 1000 / 60 });
+    await t.thaw();
+
+    // the question, a character per frame on the frozen clock
+    await visible(page.locator('textarea')).click();
+    await page.waitForTimeout(150);
+    await t.freeze();
+    t.mark('typing');
+    for (const ch of TRIP_ASK.question) {
+      await page.keyboard.type(ch);
+      await t.advance();
+      // (a keystroke restarts the caret's blink: on in every typed frame)
+      await t.snap({ rects: ASKING });
+    }
+    await t.thaw();
+
+    // send: the first words are on screen before the first frame is taken
+    await page.keyboard.press('Enter');
+    for (let k = 0; k < 40 && !server.chatOpen(); k++) await page.waitForTimeout(25);
+    if (!server.chatOpen()) throw new Error(`the question never reached /api/chat: ${JSON.stringify(server.log.slice(-4))}`);
+    t.mark('stream');
+    let done = server.advanceChat(STREAM);
+    await until('Three of your');
+    await page.waitForTimeout(90);
+    await t.freeze();
+    await t.snap({ rects: ANSWER, caret: 'hide' });
+    while (!done) {
+      done = server.advanceChat(STREAM);
+      await page.waitForTimeout(90);
+      await t.advance();
+      await t.snap({ rects: ANSWER, caret: 'hide' });
+    }
+    server.finishChat();
+    await page.waitForTimeout(400);
+    t.mark('sources');
+    await t.roll(24, { rects: ANSWER, caret: 'hide' });
+    await t.thaw();
+    await page.waitForTimeout(600);
+
+    // the first source, tapped: the card it cites opens
+    await t.freeze();
+    await visible(page.locator(ANSWER.chip1[0])).click();
+    t.mark('card');
+    await t.roll(60, { rects: CARD, step: 1000 / 60 });
     await t.thaw();
     return t.save();
   },

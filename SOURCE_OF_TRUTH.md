@@ -2712,6 +2712,25 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-02 — Meta ad 2 of 3, "The trip you already planned" (Ask), built.**
+  Branch `claude/ad-trip` (from `claude/clip-ask`, `main` merged in), NOT merged:
+  the owner reviews the cut first. Compositions `MachinaAdTrip` (9:16, the main
+  cut), `MachinaAdTripMusic` (9:16, no narrator) and `MachinaAdTripFeed` (4:5,
+  reframed), 22.9s, plus a 1080 square poster. A Sardinia trip saved across five
+  apps (five piles on frame 0, the hook line already up), gathered into the mark,
+  a match cut into the real Ask screen on its promise, "What should we do in
+  Sardinia?", an answer from three saves on three platforms (Instagram, YouTube,
+  Dana's screenshot), one source tapped open on its passage, the tagline lockup.
+  One continuous real-app take `adtrip`; the trip's five new saves
+  (`TRIP_CARDS`) and the answer (`TRIP_ASK`) are scripted in
+  `capture/library.mjs`, written by the take only, so no other video changes.
+  Every place fact checked (search results; Wikipedia is blocked from the
+  container). Gates in `audio/ads/trip-verify.mjs` ("── ad: trip"), all green;
+  both mixes −14.0 LUFS, −1.25 dBTP. Details: launch-clip README "Meta ad: The
+  trip". **Open:** 22.9s is over the 15–20s aim; the mark forms at 4.3s, not
+  ~3s; nobody has listened to the mix on speakers; `takes.json` on this branch
+  is the committed file plus the `adtrip` entry (regenerate all takes on merge).
+
 - **2026-10-01 — Demo account: Mark Manson's essay replaces the old essay card.**
   Branch `claude/clip-ask`, not merged. Owner: no mentions of the previous author
   anywhere. The demo account's essay card (`capture/library.mjs`) is now Mark
