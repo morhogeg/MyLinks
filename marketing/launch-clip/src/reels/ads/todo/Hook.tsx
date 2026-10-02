@@ -1,139 +1,117 @@
 import React from 'react';
-import { AbsoluteFill, Img, staticFile, useVideoConfig } from 'remotion';
+import { AbsoluteFill, useVideoConfig } from 'remotion';
 import { HITS } from '../../../../clips/ad-todo-timeline.mjs';
-import { MarkAssembly } from '../../kit/Brand';
+import { MarkAssembly, SaveChip, type SaveKind } from '../../kit/Brand';
 import { EASE_GATHER, EASE_IN_OUT, EASE_MODAL, EASE_SPRING, mix, prog } from '../../kit/curves';
 import { useShape } from './frame';
 
 /**
- * 1 HOOK (round 3: built to stop the scroll). The poster, frame 0: the
- * advice carousel the ad saves ("How to ask for a raise", its three slides)
- * under the line "You screenshot the advice. You never use it." Then the
- * pain plays out in under three seconds:
- *  - "You screenshot the advice.": three more screenshots LAND on the pile,
- *    one after another (the app's spring, a lift of white light where each
- *    lands, a shutter click in the score): a talk slide, a "Sunday reset"
- *    note, a packing list;
- *  - "You never use it.": the whole pile sinks, greys and goes soft;
- *  - it rushes into one point (EASE_GATHER), the brackets snap round it:
- *    the Machina mark, at 3.2s. The point then drops onto the + button (the
- *    reel's match cut) and the app irises open round it (App.tsx).
+ * 1 HOOK and 2 SHARE (round 4), in the reel's hook language (kit SaveChip,
+ * MarkAssembly; the REVISIT clip's Opening.tsx is the model, not imported).
  *
- * The screenshots are the ad's own invented, typographic pictures
- * (capture/ad-todo.mjs renders them; copied small into
- * public/ads/todo/hook/): no platform chrome, no third-party image, no real
- * creator.
+ * The poster, frame 0: real saves of every kind from the demo account, where
+ * they were kept (a YouTube video, an Instagram post, an article, an X post, a
+ * screenshot), under "You save it. You never see it again."; they are already
+ * in focus (their cascade began before frame 0). On "never" they bleach into
+ * the paper. On "Share it to Machina instead." they come back to ink as they
+ * rush into one point (EASE_GATHER), the brackets snap round it (the app's
+ * spring): the mark, at 2.9s. The point then opens as an iris onto the app
+ * (App.tsx draws the iris, centred on the same pixel).
+ *
+ * The chips are the kit's: the app's own platform marks, titles of real saves.
  */
 
 /** where everything gathers (tall frame; the feed shape moves it by dy) */
 export const POINT = { x: 540, y: 960 };
-/** the + button's centre in the frame when the app opens (App.tsx OPEN_CAM) */
-export const PLUS = { x: 540, y: 1180, r: 20 * 1.5 };
 const MARK_W = 220;
+/** the point's radius in px: the iris starts from it */
 export const POINT_R = 52 * (MARK_W / 448);
 
-type Shot = { f: string; x: number; y: number; w: number; r: number; drop?: number };
-/** back to front: the pile on frame 0 (the poster: the carousel on top),
- *  then the three that land on its edges, clear of the carousel's title */
-const SHOTS: Shot[] = [
-  { f: 'other-3', x: 840, y: 1180, w: 300, r: 9 },
-  { f: 'other-2', x: 230, y: 1220, w: 290, r: -10 },
-  { f: 'raise-3', x: 790, y: 860, w: 310, r: 6 },
-  { f: 'other-1', x: 270, y: 840, w: 300, r: -7 },
-  { f: 'raise-2', x: 650, y: 1000, w: 330, r: 3 },
-  { f: 'raise-1', x: 430, y: 960, w: 350, r: -3.5 },
-  { f: 'other-4', x: 880, y: 790, w: 260, r: 11, drop: HITS.drops[0] },
-  { f: 'other-5', x: 200, y: 1330, w: 270, r: -9, drop: HITS.drops[1] },
-  { f: 'other-6', x: 870, y: 1290, w: 270, r: 8, drop: HITS.drops[2] },
+const CHIPS: { kind: SaveKind; title: string; x: number; y: number; s: number; r: number; blur: number }[] = [
+  { kind: 'youtube', title: 'How to overcome your addiction to technology', x: 560, y: 590, s: 0.98, r: -3, blur: 0 },
+  { kind: 'web', title: 'Four Thousand Weeks', x: 900, y: 700, s: 0.76, r: 5, blur: 1.6 },
+  { kind: 'instagram', title: 'One week, one small bag', x: 270, y: 770, s: 1.12, r: -4, blur: 0 },
+  { kind: 'x', title: 'You do not rise to the level of your goals', x: 640, y: 890, s: 0.92, r: 2.5, blur: 0 },
+  { kind: 'web', title: 'The Tail End', x: 150, y: 1010, s: 1.6, r: -6, blur: 3.5 },
+  { kind: 'screenshot', title: 'Read Piranesi, and go in blind', x: 760, y: 1070, s: 1.0, r: 3.5, blur: 0 },
+  { kind: 'web', title: 'The Most Important Question of Your Life', x: 420, y: 1200, s: 1.05, r: -2.5, blur: 0 },
+  { kind: 'youtube', title: 'Inside the mind of a master procrastinator', x: 860, y: 1310, s: 0.7, r: 4, blur: 1.6 },
+  { kind: 'instagram', title: 'Cosmic Cliffs in the Carina Nebula', x: 470, y: 1420, s: 0.98, r: -3, blur: 0 },
+  { kind: 'instagram', title: 'Fushimi Inari at dawn', x: 820, y: 1560, s: 1.5, r: 5, blur: 3.5 },
 ];
+
+const CHIP_SCALE = 1.3;
+
+const chipAt = (k: number, f: number, P: { x: number; y: number }, dy: number) => {
+  const c = CHIPS[k];
+  // in focus on a rolling cascade that began before frame 0, so the first
+  // frame (the poster a feed shows) already reads
+  const t0 = k * 1.2 - 14;
+  const arrive = prog(f, t0, t0 + 20, EASE_MODAL);
+  // the hang: a slow push-in, nearer ones faster (parallax)
+  const hang = prog(f, 0, HITS.gather[0], (t) => t);
+  const push = 1 + hang * 0.08 * c.s;
+  const g = prog(f, HITS.gather[0] - 6, HITS.gather[1], EASE_GATHER);
+  // never seen again: bleached into the paper, back to ink as they gather
+  const b = prog(f, HITS.bleach, HITS.bleach + 20, EASE_MODAL) * (1 - prog(f, HITS.gather[0] - 8, HITS.gather[1] - 4, EASE_IN_OUT));
+  return {
+    x: P.x + (c.x - POINT.x) * push * (1 - g),
+    y: P.y + ((c.y - POINT.y) * push + (1 - arrive) * 26 * c.s) * (1 - g),
+    // (the saves are set 30% larger than the REVISIT clip's: on a phone the
+    // poster's titles must read at a glance)
+    s: CHIP_SCALE * c.s * push * mix(0.95, 1, arrive) * mix(1, 0.06 / CHIP_SCALE, Math.pow(g, 0.7)),
+    r: c.r * (1 - g) + g * (k % 2 ? 16 : -16),
+    o: mix(0.5, 1, arrive) * (1 - Math.pow(g, 5)) * (1 - 0.72 * b),
+    blur: (1 - arrive) * 8 + c.blur * (1 - g) + g * 2 + 3 * b,
+    grey: b,
+    g,
+    dy,
+  };
+};
 
 export const Hook: React.FC<{ f: number }> = ({ f }) => {
   const { dy } = useShape();
   const { height } = useVideoConfig();
   if (f > HITS.iris[1]) return null;
   const P = { x: POINT.x, y: POINT.y + dy };
-  const g = (lag: number) => prog(f - lag, HITS.gather[0], HITS.gather[1], EASE_GATHER);
-  // a slow push in from frame 0 (a hold is never dead still)
-  const push = 1 + 0.05 * prog(f, 0, HITS.gather[0], (t) => t);
-  // "You never use it.": the pile sinks grey and soft, back to ink as it gathers
-  const sink = prog(f, HITS.bleach, HITS.bleach + 18, EASE_IN_OUT) * (1 - prog(f, HITS.gather[0] - 4, HITS.gather[1] - 4, EASE_IN_OUT));
   const dot = prog(f, HITS.gather[1], HITS.gather[1] + 7, EASE_SPRING);
   const flash = f < HITS.gather[1] ? Math.pow(prog(f, HITS.gather[0], HITS.gather[1], (t) => t), 3) * 0.45 : Math.max(0, 1 - (f - HITS.gather[1]) / 18);
   const close = prog(f, HITS.gather[1] + 1, HITS.snap + 4, EASE_SPRING);
-  // the brackets hold while the point drops away, then part
-  const part = prog(f, HITS.part + 4, HITS.iris[1], EASE_IN_OUT);
-  const travel = prog(f, HITS.part, HITS.iris[0], EASE_IN_OUT);
-  const plus = { x: PLUS.x, y: PLUS.y + dy };
-  const dotX = mix(P.x, plus.x, travel);
-  const dotY = mix(P.y, plus.y, travel);
-  const dotScale = mix(1, PLUS.r / POINT_R, travel);
+  const part = prog(f, HITS.iris[0] - 6, HITS.iris[0] + 6, EASE_MODAL);
   return (
     <AbsoluteFill style={{ pointerEvents: 'none' }}>
       {f < HITS.gather[1] + 1 &&
-        SHOTS.map((s, k) =>
+        CHIPS.map((c, k) =>
           [3, 2, 1, 0].map((lag) => {
-            // a screenshot lands: dropped in from a little above, larger, on
-            // the app's spring
-            const land = s.drop === undefined ? 1 : prog(f, s.drop, s.drop + 10, EASE_SPRING);
-            if (land <= 0.001) return null;
-            const t = g(lag * 1.2 - k * 0.6);
-            if (lag > 0 && t < 0.08) return null;
+            const p = chipAt(k, f - lag * 1.2, P, dy);
+            if (lag > 0 && p.g < 0.08) return null;
             const alpha = lag === 0 ? 1 : [0, 0.28, 0.16, 0.08][lag];
-            const x = P.x + (s.x - POINT.x) * push * (1 - t);
-            const y = P.y + ((s.y - POINT.y) * push + (1 - land) * -70 + sink * 24) * (1 - t);
-            const sc = push * mix(1.14, 1, land) * mix(1, 0.965, sink) * mix(1, 0.05, Math.pow(t, 0.7));
-            const blur = t * 2 + sink * 3.5 + (1 - land) * 6;
             return (
               <div
                 key={`${k}-${lag}`}
                 style={{
                   position: 'absolute',
-                  left: x,
-                  top: y,
-                  width: s.w,
-                  transform: `translate(-50%, -50%) rotate(${(s.r + (1 - land) * (k % 2 ? 6 : -6)) * (1 - t) + t * (k % 2 ? 14 : -14)}deg) scale(${sc})`,
-                  opacity: alpha * (1 - Math.pow(t, 5)) * Math.min(1, land * 1.6) * (1 - 0.45 * sink),
-                  filter: [blur > 0.2 ? `blur(${blur.toFixed(2)}px)` : '', sink > 0.01 ? `grayscale(${sink.toFixed(3)})` : ''].join(' ').trim() || undefined,
+                  left: p.x,
+                  top: p.y,
+                  transform: `translate(-50%, -50%) rotate(${p.r}deg) scale(${p.s})`,
+                  opacity: p.o * alpha,
+                  filter: [p.blur > 0.2 ? `blur(${p.blur.toFixed(2)}px)` : '', p.grey > 0.01 ? `grayscale(${p.grey.toFixed(3)})` : ''].join(' ').trim() || undefined,
                 }}
               >
-                <Img
-                  src={staticFile(`ads/todo/hook/${s.f}.jpg`)}
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: 22,
-                    border: '1px solid rgba(16,24,40,0.08)',
-                    boxShadow: '0 1px 2px rgba(16,24,40,0.08), 0 26px 60px -20px rgba(24,32,48,0.35), 0 50px 90px -40px rgba(24,32,48,0.22)',
-                  }}
-                />
+                <SaveChip kind={c.kind} title={c.title} />
               </div>
             );
           }),
         )}
 
-      {/* each landing: a lift of white light where the screenshot lands (the
-          kit's landing light, never a full-frame flash) */}
-      {SHOTS.filter((s) => s.drop !== undefined).map((s) => {
-        const a = Math.max(0, 1 - Math.abs(f - (s.drop! + 3)) / 7) * 0.7;
-        if (a <= 0.01) return null;
-        return (
-          <AbsoluteFill
-            key={s.f}
-            style={{
-              background: `radial-gradient(30% 18% at ${((s.x / 1080) * 100).toFixed(2)}% ${(((s.y + dy) / height) * 100).toFixed(2)}%, rgba(255,255,255,${a.toFixed(3)}) 0%, rgba(255,255,255,0) 70%)`,
-            }}
-          />
-        );
-      })}
-
-      {/* the gather's landing: a lift of white light */}
+      {/* the landing: a lift of white light */}
       <AbsoluteFill
         style={{
           background: `radial-gradient(38% 22% at 50% ${((P.y / height) * 100).toFixed(2)}%, rgba(255,255,255,${0.9 * flash}) 0%, rgba(255,255,255,0) 70%)`,
         }}
       />
 
-      {/* the mark: the brackets */}
+      {/* the mark: the brackets (the point is drawn on its own: it opens) */}
       {f >= HITS.gather[1] - 1 && part < 1 && (
         <div
           style={{
@@ -149,18 +127,18 @@ export const Hook: React.FC<{ f: number }> = ({ f }) => {
         </div>
       )}
 
-      {/* the point: everything gathered; it drops onto the + */}
+      {/* the point: everything gathered, the iris's first frame */}
       {dot > 0 && f < HITS.iris[0] + 8 && (
         <div
           style={{
             position: 'absolute',
-            left: dotX,
-            top: dotY,
+            left: P.x,
+            top: P.y,
             width: POINT_R * 2,
             height: POINT_R * 2,
             borderRadius: '50%',
             background: '#14141B',
-            transform: `translate(-50%, -50%) scale(${dot * dotScale})`,
+            transform: `translate(-50%, -50%) scale(${dot})`,
             boxShadow: `0 ${8 + flash * 8}px ${26 + flash * 30}px rgba(24,32,48,${0.3 + flash * 0.2})`,
             opacity: 1 - prog(f, HITS.iris[0], HITS.iris[0] + 8, EASE_MODAL),
           }}

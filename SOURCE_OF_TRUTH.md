@@ -2720,6 +2720,26 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-02 — META AD 3, round 4: "save anything", the to-do story
+  dropped.** Branch `claude/ad-todo`. Owner: "why are we focusing on advice?
+  It sounds absurd. Machina saves articles, YouTube videos, Instagram posts,
+  any post, screenshots, and they are saved, categorized, analyzed and
+  summarized: focus on that." New cut (20.3s, compositions unchanged): "You
+  save it. You never see it again." (real saves of every kind bleach away) /
+  "Share it to Machina instead." (they rush into the mark) / "Screenshots,
+  articles, posts, videos." (four saves land in the feed, each on its word,
+  each with its source and topic) / "A whole video, down to its key moments."
+  (the YouTube card opens on its timestamped Key moments) / "Sorted by topic,
+  all on its own." (the List view, colour-coded topics) / "Download Machina.
+  Everything you save, finally useful." Take `adTodo` re-shot (188 frames);
+  the advice slides, the to-do beats and their hook images are gone.
+  **Verified:** `tsc` clean; `npm run verify` exit 0; stills of every beat in
+  both shapes against the safe zones; both mixes −14.0 LUFS, every line 5dB+
+  over the music in the speech band. **Open:** overlaps ad 1 (both show a
+  YouTube card's key moments; video ingestion is Pro, so neither names a
+  plan); must not be posted before the App Store listing is live (it says
+  "Download Machina."); nobody has listened on speakers; not through Meta's
+  ad review; `takes.json` re-capture at merge.
 - **2026-10-02 — META AD 3, round 3: rewritten to stop the scroll and ask
   for the download.** Branch `claude/ad-todo`. Owner: "the pacing feels off
   and it doesn't grab attention"; rewrite it as an app promo built to drive

@@ -1,20 +1,17 @@
 /**
- * Meta ad 3 (TODO)'s score: the film's and the reel's instruments
- * (audio/synth.mjs), its own arrangement on the ad's clock
- * (clips/ad-todo-timeline.mjs: 112.5 BPM, 16 frames a beat, OUTPUT frames).
+ * Meta ad 3's score: the film's and the reel's instruments (audio/synth.mjs),
+ * its own arrangement on the ad's clock (clips/ad-todo-timeline.mjs: 112.5
+ * BPM, 16 frames a beat, OUTPUT frames).
  *
- * A feed ad starts mid-scroll, so the music is already playing on frame 0.
- * Round 3 (built to stop the scroll): the hook's three screenshots each land
- * with a shutter click and a soft thump; the pile sinks on a falling whoosh;
- * the band comes in with the save and drives through the features; THE
- * STANDOUT (the match cut, the step becoming a to-do) gets a riser that ends
- * on the cut and a bright shimmer after "to-do."; the tick gets the ad's one
- * sweet moment (a click, the fill's sparkle, the fold, a rising three-note
- * answer as "Marked as done" arrives); the band drops out for the lockup, so
- * the mark strikes into air under "Download Machina." The kit's rules: one
- * chord a bar, risers END on the reveal they lead into, a tap is a tick on
- * the frame the app responds, nothing sounds on a word the narrator has to
- * land.
+ * Round 4 ("save anything, and Machina makes sense of it"). A feed ad starts
+ * mid-scroll, so the music is already playing on frame 0. The saves bleach on
+ * a falling whoosh and rush into the mark (whooshes, the impact, the snap);
+ * the band comes in as the app opens and each save lands with a soft thud
+ * under its word; a riser ends on the cut to the list; the band drops out for
+ * the lockup, so the mark strikes into air under "Download Machina." The
+ * kit's rules: one chord a bar, risers END on the reveal they lead into, a tap
+ * is a tick on the frame the app responds, nothing pitched sounds on a word
+ * the narrator has to land (notes and shimmers sit in the gaps).
  *
  *   node audio/ads/todo-score.mjs           →   public/ads/todo/score.wav
  *   node audio/mix-vo.mjs adtodo            →   public/ads/todo/score-vo.wav
@@ -42,7 +39,7 @@ const CHORDS = {
 
 const BARS = Math.ceil(TOTAL_FRAMES / BAR_FRAMES);
 /** how much of the band plays, per bar */
-const DENSITY = [0.34, 0.38, 0.56, 0.6, 0.62, 0.64, 0.7, 0.66, 0.4, 0.34, 0.3];
+const DENSITY = [0.34, 0.4, 0.58, 0.62, 0.66, 0.68, 0.7, 0.42, 0.34, 0.3];
 const LOCKUP = s(HITS.out);
 
 for (let bar = 0; bar < BARS; bar++) {
@@ -103,10 +100,9 @@ for (const m of [48, 64, 67, 72]) pad(LOCKUP, TOTAL_SEC - LOCKUP - 0.1, m, 0.08,
 // never on a word
 const MELODY = [
   // [frame, midi, level?]
-  [160, 67], [176, 72], // the slides land, Save (after "…instead.")
-  [288, 69], [296, 71], [304, 72], // the Key Points lift (after "…key points.")
-  [368, 76], [376, 79], // the standout, after "…a to-do."
-  [440, 72], [452, 76], [464, 79], // the tick answered: the fold, "Marked as done"
+  [212, 67], [220, 72], // after "…posts, videos."
+  [306, 69], [314, 72], // after "…its key moments."
+  [392, 76], [400, 79], // after "…all on its own."
   // home: C as the mark draws, G after the last word
   [HITS.markStrike - 8, 72, 0.17], [TOTAL_FRAMES - 44, 79, 0.17],
 ];
@@ -117,46 +113,26 @@ for (const [from, to] of RISERS) riser(s(from), s(to) - s(from), 0.09);
 
 // ── sound design, on the picture's frames (HITS)
 const H = HITS;
-// the hook: each screenshot lands with a shutter click and a soft thump
-for (const [k, d] of H.drops.entries()) {
-  tick(s(d), 0.13, 0.62);
-  tick(s(d) + 0.045, 0.09, 0.95);
-  sub(s(d + 2), 40 + k * 2, 0.16, 0.22);
-  whoosh(s(d) - 0.08, 0.22, 0.035, k % 2 ? 0.3 : -0.3);
-}
-// "You never use it.": the pile sinks
+// the hook: the saves bleach on "never"; they rush into the point; the snap
 whoosh(s(H.bleach) + 0.05, 0.9, 0.05, 0);
-// it gathers into the point, the brackets snap
 whoosh(s(H.gather[0]) + 0.05, 0.5, 0.09, -0.35);
 whoosh(s(H.gather[0]) + 0.1, 0.45, 0.09, 0.35);
 impact(s(H.gather[1]), 0.24);
 sub(s(H.gather[1]), 36, 0.24, 0.6);
 tick(s(H.snap), 0.1, 0.85);
-// the point drops onto the +, the iris opens
-whoosh(s(H.part) + 0.05, 0.4, 0.06, 0);
-// taps
-tick(s(H.plusTap), 0.09, 1.2);
-tick(s(H.imageTap), 0.08, 1.3);
-bell(s(H.pick + 2), 84, 0.04, 0.2, 1.2); // the slides land in the dialog
-tick(s(H.saveTap), 0.09, 1.2);
-whoosh(s(H.saveTap) + 0.05, 0.45, 0.05, -0.2);
-// the card becomes the card; opened; its Key Points lift
-shimmer(s(H.cardDone + 4), [76, 79, 84], 0.03);
+// the point opens onto the app
+whoosh(s(H.iris[0]) - 0.05, 0.45, 0.06, 0);
+// each save lands with a soft thud (unpitched: it sits under its word)
+for (const [k, l] of H.lands.entries()) {
+  sub(s(l + 2), 40 + k * 2, 0.16, 0.22);
+  tick(s(l + 2), 0.05, 0.8 + k * 0.1);
+}
+// the video's card, tapped and opened
 tick(s(H.cardTap), 0.09, 1.25);
 whoosh(s(H.cardTap) + 0.05, 0.3, 0.045, -0.15);
-bell(s(H.keyPoints), 81, 0.045, -0.2, 1.4);
-// on down to the card's own "Do this", which lifts on "becomes" (no note:
-// the word is the narrator's; the riser into the cut carries it)
-whoosh(s(H.scroll2[0]) + 0.03, 0.5, 0.035, 0.15);
-// THE STANDOUT: the riser ends on the match cut; a sub under it; the shimmer
-// waits for "to-do." to land
-sub(s(H.revisit), 48, 0.2, 0.4);
-shimmer(s(H.revisit + 12), [79, 84, 88, 91], 0.05);
-// THE TICK: the tap, the ring filling, the fold
-tick(s(H.tick), 0.13, 1.35);
-// (the fill's sparkle waits for "…tick it off." to land)
-shimmer(s(H.tick + 20), [84, 88, 91], 0.04);
-whoosh(s(H.tick + 46), 0.3, 0.035, 0);
+shimmer(s(H.moments + 26), [76, 79, 84], 0.035); // after "…key moments."
+// the cut to the list (the riser ends on it)
+sub(s(H.list), 48, 0.2, 0.4);
 // thrown out; the mark strikes into air
 whoosh(s(H.out) - 0.1, 0.6, 0.09, 0);
 impact(s(H.markStrike), 0.34);

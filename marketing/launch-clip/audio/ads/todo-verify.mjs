@@ -16,7 +16,8 @@
  *    tagline), exactly, once, at the end, its last word landed at least 1.6s
  *    before the last frame;
  *  - length ≤ 30s;
- *  - bans, on every caption, the voice, and every frame of the take: em dash,
+ *  - bans, on every caption, the voice, every frame of the take and the four
+ *    saves it seeds: em dash,
  *    literal "AI", "second brain", "library"; in the captions and voice also
  *    "share sheet", "bookmarks", "free", a price, "App Store", "available";
  *    on the app's frames: no recipe card (owner, 2026-10-02), no Pro surface
@@ -133,7 +134,7 @@ for (const c of caps) if (c !== close && /finally useful/i.test(c.text)) bad.pus
 
 // ── the grid
 const H = C.HITS;
-for (const k of ['snap', 'plusTap', 'imageTap', 'pick', 'saveTap', 'cardDone', 'cardTap', 'keyPoints', 'cardTodo', 'revisit', 'tick', 'out', 'markStrike']) {
+for (const k of ['snap', 'cardTap', 'moments', 'list', 'rows', 'out', 'markStrike']) {
   if (H[k] % (C.BEAT_FRAMES / 2)) bad.push(`${k} at ${H[k]} is not on an 8th`);
 }
 // (round 3, owner: "a new visual or cut every two to three seconds") until
@@ -152,17 +153,15 @@ const takes = JSON.parse(read('src/reels/data/takes.json'));
 const take = takes[C.TAKE];
 if (!take) bad.push(`no take "${C.TAKE}" in takes.json: run \`CAPTURE_ONLY=${C.TAKE} npm run reel:capture\``);
 else take.frames.forEach((fr, i) => fr.t.forEach((k) => scan(`the app on ${C.TAKE} frame ${i}`, take.texts[k], SHOWN)));
-for (const m of ['home', 'dialogOpen', 'modeImage', 'picked', 'saving', 'done', 'landed', 'detail', 'detailScroll', 'revisit', 'todo', 'tick']) if (take && take.marks[m] === undefined) bad.push(`take ${C.TAKE} has no mark ${m}`);
-// the capture material the ad seeds (capture/ad-todo.mjs)
+for (const m of ['home', ...C.LANDS.map((k) => `${k}Land`), 'landed', 'open', 'list']) if (take && take.marks[m] === undefined) bad.push(`take ${C.TAKE} has no mark ${m}`);
+// the capture material the ad seeds (capture/ad-todo.mjs): the four saves
 {
   const M = await import('../../capture/ad-todo.mjs');
-  for (const html of [...M.SLIDES, ...M.OTHERS]) scan('a hook screenshot', html.replace(/<[^>]+>/g, ' '), SHOWN);
-  const card = M.raiseCard(['x']);
-  for (const v of [card.title, card.summary, card.detailedSummary, card.actionableTakeaway, ...card.tags]) scan('the raise card', v, SHOWN);
-  for (const [, t] of M.TODOS) scan('a "Do this" row', t, SHOWN);
-  // the analysis prompt's rule since 2026-10-02: one sentence, ≤ 20 words, verb first
-  const todo = card.actionableTakeaway;
-  if (words(todo) > 20 || (todo.match(/[.!?]/g) ?? []).length !== 1) bad.push(`the raise card's "Do this" breaks rule 8 (one sentence, ≤20 words): "${todo}"`);
+  const L = await import('../../capture/library.mjs');
+  const piranesi = L.CARDS.find((c) => c.id === 'piranesi');
+  for (const { key, doc } of M.sourceCards('x', piranesi)) {
+    for (const v of [doc.title, doc.summary, doc.detailedSummary ?? '', ...(doc.tags ?? []), ...(doc.metadata?.videoHighlights ?? [])]) scan(`the ${key} save`, v, SHOWN);
+  }
 }
 
 if (bad.length) {

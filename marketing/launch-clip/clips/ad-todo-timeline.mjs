@@ -1,37 +1,36 @@
 /**
- * Meta ad 3 of 3, "The screenshot that becomes a to-do" (TODO): its single
- * source of time. Picture (src/reels/ads/todo/), score
- * (audio/ads/todo-score.mjs), narrator (audio/synth-vo.py adtodo), mix
- * (audio/mix-vo.mjs adtodo / adtodo-music) and `npm run verify`
- * (audio/ads/todo-verify.mjs) all read this file.
+ * Meta ad 3 of 3 (compositions MachinaAdTodo*): its single source of time.
+ * Picture (src/reels/ads/todo/), score (audio/ads/todo-score.mjs), narrator
+ * (audio/synth-vo.py adtodo), mix (audio/mix-vo.mjs adtodo / adtodo-music)
+ * and `npm run verify` (audio/ads/todo-verify.mjs) all read this file.
  *
- * ROUND 3 (owner: "the pacing feels off and it doesn't grab attention";
- * rewrite it as a scroll-stopping app promo that drives downloads). Three
- * features, pain to payoff, a new picture every two to three seconds:
+ * ROUND 4 (owner: "why are we focusing on advice? It sounds absurd. Machina
+ * saves articles, YouTube videos, Instagram posts, any post, screenshots, and
+ * they are saved, categorized, analyzed and summarized: focus on that"). The
+ * to-do story is gone; the ad is now "save anything, and Machina makes sense
+ * of it":
  *
- *  1 HOOK      the pain, on frame 0: "You screenshot the advice." (three more
- *              screenshots land on the pile, a shutter click each) "You never
- *              use it." (the pile sinks grey). It gathers into the mark (3.3s)
- *  2 SAVE      "Save them to Machina instead.": the point becomes the +; the
- *              Add dialog, Image, three slides, Save, at the app's REAL speed
- *              (the app should feel quick; rounds 1–2 played it at half speed)
- *  3 READ      "It reads every slide," over the feed's "Reading 3
- *              screenshots…" card; "and pulls out the key points.": the card
- *              opens and the Key Points lift
- *  4 STANDOUT  "Then the advice becomes a to-do.": the card's own "Do this"
- *              lifts, and a MATCH CUT holds those words in place while the
- *              world around them becomes Revisit's to-do list
- *  5 TICK      "Do it. Tick it off.": the one beat at half speed (the
- *              satisfying one): the ring fills, the task strikes, the row
- *              folds, "Marked as done"
- *  6 CTA       the lockup: "Download Machina." (in the caption band, held to the
- *              end) and the tagline, `Everything you save, finally useful.`
+ *  1 HOOK     the pain, on frame 0: real saves of every kind, scattered where
+ *             they were kept; "You save it. You never see it again.": they
+ *             bleach into the paper
+ *  2 SHARE    "Share it to Machina instead.": they rush into one point, the
+ *             brackets snap round it (the mark, 2.9s); the point opens as an
+ *             iris onto the app
+ *  3 ANY KIND "Screenshots, articles, posts, videos.": four saves land at the
+ *             top of the feed, each on its word, each already with its source
+ *             and its topic
+ *  4 STANDOUT "A whole video, down to its key moments.": the video's card
+ *             opens on its Key moments, with timestamps; they lift one by one
+ *  5 SORTED   "Sorted by topic, all on its own.": cut to the list, every save
+ *             with its source and its colour-coded topic; the four new rows lift
+ *  6 CTA      the lockup: "Download Machina." in the band to the end, and the
+ *             tagline, `Everything you save, finally useful.`
  *
- * Both features are free (screenshots: up to 5 per card; "Do this"); the ad
- * names no plan and shows no Pro surface (no Daily Brew, no weekly recap).
- * OUTPUT frames at 30fps on the reel's grid (112.5 BPM, 16 frames a beat). The
- * app is one take, `adTodo` (capture/shoot.mjs), recorded at 60fps: `rate: 2`
- * plays it at real speed, `rate: 1` at half speed.
+ * Video key moments are a Pro feature (YouTube ingestion); the ad names no
+ * plan and never says "free" (as ad 1, CAMPAIGN.md §8). OUTPUT frames at
+ * 30fps on the reel's grid (112.5 BPM, 16 frames a beat). The app is one take,
+ * `adTodo` (capture/shoot.mjs), recorded at 60fps and played at its real
+ * speed (`rate: 2`).
  */
 
 export const FPS = 30;
@@ -53,65 +52,48 @@ export const TAKE = 'adTodo';
 
 /**
  * THE CUT. Every scene reads these numbers, and so does the score, so
- * picture and sound move together. Taps, lifts and cuts on 8ths; a tap lands
- * on the frame the app responds.
+ * picture and sound move together. Taps, lifts and cuts on 8ths (the four
+ * landings follow the narrator's words instead).
  */
 export const HITS = {
-  // 1 HOOK (Hook.tsx): the pile is already there on frame 0 (the poster);
-  // three more screenshots land on it, a shutter click each, on "You
-  // screenshot the advice."
-  drops: [8, 20, 32],
-  bleach: 56, // "You never use it.": the pile sinks grey
-  gather: [76, 92], // the screenshots rush into one point
-  snap: 96, // the brackets snap round it: the mark (3.2s)
-  // 2 SAVE: the point drops onto the + and Home irises open round it
-  part: 104,
-  iris: [116, 132], // (the point lands on the + at 116)
-  plusTap: 136,
-  dialog: 136, // the dialog's own entrance, real speed
-  imageTap: 152,
-  pick: 168, // the three slides land in the dialog
-  saveTap: 184,
-  // 3 READ: the dialog drops away; the feed's working card, the card it becomes
-  reading: 214, // (the capture's second working-card roll)
-  cardDone: 232,
-  cardTap: 248,
-  scroll: [264, 288], // read down to the Key Points
-  keyPoints: 288, // …which lift
-  // 4 STANDOUT: on to the card's own "Do this"; it lifts; the match cut
-  scroll2: [316, 336],
-  cardTodo: 336,
-  revisit: 352, // the cut: the same words, now Revisit's first to-do
-  todoDrop: 384,
-  // 5 TICK: the ring, tapped on "Tick" (the app: fill 200ms, hold 650ms, fold
-  // 280ms, then the write and its toast; half speed)
-  tick: 400,
-  toToast: [448, 472],
+  // 1 HOOK (Hook.tsx): the saves are already there on frame 0 (the poster)
+  bleach: 40, // "…never see it again.": they bleach into the paper
+  // 2 SHARE
+  gather: [64, 80], // the saves rush into one point
+  snap: 88, // the brackets snap round it: the mark (2.9s)
+  iris: [96, 112], // the point opens onto the feed
+  // 3 ANY KIND: each save lands at the top of the feed on its word
+  // ("Screenshots," "articles," "posts," "videos.")
+  // (each a few frames before its word, so the card is arriving as it is said)
+  lands: [134, 158, 176, 189],
+  // 4 STANDOUT
+  cardTap: 224, // the video's card, tapped: it opens on its Key moments
+  moments: 280, // …which lift one by one on "key moments", 6 frames apart
+  // 5 SORTED
+  list: 328, // cut on the beat to the list
+  rows: 344, // the four new rows lift one by one, 6 frames apart
   // 6 CTA
-  out: 488, // thrown out of frame
-  markStrike: 520, // the lockup's mark strikes (the impact)
+  out: 408, // thrown out of frame
+  markStrike: 440, // the lockup's mark strikes (the impact)
 };
+
+/** the four landings, in take order (capture/ad-todo.mjs sourceCards) */
+export const LANDS = ['screenshot', 'article', 'instagram', 'youtube'];
 
 /**
  * The app's take, by stretch: which capture mark plays from which output
  * frame, how many captured frames it has, and at what rate (2 = the app's
- * real speed, 1 = half speed).
+ * real speed).
  */
 export const PLAY = {
-  dialogOpen: { at: HITS.dialog, n: 24, rate: 2 },
-  modeImage: { at: HITS.imageTap, n: 24, rate: 2 },
-  picked: { at: HITS.pick, n: 24, rate: 2 },
-  saving: { at: HITS.saveTap, n: 60, rate: 2 },
-  reading: { at: HITS.reading, n: 60, rate: 2 },
-  done: { at: HITS.cardDone, n: 48, rate: 2 },
-  detail: { at: HITS.cardTap, n: 40, rate: 2 },
-  tick: { at: HITS.tick, n: 132, rate: 1 },
+  ...Object.fromEntries(LANDS.map((k, i) => [`${k}Land`, { at: HITS.lands[i], n: 36, rate: 2 }])),
+  open: { at: HITS.cardTap, n: 40, rate: 2 },
 };
 
 export const THROW_LEN = 24;
 /** the tagline holds ~1.7s once its last word has landed (spec: ≥ 1.6s);
  *  verify measures it */
-export const TOTAL_FRAMES = 688;
+export const TOTAL_FRAMES = 608;
 export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 
 /**
@@ -127,17 +109,15 @@ export const TOTAL_SEC = TOTAL_FRAMES / FPS;
  */
 export const CAPTIONS = [
   // the pain, on the poster
-  { at: 8, to: 94, hook: true, text: 'You screenshot the advice.\nYou never use it.' },
-  // feature 1: saving takes a tap
-  { at: 96, to: 184, text: 'Save them to Machina\ninstead.', until: 'the slides are picked and Save is tapped' },
-  // feature 2: it reads them for you
-  { at: 192, to: 240, text: 'It reads every slide,' },
-  { at: 240, to: 304, text: 'and pulls out\nthe key points.', until: 'the Key Points lift' },
-  // feature 3, the standout: the step on the card becomes the to-do
-  // (the standout line: the music ducks further under it, like the brand lines)
-  { at: 312, to: 376, text: 'Then the advice\nbecomes a to-do.', until: 'the match cut lands on the to-do list', duck: 0.45 },
-  // the payoff
-  { at: 384, to: 480, text: 'Do it.\nTick it off.', until: 'the row folds and "Marked as done" shows' },
+  { at: 8, to: 78, hook: true, text: 'You save it.\nYou never see it again.' },
+  // the turn: everything goes to one place
+  { at: 80, to: 136, text: 'Share it to Machina\ninstead.', until: 'the mark opens onto the app' },
+  // any kind of save: each lands on its word
+  { at: 136, to: 220, text: 'Screenshots, articles,\nposts, videos.' },
+  // the standout: a video becomes its key moments
+  { at: 232, to: 320, text: 'A whole video, down to\nits key moments.', until: 'the Key moments lift' },
+  // sorted, on its own
+  { at: 328, to: 400, text: 'Sorted by topic,\nall on its own.', until: 'the four new rows lift' },
   // the CTA and the close: "Download Machina." sits in the caption band to the
   // end; the wordmark wipes in on "Machina"; the tagline, exactly, closes
   // (owner, 2026-09-28: every film ends on it)
@@ -149,15 +129,15 @@ export const KICKERS = [];
 
 /**
  * THE SCORE (audio/ads/todo-score.mjs): one chord per bar from the reel's
- * C-major vocabulary. The pain hangs on IV and V, the mark resolves home, the
- * features walk I V IV I, the tick lands home, the lockup holds C.
+ * C-major vocabulary. The pain hangs on IV, the mark resolves home, the
+ * landings and the video walk I V IV, the list lands home, the lockup holds C.
  */
-export const BAR_CHORDS = ['Fmaj7', 'G6', 'Cmaj7', 'G6', 'Fmaj7', 'Cmaj7', 'G6', 'Cmaj7', 'Fmaj7', 'Cmaj7', 'Cmaj7'];
-/** the drums: in with the save (bar 2), out for the lockup */
+export const BAR_CHORDS = ['Fmaj7', 'Cmaj7', 'G6', 'Fmaj7', 'G6', 'Cmaj7', 'Fmaj7', 'Cmaj7', 'Cmaj7', 'Cmaj7'];
+/** the drums: in with the landings, out for the lockup */
 export const DRUMS = [2 * BAR_FRAMES, HITS.out];
 /** risers END on the reveal they lead into: the mark, the cut, the strike */
 export const RISERS = [
   [HITS.gather[0] - 32, HITS.snap],
-  [HITS.revisit - 24, HITS.revisit],
+  [HITS.list - 24, HITS.list],
   [HITS.out - 16, HITS.markStrike],
 ];

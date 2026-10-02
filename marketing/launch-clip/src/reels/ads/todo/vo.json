@@ -1,76 +1,68 @@
 [
  {
   "frame": 8,
-  "text": "You screenshot the advice. You never use it.",
+  "text": "You save it. You never see it again.",
   "words": [
    0.05,
-   0.251,
-   0.806,
-   1.007,
-   1.66,
-   1.829,
-   2.082,
-   2.251
+   0.244,
+   0.486,
+   0.9,
+   1.073,
+   1.333,
+   1.507,
+   1.637
   ]
  },
  {
-  "frame": 96,
-  "text": "Save them to Makeena instead.",
-  "words": [
-   0.03,
-   0.298,
-   0.567,
-   0.728,
-   1.157
-  ]
- },
- {
-  "frame": 192,
-  "text": "It reads every slide,",
-  "words": [
-   0.06,
-   0.217,
-   0.53,
-   0.844
-  ]
- },
- {
-  "frame": 240,
-  "text": "and pulls out the key points.",
-  "words": [
-   0.08,
-   0.259,
-   0.527,
-   0.705,
-   0.884,
-   1.063
-  ]
- },
- {
-  "frame": 312,
-  "text": "Then the advice becomes a to-do.",
+  "frame": 80,
+  "text": "Share it to Makeena instead.",
   "words": [
    0.04,
-   0.293,
-   0.495,
-   0.85,
-   1.255,
-   1.356
+   0.336,
+   0.484,
+   0.632,
+   1.026
   ]
  },
  {
-  "frame": 384,
-  "text": "Do it. Tick it off.",
+  "frame": 136,
+  "text": "Screenshots, articles, posts, videos.",
   "words": [
-   0.06,
-   0.201,
-   0.49,
-   0.725,
-   0.865
+   0.05,
+   0.857,
+   1.478,
+   1.913
   ]
  },
  {
-  "frame": 528,
+  "frame": 232,
+  "text": "A whole video, down to its key moments.",
+  "words": [
+   0.1,
+   0.2,
+   0.5,
+   1.11,
+   1.36,
+   1.51,
+   1.71,
+   1.91
+  ]
+ },
+ {
+  "frame": 328,
+  "text": "Sorted by topic, all on its own.",
+  "words": [
+   0.04,
+   0.464,
+   0.646,
+   1.27,
+   1.455,
+   1.594,
+   1.779
+  ]
+ },
+ {
+  "frame": 448,
   "text": "Download Makeena. Everything you save, finally useful.",
   "words": [
    0.09,

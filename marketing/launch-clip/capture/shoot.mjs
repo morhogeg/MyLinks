@@ -585,174 +585,82 @@ const takes = {
   },
 
   // ─────────────────────────────────────────────────────────── adTodo
-  // The TODO ad (clips/ad-todo-timeline.mjs): an advice carousel's three
-  // slides picked in the Add dialog's Image tab and saved as ONE card, read in
-  // the background (the feed's own "Reading 3 screenshots…" card), opened on
-  // its screenshots, gist and Key Points; then Revisit's "Do this", where its
-  // step now leads the list, ticked: the ring fills, the task strikes, the
-  // row folds, "Marked as done". No recipe, money or workout card is in the
-  // store, and no Pro surface (the Daily Brew, the weekly recap) is seeded.
-  // Rolls at 60fps. (capture/ad-todo.mjs has the slides and the card.)
+  // Meta ad 3 (clips/ad-todo-timeline.mjs), round 4: "save anything, and it
+  // is summarized and sorted". Four saves of four kinds land at the top of
+  // the feed one after another (a screenshot, an article, an Instagram post,
+  // a YouTube video: capture/ad-todo.mjs); the video's card is opened and
+  // read down to its Key moments; then the feed as a list, every save with
+  // its source and its topic. Rolls at 60fps. No recipe, money or workout
+  // card is in the store, and no Pro surface is seeded.
   async adTodo() {
     const shotsDir = path.join(here, '..', 'out', 'capture', 'app', 'out', AD_TODO.SHOTS_DIR);
-    const shots = await AD_TODO.renderShots(dev.browser, shotsDir);
-    const urls = shots.slides.map((f) => `${server.url}/${AD_TODO.SHOTS_DIR}/${path.basename(f)}`);
+    await AD_TODO.renderPost(dev.browser, shotsDir);
+    const postUrl = `${server.url}/${AD_TODO.SHOTS_DIR}/post-1.png`;
+    const piranesi = CARDS.find((c) => c.id === 'piranesi');
+    const sources = AD_TODO.sourceCards(postUrl, piranesi);
     await fresh(async () => {
       await page.evaluate(
-        ([uid, hidden, hiddenCols, todos]) => {
+        ([uid, hidden, hiddenCols, landing]) => {
           for (const p of window.__capture.list(`users/${uid}/digests/`)) window.__capture.remove(p);
           for (const p of window.__capture.list(`users/${uid}/syntheses/`)) window.__capture.remove(p);
-          for (const id of hidden) window.__capture.remove(`users/${uid}/links/${id}`);
+          for (const id of [...hidden, ...landing]) window.__capture.remove(`users/${uid}/links/${id}`);
           for (const id of hiddenCols) window.__capture.remove(`users/${uid}/collections/${id}`);
-          // only these carry an open "Do this" (the app writes one only when
-          // the content calls for an action)
-          for (const p of window.__capture.list(`users/${uid}/links/`)) {
-            const cur = window.__capture.get(p);
-            if (cur?.actionableTakeaway) {
-              const { actionableTakeaway, ...rest } = cur;
-              void actionableTakeaway;
-              window.__capture.set(p, rest);
-            }
-          }
-          for (const [id, text] of todos) {
-            const p = `users/${uid}/links/${id}`;
-            const cur = window.__capture.get(p);
-            if (cur) window.__capture.set(p, { ...cur, actionableTakeaway: text });
-          }
         },
-        [UID, AD_TODO.HIDDEN, AD_TODO.HIDDEN_COLLECTIONS, AD_TODO.TODOS],
+        [UID, AD_TODO.HIDDEN, AD_TODO.HIDDEN_COLLECTIONS, sources.map((x) => x.id)],
       );
     });
     const t = new Take(dev, OUT, 'adTodo');
     const F60 = 1000 / 60;
-    const D = {
-      dialog: R.dialog,
-      tabImage: ['[role=dialog] button', 'Image'],
-      dropzone: ['[role=dialog] label, [role=dialog] div', 'Tap to add images'],
-      strip: ['[role=dialog] ol, [role=dialog] ul, [role=dialog] div', 'Screens of one post'],
-      save: ['[role=dialog] button', 'Save'],
-    };
     t.mark('home');
-    await t.snap({ rects: { plus: R.plus, firstCard: R.firstCard } });
+    await t.snap({ rects: { firstCard: R.firstCard } });
 
-    // + : the dialog's own entrance
-    await t.freeze();
-    await visible(page.locator(R.plus[0])).click();
-    t.mark('dialogOpen');
-    await t.roll(24, { rects: D, step: F60 });
-    await t.thaw();
-
-    // the Image tab
-    await page.waitForTimeout(250);
-    await t.freeze();
-    await visible(page.locator('[role=dialog]').getByRole('button', { name: 'Image', exact: true })).click();
-    t.mark('modeImage');
-    await t.roll(24, { rects: D, step: F60 });
-    await t.thaw();
-
-    // the three slides, picked (the photo picker is native; the dialog shows
-    // them the moment they are chosen)
-    await page.locator('#image-upload').setInputFiles(shots.slides);
-    await until('Screens of one post');
-    await page.waitForTimeout(600);
-    t.mark('picked');
-    await t.roll(24, { rects: D, step: F60 });
-    await t.thaw();
-
-    // Save: the placeholder card is written; /api/share is held until time is
-    // frozen, so the dialog's close is recorded from its first frame
-    let held = null;
-    await page.route('**/api/share', (route) => {
-      held = route;
-    });
-    await visible(page.getByRole('button', { name: 'Save', exact: true })).click();
-    for (let k = 0; k < 200 && !held; k++) await page.waitForTimeout(50);
-    if (!held) throw new Error('adTodo: /api/share was never called');
-    const cardPath = await page.evaluate(
-      (uid) => window.__capture.list(`users/${uid}/links/`).find((p) => window.__capture.get(p)?.status === 'processing') ?? null,
-      UID,
-    );
-    if (!cardPath) throw new Error('adTodo: no processing card was written');
-    await t.freeze();
-    t.mark('saving');
-    await held.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, cardId: cardPath.split('/').pop() }) });
-    await page.unroute('**/api/share');
-    await t.roll(60, { rects: { dialog: R.dialog, toast: ['[role=status]'], firstCard: R.firstCard }, step: F60 });
-    // the feed's own working card while the screenshots are read
-    t.mark('reading');
-    await t.roll(60, { rects: { toast: ['[role=status]'], firstCard: R.firstCard }, step: F60 });
-
-    // the backend finishes: the placeholder becomes the card
-    await page.evaluate(
-      ([p, card]) => {
-        const cur = window.__capture.get(p) ?? {};
-        const { processingStartedAt, ...rest } = cur;
-        void processingStartedAt;
-        window.__capture.set(p, { ...rest, ...card });
-      },
-      [cardPath, AD_TODO.raiseCard(urls)],
-    );
-    await page.waitForTimeout(150);
-    t.mark('done');
-    await t.roll(48, { rects: { toast: ['[role=status]'], firstCard: R.firstCard }, step: F60 });
-    await t.thaw();
-    await page.waitForTimeout(800);
+    // the four saves land at the top of the feed, one after another
+    for (const { key, id, doc } of sources) {
+      await t.freeze();
+      await page.evaluate(([p, d]) => window.__capture.set(p, { ...d, createdAt: Date.now() }), [linkPath(id), doc]);
+      t.mark(`${key}Land`);
+      await t.roll(36, { rects: { firstCard: R.firstCard }, step: F60 });
+      await t.thaw();
+      await page.waitForTimeout(500);
+    }
     t.mark('landed');
     await t.snap({ rects: { firstCard: R.firstCard } });
 
-    // opened: the screenshots, the gist, then down to the Key Points
+    // the video's card, opened, read down to its Key moments
     const DETAIL = {
-      gallery: ['[aria-label^="Screenshots"]'],
-      detailTitle: ['h2', 'How to ask for a raise'],
-      gist: ['div,p', 'bring your wins with numbers'],
+      title: ['h2', 'How to overcome your addiction'],
+      gist: ['p,div', 'hijack the brain'],
+      moments: ['div', 'Explains that dopamine'],
+      moment1: ['li', '2:24'],
+      moment2: ['li', '6:44'],
+      moment3: ['li', '19:20'],
+      moment4: ['li', '26:20'],
       keyPoints: ['h1,h2,h3,h4', 'Key Points'],
-      points: ['ul', 'Keep a list of your wins'],
-      takeaway: ['div', 'Write down three wins'],
     };
     await t.freeze();
     await visible(page.locator(R.firstCard[0]).first()).click({ position: { x: 120, y: 40 } });
-    t.mark('detail');
+    t.mark('open');
     await t.roll(40, { rects: DETAIL, step: F60 });
     await t.thaw();
     await page.waitForTimeout(500);
     await t.freeze();
-    await tagScroller('Key Points');
-    t.mark('detailScroll');
-    // (round 2) on past the Key Points to the card's own "Do this": the step
-    // the analysis wrote, the same one Revisit lists
-    await rollScroll(t, await scrollTargetFor('before your next review', 640), 4, DETAIL);
+    await tagScroller('Explains that dopamine');
+    t.mark('scroll');
+    await rollScroll(t, await scrollTargetFor('Suggests turning off color', 700), 4, DETAIL);
     await t.thaw();
 
-    // Revisit: its "Do this" list, the new step on top
+    // back to the feed, shown as a list: every save with its source and topic
     await page.keyboard.press('Escape');
     await page.waitForTimeout(900);
-    const TODO = {
-      list: ['div[class*="rounded-2xl"][class*="overflow-hidden"]', AD_TODO.RAISE_TODO],
-      header: ['button', 'Do this'],
-      row1: ['div[class*="ps-1.5"]', AD_TODO.RAISE_TODO],
-      row2: ['div[class*="ps-1.5"]', AD_TODO.TODOS[0][1]],
-      row3: ['div[class*="ps-1.5"]', AD_TODO.TODOS[1][1]],
-      check1: [`button[role=checkbox][aria-label*="Write down three wins"]`],
-      toast: ['[role=status]', 'Marked as done'],
-      done: ['button', 'Done 1'],
-      revisitTab: R.revisitTab,
-    };
-    await t.freeze();
-    await tab('Revisit').click();
-    t.mark('revisit');
-    await t.roll(24, { rects: TODO, step: F60 });
-    await t.thaw();
-    await page.waitForTimeout(900);
-    t.mark('todo');
-    await t.snap({ rects: TODO });
-
-    // the tick: the ring fills with the accent and a check, the task strikes,
-    // a ~650ms hold, the row folds, then the write and "Marked as done"
-    await t.freeze();
-    await visible(page.locator(TODO.check1[0])).click();
-    t.mark('tick');
-    await t.roll(132, { rects: TODO, step: F60 });
-    await t.thaw();
+    await visible(page.locator('button[aria-label^="View:"]')).click();
+    await page.waitForTimeout(600);
+    await page.locator('[role=radio]', { hasText: 'List' }).first().click();
+    await page.waitForTimeout(1200);
+    const LIST = Object.fromEntries(
+      [...sources.map((x) => [x.key, x.doc.title]), ['tailend', 'The Tail End'], ['weeks', 'Four Thousand Weeks']].map(([k, title]) => [k, ['div.surface-card', title]]),
+    );
+    t.mark('list');
+    await t.snap({ rects: LIST });
     return t.save();
   },
 
