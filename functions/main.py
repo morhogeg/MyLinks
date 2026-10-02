@@ -5415,6 +5415,7 @@ _USER_OWNED_CARD_FIELDS = (
     "isPrivate", "hideThumbnail", "shareId", "sharePublishedAt",
     "reminderStatus", "nextReminderAt", "reminderCount", "reminderProfile",
     "reminderDue", "reminderDueAt", "lastViewedAt", "reviewedAt", "takeawayDoneAt",
+    "takeawayDismissedAt",
     "archived", "isRead", "importedAt", "importedFromAt", "importedTags",
 )
 

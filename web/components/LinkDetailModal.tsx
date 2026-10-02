@@ -23,7 +23,7 @@ import { isCardShareStale } from '@/lib/collections';
 import CitationMark from './ui/CitationMark';
 import ProBadge from './ui/ProBadge';
 import { requestPaywall } from '@/lib/entitlement';
-import { getActionableTakeaway, isTakeawayDone } from '@/lib/takeaway';
+import { getActionableTakeaway, isTakeawayDismissed, isTakeawayDone } from '@/lib/takeaway';
 import ScreenshotEnrich from '@/components/ScreenshotEnrich';
 
 // Sentinel `editingNoteId` for the composer when adding a brand-new note (as
@@ -63,6 +63,8 @@ interface LinkDetailModalProps {
     uid: string | null;
     /** Tick the card's "Do this" takeaway off or back on (Feed writes it). */
     onToggleTakeawayDone?: (link: Link, done: boolean) => void;
+    /** Put a "Not for me" takeaway back on Revisit's "Do this" list. */
+    onRestoreTakeaway?: (link: Link) => void;
     isOpen: boolean;
     onClose: () => void;            // dismiss the modal entirely (clears the back-stack)
     onBack?: () => void;           // step back to the previous card in the back-stack
@@ -111,6 +113,7 @@ export default function LinkDetailModal({
     allCategories,
     uid,
     onToggleTakeawayDone,
+    onRestoreTakeaway,
     isOpen,
     onClose,
     onBack,
@@ -1343,13 +1346,19 @@ export default function LinkDetailModal({
                             // the row from Revisit's "Do this" list and strikes the
                             // line through here, and the text itself never changes.
                             const done = isTakeawayDone(link);
+                            // Swiped away in Revisit ("Not for me"): the label
+                            // says so, and tapping it puts the task back on the
+                            // list. Done wins if both are set.
+                            const dismissed = !done && isTakeawayDismissed(link);
                             const label = done
                                 ? (isRtl ? 'בוצע' : 'Done')
-                                : (isRtl ? 'לעשות' : 'Do this');
+                                : dismissed
+                                    ? (isRtl ? 'לא בשבילי' : 'Not for me')
+                                    : (isRtl ? 'לעשות' : 'Do this');
                             const labelClass = `flex items-center gap-2 mb-2 text-sm font-bold text-text-muted ${isRtl ? '' : 'uppercase tracking-wider'}`;
                             const icon = done
                                 ? <CircleCheck className="w-4 h-4 shrink-0 text-accent" />
-                                : <Circle className="w-4 h-4 shrink-0 text-accent" />;
+                                : <Circle className={`w-4 h-4 shrink-0 ${dismissed ? 'text-text-muted' : 'text-accent'}`} />;
                             return (
                                 <div className="mb-6" dir={isRtl ? 'rtl' : 'ltr'}>
                                     {/* Same label treatment as Machina's read below, so
@@ -1357,7 +1366,18 @@ export default function LinkDetailModal({
                                         unrelated inventions. Hebrew skips the uppercase
                                         (a no-op) and the wide tracking (which only makes
                                         Hebrew look loose). */}
-                                    {onToggleTakeawayDone ? (
+                                    {dismissed && onRestoreTakeaway ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => onRestoreTakeaway(link)}
+                                            aria-label="Put back on the Do this list"
+                                            title="Put back on the Do this list"
+                                            className={`${labelClass} -mx-1 px-1 rounded-md hover:text-text-secondary transition-colors cursor-pointer`}
+                                        >
+                                            {icon}
+                                            <span>{label}</span>
+                                        </button>
+                                    ) : onToggleTakeawayDone ? (
                                         <button
                                             type="button"
                                             onClick={() => onToggleTakeawayDone(link, !done)}
@@ -1374,7 +1394,7 @@ export default function LinkDetailModal({
                                             <span>{label}</span>
                                         </div>
                                     )}
-                                    <p className={`reading-prose leading-relaxed ${isRtl ? 'text-right' : 'text-left'} ${done ? 'text-text-muted line-through decoration-text-muted/60' : 'text-text-secondary'}`}>
+                                    <p className={`reading-prose leading-relaxed ${isRtl ? 'text-right' : 'text-left'} ${done ? 'text-text-muted line-through decoration-text-muted/60' : dismissed ? 'text-text-muted' : 'text-text-secondary'}`}>
                                         {takeaway}
                                     </p>
                                 </div>
