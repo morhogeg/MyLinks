@@ -1878,7 +1878,8 @@ G2. **[ ] Graph next levers (from the round-3 product pass):** (a) search/
     again clears. Category filtering still lives in the library filter
     sheet, which scopes the graph.
 
-G2c. **[ ] Category colors collide.** `getCategoryColorStyle` (`lib/colors.ts`)
+G2c. **[x] Category colors collide — FIXED 2026-10-02** (per-library
+    assignment in `lib/colors.ts`, see §9). Original report: `getCategoryColorStyle` (`lib/colors.ts`)
     picks a color by string hash mod the palette size, so two categories can
     share a color (owner screenshot 2026-10-01: Tech and Health both orange
     in the graph). Fix: assign distinct colors per user's category set
@@ -2399,6 +2400,46 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-02 — Category colors no longer collide (G2c) + Revisit "Done"
+  list + whole tasks.** Branch `claude/revisit-done-and-colors`. Owner on
+  build 1344: should Do this be color-coded like the list view, and can done
+  items be seen? **Colors (decision):** not the list view's stripe/chip yet;
+  the real defect was that colors didn't distinguish categories (Tech/Health
+  both orange, Career/Travel both red: `getCategoryColorStyle` was a name
+  hash mod 10). Now each of the library's categories gets its own slot:
+  `assignCategoryColors` (called by Feed during render with every visible
+  card's category, before children paint) gives new categories the next free
+  slot in a hue-spread order (blue, orange, green, pink, yellow, teal, red,
+  indigo, cyan; most-used first; graphite last; past 10 categories they share
+  by hash). Sticky per device in localStorage `machina.categoryColors.v1`, so
+  a new save never recolors the library; case-insensitive keys; a stored
+  collision is repaired in favor of the more-used category. Every existing
+  call site (cards, list, chips, filters, graph, Revisit dots) picks it up
+  unchanged. Landing page + onboarding mocks use the new
+  `getStaticCategoryColorStyle` (pure hash) so SSR/signed-out renders stay
+  identical. **Known limits:** colors are per device (web vs phone can
+  differ; syncing would need a user-doc field + rules allowlist entry); a
+  server-rendered page using the per-library function would hydrate with
+  hash colors (React doesn't patch style attrs), which is why the static
+  variant exists, and why Feed's client-only render is fine. **Done list
+  (reverses the 2026-09-11 "no aggregated done list" call, owner asked):**
+  under the open tasks, a collapsed "Done N" toggle lists done and "Not for
+  me" takeaways most recently closed first (`lib/takeaway closedTakeaways`,
+  `takeawayClosedAt`), newest 10 then "Show all"; done rows keep the filled
+  check + strike, skipped rows show the slash and "· Not for me"; tapping the
+  mark puts the task back (Feed `reopenTakeaway` clears whichever marker is
+  set; analytics `takeaway_reopened`), tapping the text opens the card. The
+  Do this section now also shows when every task is closed ("All done. New
+  tasks arrive with your saves."). **Whole tasks:** the 4-line clamp is gone
+  (owner's 1344 screenshot still cut two older long tasks). **Verified:**
+  tsc 0; eslint clean on touched files except a pre-existing
+  `react-hooks/set-state-in-effect` error in `landing/parts.tsx` (present on
+  main); `test:colors` 4/4 (new), `test:takeaway` 5/5. Rendered via a
+  throwaway harness (client-only; deleted with its `PUBLIC_ROUTES` edit) at
+  390px light + dark: 5 categories → 5 distinct colors, Done list open with
+  done/skipped/Hebrew rows, reopening the skipped task returns it to the
+  open list; no console errors. **NOT verified:** on device; how an existing
+  library's first assignment looks.
 - **2026-10-02 — REVISIT "DO THIS" ROUND 4: whole tasks, a real checkbox,
   category dots, swipe "Not for me", shorter tasks for new saves.** Branch
   `claude/revisit-do-this-polish`. Owner on build 1343 (screenshot): "find

@@ -5,7 +5,7 @@ import { Globe, Image as ImageIcon, StickyNote, Clock } from 'lucide-react';
 import SourceByline from '@/components/SourceByline';
 import CitationMark from '@/components/ui/CitationMark';
 import { CitationGlyph } from '@/components/ui/Wordmark';
-import { getCategoryColorStyle } from '@/lib/colors';
+import { getStaticCategoryColorStyle } from '@/lib/colors';
 import { platformIcon, platformColor, type PlatformKey } from '@/lib/platform';
 import type { DemoCard, DemoKind } from './demoData';
 
@@ -46,8 +46,9 @@ export function LiveMark({ size = 24, className = '', ...rest }: ComponentProps<
  *   - `SourceByline` — the REAL component, not a lookalike, so a YouTube card
  *     carries its channel, an X card its @handle, a screenshot its icon,
  *     pixel-identical to the feed;
- *   - `getCategoryColorStyle` — the app's category → colour hash, so TRAVEL is
- *     the same tinted chip here as in the app;
+ *   - `getStaticCategoryColorStyle` — the app's palette and category → colour
+ *     hash, so TRAVEL is the same kind of tinted chip as in the app (the app
+ *     itself assigns colours per library, so the exact hue can differ);
  *   - the shell, header row, title, tag chips and Clock footer carry the card's
  *     own classes (`surface-card`, `rounded-[20px]`, the `text-[10px]
  *     font-black tracking-widest` chip, the `text-[9px]` tag pills).
@@ -94,7 +95,7 @@ export function CardView({ card, compact = false, dense = false, className = '' 
     dense?: boolean;
     className?: string;
 }) {
-    const colorStyle = getCategoryColorStyle(card.category);
+    const colorStyle = getStaticCategoryColorStyle(card.category);
     if (dense) {
         return (
             <article
