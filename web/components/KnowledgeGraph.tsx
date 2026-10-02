@@ -1030,7 +1030,11 @@ export default function KnowledgeGraph({
                             {filtered && <span className="text-accent"> · filtered</span>}
                         </>
                     ) : (
-                        <span className="text-text-muted">Mapping your knowledge…</span>
+                        // The canvas already says "Mapping your knowledge…" —
+                        // saying it here too showed it twice (owner QA). A blank
+                        // line keeps the row's height so the canvas doesn't jump
+                        // when the stats land.
+                        <span aria-hidden="true">&nbsp;</span>
                     )}
                 </div>
                 <div className="hidden sm:block flex-1" />

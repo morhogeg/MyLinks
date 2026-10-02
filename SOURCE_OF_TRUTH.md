@@ -2399,6 +2399,16 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-02 — GRAPH: "Mapping your knowledge…" no longer shows twice.**
+  Branch `claude/graph-cluster-chips`. Owner device QA on build 1342 (cluster
+  chips confirmed good; TestFlight run #342 green): opening the Graph showed
+  the loading line in the stats header AND centered in the canvas.
+  `KnowledgeGraph.tsx`: the header's loading branch is now a blank
+  `&nbsp;` line (keeps the row height so the canvas doesn't jump when the
+  stats land); the canvas loader is the only message. **Verified:** tsc 0;
+  loading state rendered via a throwaway harness (deleted, temporary
+  `PUBLIC_ROUTES` entry reverted) at 390px: one "Mapping your knowledge…".
+  **NOT verified:** on device.
 - **2026-10-01 — GRAPH: CLUSTER CHIPS REPLACE CATEGORY CHIPS.** Branch
   `claude/graph-cluster-chips`. Owner: each cluster name on the canvas
   (e.g. LONGEVITY) should have a chip above the graph that opens the same
