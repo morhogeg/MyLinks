@@ -750,19 +750,26 @@ that you tick off. Both features are free (up to 5 screenshots a card; "Do
 this"); the ad names no plan, says no price and no "free", and shows no Pro
 surface (no Daily Brew, no weekly recap).
 
-**27.5s** (824 frames). The brief aimed for 15 to 20s; with every beat kept,
+**28.5s** (856 frames). The brief aimed for 15 to 20s; with every beat kept,
 and the app at the kit's steady half speed, it would not breathe in less.
-The cut to make for a 20s version is beat 3's card opening (the feed card
-already shows the gist).
 
 | Frames | Beat | Line (burned in and spoken) |
 |---|---|---|
 | 0–104 | **Hook.** A pile of screenshots, on frame 0 (the poster): the ad's invented carousel "How to ask for a raise" on top, a slide from a talk, a "Sunday reset" note and a packing list under it. They rush into one point; the brackets snap round it: the mark, at 3.5s | "Your camera roll is full of advice you never took." (on screen whole from frame 0; the voice starts at 0.33s) |
-| 104–232 | **Save.** The point drops onto the + (the reel's match cut) and Home irises open round it; + tapped; the real Add dialog, lifted off its screen: Image tab, the three slides picked ("Screens of one post, read in this order."), Save | "Save the screenshots to Machina." |
-| 216–392 | **Read.** The dialog drops away; the feed's own "Reading 3 screenshots…" card becomes the card; tapped open on the screenshots, the title and the gist, read down to the Key Points, which lift | "It reads them, and keeps the key points." |
-| 392–544 | **Do this.** A cut on the beat to Revisit as its rows arrive: the new task leads the list ("Write down three wins, each with a number, before your next review."), above The Tail End's and Mark Manson's; it lifts on "to-do" | "When a save calls for action," / "Machina turns it into a to-do." |
-| 544–640 | **Tick.** The ring is tapped on "tick": it fills with the accent and a check, the task strikes, holds ~650ms, the row folds (the shipped round-4 motion, frame for frame, at half speed); "Marked as done" with Undo is lifted off the bottom of the screen into the frame, over the new "Done 1" | "Then do it, and tick it off." |
-| 640–824 | **Close.** Thrown out into the kit's lockup: the mark strikes, the wordmark wipes in on "Machina", the tagline on one line, held 1.7s. Nothing under it: the slot for the App Store badge once the listing is live | "Machina." / "Everything you save, finally useful." |
+| 104–232 | **Save.** The point drops onto the + (the reel's match cut) and Home irises open round it; + tapped; the real Add dialog, lifted off its screen: Image tab, the three slides picked ("Screens of one post, read in this order."), Save | "Save up to five screenshots as one card." (the Image tab's own "Up to 5 screenshots become one card") |
+| 216–400 | **Read.** The dialog drops away; the feed's own "Reading 3 screenshots…" card becomes the card; tapped open on the screenshots, the title and the gist, read down to the Key Points, which lift and are held to be read (the page creeps on a few points) | "It reads every slide for its key points." |
+| 400–488 | **The step.** (round 2) On down the card to its own "Do this", the step the analysis wrote, which lifts on "action," | "When a save calls for action," |
+| 488–576 | **Do this.** A cut on the beat to Revisit as its rows arrive: the same step now leads the to-do list, above The Tail End's and Mark Manson's; it lifts on "to-do" | "Machina turns it into a to-do." |
+| 576–672 | **Tick.** The ring is tapped on "tick": it fills with the accent and a check, the task strikes, holds ~650ms, the row folds (the shipped round-4 motion, frame for frame, at half speed); "Marked as done" with Undo is lifted off the bottom of the screen into the frame, over the new "Done 1" | "Then do it, and tick it off." |
+| 672–856 | **Close.** Thrown out into the kit's lockup: the mark strikes, the wordmark wipes in on "Machina", the tagline on one line, held 1.7s. Nothing under it: the slot for the App Store badge once the listing is live | "Machina." / "Everything you save, finally useful." |
+
+**Round 2 (owner: "maybe it needs to be a bit more detailed, with more
+info").** Inside the 30s limit (27.5 → 28.5s): the card is read on past its
+Key Points to its own "Do this", so the viewer sees where the to-do comes
+from before Revisit shows it as one (the take's read-down now ends there);
+the Key Points are held long enough to read; and two lines now carry facts
+("Save up to five screenshots as one card.", "It reads every slide for its
+key points.").
 
 **Compositions:** `MachinaAdTodo` (9:16, score + narrator + captions, the main
 cut), `MachinaAdTodoMusic` (9:16, score + captions, no narrator: the A/B cut),
@@ -810,7 +817,7 @@ option for it, `noVoice` (the music-only master).
 
 ```bash
 npm run reel:app                               # after merging main
-CAPTURE_ONLY=adTodo npm run reel:capture       # the take (~540 frames, ~5 min)
+CAPTURE_ONLY=adTodo npm run reel:capture       # the take (~580 frames, ~9 min)
 python3 audio/synth-vo.py adtodo               # only after a line or its timing changes
 node audio/ads/todo-score.mjs && node audio/mix-vo.mjs adtodo && node audio/mix-vo.mjs adtodo-music
 npm run verify

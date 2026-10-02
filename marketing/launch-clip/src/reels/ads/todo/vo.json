@@ -31,17 +31,16 @@
  },
  {
   "frame": 232,
-  "text": "It reads every slide, and keeps the key points.",
+  "text": "It reads every slide for its key points.",
   "words": [
-   0.04,
-   0.206,
-   0.539,
-   0.872,
-   1.55,
-   1.728,
-   1.996,
-   2.175,
-   2.353
+   0.05,
+   0.209,
+   0.526,
+   0.844,
+   1.161,
+   1.373,
+   1.585,
+   1.797
   ]
  },
  {

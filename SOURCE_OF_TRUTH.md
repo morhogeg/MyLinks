@@ -2720,6 +2720,17 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-02 — META AD 3, round 2: more detail.** Branch
+  `claude/ad-todo`. Owner on the first cut: "a bit more detailed, with more
+  info". Inside the 30s limit (27.5 → 28.5s): the card is now read on past
+  its Key Points to its own "Do this" (lifted on "When a save calls for
+  action,"), so the to-do's origin is shown before Revisit lists it; the Key
+  Points hold long enough to read; lines now carry facts ("Save up to five
+  screenshots as one card.", "It reads every slide for its key points.").
+  Take re-shot (578 frames). **Verified:** `tsc` clean, `npm run verify` exit
+  0, stills of every beat in both shapes against the safe zones, mixes −14.0
+  LUFS. **Open:** as round 1 (not heard on speakers, not
+  through Meta review, `takes.json` re-capture at merge).
 - **2026-10-02 — META AD 3, "THE SCREENSHOT THAT BECOMES A TO-DO":
   first cut.** Branch `claude/ad-todo` (from `claude/clip-revisit`, `main`
   merged twice; NOT merged to `main`, owner reviews first). Compositions

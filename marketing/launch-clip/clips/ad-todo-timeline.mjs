@@ -128,7 +128,7 @@ export const CAPTIONS = [
   // promise ("Up to 5 screenshots become one card"), what is read, where the
   // to-do comes from
   { at: 112, to: 216, text: 'Save up to five screenshots\nas one card.', until: 'the slides are picked and Save is tapped' },
-  { at: 232, to: 392, text: 'It reads every slide,\nand keeps the key points.', until: 'the card opens and its Key Points lift' },
+  { at: 232, to: 392, text: 'It reads every slide\nfor its key points.', until: 'the card opens and its Key Points lift' },
   { at: 408, to: 480, text: 'When a save calls for action,', until: "the card's own \"Do this\" lifts" },
   { at: 488, to: 548, text: 'Machina turns it\ninto a to-do.' },
   { at: 552, to: 664, text: 'Then do it,\nand tick it off.', until: 'the row folds and "Marked as done" shows' },
