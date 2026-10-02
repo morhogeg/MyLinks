@@ -17,31 +17,35 @@
  },
  {
   "frame": 112,
-  "text": "Save the screenshots to Makeena.",
+  "text": "Save up to five screenshots as one card.",
   "words": [
-   0.05,
-   0.306,
-   0.511,
-   1.125,
-   1.279
+   0.04,
+   0.323,
+   0.493,
+   0.662,
+   0.945,
+   1.624,
+   1.794,
+   2.02
   ]
  },
  {
   "frame": 232,
-  "text": "It reads them, and keeps the key points.",
+  "text": "It reads every slide, and keeps the key points.",
   "words": [
-   0.06,
+   0.04,
    0.206,
-   0.498,
-   0.96,
-   1.145,
-   1.422,
-   1.606,
-   1.791
+   0.539,
+   0.872,
+   1.55,
+   1.728,
+   1.996,
+   2.175,
+   2.353
   ]
  },
  {
-  "frame": 392,
+  "frame": 408,
   "text": "When a save calls for action,",
   "words": [
    0.07,
@@ -53,7 +57,7 @@
   ]
  },
  {
-  "frame": 456,
+  "frame": 488,
   "text": "Makeena turns it into a to-do.",
   "words": [
    0.05,
@@ -65,7 +69,7 @@
   ]
  },
  {
-  "frame": 520,
+  "frame": 552,
   "text": "Then do it, and tick it off.",
   "words": [
    0.07,
@@ -78,7 +82,7 @@
   ]
  },
  {
-  "frame": 688,
+  "frame": 720,
   "text": "Makeena. Everything you save, finally useful.",
   "words": [
    0.05,

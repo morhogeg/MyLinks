@@ -24,9 +24,10 @@
  *              the three slides picked, Save
  *  3 READ      the feed's own "Reading 3 screenshots…" card becomes the card;
  *              opened on the screenshots and the gist, read down to the Key
- *              Points (lifted)
- *  4 DO THIS   cut to Revisit's "Do this": the new task on top; it lifts on
- *              "to-do"
+ *              Points (lifted, held to be read), then on to the card's own
+ *              "Do this", the step the analysis wrote (lifted; round 2)
+ *  4 DO THIS   cut to Revisit's "Do this": the same step, now a to-do on top;
+ *              it lifts on "to-do"
  *  5 TICK      the ring is tapped: it fills with the accent and a check, the
  *              task strikes, holds, the row folds; "Marked as done"; the task
  *              is under "Done 1"
@@ -71,19 +72,23 @@ export const HITS = {
   cardDone: 256,
   cardTap: 296,
   scroll: [336, 368], // read down to the Key Points
-  keyPoints: 368, // …which lift
-  // 4 DO THIS: a cut on the beat to Revisit
-  revisit: 392,
-  todoLift: 496, // the new task lifts on "to-do"
-  todoDrop: 520,
+  keyPoints: 368, // …which lift, and hold long enough to read (round 2)
+  // (round 2, owner: "more detailed") on down to the card's own "Do this":
+  // the step the analysis wrote; it lifts on "action,"
+  scroll2: [400, 432],
+  cardTodo: 448,
+  // 4 DO THIS: a cut on the beat to Revisit: the same step, now a to-do
+  revisit: 488,
+  todoLift: 528, // the new task lifts on "to-do"
+  todoDrop: 552,
   // 5 TICK: the ring, tapped on "tick" (the app: fill 200ms, hold 650ms,
   // fold 280ms, then the write and its toast; 60fps, one captured frame per
   // output frame)
-  tick: 544,
-  toToast: [600, 624], // the camera goes down with the fold to the toast
+  tick: 576,
+  toToast: [632, 656], // the camera settles under the folded list
   // 6 CLOSE
-  out: 640, // thrown out of frame
-  markStrike: 680, // the lockup's mark strikes (the impact)
+  out: 672, // thrown out of frame
+  markStrike: 712, // the lockup's mark strikes (the impact)
 };
 
 /**
@@ -104,7 +109,7 @@ export const PLAY = {
 export const THROW_LEN = 24;
 /** the tagline holds ~1.7s once its last word has landed (spec: ≥ 1.6s);
  *  verify measures it */
-export const TOTAL_FRAMES = 824;
+export const TOTAL_FRAMES = 856;
 export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 
 /**
@@ -119,11 +124,14 @@ export const TOTAL_SEC = TOTAL_FRAMES / FPS;
  */
 export const CAPTIONS = [
   { at: 8, to: 112, hook: true, text: 'Your camera roll is full\nof advice you never took.' },
-  { at: 112, to: 216, text: 'Save the screenshots\nto Machina.', until: 'the slides are picked and Save is tapped' },
-  { at: 232, to: 376, text: 'It reads them, and keeps\nthe key points.', until: 'the card opens and its Key Points lift' },
-  { at: 392, to: 452, text: 'When a save\ncalls for action,' },
-  { at: 456, to: 520, text: 'Machina turns it\ninto a to-do.' },
-  { at: 520, to: 632, text: 'Then do it,\nand tick it off.', until: 'the row folds and "Marked as done" shows' },
+  // (round 2, owner: "more info") the lines carry facts: the Image tab's own
+  // promise ("Up to 5 screenshots become one card"), what is read, where the
+  // to-do comes from
+  { at: 112, to: 216, text: 'Save up to five screenshots\nas one card.', until: 'the slides are picked and Save is tapped' },
+  { at: 232, to: 392, text: 'It reads every slide,\nand keeps the key points.', until: 'the card opens and its Key Points lift' },
+  { at: 408, to: 480, text: 'When a save calls for action,', until: "the card's own \"Do this\" lifts" },
+  { at: 488, to: 548, text: 'Machina turns it\ninto a to-do.' },
+  { at: 552, to: 664, text: 'Then do it,\nand tick it off.', until: 'the row folds and "Marked as done" shows' },
   // the close, on the lockup: the name (the drawn wordmark wipes in as it is
   // said), then the tagline, exactly (owner, 2026-09-28: every film ends on it)
   { at: HITS.markStrike + 8, to: TOTAL_FRAMES, place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4 },
@@ -138,7 +146,7 @@ export const KICKERS = [];
  * and the read walk I V vi-less (Cmaj7 G6 Fmaj7 Cmaj7), the to-do leans on
  * V and the tick lands home; the lockup holds C.
  */
-export const BAR_CHORDS = ['Fmaj7', 'Cmaj7', 'Cmaj7', 'G6', 'Fmaj7', 'Cmaj7', 'G6', 'Fmaj7', 'Cmaj7', 'Fmaj7', 'Cmaj7', 'Cmaj7', 'Cmaj7'];
+export const BAR_CHORDS = ['Fmaj7', 'Cmaj7', 'Cmaj7', 'G6', 'Fmaj7', 'Cmaj7', 'G6', 'Fmaj7', 'G6', 'Cmaj7', 'Fmaj7', 'Cmaj7', 'Cmaj7', 'Cmaj7'];
 /** the drums: in from the save (bar 2), out for the lockup */
 export const DRUMS = [2 * BAR_FRAMES, HITS.out];
 /** risers END on the reveal they lead into: the mark, the lockup's strike */

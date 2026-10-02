@@ -126,7 +126,7 @@ for (const c of caps) if (c !== close && /finally useful/i.test(c.text)) bad.pus
 
 // ── the grid
 const H = C.HITS;
-for (const k of ['snap', 'plusTap', 'imageTap', 'pick', 'saveTap', 'cardDone', 'cardTap', 'keyPoints', 'revisit', 'todoLift', 'tick', 'out', 'markStrike']) {
+for (const k of ['snap', 'plusTap', 'imageTap', 'pick', 'saveTap', 'cardDone', 'cardTap', 'keyPoints', 'cardTodo', 'revisit', 'todoLift', 'tick', 'out', 'markStrike']) {
   if (H[k] % (C.BEAT_FRAMES / 2)) bad.push(`${k} at ${H[k]} is not on an 8th`);
 }
 if (C.TOTAL_FRAMES % (C.BEAT_FRAMES / 2)) bad.push(`the ad ends at ${C.TOTAL_FRAMES}, not on an 8th`);

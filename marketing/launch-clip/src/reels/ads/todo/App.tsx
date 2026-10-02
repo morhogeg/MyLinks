@@ -20,7 +20,9 @@ import { useShape } from './frame';
  *  3 READ     the feed's own working card, "Reading 3 screenshots…", becomes
  *             the card; tapped open: the screenshots, the title and the gist;
  *             read down (the capture's 4pt scroll steps, the camera taking up
- *             each step's rounding) to the Key Points, which lift.
+ *             each step's rounding) to the Key Points, which lift and are
+ *             held to be read; then (round 2) on to the card's own "Do this",
+ *             the step the analysis wrote, which lifts on "action,".
  *  4 DO THIS  a cut on the beat to Revisit as its rows arrive (the app's own
  *             staggered entrance): the new task leads "Do this"; it lifts on
  *             "to-do".
@@ -46,8 +48,21 @@ const seg = (mark: Seg, f: number, offset = 0) =>
 const STEPS = at(T, 'revisit') - at(T, 'detailScroll');
 const stepFrame = (k: number) => (k <= 0 ? at(T, 'detail', PLAY.detail.n - 1) : at(T, 'detailScroll', k - 1));
 const refY = (k: number) => rectOf(T, stepFrame(k), 'points')[1];
+/** the step that puts the Key Points heading at 403pt (round 1's framing) */
+const KP_STEP = (() => {
+  let best = 0;
+  for (let k = 0; k <= STEPS; k++) if (Math.abs(rectOf(T, stepFrame(k), 'keyPoints')[1] - 403) < Math.abs(rectOf(T, stepFrame(best), 'keyPoints')[1] - 403)) best = k;
+  return best;
+})();
+/** (round 2) while the Key Points are read the page creeps on a few steps
+ *  (a hold is never dead still), then glides on to the card's "Do this" */
+const KP_CREEP = 3;
 const [S0, S1] = HITS.scroll;
-const scrollAt = (f: number) => STEPS * prog(f, S0, S1, EASE_IN_OUT);
+const [S2, S3] = HITS.scroll2;
+const scrollAt = (f: number) =>
+  KP_STEP * prog(f, S0, S1, EASE_IN_OUT) +
+  KP_CREEP * ((1 - Math.cos(Math.PI * prog(f, S1, S2, (t) => t))) / 2) +
+  (STEPS - KP_STEP - KP_CREEP) * prog(f, S2, S3, EASE_IN_OUT);
 const wantY = (s: number) => {
   const k = Math.min(STEPS - 1, Math.floor(s));
   return mix(refY(k), refY(k + 1), s - k);
@@ -92,7 +107,10 @@ const keysFor = (dy: number): Key[] =>
     { f: S0, cy: 402, z: 1.57, ease: linear },
     // down to the Key Points, with the scroll
     { f: S1, cy: 540, z: 1.9, fy: 940, ease: EASE_IN_OUT },
-    { f: HITS.revisit - 1, cy: 542, z: 1.93, ease: linear },
+    { f: S2, cy: 541, z: 1.92, ease: linear },
+    // (round 2) on down to the card's own "Do this", a little closer
+    { f: S3, cy: 600, z: 2.05, fy: 960, ease: EASE_IN_OUT },
+    { f: HITS.revisit - 1, cy: 601, z: 2.1, ease: linear },
     // cut on the beat to Revisit: "Do this"
     { f: HITS.revisit, cy: 280, z: 2.2, fy: 980 },
     { f: HITS.tick, cy: 283, z: 2.25, ease: linear },
@@ -167,7 +185,9 @@ export const App: React.FC<{ f: number }> = ({ f }) => {
   const landIn = prog(f, HITS.cardDone + 8, HITS.cardDone + 20, EASE_SPRING);
   const landOut = prog(f, HITS.cardTap - 14, HITS.cardTap - 4, EASE_IN_OUT);
   const kpIn = prog(f, HITS.keyPoints, HITS.keyPoints + 12, EASE_SPRING);
-  const kpOut = prog(f, HITS.revisit - 8, HITS.revisit - 1, EASE_IN_OUT);
+  const kpOut = prog(f, S2 - 10, S2 - 1, EASE_IN_OUT);
+  const doIn = prog(f, HITS.cardTodo, HITS.cardTodo + 12, EASE_SPRING);
+  const doOut = prog(f, HITS.revisit - 8, HITS.revisit - 1, EASE_IN_OUT);
   const todo = prog(f, HITS.todoLift, HITS.todoLift + 8, EASE_SPRING) * (1 - prog(f, HITS.todoDrop, HITS.todoDrop + 12, EASE_MODAL));
 
   // the toast: lifted off the bottom of the screen as it arrives
@@ -206,6 +226,11 @@ export const App: React.FC<{ f: number }> = ({ f }) => {
           return (
             <Lift take={T} i={i} rect={[kp[0] - 4, kp[1] - 6, kp[2] + 8, pts[1] + pts[3] - kp[1] + 12]} radius={14} lift={kpIn * 0.35} rise={2} grow={0.01} ring={0.55 * kpIn} opacity={1 - kpOut} />
           );
+        })()}
+        {scrolling && f >= HITS.cardTodo && doIn > 0.01 && doOut < 1 && (() => {
+          // the card's own step: its "DO THIS" label (16pt above) and the task
+          const r = rectOf(T, i, 'takeaway');
+          return <Lift take={T} i={i} rect={[r[0] - 4, r[1] - 22, r[2] + 8, r[3] + 26]} radius={14} lift={doIn * 0.5} rise={3} grow={0.015} ring={0.6 * doIn} opacity={1 - doOut} />;
         })()}
         {f >= HITS.revisit && f < HITS.tick && todo > 0.01 && (
           <Lift take={T} i={i} rect={row1} radius={14} lift={todo * 0.7} rise={3} grow={0.02} ring={0.55 * todo} />

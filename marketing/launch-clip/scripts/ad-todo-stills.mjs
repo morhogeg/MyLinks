@@ -25,7 +25,7 @@ export const REVIEW = [
   HITS.gather[1] + 2, HITS.snap + 12, // the point, the mark
   HITS.iris[1] + 4, HITS.dialog + 18, HITS.pick + 22, HITS.saveTap - 2, // the +, the dialog, Image, the slides, Save
   HITS.saveTap + 30, HITS.cardDone + 30, // "Reading 3 screenshots…", the card
-  HITS.cardTap + 32, HITS.keyPoints + 14, // opened, the Key Points
+  HITS.cardTap + 32, HITS.keyPoints + 14, HITS.cardTodo + 16, // opened, the Key Points, the card's own "Do this"
   HITS.revisit + 40, HITS.todoLift + 10, // "Do this", the task lifts
   HITS.tick + 10, HITS.tick + 34, HITS.tick + 76, // the ring fills, struck, folded + toast
   HITS.out + 12, HITS.markStrike + 60, TOTAL_FRAMES - 1, // thrown, the name, the tagline held

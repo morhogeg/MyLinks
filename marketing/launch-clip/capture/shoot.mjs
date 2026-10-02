@@ -718,7 +718,9 @@ const takes = {
     await t.freeze();
     await tagScroller('Key Points');
     t.mark('detailScroll');
-    await rollScroll(t, await scrollTargetFor('when to talk again', 700), 4, DETAIL);
+    // (round 2) on past the Key Points to the card's own "Do this": the step
+    // the analysis wrote, the same one Revisit lists
+    await rollScroll(t, await scrollTargetFor('before your next review', 640), 4, DETAIL);
     await t.thaw();
 
     // Revisit: its "Do this" list, the new step on top
@@ -732,6 +734,7 @@ const takes = {
       row3: ['div[class*="ps-1.5"]', AD_TODO.TODOS[1][1]],
       check1: [`button[role=checkbox][aria-label*="Write down three wins"]`],
       toast: ['[role=status]', 'Marked as done'],
+      done: ['button', 'Done 1'],
       revisitTab: R.revisitTab,
     };
     await t.freeze();

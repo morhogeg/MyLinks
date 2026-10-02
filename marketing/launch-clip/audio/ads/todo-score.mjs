@@ -38,7 +38,7 @@ const CHORDS = {
 
 const BARS = Math.ceil(TOTAL_FRAMES / BAR_FRAMES);
 /** how much of the band plays, per bar */
-const DENSITY = [0.3, 0.34, 0.46, 0.5, 0.5, 0.54, 0.56, 0.6, 0.66, 0.68, 0.4, 0.34, 0.3];
+const DENSITY = [0.3, 0.34, 0.46, 0.5, 0.5, 0.54, 0.56, 0.58, 0.6, 0.66, 0.68, 0.4, 0.34, 0.3];
 const LOCKUP = s(HITS.out);
 
 for (let bar = 0; bar < BARS; bar++) {
@@ -99,9 +99,9 @@ for (const m of [48, 64, 67, 72]) pad(LOCKUP, TOTAL_SEC - LOCKUP - 0.1, m, 0.08,
 // never on a word
 const MELODY = [
   // [frame, midi, level?]
-  [216, 67], [224, 72], // the save, after "…to Machina."
-  [312, 69], [328, 71], [344, 72], // the card, after "…that matter."
-  [440, 71], // the comma between the to-do lines
+  [192, 67], [200, 72], // the save, after "…as one card."
+  [320, 69], [336, 71], [352, 72], // the card, after "…the key points."
+  [464, 71], [472, 74], // (round 2) the card's own step, after "…for action,"
   // home: C as the mark draws, E after its name, G after the last word
   [HITS.markStrike - 8, 72, 0.17], [HITS.markStrike + 32, 76, 0.11], [TOTAL_FRAMES - 44, 79, 0.17],
 ];
@@ -131,6 +131,9 @@ shimmer(s(H.cardDone + 4), [76, 79, 84], 0.03);
 tick(s(H.cardTap), 0.09, 1.25);
 whoosh(s(H.cardTap) + 0.07, 0.35, 0.045, -0.15);
 bell(s(H.keyPoints), 81, 0.045, -0.2, 1.4);
+// (round 2) on down to the card's own "Do this", which lifts after "action,"
+whoosh(s(H.scroll2[0]) + 0.05, 0.6, 0.035, 0.15);
+bell(s(H.cardTodo + 8), 84, 0.045, 0.2, 1.4);
 // the cut to Revisit
 whoosh(s(H.revisit) - 0.12, 0.3, 0.05, 0.2);
 // the new task lifts (after "to-do.")
