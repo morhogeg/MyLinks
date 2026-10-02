@@ -175,10 +175,15 @@ gets shown; a fresh one gets throttled.
 2. **The Gemini spend cap is raised** (`SOURCE_OF_TRUTH.md` §4 item 5b, still open).
    At the current cap the app stops working for everyone at about 70 active
    users, and a launch that goes well is exactly the day that happens.
-3. **Product Hunt is scheduled** for the same Tuesday, 12:01 AM Pacific.
-4. **Every launch-week attachment is rendered** and in a folder (§7), along with
+3. **Pro can actually be bought.** `SOURCE_OF_TRUTH.md` §4 task 26's owner
+   checklist is still open: the RevenueCat keys, the App Store Connect
+   subscription products and the Paid Apps agreement. Until then the paywall says
+   subscriptions aren't available, and T24's "Pro is unlimited" points at
+   something nobody can buy.
+4. **Product Hunt is scheduled** for the same Tuesday, 12:01 AM Pacific.
+5. **Every launch-week attachment is rendered** and in a folder (§7), along with
    the Day 1 to 8 copy, scheduled.
-5. **You've decided the pricing line.** T24 says "100 saves and 20 questions a
+6. **You've decided the pricing line.** T24 says "100 saves and 20 questions a
    month" on free because that's what `functions/quota.py` enforces. But
    `SOURCE_OF_TRUTH.md` §7.1 also says "Capture is never gated". The code and
    the principle disagree, and the copy follows the code. If you change the cap,
@@ -619,7 +624,7 @@ After that, the free plan keeps 100 saves and 20 questions a month. Pro is unlim
 - **Attach:** the welcome screen line ("Pro is free for your first 14 days…").
 - **First comment:** none.
 - **Note:** this states the plan exactly as `functions/quota.py` and
-  `functions/entitlement.py` enforce it today (§2, Day-1 condition 5). If the
+  `functions/entitlement.py` enforce it today (§2, Day-1 condition 6). If the
   limits change, change this post. Name a price only once the App Store shows it.
 
 #### T25 · Day 31 · Thursday · 3/3: everywhere

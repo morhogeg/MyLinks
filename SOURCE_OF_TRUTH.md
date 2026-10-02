@@ -1233,6 +1233,16 @@ The multi-user auth work described below **was** fully written but not live:
     `functions/**` change (or bump `functions/.deploy-ping`) so
     deploy-functions writes them into `functions/.env`, and cut a TestFlight
     build so the public key is baked in.
+26a. **[ ] Owner decision: is capture gated on the free plan? (found 2026-10-02.)**
+    §7.1 and item 26 both say "capture is never gated". But `functions/quota.py`
+    refuses the 101st free save of the month with a 429 ("You've used all 100
+    free saves this month. Upgrade to Machina Pro…"), and the build-1334 QA list
+    expects exactly that ("free-limit share → Monthly limit reached"). So the
+    code gates capture at 100/month and the principle says it never does.
+    Marketing now follows the code: `marketing/x-launch/CAMPAIGN.md` T24 says
+    "the free plan keeps 100 saves and 20 questions a month". Decide which one
+    wins. If capture should truly never be gated, the cap has to move off the
+    save and onto the analysis, and T24 changes with it.
 
 ### 🟡 P2 — security/cost hardening & honest product surface
 
@@ -2266,7 +2276,9 @@ and cited answer is a public, OG-rendered page that links back to the app — th
 marketing job is to get those artifacts in front of the right feeds. Budget: $0
 on ads at launch. The one paid channel worth considering *later* is Apple Search
 Ads on exact-match keywords ("second brain", "save for later ai") with a hard
-$5–10/day cap — nothing else (X ads, Meta) makes sense at this stage. The plan is
+$5–10/day cap — nothing else (X ads, Meta) makes sense at this stage (2026-10-02:
+Meta ad *creative* is now being made, but the spend gate stands; see
+`docs/BRANDING.md` D-4 and "Reels, clips and Meta ads" below). The plan is
 sequenced: (1) **Build-in-public on X** starting now — 2–3 posts/week showing real
 moments (a weekly synthesis screenshot, an Ask answer with citations, the share
 sheet catching a recipe from WhatsApp); this compounds and costs nothing but is
@@ -2287,7 +2299,15 @@ markets itself if you publish what it produces. Success metric for month one:
 1,000 installs, 20% week-2 retention, 50 organic shares — retention gates any
 paid spend.
 
-**Launch assets — first set (ready to adapt):**
+**The X launch campaign lives in `marketing/x-launch/CAMPAIGN.md`** (written
+2026-09-02, reviewed against build 1344 and merged 2026-10-02): 32 posts from
+`@machinaapp` over six weeks, plus a 6-post founder track from the owner's own
+account. It also holds the Day-1 checklist, an attachment plan, and the
+Product Hunt, Show HN, LinkedIn, Reddit and Meta-ad copy. **It supersedes the
+X thread and the Show HN line below.** Those are kept for the history only; don't
+post them (emoji, and "Free on the App Store" next to Pro features).
+
+**Launch assets — first set (superseded for X and Show HN; see above):**
 
 *Announcement thread (X), post 1:*
 > I kept saving links I never looked at again. Bookmarks, WhatsApp self-messages,
@@ -2389,6 +2409,46 @@ Promise opens, loss-aversion closes. Same session: the recipe card became
 from books" still shares no word with it), the Manson title is shortened so
 the Ask chip never truncates, and two-sentence captions break at the sentence.
 
+*Reels, clips and Meta ads (state on 2026-10-02; none of it is on `main` yet):*
+everything below renders from `marketing/launch-clip/` and shows **the real app**.
+`capture/` builds the shipped `web/` with Firebase swapped for a scripted demo
+account and records it frame by frame. The one thing it can't capture is the
+native iOS share sheet, so that beat is a brand graphic.
+- **The reel kit and the highlight reel** (`MachinaReel`, 82s, 9:16, 15 owner
+  rounds) are on branch `claude/machina-reel-pilot`. The kit's rules are the
+  "Motion language" section of that branch's `marketing/launch-clip/README.md`.
+- **Four feature clips** sit on their own branches, each awaiting owner review:
+  SAVE `claude/clip-save`, FIND `claude/clip-find`, ASK `claude/clip-ask`,
+  REVISIT `claude/clip-revisit`.
+- **Three Meta ads** (Instagram/Facebook, 15 to 20s, 9:16 + 4:5) are in
+  production in three sessions spawned 2026-10-02, each on its own branch:
+  1. **What one save becomes**, the YouTube card's key moments and key points
+     (`claude/ad-card`, session `session_01TgHDKPqNmybzMgPxEug5SC`);
+  2. **The trip you already planned**, Ask across Sardinia saves from three
+     platforms (`claude/ad-trip`, `session_01KKtyi3Zhp8bcy8FpFHckJg`);
+  3. **The screenshot that becomes a to-do**, an advice carousel → Do this →
+     the round-4 tick (`claude/ad-todo`, `session_01TYVBJbvXau5ZSymkmHAbEM`).
+
+  The shared brief, as sent to all three sessions:
+  - each session merges `main` first, so the capture is today's app;
+  - Meta safe zones: nothing key in the top 14%, the bottom 35% or 65px from
+    either side of the 9:16 frame;
+  - the hook is on screen from frame 0 and readable with the sound off;
+  - three renders each: 9:16 with voice, 9:16 music only, and 4:5;
+  - every film ends on the tagline;
+  - no App Store badge until the listing is live, no price and no "free";
+  - **no recipe or cooking content** (owner, 2026-10-02);
+  - honest demo data: real facts, no third-party images, no real person
+    endorsing;
+  - nothing merges to `main` until the owner has reviewed the cut.
+
+  The copy for each ad is in `CAMPAIGN.md` §8.
+- **Merging later:** each clip and ad keeps its own files (timeline, scenes,
+  take, score, gates), so they merge together. The exceptions are one-line
+  entries in `Root.tsx`, `synth-vo.py`, `mix-vo.mjs` and `capture/shoot.mjs`,
+  and the generated `src/reels/data/takes.json`: re-run the capture rather than
+  hand-merging it.
+
 *Where to "advertise" for free:* X (primary), Product Hunt, Hacker News,
 r/PKMS + r/productivity (follow self-promo rules: give value first), Indie
 Hackers, a launch post on LinkedIn (the productivity-tools audience there is
@@ -2399,6 +2459,52 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-02 — X LAUNCH CAMPAIGN REVIEWED AND ON MAIN; THREE META AD VIDEOS
+  HANDED TO NEW SESSIONS.** Branch `claude/x-launch-content-video-prompts-flujr5`.
+  Docs and marketing only (no `web/` or `functions/` change, nothing deployed).
+  **X:** the 30-post campaign had only ever lived on unmerged
+  `claude/x-launch-marketing-campaign-7o71hw` (2026-09-02). It is now
+  `marketing/x-launch/CAMPAIGN.md` on `main`, with every claim re-checked in the
+  code. Fixed:
+  - Ask lists the saves an answer used under it, not "a citation on every line";
+    the tap opens the card, not "the passage";
+  - "capture stays free" was false since the 100-saves free cap;
+  - Pro features (the recap, the Daily Brew, video key moments) no longer sit
+    next to "Free";
+  - the browser extension isn't public;
+  - two rename slips: `support@machinaapp.app` and "park `@machinaapp`".
+
+  Added:
+  - posts for import, Do this, named graph clusters, collection Ask, shared
+    answers and the Daily Brew;
+  - a 6-post founder track (a new brand account has no reach on X);
+  - a Day-1 checklist and an attachment plan built on the existing reel, clips
+    and ads.
+
+  38 posts, all script-checked under 280 by X's weighting, with no banned words
+  or em dashes. §8 now points to the doc, and its old thread is marked
+  superseded. **Meta ads:** three sessions were spawned to build 15–20s
+  Instagram/Facebook ads from the real-app capture kit: `claude/ad-card`,
+  `claude/ad-trip` and `claude/ad-todo` (session IDs and the shared brief are in
+  §8 "Reels, clips and Meta ads"). The owner rejected a recipe concept as "too
+  simple" and asked for no recipes, so ad 1 became the card and its key points.
+  The spend stays gated by BRANDING D-4 (addendum added: no Meta SDK, so the
+  "no tracking" label stays true). **Found, not fixed:**
+  - (a) new §4 item 26a: the "capture is never gated" principle contradicts
+    `quota.py`'s 100-save free cap; owner decides.
+  - (b) Day-1 blockers still open: §4 5b (the Gemini spend cap), task 26's
+    RevenueCat/ASC checklist (Pro can't be bought yet), tasks 9 and 11. The
+    campaign's §2 lists them as Day-1 conditions.
+  - (c) the reel kit, the four feature clips and now the three ads all live on
+    unmerged branches waiting on owner review; none of it is on `main`.
+
+  **Owner steps:**
+  - fill the `[fill]` slots (CAMPAIGN §2 table);
+  - record the share-extension clip on the iPhone (A3);
+  - review the three ad cuts as their sessions deliver them.
+
+  **Not verified:** T16's example query against the live search; that the ads
+  render cleanly (their sessions verify and report).
 - **2026-10-02 — REVISIT "DO THIS" ROUND 4: whole tasks, a real checkbox,
   category dots, swipe "Not for me", shorter tasks for new saves.** Branch
   `claude/revisit-do-this-polish`. Owner on build 1343 (screenshot): "find
