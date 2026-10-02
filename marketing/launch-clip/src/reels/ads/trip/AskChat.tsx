@@ -47,9 +47,18 @@ const TYPED2 = span('typing2', 'stream2');
 const STREAMED2 = span('stream2', 'sources2');
 const SOURCED2 = span('sources2', 'graphChip');
 const GRAPH = span('graph', null);
-/** the graph view draws its nodes over its first frames (measured in the Ask
- *  clip): the cut joins it this far in, while the layout is still blooming */
-const GRAPH_JOIN = 8;
+/**
+ * The graph (round 6, owner: the cut into it was jittery). Measured on the
+ * take: its layout moves hard for its first ~30 captured frames, then keeps
+ * jiggling a pixel or two either way. So the cut joins it once it has formed
+ * and calmed (GRAPH_JOIN; at 24 the blend still ghosted the labels), it plays slower than captured (GRAPH_RATE captured frames per
+ * output frame), and each output frame blends the two captured frames around
+ * its fractional position, so the nodes glide instead of stepping or
+ * shivering. Adjacent frames of one screen, so the blend never double-exposes.
+ */
+const GRAPH_JOIN = 45;
+const GRAPH_RATE = 0.75;
+const graphPos = (f: number) => Math.min(GRAPH - 1, GRAPH_JOIN + (f - S.graphTap) * GRAPH_RATE);
 
 /** where the feed's stepped scroll is (fractional steps) */
 const feedAt = (f: number) => prog(f, S.feed, S.ask2, EASE_GATHER) * (FEED - 1);
@@ -67,7 +76,7 @@ export const frameAt = (f: number) => {
     const n = Math.floor((f - S.send2) / K);
     return n < STREAMED2 ? at(T, 'stream2', n) : at(T, 'sources2', Math.min(SOURCED2 - 1, n - STREAMED2));
   }
-  return at(T, 'graph', Math.min(GRAPH - 1, GRAPH_JOIN + f - S.graphTap));
+  return at(T, 'graph', Math.floor(graphPos(f)));
 };
 
 /** a Lift's box on whole points (the Ask clip's lesson: a half-point box hops) */
@@ -83,7 +92,8 @@ export const chatKeys = (L: AdFrame): Key[] => {
   const y = (v: number) => v + L.dy;
   return [
     // the simple question, close on the composer (the promise stays above the frame)
-    { f: S.open, cx: 196.5, cy: 768, z: 2.5, fx: 540, fy: y(1000) },
+    // (framed so the empty chat's "More ideas" sits under the paper band: round 6, owner)
+    { f: S.open, cx: 196.5, cy: 768, z: 2.5, fx: 540, fy: y(940) },
     { f: S.send - 1, cy: 764, z: 2.56, ease: linear },
     // CUT on the Send touch: its answer and its source
     { f: S.send, cx: 196.5, cy: 300, z: 2.3, fy: y(990) },
@@ -92,7 +102,7 @@ export const chatKeys = (L: AdFrame): Key[] => {
     { f: S.feed, cx: 196.5, cy: 400, z: 2.0, fy: y(1000) },
     { f: S.ask2 - 1, cy: 410, z: 2.3, ease: EASE_GATHER },
     // CUT to a new chat: the big question, typed, Send in reach
-    { f: S.ask2, cx: 196.5, cy: 768, z: 2.5, fy: y(1000) },
+    { f: S.ask2, cx: 196.5, cy: 768, z: 2.5, fy: y(900) }, // (a new chat's "More ideas" sits lower)
     { f: S.send2 - 1, cy: 766, z: 2.53, ease: linear },
     // CUT on the Send touch: the answer arrives (the empty chat between, and
     // its "29 saves" promise, never cross the frame)
@@ -106,8 +116,10 @@ export const chatKeys = (L: AdFrame): Key[] => {
     { f: S.graphTap - 1, cy: 600, z: 2.2, fy: y(980), ease: EASE_IN_OUT },
     // CUT on the touch into the graph: the three saves it connected, lit and
     // linked among the rest (framed below the graph's legend)
-    { f: S.graphTap, cx: 196.5, cy: 610, z: 2.5, fy: y(1000) },
-    { f: S.lockup - 1, cy: 606, z: 2.6, ease: linear },
+    // (it arrives a touch close and settles back, then drifts: no hard stop)
+    { f: S.graphTap, cx: 196.5, cy: 612, z: 2.62, fy: y(1000) },
+    { f: S.graphTap + 36, cy: 608, z: 2.5, ease: (t: number) => 0.85 * EASE_MODAL(t) + 0.15 * t },
+    { f: S.lockup - 1, cy: 606, z: 2.54, ease: linear },
     // thrown out of frame, into the lockup
     { f: S.lockup + 14, fx: -760, z: 2.64, ease: EASE_IN_OUT },
   ];
@@ -174,6 +186,11 @@ export const AskChat: React.FC<{ f: number }> = ({ f }) => {
         {/* the finger leaves on the cut: its ripple would sit on the graph */}
         <Tap x={graph.x} y={graph.y} t={f < S.graphTap ? tapAt(f, S.graphTap) : 0} />
       </AppShot>
+      {/* the graph's in-between: the next captured frame, laid over at the
+          fraction the output frame sits past this one */}
+      {f >= S.graphTap && graphPos(f) % 1 > 0.01 && Math.floor(graphPos(f)) < GRAPH - 1 && (
+        <AppShot take={T} i={i + 1} cam={view} motion={motion} opacity={graphPos(f) % 1} shadow={0} />
+      )}
     </AbsoluteFill>
   );
 };

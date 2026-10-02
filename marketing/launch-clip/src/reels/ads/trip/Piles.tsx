@@ -36,16 +36,22 @@ import { useAdFrame } from './format';
  */
 
 type Kind = 'youtube' | 'instagram' | 'facebook' | 'safari' | 'photos';
-type Pile = { kind: Kind; app: string; list: string; titles: string[]; r: number };
+type Pile = { kind: Kind; app: string; list: string; titles: string[]; drop?: string; r: number };
 /** each pile's titles, real demo saves, in the app they were saved from where
- *  the demo account says so */
+ *  the demo account says so. `drop` is a newer save that slides in at the top
+ *  during the hook, pushing the list down (round 6, owner: make the piles
+ *  move); the demo account holds only two screenshots, so Photos has none and
+ *  only floats */
 export const PILES: Pile[] = [
-  { kind: 'instagram', app: 'Instagram', list: 'Saved', titles: ['Cosmic Cliffs in the Carina Nebula', 'Cala Goloritzé, Sardinia'], r: -2.5 },
-  { kind: 'youtube', app: 'YouTube', list: 'Watch later', titles: ['Inside the mind of a master procrastinator', 'Optimistic Nihilism'], r: 2.5 },
-  { kind: 'safari', app: 'Safari', list: 'Reading List', titles: ['The Tail End', 'Laws of UX'], r: 2 },
-  { kind: 'facebook', app: 'Facebook', list: 'Saved', titles: ['The Psychology of Money', 'Perfect Days'], r: -2 },
+  { kind: 'instagram', app: 'Instagram', list: 'Saved', titles: ['Cosmic Cliffs in the Carina Nebula', 'Cala Goloritzé, Sardinia'], drop: 'Fushimi Inari at dawn', r: -2.5 },
+  { kind: 'youtube', app: 'YouTube', list: 'Watch later', titles: ['Inside the mind of a master procrastinator', 'Optimistic Nihilism'], drop: "Steve Jobs' 2005 Stanford Commencement Address", r: 2.5 },
+  { kind: 'safari', app: 'Safari', list: 'Reading List', titles: ['The Tail End', 'Laws of UX'], drop: 'Dieter Rams: ten principles for good design', r: 2 },
+  { kind: 'facebook', app: 'Facebook', list: 'Saved', titles: ['The Psychology of Money', 'Perfect Days'], drop: 'Four Thousand Weeks', r: -2 },
   { kind: 'photos', app: 'Photos', list: 'Screenshots', titles: ['Read Piranesi, and go in blind', "Dana's Sardinia tips"], r: -1.5 },
 ];
+/** when each pile's new save slides in: staggered so no two lists move
+ *  together, all landed before the piles drift apart */
+const DROP_AT = [12, 26, 19, 33];
 
 const SAFARI_INK = 'rgb(0, 122, 255)';
 const PHOTOS_INK = 'rgb(245, 158, 11)';
@@ -54,7 +60,7 @@ const tint = (rgb: string, a: number) => rgb.replace('rgb(', 'rgba(').replace(')
 const PILE_W = 450;
 const ROW = 54;
 
-const PileCard: React.FC<{ p: Pile; soft: number }> = ({ p, soft }) => {
+const PileCard: React.FC<{ p: Pile; soft: number; drop: number }> = ({ p, soft, drop }) => {
   const ink = inkOf(p.kind);
   return (
     <div
@@ -77,15 +83,18 @@ const PileCard: React.FC<{ p: Pile; soft: number }> = ({ p, soft }) => {
           <span style={{ display: 'block', marginTop: 1, fontSize: 22, fontWeight: 560, color: INK_SOFT }}>{p.list}</span>
         </span>
       </div>
+      {/* the list window: two rows; a newer save slides in at the top and
+          pushes the last row out of the window */}
+      <div style={{ marginTop: 12, height: ROW * 2, overflow: 'hidden' }}>
       <div
         style={{
-          marginTop: 12,
+          transform: `translateY(${Math.round(-ROW * (p.drop ? 1 - drop : 0))}px)`,
           filter: soft > 0.01 ? `blur(${(soft * 4).toFixed(2)}px) grayscale(${soft.toFixed(3)})` : undefined,
           opacity: 1 - 0.5 * soft,
         }}
       >
-        {p.titles.map((t, k) => (
-          <div key={k} style={{ height: ROW, display: 'flex', alignItems: 'center', borderTop: '1px solid rgba(16,24,40,0.07)' }}>
+        {(p.drop ? [p.drop, ...p.titles] : p.titles).map((t, k) => (
+          <div key={k} style={{ height: ROW, display: 'flex', alignItems: 'center', borderTop: '1px solid rgba(16,24,40,0.07)', opacity: p.drop && k === 0 ? Math.min(1, drop * 1.4) : 1 }}>
             <span
               style={{
                 fontSize: 25,
@@ -101,6 +110,7 @@ const PileCard: React.FC<{ p: Pile; soft: number }> = ({ p, soft }) => {
             </span>
           </div>
         ))}
+      </div>
       </div>
     </div>
   );
@@ -133,6 +143,8 @@ export const Piles: React.FC<{ f: number }> = ({ f }) => {
       o: (1 - Math.pow(g, 5)) * (1 - 0.3 * lost * (1 - g)),
       blur: g * 2 + 0.8 * lost * (1 - g),
       soft: lost,
+      // the pile's newer save slides in (the app's spring)
+      drop: k < DROP_AT.length ? prog(fr, DROP_AT[k], DROP_AT[k] + 14, EASE_SPRING) : 0,
       g,
     };
   };
@@ -172,7 +184,7 @@ export const Piles: React.FC<{ f: number }> = ({ f }) => {
                   filter: q.blur > 0.2 ? `blur(${q.blur.toFixed(2)}px)` : undefined,
                 }}
               >
-                <PileCard p={p} soft={q.soft} />
+                <PileCard p={p} soft={q.soft} drop={q.drop} />
               </div>
             );
           }),

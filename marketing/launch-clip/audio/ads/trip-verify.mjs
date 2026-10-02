@@ -131,8 +131,10 @@ export default async function verifyTrip() {
   const piles = read('src/reels/ads/trip/Piles.tsx');
   const pileBlock = /export const PILES[^=]*= \[([\s\S]*?)\n\];/.exec(piles)?.[1] ?? '';
   const pileTitles = [...pileBlock.matchAll(/titles: \[([^\]]*)\]/g)].flatMap((m) => [...m[1].matchAll(/(['"])((?:\\.|(?!\1).)*)\1/g)].map((x) => x[2].replace(/\\'/g, "'")));
+  // (round 6: each pile's newer save, `drop`, slides in during the hook)
+  for (const m of pileBlock.matchAll(/drop: (['"])((?:\\.|(?!\1).)*)\1/g)) pileTitles.push(m[2]);
   const all = [...LIB.CARDS, ...LIB.TRIP_CARDS];
-  if (pileTitles.length !== 10) bad.push(`expected 10 pile titles, read ${pileTitles.length}`);
+  if (pileTitles.length < 10) bad.push(`expected at least 10 pile titles, read ${pileTitles.length}`);
   for (const t of pileTitles) {
     scan('a pile', t);
     if (!all.some((c) => c.title === t)) bad.push(`pile title "${t}" is not a save in the demo account`);

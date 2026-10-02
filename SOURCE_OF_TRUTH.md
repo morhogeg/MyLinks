@@ -2712,6 +2712,14 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-02 — Meta ad 2 (Ask), round 6: smoother graph, moving piles.**
+  Branch `claude/ad-trip`, NOT merged. Owner notes from the phone: "More ideas"
+  showed above the composer (now framed under the paper band); the cut into
+  the graph was jittery (measured: the layout moves hard for ~30 captured
+  frames, then jiggles; it now joins at frame 45, plays at 0.75× with adjacent
+  frames blended, holds a beat longer); the hook's piles now move (a newer
+  real save slides in at the top of four of them, staggered). 25.1s; gates green.
+
 - **2026-10-02 — Meta ad 2 (Ask), round 5: the graph, and the call to action
   said only.** Branch `claude/ad-trip`, NOT merged. Owner on round 4: "It's
   perfect", plus two notes. On "…you never noticed." the answer's Graph chip is

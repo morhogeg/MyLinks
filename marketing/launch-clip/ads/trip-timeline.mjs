@@ -71,8 +71,8 @@ export const HITS = {
   lead: beat(24), // the theme it found (the answer's first line) lifts
   chips: [448, 458, 468], // the three saves it connected lift ("you never noticed": vo.json)
   graphTap: beat(30.5), // its Graph chip is tapped: the saves it connected, lit in the real graph
-  lockup: beat(34), // thrown out into the lockup; the mark launches
-  markStrike: beat(36), // the mark's point strikes as the call to action is said
+  lockup: beat(35), // thrown out into the lockup; the mark launches (round 6: the graph holds a beat longer)
+  markStrike: beat(37), // the mark's point strikes as the call to action is said
 };
 
 /** how many of the feed's captured 12pt steps the rush plays: it stops short
@@ -102,9 +102,9 @@ export const CAPTIONS = [
   { at: beat(24), to: beat(32), split: 7, until: true, text: 'And it finds the themes and connections\nyou never noticed.' },
   // the call to action, said as the mark strikes and the wordmark wipes in on
   // the name; never on screen (owner, round 5: keep the narration, not the text)
-  { at: beat(36), to: beat(39), text: 'Download Machina.', cta: true, hidden: true, duck: 0.4 },
+  { at: beat(37), to: beat(40), text: 'Download Machina.', cta: true, hidden: true, duck: 0.4 },
   // the close: the tagline on ONE line, exactly; the music steps back
-  { at: beat(39), to: beat(46), place: 'lockup', text: 'Everything you save, finally useful.', duck: 0.4 },
+  { at: beat(40), to: beat(47), place: 'lockup', text: 'Everything you save, finally useful.', duck: 0.4 },
 ];
 
 export const TOTAL_FRAMES = CAPTIONS[CAPTIONS.length - 1].to;
@@ -114,7 +114,7 @@ export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 export const RISERS = [
   [beat(3), HITS.dotLands], // the gather → the point lands
   [beat(17), HITS.ask2], // the feed rushing past → the big question
-  [beat(33), HITS.markStrike], // the throw → the mark strikes
+  [beat(34), HITS.markStrike], // the throw → the mark strikes
 ];
 
 /** One chord per bar (the film's and the reel's vocabulary). */

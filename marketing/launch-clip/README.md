@@ -913,7 +913,7 @@ to the mix on speakers; its balance, clarity and loudness are measured.
 Meta ad 2 of 3 (Instagram and Facebook: Reels, Stories, Feed; doubles as an
 organic Reel): **the Ask ad**, the chat shown off. Each of the three Meta ads
 sells one feature (ad 1, what one save becomes; ad 3, a screenshot that
-becomes a to-do). The branch keeps its first concept's name. 24.5s, 9:16 and
+becomes a to-do). The branch keeps its first concept's name. 25.1s, 9:16 and
 4:5.
 
 **How it got here.** Round 1 opened on a Sardinia trip saved across five apps
@@ -924,11 +924,16 @@ asks a question, then the range of the chat, from a simple answer to the
 themes and connections across your saves, and a call to action. Round 5
 (owner: "It's perfect", two notes): the real graph opens on "you never
 noticed" with the three connected saves lit, and "Download Machina." is said
-but no longer shown.
+but no longer shown. Round 6 (owner, from the phone): the empty chat's "More
+ideas" is out of shot; the cut into the graph was jittery, so the graph joins
+once its layout has calmed, plays slower than captured with each output frame
+blended from the two captured frames around it (the nodes glide), holds a beat
+longer and settles under a gentle camera move; and each pile's list moves (a
+newer save slides in at the top, staggered pile to pile).
 
 | Frames | Beat | What it shows, and the line |
 |---|---|---|
-| 0–88 | hook | Frame 0 is the poster: five piles, each an app's own save list with its mark (Instagram · Saved, YouTube · Watch later, Safari · Reading List, Facebook · Saved, Photos · Screenshots), two real demo saves in each. The line is up, whole, from frame 0 and spoken from 0.27s: "What if your saves could talk back?" |
+| 0–88 | hook | Frame 0 is the poster: five piles, each an app's own save list with its mark (Instagram · Saved, YouTube · Watch later, Safari · Reading List, Facebook · Saved, Photos · Screenshots), two real demo saves in each; in four of them a newer save slides in at the top during the hook, staggered (round 6). The line is up, whole, from frame 0 and spoken from 0.27s: "What if your saves could talk back?" |
 | 48–144 | the name | The piles drift apart and gather into the point, the brackets snap (2.9s) and the wordmark wipes in as the name is said: "With Machina, they can." The mark and wordmark leave, pushing in as they soften |
 | 144–272 | a simple question | CUT to a fresh chat, close on the composer: "What did that TED talk say about procrastination?" types itself. Send is tapped and the cut to its answer lands on the touch: a short answer from one save, its source under it. "Ask it about anything you've saved." |
 | 272–360 | a big question | CUT to the Home feed rushing past, accelerating; CUT to a new chat, "What do my saves say about time?" typed; Send; one answer streams in, woven from three saves. "Even across hundreds of saves, / you get one clear answer." (one sentence, two captions) |
@@ -1009,8 +1014,8 @@ its save by its title and the big one cites three platforms; no banned word, thi
 or recipe on any frame of the take; both mixes at −14 LUFS ±0.5 and ≤ −1
 dBTP; every line ≥ 3dB over the music in the speech band.
 
-**Open, for the owner:** it runs 24.5s, over the 15–20s aim (the graph
-added 1.6s); the call to action is said but not burned in, so sound-off
+**Open, for the owner:** it runs 25.1s, over the 15–20s aim (the graph
+added 2.1s); the call to action is said but not burned in, so sound-off
 viewers see only the wordmark there;
 "Download Machina." is only true once the listing is live (the paid ads run
 after launch; don't post the organic Reel before then); nobody has listened to
