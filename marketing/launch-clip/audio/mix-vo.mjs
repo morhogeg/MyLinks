@@ -38,6 +38,24 @@ const SCRIPTS = {
     timeline: '../clips/revisit-timeline.mjs',
     master: { lufs: -14, truePeak: -1 },
   },
+  // Meta ad 3 (TODO): the main cut (narrator over the score) and the A/B cut
+  // with no narrator (`noVoice`: the score alone, mastered the same way)
+  adtodo: {
+    vo: path.join(root, 'out', 'vo', 'adtodo'),
+    score: 'ads/todo/score.wav',
+    out: 'ads/todo/score-vo.wav',
+    duck: 0.55,
+    timeline: '../clips/ad-todo-timeline.mjs',
+    master: { lufs: -14, truePeak: -1 },
+  },
+  'adtodo-music': {
+    vo: path.join(root, 'out', 'vo', 'adtodo-music'),
+    score: 'ads/todo/score.wav',
+    out: 'ads/todo/score-music.wav',
+    duck: 1,
+    noVoice: true,
+    master: { lufs: -14, truePeak: -1 },
+  },
 };
 const name = process.argv[2] ?? 'film';
 const script = SCRIPTS[name];
@@ -76,7 +94,8 @@ for (let i = 0; i < N; i++) {
   R[i] = score.samples[i * 2 + 1];
 }
 
-const manifest = JSON.parse(fs.readFileSync(path.join(voDir, 'manifest.json'), 'utf8'));
+const manifest = script.noVoice ? [] : JSON.parse(fs.readFileSync(path.join(voDir, 'manifest.json'), 'utf8'));
+fs.mkdirSync(voDir, { recursive: true });
 // a reel line may duck the music further than the rest (`duck` on its caption
 // in reel-timeline.mjs, keyed by the frame the line starts on)
 const lineDuck =

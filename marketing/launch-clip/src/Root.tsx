@@ -5,6 +5,7 @@ import * as REEL from '../reel-timeline.mjs';
 import { Film } from './Film';
 import { MachinaReel } from './reels/MachinaReel';
 import { RevisitClipCompositions } from './reels/clips/revisit';
+import { AdTodoCompositions } from './reels/ads/todo';
 
 /**
  * Compositions:
@@ -118,5 +119,6 @@ export const RemotionRoot: React.FC = () => (
     />
     {/* the REVISIT feature clip (clips/revisit-timeline.mjs) */}
     <RevisitClipCompositions />
+    <AdTodoCompositions />
   </>
 );

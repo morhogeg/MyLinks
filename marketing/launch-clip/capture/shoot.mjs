@@ -34,6 +34,7 @@ import { startServer } from './server.mjs';
 import { openDevice } from './device.mjs';
 import { Take } from './recorder.mjs';
 import { ASK, CAPTURE_USER, CARDS, SAVE, SEARCH, SYNTHESIS } from './library.mjs';
+import * as AD_TODO from './ad-todo.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.join(here, '..', 'public', 'reel', 'app');
@@ -580,6 +581,175 @@ const takes = {
     await page.waitForTimeout(600);
     t.mark('cardSettled');
     await t.snap({ rects: CARD });
+    return t.save();
+  },
+
+  // ─────────────────────────────────────────────────────────── adTodo
+  // The TODO ad (clips/ad-todo-timeline.mjs): an advice carousel's three
+  // slides picked in the Add dialog's Image tab and saved as ONE card, read in
+  // the background (the feed's own "Reading 3 screenshots…" card), opened on
+  // its screenshots, gist and Key Points; then Revisit's "Do this", where its
+  // step now leads the list, ticked: the ring fills, the task strikes, the
+  // row folds, "Marked as done". No recipe, money or workout card is in the
+  // store, and no Pro surface (the Daily Brew, the weekly recap) is seeded.
+  // Rolls at 60fps. (capture/ad-todo.mjs has the slides and the card.)
+  async adTodo() {
+    const shotsDir = path.join(here, '..', 'out', 'capture', 'app', 'out', AD_TODO.SHOTS_DIR);
+    const shots = await AD_TODO.renderShots(dev.browser, shotsDir);
+    const urls = shots.slides.map((f) => `${server.url}/${AD_TODO.SHOTS_DIR}/${path.basename(f)}`);
+    await fresh(async () => {
+      await page.evaluate(
+        ([uid, hidden, hiddenCols, todos]) => {
+          for (const p of window.__capture.list(`users/${uid}/digests/`)) window.__capture.remove(p);
+          for (const p of window.__capture.list(`users/${uid}/syntheses/`)) window.__capture.remove(p);
+          for (const id of hidden) window.__capture.remove(`users/${uid}/links/${id}`);
+          for (const id of hiddenCols) window.__capture.remove(`users/${uid}/collections/${id}`);
+          // only these carry an open "Do this" (the app writes one only when
+          // the content calls for an action)
+          for (const p of window.__capture.list(`users/${uid}/links/`)) {
+            const cur = window.__capture.get(p);
+            if (cur?.actionableTakeaway) {
+              const { actionableTakeaway, ...rest } = cur;
+              void actionableTakeaway;
+              window.__capture.set(p, rest);
+            }
+          }
+          for (const [id, text] of todos) {
+            const p = `users/${uid}/links/${id}`;
+            const cur = window.__capture.get(p);
+            if (cur) window.__capture.set(p, { ...cur, actionableTakeaway: text });
+          }
+        },
+        [UID, AD_TODO.HIDDEN, AD_TODO.HIDDEN_COLLECTIONS, AD_TODO.TODOS],
+      );
+    });
+    const t = new Take(dev, OUT, 'adTodo');
+    const F60 = 1000 / 60;
+    const D = {
+      dialog: R.dialog,
+      tabImage: ['[role=dialog] button', 'Image'],
+      dropzone: ['[role=dialog] label, [role=dialog] div', 'Tap to add images'],
+      strip: ['[role=dialog] ol, [role=dialog] ul, [role=dialog] div', 'Screens of one post'],
+      save: ['[role=dialog] button', 'Save'],
+    };
+    t.mark('home');
+    await t.snap({ rects: { plus: R.plus, firstCard: R.firstCard } });
+
+    // + : the dialog's own entrance
+    await t.freeze();
+    await visible(page.locator(R.plus[0])).click();
+    t.mark('dialogOpen');
+    await t.roll(24, { rects: D, step: F60 });
+    await t.thaw();
+
+    // the Image tab
+    await page.waitForTimeout(250);
+    await t.freeze();
+    await visible(page.locator('[role=dialog]').getByRole('button', { name: 'Image', exact: true })).click();
+    t.mark('modeImage');
+    await t.roll(24, { rects: D, step: F60 });
+    await t.thaw();
+
+    // the three slides, picked (the photo picker is native; the dialog shows
+    // them the moment they are chosen)
+    await page.locator('#image-upload').setInputFiles(shots.slides);
+    await until('Screens of one post');
+    await page.waitForTimeout(600);
+    t.mark('picked');
+    await t.roll(24, { rects: D, step: F60 });
+    await t.thaw();
+
+    // Save: the placeholder card is written; /api/share is held until time is
+    // frozen, so the dialog's close is recorded from its first frame
+    let held = null;
+    await page.route('**/api/share', (route) => {
+      held = route;
+    });
+    await visible(page.getByRole('button', { name: 'Save', exact: true })).click();
+    for (let k = 0; k < 200 && !held; k++) await page.waitForTimeout(50);
+    if (!held) throw new Error('adTodo: /api/share was never called');
+    const cardPath = await page.evaluate(
+      (uid) => window.__capture.list(`users/${uid}/links/`).find((p) => window.__capture.get(p)?.status === 'processing') ?? null,
+      UID,
+    );
+    if (!cardPath) throw new Error('adTodo: no processing card was written');
+    await t.freeze();
+    t.mark('saving');
+    await held.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, cardId: cardPath.split('/').pop() }) });
+    await page.unroute('**/api/share');
+    await t.roll(60, { rects: { dialog: R.dialog, toast: ['[role=status]'], firstCard: R.firstCard }, step: F60 });
+    // the feed's own working card while the screenshots are read
+    t.mark('reading');
+    await t.roll(60, { rects: { toast: ['[role=status]'], firstCard: R.firstCard }, step: F60 });
+
+    // the backend finishes: the placeholder becomes the card
+    await page.evaluate(
+      ([p, card]) => {
+        const cur = window.__capture.get(p) ?? {};
+        const { processingStartedAt, ...rest } = cur;
+        void processingStartedAt;
+        window.__capture.set(p, { ...rest, ...card });
+      },
+      [cardPath, AD_TODO.raiseCard(urls)],
+    );
+    await page.waitForTimeout(150);
+    t.mark('done');
+    await t.roll(48, { rects: { toast: ['[role=status]'], firstCard: R.firstCard }, step: F60 });
+    await t.thaw();
+    await page.waitForTimeout(800);
+    t.mark('landed');
+    await t.snap({ rects: { firstCard: R.firstCard } });
+
+    // opened: the screenshots, the gist, then down to the Key Points
+    const DETAIL = {
+      gallery: ['[aria-label^="Screenshots"]'],
+      detailTitle: ['h2', 'How to ask for a raise'],
+      gist: ['div,p', 'bring your wins with numbers'],
+      keyPoints: ['h1,h2,h3,h4', 'Key Points'],
+      points: ['ul', 'Keep a list of your wins'],
+      takeaway: ['div', 'Write down three wins'],
+    };
+    await t.freeze();
+    await visible(page.locator(R.firstCard[0]).first()).click({ position: { x: 120, y: 40 } });
+    t.mark('detail');
+    await t.roll(40, { rects: DETAIL, step: F60 });
+    await t.thaw();
+    await page.waitForTimeout(500);
+    await t.freeze();
+    await tagScroller('Key Points');
+    t.mark('detailScroll');
+    await rollScroll(t, await scrollTargetFor('when to talk again', 700), 4, DETAIL);
+    await t.thaw();
+
+    // Revisit: its "Do this" list, the new step on top
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(900);
+    const TODO = {
+      list: ['div[class*="rounded-2xl"][class*="overflow-hidden"]', AD_TODO.RAISE_TODO],
+      header: ['button', 'Do this'],
+      row1: ['div[class*="ps-1.5"]', AD_TODO.RAISE_TODO],
+      row2: ['div[class*="ps-1.5"]', AD_TODO.TODOS[0][1]],
+      row3: ['div[class*="ps-1.5"]', AD_TODO.TODOS[1][1]],
+      check1: [`button[role=checkbox][aria-label*="Write down three wins"]`],
+      toast: ['[role=status]', 'Marked as done'],
+      revisitTab: R.revisitTab,
+    };
+    await t.freeze();
+    await tab('Revisit').click();
+    t.mark('revisit');
+    await t.roll(24, { rects: TODO, step: F60 });
+    await t.thaw();
+    await page.waitForTimeout(900);
+    t.mark('todo');
+    await t.snap({ rects: TODO });
+
+    // the tick: the ring fills with the accent and a check, the task strikes,
+    // a ~650ms hold, the row folds, then the write and "Marked as done"
+    await t.freeze();
+    await visible(page.locator(TODO.check1[0])).click();
+    t.mark('tick');
+    await t.roll(132, { rects: TODO, step: F60 });
+    await t.thaw();
     return t.save();
   },
 

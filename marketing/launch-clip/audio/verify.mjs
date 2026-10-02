@@ -437,6 +437,8 @@ console.log('\n── reel');
 
 // ── the REVISIT feature clip: its own gates (audio/clips/revisit-verify.mjs)
 if (!(await import('./clips/revisit-verify.mjs')).ok) failed = true;
+// ── Meta ad 3 (TODO): its own gates (audio/ads/todo-verify.mjs)
+if (!(await import('./ads/todo-verify.mjs')).ok) failed = true;
 
 console.log(failed ? '\nFAILED' : '\nOK');
 process.exit(failed ? 1 : 0);

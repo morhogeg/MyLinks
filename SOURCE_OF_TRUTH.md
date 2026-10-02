@@ -2720,6 +2720,29 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-02 — META AD 3, "THE SCREENSHOT THAT BECOMES A TO-DO":
+  first cut.** Branch `claude/ad-todo` (from `claude/clip-revisit`, `main`
+  merged twice; NOT merged to `main`, owner reviews first). Compositions
+  `MachinaAdTodo` (9:16, narrator), `MachinaAdTodoMusic` (9:16, no narrator,
+  the A/B cut), `MachinaAdTodoFeed` (4:5), all from the real app (take
+  `adTodo`): a pile of screenshots with the hook on screen from frame 0 →
+  the mark (3.5s) → the + → the Add dialog's Image tab, three slides of an
+  invented "How to ask for a raise" carousel → the feed's "Reading 3
+  screenshots…" card → opened to its Key Points → Revisit "Do this" (its new
+  task: "Write down three wins, each with a number, before your next
+  review.") → the round-4 tick in full (ring fills, strike, hold, fold,
+  "Marked as done", "Done 1") → "Machina." / the tagline. Lines as briefed
+  except beat 3, tightened to "It reads them, and keeps the key points." (8
+  words on screen max). **Verified:** `tsc` clean; `npm run verify` exit 0
+  (new gates `audio/ads/todo-verify.mjs`: frame-0 hook, voice by 0.5s, mark
+  timing, words on screen, tagline exact and held 1.6s+, ≤30s, no
+  recipe/Pro/plan/price/"free" anywhere, both mixes −14 LUFS / −1.2 dBTP);
+  stills of every beat in both shapes checked against Meta's safe zones.
+  **Open:** it runs **27.5s**, over the 15–20s aim (every beat kept at the
+  kit's half speed; cutting beat 3's card opening is the way to ~22s); the
+  hook is 10 words on screen (the owner's line); nobody has listened on
+  speakers; `takes.json` = committed takes + `adTodo` (re-capture all takes
+  when the three ad branches merge); not through Meta's ad review.
 - **2026-10-02 — X LAUNCH CAMPAIGN REVIEWED AND ON MAIN; THREE META AD VIDEOS
   HANDED TO NEW SESSIONS.** Branch `claude/x-launch-content-video-prompts-flujr5`.
   Docs and marketing only (no `web/` or `functions/` change, nothing deployed).

@@ -144,6 +144,10 @@ def clip_script(name):
 SCRIPTS["revisit"] = (lambda: clip_script("revisit"), os.path.join(VO, "revisit"))
 WORD_TIMING["revisit"] = os.path.join(ROOT, "src", "reels", "clips", "revisit", "vo.json")
 
+# Meta ad 3, "The screenshot that becomes a to-do" (clips/ad-todo-timeline.mjs)
+SCRIPTS["adtodo"] = (lambda: clip_script("ad-todo"), os.path.join(VO, "adtodo"))
+WORD_TIMING["adtodo"] = os.path.join(ROOT, "src", "reels", "ads", "todo", "vo.json")
+
 
 def speech_runs(samples, sr, gap=0.09):
     """[start, end] seconds of each run of speech, split at pauses >= gap."""
