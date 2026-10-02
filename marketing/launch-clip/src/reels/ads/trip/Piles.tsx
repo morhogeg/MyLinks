@@ -1,8 +1,7 @@
 import React from 'react';
 import { AbsoluteFill } from 'remotion';
 import { Compass, Image as ImageIcon } from 'lucide-react';
-import { CAPTIONS, FPS, HITS } from '../../../../ads/trip-timeline.mjs';
-import VO from './vo.json';
+import { HITS } from '../../../../ads/trip-timeline.mjs';
 import { EASE_GATHER, EASE_IN_OUT, EASE_MODAL, EASE_SPRING, mix, prog } from '../../kit/curves';
 import { MarkAssembly } from '../../kit/Brand';
 import { PLATFORM_INK, PlatformMark } from '../../../ui/app';
@@ -14,36 +13,39 @@ import { useAdFrame } from './format';
 /**
  * The hook and the name (the SAVE and REVISIT clips' hook-pile pattern).
  *
- * Frame 0 is the poster: the trip's saves where they were kept, five piles,
- * each an app's own save list with its mark (Instagram · Saved, YouTube ·
- * Watch later, Safari · Reading List, Facebook · Saved, Photos ·
- * Screenshots), the trip's save on top in ink, an older, unrelated save under
- * it, softer. "…scattered across five apps": the piles drift apart and go
- * soft. Then they gather into one point of ink (EASE_GATHER), the brackets
- * snap shut around it (the app's spring), and the drawn wordmark wipes in as
- * "Machina" is said. Then the wordmark leaves and the mark shrinks to the
- * size and place of the Ask screen's own mark, and the cut to Ask lands on it
- * (a match cut by shape: AskTrip.tsx opens framed on that mark).
+ * Frame 0 is the poster: saves of every kind where they were kept, five
+ * piles, each an app's own save list with its mark (Instagram · Saved,
+ * YouTube · Watch later, Safari · Reading List, Facebook · Saved, Photos ·
+ * Screenshots), under "Machina keeps all your saves,". On "from every app"
+ * the piles drift apart and go soft; on "in one place" they gather into one
+ * point of ink (EASE_GATHER), the brackets snap shut around it (the app's
+ * spring) and the drawn wordmark wipes in. Then the wordmark leaves and the
+ * mark shrinks to the size and place of the Ask screen's own mark, and the
+ * cut to Ask lands on it (a match cut by shape: AskTrip.tsx opens framed on
+ * that mark).
+ *
+ * Owner, round 2: the hook says what Machina is, not a trip (round 1's piles
+ * were all one trip and read as a travel app). The piles are mixed on
+ * purpose: a space photo, a TED talk, an essay, a money essay, a novel tip,
+ * with the three saves the answer later cites sitting among them.
  *
  * The piles are the ad's own cards, not rebuilt app UI: a mark as the Machina
  * app draws it (a compass for Safari, a picture for Photos), the name of that
- * app's save list, and titles of real saves of the demo account, the trip's
- * from capture/library.mjs TRIP_CARDS (verify checks).
+ * app's save list, and titles of real saves of the demo account (verify
+ * checks).
  */
 
 type Kind = 'youtube' | 'instagram' | 'facebook' | 'safari' | 'photos';
 type Pile = { kind: Kind; app: string; list: string; titles: string[]; r: number };
-/** titles[0] is the trip (ink); the rest are older, unrelated saves (soft).
- *  (Instagram holds two of the trip's saves) */
+/** each pile's titles, real demo saves, in the app they were saved from where
+ *  the demo account says so */
 export const PILES: Pile[] = [
-  { kind: 'instagram', app: 'Instagram', list: 'Saved', titles: ['Cala Goloritzé, Sardinia', 'Bosa, on the Temo'], r: -2.5 },
-  { kind: 'youtube', app: 'YouTube', list: 'Watch later', titles: ['A boat day on the Gulf of Orosei', 'Optimistic Nihilism'], r: 2.5 },
-  { kind: 'safari', app: 'Safari', list: 'Reading List', titles: ['Su Nuraxi di Barumini', 'The Tail End'], r: 2 },
-  { kind: 'facebook', app: 'Facebook', list: 'Saved', titles: ["Alghero, Sardinia's Catalan town", 'Perfect Days'], r: -2 },
-  { kind: 'photos', app: 'Photos', list: 'Screenshots', titles: ["Dana's Sardinia tips", 'Read Piranesi, and go in blind'], r: -1.5 },
+  { kind: 'instagram', app: 'Instagram', list: 'Saved', titles: ['Cosmic Cliffs in the Carina Nebula', 'Cala Goloritzé, Sardinia'], r: -2.5 },
+  { kind: 'youtube', app: 'YouTube', list: 'Watch later', titles: ['Inside the mind of a master procrastinator', 'A boat day on the Gulf of Orosei'], r: 2.5 },
+  { kind: 'safari', app: 'Safari', list: 'Reading List', titles: ['The Tail End', 'Laws of UX'], r: 2 },
+  { kind: 'facebook', app: 'Facebook', list: 'Saved', titles: ['The Psychology of Money', "Alghero, Sardinia's Catalan town"], r: -2 },
+  { kind: 'photos', app: 'Photos', list: 'Screenshots', titles: ['Read Piranesi, and go in blind', "Dana's Sardinia tips"], r: -1.5 },
 ];
-/** how many of a pile's rows are the trip */
-const TRIP_ROWS: Record<Kind, number> = { instagram: 2, youtube: 1, safari: 1, facebook: 1, photos: 1 };
 
 const SAFARI_INK = 'rgb(0, 122, 255)';
 const PHOTOS_INK = 'rgb(245, 158, 11)';
@@ -87,9 +89,9 @@ const PileCard: React.FC<{ p: Pile; soft: number }> = ({ p, soft }) => {
             <span
               style={{
                 fontSize: 25,
-                fontWeight: k < TRIP_ROWS[p.kind] ? 620 : 520,
+                fontWeight: 600,
                 letterSpacing: '-0.012em',
-                color: k < TRIP_ROWS[p.kind] ? INK : 'rgba(75,85,99,0.62)',
+                color: INK,
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
@@ -104,12 +106,6 @@ const PileCard: React.FC<{ p: Pile; soft: number }> = ({ p, soft }) => {
   );
 };
 
-const LINE_NAME = CAPTIONS.find((c) => /Machina keeps/.test(c.text))!;
-const nameAt = () => {
-  const t = VO.find((v) => v.frame === LINE_NAME.at);
-  return LINE_NAME.at + Math.round((t?.words[0] ?? 0) * FPS);
-};
-
 /** the mark's width once formed, and at the match cut (the Ask screen's mark,
  *  38pt wide, at the cut's zoom of 4px a point) */
 const MARK_W = 300;
@@ -121,7 +117,7 @@ export const Piles: React.FC<{ f: number }> = ({ f }) => {
   const L = useAdFrame();
   if (f >= HITS.open) return null;
   const C = { x: 540, y: L.markY };
-  const NAME_AT = nameAt();
+  const NAME_AT = HITS.wordmark;
 
   const pileAt = (k: number, fr: number) => {
     const c = L.piles[k];

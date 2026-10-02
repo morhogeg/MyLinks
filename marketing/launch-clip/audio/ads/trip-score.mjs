@@ -110,7 +110,7 @@ for (const m of [48, 64, 67, 72]) pad(f(H.lockup), TOTAL_SEC - f(H.lockup) - 0.2
 // melody (FM keys), sparse: in the gaps between lines, home on C at the end
 const LINE = CAPTIONS.find((c) => c.place === 'lockup');
 const MELODY = [
-  [f(H.dotLands), 72, 0.12], // the point lands (between the hook and the name)
+  [f(H.wordmark + 8), 72, 0.12], // after "in one place.", as the wordmark lands
   [f(H.markStrike) - BEAT, 72, 0.16], // a beat before the mark strikes
   [f(LINE.at + 92), 79, 0.16], // AFTER the last word
 ];
@@ -121,8 +121,9 @@ for (const [from, to] of RISERS) riser(f(from), f(to) - f(from), 0.05);
 // ── sound design, on the picture's frames
 // the piles drift ("scattered"), then gather into the point
 whoosh(f(H.lost), f(H.collapse - H.lost), 0.02, -0.2);
-whoosh(f(H.collapse), f(H.dotLands - H.collapse), 0.07, 0.15);
-impact(f(H.dotLands), 0.22);
+// (soft: "in one place" is being said as the point lands)
+whoosh(f(H.collapse), f(H.dotLands - H.collapse), 0.04, 0.15);
+impact(f(H.dotLands), 0.1);
 tick(f(H.bracketsClose), 0.08, 0.9);
 shimmer(f(H.bracketsClose) + 0.05, [79, 84, 88], 0.035);
 

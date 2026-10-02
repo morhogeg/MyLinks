@@ -911,20 +911,21 @@ to the mix on speakers; its balance, clarity and loudness are measured.
 ## Meta ad: The trip (`MachinaAdTrip`)
 
 Meta ad 2 of 3 (Instagram and Facebook: Reels, Stories, Feed; doubles as an
-organic Reel), concept approved by the owner on 2026-10-02. **The idea:** a
-trip gets researched in five apps and nobody can pull it together; with
-Machina it is all in one place, and you just ask. The feature is Ask,
-answered only from your saves, with sources you can open (the app's own
-promise line, on screen in the cut). 22.9s, 9:16 and 4:5.
+organic Reel), the Ask ad. **The idea (round 2, owner):** say in one sentence
+what Machina is, one place for every save from every app, then show Ask
+answering from those saves, with sources you can open (the app's own
+promise line, on screen in the cut). A trip question is the one worked
+example; the hook is not about travel (round 1's hook was a Sardinia trip
+saved across five apps, and the owner: "I don't want people to think it's a
+travel app"). 21.3s, 9:16 and 4:5.
 
 | Frames | Beat | What it shows, and the line |
 |---|---|---|
-| 0–120 | hook | Frame 0 is the poster: five piles, each an app's own save list with its mark (Instagram · Saved, YouTube · Watch later, Safari · Reading List, Facebook · Saved, Photos · Screenshots), the trip's save on top, an older unrelated one under it; the line is up, whole, from frame 0 and spoken from 0.27s: "You already planned this trip." On "scattered" the piles drift apart and go soft: "It's just scattered across five apps." |
-| 104–208 | the name | The piles gather into the point (120), the brackets snap (128, 4.3s), the wordmark wipes in on the spoken name: "Machina keeps it all in one place." The wordmark leaves and the mark shrinks onto the size and place of the Ask screen's own mark |
-| 208–272 | Ask | Match cut on the mark into the real Ask screen, which pulls back onto its promise, "Answers come only from your 29 saves, with sources you can open."; down to the composer as "What should we do in Sardinia?" types: "Then you just ask." |
-| 272–352 | the answer | Send is tapped; the answer streams in: "The answer comes only from your saves." |
-| 352–496 | sources | The three sources (Instagram, YouTube, a screenshot: three different marks) lift on beats: "Every answer shows its sources." The first is tapped, Cala Goloritzé's card opens in a still frame, and its summary, the passage the answer drew on, lifts: "Tap one to check it." (the Ask clip's owner-approved line, set as two captions to stay under 8 words on screen) |
-| 496–688 | close | Thrown out into the lockup: "Machina." then the tagline on one line, exactly `Everything you save, finally useful.`, held 1.97s after the last word. Nothing under it: that space is kept clear for the App Store badge once the listing is live (Meta's Install button carries the call to action until then) |
+| 0–136 | hook | Frame 0 is the poster: five piles, each an app's own save list with its mark (Instagram · Saved, YouTube · Watch later, Safari · Reading List, Facebook · Saved, Photos · Screenshots), two real demo saves in each, of every kind (a Webb telescope photo, a TED talk, The Tail End, The Psychology of Money, a novel tip, and the trip saves among them). The first half of the sentence is up, whole, from frame 0 and spoken from 0.27s: "Machina keeps all your saves," On "from every app" the piles drift apart; on "in one place." they gather into the point, the brackets snap (3.7s) and the wordmark wipes in. The wordmark leaves and the mark shrinks onto the size and place of the Ask screen's own mark |
+| 160–224 | Ask | Match cut on the mark into the real Ask screen, which pulls back onto its promise, "Answers come only from your 29 saves, with sources you can open."; down to the composer as "What should we do in Sardinia?" types: "Then you just ask." |
+| 224–304 | the answer | Send is tapped; the answer streams in: "The answer comes only from your saves." |
+| 304–448 | sources | The three sources (Instagram, YouTube, a screenshot: three different marks) lift on beats: "Every answer shows its sources." The first is tapped, Cala Goloritzé's card opens in a still frame, and its summary, the passage the answer drew on, lifts: "Tap one to check it." (the Ask clip's owner-approved line, set as two captions to stay under 8 words on screen) |
+| 448–640 | close | Thrown out into the lockup: "Machina." then the tagline on one line, exactly `Everything you save, finally useful.`, held 1.97s after the last word. Nothing under it: that space is kept clear for the App Store badge once the listing is live (Meta's Install button carries the call to action until then) |
 
 **The answer** (`TRIP_ASK` in `capture/library.mjs`): "Three of your saves
 make a plan for the east coast. / Cala Goloritzé, Sardinia: the trail down
@@ -1017,7 +1018,9 @@ cards from three platforms, each by its title; no banned word, thinking line
 or recipe on any frame of the take; both mixes at −14 LUFS ±0.5 and ≤ −1
 dBTP; every line ≥ 3dB over the music in the speech band.
 
-**Open, for the owner:** it runs 22.9s, over the 15–20s aim (each beat holds
-its line; cutting one would cut a beat of the script); the mark forms at
-4.3s, not ~3s (the gather waits for "five apps" to be heard); nobody has
-listened to the mix on speakers (measured only).
+**Open, for the owner:** it runs 21.3s, a little over the 15–20s aim; the
+mark forms at 3.7s (on "in one place"); the Sardinia question is the only
+example of Ask, so the middle of the ad is still a travel answer; nobody
+has listened to the mix on speakers (measured only). Bosa and Su Nuraxi are
+trip saves in the account that round 2 no longer shows (they stay so the
+take, and its "29 saves", is unchanged).

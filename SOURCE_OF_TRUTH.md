@@ -2712,6 +2712,16 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-02 — Meta ad 2 (Ask), round 2: a new hook.** Branch `claude/ad-trip`,
+  NOT merged. Owner on round 1: the trip hook made Machina look like a travel
+  app; say in one sentence what Machina is, then show Ask. The hook is now
+  "Machina keeps all your saves, / from every app, in one place." over five
+  piles of mixed real demo saves (space, a TED talk, essays, money, a novel tip,
+  the trip saves among them), gathering into the mark at 3.7s; then the same
+  Ask beats and close. 21.3s (was 22.9s). Same take, no re-capture; all "ad:
+  trip" gates green, both mixes −14.0 LUFS. **Open:** the Ask example is still
+  the Sardinia question; nobody has listened to the mix on speakers.
+
 - **2026-10-02 — Meta ad 2 of 3, "The trip you already planned" (Ask), built.**
   Branch `claude/ad-trip` (from `claude/clip-ask`, `main` merged in), NOT merged:
   the owner reviews the cut first. Compositions `MachinaAdTrip` (9:16, the main
