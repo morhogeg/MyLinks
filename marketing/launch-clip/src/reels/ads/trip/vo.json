@@ -1,63 +1,70 @@
 [
  {
   "frame": 8,
-  "text": "Makeena keeps all your saves,",
+  "text": "Your saves hold more knowledge than you remember.",
   "words": [
    0.04,
-   0.459,
-   0.773,
-   0.982,
-   1.244
+   0.278,
+   0.564,
+   0.802,
+   1.04,
+   1.516,
+   1.754,
+   1.944
   ]
  },
  {
-  "frame": 72,
-  "text": "from every app, in one place.",
+  "frame": 104,
+  "text": "With Makeena, you just ask.",
   "words": [
-   0.08,
-   0.332,
-   0.634,
-   0.885,
-   1.036,
-   1.238
+   0.06,
+   0.314,
+   0.91,
+   1.116,
+   1.373
   ]
  },
  {
-  "frame": 176,
-  "text": "Then you just ask.",
+  "frame": 192,
+  "text": "Ask in your own words.",
   "words": [
-   0.05,
-   0.316,
-   0.528,
-   0.794
+   0.1,
+   0.291,
+   0.435,
+   0.674,
+   0.865
   ]
  },
  {
-  "frame": 224,
-  "text": "The answer comes only from your saves.",
-  "words": [
-   0.07,
-   0.266,
-   0.609,
-   0.903,
-   1.147,
-   1.392,
-   1.637
-  ]
- },
- {
-  "frame": 304,
-  "text": "Every answer shows its sources.",
+  "frame": 240,
+  "text": "The answer is written from your own saves.",
   "words": [
    0.03,
-   0.338,
-   0.696,
-   1.004,
-   1.209
+   0.225,
+   0.567,
+   0.714,
+   1.104,
+   1.349,
+   1.593,
+   1.788
   ]
  },
  {
-  "frame": 368,
+  "frame": 320,
+  "text": "A post, a video, even a friend's screenshot.",
+  "words": [
+   0.03,
+   0.141,
+   0.474,
+   0.586,
+   0.974,
+   1.252,
+   1.363,
+   1.863
+  ]
+ },
+ {
+  "frame": 408,
   "text": "Tap one to check it.",
   "words": [
    0.06,
@@ -68,15 +75,22 @@
   ]
  },
  {
-  "frame": 496,
-  "text": "Makeena. Everything you save, finally useful.",
+  "frame": 512,
+  "text": "Download Makeena.",
   "words": [
-   0.05,
-   0.93,
-   1.375,
-   1.537,
-   2.01,
-   2.425
+   0.07,
+   0.585
+  ]
+ },
+ {
+  "frame": 560,
+  "text": "Everything you save, finally useful.",
+  "words": [
+   0.03,
+   0.512,
+   0.687,
+   1.26,
+   1.675
   ]
  }
 ]

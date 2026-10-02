@@ -911,21 +911,28 @@ to the mix on speakers; its balance, clarity and loudness are measured.
 ## Meta ad: The trip (`MachinaAdTrip`)
 
 Meta ad 2 of 3 (Instagram and Facebook: Reels, Stories, Feed; doubles as an
-organic Reel), the Ask ad. **The idea (round 2, owner):** say in one sentence
-what Machina is, one place for every save from every app, then show Ask
-answering from those saves, with sources you can open (the app's own
-promise line, on screen in the cut). A trip question is the one worked
-example; the hook is not about travel (round 1's hook was a Sardinia trip
-saved across five apps, and the owner: "I don't want people to think it's a
-travel app"). 21.3s, 9:16 and 4:5.
+organic Reel): **the Ask ad**. Each of the three Meta ads sells one feature
+(ad 1, what one save becomes; ad 3, a screenshot that becomes a to-do); this
+one sells Ask, from start to finish. The branch keeps its first concept's name.
+22.7s, 9:16 and 4:5.
+
+**How it got here.** Round 1 opened on a Sardinia trip saved across five apps
+(owner: it looks like a travel app). Round 2 opened on what Machina is ("Machina
+keeps all your saves, from every app, in one place."). Round 3 (owner: is this
+about one feature or the whole app? it does neither; focus on Ask, improve the
+hook, reuse the Ask clip's phrases): the hook is the Ask clip's owner-approved
+line, every beat is Ask, the standout names each source as it appears, and it
+ends on a call to action, then the tagline.
 
 | Frames | Beat | What it shows, and the line |
 |---|---|---|
-| 0–136 | hook | Frame 0 is the poster: five piles, each an app's own save list with its mark (Instagram · Saved, YouTube · Watch later, Safari · Reading List, Facebook · Saved, Photos · Screenshots), two real demo saves in each, of every kind (a Webb telescope photo, a TED talk, The Tail End, The Psychology of Money, a novel tip, and the trip saves among them). The first half of the sentence is up, whole, from frame 0 and spoken from 0.27s: "Machina keeps all your saves," On "from every app" the piles drift apart; on "in one place." they gather into the point, the brackets snap (3.7s) and the wordmark wipes in. The wordmark leaves and the mark shrinks onto the size and place of the Ask screen's own mark |
-| 160–224 | Ask | Match cut on the mark into the real Ask screen, which pulls back onto its promise, "Answers come only from your 29 saves, with sources you can open."; down to the composer as "What should we do in Sardinia?" types: "Then you just ask." |
-| 224–304 | the answer | Send is tapped; the answer streams in: "The answer comes only from your saves." |
-| 304–448 | sources | The three sources (Instagram, YouTube, a screenshot: three different marks) lift on beats: "Every answer shows its sources." The first is tapped, Cala Goloritzé's card opens in a still frame, and its summary, the passage the answer drew on, lifts: "Tap one to check it." (the Ask clip's owner-approved line, set as two captions to stay under 8 words on screen) |
-| 448–640 | close | Thrown out into the lockup: "Machina." then the tagline on one line, exactly `Everything you save, finally useful.`, held 1.97s after the last word. Nothing under it: that space is kept clear for the App Store badge once the listing is live (Meta's Install button carries the call to action until then) |
+| 0–96 | hook | Frame 0 is the poster: five piles, each an app's own save list with its mark (Instagram · Saved, YouTube · Watch later, Safari · Reading List, Facebook · Saved, Photos · Screenshots), two real demo saves in each, of every kind (a Webb telescope photo, a TED talk, The Tail End, The Psychology of Money, a novel tip, with the three saves the answer cites among them). The line is up, whole, from frame 0 and spoken from 0.27s: "Your saves hold more knowledge than you remember." (the Ask clip's hook) |
+| 64–176 | the name | The piles drift apart, gather into the point, the brackets snap (3.5s) and the wordmark wipes in as the name is said: "With Machina, you just ask." (the Ask clip's line). The wordmark leaves and the mark shrinks onto the size and place of the Ask screen's own mark |
+| 176–240 | your own words | Match cut on the mark into the real Ask screen, which pulls back onto its promise, "Answers come only from your 29 saves, with sources you can open."; down to the composer as "What should we do in Sardinia?" types: "Ask in your own words." (the Ask clip's line) |
+| 240–320 | the answer | Send is tapped; the answer streams in: "The answer is written from your own saves." (the Ask clip's line) |
+| 320–408 | the standout | Each source lifts as the voice names it, each with its app's mark: "A post, a video, even a friend's screenshot." (Instagram, YouTube, Dana's screenshot) |
+| 408–480 | proof | The first source is tapped, Cala Goloritzé's card opens in a still frame, and its summary, the passage the answer drew on, lifts: "Tap one to check it." (the Ask clip's line) |
+| 480–680 | close | Thrown out into the lockup; the mark strikes as the call to action starts and the wordmark wipes in on its name: "Download Machina." Then the tagline on one line, exactly `Everything you save, finally useful.`, held 1.9s after the last word. Nothing under it: that space is kept clear for the App Store badge once the listing is live |
 
 **The answer** (`TRIP_ASK` in `capture/library.mjs`): "Three of your saves
 make a plan for the east coast. / Cala Goloritzé, Sardinia: the trail down
@@ -968,7 +975,8 @@ The piles are the ad's own graphic (the SAVE clip's hook-pile pattern), not
 rebuilt app UI: a mark as the Machina app draws it, the list's name, and
 titles of real demo saves (verify checks). No other app's UI is drawn. The
 app's thinking line is not in the take. No plan is named (Ask is free up to
-20 questions a month), no price, no "free", no availability claim.
+20 questions a month), no price, no "free", and no availability claim beyond
+the owner's call to action, "Download Machina." (round 3).
 
 **Two shapes, one scene** (`src/reels/ads/trip/format.ts`, the film's
 `useFraming()` idea in the ad's own folder): 9:16 keeps every line, logo and
@@ -1010,17 +1018,17 @@ Its parts: `ads/trip-timeline.mjs`, `src/reels/ads/trip/` (`MachinaAdTrip`,
 `shoot.mjs`, `server.mjs`, `synth-vo.py`, `mix-vo.mjs`, `verify.mjs` and
 `Root.tsx`. The "ad: trip" gates: no caption overlap, at most 8 words up at
 once, the hook up from frame 0 and spoken by 0.5s, the mark formed by 4.5s,
-Machina named, the close exactly the tagline and held ≥ 1.6s, at most 30s;
+Machina named, the close "Download Machina." then exactly the tagline, held ≥ 1.6s, at most 30s;
 the narrator mirrors, fits and leaves on time; no em dash, "AI", "second
 brain", "library", "share sheet", "bookmarks", price, "free", plan or
-availability claim; the piles are real demo saves; the answer cites three
+availability claim (the one "Download Machina." aside); the piles are real demo saves; the answer cites three
 cards from three platforms, each by its title; no banned word, thinking line
 or recipe on any frame of the take; both mixes at −14 LUFS ±0.5 and ≤ −1
 dBTP; every line ≥ 3dB over the music in the speech band.
 
-**Open, for the owner:** it runs 21.3s, a little over the 15–20s aim; the
-mark forms at 3.7s (on "in one place"); the Sardinia question is the only
-example of Ask, so the middle of the ad is still a travel answer; nobody
-has listened to the mix on speakers (measured only). Bosa and Su Nuraxi are
-trip saves in the account that round 2 no longer shows (they stay so the
-take, and its "29 saves", is unchanged).
+**Open, for the owner:** it runs 22.7s, a little over the 15–20s aim; "Download
+Machina." is only true once the listing is live (the paid ads run after launch;
+don't post the organic Reel before then); the Sardinia question is the one
+example of Ask; nobody has listened to the mix on speakers (measured only).
+Bosa and Su Nuraxi are trip saves in the account that the cut no longer shows
+(they stay so the take, and its "29 saves", is unchanged).

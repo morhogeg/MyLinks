@@ -4,13 +4,15 @@
  *
  *  - the script: captions never overlap, start on an 8th, at most 8 words on
  *    screen at once; the hook is on screen from frame 0 and spoken by 0.5s;
- *    Machina is named before the close; the close is the tagline, exactly,
+ *    Machina is named before the close; the close is "Download Machina."
+ *    then the tagline, exactly,
  *    said nowhere earlier, held ≥ 1.6s after its last word; the ad runs at
  *    most 30s; the narrator mirrors every caption, fits it, and leaves on
  *    time (the dwell rule);
  *  - the words: no em dash, literal "AI", "second brain", "library", "share
  *    sheet" or "bookmarks", and no price, "free" or availability claim
- *    ("App Store", "available", "download"), in the captions, the voice, the
+ *    ("App Store", "available"; the one "Download Machina." is the owner's
+ *    call to action), in the captions, the voice, the
  *    hook's piles, the trip's cards, the question and the answer, or the
  *    text of ANY frame of the take; and the app's thinking line on no frame;
  *  - honesty: the piles show real saves of the demo account; the answer
@@ -51,7 +53,9 @@ export default async function verifyTrip() {
   const CLAIMS = [
     [/\bfree\b/i, '"free"'],
     [/[$€£]\s?\d|\bprice\b|\bper month\b/i, 'a price'],
-    [/app store|available|download/i, 'an availability claim'],
+    // (owner, round 3: the ad ends on "Download Machina." before the tagline;
+    // it runs only once the listing is live. Nothing else claims availability)
+    [/app store|available|\bnow on\b/i, 'an availability claim'],
     [/\bpro\b/i, 'a plan'],
   ];
   const scan = (where, text, claims = true) => {
@@ -77,9 +81,9 @@ export default async function verifyTrip() {
   const lines = caps.filter((c) => !c.place);
   if (!lines.some((c) => /\bMachina\b/.test(c.say ?? c.text))) bad.push('no line before the close names Machina');
   const close = caps.find((c) => c.place === 'lockup');
-  const closeLine = close?.text.split('\n').slice(1).join(' ');
-  if (closeLine !== 'Everything you save, finally useful.') bad.push(`the ad does not end on the tagline: "${closeLine}"`);
-  if (close?.text.split('\n')[0] !== 'Machina.') bad.push('the close does not open on "Machina."');
+  if (close?.text !== 'Everything you save, finally useful.') bad.push(`the ad does not end on the tagline: "${close?.text}"`);
+  const cta = caps.filter((c) => c.cta);
+  if (cta.length !== 1 || cta[0].text !== 'Download Machina.' || caps[caps.indexOf(close) - 1] !== cta[0]) bad.push('the close is not "Download Machina." then the tagline');
   for (const c of caps) if (c !== close && /finally useful/i.test(`${c.text} ${c.say ?? ''}`)) bad.push(`the tagline appears before the end: "${c.text}"`);
   if (caps.some((c) => /great find/i.test(`${c.text} ${c.say ?? ''}`))) bad.push('the ad says the App Store subtitle');
   if (A.TOTAL_SEC > 30) bad.push(`the ad runs ${A.TOTAL_SEC.toFixed(1)}s (max 30s)`);

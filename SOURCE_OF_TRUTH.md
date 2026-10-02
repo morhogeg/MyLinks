@@ -2712,6 +2712,18 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-02 — Meta ad 2 (Ask), round 3: an Ask ad, start to finish.**
+  Branch `claude/ad-trip`, NOT merged. Owner: the cut showed neither one
+  feature nor the whole app; focus on Ask, improve the hook, reuse the Ask
+  clip's lines. Now: "Your saves hold more knowledge than you remember." over
+  mixed saves from five apps → "With Machina, you just ask." (the mark) → "Ask in
+  your own words." → "The answer is written from your own saves." → "A post, a
+  video, even a friend's screenshot." (each source lifts as it's named) → "Tap
+  one to check it." → "Download Machina." → the tagline. 22.7s. Same take; all
+  "ad: trip" gates green, both mixes −14.0 LUFS. **Open:** "Download Machina."
+  is only true once the listing is live (don't post the organic Reel before);
+  nobody has listened to the mix on speakers.
+
 - **2026-10-02 — Meta ad 2 (Ask), round 2: a new hook.** Branch `claude/ad-trip`,
   NOT merged. Owner on round 1: the trip hook made Machina look like a travel
   app; say in one sentence what Machina is, then show Ask. The hook is now

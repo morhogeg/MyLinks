@@ -110,7 +110,7 @@ for (const m of [48, 64, 67, 72]) pad(f(H.lockup), TOTAL_SEC - f(H.lockup) - 0.2
 // melody (FM keys), sparse: in the gaps between lines, home on C at the end
 const LINE = CAPTIONS.find((c) => c.place === 'lockup');
 const MELODY = [
-  [f(H.wordmark + 8), 72, 0.12], // after "in one place.", as the wordmark lands
+  [f(H.part), 72, 0.12], // after "With Machina, you just ask.", as the mark leaves
   [f(H.markStrike) - BEAT, 72, 0.16], // a beat before the mark strikes
   [f(LINE.at + 92), 79, 0.16], // AFTER the last word
 ];
@@ -125,7 +125,8 @@ whoosh(f(H.lost), f(H.collapse - H.lost), 0.02, -0.2);
 whoosh(f(H.collapse), f(H.dotLands - H.collapse), 0.04, 0.15);
 impact(f(H.dotLands), 0.1);
 tick(f(H.bracketsClose), 0.08, 0.9);
-shimmer(f(H.bracketsClose) + 0.05, [79, 84, 88], 0.035);
+// (the name is said as the brackets close: the shimmer waits for the line)
+shimmer(f(H.part) - 0.3, [79, 84, 88], 0.03);
 
 // the match cut into Ask
 whoosh(f(H.part), f(H.open - H.part), 0.05, 0);
@@ -151,8 +152,11 @@ bell(f(H.summary) + 0.1, 88, 0.04, 0.2, 1.8);
 
 // the lockup: thrown out, the mark strikes into air
 whoosh(f(H.lockup) - 0.3, 0.7, 0.09, 0);
-impact(f(H.markStrike), 0.34);
-shimmer(f(H.markStrike) + 0.08, [79, 84, 88, 91], 0.055);
+// (the call to action starts on the strike: the impact stays soft and the
+// shimmer waits for "Download Machina." to finish)
+impact(f(H.markStrike), 0.18);
+const CTA = CAPTIONS.find((c) => c.cta);
+shimmer(f(CTA.at) + 1.2, [79, 84, 88, 91], 0.045);
 
 // frame 0 is already playing (a short 40ms de-click, not a fade-in)
 S.master({ fadeInSec: 0.04, fadeOutSec: 1.1 });

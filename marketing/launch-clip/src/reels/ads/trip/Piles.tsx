@@ -16,16 +16,17 @@ import { useAdFrame } from './format';
  * Frame 0 is the poster: saves of every kind where they were kept, five
  * piles, each an app's own save list with its mark (Instagram · Saved,
  * YouTube · Watch later, Safari · Reading List, Facebook · Saved, Photos ·
- * Screenshots), under "Machina keeps all your saves,". On "from every app"
- * the piles drift apart and go soft; on "in one place" they gather into one
- * point of ink (EASE_GATHER), the brackets snap shut around it (the app's
- * spring) and the drawn wordmark wipes in. Then the wordmark leaves and the
- * mark shrinks to the size and place of the Ask screen's own mark, and the
- * cut to Ask lands on it (a match cut by shape: AskTrip.tsx opens framed on
- * that mark).
+ * Screenshots), under the hook "Your saves hold more knowledge than you
+ * remember." (the Ask clip's line). As the line ends the piles drift apart
+ * and go soft; they gather into one point of ink (EASE_GATHER), the brackets
+ * snap shut around it (the app's spring) and the drawn wordmark wipes in as
+ * "Machina" is said ("With Machina, you just ask."). Then the wordmark leaves
+ * and the mark shrinks to the size and place of the Ask screen's own mark,
+ * and the cut to Ask lands on it (a match cut by shape: AskTrip.tsx opens
+ * framed on that mark).
  *
- * Owner, round 2: the hook says what Machina is, not a trip (round 1's piles
- * were all one trip and read as a travel app). The piles are mixed on
+ * Owner, round 2: not a trip (round 1's piles were all one trip and read as
+ * a travel app); round 3: an Ask ad from start to finish. The piles are mixed on
  * purpose: a space photo, a TED talk, an essay, a money essay, a novel tip,
  * with the three saves the answer later cites sitting among them.
  *
