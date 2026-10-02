@@ -745,6 +745,59 @@ const takes = {
     t.mark('graph');
     await t.roll(150, { rects: { canvas: ['canvas'] }, step: F60 });
     await t.thaw();
+
+    // back on the card: its bell, "Remind me", Smart review, Save (the app's
+    // own sheet over its own scrim; the ad lifts the sheet off its screen)
+    const REMIND = {
+      bell: ['button[aria-label="Set reminder"]'],
+      sheet: ['[role=dialog][aria-label="Set reminder"]'],
+      smart: ['button,label,div[role=radio]', 'Smart review'],
+      save: ['button', 'Save'],
+      toast: ['li[data-sonner-toast],[role=status]', 'Reminder set'],
+    };
+    await visible(page.getByText('Back to card')).click();
+    await page.waitForTimeout(900);
+    // the card from its top, the header's bell in reach
+    await page.evaluate(() => document.querySelector('[data-capture-scroller]')?.scrollTo({ top: 0, behavior: 'instant' }));
+    await page.waitForTimeout(400);
+    t.mark('back');
+    await t.snap({ rects: { ...DETAIL, ...REMIND } });
+    await t.freeze();
+    await visible(page.locator(REMIND.bell[0])).click();
+    t.mark('remind');
+    await t.roll(40, { rects: REMIND, step: F60 });
+    await t.thaw();
+    await page.waitForTimeout(500);
+    await t.freeze();
+    await visible(page.getByText('Smart review', { exact: true })).click();
+    t.mark('smart');
+    await t.roll(16, { rects: REMIND, step: F60 });
+    await t.thaw();
+    await page.waitForTimeout(300);
+    await t.freeze();
+    await visible(page.getByRole('dialog', { name: 'Set reminder' }).getByRole('button', { name: 'Save', exact: true })).click();
+    t.mark('set');
+    await t.roll(60, { rects: REMIND, step: F60 });
+    await t.thaw();
+    await page.waitForTimeout(4500); // the toast has gone
+
+    // tomorrow, 9:00: the backend flags the reminder due (reminder_service),
+    // and the feed's own "Reminders due" strip carries it (Feed.tsx)
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(900);
+    await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+    await page.waitForTimeout(300);
+    const DUE = { strip: ['div.rounded-2xl', 'Reminders due'], dueRow: ['button', 'How to overcome your addiction'], firstCard: R.firstCard };
+    t.mark('feed');
+    await t.snap({ rects: DUE });
+    await t.freeze();
+    await page.evaluate((p) => window.__capture.merge(p, { reminderDue: true, reminderDueAt: Date.now() }), linkPath(AD_CARD_ID));
+    t.mark('due');
+    await t.roll(40, { rects: DUE, step: F60 });
+    await t.thaw();
+    await page.waitForTimeout(600);
+    t.mark('dueHeld');
+    await t.snap({ rects: DUE });
     return t.save();
   },
 };

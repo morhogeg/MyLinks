@@ -16,7 +16,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { bundle } from '@remotion/bundler';
 import { renderStill, selectComposition } from '@remotion/renderer';
-import { HITS, SCROLLS, TOTAL_FRAMES } from '../ads/card-timeline.mjs';
+import { HITS, TOTAL_FRAMES } from '../ads/card-timeline.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(here, '..');
@@ -27,14 +27,15 @@ const BROWSER = '/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/head
 
 // every beat, read off the timeline
 const REVIEW = [
-  0, 60, // the poster; the first line
-  HITS.lost + 16, HITS.talkLifts + 20, // "never": the list bleaches, the talk lifts out
-  HITS.shareTap, HITS.shareLands + 8, // Share tapped; in the mark, the name
-  HITS.part + 6, HITS.toApp + 20, // the point drops; the app opens, the talk landing
-  HITS.cardTap + 20, ...HITS.moments.map((m) => m + 10), // opened; each Key moment lifts
-  SCROLLS[0][1] + 4, HITS.keyPoints + 14, // the gist; the Key Points
-  HITS.tags + 12, HITS.related + 18, // the tags; the Related cards
-  HITS.graphTap - 4, HITS.graphTap + 2, HITS.graphTap + 30, // "See in graph" tapped; the graph; its ties
+  0, 30, // the poster; "Saved for later?"
+  HITS.lost + 16, HITS.talkLifts + 20, // "Later never comes.": the list bleaches, the video lifts out
+  HITS.shareTap, HITS.shareLands + 12, // Share tapped; in the mark, the name
+  HITS.toApp + 20, HITS.cardTap + 12, // the app opens, the video landing; opened
+  ...HITS.moments.map((m) => m + 10), // each Key moment lifts (the peak)
+  HITS.keyPoints + 14, HITS.related + 18, // the Key Points; the Related cards
+  HITS.graphTap + 2, HITS.graphTap + 30, // the graph; its ties
+  HITS.bellTap - 2, HITS.smart + 12, HITS.saveTap, HITS.reminderSet + 10, // the bell; Smart review; Save; Reminder set
+  HITS.due + 2, HITS.dueLift + 16, // tomorrow, 9:00 AM: Reminders due
   HITS.throw + 14, HITS.markStrike + 10, TOTAL_FRAMES - 30, TOTAL_FRAMES - 1, // the throw, the lockup, the tagline held
 ];
 const args = process.argv.slice(2).map(Number).filter((n) => !Number.isNaN(n));

@@ -1,24 +1,25 @@
 import React from 'react';
 import { AbsoluteFill, Audio, staticFile, useCurrentFrame } from 'remotion';
-import { CAPTIONS, FPS, HITS, THROW_LEN } from '../../../../ads/card-timeline.mjs';
+import { CAPTIONS, FPS, HITS, KICKERS, THROW_LEN } from '../../../../ads/card-timeline.mjs';
 import { sans } from '../../../fonts';
 import VO from './vo.json';
 import { CLOCK } from '../../kit/camera';
 import { prog } from '../../kit/curves';
 import { Lens, Paper } from '../../kit/Paper';
-import { AdCaptions, type AdCaption } from './AdCaptions';
+import { AdCaptions, type AdCaption, type AdKicker } from './AdCaptions';
 import { FRAMINGS, FramingContext, useAdFrame, type AdFormat } from './format';
 import { Hook } from './Hook';
 import { Share } from './Share';
 import { Card } from './Card';
+import { Remind } from './Remind';
 import { End } from './End';
 
 /**
- * Meta ad 1, "What one save becomes": ~21s on its own clock
+ * Meta ad 1, "What one save becomes": ~26s on its own clock
  * (ads/card-timeline.mjs), built from the reel kit in the reel's design
  * language. The Watch later pile and the hook (Hook), the share into the mark
  * (Share), the card read down in the real app (Card: take "adcard"), the
- * tagline on the lockup (End). Three shapes from one scene code (format.ts):
+ * reminder and its return (Remind), the tagline on the lockup (End). Three shapes from one scene code (format.ts):
  * `tall` 9:16, `feed` 4:5, `square` 1:1 (the poster).
  */
 
@@ -51,12 +52,13 @@ export const AdCard: React.FC<{
         {withAudio && <Audio src={staticFile(audioFile)} />}
         <Paper drift={Math.sin(f / 180) * 0.5} />
         <Card f={f} />
+        <Remind f={f} />
         <Hook f={f} />
         <Share f={f} />
         <End f={f} />
         {/* type never sits on UI: the app fades out under the caption band */}
         <AdBandScrim opacity={prog(f, HITS.toApp - 8, HITS.toApp) * (1 - prog(f, HITS.throw + 12, HITS.throw + THROW_LEN - 2))} />
-        {withCaptions && <AdCaptions frame={f} fps={FPS} captions={CAPTIONS as AdCaption[]} timing={VO} />}
+        {withCaptions && <AdCaptions frame={f} fps={FPS} captions={CAPTIONS as AdCaption[]} kickers={KICKERS as AdKicker[]} timing={VO} />}
         <Lens />
       </AbsoluteFill>
     </FramingContext.Provider>

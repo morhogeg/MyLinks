@@ -1,6 +1,6 @@
 import React from 'react';
 import { AbsoluteFill } from 'remotion';
-import { HITS, SCROLLS, THROW_LEN } from '../../../../ads/card-timeline.mjs';
+import { HITS, SCROLLS } from '../../../../ads/card-timeline.mjs';
 import { AppShot, Lift, Tap } from '../../kit/AppShot';
 import { camAt, camVelocity, type Key } from '../../kit/camera';
 import { EASE_IN_OUT, EASE_MODAL, EASE_SPRING, mix, prog } from '../../kit/curves';
@@ -10,18 +10,18 @@ import { AD_OPEN_CAM } from './handoff';
 
 /**
  * The card, in the real app (take "adcard", capture/shoot.mjs): the app
- * irises open around the + the mark's point became; the shared talk lands at
- * the top of the feed and is tapped open (the app's own open); then it is
- * read all the way down:
+ * irises open around the + the mark's point became; the shared video lands
+ * at the top of the feed and is tapped open (the app's own open); then it is
+ * read down:
  *
  *  MOMENTS  its four Key moments, each lifted in turn, the timestamp first
- *           (the lift opens from the timestamp across the row)
- *  POINTS   the title and gist, then the Key Points, lifted
- *  LINKS    the tags, lifted; then the three Related cards, lifted together;
- *           then the section's own "See in graph" is tapped and the real
- *           graph opens with the talk in focus, its three ties lit
+ *           (the lift opens from the timestamp across the row): the peak
+ *  POINTS   one scroll down to the Key Points, lifted
+ *  LINKS    on down: the three Related cards, lifted together; then the
+ *           section's own "See in graph" is tapped and the real graph opens
+ *           with the video in focus, its three ties lit
  *
- * then thrown out into the lockup. The detail view's scroll is captured in
+ * then a cut back to the card for the reminder (Remind.tsx). The detail view's scroll is captured in
  * 3pt steps; the camera takes up each step's rounding (the reel's round-13
  * fix), so the read-down never hops. OUTPUT frames; rolls were captured at
  * 60fps and play one frame per output frame.
@@ -45,9 +45,7 @@ const stepFor = (key: string, y: number) => {
   return best;
 };
 const TARGET: Record<string, number> = {
-  gist: stepFor('title', 270), // the title and its gist
   keyPoints: stepFor('keyPoints', 235), // the Key Points heading, the list under it
-  tags: stepFor('tag1', 360), // the tag pills
   related: STEPS, // the end: Related cards, all three
 };
 const scrollAt = (f: number) => {
@@ -83,7 +81,7 @@ const keysFor = (dy: number): Key[] =>
     // the + button, exactly where the mark's point lands (the match cut)
     { f: HITS.toApp, ...AD_OPEN_CAM, rx: 9 },
     { f: HITS.toApp + 14, z: 1.56, rx: 0, ease: EASE_MODAL },
-    // onto the talk landing at the top of the feed
+    // onto the video landing at the top of the feed
     { f: HITS.toApp + 30, cx: 196.5, cy: 328, z: 2.0, fy: HERO, ease: EASE_IN_OUT },
     { f: HITS.cardTap, z: 2.03, ease: linear },
     // opened: the Key moments' heading and the first moments
@@ -92,39 +90,26 @@ const keysFor = (dy: number): Key[] =>
     // down the moments as each lifts
     { f: HITS.moments[3] + 8, cy: 350, z: 2.36, ease: EASE_IN_OUT },
     { f: S0, cy: 352, z: 2.37, ease: linear },
-    // the read-down: the title and gist, then the Key Points
-    { f: SCROLLS[0][1] as number, cy: 350, z: 2.3, ease: EASE_IN_OUT },
-    { f: SCROLLS[1][1] as number, cy: 382, z: 2.05, ease: EASE_IN_OUT },
-    { f: SCROLLS[2][0] as number, cy: 383, z: 2.07, ease: linear },
-    // the tags
-    { f: SCROLLS[2][1] as number, cy: 362, z: 2.3, ease: EASE_IN_OUT },
-    { f: SCROLLS[3][0] as number, cy: 362, z: 2.32, ease: linear },
-    // the Related cards
-    { f: SCROLLS[3][1] as number, cy: 664, z: 2.05, ease: EASE_IN_OUT },
+    // one scroll down: the Key Points
+    { f: SCROLLS[0][1] as number, cy: 382, z: 2.05, ease: EASE_IN_OUT },
+    { f: SCROLLS[1][0] as number, cy: 383, z: 2.07, ease: linear },
+    // on down: the Related cards
+    { f: SCROLLS[1][1] as number, cy: 664, z: 2.05, ease: EASE_IN_OUT },
     { f: HITS.related + 22, cy: 664, z: 2.06, ease: linear },
     // up a little, so the section's "See in graph" clears the band, as the finger comes
     // (its last key ON the frame before the cut: a key between would read the cut as speed)
     { f: HITS.graphTap - 1, cy: 604, z: 2.1, ease: EASE_IN_OUT },
     // a cut on the tap (two keys a frame apart: nothing drawn between) to the
-    // graph: the talk in focus, its three ties lit, the app's panel naming it
+    // graph: the video in focus, its three ties lit, the app's panel naming it
     // (framed under the legend chips), then a slow push onto the ties
     { f: HITS.graphTap, cy: 462, z: 2.25 },
-    { f: HITS.throw, cy: 432, z: 2.6, ease: EASE_IN_OUT },
-    // thrown out of frame, into the lockup
-    { f: HITS.throw + THROW_LEN, fx: -760, z: 2.15, ease: EASE_IN_OUT },
+    { f: HITS.back, cy: 440, z: 2.5, ease: EASE_IN_OUT },
   ].map((k) => (k.fy !== undefined ? { ...k, fy: k.fy + dy } : k)) as Key[];
 
 const MOMENTS = ['moment1', 'moment2', 'moment3', 'moment4'];
 /** the timestamp chip at the left of each moment row (points) */
 const CHIP_W = 46;
 
-/** the tag pills, from the first and last tag's text boxes (the capture's
- *  "tags" box is the feed card's, behind the sheet) */
-const pillsOf = (i: number): Rect => {
-  const a = rectOf(T, i, 'tag1');
-  const b = rectOf(T, i, 'tag3');
-  return [a[0] - 10, a[1] - 7, b[0] + b[2] + 26 - (a[0] - 10), a[3] + 14];
-};
 /** the three Related cards, as one block */
 const relatedOf = (i: number): Rect => {
   const a = rectOf(T, i, 'related1');
@@ -134,7 +119,7 @@ const relatedOf = (i: number): Rect => {
 
 export const Card: React.FC<{ f: number }> = ({ f }) => {
   const { dy } = useAdFrame();
-  if (f < HITS.toApp || f > HITS.throw + THROW_LEN) return null;
+  if (f < HITS.toApp || f >= HITS.back) return null;
   const keys = keysFor(dy);
   const i = frameAt(f);
   const scrolling = f >= S0 && f < HITS.graphTap;
@@ -149,11 +134,9 @@ export const Card: React.FC<{ f: number }> = ({ f }) => {
   const card = rectOf(T, at(T, 'landed'), 'firstCard');
 
   // lifts, each on its beat, each gone before its screen moves
-  const momOut = prog(f, HITS.moments[3] + 10, S0, EASE_IN_OUT);
+  const momOut = prog(f, HITS.moments[3] + 8, S0, EASE_IN_OUT);
   const kpIn = prog(f, HITS.keyPoints, HITS.keyPoints + 16, EASE_SPRING);
-  const kpOut = prog(f, HITS.keyPoints + 14, (SCROLLS[2][0] as number) + 2, EASE_IN_OUT);
-  const tagIn = prog(f, HITS.tags, HITS.tags + 14, EASE_SPRING);
-  const tagOut = prog(f, HITS.tags + 10, (SCROLLS[3][0] as number) + 2, EASE_IN_OUT);
+  const kpOut = prog(f, (SCROLLS[1][0] as number) - 8, (SCROLLS[1][0] as number) + 2, EASE_IN_OUT);
   const relIn = prog(f, HITS.related, HITS.related + 16, EASE_SPRING);
   const relOut = prog(f, HITS.related + 20, HITS.related + 28, EASE_IN_OUT);
   const seeGraph = rectOf(T, stepFrame(STEPS), 'seeGraph');
@@ -189,11 +172,6 @@ export const Card: React.FC<{ f: number }> = ({ f }) => {
           const p = rectOf(T, i, 'points');
           return <Lift take={T} i={i} rect={[p[0] - 6, p[1] - 6, p[2] + 12, p[3] + 12]} radius={12} lift={kpIn * 0.35} rise={2} grow={0.01} ring={0.55 * kpIn} opacity={1 - kpOut} />;
         })()}
-
-        {/* the tags */}
-        {scrolling && f >= HITS.tags && tagIn > 0.01 && tagOut < 1 && (
-          <Lift take={T} i={i} rect={pillsOf(i)} radius={12} lift={tagIn * 0.35} rise={2} grow={0.015} ring={0.5 * tagIn} opacity={1 - tagOut} />
-        )}
 
         {/* the Related cards */}
         {scrolling && f >= HITS.related && relIn > 0.01 && relOut < 1 && (

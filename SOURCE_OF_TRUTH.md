@@ -2707,6 +2707,19 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-02 — META AD 1, ROUND 3: NEW SCRIPT, THE REMINDER IS THE
+  PAYOFF.** Branch `claude/ad-card`, not merged. Owner rewrote the script
+  with me: "Saved for later? / Later never comes. / Share it to Machina
+  instead. / Get the moments that matter, timestamped. / Get the key points. /
+  Linked to what you already saved. / Pick a time. Machina brings it back. /
+  Ready when you are." then the tagline. The pain ("later never comes") is now
+  answered by the real reminder flow (bell → "Remind me", Smart review → Save
+  → "Reminder set") and its return (a cut to tomorrow 9:00 AM, the feed's
+  "Reminders due" strip); "Ready when you are." is the launch film's own line;
+  never "talk" (verify gate). 26.3s (owner asks: graph + reminder). Verify
+  clean; all three renders exit 0. Open: nobody has listened on speakers; the
+  lock-screen push is native and not shown (`PUSH_SLOT` for a real recording);
+  on-screen dates are the capture day's ("Sat, Oct 3").
 - **2026-10-02 — META AD 1, ROUND 2: THE GRAPH AFTER THE RELATED CARDS.**
   Branch `claude/ad-card`, not merged. Owner: "linked to what you saved" should
   also show the graph. The take `adcard` now ends on the Related section's own

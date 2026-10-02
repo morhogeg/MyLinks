@@ -748,40 +748,59 @@ fast-start curve, and the landed card's lift box within 2pt of the app's.
 
 ## Meta ad 1: "What one save becomes"
 
-`MachinaAdCard` is a 23.1s vertical ad for Instagram and Facebook (Reels,
-Stories, Feed) and an organic Reel: one save, fully read (owner concept,
-2026-10-02). The save everyone has is the long video in Watch later they will
-never get to; shared once, Machina makes it a card you take in at a glance:
-the gist, the Key moments with timestamps, the Key Points, its tags and the
-saves it connects to. No Ask, no Find, no Revisit. Branch `claude/ad-card`.
+`MachinaAdCard` is a 26.3s vertical ad for Instagram and Facebook (Reels,
+Stories, Feed) and an organic Reel: one save, fully read, and brought back
+(owner concept, 2026-10-02). The save everyone has is the long video in Watch
+later they never get to. Shared once, Machina makes it a card you take in at a
+glance (its key moments with timestamps, its Key Points, the saves it links
+to), and brings it back when you choose. The hook's pain, "Later never
+comes.", is answered by the reminder: "Pick a time. Machina brings it back.
+Ready when you are." (the launch film's own payoff line). No Ask, no Find.
+Branch `claude/ad-card`.
 
 | Frames | Beat | What is shown (the line) |
 |---|---|---|
-| 0–72 | the hook | frame 0 is the poster: YouTube · Watch later, the talk on top (Big Think Clips, "How to overcome your addiction to technology") and three real demo saves under it, the line already set ("That talk you saved for later?"); the voice starts at 0.27s |
-| 72–120 | | "You'll never get to it.": the list bleaches (80), the talk lifts out of it (88); the Machina mark's point strikes (96), the brackets snap (104, 3.5s) |
-| 88–136 | the share (the slot) | the talk as a card wearing YouTube's mark, its Share tapped on "Share" (120), pulled into the mark (136); the wordmark wipes in as "Machina" is said ("Share it to Machina.") |
-| 160–216 | into the app | the point drops to become the + (the reel's match cut), the app irises open (184); the talk lands at the top of the feed and is tapped open (216) |
-| 216–288 | moments | its Key moments lift one by one, each timestamp first, the lift then opening across its row (240, 248, 256, 264) ("Get the key moments, with timestamps.") |
-| 280–368 | points | read down: the title and gist (312), then the Key Points, lifted (336) ("The whole talk, down to what matters.") |
-| 360–520 | tags & links | the tags lift (384), then the three Related cards, as one block (424); the section's own "See in graph" is tapped (456) and the cut lands in the real graph, the talk in focus and its three ties lit, pushing in on them ("Tagged, and linked to what you already saved.") |
-| 520–694 | the close | thrown into the lockup: the mark strikes (560), MACHINA wipes in on the spoken name, then the tagline on one line, exactly "Everything you save, finally useful.", held 1.6s after the voice |
+| 0–48 | the hook | frame 0 is the poster: YouTube · Watch later, the video on top (Big Think Clips, "How to overcome your addiction to technology") and three real demo saves under it, the line already set ("Saved for later?"); the voice starts at 0.27s |
+| 48–96 | | "Later never comes.": the list bleaches (56), the video lifts out of it (64); the Machina mark's point strikes (72), the brackets snap (80, 2.7s) |
+| 64–152 | the share (the slot) | the video as a card wearing YouTube's mark, its Share tapped on "Share" (96), pulled into the mark (112); MACHINA wipes in as the name is said ("Share it to Machina instead.") |
+| 144–200 | into the app | the point drops to become the + (the reel's match cut), the app irises open (168); the video lands at the top of the feed and is tapped open (200) |
+| 200–280 | the peak | its four Key moments lift one by one, each timestamp first (216, 224, 232, 240) ("Get the moments that matter, timestamped.") |
+| 256–328 | key points | one scroll down; the Key Points lift (296) ("Get the key points.") |
+| 328–456 | links | on down: the three Related cards lift as one block (368); "See in graph" is tapped (408) and the cut lands in the real graph, the video in focus, its three ties lit ("Linked to what you already saved.") |
+| 456–552 | the reminder | a cut back to the card; its bell tapped (472); the app's "Remind me" sheet rises, lifted off its screen, Smart review (preselected: "Tomorrow 9:00 AM · then 1 week & 1 month") ringed (488); Save tapped (520); the app's "Reminder set for …" lifted (536) ("Pick a time. Machina brings it back.") |
+| 552–616 | tomorrow | a cut to the feed, "TOMORROW, 9:00 AM" above the line: the feed's own "Reminders due" strip, the video in it, lifted (576) ("Ready when you are.") |
+| 616–790 | the close | thrown into the lockup: the mark strikes (656), MACHINA wipes in on the spoken name, then the tagline on one line, exactly "Everything you save, finally useful.", held 1.6s after the voice |
 
-**The Meta spec, and how the ad meets it.** 23.1s (the aim was 15–20s; the
-graph after the Related cards, owner round 2, adds 2.1s, and the tagline's
-1.6s hold the last second; every beat runs at the reel's pace, never over 30s). Frame 0 is a legible picture with the hook line set
-on it (a `poster` line, arriving before the ad starts), so the hook lands with
-the sound off. At most 8 words on screen at once (the hook is two lines for
-that reason). Safe zones (9:16): the line sits at 346px, under Meta's top
-270px; the paper band hides the app above ~550–650px; the app's hero line is
-930px, and every lifted element, the + the point lands on (1235px), the mark,
-the wordmark and the tagline sit above Meta's bottom 670px (y 1250) and 65px
-from the sides. Stills of every beat with those zones drawn are in
+**How it got here.** Round 1 (21.0s) read the card down section by section
+("Get the key moments, with timestamps." / "The whole talk, down to what
+matters." / "Tagged, and linked to what you already saved."). Round 2 (owner:
+"linked to what you saved should also show the graph") added "See in graph"
+and the real graph (23.1s). Round 3 (owner, 2026-10-02) rewrote the script:
+the hook in six words ("Saved for later? Later never comes."), "instead" in
+the share line, "Get … / Get the key points." for the card, the video never
+called a "talk" (verify fails the word), and, the key note, the payoff answers
+the pain: the reminder and its return, in the launch films' words ("brings it
+back", "Ready when you are."). The card is open by 6.7s (was 7.2s with a
+longer hook).
+
+**The Meta spec, and how the ad meets it.** 26.3s (the aim was 15–20s; the
+graph and the reminder, both owner asks, cost the time; never over 30s).
+Frame 0 is a legible picture with the hook line set on it (a `poster` line,
+arriving before the ad starts), so the hook lands with the sound off. At most
+8 words on screen at once (the "Tomorrow, 9:00 AM" kicker counts). Safe zones
+(9:16): the line sits at 346px, under Meta's top 270px; the paper band hides
+the app above ~550–650px; the app's hero line is 930px, and every lifted
+element, the + the point lands on (1235px), the mark, the wordmark and the
+tagline sit above Meta's bottom 670px (y 1250) and 65px from the sides.
+Stills of every beat with those zones drawn are in
 `out/ads/card/contact-tall.png`. No App Store badge, no "available", no price,
 no "free", no plan: YouTube Key moments need Pro, and the ad names no plan
-(the SAVE clip's rule). The space under the tagline is kept clear for the
-official badge once the listing is live. No recipe anywhere: the pile holds
-the talk, Tim Urban's TED talk, Kurzgesagt's "Optimistic Nihilism" and Steve
-Jobs' Stanford address; the feed the card lands in shows the Tail End under it.
+(the SAVE clip's rule); reminders are on both plans. The space under the
+tagline is kept clear for the official badge once the listing is live. No
+recipe anywhere: the pile holds the video, Tim Urban's TED talk, Kurzgesagt's
+"Optimistic Nihilism" and Steve Jobs' Stanford address; the feed shows the
+Tail End under the video; the graph is framed under its legend chips (they
+name every category, "cooking" among them).
 
 **Three renders, one scene code.** `src/reels/ads/card/format.ts` frames the
 same scenes for three shapes (the film's `useFraming()` idea): `tall` 9:16,
@@ -804,19 +823,27 @@ written for the SAVE clip, true to those moments. Scripted here, in
 `capture/ad-card.mjs`: its Related row, three real demo saves with a one-line
 reason each, true of both cards (Tim Urban's talk on the pull of instant
 reward, Oliver Burkeman's Four Thousand Weeks on where limited time and
-attention go, James Clear's line that systems change habits). The narration
-never says how long the talk is (its length was not verified; the last Key
+attention go, James Clear's line that systems change habits). The reminder
+is the app's own flow, really tapped: the bell, the "Remind me" sheet (Smart
+review is the app's default; the ad rings it, it does not fake a tap on it),
+Save, the app's toast. The dates on screen are the capture day's ("Sat, Oct
+3"). Scripted, as the backend's part: the reminder coming due ("tomorrow"),
+written onto the card the way `reminder_service` flags it (`reminderDue`), so
+the feed shows its real "Reminders due" strip. The lock-screen push ("Time to
+revisit") is native iOS and is not shown: `PUSH_SLOT` marks where a real
+iPhone recording could go. The narration
+never says how long the video is (its length was not verified; the last Key
 moment is at 26:20). The Watch later pile and the share card are the kit's
 brand graphics, not YouTube's UI: an app's mark as the Machina app draws it,
 the name of its save list, real titles, no thumbnails.
 
 **Round 2 (owner, 2026-10-02: "the linked to what you saved should also
-show the graph after the related cards").** The take now ends on the Related
-section's own "See in graph" (the app's `onOpenInGraph`), recorded 2.5s at
-60fps. The ad taps it after the line's last word and cuts on the tap to the
+show the graph after the related cards").** The take now continues from the
+Related section's own "See in graph" (the app's `onOpenInGraph`), recorded
+2.5s at 60fps. The ad taps it after the line's last word and cuts on the tap to the
 graph's fifth frame (its first frames are the view fading in from white, which
 read as a flash), framed under the legend chips (they name every category,
-"cooking" among them), and pushes in on the talk's three lit ties. The cut
+"cooking" among them), and pushes in on the video's three lit ties. The cut
 grew 64 frames (2.1s); the no-narrator mix got 0.3dB more true-peak headroom
 (its AAC encode measured exactly −1.0 dBTP; now −1.6).
 
@@ -844,7 +871,7 @@ Its gates (`audio/ads/card-verify.mjs`, run by `npm run verify`) hold the SAVE
 clip's caption, dwell, grid, tap, exit, banned-word and loudness gates to the
 ad, and add the Meta spec: 15–30s (a note over 20s), a poster line on frame 0
 and the voice by 0.5s, the mark by ~3.5s, at most 8 words on screen, the
-tagline exact and held 1.6s, no "share sheet", "bookmarks", "free", price,
+tagline exact and held 1.6s (a kicker counts toward the 8 words), no "talk", "share sheet", "bookmarks", "free", price,
 plan or availability in what the ad says, no recipe on any frame of the take
 it plays, the 9:16 safe zones (the line, the +, the hero line), and both
 mixes at −14 ±0.5 LUFS, true peak ≤ −1 dBTP. Sound: every line ≥ 6dB over the

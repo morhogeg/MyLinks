@@ -39,7 +39,7 @@ const CHORDS = {
 const BARS = Math.ceil(TOTAL_FRAMES / BAR_FRAMES);
 const LOCKUP_BAR = Math.round(HITS.lockup / BAR_FRAMES);
 /** how much of the band is playing, per bar */
-const DENSITY = [0.36, 0.5, 0.6, 0.8, 0.84, 0.84, 0.84, 0.86, 0.45, 0.45, 0.45];
+const DENSITY = [0.36, 0.5, 0.74, 0.8, 0.84, 0.84, 0.84, 0.86, 0.82, 0.8, 0.45, 0.45, 0.45];
 
 for (let bar = 0; bar < BARS; bar++) {
   const ch = CHORDS[BAR_CHORDS[bar]];
@@ -126,11 +126,19 @@ sub(t(H.toApp + 8), 43, 0.14, 0.25);
 tick(t(H.cardTap), 0.09, 1.1);
 whoosh(t(H.cardTap) + 0.07, 0.35, 0.045, -0.15);
 // the lifts stay silent under the lines; "See in graph" is tapped after
-// the last word, and the graph opens on a chime
+// the line's last word, and the graph opens on a chime
 tick(t(H.graphTap), 0.09, 1.2);
 whoosh(t(H.graphTap) + 0.07, 0.4, 0.05, 0.15);
 bell(t(H.graphTap + 16), 88, 0.045, 0.2, 1.4);
-shimmer(t(H.graphTap + 18), [79, 84, 91], 0.03);
+// the reminder: the bell tapped, the sheet rising, Save; the confirmation
+// shimmers after the line's last word
+tick(t(H.bellTap), 0.09, 1.15);
+whoosh(t(H.bellTap) + 0.05, 0.35, 0.04, -0.15);
+tick(t(H.saveTap), 0.1, 1.25);
+shimmer(t(H.reminderSet + 8), [79, 84, 88], 0.03);
+// tomorrow, 9:00 AM: a soft chime on the cut, before "Ready when you are."
+bell(t(H.due), 84, 0.05, 0, 1.6);
+sub(t(H.due), 36, 0.16, 0.4);
 // thrown out into the lockup; the mark strikes into air
 whoosh(t(H.throw) - 0.1, 0.7, 0.09, 0);
 impact(t(H.markStrike), 0.34);

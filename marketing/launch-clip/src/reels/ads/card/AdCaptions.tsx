@@ -1,6 +1,6 @@
 import React from 'react';
 import { AbsoluteFill } from 'remotion';
-import { KineticLine } from '../../kit/Type';
+import { KineticLine, Kicker } from '../../kit/Type';
 import { useAdFrame } from './format';
 
 /**
@@ -10,12 +10,21 @@ import { useAdFrame } from './format';
  * `poster` line is already set on frame 0 (it arrives before the ad starts),
  * so the first frame reads with the sound off.
  */
-export type AdCaption = { at: number; to: number; text: string; size?: number; poster?: boolean; place?: 'lockup' };
+export type AdCaption = { at: number; to: number; text: string; size?: number; poster?: boolean; place?: 'lockup'; kicker?: string };
+export type AdKicker = { at: number; to: number; text: string };
 
-export const AdCaptions: React.FC<{ frame: number; fps: number; captions: AdCaption[]; timing: { frame: number | null; words: number[] }[] }> = ({ frame, fps, captions, timing }) => {
+/** the kicker sits one label above the line (the kit's 290 over 346) */
+const KICKER_ABOVE = 56;
+
+export const AdCaptions: React.FC<{ frame: number; fps: number; captions: AdCaption[]; kickers?: AdKicker[]; timing: { frame: number | null; words: number[] }[] }> = ({ frame, fps, captions, kickers = [], timing }) => {
   const { line } = useAdFrame();
   return (
     <AbsoluteFill style={{ pointerEvents: 'none' }}>
+      {kickers.map((k) => (
+        <div key={`k${k.at}`} style={{ position: 'absolute', left: 0, right: 0, top: line - KICKER_ABOVE }}>
+          <Kicker text={k.text} frame={frame} from={k.at} to={k.to} />
+        </div>
+      ))}
       {captions.map((c) => {
         if (c.place === 'lockup') return null;
         const t = timing.find((x) => x.frame === c.at);

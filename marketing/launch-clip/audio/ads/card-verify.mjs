@@ -41,6 +41,7 @@ export default async function verifyAdCard() {
     [/librar(y|ies)/i, '"library"'],
     [/share sheet/i, '"share sheet"'],
     [/bookmark/i, '"bookmarks"'],
+    [/\btalks?\b/i, '"talk" (owner, round 3: say video)'],
   ];
   // what the ad itself says (lines, the share card): no plan, no price, no
   // availability (the listing is not live; Meta's Install button is the CTA)
@@ -59,11 +60,13 @@ export default async function verifyAdCard() {
   const caps = [...C.CAPTIONS].sort((a, b) => a.at - b.at);
   caps.forEach((c, i) => {
     scan(`caption ${i + 1}`, c.text, true);
+    if (c.kicker) scan(`kicker ${i + 1}`, c.kicker, true);
+    if (c.kicker && / /.test(c.kicker)) bad.push(`kicker "${c.kicker}" has a plain space (the Kicker collapses it: use \\u00a0)`);
     if (c.to <= c.at) bad.push(`caption "${c.text}" ends before it starts`);
     if (i && c.at < caps[i - 1].to) bad.push(`caption overlap: "${c.text}" / "${caps[i - 1].text}"`);
     if (c.to > C.TOTAL_FRAMES) bad.push(`caption "${c.text}" runs past the ad`);
     if (c.at % (C.BEAT_FRAMES / 2)) bad.push(`caption "${c.text}" starts at ${c.at}, not on an 8th`);
-    const words = c.text.split(/\s+/).filter(Boolean).length - (c.place === 'lockup' ? 1 : 0); // the name is the drawn wordmark
+    const words = c.text.split(/\s+/).filter(Boolean).length - (c.place === 'lockup' ? 1 : 0) + (c.kicker ? c.kicker.split(/[\s\u00a0]+/).length : 0); // the name is the drawn wordmark; a kicker counts
     if (words > 8) bad.push(`caption "${c.text}" puts ${words} words on screen (Meta spec: at most about 8)`);
     c.text.split('\n').forEach((row) => {
       if (/[.?!]\s+\S/.test(row)) bad.push(`caption row "${row}" starts a new sentence mid-row`);
@@ -139,7 +142,7 @@ export default async function verifyAdCard() {
   const take = takes.adcard;
   if (!take) bad.push('no "adcard" take: run CAPTURE_ONLY=adcard node capture/shoot.mjs');
   else {
-    for (const k of ['home', 'land', 'landed', 'open', 'scroll', 'graph']) if (take.marks[k] === undefined) bad.push(`the adcard take has no mark "${k}"`);
+    for (const k of ['home', 'land', 'landed', 'open', 'scroll', 'graph', 'back', 'remind', 'set', 'feed', 'due', 'dueHeld']) if (take.marks[k] === undefined) bad.push(`the adcard take has no mark "${k}"`);
     // the ad plays from the landing on (the home frame before it is never shown)
     take.frames.slice(take.marks.land).forEach((fr, i) =>
       fr.t.forEach((k) => {
@@ -165,7 +168,7 @@ export default async function verifyAdCard() {
   if (!(hero >= 720 && hero <= 1240)) bad.push(`the app's hero line is ${hero}px (aim between 720 and 1240)`);
 
   // ── taps touch on their hits; exits ease in and out
-  for (const [file, want] of [['Card.tsx', 2], ['Share.tsx', 1]]) {
+  for (const [file, want] of [['Card.tsx', 2], ['Share.tsx', 1], ['Remind.tsx', 2]]) {
     let taps = 0;
     for (const [, hit, a, b] of read(`src/reels/ads/card/${file}`).matchAll(/<Tap [^>]*t=\{prog\(f, ([\w.]+) - (\d+), \1 \+ (\d+)/g)) {
       taps++;
@@ -174,7 +177,7 @@ export default async function verifyAdCard() {
     }
     if (taps < want) bad.push(`found ${taps} taps in ${file} (expected ${want}): the tap gate no longer reads it`);
   }
-  for (const file of ['Hook.tsx', 'Share.tsx', 'Card.tsx', 'End.tsx']) {
+  for (const file of ['Hook.tsx', 'Share.tsx', 'Card.tsx', 'Remind.tsx', 'End.tsx']) {
     for (const [, name, curve] of read(`src/reels/ads/card/${file}`).matchAll(/const (\w*Out|part|leave) = prog\([^;]*(EASE_MODAL|EASE_SPRING|EASE_FLING)\)/g))
       bad.push(`${file}: exit ${name} uses ${curve} (a fast start reads as a blink: EASE_IN_OUT)`);
   }

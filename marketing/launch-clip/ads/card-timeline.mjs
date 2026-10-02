@@ -5,18 +5,22 @@
  * `audio/synth-vo.py adcard`, the gates in audio/ads/card-verify.mjs all read
  * this file).
  *
- * One save, fully read, in about 20 seconds (owner, 2026-10-02):
+ * One save, fully read, and brought back (owner, round 3, 2026-10-02: the
+ * pain is "later never comes", so the payoff is the reminder):
  *
- *   HOOK    the YouTube · Watch later pile, the talk on top: "That talk you
- *           saved for later? You'll never get to it." (on screen from frame 0)
- *   SHARE   the talk lifts out of the fading pile, its Share is tapped and it
- *           is pulled into the mark; the wordmark wipes in: "Share it to Machina."
- *   MOMENTS the card lands in the feed and is tapped open; its Key moments
- *           lift one by one, timestamps first
- *   POINTS  read down to the gist and the Key Points
- *   LINKS   the tags lift, then the three Related cards; "See in graph" is
- *           tapped and the real graph opens on the talk, its three ties lit
- *   CLOSE   thrown into the lockup: "Machina." / "Everything you save, finally useful."
+ *   HOOK     the YouTube · Watch later pile, the video on top: "Saved for
+ *            later?" (on screen from frame 0) "Later never comes."
+ *   SHARE    the video lifts out of the fading list, its Share is tapped, it
+ *            is pulled into the mark; the wordmark wipes in on the name:
+ *            "Share it to Machina instead."
+ *   MOMENTS  the card lands in the feed and is tapped open; its four Key
+ *            moments lift one by one, timestamps first (the peak)
+ *   POINTS   one scroll down; the Key Points lift
+ *   LINKS    the Related cards lift; "See in graph"; the real graph, its ties lit
+ *   REMIND   back on the card: the bell, "Remind me" (Smart review: tomorrow
+ *            9:00 AM, then 1 week and 1 month), Save, "Reminder set"
+ *   DUE      tomorrow, 9:00 AM: the feed's "Reminders due" strip, the video in it
+ *   CLOSE    thrown into the lockup: "Machina." / "Everything you save, finally useful."
  *
  * OUTPUT frames at 30fps on the reel's grid (112.5 BPM, 16 frames a beat).
  * The app is take "adcard" (capture/shoot.mjs, capture/ad-card.mjs), its rolls
@@ -34,84 +38,106 @@ export const BAR = BAR_FRAMES / FPS;
 
 /** THE CUT: every scene reads these, and so does the score */
 export const HITS = {
-  // the hook: on "never" the pile bleaches; the talk lifts out of it
-  lost: 80,
-  talkLifts: 88,
-  // the mark assembles where the share will land (by ~3s)
-  dotLands: 96,
-  bracketsClose: 104,
+  // the hook: on "never" the list bleaches; the video lifts out of it
+  lost: 56,
+  talkLifts: 64,
+  // the mark assembles where the share will land (by ~2.7s)
+  dotLands: 72,
+  bracketsClose: 80,
   // the share: tapped on "Share", pulled into the mark
-  shareTap: 120,
-  shareLands: 136,
+  shareTap: 96,
+  shareLands: 112,
   // the point drops to become the + button; the app irises open around it
-  part: 160,
-  toApp: 184,
+  part: 144,
+  toApp: 168,
   // the card lands at the top of the feed (from toApp) and is tapped open
-  cardTap: 216,
-  // its Key moments, one by one, timestamps first
-  moments: [240, 248, 256, 264],
-  // the read-down: the gist, then the Key Points, lifted
-  keyPoints: 336,
-  // the tags, then the Related cards
-  tags: 384,
-  related: 424, // the three cards, lifted as one block
+  cardTap: 200,
+  // the peak: its Key moments, one by one, timestamps first
+  moments: [216, 224, 232, 240],
+  // one scroll down: the Key Points, lifted
+  keyPoints: 296,
+  // on down: the three Related cards, lifted as one block
+  related: 368,
   // the app's own "See in graph": the same ties, as a map
-  graphTap: 456,
+  graphTap: 408,
+  // a cut back to the card: its bell, "Remind me", Save
+  back: 456,
+  bellTap: 472,
+  smart: 488, // the Smart review row (preselected: tomorrow 9:00 AM, then 1 week & 1 month), lifted
+  saveTap: 520,
+  reminderSet: 536, // the app's "Reminder set for …", lifted
+  // tomorrow, 9:00 AM: the feed's "Reminders due" strip
+  due: 552,
+  dueLift: 576,
   // the close
-  throw: 520,
-  lockup: 536,
-  markStrike: 560,
+  throw: 616,
+  lockup: 632,
+  markStrike: 656,
 };
 
 /**
  * The share-sheet slot: the span a real iPhone screen recording of the share
  * (Share → Machina) could replace one day, cut for cut. Today it is the kit's
- * brand share gesture (Share.tsx), never rebuilt iOS UI. [from, to): the talk
+ * brand share gesture (Share.tsx), never rebuilt iOS UI. [from, to): the video
  * lifting out of the pile until it lands in the mark.
  */
 export const SHARE_SLOT = [HITS.talkLifts, HITS.shareLands];
 
+/**
+ * The push slot: the reminder arriving as a lock-screen push ("Time to
+ * revisit") is native iOS and cannot be captured from the web build; the ad
+ * shows the in-app delivery (the feed's "Reminders due" strip). A real iPhone
+ * recording of the push could replace [from, to) later.
+ */
+export const PUSH_SLOT = [HITS.due, HITS.throw];
+
 /** the card's read-down (the app's scroll, captured in 3pt steps): [from, to,
  *  target] in output frames; targets are named in Card.tsx */
 export const SCROLLS = [
-  [280, 312, 'gist'],
-  [312, 336, 'keyPoints'],
-  [360, 384, 'tags'],
-  [400, 424, 'related'],
+  [256, 288, 'keyPoints'],
+  [328, 360, 'related'],
 ];
 
 export const THROW_LEN = 30;
-export const TOTAL_FRAMES = 694; // the tagline holds 1.6s after the voice ends
+export const TOTAL_FRAMES = 790; // the tagline holds 1.6s after the voice ends
 export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 
 /**
  * The narrator = the captions, line for line (Kokoro `af_heart` 0.95,
  * "Machina" spoken "Makeena"). `at` is the frame the voice starts, `to` the
  * frame the line leaves (0.3–1.2s after the voice; up to 4s with `until`).
- * At most 8 words on screen at once. `poster`: the line is already set on
- * frame 0 (the ad's first frame is its poster; the hook must land with the
- * sound off). NO em dashes, no literal "AI", no "second brain", no "library".
+ * At most 8 words on screen at once (a kicker counts). `poster`: the line is
+ * already set on frame 0 (the ad's first frame is its poster; the hook must
+ * land with the sound off). NO em dashes, no literal "AI", no "second
+ * brain", no "library". "Ready when you are." is the launch film's own payoff
+ * line (timeline.mjs, round 13g).
  */
 export const CAPTIONS = [
-  { at: 8, to: 68, text: 'That talk you\nsaved for later?', size: 76, poster: true },
-  { at: 72, to: 120, text: "You'll never\nget to it.", size: 76 },
-  { at: 120, to: 168, text: 'Share it to Machina.', size: 64 },
-  { at: 216, to: 288, text: 'Get the key moments,\nwith timestamps.', size: 60, until: 'the four Key moments lift' },
-  { at: 296, to: 368, text: 'The whole talk,\ndown to what matters.', size: 60, until: 'the Key Points lift' },
-  { at: 376, to: 520, text: 'Tagged, and linked to\nwhat you already saved.', size: 60, until: 'the Related cards lift, then the graph opens on their ties' },
+  { at: 8, to: 48, text: 'Saved for later?', size: 80, poster: true },
+  { at: 48, to: 92, text: 'Later never comes.', size: 80 },
+  { at: 96, to: 152, text: 'Share it to Machina instead.', size: 64 },
+  { at: 200, to: 280, text: 'Get the moments that matter,\ntimestamped.', size: 60, until: 'the four Key moments lift' },
+  { at: 280, to: 328, text: 'Get the key points.', size: 64, until: 'the Key Points lift' },
+  { at: 336, to: 456, text: 'Linked to what you\nalready saved.', size: 60, until: 'the Related cards lift, then the graph opens on their ties' },
+  { at: 464, to: 544, text: 'Pick a time.\nMachina brings it back.', size: 60, until: 'the reminder is set' },
+  { at: 560, to: 616, text: 'Ready when you are.', size: 64, kicker: 'Tomorrow,\u00a09:00\u00a0AM', until: 'the Reminders due strip lifts' },
   // the close, on the lockup: the name (the drawn wordmark wipes in as it is
   // said), then the tagline, exactly as written (owner call 2026-09-28)
   { at: HITS.markStrike, to: TOTAL_FRAMES, place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4 },
 ];
 
+/** the time card above "Ready when you are." (the kit's Kicker): 4 frames
+ *  before its line, leaving with it */
+export const KICKERS = CAPTIONS.filter((c) => c.kicker).map((c) => ({ at: c.at - 4, to: c.to, text: c.kicker }));
+
 /**
- * THE SCORE's map (audio/ads/card-score.mjs), one chord per bar (11 bars):
+ * THE SCORE's map (audio/ads/card-score.mjs), one chord per bar (13 bars):
  * the hook hangs on IV, the mark resolves to I, the card walks I V IV I,
- * home for the lockup.
+ * the reminder leans on V, home for "Ready when you are." and the lockup.
  */
-export const BAR_CHORDS = ['Fmaj7', 'Fmaj7', 'Cmaj7', 'G6', 'Cmaj7', 'G6', 'Fmaj7', 'Cmaj7', 'G6', 'Cmaj7', 'Cmaj7'];
-/** the drums: in with the card (bar 3), out for the lockup */
-export const DRUMS = [3 * BAR_FRAMES, HITS.lockup];
+export const BAR_CHORDS = ['Fmaj7', 'Fmaj7', 'Cmaj7', 'G6', 'Cmaj7', 'G6', 'Fmaj7', 'Cmaj7', 'G6', 'Cmaj7', 'Cmaj7', 'Cmaj7', 'Cmaj7'];
+/** the drums: in with the card (bar 2), out for the lockup */
+export const DRUMS = [2 * BAR_FRAMES, HITS.lockup];
 /** risers END on the reveal they lead into: the mark, the app, the strike */
 export const RISERS = [
   [HITS.dotLands - 32, HITS.dotLands],

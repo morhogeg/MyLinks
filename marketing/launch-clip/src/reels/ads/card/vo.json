@@ -1,78 +1,92 @@
 [
  {
   "frame": 8,
-  "text": "That talk you saved for later?",
-  "words": [
-   0.05,
-   0.29,
-   0.531,
-   0.723,
-   1.011,
-   1.204
-  ]
- },
- {
-  "frame": 72,
-  "text": "You'll never get to it.",
-  "words": [
-   0.08,
-   0.386,
-   0.649,
-   0.824,
-   0.955
-  ]
- },
- {
-  "frame": 120,
-  "text": "Share it to Makeena.",
+  "text": "Saved for later?",
   "words": [
    0.04,
-   0.337,
-   0.486,
-   0.634
+   0.379,
+   0.605
   ]
  },
  {
-  "frame": 216,
-  "text": "Get the key moments, with timestamps.",
+  "frame": 48,
+  "text": "Later never comes.",
+  "words": [
+   0.07,
+   0.402,
+   0.733
+  ]
+ },
+ {
+  "frame": 96,
+  "text": "Share it to Makeena instead.",
+  "words": [
+   0.04,
+   0.336,
+   0.484,
+   0.632,
+   1.026
+  ]
+ },
+ {
+  "frame": 200,
+  "text": "Get the moments that matter, timestamped.",
   "words": [
    0.06,
-   0.22,
-   0.38,
-   0.54,
-   0.99,
-   1.261
+   0.219,
+   0.377,
+   0.694,
+   0.893,
+   1.42
   ]
  },
  {
-  "frame": 296,
-  "text": "The whole talk, down to what matters.",
+  "frame": 280,
+  "text": "Get the key points.",
   "words": [
-   0.09,
-   0.253,
-   0.496,
-   0.96,
-   1.185,
-   1.32,
-   1.545
+   0.05,
+   0.246,
+   0.442,
+   0.638
   ]
  },
  {
-  "frame": 376,
-  "text": "Tagged, and linked to what you already saved.",
+  "frame": 336,
+  "text": "Linked to what you already saved.",
+  "words": [
+   0.05,
+   0.384,
+   0.526,
+   0.765,
+   0.955,
+   1.336
+  ]
+ },
+ {
+  "frame": 464,
+  "text": "Pick a time. Makeena brings it back.",
   "words": [
    0.04,
-   0.67,
-   0.836,
-   1.127,
-   1.252,
-   1.46,
-   1.626,
-   1.959
+   0.298,
+   0.401,
+   0.99,
+   1.387,
+   1.734,
+   1.883
   ]
  },
  {
   "frame": 560,
+  "text": "Ready when you are.",
+  "words": [
+   0.03,
+   0.303,
+   0.53,
+   0.713
+  ]
+ },
+ {
+  "frame": 656,
   "text": "Makeena. Everything you save, finally useful.",
   "words": [
    0.05,
