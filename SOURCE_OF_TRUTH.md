@@ -2440,7 +2440,7 @@ exact-match, capped.
   done/skipped/Hebrew rows, reopening the skipped task returns it to the
   open list; no console errors. **NOT verified:** on device; how an existing
   library's first assignment looks. **SHIPPED** as merge `f82dbca` (frontend only):
-  Vercel on push; TestFlight run #345 → **build 1345**. Owner QA: library
+  Vercel on push; TestFlight run #345 → **build 1345 green**. Owner QA: library
   list chips + graph dots now one color per category; Revisit → "Done N"
   opens the look-back list, tapping a mark puts the task back.
 - **2026-10-02 — REVISIT "DO THIS" ROUND 4: whole tasks, a real checkbox,
