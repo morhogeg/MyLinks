@@ -154,6 +154,12 @@ H.chips.forEach((fr, i) => {
   bell(f(fr), [84, 88, 91][i], 0.024, [-0.35, 0, 0.35][i], 1.2);
 });
 
+// its Graph chip tapped: the cut into the graph (soft: "you never noticed"
+// has just been said)
+tick(f(H.graphTap), 0.1, 1.2);
+impact(f(H.graphTap), 0.08);
+shimmer(f(H.graphTap) + 0.3, [79, 84, 88], 0.025);
+
 // the lockup: thrown out, the mark strikes into air
 whoosh(f(H.lockup) - 0.3, 0.7, 0.09, 0);
 // (the call to action starts on the strike: the impact stays soft and the

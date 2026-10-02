@@ -36,7 +36,9 @@ export const REVIEW = [
   HITS.sources2 - 4, // its answer
   HITS.lead + 14, // the theme lifted
   HITS.chips[2] + 6, // the three saves lifted
-  HITS.lockup - 2, // the suggested next questions
+  HITS.graphTap - 2, // the suggested next questions, the finger on Graph
+  HITS.graphTap + 1, // the first frame of the graph (the cut)
+  HITS.graphTap + 40, // the graph: the three saves, lit and linked
   HITS.markStrike + 10, // "Download Machina."
   TOTAL_FRAMES - 1, // the last frame
 ];

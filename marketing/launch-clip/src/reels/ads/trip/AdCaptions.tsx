@@ -4,7 +4,7 @@ import { KineticLine } from '../../kit/Type';
 import type { WordTiming } from '../../kit/Captions';
 import { useAdFrame } from './format';
 
-type AdCaption = { at: number; to: number; text: string; pre?: boolean; split?: number; place?: string };
+type AdCaption = { at: number; to: number; text: string; pre?: boolean; split?: number; hidden?: boolean; place?: string };
 
 /**
  * The narrated lines, the kit's KineticLine in the kit's type (56px, Geist
@@ -25,7 +25,8 @@ export const AdCaptions: React.FC<{ frame: number; fps: number; captions: AdCapt
   return (
     <AbsoluteFill style={{ pointerEvents: 'none' }}>
       {captions.flatMap((c) => {
-        if (c.place === 'lockup') return [];
+        // (`hidden`: said, never shown; owner's call for the call to action)
+        if (c.place === 'lockup' || c.hidden) return [];
         const t = timing.find((x) => x.frame === c.at);
         const words = c.text.split(/\s+/).filter(Boolean);
         // a `pre` line's words have all landed before frame 0

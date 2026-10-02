@@ -2712,6 +2712,14 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-02 — Meta ad 2 (Ask), round 5: the graph, and the call to action
+  said only.** Branch `claude/ad-trip`, NOT merged. Owner on round 4: "It's
+  perfect", plus two notes. On "…you never noticed." the answer's Graph chip is
+  tapped and the real graph opens with the three connected saves lit and linked
+  (re-recorded `adask` take, the graph at 60fps, framed below its category
+  legend); "Download Machina." stays in the voice, no caption. 24.5s. All
+  "ad: trip" gates green (a new one: the call to action is never on screen).
+
 - **2026-10-02 — Meta ad 2 (Ask), round 4: the chat, shown off.** Branch
   `claude/ad-trip`, NOT merged. Script written with the owner line by line:
   "What if your saves could talk back?" / "With Machina, they can." / "Ask it

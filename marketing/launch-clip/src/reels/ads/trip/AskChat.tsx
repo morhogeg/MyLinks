@@ -22,7 +22,10 @@ import { useAdFrame, type AdFrame } from './format';
  *           platforms. Its first line, the theme it found, lifts; then the
  *           three saves it connected lift as the voice says "you never
  *           noticed"; the camera eases down onto the questions the app
- *           suggests next, and the screen is thrown out into the lockup.
+ *           suggests next and comes to rest as the finger lands on the
+ *           answer's Graph chip.
+ *  graph    CUT on the touch into the real graph: those three saves, lit and
+ *           linked among the rest (round 5, owner). Thrown out into the lockup.
  *
  * The app's thinking line is not in the take at all. Captured scrolls (the
  * feed) are stepped: the camera takes up each step's rounding.
@@ -42,7 +45,11 @@ const STREAMED1 = span('stream1', 'sources1');
 const SOURCED1 = span('sources1', 'typing2');
 const TYPED2 = span('typing2', 'stream2');
 const STREAMED2 = span('stream2', 'sources2');
-const SOURCED2 = span('sources2', null);
+const SOURCED2 = span('sources2', 'graphChip');
+const GRAPH = span('graph', null);
+/** the graph view draws its nodes over its first frames (measured in the Ask
+ *  clip): the cut joins it this far in, while the layout is still blooming */
+const GRAPH_JOIN = 8;
 
 /** where the feed's stepped scroll is (fractional steps) */
 const feedAt = (f: number) => prog(f, S.feed, S.ask2, EASE_GATHER) * (FEED - 1);
@@ -56,8 +63,11 @@ export const frameAt = (f: number) => {
   }
   if (f < S.ask2) return at(T, 'feed', Math.round(feedAt(f)));
   if (f < S.send2) return at(T, 'typing2', TYPED2 - 1);
-  const n = Math.floor((f - S.send2) / K);
-  return n < STREAMED2 ? at(T, 'stream2', n) : at(T, 'sources2', Math.min(SOURCED2 - 1, n - STREAMED2));
+  if (f < S.graphTap) {
+    const n = Math.floor((f - S.send2) / K);
+    return n < STREAMED2 ? at(T, 'stream2', n) : at(T, 'sources2', Math.min(SOURCED2 - 1, n - STREAMED2));
+  }
+  return at(T, 'graph', Math.min(GRAPH - 1, GRAPH_JOIN + f - S.graphTap));
 };
 
 /** a Lift's box on whole points (the Ask clip's lesson: a half-point box hops) */
@@ -91,10 +101,15 @@ export const chatKeys = (L: AdFrame): Key[] => {
     // the theme lifts; then down onto the three saves it connected, at rest as they lift
     { f: S.chips[0] - 6, cx: 196.5, cy: 492, z: 2.4, fy: y(980), ease: EASE_IN_OUT },
     { f: S.chips[2] + 8, cy: 496, z: 2.42, ease: linear },
-    // on down to the questions the app suggests next
-    { f: S.lockup - 1, cy: 600, z: 2.2, fy: y(980), ease: EASE_IN_OUT },
+    // on down to its Graph chip and the questions the app suggests next, at
+    // rest as the finger lands on Graph
+    { f: S.graphTap - 1, cy: 600, z: 2.2, fy: y(980), ease: EASE_IN_OUT },
+    // CUT on the touch into the graph: the three saves it connected, lit and
+    // linked among the rest (framed below the graph's legend)
+    { f: S.graphTap, cx: 196.5, cy: 610, z: 2.5, fy: y(1000) },
+    { f: S.lockup - 1, cy: 606, z: 2.6, ease: linear },
     // thrown out of frame, into the lockup
-    { f: S.lockup + 14, fx: -760, z: 2.24, ease: EASE_IN_OUT },
+    { f: S.lockup + 14, fx: -760, z: 2.64, ease: EASE_IN_OUT },
   ];
 };
 
@@ -120,6 +135,7 @@ export const AskChat: React.FC<{ f: number }> = ({ f }) => {
 
   const send1 = center(rectOf(T, at(T, 'typing1', TYPED1 - 1), 'send'));
   const send2 = center(rectOf(T, at(T, 'typing2', TYPED2 - 1), 'send'));
+  const graph = center(rectOf(T, at(T, 'graphChip'), 'graph2'));
 
   // the theme (the answer's first line) lifts with the line that names it,
   // and settles as the camera moves on
@@ -136,7 +152,7 @@ export const AskChat: React.FC<{ f: number }> = ({ f }) => {
           <Lift take={T} i={i} rect={wholePoints(rectOf(T, i, 'lead'))} radius={10} lift={theme * 0.45} rise={2} grow={0.012} ring={0.5 * theme} />
         )}
         {f >= S.sources2 &&
-          f < S.lockup + 2 &&
+          f < S.graphTap &&
           CHIPS.map((key, k) => {
             const hit = S.chips[k];
             const up = prog(f, hit - 2, hit + 10, EASE_SPRING);
@@ -155,6 +171,8 @@ export const AskChat: React.FC<{ f: number }> = ({ f }) => {
               />
             );
           })}
+        {/* the finger leaves on the cut: its ripple would sit on the graph */}
+        <Tap x={graph.x} y={graph.y} t={f < S.graphTap ? tapAt(f, S.graphTap) : 0} />
       </AppShot>
     </AbsoluteFill>
   );

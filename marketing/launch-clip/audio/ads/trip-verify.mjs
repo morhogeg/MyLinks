@@ -85,7 +85,9 @@ export default async function verifyTrip() {
   if (!lines.some((c) => /\bMachina\b/.test(c.say ?? c.text))) bad.push('no line before the close names Machina');
   const close = caps.find((c) => c.place === 'lockup');
   if (close?.text !== 'Everything you save, finally useful.') bad.push(`the ad does not end on the tagline: "${close?.text}"`);
+  // (the call to action is said, not shown: owner, round 5)
   const cta = caps.filter((c) => c.cta);
+  if (cta.some((c) => !c.hidden)) bad.push('the call to action is on screen (owner: narration only)');
   if (cta.length !== 1 || cta[0].text !== 'Download Machina.' || caps[caps.indexOf(close) - 1] !== cta[0]) bad.push('the close is not "Download Machina." then the tagline');
   for (const c of caps) if (c !== close && /finally useful/i.test(`${c.text} ${c.say ?? ''}`)) bad.push(`the tagline appears before the end: "${c.text}"`);
   if (caps.some((c) => /great find/i.test(`${c.text} ${c.say ?? ''}`))) bad.push('the ad says the App Store subtitle');

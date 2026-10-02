@@ -913,7 +913,7 @@ to the mix on speakers; its balance, clarity and loudness are measured.
 Meta ad 2 of 3 (Instagram and Facebook: Reels, Stories, Feed; doubles as an
 organic Reel): **the Ask ad**, the chat shown off. Each of the three Meta ads
 sells one feature (ad 1, what one save becomes; ad 3, a screenshot that
-becomes a to-do). The branch keeps its first concept's name. 22.9s, 9:16 and
+becomes a to-do). The branch keeps its first concept's name. 24.5s, 9:16 and
 4:5.
 
 **How it got here.** Round 1 opened on a Sardinia trip saved across five apps
@@ -921,7 +921,10 @@ becomes a to-do). The branch keeps its first concept's name. 22.9s, 9:16 and
 used the Ask clip's lines (owner: neither one feature nor the whole app).
 Round 4 is the script the owner wrote line by line with Claude: a hook that
 asks a question, then the range of the chat, from a simple answer to the
-themes and connections across your saves, and a call to action.
+themes and connections across your saves, and a call to action. Round 5
+(owner: "It's perfect", two notes): the real graph opens on "you never
+noticed" with the three connected saves lit, and "Download Machina." is said
+but no longer shown.
 
 | Frames | Beat | What it shows, and the line |
 |---|---|---|
@@ -929,8 +932,8 @@ themes and connections across your saves, and a call to action.
 | 48–144 | the name | The piles drift apart and gather into the point, the brackets snap (2.9s) and the wordmark wipes in as the name is said: "With Machina, they can." The mark and wordmark leave, pushing in as they soften |
 | 144–272 | a simple question | CUT to a fresh chat, close on the composer: "What did that TED talk say about procrastination?" types itself. Send is tapped and the cut to its answer lands on the touch: a short answer from one save, its source under it. "Ask it about anything you've saved." |
 | 272–360 | a big question | CUT to the Home feed rushing past, accelerating; CUT to a new chat, "What do my saves say about time?" typed; Send; one answer streams in, woven from three saves. "Even across hundreds of saves, / you get one clear answer." (one sentence, two captions) |
-| 360–496 | themes and connections | The answer's first line, the theme it found ("Your saves keep circling one idea…"), lifts; the three saves it connected (Wait But Why, TED on YouTube, @naval on X: three marks) lift one by one on "you never noticed"; the camera eases down onto the questions the app suggests next, no words about them. "And it finds the themes and connections / you never noticed." |
-| 496–688 | close | Thrown out into the lockup; the mark strikes as the call to action starts and the wordmark wipes in on its name: "Download Machina." Then the tagline on one line, exactly `Everything you save, finally useful.`, held 1.9s after the last word. Nothing under it: that space is kept clear for the App Store badge once the listing is live |
+| 360–544 | themes and connections | The answer's first line, the theme it found ("Your saves keep circling one idea…"), lifts; the three saves it connected (Wait But Why, TED on YouTube, @naval on X: three marks) lift one by one on "you never noticed"; the camera eases down onto the questions the app suggests next and comes to rest as the finger lands on the answer's **Graph** chip; CUT on the touch into the real graph, those three saves lit and linked among the rest (framed below its category legend), held while the line finishes. "And it finds the themes and connections / you never noticed." |
+| 544–736 | close | Thrown out into the lockup; the mark strikes and the wordmark wipes in as "Download Machina." is said (voice only, no caption: owner, round 5). Then the tagline on one line, exactly `Everything you save, finally useful.`, held 1.6s after the last word. Nothing under it: that space is kept clear for the App Store badge once the listing is live |
 
 **The answers.** The simple one (`ADASK_TED` in `capture/library.mjs`) is
 written from the TED talk's own card and names it by its title. The big one
@@ -940,7 +943,8 @@ talk, Naval's thread). The suggested next questions are the real app's.
 **What is real and what is scripted.** Every app frame is the real, shipped
 web app, one continuous take, `adask` (`capture/shoot.mjs`): the feed
 scrolled, a fresh chat, the first question typed and answered, "+ New", the
-second question typed and answered. Scripted, as for the Ask clip: the two
+second question typed and answered, its Graph chip tapped and the graph
+recorded at 60fps. Scripted, as for the Ask clip: the two
 answers and which cards they cite (answered by the capture server). The
 account's "29 saves" promise line never enters the frame (the composer is
 framed below it, and the big question cuts from the typed composer straight to
@@ -1005,7 +1009,9 @@ its save by its title and the big one cites three platforms; no banned word, thi
 or recipe on any frame of the take; both mixes at −14 LUFS ±0.5 and ≤ −1
 dBTP; every line ≥ 3dB over the music in the speech band.
 
-**Open, for the owner:** it runs 22.9s, a little over the 15–20s aim;
+**Open, for the owner:** it runs 24.5s, over the 15–20s aim (the graph
+added 1.6s); the call to action is said but not burned in, so sound-off
+viewers see only the wordmark there;
 "Download Machina." is only true once the listing is live (the paid ads run
 after launch; don't post the organic Reel before then); nobody has listened to
 the mix on speakers (measured only). The `adtrip` take (rounds 1–3) is still

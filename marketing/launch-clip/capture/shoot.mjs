@@ -812,6 +812,22 @@ const takes = {
     await until('What do you want to recall?');
     await page.waitForTimeout(1200);
     await ask(ASK.question, ANSWER2, 'Your saves', 2);
+
+    // its Graph chip: the saves it connected, lit among the rest (round 5,
+    // owner: show the graph on "themes and connections"). The chip is tagged
+    // and its box recorded on one settled frame, then tapped; the graph view
+    // draws itself over its first frames (60fps)
+    await page.evaluate(() => {
+      const all = [...document.querySelectorAll('button[title="See these cards in the graph"]')];
+      all[all.length - 1]?.setAttribute('data-capture', 'graph2');
+    });
+    await t.freeze();
+    t.mark('graphChip');
+    await t.snap({ rects: { ...ANSWER2, graph2: ['[data-capture="graph2"]'] }, caret: 'hide' });
+    await visible(page.locator('[data-capture="graph2"]')).click();
+    t.mark('graph');
+    await t.roll(150, { rects: { canvas: ['canvas'] }, step: 1000 / 60 });
+    await t.thaw();
     return t.save();
   },
 };

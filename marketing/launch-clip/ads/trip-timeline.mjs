@@ -7,7 +7,9 @@
  * question gets a simple answer from one save; the feed rushes past and a big
  * question gets one answer woven from three saves on three platforms; the
  * theme it found and the saves it connected lift, with the questions the app
- * suggests next under them; "Download Machina." and the tagline.
+ * suggests next under them, and its Graph chip opens the real graph with
+ * those saves lit (round 5); "Download Machina." (said, not shown) and the
+ * tagline.
  * Picture (src/reels/ads/trip/), score (audio/ads/trip-score.mjs), narrator
  * (audio/synth-vo.py trip) and the ad's verify gates
  * (audio/ads/trip-verify.mjs) all read this file.
@@ -68,8 +70,9 @@ export const HITS = {
   sources2: beat(22.5), // its three sources and the suggested next questions arrive
   lead: beat(24), // the theme it found (the answer's first line) lifts
   chips: [448, 458, 468], // the three saves it connected lift ("you never noticed": vo.json)
-  lockup: beat(31), // thrown out into the lockup; the mark launches
-  markStrike: beat(33), // the mark's point strikes as the call to action starts
+  graphTap: beat(30.5), // its Graph chip is tapped: the saves it connected, lit in the real graph
+  lockup: beat(34), // thrown out into the lockup; the mark launches
+  markStrike: beat(36), // the mark's point strikes as the call to action is said
 };
 
 /** how many of the feed's captured 12pt steps the rush plays: it stops short
@@ -94,11 +97,14 @@ export const CAPTIONS = [
   { at: beat(5.5), to: beat(8.5), text: 'With Machina, they can.', duck: 0.4 },
   { at: beat(9.5), to: beat(13.5), text: "Ask it about\nanything you've saved." },
   { at: beat(17), to: beat(23.5), split: 5, text: 'Even across hundreds of saves,\nyou get one clear answer.' },
-  { at: beat(24), to: beat(31), split: 7, text: 'And it finds the themes and connections\nyou never noticed.' },
-  // the call to action, as the mark strikes and the wordmark wipes in on the name
-  { at: beat(33), to: beat(36), text: 'Download Machina.', cta: true, duck: 0.4 },
+  // (round 5, owner: the graph plays under "you never noticed.", so the line
+  // stays up while it blooms: `until`)
+  { at: beat(24), to: beat(32), split: 7, until: true, text: 'And it finds the themes and connections\nyou never noticed.' },
+  // the call to action, said as the mark strikes and the wordmark wipes in on
+  // the name; never on screen (owner, round 5: keep the narration, not the text)
+  { at: beat(36), to: beat(39), text: 'Download Machina.', cta: true, hidden: true, duck: 0.4 },
   // the close: the tagline on ONE line, exactly; the music steps back
-  { at: beat(36), to: beat(43), place: 'lockup', text: 'Everything you save, finally useful.', duck: 0.4 },
+  { at: beat(39), to: beat(46), place: 'lockup', text: 'Everything you save, finally useful.', duck: 0.4 },
 ];
 
 export const TOTAL_FRAMES = CAPTIONS[CAPTIONS.length - 1].to;
@@ -108,7 +114,7 @@ export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 export const RISERS = [
   [beat(3), HITS.dotLands], // the gather → the point lands
   [beat(17), HITS.ask2], // the feed rushing past → the big question
-  [beat(30), HITS.markStrike], // the throw → the mark strikes
+  [beat(33), HITS.markStrike], // the throw → the mark strikes
 ];
 
 /** One chord per bar (the film's and the reel's vocabulary). */
