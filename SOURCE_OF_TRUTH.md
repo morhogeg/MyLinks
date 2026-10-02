@@ -2444,8 +2444,8 @@ exact-match, capped.
   **NOT verified:** on device (swipe feel inside WKWebView, haptics), a
   live re-analysis keeping `takeawayDismissedAt`, the new prompt's output
   length on real saves. **SHIPPED** as merge `46f068e`: Vercel on push;
-  functions deploy #121 (unscoped, on purpose); TestFlight run #344 →
-  **build 1344**. Owner QA: Revisit → tick a task (fills, strikes, folds,
+  functions deploy #121 (unscoped, on purpose) **green**; TestFlight run
+  #344 → **build 1344 green** (owner confirmed on device). Owner QA: Revisit → tick a task (fills, strikes, folds,
   Undo toast); swipe one left (Not for me, Undo); open that card → label
   reads "Not for me", tap puts it back.
 - **2026-10-02 — GRAPH: "Mapping your knowledge…" no longer shows twice.**
