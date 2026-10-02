@@ -2707,6 +2707,13 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-02 — META AD 1, ROUND 2: THE GRAPH AFTER THE RELATED CARDS.**
+  Branch `claude/ad-card`, not merged. Owner: "linked to what you saved" should
+  also show the graph. The take `adcard` now ends on the Related section's own
+  "See in graph", and the ad cuts on that tap to the real graph, the talk in
+  focus with its three ties lit. 23.1s (was 21.0s). Verify clean; all three
+  renders −14.0 LUFS, true peak ≤ −1.2 dBTP after encoding. Still open: nobody
+  has listened on speakers.
 - **2026-10-02 — META AD 1, "WHAT ONE SAVE BECOMES" (the card and its key
   points).** Branch `claude/ad-card` (from `claude/clip-save`, `main` merged
   in), **not merged**: the owner reviews first. Compositions `MachinaAdCard`

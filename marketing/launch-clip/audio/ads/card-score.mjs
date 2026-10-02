@@ -39,7 +39,7 @@ const CHORDS = {
 const BARS = Math.ceil(TOTAL_FRAMES / BAR_FRAMES);
 const LOCKUP_BAR = Math.round(HITS.lockup / BAR_FRAMES);
 /** how much of the band is playing, per bar */
-const DENSITY = [0.36, 0.5, 0.6, 0.8, 0.84, 0.84, 0.84, 0.8, 0.45, 0.45];
+const DENSITY = [0.36, 0.5, 0.6, 0.8, 0.84, 0.84, 0.84, 0.86, 0.45, 0.45, 0.45];
 
 for (let bar = 0; bar < BARS; bar++) {
   const ch = CHORDS[BAR_CHORDS[bar]];
@@ -125,8 +125,12 @@ whoosh(t(H.toApp) - 0.1, 0.5, 0.08, 0);
 sub(t(H.toApp + 8), 43, 0.14, 0.25);
 tick(t(H.cardTap), 0.09, 1.1);
 whoosh(t(H.cardTap) + 0.07, 0.35, 0.045, -0.15);
-// the lifts stay silent under the lines; one chime answers the last line
-bell(t(H.throw - 8), 88, 0.045, 0.2, 1.4);
+// the lifts stay silent under the lines; "See in graph" is tapped after
+// the last word, and the graph opens on a chime
+tick(t(H.graphTap), 0.09, 1.2);
+whoosh(t(H.graphTap) + 0.07, 0.4, 0.05, 0.15);
+bell(t(H.graphTap + 16), 88, 0.045, 0.2, 1.4);
+shimmer(t(H.graphTap + 18), [79, 84, 91], 0.03);
 // thrown out into the lockup; the mark strikes into air
 whoosh(t(H.throw) - 0.1, 0.7, 0.09, 0);
 impact(t(H.markStrike), 0.34);

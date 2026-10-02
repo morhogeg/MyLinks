@@ -52,7 +52,8 @@ SCRIPTS.adcard = {
   timeline: '../ads/card-timeline.mjs',
   master: { lufs: -14, truePeak: -1 },
 };
-SCRIPTS.adcardMusic = { ...SCRIPTS.adcard, vo: path.join(root, 'out', 'vo', 'adcard-music'), out: 'ads/card/score-music.wav', noVoice: true };
+// (0.3dB more headroom: without the voice its AAC encode measured −1.0 dBTP)
+SCRIPTS.adcardMusic = { ...SCRIPTS.adcard, vo: path.join(root, 'out', 'vo', 'adcard-music'), out: 'ads/card/score-music.wav', noVoice: true, master: { lufs: -14, truePeak: -1.3 } };
 const name = process.argv[2] ?? 'film';
 const script = SCRIPTS[name];
 if (!script) throw new Error(`unknown script ${name}; one of ${Object.keys(SCRIPTS).join(', ')}`);

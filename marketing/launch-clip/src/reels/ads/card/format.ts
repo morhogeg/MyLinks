@@ -32,7 +32,7 @@ export type Framing = {
 
 export const FRAMINGS: Record<AdFormat, Framing> = {
   tall: { format: 'tall', W: 1080, H: 1920, line: 346, band: { solid: 550, clear: 650 }, dy: 0, lockupTop: 560 },
-  feed: { format: 'feed', W: 1080, H: 1350, line: 92, band: { solid: 330, clear: 420 }, dy: -150, lockupTop: 300 },
+  feed: { format: 'feed', W: 1080, H: 1350, line: 92, band: { solid: 390, clear: 460 }, dy: -150, lockupTop: 300 },
   square: { format: 'square', W: 1080, H: 1080, line: 64, band: { solid: 234, clear: 320 }, dy: -300, lockupTop: 170 },
 };
 

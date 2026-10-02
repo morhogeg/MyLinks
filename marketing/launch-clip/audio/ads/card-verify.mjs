@@ -139,7 +139,7 @@ export default async function verifyAdCard() {
   const take = takes.adcard;
   if (!take) bad.push('no "adcard" take: run CAPTURE_ONLY=adcard node capture/shoot.mjs');
   else {
-    for (const k of ['home', 'land', 'landed', 'open', 'scroll']) if (take.marks[k] === undefined) bad.push(`the adcard take has no mark "${k}"`);
+    for (const k of ['home', 'land', 'landed', 'open', 'scroll', 'graph']) if (take.marks[k] === undefined) bad.push(`the adcard take has no mark "${k}"`);
     // the ad plays from the landing on (the home frame before it is never shown)
     take.frames.slice(take.marks.land).forEach((fr, i) =>
       fr.t.forEach((k) => {
@@ -165,7 +165,7 @@ export default async function verifyAdCard() {
   if (!(hero >= 720 && hero <= 1240)) bad.push(`the app's hero line is ${hero}px (aim between 720 and 1240)`);
 
   // ── taps touch on their hits; exits ease in and out
-  for (const [file, want] of [['Card.tsx', 1], ['Share.tsx', 1]]) {
+  for (const [file, want] of [['Card.tsx', 2], ['Share.tsx', 1]]) {
     let taps = 0;
     for (const [, hit, a, b] of read(`src/reels/ads/card/${file}`).matchAll(/<Tap [^>]*t=\{prog\(f, ([\w.]+) - (\d+), \1 \+ (\d+)/g)) {
       taps++;

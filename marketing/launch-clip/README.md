@@ -748,7 +748,7 @@ fast-start curve, and the landed card's lift box within 2pt of the app's.
 
 ## Meta ad 1: "What one save becomes"
 
-`MachinaAdCard` is a 21.0s vertical ad for Instagram and Facebook (Reels,
+`MachinaAdCard` is a 23.1s vertical ad for Instagram and Facebook (Reels,
 Stories, Feed) and an organic Reel: one save, fully read (owner concept,
 2026-10-02). The save everyone has is the long video in Watch later they will
 never get to; shared once, Machina makes it a card you take in at a glance:
@@ -763,12 +763,12 @@ saves it connects to. No Ask, no Find, no Revisit. Branch `claude/ad-card`.
 | 160–216 | into the app | the point drops to become the + (the reel's match cut), the app irises open (184); the talk lands at the top of the feed and is tapped open (216) |
 | 216–288 | moments | its Key moments lift one by one, each timestamp first, the lift then opening across its row (240, 248, 256, 264) ("Get the key moments, with timestamps.") |
 | 280–368 | points | read down: the title and gist (312), then the Key Points, lifted (336) ("The whole talk, down to what matters.") |
-| 360–456 | tags & links | the tags lift (384), then the three Related cards, as one block (424) ("Tagged, and linked to what you already saved.") |
-| 456–630 | the close | thrown into the lockup: the mark strikes (496), MACHINA wipes in on the spoken name, then the tagline on one line, exactly "Everything you save, finally useful.", held 1.6s after the voice |
+| 360–520 | tags & links | the tags lift (384), then the three Related cards, as one block (424); the section's own "See in graph" is tapped (456) and the cut lands in the real graph, the talk in focus and its three ties lit, pushing in on them ("Tagged, and linked to what you already saved.") |
+| 520–694 | the close | thrown into the lockup: the mark strikes (560), MACHINA wipes in on the spoken name, then the tagline on one line, exactly "Everything you save, finally useful.", held 1.6s after the voice |
 
-**The Meta spec, and how the ad meets it.** 21.0s (the aim was 15–20s; the
-tagline's 1.6s hold is what costs the last second, and every beat already
-runs at the reel's pace). Frame 0 is a legible picture with the hook line set
+**The Meta spec, and how the ad meets it.** 23.1s (the aim was 15–20s; the
+graph after the Related cards, owner round 2, adds 2.1s, and the tagline's
+1.6s hold the last second; every beat runs at the reel's pace, never over 30s). Frame 0 is a legible picture with the hook line set
 on it (a `poster` line, arriving before the ad starts), so the hook lands with
 the sound off. At most 8 words on screen at once (the hook is two lines for
 that reason). Safe zones (9:16): the line sits at 346px, under Meta's top
@@ -809,6 +809,16 @@ never says how long the talk is (its length was not verified; the last Key
 moment is at 26:20). The Watch later pile and the share card are the kit's
 brand graphics, not YouTube's UI: an app's mark as the Machina app draws it,
 the name of its save list, real titles, no thumbnails.
+
+**Round 2 (owner, 2026-10-02: "the linked to what you saved should also
+show the graph after the related cards").** The take now ends on the Related
+section's own "See in graph" (the app's `onOpenInGraph`), recorded 2.5s at
+60fps. The ad taps it after the line's last word and cuts on the tap to the
+graph's fifth frame (its first frames are the view fading in from white, which
+read as a flash), framed under the legend chips (they name every category,
+"cooking" among them), and pushes in on the talk's three lit ties. The cut
+grew 64 frames (2.1s); the no-narrator mix got 0.3dB more true-peak headroom
+(its AAC encode measured exactly −1.0 dBTP; now −1.6).
 
 **The share slot.** The iOS share sheet is native and cannot be captured from
 the web build, so the share beat is the kit's brand gesture (`Share.tsx`),

@@ -14,7 +14,8 @@
  *   MOMENTS the card lands in the feed and is tapped open; its Key moments
  *           lift one by one, timestamps first
  *   POINTS  read down to the gist and the Key Points
- *   LINKS   the tags lift, then the three Related cards
+ *   LINKS   the tags lift, then the three Related cards; "See in graph" is
+ *           tapped and the real graph opens on the talk, its three ties lit
  *   CLOSE   thrown into the lockup: "Machina." / "Everything you save, finally useful."
  *
  * OUTPUT frames at 30fps on the reel's grid (112.5 BPM, 16 frames a beat).
@@ -54,10 +55,12 @@ export const HITS = {
   // the tags, then the Related cards
   tags: 384,
   related: 424, // the three cards, lifted as one block
+  // the app's own "See in graph": the same ties, as a map
+  graphTap: 456,
   // the close
-  throw: 456,
-  lockup: 472,
-  markStrike: 496,
+  throw: 520,
+  lockup: 536,
+  markStrike: 560,
 };
 
 /**
@@ -78,7 +81,7 @@ export const SCROLLS = [
 ];
 
 export const THROW_LEN = 30;
-export const TOTAL_FRAMES = 630; // the tagline holds 1.6s after the voice ends
+export const TOTAL_FRAMES = 694; // the tagline holds 1.6s after the voice ends
 export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 
 /**
@@ -95,18 +98,18 @@ export const CAPTIONS = [
   { at: 120, to: 168, text: 'Share it to Machina.', size: 64 },
   { at: 216, to: 288, text: 'Get the key moments,\nwith timestamps.', size: 60, until: 'the four Key moments lift' },
   { at: 296, to: 368, text: 'The whole talk,\ndown to what matters.', size: 60, until: 'the Key Points lift' },
-  { at: 376, to: 456, text: 'Tagged, and linked to\nwhat you already saved.', size: 60, until: 'the Related cards lift' },
+  { at: 376, to: 520, text: 'Tagged, and linked to\nwhat you already saved.', size: 60, until: 'the Related cards lift, then the graph opens on their ties' },
   // the close, on the lockup: the name (the drawn wordmark wipes in as it is
   // said), then the tagline, exactly as written (owner call 2026-09-28)
   { at: HITS.markStrike, to: TOTAL_FRAMES, place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4 },
 ];
 
 /**
- * THE SCORE's map (audio/ads/card-score.mjs), one chord per bar (10 bars):
+ * THE SCORE's map (audio/ads/card-score.mjs), one chord per bar (11 bars):
  * the hook hangs on IV, the mark resolves to I, the card walks I V IV I,
  * home for the lockup.
  */
-export const BAR_CHORDS = ['Fmaj7', 'Fmaj7', 'Cmaj7', 'G6', 'Cmaj7', 'G6', 'Fmaj7', 'G6', 'Cmaj7', 'Cmaj7'];
+export const BAR_CHORDS = ['Fmaj7', 'Fmaj7', 'Cmaj7', 'G6', 'Cmaj7', 'G6', 'Fmaj7', 'Cmaj7', 'G6', 'Cmaj7', 'Cmaj7'];
 /** the drums: in with the card (bar 3), out for the lockup */
 export const DRUMS = [3 * BAR_FRAMES, HITS.lockup];
 /** risers END on the reveal they lead into: the mark, the app, the strike */

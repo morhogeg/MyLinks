@@ -17,7 +17,9 @@ import { AD_OPEN_CAM } from './handoff';
  *  MOMENTS  its four Key moments, each lifted in turn, the timestamp first
  *           (the lift opens from the timestamp across the row)
  *  POINTS   the title and gist, then the Key Points, lifted
- *  LINKS    the tags, lifted; then the three Related cards, lifted together
+ *  LINKS    the tags, lifted; then the three Related cards, lifted together;
+ *           then the section's own "See in graph" is tapped and the real
+ *           graph opens with the talk in focus, its three ties lit
  *
  * then thrown out into the lockup. The detail view's scroll is captured in
  * 3pt steps; the camera takes up each step's rounding (the reel's round-13
@@ -33,7 +35,7 @@ const LAND_N = 36;
 const OPEN_N = 48;
 
 // ── the read-down: step 0 is the opened view, settled
-const STEPS = takeOf(T).count - at(T, 'scroll');
+const STEPS = takeOf(T).marks.graph - at(T, 'scroll');
 const stepFrame = (k: number) => (k <= 0 ? at(T, 'open', OPEN_N - 1) : at(T, 'scroll', k - 1));
 const refY = (k: number) => rectOf(T, stepFrame(k), 'keyPoints')[1];
 /** the step that puts `key`'s top nearest `y` (points) */
@@ -59,7 +61,14 @@ const wantY = (s: number) => {
 };
 const S0 = (SCROLLS[0] as [number, number, string])[0];
 
+/** the graph's opening roll (150 frames at 60fps). Its first frames are the
+ *  app before the graph mounts, then the view's own fade-in from white (to
+ *  roll frame 5): the cut lands on frame 5, opaque, the ties still settling */
+const GRAPH_N = 150;
+const GRAPH_FROM = 5;
+
 const frameAt = (f: number) => {
+  if (f >= HITS.graphTap) return at(T, 'graph', Math.min(GRAPH_N - 1, GRAPH_FROM + f - HITS.graphTap));
   if (f < HITS.cardTap) return at(T, 'land', Math.min(LAND_N - 1, f - HITS.toApp));
   if (f < HITS.cardTap + OPEN_N) return at(T, 'open', f - HITS.cardTap);
   if (f < S0) return stepFrame(0);
@@ -92,7 +101,15 @@ const keysFor = (dy: number): Key[] =>
     { f: SCROLLS[3][0] as number, cy: 362, z: 2.32, ease: linear },
     // the Related cards
     { f: SCROLLS[3][1] as number, cy: 664, z: 2.05, ease: EASE_IN_OUT },
-    { f: HITS.throw, cy: 664, z: 2.08, ease: linear },
+    { f: HITS.related + 22, cy: 664, z: 2.06, ease: linear },
+    // up a little, so the section's "See in graph" clears the band, as the finger comes
+    // (its last key ON the frame before the cut: a key between would read the cut as speed)
+    { f: HITS.graphTap - 1, cy: 604, z: 2.1, ease: EASE_IN_OUT },
+    // a cut on the tap (two keys a frame apart: nothing drawn between) to the
+    // graph: the talk in focus, its three ties lit, the app's panel naming it
+    // (framed under the legend chips), then a slow push onto the ties
+    { f: HITS.graphTap, cy: 462, z: 2.25 },
+    { f: HITS.throw, cy: 432, z: 2.6, ease: EASE_IN_OUT },
     // thrown out of frame, into the lockup
     { f: HITS.throw + THROW_LEN, fx: -760, z: 2.15, ease: EASE_IN_OUT },
   ].map((k) => (k.fy !== undefined ? { ...k, fy: k.fy + dy } : k)) as Key[];
@@ -120,7 +137,7 @@ export const Card: React.FC<{ f: number }> = ({ f }) => {
   if (f < HITS.toApp || f > HITS.throw + THROW_LEN) return null;
   const keys = keysFor(dy);
   const i = frameAt(f);
-  const scrolling = f >= S0;
+  const scrolling = f >= S0 && f < HITS.graphTap;
   const s = scrollAt(f);
   const cam = camAt(keys, f);
   // the step on screen vs where the scroll curve wants it (points)
@@ -138,7 +155,8 @@ export const Card: React.FC<{ f: number }> = ({ f }) => {
   const tagIn = prog(f, HITS.tags, HITS.tags + 14, EASE_SPRING);
   const tagOut = prog(f, HITS.tags + 10, (SCROLLS[3][0] as number) + 2, EASE_IN_OUT);
   const relIn = prog(f, HITS.related, HITS.related + 16, EASE_SPRING);
-  const relOut = prog(f, HITS.throw - 10, HITS.throw, EASE_IN_OUT);
+  const relOut = prog(f, HITS.related + 20, HITS.related + 28, EASE_IN_OUT);
+  const seeGraph = rectOf(T, stepFrame(STEPS), 'seeGraph');
 
   return (
     <AbsoluteFill>
@@ -152,6 +170,7 @@ export const Card: React.FC<{ f: number }> = ({ f }) => {
         sheen={f < HITS.toApp + 24 ? prog(f, HITS.toApp, HITS.toApp + 24, EASE_MODAL) : 0}
       >
         <Tap x={card[0] + 120} y={card[1] + 40} t={prog(f, HITS.cardTap - 7, HITS.cardTap + 12, linear)} />
+        <Tap x={seeGraph[0] + seeGraph[2] / 2} y={seeGraph[1] + seeGraph[3] / 2} t={prog(f, HITS.graphTap - 7, HITS.graphTap + 12, linear)} />
 
         {/* the Key moments, one by one: the timestamp lifts first, then the lift opens across its row */}
         {f < S0 &&

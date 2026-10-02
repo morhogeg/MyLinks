@@ -34,6 +34,7 @@ const REVIEW = [
   HITS.cardTap + 20, ...HITS.moments.map((m) => m + 10), // opened; each Key moment lifts
   SCROLLS[0][1] + 4, HITS.keyPoints + 14, // the gist; the Key Points
   HITS.tags + 12, HITS.related + 18, // the tags; the Related cards
+  HITS.graphTap - 4, HITS.graphTap + 2, HITS.graphTap + 30, // "See in graph" tapped; the graph; its ties
   HITS.throw + 14, HITS.markStrike + 10, TOTAL_FRAMES - 30, TOTAL_FRAMES - 1, // the throw, the lockup, the tagline held
 ];
 const args = process.argv.slice(2).map(Number).filter((n) => !Number.isNaN(n));

@@ -706,6 +706,7 @@ const takes = {
       related1: ['div.group', 'pull of instant reward'],
       related2: ['div.group', 'limited time and attention'],
       related3: ['div.group', 'systems change habits'],
+      seeGraph: ['button', 'See in graph'],
     };
     t.mark('home');
     await t.snap({ rects: { firstCard: R.firstCard } });
@@ -735,6 +736,14 @@ const takes = {
     t.mark('scroll');
     await rollScroll(t, await scrollTargetFor('systems change habits', 800), 3, DETAIL);
     await t.snap({ rects: DETAIL });
+    await t.thaw();
+
+    // "See in graph": the same ties as a map, this card in focus (the
+    // app's own graph opening, 2.5s at 60fps, as the reel's take records it)
+    await t.freeze();
+    await visible(page.getByRole('button', { name: 'See this card in the graph' })).click();
+    t.mark('graph');
+    await t.roll(150, { rects: { canvas: ['canvas'] }, step: F60 });
     await t.thaw();
     return t.save();
   },
