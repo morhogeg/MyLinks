@@ -2712,6 +2712,18 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-02 — Meta ad 2 (Ask), round 4: the chat, shown off.** Branch
+  `claude/ad-trip`, NOT merged. Script written with the owner line by line:
+  "What if your saves could talk back?" / "With Machina, they can." / "Ask it
+  about anything you've saved." (a simple question, one save) / "Even across
+  hundreds of saves, you get one clear answer." (feed rush, then the Ask clip's
+  "time" question) / "And it finds the themes and connections you never
+  noticed." (the theme lifts, then three sources from three apps, then the
+  suggested questions, no narration) / "Download Machina." / the tagline. 22.9s.
+  New real-app take `adask`; all "ad: trip" gates green, both mixes −14.0 LUFS.
+  **Open:** "Download Machina." only once the listing is live; nobody has
+  listened to the mix on speakers.
+
 - **2026-10-02 — Meta ad 2 (Ask), round 3: an Ask ad, start to finish.**
   Branch `claude/ad-trip`, NOT merged. Owner: the cut showed neither one
   feature nor the whole app; focus on Ask, improve the hook, reuse the Ask

@@ -16,19 +16,18 @@ import { useAdFrame } from './format';
  * Frame 0 is the poster: saves of every kind where they were kept, five
  * piles, each an app's own save list with its mark (Instagram · Saved,
  * YouTube · Watch later, Safari · Reading List, Facebook · Saved, Photos ·
- * Screenshots), under the hook "Your saves hold more knowledge than you
- * remember." (the Ask clip's line). As the line ends the piles drift apart
+ * Screenshots), under the hook "What if your saves could talk back?". As
+ * the line ends the piles drift apart
  * and go soft; they gather into one point of ink (EASE_GATHER), the brackets
  * snap shut around it (the app's spring) and the drawn wordmark wipes in as
- * "Machina" is said ("With Machina, you just ask."). Then the wordmark leaves
- * and the mark shrinks to the size and place of the Ask screen's own mark,
- * and the cut to Ask lands on it (a match cut by shape: AskTrip.tsx opens
- * framed on that mark).
+ * "Machina" is said ("With Machina, they can."). Then the mark and the
+ * wordmark leave together, pushing in as they soften, and the cut to the
+ * chat lands on the beat (AskChat.tsx).
  *
  * Owner, round 2: not a trip (round 1's piles were all one trip and read as
  * a travel app); round 3: an Ask ad from start to finish. The piles are mixed on
- * purpose: a space photo, a TED talk, an essay, a money essay, a novel tip,
- * with the three saves the answer later cites sitting among them.
+ * purpose: a space photo, a TED talk, an essay, a money essay, a novel tip;
+ * the TED talk and the essay are two of the saves the chat answers from.
  *
  * The piles are the ad's own cards, not rebuilt app UI: a mark as the Machina
  * app draws it (a compass for Safari, a picture for Photos), the name of that
@@ -42,9 +41,9 @@ type Pile = { kind: Kind; app: string; list: string; titles: string[]; r: number
  *  the demo account says so */
 export const PILES: Pile[] = [
   { kind: 'instagram', app: 'Instagram', list: 'Saved', titles: ['Cosmic Cliffs in the Carina Nebula', 'Cala Goloritzé, Sardinia'], r: -2.5 },
-  { kind: 'youtube', app: 'YouTube', list: 'Watch later', titles: ['Inside the mind of a master procrastinator', 'A boat day on the Gulf of Orosei'], r: 2.5 },
+  { kind: 'youtube', app: 'YouTube', list: 'Watch later', titles: ['Inside the mind of a master procrastinator', 'Optimistic Nihilism'], r: 2.5 },
   { kind: 'safari', app: 'Safari', list: 'Reading List', titles: ['The Tail End', 'Laws of UX'], r: 2 },
-  { kind: 'facebook', app: 'Facebook', list: 'Saved', titles: ['The Psychology of Money', "Alghero, Sardinia's Catalan town"], r: -2 },
+  { kind: 'facebook', app: 'Facebook', list: 'Saved', titles: ['The Psychology of Money', 'Perfect Days'], r: -2 },
   { kind: 'photos', app: 'Photos', list: 'Screenshots', titles: ['Read Piranesi, and go in blind', "Dana's Sardinia tips"], r: -1.5 },
 ];
 
@@ -107,12 +106,9 @@ const PileCard: React.FC<{ p: Pile; soft: number }> = ({ p, soft }) => {
   );
 };
 
-/** the mark's width once formed, and at the match cut (the Ask screen's mark,
- *  38pt wide, at the cut's zoom of 4px a point) */
+/** the mark's width, and its scale once formed */
 const MARK_W = 300;
 const FORMED = 0.86;
-export const MATCH_Z = 4;
-const MATCH_W = 38 * MATCH_Z;
 
 export const Piles: React.FC<{ f: number }> = ({ f }) => {
   const L = useAdFrame();
@@ -147,12 +143,13 @@ export const Piles: React.FC<{ f: number }> = ({ f }) => {
   const form = prog(f, HITS.bracketsClose - 6, HITS.bracketsClose + 12, EASE_MODAL);
   const wm = prog(f, NAME_AT, NAME_AT + 16, EASE_MODAL);
   // the wordmark leaves (eased in and out: a fast-start fade reads as a blink)
-  const wmOut = prog(f, HITS.part, HITS.part + 10, EASE_IN_OUT);
-  // the mark shrinks onto the Ask screen's own mark, arriving on the cut
-  const shrink = prog(f, HITS.part, HITS.open, EASE_IN_OUT);
+  // the mark and the wordmark leave together, pushing in as they soften,
+  // gone by the cut
+  const exit = prog(f, HITS.part, HITS.open - 2, EASE_IN_OUT);
+  const wmOut = exit;
   // a slow push on the paths while the name holds (text never pushed)
   const push = 1 + 0.035 * prog(f, NAME_AT + 16, HITS.part, (t) => t);
-  const markScale = mix(1, FORMED, form) * mix(push, MATCH_W / (MARK_W * FORMED), shrink);
+  const markScale = mix(1, FORMED, form) * push * (1 + 0.08 * exit);
   const dotR = 52 * (MARK_W / 448);
 
   return (
@@ -195,7 +192,8 @@ export const Piles: React.FC<{ f: number }> = ({ f }) => {
             top: C.y,
             width: MARK_W,
             transform: `translate(-50%, -50%) scale(${markScale})`,
-            filter: `drop-shadow(0 ${(10 + flash * 10) * (1 - shrink)}px ${(30 + flash * 40) * (1 - shrink) + 1}px rgba(24,32,48,${(0.22 + flash * 0.2) * (1 - shrink)}))`,
+            opacity: 1 - exit,
+            filter: `drop-shadow(0 ${10 + flash * 10}px ${30 + flash * 40}px rgba(24,32,48,${0.22 + flash * 0.2}))${exit > 0.001 ? ` blur(${(exit * 6).toFixed(2)}px)` : ''}`,
           }}
         >
           <MarkAssembly close={close} dot={0} width={MARK_W} />
@@ -222,7 +220,7 @@ export const Piles: React.FC<{ f: number }> = ({ f }) => {
             position: 'absolute',
             left: C.x,
             top: C.y + 170,
-            width: 460 * push,
+            width: 460 * push * (1 + 0.08 * exit),
             transform: `translate(-50%, 0) translateY(${Math.round((1 - wm) * 10 + wmOut * 8)}px)`,
             clipPath: `inset(-20% ${((1 - wm) * 100).toFixed(2)}% -20% 0)`,
             opacity: 1 - wmOut,

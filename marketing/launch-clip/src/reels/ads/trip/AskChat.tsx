@@ -1,0 +1,161 @@
+import React from 'react';
+import { AbsoluteFill } from 'remotion';
+import { FEED_STEPS, HITS, K, TAKE, TYPE_STEP } from '../../../../ads/trip-timeline.mjs';
+import { AppShot, Lift, Tap } from '../../kit/AppShot';
+import { camAt, camVelocity, type Key } from '../../kit/camera';
+import { EASE_GATHER, EASE_IN_OUT, EASE_MODAL, EASE_SPRING, mix, prog } from '../../kit/curves';
+import { at, center, rectOf, takeOf, type Rect } from '../../kit/takes';
+import { useAdFrame, type AdFrame } from './format';
+
+/**
+ * The chat, from ONE take of the real app (`adask`), in four shots:
+ *
+ *  ask      a fresh chat, close on the composer: "What did that TED talk say
+ *           about procrastination?" types itself (the promise line above it,
+ *           "your 29 saves", stays out of shot under "hundreds of saves").
+ *  answer   Send; the cut lands on the touch. A short answer from one save
+ *           streams in, its source under it.
+ *  feed     CUT to the Home feed rushing past (EASE_GATHER, the one move that
+ *           ends at speed): "Even across hundreds of saves,".
+ *  big      CUT to a new chat, "What do my saves say about time?" typed;
+ *           Send; one answer streams, woven from three saves on three
+ *           platforms. Its first line, the theme it found, lifts; then the
+ *           three saves it connected lift as the voice says "you never
+ *           noticed"; the camera eases down onto the questions the app
+ *           suggests next, and the screen is thrown out into the lockup.
+ *
+ * The app's thinking line is not in the take at all. Captured scrolls (the
+ * feed) are stepped: the camera takes up each step's rounding.
+ */
+
+const T = TAKE;
+const S = HITS;
+const linear = (t: number) => t;
+const ARRIVE_DRIFTING = (t: number) => 0.75 * EASE_MODAL(t) + 0.25 * t;
+
+const take = takeOf(T);
+const span = (from: string, to: string | null) => (to ? take.marks[to] : take.count) - take.marks[from];
+// (12pt steps; the rush stops short of the feed's first recipe card)
+const FEED = Math.min(FEED_STEPS, span('feed', 'typing1'));
+const TYPED1 = span('typing1', 'stream1');
+const STREAMED1 = span('stream1', 'sources1');
+const SOURCED1 = span('sources1', 'typing2');
+const TYPED2 = span('typing2', 'stream2');
+const STREAMED2 = span('stream2', 'sources2');
+const SOURCED2 = span('sources2', null);
+
+/** where the feed's stepped scroll is (fractional steps) */
+const feedAt = (f: number) => prog(f, S.feed, S.ask2, EASE_GATHER) * (FEED - 1);
+
+/** output frame → the take's frame */
+export const frameAt = (f: number) => {
+  if (f < S.send) return at(T, 'typing1', Math.min(TYPED1 - 1, Math.max(0, Math.floor((f - S.open) / TYPE_STEP))));
+  if (f < S.feed) {
+    const n = Math.floor((f - S.send) / K);
+    return n < STREAMED1 ? at(T, 'stream1', n) : at(T, 'sources1', Math.min(SOURCED1 - 1, n - STREAMED1));
+  }
+  if (f < S.ask2) return at(T, 'feed', Math.round(feedAt(f)));
+  if (f < S.send2) return at(T, 'typing2', TYPED2 - 1);
+  const n = Math.floor((f - S.send2) / K);
+  return n < STREAMED2 ? at(T, 'stream2', n) : at(T, 'sources2', Math.min(SOURCED2 - 1, n - STREAMED2));
+};
+
+/** a Lift's box on whole points (the Ask clip's lesson: a half-point box hops) */
+const wholePoints = ([x, y, w, h]: Rect): Rect => {
+  const x0 = Math.floor(x);
+  const y0 = Math.floor(y);
+  return [x0, y0, Math.ceil(x + w) - x0, Math.ceil(y + h) - y0];
+};
+
+const CHIPS = ['chip1', 'chip2', 'chip3'] as const;
+
+export const chatKeys = (L: AdFrame): Key[] => {
+  const y = (v: number) => v + L.dy;
+  return [
+    // the simple question, close on the composer (the promise stays above the frame)
+    { f: S.open, cx: 196.5, cy: 768, z: 2.5, fx: 540, fy: y(1000) },
+    { f: S.send - 1, cy: 764, z: 2.56, ease: linear },
+    // CUT on the Send touch: its answer and its source
+    { f: S.send, cx: 196.5, cy: 300, z: 2.3, fy: y(990) },
+    { f: S.feed - 1, cy: 306, z: 2.38, ease: ARRIVE_DRIFTING },
+    // CUT to the feed rushing past, the camera pushing with it, at speed into the cut
+    { f: S.feed, cx: 196.5, cy: 400, z: 2.0, fy: y(1000) },
+    { f: S.ask2 - 1, cy: 410, z: 2.3, ease: EASE_GATHER },
+    // CUT to a new chat: the big question, typed, Send in reach
+    { f: S.ask2, cx: 196.5, cy: 768, z: 2.5, fy: y(1000) },
+    { f: S.send2 - 1, cy: 766, z: 2.53, ease: linear },
+    // CUT on the Send touch: the answer arrives (the empty chat between, and
+    // its "29 saves" promise, never cross the frame)
+    { f: S.send2, cx: 196.5, cy: 290, z: 2.3, fy: y(980) },
+    { f: S.lead - 1, cy: 296, z: 2.34, ease: linear },
+    // the theme lifts; then down onto the three saves it connected, at rest as they lift
+    { f: S.chips[0] - 6, cx: 196.5, cy: 492, z: 2.4, fy: y(980), ease: EASE_IN_OUT },
+    { f: S.chips[2] + 8, cy: 496, z: 2.42, ease: linear },
+    // on down to the questions the app suggests next
+    { f: S.lockup - 1, cy: 600, z: 2.2, fy: y(980), ease: EASE_IN_OUT },
+    // thrown out of frame, into the lockup
+    { f: S.lockup + 14, fx: -760, z: 2.24, ease: EASE_IN_OUT },
+  ];
+};
+
+const tapAt = (f: number, hit: number) => prog(f, hit - 10, hit + 18, linear);
+
+export const AskChat: React.FC<{ f: number }> = ({ f }) => {
+  const L = useAdFrame();
+  if (f < S.open || f > S.lockup + 15) return null;
+  const i = frameAt(f);
+  const keys = chatKeys(L);
+  const cam = camAt(keys, f);
+  const camV = camVelocity(keys, f, 1);
+
+  // the feed's stepped scroll: the camera takes up each step's rounding, and
+  // motion blur follows what moves on screen (camera + scroll)
+  let view = cam;
+  let motion = camV;
+  if (f >= S.feed && f < S.ask2) {
+    const e = feedAt(f);
+    view = { ...cam, cy: cam.cy - (Math.round(e) - e) * 12 };
+    motion = { ...camV, y: camV.y - 12 * cam.z * (e - feedAt(f - 1)) };
+  }
+
+  const send1 = center(rectOf(T, at(T, 'typing1', TYPED1 - 1), 'send'));
+  const send2 = center(rectOf(T, at(T, 'typing2', TYPED2 - 1), 'send'));
+
+  // the theme (the answer's first line) lifts with the line that names it,
+  // and settles as the camera moves on
+  const theme =
+    f >= S.sources2 ? prog(f, S.lead - 2, S.lead + 12, EASE_SPRING) * (1 - prog(f, S.chips[0] - 20, S.chips[0] - 4, EASE_IN_OUT)) : 0;
+
+  return (
+    <AbsoluteFill>
+      <AppShot take={T} i={i} cam={view} motion={motion}>
+        {/* Send: a light tap on the dark button; the cut lands on the touch */}
+        <Tap x={send1.x} y={send1.y} tone="light" t={tapAt(f, S.send)} />
+        <Tap x={send2.x} y={send2.y} tone="light" t={f >= S.ask2 ? tapAt(f, S.send2) : 0} />
+        {theme > 0.01 && (
+          <Lift take={T} i={i} rect={wholePoints(rectOf(T, i, 'lead'))} radius={10} lift={theme * 0.45} rise={2} grow={0.012} ring={0.5 * theme} />
+        )}
+        {f >= S.sources2 &&
+          f < S.lockup + 2 &&
+          CHIPS.map((key, k) => {
+            const hit = S.chips[k];
+            const up = prog(f, hit - 2, hit + 10, EASE_SPRING);
+            const down = prog(f, hit + 14, hit + 36, EASE_MODAL);
+            return (
+              <Lift
+                key={key}
+                take={T}
+                i={i}
+                rect={wholePoints(rectOf(T, i, key))}
+                radius={12}
+                lift={up * mix(1, 0.28, down)}
+                rise={5}
+                grow={0.05}
+                ring={0.7 * up * (1 - down)}
+              />
+            );
+          })}
+      </AppShot>
+    </AbsoluteFill>
+  );
+};

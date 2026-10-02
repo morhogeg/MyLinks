@@ -911,65 +911,44 @@ to the mix on speakers; its balance, clarity and loudness are measured.
 ## Meta ad: The trip (`MachinaAdTrip`)
 
 Meta ad 2 of 3 (Instagram and Facebook: Reels, Stories, Feed; doubles as an
-organic Reel): **the Ask ad**. Each of the three Meta ads sells one feature
-(ad 1, what one save becomes; ad 3, a screenshot that becomes a to-do); this
-one sells Ask, from start to finish. The branch keeps its first concept's name.
-22.7s, 9:16 and 4:5.
+organic Reel): **the Ask ad**, the chat shown off. Each of the three Meta ads
+sells one feature (ad 1, what one save becomes; ad 3, a screenshot that
+becomes a to-do). The branch keeps its first concept's name. 22.9s, 9:16 and
+4:5.
 
 **How it got here.** Round 1 opened on a Sardinia trip saved across five apps
-(owner: it looks like a travel app). Round 2 opened on what Machina is ("Machina
-keeps all your saves, from every app, in one place."). Round 3 (owner: is this
-about one feature or the whole app? it does neither; focus on Ask, improve the
-hook, reuse the Ask clip's phrases): the hook is the Ask clip's owner-approved
-line, every beat is Ask, the standout names each source as it appears, and it
-ends on a call to action, then the tagline.
+(owner: it reads as a travel app). Round 2 opened on what Machina is. Round 3
+used the Ask clip's lines (owner: neither one feature nor the whole app).
+Round 4 is the script the owner wrote line by line with Claude: a hook that
+asks a question, then the range of the chat, from a simple answer to the
+themes and connections across your saves, and a call to action.
 
 | Frames | Beat | What it shows, and the line |
 |---|---|---|
-| 0–96 | hook | Frame 0 is the poster: five piles, each an app's own save list with its mark (Instagram · Saved, YouTube · Watch later, Safari · Reading List, Facebook · Saved, Photos · Screenshots), two real demo saves in each, of every kind (a Webb telescope photo, a TED talk, The Tail End, The Psychology of Money, a novel tip, with the three saves the answer cites among them). The line is up, whole, from frame 0 and spoken from 0.27s: "Your saves hold more knowledge than you remember." (the Ask clip's hook) |
-| 64–176 | the name | The piles drift apart, gather into the point, the brackets snap (3.5s) and the wordmark wipes in as the name is said: "With Machina, you just ask." (the Ask clip's line). The wordmark leaves and the mark shrinks onto the size and place of the Ask screen's own mark |
-| 176–240 | your own words | Match cut on the mark into the real Ask screen, which pulls back onto its promise, "Answers come only from your 29 saves, with sources you can open."; down to the composer as "What should we do in Sardinia?" types: "Ask in your own words." (the Ask clip's line) |
-| 240–320 | the answer | Send is tapped; the answer streams in: "The answer is written from your own saves." (the Ask clip's line) |
-| 320–408 | the standout | Each source lifts as the voice names it, each with its app's mark: "A post, a video, even a friend's screenshot." (Instagram, YouTube, Dana's screenshot) |
-| 408–480 | proof | The first source is tapped, Cala Goloritzé's card opens in a still frame, and its summary, the passage the answer drew on, lifts: "Tap one to check it." (the Ask clip's line) |
-| 480–680 | close | Thrown out into the lockup; the mark strikes as the call to action starts and the wordmark wipes in on its name: "Download Machina." Then the tagline on one line, exactly `Everything you save, finally useful.`, held 1.9s after the last word. Nothing under it: that space is kept clear for the App Store badge once the listing is live |
+| 0–88 | hook | Frame 0 is the poster: five piles, each an app's own save list with its mark (Instagram · Saved, YouTube · Watch later, Safari · Reading List, Facebook · Saved, Photos · Screenshots), two real demo saves in each. The line is up, whole, from frame 0 and spoken from 0.27s: "What if your saves could talk back?" |
+| 48–144 | the name | The piles drift apart and gather into the point, the brackets snap (2.9s) and the wordmark wipes in as the name is said: "With Machina, they can." The mark and wordmark leave, pushing in as they soften |
+| 144–272 | a simple question | CUT to a fresh chat, close on the composer: "What did that TED talk say about procrastination?" types itself. Send is tapped and the cut to its answer lands on the touch: a short answer from one save, its source under it. "Ask it about anything you've saved." |
+| 272–360 | a big question | CUT to the Home feed rushing past, accelerating; CUT to a new chat, "What do my saves say about time?" typed; Send; one answer streams in, woven from three saves. "Even across hundreds of saves, / you get one clear answer." (one sentence, two captions) |
+| 360–496 | themes and connections | The answer's first line, the theme it found ("Your saves keep circling one idea…"), lifts; the three saves it connected (Wait But Why, TED on YouTube, @naval on X: three marks) lift one by one on "you never noticed"; the camera eases down onto the questions the app suggests next, no words about them. "And it finds the themes and connections / you never noticed." |
+| 496–688 | close | Thrown out into the lockup; the mark strikes as the call to action starts and the wordmark wipes in on its name: "Download Machina." Then the tagline on one line, exactly `Everything you save, finally useful.`, held 1.9s after the last word. Nothing under it: that space is kept clear for the App Store badge once the listing is live |
 
-**The answer** (`TRIP_ASK` in `capture/library.mjs`): "Three of your saves
-make a plan for the east coast. / Cala Goloritzé, Sardinia: the trail down
-from the Golgo plateau takes about an hour, so start early. A boat day on the
-Gulf of Orosei leaves Cala Gonone for Cala Luna and the Bue Marino sea cave.
-And Dana's Sardinia tips: in Ogliastra, order culurgiones. They come from
-there." Each sentence states only what its cited card says, and names it by
-its title. Culurgiones appear only as a place to eat; no recipe card is in the
-take (verify checks every frame).
+**The answers.** The simple one (`ADASK_TED` in `capture/library.mjs`) is
+written from the TED talk's own card and names it by its title. The big one
+is the Ask clip's owner-approved `ASK` exchange (The Tail End, Tim Urban's
+talk, Naval's thread). The suggested next questions are the real app's.
 
 **What is real and what is scripted.** Every app frame is the real, shipped
-web app (the same code the iPhone app runs), one continuous take, `adtrip`
-(`capture/shoot.mjs`): the Ask tab opened, the question typed, the answer
-streamed, the first source tapped. Scripted, as for the Ask clip: the answer
-and its sources (`TRIP_ASK`, answered by the capture server), and the trip's
-five saves (`TRIP_CARDS` in `capture/library.mjs`, written onto the store by
-the take as the backend writes finished cards, `capture/ad-trip.mjs`; they
-are NOT in the seeded account, so no other video's take changes). With the
-demo account's existing `goloritze` they are the trip: Bosa (Instagram,
-invented handle `@pastelrivertowns`), "A boat day on the Gulf of Orosei"
-(YouTube, invented channel "Footpath & Ferry", no thumbnail), Wikipedia's Su
-Nuraxi di Barumini (Safari), "Alghero, Sardinia's Catalan town" (Facebook,
-invented page "Two Coasts Postcards") and "Dana's Sardinia tips" (a
-screenshot of an invented message; Dana is the demo account's friend from
-"Birthday idea for Dana"). No images of any kind. Facts checked on
-2026-10-02 (Wikipedia itself is blocked from this container, so through
-search results from the official Sardinia tourism site, UNESCO and travel
-sources): the Goloritzé trail (3.5km from Su Porteddu on the Golgo plateau,
-about an hour down); Bosa's pastel houses under the 12th-century Malaspina
-castle, on the Temo, Sardinia's only navigable river; boat trips from Cala
-Gonone to Cala Luna and the Bue Marino cave (a guided ~800m walk; monk seals
-lived there until a few decades ago); Su Nuraxi (a 17th-century BC tower,
-four corner towers and a village; UNESCO 1997); Alghero (Catalan settlers in
-1372, Algherese still spoken, bilingual street signs, sea walls); culurgiones
-(from Ogliastra, potato, pecorino and mint; PGI since 2015). The invented
-handle, channel and page were searched for and no account by those exact
-names turned up; that is not proof none exists.
+web app, one continuous take, `adask` (`capture/shoot.mjs`): the feed
+scrolled, a fresh chat, the first question typed and answered, "+ New", the
+second question typed and answered. Scripted, as for the Ask clip: the two
+answers and which cards they cite (answered by the capture server). The
+account's "29 saves" promise line never enters the frame (the composer is
+framed below it, and the big question cuts from the typed composer straight to
+its answer), so "hundreds of saves" is said about what Machina handles, not
+claimed of the demo account. The feed rush stops short of the feed's first
+recipe card (`FEED_STEPS`). The account also carries the trip's saves from
+rounds 1–3 (`TRIP_CARDS`, written by the take); the hook's Photos pile shows
+one of them. No images of any kind.
 
 The piles are the ad's own graphic (the SAVE clip's hook-pile pattern), not
 rebuilt app UI: a mark as the Machina app draws it, the list's name, and
@@ -994,7 +973,7 @@ narrator + captions). The poster is frame 0 of the 9:16 cut, cropped square
 from the line through the piles.
 
 ```bash
-npm run reel:app && CAPTURE_ONLY=adtrip node capture/shoot.mjs   # the take
+npm run reel:app && CAPTURE_ONLY=adask node capture/shoot.mjs    # the take
 python3 audio/synth-vo.py trip                 # narrator → out/vo/trip/, src/reels/ads/trip/vo.json
 node audio/ads/trip-score.mjs                  # bed + music-only master → public/ads/trip/
 node audio/mix-vo.mjs trip                     # narrator mix → public/ads/trip/score-vo.wav (committed)
@@ -1011,24 +990,23 @@ branch's `takes.json` is the committed file with the `adtrip` entry added by
 script; on merge, regenerate it by capturing every take.
 
 Its parts: `ads/trip-timeline.mjs`, `src/reels/ads/trip/` (`MachinaAdTrip`,
-`Piles`, `AskTrip`, `End`, `AdCaptions`, `format`, `vo.json`),
+`Piles`, `AskChat`, `End`, `AdCaptions`, `format`, `vo.json`),
 `audio/ads/trip-score.mjs`, `audio/ads/trip-verify.mjs`,
 `capture/ad-trip.mjs`, `scripts/ad-trip-stills.mjs`, `scripts/ad-trip-sheet.py`,
-`TRIP_CARDS`/`TRIP_ASK` in the demo account, and one entry each in
+`ADASK_TED` and `TRIP_CARDS` in the demo account, the `adask` take, and one entry each in
 `shoot.mjs`, `server.mjs`, `synth-vo.py`, `mix-vo.mjs`, `verify.mjs` and
 `Root.tsx`. The "ad: trip" gates: no caption overlap, at most 8 words up at
 once, the hook up from frame 0 and spoken by 0.5s, the mark formed by 4.5s,
 Machina named, the close "Download Machina." then exactly the tagline, held ≥ 1.6s, at most 30s;
 the narrator mirrors, fits and leaves on time; no em dash, "AI", "second
 brain", "library", "share sheet", "bookmarks", price, "free", plan or
-availability claim (the one "Download Machina." aside); the piles are real demo saves; the answer cites three
-cards from three platforms, each by its title; no banned word, thinking line
+availability claim (the one "Download Machina." aside); the piles are real demo saves; the simple answer names
+its save by its title and the big one cites three platforms; no banned word, thinking line
 or recipe on any frame of the take; both mixes at −14 LUFS ±0.5 and ≤ −1
 dBTP; every line ≥ 3dB over the music in the speech band.
 
-**Open, for the owner:** it runs 22.7s, a little over the 15–20s aim; "Download
-Machina." is only true once the listing is live (the paid ads run after launch;
-don't post the organic Reel before then); the Sardinia question is the one
-example of Ask; nobody has listened to the mix on speakers (measured only).
-Bosa and Su Nuraxi are trip saves in the account that the cut no longer shows
-(they stay so the take, and its "29 saves", is unchanged).
+**Open, for the owner:** it runs 22.9s, a little over the 15–20s aim;
+"Download Machina." is only true once the listing is live (the paid ads run
+after launch; don't post the organic Reel before then); nobody has listened to
+the mix on speakers (measured only). The `adtrip` take (rounds 1–3) is still
+in `takes.json` and `shoot.mjs`, unused by this cut.

@@ -71,8 +71,11 @@ export default async function verifyTrip() {
     if (i && c.at < caps[i - 1].to) bad.push(`caption overlap: "${c.text}" starts at ${c.at}, "${caps[i - 1].text}" runs to ${caps[i - 1].to}`);
     if (c.to > A.TOTAL_FRAMES) bad.push(`caption "${c.text}" runs past the ad`);
     if (c.at % (A.BEAT_FRAMES / 2)) bad.push(`caption "${c.text}" starts at ${c.at}, not on an 8th`);
-    const words = c.text.split(/\s+/).filter(Boolean).length;
-    if (words > 8) bad.push(`caption "${c.text}" puts ${words} words on screen (max 8)`);
+    // (a `split` line is shown as two captions, broken at word `split`)
+    const all = c.text.split(/\s+/).filter(Boolean);
+    const shown = c.split ? [all.slice(0, c.split), all.slice(c.split)] : [all];
+    for (const part of shown) if (part.length > 8) bad.push(`caption "${part.join(' ')}" puts ${part.length} words on screen (max 8)`);
+    if (c.split && c.text.split('\n')[0].split(/\s+/).filter(Boolean).length !== c.split) bad.push(`caption "${c.text}" breaks its row away from word ${c.split}`);
   });
   const hook = caps[0];
   if (!hook?.hook || !hook.pre) bad.push('the ad does not open on its hook, on screen from frame 0');
@@ -133,26 +136,34 @@ export default async function verifyTrip() {
     if (!all.some((c) => c.title === t)) bad.push(`pile title "${t}" is not a save in the demo account`);
   }
   for (const c of LIB.TRIP_CARDS) for (const k of ['title', 'summary', 'sourceName', 'youtubeChannel']) if (c[k]) scan(`trip card ${c.id}.${k}`, c[k]);
-  scan('the question', LIB.TRIP_ASK.question);
-  scan('the answer', LIB.TRIP_ASK.answer);
-  const cited = LIB.TRIP_ASK.sources.map((id) => all.find((c) => c.id === id));
-  if (cited.some((c) => !c)) bad.push('the answer cites a card that does not exist');
-  else {
-    const mark = (c) =>
-      /instagram\.com/.test(c.url) ? 'instagram' : /youtube\.com|youtu\.be/.test(c.url) ? 'youtube' : /facebook\.com/.test(c.url) ? 'facebook' : c.sourceType === 'image' ? 'screenshot' : c.sourceType === 'note' ? 'note' : 'web';
-    const marks = new Set(cited.map(mark));
-    if (cited.length !== 3 || marks.size !== 3) bad.push(`the answer should cite three cards from three platforms (got ${[...marks].join(', ')})`);
-    for (const c of cited) {
-      if (!LIB.TRIP_ASK.answer.includes(c.title)) bad.push(`the answer does not name "${c.title}" by its title`);
+  // the two questions the chat answers: the simple one from one save, named
+  // by its title; the big one (the Ask clip's, owner-approved) from three
+  // saves on three platforms, so its sources show three different marks
+  const mark = (c) =>
+    /instagram\.com/.test(c.url) ? 'instagram' : /youtube\.com|youtu\.be/.test(c.url) ? 'youtube' : /facebook\.com/.test(c.url) ? 'facebook' : /(^|\/\/)(www\.)?(x|twitter)\.com/.test(c.url) ? 'x' : c.sourceType === 'image' ? 'screenshot' : c.sourceType === 'note' ? 'note' : 'web';
+  for (const [name, r, n] of [['the simple question', LIB.ADASK_TED, 1], ['the big question', LIB.ASK, 3]]) {
+    scan(`${name}`, r.question);
+    scan(`${name}'s answer`, r.answer);
+    const cited = r.sources.map((id) => all.find((c) => c.id === id));
+    if (cited.some((c) => !c)) {
+      bad.push(`${name} cites a card that does not exist`);
+      continue;
     }
-    for (const c of all) if (new RegExp(`\\b${c.id}\\b`).test(LIB.TRIP_ASK.answer) && !LIB.TRIP_ASK.answer.includes(c.title)) bad.push(`the answer names a card by its id: ${c.id}`);
+    const marks = new Set(cited.map(mark));
+    if (cited.length !== n || marks.size !== n) bad.push(`${name} should cite ${n} card(s) from ${n} platform(s) (got ${[...marks].join(', ')})`);
+    for (const c of all) {
+      const id = new RegExp(`\\b${c.id}\\b`);
+      // (an id that is also a word of a title the answer names is that title)
+      if (id.test(r.answer) && !all.some((x) => r.answer.includes(x.title) && id.test(x.title))) bad.push(`${name}'s answer names a card by its id: ${c.id}`);
+    }
   }
+  if (!LIB.ADASK_TED.answer.includes(all.find((c) => c.id === LIB.ADASK_TED.sources[0]).title)) bad.push('the simple answer does not name its save by its title');
 
   // ── the take: banned words, the thinking line and recipes on no frame
   const RECIPES = LIB.CARDS.filter((c) => c.recipe || c.concepts?.includes('recipe') || /V60/.test(c.title)).map((c) => c.title);
   const takes = JSON.parse(read('src/reels/data/takes.json'));
   const t = takes[A.TAKE];
-  if (!t) bad.push(`no capture take "${A.TAKE}": run CAPTURE_ONLY=adtrip npm run reel:capture`);
+  if (!t) bad.push(`no capture take "${A.TAKE}": run CAPTURE_ONLY=adask node capture/shoot.mjs`);
   else {
     const seen = new Set();
     t.frames.forEach((fr, i) =>
@@ -162,17 +173,20 @@ export default async function verifyTrip() {
         seen.add(text);
         scan(`the app on ${A.TAKE} frame ${i}`, text, false);
         if (/Searching your/i.test(text)) bad.push(`the app's thinking line is on ${A.TAKE} frame ${i}`);
-        for (const r of RECIPES) if (text.includes(r)) bad.push(`a recipe ("${r}") is on ${A.TAKE} frame ${i}`);
+        // (the feed's steps past FEED_STEPS are never played)
+        const unused = i >= t.marks.feed + A.FEED_STEPS && i < t.marks.typing1;
+        if (!unused) for (const r of RECIPES) if (text.includes(r)) bad.push(`a recipe ("${r}") is on ${A.TAKE} frame ${i}`);
       }),
     );
+    // each captured run fits the window the ad plays it in
     const runs = [
-      ['typing', 'stream', A.HITS.send - A.HITS.typeFrom, A.TYPE_STEP],
-      ['stream', 'sources', A.HITS.sources - A.HITS.send, A.K],
-      ['sources', 'card', A.HITS.citeTap - A.HITS.sources, A.K],
+      ['typing1', 'stream1', A.HITS.send - A.HITS.open, A.TYPE_STEP],
+      ['stream1', 'sources1', A.HITS.feed - A.HITS.send, A.K],
+      ['stream2', 'sources2', A.HITS.sources2 - A.HITS.send2, A.K],
     ];
     for (const [a, b, window, step] of runs) {
       const n = t.marks[b] - t.marks[a];
-      if (a !== 'sources' && n * step > window) bad.push(`the ${a} run (${n} frames × ${step}) overruns its ${window}-frame window`);
+      if (n * step > window) bad.push(`the ${a} run (${n} frames × ${step}) overruns its ${window}-frame window`);
     }
   }
 
@@ -184,7 +198,7 @@ export default async function verifyTrip() {
   } else {
     console.log(`✓ ${caps.length} captions, no overlaps, ≤ 8 words each, hook up from frame 0 and spoken at ${(hook.at / A.FPS).toFixed(2)}s, ends on the tagline; ${A.TOTAL_SEC.toFixed(1)}s`);
     console.log('✓ narrator mirrors, fits and leaves on time; the end card holds ≥ 1.6s');
-    console.log('✓ the piles are real demo saves; the answer cites three platforms, each card by its title');
+    console.log('✓ the piles are real demo saves; the simple answer names its save, the big one cites three platforms; no card named by its id');
     console.log(`✓ no banned word, claim, thinking line or recipe on any of the ${t.count} frames of ${A.TAKE}`);
   }
 

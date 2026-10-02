@@ -7,13 +7,13 @@ import { CLOCK } from '../../kit/camera';
 import { prog } from '../../kit/curves';
 import { Lens, Paper } from '../../kit/Paper';
 import { AdBandScrim, AdCaptions } from './AdCaptions';
-import { AskTrip } from './AskTrip';
+import { AskChat } from './AskChat';
 import { End } from './End';
 import { Piles } from './Piles';
 import { AdFrameContext, FRAMES, type AdShape } from './format';
 
 /**
- * Meta ad 2 of 3, "The trip you already planned" (Ask), 22.9s. The reel kit's
+ * Meta ad 2 of 3, the Ask ad (round 4: the chat, shown off), 22.9s. The reel kit's
  * design language (src/reels/kit, unchanged), on the ad's own clock
  * (ads/trip-timeline.mjs), in two shapes (format.ts):
  *
@@ -22,7 +22,7 @@ import { AdFrameContext, FRAMES, type AdShape } from './format';
  *   MachinaAdTripFeed   4:5, score + narrator + captions, reframed
  *
  * Every frame of app UI is the real app, one continuous take
- * (capture/shoot.mjs `adtrip`).
+ * (capture/shoot.mjs `adask`).
  */
 export const MachinaAdTrip: React.FC<{
   shape?: AdShape;
@@ -39,7 +39,7 @@ export const MachinaAdTrip: React.FC<{
         <Paper drift={Math.sin(f / 180) * 0.5} />
 
         <Piles f={f} />
-        <AskTrip f={f} />
+        <AskChat f={f} />
         <End f={f} />
 
         {/* type never sits on UI: the app fades out under the line's band */}

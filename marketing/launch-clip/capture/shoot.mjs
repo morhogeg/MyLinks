@@ -20,9 +20,12 @@
  *   askfull  (the ASK feature clip) the feed → Ask → the question → the
  *            answer and its sources → a source opened and closed → the
  *            suggested follow-up → its answer → its Graph chip
- *   adtrip   (the trip ad) the trip's saves written in → Ask → "What should
- *            we do in Sardinia?" → the answer and its three sources → the
- *            first source opened
+ *   adtrip   (the trip ad, rounds 1–3) the trip's saves written in → Ask →
+ *            "What should we do in Sardinia?" → the answer and its three
+ *            sources → the first source opened
+ *   adask    (the Ask ad, round 4) the feed → Ask: a simple question and
+ *            its answer → a new chat: a big question, its three sources and
+ *            the questions suggested next
  *
  * What the backend would do (finish analysing a card, answer a question) is
  * driven through the capture server and `window.__capture`, so the app
@@ -39,7 +42,7 @@ import { fileURLToPath } from 'node:url';
 import { startServer } from './server.mjs';
 import { openDevice } from './device.mjs';
 import { Take } from './recorder.mjs';
-import { ASK, CAPTURE_USER, CARDS, SAVE, SEARCH, SYNTHESIS, TRIP_ASK } from './library.mjs';
+import { ADASK_TED, ASK, CAPTURE_USER, CARDS, SAVE, SEARCH, SYNTHESIS, TRIP_ASK } from './library.mjs';
 import { tripDocs } from './ad-trip.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -67,7 +70,9 @@ async function fresh(prepare) {
 
 /** Wait (in real time) until the page shows `text`. */
 const until = (text, timeout = 10000) =>
-  page.waitForFunction((t) => document.body.innerText.includes(t), text, { timeout });
+  page.waitForFunction((t) => document.body.innerText.includes(t), text, { timeout }).catch((e) => {
+    throw new Error(`waited ${timeout}ms for "${text}": ${e.message.split('\n')[0]}`);
+  });
 
 /**
  * Scrolling, recorded. Tags the scrollable ancestor of the element showing
@@ -710,6 +715,103 @@ const takes = {
     t.mark('card');
     await t.roll(60, { rects: CARD, step: 1000 / 60 });
     await t.thaw();
+    return t.save();
+  },
+
+  // ─────────────────────────────────────────────────────────── adask
+  // The Ask ad, round 4 (ads/trip-timeline.mjs), one continuous take:
+  //   feed     the Home feed scrolled through, 12pt steps ("…hundreds of saves")
+  //   typing1  a simple question, a character a frame, in a fresh chat
+  //   stream1  its answer, from one save; `sources1` its source
+  //   typing2  "+ New", then the big question, a character a frame
+  //   stream2  its answer, from three saves; `sources2` its sources and the
+  //            questions the app suggests next
+  // The trip's saves are written in as in adtrip (the hook's Photos pile shows
+  // one). As in askfull, the thinking line is never recorded (verify checks).
+  async adask() {
+    await fresh(async () => {
+      const docs = tripDocs(Date.now());
+      await page.evaluate((d) => d.forEach(([p, v]) => window.__capture.set(p, v)), docs);
+    });
+    const t = new Take(dev, OUT, 'adask');
+    const ASKING = { composer: R.composer, send: R.send, promise: ['p', 'Answers come only from'] };
+    const ANSWER1 = {
+      question: ['p', ADASK_TED.question],
+      ans: ['p', 'Inside the mind of a master procrastinator:'],
+      chip: ['button[title="Inside the mind of a master procrastinator"]'],
+    };
+    const ANSWER2 = {
+      question: ['p', ASK.question],
+      lead: ['p', 'Your saves keep circling'],
+      body: ['p', 'The Tail End counts'],
+      chip1: ['button[title="The Tail End"]'],
+      chip2: ['button[title="Inside the mind of a master procrastinator"]'],
+      chip3: ['button[title="How to Get Rich (without getting lucky)"]'],
+      next1: ['button', 'Compare the Time saves'],
+      next2: ['button', 'What else did I save on time?'],
+    };
+    const STREAM = 10;
+    const stream = async (first, rects) => {
+      let done = server.advanceChat(STREAM);
+      await until(first);
+      await page.waitForTimeout(90);
+      await t.freeze();
+      await t.snap({ rects, caret: 'hide' });
+      while (!done) {
+        done = server.advanceChat(STREAM);
+        await page.waitForTimeout(90);
+        await t.advance();
+        await t.snap({ rects, caret: 'hide' });
+      }
+      server.finishChat();
+      await page.waitForTimeout(400);
+    };
+    const ask = async (question, rects, first, n) => {
+      await visible(page.locator('textarea')).click();
+      await page.waitForTimeout(150);
+      await t.freeze();
+      t.mark(`typing${n}`);
+      for (const ch of question) {
+        await page.keyboard.type(ch);
+        await t.advance();
+        await t.snap({ rects: ASKING });
+      }
+      await t.thaw();
+      await page.keyboard.press('Enter');
+      for (let k = 0; k < 40 && !server.chatOpen(); k++) await page.waitForTimeout(25);
+      if (!server.chatOpen()) throw new Error(`"${question}" never reached /api/chat`);
+      t.mark(`stream${n}`);
+      await stream(first, rects);
+      t.mark(`sources${n}`);
+      await t.roll(24, { rects, caret: 'hide' });
+      await t.thaw();
+      await page.waitForTimeout(500);
+    };
+
+    // the feed, scrolled through at an even pace
+    await t.freeze();
+    await tagScroller('Read Piranesi');
+    t.mark('feed');
+    const feedEnd = await page.evaluate(() => {
+      const sc = document.querySelector('[data-capture-scroller]');
+      return Math.min(2600, sc.scrollHeight - sc.clientHeight);
+    });
+    await rollScroll(t, feedEnd, 12, {});
+    await t.thaw();
+    await page.evaluate(() => document.querySelector('[data-capture-scroller]').scrollTo({ top: 0, behavior: 'instant' }));
+    await page.waitForTimeout(900);
+
+    // Ask, a fresh chat: the simple question
+    await tab('Ask').click();
+    await until('What do you want to recall?');
+    await page.waitForTimeout(1200);
+    await ask(ADASK_TED.question, ANSWER1, 'Inside the', 1);
+
+    // "+ New", then the big question
+    await visible(page.getByRole('button', { name: 'New', exact: true })).click();
+    await until('What do you want to recall?');
+    await page.waitForTimeout(1200);
+    await ask(ASK.question, ANSWER2, 'Your saves', 2);
     return t.save();
   },
 };

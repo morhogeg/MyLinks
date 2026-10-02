@@ -14,7 +14,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { bundle } from '@remotion/bundler';
 import { renderStill, selectComposition } from '@remotion/renderer';
-import { CAPTIONS, HITS, TOTAL_FRAMES } from '../ads/trip-timeline.mjs';
+import { HITS, TOTAL_FRAMES } from '../ads/trip-timeline.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(here, '..');
@@ -23,18 +23,21 @@ const BROWSER = '/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/head
 // every beat, read off the timeline so the list cannot go stale
 export const REVIEW = [
   0, // the poster: the five piles and the hook line
-  CAPTIONS[1].at + 30, // "…scattered across five apps": the piles drifting
-  HITS.collapse + 8, // the gather
-  HITS.bracketsClose + 30, // the mark, the wordmark, "Machina keeps it all in one place."
-  HITS.open - 4, // the mark shrunk onto the app's (the frame before the cut)
-  HITS.open + 1, // the first frame after the match cut
-  HITS.typeFrom - 2, // Ask's promise
-  HITS.send - 4, // the question typed
-  HITS.sources - 4, // the answer, streamed
-  HITS.chips[2] + 6, // the three sources lifted
-  HITS.citeTap + 1, // the tap: the card opening
-  HITS.summary + 24, // the card's summary lifted
-  HITS.markStrike + 10, // the lockup
+  HITS.lost + 12, // the piles drifting
+  HITS.dotLands + 2, // the point lands
+  HITS.wordmark + 18, // the mark, the wordmark, "With Machina, they can."
+  HITS.part + 12, // the mark leaving
+  HITS.open + 1, // the first frame of the chat (the cut)
+  HITS.send - 4, // the simple question typed
+  HITS.send + 50, // its answer
+  HITS.feed + 1, // the first frame of the feed (the cut)
+  HITS.feed + 24, // the feed at speed
+  HITS.ask2 + 2, // the big question typed (the cut)
+  HITS.sources2 - 4, // its answer
+  HITS.lead + 14, // the theme lifted
+  HITS.chips[2] + 6, // the three saves lifted
+  HITS.lockup - 2, // the suggested next questions
+  HITS.markStrike + 10, // "Download Machina."
   TOTAL_FRAMES - 1, // the last frame
 ];
 const frames = process.argv.slice(2).map(Number).filter((n) => !Number.isNaN(n));

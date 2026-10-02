@@ -110,7 +110,7 @@ for (const m of [48, 64, 67, 72]) pad(f(H.lockup), TOTAL_SEC - f(H.lockup) - 0.2
 // melody (FM keys), sparse: in the gaps between lines, home on C at the end
 const LINE = CAPTIONS.find((c) => c.place === 'lockup');
 const MELODY = [
-  [f(H.part), 72, 0.12], // after "With Machina, you just ask.", as the mark leaves
+  [f(H.part), 72, 0.12], // after "With Machina, they can.", as the mark leaves
   [f(H.markStrike) - BEAT, 72, 0.16], // a beat before the mark strikes
   [f(LINE.at + 92), 79, 0.16], // AFTER the last word
 ];
@@ -128,27 +128,31 @@ tick(f(H.bracketsClose), 0.08, 0.9);
 // (the name is said as the brackets close: the shimmer waits for the line)
 shimmer(f(H.part) - 0.3, [79, 84, 88], 0.03);
 
-// the match cut into Ask
-whoosh(f(H.part), f(H.open - H.part), 0.05, 0);
-impact(f(H.open), 0.14);
+// the mark leaves; the cut to the chat
+whoosh(f(H.part), f(H.open - H.part), 0.04, 0);
+impact(f(H.open), 0.1);
 
-// the question typing (a character every TYPE_STEP frames, ticks on 16ths)
-for (let fr = H.typeFrom; fr < H.typeFrom + 30 * TYPE_STEP; fr += 4) tick(f(fr), 0.03, 1.6 + ((fr / 4) % 3) * 0.08);
+// the simple question typing (a character every TYPE_STEP frames, ticks on 16ths)
+const Q1_END = H.open + 50 * TYPE_STEP;
+for (let fr = H.open; fr < Q1_END; fr += 4) tick(f(fr), 0.028, 1.6 + ((fr / 4) % 3) * 0.08);
 
 // send, and the answer arriving on the touch
 tick(f(H.send), 0.11, 1.3);
 whoosh(f(H.send), 0.4, 0.05, 0.25);
 
-// the three sources, each on its beat
-H.chips.forEach((fr, i) => {
-  sub(f(fr), [48, 52, 55][i], 0.16, 0.26);
-  bell(f(fr), [84, 88, 91][i], 0.028, [-0.35, 0, 0.35][i], 1.2);
-});
+// the feed rushing past, accelerating into the cut; the big question lands
+whoosh(f(H.feed), f(H.ask2 - H.feed), 0.06, -0.2);
+impact(f(H.ask2), 0.1);
+tick(f(H.send2), 0.11, 1.3);
+whoosh(f(H.send2), 0.4, 0.05, 0.25);
 
-// a source tapped: its card opens; its passage lifts
-tick(f(H.citeTap), 0.1, 1.2);
-whoosh(f(H.citeTap) + 0.03, 0.45, 0.05, -0.2);
-bell(f(H.summary) + 0.1, 88, 0.04, 0.2, 1.8);
+// the theme lifts (soft: "And it finds the themes" is being said)
+bell(f(H.lead) + 0.05, 84, 0.02, 0, 1.4);
+// the three saves it connected, each as it lifts
+H.chips.forEach((fr, i) => {
+  sub(f(fr), [48, 52, 55][i], 0.14, 0.26);
+  bell(f(fr), [84, 88, 91][i], 0.024, [-0.35, 0, 0.35][i], 1.2);
+});
 
 // the lockup: thrown out, the mark strikes into air
 whoosh(f(H.lockup) - 0.3, 0.7, 0.09, 0);

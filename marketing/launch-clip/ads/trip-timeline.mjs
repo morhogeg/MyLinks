@@ -1,28 +1,31 @@
 /**
  * Meta ad 2 of 3, the Ask ad (the branch is named for its first concept, "The
- * trip you already planned"): the single source of truth for its time. Round
- * 3 (owner): an Ask ad from start to finish, in the Ask clip's own words. The
- * hook is the Ask clip's approved line ("Your saves hold more knowledge than
- * you remember.") over saves of every kind from five apps; they gather into
- * the mark on "With Machina, you just ask."; then Ask: the question, the
- * answer written from your own saves, its three sources from three apps (the
- * standout), one tapped open; then "Download Machina." and the tagline.
+ * trip you already planned"): the single source of truth for its time.
+ * Round 4 (owner-approved script, 2026-10-02): the chat, shown off. The hook
+ * ("What if your saves could talk back?") over saves of every kind from five
+ * apps; they gather into the mark ("With Machina, they can."); a simple
+ * question gets a simple answer from one save; the feed rushes past and a big
+ * question gets one answer woven from three saves on three platforms; the
+ * theme it found and the saves it connected lift, with the questions the app
+ * suggests next under them; "Download Machina." and the tagline.
  * Picture (src/reels/ads/trip/), score (audio/ads/trip-score.mjs), narrator
  * (audio/synth-vo.py trip) and the ad's verify gates
  * (audio/ads/trip-verify.mjs) all read this file.
  *
  * Written in OUTPUT frames on the reel's grid: 112.5 BPM, 16 frames a beat.
- * Cuts and taps on beats, secondary events on 8ths, every line starting on a
- * beat or an 8th. The app's motion plays at the reel's steady pace (a frame
- * captured at 30fps lasts K output frames, one at 60fps lasts one).
+ * Cuts and taps on beats or 8ths, every line starting on a beat or an 8th.
+ * The app's motion plays at the reel's steady pace (a frame captured at 30fps
+ * lasts K output frames, one at 60fps lasts one); typing plays a character a
+ * frame (TYPE_STEP), so a question asks itself as fast as it reads.
  *
  * THE META SPEC (2026-10-02 brief): about 20s, never over 30; frame 0 is the
  * poster (saves from five apps, legible, the hook line already up); the
- * narrator starts by 0.5s; the mark forms at 3.5s; every line burned in, at
- * most about 8 words up at once; every line, logo and key app moment inside
+ * narrator starts by 0.5s; the mark forms at 2.9s; every line burned in, at
+ * most 8 words up at once (the two long sentences are spoken whole and shown
+ * as two captions each, `split`); every line, logo and key app moment inside
  * the 9:16 safe zone (verified on stills).
  *
- * Every frame of app UI is the real app, one continuous take (`adtrip`,
+ * Every frame of app UI is the real app, one continuous take (`adask`,
  * capture/shoot.mjs).
  */
 
@@ -43,7 +46,7 @@ export const BAR = BAR_FRAMES / FPS;
 export const beat = (n) => Math.round(n * BEAT_FRAMES);
 
 /** the capture take every app frame comes from */
-export const TAKE = 'adtrip';
+export const TAKE = 'adask';
 
 /**
  * Picture events, in frames. The scenes and the score read these same
@@ -51,55 +54,51 @@ export const TAKE = 'adtrip';
  */
 export const HITS = {
   hook: 0, // saves of every kind, each in the app it was saved in (the poster)
-  lost: beat(4), // "…than you remember": the piles drift apart and go soft
-  collapse: beat(5), // they gather into one point (EASE_GATHER)…
-  dotLands: beat(6), // …which lands
-  bracketsClose: beat(6.5), // the brackets snap shut around it (3.5s)
-  wordmark: beat(7), // the drawn wordmark wipes in as "Machina" is said
-  part: beat(10), // the wordmark leaves; the mark shrinks onto the app's own
-  open: beat(11), // CUT (match cut on the mark) to Ask, its promise under it
-  typeFrom: beat(12), // the question types, a character every 1.5 frames
-  send: beat(15), // Send is tapped; the cut to the answer lands on the touch
-  sources: beat(19), // the sources arrive under the finished answer
-  chips: [324, 338, 368], // each source lifts as the voice names it ("post", "video", "screenshot": vo.json)
-  citeTap: beat(26), // the first source is tapped: its card opens
-  summary: beat(27), // the passage the answer drew on lifts
-  lockup: beat(30), // the card is thrown out; the mark launches
-  markStrike: beat(32), // the mark's point strikes
+  lost: beat(3), // the line lands: the piles drift apart and go soft
+  collapse: beat(4), // they gather into one point (EASE_GATHER)…
+  dotLands: beat(5), // …which lands
+  bracketsClose: beat(5.5), // the brackets snap shut around it (2.9s)
+  wordmark: beat(6), // the drawn wordmark wipes in as "Machina" is said
+  part: beat(7.5), // the mark and the wordmark leave
+  open: beat(9), // CUT to the chat: the simple question types itself
+  send: beat(12.5), // Send is tapped; the cut to its answer lands on the touch
+  feed: beat(17), // CUT to the feed rushing past ("…hundreds of saves")
+  ask2: beat(19), // CUT to a new chat, the big question typed
+  send2: beat(19.5), // Send is tapped; its answer arrives on the touch
+  sources2: beat(22.5), // its three sources and the suggested next questions arrive
+  lead: beat(24), // the theme it found (the answer's first line) lifts
+  chips: [448, 458, 468], // the three saves it connected lift ("you never noticed": vo.json)
+  lockup: beat(31), // thrown out into the lockup; the mark launches
+  markStrike: beat(33), // the mark's point strikes as the call to action starts
 };
 
+/** how many of the feed's captured 12pt steps the rush plays: it stops short
+ *  of the first recipe card in the feed (Marcella Hazan's sauce enters at
+ *  step 199; no recipe in frame, owner 2026-10-02; verify checks) */
+export const FEED_STEPS = 186;
+
 /** output frames per typed character (the capture types one per frame) */
-export const TYPE_STEP = 1.5;
+export const TYPE_STEP = 1;
 
 /**
  * The captions ARE the script (audio/synth-vo.py trip speaks each as
  * written, "Machina" respelled for the voice only). `at` is the frame the
  * voice starts, `to` the frame the line has left (the dwell rule: 0.3–1.2s
- * after the voice). `pre` puts a line on screen before its voice: the hook is
- * up, whole, from frame 0, so the poster frame says it with the sound off.
- * `\n` is a break on screen only. At most about 8 words on screen at once.
+ * after the voice). `pre` puts a line on screen, whole, from frame 0, so the
+ * poster says the hook with the sound off. `split: n` speaks a sentence whole
+ * but shows it as two captions, the second arriving with word n, so no more
+ * than 8 words are ever up at once. `\n` is a break on screen only.
  */
 export const CAPTIONS = [
-  // 1. the hook (owner, round 3: an Ask ad, start to finish; reuse the Ask
-  // clip's lines). The Ask clip's owner-approved hook, up whole from frame 0
-  // over saves of every kind from five apps (`tight`: the voice's own pause
-  // after "knowledge" is closed, as in the Ask clip)
-  { at: beat(0.5), to: beat(6), hook: true, pre: true, tight: true, text: 'Your saves hold more knowledge\nthan you remember.' },
-  // 2. the name: the saves gather into the mark (the Ask clip's line)
-  { at: beat(6.5), to: beat(10.5), text: 'With Machina, you just ask.', duck: 0.4 },
-  // 3. Ask opens on its promise; the question types itself (the Ask clip's line)
-  { at: beat(12), to: beat(15), text: 'Ask in your own words.' },
-  // 4. the answer streams in (the Ask clip's line)
-  { at: beat(15), to: beat(20), text: 'The answer is written\nfrom your own saves.' },
-  // 5. the standout: each source lifts as it is named
-  { at: beat(20), to: beat(25.5), text: "A post, a video,\neven a friend's screenshot." },
-  // 6. one is tapped and its card opens on the passage (the Ask clip's line)
-  { at: beat(25.5), to: beat(29), until: true, text: 'Tap one to check it.' },
-  // 7. the call to action, as the mark strikes and the wordmark wipes in on the name
-  { at: beat(32), to: beat(35), text: 'Download Machina.', cta: true, duck: 0.4 },
-  // 8. the close: the tagline on ONE line, exactly, under the lockup; the
-  // music steps back
-  { at: beat(35), to: beat(42.5), place: 'lockup', text: 'Everything you save, finally useful.', duck: 0.4 },
+  { at: beat(0.5), to: beat(4.5), hook: true, pre: true, text: 'What if your saves\ncould talk back?' },
+  { at: beat(5.5), to: beat(8.5), text: 'With Machina, they can.', duck: 0.4 },
+  { at: beat(9.5), to: beat(13.5), text: "Ask it about\nanything you've saved." },
+  { at: beat(17), to: beat(23.5), split: 5, text: 'Even across hundreds of saves,\nyou get one clear answer.' },
+  { at: beat(24), to: beat(31), split: 7, text: 'And it finds the themes and connections\nyou never noticed.' },
+  // the call to action, as the mark strikes and the wordmark wipes in on the name
+  { at: beat(33), to: beat(36), text: 'Download Machina.', cta: true, duck: 0.4 },
+  // the close: the tagline on ONE line, exactly; the music steps back
+  { at: beat(36), to: beat(43), place: 'lockup', text: 'Everything you save, finally useful.', duck: 0.4 },
 ];
 
 export const TOTAL_FRAMES = CAPTIONS[CAPTIONS.length - 1].to;
@@ -107,8 +106,9 @@ export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 
 /** Risers END on the reveal they lead into. [from, to] in frames. */
 export const RISERS = [
-  [beat(4), HITS.dotLands], // the gather → the point lands
-  [beat(29), HITS.markStrike], // the throw → the mark strikes
+  [beat(3), HITS.dotLands], // the gather → the point lands
+  [beat(17), HITS.ask2], // the feed rushing past → the big question
+  [beat(30), HITS.markStrike], // the throw → the mark strikes
 ];
 
 /** One chord per bar (the film's and the reel's vocabulary). */

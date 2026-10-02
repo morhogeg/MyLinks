@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ASK, ASK_MORE, CAPTURE_USER, CARDS, SEARCH, TRIP_ASK, TRIP_CARDS } from './library.mjs';
+import { ADASK_TED, ASK, ASK_MORE, CAPTURE_USER, CARDS, SEARCH, TRIP_ASK, TRIP_CARDS } from './library.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(here, '..', 'out', 'capture', 'app', 'out');
@@ -102,9 +102,9 @@ export function startServer(port = 4600) {
         });
         res.flushHeaders?.();
         // (the ASK clip's follow-up: any other question gets ASK_MORE)
-        // (the trip ad's question gets its own answer)
-        const reply =
-          body.question === TRIP_ASK.question ? TRIP_ASK : body.question === undefined || body.question === ASK.question ? ASK : ASK_MORE;
+        // (the Ask ad's questions get their own answers)
+        const own = [TRIP_ASK, ADASK_TED].find((r) => r.question === body.question);
+        const reply = own ?? (body.question === undefined || body.question === ASK.question ? ASK : ASK_MORE);
         chat = { res, sent: 0, text: reply.answer, sources: reply.sources, sourcesSent: false };
         return;
       }

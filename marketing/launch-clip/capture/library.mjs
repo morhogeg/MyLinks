@@ -707,4 +707,17 @@ export const TRIP_ASK = {
   sources: ['goloritze', 'orosei', 'danatips'],
 };
 
+/**
+ * The Ask ad's first question (round 4 of ads/trip-timeline.mjs): a simple
+ * question about one save, answered from that save alone, in the words of
+ * its card (`procrastinator` above). The ad's second question is ASK.question,
+ * answered with ASK (owner-approved in the Ask clip).
+ */
+export const ADASK_TED = {
+  question: 'What did that TED talk say about procrastination?',
+  answer:
+    'Inside the mind of a master procrastinator: an Instant Gratification Monkey keeps grabbing the wheel from your rational decision-maker, and only the Panic Monster of a deadline takes it back. So the goals with no deadline are the ones that quietly never happen.',
+  sources: ['procrastinator'],
+};
+
 export { DAY };
