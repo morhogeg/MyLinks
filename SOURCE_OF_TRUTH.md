@@ -2399,6 +2399,51 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-02 — REVISIT "DO THIS" ROUND 4: whole tasks, a real checkbox,
+  category dots, swipe "Not for me", shorter tasks for new saves.** Branch
+  `claude/revisit-do-this-polish`. Owner on build 1343 (screenshot): "find
+  the best way to show these, this is not good enough". Diagnosis: every
+  task was cut at 2 lines exactly where the instruction was ("…use a
+  Suica…"), because `actionableTakeaway` had no length rule (stored up to
+  1000 chars) and `TakeawayRow` clamped at 2; the check ring was a faint
+  50%-opacity icon and a tick just made the row vanish; rows had no
+  identity. **App (`DigestView.tsx` `TakeawayRow`):** the task shows whole
+  (clamp 4); a 22px ring checkbox (`role=checkbox`) that fills with the
+  accent + check, strikes the task, holds 650ms, folds the row (grid-rows
+  1fr→0fr, 280ms, `--ease-modal`), THEN writes (Feed's "Marked as done" +
+  Undo toast unchanged); leaving the screen mid-animation flushes the write
+  on unmount; a failed write un-folds after 1.5s. Card line gets the
+  card's category dot (`getCategoryColorStyle`). Press state, hover guarded
+  by `[@media(hover:hover)]`, `hapticLight` on tick, staggered
+  `animate-card-enter`. Divider moved from the list's `divide-y` onto each
+  row (the swipe layer painted over the hairline). **"Not for me"
+  (owner-approved round 2):** swipe a row left past 35% of its width
+  (haptic when armed; shorter swipes snap back; only leftward,
+  mostly-horizontal drags are claimed, so page scroll and the app's
+  rightward edge-swipe-back are untouched) → new field
+  `takeawayDismissedAt` (`storage.markTakeawayDismissed`; links rules
+  already allow any owner field), toast "Removed from Do this" + Undo,
+  analytics `takeaway_dismissed`. `openTakeaways` skips dismissed cards.
+  Pointer devices get a hover button; touch screen readers get it as an
+  sr-only button. A one-line hint "Swipe left on a task that isn't for
+  you." shows on touch until the first dismissal (localStorage
+  `machina.takeawaySwipeLearned`). The card detail's label reads "Not for
+  me / לא בשבילי" for a dismissed task; tapping it puts the task back.
+  Backend: `takeawayDismissedAt` added to `_USER_OWNED_CARD_FIELDS` so a
+  re-analysis keeps it. **Shorter tasks (new saves only):** analysis prompt
+  rule 8 now asks for ONE sentence of at most 20 words, verb first, one
+  action; existing cards keep their text (the clamp-4 handles them).
+  **Verified:** tsc 0; eslint clean on touched files (pre-existing
+  `isYouTube` warning only); `test:takeaway` 4/4 (new dismissed test);
+  pytest 1266 passed; py_compile. Rendered via a throwaway harness
+  (deleted, `PUBLIC_ROUTES` edit reverted) at 390px light + dark with
+  English + Hebrew fixtures and Playwright driving it: tick → filled check +
+  strike → row folds → `done`; short swipe snaps back; full swipe →
+  `dismiss` and the hint disappears; tap opens the card; no console
+  errors; 1280px desktop shows the hover button and hides the hint.
+  **NOT verified:** on device (swipe feel inside WKWebView, haptics), a
+  live re-analysis keeping `takeawayDismissedAt`, the new prompt's output
+  length on real saves.
 - **2026-10-02 — GRAPH: "Mapping your knowledge…" no longer shows twice.**
   Branch `claude/graph-cluster-chips`. Owner device QA on build 1342 (cluster
   chips confirmed good; TestFlight run #342 green): opening the Graph showed

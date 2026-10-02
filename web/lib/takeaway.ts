@@ -41,6 +41,7 @@ export function getActionableTakeaway(link: TakeawaySource | null | undefined): 
 export interface TakeawayCard extends TakeawaySource {
     captureType?: string;
     takeawayDoneAt?: number | null;
+    takeawayDismissedAt?: number | null;
     // A Link's createdAt is `string | number` (legacy docs stored ISO strings).
     createdAt?: number | string;
 }
@@ -62,14 +63,21 @@ export function isTakeawayDone(link: Pick<TakeawayCard, 'takeawayDoneAt'> | null
     return typeof link?.takeawayDoneAt === 'number' && link.takeawayDoneAt > 0;
 }
 
+/** True once the user has said the takeaway is not for them ("Not for me"):
+ *  it leaves the Revisit list without being marked done. */
+export function isTakeawayDismissed(link: Pick<TakeawayCard, 'takeawayDismissedAt'> | null | undefined): boolean {
+    return typeof link?.takeawayDismissedAt === 'number' && link.takeawayDismissedAt > 0;
+}
+
 /**
  * The cards whose "Do this" is still open, newest save first: what the Revisit
  * tab lists. A saved Ask answer never carries one (it is already an answer to
- * the user's own question, same rule as the card detail), and a done takeaway
- * leaves the list but stays on its card. Pure, so the rule is testable.
+ * the user's own question, same rule as the card detail), and a done or
+ * dismissed takeaway leaves the list but stays on its card. Pure, so the rule
+ * is testable.
  */
 export function openTakeaways<T extends TakeawayCard>(links: readonly T[]): T[] {
     return links
-        .filter((l) => !!getActionableTakeaway(l) && String(l.captureType) !== 'answer' && !isTakeawayDone(l))
+        .filter((l) => !!getActionableTakeaway(l) && String(l.captureType) !== 'answer' && !isTakeawayDone(l) && !isTakeawayDismissed(l))
         .sort((a, b) => createdMs(b.createdAt) - createdMs(a.createdAt));
 }

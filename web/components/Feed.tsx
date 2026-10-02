@@ -10,7 +10,7 @@ import { platformIcon, platformColor, type PlatformKey } from '@/lib/platform';
 import DigestView from './DigestView';
 import DigestCard from './DigestCard';
 import Dropdown from './Dropdown';
-import { deleteLink, updateLinkReminder, markLinkReviewed, markTakeawayDone, toLink } from '@/lib/storage';
+import { deleteLink, updateLinkReminder, markLinkReviewed, markTakeawayDone, markTakeawayDismissed, toLink } from '@/lib/storage';
 import { openTakeaways } from '@/lib/takeaway';
 import { track } from '@/lib/analytics';
 import { collection, onSnapshot, doc, getDoc, updateDoc, arrayUnion, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
@@ -1163,6 +1163,30 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         );
     }, [uid, toast]);
 
+    // "Not for me" (a swipe in Revisit): the row leaves the list without
+    // counting as done. Same toast beat as done, so Undo is one tap away.
+    const dismissTakeaway = useCallback((link: Link) => {
+        if (!uid) return;
+        markTakeawayDismissed(uid, link.id, true).then(
+            () => {
+                track('takeaway_dismissed');
+                toast.success('Removed from Do this', {
+                    label: 'Undo',
+                    onClick: () => { void markTakeawayDismissed(uid, link.id, false); },
+                });
+            },
+            () => { toast.error('Could not save that. Try again.'); },
+        );
+    }, [uid, toast]);
+
+    // The card detail's "Not for me" label puts the task back on the list.
+    const restoreTakeaway = useCallback((link: Link) => {
+        if (!uid) return;
+        markTakeawayDismissed(uid, link.id, false).catch(() => {
+            toast.error('Could not save that. Try again.');
+        });
+    }, [uid, toast]);
+
     // "Done" on a due card: stop a still-pending reminder from coming back, and
     // clear the fired flag. Both writes are the ones the rest of the app already
     // uses, so a card marked done here looks done everywhere.
@@ -2066,6 +2090,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
             takeawayCards={takeawayCards}
             onOpenTakeawayCard={openLinkDetails}
             onCompleteTakeaway={completeTakeaway}
+            onDismissTakeaway={dismissTakeaway}
         />
     );
 
@@ -3609,6 +3634,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                     allCategories={categories}
                     uid={uid}
                     onToggleTakeawayDone={completeTakeaway}
+                    onRestoreTakeaway={restoreTakeaway}
                     isOpen={!!activeLink}
                     onClose={closeActiveLinkStack}
                     onBack={goBackOrClose}
