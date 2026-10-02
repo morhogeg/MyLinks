@@ -2443,7 +2443,11 @@ exact-match, capped.
   errors; 1280px desktop shows the hover button and hides the hint.
   **NOT verified:** on device (swipe feel inside WKWebView, haptics), a
   live re-analysis keeping `takeawayDismissedAt`, the new prompt's output
-  length on real saves.
+  length on real saves. **SHIPPED** as merge `46f068e`: Vercel on push;
+  functions deploy #121 (unscoped, on purpose); TestFlight run #344 →
+  **build 1344**. Owner QA: Revisit → tick a task (fills, strikes, folds,
+  Undo toast); swipe one left (Not for me, Undo); open that card → label
+  reads "Not for me", tap puts it back.
 - **2026-10-02 — GRAPH: "Mapping your knowledge…" no longer shows twice.**
   Branch `claude/graph-cluster-chips`. Owner device QA on build 1342 (cluster
   chips confirmed good; TestFlight run #342 green): opening the Graph showed
