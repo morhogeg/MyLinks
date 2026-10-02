@@ -206,6 +206,17 @@ override enthusiasm.
 same way the App Store keywords field is, so bidding on `second brain` there is
 permitted. D-3 restricts *user-visible surfaces*, not the search index.
 
+**Addendum 2026-10-02: Meta ad creative now, Meta spend later.** The owner asked
+for three Instagram/Facebook ad videos, and they are being produced
+(`SOURCE_OF_TRUTH.md` §8, "Reels, clips and Meta ads"). This changes when the
+*creative* gets made, not the gate on *spend*. No money goes into Meta until the
+App Store listing is live and week-2 retention holds. Making the videos now still
+pays: they double as organic Reels from day one. **When the spend starts, run
+it without the Meta SDK.** Installs are then attributed only through Apple's
+SKAdNetwork, which keeps the App Privacy label's "no tracking" true. The X
+campaign also promises "No tracking" in public (`marketing/x-launch/CAMPAIGN.md`,
+T23). Meta optimizes less well that way; that is the accepted cost.
+
 ### D-5 · The stated hero is the Recall Engine — and D-2 now partly contradicts it
 
 **Recorded, not resolved.** `SOURCE_OF_TRUTH.md` §1 states the hero as the
@@ -342,7 +353,8 @@ duplicated here, so a change goes in ONE place):
 |---|---|
 | **Tagline** (D-6) — the ONE promise line | `web/app/layout.tsx` + `web/public/manifest.json` (`description`), `README.md` line 3, `marketing/launch-clip/src/scenes/Endcard.tsx` (footer), `functions/share_service.py` (the public share-page footer, added 2026-08-06), `web/components/LandingPage.tsx` (the public landing page — the `<h1>` **and** the footer, added 2026-08-06), `SOURCE_OF_TRUTH.md` §8 (Product Hunt), `web/components/LoginScreen.tsx` (the sign-in subtitle line, owner call 2026-08-24), `docs/APP_STORE.md` §2 (the App Store promotional text, owner call 2026-08-25). Eight surfaces, so a change is an eight-file sweep — grep the exact string. Note the App Store one is DOC-only until it is typed into Connect by hand; the store field is not deployed from this repo. The landing page is the one that says it TWICE and the one that says it loudest: it is the `<h1>` of the product's public home page. |
 | App Store Name, Subtitle, keywords, promo text, description | `docs/APP_STORE.md` §2 |
-| Growth strategy, channel sequence, launch assets (X thread, Show HN, Product Hunt) | `SOURCE_OF_TRUTH.md` §8 |
+| Growth strategy, channel sequence | `SOURCE_OF_TRUTH.md` §8 |
+| Launch copy: the X campaign (brand + founder), Product Hunt, Show HN, LinkedIn, Reddit, Meta ad copy | `marketing/x-launch/CAMPAIGN.md` (since 2026-10-02) |
 | Positioning statement / product one-liner | `SOURCE_OF_TRUTH.md` §1 |
 | In-product name strings | §2 above |
 | The reasoning behind all of it | this file |
@@ -439,7 +451,7 @@ finding dissolves.
 | **A-1** | **Trademark search for "Machina"** — ☑ **CLOSED 2026-08-23.** Search run (findings in C-2); owner reviewed the one live conflict (Ionic Security, US cl 9/42, likely lapsing 2027) and accepted the risk. Tickler: re-check TSDR 6278707 after Feb 2027. | Owner | — | ☑ done |
 | **A-2** | Enter the D-2 Name/Subtitle and the D-3 keywords into App Store Connect. Values are in `docs/APP_STORE.md` §2. | Owner | §4 task 8 | ☐ open |
 | ~~**A-3**~~ | ~~Decide Q-1 (the AI-powered tagline).~~ **DONE 2026-08-02** — D-6 settled it; landed in `layout.tsx`, `manifest.json`, `README.md` (which also cleared a D-3 `ai` violation) and the §8 Product Hunt slot. The launch film's endcard already carried the line. | — | — | ☑ done |
-| **A-5** | **Re-check every §8 launch asset against D-1/D-2/D-3 and Q-4** before launch week: no "Machina AI" anywhere, no "bookmarks" as a self-description (Q-5), and a hero consistent with whatever Q-4 settles on. The assets were written when the app was still called Machina AI. | Owner / next session | Launch week | ☐ open |
+| **A-5** | **Re-check every §8 launch asset against D-1/D-2/D-3 and Q-4** before launch week: no "Machina AI" anywhere, no "bookmarks" as a self-description (Q-5), and a hero consistent with whatever Q-4 settles on. The assets were written when the app was still called Machina AI. ☑ **Done 2026-10-02 for X, Product Hunt, Show HN, LinkedIn and Reddit:** all in `marketing/x-launch/CAMPAIGN.md`, which leads on capture (D-7), never calls Machina bookmarks, and keeps "AI" to the one founder post about dropping it (F4). The old §8 thread is marked superseded. | — | — | ☑ done |
 | **A-4** | Rebuild any store/marketing screenshot that shows the old "Machina AI" label. The §4 task 9 shot-list has not been shot yet, so this is a "shoot it right", not a redo. | Owner | §4 task 9 | ☐ open |
 
 ---
@@ -448,6 +460,28 @@ finding dissolves.
 
 > Newest first. One entry per conversation; conclusions belong in §1–§5, this is
 > the narrative of how they were reached.
+
+- **2026-10-02 — The X campaign meets the shipped app, and Meta enters the
+  plan.** The owner asked for the prepared X posts to be made launch-ready, plus
+  three Instagram/Facebook ad videos showing the real app. Reviewing the
+  campaign against the code found posts promising what the app doesn't do:
+  - "a citation on every line" (Ask lists its sources under the answer);
+  - "capture stays free" (the free plan caps saves at 100 a month);
+  - Pro features beside the word "Free".
+
+  The fix was to make the copy follow the code, not the other way round, and
+  the one real contradiction (the "never gate capture" principle vs the cap) went
+  to the owner as `SOURCE_OF_TRUTH.md` §4 item 26a. Two strategic changes:
+  - **A founder track.** On X, a brand-new brand account has no distribution;
+    the founder's account carries the story, and `@machinaapp` carries the
+    proof.
+  - **Meta ads.** They reverse D-4's "Meta rejected at this stage" for the
+    creative only, and the spend gate stands (D-4 addendum).
+
+  On the ads, the owner rejected a recipe concept as "too simple" and asked for
+  feature showcases with no recipe content. The three became the card and its
+  key points, Ask across a trip's saves, and a screenshot that becomes a "Do
+  this" task.
 
 - **2026-08-02 — The app gets a tagline, and it is the owner's line.** Owner
   proposed **"Everything you save, finally useful."** while asking what was left
