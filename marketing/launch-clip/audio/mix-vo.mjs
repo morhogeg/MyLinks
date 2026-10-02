@@ -40,6 +40,19 @@ SCRIPTS.save = {
   timeline: '../clips/save-timeline.mjs',
   master: { lufs: -14, truePeak: -1 },
 };
+// Meta ad 1 (ads/card-timeline.mjs): the main cut, and the A/B test's cut
+// with no narrator (the same score, mastered the same way)
+//   node audio/mix-vo.mjs adcard       →  public/ads/card/score-vo.wav
+//   node audio/mix-vo.mjs adcardMusic  →  public/ads/card/score-music.wav
+SCRIPTS.adcard = {
+  vo: path.join(root, 'out', 'vo', 'adcard'),
+  score: 'ads/card/score.wav',
+  out: 'ads/card/score-vo.wav',
+  duck: 0.55,
+  timeline: '../ads/card-timeline.mjs',
+  master: { lufs: -14, truePeak: -1 },
+};
+SCRIPTS.adcardMusic = { ...SCRIPTS.adcard, vo: path.join(root, 'out', 'vo', 'adcard-music'), out: 'ads/card/score-music.wav', noVoice: true };
 const name = process.argv[2] ?? 'film';
 const script = SCRIPTS[name];
 if (!script) throw new Error(`unknown script ${name}; one of ${Object.keys(SCRIPTS).join(', ')}`);
@@ -77,7 +90,9 @@ for (let i = 0; i < N; i++) {
   R[i] = score.samples[i * 2 + 1];
 }
 
-const manifest = JSON.parse(fs.readFileSync(path.join(voDir, 'manifest.json'), 'utf8'));
+// (a `noVoice` script is the score alone, mastered the same way)
+if (script.noVoice) fs.mkdirSync(voDir, { recursive: true });
+const manifest = script.noVoice ? [] : JSON.parse(fs.readFileSync(path.join(voDir, 'manifest.json'), 'utf8'));
 // a reel line may duck the music further than the rest (`duck` on its caption
 // in reel-timeline.mjs, keyed by the frame the line starts on)
 const lineDuck =

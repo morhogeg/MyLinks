@@ -2707,6 +2707,26 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-02 — META AD 1, "WHAT ONE SAVE BECOMES" (the card and its key
+  points).** Branch `claude/ad-card` (from `claude/clip-save`, `main` merged
+  in), **not merged**: the owner reviews first. Compositions `MachinaAdCard`
+  (9:16, the main cut), `MachinaAdCardMusic` (9:16, no narrator, the A/B test),
+  `MachinaAdCardFeed` (4:5), plus `MachinaAdCardPoster` (1:1 thumbnail) and
+  silent QA cuts; all in `src/reels/ads/card/`, timeline `ads/card-timeline.mjs`,
+  take `adcard` (`capture/shoot.mjs`, data `capture/ad-card.mjs`), score
+  `audio/ads/card-score.mjs`, gates `audio/ads/card-verify.mjs` (run by `npm run
+  verify`). The hook is the Watch later pile with the SAVE clip's real YouTube
+  card on top ("That talk you saved for later? / You'll never get to it.", set
+  on frame 0), the share into the mark, then the card in the real app: Key
+  moments, gist, Key Points, tags and a Related row (three demo saves, the one
+  scripted part), closing on the tagline. 21.0s (the aim was ≤ 20s; the
+  tagline's 1.6s hold costs the last second). Both mixes −14.0 LUFS, −1.25
+  dBTP; verify clean; 9:16 safe zones checked on stills. **Open:** nobody has
+  listened on speakers; the share beat is a brand graphic in a marked slot
+  (`SHARE_SLOT`) a real iPhone share recording can replace; the talk's length
+  was not verified, so no line says "thirty minutes"; `takes.json` was
+  regenerated from a fresh capture of every take (generated, never hand-merge).
+  README: `marketing/launch-clip/README.md`, "Meta ad 1".
 - **2026-10-02 — X LAUNCH CAMPAIGN REVIEWED AND ON MAIN; THREE META AD VIDEOS
   HANDED TO NEW SESSIONS.** Branch `claude/x-launch-content-video-prompts-flujr5`.
   Docs and marketing only (no `web/` or `functions/` change, nothing deployed).

@@ -144,6 +144,10 @@ def timeline_script(module):
 SCRIPTS["save"] = (lambda: timeline_script("./clips/save-timeline.mjs"), os.path.join(VO, "save"))
 WORD_TIMING["save"] = os.path.join(ROOT, "src", "reels", "clips", "save", "vo.json")
 
+# Meta ad 1, "What one save becomes" (ads/card-timeline.mjs)
+SCRIPTS["adcard"] = (lambda: timeline_script("./ads/card-timeline.mjs"), os.path.join(VO, "adcard"))
+WORD_TIMING["adcard"] = os.path.join(ROOT, "src", "reels", "ads", "card", "vo.json")
+
 
 def speech_runs(samples, sr, gap=0.09):
     """[start, end] seconds of each run of speech, split at pauses >= gap."""

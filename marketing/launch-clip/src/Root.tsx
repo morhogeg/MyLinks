@@ -6,6 +6,7 @@ import { Film } from './Film';
 import { MachinaReel } from './reels/MachinaReel';
 import * as SAVE from '../clips/save-timeline.mjs';
 import { SaveClip } from './reels/clips/save/SaveClip';
+import { AdCardCompositions } from './reels/ads/card/Compositions';
 
 /**
  * Compositions:
@@ -147,5 +148,7 @@ export const RemotionRoot: React.FC = () => (
       height={SAVE.HEIGHT}
       defaultProps={{ withAudio: false, withCaptions: false }}
     />
+    {/* Meta ad 1, "What one save becomes" (src/reels/ads/card) */}
+    <AdCardCompositions />
   </>
 );

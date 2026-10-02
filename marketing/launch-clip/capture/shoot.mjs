@@ -35,6 +35,7 @@ import { openDevice } from './device.mjs';
 import { Take } from './recorder.mjs';
 import { ASK, CAPTURE_USER, CARDS, SAVE, SEARCH, SYNTHESIS } from './library.mjs';
 import { NOTE_READ, SHOTS_DIR, renderPost, renderShots, shotsCard, sourceCards } from './clip-save.mjs';
+import { AD_CARD_ID, adCard } from './ad-card.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.join(here, '..', 'public', 'reel', 'app');
@@ -674,6 +675,67 @@ const takes = {
       await page.keyboard.press('Escape');
       await page.waitForTimeout(900);
     }
+    return t.save();
+  },
+
+  // ─────────────────────────────────────────────────────────── adcard
+  // Meta ad 1, "What one save becomes": the SAVE clip's YouTube card (the
+  // app's real output, capture/ad-card.mjs) arrives at the top of the feed,
+  // is opened, and is read all the way down in fine steps: the Key moments,
+  // the gist, the Key Points, the "Do this", the tags and the Related cards.
+  // 60fps rolls.
+  async adcard() {
+    await fresh();
+    const t = new Take(dev, OUT, 'adcard');
+    const F60 = 1000 / 60;
+    const DETAIL = {
+      title: ['h2'],
+      moments: ['div', 'Explains that dopamine'],
+      moment1: ['li', '2:24'],
+      moment2: ['li', '6:44'],
+      moment3: ['li', '19:20'],
+      moment4: ['li', '26:20'],
+      gist: ['p,div', 'hijack the brain'],
+      keyPoints: ['h1,h2,h3,h4', 'Key Points'],
+      points: ['ul', 'Dopamine is not a pleasure'],
+      takeaway: ['div', 'Pick one tech-free zone'],
+      tags: ['div', 'screen time'],
+      tag1: ['button,span,a', 'dopamine'],
+      tag3: ['button,span,a', 'screen time'],
+      relatedHead: ['h3', 'Related cards'],
+      related1: ['div.group', 'pull of instant reward'],
+      related2: ['div.group', 'limited time and attention'],
+      related3: ['div.group', 'systems change habits'],
+    };
+    t.mark('home');
+    await t.snap({ rects: { firstCard: R.firstCard } });
+
+    // it arrives at the top of the feed
+    await t.freeze();
+    await page.evaluate(([p, d]) => window.__capture.set(p, { ...d, createdAt: Date.now() }), [linkPath(AD_CARD_ID), adCard()]);
+    t.mark('land');
+    await t.roll(36, { rects: { firstCard: R.firstCard }, step: F60 });
+    await t.thaw();
+    await page.waitForTimeout(600);
+    t.mark('landed');
+    await t.snap({ rects: { firstCard: R.firstCard } });
+
+    // opened
+    await t.freeze();
+    await visible(page.locator(R.firstCard[0]).first()).click({ position: { x: 120, y: 40 } });
+    t.mark('open');
+    await t.roll(48, { rects: DETAIL, step: F60 });
+    await t.thaw();
+    await page.waitForTimeout(500);
+
+    // read all the way down, in fine steps (the ad plays parts of this at
+    // its own pace): the last Related card's reason ends at 800pt
+    await t.freeze();
+    await tagScroller('Suggests turning off color');
+    t.mark('scroll');
+    await rollScroll(t, await scrollTargetFor('systems change habits', 800), 3, DETAIL);
+    await t.snap({ rects: DETAIL });
+    await t.thaw();
     return t.save();
   },
 };

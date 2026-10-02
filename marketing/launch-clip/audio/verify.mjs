@@ -728,5 +728,8 @@ console.log('\n── clip: save');
   }
 }
 
+// Meta ad 1, "What one save becomes" (its gates live with it)
+if (await (await import('./ads/card-verify.mjs')).default()) failed = true;
+
 console.log(failed ? '\nFAILED' : '\nOK');
 process.exit(failed ? 1 : 0);
