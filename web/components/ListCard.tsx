@@ -4,7 +4,7 @@ import { memo, useRef, useState } from 'react';
 import { Link, StatusChangeHandler, CardShareMode } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { getDirection } from '@/lib/rtl';
-import { getPlatform, platformIcon, platformColor, PLATFORM_LABELS, xHandle, prettyHost } from '@/lib/platform';
+import { linkPlatform, platformIcon, platformColor, PLATFORM_LABELS, xHandle, prettyHost } from '@/lib/platform';
 import { hapticLight, hapticMedium } from '@/lib/haptics';
 import { Star, Check, Trash2, StickyNote, Lock, MoreHorizontal, EyeOff } from 'lucide-react';
 import { getNotes } from '@/lib/notes';
@@ -88,7 +88,7 @@ function ListCard({
 
     // Source shown as its home-screen brand icon; text falls back to the
     // publisher/handle so non-platform links still read clearly.
-    const platform = getPlatform(link.url);
+    const platform = linkPlatform(link);
     const handle = platform === 'x' ? xHandle(link.url) : null;
     const cleanSource = link.sourceName && !['none', 'screenshot'].includes(link.sourceName.toLowerCase())
         ? link.sourceName

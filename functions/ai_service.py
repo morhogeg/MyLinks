@@ -389,6 +389,7 @@ Requirements for the analysis:
 
 8. actionableTakeaway: One concrete, specific action the reader can apply. This field is OPTIONAL.
    - **LANGUAGE**: Write the takeaway in the SAME language as the input content.
+   - **SHORT, ONE ACTION**: ONE sentence of at most 20 words, starting with the verb (e.g. "Get morning sunlight within an hour of waking."). It is shown as a to-do item, so name the single most useful action; never chain several actions with "and".
    - **INCLUDE ONLY WHEN GENUINE**: Provide a takeaway ONLY if the content genuinely supports one concrete, specific action. If the content is not actionable (e.g. a news event, an anecdote, a personal note or update), OMIT this field entirely — leave it out of the JSON rather than manufacturing advice.
    - **DO NOT INVENT ADVICE**: Never pad this with generic filler ("stay informed", "consider the implications"). An omitted takeaway is always better than a fabricated one.
 

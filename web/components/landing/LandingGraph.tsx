@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { buildGraphModel, GraphModel } from '@/lib/graph';
 import { tick, ALPHA_MIN } from '@/lib/graphPhysics';
-import { getCategoryColorStyle } from '@/lib/colors';
+import { getStaticCategoryColorStyle } from '@/lib/colors';
 import { GRAPH_LINKS } from './demoData';
 import { prefersReducedMotion } from './hooks';
 
@@ -21,8 +21,8 @@ import { prefersReducedMotion } from './hooks';
  *     relations), the same path a fresh real library uses.
  *   `tick` (lib/graphPhysics.ts)          — the real force simulation, with
  *     the same constants, cooling to the same rest.
- *   `getCategoryColorStyle` (lib/colors)  — the real category → color hash, so
- *     "Travel" here is the same hue "Travel" is in the app.
+ *   `getStaticCategoryColorStyle` (lib/colors)  — the app's palette via the
+ *     category → color hash (the app assigns per library, so hues can differ).
  *
  * The draw pass below is a faithful port of `KnowledgeGraph`'s canvas language
  * — weight-driven edge alpha/width, the offset radial gradient that lights each
@@ -147,7 +147,7 @@ export default function LandingGraph({ className = '' }: { className?: string })
 
             // Nodes: category color, lit from the top-left, hairline ring.
             for (const n of nodes) {
-                const color = getCategoryColorStyle(n.category).color;
+                const color = getStaticCategoryColorStyle(n.category).color;
                 const r = rOf(n.r);
                 const body = ctx.createRadialGradient(
                     n.x - r * 0.35, n.y - r * 0.35, r * 0.15,

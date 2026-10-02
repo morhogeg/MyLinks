@@ -1,16 +1,18 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
-import { CalendarCheck, ChevronRight, ChevronDown, Bell, CheckCircle2, Circle, GalleryHorizontalEnd } from 'lucide-react';
+import { CalendarCheck, ChevronRight, ChevronDown, Bell, Check, CheckCircle2, CircleSlash, GalleryHorizontalEnd } from 'lucide-react';
 import { CitationGlyph } from '@/components/ui/Wordmark';
 import type { CuratedDigest, WeeklySynthesis, DigestCardRef, UserNote, Link } from '@/lib/types';
 import { track } from '@/lib/analytics';
 import { digestDisplayTitle, digestKindLabel } from '@/lib/digest';
 import { synthesisWeekLabel } from '@/lib/synthesis';
 import { cardThumbnailUrl } from '@/lib/cardThumbnail';
-import { getActionableTakeaway } from '@/lib/takeaway';
+import { getActionableTakeaway, isTakeawayDone } from '@/lib/takeaway';
 import { getDirection } from '@/lib/rtl';
+import { getCategoryColorStyle } from '@/lib/colors';
+import { hapticLight } from '@/lib/haptics';
 import DigestCard, { ResurfacedCardRow } from './DigestCard';
 import SynthesisCard from './SynthesisCard';
 
@@ -124,6 +126,13 @@ interface Props {
     onOpenTakeawayCard?: (link: Link) => void;
     /** Tick the takeaway off: it leaves this list and stays on its card. */
     onCompleteTakeaway?: (link: Link) => void;
+    /** "Not for me" (swipe left): leaves this list without counting as done. */
+    onDismissTakeaway?: (link: Link) => void;
+    /** Done and "Not for me" takeaways, most recently closed first
+     *  (lib/takeaway closedTakeaways): the collapsed Done list. */
+    closedTakeawayCards?: Link[];
+    /** Put a closed takeaway back on the open list. */
+    onReopenTakeaway?: (link: Link) => void;
 }
 
 /**
@@ -142,7 +151,8 @@ export default function DigestView({
     onOpenDigestSettings, onDeleteDigest, onOpenDigest,
     reminderCards = [], onOpenReminderCard, onEditReminder, onCompleteReminder,
     reviewDigest = null, reviewLeft = 0, onStartReview,
-    takeawayCards = [], onOpenTakeawayCard, onCompleteTakeaway,
+    takeawayCards = [], onOpenTakeawayCard, onCompleteTakeaway, onDismissTakeaway,
+    closedTakeawayCards = [], onReopenTakeaway,
 }: Props) {
     // The Revisit tab mounts only when the user opens it (Feed swaps it in),
     // so a mount is a genuine "digest opened" view. Fired once per mount (the
@@ -169,6 +179,24 @@ export default function DigestView({
     // through); one tap unfolds the rest.
     const [showAllTakeaways, setShowAllTakeaways] = useState(false);
     const TAKEAWAYS_FOLDED = 5;
+    // The Done list starts closed (it is a look back, not the task at hand)
+    // and shows the most recent few until asked for the rest.
+    const [showDone, setShowDone] = useState(false);
+    const [showAllDone, setShowAllDone] = useState(false);
+    const DONE_FOLDED = 10;
+    const hasTakeaways = takeawayCards.length > 0 || closedTakeawayCards.length > 0;
+    // A one-line hint teaches the swipe until the user has used it once
+    // (touch only; pointer devices get the hover button instead).
+    const [swipeLearned, setSwipeLearned] = useState(() => {
+        try { return localStorage.getItem(SWIPE_HINT_KEY) === '1'; } catch { return false; }
+    });
+    const dismissTakeaway = (l: Link) => {
+        if (!swipeLearned) {
+            setSwipeLearned(true);
+            try { localStorage.setItem(SWIPE_HINT_KEY, '1'); } catch { /* private mode: hint just shows again */ }
+        }
+        onDismissTakeaway?.(l);
+    };
 
     // Desktop sidebar selection. A digest id or `synthesis:<weekId>`; resolved
     // against the live lists below, so a deleted entry falls back on its own.
@@ -199,7 +227,7 @@ export default function DigestView({
     const reviewWhen = reviewDigest ? digestDisplayTitle(reviewDigest, { relative: true }) : '';
 
     const isEmpty = digests.length === 0 && syntheses.length === 0 && dueToday.length === 0
-        && takeawayCards.length === 0 && !showReview;
+        && !hasTakeaways && !showReview;
     if (isEmpty) {
         return (
             <div className="max-w-3xl mx-auto">
@@ -246,7 +274,7 @@ export default function DigestView({
         : null;
     const activeDigest = digests.find((d) => d.id === activeId) ?? null;
 
-    const todayTop = (dueToday.length > 0 || takeawayCards.length > 0 || thisWeek || showReview) ? (
+    const todayTop = (dueToday.length > 0 || hasTakeaways || thisWeek || showReview) ? (
         <div className="flex flex-col gap-4">
             {/* First: it's the one thing here with an end. */}
             {showReview && (
@@ -317,32 +345,48 @@ export default function DigestView({
                 </div>
             )}
 
-            {takeawayCards.length > 0 && (
+            {hasTakeaways && (
                 <div className="flex flex-col gap-1.5">
                     <SectionHeader
                         label="Do this"
-                        count={takeawayCards.length}
+                        count={takeawayCards.length || undefined}
                         open={isOpen(DO_KEY)}
                         onToggle={() => toggle(DO_KEY)}
                     />
                     {/* A to-do list, not a card list (owner QA on 1322: the card
-                        rows were too busy). One grouped container, a blank circle
-                        to tick, the task on two lines at most, and the card title
-                        as one muted line under it. No byline, chip or thumbnail:
-                        tapping the row opens the card, which has all of that. */}
+                        rows were too busy). One grouped container, a circle to
+                        tick, the whole task, and the card title with its category
+                        dot as one muted line under it. No byline, chip or
+                        thumbnail: tapping the row opens the card, which has all
+                        of that. See TakeawayRow for the tick and the swipe. */}
                     {isOpen(DO_KEY) && (
                         <>
-                            <div className="rounded-2xl border border-border-subtle bg-card divide-y divide-border-subtle overflow-hidden">
-                                {(showAllTakeaways ? takeawayCards : takeawayCards.slice(0, TAKEAWAYS_FOLDED)).map((l) => (
+                            {takeawayCards.length === 0 && (
+                                <p className="px-1 py-1 text-[13px] text-text-muted">
+                                    All done. New tasks arrive with your saves.
+                                </p>
+                            )}
+                            {takeawayCards.length > 0 && (
+                            <div className="rounded-2xl border border-border-subtle bg-card overflow-hidden">
+                                {(showAllTakeaways ? takeawayCards : takeawayCards.slice(0, TAKEAWAYS_FOLDED)).map((l, i) => (
                                     <TakeawayRow
                                         key={l.id}
+                                        index={i}
                                         task={getActionableTakeaway(l)}
                                         cardTitle={l.title}
+                                        color={getCategoryColorStyle(l.category || '').color}
                                         onOpen={() => onOpenTakeawayCard?.(l)}
                                         onDone={onCompleteTakeaway ? () => onCompleteTakeaway(l) : undefined}
+                                        onDismiss={onDismissTakeaway ? () => dismissTakeaway(l) : undefined}
                                     />
                                 ))}
                             </div>
+                            )}
+                            {onDismissTakeaway && !swipeLearned && takeawayCards.length > 0 && (
+                                <p className="px-1 text-[12px] text-text-muted [@media(hover:hover)]:hidden">
+                                    Swipe left on a task that isn’t for you.
+                                </p>
+                            )}
                             {takeawayCards.length > TAKEAWAYS_FOLDED && (
                                 <button
                                     onClick={() => setShowAllTakeaways((v) => !v)}
@@ -350,6 +394,50 @@ export default function DigestView({
                                 >
                                     {showAllTakeaways ? 'Show fewer' : `Show all ${takeawayCards.length}`}
                                 </button>
+                            )}
+                            {/* The look back (owner ask on 1344): what was done,
+                                and what was set aside as "Not for me", so a
+                                mistaken swipe can be found after its toast is
+                                gone. Collapsed by default; either can go back. */}
+                            {closedTakeawayCards.length > 0 && (
+                                <>
+                                    <button
+                                        onClick={() => setShowDone((v) => !v)}
+                                        aria-expanded={showDone}
+                                        className="self-start flex items-center gap-1 px-1 py-1 text-[12px] font-semibold text-text-muted [@media(hover:hover)]:hover:text-text-secondary active:opacity-60 transition-colors cursor-pointer"
+                                    >
+                                        <ChevronDown
+                                            className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${showDone ? '' : '-rotate-90 rtl:rotate-90'}`}
+                                            style={{ transitionTimingFunction: 'var(--ease-modal)' }}
+                                        />
+                                        Done
+                                        <span className="tabular-nums opacity-70">{closedTakeawayCards.length}</span>
+                                    </button>
+                                    {showDone && (
+                                        <div className="rounded-2xl border border-border-subtle bg-card overflow-hidden animate-fade-in">
+                                            {(showAllDone ? closedTakeawayCards : closedTakeawayCards.slice(0, DONE_FOLDED)).map((l, i) => (
+                                                <ClosedTakeawayRow
+                                                    key={l.id}
+                                                    index={i}
+                                                    task={getActionableTakeaway(l)}
+                                                    cardTitle={l.title}
+                                                    color={getCategoryColorStyle(l.category || '').color}
+                                                    dismissed={!isTakeawayDone(l)}
+                                                    onOpen={() => onOpenTakeawayCard?.(l)}
+                                                    onReopen={onReopenTakeaway ? () => onReopenTakeaway(l) : undefined}
+                                                />
+                                            ))}
+                                        </div>
+                                    )}
+                                    {showDone && closedTakeawayCards.length > DONE_FOLDED && (
+                                        <button
+                                            onClick={() => setShowAllDone((v) => !v)}
+                                            className="self-start px-1 py-1 text-[12px] font-semibold text-text-muted hover:text-accent transition-colors cursor-pointer"
+                                        >
+                                            {showAllDone ? 'Show fewer' : `Show all ${closedTakeawayCards.length}`}
+                                        </button>
+                                    )}
+                                </>
                             )}
                         </>
                     )}
@@ -501,43 +589,294 @@ export default function DigestView({
 /** A collapsible group header — same typographic weight as the plain date
  *  headers next to it, so the submenu reads as part of the same list rather
  *  than as a control bolted on top. */
+/** How far a row must travel left (share of its width) to count as
+ *  "Not for me" when released. */
+const DISMISS_FRACTION = 0.35;
+const SWIPE_HINT_KEY = 'machina.takeawaySwipeLearned';
+/** The tick reads as done (filled circle, struck task) for this long before
+ *  the row folds away, so the user sees what they did. */
+const CHECK_HOLD_MS = 650;
+/** The fold itself: the row's height eases to zero. */
+const COLLAPSE_MS = 280;
+
 /**
- * One line of Revisit's "Do this" list. The circle is the SAME blank circle the
- * card detail uses for "not yet" (18px, half opacity), so an open task never
- * looks ticked; ticking it removes the row. The text block follows the task's
- * own direction while the circle keeps one column on the left, so a mixed
- * Hebrew/English list still reads as one list.
+ * One task in Revisit's "Do this" list, Reminders-style.
+ *
+ * - The task is shown whole: it IS the content. A clamp at two lines cut
+ *   every instruction mid-sentence (owner QA on 1343), and four still cut
+ *   older long tasks (1344); new saves are capped at 20 words upstream.
+ * - The circle is a real checkbox. Ticking fills it, strikes the task, holds a
+ *   beat, then folds the row away and THEN writes (Feed's toast carries Undo).
+ *   Leaving the screen mid-animation flushes the write instead of losing it.
+ * - Swiping the row left past a third of its width is "Not for me": the task
+ *   leaves the list without counting as done. Pointer devices also get a
+ *   hover button for the same action; screen readers get it as a plain button.
+ * - The card line carries the card's category dot, so tasks from the same
+ *   area read as related at a glance.
+ * The circle keeps one column on the left whatever the task's language, so a
+ * mixed Hebrew/English list reads as one list, and the swipe is always left.
  */
-function TakeawayRow({ task, cardTitle, onOpen, onDone }: {
+function TakeawayRow({ task, cardTitle, color, index, onOpen, onDone, onDismiss }: {
     task: string;
     cardTitle: string;
+    /** The source card's category color (the app-wide category dot). */
+    color: string;
+    /** Position in the list, for the staggered entrance. */
+    index: number;
     onOpen: () => void;
     onDone?: () => void;
+    onDismiss?: () => void;
+}) {
+    const dir = getDirection(task);
+    const isRtl = dir === 'rtl';
+    const [phase, setPhase] = useState<'idle' | 'checked' | 'leaving'>('idle');
+    const [dx, setDx] = useState(0);
+    const [dragging, setDragging] = useState(false);
+    const [armed, setArmed] = useState(false);
+    const rowRef = useRef<HTMLDivElement>(null);
+    const timers = useRef<number[]>([]);
+    // The write this row still owes (done / dismiss), if its animation hasn't
+    // finished. Flushed on unmount so navigating away never drops a tick.
+    const pending = useRef<(() => void) | null>(null);
+    const drag = useRef<{ id: number; x: number; y: number; axis: 'h' | 'v' | null; armed: boolean } | null>(null);
+    const suppressClick = useRef(false);
+
+    useEffect(() => () => {
+        timers.current.forEach((t) => window.clearTimeout(t));
+        const owed = pending.current;
+        pending.current = null;
+        owed?.();
+    }, []);
+
+    const later = (fn: () => void, ms: number) => {
+        timers.current.push(window.setTimeout(fn, ms));
+    };
+    // Fold the row, then write. On success the card leaves the list and this
+    // row unmounts; if it is somehow still here a moment later (a failed
+    // write), it comes back instead of sitting at zero height.
+    const leave = (write: () => void) => {
+        pending.current = write;
+        setPhase('leaving');
+        later(() => {
+            pending.current = null;
+            write();
+            later(() => { setPhase('idle'); setDx(0); }, 1500);
+        }, COLLAPSE_MS);
+    };
+
+    const tick = () => {
+        if (!onDone || phase !== 'idle') return;
+        hapticLight();
+        setPhase('checked');
+        pending.current = onDone;
+        later(() => leave(onDone), CHECK_HOLD_MS);
+    };
+    const dismiss = () => {
+        if (!onDismiss || phase !== 'idle') return;
+        hapticLight();
+        leave(onDismiss);
+    };
+
+    const onPointerDown = (e: React.PointerEvent) => {
+        if (!onDismiss || phase !== 'idle' || !e.isPrimary || e.button !== 0) return;
+        drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, axis: null, armed: false };
+    };
+    const onPointerMove = (e: React.PointerEvent) => {
+        const d = drag.current;
+        if (!d || d.id !== e.pointerId) return;
+        const mx = e.clientX - d.x;
+        const my = e.clientY - d.y;
+        if (d.axis === null) {
+            if (Math.abs(mx) < 8 && Math.abs(my) < 8) return;
+            // Only a leftward, mostly-horizontal drag is ours: vertical is the
+            // page scroll, rightward is the app's edge swipe back.
+            d.axis = Math.abs(mx) > Math.abs(my) && mx < 0 ? 'h' : 'v';
+            if (d.axis === 'h') {
+                rowRef.current?.setPointerCapture(e.pointerId);
+                setDragging(true);
+            }
+        }
+        if (d.axis !== 'h') return;
+        const next = Math.min(0, mx);
+        setDx(next);
+        const width = rowRef.current?.offsetWidth ?? 1;
+        const armed = -next > width * DISMISS_FRACTION;
+        if (armed !== d.armed) {
+            d.armed = armed;
+            setArmed(armed);
+            if (armed) hapticLight();
+        }
+    };
+    const onPointerEnd = (e: React.PointerEvent) => {
+        const d = drag.current;
+        if (!d || d.id !== e.pointerId) return;
+        drag.current = null;
+        if (d.axis !== 'h') return;
+        suppressClick.current = true;
+        setDragging(false);
+        setArmed(false);
+        if (d.armed && e.type === 'pointerup') {
+            setDx(-(rowRef.current?.offsetWidth ?? 400));
+            const write = onDismiss!;
+            pending.current = write;
+            later(() => leave(write), 180);
+        } else {
+            setDx(0);
+        }
+    };
+
+    const checked = phase !== 'idle';
+    return (
+        <div
+            className="grid motion-safe:transition-[grid-template-rows,opacity] animate-card-enter"
+            style={{
+                gridTemplateRows: phase === 'leaving' ? '0fr' : '1fr',
+                opacity: phase === 'leaving' ? 0 : 1,
+                transitionDuration: `${COLLAPSE_MS}ms`,
+                transitionTimingFunction: 'var(--ease-modal)',
+                ['--enter-delay' as string]: `${Math.min(index, 8) * 35}ms`,
+            }}
+        >
+            {/* The divider lives on the row, not the list (divide-y): each row
+                is its own layer for the swipe, and a layered row painted over
+                the hairline above it. */}
+            <div className={`relative min-h-0 overflow-hidden ${index > 0 ? 'border-t border-border-subtle' : ''}`}>
+                {/* What a left swipe reveals. Neutral, not red: this is "not
+                    for me", not a delete; the card itself is untouched. */}
+                {onDismiss && dx < 0 && (
+                    <div
+                        aria-hidden="true"
+                        className={`absolute inset-0 flex items-center justify-end gap-1.5 pe-5 text-[13px] font-semibold transition-colors ${armed ? 'bg-fill-strong text-text' : 'bg-fill-subtle text-text-muted'}`}
+                    >
+                        <CircleSlash className="w-4 h-4" />
+                        Not for me
+                    </div>
+                )}
+                <div
+                    ref={rowRef}
+                    onPointerDown={onPointerDown}
+                    onPointerMove={onPointerMove}
+                    onPointerUp={onPointerEnd}
+                    onPointerCancel={onPointerEnd}
+                    onClickCapture={(e) => {
+                        if (suppressClick.current) {
+                            suppressClick.current = false;
+                            e.preventDefault();
+                            e.stopPropagation();
+                        }
+                    }}
+                    className="group relative flex items-start gap-1 ps-1.5 pe-3 bg-card touch-pan-y select-none"
+                    style={{
+                        transform: dx ? `translateX(${dx}px)` : undefined,
+                        transition: dragging ? 'none' : 'transform 220ms var(--ease-modal)',
+                    }}
+                >
+                    {onDone && (
+                        <button
+                            onClick={tick}
+                            role="checkbox"
+                            aria-checked={checked}
+                            aria-label={`Mark “${task}” as done`}
+                            title="Mark as done"
+                            className="w-11 h-12 shrink-0 flex items-center justify-center cursor-pointer"
+                        >
+                            <span
+                                className={`w-[22px] h-[22px] rounded-full flex items-center justify-center border-[1.5px] transition-all duration-200 ${checked
+                                    ? 'bg-accent border-accent scale-100'
+                                    : 'border-text-muted/60 [@media(hover:hover)]:hover:border-accent active:scale-90'}`}
+                                style={{ transitionTimingFunction: 'var(--ease-spring)' }}
+                            >
+                                {checked && <Check className="w-3.5 h-3.5 text-accent-ink animate-scale-up" strokeWidth={3} />}
+                            </span>
+                        </button>
+                    )}
+                    <button
+                        onClick={onOpen}
+                        dir={dir}
+                        disabled={checked}
+                        className="min-w-0 flex-1 py-3 text-start cursor-pointer active:opacity-60 transition-opacity"
+                    >
+                        <div
+                            className={`text-[14.5px] font-medium leading-snug transition-colors duration-200 ${checked
+                                ? 'text-text-muted line-through decoration-text-muted/60'
+                                : 'text-text [@media(hover:hover)]:group-hover:text-accent'} ${isRtl ? 'font-hebrew' : ''}`}
+                        >
+                            {task}
+                        </div>
+                        {cardTitle && (
+                            <div className="mt-1 flex items-center gap-1.5 min-w-0 text-[12px] text-text-muted">
+                                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                                <span dir="auto" className="truncate">{cardTitle}</span>
+                            </div>
+                        )}
+                    </button>
+                    {onDismiss && (
+                        // Pointer devices get the swipe's action as a hover
+                        // button; touch screen readers still reach it (sr-only).
+                        <button
+                            onClick={dismiss}
+                            aria-label={`Not for me: remove “${task}” from Do this`}
+                            title="Not for me"
+                            className="sr-only [@media(hover:hover)]:not-sr-only [@media(hover:hover)]:self-center [@media(hover:hover)]:w-8 [@media(hover:hover)]:h-8 [@media(hover:hover)]:shrink-0 [@media(hover:hover)]:flex [@media(hover:hover)]:items-center [@media(hover:hover)]:justify-center [@media(hover:hover)]:rounded-lg [@media(hover:hover)]:text-text-muted [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:hover:text-text [@media(hover:hover)]:hover:bg-fill-subtle focus-visible:opacity-100 transition-opacity cursor-pointer"
+                        >
+                            <CircleSlash className="w-4 h-4" />
+                        </button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/**
+ * A row in the Done list: a closed task, muted. Done tasks keep the filled
+ * check and the strike; "Not for me" tasks show the slash and say so on the
+ * card line. Tapping the mark puts the task back on the open list; tapping
+ * the text opens the card, as in the open list.
+ */
+function ClosedTakeawayRow({ task, cardTitle, color, dismissed, index, onOpen, onReopen }: {
+    task: string;
+    cardTitle: string;
+    color: string;
+    dismissed: boolean;
+    index: number;
+    onOpen: () => void;
+    onReopen?: () => void;
 }) {
     const dir = getDirection(task);
     const isRtl = dir === 'rtl';
     return (
-        <div className="flex items-start gap-1 ps-1.5 pe-3.5">
-            {onDone && (
+        <div className={`flex items-start gap-1 ps-1.5 pe-3 ${index > 0 ? 'border-t border-border-subtle' : ''}`}>
+            {onReopen && (
                 <button
-                    onClick={onDone}
-                    aria-label="Mark as done"
-                    title="Mark as done"
-                    className="w-10 h-11 shrink-0 flex items-center justify-center text-text-muted hover:text-accent transition-colors cursor-pointer"
+                    onClick={() => { hapticLight(); onReopen(); }}
+                    aria-label={`Move “${task}” back to Do this`}
+                    title="Move back to Do this"
+                    className="w-11 h-12 shrink-0 flex items-center justify-center cursor-pointer active:scale-90 transition-transform"
                 >
-                    <Circle className="w-[18px] h-[18px] opacity-50" />
+                    {dismissed ? (
+                        <CircleSlash className="w-[22px] h-[22px] text-text-muted" strokeWidth={1.5} />
+                    ) : (
+                        <span className="w-[22px] h-[22px] rounded-full flex items-center justify-center bg-accent/70 border-[1.5px] border-transparent">
+                            <Check className="w-3.5 h-3.5 text-accent-ink" strokeWidth={3} />
+                        </span>
+                    )}
                 </button>
             )}
             <button
                 onClick={onOpen}
                 dir={dir}
-                className="group min-w-0 flex-1 py-3 text-start cursor-pointer"
+                className="min-w-0 flex-1 py-3 text-start cursor-pointer active:opacity-60 transition-opacity"
             >
-                <div className={`text-[14px] font-medium leading-snug text-text group-hover:text-accent transition-colors line-clamp-2 ${isRtl ? 'font-hebrew' : ''}`}>
+                <div className={`text-[14.5px] font-medium leading-snug text-text-muted ${dismissed ? '' : 'line-through decoration-text-muted/60'} ${isRtl ? 'font-hebrew' : ''}`}>
                     {task}
                 </div>
                 {cardTitle && (
-                    <div className="mt-0.5 text-[12px] text-text-muted truncate">{cardTitle}</div>
+                    <div className="mt-1 flex items-center gap-1.5 min-w-0 text-[12px] text-text-muted">
+                        <span className="w-1.5 h-1.5 rounded-full shrink-0 opacity-70" style={{ backgroundColor: color }} />
+                        <span dir="auto" className="truncate">{cardTitle}</span>
+                        {dismissed && <span className="shrink-0">· Not for me</span>}
+                    </div>
                 )}
             </button>
         </div>

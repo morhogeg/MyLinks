@@ -75,16 +75,113 @@ export function getColorStyleByKey(key?: string): CategoryColorStyle {
     return getCategoryColorStyle(key || '');
 }
 
-/**
- * Generate consistent inline styles for a category
- */
-export function getCategoryColorStyle(category: string): CategoryColorStyle {
+/** The old name-hash rule: a category's color slot from its spelling alone.
+ *  Different categories often land on the same slot (owner QA 2026-10-01:
+ *  Tech/Health both orange, Career/Travel both red), so the app only uses it
+ *  for static demo content and once the palette is exhausted. */
+function hashSlot(category: string): number {
     let hash = 0;
     for (let i = 0; i < category.length; i++) {
         hash = category.charCodeAt(i) + ((hash << 5) - hash);
     }
+    return Math.abs(hash) % colorKeys.length;
+}
 
-    const index = Math.abs(hash) % colorKeys.length;
-    const colorKey = colorKeys[index];
-    return categoryColorStyles[colorKey];
+/**
+ * Hash-only style: the same color on every device, whatever the user's
+ * library holds. For static demo content (landing page, onboarding mocks),
+ * which must render identically on the server and for a signed-out visitor.
+ */
+export function getStaticCategoryColorStyle(category: string): CategoryColorStyle {
+    return categoryColorStyles[colorKeys[hashSlot(category)]];
+}
+
+// ── Per-library assignment (G2c) ───────────────────────────────────────────
+// Each of the user's categories gets its OWN palette slot: the first time a
+// category is seen it takes the next free slot in SPREAD order (neighbouring
+// picks are far apart in hue, so two categories never read as one, the way
+// blue next to indigo did); most-used categories pick first; graphite only
+// once every chromatic slot is taken, and past the palette's size categories
+// share by hash again. Once assigned, a
+// category keeps its color (stored per device), so saving a new card never
+// recolors the library. Keys are case-insensitive, like the graph's merge.
+const STORE_KEY = 'machina.categoryColors.v1';
+const GRAPHITE = 'purple';
+const SPREAD = ['blue', 'orange', 'green', 'pink', 'yellow', 'teal', 'red', 'indigo', 'cyan'];
+let assigned: Record<string, string> | null = null;
+
+function loadAssigned(): Record<string, string> | null {
+    if (assigned) return assigned;
+    if (typeof window === 'undefined') return null; // server: never cache shared state
+    assigned = {};
+    try {
+        const raw = window.localStorage.getItem(STORE_KEY);
+        const parsed = raw ? JSON.parse(raw) : null;
+        if (parsed && typeof parsed === 'object') {
+            for (const [k, v] of Object.entries(parsed)) {
+                if (typeof v === 'string' && categoryColorStyles[v]) assigned[k] = v;
+            }
+        }
+    } catch { /* storage blocked or corrupt: start fresh */ }
+    return assigned;
+}
+
+/**
+ * Pure assignment step (exported for tests): give every category in `names`
+ * (duplicates allowed; they weigh the order) a distinct slot, keeping the
+ * slots in `previous` wherever they don't collide. Returns the new map.
+ */
+export function assignSlots(names: readonly string[], previous: Record<string, string>): Record<string, string> {
+    const counts = new Map<string, number>();
+    for (const n of names) {
+        const k = n.trim().toLowerCase();
+        if (k) counts.set(k, (counts.get(k) ?? 0) + 1);
+    }
+    // Most-used first: if anything has to give way, it is a rare category.
+    const order = [...counts.keys()].sort((a, b) => (counts.get(b)! - counts.get(a)!) || a.localeCompare(b));
+    const next: Record<string, string> = { ...previous };
+    const taken = new Set<string>();
+    const fresh: string[] = [];
+    for (const k of order) {
+        const slot = previous[k];
+        if (slot && !taken.has(slot)) taken.add(slot);
+        else fresh.push(k);
+    }
+    for (const k of fresh) {
+        let slot = SPREAD.find((c) => !taken.has(c));
+        if (!slot && !taken.has(GRAPHITE)) slot = GRAPHITE;
+        if (slot) {
+            next[k] = slot;
+            taken.add(slot);
+        } else {
+            delete next[k]; // palette exhausted: share by hash
+        }
+    }
+    return next;
+}
+
+/**
+ * Register the library's categories (call with every card's category; Feed
+ * does it during render, before its children paint). Cheap when nothing new
+ * appeared; persists only when the map changed.
+ */
+export function assignCategoryColors(categories: readonly string[]): void {
+    const current = loadAssigned();
+    if (!current) return;
+    const next = assignSlots(categories, current);
+    const changed = Object.keys(next).length !== Object.keys(current).length
+        || Object.entries(next).some(([k, v]) => current[k] !== v);
+    if (!changed) return;
+    assigned = next;
+    try { window.localStorage.setItem(STORE_KEY, JSON.stringify(next)); } catch { /* in-memory only */ }
+}
+
+/**
+ * Inline styles for a category: its assigned slot in this library, else the
+ * name hash.
+ */
+export function getCategoryColorStyle(category: string): CategoryColorStyle {
+    const slot = loadAssigned()?.[category.trim().toLowerCase()];
+    if (slot) return categoryColorStyles[slot];
+    return getStaticCategoryColorStyle(category);
 }
