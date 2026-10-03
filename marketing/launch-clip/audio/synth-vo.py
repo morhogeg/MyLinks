@@ -228,7 +228,8 @@ def main():
         import gemini_tts
 
         def speak(line):
-            return gemini_tts.synth(gemini_tts.performed(line.get("tts") or line["text"]), style=gemini_tts.direct(line.get("style")))
+            samples, sr = gemini_tts.synth(gemini_tts.performed(line.get("tts") or line["text"]), style=gemini_tts.direct(line.get("style")))
+            return gemini_tts.cap_pauses(samples, sr), sr
     else:
         from kokoro_onnx import Kokoro
 

@@ -25,6 +25,7 @@ import base64
 import hashlib
 import json
 import os
+import sys
 import time
 import urllib.error
 import urllib.request
@@ -105,9 +106,11 @@ def _request(text, voice, style):
             if e.code in (429, 500, 503) and attempt < 3:
                 time.sleep(2 ** (attempt + 1))
                 continue
-            raise SystemExit(f"Gemini TTS {e.code}: {detail}")
+            print(f"Gemini TTS {e.code}: {detail}", file=sys.stderr)
+            sys.exit(3)
         except urllib.error.URLError as e:
-            raise SystemExit(f"Gemini TTS unreachable ({e.reason}): allow generativelanguage.googleapis.com in the environment's network access")
+            print(f"Gemini TTS unreachable ({e.reason}): allow generativelanguage.googleapis.com in the environment's network access", file=sys.stderr)
+            sys.exit(3)
     parts = data["candidates"][0]["content"]["parts"]
     pcm = b"".join(base64.b64decode(p["inlineData"]["data"]) for p in parts if "inlineData" in p)
     return np.frombuffer(pcm, dtype="<i2").astype(np.float32) / 32768
@@ -124,6 +127,39 @@ def _trim(samples, sr, keep=0.03):
     return samples[a:b]
 
 
+def cap_pauses(samples, sr, longest=0.34, fade=0.01):
+    """Shorten every pause INSIDE a line to at most `longest` seconds. Gemini,
+    asked to act, takes long dramatic beats (a 1.4s pause inside the opening);
+    the beat survives at a third of a second, the dead air goes. Vocal sounds
+    (a sigh, a chuckle) are not silence and stay. Lead-in and tail untouched."""
+    hop = int(sr * 0.01)
+    n = len(samples) // hop
+    rms = np.array([np.sqrt(np.mean(samples[i * hop:(i + 1) * hop] ** 2)) for i in range(n)])
+    quiet = rms <= rms.max() * 0.02
+    out, pos, i = [], 0, 0
+    while i < n:
+        if quiet[i]:
+            j = i
+            while j < n and quiet[j]:
+                j += 1
+            inner = i > 0 and j < n
+            extra = (j - i) * hop - int(longest * sr)
+            if inner and extra > 0:
+                mid = (i + j) * hop // 2
+                x0, x1 = mid - extra // 2, mid - extra // 2 + extra
+                k = int(fade * sr)
+                head, tail = samples[pos:x0].copy(), samples[x1:x1 + k]
+                ramp = np.linspace(0, 1, len(tail))
+                head[-len(tail):] = head[-len(tail):] * (1 - ramp) + tail * ramp
+                out.append(head)
+                pos = x1 + len(tail)
+            i = j
+        else:
+            i += 1
+    out.append(samples[pos:])
+    return np.concatenate(out)
+
+
 def synth(text, cache_dir=TAKES, voice=None, style=None):
     """(samples, sample_rate) for one line: the committed take when there is
     one, else a new one from the API (kept for next time)."""
@@ -133,10 +169,12 @@ def synth(text, cache_dir=TAKES, voice=None, style=None):
         samples, sr = sf.read(path, dtype="float32")
         return samples, sr
     if not os.environ.get("GEMINI_API_KEY"):
-        raise SystemExit(
+        print(
             f"no take for {voice!r}: {text[:60]!r}… — voice it on GitHub "
-            "(audio/narration-request.json + push), or set GEMINI_API_KEY"
+            "(audio/narration-request.json + push), or set GEMINI_API_KEY",
+            file=sys.stderr,
         )
+        sys.exit(3)
     os.makedirs(cache_dir, exist_ok=True)
     samples = _trim(_request(text, voice, style), SR)
     sf.write(path, samples, SR, subtype="PCM_16")

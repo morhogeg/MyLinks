@@ -29,8 +29,8 @@ for script in req.get("scripts", []):
         if v.get("name_note"):
             env["GEMINI_NAME_NOTE"] = "1"
         # synth-vo exits 1 when a line overruns its caption window: the takes
-        # are still kept (the picture is re-timed to them afterwards), so only
-        # a crash counts as a failure here
+        # are still kept (the picture is re-timed to them afterwards); a failed
+        # request exits 3 (gemini_tts), and anything but 0 or 1 is a failure
         r = subprocess.run([sys.executable, os.path.join(HERE, "synth-vo.py"), script], env=env)
         ok = ok and r.returncode in (0, 1)
 sys.exit(0 if ok else 1)
