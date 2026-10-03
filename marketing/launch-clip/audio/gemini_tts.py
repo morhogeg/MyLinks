@@ -168,6 +168,33 @@ def cap_pauses(samples, sr, longest=0.34, fade=0.01):
     return np.concatenate(out)
 
 
+def gate(samples, sr, below=30.0, depth=40.0, look=0.01, release=0.025):
+    """A smooth noise gate: Gemini's audio is not silent between words (a
+    hiss floor around -52 to -64 dB) and the mix lifts it into audible static
+    in every pause. Where the 5ms level is more than `below` dB under the
+    line's loudest, fade it down by `depth` dB; open `look` seconds early (the
+    level is read over a window) so no word onset is clipped, close over
+    `release` seconds."""
+    hop = int(sr * 0.005)
+    n = -(-len(samples) // hop)  # every block, the last one partial (never empty)
+    rms = np.array([np.sqrt(np.mean(samples[i * hop:(i + 1) * hop] ** 2) + 1e-12) for i in range(n)])
+    db = 20 * np.log10(rms)
+    open_ = db > db.max() - below
+    w = max(1, int(look / 0.005))
+    open_ = np.convolve(open_.astype(float), np.ones(2 * w + 1), "same") > 0  # look both ways
+    floor = 10 ** (-depth / 20)
+    g = np.where(open_, 1.0, floor)
+    # smooth: instant-ish attack (already early), slow release
+    out_g = np.empty_like(g)
+    k = np.exp(-0.005 / release)
+    cur = 1.0
+    for i, t in enumerate(g):
+        cur = t if t > cur else k * cur + (1 - k) * t
+        out_g[i] = cur
+    gain = np.repeat(out_g, hop)[: len(samples)]
+    return samples * gain
+
+
 def to_the_words(samples, sr, before=0.06, after=0.12, fade=0.02):
     """Trim a line to its words: Gemini opens each take with a click and a
     breath in (about 0.4s before "Okay"), and often breathes out after the

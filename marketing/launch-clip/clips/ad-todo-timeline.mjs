@@ -131,21 +131,24 @@ const line = (at, to, say, chunks, extra = {}) => ({
  * words.
  */
 const act = (style, tts) => (tts ? { style, tts } : { style });
+/** the problem (owner: "a bit too slow… punchier, move a bit quicker"):
+ *  brisk delivery, and its pauses capped tighter */
+const punchy = (style, tts) => ({ ...act(`Punchy and quick, moving briskly, no lingering: ${style}`, tts), maxPause: 0.2 });
 
 export const CAPTIONS = [
   line(8, 184, 'Okay, be honest. How many things did you save this month… and never open again?', [
     [3, 'How many things did you save\nthis month…'],
     [11, '…and never open again?'],
-  ], { hook: true, ...act('Leaning in with a knowing, playful smile, gently teasing a friend; a touch of mock guilt on "and never open again?"') }),
-  line(184, 256, 'That video you’d watch later.', [[0, 'That video you’d watch later.']], act('Wry and amused, naming the first familiar culprit, quick and light')),
-  line(256, 320, 'The post you loved.', [[0, 'The post you loved.']], act('Fond, a little wistful, still smiling')),
-  line(320, 392, 'That article.', [[0, 'That article.']], act('Deadpan, knowing; a tiny chuckle after it', 'That article. <chuckle>')),
-  line(392, 512, 'The screenshot you swore you’d remember.', [[0, 'The screenshot you swore'], [4, 'you’d remember.']], act('Playfully incredulous, smiling: we both know how that went')),
+  ], { hook: true, ...punchy('Leaning in with a knowing, playful smile, gently teasing a friend; a touch of mock guilt on "and never open again?"') }),
+  line(184, 256, 'That video you’d watch later.', [[0, 'That video you’d watch later.']], punchy('Wry and amused, naming the first familiar culprit, quick and light')),
+  line(256, 320, 'The post you loved.', [[0, 'The post you loved.']], punchy('Fond, a little wistful, still smiling')),
+  line(320, 392, 'That article.', [[0, 'That article.']], punchy('Deadpan, knowing; a tiny chuckle after it', 'That article. <chuckle>')),
+  line(392, 512, 'The screenshot you swore you’d remember.', [[0, 'The screenshot you swore'], [4, 'you’d remember.']], punchy('Playfully incredulous, smiling: we both know how that went')),
   line(512, 672, 'They’re all still out there, buried across a dozen different apps.', [
     [0, 'They’re all still out there,'],
     [5, 'buried across a dozen\ndifferent apps.'],
-  ], act('Sympathetic and a touch lower, with a soft sigh before "buried"', 'They’re all still out there, <sigh> buried across a dozen different apps.')),
-  line(672, 768, 'That’s exactly why we made Machina.', [[0, 'That’s exactly why\nwe made Machina.']], act('Turning bright: the reveal, warm and proud, the name landing with a smile')),
+  ], punchy('Sympathetic and a touch lower, with a soft sigh before "buried"', 'They’re all still out there, <sigh> buried across a dozen different apps.')),
+  line(672, 768, 'That’s exactly why we made Machina.', [[0, 'That’s exactly why\nwe made Machina.']], punchy('Turning bright: the reveal, warm and proud, the name landing with a smile')),
   line(768, 856, 'From any app, just share to Machina.', [[0, 'From any app,'], [3, 'just share to Machina.']], act('Easy and reassuring, like it is the simplest thing in the world')),
   line(856, 1008, 'Videos, posts, articles, screenshots… it all lands in one place.', [
     [0, 'Videos, posts, articles,\nscreenshots…'],
