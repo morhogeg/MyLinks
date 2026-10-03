@@ -121,21 +121,29 @@ export const TOTAL_SEC = TOTAL_FRAMES / FPS;
  * drawn (round 7). NO em dashes, no literal "AI",
  * no "second brain", no "library", no "talk".
  */
+// the narrator (round 9, owner 2026-10-03): Gemini TTS, Sulafat, the house
+// narrator. This ad's own tone: knowing, wry, relatable, then a satisfying
+// payoff; the reminder is the hero. `style` is each line's acting note, `pace`
+// replaces the house pace, `tempo`/`maxPause` tighten the four pain lines
+// (audio/gemini_tts.py). A take is keyed by its words AND its direction:
+// editing a note re-voices that line (on GitHub, narration-request.json).
+const PAIN = 'Punchy and quick, like a friend teasing you; short pauses, no lingering.';
+const EASY = 'Conversational and easy, about 165 words a minute; short natural pauses.';
 const LINES = [
-  { at: 8, to: 116, text: 'How many things did you\nsave this month | and never open again?', say: 'How many things did you save this month… and never open again?', poster: true },
-  { at: 116, to: 192, text: "The article you promised\nyourself you'd read", say: "The article you promised yourself you'd read…" },
-  { at: 192, to: 264, text: 'the thread you\nbookmarked at midnight', say: 'the thread you bookmarked at midnight…' },
-  { at: 264, to: 332, text: "the screenshot you\nswore you'd remember." },
+  { at: 8, to: 116, text: 'How many things did you\nsave this month | and never open again?', say: 'How many things did you save this month… and never open again?', poster: true, style: 'Knowing, teasing smile, leaning in; a beat of mock guilt on "and never open again?"', pace: PAIN, tempo: 1.1, maxPause: 0.2 },
+  { at: 116, to: 192, text: "The article you promised\nyourself you'd read", say: "The article you promised yourself you'd read…", style: 'Wry, trailing off knowingly, as if listing evidence.', pace: PAIN, tempo: 1.1, maxPause: 0.2 },
+  { at: 192, to: 264, text: 'the thread you\nbookmarked at midnight', say: 'the thread you bookmarked at midnight…', style: 'Amused, a little sheepish, late-night confession energy.', pace: PAIN, tempo: 1.1, maxPause: 0.2 },
+  { at: 264, to: 332, text: "the screenshot you\nswore you'd remember.", style: 'Playful disbelief, landing the list with a smile.', pace: PAIN, tempo: 1.1, maxPause: 0.2 },
   // (round 7, owner: said, not shown; the drawn MACHINA is the name on screen)
-  { at: 332, to: 401, text: "That's exactly why\nwe made Machina.", place: 'voice' },
-  { at: 401, to: 504, text: 'From any app, just\nshare it to Machina.', until: 'the last share lands in the mark' },
-  { at: 504, to: 672, text: "It reads what you save | and pulls out\nthe key points | so you'll always remember\nwhy you kept it.", say: "It reads what you save and pulls out the key points… so you'll always remember why you kept it.", until: 'the Key Points lift', duck: 0.45 },
-  { at: 672, to: 816, text: 'It links each save | to what you saved before | so you see how\nyour ideas connect.', say: 'It links each save to what you saved before… so you see how your ideas connect.', until: 'the graph opens on its ties', duck: 0.45 },
-  { at: 848, to: 1000, text: 'Then pick a time, | and Machina brings it back', say: 'Then pick a time, and Machina brings it back…', until: 'the reminder is set and confirmed' },
-  { at: 1016, to: 1088, text: 'so you actually\nget back to it.', kicker: 'Tomorrow', kickerChunk: 0, until: 'the Reminders due strip lifts' },
+  { at: 332, to: 401, text: "That's exactly why\nwe made Machina.", place: 'voice', style: 'The turn: bright, warm and proud; the name lands with a smile.', pace: EASY },
+  { at: 401, to: 504, text: 'From any app, just\nshare it to Machina.', until: 'the last share lands in the mark', style: 'Easy and effortless, like it is the simplest thing.', pace: EASY },
+  { at: 504, to: 672, text: "It reads what you save | and pulls out\nthe key points | so you'll always remember\nwhy you kept it.", say: "It reads what you save and pulls out the key points… so you'll always remember why you kept it.", until: 'the Key Points lift', duck: 0.45, style: "Clear and genuinely pleased; warm and reassuring on 'so you'll always remember why you kept it'.", pace: EASY },
+  { at: 672, to: 816, text: 'It links each save | to what you saved before | so you see how\nyour ideas connect.', say: 'It links each save to what you saved before… so you see how your ideas connect.', until: 'the graph opens on its ties', duck: 0.45, style: "A little wonder, opening up on 'how your ideas connect'.", pace: EASY },
+  { at: 848, to: 1000, text: 'Then pick a time, | and Machina brings it back', say: 'Then pick a time, and Machina brings it back…', until: 'the reminder is set and confirmed', style: "Anticipation, the reveal of the best part; a small lift on 'brings it back'.", pace: EASY },
+  { at: 1016, to: 1088, text: 'so you actually\nget back to it.', kicker: 'Tomorrow', kickerChunk: 0, until: 'the Reminders due strip lifts', style: "Satisfied and knowing, the payoff line; warm emphasis on 'actually'.", pace: EASY },
   // the close, on the lockup: the name (the drawn wordmark wipes in as it is
   // said), then the tagline, exactly as written (owner call 2026-09-28)
-  { at: HITS.markStrike, to: TOTAL_FRAMES, place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4 },
+  { at: HITS.markStrike, to: TOTAL_FRAMES, place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4, style: 'A confident, warm sign-off with a smile; the name proud, then the tagline unhurried and sincere.', pace: 'Unhurried.' },
 ];
 const plain = (t) => t.replace(/\s*\|\s*/g, ' ').split(/\s+/).filter(Boolean).join(' ');
 // (round 6, owner: no ellipsis on screen; the narrator keeps its pauses in `say`)

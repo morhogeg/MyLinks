@@ -42,8 +42,9 @@ const LOCKUP_BAR = Math.round(HITS.lockup / BAR_FRAMES);
 const DENSITY = [0.34, 0.4, 0.46, 0.5, 0.56, 0.62, 0.68, 0.72, 0.74, 0.74, 0.76, 0.76, 0.76, 0.74, 0.72, 0.7, 0.45, 0.45, 0.45, 0.45];
 
 for (let bar = 0; bar < BARS; bar++) {
-  const ch = CHORDS[BAR_CHORDS[bar]];
-  const d = DENSITY[bar];
+  // (a re-timed cut may run a bar past the maps: the last entry holds)
+  const ch = CHORDS[BAR_CHORDS[Math.min(bar, BAR_CHORDS.length - 1)]];
+  const d = DENSITY[Math.min(bar, DENSITY.length - 1)];
   const t0 = b(bar);
   const len = Math.min(BAR, TOTAL_SEC - t0);
   const drums = t0 >= t(DRUMS[0]) - 0.01 && t0 < t(DRUMS[1]) - 0.01;
