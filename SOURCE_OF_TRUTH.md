@@ -2720,6 +2720,21 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-03 — META AD 3 voiced by Gemini TTS.** Branch `claude/ad-todo`.
+  Owner: Gemini 3.8 TTS "for much better narration", "use its full
+  abilities", Sulafat, "a bit more playful", and say Machina properly. Lines
+  are voiced on GitHub (`narration-tts.yml`, the repo's key) and kept as
+  takes in `audio/vo-takes/`. Per-line acting notes and inline tags;
+  "Machina" in the real spelling with a note to say it the classical Latin
+  way, MAH-kee-nah (owner's pick by ear; Kokoro says MACK-ee-nuh). The
+  Flash model's 100-a-day quota ran out after the auditions, so the ad is
+  on **Flash-Lite TTS**; a Flash re-voice is scheduled after the reset
+  (07:15 UTC). New for Gemini lines: a word aligner that ignores clicks and
+  breaths, lines trimmed to their words, inner pauses capped at 0.34s. The
+  ad is re-laid out from the read: **57.3s**; verify ceiling 62s; the score
+  follows the beats. **Verified:** `tsc`; `npm run verify` exit 0; stills in
+  both shapes. **Not verified:** word times are estimates (±0.2s, no speech
+  recogniser here); nobody here has heard it.
 - **2026-10-03 — Gemini TTS engine for the narrator (built, not yet
   heard).** Branch `claude/ad-todo`. Owner: use Gemini 3.8 TTS "for much
   better narration". `audio/gemini_tts.py` + `VO_ENGINE=gemini` in
