@@ -1,0 +1,69 @@
+# Voice video narration with Gemini TTS (marketing/launch-clip/audio/gemini_tts.py).
+#
+# Cloud sessions cannot reach Google's API and do not hold the Gemini key, so
+# the narration is voiced here, with the repo's GEMINI_API_KEY secret (the one
+# the Cloud Functions use; never printed). Push is the control channel (the
+# dispatch API 403s for cloud sessions): a push that changes
+# marketing/launch-clip/audio/narration-request.json runs it on that branch,
+# and the new takes (audio/vo-takes/*.flac) are committed back to the same
+# branch. A GITHUB_TOKEN push does not trigger workflows, so it cannot loop.
+
+name: Narration (Gemini TTS)
+
+on:
+  push:
+    paths:
+      - "marketing/launch-clip/audio/narration-request.json"
+
+concurrency:
+  group: narration-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  voice:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: marketing/launch-clip
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Check the key
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "::error::Repo secret GEMINI_API_KEY is not set (Settings → Secrets and variables → Actions)."
+            exit 1
+          fi
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install
+        run: pip install numpy soundfile
+
+      - name: Voice the request
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python3 audio/narration-run.py
+
+      - name: Commit the takes
+        run: |
+          git add audio/vo-takes
+          if git diff --cached --quiet; then echo "no new takes"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Narration: Gemini TTS takes ($(git rev-parse --short HEAD))"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

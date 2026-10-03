@@ -2731,9 +2731,8 @@ exact-match, capped.
   session with no key). Owner: use the key the app already has; it is a repo
   secret, so lines would be voiced on GitHub by a workflow
   (`narration-tts.yml`, on a push changing `audio/narration-request.json`).
-  **That workflow is NOT committed:** it awaits the owner's explicit go-ahead
-  to use the repo secret (alternative: `GEMINI_API_KEY` in the environment
-  plus the host allowed).
+  The owner approved the workflow (2026-10-03); its first run voices the
+  six-voice audition.
 - **2026-10-03 — META AD 3, round 6: a person talking, not an ad.**
   Branch `claude/ad-todo`. Owner on round 5: "far too slim, the narration
   sounds robotic… explain further and talk more". Approved script, spoken

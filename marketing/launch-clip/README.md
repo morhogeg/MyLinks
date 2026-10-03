@@ -245,10 +245,9 @@ manifest and word timings, so every clip, ad, mix and verify gate works
 unchanged. A caption may carry its own `style` note.
 
 **Where it runs.** Cloud sessions can't reach Google's API and don't hold a
-key, so new lines are to be voiced ON GITHUB by a workflow,
-`.github/workflows/narration-tts.yml` (NOT yet added: it awaits the owner's
-approval, since it uses a repo secret), or locally with `GEMINI_API_KEY` set
-and the host allowed. The workflow runs
+key, so new lines are voiced ON GITHUB by `.github/workflows/narration-tts.yml`
+(owner-approved 2026-10-03), or locally with `GEMINI_API_KEY` set and the
+host allowed. The workflow runs
 with the repo's existing `GEMINI_API_KEY` secret (the one the Cloud Functions
 use; never printed). Edit `audio/narration-request.json` (voices to audition,
 scripts to voice and in which voice), commit, push: the workflow commits the
