@@ -32,9 +32,10 @@ VO = os.path.join(ROOT, "out", "vo")
 VOICE = "af_heart"  # Kokoro's flagship female voice
 SPEED = 0.95  # for weight (owner-approved)
 
-# The brand reads "Machina" but is SPOKEN "mah-KEE-nah" (machine, in Latin) —
-# the respelling below is for the synthesizer's ear only; captions keep the
-# real spelling.
+# The brand reads "Machina" and Kokoro says this respelling as MACK-ee-nuh
+# (/ˈmækiːnə/); Gemini TTS says it the Latin way, MAH-kee-nah (gemini_tts.py).
+# The respelling is for the synthesizer's ear only; captions keep the real
+# spelling.
 SAY_NAME = "Makeena"
 
 BAR_SEC = 2.5  # the film's bar (timeline.mjs)
@@ -156,6 +157,11 @@ SCRIPTS["adtodo"] = (lambda: clip_script("ad-todo"), os.path.join(VO, "adtodo"))
 WORD_TIMING["adtodo"] = os.path.join(ROOT, "src", "reels", "ads", "todo", "vo.json")
 
 
+# a script's own engine (VO_ENGINE overrides): Meta ad 3 is voiced by Gemini
+# TTS, Sulafat (owner, 2026-10-03); everything else stays on Kokoro
+ENGINE = {"adtodo": "gemini"}
+
+
 def speech_runs(samples, sr, gap=0.09):
     """[start, end] seconds of each run of speech, split at pauses >= gap."""
     import numpy as np
@@ -222,7 +228,7 @@ def main():
 
     # the engine: Kokoro (offline, the default) or Gemini TTS (VO_ENGINE=gemini,
     # audio/gemini_tts.py: directed delivery, needs an API key and network)
-    engine = os.environ.get("VO_ENGINE", "kokoro")
+    engine = os.environ.get("VO_ENGINE", ENGINE.get(name, "kokoro"))
     if engine == "gemini":
         sys.path.insert(0, HERE)
         import gemini_tts

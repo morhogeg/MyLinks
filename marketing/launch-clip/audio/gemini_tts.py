@@ -51,16 +51,16 @@ PACE = (
     "about 170 words a minute; keep pauses short and light, no long dramatic beats."
 )
 
-# THE NAME: how the words given to Gemini spell "Machina" (GEMINI_SAY_NAME),
-# and an optional note on how to say it, appended to every direction
-# (GEMINI_NAME_NOTE=1). The reference is Kokoro, the one narrator that says it
-# right: its phonemes for "Makeena" are /ˈmækiːnə/, MACK-ee-nuh.
-SAY_NAME = os.environ.get("GEMINI_SAY_NAME", "Makeena")
+# THE NAME (owner's pick, 2026-10-03, audition "I"): Gemini reads the real
+# spelling, "Machina", guided by a note to say it the classical Latin way,
+# MAH-kee-nah: stress on the first syllable, a hard "k", "ah" as in "father".
+# (Kokoro says the English-ized MACK-ee-nuh; the spelled-out variants read
+# less naturally.) GEMINI_SAY_NAME / GEMINI_NAME_NOTE=0 override, for tests.
+SAY_NAME = os.environ.get("GEMINI_SAY_NAME", "Machina")
 NAME_NOTE = (
-    ' The product name is pronounced MACK-ee-nuh (IPA /ˈmækiːnə/, exactly as '
-    'the house narrator says it): stress on the FIRST syllable, "mack" as in '
-    '"mackerel", then a long "ee", then a soft "nuh". Never "mah-KEE-nah", '
-    'never "MAH-chee-nah", never "ma-SHEE-nah".'
+    ' The product name "Machina" is the Latin word, said the classical Latin way: MAH-kee-nah, '
+    'stress on the FIRST syllable; "ch" is a hard "k"; open vowels, "a" as in "father" (not as in "cat"), '
+    'a short "ee", and a clear "ah" at the end, not "nuh". Never mah-KEE-nah.'
 )
 
 
@@ -72,7 +72,7 @@ def performed(text):
 def direct(style):
     """A line's direction: its own note, else the house one; plus the name note."""
     note = (style or STYLE) + PACE
-    return note + NAME_NOTE if os.environ.get("GEMINI_NAME_NOTE") else note
+    return note if os.environ.get("GEMINI_NAME_NOTE") == "0" else note + NAME_NOTE
 
 
 TAKES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vo-takes")
