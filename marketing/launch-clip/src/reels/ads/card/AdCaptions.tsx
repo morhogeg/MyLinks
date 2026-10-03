@@ -20,7 +20,7 @@ export type AdCaption = {
   text: string;
   size?: number;
   poster?: boolean;
-  place?: 'lockup';
+  place?: 'lockup' | 'voice';
   kicker?: string;
   kickerChunk?: number;
 };
@@ -59,7 +59,8 @@ export const AdCaptions: React.FC<{ frame: number; fps: number; captions: AdCapt
   return (
     <AbsoluteFill style={{ pointerEvents: 'none' }}>
       {captions.map((c) => {
-        if (c.place === 'lockup') return null;
+        // the lockup draws its own line; a 'voice' line is said, not shown
+        if (c.place) return null;
         return chunksOf(c, timing, fps).map((ch) => (
           <React.Fragment key={`${c.at}-${ch.from}`}>
             {ch.kicker && (

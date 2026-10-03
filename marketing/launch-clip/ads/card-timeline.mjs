@@ -54,34 +54,35 @@ export const HITS = {
   collapse: 328,
   dotLands: 344,
   bracketsClose: 352,
-  // "From any app, just share it to Machina.": three shares, a beat apart
-  shareStarts: [400, 416, 432],
-  shareTaps: [416, 432, 448],
-  shareLands: [432, 448, 464],
+  // "From any app, just share it to Machina.": three shares, from three
+  // places on the screen, each held a moment before its tap (round 7: slower)
+  shareStarts: [400, 424, 448],
+  shareTaps: [424, 448, 472],
+  shareLands: [440, 464, 488],
   // the point drops to become the + button; the app irises open around it
-  part: 464,
-  toApp: 488,
+  part: 496,
+  toApp: 520,
   // the article lands at the top of the feed and is tapped open
-  cardTap: 528,
+  cardTap: 560,
   // one scroll down: its Key Points, lifted
-  keyPoints: 600,
+  keyPoints: 632,
   // on down: its three Related cards, lifted as one block; then the graph
-  related: 672,
-  graphTap: 720,
+  related: 704,
+  graphTap: 752,
   // a cut back to the card: its bell, "Remind me" (Smart review ringed and
   // held a second), down to Save; the app's confirmation, held
-  back: 776,
-  bellTap: 792,
-  smart: 808,
-  saveTap: 880,
-  reminderSet: 888,
+  back: 808,
+  bellTap: 824,
+  smart: 840,
+  saveTap: 912,
+  reminderSet: 920,
   // tomorrow, 9:00 AM: the feed's "Reminders due" strip
-  due: 920,
-  dueLift: 944,
+  due: 952,
+  dueLift: 976,
   // the close
-  throw: 992,
-  lockup: 1008,
-  markStrike: 1032,
+  throw: 1024,
+  lockup: 1040,
+  markStrike: 1064,
 };
 
 /**
@@ -100,12 +101,12 @@ export const PUSH_SLOT = [HITS.due, HITS.throw];
 
 /** the card's read-down (the app's scroll, captured in 3pt steps): [from, to, target] */
 export const SCROLLS = [
-  [560, 600, 'keyPoints'],
-  [632, 672, 'related'],
+  [592, 632, 'keyPoints'],
+  [664, 704, 'related'],
 ];
 
 export const THROW_LEN = 30;
-export const TOTAL_FRAMES = 1166; // the tagline holds 1.6s after the voice ends
+export const TOTAL_FRAMES = 1198; // the tagline holds 1.6s after the voice ends
 export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 
 /**
@@ -115,7 +116,8 @@ export const TOTAL_SEC = TOTAL_FRAMES / FPS;
  * chunk begins; `\n` breaks a chunk's rows. `say` respells for the voice only
  * (same words). `at` is the frame the voice starts, `to` the frame the last
  * chunk leaves (0.3–1.2s after the voice; up to 4s with `until`). `poster`:
- * the first chunk is already set on frame 0. NO em dashes, no literal "AI",
+ * the first chunk is already set on frame 0. `place: 'voice'`: said, never
+ * drawn (round 7). NO em dashes, no literal "AI",
  * no "second brain", no "library", no "talk".
  */
 const LINES = [
@@ -123,12 +125,13 @@ const LINES = [
   { at: 116, to: 192, text: "The article you promised\nyourself you'd read", say: "The article you promised yourself you'd read…" },
   { at: 192, to: 264, text: 'the thread you\nbookmarked at midnight', say: 'the thread you bookmarked at midnight…' },
   { at: 264, to: 332, text: "the screenshot you\nswore you'd remember." },
-  { at: 332, to: 401, text: "That's exactly why\nwe made Machina." },
-  { at: 401, to: 472, text: 'From any app, just\nshare it to Machina.' },
-  { at: 472, to: 640, text: "It reads what you save | and pulls out\nthe key points | so you'll always remember\nwhy you kept it.", say: "It reads what you save and pulls out the key points… so you'll always remember why you kept it.", until: 'the Key Points lift', duck: 0.45 },
-  { at: 640, to: 784, text: 'It links each save | to what you saved before | so you see how\nyour ideas connect.', say: 'It links each save to what you saved before… so you see how your ideas connect.', until: 'the graph opens on its ties', duck: 0.45 },
-  { at: 784, to: 916, text: 'Then pick a time, | and Machina brings it back', say: 'Then pick a time, and Machina brings it back…', until: 'the reminder is set and confirmed' },
-  { at: 928, to: 992, text: 'so you actually\nget back to it.', kicker: 'Tomorrow', kickerChunk: 0, until: 'the Reminders due strip lifts' },
+  // (round 7, owner: said, not shown; the drawn MACHINA is the name on screen)
+  { at: 332, to: 401, text: "That's exactly why\nwe made Machina.", place: 'voice' },
+  { at: 401, to: 504, text: 'From any app, just\nshare it to Machina.', until: 'the last share lands in the mark' },
+  { at: 504, to: 672, text: "It reads what you save | and pulls out\nthe key points | so you'll always remember\nwhy you kept it.", say: "It reads what you save and pulls out the key points… so you'll always remember why you kept it.", until: 'the Key Points lift', duck: 0.45 },
+  { at: 672, to: 816, text: 'It links each save | to what you saved before | so you see how\nyour ideas connect.', say: 'It links each save to what you saved before… so you see how your ideas connect.', until: 'the graph opens on its ties', duck: 0.45 },
+  { at: 816, to: 948, text: 'Then pick a time, | and Machina brings it back', say: 'Then pick a time, and Machina brings it back…', until: 'the reminder is set and confirmed' },
+  { at: 960, to: 1024, text: 'so you actually\nget back to it.', kicker: 'Tomorrow', kickerChunk: 0, until: 'the Reminders due strip lifts' },
   // the close, on the lockup: the name (the drawn wordmark wipes in as it is
   // said), then the tagline, exactly as written (owner call 2026-09-28)
   { at: HITS.markStrike, to: TOTAL_FRAMES, place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4 },
@@ -148,7 +151,7 @@ export const BAR_CHORDS = [
   'Fmaj7', 'G6', 'Cmaj7', 'Cmaj7', 'Cmaj7', 'Cmaj7', 'Cmaj7',
 ];
 /** the drums: in with the app, out for the lockup */
-export const DRUMS = [7 * BAR_FRAMES, HITS.lockup];
+export const DRUMS = [8 * BAR_FRAMES, HITS.lockup];
 /** risers END on the reveal they lead into: the mark, the app, the strike */
 export const RISERS = [
   [HITS.dotLands - 32, HITS.dotLands],

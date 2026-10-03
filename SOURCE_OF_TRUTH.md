@@ -2707,6 +2707,14 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-03 — META AD 1, ROUND 7: THE NAME UNCAPTIONED; SHARES
+  SCATTERED AND SLOWER.** Branch `claude/ad-card`, not merged. Owner: don't
+  show "That's exactly why we made Machina." (the narrator still says it; the
+  drawn MACHINA is the only text there), and the three shares should be more
+  scattered and slower. They now settle high left, mid right and low left,
+  each tilted, 24 frames apart (was 16) and held before the tap; everything
+  after moved 32 frames later, so the ad is 39.9s (verify fails over 40s).
+  Verify clean; mixes −14.0 LUFS, ≤ −1.25 dBTP.
 - **2026-10-03 — META AD 1, ROUND 6: SLOWER REMINDER, LIVE LISTS, SAVES
   FROM EVERYWHERE.** Branch `claude/ad-card`, not merged. Owner notes, each
   done: (1) from the reminder on, the screens were too fast: Smart review is

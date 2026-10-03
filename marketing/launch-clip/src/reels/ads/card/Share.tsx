@@ -25,17 +25,18 @@ import { MARK } from './Hook';
  */
 
 type Kind = 'safari' | 'x' | 'photos';
-type Source = { kind: Kind; app: string; by: string; title: string; from: [number, number]; rest: { x: number; y: number } };
+type Source = { kind: Kind; app: string; by: string; title: string; from: [number, number]; rest: { x: number; y: number; r: number } };
 export const SOURCES: Source[] = [
-  // round 6 (owner: each save from a different part of the screen): above
-  // the mark from the top, beside it from the right, beside it from the left
-  { kind: 'safari', app: 'Safari', by: 'markmanson.net', title: 'The Most Important Question of Your Life', from: [0, -460], rest: { x: 540, y: 680 } },
-  { kind: 'x', app: 'X', by: '@naval', title: 'How to Get Rich (without getting lucky)', from: [520, 0], rest: { x: 838, y: 870 } },
-  { kind: 'photos', app: 'Photos', by: 'Screenshot', title: 'Maya: You HAVE to do the Tour du Mont Blanc', from: [-520, 0], rest: { x: 242, y: 990 } },
+  // owner (rounds 6, 7): each save from a different part of the screen, and
+  // scattered: high on the left from the top, mid-right from the right, low
+  // on the left from the left, each at its own tilt
+  { kind: 'safari', app: 'Safari', by: 'markmanson.net', title: 'The Most Important Question of Your Life', from: [-200, -460], rest: { x: 330, y: 650, r: -5 } },
+  { kind: 'x', app: 'X', by: '@naval', title: 'How to Get Rich (without getting lucky)', from: [520, -60], rest: { x: 836, y: 822, r: 4 } },
+  { kind: 'photos', app: 'Photos', by: 'Screenshot', title: 'Maya: You HAVE to do the Tour du Mont Blanc', from: [-520, 80], rest: { x: 240, y: 1012, r: -3 } },
 ];
 const CARD_W = 600;
 const REST_S = 0.56;
-const ENTER = 12;
+const ENTER = 16;
 const SAFARI_INK = 'rgb(0, 122, 255)';
 const PHOTOS_INK = 'rgb(245, 158, 11)';
 const ink = (s: Source) => (s.kind === 'safari' ? SAFARI_INK : s.kind === 'photos' ? PHOTOS_INK : PLATFORM_INK[s.kind]);
@@ -112,7 +113,7 @@ export const Share: React.FC<{ f: number }> = ({ f }) => {
                   position: 'absolute',
                   left: x,
                   top: y,
-                  transform: `translate(-50%, -50%) scale(${scale}) rotate(${side * 4 * pull}deg)`,
+                  transform: `translate(-50%, -50%) scale(${scale}) rotate(${s.rest.r * (1 - pull) + side * 4 * pull}deg)`,
                   opacity: Math.min(1, enter * 1.4) * (1 - prog(t, LAND - 3, LAND, EASE_IN_OUT)),
                   filter: pull > 0.05 || enter < 0.97 ? `blur(${(pull * 5 + (1 - enter) * 6).toFixed(2)}px)` : undefined,
                   zIndex: k,
