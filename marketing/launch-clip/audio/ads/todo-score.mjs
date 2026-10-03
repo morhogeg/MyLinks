@@ -85,8 +85,10 @@ for (let bar = 0; bar < BARS; bar++) {
     for (let k = 0; k < 16; k++) {
       if (at(bar, k / 4) >= LOCKUP) break;
       const accent = k % 4 === 0 ? 0.9 : k % 2 ? 1 : 0.55;
-      hat(at(bar, k / 4), 0.03 * accent * d, k % 2 ? 0.22 : -0.18);
-      shaker(at(bar, k / 4), 0.018 * d, k % 2 ? 0.34 : -0.3);
+      // (round 6, Gemini: noise-based parts read as static between the
+      // narrator's sentences; the hats and shaker sit lower)
+      hat(at(bar, k / 4), 0.018 * accent * d, k % 2 ? 0.22 : -0.18);
+      shaker(at(bar, k / 4), 0.008 * d, k % 2 ? 0.34 : -0.3);
     }
   }
 
@@ -121,40 +123,37 @@ const MELODY = [
 for (const [fr, m, level] of MELODY) keys(s(fr), m, level ?? 0.13, (fr / 16) % 2 ? 0.2 : -0.2, fr >= HITS.out ? 2.6 : 1.8);
 
 // ── risers, each ENDING on the reveal it leads into
-for (const [from, to] of RISERS) riser(s(from), s(to) - s(from), 0.09);
+for (const [from, to] of RISERS) riser(s(from), s(to) - s(from), 0.045);
 
 // ── sound design, on the picture's frames (HITS). Under a word only
-// unpitched sounds (ticks, whooshes, sub thumps); shimmers in the pauses.
+// unpitched sounds (ticks, sub thumps); shimmers in the pauses. (Round 6,
+// Gemini: no noise whooshes under the narration: between its sentences they
+// read as static; only the mark's gather, the iris and the throw keep one,
+// quieter.)
 const H = HITS;
 // THE PAIN: they grey out; each named save lifts (a soft air and a click);
 // they drift apart on "buried"
-whoosh(s(H.grey) + 0.05, 0.9, 0.045, 0);
 for (const [k, n] of H.named.entries()) {
   tick(s(n + 1), 0.06, 0.9 + k * 0.08);
-  whoosh(s(n) - 0.04, 0.28, 0.03, k % 2 ? 0.3 : -0.3);
 }
-whoosh(s(H.bury[0]) + 0.05, 1.6, 0.05, 0);
 // THE ANSWER: they rush into the point; the brackets snap on "Machina"
-whoosh(s(H.gather[0]) + 0.05, 0.5, 0.09, -0.35);
-whoosh(s(H.gather[0]) + 0.1, 0.45, 0.09, 0.35);
+whoosh(s(H.gather[0]) + 0.05, 0.5, 0.045, -0.35);
+whoosh(s(H.gather[0]) + 0.1, 0.45, 0.045, 0.35);
 impact(s(H.gather[1]), 0.24);
 sub(s(H.gather[1]), 36, 0.24, 0.6);
 tick(s(H.snap), 0.1, 0.85);
-whoosh(s(H.iris[0]) - 0.05, 0.45, 0.06, 0);
+whoosh(s(H.iris[0]) - 0.05, 0.45, 0.03, 0);
 // SAVE: each save lands with a soft thud
 for (const [k, l] of H.lands.entries()) {
   sub(s(l + 2), 40 + k * 2, 0.16, 0.22);
   tick(s(l + 2), 0.05, 0.8 + k * 0.1);
 }
 // WHAT IT DOES: the glide; the card tapped open; down to its Key Points
-whoosh(s(H.glide[0]) + 0.05, 2.6, 0.03, 0.1);
 tick(s(H.kpOpen), 0.09, 1.25);
-whoosh(s(H.kpOpen) + 0.05, 0.3, 0.045, -0.15);
-whoosh(s(H.kpScroll[0]), 0.6, 0.03, 0.1);
+whoosh(s(H.kpOpen) + 0.05, 0.3, 0.025, -0.15);
 sub(s(H.keyPoints), 45, 0.12, 0.3);
 // LINKED: the riser ends on the cut into the graph; the second cluster
 sub(s(H.cluster), 48, 0.2, 0.4);
-whoosh(s(H.cluster2) - 0.05, 0.5, 0.04, 0.15);
 sub(s(H.cluster2), 43, 0.14, 0.3);
 // CLOSE: thrown out; the mark strikes into air
 whoosh(s(H.out) - 0.1, 0.6, 0.09, 0);

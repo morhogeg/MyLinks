@@ -143,7 +143,7 @@ export const CAPTIONS = [
   ], { hook: true, ...punchy('Leaning in with a knowing, playful smile, gently teasing a friend; a touch of mock guilt on "and never open again?"') }),
   line(176, 232, 'That video you’d watch later.', [[0, 'That video you’d watch later.']], punchy('Wry and amused, naming the first familiar culprit, quick and light')),
   line(232, 272, 'The post you loved.', [[0, 'The post you loved.']], punchy('Fond, a little wistful, still smiling')),
-  line(272, 328, 'That article.', [[0, 'That article.']], punchy('Deadpan, knowing; a tiny chuckle after it', 'That article. <chuckle>')),
+  line(272, 328, 'That article.', [[0, 'That article.']], punchy('Deadpan, knowing, a little smile in it')),
   line(328, 432, 'The screenshot you swore you’d remember.', [[0, 'The screenshot you swore'], [4, 'you’d remember.']], punchy('Playfully incredulous, smiling: we both know how that went')),
   line(432, 568, 'They’re all still out there, buried across a dozen different apps.', [
     [0, 'They’re all still out there,'],
