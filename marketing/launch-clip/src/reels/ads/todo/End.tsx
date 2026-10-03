@@ -8,24 +8,20 @@ import { KineticLine } from '../../kit/Type';
 import { useShape } from './frame';
 
 /**
- * 6 CTA (round 3, owner: end on a clear, confident call to download). The
- * narrator says "Download Machina. Everything you save, finally useful.":
- *  - "Download Machina." is SAID; on screen it is set in the caption band
- *    only if the caption allows it (`showFirstLine`; round 5: it does not);
- *  - the kit's lockup, unchanged (kit/Brand.tsx `Lockup`): the mark launches
- *    and strikes on the score's impact, the drawn wordmark wipes in as
- *    "Machina" is said, and the tagline arrives on the narrator's timing on
- *    one line and holds: the ad still ENDS on the tagline (owner,
- *    2026-09-28).
+ * 6 CLOSE (round 6). The narrator says "Machina. Everything you save, finally
+ * useful." over the kit's lockup, unchanged (kit/Brand.tsx `Lockup`): the mark
+ * launches and strikes on the score's impact, the drawn wordmark wipes in as
+ * "Machina" is said, and the tagline arrives on the narrator's timing on one
+ * line and holds: the ad ENDS on the tagline (owner, 2026-09-28). The first
+ * line is set in the caption band only if the caption allows it
+ * (`showFirstLine`; round 6 does not: the wordmark already says it).
  * Nothing under the tagline: that space is kept for the App Store badge once
  * the listing is live (no badge, no "available now" before then).
  */
-const LINE = CAPTIONS.find((c) => c.place === 'lockup')!;
+const LINE = (CAPTIONS as { at: number; to: number; text: string; place?: string }[]).find((c) => c.place === 'lockup')!;
 const timing = VO.find((v) => v.frame === LINE.at);
 const [CTA, TAGLINE] = LINE.text.split('\n');
 const CTA_WORDS = CTA.split(' ').length;
-/** (round 5, owner: "I don't want to see the words Download Machina": the
- *  narrator still says them; the screen holds only the lockup) */
 const SHOW_CTA = (LINE as { showFirstLine?: boolean }).showFirstLine !== false;
 
 export const End: React.FC<{ f: number; withCaptions?: boolean }> = ({ f, withCaptions = true }) => {

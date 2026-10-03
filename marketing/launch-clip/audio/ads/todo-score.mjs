@@ -3,8 +3,8 @@
  * its own arrangement on the ad's clock (clips/ad-todo-timeline.mjs: 112.5
  * BPM, 16 frames a beat, OUTPUT frames).
  *
- * Round 5 (the owner's approved script: save from anywhere; analyzed,
- * summarized, linked). A feed ad starts mid-scroll, so the music is already
+ * Round 6 (the owner's approved script, a person talking: the pain, the
+ * answer, save from any app, analyzed and summarized, linked). A feed ad starts mid-scroll, so the music is already
  * playing on frame 0. The saves bleach on a falling whoosh and rush into the
  * mark (whooshes, the impact, the snap); the band comes in as the app opens
  * and each save lands with a soft thud under its word; the feed glides on a
@@ -41,7 +41,7 @@ const CHORDS = {
 
 const BARS = Math.ceil(TOTAL_FRAMES / BAR_FRAMES);
 /** how much of the band plays, per bar */
-const DENSITY = [0.34, 0.42, 0.6, 0.64, 0.68, 0.62, 0.4, 0.34, 0.3];
+const DENSITY = [0.3, 0.32, 0.34, 0.36, 0.36, 0.38, 0.42, 0.5, 0.58, 0.62, 0.64, 0.64, 0.66, 0.66, 0.68, 0.68, 0.66, 0.42, 0.34, 0.3];
 const LOCKUP = s(HITS.out);
 
 for (let bar = 0; bar < BARS; bar++) {
@@ -101,42 +101,51 @@ for (const m of [48, 64, 67, 72]) pad(LOCKUP, TOTAL_SEC - LOCKUP - 0.1, m, 0.08,
 // ── melody (FM keys), in the narrator's pauses (src/reels/ads/todo/vo.json),
 // never on a word
 const MELODY = [
-  // [frame, midi, level?]
-  [124, 72], // after "…to Machina."
-  [196, 67], [202, 72], // after "…Even screenshots."
-  [312, 76], [320, 79], [328, 84], // after "…related saves.", the cluster lit
-  // home: C as the mark draws, G after the last word
-  [HITS.markStrike - 8, 72, 0.17], [TOTAL_FRAMES - 44, 79, 0.17],
+  // [frame, midi, level?] (round 6: the narrator talks almost throughout; the
+  // melody only answers in the real pauses)
+  [904, 76], // after "…why you kept it."
+  [1080, 72, 0.15], // after "…each other.", into the lockup
+  [TOTAL_FRAMES - 44, 79, 0.17], // after the last word
 ];
 for (const [fr, m, level] of MELODY) keys(s(fr), m, level ?? 0.13, (fr / 16) % 2 ? 0.2 : -0.2, fr >= HITS.out ? 2.6 : 1.8);
 
 // ── risers, each ENDING on the reveal it leads into
 for (const [from, to] of RISERS) riser(s(from), s(to) - s(from), 0.09);
 
-// ── sound design, on the picture's frames (HITS)
+// ── sound design, on the picture's frames (HITS). Under a word only
+// unpitched sounds (ticks, whooshes, sub thumps); shimmers in the pauses.
 const H = HITS;
-// the hook: the saves bleach on "never"; they rush into the point; the snap
-whoosh(s(H.bleach) + 0.05, 0.9, 0.05, 0);
+// THE PAIN: they grey out; each named save lifts (a soft air and a click);
+// they drift apart on "buried"
+whoosh(s(H.grey) + 0.05, 0.9, 0.045, 0);
+for (const [k, n] of H.named.entries()) {
+  tick(s(n + 1), 0.06, 0.9 + k * 0.08);
+  whoosh(s(n) - 0.04, 0.28, 0.03, k % 2 ? 0.3 : -0.3);
+}
+whoosh(s(H.bury[0]) + 0.05, 1.6, 0.05, 0);
+// THE ANSWER: they rush into the point; the brackets snap on "Machina"
 whoosh(s(H.gather[0]) + 0.05, 0.5, 0.09, -0.35);
 whoosh(s(H.gather[0]) + 0.1, 0.45, 0.09, 0.35);
 impact(s(H.gather[1]), 0.24);
 sub(s(H.gather[1]), 36, 0.24, 0.6);
 tick(s(H.snap), 0.1, 0.85);
-// the point opens onto the app
 whoosh(s(H.iris[0]) - 0.05, 0.45, 0.06, 0);
-// each save lands with a soft thud (unpitched: it sits under its word)
+// SAVE: each save lands with a soft thud
 for (const [k, l] of H.lands.entries()) {
   sub(s(l + 2), 40 + k * 2, 0.16, 0.22);
   tick(s(l + 2), 0.05, 0.8 + k * 0.1);
 }
-// the feed glides
-whoosh(s(H.glide[0]) + 0.05, 1.8, 0.035, 0.1);
-// the cut to the graph (the riser ends on it)
-sub(s(H.graph), 48, 0.2, 0.4);
-// the cluster lit: a shimmer once "…related saves." has landed
-whoosh(s(H.graph) + 0.05, 0.6, 0.04, -0.1);
-shimmer(s(304), [79, 84, 88, 91], 0.045);
-// thrown out; the mark strikes into air
+// WHAT IT DOES: the glide; the card tapped open; down to its Key Points
+whoosh(s(H.glide[0]) + 0.05, 2.6, 0.03, 0.1);
+tick(s(H.kpOpen), 0.09, 1.25);
+whoosh(s(H.kpOpen) + 0.05, 0.3, 0.045, -0.15);
+whoosh(s(H.kpScroll[0]), 0.6, 0.03, 0.1);
+sub(s(H.keyPoints), 45, 0.12, 0.3);
+// LINKED: the riser ends on the cut into the graph; the second cluster
+sub(s(H.cluster), 48, 0.2, 0.4);
+whoosh(s(H.cluster2) - 0.05, 0.5, 0.04, 0.15);
+sub(s(H.cluster2), 43, 0.14, 0.3);
+// CLOSE: thrown out; the mark strikes into air
 whoosh(s(H.out) - 0.1, 0.6, 0.09, 0);
 impact(s(H.markStrike), 0.34);
 shimmer(s(H.markStrike) + 0.08, [79, 84, 88, 91], 0.05);

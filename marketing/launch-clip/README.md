@@ -743,25 +743,31 @@ times"); "Open one, and the key points are already there."
 ## Meta ad 3: "Save anything" (compositions `MachinaAdTodo*`)
 
 Branch `claude/ad-todo`. One of three short ads for Instagram and Facebook
-(Reels, Stories, Feed), made from the kit. **Round 5, the owner's approved
-script (2026-10-02):** the ad is about saving from everywhere, and what
-Machina makes of it: analyzed, summarized, linked. No beat singles out one
-kind of save ("focusing on just video sounds weird"), and "Download
-Machina." is said but never shown. Rounds 1–4 (the screenshot that becomes a
-to-do, then a video-first cut) are in git history. Its files keep their
-`todo` names so the three ad branches still merge cleanly. Nothing in it is a
-Pro surface; it names no plan and never says "free".
+(Reels, Stories, Feed), made from the kit. **Round 6, the owner's approved
+script (2026-10-03):** one real person talking to a friend, not an ad
+reading out features (owner on round 5: "far too slim, the narration sounds
+robotic… explain further and talk more"). Every line is spoken whole at a
+natural pace (Kokoro at 1.1×) and set on screen in short chunks (≤8 words),
+each arriving with its first word (`chunks` in the timeline,
+`src/reels/ads/todo/Chunks.tsx`). Nothing says or shows "Download". Rounds
+1–5 are in git history. Its files keep their `todo` names so the three ad
+branches still merge cleanly. Nothing in it is a Pro surface; it names no
+plan and never says "free".
 
-**18.1s** (544 frames), something new on screen at least every 3s (verify
-checks), the app at its real speed:
+**41.1s** (1232 frames; the brief asked 30–40s, the approved words at a
+natural pace run a second over), something new on screen at least every 3s
+(verify checks), the app at its real speed:
 
-| Time | Picture | Line (spoken, and burned in) |
+| Time | Picture | Line (spoken; burned in, in chunks) |
 |---|---|---|
-| 0.0–2.1s | **Hook, the pain.** Frame 0 is the poster: real saves of every kind from the demo account (a YouTube video, an Instagram post, an article, an X post, a screenshot), scattered where they were kept, the kit's `SaveChip`s 30% larger than the REVISIT clip's so the titles read on a phone. On "never" they bleach into the paper | "You save it. You never see it again." (whole on frame 0; the voice starts at 0.33s) |
-| 2.1–3.7s | **Share.** They come back to ink as they rush into one point; the brackets snap round it (the mark, 2.9s); the point opens as an iris onto the app | "Share anything to Machina." |
-| 3.7–6.4s | **From anywhere.** A YouTube video, an Instagram post, an article and a screenshot land at the top of the feed one after another, the screenshot on "screenshots", each already showing where it came from | "From any app. Even screenshots." |
-| 6.4–11.5s | **Made sense of.** A glide down the feed, every save already summarized (the capture's even 4pt scroll steps, the camera taking up each step's remainder); on "linked" a cut into the Graph view as the app zooms onto its largest cluster, the saves it links lit up together, framed tight | "Analyzed, summarized, and linked to related saves." |
-| 11.5–18.1s | **Close.** Thrown into the kit's lockup: the mark strikes, the wordmark wipes in on "Machina", the tagline on one line, held 1.7s. On screen only the lockup; nothing under it (the slot for the App Store badge) | "Download Machina. Everything you save, finally useful." (the first sentence is spoken only) |
+| 0.0–4.7s | **The pain.** Frame 0 is the poster: real saves of every kind from the demo account, scattered, in the kit's `SaveChip` (1.3×). On "How many things" a ripple runs through them; on "never" they grey out | "Okay, be honest. How many things did you save this month… and never open again?" (the question on screen from frame 0; "Okay, be honest." spoken over it, voice at 0.27s) |
+| 4.8–10.3s | **Each one named.** The video, the post, the article, the screenshot each light up, lifting off the page, on its word | "That video you'd watch later. The post you loved. That article. The screenshot you swore you'd remember." |
+| 10.4–13.5s | **Buried.** They drift apart, blur and fade | "They're all still out there, buried across a dozen different apps." |
+| 13.6–15.5s | **The answer.** They rush into one point; the brackets snap round it on "Machina" (14.9s); the point opens as an iris onto the app | "That's exactly why we made Machina." |
+| 15.7–21.7s | **Save.** A YouTube video, an Instagram post, an article and a screenshot land at the top of the feed, each on its word, each showing where it came from | "From any app, just share to Machina. Videos, posts, articles, screenshots… it all lands in one place." |
+| 21.9–30.1s | **What it does.** A glide down the feed, every save already summarized; a cut onto the Instagram post as it is tapped open, read down to its Key Points, which lift on "key points" | "Then Machina gets to work. It analyzes every save, summarizes it, and pulls out the key points, so you'll always remember why you kept it." |
+| 30.4–35.9s | **Linked.** A cut into the Graph view as the app zooms onto a lit cluster ("time"), then onto a second ("travel") | "It even connects each save to related ones you've kept before, so your ideas start building on each other." |
+| 35.7–41.1s | **Close.** Thrown into the kit's lockup: the mark strikes, the wordmark wipes in on "Machina", the tagline on one line, held 1.7s. Nothing under it (the slot for the App Store badge) | "Machina. Everything you save, finally useful." (the name is the wordmark, not set again in the band) |
 
 **Compositions:** `MachinaAdTodo` (9:16, score + narrator + captions, the main
 cut), `MachinaAdTodoMusic` (9:16, score + captions, no narrator: the A/B cut),
@@ -780,7 +786,8 @@ with the zones drawn (`python3 scripts/ad-todo-sheet.py --zones`).
 **What is real and what is scripted.** Every pixel of app UI is the shipped
 web app (merged with `main` on 2026-10-02), captured as take `adTodo`; the
 graph is the app's own Graph view and its cluster focus (the capture taps the
-"time" chip off camera; the cut lands on the app's zoom). Scripted, in
+"time" then the "travel" chip off camera; the cuts land on the app's zoom);
+the opened post and its Key Points are the app's own card view, tapped open. Scripted, in
 `capture/ad-todo.mjs`: two new saves the backend would have returned, each
 written the way it writes that kind, with their related saves (both ways,
 with reasons): the YouTube card is the app's real output for a real video,
@@ -808,7 +815,7 @@ option for it, `noVoice` (the music-only master).
 
 ```bash
 npm run reel:app                               # after merging main
-CAPTURE_ONLY=adTodo npm run reel:capture       # the take (~730 frames, ~7 min)
+CAPTURE_ONLY=adTodo npm run reel:capture       # the take (784 frames, ~8 min)
 python3 audio/synth-vo.py adtodo               # only after a line or its timing changes
 node audio/ads/todo-score.mjs && node audio/mix-vo.mjs adtodo && node audio/mix-vo.mjs adtodo-music
 npm run verify
@@ -826,21 +833,20 @@ clip's frames under its timeline. When the ad branches merge, keep every take
 in `shoot.mjs` and re-capture, as the clips' rule says.
 
 **The ad's gates** (`npm run verify`, on top of the clip rules): the hook is
-the first caption, whole on frame 0, its voice heard by 0.5s; the mark by
-~3.5s; at most 8 words on screen at once; until the lockup, something new on
-screen at least every 3s; the close says "Download Machina." then the
-tagline, exactly, last, its final word landed 1.6s+ before the end (only the
-tagline on screen); ≤ 30s; no "share
+the first caption, its question whole on frame 0, its voice heard by 0.5s;
+the mark snaps on the spoken "Machina"; every chunk ≤8 words and word for
+word what the narrator says; until the lockup, something new on screen at
+least every 3s; the close is "Machina." then the tagline, exactly, last, its
+final word landed 1.6s+ before the end; "Download" nowhere; ≤ 42s; no "share
 sheet", "bookmarks", "free", a price, "App Store", "available" or a plan name
 in what the ad says; no recipe card, Pro surface or plan legible on any
 captured frame or in the four saves it seeds; both mixes at −14 LUFS ±0.5,
 true peak ≤ −1 dBTP, every line 3dB+ over the music in the speech band.
 
-**Before it is posted:** the narrator says "Download Machina.", so it must not
-go out, paid or organic, before the App Store listing is live.
-
 **Not verified:** nobody has listened to either mix on speakers (measured
-only); the ad has not been through Meta's ad review; the app's font here is
+only); the narrator is still Kokoro TTS (a human read can replace
+`out/vo/adtodo/` and re-run the mixes, as long as the word timings are
+re-measured); the ad has not been through Meta's ad review; the app's font here is
 Inter standing in for SF Pro (see "Font" above).
 
 ## Motion language

@@ -2720,6 +2720,25 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-03 — META AD 3, round 6: a person talking, not an ad.**
+  Branch `claude/ad-todo`. Owner on round 5: "far too slim, the narration
+  sounds robotic… explain further and talk more". Approved script, spoken
+  whole at a natural pace and shown in ≤8-word chunks: "Okay, be honest. How
+  many things did you save this month… and never open again?" / the video,
+  the post, the article, the screenshot (each lights up on its word) /
+  "…buried across a dozen different apps." / "That's exactly why we made
+  Machina." (the mark) / "From any app, just share to Machina. Videos, posts,
+  articles, screenshots… it all lands in one place." / "Then Machina gets to
+  work. It analyzes every save, summarizes it, and pulls out the key points…"
+  (glide, a post opened to its lifted Key Points) / "It even connects each
+  save to related ones you've kept before…" (two graph clusters) / "Machina.
+  Everything you save, finally useful." No "Download" said or shown. Take
+  re-shot (784 frames). **41.1s**, a second over the brief's 30–40s; verify's
+  ceiling is now 42s. **Verified:** `tsc` clean; `npm run verify` exit 0;
+  stills of every beat in both shapes; both mixes −14.0 LUFS, ≤ −1.2 dBTP.
+  **Open:** the voice is still TTS; nobody has listened on speakers; not
+  through Meta's ad review; the "time" cluster panel reads "also share
+  mortality and attention"; `takes.json` re-capture at merge.
 - **2026-10-02 — META AD 3, round 5: the owner's script, every place,
   nothing singled out.** Branch `claude/ad-todo`. Owner on round 4: it is
   about saving from all places, so a video-first beat "sounds weird"; replace

@@ -668,28 +668,48 @@ const takes = {
     await page.evaluate(() => document.querySelector('[data-capture-scroller]')?.scrollTo({ top: 0, behavior: 'instant' }));
     await page.waitForTimeout(400);
 
+    // (round 6) one card, opened to its Key Points: "pulls out the key points"
+    const KP = {
+      dialog: R.dialog,
+      keyPoints: ['[role=dialog] h1, [role=dialog] h2, [role=dialog] h3, [role=dialog] h4', 'Key Points'],
+      points: ['[role=dialog] ul', 'Pack for four days'],
+      title: ['[role=dialog] h2', 'One week, one small bag'],
+    };
+    const igCard = visible(page.locator(R.firstCard[0], { hasText: 'One week, one small bag' }));
+    await igCard.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(400);
+    await t.freeze();
+    await igCard.click({ position: { x: 200, y: 20 } });
+    t.mark('kpOpen');
+    await t.roll(40, { rects: KP, step: F60 });
+    await t.thaw();
+    await page.waitForTimeout(500);
+    await t.freeze();
+    await tagScroller('Pack for four days and do one wash');
+    t.mark('kpScroll');
+    await rollScroll(t, await scrollTargetFor('keep one outfit in your personal bag', 640), 4, KP);
+    await t.thaw();
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(900);
+
     // the Graph view: every save, linked to the ones it relates to
     await visible(page.locator('button[aria-label^="View:"]')).click();
     await page.waitForTimeout(700);
-    await t.freeze();
     await page.locator('[role=radio]', { hasText: 'Graph' }).first().click();
-    t.mark('graph');
-    await t.roll(150, { rects: { canvas: ['canvas'] }, step: F60 });
-    await t.thaw();
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(3500);
     t.mark('graphSettled');
-    await t.snap({ rects: { canvas: ['canvas'], chip: ['button[aria-pressed]', 'time'] } });
-
-    // its largest cluster, tapped: the saves it links light up together, the
-    // links between them drawn in colour (the app's own cluster focus)
-    await t.freeze();
-    await visible(page.locator('button[aria-pressed]', { hasText: 'time' })).click();
-    t.mark('cluster');
-    await t.roll(60, { rects: { canvas: ['canvas'], chip: ['button[aria-pressed]', 'time'] }, step: F60 });
-    await t.thaw();
-    await page.waitForTimeout(800);
-    t.mark('clusterSettled');
     await t.snap({ rects: { canvas: ['canvas'] } });
+
+    // its largest cluster, then a second one, focused in turn: the saves each
+    // links light up together (the app's own cluster focus and zoom)
+    for (const [mark, label] of [['cluster', 'time'], ['cluster2', 'travel']]) {
+      await t.freeze();
+      await visible(page.locator('button[aria-pressed]', { hasText: label })).click();
+      t.mark(mark);
+      await t.roll(60, { rects: { canvas: ['canvas'] }, step: F60 });
+      await t.thaw();
+      await page.waitForTimeout(600);
+    }
     return t.save();
   },
 

@@ -134,7 +134,9 @@ def clip_script(name):
             "start": c["at"] / data["fps"],
             "window": (c["to"] - c["at"]) / data["fps"],
             "text": " ".join((c.get("say") or c["text"]).split()).replace("Machina", SAY_NAME),
-            "speed": SPEED,
+            # a clip or ad may set its own delivery speed per line (the Meta ad
+            # 3 script, round 6: a natural conversational pace)
+            "speed": c.get("speed", SPEED),
         }
         for c in data["captions"]
     ]

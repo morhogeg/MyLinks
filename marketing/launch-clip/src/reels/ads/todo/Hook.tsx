@@ -6,17 +6,20 @@ import { EASE_GATHER, EASE_IN_OUT, EASE_MODAL, EASE_SPRING, mix, prog } from '..
 import { useShape } from './frame';
 
 /**
- * 1 HOOK and 2 SHARE (round 4), in the reel's hook language (kit SaveChip,
+ * 1 THE PAIN and 2 THE ANSWER, in the reel's hook language (kit SaveChip,
  * MarkAssembly; the REVISIT clip's Opening.tsx is the model, not imported).
  *
- * The poster, frame 0: real saves of every kind from the demo account, where
- * they were kept (a YouTube video, an Instagram post, an article, an X post, a
- * screenshot), under "You save it. You never see it again."; they are already
- * in focus (their cascade began before frame 0). On "never" they bleach into
- * the paper. On "Share it to Machina instead." they come back to ink as they
- * rush into one point (EASE_GATHER), the brackets snap round it (the app's
- * spring): the mark, at 2.9s. The point then opens as an iris onto the app
- * (App.tsx draws the iris, centred on the same pixel).
+ * Round 6 (the owner's script). The poster, frame 0: real saves of every kind
+ * from the demo account, where they were kept (a YouTube video, an Instagram
+ * post, an article, an X post, a screenshot), under "How many things did you
+ * save this month…"; already in focus (their cascade began before frame 0).
+ * On "never open again" they grey out. As the narrator names "that video",
+ * "the post", "that article", "the screenshot", each comes back in colour and
+ * lifts toward the viewer (an ink ring, a deeper shadow: the kit's Lift). On
+ * "buried across a dozen different apps" they drift apart and fade. On "That's
+ * exactly why we made Machina." they come back to ink as they rush into one
+ * point (EASE_GATHER), and the brackets snap round it on "Machina". The point
+ * then opens as an iris onto the app (App.tsx).
  *
  * The chips are the kit's: the app's own platform marks, titles of real saves.
  */
@@ -42,6 +45,10 @@ const CHIPS: { kind: SaveKind; title: string; x: number; y: number; s: number; r
 
 const CHIP_SCALE = 1.3;
 
+/** the four saves the narrator names, in order (round 6): the video, the
+ *  post, the article, the screenshot (indices into CHIPS) */
+const NAMED = [0, 2, 6, 5];
+
 const chipAt = (k: number, f: number, P: { x: number; y: number }, dy: number) => {
   const c = CHIPS[k];
   // in focus on a rolling cascade that began before frame 0, so the first
@@ -50,20 +57,35 @@ const chipAt = (k: number, f: number, P: { x: number; y: number }, dy: number) =
   const arrive = prog(f, t0, t0 + 20, EASE_MODAL);
   // the hang: a slow push-in, nearer ones faster (parallax)
   const hang = prog(f, 0, HITS.gather[0], (t) => t);
-  const push = 1 + hang * 0.08 * c.s;
+  const push = 1 + hang * 0.1 * c.s;
+  // "…and never open again?": they grey out and go soft
+  const grey = prog(f, HITS.grey, HITS.grey + 20, EASE_MODAL);
+  // as each is named it comes back in colour and lifts toward the viewer,
+  // and stays lit until they are buried
+  const n = NAMED.indexOf(k);
+  const lit = n < 0 ? 0 : prog(f, HITS.named[n], HITS.named[n] + 10, EASE_SPRING);
+  // "buried across a dozen different apps": they drift apart and fade
+  const bury = prog(f, HITS.bury[0], HITS.bury[1], EASE_IN_OUT);
   const g = prog(f, HITS.gather[0] - 6, HITS.gather[1], EASE_GATHER);
-  // never seen again: bleached into the paper, back to ink as they gather
-  const b = prog(f, HITS.bleach, HITS.bleach + 20, EASE_MODAL) * (1 - prog(f, HITS.gather[0] - 8, HITS.gather[1] - 4, EASE_IN_OUT));
+  // (back to ink as they gather)
+  const ink = prog(f, HITS.gather[0] - 8, HITS.gather[1] - 4, EASE_IN_OUT);
+  const b = Math.max(0, grey * (1 - lit) * (1 - ink));
+  const spread = 1 + 0.35 * bury * (1 - g);
+  const near = 1 + 0.14 * lit * (1 - bury);
+  // "How many things…": a ripple runs through the saves, one after another
+  const st = f - (HITS.stir + k * 3);
+  const ripple = st > 0 && st < 18 ? Math.sin((st / 18) * Math.PI) : 0;
   return {
-    x: P.x + (c.x - POINT.x) * push * (1 - g),
-    y: P.y + ((c.y - POINT.y) * push + (1 - arrive) * 26 * c.s) * (1 - g),
+    x: P.x + (c.x - POINT.x) * push * spread * (1 - g),
+    y: P.y + ((c.y - POINT.y) * push * spread + (1 - arrive) * 26 * c.s - 14 * ripple) * (1 - g),
     // (the saves are set 30% larger than the REVISIT clip's: on a phone the
     // poster's titles must read at a glance)
-    s: CHIP_SCALE * c.s * push * mix(0.95, 1, arrive) * mix(1, 0.06 / CHIP_SCALE, Math.pow(g, 0.7)),
-    r: c.r * (1 - g) + g * (k % 2 ? 16 : -16),
-    o: mix(0.5, 1, arrive) * (1 - Math.pow(g, 5)) * (1 - 0.72 * b),
-    blur: (1 - arrive) * 8 + c.blur * (1 - g) + g * 2 + 3 * b,
-    grey: b,
+    s: CHIP_SCALE * c.s * push * near * mix(0.95, 1, arrive) * mix(1, 0.06 / CHIP_SCALE, Math.pow(g, 0.7)),
+    r: c.r * (1 - g) * (1 - 0.6 * lit * (1 - bury)) + g * (k % 2 ? 16 : -16),
+    o: mix(0.5, 1, arrive) * (1 - Math.pow(g, 5)) * (1 - 0.6 * b) * (1 - 0.75 * bury * (1 - ink)),
+    blur: (1 - arrive) * 8 + c.blur * (1 - g) * (1 - lit * (1 - bury)) + g * 2 + 2.5 * b + 6 * bury * (1 - ink),
+    grey: Math.min(1, b + bury * (1 - ink)),
+    lit: lit * (1 - bury),
     g,
     dy,
   };
@@ -81,7 +103,8 @@ export const Hook: React.FC<{ f: number }> = ({ f }) => {
   return (
     <AbsoluteFill style={{ pointerEvents: 'none' }}>
       {f < HITS.gather[1] + 1 &&
-        CHIPS.map((c, k) =>
+        // (the named saves are drawn last, so the one lit is on top)
+        [...CHIPS.keys()].sort((a, z) => NAMED.indexOf(a) - NAMED.indexOf(z)).map((k) => { const c = CHIPS[k]; return (
           [3, 2, 1, 0].map((lag) => {
             const p = chipAt(k, f - lag * 1.2, P, dy);
             if (lag > 0 && p.g < 0.08) return null;
@@ -98,11 +121,11 @@ export const Hook: React.FC<{ f: number }> = ({ f }) => {
                   filter: [p.blur > 0.2 ? `blur(${p.blur.toFixed(2)}px)` : '', p.grey > 0.01 ? `grayscale(${p.grey.toFixed(3)})` : ''].join(' ').trim() || undefined,
                 }}
               >
-                <SaveChip kind={c.kind} title={c.title} />
+                <SaveChip kind={c.kind} title={c.title} style={p.lit > 0.01 ? { boxShadow: `0 1px 2px rgba(16,24,40,0.06), 0 ${Math.round(18 + 22 * p.lit)}px ${Math.round(40 + 40 * p.lit)}px -14px rgba(24,32,48,${(0.28 + 0.2 * p.lit).toFixed(3)}), 0 0 0 ${(2 * p.lit).toFixed(2)}px rgba(20,20,27,${(0.55 * p.lit).toFixed(3)})` } : undefined} />
               </div>
             );
-          }),
-        )}
+          }));
+        })}
 
       {/* the landing: a lift of white light */}
       <AbsoluteFill

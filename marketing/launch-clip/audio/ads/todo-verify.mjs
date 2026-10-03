@@ -12,10 +12,10 @@
  *    every 3s;
  *  - THE FIRST SECOND: the hook is the first caption, on screen whole from
  *    frame 0, its voice heard by 0.5s; the mark has formed by ~3.5s;
- *  - the close: "Download Machina." then the film's endcard line (the
- *    tagline), exactly, once, at the end, its last word landed at least 1.6s
+ *  - the close: "Machina." then the film's endcard line (the tagline),
+ *    exactly, once, at the end (round 6: "Download" nowhere), its last word landed at least 1.6s
  *    before the last frame;
- *  - length ≤ 30s;
+ *  - length ≤ 42s (round 6: the owner's approved script runs ~41s);
  *  - bans, on every caption, the voice, every frame of the take and the four
  *    saves it seeds: em dash,
  *    literal "AI", "second brain", "library"; in the captions and voice also
@@ -70,7 +70,8 @@ const scan = (where, text, extra = []) => {
 
 // ── captions, the narrator
 const caps = [...C.CAPTIONS].sort((a, b) => a.at - b.at);
-const words = (t) => t.split(/\s+/).filter(Boolean).length;
+const list = (t) => t.split(/\s+/).filter(Boolean);
+const words = (t) => list(t).length;
 caps.forEach((c, i) => {
   scan(`caption ${i + 1}`, c.text, SAID);
   if (c.to <= c.at) bad.push(`caption "${c.text}" ends before it starts`);
@@ -81,10 +82,22 @@ caps.forEach((c, i) => {
   // two lines ("Download Machina." in the band, the tagline in the lockup)
   // are on screen together, so they count together
   const max = 8;
-  // (round 5: the close's first line, "Download Machina.", is said but not
-  // shown: `showFirstLine: false`)
-  const n = c.place === 'lockup' && c.showFirstLine === false ? words(c.text.split('\n').slice(-1)[0]) : words(c.text);
-  if (n > max) bad.push(`"${c.text}" puts ${n} words on screen (max ${max})`);
+  // (round 6) a line is spoken whole and shown in chunks: each chunk at most 8
+  // words, and its words are the spoken ones, in order, from its first word
+  if (c.chunks) {
+    const said = list(c.say ?? c.text);
+    const norm = (w) => w.toLowerCase().replace(/[^a-z0-9']/g, '').replace(/’/g, "'");
+    for (const [first, text] of c.chunks) {
+      const shown = list(text).filter((w) => /[a-z0-9]/i.test(w));
+      if (shown.length > max) bad.push(`"${text}" puts ${shown.length} words on screen (max ${max})`);
+      shown.forEach((w, j) => {
+        if (norm(w.replace(/’/g, "'")) !== norm((said[first + j] ?? '').replace(/’/g, "'"))) bad.push(`chunk "${text.split('\n')[0]}…" word ${j + 1} ("${w}") is not what the narrator says ("${said[first + j]}")`);
+      });
+    }
+  } else {
+    const n = c.place === 'lockup' ? words(c.text.split('\n').slice(-1)[0]) : words(c.text);
+    if (n > max) bad.push(`"${c.text}" puts ${n} words on screen (max ${max})`);
+  }
 });
 // the first second
 if (!caps[0]?.hook) bad.push('the ad does not open on its hook (the first caption must be `hook`)');
@@ -93,8 +106,19 @@ const spoken = (t) => t.split(/\s+/).join(' ').replaceAll('Machina', SAY_NAME);
 const timing = JSON.parse(read('src/reels/ads/todo/vo.json'));
 const hookT = timing.find((x) => x.frame === caps[0].at);
 if (!hookT || caps[0].at + hookT.words[0] * C.FPS > 15) bad.push('the narrator is not heard by 0.5s');
-if (C.HITS.snap > 105) bad.push(`the mark forms at ${(C.HITS.snap / C.FPS).toFixed(2)}s (spec: by about 3s)`);
-if (C.TOTAL_SEC > 30) bad.push(`the ad runs ${C.TOTAL_SEC.toFixed(1)}s (max 30s)`);
+// (round 6) the mark forms on the word "Machina" in "That's exactly why we
+// made Machina." (the owner's script holds the pain for ~15s; until then the
+// real saves are the picture, from frame 0)
+{
+  const ans = caps.find((c) => /why we made Machina/.test(c.say ?? c.text));
+  const t = ans && timing.find((x) => x.frame === ans.at);
+  const said = ans ? list(ans.say ?? ans.text) : [];
+  const word = ans && t ? ans.at + t.words[said.findIndex((w) => w.startsWith('Machina'))] * C.FPS : NaN;
+  if (!(Math.abs(C.HITS.snap - word) <= 4)) bad.push(`the mark snaps at ${C.HITS.snap}, not on "Machina" (${word.toFixed?.(0)})`);
+}
+// (round 6) the owner's approved conversational script runs ~41s at a natural
+// pace (the brief asked 30–40s); a hard ceiling keeps it from creeping further
+if (C.TOTAL_SEC > 42) bad.push(`the ad runs ${C.TOTAL_SEC.toFixed(1)}s (max 42s)`);
 caps.forEach((c) => {
   const t = timing.find((x) => x.frame === c.at);
   if (!t) return bad.push(`no narrator timing for the line at ${c.at}: run \`python3 audio/synth-vo.py adtodo\``);
@@ -119,7 +143,9 @@ if (fs.existsSync(manifestPath)) {
     }
     const dwell = window - line.spoken;
     const max = c.until ? 4 : 1.2;
-    if (dwell < 0.3) bad.push(`"${c.text}" leaves ${dwell.toFixed(2)}s after its voice (min 0.3s)`);
+    // (round 6) a chunked line is talk, not a title card: its chunks arrive with
+    // the words, and the next line follows straight on, so no minimum gap
+    if (dwell < (c.chunks ? 0 : 0.3)) bad.push(`"${c.text}" leaves ${dwell.toFixed(2)}s after its voice (min 0.3s)`);
     if (dwell > max + 1e-6) bad.push(`"${c.text}" lingers ${dwell.toFixed(2)}s after its voice (max ${max}s)`);
   }
 } else {
@@ -130,20 +156,24 @@ const closeLine = close?.text.split('\n').slice(-1)[0].replace(/\.$/, '');
 if (!close || !read('src/scenes/Endcard.tsx').includes(closeLine)) bad.push('the lockup line is not the film endcard line (the tagline)');
 // (round 3, owner: end on a clear call to download) the close asks, then
 // the tagline closes (owner, 2026-09-28: every film ends on it)
-if (close?.text !== 'Download Machina.\nEverything you save, finally useful.') bad.push('the ad does not close on "Download Machina." and the tagline, exactly');
+if (close?.text !== 'Machina.\nEverything you save, finally useful.') bad.push('the ad does not close on "Machina." and the tagline, exactly');
+// (round 5, owner: never show "Download Machina"; round 6: not said either)
+for (const c of caps) if (/download/i.test(`${c.text} ${c.say ?? ''}`)) bad.push(`"Download" in a line: "${c.text}"`);
 if (close?.to !== C.TOTAL_FRAMES) bad.push('the tagline is not the last thing on screen');
 for (const c of caps) if (c !== close && /finally useful/i.test(c.text)) bad.push(`the tagline appears before the end: "${c.text}"`);
 
 // ── the grid
 const H = C.HITS;
-for (const k of ['snap', 'graph', 'out', 'markStrike']) {
+for (const k of ['snap', 'kpOpen', 'cluster', 'cluster2', 'out', 'markStrike']) {
   if (H[k] % (C.BEAT_FRAMES / 2)) bad.push(`${k} at ${H[k]} is not on an 8th`);
 }
 // (round 3, owner: "a new visual or cut every two to three seconds") until
 // the lockup, no stretch of more than 3s passes without a new event on
 // screen (a landing, a tap, a lift, a cut, a line)
 {
-  const events = [...new Set([0, ...Object.values(H).flat(), ...caps.map((c) => c.at)])].filter((x) => x <= H.markStrike).sort((a, b) => a - b);
+  const timingOf = (c) => JSON.parse(read('src/reels/ads/todo/vo.json')).find((x) => x.frame === c.at);
+  const chunkStarts = caps.flatMap((c) => (c.chunks ?? []).map(([first]) => c.at + Math.round((timingOf(c)?.words[first] ?? 0) * C.FPS)));
+  const events = [...new Set([0, ...Object.values(H).flat(), ...caps.map((c) => c.at), ...chunkStarts])].filter((x) => x <= H.markStrike).sort((a, b) => a - b);
   for (let k = 1; k < events.length; k++) {
     if (events[k] - events[k - 1] > 3 * C.FPS) bad.push(`nothing new on screen from ${events[k - 1]} to ${events[k]} (${((events[k] - events[k - 1]) / C.FPS).toFixed(1)}s; max 3s)`);
   }
@@ -155,7 +185,7 @@ const takes = JSON.parse(read('src/reels/data/takes.json'));
 const take = takes[C.TAKE];
 if (!take) bad.push(`no take "${C.TAKE}" in takes.json: run \`CAPTURE_ONLY=${C.TAKE} npm run reel:capture\``);
 else take.frames.forEach((fr, i) => fr.t.forEach((k) => scan(`the app on ${C.TAKE} frame ${i}`, take.texts[k], SHOWN)));
-for (const m of ['home', ...C.LANDS.map((k) => `${k}Land`), 'landed', 'glide', 'graph', 'graphSettled', 'cluster', 'clusterSettled']) if (take && take.marks[m] === undefined) bad.push(`take ${C.TAKE} has no mark ${m}`);
+for (const m of ['home', ...C.LANDS.map((k) => `${k}Land`), 'landed', 'glide', 'kpOpen', 'kpScroll', 'graphSettled', 'cluster', 'cluster2']) if (take && take.marks[m] === undefined) bad.push(`take ${C.TAKE} has no mark ${m}`);
 // the capture material the ad seeds (capture/ad-todo.mjs): the new saves
 // and their links
 {
