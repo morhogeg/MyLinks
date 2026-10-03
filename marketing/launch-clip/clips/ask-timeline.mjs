@@ -73,6 +73,18 @@ export const HITS = {
  * "library" (verify). Each of the five things Ask does gets its line: what it
  * does, and why that matters.
  */
+/**
+ * THE NARRATOR (owner, 2026-10-03): Gemini TTS, voice Sulafat (synth-vo.py
+ * ENGINE), with this clip's own tone: curious, clear, quietly impressed; a
+ * smart friend showing you something that genuinely works, a small "aha",
+ * never salesy. `pace` replaces the house "lively and quick" note on every
+ * line; `style` is each line's acting note. A take is keyed by its words,
+ * style and pace (audio/vo-takes/): editing any of them re-voices the line on
+ * GitHub (audio/narration-request.json), which costs quota. `maxPause` and
+ * `tempo` shape the take afterwards and cost nothing.
+ */
+const PACE = 'Clear and measured, about 155 words a minute; small pauses between sentences, crisp within them.';
+
 export const CAPTIONS = [
   // (finishing pass: the hook speaks from 0.5s, since a feed decides in the
   // first second, and leaves a beat before the cut so the feed's last rush
@@ -81,24 +93,32 @@ export const CAPTIONS = [
   // round 2: frame the knowledge Ask reaches, not the search; no chapter word)
   // (`tight`, owner 2026-09-29: the voice paused 0.22s after "knowledge"
   // on its own; synth-vo.py closes pauses inside the line)
-  { at: beat(1), to: beat(7) + 8, hook: true, tight: true, text: 'Your saves hold more knowledge\nthan you remember.' },
+  { at: beat(1), to: beat(7) + 8, hook: true, tight: true, text: 'Your saves hold more knowledge\nthan you remember.',
+    style: 'Intriguing, a gentle hook, slightly lowered as if sharing a secret.', pace: PACE },
   // the name, on Ask opening
-  { at: beat(10), to: beat(14), text: 'With Machina, you just ask.' },
+  { at: beat(10), to: beat(14), text: 'With Machina, you just ask.',
+    style: "Simple and easy, a small smile; 'just ask' effortless.", pace: PACE },
   // 1. plain words: no remembering where, or what it was called
-  { at: beat(14), to: beat(20), text: 'Ask in your own words.\nNo keywords, no folders.' },
+  { at: beat(14), to: beat(20), text: 'Ask in your own words.\nNo keywords, no folders.',
+    style: "Relaxed and freeing; brush away 'no keywords, no folders' lightly.", pace: PACE },
   // 2. grounded: the answer is made of what you saved
-  { at: beat(20), to: beat(25), text: 'The answer is written\nfrom your own saves.' },
+  { at: beat(20), to: beat(25), text: 'The answer is written\nfrom your own saves.',
+    style: "Clear, with gentle emphasis on 'your own saves'.", pace: PACE },
   // 3. sources: so it can be trusted, and checked
-  { at: beat(25), to: beat(31) + 8, text: 'Every answer shows its sources.\nTap one to check it.' },
+  { at: beat(25), to: beat(31) + 8, text: 'Every answer shows its sources.\nTap one to check it.',
+    style: 'Trustworthy and matter-of-fact; the second sentence light and practical.', pace: PACE },
   // 4. follow-ups: go deeper without starting over
   // (owner, round 3: this line is about the continuation chips the app
   // suggests under an answer; it starts once the card has closed, so no
   // other tap is on screen while it plays)
-  { at: beat(34), to: beat(39) + 8, text: 'Keep going. One tap asks\nthe next question.' },
+  { at: beat(34), to: beat(39) + 8, text: 'Keep going. One tap asks\nthe next question.',
+    style: 'Momentum, encouraging, a touch quicker.', pace: PACE },
   // 5. connections: what else those saves sit next to
-  { at: beat(41), to: beat(45), text: 'Then see how\nthose saves connect.' },
+  { at: beat(41), to: beat(45), text: 'Then see how\nthose saves connect.',
+    style: 'A little wonder, easing slightly.', pace: PACE },
   // the takeaway
-  { at: beat(45), to: beat(50), text: 'Ask once. Get the answer,\nand the proof.' },
+  { at: beat(45), to: beat(50), text: 'Ask once. Get the answer,\nand the proof.',
+    style: "Confident, punchy summary; a small beat before 'and the proof', satisfied.", pace: PACE },
   // (finishing pass: the end card holds ~2s after the last word, the owner's
   // rule for the reel; it held 1.3s. The tagline runs longer than the
   // subtitle did, so the close grew one beat: 33.1s, a 1.96s hold)
@@ -107,7 +127,8 @@ export const CAPTIONS = [
   // "Everything you save, finally useful."; 2026-09-29: one line, as the
   // Revisit clip sets it); the music steps back
   // under both
-  { at: beat(53), to: beat(62), place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4 },
+  { at: beat(53), to: beat(62), place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4,
+    style: 'A confident, warm sign-off; the name proud, then the tagline unhurried and sincere.', pace: PACE },
 ];
 
 export const TOTAL_FRAMES = CAPTIONS[CAPTIONS.length - 1].to;
