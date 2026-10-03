@@ -1,6 +1,6 @@
 {
   "_": "Voice narration on GitHub with Gemini TTS (.github/workflows/narration-tts.yml). Edit, commit, push: the workflow voices what is listed and commits the takes to audio/vo-takes/. `audition`: voices for audio/vo-audition.py; `takes`: named takes (voice, text, style) to try a direction or a pronunciation; `scripts`: synth-vo.py scripts to voice in `voice`. Bump `run` to re-run with no other change. `name_variants`: voice each script once per way of saying the name (say_name, name_note).",
-  "run": 7,
+  "run": 8,
   "audition": [],
   "voice": "Sulafat",
   "scripts": [],
@@ -12,34 +12,34 @@
       "style": "Playful and warm, like telling a good friend something you're a little excited about: a smile in the voice, bright and proud on the name. Pace: lively and quick, like real chatty conversation between friends, about 170 words a minute; keep pauses short and light, no long dramatic beats."
     },
     {
-      "name": "name-B-Mackeena-note",
-      "voice": "Sulafat",
-      "text": "That's exactly why we made Mackeena. Mackeena. Everything you save, finally useful.",
-      "style": "Playful and warm, like telling a good friend something you're a little excited about: a smile in the voice, bright and proud on the name. Pace: lively and quick, like real chatty conversation between friends, about 170 words a minute; keep pauses short and light, no long dramatic beats. The product name is pronounced MACK-ee-nuh (IPA /ˈmækiːnə/, exactly as the house narrator says it): stress on the FIRST syllable, \"mack\" as in \"mackerel\", then a long \"ee\", then a soft \"nuh\". Never \"mah-KEE-nah\", never \"MAH-chee-nah\", never \"ma-SHEE-nah\"."
-    },
-    {
-      "name": "name-C-Machina-note",
-      "voice": "Sulafat",
-      "text": "That's exactly why we made Machina. Machina. Everything you save, finally useful.",
-      "style": "Playful and warm, like telling a good friend something you're a little excited about: a smile in the voice, bright and proud on the name. Pace: lively and quick, like real chatty conversation between friends, about 170 words a minute; keep pauses short and light, no long dramatic beats. The product name is pronounced MACK-ee-nuh (IPA /ˈmækiːnə/, exactly as the house narrator says it): stress on the FIRST syllable, \"mack\" as in \"mackerel\", then a long \"ee\", then a soft \"nuh\". Never \"mah-KEE-nah\", never \"MAH-chee-nah\", never \"ma-SHEE-nah\"."
-    },
-    {
       "name": "name-D-MACK-ee-nuh",
       "voice": "Sulafat",
       "text": "That's exactly why we made MACK-ee-nuh. MACK-ee-nuh. Everything you save, finally useful.",
       "style": "Playful and warm, like telling a good friend something you're a little excited about: a smile in the voice, bright and proud on the name. Pace: lively and quick, like real chatty conversation between friends, about 170 words a minute; keep pauses short and light, no long dramatic beats."
     },
     {
-      "name": "name-E-Mack-ee-nuh-note",
-      "voice": "Sulafat",
-      "text": "That's exactly why we made Mack-ee-nuh. Mack-ee-nuh. Everything you save, finally useful.",
-      "style": "Playful and warm, like telling a good friend something you're a little excited about: a smile in the voice, bright and proud on the name. Pace: lively and quick, like real chatty conversation between friends, about 170 words a minute; keep pauses short and light, no long dramatic beats. The product name is pronounced MACK-ee-nuh (IPA /ˈmækiːnə/, exactly as the house narrator says it): stress on the FIRST syllable, \"mack\" as in \"mackerel\", then a long \"ee\", then a soft \"nuh\". Never \"mah-KEE-nah\", never \"MAH-chee-nah\", never \"ma-SHEE-nah\"."
-    },
-    {
       "name": "name-F-Makeena-note",
       "voice": "Sulafat",
       "text": "That's exactly why we made Makeena. Makeena. Everything you save, finally useful.",
       "style": "Playful and warm, like telling a good friend something you're a little excited about: a smile in the voice, bright and proud on the name. Pace: lively and quick, like real chatty conversation between friends, about 170 words a minute; keep pauses short and light, no long dramatic beats. The product name is pronounced MACK-ee-nuh (IPA /ˈmækiːnə/, exactly as the house narrator says it): stress on the FIRST syllable, \"mack\" as in \"mackerel\", then a long \"ee\", then a soft \"nuh\". Never \"mah-KEE-nah\", never \"MAH-chee-nah\", never \"ma-SHEE-nah\"."
+    },
+    {
+      "name": "name-G-MAH-kee-nah",
+      "voice": "Sulafat",
+      "text": "That's exactly why we made MAH-kee-nah. MAH-kee-nah. Everything you save, finally useful.",
+      "style": "Playful and warm, like telling a good friend something you're a little excited about: a smile in the voice, bright and proud on the name. Pace: lively and quick, like real chatty conversation between friends, about 170 words a minute; keep pauses short and light, no long dramatic beats."
+    },
+    {
+      "name": "name-H-Mahkeenah-latin-note",
+      "voice": "Sulafat",
+      "text": "That's exactly why we made Mahkeenah. Mahkeenah. Everything you save, finally useful.",
+      "style": "Playful and warm, like telling a good friend something you're a little excited about: a smile in the voice, bright and proud on the name. Pace: lively and quick, like real chatty conversation between friends, about 170 words a minute; keep pauses short and light, no long dramatic beats. The product name \"Machina\" is the Latin word, said the classical Latin way: MAH-kee-nah, stress on the FIRST syllable; \"ch\" is a hard \"k\"; open vowels, \"a\" as in \"father\" (not as in \"cat\"), a short \"ee\", and a clear \"ah\" at the end, not \"nuh\". Never mah-KEE-nah."
+    },
+    {
+      "name": "name-I-Machina-latin-note",
+      "voice": "Sulafat",
+      "text": "That's exactly why we made Machina. Machina. Everything you save, finally useful.",
+      "style": "Playful and warm, like telling a good friend something you're a little excited about: a smile in the voice, bright and proud on the name. Pace: lively and quick, like real chatty conversation between friends, about 170 words a minute; keep pauses short and light, no long dramatic beats. The product name \"Machina\" is the Latin word, said the classical Latin way: MAH-kee-nah, stress on the FIRST syllable; \"ch\" is a hard \"k\"; open vowels, \"a\" as in \"father\" (not as in \"cat\"), a short \"ee\", and a clear \"ah\" at the end, not \"nuh\". Never mah-KEE-nah."
     }
   ],
   "name_variants": [
