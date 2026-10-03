@@ -65,5 +65,8 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "Narration: Gemini TTS takes ($(git rev-parse --short HEAD))"
+          # voicing a script also rewrites its word timings (src/reels/…):
+          # only the takes are committed; the session re-times the picture
+          git reset --hard HEAD
           git pull --rebase origin "${GITHUB_REF_NAME}"
           git push origin "HEAD:${GITHUB_REF_NAME}"
