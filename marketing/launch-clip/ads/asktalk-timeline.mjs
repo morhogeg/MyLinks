@@ -85,16 +85,25 @@ export const HITS = {
  * so no more than 8 words are ever up. `pre` puts the first caption on
  * screen, whole, from frame 0.
  */
+/**
+ * The narrator: Gemini TTS, voice Sulafat, the house narrator (owner,
+ * 2026-10-03). Each line carries its acting note (`style`) and this video's
+ * pace (`pace`, replacing the house one): a friend sharing a discovery. A
+ * take is keyed by its words and its direction
+ * (audio/vo-takes/), so changing either re-voices the line.
+ */
+const PACE = 'Conversational, about 160 words a minute, natural breaths.';
+
 export const CAPTIONS = [
-  { at: beat(0.5), to: beat(9.5), hook: true, pre: true, splits: [8, 13], text: 'You save the good stuff for a reason. So why does most of it slip your mind?' },
-  { at: beat(10), to: beat(17.5), splits: [7], text: 'The talk that made it all click. The article you meant to come back to.' },
-  { at: beat(18), to: beat(22.5), text: "That's exactly why we made Machina.", duck: 0.4 },
-  { at: beat(23.5), to: beat(27.5), text: 'Now you can ask your saves anything.' },
-  { at: beat(28), to: beat(35), splits: [6], text: 'It reads across all your saves… so you get one clear answer.' },
-  { at: beat(35.5), to: beat(45), splits: [6, 9], until: true, text: 'It even finds what connects them… so you see the theme running through your saves.' },
+  { at: beat(0.5), to: beat(9.5), hook: true, pre: true, splits: [8, 13], text: 'You save the good stuff for a reason. So why does most of it slip your mind?', pace: PACE, style: 'Warm and reflective, then a genuine, gently puzzled question.' },
+  { at: beat(10), to: beat(17.5), splits: [7], text: 'The talk that made it all click. The article you meant to come back to.', pace: PACE, style: 'Fond, remembering, a small smile on each.' },
+  { at: beat(18), to: beat(22.5), text: "That's exactly why we made Machina.", pace: PACE, style: 'The turn: bright, warm and proud; the name lands with a smile.', duck: 0.4 },
+  { at: beat(23.5), to: beat(27.5), text: 'Now you can ask your saves anything.', pace: PACE, style: 'Excited, sharing good news with a friend.' },
+  { at: beat(28), to: beat(35), splits: [6], text: 'It reads across all your saves… so you get one clear answer.', pace: PACE, style: 'Clear and quietly impressed.' },
+  { at: beat(35.5), to: beat(45), splits: [6, 9], until: true, text: 'It even finds what connects them… so you see the theme running through your saves.', pace: PACE, style: "Delighted, a little wonder on 'It even'." },
   // the close: the name (the drawn wordmark wipes in as it is said), then the
   // tagline on ONE line, exactly; the music steps back
-  { at: beat(47.5), to: beat(56), place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4 },
+  { at: beat(47.5), to: beat(56), place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', pace: PACE, style: 'A confident, warm sign-off with a smile; the name proud, then the tagline unhurried and sincere.', duck: 0.4 },
 ];
 
 export const TOTAL_FRAMES = CAPTIONS[CAPTIONS.length - 1].to;

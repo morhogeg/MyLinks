@@ -92,19 +92,28 @@ export const TYPE_STEP = 1;
  * but shows it as two captions, the second arriving with word n, so no more
  * than 8 words are ever up at once. `\n` is a break on screen only.
  */
+/**
+ * The narrator: Gemini TTS, voice Sulafat, the house narrator (owner,
+ * 2026-10-03). Each line carries its acting note (`style`) and this video's
+ * pace (`pace`, replacing the house one): intriguing, a little magical,
+ * then confident delight. A take is keyed by its words and its direction
+ * (audio/vo-takes/), so changing either re-voices the line.
+ */
+const PACE = 'Brisk but unhurried, about 160 words a minute.';
+
 export const CAPTIONS = [
-  { at: beat(0.5), to: beat(4.5), hook: true, pre: true, text: 'What if your saves\ncould talk back?' },
-  { at: beat(5.5), to: beat(8.5), text: 'With Machina, they can.', duck: 0.4 },
-  { at: beat(9.5), to: beat(13.5), text: "Ask it about\nanything you've saved." },
-  { at: beat(17), to: beat(23.5), split: 5, text: 'Even across hundreds of saves,\nyou get one clear answer.' },
+  { at: beat(0.5), to: beat(4.5), hook: true, pre: true, text: 'What if your saves\ncould talk back?', pace: PACE, style: 'Intriguing, playful wonder; the question hangs in the air, a small suspenseful pause after it.' },
+  { at: beat(5.5), to: beat(8.5), text: 'With Machina, they can.', pace: PACE, style: 'Confident, a small knowing smile, answering the riddle.', duck: 0.4 },
+  { at: beat(9.5), to: beat(13.5), text: "Ask it about\nanything you've saved.", pace: PACE, style: 'Inviting and easy.' },
+  { at: beat(17), to: beat(23.5), split: 5, text: 'Even across hundreds of saves,\nyou get one clear answer.', pace: PACE, style: "Impressed and clear; emphasis on 'one clear answer'." },
   // (round 5, owner: the graph plays under "you never noticed.", so the line
   // stays up while it blooms: `until`)
-  { at: beat(24), to: beat(32), split: 7, until: true, text: 'And it finds the themes and connections\nyou never noticed.' },
+  { at: beat(24), to: beat(32), split: 7, until: true, text: 'And it finds the themes and connections\nyou never noticed.', pace: PACE, style: 'Delighted wonder, opening up at the end.' },
   // the call to action, said as the mark strikes and the wordmark wipes in on
   // the name; never on screen (owner, round 5: keep the narration, not the text)
-  { at: beat(37), to: beat(40), text: 'Download Machina.', cta: true, hidden: true, duck: 0.4 },
+  { at: beat(37), to: beat(40), text: 'Download Machina.', pace: PACE, style: 'Warm, confident invitation, not pushy.', cta: true, hidden: true, duck: 0.4 },
   // the close: the tagline on ONE line, exactly; the music steps back
-  { at: beat(40), to: beat(47), place: 'lockup', text: 'Everything you save, finally useful.', duck: 0.4 },
+  { at: beat(40), to: beat(47), place: 'lockup', text: 'Everything you save, finally useful.', pace: PACE, style: 'Sincere, warm and unhurried; the closing thought.', duck: 0.4 },
 ];
 
 export const TOTAL_FRAMES = CAPTIONS[CAPTIONS.length - 1].to;
