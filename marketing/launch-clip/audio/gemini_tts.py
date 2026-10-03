@@ -7,14 +7,16 @@
 # `speech_metadata.style`) sets the delivery: warm, unhurried, a person
 # talking to a friend. A line may carry its own note (a caption's `style`).
 #
-# Needs (the container blocks both by default):
-#   - GEMINI_API_KEY in the environment (an AI Studio key; paid tier: the free
-#     tier allows only 10 TTS requests a day, and a script is one per line)
-#   - network access to generativelanguage.googleapis.com
+# A NEW line needs GEMINI_API_KEY and network access to
+# generativelanguage.googleapis.com. Cloud sessions have neither, so new lines
+# are voiced on GitHub by .github/workflows/narration-tts.yml (it holds the
+# repo's GEMINI_API_KEY secret): edit audio/narration-request.json, push, and
+# the workflow commits the takes back.
 #
-# Every line is cached by (model, voice, style, text) in out/vo/gemini-cache/,
-# so a re-run only pays for lines that changed (the cache is gitignored and
-# lives with the container; what persists is the committed mix).
+# THE TAKES: every line is kept by (model, voice, style, text) in
+# audio/vo-takes/ (committed, FLAC), so any session re-uses a voiced line with
+# no key and no network, a re-run only pays for lines that changed, and a take
+# the owner liked is never re-rolled.
 #
 #   GEMINI_VOICE=Sulafat VO_ENGINE=gemini python3 audio/synth-vo.py adtodo
 #   python3 audio/vo-audition.py      # one line in several voices, to choose
@@ -28,6 +30,7 @@ import urllib.error
 import urllib.request
 
 import numpy as np
+import soundfile as sf
 
 MODEL = os.environ.get("GEMINI_TTS_MODEL", "gemini-3.8-flash-tts")
 # a warm prebuilt voice; the owner picks the house voice by ear (vo-audition.py)
@@ -42,12 +45,14 @@ STYLE = (
     "land softly; no sales emphasis, no rising 'presenter' tone."
 )
 
+TAKES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vo-takes")
+
 ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
 
 def _cache_path(cache_dir, text, voice, style):
     key = hashlib.sha256(json.dumps([MODEL, voice, style, text]).encode()).hexdigest()[:20]
-    return os.path.join(cache_dir, f"{key}.npy")
+    return os.path.join(cache_dir, f"{key}.flac")
 
 
 def _request(text, voice, style):
@@ -98,15 +103,20 @@ def _trim(samples, sr, keep=0.03):
     return samples[a:b]
 
 
-def synth(text, cache_dir, voice=None, style=None):
-    """(samples, sample_rate) for one line, from the cache when it is there."""
-    if not os.environ.get("GEMINI_API_KEY"):
-        raise SystemExit("VO_ENGINE=gemini needs GEMINI_API_KEY in the environment")
+def synth(text, cache_dir=TAKES, voice=None, style=None):
+    """(samples, sample_rate) for one line: the committed take when there is
+    one, else a new one from the API (kept for next time)."""
     voice, style = voice or VOICE, style or STYLE
-    os.makedirs(cache_dir, exist_ok=True)
     path = _cache_path(cache_dir, text, voice, style)
     if os.path.exists(path):
-        return np.load(path), SR
+        samples, sr = sf.read(path, dtype="float32")
+        return samples, sr
+    if not os.environ.get("GEMINI_API_KEY"):
+        raise SystemExit(
+            f"no take for {voice!r}: {text[:60]!r}… — voice it on GitHub "
+            "(audio/narration-request.json + push), or set GEMINI_API_KEY"
+        )
+    os.makedirs(cache_dir, exist_ok=True)
     samples = _trim(_request(text, voice, style), SR)
-    np.save(path, samples)
+    sf.write(path, samples, SR, subtype="PCM_16")
     return samples, SR

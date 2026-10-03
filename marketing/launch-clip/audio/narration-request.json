@@ -1,0 +1,7 @@
+{
+  "_": "Voice narration on GitHub with Gemini TTS (.github/workflows/narration-tts.yml). Edit, commit, push: the workflow voices what is listed and commits the takes to audio/vo-takes/. `audition`: voices for audio/vo-audition.py; `scripts`: synth-vo.py scripts to voice in `voice`. Bump `run` to re-run with no other change.",
+  "run": 1,
+  "audition": ["Sulafat", "Achernar", "Aoede", "Leda", "Achird", "Umbriel"],
+  "voice": "Sulafat",
+  "scripts": []
+}

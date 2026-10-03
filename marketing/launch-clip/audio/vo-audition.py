@@ -3,6 +3,9 @@
 # one request per voice. The owner picks the voice by ear; it then becomes the
 # house voice (GEMINI_VOICE, or gemini_tts.VOICE) for every video.
 #
+# (New voices are voiced on GitHub: audio/narration-request.json + push; once
+# their takes are committed this runs anywhere, no key needed.)
+#
 #   python3 audio/vo-audition.py                  # → out/vo/audition/<voice>.wav
 #   python3 audio/vo-audition.py Sulafat Achird   # just these voices
 
@@ -22,12 +25,12 @@ OUT = os.path.join(os.path.dirname(HERE), "out", "vo", "audition")
 CANDIDATES = ["Sulafat", "Achernar", "Aoede", "Leda", "Achird", "Umbriel"]
 
 TEXT = (
-    "Okay, be honest. How many things did you save this month... and never open again? "
+    "Okay, be honest. How many things did you save this month… and never open again? "
     "That's exactly why we made Makeena."
 )
 
 os.makedirs(OUT, exist_ok=True)
 for voice in sys.argv[1:] or CANDIDATES:
-    samples, sr = gemini_tts.synth(TEXT, os.path.join(OUT, "cache"), voice=voice)
+    samples, sr = gemini_tts.synth(TEXT, voice=voice)
     sf.write(os.path.join(OUT, f"{voice}.wav"), np.asarray(samples), sr)
     print(f"{voice:10s} {len(samples) / sr:5.2f}s")

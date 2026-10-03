@@ -23,7 +23,6 @@ import subprocess
 import sys
 
 import soundfile as sf
-from kokoro_onnx import Kokoro
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -225,8 +224,10 @@ def main():
         import gemini_tts
 
         def speak(line):
-            return gemini_tts.synth(line["text"], os.path.join(VO, "gemini-cache"), style=line.get("style"))
+            return gemini_tts.synth(line["text"], style=line.get("style"))
     else:
+        from kokoro_onnx import Kokoro
+
         k = Kokoro(os.path.join(VO, "kokoro-v1.0.onnx"), os.path.join(VO, "voices-v1.0.bin"))
 
         def speak(line):

@@ -244,20 +244,31 @@ engine for the SAME pipeline: `synth-vo.py` writes the same `line-NN.wav`,
 manifest and word timings, so every clip, ad, mix and verify gate works
 unchanged. A caption may carry its own `style` note.
 
+**Where it runs.** Cloud sessions can't reach Google's API and don't hold a
+key, so new lines are to be voiced ON GITHUB by a workflow,
+`.github/workflows/narration-tts.yml` (NOT yet added: it awaits the owner's
+approval, since it uses a repo secret), or locally with `GEMINI_API_KEY` set
+and the host allowed. The workflow runs
+with the repo's existing `GEMINI_API_KEY` secret (the one the Cloud Functions
+use; never printed). Edit `audio/narration-request.json` (voices to audition,
+scripts to voice and in which voice), commit, push: the workflow commits the
+takes back to the same branch as `audio/vo-takes/*.flac`, one per line, keyed
+by model, voice, direction and words. Every session then re-uses them with no
+key and no network:
+
 ```bash
+git pull                                              # after the workflow's commit
 python3 audio/vo-audition.py                          # 2 lines × 6 voices → out/vo/audition/
-GEMINI_VOICE=Sulafat VO_ENGINE=gemini python3 audio/synth-vo.py adtodo   # any script
+GEMINI_VOICE=Sulafat VO_ENGINE=gemini python3 audio/synth-vo.py adtodo   # from the takes
 node audio/mix-vo.mjs adtodo                          # then re-time and re-render as usual
 ```
 
-It needs two things this container does not have: a `GEMINI_API_KEY`
-environment variable (an AI Studio key on the paid tier: the free tier allows
-10 TTS requests a day, and a script is one per line; a 48s ad is about 1,200
-audio tokens, around a cent), and `generativelanguage.googleapis.com` allowed
-in the environment's network access. Kokoro stays the default until the owner
-picks a Gemini voice by ear; then it becomes the one narrator for every video.
-Gemini voices read the words differently from Kokoro, so a re-voiced video's
-lines get new lengths and its picture is re-timed to them.
+The key's tier matters: the free tier allows 10 TTS requests a day (a script
+is one per line); on the paid tier a 48s ad is about 1,200 audio tokens,
+around a cent. Kokoro stays the default until the owner picks a Gemini voice
+by ear; then it becomes the one narrator for every video. Gemini voices read
+the words differently from Kokoro, so a re-voiced video's lines get new
+lengths and its picture is re-timed to them.
 
 ## The score
 
