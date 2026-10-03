@@ -69,9 +69,11 @@ def performed(text):
     return text.replace("Machina", SAY_NAME).replace("Makeena", SAY_NAME)
 
 
-def direct(style):
-    """A line's direction: its own note, else the house one; plus the name note."""
-    note = (style or STYLE) + PACE
+def direct(style, pace=None):
+    """A line's direction: its own note, else the house one; its own pace
+    (a video sets its own: a launch film is not a social ad), else the house
+    PACE; plus the name note."""
+    note = (style or STYLE) + (f" Pace: {pace}" if pace else PACE)
     return note if os.environ.get("GEMINI_NAME_NOTE") == "0" else note + NAME_NOTE
 
 

@@ -147,6 +147,8 @@ def clip_script(name):
             "max_pause": c.get("maxPause"),
             # and its tempo (1.1 = 10% quicker, pitch kept; gemini_tts.stretch)
             "tempo": c.get("tempo"),
+            # and its pace note, replacing the house one (gemini_tts.direct)
+            "pace": c.get("pace"),
         }
         for c in data["captions"]
     ]
@@ -319,7 +321,7 @@ def main():
         import gemini_tts
 
         def speak(line):
-            samples, sr = gemini_tts.synth(gemini_tts.performed(line.get("tts") or line["text"]), style=gemini_tts.direct(line.get("style")))
+            samples, sr = gemini_tts.synth(gemini_tts.performed(line.get("tts") or line["text"]), style=gemini_tts.direct(line.get("style"), line.get("pace")))
             if os.environ.get("NARRATION_TAKES_ONLY"):
                 # on GitHub (narration-tts.yml) only the raw takes are needed;
                 # the shaping below runs where the ad is built (it needs ffmpeg)
