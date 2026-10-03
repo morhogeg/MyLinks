@@ -230,17 +230,17 @@ export const CARDS = [
     status: 'unread',
   },
   {
-    id: 'greatwork',
-    url: 'https://paulgraham.com/greatwork.html',
-    title: 'How to Do Great Work',
+    id: 'question',
+    url: 'https://markmanson.net/question',
+    title: 'The Most Important Question of Your Life',
     summary:
-      'Choose work you have a natural aptitude for and a deep interest in, learn enough to reach the frontier, then notice the gaps. Curiosity, delight and the desire to do something impressive, in that order.',
+      'Everybody wants the rewards. Mark Manson on the question that shapes a life: what pain are you willing to sustain? Choose the struggle you can live with, and the result follows.',
     category: 'Career',
-    tags: ['curiosity', 'ambition'],
-    concepts: ['work', 'curiosity', 'career'],
+    tags: ['purpose', 'motivation'],
+    concepts: ['work', 'purpose', 'career'],
     sourceType: 'web',
-    sourceName: 'Paul Graham',
-    readTime: 45,
+    sourceName: 'Mark Manson',
+    readTime: 8,
     age: 34,
     status: 'unread',
   },
@@ -473,9 +473,9 @@ export const EDGES = [
   ['naval', 'systems', 'Small repeated actions that compound.', ['compounding']],
   ['money', 'naval', 'Wealth as behavior, not luck.', ['wealth']],
   ['money', 'systems', 'Small choices, repeated, compound.', ['compounding']],
-  ['naval', 'greatwork', 'Choosing work you would do for its own sake.', ['career']],
-  ['greatwork', 'jobs', 'Do what you love, and trust the dots.', ['work']],
-  ['greatwork', 'bretvictor', 'Following a principle to the frontier.', ['work', 'craft']],
+  ['naval', 'question', 'Choosing the game you are willing to play for years.', ['career']],
+  ['question', 'jobs', 'Do what you love, and keep choosing it.', ['work']],
+  ['question', 'bretvictor', 'Finding the cause worth struggling for.', ['work', 'craft']],
   ['bretvictor', 'rams', 'Tools and objects that respect the person using them.', ['design']],
   ['lawsofux', 'rams', 'Principles for designing what people use.', ['design']],
   ['lawsofux', 'bretvictor', 'Designing for the person on the other side.', ['design']],
@@ -531,7 +531,7 @@ export const COLLECTIONS = [
 ];
 
 /** Today's Daily Brew: five older saves nobody has opened in weeks. */
-export const DAILY_BREW = ['greatwork', 'rams', 'jobs', 'bretvictor', 'optimistic'];
+export const DAILY_BREW = ['question', 'rams', 'jobs', 'bretvictor', 'optimistic'];
 
 /** The Ask exchange (the reel's hero). Three sources, three platforms. */
 export const ASK = {

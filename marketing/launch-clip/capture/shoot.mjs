@@ -596,7 +596,7 @@ const takes = {
     await t.freeze();
     await visible(page.getByText('Review 5 cards')).click();
     t.mark('deck');
-    await t.roll(14, { rects: { card: ['.surface-card', 'How to Do Great Work'] } });
+    await t.roll(14, { rects: { card: ['.surface-card', 'The Most Important Question of Your Life'] } });
     // Keep, Keep, Keep: each is the deck's real fling and the next card settling
     for (let k = 0; k < 3; k++) {
       await t.thaw();
@@ -604,7 +604,7 @@ const takes = {
       await t.freeze();
       await page.keyboard.press('ArrowRight');
       t.mark(`fling${k}`);
-      await t.roll(16, { rects: { card: ['.surface-card', ['How to Do Great Work', 'Dieter Rams', 'Steve Jobs'][k]] } });
+      await t.roll(16, { rects: { card: ['.surface-card', ['The Most Important Question of Your Life', 'Dieter Rams', 'Steve Jobs'][k]] } });
     }
     await t.thaw();
     return t.save();
