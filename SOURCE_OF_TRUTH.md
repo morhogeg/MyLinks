@@ -2727,8 +2727,13 @@ exact-match, capped.
   direction note, per-line `style`, a per-line cache, and
   `audio/vo-audition.py` (6 voices). **Not verified:** never called; the
   container blocks `generativelanguage.googleapis.com` and has no key.
-  **Owner action:** add `GEMINI_API_KEY` (paid tier) to the environment and
-  allow that host; then audition, pick the house voice, re-voice.
+  Takes are kept in `audio/vo-takes/` (FLAC, committed, re-used by every
+  session with no key). Owner: use the key the app already has; it is a repo
+  secret, so lines would be voiced on GitHub by a workflow
+  (`narration-tts.yml`, on a push changing `audio/narration-request.json`).
+  **That workflow is NOT committed:** it awaits the owner's explicit go-ahead
+  to use the repo secret (alternative: `GEMINI_API_KEY` in the environment
+  plus the host allowed).
 - **2026-10-03 — META AD 3, round 6: a person talking, not an ad.**
   Branch `claude/ad-todo`. Owner on round 5: "far too slim, the narration
   sounds robotic… explain further and talk more". Approved script, spoken
