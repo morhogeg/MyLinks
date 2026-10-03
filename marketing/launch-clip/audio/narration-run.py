@@ -15,6 +15,9 @@ ok = True
 if req.get("audition"):
     r = subprocess.run([sys.executable, os.path.join(HERE, "vo-audition.py"), *req["audition"]])
     ok = ok and r.returncode == 0
+if req.get("takes"):
+    r = subprocess.run([sys.executable, os.path.join(HERE, "vo-audition.py"), "--takes"])
+    ok = ok and r.returncode == 0
 for script in req.get("scripts", []):
     env = {**os.environ, "VO_ENGINE": "gemini", "GEMINI_VOICE": req.get("voice", "Sulafat")}
     # synth-vo exits 1 when a line overruns its caption window: the takes are

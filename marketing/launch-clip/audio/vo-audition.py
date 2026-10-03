@@ -8,6 +8,7 @@
 #
 #   python3 audio/vo-audition.py                  # → out/vo/audition/<voice>.wav
 #   python3 audio/vo-audition.py Sulafat Achird   # just these voices
+#   python3 audio/vo-audition.py --takes          # the request's named takes
 
 import os
 import sys
@@ -30,6 +31,19 @@ TEXT = (
 )
 
 os.makedirs(OUT, exist_ok=True)
+
+# named takes from audio/narration-request.json (`takes`: name, voice, text,
+# style): a direction or a pronunciation to try, each written to <name>.wav
+if sys.argv[1:] == ["--takes"]:
+    import json
+
+    req = json.load(open(os.path.join(HERE, "narration-request.json")))
+    for t in req.get("takes", []):
+        samples, sr = gemini_tts.synth(t["text"], voice=t["voice"], style=t.get("style"))
+        sf.write(os.path.join(OUT, f"{t['name']}.wav"), np.asarray(samples), sr)
+        print(f"{t['name']:28s} {len(samples) / sr:5.2f}s")
+    sys.exit(0)
+
 for voice in sys.argv[1:] or CANDIDATES:
     samples, sr = gemini_tts.synth(TEXT, voice=voice)
     sf.write(os.path.join(OUT, f"{voice}.wav"), np.asarray(samples), sr)

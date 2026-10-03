@@ -1,7 +1,45 @@
 {
-  "_": "Voice narration on GitHub with Gemini TTS (.github/workflows/narration-tts.yml). Edit, commit, push: the workflow voices what is listed and commits the takes to audio/vo-takes/. `audition`: voices for audio/vo-audition.py; `scripts`: synth-vo.py scripts to voice in `voice`. Bump `run` to re-run with no other change.",
-  "run": 2,
-  "audition": ["Sulafat", "Achernar", "Aoede", "Leda", "Achird", "Umbriel"],
+  "_": "Voice narration on GitHub with Gemini TTS (.github/workflows/narration-tts.yml). Edit, commit, push: the workflow voices what is listed and commits the takes to audio/vo-takes/. `audition`: voices for audio/vo-audition.py; `takes`: named takes (voice, text, style) to try a direction or a pronunciation; `scripts`: synth-vo.py scripts to voice in `voice`. Bump `run` to re-run with no other change.",
+  "run": 3,
+  "audition": [],
   "voice": "Sulafat",
-  "scripts": []
+  "scripts": [],
+  "takes": [
+    {
+      "name": "1-Sulafat-playful",
+      "voice": "Sulafat",
+      "style": "Playful and warm, like telling a good friend something you're a little excited about: a smile in the voice, light teasing on 'be honest', a beat of mock guilt on 'never open again', bright and proud on the name. Conversational and unhurried, with natural breaths and small pauses at commas and ellipses. Never an announcer, never salesy.",
+      "text": "Okay, be honest. How many things did you save this month… and never open again? That's exactly why we made Makeena."
+    },
+    {
+      "name": "2-Leda-playful",
+      "voice": "Leda",
+      "style": "Playful and warm, like telling a good friend something you're a little excited about: a smile in the voice, light teasing on 'be honest', a beat of mock guilt on 'never open again', bright and proud on the name. Conversational and unhurried, with natural breaths and small pauses at commas and ellipses. Never an announcer, never salesy.",
+      "text": "Okay, be honest. How many things did you save this month… and never open again? That's exactly why we made Makeena."
+    },
+    {
+      "name": "3-Aoede-playful",
+      "voice": "Aoede",
+      "style": "Playful and warm, like telling a good friend something you're a little excited about: a smile in the voice, light teasing on 'be honest', a beat of mock guilt on 'never open again', bright and proud on the name. Conversational and unhurried, with natural breaths and small pauses at commas and ellipses. Never an announcer, never salesy.",
+      "text": "Okay, be honest. How many things did you save this month… and never open again? That's exactly why we made Makeena."
+    },
+    {
+      "name": "name-A-Makeena",
+      "voice": "Sulafat",
+      "style": "Playful and warm, like telling a good friend something you're a little excited about: a smile in the voice, light teasing on 'be honest', a beat of mock guilt on 'never open again', bright and proud on the name. Conversational and unhurried, with natural breaths and small pauses at commas and ellipses. Never an announcer, never salesy.",
+      "text": "That's exactly why we made Makeena. Makeena. Everything you save, finally useful."
+    },
+    {
+      "name": "name-B-Machina-with-note",
+      "voice": "Sulafat",
+      "style": "Playful and warm, like telling a good friend something you're a little excited about: a smile in the voice, light teasing on 'be honest', a beat of mock guilt on 'never open again', bright and proud on the name. Conversational and unhurried, with natural breaths and small pauses at commas and ellipses. Never an announcer, never salesy. The product name \"Machina\" is pronounced mah-KEE-nah: three syllables, stress on the middle one, the \"ch\" said as a hard \"k\" (as in \"machine\" in Latin), never \"MAH-chee-nah\" or \"ma-SHEE-nah\".",
+      "text": "That's exactly why we made Machina. Machina. Everything you save, finally useful."
+    },
+    {
+      "name": "name-C-Mah-keena",
+      "voice": "Sulafat",
+      "style": "Playful and warm, like telling a good friend something you're a little excited about: a smile in the voice, light teasing on 'be honest', a beat of mock guilt on 'never open again', bright and proud on the name. Conversational and unhurried, with natural breaths and small pauses at commas and ellipses. Never an announcer, never salesy.",
+      "text": "That's exactly why we made Mah-keena. Mah-keena. Everything you save, finally useful."
+    }
+  ]
 }
