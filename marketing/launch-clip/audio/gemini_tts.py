@@ -239,7 +239,7 @@ def gate(samples, sr, below=30.0, depth=40.0, look=0.01, release=0.025):
     return samples * gain
 
 
-def to_the_words(samples, sr, before=0.06, after=0.12, fade=0.02):
+def to_the_words(samples, sr, before=0.06, after=0.15, fade=0.03):
     """Trim a line to its words: Gemini opens each take with a click and a
     breath in (about 0.4s before "Okay"), and often breathes out after the
     last word. Keep `before`/`after` seconds around the first and last
@@ -256,7 +256,14 @@ def to_the_words(samples, sr, before=0.06, after=0.12, fade=0.02):
     if not len(loud):
         return samples
     a = max(0, loud[0] * hop - int(before * sr))
-    b = min(len(samples), (loud[-1] + 5) * hop + int(after * sr))
+    # the END by a much lower bar: a line's last word is often said softer
+    # than the rest ("…in one PLACE", "…we made MACHINA"), and the loud bar
+    # cut it off; anything clearly above silence (30dB under the line's
+    # typical loud level, for 30ms) is speech, then `after` to let it decay
+    some = rms >= np.percentile(rms, 95) * 0.03
+    tail = np.nonzero(np.convolve(some.astype(int), np.ones(3, int), "valid") == 3)[0]
+    last = max(loud[-1] + 5, (tail[-1] + 3) if len(tail) else 0)
+    b = min(len(samples), last * hop + int(after * sr))
     # back off to where the sound actually starts / dies away before the edge
     quiet = peak.max() * 0.02
     i = a // hop
