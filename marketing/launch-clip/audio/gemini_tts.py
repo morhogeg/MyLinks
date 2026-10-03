@@ -45,6 +45,27 @@ STYLE = (
     "land softly; no sales emphasis, no rising 'presenter' tone."
 )
 
+# THE NAME: how the words given to Gemini spell "Machina" (GEMINI_SAY_NAME),
+# and an optional note on how to say it, appended to every direction
+# (GEMINI_NAME_NOTE=1). Chosen by ear from the pronunciation audition.
+SAY_NAME = os.environ.get("GEMINI_SAY_NAME", "Makeena")
+NAME_NOTE = (
+    ' The product name "Machina" is pronounced mah-KEE-nah: three syllables, stress on the '
+    'middle one, the "ch" said as a hard "k" (as in "machine" in Latin), never "MAH-chee-nah" or "ma-SHEE-nah".'
+)
+
+
+def performed(text):
+    """The words as Gemini gets them: the name spelled for its ear."""
+    return text.replace("Machina", SAY_NAME).replace("Makeena", SAY_NAME)
+
+
+def direct(style):
+    """A line's direction: its own note, else the house one; plus the name note."""
+    note = style or STYLE
+    return note + NAME_NOTE if os.environ.get("GEMINI_NAME_NOTE") else note
+
+
 TAKES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vo-takes")
 
 ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"

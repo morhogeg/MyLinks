@@ -136,8 +136,12 @@ def clip_script(name):
             # a clip or ad may set its own delivery speed per line (the Meta ad
             # 3 script, round 6: a natural conversational pace)
             "speed": c.get("speed", SPEED),
-            # a line's own direction for Gemini TTS (VO_ENGINE=gemini), if any
+            # Gemini TTS only (VO_ENGINE=gemini): the line's own acting note, and
+            # the words as performed, with inline vocal tags (<chuckle>,
+            # <short pause>…) and the real name; Kokoro ignores both, and the
+            # word timing, manifest and captions keep the plain words above
             "style": c.get("style"),
+            "tts": " ".join((c.get("tts") or c.get("say") or c["text"]).split()),
         }
         for c in data["captions"]
     ]
@@ -224,7 +228,7 @@ def main():
         import gemini_tts
 
         def speak(line):
-            return gemini_tts.synth(line["text"], style=line.get("style"))
+            return gemini_tts.synth(gemini_tts.performed(line.get("tts") or line["text"]), style=gemini_tts.direct(line.get("style")))
     else:
         from kokoro_onnx import Kokoro
 

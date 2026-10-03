@@ -122,39 +122,47 @@ const line = (at, to, say, chunks, extra = {}) => ({
   ...extra,
 });
 
+/**
+ * Gemini TTS direction (audio/gemini_tts.py, VO_ENGINE=gemini; Kokoro ignores
+ * it): `style`, the line's acting note, and `tts`, the words as performed,
+ * with inline vocal tags. The captions, word timing and verify keep the plain
+ * words.
+ */
+const act = (style, tts) => (tts ? { style, tts } : { style });
+
 export const CAPTIONS = [
   line(8, 168, 'Okay, be honest. How many things did you save this month… and never open again?', [
     [3, 'How many things did you save\nthis month…'],
     [11, '…and never open again?'],
-  ], { hook: true }),
-  line(168, 224, 'That video you’d watch later.', [[0, 'That video you’d watch later.']]),
-  line(224, 264, 'The post you loved.', [[0, 'The post you loved.']]),
-  line(264, 296, 'That article.', [[0, 'That article.']]),
-  line(296, 368, 'The screenshot you swore you’d remember.', [[0, 'The screenshot you swore\nyou’d remember.']]),
+  ], { hook: true, ...act('Leaning in with a knowing, playful smile, gently teasing a friend; a beat of mock guilt on "and never open again?"', 'Okay, be honest. <short pause> How many things did you save this month… and never open again?') }),
+  line(168, 224, 'That video you’d watch later.', [[0, 'That video you’d watch later.']], act('Wry and amused, naming the first familiar culprit; a light, rhythmic list read')),
+  line(224, 264, 'The post you loved.', [[0, 'The post you loved.']], act('Fond, a little wistful, still smiling')),
+  line(264, 296, 'That article.', [[0, 'That article.']], act('Deadpan, knowing; a tiny chuckle after it', 'That article. <chuckle>')),
+  line(296, 368, 'The screenshot you swore you’d remember.', [[0, 'The screenshot you swore\nyou’d remember.']], act('Playfully incredulous, smiling: we both know how that went')),
   line(368, 488, 'They’re all still out there, buried across a dozen different apps.', [
     [0, 'They’re all still out there,'],
     [5, 'buried across a dozen\ndifferent apps.'],
-  ]),
-  line(488, 568, 'That’s exactly why we made Machina.', [[0, 'That’s exactly why\nwe made Machina.']]),
-  line(568, 640, 'From any app, just share to Machina.', [[0, 'From any app,\njust share to Machina.']]),
+  ], act('Sympathetic and a touch lower, with a soft sigh before "buried"', 'They’re all still out there, <sigh> buried across a dozen different apps.')),
+  line(488, 568, 'That’s exactly why we made Machina.', [[0, 'That’s exactly why\nwe made Machina.']], act('Turning bright: the reveal, warm and proud, the name landing with a smile')),
+  line(568, 640, 'From any app, just share to Machina.', [[0, 'From any app,\njust share to Machina.']], act('Easy and reassuring, like it is the simplest thing in the world')),
   line(640, 784, 'Videos, posts, articles, screenshots… it all lands in one place.', [
     [0, 'Videos, posts, articles,\nscreenshots…'],
     [4, '…it all lands in one place.'],
-  ]),
-  line(784, 848, 'Then Machina gets to work.', [[0, 'Then Machina gets to work.']]),
+  ], act('A quick, light rhythm through the list, then relaxed and satisfied on "it all lands in one place"')),
+  line(784, 848, 'Then Machina gets to work.', [[0, 'Then Machina gets to work.']], act('Playful anticipation, like about to show a friend a good trick')),
   line(848, 1080, 'It analyzes every save, summarizes it, and pulls out the key points… so you’ll always remember why you kept it.', [
     [0, 'It analyzes every save,\nsummarizes it,'],
     [6, 'and pulls out the key points,'],
     [12, 'so you’ll always remember\nwhy you kept it.'],
-  ]),
+  ], act('Genuinely enthusiastic but natural, explaining something you love; warm and reassuring on "so you’ll always remember why you kept it"')),
   line(1080, HITS.out, 'It even connects each save to related ones you’ve kept before… so your ideas start building on each other.', [
     [0, 'It even connects each save'],
     [5, 'to related ones\nyou’ve kept before,'],
     [11, 'so your ideas start\nbuilding on each other.'],
-  ]),
+  ], act('Delighted, a little wonder on "It even", building gently to a satisfied "building on each other"')),
   // the close, on the lockup: the wordmark wipes in on "Machina"; the tagline,
   // exactly, closes (owner, 2026-09-28: every film ends on it)
-  { at: HITS.markStrike + 8, to: TOTAL_FRAMES, place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4, showFirstLine: false },
+  { at: HITS.markStrike + 8, to: TOTAL_FRAMES, place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4, showFirstLine: false, ...act('A confident, warm sign-off with a smile; the name proud, then the tagline unhurried and sincere', 'Machina. <short pause> Everything you save, finally useful.') },
 ];
 
 /** no chapter words */
