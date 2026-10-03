@@ -124,6 +124,29 @@ def _request(text, voice, style):
     return np.frombuffer(pcm, dtype="<i2").astype(np.float32) / 32768
 
 
+def unwrap(samples):
+    """Gemini 3.8 TTS returns a WAV FILE, not raw samples: a RIFF header (heard
+    as a click at the start of every line) and, after the audio, a C2PA chunk
+    (Google's Content Credentials, ~6KB; heard as ~0.12s of loud static after
+    every sentence). Read the bytes as the file they are and keep only the
+    `data` chunk. Takes saved before this fix hold the whole file byte for
+    byte (the header and the C2PA chunk are loud, so `_trim` kept them), so
+    they unwrap the same way. Anything that is not a RIFF file passes through."""
+    import struct
+
+    pcm = np.round(np.asarray(samples) * 32768).clip(-32768, 32767).astype("<i2").tobytes()
+    if pcm[:4] != b"RIFF" or pcm[8:12] != b"WAVE":
+        return samples
+    pos = 12
+    while pos + 8 <= len(pcm):
+        cid, size = pcm[pos:pos + 4], struct.unpack("<I", pcm[pos + 4:pos + 8])[0]
+        if cid == b"data":
+            data = pcm[pos + 8:pos + 8 + size]
+            return np.frombuffer(data[: len(data) // 2 * 2], dtype="<i2").astype(np.float32) / 32768
+        pos += 8 + size + (size & 1)
+    return samples
+
+
 def _trim(samples, sr, keep=0.03):
     """Trim the silence the model leaves before and after the speech to `keep`
     seconds, so a line starts on its caption's frame."""
@@ -260,7 +283,7 @@ def synth(text, cache_dir=TAKES, voice=None, style=None):
     path = _cache_path(cache_dir, text, voice, style)
     if os.path.exists(path):
         samples, sr = sf.read(path, dtype="float32")
-        return samples, sr
+        return unwrap(samples), sr
     if not os.environ.get("GEMINI_API_KEY"):
         print(
             f"no take for {voice!r}: {text[:60]!r}… — voice it on GitHub "
@@ -269,6 +292,6 @@ def synth(text, cache_dir=TAKES, voice=None, style=None):
         )
         sys.exit(3)
     os.makedirs(cache_dir, exist_ok=True)
-    samples = _trim(_request(text, voice, style), SR)
+    samples = _trim(unwrap(_request(text, voice, style)), SR)
     sf.write(path, samples, SR, subtype="PCM_16")
     return samples, SR

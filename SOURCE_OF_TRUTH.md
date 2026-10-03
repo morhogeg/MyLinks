@@ -2720,6 +2720,18 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-03 — Gemini TTS static: it was the file's C2PA chunk.**
+  Branch `claude/ad-todo`. Owner: static between sentences (after "never
+  open again"). Gemini 3.8 TTS returns a WAV FILE (RIFF header + data +
+  a ~6KB C2PA Content Credentials chunk), not raw PCM; read as samples, the
+  header was a click before every line and the C2PA chunk ~0.12s of loud
+  static after it. `gemini_tts.unwrap` keeps only the `data` chunk (saved
+  takes hold the whole file, so they unwrap too; nothing re-voiced). Also
+  this round: a noise gate on Gemini lines, the problem section 1.1x
+  (Rubber Band) with tighter gaps (owner: "punchier"), no noise whooshes
+  under the narration, the chuckle dropped. Ad now **48.8s**. **Verified:**
+  noise-burst scan clean on every line; >5kHz after "again?" -73 dB (speech
+  +12 dB); `npm run verify` exit 0.
 - **2026-10-03 — META AD 3 voiced by Gemini TTS.** Branch `claude/ad-todo`.
   Owner: Gemini 3.8 TTS "for much better narration", "use its full
   abilities", Sulafat, "a bit more playful", and say Machina properly. Lines

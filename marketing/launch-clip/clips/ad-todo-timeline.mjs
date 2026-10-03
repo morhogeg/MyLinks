@@ -61,26 +61,26 @@ export const TAKE = 'adTodo';
 export const HITS = {
   // 1 THE PAIN (Hook.tsx): the saves are already there on frame 0 (the poster)
   stir: 50, // "How many things…": the saves ripple, one after another
-  grey: 131, // "…and never open again?": they grey out
-  named: [183,  237,  277,  319], // each lights up as it is named
-  bury: [456,  512], // "…buried across a dozen different apps": they drift apart and fade
+  grey: 130, // "…and never open again?": they grey out
+  named: [176,  232,  272,  311], // each lights up as it is named
+  bury: [442,  498], // "…buried across a dozen different apps": they drift apart and fade
   // 2 THE ANSWER
-  gather: [568,  588], // they rush into one point
-  snap: 592, // the brackets snap round it as "Machina" lands
-  iris: [604,  620], // the point opens onto the app
+  gather: [536,  556], // they rush into one point
+  snap: 560, // the brackets snap round it as "Machina" lands
+  iris: [572,  588], // the point opens onto the app
   // 3 SAVE: four saves land at the top of the feed, each on its word
-  lands: [717,  731,  743,  761], // "Videos", "posts", "articles", "screenshots"
+  lands: [669,  682,  693,  708], // "Videos", "posts", "articles", "screenshots"
   // 4 WHAT IT DOES
-  glide: [872,  1016], // down the feed, every save summarized ("Then Machina gets to work… summarizes it")
-  kpOpen: 1024, // one card opens…
-  kpScroll: [1047,  1071], // …down to its Key Points
-  keyPoints: 1074, // which lift on "key points"
+  glide: [808,  952], // down the feed, every save summarized ("Then Machina gets to work… summarizes it")
+  kpOpen: 960, // one card opens…
+  kpScroll: [983,  1007], // …down to its Key Points
+  keyPoints: 1010, // which lift on "key points"
   // 5 LINKED
-  cluster: 1176, // cut on "It even connects" into the graph as it zooms onto a lit cluster
-  cluster2: 1272, // a second cluster lights up, into "so your ideas"
+  cluster: 1088, // cut on "It even connects" into the graph as it zooms onto a lit cluster
+  cluster2: 1184, // a second cluster lights up, into "so your ideas"
   // 6 CLOSE
-  out: 1376, // thrown out of frame as "…each other." ends
-  markStrike: 1400, // the lockup's mark strikes
+  out: 1272, // thrown out of frame as "…each other." ends
+  markStrike: 1296, // the lockup's mark strikes
 };
 
 /** the four landings, in take order (capture/ad-todo.mjs sourceCards) */
@@ -100,7 +100,7 @@ export const PLAY = {
 
 export const THROW_LEN = 24;
 /** the tagline holds ~1.7s once its last word has landed; verify measures it */
-export const TOTAL_FRAMES = 1584;
+export const TOTAL_FRAMES = 1464;
 export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 
 /**
@@ -137,32 +137,32 @@ const act = (style, tts) => (tts ? { style, tts } : { style });
 const punchy = (style, tts) => ({ ...act(`Punchy and quick, moving briskly, no lingering: ${style}`, tts), maxPause: 0.2, tempo: 1.1 });
 
 export const CAPTIONS = [
-  line(8, 176, 'Okay, be honest. How many things did you save this month… and never open again?', [
+  line(8, 168, 'Okay, be honest. How many things did you save this month… and never open again?', [
     [3, 'How many things did you save\nthis month…'],
     [11, '…and never open again?'],
   ], { hook: true, ...punchy('Leaning in with a knowing, playful smile, gently teasing a friend; a touch of mock guilt on "and never open again?"') }),
-  line(176, 232, 'That video you’d watch later.', [[0, 'That video you’d watch later.']], punchy('Wry and amused, naming the first familiar culprit, quick and light')),
-  line(232, 272, 'The post you loved.', [[0, 'The post you loved.']], punchy('Fond, a little wistful, still smiling')),
-  line(272, 304, 'That article.', [[0, 'That article.']], punchy('Deadpan, knowing, a little smile in it')),
-  line(304, 408, 'The screenshot you swore you’d remember.', [[0, 'The screenshot you swore'], [4, 'you’d remember.']], punchy('Playfully incredulous, smiling: we both know how that went')),
-  line(408, 544, 'They’re all still out there, buried across a dozen different apps.', [
+  line(168, 224, 'That video you’d watch later.', [[0, 'That video you’d watch later.']], punchy('Wry and amused, naming the first familiar culprit, quick and light')),
+  line(224, 264, 'The post you loved.', [[0, 'The post you loved.']], punchy('Fond, a little wistful, still smiling')),
+  line(264, 296, 'That article.', [[0, 'That article.']], punchy('Deadpan, knowing, a little smile in it')),
+  line(296, 392, 'The screenshot you swore you’d remember.', [[0, 'The screenshot you swore'], [4, 'you’d remember.']], punchy('Playfully incredulous, smiling: we both know how that went')),
+  line(392, 520, 'They’re all still out there, buried across a dozen different apps.', [
     [0, 'They’re all still out there,'],
     [5, 'buried across a dozen\ndifferent apps.'],
   ], punchy('Sympathetic and a touch lower, with a soft sigh before "buried"', 'They’re all still out there, <sigh> buried across a dozen different apps.')),
-  line(544, 632, 'That’s exactly why we made Machina.', [[0, 'That’s exactly why\nwe made Machina.']], punchy('Turning bright: the reveal, warm and proud, the name landing with a smile')),
-  line(632, 720, 'From any app, just share to Machina.', [[0, 'From any app,'], [3, 'just share to Machina.']], act('Easy and reassuring, like it is the simplest thing in the world')),
-  line(720, 872, 'Videos, posts, articles, screenshots… it all lands in one place.', [
+  line(520, 592, 'That’s exactly why we made Machina.', [[0, 'That’s exactly why\nwe made Machina.']], punchy('Turning bright: the reveal, warm and proud, the name landing with a smile')),
+  line(592, 672, 'From any app, just share to Machina.', [[0, 'From any app,'], [3, 'just share to Machina.']], act('Easy and reassuring, like it is the simplest thing in the world')),
+  line(672, 808, 'Videos, posts, articles, screenshots… it all lands in one place.', [
     [0, 'Videos, posts, articles,\nscreenshots…'],
     [4, '…it all lands in one place.'],
   ], act('A quick, light rhythm through the list, then relaxed and satisfied on "it all lands in one place"')),
-  line(872, 960, 'Then Machina gets to work.', [[0, 'Then Machina'], [2, 'gets to work.']], act('Playful anticipation, like about to show a friend a good trick')),
-  line(960, 1176, 'It analyzes every save, summarizes it, and pulls out the key points… so you’ll always remember why you kept it.', [
+  line(808, 880, 'Then Machina gets to work.', [[0, 'Then Machina'], [2, 'gets to work.']], act('Playful anticipation, like about to show a friend a good trick')),
+  line(880, 1088, 'It analyzes every save, summarizes it, and pulls out the key points… so you’ll always remember why you kept it.', [
     [0, 'It analyzes every save,\nsummarizes it,'],
     [6, 'and pulls out the key points,'],
     [12, 'so you’ll always remember'],
     [16, 'why you kept it.'],
   ], act('Genuinely enthusiastic, explaining something you love, moving along; warm on "so you’ll always remember why you kept it"')),
-  line(1176, HITS.out, 'It even connects each save to related ones you’ve kept before… so your ideas start building on each other.', [
+  line(1088, HITS.out, 'It even connects each save to related ones you’ve kept before… so your ideas start building on each other.', [
     [0, 'It even connects each save'],
     [5, 'to related ones\nyou’ve kept before,'],
     [11, 'so your ideas start\nbuilding on each other.'],
