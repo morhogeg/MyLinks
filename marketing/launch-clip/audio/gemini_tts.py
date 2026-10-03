@@ -53,11 +53,14 @@ PACE = (
 
 # THE NAME: how the words given to Gemini spell "Machina" (GEMINI_SAY_NAME),
 # and an optional note on how to say it, appended to every direction
-# (GEMINI_NAME_NOTE=1). Chosen by ear from the pronunciation audition.
+# (GEMINI_NAME_NOTE=1). The reference is Kokoro, the one narrator that says it
+# right: its phonemes for "Makeena" are /ˈmækiːnə/, MACK-ee-nuh.
 SAY_NAME = os.environ.get("GEMINI_SAY_NAME", "Makeena")
 NAME_NOTE = (
-    ' The product name "Machina" is pronounced mah-KEE-nah: three syllables, stress on the '
-    'middle one, the "ch" said as a hard "k" (as in "machine" in Latin), never "MAH-chee-nah" or "ma-SHEE-nah".'
+    ' The product name is pronounced MACK-ee-nuh (IPA /ˈmækiːnə/, exactly as '
+    'the house narrator says it): stress on the FIRST syllable, "mack" as in '
+    '"mackerel", then a long "ee", then a soft "nuh". Never "mah-KEE-nah", '
+    'never "MAH-chee-nah", never "ma-SHEE-nah".'
 )
 
 
