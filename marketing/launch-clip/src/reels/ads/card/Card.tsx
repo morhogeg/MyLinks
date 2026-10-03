@@ -10,16 +10,15 @@ import { AD_OPEN_CAM } from './handoff';
 
 /**
  * The card, in the real app (take "adcard", capture/shoot.mjs): the app
- * irises open around the + the mark's point became; the shared video lands
+ * irises open around the + the mark's point became; the shared article lands
  * at the top of the feed and is tapped open (the app's own open); then it is
  * read down:
  *
- *  MOMENTS  its four Key moments, each lifted in turn, the timestamp first
- *           (the lift opens from the timestamp across the row): the peak
+ *  GIST     the title and the gist, as it opens
  *  POINTS   one scroll down to the Key Points, lifted
  *  LINKS    on down: the three Related cards, lifted together; then the
  *           section's own "See in graph" is tapped and the real graph opens
- *           with the video in focus, its three ties lit
+ *           with the article in focus, its three ties lit
  *
  * then a cut back to the card for the reminder (Remind.tsx). The detail view's scroll is captured in
  * 3pt steps; the camera takes up each step's rounding (the reel's round-13
@@ -45,7 +44,7 @@ const stepFor = (key: string, y: number) => {
   return best;
 };
 const TARGET: Record<string, number> = {
-  keyPoints: stepFor('keyPoints', 235), // the Key Points heading, the list under it
+  keyPoints: stepFor('keyPoints', 250), // the Key Points heading, the list under it
   related: STEPS, // the end: Related cards, all three
 };
 const scrollAt = (f: number) => {
@@ -81,34 +80,26 @@ const keysFor = (dy: number): Key[] =>
     // the + button, exactly where the mark's point lands (the match cut)
     { f: HITS.toApp, ...AD_OPEN_CAM, rx: 9 },
     { f: HITS.toApp + 14, z: 1.56, rx: 0, ease: EASE_MODAL },
-    // onto the video landing at the top of the feed
-    { f: HITS.toApp + 30, cx: 196.5, cy: 328, z: 2.0, fy: HERO, ease: EASE_IN_OUT },
+    // onto the article landing at the top of the feed
+    { f: HITS.toApp + 30, cx: 196.5, cy: 308, z: 2.0, fy: HERO, ease: EASE_IN_OUT },
     { f: HITS.cardTap, z: 2.03, ease: linear },
-    // opened: the Key moments' heading and the first moments (settled before
-    // the first lift; every key here is in time order)
-    { f: HITS.cardTap + 20, cy: 262, z: 2.35, ease: EASE_MODAL },
-    { f: HITS.moments[0], cy: 264, z: 2.36, ease: linear },
-    // one slow drift down the moments as each lifts, a beat apart
-    { f: HITS.moments[3] + 12, cy: 350, z: 2.37, ease: EASE_IN_OUT },
-    // one scroll down: the Key Points
-    { f: SCROLLS[0][1] as number, cy: 382, z: 2.05, ease: EASE_IN_OUT },
-    { f: SCROLLS[1][0] as number, cy: 383, z: 2.07, ease: linear },
-    // on down: the Related cards
-    { f: SCROLLS[1][1] as number, cy: 664, z: 2.05, ease: EASE_IN_OUT },
-    { f: HITS.related + 24, cy: 664, z: 2.06, ease: linear },
-    // up a little, so the section's "See in graph" clears the band, as the finger comes
+    // opened: the title and the gist (settled before the scroll)
+    { f: HITS.cardTap + 20, cy: 280, z: 2.3, ease: EASE_MODAL },
+    { f: S0, cy: 284, z: 2.32, ease: linear },
+    // one scroll down: the Key Points, the whole list in frame
+    { f: SCROLLS[0][1] as number, cy: 425, z: 1.78, ease: EASE_IN_OUT },
+    { f: SCROLLS[1][0] as number, cy: 426, z: 1.8, ease: linear },
+    // on down: the Related cards and the section's "See in graph"
+    { f: SCROLLS[1][1] as number, cy: 662, z: 2.0, ease: EASE_IN_OUT },
     // (its last key ON the frame before the cut: a key between would read the cut as speed)
-    { f: HITS.graphTap - 1, cy: 620, z: 2.1, ease: EASE_IN_OUT },
+    { f: HITS.graphTap - 1, cy: 662, z: 2.02, ease: linear },
     // a cut on the tap (two keys a frame apart: nothing drawn between) to the
-    // graph: the video in focus, its three ties lit, the app's panel naming it
-    // (framed under the legend chips), then a slow push onto the ties
-    { f: HITS.graphTap, cy: 462, z: 2.25 },
-    { f: HITS.back, cy: 445, z: 2.45, ease: EASE_IN_OUT },
+    // graph: the article in focus, its three ties lit, the app's panel naming
+    // it (framed under the legend chips), then a slow push onto the ties
+    { f: HITS.graphTap, cy: 470, z: 2.3 },
+    { f: HITS.back, cy: 458, z: 2.48, ease: EASE_IN_OUT },
   ].map((k) => (k.fy !== undefined ? { ...k, fy: k.fy + dy } : k)) as Key[];
 
-const MOMENTS = ['moment1', 'moment2', 'moment3', 'moment4'];
-/** the timestamp chip at the left of each moment row (points) */
-const CHIP_W = 46;
 
 /** the three Related cards, as one block */
 const relatedOf = (i: number): Rect => {
@@ -134,7 +125,6 @@ export const Card: React.FC<{ f: number }> = ({ f }) => {
   const card = rectOf(T, at(T, 'landed'), 'firstCard');
 
   // lifts, each on its beat, each gone before its screen moves
-  const momOut = prog(f, HITS.moments[3] + 10, S0 + 2, EASE_IN_OUT);
   const kpIn = prog(f, HITS.keyPoints, HITS.keyPoints + 16, EASE_SPRING);
   const kpOut = prog(f, (SCROLLS[1][0] as number) - 8, (SCROLLS[1][0] as number) + 2, EASE_IN_OUT);
   const relIn = prog(f, HITS.related, HITS.related + 16, EASE_SPRING);
@@ -154,18 +144,6 @@ export const Card: React.FC<{ f: number }> = ({ f }) => {
       >
         <Tap x={card[0] + 120} y={card[1] + 40} t={prog(f, HITS.cardTap - 7, HITS.cardTap + 12, linear)} />
         <Tap x={seeGraph[0] + seeGraph[2] / 2} y={seeGraph[1] + seeGraph[3] / 2} t={prog(f, HITS.graphTap - 7, HITS.graphTap + 12, linear)} />
-
-        {/* the Key moments, one by one: the timestamp lifts first, then the lift opens across its row */}
-        {f < S0 &&
-          MOMENTS.map((m, k) => {
-            const h = HITS.moments[k];
-            const on = prog(f, h, h + 14, EASE_SPRING);
-            if (on <= 0.01 || momOut >= 1) return null;
-            const r = rectOf(T, i, m);
-            const open = prog(f, h + 3, h + 12, EASE_IN_OUT);
-            const rect: Rect = [r[0] - 4, r[1] - 2, mix(CHIP_W, r[2] + 8, open), r[3] + 4];
-            return <Lift key={m} take={T} i={i} rect={rect} radius={10} lift={on * 0.35} rise={2} grow={0.012} ring={0.5 * on} opacity={1 - momOut} />;
-          })}
 
         {/* the Key Points */}
         {scrolling && kpIn > 0.01 && kpOut < 1 && (() => {

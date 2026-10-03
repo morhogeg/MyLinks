@@ -35,7 +35,7 @@ import { openDevice } from './device.mjs';
 import { Take } from './recorder.mjs';
 import { ASK, CAPTURE_USER, CARDS, SAVE, SEARCH, SYNTHESIS } from './library.mjs';
 import { NOTE_READ, SHOTS_DIR, renderPost, renderShots, shotsCard, sourceCards } from './clip-save.mjs';
-import { AD_CARD_ID, adCard } from './ad-card.mjs';
+import { AD_CARD_ID, DEMO_ESSAY_ID, adCard } from './ad-card.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.join(here, '..', 'public', 'reel', 'app');
@@ -679,33 +679,26 @@ const takes = {
   },
 
   // ─────────────────────────────────────────────────────────── adcard
-  // Meta ad 1, "What one save becomes": the SAVE clip's YouTube card (the
-  // app's real output, capture/ad-card.mjs) arrives at the top of the feed,
-  // is opened, and is read all the way down in fine steps: the Key moments,
-  // the gist, the Key Points, the "Do this", the tags and the Related cards.
-  // 60fps rolls.
+  // Meta ad 1, "What one save becomes" (round 5: an article, not a video):
+  // Mark Manson's essay (capture/ad-card.mjs) arrives at the top of the feed
+  // as a fresh share, is opened, and is read down in fine steps: the gist,
+  // the Key Points, the Related cards; then "See in graph"; back on the card,
+  // its bell, "Remind me", Save; the reminder coming due in the feed. 60fps rolls.
   async adcard() {
-    await fresh();
+    // the demo's copy of the essay goes: the share is the only one
+    await fresh(() => page.evaluate((p) => window.__capture.remove(p), linkPath(DEMO_ESSAY_ID)));
     const t = new Take(dev, OUT, 'adcard');
     const F60 = 1000 / 60;
     const DETAIL = {
       title: ['h2'],
-      moments: ['div', 'Explains that dopamine'],
-      moment1: ['li', '2:24'],
-      moment2: ['li', '6:44'],
-      moment3: ['li', '19:20'],
-      moment4: ['li', '26:20'],
-      gist: ['p,div', 'hijack the brain'],
+      gist: ['p,div', 'Everybody wants the rewards'],
       keyPoints: ['h1,h2,h3,h4', 'Key Points'],
-      points: ['ul', 'Dopamine is not a pleasure'],
-      takeaway: ['div', 'Pick one tech-free zone'],
-      tags: ['div', 'screen time'],
-      tag1: ['button,span,a', 'dopamine'],
-      tag3: ['button,span,a', 'screen time'],
+      points: ['ul', 'Wanting the good things'],
+      takeaway: ['div', 'Name one goal'],
       relatedHead: ['h3', 'Related cards'],
-      related1: ['div.group', 'pull of instant reward'],
-      related2: ['div.group', 'limited time and attention'],
-      related3: ['div.group', 'systems change habits'],
+      related1: ['div.group', 'Choosing the game you are willing'],
+      related2: ['div.group', 'Do what you love'],
+      related3: ['div.group', 'Finding the cause worth'],
       seeGraph: ['button', 'See in graph'],
     };
     t.mark('home');
@@ -732,9 +725,9 @@ const takes = {
     // read all the way down, in fine steps (the ad plays parts of this at
     // its own pace): the last Related card's reason ends at 800pt
     await t.freeze();
-    await tagScroller('Suggests turning off color');
+    await tagScroller('Wanting the good things');
     t.mark('scroll');
-    await rollScroll(t, await scrollTargetFor('systems change habits', 800), 3, DETAIL);
+    await rollScroll(t, await scrollTargetFor('Finding the cause worth', 800), 3, DETAIL);
     await t.snap({ rects: DETAIL });
     await t.thaw();
 
@@ -787,7 +780,7 @@ const takes = {
     await page.waitForTimeout(900);
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
     await page.waitForTimeout(300);
-    const DUE = { strip: ['div.rounded-2xl', 'Reminders due'], dueRow: ['button', 'How to overcome your addiction'], firstCard: R.firstCard };
+    const DUE = { strip: ['div.rounded-2xl', 'Reminders due'], dueRow: ['button', 'The Most Important Question'], firstCard: R.firstCard };
     t.mark('feed');
     await t.snap({ rects: DUE });
     await t.freeze();

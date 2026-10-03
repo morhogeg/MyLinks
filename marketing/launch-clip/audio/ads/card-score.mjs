@@ -4,8 +4,8 @@
  * ad's clock (ads/card-timeline.mjs: 112.5 BPM, 16 frames a beat, 10 bars).
  * The SAVE clip's score is the template.
  *
- * The hook floats on an open IV with no drums (it must work from frame 0,
- * sound on or off); a soft fall as the list is lost; a riser into the point,
+ * The hook floats with no drums (it must work from frame 0, sound on or
+ * off); a soft fall as the lists are lost, a whoosh as each pain is visited; a riser into the point,
  * the mark resolving to I; a tick and a bell as the share lands in it; a
  * riser carries the point into the app; the drums come in with the card (a
  * tick as it is tapped open); the lifts are silent under the lines (the
@@ -39,7 +39,7 @@ const CHORDS = {
 const BARS = Math.ceil(TOTAL_FRAMES / BAR_FRAMES);
 const LOCKUP_BAR = Math.round(HITS.lockup / BAR_FRAMES);
 /** how much of the band is playing, per bar */
-const DENSITY = [0.36, 0.5, 0.6, 0.78, 0.82, 0.82, 0.82, 0.84, 0.82, 0.8, 0.78, 0.45, 0.45, 0.45];
+const DENSITY = [0.34, 0.4, 0.46, 0.5, 0.56, 0.62, 0.68, 0.72, 0.74, 0.74, 0.76, 0.76, 0.76, 0.76, 0.76, 0.45, 0.45, 0.45];
 
 for (let bar = 0; bar < BARS; bar++) {
   const ch = CHORDS[BAR_CHORDS[bar]];
@@ -105,20 +105,28 @@ MELODY.forEach(([sec, m, level], i) => keys(sec, m, level, i % 2 ? 0.2 : -0.2, s
 for (const [from, to] of RISERS) riser(t(from), t(to) - t(from), 0.09);
 
 const H = HITS;
-// the hook: the list is lost (a soft fall after "never get to it")
-whoosh(t(H.lost) + 0.6, 0.9, 0.04, 0);
-// the talk lifts out of the list
-shimmer(t(H.talkLifts) + 0.1, [79, 84], 0.025);
-// the mark: the point, the snap
+// the hook: a new save drops into each list (soft ticks), they grey out (a
+// soft fall), the camera visits each pain (a soft whoosh), the screenshot
+// slides in (a tick)
+[0, 1, 2].forEach((k) => tick(t(48 + k * 5), 0.03, 1.3 + k * 0.06));
+whoosh(t(H.lost) + 0.6, 0.9, 0.035, 0);
+[H.article, H.thread, H.screenshot].forEach((fr, k) => whoosh(t(fr) - 0.05, 0.45, 0.035, [-0.3, 0.3, 0.1][k]));
+tick(t(H.shotIn), 0.05, 1.25);
+// the mark: the lists rush in, the point, the snap
+whoosh(t(H.collapse) - 0.1, 0.55, 0.08, -0.3);
+whoosh(t(H.collapse) - 0.05, 0.5, 0.08, 0.3);
 impact(t(H.dotLands), 0.3);
 sub(t(H.dotLands), 36, 0.28, 0.6);
 tick(t(H.bracketsClose), 0.1, 0.85);
 sub(t(H.bracketsClose), 43, 0.18, 0.25);
-// the share: tapped, pulled, landing in the mark (the bell after "Machina")
-tick(t(H.shareTap), 0.09, 1.15);
-whoosh(t(H.shareTap + 2), 0.45, 0.06, -0.3);
-sub(t(H.shareLands), 43, 0.16, 0.25);
-bell(t(H.shareLands + 16), 88, 0.05, 0, 1.4);
+// the shares: each tapped, pulled, landing in the mark (the bells are soft:
+// they sit under "From any app, just share it to Machina.")
+H.shareTaps.forEach((fr, i) => {
+  tick(t(fr), 0.08, 1.15 + i * 0.1);
+  whoosh(t(fr + 2), 0.4, 0.05, [-0.4, 0.4, 0][i]);
+  sub(t(H.shareLands[i]), 43, 0.14, 0.25);
+});
+bell(t(H.shareLands[2] + 4), 88, 0.04, 0, 1.4);
 // the point becomes the + and the app opens around it
 whoosh(t(H.toApp) - 0.1, 0.5, 0.08, 0);
 // the card lands (a soft sub), is tapped open (a tick, a small whoosh)

@@ -748,28 +748,25 @@ fast-start curve, and the landed card's lift box within 2pt of the app's.
 
 ## Meta ad 1: "What one save becomes"
 
-`MachinaAdCard` is a 29.3s vertical ad for Instagram and Facebook (Reels,
-Stories, Feed) and an organic Reel: one save, fully read, and brought back
-(owner concept, 2026-10-02). The save everyone has is the long video in Watch
-later they never get to. Shared once, Machina makes it a card you take in at a
-glance (its key moments with timestamps, its Key Points, the saves it links
-to), and brings it back when you choose. The hook's pain, "Later never
-comes.", is answered by the reminder: "Pick a time. Machina brings it back.
-Ready when you are." (the launch film's own payoff line). No Ask, no Find.
-Branch `claude/ad-card`.
+`MachinaAdCard` is a 36.8s vertical ad for Instagram and Facebook (Reels,
+Stories, Feed) and an organic Reel: what one save becomes. Round 5 (owner,
+2026-10-03) rebuilt it around SAVES, not videos, in the voice of one person
+talking to a friend: a question the viewer answers in their head, three
+small, specific pains, "That's exactly why we made Machina.", one
+instruction said once, and every feature line ending on "so you…". The
+hero card is an article (Mark Manson's "The Most Important Question of Your
+Life"). Branch `claude/ad-card`.
 
-| Frames | Beat | What is shown (the line) |
+| Frames | What you see | What's said (on screen in chunks of at most 8 words) |
 |---|---|---|
-| 0–48 | the hook | frame 0 is the poster: YouTube · Watch later, the video on top (Big Think Clips, "How to overcome your addiction to technology") and three real demo saves under it, the line already set ("Saved for later?"); the voice starts at 0.27s |
-| 48–96 | | "Later never comes.": the rest of the list bleaches (56); the video stays sharp, still in the list |
-| 96–160 | the share (the slot) | only as the line is said ("Share it to Machina instead."): the video lifts out as a card wearing YouTube's mark, the mark assembles below it (104, 112: 3.7s), MACHINA wipes in on the spoken name, Share is tapped (128) and the card is pulled into the mark (144) |
-| 168–232 | into the app | the point drops to become the + (the reel's match cut), the app irises open (192); the video lands at the top of the feed, the camera settles, and it is tapped open (232) |
-| 232–320 | the peak | its four Key moments lift a beat apart, each timestamp first (256, 272, 288, 304), under one slow drift ("Get the moments that matter, timestamped.") |
-| 320–416 | key points | one scroll down (2.1s); the Key Points lift (384) ("Get the key points.") |
-| 416–536 | links | on down (1.6s): the three Related cards lift as one block (464); "See in graph" is tapped (496) and the cut lands in the real graph, the video in focus, its three ties lit ("Linked to what you already saved.") |
-| 536–656 | the reminder | a cut back to the card; its bell tapped (552); the app's "Remind me" sheet rises, lifted off its screen, Smart review (preselected: "Tomorrow 9:00 AM · then 1 week & 1 month") ringed (568); down to Save, tapped (624); the app's "Reminder set for …" lifted (632) ("Pick a time. Machina brings it back.") |
-| 656–704 | tomorrow | a cut to the feed, "TOMORROW, 9:00 AM" above the line: the feed's own "Reminders due" strip, the video in it, lifted (680) ("Ready when you are.") |
-| 704–878 | the close | thrown into the lockup: the mark strikes (744), MACHINA wipes in on the spoken name, then the tagline on one line, exactly "Everything you save, finally useful.", held 1.6s after the voice |
+| 0–116 | frame 0 is the poster: four apps' save lists (Safari · Reading List, X · Bookmarks, Instagram · Saved, Photos · Screenshots), real demo titles and the ad's own screenshots, the first chunk already set; a new save drops into each, then they grey out (80) | "How many things did you save this month… and never open again?" |
+| 116–332 | the camera visits the pain: the Reading List, the article on top (120); X's Bookmarks, Naval's thread on top (192); Photos, a friend's message about a hike sliding in (264, 280) | "The article you promised yourself you'd read… the thread you bookmarked at 1 a.m… the screenshot you swore you'd remember." |
+| 328–401 | the lists gather into one point, the mark snaps (352), MACHINA wipes in on the spoken name | "That's exactly why we made Machina." |
+| 400–472 | the article, the thread and the screenshot, each Share tapped (416, 432, 448), pulled into the mark | "From any app, just share it to Machina." |
+| 464–640 | the point becomes the + (464), the app opens (488); the article lands and is tapped open (528): its gist; one scroll; the Key Points lift (600) | "It reads what you save and pulls out the key points… so you'll always remember why you kept it." |
+| 640–784 | on down: its Related cards (Naval's thread, Jobs' Stanford address, Bret Victor's talk) lift (672); "See in graph" (720), the real graph, its ties lit | "It links each save to what you saved before… so you see how your ideas connect." |
+| 776–928 | back on the card: its bell (792), "Remind me" lifted off its screen, Smart review ringed (808), Save (856); a cut to the feed (880), TOMORROW over the line, "Reminders due", the article in it, lifted (896) | "Then pick a time, and Machina brings it back… so you actually get back to it." |
+| 928–1104 | thrown into the lockup: the mark strikes (968), MACHINA on the spoken name, the tagline on one line, held 1.6s after the voice | "Machina. Everything you save, finally useful." |
 
 **How it got here.** Round 1 (21.0s) read the card down section by section
 ("Get the key moments, with timestamps." / "The whole talk, down to what
@@ -791,25 +788,30 @@ first); the Key moments lift a beat apart, not an 8th; the two scrolls and the
 pan down the reminder sheet take 1.6s (the Key Points scroll, ~570pt, 2.1s;
 it was 1.1s). Measured after: no jump between frames except the four cuts.
 29.3s.
+Round 5 (owner, 2026-10-03: "why are you focused on videos?"; write it like
+one real person talking to a friend): the ad is about saves, not one video.
+New script (above), new picture around it: four apps' save lists (the SAVE
+clip's pile cards, no recipe; the Photos list's screenshots drawn for the ad,
+`scripts/ad-card-shots.mjs`), the three saves the hook named shared into the
+mark, and the take re-shot on the essay card (`capture/ad-card.mjs`: the
+demo's copy is removed and the essay arrives fresh, its Key Points and "Do
+this" as the SAVE clip wrote them true to the essay, its Related row the demo's
+own connections). Captions are chunks of the narrator's own words, each
+arriving with its first spoken word (`|` in the timeline, `AdCaptions.tsx`).
+The narrator's "…" pauses are long in this voice, so lines start a breath
+(0.3s) after the line before, not on the next 8th; taps and cuts stay on the
+grid. 36.8s (owner: about 30–35s; under 35 would need a faster voice).
 
-**The Meta spec, and how the ad meets it.** 29.3s (the aim was 15–20s; the
-graph, the reminder and a calmer pace, all owner asks, cost the time; never
-over 30s).
-Frame 0 is a legible picture with the hook line set on it (a `poster` line,
-arriving before the ad starts), so the hook lands with the sound off. At most
-8 words on screen at once (the "Tomorrow, 9:00 AM" kicker counts). Safe zones
-(9:16): the line sits at 346px, under Meta's top 270px; the paper band hides
-the app above ~550–650px; the app's hero line is 930px, and every lifted
-element, the + the point lands on (1235px), the mark, the wordmark and the
-tagline sit above Meta's bottom 670px (y 1250) and 65px from the sides.
-Stills of every beat with those zones drawn are in
-`out/ads/card/contact-tall.png`. No App Store badge, no "available", no price,
-no "free", no plan: YouTube Key moments need Pro, and the ad names no plan
-(the SAVE clip's rule); reminders are on both plans. The space under the
-tagline is kept clear for the official badge once the listing is live. No
-recipe anywhere: the pile holds the video, Tim Urban's TED talk, Kurzgesagt's
-"Optimistic Nihilism" and Steve Jobs' Stanford address; the feed shows the
-Tail End under the video; the graph is framed under its legend chips (they
+**The Meta spec, and how the ad meets it.** 36.8s (owner, round 5: about
+30–35s; over Meta's original 30s cap). Frame 0 is a legible picture with the
+first chunk set on it, so the hook lands with the sound off. At most 8 words
+on screen at once (the TOMORROW kicker counts). The mark arrives with "That's
+exactly why we made Machina." (~11s), by the owner's script, not by 3s as the
+first brief asked. Safe zones (9:16): the line at 346px, under Meta's top
+270px; the lists, the shares, the mark, every lifted element and the tagline
+above Meta's bottom 670px (y 1250). No App Store badge, no "available", no
+price, no "free", no plan (Key Points, Related cards and reminders are on both
+plans). No recipe anywhere; the graph is framed under its legend chips (they
 name every category, "cooking" among them).
 
 **Three renders, one scene code.** `src/reels/ads/card/format.ts` frames the
@@ -823,39 +825,21 @@ plus `MachinaAdCardSilent` / `MachinaAdCardFeedSilent` (stills, QA) and
 `MachinaAdCardPoster` (1:1, frame 0 is the thumbnail).
 
 **What is real and what is scripted.** Every app frame is the real, shipped
-app (take `adcard`, `capture/shoot.mjs`): the card is written onto the store
-the way the backend writes it, lands in the feed, is opened in the real
-detail view and scrolled in 3pt steps. The card is the SAVE clip's YouTube
-card, the app's own output for a real video copied from the owner's phone
-(`capture/clip-save.mjs` `sourceCards`): title, channel, gist and the four Key
-moments with their timestamps verbatim. Its Key Points and "Do this" were
-written for the SAVE clip, true to those moments. Scripted here, in
-`capture/ad-card.mjs`: its Related row, three real demo saves with a one-line
-reason each, true of both cards (Tim Urban's talk on the pull of instant
-reward, Oliver Burkeman's Four Thousand Weeks on where limited time and
-attention go, James Clear's line that systems change habits). The reminder
-is the app's own flow, really tapped: the bell, the "Remind me" sheet (Smart
-review is the app's default; the ad rings it, it does not fake a tap on it),
-Save, the app's toast. The dates on screen are the capture day's ("Sat, Oct
-3"). Scripted, as the backend's part: the reminder coming due ("tomorrow"),
-written onto the card the way `reminder_service` flags it (`reminderDue`), so
-the feed shows its real "Reminders due" strip. The lock-screen push ("Time to
-revisit") is native iOS and is not shown: `PUSH_SLOT` marks where a real
-iPhone recording could go. The narration
-never says how long the video is (its length was not verified; the last Key
-moment is at 26:20). The Watch later pile and the share card are the kit's
-brand graphics, not YouTube's UI: an app's mark as the Machina app draws it,
-the name of its save list, real titles, no thumbnails.
-
-**Round 2 (owner, 2026-10-02: "the linked to what you saved should also
-show the graph after the related cards").** The take now continues from the
-Related section's own "See in graph" (the app's `onOpenInGraph`), recorded
-2.5s at 60fps. The ad taps it after the line's last word and cuts on the tap to the
-graph's fifth frame (its first frames are the view fading in from white, which
-read as a flash), framed under the legend chips (they name every category,
-"cooking" among them), and pushes in on the video's three lit ties. The cut
-grew 64 frames (2.1s); the no-narrator mix got 0.3dB more true-peak headroom
-(its AAC encode measured exactly −1.0 dBTP; now −1.6).
+app (take `adcard`, `capture/shoot.mjs`): the essay card lands in the feed,
+is opened in the real detail view and scrolled in 3pt steps, its "See in
+graph" opens the real graph, and its reminder is the app's own flow, really
+tapped (the bell, the "Remind me" sheet, Save, the toast). Scripted, as the
+backend's part: the card as the backend writes an article
+(`capture/clip-save.mjs` `src-article`: gist, Key Points and "Do this" true to
+Mark Manson's essay), its Related row (the demo's own connections, with their
+reasons), and the reminder coming due ("tomorrow"), written the way
+`reminder_service` flags it, so the feed shows its real "Reminders due" strip.
+The opening lists and the shares are the kit's brand graphics, not app UI: an
+app's mark as the Machina app draws it, the name of its save list, real demo
+titles, and screenshots drawn for the ad (a friend's message about the Tour du
+Mont Blanc, a list of books, James Clear's line, the SAVE clip's packing post).
+The lock-screen push ("Time to revisit") is native iOS and is not shown
+(`PUSH_SLOT`). The dates on screen are the capture day's.
 
 **The share slot.** The iOS share sheet is native and cannot be captured from
 the web build, so the share beat is the kit's brand gesture (`Share.tsx`),

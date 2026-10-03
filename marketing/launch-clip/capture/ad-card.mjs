@@ -1,55 +1,39 @@
 /**
  * Meta ad 1, "What one save becomes" (take `adcard` in shoot.mjs): ONE save,
- * fully read. The card is the SAVE clip's YouTube card, the app's own output
- * for a real video copied from the owner's phone (Big Think Clips, "How to
- * overcome your addiction to technology"; capture/clip-save.mjs sourceCards,
- * reused as is: title, channel, gist, the four Key moments and their
- * timestamps).
+ * fully read, and brought back. Round 5 (owner, 2026-10-03: the ad is about
+ * saves, not videos): the save is an article, Mark Manson's "The Most
+ * Important Question of Your Life", a real essay that is already in the demo
+ * account (library.mjs `question`).
  *
- * The one thing added here is its Related row: three real cards of the demo
- * account that the backend would plausibly tie to a talk about dopamine and
- * screen habits, each with a one-line reason in the app's own style (the
- * Related cards' "why"). Every reason is true of both cards: Tim Urban's
- * Instant Gratification Monkey is the pull of instant reward; Oliver
- * Burkeman's Four Thousand Weeks is about where limited time and attention
- * go; James Clear's line is that systems, not goals, change habits, and the
- * talk's tech-free times and zones are such systems.
+ * In the ad it arrives as a fresh share, so the take removes the demo's copy
+ * and writes this one at the top of the feed: the card as the backend writes
+ * an article (capture/clip-save.mjs sourceCards `src-article`: its gist, Key
+ * Points and "Do this", written for the SAVE clip true to the essay), with
+ * the demo's own three connections for it (library.mjs EDGES: Naval's thread,
+ * Steve Jobs' Stanford address, Bret Victor's talk, each with its reason).
  */
 
-import { CARDS } from './library.mjs';
+import { CARDS, EDGES } from './library.mjs';
 import { sourceCards } from './clip-save.mjs';
 
 const title = (id) => CARDS.find((c) => c.id === id).title;
 
-export const AD_CARD_ID = 'ad-youtube';
+/** the demo's copy of the essay, removed so the share is the only one */
+export const DEMO_ESSAY_ID = 'question';
+export const AD_CARD_ID = 'ad-essay';
 
-/** the stored relations, in the order the card lists them */
-export const AD_RELATED = [
-  {
-    id: 'procrastinator',
-    reason: 'Both are about the pull of instant reward over what matters more.',
-    similarity: 0.87,
-    commonConcepts: ['habits', 'attention'],
-  },
-  {
-    id: 'fourthousand',
-    reason: 'Both ask where your limited time and attention should go.',
-    similarity: 0.83,
-    commonConcepts: ['attention', 'time'],
-  },
-  {
-    id: 'systems',
-    reason: 'Tech-free times and zones are systems, and systems change habits.',
-    similarity: 0.82,
-    commonConcepts: ['habits'],
-  },
-];
+/** the essay's connections, from the demo account's own graph, in this order */
+const RELATED_ORDER = ['naval', 'jobs', 'bretvictor'];
+export const AD_RELATED = RELATED_ORDER.map((id, k) => {
+  const e = EDGES.find(([a, b]) => (a === DEMO_ESSAY_ID && b === id) || (b === DEMO_ESSAY_ID && a === id));
+  return { id, reason: e[2], similarity: [0.87, 0.84, 0.83][k], commonConcepts: e[3] };
+});
 
 /** the card as the backend writes it, with its Related row */
 export const adCard = () => {
-  const yt = sourceCards('').find((c) => c.id === 'src-youtube').doc;
+  const essay = sourceCards('').find((c) => c.id === 'src-article').doc;
   return {
-    ...yt,
+    ...essay,
     relatedLinks: AD_RELATED.map((r) => ({ ...r, title: title(r.id) })),
   };
 };

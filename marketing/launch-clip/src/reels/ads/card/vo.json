@@ -1,92 +1,157 @@
 [
  {
   "frame": 8,
-  "text": "Saved for later?",
+  "text": "How many things did you save this month\u2026 and never open again?",
   "words": [
-   0.04,
-   0.379,
-   0.605
+   0.05,
+   0.255,
+   0.511,
+   0.87,
+   1.075,
+   1.28,
+   1.537,
+   1.793,
+   2.152,
+   2.357,
+   2.665,
+   2.921
   ]
  },
  {
-  "frame": 48,
-  "text": "Later never comes.",
+  "frame": 116,
+  "text": "The article you promised yourself you'd read\u2026",
   "words": [
    0.07,
-   0.402,
-   0.733
+   0.257,
+   0.631,
+   0.818,
+   1.238,
+   1.659,
+   1.94
   ]
  },
  {
-  "frame": 96,
-  "text": "Share it to Makeena instead.",
-  "words": [
-   0.04,
-   0.336,
-   0.484,
-   0.632,
-   1.026
-  ]
- },
- {
-  "frame": 232,
-  "text": "Get the moments that matter, timestamped.",
+  "frame": 192,
+  "text": "the thread you bookmarked at one a.m\u2026",
   "words": [
    0.06,
-   0.219,
-   0.377,
-   0.694,
-   0.893,
-   1.42
+   0.271,
+   0.639,
+   0.849,
+   1.428,
+   1.586,
+   1.797
   ]
  },
  {
-  "frame": 368,
-  "text": "Get the key points.",
+  "frame": 264,
+  "text": "the screenshot you swore you'd remember.",
   "words": [
-   0.05,
-   0.246,
+   0.07,
+   0.25,
+   0.743,
+   0.923,
+   1.192,
+   1.461
+  ]
+ },
+ {
+  "frame": 332,
+  "text": "That's exactly why we made Makeena.",
+  "words": [
+   0.08,
    0.442,
-   0.638
+   0.855,
+   1.062,
+   1.217,
+   1.475
   ]
  },
  {
-  "frame": 432,
-  "text": "Linked to what you already saved.",
+  "frame": 401,
+  "text": "From any app, just share it to Makeena.",
   "words": [
-   0.05,
-   0.384,
-   0.526,
-   0.765,
-   0.955,
-   1.336
+   0.09,
+   0.279,
+   0.431,
+   0.88,
+   1.095,
+   1.354,
+   1.483,
+   1.612
   ]
  },
  {
-  "frame": 544,
-  "text": "Pick a time. Makeena brings it back.",
-  "words": [
-   0.04,
-   0.298,
-   0.401,
-   0.99,
-   1.387,
-   1.734,
-   1.883
-  ]
- },
- {
-  "frame": 664,
-  "text": "Ready when you are.",
+  "frame": 472,
+  "text": "It reads what you save and pulls out the key points\u2026 so you'll always remember why you kept it.",
   "words": [
    0.03,
-   0.303,
-   0.53,
-   0.713
+   0.191,
+   0.512,
+   0.78,
+   0.994,
+   1.261,
+   1.476,
+   1.797,
+   2.011,
+   2.225,
+   2.439,
+   2.868,
+   3.028,
+   3.403,
+   3.778,
+   4.26,
+   4.474,
+   4.688,
+   4.956
   ]
  },
  {
-  "frame": 744,
+  "frame": 640,
+  "text": "It links each save to what you saved before\u2026 so you see how your ideas connect.",
+  "words": [
+   0.03,
+   0.196,
+   0.528,
+   0.805,
+   1.082,
+   1.248,
+   1.525,
+   1.747,
+   2.079,
+   2.522,
+   2.688,
+   2.909,
+   3.131,
+   3.352,
+   3.629,
+   3.962
+  ]
+ },
+ {
+  "frame": 784,
+  "text": "Then pick a time, and Makeena brings it back\u2026 so you actually get back to it.",
+  "words": [
+   0.04,
+   0.715,
+   1.39,
+   1.66,
+   2.75,
+   2.854,
+   3.062,
+   3.244,
+   3.322,
+   3.478,
+   3.556,
+   3.66,
+   3.894,
+   3.998,
+   4.128,
+   4.206
+  ]
+ },
+ {
+  "frame": 968,
   "text": "Makeena. Everything you save, finally useful.",
   "words": [
    0.05,

@@ -2707,6 +2707,22 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-03 — META AD 1, ROUND 5: SAVES, NOT VIDEOS; A FRIEND'S VOICE.**
+  Branch `claude/ad-card`, not merged. Owner: the ad was stuck on one YouTube
+  video (the first brief's hero); it is about what ANY save becomes, voiced
+  like one person talking to a friend. New approved script: "How many things
+  did you save this month… and never open again? The article… the thread…
+  the screenshot… That's exactly why we made Machina. From any app, just share
+  it to Machina. It reads what you save and pulls out the key points… so
+  you'll always remember why you kept it. It links each save… so you see how
+  your ideas connect. Then pick a time, and Machina brings it back… so you
+  actually get back to it." then the tagline. New picture: four apps' save
+  lists (no recipe; screenshots drawn for the ad), three shares, the take
+  re-shot on Mark Manson's essay card (Key Points, Related, graph, reminder,
+  due strip). Captions are chunks of the narrator's words. 36.8s (owner asked
+  ~30–35s; the voice's "…" pauses cost the rest). Verify clean. Open: nobody
+  has listened on speakers; the mark arrives at ~11s (the script names
+  Machina there), not by 3s.
 - **2026-10-02 — META AD 1, ROUND 4: THE CARD WAITS FOR ITS LINE; CALMER,
   SMOOTH PACING.** Branch `claude/ad-card`, not merged. Owner on device: the
   share card appeared during "Later never comes." (now only on "Share it to

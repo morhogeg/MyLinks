@@ -27,15 +27,13 @@ const BROWSER = '/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/head
 
 // every beat, read off the timeline
 const REVIEW = [
-  0, 30, // the poster; "Saved for later?"
-  HITS.lost + 16, HITS.talkLifts + 20, // "Later never comes.": the list bleaches, the video lifts out
-  HITS.shareTap, HITS.shareLands + 12, // Share tapped; in the mark, the name
-  HITS.toApp + 20, HITS.cardTap + 12, // the app opens, the video landing; opened
-  ...HITS.moments.map((m) => m + 10), // each Key moment lifts (the peak)
-  HITS.keyPoints + 14, HITS.related + 18, // the Key Points; the Related cards
-  HITS.graphTap + 2, HITS.graphTap + 30, // the graph; its ties
-  HITS.bellTap - 2, HITS.smart + 12, HITS.saveTap, HITS.reminderSet + 10, // the bell; Smart review; Save; Reminder set
-  HITS.due + 2, HITS.dueLift + 16, // tomorrow, 9:00 AM: Reminders due
+  0, 60, HITS.lost + 24, // the poster; a new save in each list; "never open again"
+  HITS.article + 30, HITS.thread + 30, HITS.screenshot + 40, // the article, the thread, the screenshot
+  HITS.collapse + 8, HITS.bracketsClose + 30, // the gather, the mark and the name
+  ...HITS.shareTaps, // the three shares
+  HITS.toApp + 20, HITS.cardTap + 30, // the app opens; the article opened, its gist
+  HITS.keyPoints + 14, HITS.related + 16, HITS.graphTap + 30, // the Key Points; the Related cards; the graph
+  HITS.smart + 8, HITS.saveTap, HITS.due + 2, HITS.dueLift + 16, // Smart review; Save; tomorrow; Reminders due
   HITS.throw + 14, HITS.markStrike + 10, TOTAL_FRAMES - 30, TOTAL_FRAMES - 1, // the throw, the lockup, the tagline held
 ];
 const args = process.argv.slice(2).map(Number).filter((n) => !Number.isNaN(n));

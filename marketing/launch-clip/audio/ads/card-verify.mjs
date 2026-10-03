@@ -40,7 +40,8 @@ export default async function verifyAdCard() {
     [/second brain/i, '"second brain"'],
     [/librar(y|ies)/i, '"library"'],
     [/share sheet/i, '"share sheet"'],
-    [/bookmark/i, '"bookmarks"'],
+    // (never "bookmarks" as what Machina is; the user bookmarking a thread is fine)
+    [/\bbookmarks?\b/i, '"bookmarks"'],
     [/\btalks?\b/i, '"talk" (owner, round 3: say video)'],
   ];
   // what the ad itself says (lines, the share card): no plan, no price, no
@@ -56,21 +57,28 @@ export default async function verifyAdCard() {
     for (const [re, what] of copy ? [...BANNED, ...AD_COPY] : BANNED) if (re.test(text)) bad.push(`${what} in ${where}: ${JSON.stringify(text).slice(0, 110)}`);
   };
 
-  // ── captions
+  // ── captions (round 5: each spoken line is shown as chunks, split by `|`;
+  // at most 8 words on screen at once, a kicker included)
   const caps = [...C.CAPTIONS].sort((a, b) => a.at - b.at);
+  const chunksOf = (c) => c.text.split('|').map((p) => p.trim());
+  const wordsOf = (t) => t.split(/[\s ]+/).filter(Boolean).length;
   caps.forEach((c, i) => {
     scan(`caption ${i + 1}`, c.text, true);
+    scan(`caption ${i + 1} (spoken)`, c.say, true);
     if (c.kicker) scan(`kicker ${i + 1}`, c.kicker, true);
     if (c.kicker && / /.test(c.kicker)) bad.push(`kicker "${c.kicker}" has a plain space (the Kicker collapses it: use \\u00a0)`);
     if (c.to <= c.at) bad.push(`caption "${c.text}" ends before it starts`);
     if (i && c.at < caps[i - 1].to) bad.push(`caption overlap: "${c.text}" / "${caps[i - 1].text}"`);
     if (c.to > C.TOTAL_FRAMES) bad.push(`caption "${c.text}" runs past the ad`);
-    if (c.at % (C.BEAT_FRAMES / 2)) bad.push(`caption "${c.text}" starts at ${c.at}, not on an 8th`);
-    const words = c.text.split(/\s+/).filter(Boolean).length - (c.place === 'lockup' ? 1 : 0) + (c.kicker ? c.kicker.split(/[\s\u00a0]+/).length : 0); // the name is the drawn wordmark; a kicker counts
-    if (words > 8) bad.push(`caption "${c.text}" puts ${words} words on screen (Meta spec: at most about 8)`);
-    c.text.split('\n').forEach((row) => {
-      if (/[.?!]\s+\S/.test(row)) bad.push(`caption row "${row}" starts a new sentence mid-row`);
+    chunksOf(c).forEach((ch, k) => {
+      const words = wordsOf(ch) - (c.place === 'lockup' ? 1 : 0) + (c.kicker && c.kickerChunk === k ? wordsOf(c.kicker) : 0); // the name is the drawn wordmark; a kicker counts
+      if (words > 8) bad.push(`caption chunk "${ch}" puts ${words} words on screen (at most 8)`);
+      ch.split('\n').forEach((row) => {
+        if (/[.?!]\s+\S/.test(row)) bad.push(`caption row "${row}" starts a new sentence mid-row`);
+      });
     });
+    const plain = (t) => t.replace(/\s*\|\s*/g, ' ').split(/\s+/).filter(Boolean);
+    if (wordsOf(c.say) !== plain(c.text).length) bad.push(`caption at ${c.at}: its spoken words (${wordsOf(c.say)}) don't match its on-screen words (${plain(c.text).length})`);
   });
   const lines = caps.filter((c) => !c.place);
   const close = caps.find((c) => c.place === 'lockup');
@@ -78,29 +86,33 @@ export default async function verifyAdCard() {
   const flat = (t) => t.split(/\s+/).join(' ');
   if (!close || close !== caps[caps.length - 1]) bad.push('the ad does not close on its lockup line');
   if (!close || flat(close.text) !== `Machina. ${TAGLINE}`) bad.push(`the close is "${flat(close?.text ?? '')}", not "Machina. ${TAGLINE}"`);
-  if (lines.some((c) => flat(c.text).includes(TAGLINE))) bad.push('the tagline also appears before the close');
-  if (caps.some((c) => /never lose another great find/i.test(c.text))) bad.push('the ad says the App Store subtitle');
+  if (lines.some((c) => flat(c.say).includes(TAGLINE))) bad.push('the tagline also appears before the close');
+  if (caps.some((c) => /never lose another great find/i.test(c.say))) bad.push('the ad says the App Store subtitle');
   if (!lines.some((c) => /\bMachina\b/.test(c.text))) bad.push('no line names Machina before the close');
   if (!caps[0].poster || caps[0].at > 15) bad.push('the first line is not set on frame 0 (`poster`) with its voice by 0.5s');
-  if (C.TOTAL_SEC > 30 || C.TOTAL_SEC < 15) bad.push(`the ad runs ${C.TOTAL_SEC.toFixed(1)}s (Meta spec: 15–30s, aim ≤ 20s)`);
-  else if (C.TOTAL_SEC > 20) console.log(`  (note: ${C.TOTAL_SEC.toFixed(1)}s, over the 20s aim)`);
-  // (spec: the mark by about 3s; owner, round 4: the share card waits for
-  // its line, so the mark assembles with it, at about 3.7s)
-  if (C.HITS.bracketsClose > 120) bad.push(`the mark closes at ${C.HITS.bracketsClose} (spec: by about 3s, 4s at most)`);
+  // (owner, round 5: "about 30–35 seconds"; Meta's cap was 30s)
+  if (C.TOTAL_SEC > 37 || C.TOTAL_SEC < 15) bad.push(`the ad runs ${C.TOTAL_SEC.toFixed(1)}s (owner: about 30–35s)`);
+  else if (C.TOTAL_SEC > 35) console.log(`  (note: ${C.TOTAL_SEC.toFixed(1)}s, over the owner's 30–35s)`);
+  // (owner, round 5: the script names Machina in its fifth line, "That's
+  // exactly why we made Machina."; the mark must arrive WITH that line)
+  {
+    const name = caps.find((c) => /exactly why we made Machina/.test(c.say));
+    if (!name || C.HITS.bracketsClose < name.at - 8 || C.HITS.bracketsClose > name.to) bad.push(`the mark closes at ${C.HITS.bracketsClose}, not with "That's exactly why we made Machina."`);
+  }
 
   // ── the grid
   for (const [k, v] of Object.entries(C.HITS)) for (const fr of [v].flat()) if (fr % (C.BEAT_FRAMES / 2)) bad.push(`hit ${k} at ${fr} is not on an 8th`);
 
-  // ── the narrator: mirrors the captions, every word timed, in by 0.5s,
-  // the dwell rule, and the tagline held 1.6s after its last word
+  // ── the narrator: mirrors the captions (their `say`), every word timed,
+  // in by 0.5s, the dwell rule, and the tagline held 1.6s after the voice
   const SAY_NAME = /SAY_NAME = "([^"]+)"/.exec(read('audio/synth-vo.py'))[1];
   const spoken = (t) => t.split(/\s+/).join(' ').replaceAll('Machina', SAY_NAME);
   const timing = JSON.parse(read('src/reels/ads/card/vo.json'));
   caps.forEach((c) => {
     const t = timing.find((x) => x.frame === c.at);
     if (!t) return bad.push(`no narrator timing for "${c.text}" at ${c.at}: run synth-vo.py adcard`);
-    if (t.text !== spoken(c.text)) bad.push(`narrator ≠ caption at ${c.at}: said "${t.text}"`);
-    if (t.words.length !== c.text.split(/\s+/).filter(Boolean).length) bad.push(`caption at ${c.at}: word timings don't match its words`);
+    if (t.text !== spoken(c.say)) bad.push(`narrator ≠ caption at ${c.at}: said "${t.text}"`);
+    if (t.words.length !== wordsOf(c.say)) bad.push(`caption at ${c.at}: word timings don't match its words`);
   });
   const t0 = timing.find((x) => x.frame === caps[0].at);
   if (t0 && caps[0].at + t0.words[0] * C.FPS > 15) bad.push('the narrator starts after 0.5s');
@@ -123,23 +135,27 @@ export default async function verifyAdCard() {
     }
   } else console.log('  (no out/vo/adcard/manifest.json: VO fit not re-checked; run synth-vo.py adcard)');
 
-  // ── what a viewer can read: the pile holds the talk and real demo saves;
-  // the share card is the card the ad opens; the card's scripted Related
+  // ── what a viewer can read: the lists hold real demo saves and the ad's own
+  // screenshots; the shares are those saves; the card and its Related
   // reasons pass the bans; the app's own text on every frame of the take
   const card = AD.adCard();
-  [card.title, card.summary, card.detailedSummary, card.actionableTakeaway, ...card.tags, ...card.metadata.videoHighlights, ...card.relatedLinks.map((r) => r.reason)].forEach((x) => scan('the ad card', x));
+  [card.title, card.summary, card.detailedSummary, card.actionableTakeaway, ...card.tags, ...card.relatedLinks.map((r) => r.reason)].forEach((x) => scan('the ad card', x));
   for (const r of card.relatedLinks) if (!L.CARDS.some((c) => c.id === r.id)) bad.push(`Related card ${r.id} is not a demo save`);
   const hookSrc = read('src/reels/ads/card/Hook.tsx');
-  const pile = [...hookSrc.matchAll(/TITLES = \[([^\]]+)\]/g)].flatMap(([, list]) => [...list.matchAll(/'([^']+)'|"([^"]+)"/g)].map((m) => m[1] ?? m[2]));
-  if (pile.length < 3) bad.push(`found ${pile.length} titles in the pile: the gate no longer reads Hook.tsx`);
+  const pile = [...hookSrc.matchAll(/titles: \[([^\]]*)\]/g)].flatMap(([, list]) => [...list.matchAll(/'([^']+)'|"([^"]+)"/g)].map((m) => m[1] ?? m[2]));
+  if (pile.length < 9) bad.push(`found ${pile.length} titles in the lists: the gate no longer reads Hook.tsx`);
   for (const title of pile) {
     scan('Hook.tsx', title, true);
-    if (title !== card.title && !L.CARDS.some((c) => c.title === title)) bad.push(`"${title}" (Hook.tsx) is not a demo save or the ad's talk`);
+    if (!L.CARDS.some((c) => c.title === title)) bad.push(`"${title}" (Hook.tsx) is not a demo save`);
   }
-  const talk = /TALK = \{ title: '([^']+)'/.exec(hookSrc)?.[1];
-  if (talk !== card.title) bad.push(`the shared talk "${talk}" is not the card the ad opens`);
+  for (const [, list] of hookSrc.matchAll(/shots: \[([^\]]*)\]/g))
+    for (const [, f] of list.matchAll(/'([^']+)'/g)) if (!exists(`public/ads/card/hook/${f}`)) bad.push(`the screenshot ${f} is missing: run node scripts/ad-card-shots.mjs`);
+  for (const [, title] of read('src/reels/ads/card/Share.tsx').matchAll(/title: '([^']+)'/g)) {
+    scan('Share.tsx', title, true);
+    if (!L.CARDS.some((c) => c.title === title) && !/^Maya: /.test(title)) bad.push(`"${title}" (Share.tsx) is not a save the hook named`);
+  }
   const RECIPES = L.CARDS.filter((c) => /recipe|cook|kitchen|food/i.test(`${c.category} ${(c.tags ?? []).join(' ')}`) || ['marcella', 'chicken', 'coffee'].includes(c.id)).map((c) => c.title).filter(Boolean);
-  for (const t of pile) if (RECIPES.includes(t)) bad.push(`the pile shows a recipe: "${t}"`);
+  for (const t of pile) if (RECIPES.includes(t)) bad.push(`the lists show a recipe: "${t}"`);
   const takes = JSON.parse(read('src/reels/data/takes.json'));
   const take = takes.adcard;
   if (!take) bad.push('no "adcard" take: run CAPTURE_ONLY=adcard node capture/shoot.mjs');
@@ -173,7 +189,7 @@ export default async function verifyAdCard() {
   // camera mid-move in the Key moments shot). Each key's frame is evaluated
   // from the timeline's numbers, in the order the scene lists them
   {
-    const env = { HITS: C.HITS, SCROLLS: C.SCROLLS, THROW_LEN: C.THROW_LEN };
+    const env = { HITS: C.HITS, SCROLLS: C.SCROLLS, THROW_LEN: C.THROW_LEN, S0: C.SCROLLS[0][0] };
     for (const file of ['Card.tsx', 'Remind.tsx']) {
       const src = read(`src/reels/ads/card/${file}`);
       for (const [, body] of src.matchAll(/const \w*[kK]eysFor = \(dy: number\): Key\[\] =>\s*\[([\s\S]*?)\]\.map/g)) {
@@ -189,7 +205,7 @@ export default async function verifyAdCard() {
   // ── taps touch on their hits; exits ease in and out
   for (const [file, want] of [['Card.tsx', 2], ['Share.tsx', 1], ['Remind.tsx', 2]]) {
     let taps = 0;
-    for (const [, hit, a, b] of read(`src/reels/ads/card/${file}`).matchAll(/<Tap [^>]*t=\{prog\(f, ([\w.]+) - (\d+), \1 \+ (\d+)/g)) {
+    for (const [, hit, a, , b] of read(`src/reels/ads/card/${file}`).matchAll(/<Tap [^>]*t=\{prog\(f, ([\w.\[\]]+) - (\d+), ([\w.\[\]]+) \+ (\d+)/g)) {
       taps++;
       const touch = Math.ceil(-Number(a) + 0.35 * (Number(a) + Number(b)) - 1e-9);
       if (touch !== 0) bad.push(`${file}: the tap on ${hit} first shows its touch ${touch} frames off its hit`);
