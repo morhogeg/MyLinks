@@ -92,22 +92,32 @@ export const SCENES = [
  * plain words. A "\n" breaks the line on screen only. NO em dashes, no
  * literal "AI", no "second brain", no "library" (verify).
  */
+/**
+ * THE VOICE (owner, 2026-10-03): Gemini TTS, Sulafat, with this clip's own
+ * tone, relatable frustration turning into relief: empathetic about the
+ * tip-of-the-tongue feeling, then calm, crisp competence, a friend who always
+ * knows where things are. Reassuring, efficient, never smug. `style` is each
+ * line's acting note and `pace` replaces the house pace note
+ * (audio/gemini_tts.py); Kokoro ignores both.
+ */
+const PACE = 'Crisp and efficient, about 160 words a minute; the opening question given a real beat.';
+
 export const CAPTIONS = [
   // the hook: the problem, over the feed scrolling past
-  { at: 16, to: 100, text: 'You saved it.\nBut what was it called?', duck: 0.45 },
+  { at: 16, to: 100, text: 'You saved it.\nBut what was it called?', duck: 0.45, style: 'Wry and relatable; the question genuinely searching, tip-of-the-tongue frustration.', pace: PACE },
   // the name, as the camera goes to the search field
-  { at: 128, to: 208, text: 'Machina finds it\nin your own words.', kicker: 'Your own words', duck: 0.4 },
-  { at: 304, to: 416, text: 'Only half remember it?\nYou still get what’s close.', kicker: 'Close matches' },
-  { at: 448, to: 560, text: 'Type where you saw it,\nand get everything from there.', kicker: 'Where you saw it' },
-  { at: 576, to: 688, text: 'Open it for the summary,\nand everything it connects to.', kicker: 'Open it' },
+  { at: 128, to: 208, text: 'Machina finds it\nin your own words.', kicker: 'Your own words', duck: 0.4, style: 'Calm relief, reassuring, a small smile.', pace: PACE },
+  { at: 304, to: 416, text: 'Only half remember it?\nYou still get what’s close.', kicker: 'Close matches', style: 'Understanding, then easy reassurance.', pace: PACE },
+  { at: 448, to: 560, text: 'Type where you saw it,\nand get everything from there.', kicker: 'Where you saw it', style: 'Practical and clear, a light "oh, nice" energy.', pace: PACE },
+  { at: 576, to: 688, text: 'Open it for the summary,\nand everything it connects to.', kicker: 'Open it', style: 'Interested, opening up at the end.', pace: PACE },
   // the takeaway
-  { at: 688, to: 776, text: 'Type what you remember.\nGet the one you meant.' },
+  { at: 688, to: 776, text: 'Type what you remember.\nGet the one you meant.', style: 'Crisp and satisfying; a confident landing on "the one you meant".', pace: PACE },
   // the close: the name (the drawn wordmark wipes in as it is said), then
   // the tagline, as the reel closes (owner call 2026-09-28: every launch
   // film ends on it; it appears nowhere earlier in this clip). On ONE row
   // under the wordmark (owner, 2026-09-29), set smaller than the reel's
   // two-row statement so it fits (End.tsx)
-  { at: onBeat(HITS.lockup + 60), to: TOTAL_FRAMES, place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4 },
+  { at: onBeat(HITS.lockup + 60), to: TOTAL_FRAMES, place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4, style: 'A confident, warm sign-off; the name proud, then the tagline unhurried and sincere.', pace: PACE },
 ];
 
 /**
