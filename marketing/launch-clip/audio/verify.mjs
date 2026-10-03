@@ -704,6 +704,8 @@ console.log('\n── clip: ask');
 
 // ─────────────────────────────────────────────────────── THE TRIP AD
 if (!(await (await import('./ads/trip-verify.mjs')).default())) failed = true;
+// ─────────────────────────────── THE ASK AD, "talking to a friend" edition
+if (!(await (await import('./ads/asktalk-verify.mjs')).default())) failed = true;
 
 console.log(failed ? '\nFAILED' : '\nOK');
 process.exit(failed ? 1 : 0);

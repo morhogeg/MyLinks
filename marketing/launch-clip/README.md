@@ -1021,3 +1021,47 @@ viewers see only the wordmark there;
 after launch; don't post the organic Reel before then); nobody has listened to
 the mix on speakers (measured only). The `adtrip` take (rounds 1–3) is still
 in `takes.json` and `shoot.mjs`, unused by this cut.
+
+## Meta ad 2, "talking to a friend" edition (`MachinaAdAskTalk`)
+
+The same Ask ad in a new voice (owner-approved script, 2026-10-03), built
+beside round 6 (`MachinaAdTrip*`, kept as it is) so the two can be compared or
+A/B tested. One real person talking to a friend: a question the viewer answers
+in their head, two specific saves, "That's exactly why we made Machina", the
+feature said once, each feature line ending on "so you…", the brand and the
+tagline. No call to action on screen or in the voice (Meta's Install button is
+the call to action). 29.9s, 9:16 and 4:5.
+
+| Frames | What you see | What's said |
+|---|---|---|
+| 0–152 | Frame 0, the poster: the five piles (round 6's, newer saves sliding in), the first caption up whole | "You save the good stuff for a reason. / So why does most of it / slip your mind?" |
+| 160–280 | The YouTube pile lifts forward on "talk", the TED talk lit; then the Safari pile on "article", The Tail End lit; the piles go soft | "The talk that made it all click. / The article you meant to come back to." |
+| 272–376 | They gather into the point, the brackets snap, the wordmark wipes in on the spoken name; mark and wordmark leave | "That's exactly why we made Machina." |
+| 376–448 | CUT to the chat, close on the composer: "What did that TED talk say about procrastination?" types itself; Send | "Now you can ask your saves anything." |
+| 448–560 | Its answer streams in; on "one clear answer" the answer itself lifts | "It reads across all your saves… / so you get one clear answer." |
+| 552–712 | CUT to a new chat, "What do my saves say about time?"; Send; the theme (the answer's first line) lifts and holds; the three sources lift on "so you see"; its Graph chip is tapped and the real graph opens, those saves lit and linked | "It even finds what connects them… / so you see / what you keep coming back to." |
+| 712–896 | Thrown out into the lockup: the mark strikes, the wordmark wipes in on "Machina", the tagline on one line, held 1.7s | "Machina. / Everything you save, finally useful." |
+
+**Real and scripted:** the same as round 6 (the `adask` take, the two scripted
+answers, no feed rush in this edition). The two saves the pain line names are
+the two the chat answers from. **Built from:** `ads/asktalk-timeline.mjs`,
+`src/reels/ads/asktalk/` (`MachinaAdAskTalk`, `Piles` with the named piles,
+`AskChat` without the feed, `End`, `vo.json`; captions and framing shared from
+`../trip/`), `audio/ads/asktalk-score.mjs`, `audio/ads/asktalk-verify.mjs`
+("── ad: asktalk"), `scripts/ad-asktalk-stills.mjs`, and one entry each in
+`synth-vo.py`, `mix-vo.mjs`, `verify.mjs` and `Root.tsx`. Its gates are round
+6's with the close "Machina." then the tagline, no call to action anywhere, and
+chunks of at most 8 words (`splits`). Captions longer than ~28 characters now
+break into two balanced rows inside the 65px margins (`AdCaptions`, shared, so
+round 6 picks this up on its next render).
+
+```bash
+python3 audio/synth-vo.py asktalk && node audio/ads/asktalk-score.mjs && node audio/mix-vo.mjs asktalk
+npm run verify                                         # "── ad: asktalk"
+node scripts/ad-asktalk-stills.mjs && python3 scripts/ad-trip-sheet.py asktalk [--safe]
+npx remotion render src/index.ts MachinaAdAskTalk out/ads/asktalk/machina-ad-asktalk.mp4   # also …Music, …Feed
+```
+
+**Open:** the name arrives at ~10s (the script spends its first 10s on the
+viewer's problem), not by ~3s as the original Meta brief asked; 29.9s, at
+Meta's 30s limit; nobody has listened to the mix on speakers.

@@ -1,0 +1,3 @@
+# regenerable (node audio/ads/asktalk-score.mjs rewrites it byte-identically); the
+# two delivered mixes, score-vo.wav and score-music.wav, are committed
+score.wav

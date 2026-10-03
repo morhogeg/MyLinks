@@ -1,6 +1,6 @@
 """Contact sheets and the poster for the trip ad.
 
-    python3 scripts/ad-trip-sheet.py [--safe]
+    python3 scripts/ad-trip-sheet.py [trip|asktalk] [--safe]
 
 Reads out/ads/trip/stills/{story,feed}/fNNNN.png (scripts/ad-trip-stills.mjs)
 and writes out/ads/trip/contact-story.png, contact-feed.png and
@@ -13,7 +13,8 @@ import sys
 from PIL import Image, ImageDraw
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
-OUT = os.path.join(ROOT, "out", "ads", "trip")
+AD = next((a for a in sys.argv[1:] if not a.startswith("--")), "trip")  # trip | asktalk
+OUT = os.path.join(ROOT, "out", "ads", AD)
 SAFE = "--safe" in sys.argv
 
 

@@ -182,6 +182,37 @@ SCRIPTS["trip"] = (trip_script, os.path.join(VO, "trip"))
 WORD_TIMING["trip"] = os.path.join(ROOT, "src", "reels", "ads", "trip", "vo.json")
 
 
+# ── Meta ad 2, the "talking to a friend" edition (ads/asktalk-timeline.mjs) ──
+# Same narrator; its own folder (out/vo/asktalk/) and word timings
+# (src/reels/ads/asktalk/vo.json).
+#
+#   python3 audio/synth-vo.py asktalk
+def asktalk_script():
+    """The asktalk ad's captions, read from ads/asktalk-timeline.mjs."""
+    js = (
+        "import('./ads/asktalk-timeline.mjs').then(m => console.log(JSON.stringify("
+        "{ fps: m.FPS, captions: m.CAPTIONS })))"
+    )
+    raw = subprocess.run(["node", "-e", js], cwd=ROOT, check=True, capture_output=True, text=True).stdout
+    data = json.loads(raw)
+    fps = data["fps"]
+    return [
+        {
+            "frame": c["at"],
+            "start": c["at"] / fps,
+            "window": (c["to"] - c["at"]) / fps,
+            "text": " ".join((c.get("say") or c["text"]).split()).replace("Machina", SAY_NAME),
+            "speed": SPEED,
+            "tight": bool(c.get("tight")),
+        }
+        for c in data["captions"]
+    ]
+
+
+SCRIPTS["asktalk"] = (asktalk_script, os.path.join(VO, "asktalk"))
+WORD_TIMING["asktalk"] = os.path.join(ROOT, "src", "reels", "ads", "asktalk", "vo.json")
+
+
 def tighten(samples, sr, keep=0.05, fade=0.01):
     """Close the pauses INSIDE a line to `keep` seconds. Kokoro sometimes
     breathes mid-sentence where the text has no comma ("...more knowledge

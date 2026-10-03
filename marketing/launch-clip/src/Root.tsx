@@ -8,6 +8,8 @@ import * as ASK from '../clips/ask-timeline.mjs';
 import { MachinaAsk } from './reels/clips/ask/MachinaAsk';
 import * as TRIP from '../ads/trip-timeline.mjs';
 import { MachinaAdTrip } from './reels/ads/trip/MachinaAdTrip';
+import * as ASKTALK from '../ads/asktalk-timeline.mjs';
+import { MachinaAdAskTalk } from './reels/ads/asktalk/MachinaAdAskTalk';
 
 /**
  * Compositions:
@@ -180,6 +182,37 @@ export const RemotionRoot: React.FC = () => (
         width={TRIP.WIDTH}
         height={TRIP.FEED_HEIGHT}
         defaultProps={{ shape: 'feed' as const, audioFile: 'ads/trip/score-vo.wav', withCaptions: true }}
+      />
+    </>
+    {/* Meta ad 2, the "talking to a friend" edition (src/reels/ads/asktalk, its
+        clock in ads/asktalk-timeline.mjs), beside round 6 above */}
+    <>
+      <Composition
+        id="MachinaAdAskTalk"
+        component={MachinaAdAskTalk}
+        durationInFrames={ASKTALK.TOTAL_FRAMES}
+        fps={ASKTALK.FPS}
+        width={ASKTALK.WIDTH}
+        height={ASKTALK.HEIGHT}
+        defaultProps={{ shape: 'story' as const, audioFile: 'ads/asktalk/score-vo.wav', withCaptions: true }}
+      />
+      <Composition
+        id="MachinaAdAskTalkMusic"
+        component={MachinaAdAskTalk}
+        durationInFrames={ASKTALK.TOTAL_FRAMES}
+        fps={ASKTALK.FPS}
+        width={ASKTALK.WIDTH}
+        height={ASKTALK.HEIGHT}
+        defaultProps={{ shape: 'story' as const, audioFile: 'ads/asktalk/score-music.wav', withCaptions: true }}
+      />
+      <Composition
+        id="MachinaAdAskTalkFeed"
+        component={MachinaAdAskTalk}
+        durationInFrames={ASKTALK.TOTAL_FRAMES}
+        fps={ASKTALK.FPS}
+        width={ASKTALK.WIDTH}
+        height={ASKTALK.FEED_HEIGHT}
+        defaultProps={{ shape: 'feed' as const, audioFile: 'ads/asktalk/score-vo.wav', withCaptions: true }}
       />
     </>
   </>

@@ -2712,6 +2712,20 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-03 — Meta ad 2 (Ask), "talking to a friend" edition, built beside
+  round 6.** Branch `claude/ad-trip`, NOT merged. Owner's voiceover brief (one
+  person talking to a friend, a question with the sting at the end, specific
+  moments, "That's exactly why we made Machina", "so you…" benefits, no call to
+  action), script approved line by line: "You save the good stuff for a
+  reason. So why does most of it slip your mind?" → the TED talk and The Tail
+  End named (their piles lift) → "That's exactly why we made Machina." → "Now
+  you can ask your saves anything." → "It reads across all your saves… so you
+  get one clear answer." → "It even finds what connects them… so you see what
+  you keep coming back to." (theme, sources, graph) → "Machina. Everything you
+  save, finally useful." `MachinaAdAskTalk` / `…Music` / `…Feed`, 29.9s; round
+  6 (`MachinaAdTrip*`) untouched. Gates green. **Open:** the name arrives at
+  ~10s, not ~3s; nobody has listened to the mix on speakers.
+
 - **2026-10-02 — Meta ad 2 (Ask), round 6: smoother graph, moving piles.**
   Branch `claude/ad-trip`, NOT merged. Owner notes from the phone: "More ideas"
   showed above the composer (now framed under the paper band); the cut into
