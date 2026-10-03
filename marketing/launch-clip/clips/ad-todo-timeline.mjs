@@ -134,8 +134,8 @@ export const CAPTIONS = [
   line(8, 168, 'Okay, be honest. How many things did you save this month… and never open again?', [
     [3, 'How many things did you save\nthis month…'],
     [11, '…and never open again?'],
-  ], { hook: true, ...act('Leaning in with a knowing, playful smile, gently teasing a friend; a beat of mock guilt on "and never open again?"', 'Okay, be honest. <short pause> How many things did you save this month… and never open again?') }),
-  line(168, 224, 'That video you’d watch later.', [[0, 'That video you’d watch later.']], act('Wry and amused, naming the first familiar culprit; a light, rhythmic list read')),
+  ], { hook: true, ...act('Leaning in with a knowing, playful smile, gently teasing a friend; a touch of mock guilt on "and never open again?"') }),
+  line(168, 224, 'That video you’d watch later.', [[0, 'That video you’d watch later.']], act('Wry and amused, naming the first familiar culprit, quick and light')),
   line(224, 264, 'The post you loved.', [[0, 'The post you loved.']], act('Fond, a little wistful, still smiling')),
   line(264, 296, 'That article.', [[0, 'That article.']], act('Deadpan, knowing; a tiny chuckle after it', 'That article. <chuckle>')),
   line(296, 368, 'The screenshot you swore you’d remember.', [[0, 'The screenshot you swore\nyou’d remember.']], act('Playfully incredulous, smiling: we both know how that went')),
@@ -154,7 +154,7 @@ export const CAPTIONS = [
     [0, 'It analyzes every save,\nsummarizes it,'],
     [6, 'and pulls out the key points,'],
     [12, 'so you’ll always remember\nwhy you kept it.'],
-  ], act('Genuinely enthusiastic but natural, explaining something you love; warm and reassuring on "so you’ll always remember why you kept it"')),
+  ], act('Genuinely enthusiastic, explaining something you love, moving along; warm on "so you’ll always remember why you kept it"')),
   line(1080, HITS.out, 'It even connects each save to related ones you’ve kept before… so your ideas start building on each other.', [
     [0, 'It even connects each save'],
     [5, 'to related ones\nyou’ve kept before,'],
@@ -162,7 +162,7 @@ export const CAPTIONS = [
   ], act('Delighted, a little wonder on "It even", building gently to a satisfied "building on each other"')),
   // the close, on the lockup: the wordmark wipes in on "Machina"; the tagline,
   // exactly, closes (owner, 2026-09-28: every film ends on it)
-  { at: HITS.markStrike + 8, to: TOTAL_FRAMES, place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4, showFirstLine: false, ...act('A confident, warm sign-off with a smile; the name proud, then the tagline unhurried and sincere', 'Machina. <short pause> Everything you save, finally useful.') },
+  { at: HITS.markStrike + 8, to: TOTAL_FRAMES, place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4, showFirstLine: false, ...act('A confident, warm sign-off with a smile; the name proud, then the tagline unhurried and sincere', 'Machina. Everything you save, finally useful.') },
 ];
 
 /** no chapter words */

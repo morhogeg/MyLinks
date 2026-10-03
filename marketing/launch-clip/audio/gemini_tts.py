@@ -41,9 +41,14 @@ SR = 24000  # the API returns 24kHz mono 16-bit PCM (Kokoro's rate too)
 # THE HOUSE DELIVERY, for every line unless a line brings its own note
 STYLE = (
     "A real person talking to a friend, not an announcer and not an ad: warm, "
-    "relaxed, lightly amused, sincere. Unhurried, an easy conversational pace "
-    "with natural breaths and small pauses at commas and ellipses. Sentences "
-    "land softly; no sales emphasis, no rising 'presenter' tone."
+    "playful, lightly amused, sincere. Sentences land softly; no sales "
+    "emphasis, no rising 'presenter' tone."
+)
+# THE PACE, added to every direction: asked to act, the model slows right
+# down (about 120 words a minute, long dramatic beats); real chat is quicker
+PACE = (
+    " Pace: lively and quick, like real chatty conversation between friends, "
+    "about 170 words a minute; keep pauses short and light, no long dramatic beats."
 )
 
 # THE NAME: how the words given to Gemini spell "Machina" (GEMINI_SAY_NAME),
@@ -63,7 +68,7 @@ def performed(text):
 
 def direct(style):
     """A line's direction: its own note, else the house one; plus the name note."""
-    note = style or STYLE
+    note = (style or STYLE) + PACE
     return note + NAME_NOTE if os.environ.get("GEMINI_NAME_NOTE") else note
 
 
