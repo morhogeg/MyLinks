@@ -760,13 +760,13 @@ Life"). Branch `claude/ad-card`.
 | Frames | What you see | What's said (on screen in chunks of at most 8 words) |
 |---|---|---|
 | 0–116 | frame 0 is the poster: four apps' save lists (Safari · Reading List, X · Bookmarks, Instagram · Saved, Photos · Screenshots), real demo titles and the ad's own screenshots, the first chunk already set; a new save drops into each, then they grey out (80) | "How many things did you save this month… and never open again?" |
-| 116–332 | the camera visits the pain: the Reading List, the article on top (120); X's Bookmarks, Naval's thread on top (192); Photos, a friend's message about a hike sliding in (264, 280) | "The article you promised yourself you'd read… the thread you bookmarked at 1 a.m… the screenshot you swore you'd remember." |
+| 116–332 | the camera visits the pain: the Reading List, the article on top (120); X's Bookmarks, Naval's thread on top (192); Photos, a friend's message about a hike sliding in (264, 280) | "The article you promised yourself you'd read… the thread you bookmarked at midnight… the screenshot you swore you'd remember." |
 | 328–401 | the lists gather into one point, the mark snaps (352), MACHINA wipes in on the spoken name | "That's exactly why we made Machina." |
-| 400–472 | the article, the thread and the screenshot, each Share tapped (416, 432, 448), pulled into the mark | "From any app, just share it to Machina." |
+| 400–472 | the article (from the top), the thread (from the right), the screenshot (from the left), each settling in its own place around the mark, Share tapped (416, 432, 448), pulled in | "From any app, just share it to Machina." |
 | 464–640 | the point becomes the + (464), the app opens (488); the article lands and is tapped open (528): its gist; one scroll; the Key Points lift (600) | "It reads what you save and pulls out the key points… so you'll always remember why you kept it." |
 | 640–784 | on down: its Related cards (Naval's thread, Jobs' Stanford address, Bret Victor's talk) lift (672); "See in graph" (720), the real graph, its ties lit | "It links each save to what you saved before… so you see how your ideas connect." |
-| 776–928 | back on the card: its bell (792), "Remind me" lifted off its screen, Smart review ringed (808), Save (856); a cut to the feed (880), TOMORROW over the line, "Reminders due", the article in it, lifted (896) | "Then pick a time, and Machina brings it back… so you actually get back to it." |
-| 928–1104 | thrown into the lockup: the mark strikes (968), MACHINA on the spoken name, the tagline on one line, held 1.6s after the voice | "Machina. Everything you save, finally useful." |
+| 776–992 | back on the card: its bell (792), "Remind me" lifted off its screen, Smart review ringed and held (808), Save (880); a cut to the feed (920), TOMORROW over the line, "Reminders due", the article in it, lifted (944) | "Then pick a time, and Machina brings it back… so you actually get back to it." |
+| 992–1166 | thrown into the lockup: the mark strikes (1032), MACHINA on the spoken name, the tagline on one line, held 1.6s after the voice | "Machina. Everything you save, finally useful." |
 
 **How it got here.** Round 1 (21.0s) read the card down section by section
 ("Get the key moments, with timestamps." / "The whole talk, down to what
@@ -802,8 +802,19 @@ The narrator's "…" pauses are long in this voice, so lines start a breath
 (0.3s) after the line before, not on the next 8th; taps and cuts stay on the
 grid. 36.8s (owner: about 30–35s; under 35 would need a faster voice).
 
-**The Meta spec, and how the ad meets it.** 36.8s (owner, round 5: about
-30–35s; over Meta's original 30s cap). Frame 0 is a legible picture with the
+Round 6 (owner, 2026-10-03): the reminder and everything after it had too
+little time on screen, so Smart review holds ~1s longer and the rest follows
+(Save 880, the due strip 920, the lockup 1008). "1 a.m." became "at midnight"
+because the voice said it badly. The Safari, X and Instagram lists now slide
+new saves in, like the Photos strip. No ellipsis on screen (verify fails one;
+the narrator's pauses stay in `say`). The three shares enter from the top,
+the right and the left and settle in three places around the mark, so the
+saves read as coming from all over. The reminder line is split in two, the
+TOMORROW kicker on the second. 38.9s.
+
+**The Meta spec, and how the ad meets it.** 38.9s (owner, round 5: about
+30–35s; round 6's slower reminder took it over; verify notes over 35s and
+fails over 40s). Frame 0 is a legible picture with the
 first chunk set on it, so the hook lands with the sound off. At most 8 words
 on screen at once (the TOMORROW kicker counts). The mark arrives with "That's
 exactly why we made Machina." (~11s), by the owner's script, not by 3s as the

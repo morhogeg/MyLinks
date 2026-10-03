@@ -32,15 +32,14 @@
  },
  {
   "frame": 192,
-  "text": "the thread you bookmarked at one a.m\u2026",
+  "text": "the thread you bookmarked at midnight\u2026",
   "words": [
    0.06,
-   0.271,
-   0.639,
-   0.849,
-   1.428,
-   1.586,
-   1.797
+   0.231,
+   0.531,
+   0.702,
+   1.173,
+   1.302
   ]
  },
  {
@@ -130,28 +129,34 @@
  },
  {
   "frame": 784,
-  "text": "Then pick a time, and Makeena brings it back\u2026 so you actually get back to it.",
+  "text": "Then pick a time, and Makeena brings it back\u2026",
   "words": [
    0.04,
-   0.715,
-   1.39,
-   1.66,
-   2.75,
-   2.854,
-   3.062,
-   3.244,
-   3.322,
-   3.478,
-   3.556,
-   3.66,
-   3.894,
-   3.998,
-   4.128,
-   4.206
+   0.284,
+   0.529,
+   0.627,
+   1.2,
+   1.381,
+   1.744,
+   2.062,
+   2.198
   ]
  },
  {
-  "frame": 968,
+  "frame": 928,
+  "text": "so you actually get back to it.",
+  "words": [
+   0.04,
+   0.177,
+   0.359,
+   0.77,
+   0.953,
+   1.181,
+   1.317
+  ]
+ },
+ {
+  "frame": 1032,
   "text": "Makeena. Everything you save, finally useful.",
   "words": [
    0.05,

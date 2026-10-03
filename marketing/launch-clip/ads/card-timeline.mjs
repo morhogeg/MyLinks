@@ -49,7 +49,6 @@ export const HITS = {
   article: 120,
   thread: 192,
   screenshot: 264,
-  shotIn: 280,
   // "That's exactly why we made Machina.": the lists gather into one point,
   // the brackets snap, the name wipes in as it is said
   collapse: 328,
@@ -69,19 +68,20 @@ export const HITS = {
   // on down: its three Related cards, lifted as one block; then the graph
   related: 672,
   graphTap: 720,
-  // a cut back to the card: its bell, "Remind me" (Smart review ringed), Save
+  // a cut back to the card: its bell, "Remind me" (Smart review ringed and
+  // held a second), down to Save; the app's confirmation, held
   back: 776,
   bellTap: 792,
   smart: 808,
-  saveTap: 856,
-  reminderSet: 864,
+  saveTap: 880,
+  reminderSet: 888,
   // tomorrow, 9:00 AM: the feed's "Reminders due" strip
-  due: 880,
-  dueLift: 896,
+  due: 920,
+  dueLift: 944,
   // the close
-  throw: 928,
-  lockup: 944,
-  markStrike: 968,
+  throw: 992,
+  lockup: 1008,
+  markStrike: 1032,
 };
 
 /**
@@ -105,7 +105,7 @@ export const SCROLLS = [
 ];
 
 export const THROW_LEN = 30;
-export const TOTAL_FRAMES = 1104; // the tagline holds 1.6s after the voice ends
+export const TOTAL_FRAMES = 1166; // the tagline holds 1.6s after the voice ends
 export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 
 /**
@@ -119,31 +119,33 @@ export const TOTAL_SEC = TOTAL_FRAMES / FPS;
  * no "second brain", no "library", no "talk".
  */
 const LINES = [
-  { at: 8, to: 116, text: 'How many things did you\nsave this month… | and never open again?', poster: true },
-  { at: 116, to: 192, text: "The article you promised\nyourself you'd read…" },
-  { at: 192, to: 264, text: 'the thread you\nbookmarked at 1 a.m…', say: 'the thread you bookmarked at one a.m…' },
+  { at: 8, to: 116, text: 'How many things did you\nsave this month | and never open again?', say: 'How many things did you save this month… and never open again?', poster: true },
+  { at: 116, to: 192, text: "The article you promised\nyourself you'd read", say: "The article you promised yourself you'd read…" },
+  { at: 192, to: 264, text: 'the thread you\nbookmarked at midnight', say: 'the thread you bookmarked at midnight…' },
   { at: 264, to: 332, text: "the screenshot you\nswore you'd remember." },
   { at: 332, to: 401, text: "That's exactly why\nwe made Machina." },
   { at: 401, to: 472, text: 'From any app, just\nshare it to Machina.' },
-  { at: 472, to: 640, text: "It reads what you save | and pulls out\nthe key points… | so you'll always remember\nwhy you kept it.", until: 'the Key Points lift', duck: 0.45 },
-  { at: 640, to: 784, text: 'It links each save | to what you saved before… | so you see how\nyour ideas connect.', until: 'the graph opens on its ties', duck: 0.45 },
-  { at: 784, to: 928, text: 'Then pick a time, | and Machina brings it back… | so you actually\nget back to it.', kicker: 'Tomorrow', kickerChunk: 2, until: 'the Reminders due strip lifts' },
+  { at: 472, to: 640, text: "It reads what you save | and pulls out\nthe key points | so you'll always remember\nwhy you kept it.", say: "It reads what you save and pulls out the key points… so you'll always remember why you kept it.", until: 'the Key Points lift', duck: 0.45 },
+  { at: 640, to: 784, text: 'It links each save | to what you saved before | so you see how\nyour ideas connect.', say: 'It links each save to what you saved before… so you see how your ideas connect.', until: 'the graph opens on its ties', duck: 0.45 },
+  { at: 784, to: 916, text: 'Then pick a time, | and Machina brings it back', say: 'Then pick a time, and Machina brings it back…', until: 'the reminder is set and confirmed' },
+  { at: 928, to: 992, text: 'so you actually\nget back to it.', kicker: 'Tomorrow', kickerChunk: 0, until: 'the Reminders due strip lifts' },
   // the close, on the lockup: the name (the drawn wordmark wipes in as it is
   // said), then the tagline, exactly as written (owner call 2026-09-28)
   { at: HITS.markStrike, to: TOTAL_FRAMES, place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4 },
 ];
 const plain = (t) => t.replace(/\s*\|\s*/g, ' ').split(/\s+/).filter(Boolean).join(' ');
+// (round 6, owner: no ellipsis on screen; the narrator keeps its pauses in `say`)
 export const CAPTIONS = LINES.map((c) => ({ ...c, say: plain(c.say ?? c.text) }));
 
 /**
- * THE SCORE's map (audio/ads/card-score.mjs), one chord per bar (18 bars):
+ * THE SCORE's map (audio/ads/card-score.mjs), one chord per bar (19 bars):
  * the hook hangs on IV and leans on V, the name resolves to I, the card walks
  * I V IV I, the reminder home, and the lockup on I.
  */
 export const BAR_CHORDS = [
   'Fmaj7', 'Fmaj7', 'G6', 'Fmaj7', 'G6', 'Cmaj7',
   'G6', 'Cmaj7', 'G6', 'Fmaj7', 'Cmaj7', 'G6',
-  'Fmaj7', 'Cmaj7', 'Cmaj7', 'Cmaj7', 'Cmaj7', 'Cmaj7',
+  'Fmaj7', 'G6', 'Cmaj7', 'Cmaj7', 'Cmaj7', 'Cmaj7', 'Cmaj7',
 ];
 /** the drums: in with the app, out for the lockup */
 export const DRUMS = [7 * BAR_FRAMES, HITS.lockup];

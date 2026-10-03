@@ -2707,6 +2707,23 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-03 — META AD 1, ROUND 6: SLOWER REMINDER, LIVE LISTS, SAVES
+  FROM EVERYWHERE.** Branch `claude/ad-card`, not merged. Owner notes, each
+  done: (1) from the reminder on, the screens were too fast: Smart review is
+  held ~1s longer, Save lands at 880, the due strip at 920/944, the lockup at
+  1008, so the ad is now 38.9s (verify notes it over 35s; it fails above 40s);
+  (2) "1 a.m." was voiced badly: the line now says "at midnight"; (3) the
+  hook's Safari, X and Instagram lists now slide in new saves like the Photos
+  strip did (tiles drawn by `scripts/ad-card-shots.mjs`; the X list's third
+  post is the SAVE clip's own invented @marginalia post, now allowed by the
+  title gate); (4) no ellipsis on screen (the narrator keeps its pauses in
+  `say`; verify fails a "…" in caption text); (5) the three shares come from
+  three sides of the screen (above from the top, right, left) and settle
+  around the mark before it pulls them in. The reminder line is split into
+  two lines ("Then pick a time, and Machina brings it back" / "so you actually
+  get back to it." with the TOMORROW kicker). Verify clean; mixes −14.0 LUFS,
+  ≤ −1.25 dBTP. Open: still over the owner's 30–35s; nobody has listened on
+  speakers; the push is not shown (`PUSH_SLOT`).
 - **2026-10-03 — META AD 1, ROUND 5: SAVES, NOT VIDEOS; A FRIEND'S VOICE.**
   Branch `claude/ad-card`, not merged. Owner: the ad was stuck on one YouTube
   video (the first brief's hero); it is about what ANY save becomes, voiced

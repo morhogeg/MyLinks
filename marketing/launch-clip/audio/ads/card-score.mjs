@@ -39,7 +39,7 @@ const CHORDS = {
 const BARS = Math.ceil(TOTAL_FRAMES / BAR_FRAMES);
 const LOCKUP_BAR = Math.round(HITS.lockup / BAR_FRAMES);
 /** how much of the band is playing, per bar */
-const DENSITY = [0.34, 0.4, 0.46, 0.5, 0.56, 0.62, 0.68, 0.72, 0.74, 0.74, 0.76, 0.76, 0.76, 0.76, 0.76, 0.45, 0.45, 0.45];
+const DENSITY = [0.34, 0.4, 0.46, 0.5, 0.56, 0.62, 0.68, 0.72, 0.74, 0.74, 0.76, 0.76, 0.76, 0.74, 0.72, 0.7, 0.45, 0.45, 0.45];
 
 for (let bar = 0; bar < BARS; bar++) {
   const ch = CHORDS[BAR_CHORDS[bar]];
@@ -111,7 +111,7 @@ const H = HITS;
 [0, 1, 2].forEach((k) => tick(t(48 + k * 5), 0.03, 1.3 + k * 0.06));
 whoosh(t(H.lost) + 0.6, 0.9, 0.035, 0);
 [H.article, H.thread, H.screenshot].forEach((fr, k) => whoosh(t(fr) - 0.05, 0.45, 0.035, [-0.3, 0.3, 0.1][k]));
-tick(t(H.shotIn), 0.05, 1.25);
+[H.article, H.thread, H.screenshot].forEach((fr) => tick(t(fr + 12), 0.04, 1.25));
 // the mark: the lists rush in, the point, the snap
 whoosh(t(H.collapse) - 0.1, 0.55, 0.08, -0.3);
 whoosh(t(H.collapse) - 0.05, 0.5, 0.08, 0.3);

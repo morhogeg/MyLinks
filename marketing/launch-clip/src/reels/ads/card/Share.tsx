@@ -14,8 +14,9 @@ import { MARK } from './Hook';
  * "From any app, just share it to Machina." The kit's share gesture (the
  * reel's ShareBeat, the SAVE clip's Shares) for the three saves the hook
  * named, a beat apart: the article (Safari), the thread (X), the screenshot
- * (Photos). Each enters from its own edge, its Share button is tapped, and it
- * is pulled into the Machina mark, which answers with a ring.
+ * (Photos). Each enters from its own edge and settles in its own place
+ * around the mark (round 6: saves come from everywhere), its Share button is
+ * tapped, and it is pulled into the Machina mark, which answers with a ring.
  *
  * THE SLOT. The iOS share sheet is native and cannot be captured from the web
  * build, so this is a brand graphic, not rebuilt iOS UI (SHARE_SLOT in the
@@ -24,14 +25,16 @@ import { MARK } from './Hook';
  */
 
 type Kind = 'safari' | 'x' | 'photos';
-type Source = { kind: Kind; app: string; by: string; title: string; from: [number, number] };
+type Source = { kind: Kind; app: string; by: string; title: string; from: [number, number]; rest: { x: number; y: number } };
 export const SOURCES: Source[] = [
-  { kind: 'safari', app: 'Safari', by: 'markmanson.net', title: 'The Most Important Question of Your Life', from: [-700, 0] },
-  { kind: 'x', app: 'X', by: '@naval', title: 'How to Get Rich (without getting lucky)', from: [700, 0] },
-  { kind: 'photos', app: 'Photos', by: 'Screenshot', title: 'Maya: You HAVE to do the Tour du Mont Blanc', from: [0, -560] },
+  // round 6 (owner: each save from a different part of the screen): above
+  // the mark from the top, beside it from the right, beside it from the left
+  { kind: 'safari', app: 'Safari', by: 'markmanson.net', title: 'The Most Important Question of Your Life', from: [0, -460], rest: { x: 540, y: 680 } },
+  { kind: 'x', app: 'X', by: '@naval', title: 'How to Get Rich (without getting lucky)', from: [520, 0], rest: { x: 838, y: 870 } },
+  { kind: 'photos', app: 'Photos', by: 'Screenshot', title: 'Maya: You HAVE to do the Tour du Mont Blanc', from: [-520, 0], rest: { x: 242, y: 990 } },
 ];
-const CARD_W = 780;
-const REST = { x: 540, y: 690, s: 0.94 };
+const CARD_W = 600;
+const REST_S = 0.56;
 const ENTER = 12;
 const SAFARI_INK = 'rgb(0, 122, 255)';
 const PHOTOS_INK = 'rgb(245, 158, 11)';
@@ -95,10 +98,10 @@ export const Share: React.FC<{ f: number }> = ({ f }) => {
         const enter = prog(t, 0, ENTER, EASE_MODAL);
         const share = prog(t, TAP - 2, TAP + 4, EASE_MODAL);
         const pull = prog(t, TAP + 4, LAND, EASE_GATHER);
-        const side = s.from[0] < 0 ? -1 : 1;
-        const x = mix(REST.x + s.from[0] * (1 - enter), MARK.x, pull) + side * 60 * Math.sin(pull * Math.PI);
-        const y = mix(REST.y + dy + s.from[1] * (1 - enter), markY, pull);
-        const scale = REST.s * mix(1, 0.05, Math.pow(pull, 0.8)) * mix(0.94, 1, enter);
+        const side = s.from[0] < 0 ? -1 : s.from[0] > 0 ? 1 : 0;
+        const x = mix(s.rest.x + s.from[0] * (1 - enter), MARK.x, pull) + side * 40 * Math.sin(pull * Math.PI);
+        const y = mix(s.rest.y + dy + s.from[1] * (1 - enter), markY, pull);
+        const scale = REST_S * mix(1, 0.05, Math.pow(pull, 0.8)) * mix(0.94, 1, enter);
         const ring = prog(t, LAND, LAND + 22, EASE_MODAL);
         const p = prog(t, LAND, LAND + 10, EASE_SPRING) * (1 - prog(t, LAND + 10, LAND + 20, EASE_IN_OUT));
         return (

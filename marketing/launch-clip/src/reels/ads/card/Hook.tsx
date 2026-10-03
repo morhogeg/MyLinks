@@ -35,14 +35,18 @@ export const MARK = { x: 540, y: 930 };
 export const MARK_W = 300;
 
 type Kind = 'safari' | 'x' | 'instagram' | 'photos';
-type Pile = { kind: Kind; app: string; list: string; titles: string[]; shots?: string[]; x: number; y: number; r: number };
-// titles[0] is the save that drops in on "this month" (the screenshot slides
-// in later, on its own line); the rest are already there
+type Pile = { kind: Kind; app: string; list: string; titles: string[]; shots: string[]; hero: boolean; x: number; y: number; r: number };
+// Round 6 (owner: make every list dynamic, like the screenshots): every list
+// is a strip of tiles drawn for the ad (scripts/ad-card-shots.mjs). A new save
+// slides in on "this month"; a list the camera visits (`hero`) slides in one
+// more as its line names it: the article, the thread, the screenshot. shots[0]
+// is that hero. `titles` are what the tiles show, in order (verify checks
+// them against the demo account).
 const PILES: Pile[] = [
-  { kind: 'safari', app: 'Safari', list: 'Reading List', titles: ['The Most Important Question of Your Life', 'The Tail End', 'Laws of UX', 'Dieter Rams: ten principles for good design'], x: 295, y: 765, r: -2.5 },
-  { kind: 'x', app: 'X', list: 'Bookmarks', titles: ['How to Get Rich (without getting lucky)', 'You do not rise to the level of your goals', 'Inventing on Principle', 'Four Thousand Weeks'], x: 785, y: 758, r: 2.5 },
-  { kind: 'instagram', app: 'Instagram', list: 'Saved', titles: ['Fushimi Inari at dawn', 'Cala Goloritzé, Sardinia', 'Cosmic Cliffs in the Carina Nebula', 'Tour du Mont Blanc'], x: 290, y: 1098, r: 2 },
-  { kind: 'photos', app: 'Photos', list: 'Screenshots', titles: [], shots: ['shot-1.jpg', 'shot-2.jpg', 'shot-3.jpg', 'post-1.jpg'], x: 790, y: 1090, r: -2 },
+  { kind: 'safari', app: 'Safari', list: 'Reading List', titles: ['The Most Important Question of Your Life', 'The Tail End', 'Laws of UX', 'Dieter Rams: ten principles for good design'], shots: ['article-1.jpg', 'article-2.jpg', 'article-3.jpg', 'article-4.jpg'], hero: true, x: 295, y: 765, r: -2.5 },
+  { kind: 'x', app: 'X', list: 'Bookmarks', titles: ['How to Get Rich (without getting lucky)', 'You do not rise to the level of your goals', 'How I read 40 books a year without speed reading'], shots: ['post-x-1.jpg', 'post-x-2.jpg', 'post-x-3.jpg'], hero: true, x: 785, y: 758, r: 2.5 },
+  { kind: 'instagram', app: 'Instagram', list: 'Saved', titles: ['Fushimi Inari at dawn', 'Cala Goloritzé, Sardinia', 'Cosmic Cliffs in the Carina Nebula'], shots: ['ig-1.jpg', 'ig-2.jpg', 'ig-3.jpg'], hero: false, x: 290, y: 1098, r: 2 },
+  { kind: 'photos', app: 'Photos', list: 'Screenshots', titles: [], shots: ['shot-1.jpg', 'shot-2.jpg', 'shot-3.jpg', 'post-1.jpg'], hero: true, x: 790, y: 1090, r: -2 },
 ];
 /** which list each pain line visits */
 const VISITS: [number, number][] = [
@@ -73,7 +77,7 @@ const SAVED = wordAt(HOOK.at, 5);
 /** "Machina" in "That's exactly why we made Machina.": the wordmark wipes in as it is said */
 export const NAME_AT = wordAt(NAME.at, 5);
 
-const PileCard: React.FC<{ p: Pile; drop: number; grey: number }> = ({ p, drop, grey }) => {
+const PileCard: React.FC<{ p: Pile; pending: number; grey: number }> = ({ p, pending, grey }) => {
   const ink = inkOf(p.kind);
   return (
     <div
@@ -97,26 +101,16 @@ const PileCard: React.FC<{ p: Pile; drop: number; grey: number }> = ({ p, drop, 
         </span>
       </div>
       <div style={{ marginTop: 16, height: ROW * 3, overflow: 'hidden', filter: grey > 0.01 ? `blur(${(grey * 4).toFixed(2)}px) grayscale(${grey.toFixed(3)})` : undefined, opacity: 1 - 0.5 * grey }}>
-        {p.shots ? (
-          <div style={{ display: 'flex', gap: SHOT_GAP, paddingTop: 8, transform: `translateX(${Math.round(-(SHOT_W + SHOT_GAP) * (1 - drop))}px)` }}>
-            {p.shots.map((f, k) => (
-              <Img
-                key={f}
-                src={staticFile(`ads/card/hook/${f}`)}
-                style={{ width: SHOT_W, height: ROW * 3 - 16, flexShrink: 0, objectFit: 'cover', objectPosition: 'left top', borderRadius: 10, border: '1px solid rgba(16,24,40,0.08)', opacity: k === 0 ? drop : 1 }}
-              />
-            ))}
-          </div>
-        ) : (
-          <div style={{ transform: `translateY(${Math.round(-ROW * (1 - drop))}px)` }}>
-            {p.titles.map((t, k) => (
-              <div key={k} style={{ height: ROW, display: 'flex', alignItems: 'center', gap: 14, borderTop: '1px solid rgba(16,24,40,0.06)', opacity: k === 0 ? drop : 1 }}>
-                <span style={{ width: 38, height: 38, borderRadius: 10, flexShrink: 0, background: tint(ink, 0.1) }} />
-                <span style={{ fontSize: 23, fontWeight: k === 0 ? 640 : 560, color: INK, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t}</span>
-              </div>
-            ))}
-          </div>
-        )}
+        {/* the strip: `pending` tiles are still off to the left; each arrival slides it right */}
+        <div style={{ display: 'flex', gap: SHOT_GAP, paddingTop: 8, transform: `translateX(${Math.round(-(SHOT_W + SHOT_GAP) * pending)}px)` }}>
+          {p.shots.map((f, k) => (
+            <Img
+              key={f}
+              src={staticFile(`ads/card/hook/${f}`)}
+              style={{ width: SHOT_W, height: ROW * 3 - 16, flexShrink: 0, objectFit: 'cover', objectPosition: 'left top', borderRadius: 10, border: '1px solid rgba(16,24,40,0.08)', opacity: Math.min(1, Math.max(0, 1 + k - pending)) }}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -181,7 +175,11 @@ export const Hook: React.FC<{ f: number }> = ({ f }) => {
           const s = SCALE * cam.s * mix(1, 0.05, Math.pow(g, 0.7));
           const focused = cam.focus === k ? cam.w : 0;
           const others = cam.focus >= 0 && cam.focus !== k ? cam.w : 0;
-          const drop = p.shots ? prog(f, HITS.shotIn, HITS.shotIn + 14, EASE_SPRING) : prog(f, SAVED - 6 + k * 5, SAVED + 8 + k * 5, EASE_SPRING);
+          // a new save on "this month"; the hero as its line names it
+          const first = prog(f, SAVED - 6 + k * 5, SAVED + 8 + k * 5, EASE_SPRING);
+          const visit = VISITS.find(([, v]) => v === k);
+          const second = p.hero && visit ? prog(f, visit[0] + 12, visit[0] + 26, EASE_SPRING) : 0;
+          const pending = (p.hero ? 2 : 1) - first - second;
           // grey once lost; the list the camera visits comes back into focus
           const grey = lost * (1 - focused);
           return (
@@ -197,7 +195,7 @@ export const Hook: React.FC<{ f: number }> = ({ f }) => {
                 zIndex: focused > 0.5 ? 2 : 1,
               }}
             >
-              <PileCard p={p} drop={drop} grey={grey} />
+              <PileCard p={p} pending={pending} grey={grey} />
             </div>
           );
         })}
