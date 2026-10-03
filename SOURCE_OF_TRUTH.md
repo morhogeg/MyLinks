@@ -2712,6 +2712,12 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-03 — Ask ad, talking edition: one line rephrased.** Branch
+  `claude/ad-trip`, NOT merged. Owner: "so you see what you keep coming back
+  to" didn't mean anything; now "It even finds what connects them… so you see
+  the theme running through your saves." (three captions). The graph holds to
+  the end of the longer line; still 29.9s; gates green.
+
 - **2026-10-03 — Meta ad 2 (Ask), "talking to a friend" edition, built beside
   round 6.** Branch `claude/ad-trip`, NOT merged. Owner's voiceover brief (one
   person talking to a friend, a question with the sting at the end, specific
@@ -2720,8 +2726,8 @@ exact-match, capped.
   reason. So why does most of it slip your mind?" → the TED talk and The Tail
   End named (their piles lift) → "That's exactly why we made Machina." → "Now
   you can ask your saves anything." → "It reads across all your saves… so you
-  get one clear answer." → "It even finds what connects them… so you see what
-  you keep coming back to." (theme, sources, graph) → "Machina. Everything you
+  get one clear answer." → "It even finds what connects them… so you see the
+  theme running through your saves." (theme, sources, graph) → "Machina. Everything you
   save, finally useful." `MachinaAdAskTalk` / `…Music` / `…Feed`, 29.9s; round
   6 (`MachinaAdTrip*`) untouched. Gates green. **Open:** the name arrives at
   ~10s, not ~3s; nobody has listened to the mix on speakers.

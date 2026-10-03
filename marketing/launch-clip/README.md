@@ -1039,8 +1039,8 @@ the call to action). 29.9s, 9:16 and 4:5.
 | 272–376 | They gather into the point, the brackets snap, the wordmark wipes in on the spoken name; mark and wordmark leave | "That's exactly why we made Machina." |
 | 376–448 | CUT to the chat, close on the composer: "What did that TED talk say about procrastination?" types itself; Send | "Now you can ask your saves anything." |
 | 448–560 | Its answer streams in; on "one clear answer" the answer itself lifts | "It reads across all your saves… / so you get one clear answer." |
-| 552–712 | CUT to a new chat, "What do my saves say about time?"; Send; the theme (the answer's first line) lifts and holds; the three sources lift on "so you see"; its Graph chip is tapped and the real graph opens, those saves lit and linked | "It even finds what connects them… / so you see / what you keep coming back to." |
-| 712–896 | Thrown out into the lockup: the mark strikes, the wordmark wipes in on "Machina", the tagline on one line, held 1.7s | "Machina. / Everything you save, finally useful." |
+| 552–720 | CUT to a new chat, "What do my saves say about time?"; Send; the theme (the answer's first line) lifts and holds; the three sources lift on "so you see"; its Graph chip is tapped and the real graph opens, those saves lit and linked | "It even finds what connects them… / so you see / the theme running through your saves." |
+| 720–896 | Thrown out into the lockup: the mark strikes, the wordmark wipes in on "Machina", the tagline on one line, held 1.7s | "Machina. / Everything you save, finally useful." |
 
 **Real and scripted:** the same as round 6 (the `adask` take, the two scripted
 answers, no feed rush in this edition). The two saves the pain line names are

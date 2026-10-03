@@ -11,8 +11,8 @@
  *    made Machina." (they gather into the mark); "Now you can ask your saves
  *    anything." (the chat, the question typing); "It reads across all your
  *    saves… so you get one clear answer."; "It even finds what connects
- *    them… so you see what you keep coming back to." (the theme, the three
- *    sources, the graph); "Machina. Everything you save, finally useful."
+ *    them… so you see the theme running through your saves." (the theme,
+ *    the three sources, the graph); "Machina. Everything you save, finally useful."
  *
  * Picture (src/reels/ads/asktalk/), score (audio/ads/asktalk-score.mjs),
  * narrator (audio/synth-vo.py asktalk) and the ad's gates
@@ -72,8 +72,8 @@ export const HITS = {
   lead: beat(36), // "It even finds…": the theme (its first line) lifts, and holds
   sources2: beat(38), // its three sources arrive…
   chips: [beat(39), beat(39.5), beat(40)], // …and lift one by one on "so you see"
-  graphTap: beat(41), // its Graph chip: the saves it connected, lit in the real graph ("what you keep coming back to")
-  lockup: beat(44.5), // thrown out into the lockup; the mark launches
+  graphTap: beat(41), // its Graph chip: the saves it connected, lit in the real graph ("the theme running through your saves")
+  lockup: beat(45), // thrown out into the lockup; the mark launches
   markStrike: beat(46.5), // the mark's point strikes
 };
 
@@ -91,7 +91,7 @@ export const CAPTIONS = [
   { at: beat(18), to: beat(22.5), text: "That's exactly why we made Machina.", duck: 0.4 },
   { at: beat(23.5), to: beat(27.5), text: 'Now you can ask your saves anything.' },
   { at: beat(28), to: beat(35), splits: [6], text: 'It reads across all your saves… so you get one clear answer.' },
-  { at: beat(35.5), to: beat(44.5), splits: [6, 9], until: true, text: 'It even finds what connects them… so you see what you keep coming back to.' },
+  { at: beat(35.5), to: beat(45), splits: [6, 9], until: true, text: 'It even finds what connects them… so you see the theme running through your saves.' },
   // the close: the name (the drawn wordmark wipes in as it is said), then the
   // tagline on ONE line, exactly; the music steps back
   { at: beat(47.5), to: beat(56), place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4 },
