@@ -2733,10 +2733,14 @@ exact-match, capped.
   (glide, a post opened to its lifted Key Points) / "It even connects each
   save to related ones you've kept before…" (two graph clusters) / "Machina.
   Everything you save, finally useful." No "Download" said or shown. Take
-  re-shot (784 frames). **41.1s**, a second over the brief's 30–40s; verify's
-  ceiling is now 42s. **Verified:** `tsc` clean; `npm run verify` exit 0;
-  stills of every beat in both shapes; both mixes −14.0 LUFS, ≤ −1.2 dBTP.
-  **Open:** the voice is still TTS; nobody has listened on speakers; not
+  re-shot (784 frames). Owner on the first cut (41.1s): the narration "sounds
+  super robotic… too fast"; "the other videos' narration is perfect". Cause:
+  this cut alone read long lines at 1.1×. Re-read like the other ads: the
+  house voice at 0.95 in short lines, each synthesized alone (13 lines; "…"
+  now splits phrases in `synth-vo.py`'s word aligner), the picture re-timed
+  to it. **48.0s**, over the brief's 30–40s; verify's ceiling is now 49s.
+  **Verified:** `tsc` clean; `npm run verify` exit 0; stills of every beat in
+  both shapes; both mixes −14.0 LUFS, ≤ −1.2 dBTP. **Open:** the voice is still TTS (now the house read); nobody has listened on speakers; not
   through Meta's ad review; the "time" cluster panel reads "also share
   mortality and attention"; `takes.json` re-capture at merge.
 - **2026-10-02 — META AD 3, round 5: the owner's script, every place,

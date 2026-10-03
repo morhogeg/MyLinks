@@ -4,13 +4,14 @@
  * BPM, 16 frames a beat, OUTPUT frames).
  *
  * Round 6 (the owner's approved script, a person talking: the pain, the
- * answer, save from any app, analyzed and summarized, linked). A feed ad starts mid-scroll, so the music is already
+ * answer, save from any app, analyzed and summarized, linked; read in short
+ * lines at the house pace, like the other ads). A feed ad starts mid-scroll, so the music is already
  * playing on frame 0. The saves bleach on a falling whoosh and rush into the
  * mark (whooshes, the impact, the snap); the band comes in as the app opens
  * and each save lands with a soft thud under its word; the feed glides on a
  * long whoosh; a riser ends on the cut to the lit cluster, and once "…related
  * saves." has landed, a shimmer; the band drops out
- * for the lockup, so the mark strikes into air under "Download Machina." The
+ * for the lockup, so the mark strikes into air under "Machina." The
  * kit's rules: one chord a bar, risers END on the reveal they lead into, a tap
  * is a tick on the frame the app responds, nothing pitched sounds on a word
  * the narrator has to land (notes and shimmers sit in the gaps).
@@ -41,7 +42,7 @@ const CHORDS = {
 
 const BARS = Math.ceil(TOTAL_FRAMES / BAR_FRAMES);
 /** how much of the band plays, per bar */
-const DENSITY = [0.3, 0.32, 0.34, 0.36, 0.36, 0.38, 0.42, 0.5, 0.58, 0.62, 0.64, 0.64, 0.66, 0.66, 0.68, 0.68, 0.66, 0.42, 0.34, 0.3];
+const DENSITY = [0.3, 0.32, 0.34, 0.35, 0.36, 0.37, 0.4, 0.44, 0.52, 0.58, 0.62, 0.64, 0.64, 0.66, 0.66, 0.68, 0.68, 0.68, 0.66, 0.6, 0.42, 0.34, 0.3];
 const LOCKUP = s(HITS.out);
 
 for (let bar = 0; bar < BARS; bar++) {
@@ -103,8 +104,9 @@ for (const m of [48, 64, 67, 72]) pad(LOCKUP, TOTAL_SEC - LOCKUP - 0.1, m, 0.08,
 const MELODY = [
   // [frame, midi, level?] (round 6: the narrator talks almost throughout; the
   // melody only answers in the real pauses)
-  [904, 76], // after "…why you kept it."
-  [1080, 72, 0.15], // after "…each other.", into the lockup
+  [470, 76], // after "…different apps."
+  [1062, 72, 0.15], // after "…why you kept it."
+  [1272, 74, 0.15], // after "…each other.", into the lockup
   [TOTAL_FRAMES - 44, 79, 0.17], // after the last word
 ];
 for (const [fr, m, level] of MELODY) keys(s(fr), m, level ?? 0.13, (fr / 16) % 2 ? 0.2 : -0.2, fr >= HITS.out ? 2.6 : 1.8);

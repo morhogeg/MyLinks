@@ -176,7 +176,7 @@ def speech_runs(samples, sr, gap=0.09):
 
 
 def word_timing(text, runs):
-    """Seconds at which each written word starts. Phrases (split after , . ? !)
+    """Seconds at which each written word starts. Phrases (split after , . ? ! …)
     are matched to the pauses the voice actually took; words inside a phrase
     are spread by length."""
     import re
@@ -185,7 +185,7 @@ def word_timing(text, runs):
     phrases, cur = [], []
     for w in words:
         cur.append(w)
-        if re.search(r"[.,?!]$", w):
+        if re.search(r"[.,?!…]$", w):
             phrases.append(cur)
             cur = []
     if cur:

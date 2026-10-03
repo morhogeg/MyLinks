@@ -746,28 +746,30 @@ Branch `claude/ad-todo`. One of three short ads for Instagram and Facebook
 (Reels, Stories, Feed), made from the kit. **Round 6, the owner's approved
 script (2026-10-03):** one real person talking to a friend, not an ad
 reading out features (owner on round 5: "far too slim, the narration sounds
-robotic… explain further and talk more"). Every line is spoken whole at a
-natural pace (Kokoro at 1.1×) and set on screen in short chunks (≤8 words),
-each arriving with its first word (`chunks` in the timeline,
-`src/reels/ads/todo/Chunks.tsx`). Nothing says or shows "Download". Rounds
+robotic… explain further and talk more"). Read like the other ads (owner:
+"the other videos' narration is perfect"): the house voice at the house pace
+(`af_heart`, 0.95), in short lines, each synthesized on its own with air
+around it. (A first cut read long lines at 1.1× and sounded rushed and flat.)
+Each line is set on screen in chunks (≤8 words), each arriving with its first
+word (`chunks` in the timeline, `src/reels/ads/todo/Chunks.tsx`). Nothing says or shows "Download". Rounds
 1–5 are in git history. Its files keep their `todo` names so the three ad
 branches still merge cleanly. Nothing in it is a Pro surface; it names no
 plan and never says "free".
 
-**41.1s** (1232 frames; the brief asked 30–40s, the approved words at a
-natural pace run a second over), something new on screen at least every 3s
-(verify checks), the app at its real speed:
+**48.0s** (1440 frames; the brief asked 30–40s: the approved words, at the
+other ads' pace), something new on screen at least every 3s (verify checks),
+the app at its real speed:
 
 | Time | Picture | Line (spoken; burned in, in chunks) |
 |---|---|---|
-| 0.0–4.7s | **The pain.** Frame 0 is the poster: real saves of every kind from the demo account, scattered, in the kit's `SaveChip` (1.3×). On "How many things" a ripple runs through them; on "never" they grey out | "Okay, be honest. How many things did you save this month… and never open again?" (the question on screen from frame 0; "Okay, be honest." spoken over it, voice at 0.27s) |
-| 4.8–10.3s | **Each one named.** The video, the post, the article, the screenshot each light up, lifting off the page, on its word | "That video you'd watch later. The post you loved. That article. The screenshot you swore you'd remember." |
-| 10.4–13.5s | **Buried.** They drift apart, blur and fade | "They're all still out there, buried across a dozen different apps." |
-| 13.6–15.5s | **The answer.** They rush into one point; the brackets snap round it on "Machina" (14.9s); the point opens as an iris onto the app | "That's exactly why we made Machina." |
-| 15.7–21.7s | **Save.** A YouTube video, an Instagram post, an article and a screenshot land at the top of the feed, each on its word, each showing where it came from | "From any app, just share to Machina. Videos, posts, articles, screenshots… it all lands in one place." |
-| 21.9–30.1s | **What it does.** A glide down the feed, every save already summarized; a cut onto the Instagram post as it is tapped open, read down to its Key Points, which lift on "key points" | "Then Machina gets to work. It analyzes every save, summarizes it, and pulls out the key points, so you'll always remember why you kept it." |
-| 30.4–35.9s | **Linked.** A cut into the Graph view as the app zooms onto a lit cluster ("time"), then onto a second ("travel") | "It even connects each save to related ones you've kept before, so your ideas start building on each other." |
-| 35.7–41.1s | **Close.** Thrown into the kit's lockup: the mark strikes, the wordmark wipes in on "Machina", the tagline on one line, held 1.7s. Nothing under it (the slot for the App Store badge) | "Machina. Everything you save, finally useful." (the name is the wordmark, not set again in the band) |
+| 0.0–5.6s | **The pain.** Frame 0 is the poster: real saves of every kind from the demo account, scattered, in the kit's `SaveChip` (1.3×). On "How many things" a ripple runs through them; on "never" they grey out | "Okay, be honest. How many things did you save this month… and never open again?" (the question on screen from frame 0; "Okay, be honest." spoken over it, voice at 0.27s) |
+| 5.6–12.3s | **Each one named.** The video, the post, the article, the screenshot each light up, lifting off the page, on its word | "That video you'd watch later." / "The post you loved." / "That article." / "The screenshot you swore you'd remember." |
+| 12.3–16.3s | **Buried.** They drift apart, blur and fade | "They're all still out there, buried across a dozen different apps." |
+| 16.3–18.9s | **The answer.** They rush into one point; the brackets snap round it on "Machina" (17.9s); the point opens as an iris onto the app | "That's exactly why we made Machina." |
+| 18.9–26.1s | **Save.** A YouTube video, an Instagram post, an article and a screenshot land at the top of the feed, each on its word, each showing where it came from | "From any app, just share to Machina." / "Videos, posts, articles, screenshots… it all lands in one place." |
+| 26.1–36.0s | **What it does.** A glide down the feed, every save already summarized; a cut onto the Instagram post as it is tapped open, read down to its Key Points, which lift on "key points" | "Then Machina gets to work." / "It analyzes every save, summarizes it, and pulls out the key points… so you'll always remember why you kept it." |
+| 36.0–42.1s | **Linked.** A cut into the Graph view as the app zooms onto a lit cluster ("time"), then onto a second ("travel") | "It even connects each save to related ones you've kept before… so your ideas start building on each other." |
+| 42.1–48.0s | **Close.** Thrown into the kit's lockup: the mark strikes, the wordmark wipes in on "Machina", the tagline on one line, held 1.7s. Nothing under it (the slot for the App Store badge) | "Machina. Everything you save, finally useful." (the name is the wordmark, not set again in the band) |
 
 **Compositions:** `MachinaAdTodo` (9:16, score + narrator + captions, the main
 cut), `MachinaAdTodoMusic` (9:16, score + captions, no narrator: the A/B cut),
@@ -837,7 +839,7 @@ the first caption, its question whole on frame 0, its voice heard by 0.5s;
 the mark snaps on the spoken "Machina"; every chunk ≤8 words and word for
 word what the narrator says; until the lockup, something new on screen at
 least every 3s; the close is "Machina." then the tagline, exactly, last, its
-final word landed 1.6s+ before the end; "Download" nowhere; ≤ 42s; no "share
+final word landed 1.6s+ before the end; "Download" nowhere; ≤ 49s; no "share
 sheet", "bookmarks", "free", a price, "App Store", "available" or a plan name
 in what the ad says; no recipe card, Pro surface or plan legible on any
 captured frame or in the four saves it seeds; both mixes at −14 LUFS ±0.5,
