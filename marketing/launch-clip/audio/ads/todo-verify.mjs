@@ -15,7 +15,7 @@
  *  - the close: "Machina." then the film's endcard line (the tagline),
  *    exactly, once, at the end (round 6: "Download" nowhere), its last word landed at least 1.6s
  *    before the last frame;
- *  - length ≤ 49s (round 6: the owner's approved script, at the house pace, runs 48s);
+ *  - length ≤ 62s (round 6: the owner's approved script, read by Gemini Sulafat, runs ~61s);
  *  - bans, on every caption, the voice, every frame of the take and the four
  *    saves it seeds: em dash,
  *    literal "AI", "second brain", "library"; in the captions and voice also
@@ -116,10 +116,10 @@ if (!hookT || caps[0].at + hookT.words[0] * C.FPS > 15) bad.push('the narrator i
   const word = ans && t ? ans.at + t.words[said.findIndex((w) => w.startsWith('Machina'))] * C.FPS : NaN;
   if (!(Math.abs(C.HITS.snap - word) <= 4)) bad.push(`the mark snaps at ${C.HITS.snap}, not on "Machina" (${word.toFixed?.(0)})`);
 }
-// (round 6) the owner's approved conversational script, read at the house
-// pace like the other ads, runs 48s (the brief asked 30–40s); a hard ceiling
-// keeps it from creeping further
-if (C.TOTAL_SEC > 49) bad.push(`the ad runs ${C.TOTAL_SEC.toFixed(1)}s (max 49s)`);
+// (round 6) the owner's approved conversational script, read by Gemini
+// Sulafat (owner's voice pick), runs about 61s (the brief asked 30–40s); a
+// hard ceiling keeps it from creeping further
+if (C.TOTAL_SEC > 62) bad.push(`the ad runs ${C.TOTAL_SEC.toFixed(1)}s (max 62s)`);
 caps.forEach((c) => {
   const t = timing.find((x) => x.frame === c.at);
   if (!t) return bad.push(`no narrator timing for the line at ${c.at}: run \`python3 audio/synth-vo.py adtodo\``);

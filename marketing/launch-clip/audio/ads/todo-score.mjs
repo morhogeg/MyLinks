@@ -23,7 +23,7 @@
 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BAR, BAR_CHORDS, BAR_FRAMES, BEAT, DRUMS, FPS, HITS, RISERS, TOTAL_FRAMES, TOTAL_SEC } from '../../clips/ad-todo-timeline.mjs';
+import { BAR, BAR_CHORDS, BAR_FRAMES, BEAT, CAPTIONS, DRUMS, FPS, HITS, RISERS, TOTAL_FRAMES, TOTAL_SEC } from '../../clips/ad-todo-timeline.mjs';
 import { createSynth } from '../synth.mjs';
 
 const S = createSynth({ seconds: TOTAL_SEC, beat: BEAT });
@@ -41,8 +41,16 @@ const CHORDS = {
 };
 
 const BARS = Math.ceil(TOTAL_FRAMES / BAR_FRAMES);
-/** how much of the band plays, per bar */
-const DENSITY = [0.3, 0.32, 0.34, 0.35, 0.36, 0.37, 0.4, 0.44, 0.52, 0.58, 0.62, 0.64, 0.64, 0.66, 0.66, 0.68, 0.68, 0.68, 0.66, 0.6, 0.42, 0.34, 0.3];
+/** how much of the band plays, per bar: builds through the pain, lifts on the
+ *  answer, fullest under the app, eases for the lockup (read off the beats) */
+const DENSITY = Array.from({ length: BARS }, (_, bar) => {
+  const f = bar * BAR_FRAMES;
+  const ramp = (a, b, x0, x1) => a + (b - a) * Math.min(1, Math.max(0, (f - x0) / (x1 - x0)));
+  if (f >= HITS.out) return ramp(0.42, 0.3, HITS.out, TOTAL_FRAMES);
+  if (f >= HITS.cluster) return 0.66;
+  if (f >= HITS.snap) return ramp(0.52, 0.68, HITS.snap, HITS.cluster);
+  return ramp(0.3, 0.44, 0, HITS.snap);
+});
 const LOCKUP = s(HITS.out);
 
 for (let bar = 0; bar < BARS; bar++) {
@@ -97,16 +105,17 @@ for (let bar = 0; bar < BARS; bar++) {
 }
 
 // ── the lockup: one held voicing under the end, a single breath
-for (const m of [48, 64, 67, 72]) pad(LOCKUP, TOTAL_SEC - LOCKUP - 0.1, m, 0.08, m === 64 ? -0.4 : 0.35);
+for (const m of [48, 64, 67, 72]) pad(LOCKUP, TOTAL_SEC - LOCKUP - 0.1, m, 0.12, m === 64 ? -0.4 : 0.35);
 
 // ── melody (FM keys), in the narrator's pauses (src/reels/ads/todo/vo.json),
 // never on a word
+const lineAt = (re) => CAPTIONS.find((c) => re.test(c.say ?? c.text)).at;
 const MELODY = [
   // [frame, midi, level?] (round 6: the narrator talks almost throughout; the
-  // melody only answers in the real pauses)
-  [470, 76], // after "…different apps."
-  [1062, 72, 0.15], // after "…why you kept it."
-  [1272, 74, 0.15], // after "…each other.", into the lockup
+  // melody only answers in the real pauses, just before the next line)
+  [lineAt(/^That’s exactly why/) - 12, 76], // after "…different apps."
+  [lineAt(/^It even connects/) - 12, 72, 0.15], // after "…why you kept it."
+  [HITS.out + 8, 74, 0.15], // after "…each other.", into the lockup
   [TOTAL_FRAMES - 44, 79, 0.17], // after the last word
 ];
 for (const [fr, m, level] of MELODY) keys(s(fr), m, level ?? 0.13, (fr / 16) % 2 ? 0.2 : -0.2, fr >= HITS.out ? 2.6 : 1.8);

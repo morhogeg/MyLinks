@@ -168,6 +168,43 @@ def cap_pauses(samples, sr, longest=0.34, fade=0.01):
     return np.concatenate(out)
 
 
+def to_the_words(samples, sr, before=0.06, after=0.12, fade=0.02):
+    """Trim a line to its words: Gemini opens each take with a click and a
+    breath in (about 0.4s before "Okay"), and often breathes out after the
+    last word. Keep `before`/`after` seconds around the first and last
+    sustained loud stretch (RMS at least half the line's), with short fades."""
+    hop = int(sr * 0.01)
+    n = len(samples) // hop
+    peak = np.array([np.abs(samples[i * hop:(i + 1) * hop]).max() for i in range(n)])
+    rms = np.array([np.sqrt(np.mean(samples[i * hop:(i + 1) * hop] ** 2)) for i in range(n)])
+    # sustained loudness (50ms running, against the line's typical loud level,
+    # not its single loudest block): a click is not a word
+    on = rms >= np.percentile(rms, 95) * 0.4
+    run = np.convolve(on.astype(int), np.ones(5, int), "valid") == 5
+    loud = np.nonzero(run)[0]
+    if not len(loud):
+        return samples
+    a = max(0, loud[0] * hop - int(before * sr))
+    b = min(len(samples), (loud[-1] + 5) * hop + int(after * sr))
+    # back off to where the sound actually starts / dies away before the edge
+    quiet = peak.max() * 0.02
+    i = a // hop
+    while i > 0 and peak[i - 1] > quiet and (a - (i - 1) * hop) < 0.15 * sr:
+        i -= 1
+    a = i * hop
+    j = b // hop
+    while j < n and peak[j] > quiet and (j * hop - b) < 0.3 * sr:
+        j += 1
+    b = min(len(samples), j * hop)
+    if (b - a) < 0.67 * len(samples):  # never cut a third of a line: misread
+        return samples
+    out = samples[a:b].copy()
+    k = min(int(fade * sr), len(out) // 2)
+    out[:k] *= np.linspace(0, 1, k)
+    out[-k:] *= np.linspace(1, 0, k)
+    return out
+
+
 def synth(text, cache_dir=TAKES, voice=None, style=None):
     """(samples, sample_rate) for one line: the committed take when there is
     one, else a new one from the API (kept for next time)."""

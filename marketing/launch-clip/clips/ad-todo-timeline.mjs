@@ -54,31 +54,33 @@ export const TAKE = 'adTodo';
 /**
  * THE CUT, in output frames. Every scene reads these numbers, and so does the
  * score. Most follow the narrator's words (src/reels/ads/todo/vo.json): each
- * is noted with the word it lands on.
+ * is noted with the word it lands on. They are laid out FROM the read: when
+ * the voice changes, the lines and these beats are re-derived from its
+ * measured word times (round 6, Gemini Sulafat: 60.8s).
  */
 export const HITS = {
   // 1 THE PAIN (Hook.tsx): the saves are already there on frame 0 (the poster)
-  stir: 43, // "How many things…": the saves ripple, one after another ("How" 39)
-  grey: 117, // "…and never open again?": they grey out ("never" 119)
-  named: [174, 228, 270, 301], // each lights up as it is named: "video" 177, "post" 231, "article" 273, "screenshot" 304
-  bury: [403, 459], // "…buried across a dozen different apps" ("buried" 411): they drift apart and fade
+  stir: 48, // "How many things…": the saves ripple, one after another
+  grey: 123, // "…and never open again?": they grey out
+  named: [192,  261,  328,  399], // each lights up as it is named
+  bury: [567,  623], // "…buried across a dozen different apps": they drift apart and fade
   // 2 THE ANSWER
-  gather: [512, 532], // they rush into one point
-  snap: 536, // the brackets snap round it as "Machina" lands (532)
-  iris: [548, 564], // the point opens onto the app
+  gather: [696,  716], // they rush into one point
+  snap: 720, // the brackets snap round it as "Machina" lands
+  iris: [732,  748], // the point opens onto the app
   // 3 SAVE: four saves land at the top of the feed, each on its word
-  lands: [638, 653, 666, 685], // "Videos" 642, "posts" 657, "articles" 670, "screenshots" 689
+  lands: [853,  867,  879,  897], // "Videos", "posts", "articles", "screenshots"
   // 4 WHAT IT DOES
-  glide: [784, 912], // down the feed, every save summarized ("Then Machina gets to work… summarizes it")
-  kpOpen: 920, // one card opens…
-  kpScroll: [945, 969], // …down to its Key Points
-  keyPoints: 972, // which lift on "key points" (969)
+  glide: [1008,  1152], // down the feed, every save summarized ("Then Machina gets to work… summarizes it")
+  kpOpen: 1160, // one card opens…
+  kpScroll: [1183,  1207], // …down to its Key Points
+  keyPoints: 1210, // which lift on "key points"
   // 5 LINKED
-  cluster: 1080, // cut on "It even connects" into the graph as it zooms onto a lit cluster
-  cluster2: 1184, // a second cluster lights up, into "so your ideas" (1200)
+  cluster: 1312, // cut on "It even connects" into the graph as it zooms onto a lit cluster
+  cluster2: 1408, // a second cluster lights up, into "so your ideas"
   // 6 CLOSE
-  out: 1264, // thrown out of frame as "…each other." ends
-  markStrike: 1288, // the lockup's mark strikes
+  out: 1512, // thrown out of frame as "…each other." ends
+  markStrike: 1536, // the lockup's mark strikes
 };
 
 /** the four landings, in take order (capture/ad-todo.mjs sourceCards) */
@@ -98,7 +100,7 @@ export const PLAY = {
 
 export const THROW_LEN = 24;
 /** the tagline holds ~1.7s once its last word has landed; verify measures it */
-export const TOTAL_FRAMES = 1440;
+export const TOTAL_FRAMES = 1720;
 export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 
 /**
@@ -131,31 +133,32 @@ const line = (at, to, say, chunks, extra = {}) => ({
 const act = (style, tts) => (tts ? { style, tts } : { style });
 
 export const CAPTIONS = [
-  line(8, 168, 'Okay, be honest. How many things did you save this month… and never open again?', [
+  line(8, 184, 'Okay, be honest. How many things did you save this month… and never open again?', [
     [3, 'How many things did you save\nthis month…'],
     [11, '…and never open again?'],
   ], { hook: true, ...act('Leaning in with a knowing, playful smile, gently teasing a friend; a touch of mock guilt on "and never open again?"') }),
-  line(168, 224, 'That video you’d watch later.', [[0, 'That video you’d watch later.']], act('Wry and amused, naming the first familiar culprit, quick and light')),
-  line(224, 264, 'The post you loved.', [[0, 'The post you loved.']], act('Fond, a little wistful, still smiling')),
-  line(264, 296, 'That article.', [[0, 'That article.']], act('Deadpan, knowing; a tiny chuckle after it', 'That article. <chuckle>')),
-  line(296, 368, 'The screenshot you swore you’d remember.', [[0, 'The screenshot you swore\nyou’d remember.']], act('Playfully incredulous, smiling: we both know how that went')),
-  line(368, 488, 'They’re all still out there, buried across a dozen different apps.', [
+  line(184, 256, 'That video you’d watch later.', [[0, 'That video you’d watch later.']], act('Wry and amused, naming the first familiar culprit, quick and light')),
+  line(256, 320, 'The post you loved.', [[0, 'The post you loved.']], act('Fond, a little wistful, still smiling')),
+  line(320, 392, 'That article.', [[0, 'That article.']], act('Deadpan, knowing; a tiny chuckle after it', 'That article. <chuckle>')),
+  line(392, 512, 'The screenshot you swore you’d remember.', [[0, 'The screenshot you swore'], [4, 'you’d remember.']], act('Playfully incredulous, smiling: we both know how that went')),
+  line(512, 672, 'They’re all still out there, buried across a dozen different apps.', [
     [0, 'They’re all still out there,'],
     [5, 'buried across a dozen\ndifferent apps.'],
   ], act('Sympathetic and a touch lower, with a soft sigh before "buried"', 'They’re all still out there, <sigh> buried across a dozen different apps.')),
-  line(488, 568, 'That’s exactly why we made Machina.', [[0, 'That’s exactly why\nwe made Machina.']], act('Turning bright: the reveal, warm and proud, the name landing with a smile')),
-  line(568, 640, 'From any app, just share to Machina.', [[0, 'From any app,\njust share to Machina.']], act('Easy and reassuring, like it is the simplest thing in the world')),
-  line(640, 784, 'Videos, posts, articles, screenshots… it all lands in one place.', [
+  line(672, 768, 'That’s exactly why we made Machina.', [[0, 'That’s exactly why\nwe made Machina.']], act('Turning bright: the reveal, warm and proud, the name landing with a smile')),
+  line(768, 856, 'From any app, just share to Machina.', [[0, 'From any app,'], [3, 'just share to Machina.']], act('Easy and reassuring, like it is the simplest thing in the world')),
+  line(856, 1008, 'Videos, posts, articles, screenshots… it all lands in one place.', [
     [0, 'Videos, posts, articles,\nscreenshots…'],
     [4, '…it all lands in one place.'],
   ], act('A quick, light rhythm through the list, then relaxed and satisfied on "it all lands in one place"')),
-  line(784, 848, 'Then Machina gets to work.', [[0, 'Then Machina gets to work.']], act('Playful anticipation, like about to show a friend a good trick')),
-  line(848, 1080, 'It analyzes every save, summarizes it, and pulls out the key points… so you’ll always remember why you kept it.', [
+  line(1008, 1096, 'Then Machina gets to work.', [[0, 'Then Machina'], [2, 'gets to work.']], act('Playful anticipation, like about to show a friend a good trick')),
+  line(1096, 1312, 'It analyzes every save, summarizes it, and pulls out the key points… so you’ll always remember why you kept it.', [
     [0, 'It analyzes every save,\nsummarizes it,'],
     [6, 'and pulls out the key points,'],
-    [12, 'so you’ll always remember\nwhy you kept it.'],
+    [12, 'so you’ll always remember'],
+    [16, 'why you kept it.'],
   ], act('Genuinely enthusiastic, explaining something you love, moving along; warm on "so you’ll always remember why you kept it"')),
-  line(1080, HITS.out, 'It even connects each save to related ones you’ve kept before… so your ideas start building on each other.', [
+  line(1312, HITS.out, 'It even connects each save to related ones you’ve kept before… so your ideas start building on each other.', [
     [0, 'It even connects each save'],
     [5, 'to related ones\nyou’ve kept before,'],
     [11, 'so your ideas start\nbuilding on each other.'],
@@ -173,12 +176,19 @@ export const KICKERS = [];
  * C-major vocabulary. The pain hangs on IV and vi-less V, the answer resolves
  * home, the app walks I V IV I, the links lift, the lockup holds C.
  */
-export const BAR_CHORDS = [
-  'Fmaj7', 'Fmaj7', 'G6', 'Fmaj7', 'G6', 'Fmaj7', 'G6', 'Fmaj7', // the pain (0–7)
-  'Cmaj7', // the answer (8)
-  'Cmaj7', 'G6', 'Fmaj7', 'Cmaj7', 'G6', 'Fmaj7', 'Cmaj7', 'G6', // the app (9–16)
-  'Fmaj7', 'G6', 'Cmaj7', 'Cmaj7', 'Cmaj7', 'Cmaj7', // linked, the close (17–22)
-];
+const PAIN = ['Fmaj7', 'Fmaj7', 'G6', 'Fmaj7', 'G6', 'Fmaj7', 'G6', 'Fmaj7'];
+const APP = ['Cmaj7', 'G6', 'Fmaj7', 'Cmaj7', 'G6', 'Fmaj7', 'Cmaj7', 'G6'];
+const LINKED = ['Fmaj7', 'G6', 'Cmaj7'];
+/** one chord a bar, by section, read off the beats (so a re-timed read keeps
+ *  its harmony): the pain hangs on IV and V, the answer resolves home on the
+ *  mark, the app walks I V IV I, the links lift, the lockup holds C */
+export const BAR_CHORDS = Array.from({ length: Math.ceil(TOTAL_FRAMES / BAR_FRAMES) }, (_, bar) => {
+  const f = bar * BAR_FRAMES;
+  if (f >= HITS.out) return 'Cmaj7';
+  if (f >= HITS.cluster - BAR_FRAMES / 2) return LINKED[Math.floor((f - HITS.cluster + BAR_FRAMES / 2) / BAR_FRAMES) % LINKED.length];
+  if (f >= HITS.snap - BAR_FRAMES / 2) return APP[Math.floor((f - HITS.snap + BAR_FRAMES / 2) / BAR_FRAMES) % APP.length];
+  return PAIN[bar % PAIN.length];
+});
 /** the drums: in as the app opens, out for the lockup */
 export const DRUMS = [HITS.iris[0], HITS.out];
 /** risers END on the reveal they lead into: the mark, the graph, the strike */
