@@ -23,7 +23,7 @@ if req.get("takes"):
 variants = req.get("name_variants") or [{"say_name": req.get("say_name"), "name_note": req.get("name_note")}]
 for script in req.get("scripts", []):
     for v in variants:
-        env = {**os.environ, "VO_ENGINE": "gemini", "GEMINI_VOICE": req.get("voice", "Sulafat")}
+        env = {**os.environ, "VO_ENGINE": "gemini", "GEMINI_VOICE": req.get("voice", "Sulafat"), "NARRATION_TAKES_ONLY": "1"}
         # the model (`model`): Flash TTS by default; Flash-Lite TTS has its own
         # daily quota (each model allows 100 requests a day on this key)
         if req.get("model"):
@@ -35,6 +35,8 @@ for script in req.get("scripts", []):
         # synth-vo exits 1 when a line overruns its caption window: the takes
         # are still kept (the picture is re-timed to them afterwards); a failed
         # request exits 3 (gemini_tts), and anything but 0 or 1 is a failure
-        r = subprocess.run([sys.executable, os.path.join(HERE, "synth-vo.py"), script], env=env)
-        ok = ok and r.returncode in (0, 1)
+        r = subprocess.run([sys.executable, os.path.join(HERE, "synth-vo.py"), script], env=env, stderr=subprocess.PIPE, text=True)
+        sys.stderr.write(r.stderr)
+        # a crash also exits 1: only a clean overrun counts as fine
+        ok = ok and r.returncode in (0, 1) and "Traceback" not in r.stderr
 sys.exit(0 if ok else 1)

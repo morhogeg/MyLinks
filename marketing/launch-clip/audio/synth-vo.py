@@ -320,6 +320,10 @@ def main():
 
         def speak(line):
             samples, sr = gemini_tts.synth(gemini_tts.performed(line.get("tts") or line["text"]), style=gemini_tts.direct(line.get("style")))
+            if os.environ.get("NARRATION_TAKES_ONLY"):
+                # on GitHub (narration-tts.yml) only the raw takes are needed;
+                # the shaping below runs where the ad is built (it needs ffmpeg)
+                return samples, sr
             capped = gemini_tts.cap_pauses(samples, sr, longest=line.get("max_pause") or 0.34)
             quick = gemini_tts.stretch(gemini_tts.to_the_words(capped, sr), sr, line.get("tempo"))
             return gemini_tts.gate(quick, sr), sr
