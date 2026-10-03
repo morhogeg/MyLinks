@@ -2720,6 +2720,15 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-03 — Gemini TTS engine for the narrator (built, not yet
+  heard).** Branch `claude/ad-todo`. Owner: use Gemini 3.8 TTS "for much
+  better narration". `audio/gemini_tts.py` + `VO_ENGINE=gemini` in
+  `synth-vo.py` (same outputs, so every clip and ad can switch), a house
+  direction note, per-line `style`, a per-line cache, and
+  `audio/vo-audition.py` (6 voices). **Not verified:** never called; the
+  container blocks `generativelanguage.googleapis.com` and has no key.
+  **Owner action:** add `GEMINI_API_KEY` (paid tier) to the environment and
+  allow that host; then audition, pick the house voice, re-voice.
 - **2026-10-03 — META AD 3, round 6: a person talking, not an ad.**
   Branch `claude/ad-todo`. Owner on round 5: "far too slim, the narration
   sounds robotic… explain further and talk more". Approved script, spoken

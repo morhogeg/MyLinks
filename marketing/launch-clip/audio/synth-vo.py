@@ -137,6 +137,8 @@ def clip_script(name):
             # a clip or ad may set its own delivery speed per line (the Meta ad
             # 3 script, round 6: a natural conversational pace)
             "speed": c.get("speed", SPEED),
+            # a line's own direction for Gemini TTS (VO_ENGINE=gemini), if any
+            "style": c.get("style"),
         }
         for c in data["captions"]
     ]
@@ -215,13 +217,26 @@ def main():
     make, out_dir = SCRIPTS[name]
     os.makedirs(out_dir, exist_ok=True)
 
-    k = Kokoro(os.path.join(VO, "kokoro-v1.0.onnx"), os.path.join(VO, "voices-v1.0.bin"))
+    # the engine: Kokoro (offline, the default) or Gemini TTS (VO_ENGINE=gemini,
+    # audio/gemini_tts.py: directed delivery, needs an API key and network)
+    engine = os.environ.get("VO_ENGINE", "kokoro")
+    if engine == "gemini":
+        sys.path.insert(0, HERE)
+        import gemini_tts
+
+        def speak(line):
+            return gemini_tts.synth(line["text"], os.path.join(VO, "gemini-cache"), style=line.get("style"))
+    else:
+        k = Kokoro(os.path.join(VO, "kokoro-v1.0.onnx"), os.path.join(VO, "voices-v1.0.bin"))
+
+        def speak(line):
+            return k.create(line["text"], voice=VOICE, speed=line["speed"])
 
     manifest = []
     timing = []
     ok = True
     for i, line in enumerate(make()):
-        samples, sr = k.create(line["text"], voice=VOICE, speed=line["speed"])
+        samples, sr = speak(line)
         path = os.path.join(out_dir, f"line-{i:02d}.wav")
         sf.write(path, samples, sr)
         dur = len(samples) / sr

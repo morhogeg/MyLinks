@@ -234,6 +234,31 @@ spoken editions; the plain compositions are untouched. edge-tts (Azure neural
 voices) was tried first and is BLOCKED here — the egress proxy refuses
 WebSockets — which is why the pipeline is local Kokoro.
 
+### Gemini TTS: a directed narrator (built, not yet heard)
+
+Kokoro reads every line with the same flat prosody. Google's
+`gemini-3.8-flash-tts` (September 2026) is directed: the words go in verbatim,
+and a separate note sets the delivery ("a real person talking to a friend…
+unhurried… no sales emphasis"). `audio/gemini_tts.py` adds it as a second
+engine for the SAME pipeline: `synth-vo.py` writes the same `line-NN.wav`,
+manifest and word timings, so every clip, ad, mix and verify gate works
+unchanged. A caption may carry its own `style` note.
+
+```bash
+python3 audio/vo-audition.py                          # 2 lines × 6 voices → out/vo/audition/
+GEMINI_VOICE=Sulafat VO_ENGINE=gemini python3 audio/synth-vo.py adtodo   # any script
+node audio/mix-vo.mjs adtodo                          # then re-time and re-render as usual
+```
+
+It needs two things this container does not have: a `GEMINI_API_KEY`
+environment variable (an AI Studio key on the paid tier: the free tier allows
+10 TTS requests a day, and a script is one per line; a 48s ad is about 1,200
+audio tokens, around a cent), and `generativelanguage.googleapis.com` allowed
+in the environment's network access. Kokoro stays the default until the owner
+picks a Gemini voice by ear; then it becomes the one narrator for every video.
+Gemini voices read the words differently from Kokoro, so a re-voiced video's
+lines get new lengths and its picture is re-timed to them.
+
 ## The score
 
 `audio/score.mjs` — no dependencies, deterministic (seeded LCG, so every render
