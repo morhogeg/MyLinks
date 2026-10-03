@@ -58,7 +58,10 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python3 audio/narration-run.py
 
+      # also after a failed run (a quota stop mid-script): every take voiced
+      # before the stop is kept, so the next run only voices the rest
       - name: Commit the takes
+        if: always()
         run: |
           git add audio/vo-takes
           if git diff --cached --quiet; then echo "no new takes"; exit 0; fi

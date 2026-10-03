@@ -24,6 +24,10 @@ variants = req.get("name_variants") or [{"say_name": req.get("say_name"), "name_
 for script in req.get("scripts", []):
     for v in variants:
         env = {**os.environ, "VO_ENGINE": "gemini", "GEMINI_VOICE": req.get("voice", "Sulafat")}
+        # the model (`model`): Flash TTS by default; Flash-Lite TTS has its own
+        # daily quota (each model allows 100 requests a day on this key)
+        if req.get("model"):
+            env["GEMINI_TTS_MODEL"] = req["model"]
         if v.get("say_name"):
             env["GEMINI_SAY_NAME"] = v["say_name"]
         if v.get("name_note"):
