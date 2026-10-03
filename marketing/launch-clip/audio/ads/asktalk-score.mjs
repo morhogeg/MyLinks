@@ -195,7 +195,9 @@ for (let i = 0; i < n; i++) {
   R[i] = buf.readInt16LE(46 + i * 4) / 32768;
 }
 let gain = 10 ** ((-14 - lufs(L, R, SR)) / 20);
-let ceiling = 10 ** (-1.3 / 20);
+// (the render's AAC encode adds ~0.25 dB of inter-sample peak: measured
+// −0.99 dBTP in the encoded music-only cut at a −1.25 master, so aim lower)
+let ceiling = 10 ** (-1.6 / 20);
 let out;
 for (let pass = 0; pass < 6; pass++) {
   const l = L.map((v) => v * gain);
@@ -204,9 +206,9 @@ for (let pass = 0; pass < 6; pass++) {
   const I = lufs(l, r, SR);
   const tp = truePeak(l, r);
   out = { l, r, I, tp };
-  if (Math.abs(I + 14) < 0.05 && tp <= -1.2) break;
+  if (Math.abs(I + 14) < 0.05 && tp <= -1.5) break;
   gain *= 10 ** ((-14 - I) / 20);
-  if (tp > -1.2) ceiling *= 10 ** ((-1.2 - tp - 0.05) / 20);
+  if (tp > -1.5) ceiling *= 10 ** ((-1.5 - tp - 0.05) / 20);
 }
 const m = Buffer.from(buf);
 for (let i = 0; i < n; i++) {
