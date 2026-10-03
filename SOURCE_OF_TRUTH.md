@@ -2707,6 +2707,15 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-03 — META AD 1, ROUND 8: GREY CAPTION FIXED; A SOFTER, SLOWER
+  REMINDER.** Branch `claude/ad-card`, not merged. Owner, on device: "the
+  screenshot you…" was grey (the hook's focused list, zIndex 2, sat over the
+  captions; captions are now zIndex 10); the graph → reminder cut was abrupt
+  (now a 14-frame focus-pull dissolve); the reminder was jittery and fast (a
+  second on the card before the bell, Smart review held longer); the "Reminder
+  set" toast covered a card (the screen stays soft behind it until after the
+  cut to tomorrow). 42.1s; the length gate now fails over 43s. Verify clean;
+  mixes −14.0 LUFS, ≤ −1.25 dBTP.
 - **2026-10-03 — META AD 1, ROUND 7: THE NAME UNCAPTIONED; SHARES
   SCATTERED AND SLOWER.** Branch `claude/ad-card`, not merged. Owner: don't
   show "That's exactly why we made Machina." (the narrator still says it; the

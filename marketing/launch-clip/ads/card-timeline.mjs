@@ -69,20 +69,21 @@ export const HITS = {
   // on down: its three Related cards, lifted as one block; then the graph
   related: 704,
   graphTap: 752,
-  // a cut back to the card: its bell, "Remind me" (Smart review ringed and
-  // held a second), down to Save; the app's confirmation, held
+  // back to the card through a soft focus pull (round 8: no hard cut), a
+  // second to settle, then its bell, "Remind me" (Smart review ringed and
+  // held), down to Save; the app's confirmation held over the softened card
   back: 808,
-  bellTap: 824,
-  smart: 840,
-  saveTap: 912,
-  reminderSet: 920,
+  bellTap: 840,
+  smart: 864,
+  saveTap: 944,
+  reminderSet: 952,
   // tomorrow, 9:00 AM: the feed's "Reminders due" strip
-  due: 952,
-  dueLift: 976,
+  due: 1008,
+  dueLift: 1032,
   // the close
-  throw: 1024,
-  lockup: 1040,
-  markStrike: 1064,
+  throw: 1088,
+  lockup: 1104,
+  markStrike: 1128,
 };
 
 /**
@@ -106,7 +107,7 @@ export const SCROLLS = [
 ];
 
 export const THROW_LEN = 30;
-export const TOTAL_FRAMES = 1198; // the tagline holds 1.6s after the voice ends
+export const TOTAL_FRAMES = 1262; // the tagline holds 1.6s after the voice ends
 export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 
 /**
@@ -130,8 +131,8 @@ const LINES = [
   { at: 401, to: 504, text: 'From any app, just\nshare it to Machina.', until: 'the last share lands in the mark' },
   { at: 504, to: 672, text: "It reads what you save | and pulls out\nthe key points | so you'll always remember\nwhy you kept it.", say: "It reads what you save and pulls out the key points… so you'll always remember why you kept it.", until: 'the Key Points lift', duck: 0.45 },
   { at: 672, to: 816, text: 'It links each save | to what you saved before | so you see how\nyour ideas connect.', say: 'It links each save to what you saved before… so you see how your ideas connect.', until: 'the graph opens on its ties', duck: 0.45 },
-  { at: 816, to: 948, text: 'Then pick a time, | and Machina brings it back', say: 'Then pick a time, and Machina brings it back…', until: 'the reminder is set and confirmed' },
-  { at: 960, to: 1024, text: 'so you actually\nget back to it.', kicker: 'Tomorrow', kickerChunk: 0, until: 'the Reminders due strip lifts' },
+  { at: 848, to: 1000, text: 'Then pick a time, | and Machina brings it back', say: 'Then pick a time, and Machina brings it back…', until: 'the reminder is set and confirmed' },
+  { at: 1016, to: 1088, text: 'so you actually\nget back to it.', kicker: 'Tomorrow', kickerChunk: 0, until: 'the Reminders due strip lifts' },
   // the close, on the lockup: the name (the drawn wordmark wipes in as it is
   // said), then the tagline, exactly as written (owner call 2026-09-28)
   { at: HITS.markStrike, to: TOTAL_FRAMES, place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4 },
@@ -141,14 +142,14 @@ const plain = (t) => t.replace(/\s*\|\s*/g, ' ').split(/\s+/).filter(Boolean).jo
 export const CAPTIONS = LINES.map((c) => ({ ...c, say: plain(c.say ?? c.text) }));
 
 /**
- * THE SCORE's map (audio/ads/card-score.mjs), one chord per bar (19 bars):
+ * THE SCORE's map (audio/ads/card-score.mjs), one chord per bar (20 bars):
  * the hook hangs on IV and leans on V, the name resolves to I, the card walks
  * I V IV I, the reminder home, and the lockup on I.
  */
 export const BAR_CHORDS = [
   'Fmaj7', 'Fmaj7', 'G6', 'Fmaj7', 'G6', 'Cmaj7',
   'G6', 'Cmaj7', 'G6', 'Fmaj7', 'Cmaj7', 'G6',
-  'Fmaj7', 'G6', 'Cmaj7', 'Cmaj7', 'Cmaj7', 'Cmaj7', 'Cmaj7',
+  'Fmaj7', 'G6', 'Cmaj7', 'Cmaj7', 'Cmaj7', 'Cmaj7', 'Cmaj7', 'Cmaj7',
 ];
 /** the drums: in with the app, out for the lockup */
 export const DRUMS = [8 * BAR_FRAMES, HITS.lockup];

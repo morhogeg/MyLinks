@@ -57,7 +57,9 @@ export const chunksOf = (c: AdCaption, timing: { frame: number | null; words: nu
 export const AdCaptions: React.FC<{ frame: number; fps: number; captions: AdCaption[]; timing: { frame: number | null; words: number[] }[] }> = ({ frame, fps, captions, timing }) => {
   const { line } = useAdFrame();
   return (
-    <AbsoluteFill style={{ pointerEvents: 'none' }}>
+    // over every scene's own stacking (the hook's focused list sits at zIndex
+    // 2 and greyed "the screenshot you…" through its frosted card, round 8)
+    <AbsoluteFill style={{ pointerEvents: 'none', zIndex: 10 }}>
       {captions.map((c) => {
         // the lockup draws its own line; a 'voice' line is said, not shown
         if (c.place) return null;

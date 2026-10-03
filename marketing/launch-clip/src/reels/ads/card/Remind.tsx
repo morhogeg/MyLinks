@@ -63,21 +63,27 @@ const dKeysFor = (dy: number): Key[] =>
   [
     { f: HITS.bellTap, cx: 196.5, cy: 520, z: 2.4, fx: 540, fy: 1150 },
     { f: HITS.bellTap + 12, fy: 1000, ease: EASE_MODAL },
-    { f: HITS.smart + 32, cy: 522, z: 2.42, ease: linear },
+    { f: HITS.smart + 40, cy: 522, z: 2.42, ease: linear },
     { f: HITS.saveTap - 8, cy: 660, fy: HERO, z: 2.4, ease: EASE_IN_OUT },
     { f: HITS.saveTap + 10, z: 2.3, fy: HERO + 60, ease: EASE_IN_OUT },
   ].map((k) => (k.fy !== undefined ? { ...k, fy: k.fy + dy } : k)) as Key[];
 
 export const Remind: React.FC<{ f: number }> = ({ f }) => {
   const { dy } = useAdFrame();
-  if (f < HITS.back || f > HITS.throw + THROW_LEN) return null;
+  if (f < HITS.back - 2 || f > HITS.throw + THROW_LEN) return null;
   const keys = keysFor(dy);
   const dKeys = dKeysFor(dy);
   const i = screenFrame(f);
 
   // behind the sheet: out of focus, racking back into focus as it drops away
   // (it racks out ahead of the sheet, so the sheet never fades in over sharp type)
-  const behind = prog(f, HITS.bellTap + 1, HITS.bellTap + 8, EASE_IN_OUT) * (1 - prog(f, HITS.saveTap + 6, HITS.saveTap + 16, EASE_IN_OUT));
+  // (round 8) it stays soft after the sheet drops, so the lifted "Reminder
+  // set" reads on its own instead of sitting on a card, and racks back into
+  // focus only after the cut to tomorrow (the cut itself happens under blur)
+  const behind = prog(f, HITS.bellTap + 1, HITS.bellTap + 8, EASE_IN_OUT) * (1 - prog(f, HITS.due + 2, HITS.due + 18, EASE_IN_OUT));
+  // the arrival from the graph: it fades in soft and pulls into focus
+  const arrive = 1 - prog(f, HITS.back + 2, HITS.back + 18, EASE_IN_OUT);
+  const fadeIn = prog(f, HITS.back - 2, HITS.back + 10, EASE_IN_OUT);
   const dIn = prog(f, HITS.bellTap + 1, HITS.bellTap + 7, EASE_IN_OUT);
   const dOut = prog(f, HITS.saveTap + 2, HITS.saveTap + 9, EASE_IN_OUT);
 
@@ -90,7 +96,7 @@ export const Remind: React.FC<{ f: number }> = ({ f }) => {
 
   // lifts, each on its beat, each gone before its screen moves
   const smartIn = prog(f, HITS.smart, HITS.smart + 14, EASE_SPRING);
-  const smartOut = prog(f, HITS.smart + 24, HITS.smart + 32, EASE_IN_OUT);
+  const smartOut = prog(f, HITS.smart + 30, HITS.smart + 40, EASE_IN_OUT);
   const setIn = prog(f, HITS.reminderSet, HITS.reminderSet + 14, EASE_SPRING);
   const setOut = prog(f, HITS.due - 8, HITS.due - 1, EASE_IN_OUT);
   const dueIn = prog(f, HITS.dueLift, HITS.dueLift + 16, EASE_SPRING);
@@ -99,7 +105,7 @@ export const Remind: React.FC<{ f: number }> = ({ f }) => {
   return (
     <AbsoluteFill>
       {/* the screen */}
-      <AppShot take={T} i={i} cam={camAt(keys, f)} blur={16 * behind} dim={0.12 * behind} motion={camVelocity(keys, f, 1)}>
+      <AppShot take={T} i={i} cam={camAt(keys, f)} blur={16 * Math.max(behind, arrive)} dim={0.16 * behind} opacity={fadeIn} motion={camVelocity(keys, f, 1)}>
         <Tap x={bell.x} y={bell.y} t={prog(f, HITS.bellTap - 7, HITS.bellTap + 12, linear)} />
         {f >= HITS.reminderSet && f < HITS.due && setIn > 0.01 && setOut < 1 && (
           <Lift take={T} i={i} rect={[toast[0], toast[1], toast[2], TOAST_H]} radius={16} lift={setIn * 0.35} rise={2} grow={0.012} ring={0.5 * setIn} opacity={1 - setOut} />

@@ -819,9 +819,19 @@ right, low left, each at its own tilt) and slower: 24 frames apart, each held
 still a moment before its tap. Everything after the shares moved one bar-half
 (32 frames) later. 39.9s.
 
-**The Meta spec, and how the ad meets it.** 39.9s (owner, round 5: about
+Round 8 (owner, 2026-10-03, on device): "the screenshot you swore you'd
+remember." was grey: the hook's focused list (zIndex 2) sat over the caption
+layer and its frosted card washed the type out; captions now sit at zIndex 10.
+The graph no longer hard-cuts to the card: it goes soft and fades while the
+card fades in soft and pulls into focus (14 frames). The reminder is slower:
+a second on the card before the bell, Smart review held longer, Save at 944.
+The app's "Reminder set" toast covered a Related card, so the screen stays
+soft behind it (the sheet's blur is held) and the toast reads on its own; the
+cut to tomorrow happens under that blur and racks into focus. 42.1s.
+
+**The Meta spec, and how the ad meets it.** 42.1s (owner, round 5: about
 30–35s; round 6's slower reminder took it over; verify notes over 35s and
-fails over 40s). Frame 0 is a legible picture with the
+fails over 43s). Frame 0 is a legible picture with the
 first chunk set on it, so the hook lands with the sound off. At most 8 words
 on screen at once (the TOMORROW kicker counts). The mark arrives with "That's
 exactly why we made Machina." (~11s), by the owner's script, not by 3s as the

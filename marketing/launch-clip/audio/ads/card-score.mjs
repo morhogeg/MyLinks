@@ -39,7 +39,7 @@ const CHORDS = {
 const BARS = Math.ceil(TOTAL_FRAMES / BAR_FRAMES);
 const LOCKUP_BAR = Math.round(HITS.lockup / BAR_FRAMES);
 /** how much of the band is playing, per bar */
-const DENSITY = [0.34, 0.4, 0.46, 0.5, 0.56, 0.62, 0.68, 0.72, 0.74, 0.74, 0.76, 0.76, 0.76, 0.74, 0.72, 0.7, 0.45, 0.45, 0.45];
+const DENSITY = [0.34, 0.4, 0.46, 0.5, 0.56, 0.62, 0.68, 0.72, 0.74, 0.74, 0.76, 0.76, 0.76, 0.74, 0.72, 0.7, 0.45, 0.45, 0.45, 0.45];
 
 for (let bar = 0; bar < BARS; bar++) {
   const ch = CHORDS[BAR_CHORDS[bar]];

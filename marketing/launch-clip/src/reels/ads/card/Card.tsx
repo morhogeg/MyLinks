@@ -63,6 +63,8 @@ const S0 = (SCROLLS[0] as [number, number, string])[0];
  *  roll frame 5): the cut lands on frame 5, opaque, the ties still settling */
 const GRAPH_N = 150;
 const GRAPH_FROM = 5;
+/** the graph → card dissolve: the graph goes soft and fades under the card */
+const PULL = 14;
 
 const frameAt = (f: number) => {
   if (f >= HITS.graphTap) return at(T, 'graph', Math.min(GRAPH_N - 1, GRAPH_FROM + f - HITS.graphTap));
@@ -110,7 +112,8 @@ const relatedOf = (i: number): Rect => {
 
 export const Card: React.FC<{ f: number }> = ({ f }) => {
   const { dy } = useAdFrame();
-  if (f < HITS.toApp || f >= HITS.back) return null;
+  // (round 8) the graph dissolves out through a focus pull, under the card
+  if (f < HITS.toApp || f >= HITS.back + PULL) return null;
   const keys = keysFor(dy);
   const i = frameAt(f);
   const scrolling = f >= S0 && f < HITS.graphTap;
@@ -141,6 +144,8 @@ export const Card: React.FC<{ f: number }> = ({ f }) => {
         shadow={iris ? 0 : 1}
         motion={motion}
         sheen={f < HITS.toApp + 24 ? prog(f, HITS.toApp, HITS.toApp + 24, EASE_MODAL) : 0}
+        blur={16 * prog(f, HITS.back - 10, HITS.back + 4, EASE_IN_OUT)}
+        opacity={1 - prog(f, HITS.back, HITS.back + PULL, EASE_IN_OUT)}
       >
         <Tap x={card[0] + 120} y={card[1] + 40} t={prog(f, HITS.cardTap - 7, HITS.cardTap + 12, linear)} />
         <Tap x={seeGraph[0] + seeGraph[2] / 2} y={seeGraph[1] + seeGraph[3] / 2} t={prog(f, HITS.graphTap - 7, HITS.graphTap + 12, linear)} />
