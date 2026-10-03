@@ -168,6 +168,27 @@ def cap_pauses(samples, sr, longest=0.34, fade=0.01):
     return np.concatenate(out)
 
 
+def stretch(samples, sr, tempo):
+    """Speed a line up (or down) without changing its pitch or voice: Rubber
+    Band through ffmpeg, formants preserved. Asked for punchy, Gemini barely
+    quickens (owner: the problem section "a bit too slow"), so the pace is
+    set here instead."""
+    if not tempo or abs(tempo - 1) < 1e-3:
+        return samples
+    import subprocess
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as d:
+        a, b = os.path.join(d, "in.wav"), os.path.join(d, "out.wav")
+        sf.write(a, samples, sr, subtype="FLOAT")
+        subprocess.run(
+            ["ffmpeg", "-v", "error", "-y", "-i", a, "-af", f"rubberband=tempo={tempo}:formant=preserved:pitchq=quality", b],
+            check=True,
+        )
+        out, _ = sf.read(b, dtype="float32")
+    return out
+
+
 def gate(samples, sr, below=30.0, depth=40.0, look=0.01, release=0.025):
     """A smooth noise gate: Gemini's audio is not silent between words (a
     hiss floor around -52 to -64 dB) and the mix lifts it into audible static

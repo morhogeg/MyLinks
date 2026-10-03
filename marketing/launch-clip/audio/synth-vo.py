@@ -145,6 +145,8 @@ def clip_script(name):
             "tts": " ".join((c.get("tts") or c.get("say") or c["text"]).split()),
             # and the longest pause kept inside it (seconds; gemini_tts.cap_pauses)
             "max_pause": c.get("maxPause"),
+            # and its tempo (1.1 = 10% quicker, pitch kept; gemini_tts.stretch)
+            "tempo": c.get("tempo"),
         }
         for c in data["captions"]
     ]
@@ -319,7 +321,8 @@ def main():
         def speak(line):
             samples, sr = gemini_tts.synth(gemini_tts.performed(line.get("tts") or line["text"]), style=gemini_tts.direct(line.get("style")))
             capped = gemini_tts.cap_pauses(samples, sr, longest=line.get("max_pause") or 0.34)
-            return gemini_tts.gate(gemini_tts.to_the_words(capped, sr), sr), sr
+            quick = gemini_tts.stretch(gemini_tts.to_the_words(capped, sr), sr, line.get("tempo"))
+            return gemini_tts.gate(quick, sr), sr
     else:
         from kokoro_onnx import Kokoro
 
