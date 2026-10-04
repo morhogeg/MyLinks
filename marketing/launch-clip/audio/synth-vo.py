@@ -23,7 +23,6 @@ import subprocess
 import sys
 
 import soundfile as sf
-from kokoro_onnx import Kokoro
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -33,9 +32,10 @@ VO = os.path.join(ROOT, "out", "vo")
 VOICE = "af_heart"  # Kokoro's flagship female voice
 SPEED = 0.95  # for weight (owner-approved)
 
-# The brand reads "Machina" but is SPOKEN "mah-KEE-nah" (machine, in Latin) —
-# the respelling below is for the synthesizer's ear only; captions keep the
-# real spelling.
+# The brand reads "Machina" and Kokoro says this respelling as MACK-ee-nuh
+# (/ˈmækiːnə/); Gemini TTS says it the Latin way, MAH-kee-nah (gemini_tts.py).
+# The respelling is for the synthesizer's ear only; captions keep the real
+# spelling.
 SAY_NAME = "Makeena"
 
 BAR_SEC = 2.5  # the film's bar (timeline.mjs)
@@ -134,7 +134,21 @@ def clip_script(name):
             "start": c["at"] / data["fps"],
             "window": (c["to"] - c["at"]) / data["fps"],
             "text": " ".join((c.get("say") or c["text"]).split()).replace("Machina", SAY_NAME),
-            "speed": SPEED,
+            # a clip or ad may set its own delivery speed per line (the Meta ad
+            # 3 script, round 6: a natural conversational pace)
+            "speed": c.get("speed", SPEED),
+            # Gemini TTS only (VO_ENGINE=gemini): the line's own acting note, and
+            # the words as performed, with inline vocal tags (<chuckle>,
+            # <short pause>…) and the real name; Kokoro ignores both, and the
+            # word timing, manifest and captions keep the plain words above
+            "style": c.get("style"),
+            "tts": " ".join((c.get("tts") or c.get("say") or c["text"]).split()),
+            # and the longest pause kept inside it (seconds; gemini_tts.cap_pauses)
+            "max_pause": c.get("maxPause"),
+            # and its tempo (1.1 = 10% quicker, pitch kept; gemini_tts.stretch)
+            "tempo": c.get("tempo"),
+            # and its pace note, replacing the house one (gemini_tts.direct)
+            "pace": c.get("pace"),
         }
         for c in data["captions"]
     ]
@@ -143,6 +157,13 @@ def clip_script(name):
 # the REVISIT feature clip (clips/revisit-timeline.mjs): its own lines, the one voice
 SCRIPTS["revisit"] = (lambda: clip_script("revisit"), os.path.join(VO, "revisit"))
 WORD_TIMING["revisit"] = os.path.join(ROOT, "src", "reels", "clips", "revisit", "vo.json")
+
+# a script's own engine (VO_ENGINE overrides): the REVISIT clip is voiced by
+# Gemini TTS, Sulafat (owner, 2026-10-03/04: the house narrator, this clip's
+# own gentle direction per line); everything else stays on Kokoro
+ENGINE = {"revisit": "gemini"}
+# and its Gemini model (GEMINI_TTS_MODEL overrides)
+GEMINI_MODEL = {"revisit": "gemini-3.8-flash-tts"}
 
 
 def speech_runs(samples, sr, gap=0.09):
@@ -170,7 +191,7 @@ def speech_runs(samples, sr, gap=0.09):
 
 
 def word_timing(text, runs):
-    """Seconds at which each written word starts. Phrases (split after , . ? !)
+    """Seconds at which each written word starts. Phrases (split after , . ? ! …)
     are matched to the pauses the voice actually took; words inside a phrase
     are spread by length."""
     import re
@@ -179,7 +200,7 @@ def word_timing(text, runs):
     phrases, cur = [], []
     for w in words:
         cur.append(w)
-        if re.search(r"[.,?!]$", w):
+        if re.search(r"[.,?!…]$", w):
             phrases.append(cur)
             cur = []
     if cur:
@@ -202,6 +223,82 @@ def word_timing(text, runs):
     return out
 
 
+def word_timing_voiced(text, samples, sr):
+    """Word start times for a Gemini TTS line. Gemini pauses between words,
+    not only at punctuation, and breathes at the edges of a line, so
+    `word_timing` (built for Kokoro) matched phrases to the wrong runs. Here:
+    runs too short or too quiet to be words (a click, a breath) are dropped;
+    the phrase breaks go to the longest real pauses (one fewer than the
+    phrases, in order); each phrase's words are spread over its VOICED time
+    only, by length."""
+    import re
+
+    import numpy as np
+
+    runs = speech_runs(samples, sr)
+    hop = int(sr * 0.01)
+    peak = lambda r: float(np.abs(samples[int(r[0] * sr):int(r[1] * sr) + hop]).max(initial=0))
+    top = max(peak(r) for r in runs)
+    runs = [r for r in runs if r[1] - r[0] >= 0.05 and peak(r) >= top * 0.25] or runs
+    # a short, quiet burst cut off from the edge of the line by a long pause
+    # is a breath (Gemini breathes in and out around a line), not a word (a
+    # short LOUD one is a word: "Okay,")
+    breath = lambda r, gap: r[1] - r[0] < 0.18 and gap > 0.2 and peak(r) < top * 0.5
+    while len(runs) > 1 and breath(runs[-1], runs[-1][0] - runs[-2][1]):
+        runs = runs[:-1]
+    while len(runs) > 1 and breath(runs[0], runs[1][0] - runs[0][1]):
+        runs = runs[1:]
+    words = text.split()
+    phrases, cur = [], []
+    for w in words:
+        cur.append(w)
+        if re.search(r"[.,?!…]$", w):
+            phrases.append(cur)
+            cur = []
+    if cur:
+        phrases.append(cur)
+    # each phrase break goes to the longest pause NEAR where that phrase should
+    # end (its share of the line's letters, on the voiced timeline)
+    voiced_at = []  # voiced time elapsed at the end of each run
+    acc_v = 0.0
+    for a_, b_ in runs:
+        acc_v += b_ - a_
+        voiced_at.append(acc_v)
+    letters = sum(len(w) + 1 for w in words)
+    cuts, done = [], 0
+    for ph in phrases[:-1]:
+        done += sum(len(w) + 1 for w in ph)
+        want = acc_v * done / letters
+        lo = cuts[-1] + 1 if cuts else 0
+        cand = [i for i in range(lo, len(runs) - 1)]
+        if not cand:
+            break
+        score = lambda i: (runs[i + 1][0] - runs[i][1]) - 0.6 * abs(voiced_at[i] - want)
+        cuts.append(max(cand, key=score))
+    groups, start = [], 0
+    for c in cuts + [len(runs) - 1]:
+        groups.append(runs[start:c + 1])
+        start = c + 1
+    if len(groups) < len(phrases):  # fewer pauses than phrases: one span
+        groups, phrases = [runs], [words]
+    out = []
+    for g, ph in zip(groups, phrases):
+        voiced = sum(b - a for a, b in g)
+        total = sum(len(w) + 1 for w in ph)
+        acc = 0
+        for w in ph:
+            t = voiced * acc / total  # this far into the phrase's voiced time
+            for a, b in g:
+                if t <= b - a:
+                    out.append(round(a + t, 3))
+                    break
+                t -= b - a
+            else:
+                out.append(round(g[-1][1], 3))
+            acc += len(w) + 1
+    return out
+
+
 def main():
     name = sys.argv[1] if len(sys.argv) > 1 else "film"
     if name not in SCRIPTS:
@@ -209,13 +306,37 @@ def main():
     make, out_dir = SCRIPTS[name]
     os.makedirs(out_dir, exist_ok=True)
 
-    k = Kokoro(os.path.join(VO, "kokoro-v1.0.onnx"), os.path.join(VO, "voices-v1.0.bin"))
+    # the engine: Kokoro (offline, the default) or Gemini TTS (VO_ENGINE=gemini,
+    # audio/gemini_tts.py: directed delivery, needs an API key and network)
+    engine = os.environ.get("VO_ENGINE", ENGINE.get(name, "kokoro"))
+    if engine == "gemini":
+        if name in GEMINI_MODEL:
+            os.environ.setdefault("GEMINI_TTS_MODEL", GEMINI_MODEL[name])
+        sys.path.insert(0, HERE)
+        import gemini_tts
+
+        def speak(line):
+            samples, sr = gemini_tts.synth(gemini_tts.performed(line.get("tts") or line["text"]), style=gemini_tts.direct(line.get("style"), line.get("pace")))
+            if os.environ.get("NARRATION_TAKES_ONLY"):
+                # on GitHub (narration-tts.yml) only the raw takes are needed;
+                # the shaping below runs where the ad is built (it needs ffmpeg)
+                return samples, sr
+            capped = gemini_tts.cap_pauses(samples, sr, longest=line.get("max_pause") or 0.34)
+            quick = gemini_tts.stretch(gemini_tts.to_the_words(capped, sr), sr, line.get("tempo"))
+            return gemini_tts.gate(quick, sr), sr
+    else:
+        from kokoro_onnx import Kokoro
+
+        k = Kokoro(os.path.join(VO, "kokoro-v1.0.onnx"), os.path.join(VO, "voices-v1.0.bin"))
+
+        def speak(line):
+            return k.create(line["text"], voice=VOICE, speed=line["speed"])
 
     manifest = []
     timing = []
     ok = True
     for i, line in enumerate(make()):
-        samples, sr = k.create(line["text"], voice=VOICE, speed=line["speed"])
+        samples, sr = speak(line)
         path = os.path.join(out_dir, f"line-{i:02d}.wav")
         sf.write(path, samples, sr)
         dur = len(samples) / sr
@@ -241,7 +362,7 @@ def main():
             timing.append({
                 "frame": line.get("frame"),
                 "text": line["text"],
-                "words": word_timing(line["text"], speech_runs(samples, sr)),
+                "words": word_timing_voiced(line["text"], samples, sr) if engine == "gemini" else word_timing(line["text"], speech_runs(samples, sr)),
             })
         print(f"{'ok ' if fits else 'LONG'} {spoken:5.2f}s / {line['window']:4.2f}s  {line['text']}")
 
