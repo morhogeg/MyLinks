@@ -2707,6 +2707,22 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-04 — META AD 1, ROUND 9: GEMINI TTS NARRATOR (SULAFAT).**
+  Branch `claude/ad-card`, not merged. Owner-approved (relayed from the ad 3
+  session, confirmed here): re-voice with Gemini 3.8 Flash TTS, Sulafat, with
+  this ad's own tone and a direction per line. Took ad 3's engine unchanged
+  (`gemini_tts.py`, `vo-audition.py`, `narration-run.py`,
+  `.github/workflows/narration-tts.yml`) and ported its `synth-vo.py` engine
+  switch (`ENGINE = {"adcard": "gemini"}`; Kokoro scripts re-generate their
+  word timings identically). Voiced on GitHub after the 07:00 UTC reset: 11
+  requests, each line once; runs 1 and 2 stopped on a per-minute 429 (limit
+  10, shared with other sessions) after 3 and 5 lines, run 3 finished the
+  last 3 (the kept takes are re-used, so no line was voiced twice). New
+  `scripts/ad-card-layout.py` re-times the picture to the read; whooshes,
+  risers, hats and shaker drop to a third under the voice. 43.7s (length
+  gate now fails over 45s; the pain-line dwell minimum is 0.2s). Verify
+  clean; mixes −14.0 LUFS, ≤ −1.25 dBTP. Open: nobody has listened; word
+  times are estimates (±0.2s); "midnight…" may end clipped.
 - **2026-10-03 — META AD 1, ROUND 8: GREY CAPTION FIXED; A SOFTER, SLOWER
   REMINDER.** Branch `claude/ad-card`, not merged. Owner, on device: "the
   screenshot you…" was grey (the hook's focused list, zIndex 2, sat over the

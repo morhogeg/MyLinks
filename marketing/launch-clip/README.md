@@ -829,9 +829,27 @@ The app's "Reminder set" toast covered a Related card, so the screen stays
 soft behind it (the sheet's blur is held) and the toast reads on its own; the
 cut to tomorrow happens under that blur and racks into focus. 42.1s.
 
-**The Meta spec, and how the ad meets it.** 42.1s (owner, round 5: about
+Round 9 (owner, 2026-10-04): a new narrator, Gemini 3.8 Flash TTS, voice
+Sulafat (the house narrator), with this ad's own tone ("knowing, wry,
+relatable, then a satisfying payoff"; the reminder is the hero). Each caption
+carries its acting note (`style`) and pace; the four pain lines are tightened
+(`tempo: 1.1`, `maxPause: 0.2`). The engine is Meta ad 3's
+(`audio/gemini_tts.py`), ported into `synth-vo.py`; every other script stays
+on Kokoro. Voicing runs on GitHub (`.github/workflows/narration-tts.yml`, the
+repo's `GEMINI_API_KEY`): pushing `audio/narration-request.json` voices the
+lines and commits the raw takes to `audio/vo-takes/` (keyed by words + model
++ voice + direction: editing a note re-voices that line); `synth-vo.py
+adcard` then builds the lines locally with no key. The read runs longer, so
+`scripts/ad-card-layout.py` re-times the picture to it: each line after the
+previous one's measured speech (0.2s after a pain line, 0.3s otherwise), its
+section's beats moving with it, in whole 8ths. Whooshes, risers, hats and the
+shaker drop to a third while the narrator speaks (noise under this voice
+reads as static). Word times are estimated from the audio (±0.2s), not
+recognised. 43.7s.
+
+**The Meta spec, and how the ad meets it.** 43.7s (owner, round 5: about
 30–35s; round 6's slower reminder took it over; verify notes over 35s and
-fails over 43s). Frame 0 is a legible picture with the
+fails over 45s). Frame 0 is a legible picture with the
 first chunk set on it, so the hook lands with the sound off. At most 8 words
 on screen at once (the TOMORROW kicker counts). The mark arrives with "That's
 exactly why we made Machina." (~11s), by the owner's script, not by 3s as the

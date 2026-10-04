@@ -17,6 +17,8 @@ import json, math, re, subprocess
 
 FPS = 30
 BREATH = 9  # frames of air after a line's speech before the next (0.3s)
+# after the four pain lines (punchy, the owner's direction): 0.2s
+BREATH_AFTER = {0: 6, 1: 6, 2: 6, 3: 6}
 up8 = lambda x: int(math.ceil(x / 8) * 8)
 
 man = json.load(open('out/vo/adcard/manifest.json'))
@@ -41,7 +43,7 @@ new, delta = [], []
 for i, c in enumerate(C):
     at = old[i] + (delta[-1] if delta else 0)
     if i:
-        at = max(at, new[-1] + spoken[i - 1] * FPS + BREATH)
+        at = max(at, new[-1] + spoken[i - 1] * FPS + BREATH_AFTER.get(i - 1, BREATH))
     # moves come in whole 8ths, so every beat stays on the grid
     at = old[i] + up8(max(0, at - old[i]))
     new.append(at)

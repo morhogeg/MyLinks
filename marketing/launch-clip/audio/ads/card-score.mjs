@@ -24,7 +24,20 @@ import { BAR, BAR_CHORDS, BAR_FRAMES, BEAT, CAPTIONS, DRUMS, FPS, HITS, RISERS, 
 import { createSynth } from '../synth.mjs';
 
 const S = createSynth({ seconds: TOTAL_SEC, beat: BEAT });
-const { pad, sub, pulse, keys, bell, kick, hat, rim, shaker, clap, riser, whoosh, impact, tick, shimmer } = S;
+const { pad, sub, pulse, keys, bell, kick, rim, clap, impact, tick, shimmer } = S;
+
+// (round 9, the Gemini narrator) noise-based sound under the voice reads as
+// static between its sentences (Meta ad 3's finding): whooshes, risers, hats
+// and the shaker drop to a third while the narrator is speaking (each line
+// from its first word to 0.4s after its last, from the measured word times)
+const VO = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'src', 'reels', 'ads', 'card', 'vo.json'), 'utf8'));
+const SPEAKING = VO.filter((l) => l.frame != null && l.words?.length).map((l) => [l.frame / FPS + l.words[0] - 0.1, l.frame / FPS + l.words[l.words.length - 1] + 0.8]);
+const underVoice = (from, len = 0) => SPEAKING.some(([a, z]) => from < z && from + len > a);
+const quiet = (from, len, gain) => (underVoice(from, len) ? gain / 3 : gain);
+const whoosh = (time, len, gain, ...rest) => S.whoosh(time, len, quiet(time, len, gain), ...rest);
+const riser = (time, len, gain, ...rest) => S.riser(time, len, quiet(time, len, gain), ...rest);
+const hat = (time, gain, ...rest) => S.hat(time, quiet(time, 0.05, gain), ...rest);
+const shaker = (time, gain, ...rest) => S.shaker(time, quiet(time, 0.05, gain), ...rest);
 
 const t = (frame) => frame / FPS;
 const b = (bar) => bar * BAR;
