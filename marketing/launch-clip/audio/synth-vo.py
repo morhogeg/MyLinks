@@ -166,9 +166,9 @@ WORD_TIMING["adtodo"] = os.path.join(ROOT, "src", "reels", "ads", "todo", "vo.js
 # a script's own engine (VO_ENGINE overrides): Meta ad 3 is voiced by Gemini
 # TTS, Sulafat (owner, 2026-10-03); everything else stays on Kokoro
 ENGINE = {"adtodo": "gemini"}
-# and its Gemini model (GEMINI_TTS_MODEL overrides): Flash-Lite TTS while the
-# Flash quota is spent (2026-10-03); the Flash re-voice replaces this
-GEMINI_MODEL = {"adtodo": "gemini-3.8-flash-lite-tts"}
+# and its Gemini model (GEMINI_TTS_MODEL overrides): Flash TTS, the model the
+# owner auditioned (re-voiced 2026-10-04; the Flash-Lite takes stay in vo-takes/)
+GEMINI_MODEL = {"adtodo": "gemini-3.8-flash-tts"}
 
 
 def speech_runs(samples, sr, gap=0.09):
