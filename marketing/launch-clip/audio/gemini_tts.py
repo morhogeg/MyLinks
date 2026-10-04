@@ -106,14 +106,19 @@ def _request(text, voice, style):
         data=json.dumps(body).encode(),
         headers={"Content-Type": "application/json", "x-goog-api-key": os.environ["GEMINI_API_KEY"]},
     )
-    for attempt in range(4):
+    # 429s: the key allows 10 requests a MINUTE per model (and 100 a day):
+    # wait out the minute window and retry; a daily-quota 429 still fails
+    for attempt in range(5):
         try:
             with urllib.request.urlopen(req, timeout=120) as r:
                 data = json.load(r)
             break
         except urllib.error.HTTPError as e:
             detail = e.read().decode(errors="replace")[:400]
-            if e.code in (429, 500, 503) and attempt < 3:
+            if e.code == 429 and "per_day" not in detail and attempt < 4:
+                time.sleep(35 + 15 * attempt)
+                continue
+            if e.code in (500, 503) and attempt < 4:
                 time.sleep(2 ** (attempt + 1))
                 continue
             print(f"Gemini TTS {e.code}: {detail}", file=sys.stderr)
