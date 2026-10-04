@@ -1,6 +1,6 @@
 import React from 'react';
 import { AbsoluteFill } from 'remotion';
-import { CAPTIONS, FPS } from '../../../../clips/ad-todo-timeline.mjs';
+import { CAPTIONS, FPS, FULL_CAPTIONS } from '../../../../clips/ad-todo-timeline.mjs';
 import VO from './vo.json';
 import { HEAD_LEAD, Headline } from '../../kit/Type';
 
@@ -20,30 +20,32 @@ type Line = { at: number; to: number; hook?: boolean; place?: string; heads?: He
 
 const ROLL = 0;
 
-const starts = (CAPTIONS as Line[])
-  .filter((c) => c.heads)
-  .flatMap((c) => {
+/** the captions, as headlines (`heads`) or the full narration (`full`) */
+const build = (mode: 'heads' | 'full') => {
+  const lines = (CAPTIONS as Line[]).filter((c) => c.heads);
+  const starts = lines.flatMap((c, li) => {
     const timing = VO.find((v) => v.frame === c.at);
-    return c.heads!.map(([word, text], k) => ({
+    const set = mode === 'full' ? (FULL_CAPTIONS as Head[][])[li] : c.heads!;
+    return set.map(([word, text], k) => ({
       from: c.hook && k === 0 ? 0 : c.at + Math.round((timing?.words[word] ?? 0) * FPS) - HEAD_LEAD,
       text,
       poster: !!c.hook && k === 0,
       lineTo: c.to,
     }));
   });
+  return starts.map((h, i) => ({ ...h, to: i + 1 < starts.length ? starts[i + 1].from + ROLL : h.lineTo }));
+};
 
 /** every headline, with its frames (absolute) */
-export const HEADLINES = starts.map((h, i) => ({
-  ...h,
-  to: i + 1 < starts.length ? starts[i + 1].from + ROLL : h.lineTo,
-}));
+export const HEADLINES = build('heads');
+const FULL = build('full');
 
-export const Chunks: React.FC<{ frame: number; top: number }> = ({ frame, top }) => (
+export const Chunks: React.FC<{ frame: number; top: number; mode?: 'heads' | 'full' }> = ({ frame, top, mode = 'heads' }) => (
   <AbsoluteFill style={{ pointerEvents: 'none' }}>
-    {HEADLINES.map((h) =>
+    {(mode === 'full' ? FULL : HEADLINES).map((h) =>
       frame >= h.from - 1 && frame <= h.to + 1 ? (
         <div key={h.from} style={{ position: 'absolute', left: 0, right: 0, top, display: 'flex', justifyContent: 'center' }}>
-          <Headline text={h.text} frame={frame} from={h.from} to={h.to} poster={h.poster} />
+          <Headline text={h.text} frame={frame} from={h.from} to={h.to} poster={h.poster} size={mode === 'full' ? 56 : 66} />
         </div>
       ) : null,
     )}

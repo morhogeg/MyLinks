@@ -25,8 +25,10 @@ import { useShape } from './frame';
 export const AdTodo: React.FC<{
   withAudio?: boolean;
   withCaptions?: boolean;
+  /** 'heads' (headline captions) or 'full' (the whole narration, chunked) */
+  captions?: 'heads' | 'full';
   audioFile?: string;
-}> = ({ withAudio = true, withCaptions = true, audioFile = 'ads/todo/score-vo.wav' }) => {
+}> = ({ withAudio = true, withCaptions = true, captions = 'heads', audioFile = 'ads/todo/score-vo.wav' }) => {
   const f = useCurrentFrame();
   const { slots, band } = useShape();
   return (
@@ -39,7 +41,7 @@ export const AdTodo: React.FC<{
       {/* type never sits on UI: the app fades out under the caption band */}
       {withCaptions && <BandScrim band={band} opacity={prog(f, HITS.iris[0], HITS.iris[1]) * (1 - prog(f, HITS.out + THROW_LEN - 8, HITS.out + THROW_LEN))} />}
       {/* the narration on screen, in short chunks on the voice's timing */}
-      {withCaptions && <Chunks frame={f} top={slots.top} />}
+      {withCaptions && <Chunks frame={f} top={slots.top} mode={captions} />}
       <Lens />
     </AbsoluteFill>
   );

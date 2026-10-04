@@ -43,8 +43,15 @@ const seg = (mark: Seg, f: number, offset = 0) => {
 // frame each (marks `glide` to `kpOpen`)
 const STEP_PT = 4;
 const GLIDE_STEPS = at(T, 'kpOpen') - at(T, 'glide');
+/** the steps the glide actually travels (owner, 2026-10-04: the scroll looked
+ *  "jittery"): all 375 (1500pt) in ~3.5s peaked at 80px a frame, which at
+ *  30fps strobes; 160 steps (640pt) keeps the peak near 30px a frame */
+const GLIDE_USE = Math.min(GLIDE_STEPS, 160);
 const [G0, G1] = HITS.glide;
-const glideAt = (f: number) => GLIDE_STEPS * prog(f, G0, G1, EASE_IN_OUT);
+/** a sine ease: the speed spreads over the glide instead of peaking in its
+ *  middle (EASE_IN_OUT's peak is ~2x the average speed; a sine's is ~1.6x) */
+const SINE = (t: number) => 0.5 - 0.5 * Math.cos(Math.PI * t);
+const glideAt = (f: number) => GLIDE_USE * prog(f, G0, G1, SINE);
 
 // ── the read-down to the Key Points: the capture's 4pt steps inside the open
 // card, aimed off each step's MEASURED position (the Key Points list), since

@@ -62,18 +62,18 @@ export const HITS = {
   // 1 THE PAIN (Hook.tsx): the saves are already there on frame 0 (the poster)
   stir: 44, // "How many things…": the saves ripple, one after another
   grey: 91, // "…and never open again?": they grey out
-  named: [134,  186,  220,  244], // each lights up as it is named
-  bury: [352,  408], // "…buried across a dozen different apps": they drift apart and fade
+  named: [134, 186, 220, 244], // each lights up as it is named
+  bury: [352, 408], // "…buried across a dozen different apps": they drift apart and fade
   // 2 THE ANSWER
-  gather: [448,  468], // they rush into one point
+  gather: [448, 468], // they rush into one point
   snap: 472, // the brackets snap round it as "Machina" lands
-  iris: [484,  500], // the point opens onto the app
+  iris: [500, 516], // the point opens onto the app
   // 3 SAVE: four saves land at the top of the feed, each on its word
-  lands: [565,  578,  593,  609], // "Videos", "posts", "articles", "screenshots"
+  lands: [565, 578, 593, 609], // "Videos", "posts", "articles", "screenshots"
   // 4 WHAT IT DOES
-  glide: [704,  808], // down the feed, every save summarized ("Then Machina gets to work… summarizes it")
+  glide: [704, 808], // down the feed, every save summarized ("Then Machina gets to work… summarizes it")
   kpOpen: 816, // one card opens…
-  kpScroll: [842,  866], // …down to its Key Points
+  kpScroll: [842, 866], // …down to its Key Points
   keyPoints: 869, // which lift on "key points"
   // 5 LINKED
   cluster: 960, // cut on "It even connects" into the graph as it zooms onto a lit cluster
@@ -161,6 +161,29 @@ export const CAPTIONS = [
   // the close, on the lockup: the wordmark wipes in on "Machina"; the tagline,
   // exactly, closes (owner, 2026-09-28: every film ends on it)
   { at: HITS.markStrike + 8, to: TOTAL_FRAMES, place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4, showFirstLine: false, ...act('A confident, warm sign-off with a smile; the name proud, then the tagline unhurried and sincere', 'Machina. Everything you save, finally useful.') },
+];
+
+/**
+ * THE FULL CAPTIONS (owner, 2026-10-04: "show me a version with the full
+ * captions as we had them, but with the updated animation"): every narrated
+ * line set on screen in chunks, as in round 6 before the headlines, one entry
+ * per narrated line in CAPTIONS order: [index of the chunk's first spoken
+ * word, the text]. Rendered by MachinaAdTodoFullCaptions with the same
+ * Headline motion.
+ */
+export const FULL_CAPTIONS = [
+  [[3, "How many things did you save\nthis month…"], [11, "…and never open again?"]],
+  [[0, "That video you’d watch later."]],
+  [[0, "The post you loved."]],
+  [[0, "That article."]],
+  [[0, "The screenshot you swore"], [4, "you’d remember."]],
+  [[0, "They’re all still out there,"], [5, "buried across a dozen\ndifferent apps."]],
+  [[0, "That’s exactly why\nwe made Machina."]],
+  [[0, "From any app,"], [3, "just share to Machina."]],
+  [[0, "Videos, posts, articles,\nscreenshots…"], [4, "…it all lands in one place."]],
+  [[0, "Then Machina"], [2, "gets to work."]],
+  [[0, "It analyzes every save,\nsummarizes it,"], [6, "and pulls out the key points,"], [12, "so you’ll always remember"], [16, "why you kept it."]],
+  [[0, "It even connects each save"], [5, "to related ones\nyou’ve kept before,"], [11, "so your ideas start\nbuilding on each other."]],
 ];
 
 /** no chapter words */

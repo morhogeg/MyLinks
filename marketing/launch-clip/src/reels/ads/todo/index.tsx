@@ -10,6 +10,8 @@ import { AdTodo } from './AdTodo';
  *  - MachinaAdTodoFeed    4:5 (1080 × 1350), score + narrator + captions
  *  - MachinaAdTodoClean   9:16, score + narrator, NO captions (owner,
  *    2026-10-04: "not convinced we need these captions… super busy")
+ *  - MachinaAdTodoFullCaptions  9:16, score + narrator, the FULL narration as
+ *    captions (round 6's chunks) in the new Headline motion (owner's compare)
  *  - MachinaAdTodoSilent  9:16, captions, no sound (stills and QA)
  */
 export const AdTodoCompositions: React.FC = () => (
@@ -22,6 +24,10 @@ export const AdTodoCompositions: React.FC = () => (
       defaultProps={{ withAudio: true, withCaptions: true, audioFile: 'ads/todo/score-vo.wav' }} />
     <Composition id="MachinaAdTodoClean" component={AdTodo} durationInFrames={TOTAL_FRAMES} fps={FPS} width={WIDTH} height={HEIGHT}
       defaultProps={{ withAudio: true, withCaptions: false, audioFile: 'ads/todo/score-vo.wav' }} />
+    <Composition id="MachinaAdTodoFullCaptions" component={AdTodo} durationInFrames={TOTAL_FRAMES} fps={FPS} width={WIDTH} height={HEIGHT}
+      defaultProps={{ withAudio: true, withCaptions: true, captions: 'full' as const, audioFile: 'ads/todo/score-vo.wav' }} />
+    <Composition id="MachinaAdTodoFullCaptionsSilent" component={AdTodo} durationInFrames={TOTAL_FRAMES} fps={FPS} width={WIDTH} height={HEIGHT}
+      defaultProps={{ withAudio: false, withCaptions: true, captions: 'full' as const }} />
     <Composition id="MachinaAdTodoSilent" component={AdTodo} durationInFrames={TOTAL_FRAMES} fps={FPS} width={WIDTH} height={HEIGHT}
       defaultProps={{ withAudio: false, withCaptions: true }} />
     <Composition id="MachinaAdTodoFeedSilent" component={AdTodo} durationInFrames={TOTAL_FRAMES} fps={FPS} width={WIDTH} height={FEED_HEIGHT}

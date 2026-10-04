@@ -2,6 +2,7 @@ import React from 'react';
 import { AbsoluteFill, useVideoConfig } from 'remotion';
 import { HITS } from '../../../../clips/ad-todo-timeline.mjs';
 import { MarkAssembly, SaveChip, type SaveKind } from '../../kit/Brand';
+import { Wordmark } from '../../../ui/Brand';
 import { EASE_GATHER, EASE_IN_OUT, EASE_MODAL, EASE_SPRING, mix, prog } from '../../kit/curves';
 import { useShape } from './frame';
 
@@ -27,6 +28,8 @@ import { useShape } from './frame';
 /** where everything gathers (tall frame; the feed shape moves it by dy) */
 export const POINT = { x: 540, y: 960 };
 const MARK_W = 220;
+/** the wordmark under it, in the lockup's proportion (mark 262 : word 660) */
+const WORD_W = Math.round(MARK_W * (660 / 262));
 /** the point's radius in px: the iris starts from it */
 export const POINT_R = 52 * (MARK_W / 448);
 
@@ -152,6 +155,31 @@ export const Hook: React.FC<{ f: number }> = ({ f }) => {
           <MarkAssembly close={Math.max(0, close * (1 - part * 0.35))} dot={0} width={MARK_W} />
         </div>
       )}
+
+      {/* the name, the brand's own drawn wordmark (the closing lockup's, kit
+          Lockup), wiping in under the brackets as "Machina" is said (owner,
+          2026-10-04: show the name in its font); it leaves as the app opens */}
+      {f >= HITS.snap - 2 && part < 1 && (() => {
+        const word = prog(f, HITS.snap, HITS.snap + 14, EASE_MODAL);
+        return (
+          <div
+            style={{
+              position: 'absolute',
+              left: P.x - WORD_W / 2,
+              top: P.y + MARK_W / 2 + 56,
+              width: WORD_W,
+              color: '#14141B',
+              lineHeight: 0,
+              clipPath: `inset(-10% ${((1 - word) * 100).toFixed(2)}% -10% 0)`,
+              transform: `translateY(${Math.round((1 - word) * 12)}px)`,
+              filter: 'drop-shadow(0 4px 26px rgba(24,32,48,0.14))',
+              opacity: 1 - part,
+            }}
+          >
+            <Wordmark style={{ width: '100%', height: 'auto' }} />
+          </div>
+        );
+      })()}
 
       {/* the point: everything gathered, the iris's first frame */}
       {dot > 0 && f < HITS.iris[0] + 8 && (

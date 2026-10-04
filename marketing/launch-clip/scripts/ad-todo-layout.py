@@ -28,7 +28,7 @@ H['stir']=W(0,3)+4; H['grey']=W(0,12)-2
 H['named']=[W(i,1)-3 for i in (1,2,3,4)]
 H['bury']=[W(5,5)-8, W(5,5)+48]
 mach=ats[6]+vo[6]['words'][5]*FPS; H['snap']=min((8*int(mach//8), 8*int(mach//8)+8), key=lambda x: abs(x-mach))
-H['gather']=[H['snap']-24,H['snap']-4]; H['iris']=[H['snap']+12,H['snap']+28]
+H['gather']=[H['snap']-24,H['snap']-4]; H['iris']=[H['snap']+28,H['snap']+44]  # the name holds ~1s before the app opens
 H['lands']=[W(8,k)-4 for k in range(4)]
 key=W(10,10)
 H['keyPoints']=key+3; H['kpScroll']=[key-24,key]
@@ -44,6 +44,6 @@ p='clips/ad-todo-timeline.mjs'; s=open(p).read()
 it=iter(zip(ats,tos))
 s=re.sub(r"line\(\d+, (?:\d+|HITS\.out), ", lambda m: "line(%d, %s, " % next(it), s)
 for k,v in H.items():
-    s=re.sub(r"(\n  %s: )(\[[^\]]*\]|\d+)," % k, lambda m: m.group(1)+json.dumps(v).replace(',',', ')+",", s, count=1)
+    s=re.sub(r"(\n  %s: )(\[[^\]]*\]|\d+)," % k, lambda m: m.group(1)+json.dumps(v, separators=(', ', ': '))+",", s, count=1)
 s=re.sub(r"export const TOTAL_FRAMES = \d+;", f"export const TOTAL_FRAMES = {T};", s)
 open(p,'w').write(s)
