@@ -4,14 +4,16 @@ import { FEED_HEIGHT, FPS, HEIGHT, TOTAL_FRAMES, WIDTH } from '../../../../clips
 import { AdTodo } from './AdTodo';
 
 /**
- * Meta ad 3's compositions (registered in src/Root.tsx):
+ * Meta ad 3's compositions (registered in src/Root.tsx). Captions are the FULL
+ * narration in the mask-rise motion (owner, 2026-10-04: "apply that across all
+ * the videos"); `captions: 'heads'` still gives the headline version.
  *  - MachinaAdTodo        9:16, score + narrator + captions (the main cut)
  *  - MachinaAdTodoMusic   9:16, score + captions, no narrator (the A/B cut)
  *  - MachinaAdTodoFeed    4:5 (1080 × 1350), score + narrator + captions
  *  - MachinaAdTodoClean   9:16, score + narrator, NO captions (owner,
  *    2026-10-04: "not convinced we need these captions… super busy")
- *  - MachinaAdTodoFullCaptions  9:16, score + narrator, the FULL narration as
- *    captions (round 6's chunks) in the new Headline motion (owner's compare)
+ *  - MachinaAdTodoFullCaptions  9:16, the same as the main cut (kept for the
+ *    record: the owner's compare; full captions are now every cut's default)
  *  - MachinaAdTodoSilent  9:16, captions, no sound (stills and QA)
  */
 export const AdTodoCompositions: React.FC = () => (

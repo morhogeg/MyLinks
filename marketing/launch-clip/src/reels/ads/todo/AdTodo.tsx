@@ -25,10 +25,10 @@ import { useShape } from './frame';
 export const AdTodo: React.FC<{
   withAudio?: boolean;
   withCaptions?: boolean;
-  /** 'heads' (headline captions) or 'full' (the whole narration, chunked) */
+  /** 'full' (the whole narration, chunked; owner's pick, 2026-10-04) or 'heads' (headline captions) */
   captions?: 'heads' | 'full';
   audioFile?: string;
-}> = ({ withAudio = true, withCaptions = true, captions = 'heads', audioFile = 'ads/todo/score-vo.wav' }) => {
+}> = ({ withAudio = true, withCaptions = true, captions = 'full', audioFile = 'ads/todo/score-vo.wav' }) => {
   const f = useCurrentFrame();
   const { slots, band } = useShape();
   return (
