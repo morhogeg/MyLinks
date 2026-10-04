@@ -115,12 +115,21 @@ export const TOTAL_SEC = TOTAL_FRAMES / FPS;
  * "share sheet" or "bookmarks", no "free", no price, no plan, nothing about
  * the viewer's health or money.
  */
-const line = (at, to, say, chunks, extra = {}) => ({
+/**
+ * HEADLINE CAPTIONS (2026-10-04, owner: "headline captions", and the old
+ * word-by-word reveal read "dated and laggy"). The narrator still says every
+ * word (`say`); the screen carries each line's point in 2–5 words (`heads`:
+ * [index of the spoken word it lands on, the headline]; `*…*` marks the phrase
+ * the highlighter sweeps under). A headline arrives a beat before its word and
+ * rolls out as the next rolls in (kit/Type.tsx `Headline`). `text` is the
+ * headlines, plain (what verify scans).
+ */
+const line = (at, to, say, heads, extra = {}) => ({
   at,
   to,
   say,
-  chunks,
-  text: chunks.map(([, t]) => t).join('\n'),
+  heads,
+  text: heads.map(([, t]) => t.replaceAll('*', '')).join('\n'),
   ...extra,
 });
 
@@ -137,36 +146,18 @@ const act = (style, tts) => (tts ? { style, tts } : { style });
 const punchy = (style, tts) => ({ ...act(`Punchy and quick, moving briskly, no lingering: ${style}`, tts), maxPause: 0.2, tempo: 1.1 });
 
 export const CAPTIONS = [
-  line(8, 128, 'Okay, be honest. How many things did you save this month… and never open again?', [
-    [3, 'How many things did you save\nthis month…'],
-    [11, '…and never open again?'],
-  ], { hook: true, ...punchy('Leaning in with a knowing, playful smile, gently teasing a friend; a touch of mock guilt on "and never open again?"') }),
-  line(128, 184, 'That video you’d watch later.', [[0, 'That video you’d watch later.']], punchy('Wry and amused, naming the first familiar culprit, quick and light')),
-  line(184, 216, 'The post you loved.', [[0, 'The post you loved.']], punchy('Fond, a little wistful, still smiling')),
-  line(216, 240, 'That article.', [[0, 'That article.']], punchy('Deadpan, knowing, a little smile in it')),
-  line(240, 312, 'The screenshot you swore you’d remember.', [[0, 'The screenshot you swore'], [4, 'you’d remember.']], punchy('Playfully incredulous, smiling: we both know how that went')),
-  line(312, 432, 'They’re all still out there, buried across a dozen different apps.', [
-    [0, 'They’re all still out there,'],
-    [5, 'buried across a dozen\ndifferent apps.'],
-  ], punchy('Sympathetic and a touch lower, with a soft sigh before "buried"', 'They’re all still out there, <sigh> buried across a dozen different apps.')),
-  line(432, 504, 'That’s exactly why we made Machina.', [[0, 'That’s exactly why\nwe made Machina.']], punchy('Turning bright: the reveal, warm and proud, the name landing with a smile')),
-  line(504, 568, 'From any app, just share to Machina.', [[0, 'From any app,'], [3, 'just share to Machina.']], act('Easy and reassuring, like it is the simplest thing in the world')),
-  line(568, 704, 'Videos, posts, articles, screenshots… it all lands in one place.', [
-    [0, 'Videos, posts, articles,\nscreenshots…'],
-    [4, '…it all lands in one place.'],
-  ], act('A quick, light rhythm through the list, then relaxed and satisfied on "it all lands in one place"')),
-  line(704, 776, 'Then Machina gets to work.', [[0, 'Then Machina'], [2, 'gets to work.']], act('Playful anticipation, like about to show a friend a good trick')),
-  line(776, 960, 'It analyzes every save, summarizes it, and pulls out the key points… so you’ll always remember why you kept it.', [
-    [0, 'It analyzes every save,\nsummarizes it,'],
-    [6, 'and pulls out the key points,'],
-    [12, 'so you’ll always remember'],
-    [16, 'why you kept it.'],
-  ], act('Genuinely enthusiastic, explaining something you love, moving along; warm on "so you’ll always remember why you kept it"')),
-  line(960, HITS.out, 'It even connects each save to related ones you’ve kept before… so your ideas start building on each other.', [
-    [0, 'It even connects each save'],
-    [5, 'to related ones\nyou’ve kept before,'],
-    [11, 'so your ideas start\nbuilding on each other.'],
-  ], act('Delighted, a little wonder on "It even", building gently to a satisfied "building on each other"')),
+  line(8, 128, 'Okay, be honest. How many things did you save this month… and never open again?', [[0, 'Saved it.\n*Never* opened it.']], { hook: true, ...punchy('Leaning in with a knowing, playful smile, gently teasing a friend; a touch of mock guilt on "and never open again?"') }),
+  line(128, 184, 'That video you’d watch later.', [[1, 'That *video*…']], punchy('Wry and amused, naming the first familiar culprit, quick and light')),
+  line(184, 216, 'The post you loved.', [[1, 'That *post*…']], punchy('Fond, a little wistful, still smiling')),
+  line(216, 240, 'That article.', [[1, 'That *article*…']], punchy('Deadpan, knowing, a little smile in it')),
+  line(240, 312, 'The screenshot you swore you’d remember.', [[1, 'That *screenshot*…']], punchy('Playfully incredulous, smiling: we both know how that went')),
+  line(312, 432, 'They’re all still out there, buried across a dozen different apps.', [[0, 'Lost across *a dozen apps*']], punchy('Sympathetic and a touch lower, with a soft sigh before "buried"', 'They’re all still out there, <sigh> buried across a dozen different apps.')),
+  line(432, 504, 'That’s exactly why we made Machina.', [[0, 'So we made *Machina*']], punchy('Turning bright: the reveal, warm and proud, the name landing with a smile')),
+  line(504, 568, 'From any app, just share to Machina.', [[0, 'Share from *any app*']], act('Easy and reassuring, like it is the simplest thing in the world')),
+  line(568, 704, 'Videos, posts, articles, screenshots… it all lands in one place.', [[0, 'Videos, posts, *articles*…'], [4, 'All in *one place*']], act('A quick, light rhythm through the list, then relaxed and satisfied on "it all lands in one place"')),
+  line(704, 776, 'Then Machina gets to work.', [[0, 'Then it *gets to work*']], act('Playful anticipation, like about to show a friend a good trick')),
+  line(776, 960, 'It analyzes every save, summarizes it, and pulls out the key points… so you’ll always remember why you kept it.', [[0, 'Every save *summarized*'], [10, 'The *key points*, pulled out'], [15, 'So you *remember why*']], act('Genuinely enthusiastic, explaining something you love, moving along; warm on "so you’ll always remember why you kept it"')),
+  line(960, HITS.out, 'It even connects each save to related ones you’ve kept before… so your ideas start building on each other.', [[0, '*Linked* to related saves'], [11, 'Ideas that *build*']], act('Delighted, a little wonder on "It even", building gently to a satisfied "building on each other"')),
   // the close, on the lockup: the wordmark wipes in on "Machina"; the tagline,
   // exactly, closes (owner, 2026-09-28: every film ends on it)
   { at: HITS.markStrike + 8, to: TOTAL_FRAMES, place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4, showFirstLine: false, ...act('A confident, warm sign-off with a smile; the name proud, then the tagline unhurried and sincere', 'Machina. Everything you save, finally useful.') },

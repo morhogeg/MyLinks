@@ -82,17 +82,16 @@ caps.forEach((c, i) => {
   // two lines ("Download Machina." in the band, the tagline in the lockup)
   // are on screen together, so they count together
   const max = 8;
-  // (round 6) a line is spoken whole and shown in chunks: each chunk at most 8
-  // words, and its words are the spoken ones, in order, from its first word
-  if (c.chunks) {
+  // (2026-10-04) HEADLINE captions: the narrator says the whole line, the
+  // screen shows its point: 2–5 words a headline, each landing on a word the
+  // narrator actually says (its anchor index exists in the spoken line)
+  if (c.heads) {
     const said = list(c.say ?? c.text);
-    const norm = (w) => w.toLowerCase().replace(/[^a-z0-9']/g, '').replace(/’/g, "'");
-    for (const [first, text] of c.chunks) {
-      const shown = list(text).filter((w) => /[a-z0-9]/i.test(w));
-      if (shown.length > max) bad.push(`"${text}" puts ${shown.length} words on screen (max ${max})`);
-      shown.forEach((w, j) => {
-        if (norm(w.replace(/’/g, "'")) !== norm((said[first + j] ?? '').replace(/’/g, "'"))) bad.push(`chunk "${text.split('\n')[0]}…" word ${j + 1} ("${w}") is not what the narrator says ("${said[first + j]}")`);
-      });
+    for (const [word, text] of c.heads) {
+      const n = list(text.replaceAll('*', '')).filter((w) => /[a-z0-9]/i.test(w)).length;
+      if (n < 1 || n > 5) bad.push(`headline "${text}" has ${n} words (2–5)`);
+      if (!(word >= 0 && word < said.length)) bad.push(`headline "${text}" lands on word ${word}, past the line's ${said.length} words`);
+      if ((text.match(/\*/g) ?? []).length % 2) bad.push(`headline "${text}" has an unclosed *highlight*`);
     }
   } else {
     const n = c.place === 'lockup' ? words(c.text.split('\n').slice(-1)[0]) : words(c.text);
@@ -144,9 +143,9 @@ if (fs.existsSync(manifestPath)) {
     }
     const dwell = window - line.spoken;
     const max = c.until ? 4 : 1.2;
-    // (round 6) a chunked line is talk, not a title card: its chunks arrive with
+    // (round 6) a line with headlines is talk, not a title card: they arrive with
     // the words, and the next line follows straight on, so no minimum gap
-    if (dwell < (c.chunks ? 0 : 0.3)) bad.push(`"${c.text}" leaves ${dwell.toFixed(2)}s after its voice (min 0.3s)`);
+    if (dwell < (c.heads ? 0 : 0.3)) bad.push(`"${c.text}" leaves ${dwell.toFixed(2)}s after its voice (min 0.3s)`);
     if (dwell > max + 1e-6) bad.push(`"${c.text}" lingers ${dwell.toFixed(2)}s after its voice (max ${max}s)`);
   }
 } else {
@@ -173,7 +172,7 @@ for (const k of ['snap', 'kpOpen', 'cluster', 'cluster2', 'out', 'markStrike']) 
 // screen (a landing, a tap, a lift, a cut, a line)
 {
   const timingOf = (c) => JSON.parse(read('src/reels/ads/todo/vo.json')).find((x) => x.frame === c.at);
-  const chunkStarts = caps.flatMap((c) => (c.chunks ?? []).map(([first]) => c.at + Math.round((timingOf(c)?.words[first] ?? 0) * C.FPS)));
+  const chunkStarts = caps.flatMap((c) => (c.heads ?? []).map(([first]) => c.at + Math.round((timingOf(c)?.words[first] ?? 0) * C.FPS) - 3));
   const events = [...new Set([0, ...Object.values(H).flat(), ...caps.map((c) => c.at), ...chunkStarts])].filter((x) => x <= H.markStrike).sort((a, b) => a - b);
   for (let k = 1; k < events.length; k++) {
     if (events[k] - events[k - 1] > 3 * C.FPS) bad.push(`nothing new on screen from ${events[k - 1]} to ${events[k]} (${((events[k] - events[k - 1]) / C.FPS).toFixed(1)}s; max 3s)`);

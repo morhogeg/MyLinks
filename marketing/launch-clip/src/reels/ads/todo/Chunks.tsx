@@ -2,46 +2,48 @@ import React from 'react';
 import { AbsoluteFill } from 'remotion';
 import { CAPTIONS, FPS } from '../../../../clips/ad-todo-timeline.mjs';
 import VO from './vo.json';
-import { KineticLine } from '../../kit/Type';
+import { HEAD_LEAD, Headline } from '../../kit/Type';
 
 /**
- * The narration on screen, round 6. Each narrator line is spoken whole and
- * set in short chunks (the timeline's `chunks`: at most 8 words each), in the
- * kit's line style (`KineticLine`): a chunk arrives as its first word is
- * said, its words coming into focus on the narrator's measured timing, and
- * leaves as the next chunk arrives (or at the line's `to`). The hook's first
- * chunk is already whole on frame 0: it is the poster.
- *
- * (The kit's Captions sets one caption per voice line; a whole spoken line is
- * too long for one screen, so the ad has its own, built on the kit's type.)
+ * The captions as HEADLINES (2026-10-04, owner: "headline captions", and the
+ * old word-by-word reveal read "dated and laggy"). The narrator says every
+ * word; the screen shows each line's point (the timeline's `heads`: [the
+ * spoken word it lands on, the headline]). A headline arrives `HEAD_LEAD`
+ * frames before its word and stays until the next one arrives: the old one
+ * rolls up and out in the 5 frames before, then the new one rises (`ROLL` = 0:
+ * an overlap let the next peek out under the last), the last before the
+ * lockup until its line's `to`. The hook's
+ * headline is in place on frame 0: it is the poster.
  */
-type Chunk = [number, string];
-type Line = { at: number; to: number; hook?: boolean; place?: string; chunks?: Chunk[] };
+type Head = [number, string];
+type Line = { at: number; to: number; hook?: boolean; place?: string; heads?: Head[] };
 
-const words = (t: string) => t.split(/\s+/).filter(Boolean);
+const ROLL = 0;
 
-/** every chunk, with its frames and its words' arrival frames (absolute) */
-export const CHUNKS = (CAPTIONS as Line[])
-  .filter((c) => c.chunks)
+const starts = (CAPTIONS as Line[])
+  .filter((c) => c.heads)
   .flatMap((c) => {
     const timing = VO.find((v) => v.frame === c.at);
-    const wordAt = (i: number) => c.at + Math.round((timing?.words[i] ?? 0) * FPS);
-    return c.chunks!.map(([first, text], k) => {
-      const hookPoster = c.hook && k === 0;
-      const from = hookPoster ? 0 : wordAt(first);
-      const next = c.chunks![k + 1];
-      const to = next ? wordAt(next[0]) : c.to;
-      const starts = words(text).map((_, j) => (hookPoster ? -30 : wordAt(first + j) - from));
-      return { from, to, text, starts };
-    });
+    return c.heads!.map(([word, text], k) => ({
+      from: c.hook && k === 0 ? 0 : c.at + Math.round((timing?.words[word] ?? 0) * FPS) - HEAD_LEAD,
+      text,
+      poster: !!c.hook && k === 0,
+      lineTo: c.to,
+    }));
   });
+
+/** every headline, with its frames (absolute) */
+export const HEADLINES = starts.map((h, i) => ({
+  ...h,
+  to: i + 1 < starts.length ? starts[i + 1].from + ROLL : h.lineTo,
+}));
 
 export const Chunks: React.FC<{ frame: number; top: number }> = ({ frame, top }) => (
   <AbsoluteFill style={{ pointerEvents: 'none' }}>
-    {CHUNKS.map((c) =>
-      frame >= c.from - 2 && frame <= c.to + 2 ? (
-        <div key={c.from} style={{ position: 'absolute', left: 0, right: 0, top, display: 'flex', justifyContent: 'center' }}>
-          <KineticLine text={c.text} frame={frame} from={c.from} to={c.to} starts={c.starts} size={56} width={980} />
+    {HEADLINES.map((h) =>
+      frame >= h.from - 1 && frame <= h.to + 1 ? (
+        <div key={h.from} style={{ position: 'absolute', left: 0, right: 0, top, display: 'flex', justifyContent: 'center' }}>
+          <Headline text={h.text} frame={frame} from={h.from} to={h.to} poster={h.poster} />
         </div>
       ) : null,
     )}

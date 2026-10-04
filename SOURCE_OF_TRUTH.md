@@ -2720,6 +2720,17 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-04 — Headline captions + a new caption motion (Meta ad 3 first,
+  then every video).** Branch `claude/ad-todo`. Owner: "headline captions",
+  and the caption animation was "dated and laggy". The narrator still says
+  every word; the screen shows each line's point in 2–5 words (`heads` on a
+  caption: [spoken word it lands on, headline], `*…*` = highlighted phrase).
+  New kit component `Headline` (`src/reels/kit/Type.tsx`): each line rises
+  out of a mask in 9 frames (ease-out quint, no blur), 3 frames BEFORE its
+  word; it rolls out in 5 frames just before the next one; an ink
+  highlighter sweeps under the marked phrase. One line wherever the app is
+  on screen. Also: the hook's saves fit inside the frame (owner: names cut
+  off at the sides). verify checks headlines (2–5 words, real anchor word).
 - **2026-10-04 — META AD 3 re-voiced on Gemini Flash TTS** (the model the
   owner auditioned; the Flash-Lite takes stay in `vo-takes/`). Branch
   `claude/ad-todo`. Flash reads tighter: the ad is now **43.7s** (Flash-Lite
