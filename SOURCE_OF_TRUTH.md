@@ -2712,6 +2712,17 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-04 — Meta ad 2 (Ask), both editions re-voiced with Gemini TTS
+  (Sulafat).** Branch `claude/ad-trip`, NOT merged. Owner: Gemini
+  `gemini-3.8-flash-tts`, voice Sulafat, a tone per ad and an acting note per
+  line (`style`/`pace` on each caption); round 6 keeps the spoken "Download
+  Machina.". Pipeline ported from `claude/ad-todo` (`gemini_tts.py`, the
+  narration workflow); 14 lines voiced once each over three workflow runs (the
+  daily 100-request quota, then a 10-a-minute limit). Word timings now by
+  forced alignment (pocketsphinx, offline). Re-timed: round 6 25.1s → 27.7s,
+  talking edition stays 29.9s; all gates green; six cuts rendered. Not yet
+  heard on speakers; the pronunciation of "Machina" is unchecked by ear.
+
 - **2026-10-03 — Ask ad, talking edition: one line rephrased.** Branch
   `claude/ad-trip`, NOT merged. Owner: "so you see what you keep coming back
   to" didn't mean anything; now "It even finds what connects them… so you see

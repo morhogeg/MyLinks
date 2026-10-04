@@ -1034,13 +1034,13 @@ the call to action). 29.9s, 9:16 and 4:5.
 
 | Frames | What you see | What's said |
 |---|---|---|
-| 0–152 | Frame 0, the poster: the five piles (round 6's, newer saves sliding in), the first caption up whole | "You save the good stuff for a reason. / So why does most of it / slip your mind?" |
+| 0–160 | Frame 0, the poster: the five piles (round 6's, newer saves sliding in), the first caption up whole | "You save the good stuff for a reason. / So why does most of it / slip your mind?" |
 | 160–280 | The YouTube pile lifts forward on "talk", the TED talk lit; then the Safari pile on "article", The Tail End lit; the piles go soft | "The talk that made it all click. / The article you meant to come back to." |
 | 272–376 | They gather into the point, the brackets snap, the wordmark wipes in on the spoken name; mark and wordmark leave | "That's exactly why we made Machina." |
 | 376–448 | CUT to the chat, close on the composer: "What did that TED talk say about procrastination?" types itself; Send | "Now you can ask your saves anything." |
-| 448–560 | Its answer streams in; on "one clear answer" the answer itself lifts | "It reads across all your saves… / so you get one clear answer." |
-| 552–720 | CUT to a new chat, "What do my saves say about time?"; Send; the theme (the answer's first line) lifts and holds; the three sources lift on "so you see"; its Graph chip is tapped and the real graph opens, those saves lit and linked | "It even finds what connects them… / so you see / the theme running through your saves." |
-| 720–896 | Thrown out into the lockup: the mark strikes, the wordmark wipes in on "Machina", the tagline on one line, held 1.7s | "Machina. / Everything you save, finally useful." |
+| 448–584 | Its answer streams in; on "one clear answer" the answer itself lifts | "It reads across all your saves… / so you get one clear answer." |
+| 568–720 | CUT to a new chat, "What do my saves say about time?"; Send; the theme (the answer's first line) lifts and holds; the three sources lift on "so you see"; its Graph chip is tapped and the real graph opens, those saves lit and linked | "It even finds what connects them… / so you see / the theme running through your saves." |
+| 720–896 | Thrown out into the lockup: the mark strikes, the wordmark wipes in on "Machina", the tagline on one line, held 1.67s | "Machina. / Everything you save, finally useful." |
 
 **Real and scripted:** the same as round 6 (the `adask` take, the two scripted
 answers, no feed rush in this edition). The two saves the pain line names are
@@ -1061,6 +1061,27 @@ npm run verify                                         # "── ad: asktalk"
 node scripts/ad-asktalk-stills.mjs && python3 scripts/ad-trip-sheet.py asktalk [--safe]
 npx remotion render src/index.ts MachinaAdAskTalk out/ads/asktalk/machina-ad-asktalk.mp4   # also …Music, …Feed
 ```
+
+### Both editions' narrator: Gemini TTS, Sulafat (2026-10-04)
+
+Both Meta ad 2 editions are voiced by Gemini TTS (`gemini-3.8-flash-tts`,
+voice Sulafat), no longer Kokoro. Each caption carries its acting note
+(`style`) and the video's `pace`; the takes are voiced on GitHub
+(`.github/workflows/narration-tts.yml`, triggered by a push of
+`audio/narration-request.json`) and committed to `audio/vo-takes/`, keyed by
+words + direction, so `synth-vo.py trip|asktalk` rebuilds them offline. Word
+timings for Gemini lines come from forced alignment (`pip install pocketsphinx
+scipy`; its bundled English model, offline; the old voiced-run estimate is the
+fallback, and it misplaced words around Gemini's pauses, e.g. "one clear
+answer" by a second). The quota: 100 requests a day AND 10 a minute per model
+on the shared key; a request voices only the lines with no take yet.
+
+Re-timed to the reads: round 6 is now **27.7s** (was 25.1s: a longer hook, a
+beat after "With Machina, they can.", a beat on "…one clear answer.", and a
+longer end card for the slower tagline; the mark forms at 3.7s). The talking
+edition stays **29.9s** ("It reads across…" got 1.5 beats, taken from the
+theme line's hold and the gap before the lockup; the graph shows ~1.6s, was
+~2.1s).
 
 **Open:** the name arrives at ~10s (the script spends its first 10s on the
 viewer's problem), not by ~3s as the original Meta brief asked; 29.9s, at

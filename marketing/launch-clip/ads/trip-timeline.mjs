@@ -22,7 +22,7 @@
  *
  * THE META SPEC (2026-10-02 brief): about 20s, never over 30; frame 0 is the
  * poster (saves from five apps, legible, the hook line already up); the
- * narrator starts by 0.5s; the mark forms at 2.9s; every line burned in, at
+ * narrator starts by 0.5s; the mark forms at 3.7s (Gemini read); every line burned in, at
  * most 8 words up at once (the two long sentences are spoken whole and shown
  * as two captions each, `split`); every line, logo and key app moment inside
  * the 9:16 safe zone (verified on stills).
@@ -56,23 +56,23 @@ export const TAKE = 'adask';
  */
 export const HITS = {
   hook: 0, // saves of every kind, each in the app it was saved in (the poster)
-  lost: beat(3), // the line lands: the piles drift apart and go soft
-  collapse: beat(4), // they gather into one point (EASE_GATHER)…
-  dotLands: beat(5), // …which lands
-  bracketsClose: beat(5.5), // the brackets snap shut around it (2.9s)
-  wordmark: beat(6), // the drawn wordmark wipes in as "Machina" is said
-  part: beat(7.5), // the mark and the wordmark leave
-  open: beat(9), // CUT to the chat: the simple question types itself
-  send: beat(12.5), // Send is tapped; the cut to its answer lands on the touch
-  feed: beat(17), // CUT to the feed rushing past ("…hundreds of saves")
-  ask2: beat(19), // CUT to a new chat, the big question typed
-  send2: beat(19.5), // Send is tapped; its answer arrives on the touch
-  sources2: beat(22.5), // its three sources and the suggested next questions arrive
-  lead: beat(24), // the theme it found (the answer's first line) lifts
-  chips: [448, 458, 468], // the three saves it connected lift ("you never noticed": vo.json)
-  graphTap: beat(30.5), // its Graph chip is tapped: the saves it connected, lit in the real graph
-  lockup: beat(35), // thrown out into the lockup; the mark launches (round 6: the graph holds a beat longer)
-  markStrike: beat(37), // the mark's point strikes as the call to action is said
+  lost: beat(4.5), // the line lands: the piles drift apart and go soft
+  collapse: beat(5.5), // they gather into one point (EASE_GATHER)…
+  dotLands: beat(6.5), // …which lands
+  bracketsClose: beat(7), // the brackets snap shut around it (3.7s)
+  wordmark: 117, // the drawn wordmark wipes in as "Machina" is said (vo.json)
+  part: beat(9), // the mark and the wordmark leave
+  open: beat(11), // CUT to the chat: the simple question types itself
+  send: beat(14.5), // Send is tapped; the cut to its answer lands on the touch
+  feed: beat(19), // CUT to the feed rushing past ("…hundreds of saves")
+  ask2: beat(21), // CUT to a new chat, the big question typed
+  send2: beat(21.5), // Send is tapped; its answer arrives on the touch
+  sources2: beat(24.5), // its three sources and the suggested next questions arrive
+  lead: beat(27), // the theme it found (the answer's first line) lifts
+  chips: [500, 510, 520], // the three saves it connected lift ("you never noticed": vo.json)
+  graphTap: beat(33.5), // its Graph chip is tapped: the saves it connected, lit in the real graph
+  lockup: beat(38), // thrown out into the lockup; the mark launches (round 6: the graph holds a beat longer)
+  markStrike: beat(40), // the mark's point strikes as the call to action is said
 };
 
 /** how many of the feed's captured 12pt steps the rush plays: it stops short
@@ -102,18 +102,18 @@ export const TYPE_STEP = 1;
 const PACE = 'Brisk but unhurried, about 160 words a minute.';
 
 export const CAPTIONS = [
-  { at: beat(0.5), to: beat(4.5), hook: true, pre: true, text: 'What if your saves\ncould talk back?', pace: PACE, style: 'Intriguing, playful wonder; the question hangs in the air, a small suspenseful pause after it.' },
-  { at: beat(5.5), to: beat(8.5), text: 'With Machina, they can.', pace: PACE, style: 'Confident, a small knowing smile, answering the riddle.', duck: 0.4 },
-  { at: beat(9.5), to: beat(13.5), text: "Ask it about\nanything you've saved.", pace: PACE, style: 'Inviting and easy.' },
-  { at: beat(17), to: beat(23.5), split: 5, text: 'Even across hundreds of saves,\nyou get one clear answer.', pace: PACE, style: "Impressed and clear; emphasis on 'one clear answer'." },
+  { at: beat(0.5), to: beat(6), hook: true, pre: true, text: 'What if your saves\ncould talk back?', pace: PACE, style: 'Intriguing, playful wonder; the question hangs in the air, a small suspenseful pause after it.' },
+  { at: beat(7), to: beat(10.5), text: 'With Machina, they can.', pace: PACE, style: 'Confident, a small knowing smile, answering the riddle.', duck: 0.4 },
+  { at: beat(11.5), to: beat(15.5), text: "Ask it about\nanything you've saved.", pace: PACE, style: 'Inviting and easy.' },
+  { at: beat(19), to: beat(26.5), split: 5, text: 'Even across hundreds of saves,\nyou get one clear answer.', pace: PACE, style: "Impressed and clear; emphasis on 'one clear answer'." },
   // (round 5, owner: the graph plays under "you never noticed.", so the line
   // stays up while it blooms: `until`)
-  { at: beat(24), to: beat(32), split: 7, until: true, text: 'And it finds the themes and connections\nyou never noticed.', pace: PACE, style: 'Delighted wonder, opening up at the end.' },
+  { at: beat(27), to: beat(35), split: 7, until: true, text: 'And it finds the themes and connections\nyou never noticed.', pace: PACE, style: 'Delighted wonder, opening up at the end.' },
   // the call to action, said as the mark strikes and the wordmark wipes in on
   // the name; never on screen (owner, round 5: keep the narration, not the text)
-  { at: beat(37), to: beat(40), text: 'Download Machina.', pace: PACE, style: 'Warm, confident invitation, not pushy.', cta: true, hidden: true, duck: 0.4 },
+  { at: beat(40), to: beat(43), text: 'Download Machina.', pace: PACE, style: 'Warm, confident invitation, not pushy.', cta: true, hidden: true, duck: 0.4 },
   // the close: the tagline on ONE line, exactly; the music steps back
-  { at: beat(40), to: beat(47), place: 'lockup', text: 'Everything you save, finally useful.', pace: PACE, style: 'Sincere, warm and unhurried; the closing thought.', duck: 0.4 },
+  { at: beat(43), to: beat(52), place: 'lockup', text: 'Everything you save, finally useful.', pace: PACE, style: 'Sincere, warm and unhurried; the closing thought.', duck: 0.4 },
 ];
 
 export const TOTAL_FRAMES = CAPTIONS[CAPTIONS.length - 1].to;
@@ -121,9 +121,9 @@ export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 
 /** Risers END on the reveal they lead into. [from, to] in frames. */
 export const RISERS = [
-  [beat(3), HITS.dotLands], // the gather → the point lands
-  [beat(17), HITS.ask2], // the feed rushing past → the big question
-  [beat(34), HITS.markStrike], // the throw → the mark strikes
+  [beat(4.5), HITS.dotLands], // the gather → the point lands
+  [beat(19), HITS.ask2], // the feed rushing past → the big question
+  [beat(37), HITS.markStrike], // the throw → the mark strikes
 ];
 
 /** One chord per bar (the film's and the reel's vocabulary). */

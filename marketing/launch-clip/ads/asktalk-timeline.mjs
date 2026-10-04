@@ -57,8 +57,8 @@ export const TYPE_STEP = 1;
  */
 export const HITS = {
   hook: 0, // saves of every kind, each in the app it was saved in (the poster)
-  talk: 167, // "The talk…": the YouTube pile lifts, the TED talk lit (vo.json)
-  article: 222, // "The article…": the Safari pile lifts, The Tail End lit (vo.json)
+  talk: 165, // "The talk…": the YouTube pile lifts, the TED talk lit (vo.json)
+  article: 221, // "The article…": the Safari pile lifts, The Tail End lit (vo.json)
   lost: beat(16), // "…come back to.": the piles go soft
   collapse: beat(17), // they gather into one point (EASE_GATHER)…
   dotLands: beat(18), // …which lands as "That's exactly why…" starts
@@ -67,14 +67,14 @@ export const HITS = {
   part: beat(22.5), // the mark and the wordmark leave
   open: beat(23.5), // CUT to the chat: the question types itself
   send: beat(27), // Send is tapped; the cut to its answer lands on the touch
-  ask2: beat(34.5), // CUT to a new chat, the big question typed
-  send2: beat(35), // Send is tapped; its answer arrives on the touch
-  lead: beat(36), // "It even finds…": the theme (its first line) lifts, and holds
-  sources2: beat(38), // its three sources arrive…
-  chips: [beat(39), beat(39.5), beat(40)], // …and lift one by one on "so you see"
-  graphTap: beat(41), // its Graph chip: the saves it connected, lit in the real graph ("the theme running through your saves")
+  ask2: beat(35.5), // CUT to a new chat, the big question typed
+  send2: beat(36), // Send is tapped; its answer arrives on the touch
+  lead: beat(37), // "It even finds…": the theme (its first line) lifts, and holds
+  sources2: beat(39), // its three sources arrive…
+  chips: [beat(40), beat(40.5), beat(41)], // …and lift one by one on "so you see"
+  graphTap: beat(42), // its Graph chip: the saves it connected, lit in the real graph ("the theme running through your saves")
   lockup: beat(45), // thrown out into the lockup; the mark launches
-  markStrike: beat(46.5), // the mark's point strikes
+  markStrike: beat(46), // the mark's point strikes
 };
 
 /**
@@ -95,15 +95,15 @@ export const HITS = {
 const PACE = 'Conversational, about 160 words a minute, natural breaths.';
 
 export const CAPTIONS = [
-  { at: beat(0.5), to: beat(9.5), hook: true, pre: true, splits: [8, 13], text: 'You save the good stuff for a reason. So why does most of it slip your mind?', pace: PACE, style: 'Warm and reflective, then a genuine, gently puzzled question.' },
+  { at: beat(0.5), to: beat(10), hook: true, pre: true, splits: [8, 13], text: 'You save the good stuff for a reason. So why does most of it slip your mind?', pace: PACE, style: 'Warm and reflective, then a genuine, gently puzzled question.' },
   { at: beat(10), to: beat(17.5), splits: [7], text: 'The talk that made it all click. The article you meant to come back to.', pace: PACE, style: 'Fond, remembering, a small smile on each.' },
   { at: beat(18), to: beat(22.5), text: "That's exactly why we made Machina.", pace: PACE, style: 'The turn: bright, warm and proud; the name lands with a smile.', duck: 0.4 },
-  { at: beat(23.5), to: beat(27.5), text: 'Now you can ask your saves anything.', pace: PACE, style: 'Excited, sharing good news with a friend.' },
-  { at: beat(28), to: beat(35), splits: [6], text: 'It reads across all your saves… so you get one clear answer.', pace: PACE, style: 'Clear and quietly impressed.' },
-  { at: beat(35.5), to: beat(45), splits: [6, 9], until: true, text: 'It even finds what connects them… so you see the theme running through your saves.', pace: PACE, style: "Delighted, a little wonder on 'It even'." },
+  { at: beat(23.5), to: beat(28), text: 'Now you can ask your saves anything.', pace: PACE, style: 'Excited, sharing good news with a friend.' },
+  { at: beat(28), to: beat(36.5), splits: [6], text: 'It reads across all your saves… so you get one clear answer.', pace: PACE, style: 'Clear and quietly impressed.' },
+  { at: beat(36.5), to: beat(45), splits: [6, 9], until: true, text: 'It even finds what connects them… so you see the theme running through your saves.', pace: PACE, style: "Delighted, a little wonder on 'It even'." },
   // the close: the name (the drawn wordmark wipes in as it is said), then the
   // tagline on ONE line, exactly; the music steps back
-  { at: beat(47.5), to: beat(56), place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', pace: PACE, style: 'A confident, warm sign-off with a smile; the name proud, then the tagline unhurried and sincere.', duck: 0.4 },
+  { at: beat(46.5), to: beat(56), place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', pace: PACE, style: 'A confident, warm sign-off with a smile; the name proud, then the tagline unhurried and sincere.', duck: 0.4 },
 ];
 
 export const TOTAL_FRAMES = CAPTIONS[CAPTIONS.length - 1].to;

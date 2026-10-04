@@ -317,6 +317,37 @@ def word_timing(text, runs):
     return out
 
 
+def word_timing_aligned(text, samples, sr):
+    """Word start times for a Gemini TTS line by forced alignment
+    (pocketsphinx, its bundled US English model, offline): the transcript is
+    known, so it only places each word. Gemini's pauses (the "…", a beat
+    before an emphasised word) fall anywhere, which the voiced-run estimate
+    below can only guess at. None when pocketsphinx is not installed or the
+    alignment drops a word; the caller then falls back to the estimate."""
+    import re
+
+    import numpy as np
+
+    try:
+        from pocketsphinx import Decoder
+        from scipy.signal import resample_poly
+    except ImportError:
+        return None
+    words = text.split()
+    said = [re.sub(r"[^a-z']", "", w.lower().replace(SAY_NAME.lower(), "machina")) for w in words]
+    pcm = (np.clip(resample_poly(samples.astype(np.float64), 16000, sr), -1, 1) * 32767).astype(np.int16).tobytes()
+    d = Decoder(samprate=16000, bestpath=False, loglevel="FATAL")
+    d.add_word("machina", "M AA K IY N AH", True)
+    d.set_align_text(" ".join(said))
+    d.start_utt()
+    d.process_raw(pcm, full_utt=True)
+    d.end_utt()
+    got = [(re.sub(r"\(\d+\)$", "", s.word), s.start_frame / 100) for s in d.seg() if s.word not in ("<sil>", "(NULL)", "<s>", "</s>")]
+    if [w for w, _ in got] != said:
+        return None
+    return [round(t, 3) for _, t in got]
+
+
 def word_timing_voiced(text, samples, sr):
     """Word start times for a Gemini TTS line. Gemini pauses between words,
     not only at punctuation, and breathes at the edges of a line, so
@@ -461,7 +492,7 @@ def main():
             timing.append({
                 "frame": line.get("frame"),
                 "text": line["text"],
-                "words": word_timing_voiced(line["text"], samples, sr) if engine == "gemini" else word_timing(line["text"], speech_runs(samples, sr)),
+                "words": (word_timing_aligned(line["text"], samples, sr) or word_timing_voiced(line["text"], samples, sr)) if engine == "gemini" else word_timing(line["text"], speech_runs(samples, sr)),
             })
         print(f"{'ok ' if fits else 'LONG'} {spoken:5.2f}s / {line['window']:4.2f}s  {line['text']}")
 

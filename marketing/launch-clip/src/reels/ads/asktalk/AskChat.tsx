@@ -133,7 +133,7 @@ export const AskChat: React.FC<{ f: number }> = ({ f }) => {
   const graph = center(rectOf(T, at(T, 'graphChip'), 'graph2'));
 
   // the first answer lifts on "…one clear answer" (the voice's "one", vo.json)
-  const ONE = 518;
+  const ONE = 538;
   const clear = f >= S.send && f < S.ask2 ? prog(f, ONE - 2, ONE + 12, EASE_SPRING) * (1 - prog(f, S.ask2 - 14, S.ask2 - 2, EASE_IN_OUT)) : 0;
 
   // the theme (the answer's first line) lifts with the line that names it,
