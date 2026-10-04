@@ -2460,6 +2460,38 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-04 (later) — LAUNCH FILM: HEADLINE CAPTIONS IN THE SPOKEN
+  EDITIONS.** Branch `claude/film-gemini-vo`. The owner's call for every video
+  (relayed from `claude/ad-todo`, recorded there in §9): the screen shows each
+  line's point in 2–5 words and the narrator still says every word. The old
+  caption motion was called "dated and laggy".
+  - **Where:** MachinaLaunchVO and MachinaLaunchVerticalVO only (`headlines`
+    prop on `Film`). The other editions (MachinaLaunch, MachinaLaunchSilent,
+    MachinaLaunchVertical, MachinaLaunchVerticalSilent) keep their full captions, since nothing else carries the words
+    there. **Owner to confirm** that split.
+  - **How:**
+    - `SUBTITLES` gains `heads` per line: [index of the spoken word it lands
+      on, headline]; `text` stays for the music-only editions and the .srt.
+    - `src/film/Headline.tsx` is the ad's `Headline` (same motion), plus an
+      `align` option; this branch has no reels kit to append to.
+    - `src/film/Headlines.tsx` lays them out on the film's layouts: the
+      landscape left column, centred low on device-less beats, the vertical
+      top band; one line everywhere.
+    - A headline arrives 3 frames before its word and holds until the next.
+    - The word times come from `src/film/vo.json`, which `synth-vo.py film`
+      now writes.
+    - The act kickers (CAPTURE / ASK / CONNECT) are gone from the spoken
+      editions; the tagline and endcard are untouched.
+  - **Also:** `gemini_tts.py` was re-taken from `claude/ad-todo`. Its
+    `stretch` now pads before Rubber Band, so lines 2, 3 and 5 keep their last
+    word's decay; line fits are unchanged.
+  - **Verified:** `tsc` passes. `npm run verify` now checks the 17 headlines
+    (2–5 words, one line, a real spoken anchor). Stills of every headline beat
+    in both editions show one line, clear of the device and inside the frame.
+    Both editions were re-rendered and sent.
+  - **Not verified:** no one has watched the motion or listened. Headline
+    timing rides on estimated word times (about ±0.2s).
+
 - **2026-10-04 — LAUNCH FILM RE-VOICED BY GEMINI TTS (SULAFAT).** Branch
   `claude/film-gemini-vo` (from `main`; not merged, no PR). Marketing only (no
   `web/` or `functions/` change, nothing deployed). The film's narration moves

@@ -103,6 +103,44 @@ let failed = false;
   if (!failed) console.log(`✓ ${SUBTITLES.length} captions, no overlaps, last ends bar ${prevEnd.toFixed(2)}`);
 }
 
+// ── 1b. headlines (2026-10-04): the spoken editions show each line's point,
+// not the narration verbatim. Each headline is 2–5 words on ONE line, closes
+// its *highlight*, and lands on a word the narrator actually says (its index
+// exists in the spoken line, src/film/vo.json from audio/synth-vo.py).
+{
+  const vo = JSON.parse(fs.readFileSync(path.join(here, '..', 'src', 'film', 'vo.json'), 'utf8'));
+  const bad = [];
+  let n = 0;
+  for (const cue of SUBTITLES) {
+    if (!cue.heads?.length) {
+      bad.push(`"${cue.text}" has no headline`);
+      continue;
+    }
+    const t = vo.find((v) => v.bar === cue.bar);
+    if (!t) {
+      bad.push(`"${cue.text}" has no voiced line at bar ${cue.bar} (re-run audio/synth-vo.py film)`);
+      continue;
+    }
+    const said = t.text.split(/\s+/);
+    if (t.words.length !== said.length) bad.push(`bar ${cue.bar}: ${t.words.length} word times for ${said.length} spoken words`);
+    for (const [word, text] of cue.heads) {
+      n++;
+      const words = text.replaceAll('*', '').split(/\s+/).filter((w) => /[a-z0-9]/i.test(w)).length;
+      if (words < 2 || words > 5) bad.push(`headline "${text}" has ${words} words (2–5)`);
+      if (text.includes('\n')) bad.push(`headline "${text}" breaks onto two lines (one line over the film)`);
+      if ((text.match(/\*/g) ?? []).length % 2) bad.push(`headline "${text}" has an unclosed *highlight*`);
+      if (!(Number.isInteger(word) && word >= 0 && word < said.length)) bad.push(`headline "${text}" lands on word ${word}, past the line's ${said.length} words`);
+    }
+  }
+  if (bad.length) {
+    console.error('✗ headlines:');
+    for (const b of bad) console.error('    ' + b);
+    failed = true;
+  } else {
+    console.log(`✓ ${n} headlines, 2–5 words, one line, each on a spoken word`);
+  }
+}
+
 // ── 2. score
 {
   const wav = path.join(here, '..', 'public', 'score.wav');

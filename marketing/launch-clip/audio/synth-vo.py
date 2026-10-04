@@ -141,6 +141,11 @@ ENGINE = {"film": "gemini"}
 # and its Gemini model (GEMINI_TTS_MODEL overrides)
 GEMINI_MODEL = {"film": "gemini-3.8-flash-tts"}
 
+# Where a Gemini-voiced script's word times go for the picture: the film's
+# headline captions land on spoken words (src/film/Subtitles.tsx). Estimated
+# from the audio (word_timing_voiced, about ±0.2s), not recognised.
+WORD_TIMING = {"film": os.path.join(ROOT, "src", "film", "vo.json")}
+
 
 def speech_runs(samples, sr, gap=0.09):
     """[start, end] seconds of each run of speech, split at pauses >= gap."""
@@ -304,6 +309,11 @@ def main():
 
     with open(os.path.join(out_dir, "manifest.json"), "w") as f:
         json.dump(manifest, f, indent=1)
+    if engine == "gemini" and name in WORD_TIMING:
+        timing = [{"bar": e["bar"], "text": e["text"], "words": e["words"]} for e in manifest]
+        with open(WORD_TIMING[name], "w") as f:
+            json.dump(timing, f, indent=1)
+            f.write("\n")
 
     sys.exit(0 if ok else 1)
 

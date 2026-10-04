@@ -76,6 +76,13 @@ export const sceneAt = (id) => {
  *
  * NO EM DASHES in any `text` (the app-wide ban of 2026-08-27, which the film's
  * burned-in captions are just as bound by); `npm run verify` fails on one.
+ *
+ * HEADLINES (2026-10-04, owner, for every video): the spoken editions show
+ * each line's point in 2–5 words instead of the full narration, which the
+ * narrator still says in full. `heads`: [index of the SPOKEN word it lands on
+ * (the line as audio/synth-vo.py says it, "And" included), headline]; `*…*`
+ * marks the phrase the highlighter sweeps under. `text` stays the full line:
+ * the music-only editions and the .srt still show it.
  */
 export const SUBTITLES = [
   // `place` is a LAYOUT: 'left' puts the line in the left column with the device
@@ -97,44 +104,44 @@ export const SUBTITLES = [
   // both, in that order — the film was starting mid-thought without the first).
   // Act-one lines carry real AIR between them (round 13e — the owner: VO too
   // fast, needs breaks) and their VO speaks at 0.9 speed (synth-vo.py).
-  { bar: 1.05, bars: 0.85, place: 'bottom', text: 'You save things everywhere.' },
-  { bar: 2.0, bars: 1.35, place: 'bottom', text: 'An article here. A video there. A thread somewhere else.' },
+  { bar: 1.05, bars: 0.85, place: 'bottom', text: 'You save things everywhere.', heads: [[0, 'Saved *everywhere*']] },
+  { bar: 2.0, bars: 1.35, place: 'bottom', text: 'An article here. A video there. A thread somewhere else.', heads: [[0, 'An *article* here.'], [3, 'A *video* there.'], [6, 'A *thread* elsewhere.']] },
   // Starts 0.2 bar earlier (was 3.6/0.7; 2026-10-04): Sulafat's read of this
   // line runs 3.1s, which did not fit before line 4. The caption still ends on
   // 4.3, so the silent beat before the loss line is unchanged.
-  { bar: 3.4, bars: 0.9, place: 'bottom', text: 'Multiple apps, countless saved links.' },
+  { bar: 3.4, bars: 0.9, place: 'bottom', text: 'Multiple apps, countless saved links.', heads: [[0, '*Countless* saved links']] },
   // A DELIBERATE BEAT OF SILENCE (bars 4.3–4.8) — the first wrong pile opens
   // with no words at all, then the truth lands over the second one. Owner's
   // wording ("rarely", not "never" — bold but honest), on the bar-4 minor.
-  { bar: 4.8, bars: 1.3, place: 'bottom', text: 'Saved, and rarely seen again.' },
+  { bar: 4.8, bars: 1.3, place: 'bottom', text: 'Saved, and rarely seen again.', heads: [[0, '*Rarely* seen again']] },
   // The turn is an INTRODUCTION now (owner call, round 13b) — the film stops
   // describing and presents the product by name. 2026-09-19 (owner): the line
   // after the name is the PROMISE (the product tagline), not "one place for
   // all your saved links", which volunteered Machina into the link-saver
   // category and undersold screenshots and notes. The tagline lives here now;
   // the endcard carries the App Store subtitle. Two roles, two lines.
-  { bar: 6.45, bars: 1.35, place: 'bottom', kicker: 'Introducing', text: 'Machina.\nEverything you save, finally useful.' },
+  { bar: 6.45, bars: 1.35, place: 'bottom', kicker: 'Introducing', text: 'Machina.\nEverything you save, finally useful.', heads: [[0, 'Introducing *Machina*']] },
   // Value first (owner note, round 13c): anything + anywhere. No tap-count
   // claim — the share sheet is two touches (owner correction).
-  { bar: 8.35, bars: 1.25, place: 'left', kicker: 'Capture', text: 'Save anything, from anywhere.' },
-  { bar: 9.95, bars: 2.4, place: 'left', text: 'Machina reads it, summarizes it, and files it.' },
+  { bar: 8.35, bars: 1.25, place: 'left', kicker: 'Capture', text: 'Save anything, from anywhere.', heads: [[0, 'Save *anything*']] },
+  { bar: 9.95, bars: 2.4, place: 'left', text: 'Machina reads it, summarizes it, and files it.', heads: [[0, 'Read. *Summarized.* Filed.']] },
   // THE PROMISE — one line for the whole library beat; the search (a query
   // sharing no words with the one card it finds) plays wordless underneath
   // and proves the second half.
-  { bar: 13.3, bars: 2.45, place: 'left', text: 'From now on, lose nothing.\nAnd find everything.' },
+  { bar: 13.3, bars: 2.45, place: 'left', text: 'From now on, lose nothing.\nAnd find everything.', heads: [[3, '*Lose nothing.*'], [5, '*Find everything.*']] },
   // A new feature, not a continuation — no "Then" (owner note, round 13c).
   // The name still carries the line: "ask it" mushed out loud (round 12).
-  { bar: 16.35, bars: 1.6, place: 'left', kicker: 'Ask', text: 'Ask Machina anything.' },
+  { bar: 16.35, bars: 1.6, place: 'left', kicker: 'Ask', text: 'Ask Machina anything.', heads: [[0, '*Ask* anything']] },
   // Ends BEFORE the Graph-chip tap at 20.5 — during the dive the device rises
   // through the caption band. The claim: the answers' only source is your own
   // saves ("straight from" — round 13c, after two unclear tries).
-  { bar: 18.4, bars: 1.9, place: 'left', text: 'Every answer comes straight from your saves.' },
+  { bar: 18.4, bars: 1.9, place: 'left', text: 'Every answer comes straight from your saves.', heads: [[0, 'Answers from *your saves*']] },
   // The graph beat says why it matters, not what it is (round 13). "months
   // apart" was cut by the owner — the WHEN isn't the point, the noticing is.
-  { bar: 21.4, bars: 2.3, place: 'left', kicker: 'Connect', text: 'Machina notices when things you saved belong together.' },
+  { bar: 21.4, bars: 2.3, place: 'left', kicker: 'Connect', text: 'Machina notices when things you saved belong together.', heads: [[0, 'Finds what *belongs together*']] },
   // ONE line for the whole (now two-bar) collections beat — the grouping and
   // its point in the same breath (owner's phrasing, round 13d).
-  { bar: 24.25, bars: 1.7, place: 'left', text: 'Group your saves into collections that mirror how you think.' },
+  { bar: 24.25, bars: 1.7, place: 'left', text: 'Group your saves into collections that mirror how you think.', heads: [[0, 'Collections, *your way*']] },
   // ONE line for the whole digest beat (rounds of iteration ended here: no
   // patterns jargon, no schedule talk, no reminders vibe — the concrete value
   // of the weekly synthesis, which is what the screen shows). The resurfaced
@@ -142,7 +149,7 @@ export const SUBTITLES = [
   // Round 13g (workshopped): proactivity explicit ("Behind the scenes"),
   // synthesis value in kitchen-table words, the result on YOUR timing. "it
   // all" not "your saves" — the two lines before already say saves/saved.
-  { bar: 26.1, bars: 2.6, place: 'left', text: 'Behind the scenes, Machina pieces it all together.\nReady when you are.' },
+  { bar: 26.1, bars: 2.6, place: 'left', text: 'Behind the scenes, Machina pieces it all together.\nReady when you are.', heads: [[0, 'It *pieces it together*'], [9, 'Ready *when you are*']] },
 ];
 
 /**
