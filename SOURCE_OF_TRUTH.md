@@ -2720,6 +2720,16 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-04 — META AD 3 re-voiced on Gemini Flash TTS** (the model the
+  owner auditioned; the Flash-Lite takes stay in `vo-takes/`). Branch
+  `claude/ad-todo`. Flash reads tighter: the ad is now **43.7s** (Flash-Lite
+  49.6s). Also: the key allows 10 TTS requests a MINUTE per model, so a
+  per-minute 429 now waits the window out; lines are padded before the 1.1x
+  stretch (Rubber Band dropped the last word's decay) and new takes keep
+  0.15s after their last word. **Verified:** `npm run verify` exit 0; no
+  noise burst on any line; every line decays to silence. Six other videos
+  are being re-voiced by their own sessions, each with its own tone and
+  line-by-line direction (relayed from this session, 2026-10-03).
 - **2026-10-03 — Gemini TTS static: it was the file's C2PA chunk.**
   Branch `claude/ad-todo`. Owner: static between sentences (after "never
   open again"). Gemini 3.8 TTS returns a WAV FILE (RIFF header + data +

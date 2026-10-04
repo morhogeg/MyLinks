@@ -154,7 +154,7 @@ def unwrap(samples):
     return samples
 
 
-def _trim(samples, sr, keep=0.03):
+def _trim(samples, sr, keep=0.15):
     """Trim the silence the model leaves before and after the speech to `keep`
     seconds, so a line starts on its caption's frame."""
     loud = np.abs(samples) > np.abs(samples).max() * 0.02
@@ -210,7 +210,9 @@ def stretch(samples, sr, tempo):
 
     with tempfile.TemporaryDirectory() as d:
         a, b = os.path.join(d, "in.wav"), os.path.join(d, "out.wav")
-        sf.write(a, samples, sr, subtype="FLOAT")
+        # pad with silence: Rubber Band drops the tail end of its input, and
+        # with it the decay of the line's last word ("…different apps")
+        sf.write(a, np.concatenate([samples, np.zeros(int(0.4 * sr), np.float32)]), sr, subtype="FLOAT")
         subprocess.run(
             ["ffmpeg", "-v", "error", "-y", "-i", a, "-af", f"rubberband=tempo={tempo}:formant=preserved:pitchq=quality", b],
             check=True,
