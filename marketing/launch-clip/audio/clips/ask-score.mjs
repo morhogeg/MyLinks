@@ -120,8 +120,16 @@ for (const [from, to] of RISERS) riser(f(from), f(to) - f(from), 0.09);
 
 // ── sound design, on the picture's frames
 
+// NOTHING NOISY UNDER THE VOICE (Gemini narrator, 2026-10-03): a whoosh or a
+// riser under a spoken line reads as static between its words, so a whoosh
+// plays only where no caption is up, and the hook's whoosh and riser wait for
+// its last word
+const HOOK_END = CAPTIONS[0].to;
+const clear = (fr, sec) => !CAPTIONS.some((c) => fr < c.to && fr + sec * FPS > c.at);
+const quietWhoosh = (fr, at, sec, ...rest) => clear(fr, sec) && whoosh(at, sec, ...rest);
+
 // the hook: the feed flying past (a long whoosh with the scroll), then Ask
-whoosh(f(H.hook + 48), f(H.open - H.hook - 48), 0.05, -0.2);
+whoosh(f(HOOK_END), f(H.open - HOOK_END), 0.05, -0.2);
 impact(f(H.open), 0.22);
 shimmer(f(H.appMark), [79, 84, 88], 0.03); // the app's own mark strikes
 
@@ -130,7 +138,7 @@ for (let fr = H.typeFrom; fr < H.typeFrom + 64; fr += 4) tick(f(fr), 0.035, 1.6 
 
 // send, and the answer arriving on the touch
 tick(f(H.send), 0.11, 1.3);
-whoosh(f(H.send), 0.4, 0.06, 0.25);
+quietWhoosh(H.send, f(H.send), 0.4, 0.06, 0.25);
 
 // the three sources, each on its beat (the reel's citation bells)
 H.chips.forEach((fr, i) => {
@@ -140,15 +148,15 @@ H.chips.forEach((fr, i) => {
 
 // a source tapped: its card opens; its passage lifts; the card closes
 tick(f(H.citeTap), 0.1, 1.2);
-whoosh(f(H.citeTap) + 0.03, 0.45, 0.06, -0.2);
+quietWhoosh(H.citeTap, f(H.citeTap) + 0.03, 0.45, 0.06, -0.2);
 sub(f(H.citeTap), 43, 0.2, 0.3);
 bell(f(H.summary), 88, 0.045, 0.2, 1.8);
 tick(f(H.closeTap), 0.09, 1.1);
-whoosh(f(H.closeTap), 0.3, 0.04, 0.2);
+quietWhoosh(H.closeTap, f(H.closeTap), 0.3, 0.04, 0.2);
 
 // the follow-up tapped: the second answer
 tick(f(H.followTap), 0.1, 1.25);
-whoosh(f(H.followTap), 0.4, 0.05, -0.25);
+quietWhoosh(H.followTap, f(H.followTap), 0.4, 0.05, -0.25);
 
 // the graph
 tick(f(H.graphTap), 0.1, 1.2);
@@ -156,7 +164,7 @@ tick(f(H.graphTap), 0.1, 1.2);
 impact(f(H.graphTap), 0.1);
 
 // the lockup: the graph is thrown out, the mark strikes into air
-whoosh(f(H.lockup) - 0.6, 0.7, 0.09, 0);
+quietWhoosh(H.lockup - 18, f(H.lockup) - 0.6, 0.7, 0.09, 0);
 impact(f(H.markStrike), 0.34);
 shimmer(f(H.markStrike) + 0.08, [79, 84, 88, 91], 0.055);
 

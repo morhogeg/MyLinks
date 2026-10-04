@@ -825,7 +825,7 @@ Enforced by `npm run verify` where a machine can check:
 
 ## Feature clip: Ask (`MachinaAsk`)
 
-`MachinaAsk` is a 33.1s vertical explainer of Ask for someone seeing it for the
+`MachinaAsk` is a 34.7s vertical explainer of Ask for someone seeing it for the
 first time (owner brief, 2026-09-28: the feature as the sole subject, a hook
 that frames what Ask unlocks, Machina named, three to five elements each shown in
 action with why it matters, a concrete takeaway, a light nod to Machina). It
@@ -836,14 +836,29 @@ the same instruments on the same 112.5 BPM grid, and the reel's lockup.
 
 | Frames | Beat | What it shows, and the line |
 |---|---|---|
-| 0–144 | hook | The Home feed, scrolling ever faster (everything you have saved), cut at speed; the line speaks from 0.5s (the voice runs it straight through: Kokoro paused 0.22s after "knowledge", so the caption is marked `tight` and `synth-vo.py` closes pauses inside it) and leaves at 120, so the last rush into Ask plays clean: "Your saves hold more knowledge than you remember." (owner, round 2: the hook frames the knowledge Ask reaches, not search) |
-| 144–192 | the name | Ask opens, its mark plays the app's own launch (the point strikes on a beat), under the app's promise "Answers come only from your 24 saves, with sources you can open": "With Machina, you just ask." |
-| 192–272 | 1. your own words | The question types: "Ask in your own words. No keywords, no folders." |
-| 272–384 | 2. from your saves | Send; the answer streams in: "The answer is written from your own saves." |
-| 384–528 | 3. sources | The three sources lift on beats; the first is tapped and The Tail End's own card opens on the passage the answer drew on, which lifts: "Every answer shows its sources. Tap one to check it." |
+| 0–144 | hook | The Home feed, scrolling ever faster (everything you have saved), cut at speed; the line speaks from 0.5s, softly (the music ducks deeper under it), and leaves at 122, so the last rush into Ask plays clean: "Your saves hold more knowledge than you remember." (owner, round 2: the hook frames the knowledge Ask reaches, not search) |
+| 144–208 | the name | Ask opens on the cut, the line with it; its mark plays the app's own launch (the point strikes on a beat), under the app's promise "Answers come only from your 24 saves, with sources you can open": "With Machina, you just ask." |
+| 208–336 | 1. your own words | The question types and is sent: "Ask in your own words. No keywords, no folders." |
+| 336–416 | 2. from your saves | The answer has streamed in and its sources arrive: "The answer is written from your own saves." |
+| 416–528 | 3. sources | The three sources lift on beats; the first is tapped and The Tail End's own card opens on the passage the answer drew on, which lifts: "Every answer shows its sources. Tap one to check it." |
 | 528–688 | 4. follow-ups | The card closes (the finger leaves with it), then the line starts and the camera moves in close on the continuations the app suggests under the answer ("Compare the Time saves", "More on 'The Tail End'", "What else did I save on time?"); the chosen one lifts and is tapped on "asks the next question"; a second answer and its sources: "Keep going. One tap asks the next question." (owner, round 3: the old cut left the close tap's ripple on the chat's "+ New", which read as the tap the line meant) |
 | 688–800 | 5. connections | Its Graph chip: the two cited saves lit and linked among the rest: "Then see how those saves connect." Then the takeaway: "Ask once. Get the answer, and the proof." |
-| 800–992 | close | Thrown out into the lockup: "Machina." then the tagline on one line at 50px, "Everything you save, finally useful." (as the Revisit clip sets it) (owner 2026-09-28: every launch film ends on the tagline; the clip never says the App Store subtitle), the end card held 1.96s after the last word |
+| 832–1040 | close | Thrown out into the lockup: "Machina." then the tagline on one line at 50px, "Everything you save, finally useful." (as the Revisit clip sets it) (owner 2026-09-28: every launch film ends on the tagline; the clip never says the App Store subtitle), the end card held 1.6s after the last word |
+
+**The narrator (2026-10-04, owner).** Gemini TTS, voice Sulafat, replaces
+Kokoro for this clip only (`ENGINE` in `audio/synth-vo.py`), with its own
+tone: curious, clear, quietly impressed, about 155 words a minute. Every
+caption carries its acting note (`style`) and the pace (`pace`); a take is
+kept in `audio/vo-takes/` by its words and direction, so editing either
+re-voices that line on GitHub (`audio/narration-request.json` + push, the
+`narration-tts` workflow; 100 requests a day on the shared key), while
+`maxPause`/`tempo` reshape a take for free. The read ran longer than
+Kokoro's, so the captions were re-laid from the measured speech: the name
+lands on the Ask cut, lines 1 to 3 start a beat later, the graph plays two
+beats longer on take frames that were going unused, and the close follows
+(34.7s, was 33.1s). The hook was read softly ("as if sharing a secret"),
+about 3.5dB under the rest, so the music ducks deeper under it (`duck: 0.33`);
+whooshes and the hook's riser now never play under a spoken line.
 
 **Finishing pass (2026-09-28, fresh eyes, measured).** The script, order
 and lines are unchanged. Three fixes: the hook was wordless for its first

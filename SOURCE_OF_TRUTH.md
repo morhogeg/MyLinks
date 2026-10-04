@@ -2553,7 +2553,7 @@ in Inter as a stand-in for SF Pro, which is what the app actually renders in
 on iPhone (§4 23b).
 
 **What exists (feature clip: Ask, 2026-09-28, branch `claude/clip-ask`,
-awaiting owner review, not merged):** `MachinaAsk` (33.1s, 1080×1920, score +
+awaiting owner review, not merged):** `MachinaAsk` (34.7s, 1080×1920, score +
 narrator + captions, the deliverable; mastered to −14 LUFS, true peak ≤ −1
 dBTP), `MachinaAskSilent` and `MachinaAskClean`, built from the reel kit
 unchanged. Rebuilt to the owner's explainer brief (the first cut was rejected
@@ -2647,6 +2647,22 @@ exact-match, capped.
   script's titles follow, the docs name Manson, and the `revisit` take's data
   is re-captured (shared with `claude/clip-save`, where it was shot; no other
   take changes). No rendered video showed the old card.
+- **2026-10-04 — Ask clip re-voiced: Gemini TTS, Sulafat.** Branch
+  `claude/clip-ask`, not merged. Owner (relayed from the Meta ad 3 session):
+  the house narrator is now Gemini TTS, voice Sulafat, each video with its own
+  tone; Ask's is "curious, clear, quietly impressed", ~155 wpm, with a
+  direction on every caption (`style`, `pace`). Engine taken unchanged from
+  `claude/ad-todo` (`gemini_tts.py`, `vo-audition.py`, `narration-run.py`,
+  `narration-tts.yml`); `synth-vo.py` gained the engine switch for `ask` only,
+  and film and reel Kokoro lines re-synthesize byte-identical (verified).
+  Voiced on GitHub, 9 requests: run 1 failed in the 07:07 UTC burst with the
+  other sessions (no takes), run 2 voiced all 9. The read is longer: captions
+  re-laid from the measured speech, the graph plays 2 beats longer on unused
+  take frames, close follows; **34.7s** (was 33.1s). Hook read ~3.5dB softer,
+  so the music ducks to 0.33 under it (speech band ≥5.4dB on every line);
+  whooshes and the hook riser never play under a spoken line. No tempo
+  stretch (no Rubber Band ffmpeg here). Verify OK, −14.0 LUFS. **Not
+  verified:** nobody has listened; word times are estimated (±0.2s).
 - **2026-09-29 — Ask clip: tagline on one line, hook voice without the
   pause.** Branch `claude/clip-ask`, not merged. Owner QA: the close sets the
   tagline on ONE line (kit `Lockup` gains the Revisit branch's identical

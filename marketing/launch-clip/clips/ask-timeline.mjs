@@ -59,8 +59,8 @@ export const HITS = {
   followTap: beat(37), // one of the continuations the app suggests under the answer is tapped: a second answer
   scroll2: beat(39), // its sources scroll into view
   graphTap: beat(43), // its Graph chip: the cited saves lit among the rest
-  lockup: beat(50), // the graph is thrown out; the mark launches as it leaves
-  markStrike: beat(52), // the mark's point strikes
+  lockup: beat(52), // the graph is thrown out; the mark launches as it leaves
+  markStrike: beat(54), // the mark's point strikes
 };
 
 /**
@@ -93,19 +93,22 @@ export const CAPTIONS = [
   // round 2: frame the knowledge Ask reaches, not the search; no chapter word)
   // (`tight`, owner 2026-09-29: the voice paused 0.22s after "knowledge"
   // on its own; synth-vo.py closes pauses inside the line)
-  { at: beat(1), to: beat(7) + 8, hook: true, tight: true, text: 'Your saves hold more knowledge\nthan you remember.',
-    style: 'Intriguing, a gentle hook, slightly lowered as if sharing a secret.', pace: PACE },
+  { at: beat(1), to: beat(7) + 10, hook: true, tight: true, text: 'Your saves hold more knowledge\nthan you remember.',
+    style: 'Intriguing, a gentle hook, slightly lowered as if sharing a secret.', pace: PACE,
+    // (the "secret" read came back ~3.5dB under the other lines, with its
+    // peaks already at 0.8: the music steps further back instead)
+    duck: 0.33 },
   // the name, on Ask opening
-  { at: beat(10), to: beat(14), text: 'With Machina, you just ask.',
+  { at: beat(9), to: beat(13), text: 'With Machina, you just ask.',
     style: "Simple and easy, a small smile; 'just ask' effortless.", pace: PACE },
   // 1. plain words: no remembering where, or what it was called
-  { at: beat(14), to: beat(20), text: 'Ask in your own words.\nNo keywords, no folders.',
+  { at: beat(13), to: beat(20) + 8, text: 'Ask in your own words.\nNo keywords, no folders.',
     style: "Relaxed and freeing; brush away 'no keywords, no folders' lightly.", pace: PACE },
   // 2. grounded: the answer is made of what you saved
-  { at: beat(20), to: beat(25), text: 'The answer is written\nfrom your own saves.',
+  { at: beat(21), to: beat(26), text: 'The answer is written\nfrom your own saves.',
     style: "Clear, with gentle emphasis on 'your own saves'.", pace: PACE },
   // 3. sources: so it can be trusted, and checked
-  { at: beat(25), to: beat(31) + 8, text: 'Every answer shows its sources.\nTap one to check it.',
+  { at: beat(26), to: beat(32) + 8, text: 'Every answer shows its sources.\nTap one to check it.',
     style: 'Trustworthy and matter-of-fact; the second sentence light and practical.', pace: PACE },
   // 4. follow-ups: go deeper without starting over
   // (owner, round 3: this line is about the continuation chips the app
@@ -114,20 +117,21 @@ export const CAPTIONS = [
   { at: beat(34), to: beat(39) + 8, text: 'Keep going. One tap asks\nthe next question.',
     style: 'Momentum, encouraging, a touch quicker.', pace: PACE },
   // 5. connections: what else those saves sit next to
-  { at: beat(41), to: beat(45), text: 'Then see how\nthose saves connect.',
+  { at: beat(41), to: beat(46), text: 'Then see how\nthose saves connect.',
     style: 'A little wonder, easing slightly.', pace: PACE },
   // the takeaway
-  { at: beat(45), to: beat(50), text: 'Ask once. Get the answer,\nand the proof.',
-    style: "Confident, punchy summary; a small beat before 'and the proof', satisfied.", pace: PACE },
+  { at: beat(46), to: beat(52), text: 'Ask once. Get the answer,\nand the proof.',
+    style: "Confident, punchy summary; a small beat before 'and the proof', satisfied.", pace: PACE, maxPause: 0.3 },
   // (finishing pass: the end card holds ~2s after the last word, the owner's
   // rule for the reel; it held 1.3s. The tagline runs longer than the
-  // subtitle did, so the close grew one beat: 33.1s, a 1.96s hold)
+  // subtitle did, so the close grew one beat. Re-laid 2026-10-04 to the
+  // Gemini read: 34.7s, the card holding 1.6s after the last word)
   // the close: the name (the drawn wordmark wipes in as it is said), then
   // the tagline on ONE line (owner 2026-09-28: every launch film ends on
   // "Everything you save, finally useful."; 2026-09-29: one line, as the
   // Revisit clip sets it); the music steps back
   // under both
-  { at: beat(53), to: beat(62), place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4,
+  { at: beat(55), to: beat(65), place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4,
     style: 'A confident, warm sign-off; the name proud, then the tagline unhurried and sincere.', pace: PACE },
 ];
 
@@ -154,9 +158,9 @@ export const KICKERS = (() => {
 
 /** Risers END on the reveal they lead into. [from, to] in frames. */
 export const RISERS = [
-  [beat(5), HITS.open], // the feed, accelerating → Ask
-  [beat(49), HITS.markStrike], // the throw → the mark strikes
+  [beat(7) + 8, HITS.open], // the feed, accelerating → Ask (after the hook's last word: nothing noisy under the voice)
+  [beat(51), HITS.markStrike], // the throw → the mark strikes
 ];
 
 /** One chord per bar (the film's and the reel's vocabulary). */
-export const BAR_CHORDS = ['Fmaj7', 'Fmaj7', 'Cmaj7', 'G6', 'Fmaj7', 'Cmaj7', 'G6', 'Fmaj7', 'Cmaj7', 'G6', 'Fmaj7', 'Cmaj7', 'G6', 'Cmaj7', 'Cmaj7'];
+export const BAR_CHORDS = ['Fmaj7', 'Fmaj7', 'Cmaj7', 'G6', 'Fmaj7', 'Cmaj7', 'G6', 'Fmaj7', 'Cmaj7', 'G6', 'Fmaj7', 'Cmaj7', 'G6', 'Cmaj7', 'Cmaj7', 'Cmaj7', 'Cmaj7'];
