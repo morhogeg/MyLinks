@@ -2460,6 +2460,18 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-04 (later still) — LAUNCH FILM: CAPTIONS ON HOLD, A NO-SUBTITLE
+  SPOKEN EDITION.** Branch `claude/film-gemini-vo`. Owner, relayed from
+  `claude/ad-todo` (commit 98e1afa): the grey highlight was "terrible", and
+  they are "not convinced at all we need these captions — it makes things
+  super busy". The headline captions are ON HOLD until the owner decides.
+  - The highlight is gone: a `*phrase*` mark renders as plain text.
+  - New compositions `MachinaLaunchVONoSubs` / `MachinaLaunchVerticalVONoSubs`
+    have the narrator and no captions; both were rendered and sent.
+  - `MachinaLaunchVO` / `MachinaLaunchVerticalVO` still carry the headlines;
+    the `withSubtitles` and `headlines` props on `Film` switch any edition.
+    No new captioned renders until the owner chooses.
+
 - **2026-10-04 (later) — LAUNCH FILM: HEADLINE CAPTIONS IN THE SPOKEN
   EDITIONS.** Branch `claude/film-gemini-vo`. The owner's call for every video
   (relayed from `claude/ad-todo`, recorded there in §9): the screen shows each

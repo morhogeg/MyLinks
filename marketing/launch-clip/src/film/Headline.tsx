@@ -29,9 +29,9 @@ const INK = 'rgba(17,24,39,0.96)';
  * Motion: each line rises out of its own mask in one decisive move
  * (`HEAD_IN` frames, ease-out quint, lines `HEAD_STAGGER` apart), no blur;
  * it leaves by rolling up out of the same mask (`HEAD_OUT` frames) just
- * before the next one rises: one clean roll, never two headlines at once. One
- * phrase may be marked `*like this*`: an ink highlighter sweeps under it
- * once the line has landed. `poster`: already in place on its first frame.
+ * before the next one rises: one clean roll, never two headlines at once.
+ * A `*like this*` mark is kept in the data but renders as plain text (the
+ * highlighter was cut). `poster`: already in place on its first frame.
  * Ink on paper; whole-pixel moves on the hold.
  */
 export const Headline: React.FC<{
@@ -63,9 +63,6 @@ export const Headline: React.FC<{
         const tin = poster ? 1 : OUT_QUINT(Math.min(1, Math.max(0, (local - li * HEAD_STAGGER) / HEAD_IN)));
         const tout = IN_CUBIC(Math.min(1, Math.max(0, (local - outStart - li) / HEAD_OUT)));
         const y = (1 - tin) * 108 - tout * 108;
-        // the marked phrase's highlighter: sweeps in once the line has landed
-        const sweep = poster ? 1 : OUT_QUINT(Math.min(1, Math.max(0, (local - li * HEAD_STAGGER - HEAD_IN + 2) / 10)));
-        const parts = line.split('*');
         return (
           // the mask: a little taller than the line, so descenders never clip
           <div key={li} style={{ overflow: 'hidden', padding: '0.06em 0.1em 0.14em', margin: '-0.06em 0 -0.14em' }}>
@@ -82,28 +79,9 @@ export const Headline: React.FC<{
                 whiteSpace: 'nowrap',
               }}
             >
-              {parts.map((p, k) =>
-                k % 2 ? (
-                  <span key={k} style={{ position: 'relative', display: 'inline-block' }}>
-                    <span
-                      style={{
-                        position: 'absolute',
-                        left: '-0.06em',
-                        right: '-0.06em',
-                        bottom: '0.06em',
-                        height: '0.36em',
-                        borderRadius: '0.08em',
-                        background: 'rgba(17,24,39,0.11)',
-                        transform: `scaleX(${sweep.toFixed(3)})`,
-                        transformOrigin: 'left center',
-                      }}
-                    />
-                    <span style={{ position: 'relative' }}>{p}</span>
-                  </span>
-                ) : (
-                  <span key={k}>{p}</span>
-                ),
-              )}
+              {/* a `*phrase*` mark reads as plain text: the owner called the
+                  grey highlighter "terrible" (2026-10-04, claude/ad-todo 98e1afa) */}
+              {line.replaceAll('*', '')}
             </div>
           </div>
         );

@@ -81,5 +81,25 @@ export const RemotionRoot: React.FC = () => (
       height={WIDTH}
       defaultProps={{ withAudio: true, withSubtitles: true, audioFile: 'score-vo.wav', headlines: true }}
     />
+    {/* the spoken editions with NO captions (2026-10-04): the owner is weighing
+        whether the film needs captions at all ("it makes things super busy") */}
+    <Composition
+      id="MachinaLaunchVONoSubs"
+      component={Film}
+      durationInFrames={TOTAL_FRAMES}
+      fps={FPS}
+      width={WIDTH}
+      height={HEIGHT}
+      defaultProps={{ withAudio: true, withSubtitles: false, audioFile: 'score-vo.wav' }}
+    />
+    <Composition
+      id="MachinaLaunchVerticalVONoSubs"
+      component={Film}
+      durationInFrames={TOTAL_FRAMES}
+      fps={FPS}
+      width={HEIGHT}
+      height={WIDTH}
+      defaultProps={{ withAudio: true, withSubtitles: false, audioFile: 'score-vo.wav' }}
+    />
   </>
 );
