@@ -61,8 +61,7 @@ export const RemotionRoot: React.FC = () => (
       height={WIDTH}
       defaultProps={{ withAudio: false, withSubtitles: true }}
     />
-    {/* voice-over editions — public/score-vo.wav from audio/mix-vo.mjs; their
-        captions are headlines, the narrator says the full lines (2026-10-04) */}
+    {/* voice-over editions — public/score-vo.wav from audio/mix-vo.mjs */}
     <Composition
       id="MachinaLaunchVO"
       component={Film}
@@ -70,7 +69,7 @@ export const RemotionRoot: React.FC = () => (
       fps={FPS}
       width={WIDTH}
       height={HEIGHT}
-      defaultProps={{ withAudio: true, withSubtitles: true, audioFile: 'score-vo.wav', headlines: true }}
+      defaultProps={{ withAudio: true, withSubtitles: true, audioFile: 'score-vo.wav' }}
     />
     <Composition
       id="MachinaLaunchVerticalVO"
@@ -79,10 +78,10 @@ export const RemotionRoot: React.FC = () => (
       fps={FPS}
       width={HEIGHT}
       height={WIDTH}
-      defaultProps={{ withAudio: true, withSubtitles: true, audioFile: 'score-vo.wav', headlines: true }}
+      defaultProps={{ withAudio: true, withSubtitles: true, audioFile: 'score-vo.wav' }}
     />
-    {/* the spoken editions with NO captions (2026-10-04): the owner is weighing
-        whether the film needs captions at all ("it makes things super busy") */}
+    {/* the spoken editions with NO captions (2026-10-04, made for the owner's
+        comparison; the final call kept the full captions) */}
     <Composition
       id="MachinaLaunchVONoSubs"
       component={Film}

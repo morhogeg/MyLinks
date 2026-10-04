@@ -103,41 +103,32 @@ let failed = false;
   if (!failed) console.log(`✓ ${SUBTITLES.length} captions, no overlaps, last ends bar ${prevEnd.toFixed(2)}`);
 }
 
-// ── 1b. headlines (2026-10-04): the spoken editions show each line's point,
-// not the narration verbatim. Each headline is 2–5 words on ONE line, closes
-// its *highlight*, and lands on a word the narrator actually says (its index
-// exists in the spoken line, src/film/vo.json from audio/synth-vo.py).
+// ── 1b. caption motion (2026-10-04): each caption rises in 3 frames BEFORE
+// the narrator's first word (src/film/vo.json) and rolls out on its end
+// (src/film/Subtitles.tsx), so the bar-level check above is not enough: the
+// early arrival must not land on the previous caption's way out. Two captions
+// on screen at once is the one thing the track must never do.
 {
   const vo = JSON.parse(fs.readFileSync(path.join(here, '..', 'src', 'film', 'vo.json'), 'utf8'));
+  const BAR_FRAMES = Math.round(BAR * 30);
+  const cues = [...SUBTITLES]
+    .sort((a, b) => a.bar - b.bar)
+    .map((s) => {
+      const first = vo.find((v) => v.bar === s.bar)?.words[0];
+      return { s, first, from: Math.round(s.bar * BAR_FRAMES + (first ?? 0) * 30) - 3, to: Math.round((s.bar + s.bars) * BAR_FRAMES) };
+    });
   const bad = [];
-  let n = 0;
-  for (const cue of SUBTITLES) {
-    if (!cue.heads?.length) {
-      bad.push(`"${cue.text}" has no headline`);
-      continue;
-    }
-    const t = vo.find((v) => v.bar === cue.bar);
-    if (!t) {
-      bad.push(`"${cue.text}" has no voiced line at bar ${cue.bar} (re-run audio/synth-vo.py film)`);
-      continue;
-    }
-    const said = t.text.split(/\s+/);
-    if (t.words.length !== said.length) bad.push(`bar ${cue.bar}: ${t.words.length} word times for ${said.length} spoken words`);
-    for (const [word, text] of cue.heads) {
-      n++;
-      const words = text.replaceAll('*', '').split(/\s+/).filter((w) => /[a-z0-9]/i.test(w)).length;
-      if (words < 2 || words > 5) bad.push(`headline "${text}" has ${words} words (2–5)`);
-      if (text.includes('\n')) bad.push(`headline "${text}" breaks onto two lines (one line over the film)`);
-      if ((text.match(/\*/g) ?? []).length % 2) bad.push(`headline "${text}" has an unclosed *highlight*`);
-      if (!(Number.isInteger(word) && word >= 0 && word < said.length)) bad.push(`headline "${text}" lands on word ${word}, past the line's ${said.length} words`);
-    }
+  for (const c of cues) if (c.first === undefined) bad.push(`"${c.s.text}" has no voiced line at bar ${c.s.bar} (re-run audio/synth-vo.py film)`);
+  for (let i = 1; i < cues.length; i++) {
+    if (cues[i].from <= cues[i - 1].to) bad.push(`"${cues[i].s.text}" rises at frame ${cues[i].from}, before "${cues[i - 1].s.text}" is gone (${cues[i - 1].to})`);
   }
   if (bad.length) {
-    console.error('✗ headlines:');
+    console.error('✗ caption motion:');
     for (const b of bad) console.error('    ' + b);
     failed = true;
   } else {
-    console.log(`✓ ${n} headlines, 2–5 words, one line, each on a spoken word`);
+    const gap = Math.min(...cues.slice(1).map((c, i) => c.from - cues[i].to));
+    console.log(`✓ caption motion: never two at once (tightest hand-over ${gap} frames)`);
   }
 }
 

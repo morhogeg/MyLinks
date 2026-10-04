@@ -141,9 +141,10 @@ ENGINE = {"film": "gemini"}
 # and its Gemini model (GEMINI_TTS_MODEL overrides)
 GEMINI_MODEL = {"film": "gemini-3.8-flash-tts"}
 
-# Where a Gemini-voiced script's word times go for the picture: the film's
-# headline captions land on spoken words (src/film/Subtitles.tsx). Estimated
-# from the audio (word_timing_voiced, about ±0.2s), not recognised.
+# Where a Gemini-voiced script's word times go for the picture: each film
+# caption rises 3 frames before its line's first spoken word
+# (src/film/Subtitles.tsx). Estimated from the audio (word_timing_voiced,
+# about ±0.2s), not recognised.
 WORD_TIMING = {"film": os.path.join(ROOT, "src", "film", "vo.json")}
 
 

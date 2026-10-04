@@ -3,7 +3,6 @@ import { AbsoluteFill, Audio, Sequence, staticFile, useCurrentFrame } from 'remo
 import { SCENES, barToFrame } from '../timeline.mjs';
 import { Grain, SET_BG, Vignette } from './film/effects';
 import { Subtitles } from './film/Subtitles';
-import { Headlines } from './film/Headlines';
 import { ColdOpen } from './scenes/ColdOpen';
 import { Scatter } from './scenes/Scatter';
 import { WordmarkScene } from './scenes/WordmarkScene';
@@ -42,14 +41,10 @@ export const Film: React.FC<{
   withSubtitles?: boolean;
   /** 'score.wav' (music only) or 'score-vo.wav' (music + voice-over mix). */
   audioFile?: string;
-  /** the spoken editions: headline captions (the narrator says the rest),
-   *  not the full lines (2026-10-04) */
-  headlines?: boolean;
 }> = ({
   withAudio = true,
   withSubtitles = true,
   audioFile = 'score.wav',
-  headlines = false,
 }) => {
   const frame = useCurrentFrame();
 
@@ -75,7 +70,7 @@ export const Film: React.FC<{
       <Grain opacity={0.05} />
       {/* Captions bring their own per-cue scrim; a film-wide one was invisible
           on the dark grade but washes the dark cold open on the light grade. */}
-      {withSubtitles && (headlines ? <Headlines /> : <Subtitles />)}
+      {withSubtitles && <Subtitles />}
 
       {/* the first breath — the light film blooms in from white */}
       <AbsoluteFill

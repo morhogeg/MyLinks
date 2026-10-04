@@ -2460,6 +2460,29 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-04 (final) — LAUNCH FILM: FULL CAPTIONS IN THE NEW MOTION.**
+  Branch `claude/film-gemini-vo`. The owner's final call for every video
+  (relayed from `claude/ad-todo`, 75d129f / 6187257): "I like the new version
+  with the full captions and the new animation". This SUPERSEDES the headline
+  and hold entries below.
+  - **Removed:** headlines are gone (`heads`, `Headline`/`Headlines`, their
+    verify check); the captions are the full lines again, layouts and act
+    kickers as before.
+  - **New motion** (`src/film/Subtitles.tsx`): it replaces the fade-and-slide
+    in EVERY edition.
+    - Each line rises out of its own mask over 9 frames (ease-out quint, no
+      blur), 3 frames before the narrator's first word (from `src/film/vo.json`).
+    - Lines are 2 frames apart, with the kicker first.
+    - It rolls out in the last 5 frames of its caption; the accent rule grows
+      and shrinks with it.
+  - **verify:** checks that the early arrival never lands on the previous
+    caption's way out. The tightest hand-over is 3 clear frames.
+  - **Checked by eye:** frames 240–280 (line 2 to line 3, the tightest
+    hand-over) and holds in every layout, both formats. Never two at once, and
+    no line sits clipped on a hold.
+  - **Rendered and sent:** MachinaLaunchVO and MachinaLaunchVerticalVO. The
+    NoSubs compositions stay, unrendered.
+
 - **2026-10-04 (later still) — LAUNCH FILM: CAPTIONS ON HOLD, A NO-SUBTITLE
   SPOKEN EDITION.** Branch `claude/film-gemini-vo`. Owner, relayed from
   `claude/ad-todo` (commit 98e1afa): the grey highlight was "terrible", and
