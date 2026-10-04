@@ -1,6 +1,6 @@
 {
   "_": "Voice narration on GitHub with Gemini TTS (.github/workflows/narration-tts.yml). Edit, commit, push: the workflow voices what is listed and commits the takes to audio/vo-takes/. `audition`: voices for audio/vo-audition.py; `takes`: named takes (voice, text, style) to try a direction or a pronunciation; `scripts`: synth-vo.py scripts to voice in `voice`. Bump `run` to re-run with no other change. `name_variants`: voice each script once per way of saying the name (say_name, name_note).",
-  "run": 1,
+  "run": 2,
   "voice": "Sulafat",
   "model": "gemini-3.8-flash-tts",
   "scripts": ["ask"],
