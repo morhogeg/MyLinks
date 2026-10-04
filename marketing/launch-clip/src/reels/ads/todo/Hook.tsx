@@ -35,7 +35,7 @@ const CHIPS: { kind: SaveKind; title: string; x: number; y: number; s: number; r
   { kind: 'web', title: 'Four Thousand Weeks', x: 900, y: 700, s: 0.76, r: 5, blur: 1.6 },
   { kind: 'instagram', title: 'One week, one small bag', x: 270, y: 770, s: 1.12, r: -4, blur: 0 },
   { kind: 'x', title: 'You do not rise to the level of your goals', x: 640, y: 890, s: 0.92, r: 2.5, blur: 0 },
-  { kind: 'web', title: 'The Tail End', x: 150, y: 1010, s: 1.6, r: -6, blur: 3.5 },
+  { kind: 'web', title: 'The Tail End', x: 240, y: 1010, s: 1.6, r: -6, blur: 3.5 },
   { kind: 'screenshot', title: 'Read Piranesi, and go in blind', x: 760, y: 1070, s: 1.0, r: 3.5, blur: 0 },
   { kind: 'web', title: 'The Most Important Question of Your Life', x: 420, y: 1200, s: 1.05, r: -2.5, blur: 0 },
   { kind: 'youtube', title: 'Inside the mind of a master procrastinator', x: 860, y: 1310, s: 0.7, r: 4, blur: 1.6 },
@@ -43,7 +43,10 @@ const CHIPS: { kind: SaveKind; title: string; x: number; y: number; s: number; r
   { kind: 'instagram', title: 'Fushimi Inari at dawn', x: 820, y: 1560, s: 1.5, r: 5, blur: 3.5 },
 ];
 
-const CHIP_SCALE = 1.3;
+const CHIP_SCALE = 1.12;
+/** (owner, 2026-10-04: titles ran off the sides on the first frame) the spread
+ *  is drawn toward the centre so every save sits inside the frame */
+const SPREAD_X = 0.74;
 
 /** the four saves the narrator names, in order (round 6): the video, the
  *  post, the article, the screenshot (indices into CHIPS) */
@@ -57,7 +60,7 @@ const chipAt = (k: number, f: number, P: { x: number; y: number }, dy: number) =
   const arrive = prog(f, t0, t0 + 20, EASE_MODAL);
   // the hang: a slow push-in, nearer ones faster (parallax)
   const hang = prog(f, 0, HITS.gather[0], (t) => t);
-  const push = 1 + hang * 0.1 * c.s;
+  const push = 1 + hang * 0.05 * c.s;
   // "…and never open again?": they grey out and go soft
   const grey = prog(f, HITS.grey, HITS.grey + 20, EASE_MODAL);
   // as each is named it comes back in colour and lifts toward the viewer,
@@ -71,12 +74,12 @@ const chipAt = (k: number, f: number, P: { x: number; y: number }, dy: number) =
   const ink = prog(f, HITS.gather[0] - 8, HITS.gather[1] - 4, EASE_IN_OUT);
   const b = Math.max(0, grey * (1 - lit) * (1 - ink));
   const spread = 1 + 0.35 * bury * (1 - g);
-  const near = 1 + 0.14 * lit * (1 - bury);
+  const near = 1 + 0.07 * lit * (1 - bury);
   // "How many things…": a ripple runs through the saves, one after another
   const st = f - (HITS.stir + k * 3);
   const ripple = st > 0 && st < 18 ? Math.sin((st / 18) * Math.PI) : 0;
   return {
-    x: P.x + (c.x - POINT.x) * push * spread * (1 - g),
+    x: P.x + (c.x - POINT.x) * SPREAD_X * push * spread * (1 - g),
     y: P.y + ((c.y - POINT.y) * push * spread + (1 - arrive) * 26 * c.s - 14 * ripple) * (1 - g),
     // (the saves are set 30% larger than the REVISIT clip's: on a phone the
     // poster's titles must read at a glance)
