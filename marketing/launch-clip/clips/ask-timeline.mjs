@@ -85,6 +85,13 @@ export const HITS = {
  */
 const PACE = 'Clear and measured, about 155 words a minute; small pauses between sentences, crisp within them.';
 
+/**
+ * HEADLINES (2026-10-04, owner, every video): `text` is the line the narrator
+ * says, every word; the screen shows `heads` instead, each [the index of the
+ * spoken word it lands on, a 2–5 word headline], one line over the app, and
+ * `*…*` marks the phrase the highlighter sweeps under (Heads.tsx, kit
+ * Headline). The lockup keeps its own line.
+ */
 export const CAPTIONS = [
   // (finishing pass: the hook speaks from 0.5s, since a feed decides in the
   // first second, and leaves a beat before the cut so the feed's last rush
@@ -94,33 +101,41 @@ export const CAPTIONS = [
   // (`tight`, owner 2026-09-29: the voice paused 0.22s after "knowledge"
   // on its own; synth-vo.py closes pauses inside the line)
   { at: beat(1), to: beat(7) + 10, hook: true, tight: true, text: 'Your saves hold more knowledge\nthan you remember.',
+    heads: [[0, 'Your saves *know more*']],
     style: 'Intriguing, a gentle hook, slightly lowered as if sharing a secret.', pace: PACE,
     // (the "secret" read came back ~3.5dB under the other lines, with its
     // peaks already at 0.8: the music steps further back instead)
     duck: 0.33 },
   // the name, on Ask opening
   { at: beat(9), to: beat(13), text: 'With Machina, you just ask.',
+    heads: [[2, '*Just ask*']],
     style: "Simple and easy, a small smile; 'just ask' effortless.", pace: PACE },
   // 1. plain words: no remembering where, or what it was called
   { at: beat(13), to: beat(20) + 8, text: 'Ask in your own words.\nNo keywords, no folders.',
+    heads: [[0, 'In *your own words*'], [5, 'No keywords. *No folders.*']],
     style: "Relaxed and freeing; brush away 'no keywords, no folders' lightly.", pace: PACE },
   // 2. grounded: the answer is made of what you saved
   { at: beat(21), to: beat(26), text: 'The answer is written\nfrom your own saves.',
+    heads: [[0, 'Answers from *your saves*']],
     style: "Clear, with gentle emphasis on 'your own saves'.", pace: PACE },
   // 3. sources: so it can be trusted, and checked
   { at: beat(26), to: beat(32) + 8, text: 'Every answer shows its sources.\nTap one to check it.',
+    heads: [[0, '*Sources* on every answer'], [5, 'Tap one to *check*']],
     style: 'Trustworthy and matter-of-fact; the second sentence light and practical.', pace: PACE },
   // 4. follow-ups: go deeper without starting over
   // (owner, round 3: this line is about the continuation chips the app
   // suggests under an answer; it starts once the card has closed, so no
   // other tap is on screen while it plays)
   { at: beat(34), to: beat(39) + 8, text: 'Keep going. One tap asks\nthe next question.',
+    heads: [[0, '*Keep going*'], [2, 'One tap, *next question*']],
     style: 'Momentum, encouraging, a touch quicker.', pace: PACE },
   // 5. connections: what else those saves sit next to
   { at: beat(41), to: beat(46), text: 'Then see how\nthose saves connect.',
+    heads: [[0, 'See how they *connect*']],
     style: 'A little wonder, easing slightly.', pace: PACE },
   // the takeaway
   { at: beat(46), to: beat(52), text: 'Ask once. Get the answer,\nand the proof.',
+    heads: [[0, 'Ask once.'], [2, 'The answer, *and the proof*']],
     style: "Confident, punchy summary; a small beat before 'and the proof', satisfied.", pace: PACE, maxPause: 0.3 },
   // (finishing pass: the end card holds ~2s after the last word, the owner's
   // rule for the reel; it held 1.3s. The tagline runs longer than the
@@ -145,7 +160,9 @@ export const TOTAL_SEC = TOTAL_FRAMES / FPS;
  * none: ASK arrives with the name.
  */
 const KICKER_LEAD = 4;
-export const KICKER_BRIDGE = 24;
+// (2026-10-04: headlines hand over with no gap, so the chapter word stays
+// up across the short gaps between lines instead of blinking off)
+export const KICKER_BRIDGE = 32;
 export const KICKERS = (() => {
   const spans = [];
   for (const c of CAPTIONS.filter((x) => !x.place && !x.hook)) {

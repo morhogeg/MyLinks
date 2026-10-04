@@ -2647,6 +2647,19 @@ exact-match, capped.
   script's titles follow, the docs name Manson, and the `revisit` take's data
   is re-captured (shared with `claude/clip-save`, where it was shot; no other
   take changes). No rendered video showed the old card.
+- **2026-10-04 — Ask clip: headline captions.** Branch `claude/clip-ask`, not
+  merged. Owner decision for every video (relayed from the Meta ad 3
+  session): the screen shows each line's point in 2–5 words instead of the
+  full narration, and the word-by-word blur reveal ("dated and laggy") is
+  replaced by the kit `Headline` (taken unchanged with `kit/Type.tsx` from
+  `claude/ad-todo` 724655d; `KineticLine` kept). 12 headlines from the owner's
+  list, each anchored to its spoken word 3 frames early (`heads` in the
+  timeline, `Heads.tsx`), one line over the app, hook headline on frame 0;
+  the narrator, mix and timing are unchanged (no re-voice, no quota). Verify:
+  headlines 2–5 words, one line, on a real spoken word (the gate was tested
+  failing on a bad one). Stills of every headline beat and one handover
+  checked. Disk filled mid-pass (43 stale Remotion bundles in /tmp, ~0.7GB
+  each); cleared. **Not verified:** nobody has watched it on a phone.
 - **2026-10-04 — Ask clip re-voiced: Gemini TTS, Sulafat.** Branch
   `claude/clip-ask`, not merged. Owner (relayed from the Meta ad 3 session):
   the house narrator is now Gemini TTS, voice Sulafat, each video with its own
