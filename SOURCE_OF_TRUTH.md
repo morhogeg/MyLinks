@@ -2707,6 +2707,13 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-04 — META AD 1, ROUND 11: FULL CAPTIONS, NEW MOTION.** Branch
+  `claude/ad-card`, not merged. Owner's final caption call for every video
+  (relayed from ad 3, confirmed here): full narration captions in the new
+  mask-rise motion. Round 10's headlines reverted (timeline, AdCaptions,
+  verify back to round 9); `kit/Type.tsx` from `claude/ad-todo` 75d129f.
+  Chunks now hand over with a 4-frame gap (the new motion rises 3 frames
+  early), so no two captions overlap. Verify clean; 43.7s; mixes unchanged.
 - **2026-10-04 — META AD 1, ROUND 10: HEADLINE CAPTIONS.** Branch
   `claude/ad-card`, not merged. Owner decision for every video (relayed from
   the ad 3 session, confirmed here): the screen shows each line's point in

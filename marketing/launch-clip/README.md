@@ -865,6 +865,17 @@ uncaptioned (owner, round 7, re-confirmed); the relayed headlines' trailing
 headlines (2–5 words, on a real spoken word, one line over the app) instead
 of on-screen = narration.
 
+Round 11 (owner, 2026-10-04, final call for every video, after comparing ad
+3's versions: "the full captions and the new animation"): round 10's
+headlines are reverted; the captions are the full narration again, in the
+round-5 chunks, drawn with the kit's new `KineticLine` (taken from
+`claude/ad-todo` 75d129f: each row rises out of its own mask 3 frames before
+its first word, no blur, and rolls up out in the 5 frames before it leaves).
+`AdCaptions.tsx` now ends every chunk 4 frames before the next one's first
+word, across lines too, so two captions never show at once (checked frame by
+frame around a handover and a two-row chunk). The name beat stays
+uncaptioned and there is no "…" on screen.
+
 **The Meta spec, and how the ad meets it.** 43.7s (owner, round 5: about
 30–35s; round 6's slower reminder took it over; verify notes over 35s and
 fails over 45s). Frame 0 is a legible picture with the
