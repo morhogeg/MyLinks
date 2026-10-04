@@ -2645,6 +2645,19 @@ exact-match, capped.
   script's titles follow, the docs name Manson, and the `revisit` take's data
   is re-captured (shared with `claude/clip-save`, where it was shot; no other
   take changes). No rendered video showed the old card.
+- **2026-10-04 — FIND clip and reel: the new caption motion (owner).** Branch
+  `claude/clip-find`, not merged. Owner's final call on captions: keep the
+  FULL narration, chunked as before (the headline captions and the
+  highlighter were dropped), in the new motion. `src/reels/kit/Type.tsx`
+  taken from `claude/ad-todo` (75d129f): `KineticLine` (same props) now
+  raises each line out of its own mask 3 frames before its first word (9
+  frames, ease-out quint, no blur) and rolls it up out of the mask in the 5
+  frames before it leaves. The kit is shared, so the reel's captions moved
+  too; the kicker word keeps its letter reveal (unchanged in that file).
+  Verified: `tsc`, `npm run verify` OK; 26 to 40-frame strips read around
+  three caption changes (FIND 116–141 and 656–695, reel 404–429): no line
+  held clipped at its mask edge, never two captions at once. FIND and reel
+  captioned editions re-rendered; the clean editions carry no captions.
 - **2026-10-04 — FIND clip re-voiced: Gemini TTS, Sulafat (owner).** Branch
   `claude/clip-find`, not merged. The owner's new house narrator, with this
   clip's own tone (relatable frustration turning into relief) and a
