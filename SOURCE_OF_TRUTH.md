@@ -2712,6 +2712,12 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-04 — Meta ad 2 (Ask): captions in the new mask-rise motion.**
+  Branch `claude/ad-trip`, NOT merged. Owner (relayed from the ad 3 session,
+  confirmed "Go"): full captions with the new animation in every video. Took
+  kit `Type.tsx` from `claude/ad-todo` (75d129f); `AdCaptions` hands over with
+  no overlap. Both editions re-rendered; gates green.
+
 - **2026-10-04 — Meta ad 2 (Ask): more detail, a smooth way into the graph.**
   Branch `claude/ad-trip`, NOT merged. Owner: the cut from the chat to the
   graph was abrupt, and the ads felt slim (+3–4s, past 30s approved). Both

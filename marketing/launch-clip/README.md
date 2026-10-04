@@ -1096,6 +1096,16 @@ grows out of that point (`INTO`, 18 frames), and the graph holds 2–3 beats
 longer. Round 6 is **30.7s**, the talking edition **33.9s**; the owner
 approved going past the brief's 30s (the gate is now 35s).
 
+### Captions: the mask-rise motion (2026-10-04, owner)
+
+Owner, after comparing versions of Meta ad 3: full captions, in the new
+motion, across every video. `src/reels/kit/Type.tsx` comes from
+`claude/ad-todo` (75d129f): each line rises out of its own mask 3 frames
+before its first word (9 frames, ease-out quint, no blur) and rolls up out of
+it in the 5 frames before it leaves. `AdCaptions` (shared by both editions)
+now ends each caption by the frame the next one starts to rise, so two are
+never up at once (checked on stills at every hand-off).
+
 **Open:** the name arrives at ~10s (the script spends its first 10s on the
 viewer's problem), not by ~3s as the original Meta brief asked; 29.9s, at
 Meta's 30s limit; nobody has listened to the mix on speakers.
