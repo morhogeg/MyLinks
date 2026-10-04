@@ -67,14 +67,15 @@ export const HITS = {
   part: beat(22.5), // the mark and the wordmark leave
   open: beat(23.5), // CUT to the chat: the question types itself
   send: beat(27), // Send is tapped; the cut to its answer lands on the touch
-  ask2: beat(35.5), // CUT to a new chat, the big question typed
-  send2: beat(36), // Send is tapped; its answer arrives on the touch
-  lead: beat(37), // "It even finds…": the theme (its first line) lifts, and holds
-  sources2: beat(39), // its three sources arrive…
-  chips: [beat(40), beat(40.5), beat(41)], // …and lift one by one on "so you see"
-  graphTap: beat(42), // its Graph chip: the saves it connected, lit in the real graph ("the theme running through your saves")
-  lockup: beat(45), // thrown out into the lockup; the mark launches
-  markStrike: beat(46), // the mark's point strikes
+  source: beat(39), // its source lifts on "which saves it used" (vo.json)
+  ask2: beat(41), // CUT to a new chat, the big question typed
+  send2: beat(41.5), // Send is tapped; its answer arrives on the touch
+  lead: beat(42.5), // "It even finds…": the theme (its first line) lifts, and holds
+  sources2: beat(44.5), // its three sources arrive…
+  chips: [beat(45.5), beat(46), beat(46.5)], // …and lift one by one on "so you see"
+  graphTap: beat(47.5), // its Graph chip: the saves it connected, lit in the real graph ("the theme running through your saves")
+  lockup: beat(52.5), // thrown out into the lockup; the mark launches
+  markStrike: beat(53.5), // the mark's point strikes
 };
 
 /**
@@ -100,10 +101,12 @@ export const CAPTIONS = [
   { at: beat(18), to: beat(22.5), text: "That's exactly why we made Machina.", pace: PACE, style: 'The turn: bright, warm and proud; the name lands with a smile.', duck: 0.4 },
   { at: beat(23.5), to: beat(28), text: 'Now you can ask your saves anything.', pace: PACE, style: 'Excited, sharing good news with a friend.' },
   { at: beat(28), to: beat(36.5), splits: [6], text: 'It reads across all your saves… so you get one clear answer.', pace: PACE, style: 'Clear and quietly impressed.' },
-  { at: beat(36.5), to: beat(45), splits: [6, 9], until: true, text: 'It even finds what connects them… so you see the theme running through your saves.', pace: PACE, style: "Delighted, a little wonder on 'It even'." },
+  // (2026-10-04, owner: more detail) the answer's source, the real chip under it
+  { at: beat(37), to: beat(42), splits: [5], text: 'And it shows you exactly which saves it used.', pace: PACE, style: "Clear and reassuring, like pointing it out to a friend; a small emphasis on 'exactly'." },
+  { at: beat(42), to: beat(52.5), splits: [6, 9], until: true, text: 'It even finds what connects them… so you see the theme running through your saves.', pace: PACE, style: "Delighted, a little wonder on 'It even'." },
   // the close: the name (the drawn wordmark wipes in as it is said), then the
   // tagline on ONE line, exactly; the music steps back
-  { at: beat(46.5), to: beat(56), place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', pace: PACE, style: 'A confident, warm sign-off with a smile; the name proud, then the tagline unhurried and sincere.', duck: 0.4 },
+  { at: beat(54), to: beat(63.5), place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', pace: PACE, style: 'A confident, warm sign-off with a smile; the name proud, then the tagline unhurried and sincere.', duck: 0.4 },
 ];
 
 export const TOTAL_FRAMES = CAPTIONS[CAPTIONS.length - 1].to;
@@ -112,7 +115,7 @@ export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 /** Risers END on the reveal they lead into. [from, to] in frames. */
 export const RISERS = [
   [beat(15), HITS.dotLands], // the piles going soft → the point lands
-  [beat(43.5), HITS.markStrike], // the throw → the mark strikes
+  [beat(51), HITS.markStrike], // the throw → the mark strikes
 ];
 
 /** One chord per bar (the film's and the reel's vocabulary). */
