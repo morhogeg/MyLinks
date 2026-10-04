@@ -207,16 +207,32 @@ formats pick it up.
 
 ## The voice-over
 
-A female neural voice (Kokoro `af_heart`, run LOCALLY — no API key, no cloud)
-speaks every caption plus a closing line, mixed over the score with 35% ducking
-under each line:
+Since 2026-10-04 the film is narrated by **Gemini TTS, voice Sulafat** (the
+house narrator), directed line by line: the film's tone and each line's acting
+note live on `FILM_LINES` in `audio/synth-vo.py`. The takes are committed in
+`audio/vo-takes/`, so building the lines needs no key and no network:
+
+```bash
+pip install numpy soundfile          # plus ffmpeg with rubberband, for `tempo`
+python3 audio/synth-vo.py film       # → out/vo/line-NN.wav + manifest.json (asserts each line fits)
+node audio/mix-vo.mjs                # → public/score-vo.wav (music ducked under voice)
+```
+
+A changed line, or a new direction, needs a new take: those are voiced on
+GitHub (`audio/narration-request.json` + push → `.github/workflows/narration-tts.yml`;
+see `audio/gemini_tts.py`). `tempo` and `max_pause` shape a take after the fact,
+so fitting a line to its window costs no new take.
+
+The earlier voice, Kokoro `af_heart` (run LOCALLY, no API key, no cloud), still
+works with `VO_ENGINE=kokoro` and speaks every caption plus a closing line,
+mixed over the score with 35% ducking under each line:
 
 ```bash
 pip install kokoro-onnx soundfile
 # one-time model fetch (~350MB, gitignored under out/vo/):
 curl -L -o out/vo/kokoro-v1.0.onnx  https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx
 curl -L -o out/vo/voices-v1.0.bin   https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin
-python3 audio/synth-vo.py    # → out/vo/line-NN.wav + manifest.json (asserts each line fits its caption window)
+VO_ENGINE=kokoro python3 audio/synth-vo.py film   # → out/vo/line-NN.wav + manifest.json
 node audio/mix-vo.mjs        # → public/score-vo.wav (music ducked under voice)
 ```
 

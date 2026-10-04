@@ -66,16 +66,22 @@ FILM_PACE = "Measured and cinematic, about 145 words a minute; room to breathe b
 FILM_LINES = [
     {"bar": 1.05, "bars": 0.85, "text": "You save things everywhere.", "speed": 0.9,
      "style": "Soft, intimate opener, a knowing half-smile, as if noticing something true about the listener."},
+    # Sulafat reads lines 2 and 3 longer than Kokoro did. Line 3 starts at bar 3.4
+    # (was 3.6; its caption still ends at 4.3), and both lines run at tempo
+    # 1.08 with pauses capped at 0.25s, so neither runs into the next line.
     {"bar": 2.0, "bars": 1.35, "text": "An article here. A video there. A thread somewhere else.", "speed": 0.9,
-     "style": "Light, observational list, each item a small glance in a different direction; even rhythm."},
-    {"bar": 3.6, "bars": 0.7, "text": "Multiple apps, countless saved links.", "speed": 0.9,
-     "style": "A touch heavier: the weight of the pile."},
+     "style": "Light, observational list, each item a small glance in a different direction; even rhythm.",
+     "tempo": 1.08, "max_pause": 0.25},
+    {"bar": 3.4, "bars": 0.9, "text": "Multiple apps, countless saved links.", "speed": 0.9,
+     "style": "A touch heavier: the weight of the pile.",
+     "tempo": 1.08, "max_pause": 0.25},
     # a deliberate beat of silence before this one — the first wrong pile
     # opens wordless (owner note, round 13c)
     {"bar": 4.8, "bars": 1.3, "text": "Saved, and rarely seen again.", "speed": 0.9,
      "style": "Quiet and a little wistful, landing softly; the low point."},
     {"bar": 6.45, "bars": 1.35, "text": f"Introducing {SAY_NAME}. Everything you save, finally useful.",
-     "style": "The turn: warmth rises, assured and proud, a gentle reveal; the tagline sincere."},
+     "style": "The turn: warmth rises, assured and proud, a gentle reveal; the tagline sincere.",
+     "tempo": 1.1, "max_pause": 0.3},
     {"bar": 8.35, "bars": 1.25, "text": "Save anything, from anywhere.",
      "style": "Bright, simple, confident."},
     {"bar": 9.95, "bars": 2.4, "text": f"{SAY_NAME} reads it, summarizes it, and files it.",

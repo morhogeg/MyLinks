@@ -99,7 +99,10 @@ export const SUBTITLES = [
   // fast, needs breaks) and their VO speaks at 0.9 speed (synth-vo.py).
   { bar: 1.05, bars: 0.85, place: 'bottom', text: 'You save things everywhere.' },
   { bar: 2.0, bars: 1.35, place: 'bottom', text: 'An article here. A video there. A thread somewhere else.' },
-  { bar: 3.6, bars: 0.7, place: 'bottom', text: 'Multiple apps, countless saved links.' },
+  // Starts 0.2 bar earlier (was 3.6/0.7; 2026-10-04): Sulafat's read of this
+  // line runs 3.1s, which did not fit before line 4. The caption still ends on
+  // 4.3, so the silent beat before the loss line is unchanged.
+  { bar: 3.4, bars: 0.9, place: 'bottom', text: 'Multiple apps, countless saved links.' },
   // A DELIBERATE BEAT OF SILENCE (bars 4.3–4.8) — the first wrong pile opens
   // with no words at all, then the truth lands over the second one. Owner's
   // wording ("rarely", not "never" — bold but honest), on the bar-4 minor.

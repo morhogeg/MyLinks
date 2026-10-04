@@ -2460,6 +2460,38 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-04 — LAUNCH FILM RE-VOICED BY GEMINI TTS (SULAFAT).** Branch
+  `claude/film-gemini-vo` (from `main`; not merged, no PR). Marketing only (no
+  `web/` or `functions/` change, nothing deployed). The film's narration moves
+  from Kokoro to Gemini `gemini-3.8-flash-tts`, voice Sulafat, with "Machina"
+  said the Latin way (MAH-kee-nah).
+  - **Engine:** taken from `claude/ad-todo`. `gemini_tts.py`, `vo-audition.py`,
+    `narration-run.py` and `narration-tts.yml` were copied unchanged. The rest
+    was ported into main's `audio/synth-vo.py`: the per-script
+    `ENGINE`/`GEMINI_MODEL` maps (`film` only) and the per-line
+    `style`/`tts`/`max_pause`/`tempo`/`pace`. `VO_ENGINE=kokoro` output stays
+    byte-identical to main.
+  - **Direction:** this film has its own tone, not the ads' "lively and quick"
+    one. It is a calm, assured brand introduction at about 145 words a minute,
+    with an acting note on each line (`FILM_LINES`).
+  - **Voicing:** 14 requests, each line voiced once; takes are in
+    `audio/vo-takes/`. Run 1 hit a 429 after 5 lines (the per-model limit
+    reads "limit: 10"); run 2 voiced the other 9.
+  - **Fit:**
+    - Lines 1, 4 and 6–14 fit as performed (tempo 1.0).
+    - Line 5 (the introduction) runs at tempo 1.1, with pauses capped at 0.3s.
+    - **Re-timed:** "Multiple apps, countless saved links." starts at bar 3.4
+      (was 3.6, 0.9 bars instead of 0.7). Its caption still ends on 4.3, so the
+      silent beat before the loss line is unchanged. Lines 2 and 3 run at tempo
+      1.08 with pauses capped at 0.25s. Nothing else in the film moved.
+    - Gemini lines also must end 0.15s before the next line starts.
+  - **Verified:** `tsc` and `npm run verify` pass; `public/score-vo.wav` is
+    re-mixed; MachinaLaunchVO and MachinaLaunchVerticalVO were rendered and sent
+    to the owner.
+  - **Not verified:** nobody has listened to the read yet. Word times in the
+    manifest are estimated from the audio (about ±0.2s), not recognised; the
+    film's captions don't use them.
+
 - **2026-10-02 — X LAUNCH CAMPAIGN REVIEWED AND ON MAIN; THREE META AD VIDEOS
   HANDED TO NEW SESSIONS.** Branch `claude/x-launch-content-video-prompts-flujr5`.
   Docs and marketing only (no `web/` or `functions/` change, nothing deployed).
