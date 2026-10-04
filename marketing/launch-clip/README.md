@@ -62,8 +62,8 @@ into one point of light that the brackets close around, and the middle acts
 follow what the product actually does, in order: **saving was never the hard part → Machina reads
 what you save → summarized, tagged and filed → so you can find it again → then
 ask it anything → answers built from what you saved → every save connects to the
-rest → nothing worth keeping stays buried.** The film closes on the subtitle,
-"Never lose another great find." It deliberately avoids two framings the
+rest → nothing worth keeping stays buried.** The film closes on the tagline,
+"Everything you save, finally useful." It deliberately avoids two framings the
 owner ruled out: it is **not** a learning app, and it does **not** sell
 "search by meaning" as the headline. The word *library* appears nowhere.
 
@@ -80,12 +80,12 @@ owner ruled out: it is **not** a learning app, and it does **not** sell
 | 20–23 | 0:50 | `GraphScene` | Edges draw in staggered — connections being found, not a diagram revealed |
 | 23–26 | 0:57.5 | `CollectionsScene` | The organising that is yours |
 | 26–29 | 1:05 | `DigestScene` | The weekly write-up, then the resurfaced save as its own beat |
-| 29–32 | 1:12.5 | `Endcard` | The bare mark, the wordmark, the App Store subtitle (`Never lose another great find`), which the voice-over also speaks |
+| 29–32 | 1:12.5 | `Endcard` | The bare mark, the wordmark, the tagline (`Everything you save, finally useful`), which the voice-over also speaks |
 
 `Capture` / `Ask` / `Connect` print as a letterspaced kicker above the line on
 their own beats, so a viewer can place each act inside the film's three acts
 without being told. (They were the App Store subtitle until 2026-08-26; the
-endcard now carries the current subtitle, the kickers keep the act names.)
+endcard carries the tagline since 2026-10-04, the kickers keep the act names.)
 
 **No em dashes anywhere a viewer can read** — the app-wide ban
 (`web/scripts/check-em-dash.mjs`) applies to burned-in captions, demo cards and

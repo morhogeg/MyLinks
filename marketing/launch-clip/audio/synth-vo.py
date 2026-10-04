@@ -79,9 +79,9 @@ FILM_LINES = [
     # opens wordless (owner note, round 13c)
     {"bar": 4.8, "bars": 1.3, "text": "Saved, and rarely seen again.", "speed": 0.9,
      "style": "Quiet and a little wistful, landing softly; the low point."},
-    {"bar": 6.45, "bars": 1.35, "text": f"Introducing {SAY_NAME}. Everything you save, finally useful.",
-     "style": "The turn: warmth rises, assured and proud, a gentle reveal; the tagline sincere.",
-     "tempo": 1.1, "max_pause": 0.3},
+    # the tagline moved to the closing line (owner, 2026-10-04)
+    {"bar": 6.45, "bars": 1.35, "text": f"Introducing {SAY_NAME}.",
+     "style": "The turn: warmth rises, assured and proud, a gentle reveal of the name."},
     {"bar": 8.35, "bars": 1.25, "text": "Save anything, from anywhere.",
      "style": "Bright, simple, confident."},
     {"bar": 9.95, "bars": 2.4, "text": f"{SAY_NAME} reads it, summarizes it, and files it.",
@@ -107,10 +107,11 @@ FILM_LINES = [
     {"bar": 26.1, "bars": 2.6, "text": f"And behind the scenes, {SAY_NAME} pieces it all together. Ready when you are.",
      "style": "Warm and calm, a gentle promise; 'Ready when you are' softer, like an open door.",
      "max_pause": 0.45},
-    # the closing statement = the endcard's one line, the App Store subtitle
-    # (owner call 2026-09-17: the voice says what the screen shows)
-    {"bar": 30.1, "bars": 1.6, "text": f"{SAY_NAME}. Never lose another great find.",
-     "style": "A confident, warm sign-off, unhurried."},
+    # the closing statement = the endcard's one line, the TAGLINE (owner,
+    # 2026-10-04: the film ends on it; 2026-09-17: the voice says what the
+    # screen shows)
+    {"bar": 30.1, "bars": 1.6, "text": f"{SAY_NAME}. Everything you save, finally useful.",
+     "style": "A confident, warm sign-off, unhurried; the tagline sincere, landing softly."},
 ]
 
 

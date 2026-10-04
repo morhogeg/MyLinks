@@ -132,6 +132,27 @@ let failed = false;
   }
 }
 
+// ── 1c. the tagline closes the film (owner, 2026-10-04): it is the endcard's
+// line and the closing voice line, and no caption says it before then
+{
+  const bad = [];
+  const tagline = /everything you save, finally useful/i;
+  const endcard = fs.readFileSync(path.join(here, '..', 'src', 'scenes', 'Endcard.tsx'), 'utf8');
+  if (!tagline.test(endcard)) bad.push('the endcard does not carry the tagline');
+  for (const c of SUBTITLES) if (tagline.test(c.text)) bad.push(`the tagline appears before the end: "${c.text}"`);
+  const vo = JSON.parse(fs.readFileSync(path.join(here, '..', 'src', 'film', 'vo.json'), 'utf8'));
+  const last = vo[vo.length - 1];
+  if (!tagline.test(last?.text ?? '')) bad.push(`the closing voice line is not the tagline: "${last?.text}"`);
+  for (const v of vo.slice(0, -1)) if (tagline.test(v.text)) bad.push(`the voice says the tagline before the end: "${v.text}"`);
+  if (bad.length) {
+    console.error('✗ tagline:');
+    for (const b of bad) console.error('    ' + b);
+    failed = true;
+  } else {
+    console.log('✓ the tagline closes the film (endcard + last line), and only there');
+  }
+}
+
 // ── 2. score
 {
   const wav = path.join(here, '..', 'public', 'score.wav');

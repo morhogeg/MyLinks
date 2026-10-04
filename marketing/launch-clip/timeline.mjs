@@ -109,11 +109,10 @@ export const SUBTITLES = [
   { bar: 4.8, bars: 1.3, place: 'bottom', text: 'Saved, and rarely seen again.' },
   // The turn is an INTRODUCTION now (owner call, round 13b) — the film stops
   // describing and presents the product by name. 2026-09-19 (owner): the line
-  // after the name is the PROMISE (the product tagline), not "one place for
-  // all your saved links", which volunteered Machina into the link-saver
-  // category and undersold screenshots and notes. The tagline lives here now;
-  // the endcard carries the App Store subtitle. Two roles, two lines.
-  { bar: 6.45, bars: 1.35, place: 'bottom', kicker: 'Introducing', text: 'Machina.\nEverything you save, finally useful.' },
+  // after the name was the PROMISE (the product tagline). 2026-10-04 (owner):
+  // the tagline moves to the END (the endcard and the closing line), and the
+  // turn just introduces the name.
+  { bar: 6.45, bars: 1.35, place: 'bottom', kicker: 'Introducing', text: 'Machina.' },
   // Value first (owner note, round 13c): anything + anywhere. No tap-count
   // claim — the share sheet is two touches (owner correction).
   { bar: 8.35, bars: 1.25, place: 'left', kicker: 'Capture', text: 'Save anything, from anywhere.' },
