@@ -37,7 +37,7 @@ export const AdTodo: React.FC<{
       <App f={f} />
       <End f={f} withCaptions={withCaptions} />
       {/* type never sits on UI: the app fades out under the caption band */}
-      <BandScrim band={band} opacity={prog(f, HITS.iris[0], HITS.iris[1]) * (1 - prog(f, HITS.out + THROW_LEN - 8, HITS.out + THROW_LEN))} />
+      {withCaptions && <BandScrim band={band} opacity={prog(f, HITS.iris[0], HITS.iris[1]) * (1 - prog(f, HITS.out + THROW_LEN - 8, HITS.out + THROW_LEN))} />}
       {/* the narration on screen, in short chunks on the voice's timing */}
       {withCaptions && <Chunks frame={f} top={slots.top} />}
       <Lens />
