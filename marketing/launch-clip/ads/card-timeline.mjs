@@ -117,7 +117,11 @@ export const TOTAL_SEC = TOTAL_FRAMES / FPS;
  * chunk begins; `\n` breaks a chunk's rows. `say` respells for the voice only
  * (same words). `at` is the frame the voice starts, `to` the frame the last
  * chunk leaves (0.3–1.2s after the voice; up to 4s with `until`). `poster`:
- * the first chunk is already set on frame 0. `place: 'voice'`: said, never
+ * the first chunk is already set on frame 0. `heads` (round 10, owner
+ * 2026-10-04: headline captions): what the SCREEN shows, [the index of the
+ * spoken word it lands on (in `say`), the headline, 2–5 words, `*…*` the
+ * phrase the highlighter sweeps under]; the narrator still says every word
+ * of `text`/`say`, which is no longer drawn. `place: 'voice'`: said, never
  * drawn (round 7). NO em dashes, no literal "AI",
  * no "second brain", no "library", no "talk".
  */
@@ -130,17 +134,17 @@ export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 const PAIN = 'Punchy and quick, like a friend teasing you; short pauses, no lingering.';
 const EASY = 'Conversational and easy, about 165 words a minute; short natural pauses.';
 const LINES = [
-  { at: 8, to: 116, text: 'How many things did you\nsave this month | and never open again?', say: 'How many things did you save this month… and never open again?', poster: true, style: 'Knowing, teasing smile, leaning in; a beat of mock guilt on "and never open again?"', pace: PAIN, tempo: 1.1, maxPause: 0.2 },
-  { at: 116, to: 200, text: "The article you promised\nyourself you'd read", say: "The article you promised yourself you'd read…", style: 'Wry, trailing off knowingly, as if listing evidence.', pace: PAIN, tempo: 1.1, maxPause: 0.2 },
-  { at: 200, to: 272, text: 'the thread you\nbookmarked at midnight', say: 'the thread you bookmarked at midnight…', style: 'Amused, a little sheepish, late-night confession energy.', pace: PAIN, tempo: 1.1, maxPause: 0.2 },
-  { at: 272, to: 355, text: "the screenshot you\nswore you'd remember.", style: 'Playful disbelief, landing the list with a smile.', pace: PAIN, tempo: 1.1, maxPause: 0.2 },
+  { at: 8, to: 116, heads: [[0, 'Saved it.\n*Never* opened it.']], text: 'How many things did you\nsave this month | and never open again?', say: 'How many things did you save this month… and never open again?', poster: true, style: 'Knowing, teasing smile, leaning in; a beat of mock guilt on "and never open again?"', pace: PAIN, tempo: 1.1, maxPause: 0.2 },
+  { at: 116, to: 200, heads: [[1, 'That *article*']], text: "The article you promised\nyourself you'd read", say: "The article you promised yourself you'd read…", style: 'Wry, trailing off knowingly, as if listing evidence.', pace: PAIN, tempo: 1.1, maxPause: 0.2 },
+  { at: 200, to: 272, heads: [[1, 'That *thread*']], text: 'the thread you\nbookmarked at midnight', say: 'the thread you bookmarked at midnight…', style: 'Amused, a little sheepish, late-night confession energy.', pace: PAIN, tempo: 1.1, maxPause: 0.2 },
+  { at: 272, to: 355, heads: [[1, 'That *screenshot*']], text: "the screenshot you\nswore you'd remember.", style: 'Playful disbelief, landing the list with a smile.', pace: PAIN, tempo: 1.1, maxPause: 0.2 },
   // (round 7, owner: said, not shown; the drawn MACHINA is the name on screen)
   { at: 356, to: 425, text: "That's exactly why\nwe made Machina.", place: 'voice', style: 'The turn: bright, warm and proud; the name lands with a smile.', pace: EASY },
-  { at: 425, to: 528, text: 'From any app, just\nshare it to Machina.', until: 'the last share lands in the mark', style: 'Easy and effortless, like it is the simplest thing.', pace: EASY },
-  { at: 528, to: 696, text: "It reads what you save | and pulls out\nthe key points | so you'll always remember\nwhy you kept it.", say: "It reads what you save and pulls out the key points… so you'll always remember why you kept it.", until: 'the Key Points lift', duck: 0.45, style: "Clear and genuinely pleased; warm and reassuring on 'so you'll always remember why you kept it'.", pace: EASY },
-  { at: 696, to: 856, text: 'It links each save | to what you saved before | so you see how\nyour ideas connect.', say: 'It links each save to what you saved before… so you see how your ideas connect.', until: 'the graph opens on its ties', duck: 0.45, style: "A little wonder, opening up on 'how your ideas connect'.", pace: EASY },
-  { at: 872, to: 1024, text: 'Then pick a time, | and Machina brings it back', say: 'Then pick a time, and Machina brings it back…', until: 'the reminder is set and confirmed', style: "Anticipation, the reveal of the best part; a small lift on 'brings it back'.", pace: EASY },
-  { at: 1040, to: 1112, text: 'so you actually\nget back to it.', kicker: 'Tomorrow', kickerChunk: 0, until: 'the Reminders due strip lifts', style: "Satisfied and knowing, the payoff line; warm emphasis on 'actually'.", pace: EASY },
+  { at: 425, to: 528, heads: [[0, 'Share from *any app*']], text: 'From any app, just\nshare it to Machina.', until: 'the last share lands in the mark', style: 'Easy and effortless, like it is the simplest thing.', pace: EASY },
+  { at: 528, to: 696, heads: [[0, 'Every save, *read*'], [9, 'The *key points*, pulled out'], [14, 'Remember *why you saved it*']], text: "It reads what you save | and pulls out\nthe key points | so you'll always remember\nwhy you kept it.", say: "It reads what you save and pulls out the key points… so you'll always remember why you kept it.", until: 'the Key Points lift', duck: 0.45, style: "Clear and genuinely pleased; warm and reassuring on 'so you'll always remember why you kept it'.", pace: EASY },
+  { at: 696, to: 856, heads: [[0, '*Linked* to what you saved'], [12, 'Your ideas, *connected*']], text: 'It links each save | to what you saved before | so you see how\nyour ideas connect.', say: 'It links each save to what you saved before… so you see how your ideas connect.', until: 'the graph opens on its ties', duck: 0.45, style: "A little wonder, opening up on 'how your ideas connect'.", pace: EASY },
+  { at: 872, to: 1024, heads: [[1, 'Pick a *time*'], [6, 'It *comes back*']], text: 'Then pick a time, | and Machina brings it back', say: 'Then pick a time, and Machina brings it back…', until: 'the reminder is set and confirmed', style: "Anticipation, the reveal of the best part; a small lift on 'brings it back'.", pace: EASY },
+  { at: 1040, to: 1112, heads: [[0, 'And you *actually* go back']], text: 'so you actually\nget back to it.', kicker: 'Tomorrow', kickerChunk: 0, until: 'the Reminders due strip lifts', style: "Satisfied and knowing, the payoff line; warm emphasis on 'actually'.", pace: EASY },
   // the close, on the lockup: the name (the drawn wordmark wipes in as it is
   // said), then the tagline, exactly as written (owner call 2026-09-28)
   { at: HITS.markStrike, to: TOTAL_FRAMES, place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4, style: 'A confident, warm sign-off with a smile; the name proud, then the tagline unhurried and sincere.', pace: 'Unhurried.' },

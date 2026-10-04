@@ -58,30 +58,36 @@ export default async function verifyAdCard() {
     for (const [re, what] of copy ? [...BANNED, ...AD_COPY] : BANNED) if (re.test(text)) bad.push(`${what} in ${where}: ${JSON.stringify(text).slice(0, 110)}`);
   };
 
-  // ── captions (round 5: each spoken line is shown as chunks, split by `|`;
-  // at most 8 words on screen at once, a kicker included)
+  // ── captions (round 10, owner 2026-10-04: HEADLINES. The narrator says
+  // every word of a line; the screen shows its point, `heads`: 2–5 words
+  // each, landing on a real spoken word, one line over the app, two only on
+  // the poster; no ellipsis on screen, ink only, the name beat uncaptioned)
   const caps = [...C.CAPTIONS].sort((a, b) => a.at - b.at);
-  const chunksOf = (c) => c.text.split('|').map((p) => p.trim());
-  const wordsOf = (t) => t.split(/[\s ]+/).filter(Boolean).length;
+  const wordsOf = (t) => t.split(/[\s ]+/).filter(Boolean).length;
   caps.forEach((c, i) => {
-    scan(`caption ${i + 1}`, c.text, true);
-    // (round 6, owner: no ellipsis on screen; the narrator's pauses live in `say`)
-    if (/…|\.\.\./.test(c.text)) bad.push(`caption ${i + 1} shows an ellipsis: ${JSON.stringify(c.text)}`);
     scan(`caption ${i + 1} (spoken)`, c.say, true);
     if (c.kicker) scan(`kicker ${i + 1}`, c.kicker, true);
     if (c.kicker && / /.test(c.kicker)) bad.push(`kicker "${c.kicker}" has a plain space (the Kicker collapses it: use \\u00a0)`);
     if (c.to <= c.at) bad.push(`caption "${c.text}" ends before it starts`);
     if (i && c.at < caps[i - 1].to) bad.push(`caption overlap: "${c.text}" / "${caps[i - 1].text}"`);
     if (c.to > C.TOTAL_FRAMES) bad.push(`caption "${c.text}" runs past the ad`);
-    chunksOf(c).forEach((ch, k) => {
-      const words = wordsOf(ch) - (c.place === 'lockup' ? 1 : 0) + (c.kicker && c.kickerChunk === k ? wordsOf(c.kicker) : 0); // the name is the drawn wordmark; a kicker counts
-      if (words > 8) bad.push(`caption chunk "${ch}" puts ${words} words on screen (at most 8)`);
-      ch.split('\n').forEach((row) => {
-        if (/[.?!]\s+\S/.test(row)) bad.push(`caption row "${row}" starts a new sentence mid-row`);
-      });
-    });
+    if (!c.place && !c.heads?.length) bad.push(`line "${c.say}" has no headline`);
+    if (c.place && c.heads?.length) bad.push(`the ${c.place} line "${c.say}" shows a headline (owner: no caption there)`);
+    const said = c.say.split(/\s+/).filter(Boolean);
+    let prev = -1;
+    for (const [word, text] of c.heads ?? []) {
+      scan(`headline at ${c.at}`, text, true);
+      const n = wordsOf(text.replace(/\*/g, ''));
+      if (n < 2 || n > 5) bad.push(`headline "${text}" has ${n} words (2–5)`);
+      if (!(word >= 0 && word < said.length)) bad.push(`headline "${text}" lands on word ${word}, past the line's ${said.length} words`);
+      if (word <= prev) bad.push(`headline "${text}" lands before the headline ahead of it`);
+      prev = word;
+      if ((text.match(/\*/g) ?? []).length % 2) bad.push(`headline "${text}" has an unclosed *highlight*`);
+      if (/…|\.\.\./.test(text)) bad.push(`headline "${text}" shows an ellipsis (owner, round 6)`);
+      if (text.includes('\n') && !(c.poster && word === c.heads[0][0])) bad.push(`headline "${text}" takes two lines over the app (one line only)`);
+    }
     const plain = (t) => t.replace(/\s*\|\s*/g, ' ').split(/\s+/).filter(Boolean);
-    if (wordsOf(c.say) !== plain(c.text).length) bad.push(`caption at ${c.at}: its spoken words (${wordsOf(c.say)}) don't match its on-screen words (${plain(c.text).length})`);
+    if (wordsOf(c.say) !== plain(c.text).length) bad.push(`caption at ${c.at}: its spoken words (${wordsOf(c.say)}) don't match its script (${plain(c.text).length})`);
   });
   const lines = caps.filter((c) => !c.place);
   const close = caps.find((c) => c.place === 'lockup');
@@ -229,7 +235,7 @@ export default async function verifyAdCard() {
     for (const b of bad) console.error('    ' + b);
     failed = true;
   } else {
-    console.log(`✓ ${caps.length} captions, no overlaps, ≤ 8 words on screen, poster line on frame 0, voice by 0.5s, the mark by ${(C.HITS.bracketsClose / C.FPS).toFixed(1)}s; ${C.TOTAL_SEC.toFixed(1)}s`);
+    console.log(`✓ ${caps.length} captions, no overlaps, ${caps.reduce((n, c) => n + (c.heads?.length ?? 0), 0)} headlines of 2–5 words, each on a spoken word, poster line on frame 0, voice by 0.5s, the mark by ${(C.HITS.bracketsClose / C.FPS).toFixed(1)}s; ${C.TOTAL_SEC.toFixed(1)}s`);
     console.log(`✓ narrator mirrors every caption; dwell rule holds; the tagline exact and held; ${Object.values(C.HITS).flat().length} hits on 8ths`);
     console.log(`✓ no banned word, plan, price, availability or recipe in the lines, the pile, the card or ${take.frames.length - take.marks.land} captured frames; safe zones hold`);
   }

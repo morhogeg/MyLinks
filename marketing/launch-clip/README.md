@@ -847,6 +847,24 @@ shaker drop to a third while the narrator speaks (noise under this voice
 reads as static). Word times are estimated from the audio (±0.2s), not
 recognised. 43.7s.
 
+Round 10 (owner, 2026-10-04, for every video): HEADLINE captions. The
+narrator still says every word; the screen shows each line's point in 2–5
+words (`heads` in the timeline: [the spoken word it lands on, the
+headline]), drawn with the kit's `Headline` (Meta ad 3's motion: each line
+rises out of a mask in one move, no blur, an ink highlighter sweeps under the
+`*marked*` phrase; it replaces the word-by-word reveal the owner called
+"dated and laggy"). A headline arrives 3 frames before its word and rolls out
+as the next arrives. Ad 1's headlines: "Saved it. / *Never* opened it."
+(the poster, frame 0), "That *article*", "That *thread*", "That
+*screenshot*", "Share from *any app*", "Every save, *read*", "The *key
+points*, pulled out", "Remember *why you saved it*", "*Linked* to what you
+saved", "Your ideas, *connected*", "Pick a *time*", "It *comes back*",
+"And you *actually* go back" (under TOMORROW). The name beat stays
+uncaptioned (owner, round 7, re-confirmed); the relayed headlines' trailing
+"…" were dropped (owner, round 6: no ellipsis on screen). Verify now checks
+headlines (2–5 words, on a real spoken word, one line over the app) instead
+of on-screen = narration.
+
 **The Meta spec, and how the ad meets it.** 43.7s (owner, round 5: about
 30–35s; round 6's slower reminder took it over; verify notes over 35s and
 fails over 45s). Frame 0 is a legible picture with the

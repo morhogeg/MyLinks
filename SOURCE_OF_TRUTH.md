@@ -2707,6 +2707,17 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-04 — META AD 1, ROUND 10: HEADLINE CAPTIONS.** Branch
+  `claude/ad-card`, not merged. Owner decision for every video (relayed from
+  the ad 3 session, confirmed here): the screen shows each line's point in
+  2–5 words with the kit's new `Headline` (taken from `claude/ad-todo`
+  724655d, appended to `kit/Type.tsx`; `KineticLine` kept), the narrator still
+  says every word. 13 headlines in `heads` per caption; `AdCaptions.tsx`
+  rewritten to draw them (TOMORROW kicker kept). Owner calls kept over the
+  relay: no caption on "That's exactly why we made Machina." and no "…" on
+  screen. Verify gates swapped to headline rules. Narration, picture timing
+  and length unchanged (43.7s). Open: nobody has watched the new motion on a
+  phone.
 - **2026-10-04 — META AD 1, ROUND 9: GEMINI TTS NARRATOR (SULAFAT).**
   Branch `claude/ad-card`, not merged. Owner-approved (relayed from the ad 3
   session, confirmed here): re-voice with Gemini 3.8 Flash TTS, Sulafat, with
