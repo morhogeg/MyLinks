@@ -3,13 +3,12 @@ import { AbsoluteFill, Audio, staticFile, useCurrentFrame } from 'remotion';
 import { CAPTIONS, FPS, HITS, KICKERS } from '../../../../clips/ask-timeline.mjs';
 import { sans } from '../../../fonts';
 import VO from './vo.json';
-import { BandScrim, Captions, SLOTS, type ReelCaption } from '../../kit/Captions';
+import { BandScrim, Captions, type ReelCaption } from '../../kit/Captions';
 import { CLOCK } from '../../kit/camera';
 import { prog } from '../../kit/curves';
 import { Lens, Paper } from '../../kit/Paper';
 import { AskScene } from './AskScene';
 import { End } from './End';
-import { Heads } from './Heads';
 
 /**
  * The ASK feature clip (32s, 1080 × 1920): an explainer of Ask for a first-time viewer, "ask your saves anything; every
@@ -42,11 +41,9 @@ export const MachinaAsk: React.FC<{
         captions={CAPTIONS as ReelCaption[]}
         timing={VO}
         kickers={KICKERS}
-        showCaptions={false}
+        showCaptions={withCaptions}
         showKickers={withCaptions}
       />
-      {/* (2026-10-04) the lines as headlines: the voice says every word */}
-      {withCaptions && <Heads frame={f} top={SLOTS.top} />}
       <Lens />
     </AbsoluteFill>
   );

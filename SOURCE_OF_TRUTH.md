@@ -2647,6 +2647,18 @@ exact-match, capped.
   script's titles follow, the docs name Manson, and the `revisit` take's data
   is re-captured (shared with `claude/clip-save`, where it was shot; no other
   take changes). No rendered video showed the old card.
+- **2026-10-04 — Ask clip: full captions, new motion (headlines reverted).**
+  Branch `claude/clip-ask`, not merged. Owner's final call after comparing
+  Meta ad 3 versions (relayed): full-narration captions in the new motion
+  everywhere. The headline pass below is reverted (Heads.tsx gone);
+  `kit/Type.tsx` taken from `claude/ad-todo` 75d129f, whose `KineticLine`
+  rises each line out of its mask 3 frames early and rolls it out before its
+  end. That made contiguous lines overlap for 3 frames (seen at frame 416), so
+  lines now sit ≥3 frames apart (new verify gate); line 5, the source tap and
+  its summary moved one beat later, and line 2 caps its pause at 0.18s (no
+  re-voice). Checked frames around three handovers and on holds: one caption
+  at a time, none clipped. Note: the highlight reel on this branch shares
+  `KineticLine`, so its captions take the same motion (not re-rendered here).
 - **2026-10-04 — Ask clip: headline captions.** Branch `claude/clip-ask`, not
   merged. Owner decision for every video (relayed from the Meta ad 3
   session): the screen shows each line's point in 2–5 words instead of the

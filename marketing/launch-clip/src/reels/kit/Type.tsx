@@ -22,9 +22,6 @@ import { EASE_IN_OUT, EASE_MODAL, mix, prog } from './curves';
 export const INK = 'rgba(17,24,39,0.96)';
 export const INK_SOFT = 'rgba(75,85,99,0.82)';
 
-/** frames a word takes to come into focus; frames between words in a line */
-const WORD_IN = 7;
-const CASCADE = 1.5;
 /** frames the whole line takes to leave, and its curve: eased in AND out
  *  (round 13: on EASE_MODAL half the fade happened on the first frame, so a
  *  line blinked out instead of leaving) */
@@ -56,62 +53,43 @@ export const KineticLine: React.FC<{
   font?: string;
   tracking?: string;
 }> = ({ text, frame, from, to, starts, size = 64, sizes, width = 940, align = 'center', color = INK, weight = 600, font = sans, tracking = '-0.028em' }) => {
-  if (frame < from - 2 || frame > to + 2) return null;
+  // (2026-10-04, owner: the word-by-word blur reveal read "dated and laggy";
+  // the full captions stay, in the Headline motion) each LINE rises out of
+  // its own mask in one decisive move (HEAD_IN frames, ease-out quint, no
+  // blur), HEAD_LEAD frames before its first word is said, and rolls up out
+  // of the same mask in the HEAD_OUT frames before `to`. Same props as ever.
+  const first = starts?.[0] ?? 0;
+  if (frame < from + Math.min(0, first) - HEAD_LEAD - 1 || frame > to + 1) return null;
   const local = frame - from;
   const lines = text.split('\n').map((l) => l.split(' ').filter(Boolean));
-  const out = prog(local, to - from - LINE_OUT, to - from, EXIT);
+  const outStart = to - from - HEAD_OUT;
   let w = -1;
   return (
-    <div
-      style={{
-        width,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: align === 'center' ? 'center' : 'flex-start',
-        gap: 6,
-        opacity: 1 - out,
-        filter: out > 0.01 ? `blur(${(out * 8).toFixed(2)}px)` : undefined,
-        transform: `translateY(${Math.round(-out * 10)}px)`,
-      }}
-    >
+    <div style={{ width, display: 'flex', flexDirection: 'column', alignItems: align === 'center' ? 'center' : 'flex-start', gap: 2 }}>
       {lines.map((words, li) => {
-        const first = w + 1;
-        const lineStart = starts?.[first] ?? first * 3;
+        const firstWord = w + 1;
+        w += words.length;
+        const lineStart = starts?.[firstWord] ?? li * HEAD_STAGGER;
+        const tin = OUT_QUINT(Math.min(1, Math.max(0, (local - lineStart + HEAD_LEAD) / HEAD_IN)));
+        const tout = IN_CUBIC(Math.min(1, Math.max(0, (local - outStart - li) / HEAD_OUT)));
+        const y = (1 - tin) * 108 - tout * 108;
         return (
-          <div
-            key={li}
-            style={{
-              fontFamily: font,
-              fontSize: sizes?.[li] ?? size,
-              fontWeight: weight,
-              lineHeight: 1.12,
-              letterSpacing: tracking,
-              color,
-              textAlign: align,
-              display: 'flex',
-              flexWrap: 'wrap',
-              justifyContent: align === 'center' ? 'center' : 'flex-start',
-              columnGap: '0.25em',
-            }}
-          >
-            {words.map((word, k) => {
-              w += 1;
-              const s0 = lineStart + k * CASCADE;
-              const t = prog(local, s0, s0 + WORD_IN, EASE_MODAL);
-              return (
-                <span
-                  key={w}
-                  style={{
-                    display: 'inline-block',
-                    opacity: Math.min(1, t * 1.6),
-                    transform: `translateY(${((1 - t) * 0.28).toFixed(3)}em)`,
-                    filter: t < 0.999 ? `blur(${((1 - t) * 12).toFixed(2)}px)` : undefined,
-                  }}
-                >
-                  {word}
-                </span>
-              );
-            })}
+          // the mask: a little taller than the line, so descenders never clip
+          <div key={li} style={{ overflow: 'hidden', padding: '0.06em 0.1em 0.14em', margin: '-0.06em 0 -0.14em' }}>
+            <div
+              style={{
+                transform: `translateY(${Math.round(y)}%)`,
+                fontFamily: font,
+                fontSize: sizes?.[li] ?? size,
+                fontWeight: weight,
+                lineHeight: 1.12,
+                letterSpacing: tracking,
+                color,
+                textAlign: align,
+              }}
+            >
+              {words.join(' ')}
+            </div>
           </div>
         );
       })}
@@ -193,9 +171,8 @@ export const HEAD_LEAD = 3;
  * Motion: each line rises out of its own mask in one decisive move
  * (`HEAD_IN` frames, ease-out quint, lines `HEAD_STAGGER` apart), no blur;
  * it leaves by rolling up out of the same mask (`HEAD_OUT` frames) just
- * before the next one rises: one clean roll, never two headlines at once. One
- * phrase may be marked `*like this*`: an ink highlighter sweeps under it
- * once the line has landed. `poster`: already in place on its first frame
+ * before the next one rises: one clean roll, never two headlines at once.
+ * (A `*phrase*` mark is ignored: the owner rejected the highlighter.) `poster`: already in place on its first frame
  * (frame 0 of a feed ad). Ink on paper; whole-pixel moves on the hold.
  */
 export const Headline: React.FC<{
@@ -218,8 +195,6 @@ export const Headline: React.FC<{
         const tin = poster ? 1 : OUT_QUINT(Math.min(1, Math.max(0, (local - li * HEAD_STAGGER) / HEAD_IN)));
         const tout = IN_CUBIC(Math.min(1, Math.max(0, (local - outStart - li) / HEAD_OUT)));
         const y = (1 - tin) * 108 - tout * 108;
-        // the marked phrase's highlighter: sweeps in once the line has landed
-        const sweep = poster ? 1 : OUT_QUINT(Math.min(1, Math.max(0, (local - li * HEAD_STAGGER - HEAD_IN + 2) / 10)));
         const parts = line.split('*');
         return (
           // the mask: a little taller than the line, so descenders never clip
@@ -237,28 +212,8 @@ export const Headline: React.FC<{
                 whiteSpace: 'nowrap',
               }}
             >
-              {parts.map((p, k) =>
-                k % 2 ? (
-                  <span key={k} style={{ position: 'relative', display: 'inline-block' }}>
-                    <span
-                      style={{
-                        position: 'absolute',
-                        left: '-0.06em',
-                        right: '-0.06em',
-                        bottom: '0.06em',
-                        height: '0.36em',
-                        borderRadius: '0.08em',
-                        background: 'rgba(17,24,39,0.11)',
-                        transform: `scaleX(${sweep.toFixed(3)})`,
-                        transformOrigin: 'left center',
-                      }}
-                    />
-                    <span style={{ position: 'relative' }}>{p}</span>
-                  </span>
-                ) : (
-                  <span key={k}>{p}</span>
-                ),
-              )}
+              {/* (owner, 2026-10-04: the grey highlight was "terrible": `*…*` now reads as plain text) */}
+              {parts.join('')}
             </div>
           </div>
         );

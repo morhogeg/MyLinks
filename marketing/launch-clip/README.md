@@ -845,18 +845,15 @@ the same instruments on the same 112.5 BPM grid, and the reel's lockup.
 | 688–800 | 5. connections | Its Graph chip: the two cited saves lit and linked among the rest: "Then see how those saves connect." Then the takeaway: "Ask once. Get the answer, and the proof." |
 | 832–1040 | close | Thrown out into the lockup: "Machina." then the tagline on one line at 50px, "Everything you save, finally useful." (as the Revisit clip sets it) (owner 2026-09-28: every launch film ends on the tagline; the clip never says the App Store subtitle), the end card held 1.6s after the last word |
 
-**Headline captions (2026-10-04, owner, every video).** The narrator still
-says every word, but the screen no longer shows the narration: each line
-carries `heads` in `clips/ask-timeline.mjs`, [the spoken word it lands on, a
-2–5 word headline], drawn by `src/reels/clips/ask/Heads.tsx` with the kit's
-`Headline` (`kit/Type.tsx`, from Meta ad 3 on `claude/ad-todo`): it rises out
-of a mask in one ease-out move 3 frames before its word, an ink highlighter
-sweeps under the `*marked*` phrase, and it rolls out just before the next one
-rises, never two at once. One line over the app; the hook's headline ("Your
-saves know more") is in place on frame 0, the poster. The "ASK" label stays
-up across the short gaps between lines. The lockup is unchanged. `npm run
-verify` checks every line has headlines of 2–5 words on one line, each on a
-real spoken word.
+**Caption motion (2026-10-04, owner, every video).** The captions are the
+full narration, in the new motion (kit `KineticLine`, from `claude/ad-todo`
+75d129f): each line rises out of its own mask 3 frames before its first
+word, ease-out quint, no blur, and rolls up out of it in the frames before
+its `to`. A headline-caption pass the same day was reverted on the owner's
+final call. Because a line now arrives 3 frames early, consecutive lines sit
+at least 3 frames apart (verify checks it); line 5 moved a beat, with the
+source tap and its summary, to make that room after line 4, and line 2's
+take keeps at most 0.18s between "Machina," and "you just ask".
 
 **The narrator (2026-10-04, owner).** Gemini TTS, voice Sulafat, replaces
 Kokoro for this clip only (`ENGINE` in `audio/synth-vo.py`), with its own

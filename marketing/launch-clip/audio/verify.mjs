@@ -491,22 +491,11 @@ console.log('\n── clip: ask');
     if (c.to > C.TOTAL_FRAMES) bad.push(`caption "${c.text}" runs past the clip (${c.to} > ${C.TOTAL_FRAMES})`);
     if (c.at % C.BEAT_FRAMES) bad.push(`caption "${c.text}" starts at ${c.at}, not on a beat`);
   });
-  // (2026-10-04) HEADLINE captions: the narrator says each whole line (its
-  // `text`, mirrored below), the screen shows its `heads`: 2–5 words each,
-  // one line (the app is on screen behind every one), each landing on a word
-  // the narrator actually says, and every line before the close has one
-  caps.forEach((c) => {
-    if (c.place === 'lockup') return;
-    if (!c.heads?.length) return bad.push(`line "${c.text.split('\n')[0]}…" has no headline`);
-    const said = (c.say ?? c.text).split(/\s+/).filter(Boolean);
-    for (const [word, text] of c.heads) {
-      scan('headline', text);
-      const n = text.replaceAll('*', '').split(/\s+/).filter((w) => /[a-z0-9]/i.test(w)).length;
-      if (n < 2 || n > 5) bad.push(`headline "${text}" has ${n} words (2–5)`);
-      if (text.includes('\n')) bad.push(`headline "${text}" breaks onto two lines over the app`);
-      if (!(Number.isInteger(word) && word >= 0 && word < said.length)) bad.push(`headline "${text}" lands on word ${word}, past the line's ${said.length} words`);
-      if ((text.match(/\*/g) ?? []).length % 2) bad.push(`headline "${text}" has an unclosed *highlight*`);
-    }
+  // (2026-10-04) the caption motion: a line rises 3 frames (HEAD_LEAD,
+  // kit/Type.tsx) before its `at`, so the line before it must be gone by then
+  caps.forEach((c, i) => {
+    const prev = caps[i - 1];
+    if (prev && !c.place && !prev.place && c.at - 3 < prev.to) bad.push(`"${c.text.split('\n')[0]}" rises at ${c.at - 3} while "${prev.text.split('\n')[0]}" runs to ${prev.to}: two captions at once`);
   });
   const lines = caps.filter((c) => !c.place);
   // it stands on its own: the product is named before the close
@@ -603,7 +592,7 @@ console.log('\n── clip: ask');
     for (const b of bad) console.error('    ' + b);
     failed = true;
   } else {
-    console.log(`✓ ${caps.length} captions + ${kick.length} kickers, no overlaps, lines on beats, a 2–5 word one-line headline on every line, each on a spoken word, opens on its hook, names Machina; narrator mirrors, fits and leaves on time`);
+    console.log(`✓ ${caps.length} captions + ${kick.length} kickers, no overlaps, lines on beats, opens on its hook, names Machina; narrator mirrors, fits and leaves on time`);
     console.log('✓ every cut and tap on a beat, every other picture event on an 8th');
     console.log(`✓ no em dash / "AI" / "second brain" / "library", and no thinking line, on any of the ${t.count} frames of ${C.TAKE}`);
   }
