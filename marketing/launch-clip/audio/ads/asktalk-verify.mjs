@@ -98,7 +98,8 @@ export default async function verifyAskTalk() {
   if (caps.some((c) => /download|install|get machina/i.test(`${c.text} ${c.say ?? ''}`))) bad.push('the ad carries a call to action (owner: the Install button is the call to action)');
   for (const c of caps) if (c !== close && /finally useful/i.test(`${c.text} ${c.say ?? ''}`)) bad.push(`the tagline appears before the end: "${c.text}"`);
   if (caps.some((c) => /great find/i.test(`${c.text} ${c.say ?? ''}`))) bad.push('the ad says the App Store subtitle');
-  if (A.TOTAL_SEC > 30) bad.push(`the ad runs ${A.TOTAL_SEC.toFixed(1)}s (max 30s)`);
+  // (owner, 2026-10-04: past the brief's 30s for the added detail; 35s is the new ceiling)
+  if (A.TOTAL_SEC > 35) bad.push(`the ad runs ${A.TOTAL_SEC.toFixed(1)}s (max 35s)`);
   if (A.TOTAL_SEC > 23.5) console.log(`  (the ad runs ${A.TOTAL_SEC.toFixed(1)}s: over the 15–20s aim)`);
 
   // the narrator

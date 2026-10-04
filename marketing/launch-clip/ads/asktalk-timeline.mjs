@@ -67,7 +67,7 @@ export const HITS = {
   part: beat(22.5), // the mark and the wordmark leave
   open: beat(23.5), // CUT to the chat: the question types itself
   send: beat(27), // Send is tapped; the cut to its answer lands on the touch
-  source: beat(39), // its source lifts on "which saves it used" (vo.json)
+  source: 626, // its source lifts on "which saves it used" (vo.json)
   ask2: beat(41), // CUT to a new chat, the big question typed
   send2: beat(41.5), // Send is tapped; its answer arrives on the touch
   lead: beat(42.5), // "It even finds…": the theme (its first line) lifts, and holds

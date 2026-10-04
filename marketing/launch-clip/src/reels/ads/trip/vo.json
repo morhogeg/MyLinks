@@ -35,7 +35,23 @@
   ]
  },
  {
-  "frame": 304,
+  "frame": 256,
+  "text": "And it shows you exactly which save it came from.",
+  "words": [
+   0.0,
+   0.35,
+   0.51,
+   0.79,
+   0.89,
+   1.51,
+   1.69,
+   1.93,
+   2.02,
+   2.21
+  ]
+ },
+ {
+  "frame": 344,
   "text": "Even across hundreds of saves, you get one clear answer.",
   "words": [
    0.0,
@@ -51,7 +67,7 @@
   ]
  },
  {
-  "frame": 432,
+  "frame": 472,
   "text": "And it finds the themes and connections you never noticed.",
   "words": [
    0.0,
@@ -67,7 +83,7 @@
   ]
  },
  {
-  "frame": 640,
+  "frame": 728,
   "text": "Download Makeena.",
   "words": [
    0.0,
@@ -75,7 +91,7 @@
   ]
  },
  {
-  "frame": 688,
+  "frame": 776,
   "text": "Everything you save, finally useful.",
   "words": [
    0.0,

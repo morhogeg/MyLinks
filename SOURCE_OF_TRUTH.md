@@ -2712,6 +2712,14 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-04 — Meta ad 2 (Ask): more detail, a smooth way into the graph.**
+  Branch `claude/ad-trip`, NOT merged. Owner: the cut from the chat to the
+  graph was abrupt, and the ads felt slim (+3–4s, past 30s approved). Both
+  editions: a new line on the answer's source ("And it shows you exactly which
+  save(s) it…"), the real source chip lifting; the graph grows out of the
+  Graph chip instead of a cut, and holds longer. Round 6 30.7s, talking
+  edition 33.9s; gates green (length ceiling raised 30s → 35s).
+
 - **2026-10-04 — Meta ad 2 (Ask), both editions re-voiced with Gemini TTS
   (Sulafat).** Branch `claude/ad-trip`, NOT merged. Owner: Gemini
   `gemini-3.8-flash-tts`, voice Sulafat, a tone per ad and an acting note per

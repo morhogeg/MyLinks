@@ -64,7 +64,7 @@ export const HITS = {
   part: beat(9), // the mark and the wordmark leave
   open: beat(11), // CUT to the chat: the simple question types itself
   send: beat(14.5), // Send is tapped; the cut to its answer lands on the touch
-  source: beat(17), // its source lifts on "which save it came from" (vo.json)
+  source: 300, // its source lifts on "which save it came from" (vo.json)
   feed: beat(21.5), // CUT to the feed rushing past ("…hundreds of saves")
   ask2: beat(23.5), // CUT to a new chat, the big question typed
   send2: beat(24), // Send is tapped; its answer arrives on the touch
@@ -107,7 +107,7 @@ export const CAPTIONS = [
   { at: beat(7), to: beat(10.5), text: 'With Machina, they can.', pace: PACE, style: 'Confident, a small knowing smile, answering the riddle.', duck: 0.4 },
   { at: beat(11.5), to: beat(15.5), text: "Ask it about\nanything you've saved.", pace: PACE, style: 'Inviting and easy.' },
   // (2026-10-04, owner: more detail) the answer's source, the real chip under it
-  { at: beat(16), to: beat(21), split: 5, text: 'And it shows you exactly which save it came from.', pace: PACE, style: "Reassuring and clear, a small emphasis on 'exactly'." },
+  { at: beat(16), to: beat(21.5), split: 5, text: 'And it shows you exactly\nwhich save it came from.', pace: PACE, style: "Reassuring and clear, a small emphasis on 'exactly'." },
   { at: beat(21.5), to: beat(29), split: 5, text: 'Even across hundreds of saves,\nyou get one clear answer.', pace: PACE, style: "Impressed and clear; emphasis on 'one clear answer'." },
   // (round 5, owner: the graph plays under "you never noticed.", so the line
   // stays up while it blooms: `until`)

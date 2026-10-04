@@ -91,7 +91,8 @@ export default async function verifyTrip() {
   if (cta.length !== 1 || cta[0].text !== 'Download Machina.' || caps[caps.indexOf(close) - 1] !== cta[0]) bad.push('the close is not "Download Machina." then the tagline');
   for (const c of caps) if (c !== close && /finally useful/i.test(`${c.text} ${c.say ?? ''}`)) bad.push(`the tagline appears before the end: "${c.text}"`);
   if (caps.some((c) => /great find/i.test(`${c.text} ${c.say ?? ''}`))) bad.push('the ad says the App Store subtitle');
-  if (A.TOTAL_SEC > 30) bad.push(`the ad runs ${A.TOTAL_SEC.toFixed(1)}s (max 30s)`);
+  // (owner, 2026-10-04: past the brief's 30s for the added detail; 35s is the new ceiling)
+  if (A.TOTAL_SEC > 35) bad.push(`the ad runs ${A.TOTAL_SEC.toFixed(1)}s (max 35s)`);
   if (A.TOTAL_SEC > 23.5) console.log(`  (the ad runs ${A.TOTAL_SEC.toFixed(1)}s: over the 15–20s aim)`);
 
   // the narrator

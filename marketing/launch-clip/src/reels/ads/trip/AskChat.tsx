@@ -34,6 +34,7 @@ import { useAdFrame, type AdFrame } from './format';
 const T = TAKE;
 const S = HITS;
 const linear = (t: number) => t;
+const ACCEL = (t: number) => t * t;
 const ARRIVE_DRIFTING = (t: number) => 0.75 * EASE_MODAL(t) + 0.25 * t;
 
 const take = takeOf(T);
@@ -97,7 +98,10 @@ export const chatKeys = (L: AdFrame): Key[] => {
     { f: S.send - 1, cy: 764, z: 2.56, ease: linear },
     // CUT on the Send touch: its answer and its source
     { f: S.send, cx: 196.5, cy: 300, z: 2.3, fy: y(990) },
-    { f: S.feed - 1, cy: 306, z: 2.38, ease: ARRIVE_DRIFTING },
+    { f: S.source - 12, cy: 306, z: 2.38, ease: ARRIVE_DRIFTING },
+    // down onto its source as the line names it (the chip clear of the bottom band)
+    { f: S.source + 4, cy: 376, z: 2.4, ease: EASE_IN_OUT },
+    { f: S.feed - 1, cy: 380, z: 2.42, ease: linear },
     // CUT to the feed rushing past, the camera pushing with it, at speed into the cut
     { f: S.feed, cx: 196.5, cy: 400, z: 2.0, fy: y(1000) },
     { f: S.ask2 - 1, cy: 410, z: 2.3, ease: EASE_GATHER },
@@ -125,6 +129,15 @@ export const chatKeys = (L: AdFrame): Key[] => {
   ];
 };
 
+/**
+ * Into the graph (2026-10-04, owner: the cut from the chat was abrupt). No
+ * cut: as the finger lands on the Graph chip, the chat pushes in on the chip
+ * (it holds its place on screen and grows) and fades, while the graph grows
+ * out of that same point (0.8 → 1, from the chip) and fades up, over INTO
+ * frames. The graph's own camera settles under it as before.
+ */
+const INTO = 18;
+
 const tapAt = (f: number, hit: number) => prog(f, hit - 10, hit + 18, linear);
 
 export const AskChat: React.FC<{ f: number }> = ({ f }) => {
@@ -149,17 +162,41 @@ export const AskChat: React.FC<{ f: number }> = ({ f }) => {
   const send2 = center(rectOf(T, at(T, 'typing2', TYPED2 - 1), 'send'));
   const graph = center(rectOf(T, at(T, 'graphChip'), 'graph2'));
 
+  // the first answer's source lifts on the line that names it ("which save(s)
+  // it…"), and settles as the next question arrives
+  const source = f >= S.send && f < S.feed ? prog(f, S.source - 2, S.source + 10, EASE_SPRING) * (1 - prog(f, S.feed - 12, S.feed - 2, EASE_IN_OUT)) : 0;
+
   // the theme (the answer's first line) lifts with the line that names it,
   // and settles as the camera moves on
   const theme =
     f >= S.sources2 ? prog(f, S.lead - 2, S.lead + 12, EASE_SPRING) * (1 - prog(f, S.chips[0] - 20, S.chips[0] - 4, EASE_IN_OUT)) : 0;
 
+  // the move into the graph: the chat, held on its last frame, pushes in on
+  // the Graph chip (which keeps its place on screen) as the graph grows out of it
+  const into = f >= S.graphTap && f < S.graphTap + INTO;
+  const e = EASE_IN_OUT(prog(f, S.graphTap, S.graphTap + INTO, linear));
+  const base = camAt(keys, S.graphTap - 1);
+  const p = { x: base.fx + (graph.x - base.cx) * base.z, y: base.fy + (graph.y - base.cy) * base.z };
+  const push = { ...base, cx: graph.x, cy: graph.y, fx: p.x, fy: p.y, z: base.z * mix(1, 1.6, prog(f, S.graphTap, S.graphTap + INTO, ACCEL)) };
+  const grow = into ? { opacity: e, transform: `scale(${mix(0.8, 1, e)})`, transformOrigin: `${p.x}px ${p.y}px` } : undefined;
+
   return (
     <AbsoluteFill>
+      {into && (
+        <AbsoluteFill style={{ opacity: 1 - e }}>
+          <AppShot take={T} i={at(T, 'graphChip')} cam={push}>
+            <Tap x={graph.x} y={graph.y} t={tapAt(f, S.graphTap)} />
+          </AppShot>
+        </AbsoluteFill>
+      )}
+      <AbsoluteFill style={grow}>
       <AppShot take={T} i={i} cam={view} motion={motion}>
         {/* Send: a light tap on the dark button; the cut lands on the touch */}
         <Tap x={send1.x} y={send1.y} tone="light" t={tapAt(f, S.send)} />
         <Tap x={send2.x} y={send2.y} tone="light" t={f >= S.ask2 ? tapAt(f, S.send2) : 0} />
+        {source > 0.01 && (
+          <Lift take={T} i={i} rect={wholePoints(rectOf(T, i, 'chip'))} radius={12} lift={source} rise={5} grow={0.04} ring={0.7 * source} />
+        )}
         {theme > 0.01 && (
           <Lift take={T} i={i} rect={wholePoints(rectOf(T, i, 'lead'))} radius={10} lift={theme * 0.45} rise={2} grow={0.012} ring={0.5 * theme} />
         )}
@@ -191,6 +228,7 @@ export const AskChat: React.FC<{ f: number }> = ({ f }) => {
       {f >= S.graphTap && graphPos(f) % 1 > 0.01 && Math.floor(graphPos(f)) < GRAPH - 1 && (
         <AppShot take={T} i={i + 1} cam={view} motion={motion} opacity={graphPos(f) % 1} shadow={0} />
       )}
+      </AbsoluteFill>
     </AbsoluteFill>
   );
 };

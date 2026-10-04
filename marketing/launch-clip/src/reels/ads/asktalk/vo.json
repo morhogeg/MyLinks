@@ -87,7 +87,22 @@
   ]
  },
  {
-  "frame": 584,
+  "frame": 592,
+  "text": "And it shows you exactly which saves it used.",
+  "words": [
+   0.0,
+   0.13,
+   0.2,
+   0.47,
+   0.56,
+   1.21,
+   1.41,
+   1.71,
+   1.81
+  ]
+ },
+ {
+  "frame": 672,
   "text": "It even finds what connects them\u2026 so you see the theme running through your saves.",
   "words": [
    0.0,
@@ -108,7 +123,7 @@
   ]
  },
  {
-  "frame": 744,
+  "frame": 864,
   "text": "Makeena. Everything you save, finally useful.",
   "words": [
    0.0,

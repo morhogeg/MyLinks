@@ -1083,6 +1083,19 @@ edition stays **29.9s** ("It reads across…" got 1.5 beats, taken from the
 theme line's hold and the gap before the lockup; the graph shows ~1.6s, was
 ~2.1s).
 
+### More detail, and no cut into the graph (2026-10-04, owner)
+
+Both editions gain one line on a real feature the take already showed: every
+answer shows the save it came from. Round 6, after "Ask it about anything
+you've saved.": "And it shows you exactly which save it came from."; the
+talking edition, after "…one clear answer.": "And it shows you exactly which
+saves it used." The camera eases down onto the first answer's source chip
+(clear of the bottom band) and the chip lifts on "which". The cut into the
+graph is gone: the chat pushes in on the Graph chip and fades as the graph
+grows out of that point (`INTO`, 18 frames), and the graph holds 2–3 beats
+longer. Round 6 is **30.7s**, the talking edition **33.9s**; the owner
+approved going past the brief's 30s (the gate is now 35s).
+
 **Open:** the name arrives at ~10s (the script spends its first 10s on the
 viewer's problem), not by ~3s as the original Meta brief asked; 29.9s, at
 Meta's 30s limit; nobody has listened to the mix on speakers.
