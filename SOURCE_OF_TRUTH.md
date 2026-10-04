@@ -2460,6 +2460,23 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-04 (night) — LAUNCH FILM ENDS ON THE TAGLINE.** Branch
+  `claude/film-gemini-vo`. Owner: the final frame uses the tagline
+  "Everything you save, finally useful", and it leaves the beginning.
+  - **Endcard and closing voice line:** both are the tagline now. They were the
+    App Store subtitle, "Never lose another great find", which this film no
+    longer says.
+  - **The turn:** it is "Introducing Machina." alone, on screen and in the
+    voice; its tempo and pause cap were dropped (the line is short now).
+  - **Voicing:** 2 new Gemini takes (Sulafat, run 3); both fit as performed.
+  - **verify** now fails if the tagline appears anywhere but the endcard and
+    the last line.
+  - **Verified:** `tsc`, verify, and stills of the endcard and the turn in
+    both formats (the tagline fits under the wordmark). Re-mixed; both spoken
+    editions were rendered and sent.
+  - **Not verified:** nobody has listened. The App Store listing's own subtitle
+    is untouched (docs/APP_STORE.md).
+
 - **2026-10-04 (final) — LAUNCH FILM: FULL CAPTIONS IN THE NEW MOTION.**
   Branch `claude/film-gemini-vo`. The owner's final call for every video
   (relayed from `claude/ad-todo`, 75d129f / 6187257): "I like the new version

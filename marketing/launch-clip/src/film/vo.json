@@ -49,15 +49,10 @@
  },
  {
   "bar": 6.45,
-  "text": "Introducing Makeena. Everything you save, finally useful.",
+  "text": "Introducing Makeena.",
   "words": [
-   0.03,
-   0.813,
-   1.93,
-   2.417,
-   2.594,
-   3.34,
-   3.795
+   0.05,
+   0.844
   ]
  },
  {
@@ -171,14 +166,14 @@
  },
  {
   "bar": 30.1,
-  "text": "Makeena. Never lose another great find.",
+  "text": "Makeena. Everything you save, finally useful.",
   "words": [
    0.06,
-   1.02,
-   1.436,
-   1.783,
-   2.338,
-   2.754
+   1.05,
+   1.673,
+   1.9,
+   2.71,
+   3.17
   ]
  }
 ]
