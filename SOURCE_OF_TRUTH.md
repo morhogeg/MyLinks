@@ -2720,6 +2720,20 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-04 — FINAL caption call: full narration, new motion, every
+  video.** Branch `claude/ad-todo`. The owner rejected the grey highlight,
+  saw a no-captions cut and a full-captions cut, and picked the full one:
+  "apply that across all the videos". So the headline captions below are
+  superseded. Captions are each video's full chunked narration with no
+  highlight. `KineticLine` (`src/reels/kit/Type.tsx`, 75d129f) now uses
+  the Headline motion with the same props, so every caption system built on
+  it switches automatically: each line rises out of its mask 3 frames before
+  its first word, over 9 frames, with no blur, and rolls out in 5 frames. Ad
+  3's cuts default to `captions: 'full'`. The other sessions were told to
+  take this `Type.tsx`, drop any headlines and render: ad-card, ad-trip,
+  ask, find, revisit, film, save. **Verified:** `tsc`; ad 3's audio gates;
+  rendered Revisit frames rise cleanly on the new `KineticLine`. **Not
+  verified:** the other branches' renders (their sessions own them).
 - **2026-10-04 — Headline captions + a new caption motion (Meta ad 3 first,
   then every video).** Branch `claude/ad-todo`. Owner: "headline captions",
   and the caption animation was "dated and laggy". The narrator still says
