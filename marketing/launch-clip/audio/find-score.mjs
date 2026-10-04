@@ -115,29 +115,7 @@ for (let f0 = 0; f0 < H.lockup; f0 += BAR_FRAMES) {
   }
 }
 
-// ── drums: from the first card's landing to the lockup, per beat
-// (four on the floor, backbeat claps, 16th hats, off-beat opens)
-for (let fr = DRUMS[0]; fr < DRUMS[1]; fr += BEAT_FRAMES) {
-  const d = density(fr);
-  const inBar = (fr % BAR_FRAMES) / BEAT_FRAMES; // 0–3
-  kick(t(fr), (inBar % 2 ? 0.34 : 0.42) + 0.2 * d);
-  if (inBar % 2) clap(t(fr), 0.17 + 0.05 * d);
-  if (inBar === 2) rim(t(fr + 0.75 * BEAT_FRAMES), 0.08 + 0.04 * d);
-  for (let k = 0; k < 4; k++) {
-    const accent = k === 0 ? 0.9 : k % 2 ? 1 : 0.55;
-    hat(t(fr + k * 4), 0.034 * accent * d, k % 2 ? 0.22 : -0.18);
-    shaker(t(fr + k * 4), 0.02 * d, k % 2 ? 0.34 : -0.3);
-  }
-  hat(t(fr + 8), 0.03 * d, 0.1, true);
-}
-
-// ── the lockup: one held voicing under the end, a single breath (the reel's)
-for (const m of [48, 64, 67, 72]) pad(t(H.lockup), TOTAL_SEC - t(H.lockup) - 0.2, m, 0.08, m === 64 ? -0.4 : 0.35);
-
-// ── melody (FM keys): the same small falling figure (D, B, G) answers each
-// thing found, from its beat; a figure that would land inside a narrator
-// line waits for the beat after it. Home on C for the lockup, its last note
-// AFTER the last word (the reel's close)
+// ── where the narrator is speaking, in frames (from the voice manifest)
 const MANIFEST = JSON.parse(fs.readFileSync(path.join(root, 'out', 'vo', 'find', 'manifest.json'), 'utf8'));
 const spoken = CAPTIONS.map((c) => {
   const m = MANIFEST.find((x) => x.frame === c.at);
@@ -148,6 +126,35 @@ const clearOfVoice = (from, len) => {
   for (const [a, b] of spoken) if (f < b + 2 && f + len > a) f = Math.ceil((b + 2) / BEAT_FRAMES) * BEAT_FRAMES;
   return f;
 };
+// Noise-based sounds (hats, shakers, whooshes, risers) stay OUT from under
+// the voice (2026-10-04, the Gemini narrator: noise under it reads as static
+// between its sentences); tonal parts and kicks still play through
+const voiced = (from, len = 1) => spoken.some(([a, b]) => from < b + 4 && from + len > a - 4);
+
+// ── drums: from the first card's landing to the lockup, per beat
+// (four on the floor, backbeat claps, 16th hats, off-beat opens)
+for (let fr = DRUMS[0]; fr < DRUMS[1]; fr += BEAT_FRAMES) {
+  const d = density(fr);
+  const inBar = (fr % BAR_FRAMES) / BEAT_FRAMES; // 0–3
+  kick(t(fr), (inBar % 2 ? 0.34 : 0.42) + 0.2 * d);
+  if (inBar % 2) clap(t(fr), 0.17 + 0.05 * d);
+  if (inBar === 2) rim(t(fr + 0.75 * BEAT_FRAMES), 0.08 + 0.04 * d);
+  for (let k = 0; k < 4; k++) {
+    const accent = k === 0 ? 0.9 : k % 2 ? 1 : 0.55;
+    if (voiced(fr + k * 4, 4)) continue;
+    hat(t(fr + k * 4), 0.034 * accent * d, k % 2 ? 0.22 : -0.18);
+    shaker(t(fr + k * 4), 0.02 * d, k % 2 ? 0.34 : -0.3);
+  }
+  if (!voiced(fr + 8, 8)) hat(t(fr + 8), 0.03 * d, 0.1, true);
+}
+
+// ── the lockup: one held voicing under the end, a single breath (the reel's)
+for (const m of [48, 64, 67, 72]) pad(t(H.lockup), TOTAL_SEC - t(H.lockup) - 0.2, m, 0.08, m === 64 ? -0.4 : 0.35);
+
+// ── melody (FM keys): the same small falling figure (D, B, G) answers each
+// thing found, from its beat; a figure that would land inside a narrator
+// line waits for the beat after it. Home on C for the lockup, its last note
+// AFTER the last word (the reel's close)
 const FOUND_FIGURE = [[0, 74], [16, 71], [32, 67]]; // [frames after its start, midi]
 for (const found of [H.found1, H.found2, H.chipTap + 16, H.cardTap + 16]) {
   const from = clearOfVoice(found + 16, 40);
@@ -159,19 +166,26 @@ keys(t(H.lockup + 80), 76, 0.12, 0.2, 2.8); // E, softer, in the breath after th
 keys(t(Math.ceil((lastWord + 4) / 8) * 8), 79, 0.19, -0.2, 2.8); // G after "find."
 
 // ── risers, each ENDING on the reveal it leads into
-for (const [from, to] of RISERS) riser(t(from), t(to - from), 0.09);
+// (a riser the voice runs into starts after the last word, if it still
+// has a beat to rise in; otherwise it is left out)
+for (const [from, to] of RISERS) {
+  let a = from;
+  for (const [s0, s1] of spoken) if (a < s1 + 4 && to > s0 - 4) a = s1 + 4;
+  if (to - a >= BEAT_FRAMES) riser(t(a), t(to - a), 0.09);
+}
 
 // ── sound design, on the picture's frames
 // the hook: the feed flying past, and back
-whoosh(t(H.scroll), 1.0, 0.025, -0.3);
-whoosh(t(H.scrollBack), 0.6, 0.025, 0.3);
+const swoosh = (f, len, gain, pan) => { if (!voiced(Math.round(f * FPS) - 2, Math.round(len * FPS))) whoosh(f, len, gain, pan); };
+swoosh(t(H.scroll), 1.0, 0.025, -0.3);
+swoosh(t(H.scrollBack), 0.6, 0.025, 0.3);
 // the taps
 for (const f of [H.fieldTap, H.chipTap, H.cardTap]) tick(t(f), 0.1, 1.2);
 // the typing, on 8ths
 for (const [a, b] of typing) for (let fr = Math.ceil(a / 8) * 8; fr <= b; fr += 8) tick(t(fr), 0.035, 1.6 + ((fr / 8) % 3) * 0.08);
 // each query deleted a word at a time (falling ticks)
 for (const [from, n] of [[H.clear1, STEPS1], [H.clear2, STEPS2]]) for (let k = 0; k < n; k++) tick(t(from + k * DELETE_FRAMES), 0.03, 1.5 - k * 0.07);
-for (const f of [H.back1, H.back2]) whoosh(t(f) - 0.05, 0.45, 0.04, 0.2);
+for (const f of [H.back1, H.back2]) swoosh(t(f) - 0.05, 0.45, 0.04, 0.2);
 // each thing found: weight on the landing (a sub sits under the speech
 // band), the shimmer clear of the voice
 for (const f of [H.found1, H.found2]) {
@@ -180,9 +194,9 @@ for (const f of [H.found1, H.found2]) {
 }
 // the source tapped: every video lands
 sub(t(H.chipTap), 43, 0.26, 0.3);
-whoosh(t(H.cardTap), 0.35, 0.05, -0.15);
+swoosh(t(H.cardTap), 0.35, 0.05, -0.15);
 // thrown out into the lockup; the mark strikes into air
-whoosh(t(H.lockup) - 0.1, 0.7, 0.09, 0);
+swoosh(t(H.lockup) - 0.1, 0.7, 0.09, 0);
 impact(t(H.markStrike), 0.34);
 shimmer(t(H.markStrike) + 0.08, [79, 84, 88, 91], 0.055);
 

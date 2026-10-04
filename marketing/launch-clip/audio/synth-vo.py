@@ -7,9 +7,11 @@
 #   film →  out/vo/line-NN.wav + out/vo/manifest.json
 #   reel →  out/vo/reel/line-NN.wav + out/vo/reel/manifest.json
 #
-# ONE NARRATOR. Every Machina video speaks with the voice config below (the
+# THE NARRATOR. The film and the reel speak with the voice config below (the
 # film's, owner-approved): Kokoro `af_heart` at 0.95, "Machina" respelled for
-# the synthesizer's ear. A new video adds a SCRIPT, never a new voice.
+# the synthesizer's ear. Since 2026-10-03 (owner) the FIND clip is voiced by
+# Gemini TTS, Sulafat, with its own tone and per-line direction (ENGINE below,
+# audio/gemini_tts.py); its takes are voiced on GitHub (narration-tts.yml).
 #
 # The film's lines MIRROR `SUBTITLES` in timeline.mjs (bar = caption start)
 # plus one closing line over the endcard; they live here because a few carry

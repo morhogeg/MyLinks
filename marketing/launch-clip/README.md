@@ -673,9 +673,25 @@ find` → `public/clips/find/score-vo.wav` (committed, mastered like the reel);
 `python3 audio/synth-vo.py find` → `out/vo/find/`; `scripts/find-stills.mjs`;
 the "find clip" section of `npm run verify`.
 
+**Its voice (2026-10-04, owner).** Gemini TTS, voice Sulafat
+(`gemini-3.8-flash-tts`), not the film's Kokoro: each video gets its own tone,
+and this one is relatable frustration turning into relief. Every caption
+carries its acting note (`style`) and the clip's pace note (`pace`) in
+`clips/find-timeline.mjs`. A line changed or re-directed needs a new take:
+the raw takes are voiced on GitHub (`.github/workflows/narration-tts.yml`, the
+repo's `GEMINI_API_KEY`) by committing `audio/narration-request.json` with its
+`run` bumped, and land in `audio/vo-takes/` (keyed by text and direction);
+`synth-vo.py find` then builds the lines from them offline. The shared daily
+quota is 100 requests, one per line. The reads ran faster than directed
+(about 160 to 340 words a minute), so the captions were re-timed to them:
+each leaves 0.47 to 0.6s after its last word and the picture carries on. The
+score keeps its noise sounds (hats, shakers, whooshes, risers) out from under
+the voice. This container's ffmpeg has no Rubber Band, so a line's `tempo`
+cannot be applied here.
+
 ```bash
 npm run reel:app && CAPTURE_ONLY=findClip npm run reel:capture   # the clip's take (the others keep theirs)
-python3 audio/synth-vo.py find                                    # after a line changes
+python3 audio/synth-vo.py find                                    # after a line changes (from the takes)
 node audio/find-score.mjs && node audio/mix-vo.mjs find           # after a timing change
 npm run verify
 npx remotion render src/index.ts MachinaFind out/machina-find.mp4
@@ -689,9 +705,9 @@ rules below): a drift that stopped dead for a push, a rack focus that lost
 whose removal (or whose lift reaching exactly 0) re-rastered the card on a
 still frame. After: no one-frame freeze or jump anywhere outside the typing
 and the scroll. Each tap's pad lands on the frame the app responds and its
-tick sounds; the narrator sits 4.2–7.1dB over the music in the speech band;
-the mix is −14.0 LUFS, −1.25 dBTP (−1.33 after the render's AAC). Nobody has
-listened to it on speakers.
+tick sounds; the narrator sits 8.1–17.0dB over the music in the speech band
+(the Gemini voice, noise sounds kept clear of it); the mix is −14.0 LUFS,
+−1.25 dBTP. Nobody has listened to it on speakers.
 
 ## Motion language
 

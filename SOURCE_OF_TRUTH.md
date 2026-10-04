@@ -2645,6 +2645,26 @@ exact-match, capped.
   script's titles follow, the docs name Manson, and the `revisit` take's data
   is re-captured (shared with `claude/clip-save`, where it was shot; no other
   take changes). No rendered video showed the old card.
+- **2026-10-04 — FIND clip re-voiced: Gemini TTS, Sulafat (owner).** Branch
+  `claude/clip-find`, not merged. The owner's new house narrator, with this
+  clip's own tone (relatable frustration turning into relief) and a
+  per-line acting note on every caption. The Gemini pipeline came over from
+  `claude/ad-todo` unchanged (`gemini_tts.py`, `vo-audition.py`,
+  `narration-run.py`, `narration-tts.yml`); `synth-vo.py` gained the engine
+  switch, with FIND on `gemini-3.8-flash-tts` and Kokoro for the film and reel
+  re-checked byte-identical. The seven lines were voiced once on GitHub
+  (narration request run 1, 7 of the day's 100 requests). The reads came out
+  FASTER than the 160 wpm directed (2.07 to 3.43s a line; "Type where you
+  saw it, and get everything from there." is 1.75s, about 340 wpm), so the
+  caption exits were re-timed to them (each leaves 0.47 to 0.6s after its
+  last word; the opening line now stays to frame 125). The picture's beats
+  are unchanged and the length is unchanged, 32.5s. The score keeps hats,
+  shakers, whooshes and risers out from under the voice (the static
+  pitfall); the narrator now sits 8.1 to 17.0dB over the music in the speech
+  band; −14.0 LUFS, −1.25 dBTP. Verified: `tsc`, `npm run verify` OK.
+  Not verified: nobody has listened (no audio here); `tempo` cannot run in
+  this container (its ffmpeg has no Rubber Band), so the fast line could only
+  be slowed by a new take.
 - **2026-09-29 — FIND clip: the tagline on one row.** Branch
   `claude/clip-find`, not merged. Owner (phone screenshot): the final frame
   should carry the tagline on ONE line under the wordmark. The FIND lockup
