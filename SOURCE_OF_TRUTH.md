@@ -2783,7 +2783,7 @@ save, finally useful." on the lockup. Takes `sources` and `saveclip`
 out/clips/machina-clip-save.mp4`; the launch-clip README's "Feature clip:
 SAVE" has the audio commands and the frame table.
 **What exists (feature clip: Ask, 2026-09-28, branch `claude/clip-ask`,
-awaiting owner review, not merged):** `MachinaAsk` (33.1s, 1080×1920, score +
+awaiting owner review, not merged):** `MachinaAsk` (34.7s, 1080×1920, score +
 narrator + captions, the deliverable; mastered to −14 LUFS, true peak ≤ −1
 dBTP), `MachinaAskSilent` and `MachinaAskClean`, built from the reel kit
 unchanged. Rebuilt to the owner's explainer brief (the first cut was rejected
@@ -3481,6 +3481,47 @@ exact-match, capped.
   script's titles follow, the docs name Manson, and the `revisit` take's data
   is re-captured (shared with `claude/clip-save`, where it was shot; no other
   take changes). No rendered video showed the old card.
+- **2026-10-04 — Ask clip: full captions, new motion (headlines reverted).**
+  Branch `claude/clip-ask`, not merged. Owner's final call after comparing
+  Meta ad 3 versions (relayed): full-narration captions in the new motion
+  everywhere. The headline pass below is reverted (Heads.tsx gone);
+  `kit/Type.tsx` taken from `claude/ad-todo` 75d129f, whose `KineticLine`
+  rises each line out of its mask 3 frames early and rolls it out before its
+  end. That made contiguous lines overlap for 3 frames (seen at frame 416), so
+  lines now sit ≥3 frames apart (new verify gate); line 5, the source tap and
+  its summary moved one beat later, and line 2 caps its pause at 0.18s (no
+  re-voice). Checked frames around three handovers and on holds: one caption
+  at a time, none clipped. Note: the highlight reel on this branch shares
+  `KineticLine`, so its captions take the same motion (not re-rendered here).
+- **2026-10-04 — Ask clip: headline captions.** Branch `claude/clip-ask`, not
+  merged. Owner decision for every video (relayed from the Meta ad 3
+  session): the screen shows each line's point in 2–5 words instead of the
+  full narration, and the word-by-word blur reveal ("dated and laggy") is
+  replaced by the kit `Headline` (taken unchanged with `kit/Type.tsx` from
+  `claude/ad-todo` 724655d; `KineticLine` kept). 12 headlines from the owner's
+  list, each anchored to its spoken word 3 frames early (`heads` in the
+  timeline, `Heads.tsx`), one line over the app, hook headline on frame 0;
+  the narrator, mix and timing are unchanged (no re-voice, no quota). Verify:
+  headlines 2–5 words, one line, on a real spoken word (the gate was tested
+  failing on a bad one). Stills of every headline beat and one handover
+  checked. Disk filled mid-pass (43 stale Remotion bundles in /tmp, ~0.7GB
+  each); cleared. **Not verified:** nobody has watched it on a phone.
+- **2026-10-04 — Ask clip re-voiced: Gemini TTS, Sulafat.** Branch
+  `claude/clip-ask`, not merged. Owner (relayed from the Meta ad 3 session):
+  the house narrator is now Gemini TTS, voice Sulafat, each video with its own
+  tone; Ask's is "curious, clear, quietly impressed", ~155 wpm, with a
+  direction on every caption (`style`, `pace`). Engine taken unchanged from
+  `claude/ad-todo` (`gemini_tts.py`, `vo-audition.py`, `narration-run.py`,
+  `narration-tts.yml`); `synth-vo.py` gained the engine switch for `ask` only,
+  and film and reel Kokoro lines re-synthesize byte-identical (verified).
+  Voiced on GitHub, 9 requests: run 1 failed in the 07:07 UTC burst with the
+  other sessions (no takes), run 2 voiced all 9. The read is longer: captions
+  re-laid from the measured speech, the graph plays 2 beats longer on unused
+  take frames, close follows; **34.7s** (was 33.1s). Hook read ~3.5dB softer,
+  so the music ducks to 0.33 under it (speech band ≥5.4dB on every line);
+  whooshes and the hook riser never play under a spoken line. No tempo
+  stretch (no Rubber Band ffmpeg here). Verify OK, −14.0 LUFS. **Not
+  verified:** nobody has listened; word times are estimated (±0.2s).
 - **2026-09-29 — Ask clip: tagline on one line, hook voice without the
   pause.** Branch `claude/clip-ask`, not merged. Owner QA: the close sets the
   tagline on ONE line (kit `Lockup` gains the Revisit branch's identical

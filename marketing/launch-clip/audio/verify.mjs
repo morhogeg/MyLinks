@@ -508,6 +508,12 @@ console.log('\n── clip: save');
     if (c.to > C.TOTAL_FRAMES) bad.push(`caption "${c.text}" runs past the clip`);
     if (c.at % (C.BEAT_FRAMES / 2)) bad.push(`caption "${c.text}" starts at ${c.at}, not on an 8th`);
   });
+  // (2026-10-04) the caption motion: a line rises 3 frames (HEAD_LEAD,
+  // kit/Type.tsx) before its `at`, so the line before it must be gone by then
+  caps.forEach((c, i) => {
+    const prev = caps[i - 1];
+    if (prev && !c.place && !prev.place && c.at - 3 < prev.to) bad.push(`"${c.text.split('\n')[0]}" rises at ${c.at - 3} while "${prev.text.split('\n')[0]}" runs to ${prev.to}: two captions at once`);
+  });
   const lines = caps.filter((c) => !c.place);
   const close = caps.find((c) => c.place === 'lockup');
   // a row of a line arrives whole when its first word is spoken, so a row
