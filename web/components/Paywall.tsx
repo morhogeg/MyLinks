@@ -176,8 +176,8 @@ export default function Paywall({
     // reads as an offer and not as a lost save.
     const waitingLine = reason === 'saves' || waiting > 0
         ? (waiting > 0
-            ? `${waiting} ${waiting === 1 ? 'save is' : 'saves are'} waiting to be read. Machina reads them on the 1st, or right away with Pro.`
-            : 'Your saves are kept. Machina reads them on the 1st, or right away with Pro.')
+            ? `${waiting} ${waiting === 1 ? 'save is' : 'saves are'} waiting to be read. Machina reads them next month, or right away with Pro.`
+            : 'Your saves are kept. Machina reads them next month, or right away with Pro.')
         : null;
     const trialLine = isTrial && !trialStarted
         ? `Your free trial starts once you have saved ${trialAnchorCards} things.`

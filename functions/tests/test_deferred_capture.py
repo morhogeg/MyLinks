@@ -8,6 +8,7 @@ number the test controls.
 """
 
 import types
+from datetime import datetime, timezone
 
 import pytest
 
@@ -55,6 +56,8 @@ def world(monkeypatch):
         monkeypatch.setattr(main, "refund_quota", state.quota.refund)
         monkeypatch.setattr(deferred_capture, "meter_quota", state.quota.meter)
         monkeypatch.setattr(deferred_capture, "refund_quota", state.quota.refund)
+        monkeypatch.setattr(deferred_capture, "quota_usage", lambda uid: {"saves": state.quota.used})
+        monkeypatch.setattr(deferred_capture, "quota_limit", lambda kind, plan="free": state.quota.limit)
         monkeypatch.setattr(main, "plan_for", lambda uid: plan)
         monkeypatch.setattr(main, "_rate_limited", lambda *a, **k: None)
         monkeypatch.setattr(main, "_require_app_check", lambda *a, **k: True)
@@ -111,7 +114,7 @@ def test_web_save_at_the_limit_keeps_the_card_waiting_not_failed(world):
     body = _json(resp)
     assert body["success"] and body["waiting"] and body["upgrade"] is True
     assert body["id"] == "c1" and body["kind"] == "saves"
-    assert body["message"] == "Saved. Machina will read it on the 1st, or now with Pro."
+    assert body["message"] == "Saved. Machina will read it next month, or now with Pro."
     card = db.docs["users/u1/links/c1"]
     assert card["status"] == "waiting" and "error" not in card
     assert "processingStartedAt" not in card and isinstance(card["waitingAt"], int)
@@ -139,7 +142,7 @@ def test_pro_abuse_ceiling_defers_too_without_an_upgrade_offer(world):
     world.make(limit=1000, used=1000, plan="pro")
     body = _json(main.share_ingest(_Req({"url": "https://example.com/p"})))
     assert body["waiting"] and body["upgrade"] is False
-    assert body["message"] == "Saved. Machina will read it on the 1st."
+    assert body["message"] == "Saved. Machina will read it next month."
 
 
 def test_under_the_limit_nothing_changes(world):
@@ -188,14 +191,106 @@ def test_single_image_tab_at_the_limit_returns_a_waiting_card(world):
     assert db.docs[f"users/u1/links/{body['id']}"]["status"] == "waiting"
 
 
-def test_shared_note_at_the_limit_is_saved_verbatim_without_ai(world, monkeypatch):
+def test_shared_note_at_the_limit_is_saved_verbatim_and_marked_pending(world, monkeypatch):
     db = world.make(limit=100, used=100)
     monkeypatch.setattr(main, "_enrich_shared_note",
                         lambda *a, **k: pytest.fail("no Gemini call past the allowance"))
     body = _json(main.share_ingest(_Req({"text": "buy oat milk and call Dana"})))
     assert body["saved"] and body["note"] and body["enriched"] is False
     card = db.docs[f"users/u1/links/{body['id']}"]
-    assert card["status"] == "unread"  # a complete, usable note, not a waiting one
+    # A complete, visible, searchable note: not a waiting card. Only its AI
+    # organization waits.
+    assert card["status"] == "unread" and card["summary"] == "buy oat milk and call Dana"
+    assert card["noteEnrichPending"] is True and isinstance(card["noteEnrichWaitingAt"], int)
+    assert world.quota.used == 100
+
+
+class _FakeAI:
+    """GeminiService stand-in for the note-enrichment path."""
+    calls = 0
+
+    def __init__(self, fail=False):
+        self.fail = fail
+
+    def analyze_text(self, text, **kw):
+        _FakeAI.calls += 1
+        if self.fail:
+            raise main.AnalysisError("model down")
+        return {"title": "Groceries and a call", "summary": "S", "tags": ["errands"],
+                "category": "Personal", "concepts": ["shopping"], "language": "en",
+                "actionableTakeaway": "Call Dana tonight"}
+
+    def embed_text(self, t):
+        return None
+
+
+def _pending_note(card_id, at, **extra):
+    return {f"users/u1/links/{card_id}": {
+        "url": "", "sourceType": "note", "status": "unread", "title": "buy oat milk",
+        "summary": "", "tags": [], "category": "", "createdAt": at,
+        "noteEnrichPending": True, "noteEnrichWaitingAt": at, **extra}}
+
+
+def test_upgrade_organizes_a_pending_shared_note(world, monkeypatch):
+    db = world.make(_pending_note("n1", NOW_MS - DAY_MS, captureType="text",
+                                  summary="buy oat milk and call Dana"),
+                    limit=1000, used=100, plan="pro")
+    monkeypatch.setattr(main, "GeminiService", lambda: _FakeAI())
+    report = deferred_capture.release_on_entitlement_write("u1", {"plan": "pro", "proUntil": None})
+    assert report["released"] == 1 and world.quota.used == 101
+    card = db.docs["users/u1/links/n1"]
+    # Still a normal card while queued; only the flag moved.
+    assert card["status"] == "unread" and "noteEnrichPending" not in card
+    (path, job) = next(iter(world.jobs().items()))
+    assert job["noteEnrich"] is True and job["charge"] == {"kind": "saves"}
+    world.run_job(path)
+    card = db.docs["users/u1/links/n1"]
+    assert card["title"] == "Groceries and a call" and card["tags"] == ["errands"]
+    assert card["summary"] == "buy oat milk and call Dana"  # the user's words, untouched
+    assert card["status"] == "unread" and "noteEnrichQueuedAt" not in card
+    assert world.jobs() == {} and world.quota.refunds == 0
+
+
+def test_monthly_release_organizes_a_typed_note_in_age_order(world, monkeypatch):
+    base = NOW_MS - 20 * DAY_MS
+    db = world.make({
+        **_pending_note("n1", base + 1),
+        "users/u1/links/w1": {"status": "waiting", "waitingAt": base + 2, "url": "https://e.com/w"},
+    }, limit=10, used=4)  # mid-month: reserve 5, so room for exactly 1 more
+    monkeypatch.setattr(main, "GeminiService", lambda: _FakeAI())
+    report = deferred_capture.run_waiting_release(plan_for=lambda uid: "free", now=MID_MONTH)
+    assert report["released"] == 1  # the older one: the note
+    assert db.docs["users/u1/links/w1"]["status"] == "waiting"
+    (path,) = world.jobs()
+    world.run_job(path)
+    card = db.docs["users/u1/links/n1"]
+    # A short typed note keeps its own words as its title; it gains the rest.
+    assert card["title"] == "buy oat milk" and card["category"] == "Personal"
+    assert card["tags"] == ["errands"] and card["needsEmbedding"] is True
+
+
+def test_a_failed_note_enrichment_refunds_its_unit(world, monkeypatch):
+    db = world.make(_pending_note("n1", NOW_MS), limit=1000, used=0, plan="pro")
+    monkeypatch.setattr(main, "GeminiService", lambda: _FakeAI(fail=True))
+    deferred_capture.release_waiting("u1", "pro")
+    (path,) = world.jobs()
+    world.run_job(path)
+    assert world.quota.used == 0 and world.quota.refunds == 1
+    assert db.docs["users/u1/links/n1"]["title"] == "buy oat milk"
+
+
+def test_a_long_typed_note_gets_the_ai_heading_only_while_its_title_is_derived(world, monkeypatch):
+    long_text = "Notes from the planning call\nWe agreed on three things."
+    db = world.make({
+        **_pending_note("n1", NOW_MS, title="Notes from the planning call", summary=long_text),
+        **_pending_note("n2", NOW_MS + 1, title="My own title", summary=long_text),
+    }, limit=1000, used=0, plan="pro")
+    monkeypatch.setattr(main, "GeminiService", lambda: _FakeAI())
+    deferred_capture.release_waiting("u1", "pro")
+    for path in list(world.jobs()):
+        world.run_job(path)
+    assert db.docs["users/u1/links/n1"]["title"] == "Groceries and a call"
+    assert db.docs["users/u1/links/n2"]["title"] == "My own title"
 
 
 def test_enrich_screenshots_still_refuse_at_the_limit(world):
@@ -401,11 +496,16 @@ def test_released_image_card_becomes_an_image_job(world):
     assert job["mimeType"] == "image/png" and job["cardId"] == "i1"
 
 
-# ── The monthly sweep: oldest first, inside the allowance ────────────────────
+# ── The daily sweep: oldest first, a reserve kept for fresh saves ────────────
 
-def test_monthly_sweep_releases_oldest_first_within_the_allowance(world):
+MID_MONTH = datetime(2026, 10, 15, 12, tzinfo=timezone.utc)
+LAST_DAYS = datetime(2026, 10, 29, 0, 30, tzinfo=timezone.utc)   # Oct has 31 days
+FIRST = datetime(2026, 11, 1, 0, 15, tzinfo=timezone.utc)
+
+
+def _five_out_of_order():
     base = NOW_MS - 20 * DAY_MS
-    docs = {
+    return {
         # Out of order on purpose: the sweep sorts by when each card was saved.
         "users/u1/links/c": {"status": "waiting", "waitingAt": base + 3, "url": "https://e.com/c"},
         "users/u1/links/a": {"status": "waiting", "waitingAt": base + 1, "url": "https://e.com/a"},
@@ -413,18 +513,59 @@ def test_monthly_sweep_releases_oldest_first_within_the_allowance(world):
         "users/u1/links/b": {"status": "waiting", "waitingAt": base + 2, "url": "https://e.com/b"},
         "users/u1/links/d": {"status": "waiting", "waitingAt": base + 4, "url": "https://e.com/d"},
     }
-    db = world.make(docs, limit=100, used=97)  # 3 left this month
-    report = deferred_capture.run_waiting_release(plan_for=lambda uid: "free")
+
+
+def _statuses(world):
+    return {k.rsplit("/", 1)[1]: v["status"] for k, v in world.cards().items()}
+
+
+def test_on_the_1st_the_backlog_gets_only_the_allowance_above_the_reserve(world):
+    world.make(_five_out_of_order(), limit=6, used=0)  # reserve 3 for new saves
+    report = deferred_capture.run_waiting_release(plan_for=lambda uid: "free", now=FIRST)
     assert report["released"] == 3 and report["still_waiting"] == 2
-    status = {k.rsplit("/", 1)[1]: v["status"] for k, v in world.cards().items()}
-    assert status == {"a": "processing", "b": "processing", "c": "processing",
-                      "d": "waiting", "e": "waiting"}
-    assert world.quota.used == 100  # they count toward the month they are read in
+    assert _statuses(world) == {"a": "processing", "b": "processing", "c": "processing",
+                                "d": "waiting", "e": "waiting"}
+    assert world.quota.used == 3  # they count toward the month they are read in
+
+
+def test_mid_month_the_reserve_holds_even_with_allowance_left(world):
+    # 6-save plan, 3 already used by fresh saves: 3 left, but all 3 are the
+    # reserve, so the backlog waits.
+    world.make(_five_out_of_order(), limit=6, used=3)
+    report = deferred_capture.run_waiting_release(plan_for=lambda uid: "free", now=MID_MONTH)
+    assert report["released"] == 0 and report["still_waiting"] == 5
+    assert world.jobs() == {} and world.quota.used == 3
+
+
+def test_in_the_last_three_days_the_backlog_may_use_the_reserve(world):
+    world.make(_five_out_of_order(), limit=6, used=3)
+    report = deferred_capture.run_waiting_release(plan_for=lambda uid: "free", now=LAST_DAYS)
+    assert report["released"] == 3
+    assert _statuses(world) == {"a": "processing", "b": "processing", "c": "processing",
+                                "d": "waiting", "e": "waiting"}
+    assert world.quota.used == 6
+
+
+def test_the_end_of_month_window_is_exactly_the_last_three_utc_days():
+    w = deferred_capture.in_end_of_month_window
+    assert not w(datetime(2026, 10, 28, 23, 59, tzinfo=timezone.utc))
+    assert w(datetime(2026, 10, 29, 0, 0, tzinfo=timezone.utc))
+    assert w(datetime(2026, 10, 31, 23, 59, tzinfo=timezone.utc))
+    assert not w(datetime(2026, 2, 25, tzinfo=timezone.utc))
+    assert w(datetime(2026, 2, 26, tzinfo=timezone.utc))  # 28-day February
+    assert deferred_capture.BACKLOG_RESERVE_FRACTION == 0.5
+    assert deferred_capture.END_OF_MONTH_DAYS == 3
+
+
+def test_upgrade_ignores_the_reserve(world):
+    world.make(_five_out_of_order(), limit=1000, used=0, plan="pro")
+    report = deferred_capture.release_on_entitlement_write("u1", {"plan": "pro", "proUntil": None})
+    assert report["released"] == 5
 
 
 def test_monthly_sweep_is_a_no_op_for_a_workspace_at_its_cap(world):
     db = world.make(_waiting(4), limit=100, used=100)
-    report = deferred_capture.run_waiting_release(plan_for=lambda uid: "free")
+    report = deferred_capture.run_waiting_release(plan_for=lambda uid: "free", now=LAST_DAYS)
     assert report["released"] == 0 and report["still_waiting"] == 4
     assert world.jobs() == {} and world.quota.used == 100
 
@@ -436,7 +577,7 @@ def test_monthly_sweep_serves_each_workspace_on_its_own_plan(world):
         "users/u2/links/x": {"status": "waiting", "waitingAt": NOW_MS, "url": "https://e.com/x"},
     }, limit=100, used=0)
     plans = []
-    deferred_capture.run_waiting_release(plan_for=lambda uid: plans.append(uid) or "free")
+    deferred_capture.run_waiting_release(plan_for=lambda uid: plans.append(uid) or "free", now=FIRST)
     assert sorted(plans) == ["u1", "u2"]
     assert len(world.jobs()) == 3
 
@@ -454,11 +595,12 @@ def test_a_waiting_card_with_nothing_to_read_becomes_an_ordinary_card(world):
 # ── Counting, cleanup ────────────────────────────────────────────────────────
 
 def test_entitlement_summary_reports_the_waiting_count(world, monkeypatch):
-    world.make(_waiting(3), limit=100, used=100)
+    world.make({**_waiting(3), **_pending_note("n1", NOW_MS)}, limit=100, used=100)
     monkeypatch.setattr(entitlement, "get_entitlement", lambda uid: {"plan": "free"})
     import quota
     monkeypatch.setattr(quota, "quota_usage", lambda uid: {"saves": 100, "asks": 0, "imports": 0})
-    assert entitlement.entitlement_summary("u1")["waiting"] == 3
+    # Three waiting cards plus one note whose AI organization waits.
+    assert entitlement.entitlement_summary("u1")["waiting"] == 4
 
 
 def test_deleting_a_waiting_card_deletes_its_snapshot(world):

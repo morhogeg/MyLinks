@@ -395,7 +395,22 @@ export async function enrichNoteCard(uid: string, cardId: string, text: string,
             headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()), ...(await authHeaders()) },
             body: JSON.stringify({ text: text.trim(), existingTags, existingCategories, uid }),
         });
-        if (!response.ok) return; // e.g. the note branch isn't deployed — leave the note as-is.
+        if (!response.ok) {
+            // Past the monthly allowance the note stays exactly as saved (a
+            // normal, searchable card) and its organization waits: flag it so
+            // the server enriches it on upgrade or next month
+            // (functions/deferred_capture.py). Not for the edit-path heading.
+            if (!opts.titleOnly) {
+                const body = await response.json().catch(() => null);
+                if (saveWallAsWaiting(response.status, body)) {
+                    await updateDoc(doc(db, 'users', uid, 'links', cardId), {
+                        noteEnrichPending: true,
+                        noteEnrichWaitingAt: Date.now(),
+                    });
+                }
+            }
+            return; // otherwise e.g. the note branch isn't deployed: leave the note as-is.
+        }
 
         const data = await response.json().catch(() => null);
         const l = data?.link;
@@ -516,7 +531,7 @@ export function mergeImportedTags(modelTags: string[], imported?: string[]): str
 
 /**
  * Returns `{ waiting }` when the retry crossed the monthly allowance: the card
- * is then kept as `waiting` (read on the 1st or on upgrade) rather than failed
+ * is then kept as `waiting` (read next month or on upgrade) rather than failed
  * again, and the caller announces it (lib/entitlement announceWaitingSave).
  */
 export async function retryFailedLink(uid: string, link: Link): Promise<{ waiting?: WaitingSave }> {

@@ -44,7 +44,7 @@ export interface Entitlement {
     quotas: { saves: QuotaMeter; asks: QuotaMeter; imports: QuotaMeter };
     /**
      * Saves kept past the monthly allowance and not read yet (`status:
-     * 'waiting'` cards). The server reads them on the 1st, or right away on an
+     * 'waiting'` cards). The server reads them next month, or right away on an
      * upgrade. 0 from a server that predates the field.
      */
     waiting: number;
@@ -186,8 +186,8 @@ export function saveWallAsWaiting(status: number, data: unknown): WaitingSave | 
 /** The line a waiting save shows, mirroring deferred_capture.waiting_message. */
 export function waitingSaveMessage(upgrade: boolean): string {
     return upgrade
-        ? 'Saved. Machina will read it on the 1st, or now with Pro.'
-        : 'Saved. Machina will read it on the 1st.';
+        ? 'Saved. Machina will read it next month, or now with Pro.'
+        : 'Saved. Machina will read it next month.';
 }
 
 /**

@@ -83,7 +83,7 @@ const keepWaiting = async (call: ApiCall, route: Route) => {
         body: JSON.stringify({
             success: true, saved: true, queued: false, waiting: true, id: cardId, kind: 'saves',
             upgrade: true, used: 100, limit: 100, waitingCount: 3,
-            message: 'Saved. Machina will read it on the 1st, or now with Pro.',
+            message: 'Saved. Machina will read it next month, or now with Pro.',
         }),
     });
 };
@@ -97,7 +97,7 @@ test('free plan at its save limit: the save is kept and the paywall says what is
     await saveLink(page, 'https://example.com/one-too-many');
     const paywall = page.getByRole('dialog', { name: 'Machina Pro' });
     await expect(paywall).toBeVisible();
-    await expect(paywall.getByText('3 saves are waiting to be read. Machina reads them on the 1st, or right away with Pro.')).toBeVisible();
+    await expect(paywall.getByText('3 saves are waiting to be read. Machina reads them next month, or right away with Pro.')).toBeVisible();
     // The card is kept, with its URL, waiting for its read: never failed.
     const card = await onlyCard(user);
     expect(card.data.status).toBe('waiting');
@@ -118,7 +118,7 @@ test('a waiting card reads as saved: no Retry, no error, one way to read it now'
 
     const card = page.getByRole('article').filter({ hasText: 'Waiting to be read' });
     await expect(card).toBeVisible();
-    await expect(card.getByText(/Saved\. Machina will read it on the 1st, or/)).toBeVisible();
+    await expect(card.getByText(/Saved\. Machina will read it next month, or/)).toBeVisible();
     await expect(card.getByRole('button', { name: /retry/i })).toHaveCount(0);
     await expect(page.getByText(/Couldn.t analyze/i)).toHaveCount(0);
     // The capture flow showed the paywall and nothing else: no error toast.
@@ -165,6 +165,43 @@ test('note: saved instantly, enriched in the background', async ({ page }) => {
     const card = await onlyCard(user);
     expect(card.data.sourceType).toBe('note');
     await expect(page.getByText(/test the share sheet on a real iPhone/).first()).toBeVisible();
+    expect(errors).toEqual([]);
+});
+
+test('note past the free limit: saved and visible now, organized later', async ({ page }) => {
+    const errors = collectPageErrors(page);
+    const { user } = await openAsNewUser(page, {
+        entitlement: FREE_ENTITLEMENT,
+        handlers: {
+            // The note branch of /api/analyze at the save wall.
+            '/api/analyze': (_c, route) => route.fulfill({
+                status: 429,
+                contentType: 'application/json',
+                body: JSON.stringify({ error: 'Monthly save limit reached', upgrade: true, kind: 'saves', used: 100, limit: 100 }),
+            }),
+        },
+    });
+    await page.getByRole('button', { name: 'Add to Machina' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Add link' });
+    await dialog.getByRole('button', { name: 'Note' }).click();
+    await dialog.getByRole('textbox').fill('Call the plumber about the kitchen tap on Thursday.');
+    await dialog.getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByText('Note saved')).toBeVisible();
+
+    // A normal, visible card: not a waiting card, no error. Only the AI
+    // organization is flagged to run on upgrade or next month.
+    await expect(page.getByText(/Call the plumber about the kitchen tap/).first()).toBeVisible();
+    await expect(page.getByText('Waiting to be read')).toHaveCount(0);
+    await expect.poll(async () => (await onlyCard(user)).data.noteEnrichPending).toBe(true);
+    const card = await onlyCard(user);
+    expect(card.data.status).not.toBe('waiting');
+    await expect(page.getByText(/couldn.t|limit reached|retry/i)).toHaveCount(0);
+
+    // The release runs the server's note enrichment (deferred_capture).
+    await adminUpdate(`users/${user.uid}/links/${card.id}`, {
+        noteEnrichPending: null, tags: ['plumbing'], category: 'Personal',
+    });
+    await expect(page.getByRole('article').getByText('plumbing')).toBeVisible();
     expect(errors).toEqual([]);
 });
 

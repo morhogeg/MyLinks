@@ -3770,7 +3770,9 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
             # and the paid Gemini analysis below. Past the wall the note is
             # STILL saved, verbatim: it is the user's own words, complete and
             # searchable as they are, so it becomes an ordinary note card (not a
-            # `waiting` one) and only the AI heading/tags are skipped.
+            # `waiting` one). Only its AI heading/tags wait: it is marked
+            # `noteEnrichPending` and organized on upgrade or next month
+            # (deferred_capture).
             q = _quota_blocked(uid, "saves", headers)
             over = None
             if q:
@@ -3786,6 +3788,8 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
             # sync_link_embedding (which fires on this create) generates one.
             link_data = _note_link_data({}, note_text, verbatim=True)
             link_data["needsEmbedding"] = True
+            if over is not None:
+                link_data.update(deferred_capture.note_pending_fields())
             card_ref.set(link_data)
             charged = None  # the card exists; _enrich_shared_note owns the unit now
             logger.info(f"Share ingest saved note for {_mask_uid(uid)}")
@@ -5690,6 +5694,95 @@ def _shared_note_entry(text, scraped: dict):
     return {"id": uuid.uuid4().hex[:12], "text": t, "createdAt": now_ms}
 
 
+def _derived_note_title(text: str) -> str:
+    """The title the Note tab derives from a note's text (web/lib/storage.ts
+    splitNoteText): its first non-empty line, cut at 90 characters."""
+    lines = [ln.strip() for ln in (text or "").strip().split("\n")]
+    first = next((ln for ln in lines if ln), "Note")
+    return f"{first[:90].rstrip()}…" if len(first) > 90 else first
+
+
+def _enrich_typed_note(uid: str, card_ref, card: dict, text: str) -> bool:
+    """Server-side twin of the Note tab's enrichNoteCard (web/lib/storage.ts),
+    for a note whose organization waited: tags, category, concepts, language
+    and the takeaway (set or cleared); the AI heading only for a long-form note
+    still wearing its derived title. The note's own words are never touched.
+    On failure the unit is refunded and the card stays as written."""
+    try:
+        ai = GeminiService()
+        tags, cats = get_user_vocabulary(uid)
+        analysis = ai.analyze_text(text, existing_tags=tags, existing_categories=cats)
+        if not isinstance(analysis, dict):
+            raise AnalysisError("Note analysis returned nothing")
+        full = _note_link_data(analysis, text)
+        update = {
+            "category": full["category"],
+            "concepts": full["concepts"],
+            "language": full["language"],
+            "metadata.actionableTakeaway": full["metadata"].get("actionableTakeaway") or gc_firestore.DELETE_FIELD,
+            "needsEmbedding": True,
+        }
+        if full.get("tags"):
+            update["tags"] = full["tags"]
+        ai_title = (analysis.get("title") or "").strip()
+        derived = _derived_note_title(text)
+        if (card.get("summary") or "").strip() and ai_title and ai_title != derived \
+                and card.get("title") == derived:
+            update["title"] = ai_title
+        card_ref.update(update)
+        return True
+    except Exception as e:
+        logger.error(f"Pending note enrichment failed (card kept as written): {e}", exc_info=True)
+        refund_quota(uid, "saves")
+        return False
+
+
+def _enrich_pending_note(ref, uid: str, data: dict) -> None:
+    """Organize a note released by deferred_capture (`noteEnrich` job).
+
+    The job's charge token is claimed first: from then on this run either
+    spends the unit (enrichment landed) or refunds it (both enrich paths refund
+    their own failures; a missing or changed card is refunded here). Shared
+    text uses the share-sheet path (_enrich_shared_note), a typed note its
+    Note-tab twin. A job whose token is already gone (refunded by the queue
+    prune) does no paid work and puts the note back to pending."""
+    db = get_db()
+    card_id = data.get("cardId")
+    try:
+        kind = capture_charge.claim(db, ref)
+        if not uid or not _valid_card_id(card_id):
+            if kind:
+                refund_quota(uid, kind)
+            return
+        card_ref = db.collection('users').document(uid).collection('links').document(card_id)
+        snap = card_ref.get()
+        card = (snap.to_dict() or {}) if snap.exists else None
+        if kind is None:
+            if card is not None:
+                card_ref.update({**deferred_capture.note_pending_fields(),
+                                 "noteEnrichQueuedAt": gc_firestore.DELETE_FIELD})
+            return
+        text = ((card or {}).get("summary") or (card or {}).get("title") or "").strip()
+        if not card or card.get("sourceType") != NOTE_SOURCE_TYPE or not text:
+            refund_quota(uid, kind)
+            return
+        if card.get("captureType") == TEXT_CAPTURE_TYPE:
+            _enrich_shared_note(uid, card_ref, text[:MAX_NOTE_LENGTH])
+        else:
+            _enrich_typed_note(uid, card_ref, card, text[:MAX_NOTE_LENGTH])
+        try:
+            card_ref.update({"noteEnrichQueuedAt": gc_firestore.DELETE_FIELD})
+        except Exception:
+            pass
+    except Exception as e:
+        logger.warning(f"Pending note enrichment aborted: {e}")
+    finally:
+        try:
+            ref.delete()
+        except Exception:
+            pass
+
+
 def _owned_blob_deleter(uid: str):
     """A function that deletes one of `uid`'s own Storage blobs by its
     download URL (and refuses anything else, card_cleanup.blob_path_for)."""
@@ -5845,6 +5938,10 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
     if data.get("snapshotOnly"):
         # A save kept past the monthly wall: snapshot the page, analyze later.
         _snapshot_capture(ref, uid, data)
+        return
+    if data.get("noteEnrich"):
+        # A note saved past the wall, now released: organize it.
+        _enrich_pending_note(ref, uid, data)
         return
     if data.get("enrich") and existing_card_id:
         # Screenshots completing an EXISTING partial card: a different job
