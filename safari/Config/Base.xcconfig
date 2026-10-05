@@ -1,0 +1,26 @@
+// Machina for Safari: the settings an owner actually changes, in one place.
+// Applied at the project level to both targets (app + extension). Target
+// settings in project.pbxproj only hold what never changes.
+
+// Apple team (same as the iOS app).
+DEVELOPMENT_TEAM = 8Y2M94RUHG
+
+// The app's bundle id. The extension is always this + ".extension" (Apple
+// requires an embedded extension's id to start with its app's id).
+// Deliberately NOT com.morhogeg.machina: that is the iOS app's App Store
+// record. A Mac-only listing keeps the iOS app's review and builds untouched.
+// See safari/README.md, "Distribution".
+MACHINA_BUNDLE_ID = com.morhogeg.machina.safari
+
+// App Store version (CFBundleShortVersionString). Bump per Mac App Store
+// release. Independent of extension/manifest.json "version", which the Chrome
+// build owns; the build script prints both so a mismatch is visible.
+MARKETING_VERSION = 1.0.0
+
+// Build number (CFBundleVersion). Must strictly increase per upload; CI
+// overrides it with the workflow run number (mac-app-store.yml).
+CURRENT_PROJECT_VERSION = 1
+
+// macOS 14 Sonoma shipped with Safari 17, so every supported Mac has a Safari
+// with MV3 service workers, storage.session (16.4) and keyboard commands.
+MACOSX_DEPLOYMENT_TARGET = 14.0
