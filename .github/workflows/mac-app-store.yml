@@ -1,0 +1,221 @@
+name: Mac → App Store (Safari extension)
+
+# Archives "Machina for Safari" (safari/MachinaSafari.xcodeproj: the Mac app
+# that carries the shared /extension code into Safari), verifies the signed
+# package, and optionally uploads it to App Store Connect.
+#
+# GATED ON PURPOSE: manual dispatch only, from the Actions tab. No push, no
+# schedule, no trigger branch. Nothing here runs because a commit landed, and
+# the upload needs a second explicit tick (`upload`). A Mac release is rare and
+# owner-driven; it must never ride along with /ship or an iOS build.
+#
+# One-time setup (owner): safari/store/LISTING.md, "Owner checklist". Reuses the
+# iOS workflow's ASC key and persistent signing .p12 secrets; adds one optional
+# secret pair for the Mac Installer certificate.
+
+on:
+  workflow_dispatch:
+    inputs:
+      upload:
+        description: >-
+          Upload the verified build to App Store Connect (TestFlight for Mac /
+          review). Leave OFF to only archive, export and verify.
+        type: boolean
+        default: false
+      confirm:
+        description: Type "mac" to confirm this is a deliberate Mac build.
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mac-app-store
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 30
+    env:
+      TEAM_ID: 8Y2M94RUHG
+      PROJECT: safari/MachinaSafari.xcodeproj
+      SCHEME: MachinaSafari
+      APP_NAME: Machina for Safari.app
+
+    steps:
+      - name: Refuse an unconfirmed run
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          if [ "$CONFIRM" != "mac" ]; then
+            echo "::error::confirm input was '$CONFIRM', expected 'mac'. Refusing to build."
+            exit 1
+          fi
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Select latest Xcode
+        # Same rule as ios-testflight.yml: newest Xcode 26 GA, never a beta.
+        run: |
+          XCODE="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | grep -vi beta | sort -V | tail -1)"
+          if [ -z "$XCODE" ]; then
+            echo "::error::No non-beta Xcode 26 on the runner."
+            exit 1
+          fi
+          echo "Selecting $XCODE"
+          sudo xcode-select -s "$XCODE"
+
+      # Own sequence (the Mac app is its own App Store record), kept well
+      # above any build the owner uploads by hand from Xcode.
+      - name: Compute build number
+        id: bn
+        run: echo "value=$(( 1000 + ${{ github.run_number }} ))" >> "$GITHUB_OUTPUT"
+
+      # Same persistent-identity approach as ios-testflight.yml (read the long
+      # comment there): import ONE .p12 so automatic signing reuses it instead
+      # of minting a certificate per run and hitting Apple's cap. The iOS .p12
+      # already holds Apple Development + Apple Distribution, and Apple
+      # Distribution signs Mac App Store apps too. A Mac App Store .pkg is also
+      # signed with a "Mac Installer Distribution" certificate; add it as the
+      # optional MAC_INSTALLER_P12_* secrets, or Xcode's cloud signing has to
+      # supply one at export time.
+      - name: Install signing certificates
+        env:
+          CERT_P12_BASE64: ${{ secrets.BUILD_CERTIFICATE_P12_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.BUILD_CERTIFICATE_PASSWORD }}
+          INSTALLER_P12_BASE64: ${{ secrets.MAC_INSTALLER_P12_BASE64 }}
+          INSTALLER_PASSWORD: ${{ secrets.MAC_INSTALLER_P12_PASSWORD }}
+        run: |
+          if [ -z "$CERT_P12_BASE64" ]; then
+            echo "::error::BUILD_CERTIFICATE_P12_BASE64 is not set (docs/IOS_CICD.md, 'Stable signing certificate'). Refusing to fall back to minting certificates."
+            exit 1
+          fi
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PW="$(openssl rand -base64 24)"
+          security create-keychain -p "$KEYCHAIN_PW" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PW" "$KEYCHAIN"
+          echo "$CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/build_cert.p12"
+          security import "$RUNNER_TEMP/build_cert.p12" -P "$CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          if [ -n "$INSTALLER_P12_BASE64" ]; then
+            echo "$INSTALLER_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/installer_cert.p12"
+            security import "$RUNNER_TEMP/installer_cert.p12" -P "$INSTALLER_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          else
+            echo "::warning::MAC_INSTALLER_P12_BASE64 not set. Export relies on cloud signing for the Mac Installer Distribution certificate; if export fails on the installer identity, add the secret (safari/store/LISTING.md)."
+          fi
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PW" "$KEYCHAIN" >/dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | sed 's/"//g')
+          echo "Identities in the CI keychain:"
+          security find-identity -v "$KEYCHAIN"
+
+      - name: Install App Store Connect API key
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+        run: |
+          mkdir -p ~/private_keys
+          echo "$ASC_KEY_P8_BASE64" | base64 --decode > ~/private_keys/AuthKey_${ASC_KEY_ID}.p8
+
+      # Signed archive, automatic signing, exactly like the iOS workflow (never
+      # unsigned archive + sign-at-export: that is how build 1018 lost its
+      # entitlements). The project copies /extension into the extension
+      # during this build.
+      - name: Archive
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          xcodebuild clean archive \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -destination 'generic/platform=macOS' \
+            -archivePath "$RUNNER_TEMP/MachinaSafari.xcarchive" \
+            CURRENT_PROJECT_VERSION=${{ steps.bn.outputs.value }} \
+            -allowProvisioningUpdates \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            -authenticationKeyPath ~/private_keys/AuthKey_${ASC_KEY_ID}.p8
+
+      - name: Verify the archived app
+        run: ./safari/build-safari.sh --verify "$RUNNER_TEMP/MachinaSafari.xcarchive/Products/Applications/$APP_NAME"
+
+      - name: Export package
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>teamID</key><string>${TEAM_ID}</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>destination</key><string>export</string>
+          </dict>
+          </plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/MachinaSafari.xcarchive" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -allowProvisioningUpdates \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            -authenticationKeyPath ~/private_keys/AuthKey_${ASC_KEY_ID}.p8
+          ls -la "$RUNNER_TEMP/export"
+
+      # Tripwire on the thing that would actually ship: crack the .pkg open and
+      # check both bundles are store-signed and sandboxed, with no debug
+      # entitlement. Fail here, never at App Review.
+      - name: Verify the exported package
+        run: |
+          PKG="$(ls "$RUNNER_TEMP"/export/*.pkg | head -1)"
+          test -n "$PKG" || { echo "::error::no .pkg exported"; exit 1; }
+          pkgutil --check-signature "$PKG" || { echo "::error::the .pkg is not signed with an installer identity"; exit 1; }
+          pkgutil --expand-full "$PKG" "$RUNNER_TEMP/expanded"
+          APP="$(find "$RUNNER_TEMP/expanded" -name "$APP_NAME" -maxdepth 4 -type d | head -1)"
+          test -n "$APP" || { echo "::error::app not found inside the .pkg"; exit 1; }
+          for TARGET in "$APP" "$APP/Contents/PlugIns/Machina Extension.appex"; do
+            ENT="$(codesign -d --entitlements :- "$TARGET" 2>/dev/null)"
+            echo "── $TARGET"; echo "$ENT"
+            echo "$ENT" | grep -q "com.apple.security.app-sandbox" || { echo "::error::$TARGET is not sandboxed"; exit 1; }
+            if echo "$ENT" | grep -q "com.apple.security.get-task-allow"; then
+              echo "::error::$TARGET still carries get-task-allow (a development signature); App Store would reject it."
+              exit 1
+            fi
+          done
+          codesign -dv "$APP" 2>&1 | grep -E "^Authority=" | head -3
+          ./safari/build-safari.sh --verify "$APP"
+
+      - name: Upload to App Store Connect
+        if: ${{ inputs.upload == true }}
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          cat > "$RUNNER_TEMP/UploadOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>teamID</key><string>${TEAM_ID}</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>destination</key><string>upload</string>
+          </dict>
+          </plist>
+          PLIST
+          echo "Uploading Machina for Safari build ${{ steps.bn.outputs.value }}"
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/MachinaSafari.xcarchive" \
+            -exportPath "$RUNNER_TEMP/upload" \
+            -exportOptionsPlist "$RUNNER_TEMP/UploadOptions.plist" \
+            -allowProvisioningUpdates \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            -authenticationKeyPath ~/private_keys/AuthKey_${ASC_KEY_ID}.p8

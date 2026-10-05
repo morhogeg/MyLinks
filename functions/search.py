@@ -19,6 +19,7 @@ from google.cloud.firestore_v1.base_vector_query import DistanceMeasure
 from google import genai
 
 from db import get_db
+from models import UNANALYZED_STATUSES
 from log_safe import mask_uid
 from ai_service import embedding_needs_repair, collect_notes_text
 import vector_store
@@ -795,7 +796,7 @@ def keyword_scan_cards(uid: str, query_text: str, exclude_ids: set = None,
         # answer in (matches recent_cards/category_cards) — and the anchor
         # rescue PINS its results to the front, so a failed placeholder must
         # never qualify.
-        if data.get("status") in ("processing", "failed"):
+        if data.get("status") in UNANALYZED_STATUSES:
             continue
         score = keyword_match_score(data, tokens)
         if score > 0:
@@ -981,7 +982,7 @@ def cards_by_ids(uid: str, ids: List[str]) -> List[dict]:
         if not snap.exists:
             continue
         data = snap.to_dict() or {}
-        if data.get("status") in ("processing", "failed"):
+        if data.get("status") in UNANALYZED_STATUSES:
             continue
         out.append(normalize_card_for_search(data, snap.id))
     return out
@@ -1383,7 +1384,7 @@ def category_cards(uid: str, category: str, limit: int = 10) -> List[dict]:
     out = []
     for doc in docs:
         data = doc.to_dict() or {}
-        if data.get("status") in ("processing", "failed"):
+        if data.get("status") in UNANALYZED_STATUSES:
             continue
         out.append(normalize_card_for_search(data, doc.id))
     out.sort(key=lambda c: c.get("createdAt") or 0, reverse=True)
@@ -1430,7 +1431,7 @@ def recent_cards(uid: str, limit: int = 12) -> List[dict]:
     out = []
     for doc in query.stream():
         data = doc.to_dict() or {}
-        if data.get("status") in ("processing", "failed"):
+        if data.get("status") in UNANALYZED_STATUSES:
             continue
         out.append(normalize_card_for_search(data, doc.id))
         if len(out) >= limit:
@@ -1541,7 +1542,7 @@ def sync_link_embedding(event: firestore_fn.Event[firestore_fn.Change[firestore_
         # (`processing` placeholder / retry optimistic write — content isn't
         # final and the terminal write re-fires this trigger) and `failed` cards
         # (not searchable; they re-embed when a retry flips them to `unread`).
-        if data.get("status") in ("processing", "failed"):
+        if data.get("status") in UNANALYZED_STATUSES:
             return
 
         # Where the vector lives depends on the vector-store phase (see

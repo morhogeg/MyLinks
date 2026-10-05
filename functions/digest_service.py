@@ -33,6 +33,7 @@ from google.cloud import firestore
 from db import get_db
 from entitlement import is_pro
 from log_safe import mask_uid
+from models import UNANALYZED_STATUSES
 
 logger = logging.getLogger(__name__)
 
@@ -182,6 +183,10 @@ def fetch_candidate_links(uid: str) -> List[dict]:
     for doc in docs:
         data = doc.to_dict() or {}
         if data.get("status") == "archived":
+            continue
+        # A card with no analysis yet (mid-capture, failed, or a save waiting
+        # for the 1st) has no summary to put in a digest.
+        if data.get("status") in UNANALYZED_STATUSES:
             continue
         if is_effectively_private(data, private_ids):
             continue

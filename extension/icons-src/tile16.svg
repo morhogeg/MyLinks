@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16" shape-rendering="crispEdges">
+  <!-- The 16px mark, drawn on the pixel grid so the brackets stay sharp in the
+       toolbar instead of blurring into the tile. -->
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#40404C"/>
+      <stop offset="1" stop-color="#121218"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="16" height="16" rx="3.5" fill="url(#tile)" shape-rendering="geometricPrecision"/>
+  <g fill="#FFFFFF">
+    <rect x="3" y="3" width="2" height="10"/>
+    <rect x="5" y="3" width="1" height="2"/>
+    <rect x="5" y="11" width="1" height="2"/>
+    <rect x="11" y="3" width="2" height="10"/>
+    <rect x="10" y="3" width="1" height="2"/>
+    <rect x="10" y="11" width="1" height="2"/>
+  </g>
+  <circle cx="8" cy="8" r="1.5" fill="#FFFFFF" shape-rendering="geometricPrecision"/>
+</svg>

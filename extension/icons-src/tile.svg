@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Machina mark on the graphite tile, for 24px and up. The glyph is the
+       app icon's (brackets and the point), scaled up so it reads at toolbar
+       size. Rendered to PNG by scripts/render-icons.mjs. -->
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#40404C"/>
+      <stop offset="1" stop-color="#121218"/>
+    </linearGradient>
+    <linearGradient id="ink" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#D9DEE8"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="1024" height="1024" rx="232" fill="url(#tile)"/>
+  <rect x="6" y="6" width="1012" height="1012" rx="226" fill="none" stroke="#FFFFFF" stroke-opacity="0.10" stroke-width="12"/>
+  <g transform="translate(512 512) scale(1.32) translate(-512 -500)" fill="url(#ink)">
+    <path d="M296 300 L396 300 L396 358 L354 358 L354 642 L396 642 L396 700 L296 700 Z"/>
+    <path d="M728 300 L628 300 L628 358 L670 358 L670 642 L628 642 L628 700 L728 700 Z"/>
+    <circle cx="512" cy="500" r="56"/>
+  </g>
+</svg>

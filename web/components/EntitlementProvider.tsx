@@ -45,6 +45,8 @@ interface EntitlementContextType {
     /** How many cards start that clock (the server owns the number). */
     trialAnchorCards: number;
     quotas: Entitlement['quotas'];
+    /** Saves kept past the monthly allowance, not read yet (the paywall says so). */
+    waiting: number;
     /** False until the first successful fetch; consumers hide meters until then. */
     loaded: boolean;
     refresh: () => Promise<void>;
@@ -68,6 +70,7 @@ const EntitlementContext = createContext<EntitlementContextType>({
     trialStarted: false,
     trialAnchorCards: 10,
     quotas: UNMETERED,
+    waiting: 0,
     loaded: false,
     refresh: async () => {},
     openPaywall: () => {},
@@ -131,7 +134,10 @@ export function EntitlementProvider({ children }: { children: ReactNode }) {
     const openPaywall = useCallback((reason: PaywallReason = 'manual') => {
         setPaywall({ open: true, reason });
         track('paywall_shown', { source: reason });
-    }, []);
+        // The save wall just kept a save as `waiting`: re-read the entitlement
+        // so the sheet's "N saves waiting" counts the one that opened it.
+        if (reason === 'saves') void refresh();
+    }, [refresh]);
 
     useEffect(() => {
         const onRequest = (e: Event) => {
@@ -192,6 +198,7 @@ export function EntitlementProvider({ children }: { children: ReactNode }) {
             trialStarted,
             trialAnchorCards: live?.trialAnchorCards ?? 10,
             quotas: live?.quotas ?? UNMETERED,
+            waiting: live?.waiting ?? 0,
             loaded: live !== null,
             refresh,
             openPaywall,

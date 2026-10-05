@@ -1081,6 +1081,9 @@ def _scrape_linkedin_url(url: str) -> dict:
             "truncated": truncated,
             "capture_reason": "teaser",
             "source_name": source_name,
+            # Where the redirect landed (a lnkd.in short link's real post URL):
+            # feeds finalUrlKey dedupe and the card's `sourcePlatform` stamp.
+            "final_url": final_url,
             # Poster ONLY for actual VIDEO posts: LinkedIn serves a generic
             # "Posted on LinkedIn" branding og:image even for plain TEXT posts, so
             # we can't blindly trust og:image. Gating on og:type=video / og:video
@@ -1093,7 +1096,7 @@ def _scrape_linkedin_url(url: str) -> dict:
         # never a fabricated summary), but keep the slug author: who posted is
         # still knowable from the URL even when the page won't load.
         return {"html": "", "title": "", "text": "[no text content available]",
-                "source_name": linkedin_author_from_url(url),
+                "source_name": linkedin_author_from_url(url), "final_url": url,
                 "truncated": True, "capture_reason": "login_wall"}
 
 

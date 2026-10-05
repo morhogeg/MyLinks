@@ -71,7 +71,7 @@ export default function Paywall({
     /** Re-fetch the entitlement after a purchase or restore. */
     onPurchased: () => Promise<void>;
 }) {
-    const { isTrial, trialStarted, trialAnchorCards, daysLeft, isPro, source } = useEntitlement();
+    const { isTrial, trialStarted, trialAnchorCards, daysLeft, isPro, source, waiting } = useEntitlement();
     const availability = purchasesAvailability();
     const [packages, setPackages] = useState<ProPackage[] | null>(null);
     const [period, setPeriod] = useState<ProPeriod>('annual');
@@ -171,6 +171,14 @@ export default function Paywall({
     if (!isOpen) return null;
 
     const canBuy = availability.available && !!selected && busy === null;
+    // At the save wall nothing was refused: the save was kept as `waiting`
+    // (functions/deferred_capture.py). Say so, with the backlog, so the sheet
+    // reads as an offer and not as a lost save.
+    const waitingLine = reason === 'saves' || waiting > 0
+        ? (waiting > 0
+            ? `${waiting} ${waiting === 1 ? 'save is' : 'saves are'} waiting to be read. Machina reads them next month, or right away with Pro.`
+            : 'Your saves are kept. Machina reads them next month, or right away with Pro.')
+        : null;
     const trialLine = isTrial && !trialStarted
         ? `Your free trial starts once you have saved ${trialAnchorCards} things.`
         : isTrial && daysLeft !== null
@@ -205,6 +213,9 @@ export default function Paywall({
                             <h2 className="mt-1.5 text-[21px] font-bold text-text leading-tight tracking-[-0.01em]">
                                 {HEADLINE[reason]}
                             </h2>
+                            {waitingLine && (
+                                <p className="mt-1 text-[13px] text-text-secondary leading-snug">{waitingLine}</p>
+                            )}
                             {trialLine && (
                                 <p className="mt-1 text-[13px] text-text-secondary leading-snug">{trialLine}</p>
                             )}

@@ -233,7 +233,19 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (2026-09-25): install build **1336** (screenshot-completion rebuild + Machina-mark round; 1335 was the first cut), then the 1334 steps below if not yet done
+> ## 🚨 OWNER ACTION (2026-10-05): install build **1346** (waiting saves, My notes, first-run fixes, theme follows the device)
+>
+> Merge `adf023b`; backend, rules and web all live (§9 2026-10-05). QA on
+> 1346: (1) on a FREE test account past 100 saves, share a link from Safari:
+> the sheet says "Saved ✓ / Machina will read it next month, or now with Pro";
+> the card shows "Waiting to be read" (no red, no Retry); the next app open
+> shows the paywall with "N saves waiting". (2) + → Note, then View → My notes:
+> the note is listed. (3) Fresh install on a light-mode phone: the app opens
+> in light (a brief dark flash at cold launch is a known native leftover).
+> (4) Sign in on a second device: no tour. (5) New account: no extension
+> mention on web onboarding. Owner-only: none (convert script found 0 cards).
+>
+> ## (superseded) OWNER ACTION (2026-09-25): install build **1336** (screenshot-completion rebuild + Machina-mark round; 1335 was the first cut), then the 1334 steps below if not yet done
 >
 > **1335** (run #335, merge `2cbfdbf`; backend live via functions #116/#117)
 > rebuilds "Add screenshots" on Facebook/LinkedIn partial cards: review strip
@@ -1128,6 +1140,44 @@ The multi-user auth work described below **was** fully written but not live:
     keyboard never covers inputs (LinkDetailModal category/tag, AddToCollection,
     AddLinkForm on iPhone SE); pull-to-refresh vs edge-swipe conflicts; failed
     card → Retry; Apple + Google sign-in; account deletion end-to-end.
+    **Now narrower (2026-10-04):** the web halves of failed-card Retry,
+    offline save, and account deletion are covered by the E2E suite (11b).
+    What's left here is truly native: share sheet, keyboard, haptics,
+    pull-to-refresh, real Apple/Google popups, StoreKit.
+
+11b. **[x] E2E user-journey suite — ADDED 2026-10-04** (`e2e/`, workflow
+    `e2e-journeys.yml` on `web/**`/`e2e/**`/`firestore.rules` pushes + PRs).
+    Playwright drives the real web app at iPhone size (plus a desktop pass)
+    against the Auth + Firestore emulators with the **live rules**; Cloud
+    Functions are stubbed. 40 tests: landing/legal, sign-up (incl. claim
+    endpoints down → self-serve workspace), consent/welcome/tour persistence,
+    first link save → pipeline hand-off → ready card, failed hand-off, free
+    limit → paywall, notes, duplicates, offline save, search, favorite/note/
+    archive/delete, collections, Ask (stream, sources, history, error, limit),
+    delete account (+ failure), two-account isolation, export, and a screen
+    sweep (every tab/view, light+dark, Hebrew, long titles; no console errors,
+    no sideways scroll). `npm test` in `e2e/`. Known bugs are `test.fail()`.
+    **Findings still open (owner decides / next session fixes):**
+    - **[x] E1 — FIXED 2026-10-05:** one toast per failed hand-off (the
+      enqueue `catch` records the card id; the snapshot effect skips it).
+    - **[x] E2 — FIXED 2026-10-05 via "save it, analyze it later" (26a).**
+    - **[x] E3 — FIXED 2026-10-05:** My notes lists note cards (+ → Note) as
+      their own entries beside per-card comments (`lib/notes.ts`
+      `isWrittenNote`; shared text and Ask answers excluded; private cards
+      still excluded). `e2e/tests/08-notes.spec.ts`.
+    - **[x] E4 — FIXED 2026-10-05:** web onboarding, tour step 1 and the empty
+      library name only + and the iPhone share sheet. Settings → Browser
+      extension kept (it manages the extension token), sub-line "Preview,
+      installed by hand". `e2e/tests/09-first-run.spec.ts`.
+    - **[x] E5 — FIXED 2026-10-05:** `create_workspace` stamps `graphVersion`
+      (`link_service.GRAPH_VERSION`; `test_workspace_graph_version.py` fails on
+      drift from `web/lib/rebuildConnections.ts`); `ensureGraphVersion` stamps
+      an empty library without calling `rebuild_connections`. Locked create
+      rule deliberately unchanged.
+    - **[x] E6 — FIXED 2026-10-05:** tour seen = `tourSeenAt` on the user doc
+      (`lib/tourSeen`, reconciled in AuthProvider, doc wins; a fresh workspace
+      ignores a device key left by another account). Added to the user-doc
+      update allowlist in both rules files.
 
 8a. **[x] Trademark clearance — CLOSED 2026-08-23 by owner decision.** Search
     run same day; the owner reviewed the one live conflict (US 6278707, Ionic
@@ -1233,6 +1283,57 @@ The multi-user auth work described below **was** fully written but not live:
     `functions/**` change (or bump `functions/.deploy-ping`) so
     deploy-functions writes them into `functions/.env`, and cut a TestFlight
     build so the public key is baked in.
+26a. **[x] DECIDED 2026-10-05 (owner): capture is never gated; the cap moved
+    onto the analysis.** Past 100 free saves (or Pro's 1000 ceiling) a save is
+    kept as `status: 'waiting'` with a server-only page snapshot
+    (`users/{uid}/capture_snapshots/{cardId}`, scrape only, no Gemini), and read
+    on upgrade (Firestore trigger `release_waiting_on_upgrade` on
+    `entitlements/{uid}`) or within the month's allowance (daily
+    `release_waiting_saves`, 00:15 UTC; admin `force_release_waiting_saves`).
+    Each release charges one save unit (backlog counts toward Pro's 1000).
+    Bulk import keeps its lifetime allowance + paywall; notes past the limit are
+    saved verbatim without AI; screenshot-enrich still 429s. Code:
+    `functions/deferred_capture.py`, `web/components/WaitingCard.tsx`.
+    **Follow-ups (2026-10-05, `2f9b18d`):** notes past the limit stay normal
+    cards flagged `noteEnrichPending` and get their AI tags on upgrade or from
+    the daily sweep (one unit each). The daily sweep keeps
+    `BACKLOG_RESERVE_FRACTION` (0.5) of the month's allowance (free AND Pro)
+    for new saves, released in the last `END_OF_MONTH_DAYS` (3) UTC days;
+    upgrade releases ignore it. Copy says "next month" everywhere. The Share
+    Extension shows "Saved ✓" + the server's message for `waiting: true`
+    (`c27f20a`). CAMPAIGN.md T24 left as is (owner: "No").
+    **[x] Convert script run 2026-10-05:** dry run on prod found 0 cards
+    (5 workspaces, 0 failed cards); nothing to apply. The tool stays for any
+    future use (`functions/tools/convert_quota_failed_to_waiting.py`).
+
+26b. **[ ] Browser extension on the Chrome Web Store — CODE READY 2026-10-05,
+    not published.** Popup saves on open with honest states (incl. "Saved for
+    later" for waiting saves); one-click connect via content script `connect.js`
+    on `https://mymachina.app/*` + `window.postMessage` handshake (token never
+    sent to a page; root `/` only, so `/s` `/c` share pages can't trigger it);
+    paste-token kept under Advanced. **No host permissions:** `share_ingest`
+    echoes `chrome-extension://` / `safari-web-extension://` origins
+    (`_EXTENSION_ORIGIN_RE`, `share_ingest` only, no credentials; B1).
+    Settings → Browser extension rewritten (`web/lib/extension.ts`
+    placeholders `CHROME_WEB_STORE_ITEM_ID`, `MAC_APP_STORE_URL`; deep links
+    `/?settings=extension`, `/?connect=extension`). Packaging:
+    `node extension/scripts/package.mjs` → `extension/dist/*.zip`. **Owner
+    steps:** `extension/store/LISTING.md` (5 USD developer account, upload,
+    listing + data-use answers, submit; then set `CHROME_WEB_STORE_ITEM_ID` and
+    redeploy web). Decisions taken: host permission stays dropped; "Web
+    history" unticked (only pages the user explicitly saves are sent).
+
+26c. **[ ] Machina for Safari on the Mac App Store — BUILDS LOCALLY 2026-10-05.**
+    Committed project `safari/MachinaSafari.xcodeproj` (app
+    `com.morhogeg.machina.safari`, extension `….safari.extension`, separate
+    App Store record, macOS 14+); `./safari/build-safari.sh` builds + verifies
+    (ad-hoc), copies `/extension` in at build time. CI `mac-app-store.yml`
+    (manual dispatch only, `confirm: mac`). **Owner steps:**
+    `safari/store/LISTING.md` §6 (Mac Installer cert, ASC record, archive/
+    upload, TestFlight for Mac, screenshots, review notes). Needs B1 live
+    (shipped with this merge). Not verified: Safari runtime, signing for the
+    store. iOS Safari extension: plan in `safari/README.md`, deferred to
+    post-launch (touches the fragile iOS signing pipeline).
 
 ### 🟡 P2 — security/cost hardening & honest product surface
 
@@ -1886,6 +1987,19 @@ G2. **[ ] Graph next levers (from the round-3 product pass):** (a) search/
     age) to show how knowledge grew; (d) cluster-level "synthesize this"
     (reuse M12 machinery scoped to a cluster's cards). Build in this order —
     each is independent.
+    **(e) [x] Cluster chips (2026-10-01):** the chip row above the canvas
+    now names the captioned clusters (biggest first, count, dot = the
+    island's most common category color) instead of categories; a chip tap
+    = a caption tap (spotlight + frame + "Cards in this cluster" panel), tap
+    again clears. Category filtering still lives in the library filter
+    sheet, which scopes the graph.
+
+G2c. **[x] Category colors collide — FIXED 2026-10-02** (per-library
+    assignment in `lib/colors.ts`, see §9). Original report: `getCategoryColorStyle` (`lib/colors.ts`)
+    picks a color by string hash mod the palette size, so two categories can
+    share a color (owner screenshot 2026-10-01: Tech and Health both orange
+    in the graph). Fix: assign distinct colors per user's category set
+    (stable order, hash only as the tiebreak), used everywhere the dot shows.
 
 G2b. **[x] Screenshot cards name who posted them (2026-09-08).** A screenshot
     of a post used to read "Screenshot" as its source. The vision pass now
@@ -2269,7 +2383,9 @@ and cited answer is a public, OG-rendered page that links back to the app — th
 marketing job is to get those artifacts in front of the right feeds. Budget: $0
 on ads at launch. The one paid channel worth considering *later* is Apple Search
 Ads on exact-match keywords ("second brain", "save for later ai") with a hard
-$5–10/day cap — nothing else (X ads, Meta) makes sense at this stage. The plan is
+$5–10/day cap — nothing else (X ads, Meta) makes sense at this stage (2026-10-02:
+Meta ad *creative* is now being made, but the spend gate stands; see
+`docs/BRANDING.md` D-4 and "Reels, clips and Meta ads" below). The plan is
 sequenced: (1) **Build-in-public on X** starting now — 2–3 posts/week showing real
 moments (a weekly synthesis screenshot, an Ask answer with citations, the share
 sheet catching a recipe from WhatsApp); this compounds and costs nothing but is
@@ -2290,7 +2406,15 @@ markets itself if you publish what it produces. Success metric for month one:
 1,000 installs, 20% week-2 retention, 50 organic shares — retention gates any
 paid spend.
 
-**Launch assets — first set (ready to adapt):**
+**The X launch campaign lives in `marketing/x-launch/CAMPAIGN.md`** (written
+2026-09-02, reviewed against build 1344 and merged 2026-10-02): 32 posts from
+`@machinaapp` over six weeks, plus a 6-post founder track from the owner's own
+account. It also holds the Day-1 checklist, an attachment plan, and the
+Product Hunt, Show HN, LinkedIn, Reddit and Meta-ad copy. **It supersedes the
+X thread and the Show HN line below.** Those are kept for the history only; don't
+post them (emoji, and "Free on the App Store" next to Pro features).
+
+**Launch assets — first set (superseded for X and Show HN; see above):**
 
 *Announcement thread (X), post 1:*
 > I kept saving links I never looked at again. Bookmarks, WhatsApp self-messages,
@@ -2400,6 +2524,46 @@ rule; `npm run verify` checks it. Same session (2026-09-19): the recipe card bec
 "Why you forget most of what you read" (Science; the query "remembering more
 from books" still shares no word with it), the Manson title is shortened so
 the Ask chip never truncates, and two-sentence captions break at the sentence.
+
+*Reels, clips and Meta ads (state on 2026-10-02; none of it is on `main` yet):*
+everything below renders from `marketing/launch-clip/` and shows **the real app**.
+`capture/` builds the shipped `web/` with Firebase swapped for a scripted demo
+account and records it frame by frame. The one thing it can't capture is the
+native iOS share sheet, so that beat is a brand graphic.
+- **The reel kit and the highlight reel** (`MachinaReel`, 82s, 9:16, 15 owner
+  rounds) are on branch `claude/machina-reel-pilot`. The kit's rules are the
+  "Motion language" section of that branch's `marketing/launch-clip/README.md`.
+- **Four feature clips** sit on their own branches, each awaiting owner review:
+  SAVE `claude/clip-save`, FIND `claude/clip-find`, ASK `claude/clip-ask`,
+  REVISIT `claude/clip-revisit`.
+- **Three Meta ads** (Instagram/Facebook, 15 to 20s, 9:16 + 4:5) are in
+  production in three sessions spawned 2026-10-02, each on its own branch:
+  1. **What one save becomes**, the YouTube card's key moments and key points
+     (`claude/ad-card`, session `session_01TgHDKPqNmybzMgPxEug5SC`);
+  2. **The trip you already planned**, Ask across Sardinia saves from three
+     platforms (`claude/ad-trip`, `session_01KKtyi3Zhp8bcy8FpFHckJg`);
+  3. **The screenshot that becomes a to-do**, an advice carousel → Do this →
+     the round-4 tick (`claude/ad-todo`, `session_01TYVBJbvXau5ZSymkmHAbEM`).
+
+  The shared brief, as sent to all three sessions:
+  - each session merges `main` first, so the capture is today's app;
+  - Meta safe zones: nothing key in the top 14%, the bottom 35% or 65px from
+    either side of the 9:16 frame;
+  - the hook is on screen from frame 0 and readable with the sound off;
+  - three renders each: 9:16 with voice, 9:16 music only, and 4:5;
+  - every film ends on the tagline;
+  - no App Store badge until the listing is live, no price and no "free";
+  - **no recipe or cooking content** (owner, 2026-10-02);
+  - honest demo data: real facts, no third-party images, no real person
+    endorsing;
+  - nothing merges to `main` until the owner has reviewed the cut.
+
+  The copy for each ad is in `CAMPAIGN.md` §8.
+- **Merging later:** each clip and ad keeps its own files (timeline, scenes,
+  take, score, gates), so they merge together. The exceptions are one-line
+  entries in `Root.tsx`, `synth-vo.py`, `mix-vo.mjs` and `capture/shoot.mjs`,
+  and the generated `src/reels/data/takes.json`: re-run the capture rather than
+  hand-merging it.
 
 *Short-form reels (PLANNED 2026-09-26, owner; the PILOT was built the same
 day on branch `claude/machina-reel-pilot`, NOT merged, see "What exists"
@@ -2604,6 +2768,314 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-10-05 (evening) — BROWSER EXTENSION STORE-READY + MACHINA FOR SAFARI
+  PROJECT; B1 CORS SHIPPED.** Branch `claude/app-launch-qa-a29d1f`. Two
+  parallel sessions, merged + verified centrally: Chrome (`7254510` ..
+  `dfc8e90`, §4 26b) and Safari (`a398ddb`, §4 26c); the Safari session's
+  shared-code requests (B1 CORS, A1–A7, C1–C2) were relayed to and built by the
+  Chrome session. Integration bug caught on merge: the new options page
+  `popup.html?view=settings` broke the Safari bundle check; fixed
+  `b6c8d05`. **Verified on the merged branch:** E2E 65 passed / 4 skipped
+  (desktop-only), extension Playwright 13/13, popup + background unit checks,
+  package check, rules 106/106, pytest 1348, tsc 0, em-dash clean, Safari app
+  rebuilt + verified (ad-hoc). Reviewed B1 by hand (full-match regex, one
+  endpoint, no credentials). **NOT verified:** Safari runtime; production CORS
+  through the Hosting rewrite until the deploy below; store reviews.
+  **Deploy:** `Deploy-Functions: share_ingest` + Vercel. No TestFlight (the
+  app only gets the rewritten Settings → Browser extension screen; it rides
+  the next build). The privacy policy now has an extension paragraph, dated
+  2026-10-05. **SHIPPED as merge `89be304`:** Vercel green, deploy-functions
+  (`share_ingest`) green, python-tests green. e2e-journeys failed once
+  (37282898209): a race in MY chat-history test (the chat doc exists on the
+  question, the answer lands a debounce later; a slow runner read in between),
+  not an app bug. Fixed to poll for the answer (`433cee3`); rerun green.
+
+- **2026-10-05 (later) — SHIPPED: waiting saves round 2, theme follows the
+  device, Share Extension waiting state.** Branch `claude/app-launch-qa-a29d1f`.
+  Owner decisions: notes get AI tags on upgrade (3); backlog policy and old
+  failed cards "whatever is best" (4, 6): see 26a follow-ups; no marketing
+  change (7); new users start in the device's appearance (10); shared text
+  stays out of My notes (11); ship, the Swift fix, and the App Store at web
+  launch (1, 2, 9 = yes). **Theme (`1ca855d`):** an unsaved theme resolves to
+  `system` (Auto) in ThemeProvider and the layout bootstrap script; existing
+  users keep their saved value (it has always been written back, so 'dark').
+  The Capacitor `backgroundColor` is still `#050505`, so a light-mode phone
+  may flash dark for an instant at cold launch (native change, not done).
+  **Share Extension (`c27f20a`):** typechecked with `swiftc` against the iOS
+  16.4 simulator SDK only; the TestFlight build is its first full compile.
+  **Verified on the merged branch before shipping:** E2E 59/59, rules 106/106,
+  pytest 1308, tsc 0, em-dash clean, lib tests 55/55. **Deploy:** functions
+  "all" (index `links.noteEnrichPending` deploys first), deploy-rules
+  (`tourSeenAt`), TestFlight. **SHIPPED as merge `adf023b`:** Vercel green;
+  deploy-functions run 37279314066 green (unscoped "all", index first);
+  deploy-rules 37279314100 green; python-tests, rules-tests green; the new
+  `e2e-journeys.yml` passed on its FIRST GitHub run (37279314059); TestFlight
+  run #346 → **build 1346** built + uploaded green (first full compile of the
+  Share Extension change; it compiled). Convert script dry run on prod:
+  5 workspaces, 0 failed cards, so nothing to apply (owner step closed).
+  **Push gotcha:** `git push` from `~/MyLinks` hung on the osxkeychain helper
+  (likely a hidden keychain prompt); pushing with
+  `git -c credential.helper= -c "credential.helper=!gh auth git-credential" push …`
+  worked (gh is logged in with repo+workflow scopes).
+  **In flight (not in this ship):** Chrome extension and Safari extension
+  sessions.
+
+- **2026-10-05 — E2E FINDINGS FIXED BY THREE PARALLEL SESSIONS, MERGED +
+  VERIFIED ON `claude/app-launch-qa-a29d1f`. NOT SHIPPED.** Owner approved
+  "save it, analyze it later" (26a) and asked for sessions per bug, merged and
+  tested centrally. **A** (`d7100f6`, `f723d8e`): the save limit defers analysis
+  instead of failing (see 26a) and E1 is fixed; the two E2E `test.fail` known
+  bugs now pass normally. **B** (`908c6fb`): E3, My notes includes note cards.
+  **C** (`355c1c1`): E4 extension copy, E5 graphVersion at birth, E6 tour per
+  account (`tourSeenAt`, rules allowlist). Plus `70ceeb9`: the screen sweep's
+  "light" pass had been rendering dark (theme is the app's own localStorage
+  setting, default dark, not the OS preference); it now sets it and asserts.
+  **Verified on the merged branch:** E2E 53/53 (iPhone + desktop), rules tests
+  105/105, pytest 1296, py_compile, web tsc 0, eslint 0 errors on touched files,
+  em-dash clean, web lib tests 55/55 (Node 22). Reviewed by hand: the release
+  trigger can't loop (quota charges go to `usage_quotas`, not `entitlements`);
+  a per-card transaction rechecks `waiting` so overlapping releases refund.
+  **NOT verified:** anything deployed (the entitlements trigger, the scheduler,
+  `count()` aggregation, queue bursts); device behavior (Share Extension text,
+  waiting card in light/dark/Hebrew on a phone). **Deploy when shipped:**
+  functions "all" (omit `Deploy-Functions:`; new `release_waiting_on_upgrade`,
+  `release_waiting_saves`, `force_release_waiting_saves`; `search.py`/
+  `vector_store.py`/`digest_service.py` changed); deploy-rules (`tourSeenAt`);
+  a TestFlight build (inferred, not tested: old builds don't know `waiting`, so they likely show it as an unanalyzed card and
+  toast "Saved to Machina"). No index/hosting change, no backfill.
+
+- **2026-10-04 — E2E USER-JOURNEY SUITE (40 tests) + 6 FINDINGS.** Branch
+  `claude/app-launch-qa-a29d1f`. Owner: "I don't have capacity to QA every
+  aspect, find the blind spots for real users." The backend was already well
+  covered (pytest, rules suite, canary, daily health). The gap was the
+  frontend: 7 pure-lib tests and no journey coverage. Added `e2e/` (see §4 11b):
+  Playwright + Auth/Firestore emulators with the live `firestore.rules`,
+  `demo-machina` project (can't reach prod), stubbed functions. One app change:
+  `web/lib/firebase.ts` exposes `window.__machinaE2E.signIn` **only inside the
+  existing localhost-emulator branch**, because headless Chromium can't
+  complete Google/Apple popups. New workflow `e2e-journeys.yml`.
+  **Verified:** `npm test` green 3 runs in a row locally (40/40, ~1.7 min;
+  the two known-bug tests count as expected failures); web tsc 0; eslint clean
+  on `firebase.ts`. **NOT verified:** the workflow on a GitHub runner (first
+  run happens on push). No artifact upload step, because the repo pins actions
+  by SHA and none exists for upload-artifact yet; failures print in the log.
+  **Findings:** E1–E6 in §4 11b. E1/E2 are the ones a real user hits at
+  launch. Also confirmed working (no change needed): self-serve workspace
+  creation when both claim transports are down; consent/onboarding/graph stamp
+  all persist under the locked rules; two accounts are isolated in the UI;
+  delete account wipes and signs out, and a failure keeps the user signed in.
+  **Side effect:** installing Playwright 1.63 garbage-collected older cached
+  browsers in `~/Library/Caches/ms-playwright` (chromium-1223, webkit-2287).
+  Other projects re-fetch them with `npx playwright install`.
+  **Owner steps:** decide E2 (with 26a) and E3; then the fixes are small.
+
+- **2026-10-02 — X LAUNCH CAMPAIGN REVIEWED AND ON MAIN; THREE META AD VIDEOS
+  HANDED TO NEW SESSIONS.** Branch `claude/x-launch-content-video-prompts-flujr5`.
+  Docs and marketing only (no `web/` or `functions/` change, nothing deployed).
+  **X:** the 30-post campaign had only ever lived on unmerged
+  `claude/x-launch-marketing-campaign-7o71hw` (2026-09-02). It is now
+  `marketing/x-launch/CAMPAIGN.md` on `main`, with every claim re-checked in the
+  code. Fixed:
+  - Ask lists the saves an answer used under it, not "a citation on every line";
+    the tap opens the card, not "the passage";
+  - "capture stays free" was false since the 100-saves free cap;
+  - Pro features (the recap, the Daily Brew, video key moments) no longer sit
+    next to "Free";
+  - the browser extension isn't public;
+  - two rename slips: `support@machinaapp.app` and "park `@machinaapp`".
+
+  Added:
+  - posts for import, Do this, named graph clusters, collection Ask, shared
+    answers and the Daily Brew;
+  - a 6-post founder track (a new brand account has no reach on X);
+  - a Day-1 checklist and an attachment plan built on the existing reel, clips
+    and ads.
+
+  38 posts, all script-checked under 280 by X's weighting, with no banned words
+  or em dashes. §8 now points to the doc, and its old thread is marked
+  superseded. **Meta ads:** three sessions were spawned to build 15–20s
+  Instagram/Facebook ads from the real-app capture kit: `claude/ad-card`,
+  `claude/ad-trip` and `claude/ad-todo` (session IDs and the shared brief are in
+  §8 "Reels, clips and Meta ads"). The owner rejected a recipe concept as "too
+  simple" and asked for no recipes, so ad 1 became the card and its key points.
+  The spend stays gated by BRANDING D-4 (addendum added: no Meta SDK, so the
+  "no tracking" label stays true). **Found, not fixed:**
+  - (a) new §4 item 26a: the "capture is never gated" principle contradicts
+    `quota.py`'s 100-save free cap; owner decides.
+  - (b) Day-1 blockers still open: §4 5b (the Gemini spend cap), task 26's
+    RevenueCat/ASC checklist (Pro can't be bought yet), tasks 9 and 11. The
+    campaign's §2 lists them as Day-1 conditions.
+  - (c) the reel kit, the four feature clips and now the three ads all live on
+    unmerged branches waiting on owner review; none of it is on `main`.
+
+  **Owner steps:**
+  - fill the `[fill]` slots (CAMPAIGN §2 table);
+  - record the share-extension clip on the iPhone (A3);
+  - review the three ad cuts as their sessions deliver them.
+
+  **Not verified:** T16's example query against the live search; that the ads
+  render cleanly (their sessions verify and report).
+- **2026-10-02 — Category colors no longer collide (G2c) + Revisit "Done"
+  list + whole tasks.** Branch `claude/revisit-done-and-colors`. Owner on
+  build 1344: should Do this be color-coded like the list view, and can done
+  items be seen? **Colors (decision):** not the list view's stripe/chip yet;
+  the real defect was that colors didn't distinguish categories (Tech/Health
+  both orange, Career/Travel both red: `getCategoryColorStyle` was a name
+  hash mod 10). Now each of the library's categories gets its own slot:
+  `assignCategoryColors` (called by Feed during render with every visible
+  card's category, before children paint) gives new categories the next free
+  slot in a hue-spread order (blue, orange, green, pink, yellow, teal, red,
+  indigo, cyan; most-used first; graphite last; past 10 categories they share
+  by hash). Sticky per device in localStorage `machina.categoryColors.v1`, so
+  a new save never recolors the library; case-insensitive keys; a stored
+  collision is repaired in favor of the more-used category. Every existing
+  call site (cards, list, chips, filters, graph, Revisit dots) picks it up
+  unchanged. Landing page + onboarding mocks use the new
+  `getStaticCategoryColorStyle` (pure hash) so SSR/signed-out renders stay
+  identical. **Known limits:** colors are per device (web vs phone can
+  differ; syncing would need a user-doc field + rules allowlist entry); a
+  server-rendered page using the per-library function would hydrate with
+  hash colors (React doesn't patch style attrs), which is why the static
+  variant exists, and why Feed's client-only render is fine. **Done list
+  (reverses the 2026-09-11 "no aggregated done list" call, owner asked):**
+  under the open tasks, a collapsed "Done N" toggle lists done and "Not for
+  me" takeaways most recently closed first (`lib/takeaway closedTakeaways`,
+  `takeawayClosedAt`), newest 10 then "Show all"; done rows keep the filled
+  check + strike, skipped rows show the slash and "· Not for me"; tapping the
+  mark puts the task back (Feed `reopenTakeaway` clears whichever marker is
+  set; analytics `takeaway_reopened`), tapping the text opens the card. The
+  Do this section now also shows when every task is closed ("All done. New
+  tasks arrive with your saves."). **Whole tasks:** the 4-line clamp is gone
+  (owner's 1344 screenshot still cut two older long tasks). **Verified:**
+  tsc 0; eslint clean on touched files except a pre-existing
+  `react-hooks/set-state-in-effect` error in `landing/parts.tsx` (present on
+  main); `test:colors` 4/4 (new), `test:takeaway` 5/5. Rendered via a
+  throwaway harness (client-only; deleted with its `PUBLIC_ROUTES` edit) at
+  390px light + dark: 5 categories → 5 distinct colors, Done list open with
+  done/skipped/Hebrew rows, reopening the skipped task returns it to the
+  open list; no console errors. **NOT verified:** on device; how an existing
+  library's first assignment looks. **SHIPPED** as merge `f82dbca` (frontend only):
+  Vercel on push; TestFlight run #345 → **build 1345 green**. Owner QA: library
+  list chips + graph dots now one color per category; Revisit → "Done N"
+  opens the look-back list, tapping a mark puts the task back.
+- **2026-10-02 — REVISIT "DO THIS" ROUND 4: whole tasks, a real checkbox,
+  category dots, swipe "Not for me", shorter tasks for new saves.** Branch
+  `claude/revisit-do-this-polish`. Owner on build 1343 (screenshot): "find
+  the best way to show these, this is not good enough". Diagnosis: every
+  task was cut at 2 lines exactly where the instruction was ("…use a
+  Suica…"), because `actionableTakeaway` had no length rule (stored up to
+  1000 chars) and `TakeawayRow` clamped at 2; the check ring was a faint
+  50%-opacity icon and a tick just made the row vanish; rows had no
+  identity. **App (`DigestView.tsx` `TakeawayRow`):** the task shows whole
+  (clamp 4); a 22px ring checkbox (`role=checkbox`) that fills with the
+  accent + check, strikes the task, holds 650ms, folds the row (grid-rows
+  1fr→0fr, 280ms, `--ease-modal`), THEN writes (Feed's "Marked as done" +
+  Undo toast unchanged); leaving the screen mid-animation flushes the write
+  on unmount; a failed write un-folds after 1.5s. Card line gets the
+  card's category dot (`getCategoryColorStyle`). Press state, hover guarded
+  by `[@media(hover:hover)]`, `hapticLight` on tick, staggered
+  `animate-card-enter`. Divider moved from the list's `divide-y` onto each
+  row (the swipe layer painted over the hairline). **"Not for me"
+  (owner-approved round 2):** swipe a row left past 35% of its width
+  (haptic when armed; shorter swipes snap back; only leftward,
+  mostly-horizontal drags are claimed, so page scroll and the app's
+  rightward edge-swipe-back are untouched) → new field
+  `takeawayDismissedAt` (`storage.markTakeawayDismissed`; links rules
+  already allow any owner field), toast "Removed from Do this" + Undo,
+  analytics `takeaway_dismissed`. `openTakeaways` skips dismissed cards.
+  Pointer devices get a hover button; touch screen readers get it as an
+  sr-only button. A one-line hint "Swipe left on a task that isn't for
+  you." shows on touch until the first dismissal (localStorage
+  `machina.takeawaySwipeLearned`). The card detail's label reads "Not for
+  me / לא בשבילי" for a dismissed task; tapping it puts the task back.
+  Backend: `takeawayDismissedAt` added to `_USER_OWNED_CARD_FIELDS` so a
+  re-analysis keeps it. **Shorter tasks (new saves only):** analysis prompt
+  rule 8 now asks for ONE sentence of at most 20 words, verb first, one
+  action; existing cards keep their text (the clamp-4 handles them).
+  **Verified:** tsc 0; eslint clean on touched files (pre-existing
+  `isYouTube` warning only); `test:takeaway` 4/4 (new dismissed test);
+  pytest 1266 passed; py_compile. Rendered via a throwaway harness
+  (deleted, `PUBLIC_ROUTES` edit reverted) at 390px light + dark with
+  English + Hebrew fixtures and Playwright driving it: tick → filled check +
+  strike → row folds → `done`; short swipe snaps back; full swipe →
+  `dismiss` and the hint disappears; tap opens the card; no console
+  errors; 1280px desktop shows the hover button and hides the hint.
+  **NOT verified:** on device (swipe feel inside WKWebView, haptics), a
+  live re-analysis keeping `takeawayDismissedAt`, the new prompt's output
+  length on real saves. **SHIPPED** as merge `46f068e`: Vercel on push;
+  functions deploy #121 (unscoped, on purpose) **green**; TestFlight run
+  #344 → **build 1344 green** (owner confirmed on device). Owner QA: Revisit → tick a task (fills, strikes, folds,
+  Undo toast); swipe one left (Not for me, Undo); open that card → label
+  reads "Not for me", tap puts it back.
+- **2026-10-02 — GRAPH: "Mapping your knowledge…" no longer shows twice.**
+  Branch `claude/graph-cluster-chips`. Owner device QA on build 1342 (cluster
+  chips confirmed good; TestFlight run #342 green): opening the Graph showed
+  the loading line in the stats header AND centered in the canvas.
+  `KnowledgeGraph.tsx`: the header's loading branch is now a blank
+  `&nbsp;` line (keeps the row height so the canvas doesn't jump when the
+  stats land); the canvas loader is the only message. **Verified:** tsc 0;
+  loading state rendered via a throwaway harness (deleted, temporary
+  `PUBLIC_ROUTES` entry reverted) at 390px: one "Mapping your knowledge…".
+  **NOT verified:** on device. **SHIPPED** as merge `8898ca2` (frontend only):
+  Vercel on push; TestFlight run #343 → **build 1343**.
+- **2026-10-01 — GRAPH: CLUSTER CHIPS REPLACE CATEGORY CHIPS.** Branch
+  `claude/graph-cluster-chips`. Owner: each cluster name on the canvas
+  (e.g. LONGEVITY) should have a chip above the graph that opens the same
+  card list as tapping the caption. `KnowledgeGraph.tsx`: the category
+  legend row (a category FILTER, a different grouping than the islands) is
+  replaced by one chip per captioned cluster (uncaptioned clusters get
+  none), sorted by size, dot in the island's dominant category color,
+  label `dir="auto"` + truncated. `toggleClusterFocus` does what the
+  caption tap does (clears selection/cited set/pending focus, toggles
+  `clusterFocus`), so the existing frame-the-cluster camera and cluster
+  panel are reused, and the lit chip mirrors `clusterFocus` both ways. The
+  whole `categoryFocus` state + its draw-path dimming are deleted (no other
+  caller). Category filtering remains via the library filter sheet
+  (`selectedCategory` scopes the graph, `graphFiltersActive` in Feed).
+  **Verified:** tsc 0; eslint on the file shows one error that is
+  pre-existing on main (`modelRef.current = model`, react-hooks/immutability)
+  and unchanged; rendered via a throwaway harness (deleted, plus a temporary
+  `PUBLIC_ROUTES` entry, reverted) at 390px with Playwright: 3 chips
+  matching the 3 captions, chip tap lights the chip + opens the panel with
+  the 5 members + frames the island, second tap clears both. **NOT
+  verified:** light theme render (ThemeProvider kept the harness dark; chip
+  classes are the old legend's, unchanged), on device. New bug logged as
+  §4 G2c (category color hash collisions). **SHIPPED** as merge `79deb19`
+  (frontend only, no functions): Vercel on push; TestFlight run #342 →
+  **build 1342** (queued behind another session's run #340 / build 1340;
+  an accidental early trigger of pre-merge main, run #341, was superseded
+  and cancelled, no build). Owner QA: Graph → tap each cluster chip → its
+  card list opens and the island is framed; tap again → clears.
+- **2026-10-01 — LINKEDIN BYLINE ICON: DETECTION, NOT DRAWING, WAS THE BUG
+  (owner: "for the Nth time", a share-sheet save of a Pilipda Samattanawin
+  post showed the author name with no "in" mark).** Branch
+  `claude/linkedin-byline-icon`. The `SourceByline` LinkedIn branch was intact;
+  it only runs when the card's URL host reads as LinkedIn, and `getPlatform`
+  knew only `linkedin.com`. Since 2026-08-22 the backend routes `lnkd.in` short
+  links to the LinkedIn scraper (so the real author name arrives) but the card
+  keeps the URL as shared, so such cards fell to the plain-publisher byline:
+  name, no icon. Every past fix patched the drawing, never the detection, which
+  is why it kept coming back. **Fix, two layers:** (1) web `getPlatform` maps
+  `lnkd.in` to LinkedIn; detection moved to JSX-free `web/lib/platformKey.ts`
+  (re-exported from `platform.tsx`) with a new `linkPlatform(link)` = URL host,
+  else the backend stamp; used by `SourceByline`, `ListCard`, the Ask citation
+  chip and `getSourceInfo` (Sources facet). (2) backend `_scrape_extras` stamps
+  `sourcePlatform` on WEB cards from the scrape's landing URL
+  (`_platform_for_url`), and `_scrape_linkedin_url` now returns `final_url`, so
+  any future short/redirect form still gets the mark. Screenshot cards ignore
+  the stamp (their `sourcePlatform` means the app read off the image).
+  **Guard:** `npm run test:platform` (fails if any LinkedIn URL form loses the
+  mark; confirmed failing with the `lnkd.in` line removed) + 6 backend tests in
+  `test_linkedin_author.py`. **Verified:** tsc clean, 5/5 web tests, 1266/1266
+  backend tests, server-rendered `SourceByline` draws the LinkedIn mark for an
+  `lnkd.in` card and a stamped card. **NOT verified:** the stored URL of the
+  owner's card (no Firestore access here): if it is `lnkd.in` the existing card
+  is fixed on deploy; if it is some other redirect host, only re-saves get the
+  stamp; on device. **Shipped:** fix `7e70665`, merge `7ebcaec` → `main`
+  (Vercel); functions deploy run **#120** green (scoped
+  `Deploy-Functions: analyze_link,process_link_background`); Python tests #133
+  green; TestFlight run **#340** → build **1340**.
 
 - **2026-10-01 — Demo account: Mark Manson's essay replaces the old essay card.**
   Branch `claude/machina-reel-pilot`, not merged. Owner: no mentions of the previous author

@@ -1,4 +1,5 @@
 import { Link } from '@/lib/types';
+import { isPending } from '@/lib/feedUtils';
 import { getSourceInfo } from '@/lib/source';
 import { getNotes } from '@/lib/notes';
 
@@ -119,7 +120,7 @@ const SOURCE_LABEL: Record<string, string> = {
 
 export function computeStats(links: Link[], now = Date.now()): LibraryStats {
     const cards = links.filter(
-        (l) => !l.isPrivate && l.status !== 'processing' && l.status !== 'failed',
+        (l) => !l.isPrivate && !isPending(l),
     );
 
     const monthStart = new Date(new Date(now).getFullYear(), new Date(now).getMonth(), 1).getTime();

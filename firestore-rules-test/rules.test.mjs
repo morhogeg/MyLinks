@@ -209,6 +209,7 @@ const CLIENT_WRITES = {
   privacyLock: { hash: 'x', salt: 'y', iterations: 1 }, // lib/privacyLock
   graphVersion: 2,                                   // lib/rebuildConnections
   dismissedSuggestions: arrayUnion('tag:politics'),  // lib/collectionSuggest dismissSuggestion
+  tourSeenAt: 1,                                     // lib/tourSeen (tour seen on any device)
 };
 
 for (const [field, value] of Object.entries(CLIENT_WRITES)) {
@@ -265,6 +266,7 @@ const MISTYPED = {
   privacyLock: 'pin',
   graphVersion: '2',
   dismissedSuggestions: 'tag:politics',
+  tourSeenAt: 'yes',
 };
 
 for (const [field, value] of Object.entries(MISTYPED)) {
@@ -308,6 +310,21 @@ test('self-serve create cannot carry server-owned fields', async () => {
       setDoc(doc(strangerDb(), 'users', STRANGER_AUTH), { authUids: [STRANGER_AUTH], createdAt: now, ...extra }),
     );
   }
+});
+
+test('self-serve create cannot carry graphVersion or tourSeenAt (birth fields only)', async () => {
+  // Deliberately NOT widened for E5/E6: the client fallback leaves both off
+  // and lib/rebuildConnections stamps graphVersion with an UPDATE instead.
+  const now = Date.now();
+  for (const extra of [{ graphVersion: 2 }, { tourSeenAt: now }]) {
+    await assertFails(
+      setDoc(doc(strangerDb(), 'users', STRANGER_AUTH), { authUids: [STRANGER_AUTH], createdAt: now, onboarded: false, ...extra }),
+    );
+  }
+});
+
+test('a stranger cannot mark the tour seen on someone else\'s doc', async () => {
+  await assertFails(updateDoc(doc(strangerDb(), 'users', OWNER_DOC), { tourSeenAt: 1 }));
 });
 
 test('self-serve create may carry the email (AuthProvider payload shape)', async () => {
@@ -429,6 +446,39 @@ test('a legacy past nextReminderAt survives an unrelated update, and can still b
   const ref = doc(ownerDb(), 'users', OWNER_DOC, 'links', 'stale');
   await assertSucceeds(updateDoc(ref, { isRead: true }));  // value unchanged → allowed
   await assertSucceeds(deleteDoc(ref));
+});
+
+// ── links: a save kept past the monthly allowance (`waiting`) ─────────────────
+//
+// The server writes `status: 'waiting'` itself; the client writes it only as a
+// fallback when a server still answers the save wall with a 429
+// (lib/storage markLinkWaiting). That is an ordinary owner update of a card,
+// so no rule change: this pins it. The page snapshot those cards keep
+// (users/{uid}/capture_snapshots, functions/deferred_capture.py) is server-only:
+// no rule matches it, so even the owner can neither read nor write it.
+
+test('owner can mark their own card waiting (markLinkWaiting payload)', async () => {
+  const ref = doc(ownerDb(), 'users', OWNER_DOC, 'links', 'link1');
+  await assertSucceeds(updateDoc(ref, {
+    status: 'waiting', waitingAt: Date.now(),
+    processingStartedAt: deleteField(), processingStage: deleteField(), queuedAt: deleteField(),
+    pendingEnqueue: deleteField(), error: deleteField(), failedAt: deleteField(),
+  }));
+  await assertFails(updateDoc(doc(strangerDb(), 'users', OWNER_DOC, 'links', 'link1'), { status: 'waiting' }));
+});
+
+test('owner can flag their own note for later organization (enrichNoteCard payload)', async () => {
+  const ref = doc(ownerDb(), 'users', OWNER_DOC, 'links', 'link1');
+  await assertSucceeds(updateDoc(ref, { noteEnrichPending: true, noteEnrichWaitingAt: Date.now() }));
+  await assertFails(updateDoc(doc(strangerDb(), 'users', OWNER_DOC, 'links', 'link1'), { noteEnrichPending: true }));
+});
+
+test('capture_snapshots are server-only, even for the owner', async () => {
+  const ref = doc(ownerDb(), 'users', OWNER_DOC, 'capture_snapshots', 'link1');
+  await assertFails(getDoc(ref));
+  await assertFails(setDoc(ref, { scrape: { text: 'forged' } }));
+  await assertFails(getDocs(collection(ownerDb(), 'users', OWNER_DOC, 'capture_snapshots')));
+  await assertFails(getDoc(doc(anonDb(), 'users', OWNER_DOC, 'capture_snapshots', 'link1')));
 });
 
 // ── analytics_events / client_errors: owner-only, client-appended ─────────────

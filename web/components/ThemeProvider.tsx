@@ -14,10 +14,18 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-/** Saved theme, read synchronously on the client (SSR falls back to 'dark'). */
+/** Saved theme, read synchronously on the client (SSR falls back to 'dark').
+    Nobody has chosen yet → 'system' (Auto): a new user starts in whatever
+    their phone or computer is set to. Existing users keep their saved value
+    (the effect below has always written it back, so it's 'dark' unless they
+    picked otherwise). Keep in sync with the bootstrap script in layout.tsx. */
 function getInitialTheme(): Theme {
     if (typeof window === 'undefined') return 'dark';
-    return (localStorage.getItem('theme') as Theme | null) ?? 'dark';
+    try {
+        return (localStorage.getItem('theme') as Theme | null) ?? 'system';
+    } catch {
+        return 'system'; // storage blocked: still follow the OS
+    }
 }
 
 function resolveTheme(theme: Theme): 'light' | 'dark' {

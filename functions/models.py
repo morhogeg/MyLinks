@@ -19,6 +19,15 @@ class LinkStatus(str, Enum):
     # capture is never silently lost while background analysis runs.
     PROCESSING = "processing"
     FAILED = "failed"
+    # A save kept past the plan's monthly allowance (deferred_capture): saved,
+    # with its URL and title, but not analyzed until an upgrade or the 1st.
+    WAITING = "waiting"
+
+
+# Card statuses that carry no analysis yet (no summary, no vector). Search,
+# Ask, the graph and digests skip them.
+UNANALYZED_STATUSES = (LinkStatus.PROCESSING.value, LinkStatus.FAILED.value,
+                       LinkStatus.WAITING.value)
 
 
 class ReminderStatus(str, Enum):

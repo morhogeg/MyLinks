@@ -21,8 +21,8 @@ import { collection, getDocs, limit, query, waitForPendingWrites, where } from '
 import { appCheckHeaders, db } from '@/lib/firebase';
 import { authHeaders } from '@/lib/auth';
 import { apiUrl, fetchWithTimeout } from '@/lib/api';
-import { offerUpgradeFor } from '@/lib/entitlement';
-import { markLinkFailed } from '@/lib/storage';
+import { announceWaitingSave, isWaitingSave, offerUpgradeFor, saveWallAsWaiting } from '@/lib/entitlement';
+import { markLinkFailed, markLinkWaiting } from '@/lib/storage';
 
 // Cards this tab is already enqueueing (the form's listener and the resume
 // hook can both see the same card).
@@ -46,6 +46,18 @@ export async function enqueueOfflineSave(uid: string, url: string, cardId: strin
         const text = await response.text();
         let resData: { success?: boolean; error?: string };
         try { resData = JSON.parse(text); } catch { resData = {}; }
+        // Past the monthly allowance the save is kept as `waiting` (by the
+        // server, or here for a server that still answers 429), never failed.
+        if (response.ok && isWaitingSave(resData)) {
+            announceWaitingSave(resData);
+            return;
+        }
+        const wall = saveWallAsWaiting(response.status, resData);
+        if (wall) {
+            await markLinkWaiting(uid, cardId);
+            announceWaitingSave(wall);
+            return;
+        }
         if (!response.ok || !resData.success) {
             if (response.status === 429) offerUpgradeFor(resData);
             throw new Error(resData?.error || 'Could not start analysis. Please try again.');

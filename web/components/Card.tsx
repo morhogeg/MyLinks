@@ -14,6 +14,7 @@ import SimpleMarkdown from './SimpleMarkdown';
 import { getCategoryColorStyle } from '@/lib/colors';
 import CategoryInput from './CategoryInput';
 import CardActionSheet from './CardActionSheet';
+import WaitingCard from './WaitingCard';
 import { hasHebrew } from '@/lib/rtl';
 import { isHttpUrl } from '@/lib/url';
 import { getNotes } from '@/lib/notes';
@@ -146,6 +147,12 @@ function Card({
     // a skeleton (processing) or a retryable "couldn't analyze" card (failed) so a
     // capture is never invisible and never silently dropped. These are terminal
     // presentational states — the normal card body/actions don't apply.
+    // A save kept past the monthly allowance: saved, read later. Its own calm
+    // card (no Retry, no error styling); see WaitingCard.
+    if (link.status === 'waiting') {
+        return <WaitingCard link={link} onDelete={onDelete} />;
+    }
+
     if (link.status === 'processing' || link.status === 'failed') {
         // Client-side staleness fallback: the backend janitor flips a stuck
         // `processing` card to `failed`, but if enqueue succeeded and the backend

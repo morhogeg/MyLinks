@@ -94,28 +94,59 @@ export function getNotesText(link: Link): string {
     return parts.join(' ');
 }
 
-/** One card with ALL of its notes — the My Notes view's group unit. */
+/**
+ * A note CARD the user typed themselves (+ → Note), as opposed to a card that
+ * merely carries personal notes. Shared text (`captureType: 'text'`, from the
+ * share sheet) is also `sourceType: 'note'`, but it is someone else's words
+ * kept verbatim ("a note is something you wrote, text is something you kept",
+ * SourceByline), so it is NOT one; its personal notes still list as usual.
+ */
+export function isWrittenNote(link: Link): boolean {
+    return link.sourceType === 'note' && !link.captureType;
+}
+
+/** A note card's full text: the body for a long note, else the title (a short
+    note is entirely its own title, see storage.splitNoteText). Mirrors the
+    detail modal's `noteFullText`. */
+export function noteCardText(link: Link): string {
+    return (link.summary && link.summary.trim()) ? link.summary : link.title;
+}
+
+/** One entry in My Notes: a card with ALL of its personal notes, or a note
+    card the user wrote (with any personal notes added to it since). */
 export interface CardNotes {
     link: Link;
-    /** The card's notes, newest first (via `getNotes`). Never empty. */
+    /** The card's personal notes, newest first (via `getNotes`). Never empty
+        unless `body` is set. */
     notes: UserNote[];
-    /** Most recent note activity (created or edited) — orders the groups. */
+    /** Set only for a written note card (`isWrittenNote`): the note's own
+        text. The entry then reads as the note itself, not as a card. */
+    body?: string;
+    /** Most recent activity (the note card's creation, or any personal note
+        created/edited); orders the entries. */
     newestAt: number;
 }
 
 /**
- * Every noted card across the library, grouped card-by-card and ordered by
- * newest note first — the data behind the central My Notes view. A card with
- * several notes yields ONE group carrying all of them, so the view never
- * repeats the same card strip. Callers pass an already privacy/pending-
- * filtered list.
+ * Everything the user wrote themselves, one entry per card, newest first: the
+ * data behind the central My Notes view. Two kinds of entry share one list:
+ *   - a card with personal notes ("Add a note" in card detail) yields ONE
+ *     entry carrying all of them, so the view never repeats the same card;
+ *   - a note card saved via + → Note yields an entry carrying its text, so a
+ *     note saved from the capture sheet is found where the name says it is.
+ * Callers pass an already privacy/pending-filtered list.
  */
 export function getNoteGroups(links: Link[]): CardNotes[] {
     const groups: CardNotes[] = [];
     for (const link of links) {
         const notes = getNotes(link);
-        if (notes.length === 0) continue;
-        groups.push({ link, notes, newestAt: noteActivityAt(notes[0]) });
+        const body = isWrittenNote(link) ? noteCardText(link).trim() : '';
+        if (notes.length === 0 && !body) continue;
+        const noteAt = notes.length > 0 ? noteActivityAt(notes[0]) : 0;
+        // A just-captured note's serverTimestamp reads null until the server
+        // acks the write; it is the newest thing in the library, not the oldest.
+        const writtenAt = body ? (getTimestampNumber(link.createdAt) || Date.now()) : 0;
+        groups.push({ link, notes, ...(body ? { body } : {}), newestAt: Math.max(noteAt, writtenAt) });
     }
     return groups.sort((a, b) => b.newestAt - a.newestAt);
 }

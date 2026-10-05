@@ -133,7 +133,7 @@ export default function Home() {
   // When set, the Settings sheet opens straight to that sub-screen (e.g. the
   // digest settings deep-linked from the empty Digest page, or Insights from
   // the feed's "Back to Insights" chip).
-  const [settingsSection, setSettingsSection] = useState<'digest' | 'stats' | null>(null);
+  const [settingsSection, setSettingsSection] = useState<'digest' | 'stats' | 'extension' | 'extension-connect' | null>(null);
   // A tapped Insights row (category/tag/source): Settings closes and Feed
   // applies this as its active filter, then clears it via the callback.
   const [libraryFacet, setLibraryFacet] = useState<LibraryFacetRequest | null>(null);
@@ -233,6 +233,28 @@ export default function Home() {
     if (loading || !uid) return;
     const t = setTimeout(() => ensureGraphVersion(uid), 4000);
     return () => clearTimeout(t);
+  }, [loading, uid]);
+
+  // Deep links into Settings → Browser extension:
+  //   `/?connect=extension`  the extension's Connect button: open the screen
+  //                          and connect the extension in one click
+  //                          (see lib/extension.ts);
+  //   `/?settings=extension` the Mac app and docs: just open the screen.
+  // Signed out, the param waits for sign-in; it is dropped once used so a
+  // reload doesn't reopen it.
+  useEffect(() => {
+    if (loading || !uid || typeof window === 'undefined') return;
+    let url: URL;
+    try { url = new URL(window.location.href); } catch { return; }
+    const connect = url.searchParams.get('connect') === 'extension';
+    const open = url.searchParams.get('settings') === 'extension';
+    if (!connect && !open) return;
+    url.searchParams.delete('connect');
+    url.searchParams.delete('settings');
+    try { window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash); } catch { /* sandboxed */ }
+    // From a timer, not the effect body (the param is already consumed, so
+    // this must not be cancelled by a re-render).
+    setTimeout(() => { setSettingsSection(connect ? 'extension-connect' : 'extension'); setIsSettingsOpen(true); }, 0);
   }, [loading, uid]);
 
   const replayTour = () => {
