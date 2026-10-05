@@ -61,7 +61,7 @@ export default function PrivacyPage() {
       <h1 className="mt-6 text-3xl font-semibold tracking-tight text-text">
         Privacy Policy
       </h1>
-      <p className="mt-2 text-sm text-text-muted">Last updated: September 16, 2026</p>
+      <p className="mt-2 text-sm text-text-muted">Last updated: October 5, 2026</p>
 
       <p className="mt-6 leading-relaxed text-text-secondary">
         Machina (&ldquo;we&rdquo;) is a personal knowledge base: you save
@@ -138,6 +138,14 @@ export default function PrivacyPage() {
             The addresses you share, text extracted from those pages, titles and preview images,
             images and screenshots you share, and the notes, tags, categories, and collections you
             add yourself.
+          </li>
+          <li>
+            <span className="text-text">Browser extension.</span>{" "}
+            When you save with the Machina browser extension, it sends the page&rsquo;s address, and
+            any text you selected, to Machina, and nothing else. It keeps a connection token in that
+            browser&rsquo;s extension storage so your saves reach your account; the token is only ever
+            sent to our server. It does not read or record the pages you visit and don&rsquo;t save. On
+            mymachina.app it runs a small script so you can connect it in one click.
           </li>
           <li>
             <span className="text-text">Questions you ask.</span>{" "}

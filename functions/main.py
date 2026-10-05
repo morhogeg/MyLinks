@@ -140,10 +140,26 @@ def _allowed_origins() -> list:
     ]
 
 
-def _resolve_origin(req=None) -> str:
+# A browser extension's own pages and service worker call from an origin that
+# is unique per extension (Chrome: 32 letters a-p) or even per install
+# (Safari: a random UUID), so no fixed allowlist can name it. Safari never
+# grants host permissions at install, so without this its saves fail CORS.
+# Only `share_ingest` opts in (allow_extension=True): there the ingest token
+# is the only credential, the request carries no cookies, and these responses
+# never send Access-Control-Allow-Credentials. Full-string match only.
+_EXTENSION_ORIGIN_RE = re.compile(
+    r"safari-web-extension://[0-9A-Fa-f-]{36}|chrome-extension://[a-p]{32}")
+
+
+def _is_extension_origin(origin) -> bool:
+    return isinstance(origin, str) and _EXTENSION_ORIGIN_RE.fullmatch(origin) is not None
+
+
+def _resolve_origin(req=None, allow_extension: bool = False) -> str:
     """Pick the Access-Control-Allow-Origin value.
 
-    Echoes the caller's Origin only if it's on the allowlist; otherwise falls
+    Echoes the caller's Origin only if it's on the allowlist (or, for an
+    endpoint that opts in, is a browser-extension origin); otherwise falls
     back to the primary app origin. Never reflects an arbitrary/untrusted
     Origin (which would defeat the point of pinning CORS).
     """
@@ -153,21 +169,23 @@ def _resolve_origin(req=None) -> str:
     origin = req.headers.get("Origin") if req is not None else None
     if origin and origin in allowed:
         return origin
+    if allow_extension and _is_extension_origin(origin):
+        return origin
     return allowed[0]
 
 
-def _cors_headers(req=None) -> dict:
+def _cors_headers(req=None, allow_extension: bool = False) -> dict:
     """Return standard CORS headers, pinned to the allowlist."""
     return {
-        'Access-Control-Allow-Origin': _resolve_origin(req),
+        'Access-Control-Allow-Origin': _resolve_origin(req, allow_extension),
         'Vary': 'Origin',
     }
 
 
-def _cors_preflight(req=None) -> https_fn.Response:
+def _cors_preflight(req=None, allow_extension: bool = False) -> https_fn.Response:
     """Handle CORS preflight OPTIONS request."""
     headers = {
-        'Access-Control-Allow-Origin': _resolve_origin(req),
+        'Access-Control-Allow-Origin': _resolve_origin(req, allow_extension),
         'Vary': 'Origin',
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, X-Ingest-Token, X-Firebase-AppCheck, Authorization',
@@ -3379,11 +3397,15 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
 
     Accepts JSON: { "url" | "text" | "shared": <string>, "token"?: <string> }
     Token may also be provided via the 'X-Ingest-Token' header.
+
+    CORS also admits browser-extension origins here (and only here), so the
+    browser extension can save without a host permission (Safari never
+    grants one at install). See _EXTENSION_ORIGIN_RE.
     """
     if req.method == 'OPTIONS':
-        return _cors_preflight(req)
+        return _cors_preflight(req, allow_extension=True)
 
-    headers = _cors_headers(req)
+    headers = _cors_headers(req, allow_extension=True)
 
     # Pre-body gate identity. The share-extension path carries no bearer, and
     # through the Hosting rewrite the last X-Forwarded-For hop is the PROXY's

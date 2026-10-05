@@ -1,162 +1,330 @@
-// Settings popup. Reads/writes chrome.storage.local and talks to the service
-// worker for token validation / "Save this page now". No capture logic here.
+// Machina popup.
 //
-// The token is checked, never just stored: the popup validates on open and
-// again on every save, so the screen always says whether this browser is
-// actually connected to Machina instead of looking saved and failing later.
+// Opening the popup (toolbar click or the keyboard shortcut) saves the current
+// page straight away and shows what the server said. The service worker does
+// the saving; this page only shows it. Not connected yet, it offers the
+// one-click connect instead. The same page is the extension's options screen
+// (popup.html?view=settings), where nothing is saved on open.
+//
+// No em dashes in any string a user reads.
 
-const DEFAULT_BASE_URL = "https://secondbrain-app-94da2.web.app";
-// Same as background.js: the web app's paywall for the monthly save wall.
-const UPGRADE_URL = "https://mymachina.app/?paywall=saves";
+const S = self.MachinaShared;
+const api = typeof browser !== "undefined" && browser.runtime ? browser : chrome;
+
+const params = new URLSearchParams(location.search);
+const AS_OPTIONS = params.get("view") === "settings";
+// Lets a test (or a tab-hosted copy of this page) aim the save at a given tab.
+const TARGET_TAB = Number(params.get("tab")) || null;
 
 const $ = (id) => document.getElementById(id);
-const tokenInput = $("token");
-const baseUrlInput = $("baseUrl");
-const banner = $("banner");
-const statusEl = $("status");
-const connEl = $("conn");
-const connTextEl = $("connText");
-const saveBtn = $("save");
+const app = $("app");
 
-const PASTE_PROMPT = "Paste your Machina token to start saving.";
+const ICONS = {
+  saved: '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7.5 12.5l3 3 6-6.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  waiting: '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v5.2l3.2 2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  error: '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="16.6" r="1.3" fill="currentColor"/></svg>',
+};
+const OK_STATES = new Set(["saved", "duplicate", "waiting"]);
 
-function setStatus(text, kind) {
-  statusEl.textContent = text || "";
-  statusEl.className = "status" + (kind ? " " + kind : "");
+const state = {
+  token: "",
+  account: "",
+  stack: [],
+  tab: null,
+  port: null,
+};
+
+// ── Views ───────────────────────────────────────────────────────────────────
+
+const VIEWS = {
+  connect: { el: "viewConnect", heading: "Machina" },
+  save: { el: "viewSave", heading: "Machina" },
+  settings: { el: "viewSettings", heading: "Settings" },
+  token: { el: "viewToken", heading: "Machina" },
+};
+
+function show(name, { push = true } = {}) {
+  if (push) state.stack.push(name);
+  for (const [key, v] of Object.entries(VIEWS)) $(v.el).hidden = key !== name;
+  app.dataset.view = name;
+  $("heading").textContent = VIEWS[name].heading;
+  $("backBtn").hidden = state.stack.length < 2;
+  // The gear sits on the main screens; settings and token have Back instead.
+  $("settingsBtn").hidden = !(name === "save" || name === "connect");
+  if (name === "settings") renderSettings();
+  if (name === "token") prepareTokenView();
 }
 
-function showBanner(text) {
-  if (text) {
-    banner.textContent = text;
-    banner.classList.remove("hidden");
-  } else {
-    banner.classList.add("hidden");
-  }
-}
-
-// The one line of truth about this browser's connection: hidden when no token
-// is set (the banner is asking for one), otherwise checking / connected / the
-// reason it failed.
-function setConnection(kind, text) {
-  if (!kind) {
-    connEl.className = "conn hidden";
-    connTextEl.textContent = "";
+function back() {
+  if (state.stack.length < 2) return;
+  state.stack.pop();
+  const target = state.stack[state.stack.length - 1];
+  // Connected with a token since the connect screen was shown: the main
+  // screen is now the save screen.
+  if (target === "connect" && state.token) {
+    state.stack = ["save"];
+    show("save", { push: false });
+    startSave();
     return;
   }
-  connEl.className = "conn " + kind;
-  connTextEl.textContent = text;
+  show(target, { push: false });
+}
+
+// ── Opening Machina pages ───────────────────────────────────────────────────
+
+function openTab(url) {
+  api.tabs.create({ url }).catch(() => {});
+  if (!AS_OPTIONS) window.close();
+}
+const openConnect = () => openTab(S.CONNECT_URL);
+
+// ── Saving ──────────────────────────────────────────────────────────────────
+
+async function currentTab() {
+  try {
+    if (TARGET_TAB) return await api.tabs.get(TARGET_TAB);
+    const [tab] = await api.tabs.query({ active: true, currentWindow: true });
+    return tab || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function renderPage(tab) {
+  const url = (tab && tab.url) || "";
+  const host = S.hostOf(url);
+  const title = (tab && tab.title) || "";
+  $("pageTitle").textContent = title && title !== url ? title : host || "";
+  $("pageHost").textContent = title && title !== url ? host : "";
+  $("pageCard").hidden = !$("pageTitle").textContent;
+}
+
+function renderSaving() {
+  const box = $("result");
+  box.dataset.state = "saving";
+  box.classList.remove("is-error");
+  box.querySelector(".result-icon").innerHTML = "";
+  $("resultTitle").textContent = "Saving";
+  $("resultDetail").textContent = "";
+  $("actionBtn").hidden = true;
+  $("openBtn").hidden = true;
+}
+
+const ACTION_LABEL = { retry: "Try again", connect: "Reconnect", upgrade: "Get Pro" };
+
+function renderResult(view) {
+  const box = $("result");
+  box.dataset.state = view.state;
+  const ok = OK_STATES.has(view.state);
+  box.classList.toggle("is-error", !ok);
+  box.querySelector(".result-icon").innerHTML =
+    view.state === "waiting" ? ICONS.waiting : ok ? ICONS.saved : ICONS.error;
+  $("resultTitle").textContent = view.title;
+  $("resultDetail").textContent = view.detail;
+
+  const actionBtn = $("actionBtn");
+  const label = view.state === "notoken" ? "Connect" : ACTION_LABEL[view.action];
+  actionBtn.hidden = !label;
+  actionBtn.textContent = label || "";
+  actionBtn.dataset.action = view.action || "";
+  // "Open Machina" fits every outcome where the library is worth a look.
+  $("openBtn").hidden = !(ok || view.action === "open" || view.state === "timeout" || view.state === "unknown");
+}
+
+function ensurePort() {
+  if (state.port) return state.port;
+  const port = api.runtime.connect({ name: "machina-popup" });
+  port.onMessage.addListener((msg) => {
+    if (msg && msg.type === "result") renderResult(msg.view);
+  });
+  port.onDisconnect.addListener(() => {
+    state.port = null;
+  });
+  state.port = port;
+  return port;
+}
+
+async function startSave() {
+  renderSaving();
+  const tab = state.tab || (state.tab = await currentTab());
+  renderPage(tab);
+  const where = S.classifyUrl(tab && tab.url);
+  if (!where.ok) {
+    renderResult(S.describeResult({ ok: false, status: 0, error: "bad-url", reason: where.reason }));
+    return;
+  }
+  ensurePort().postMessage({ type: "save", url: tab.url, title: tab.title || "", tabId: tab.id });
+}
+
+function onAction() {
+  const action = $("actionBtn").dataset.action;
+  if (action === "retry") startSave();
+  else if (action === "connect") openConnect();
+  else if (action === "upgrade") openTab(S.UPGRADE_URL);
+}
+
+// ── Settings ────────────────────────────────────────────────────────────────
+
+function renderSettings() {
+  const connected = !!state.token;
+  const conn = $("conn");
+  conn.className = "conn" + (connected ? " ok" : "");
+  $("connText").textContent = connected ? "Connected" : "Not connected";
+  $("accountLine").hidden = !(connected && state.account);
+  $("accountLine").textContent = state.account ? `Saving to ${state.account}` : "";
+  $("settingsConnectBtn").textContent = connected ? "Reconnect" : "Connect to Machina";
+  $("settingsConnectBtn").className = connected ? "secondary" : "primary";
+  $("settingsTokenBtn").textContent = connected ? "Use a different token" : "Use a token instead";
+  $("disconnectBtn").hidden = !connected;
+}
+
+async function renderShortcut() {
+  let keys = "";
+  try {
+    const cmds = await api.commands.getAll();
+    const cmd = cmds.find((c) => c.name === "_execute_action");
+    keys = (cmd && cmd.shortcut) || "";
+  } catch (_) {
+    // Safari before 16.4 has no commands API.
+  }
+  $("shortcutKeys").textContent = keys || "Not set";
+  $("shortcutHint").textContent = keys
+    ? `Tip: press ${keys} on any page to save it.`
+    : "Tip: right click a link or selected text to save just that.";
+}
+
+// The browser's own shortcut settings page. Safari has none to open.
+function shortcutsPage() {
+  if (S.isSafariExtension()) return "";
+  const ua = navigator.userAgent || "";
+  if (/Edg\//.test(ua)) return "edge://extensions/shortcuts";
+  return "chrome://extensions/shortcuts";
+}
+
+async function disconnect() {
+  await new Promise((resolve) => api.runtime.sendMessage({ type: "disconnect" }, () => resolve()));
+  state.token = "";
+  state.account = "";
+  renderSettings();
+}
+
+// ── Token fallback ──────────────────────────────────────────────────────────
+
+function setTokenStatus(text, kind) {
+  const el = $("tokenStatus");
+  el.textContent = text || "";
+  el.className = "status" + (kind ? " " + kind : "");
+}
+
+async function prepareTokenView() {
+  const { baseUrl = "" } = await api.storage.local.get(["baseUrl"]);
+  $("token").value = "";
+  $("baseUrl").value = baseUrl;
+  $("baseUrl").placeholder = S.API_ORIGIN;
+  setTokenStatus("", "");
+  $("token").focus();
 }
 
 function sendMessage(msg) {
   return new Promise((resolve) => {
-    chrome.runtime.sendMessage(msg, (resp) => {
-      if (chrome.runtime.lastError) {
-        resolve({ ok: false, message: chrome.runtime.lastError.message });
-      } else {
-        resolve(resp || { ok: false, message: "No response." });
-      }
+    api.runtime.sendMessage(msg, (resp) => {
+      if (api.runtime.lastError) resolve({ ok: false, message: "The extension didn't answer. Try again." });
+      else resolve(resp || { ok: false, message: "The extension didn't answer. Try again." });
     });
   });
 }
 
-// Validate the stored token against the backend. The check saves nothing (see
-// validateToken in background.js) and is safe to run on every popup open.
-async function checkConnection() {
-  setConnection("checking", "Checking…");
-  saveBtn.disabled = true;
-  const resp = await sendMessage({ type: "test-connection" });
-  saveBtn.disabled = false;
-  if (resp.ok) {
-    setConnection("ok", "Connected");
-  } else {
-    setConnection("err", resp.message || "Not connected.");
-  }
-  return resp.ok;
-}
-
-async function load() {
-  const { token = "", baseUrl = "" } = await chrome.storage.local.get(["token", "baseUrl"]);
-  tokenInput.value = token;
-  baseUrlInput.value = baseUrl;
+async function saveToken() {
+  const token = S.cleanToken($("token").value);
   if (!token) {
-    showBanner(PASTE_PROMPT);
-    setConnection(null);
-  } else {
-    showBanner("");
-    await checkConnection();
-  }
-}
-
-// Persist whatever is in the fields. Returns the trimmed token so callers can
-// decide whether there is anything to validate.
-async function saveSettings() {
-  const token = tokenInput.value.trim();
-  const baseUrl = baseUrlInput.value.trim().replace(/\/+$/, "");
-  await chrome.storage.local.set({ token, baseUrl });
-  return token;
-}
-
-async function saveAndConnect() {
-  setStatus("", "");
-  const token = await saveSettings();
-  if (!token) {
-    showBanner(PASTE_PROMPT);
-    setConnection(null);
-    setStatus("Paste your token first.", "err");
+    setTokenStatus("Paste your token first.", "err");
+    $("token").focus();
     return;
   }
-  showBanner("");
-  await checkConnection();
-}
-
-async function saveThisPage() {
-  if (!tokenInput.value.trim()) {
-    setStatus("Paste your token first.", "err");
+  if (!S.looksLikeToken(token)) {
+    setTokenStatus("That doesn't look like a Machina token.", "err");
     return;
   }
-  setStatus("Saving…", "");
-  const resp = await sendMessage({ type: "save-current-tab" });
-  if (resp.ok && resp.body && resp.body.duplicate) {
-    setStatus("Already saved ✓", "ok");
-  } else if (resp.ok) {
-    setStatus("Saved ✓", "ok");
-  } else if (resp.error === "no-token") {
-    setStatus("Paste your token first.", "err");
-  } else if (resp.error === "bad-url") {
-    setStatus("This page can't be saved.", "err");
-  } else if (resp.status === 403) {
-    setStatus("Invalid token.", "err");
-    setConnection("err", "Invalid token, check it above.");
-  } else if (resp.action === "upgrade") {
-    // Free plan's monthly wall: the status line links to the upgrade sheet.
-    setStatus(resp.message || "Free plan limit reached. Upgrade in Machina.", "err");
-    const link = document.createElement("a");
-    link.href = UPGRADE_URL;
-    link.target = "_blank";
-    link.rel = "noopener";
-    link.textContent = " Upgrade";
-    statusEl.appendChild(link);
-  } else {
-    // background.js maps every failure to plain copy (rate limit, too large,
-    // server busy, offline); fall back only if it sent none.
-    setStatus(resp.message || "Couldn't save. Check your token and connection.", "err");
+  const baseUrl = $("baseUrl").value.trim().replace(/\/+$/, "");
+  if (baseUrl && !/^https?:\/\/[^/\s]+$/i.test(baseUrl)) {
+    setTokenStatus("The server address should look like https://example.com", "err");
+    return;
   }
+  await api.storage.local.set({ baseUrl });
+  const btn = $("saveTokenBtn");
+  btn.disabled = true;
+  setTokenStatus("Checking your token", "");
+  const resp = await sendMessage({ type: "connect-token", token });
+  btn.disabled = false;
+  if (!resp.ok) {
+    setTokenStatus(resp.message || "That token doesn't work.", "err");
+    return;
+  }
+  state.token = token;
+  state.account = "";
+  $("token").value = "";
+  setTokenStatus("Connected. Click the Machina icon on any page to save it.", "ok");
 }
 
-saveBtn.addEventListener("click", saveAndConnect);
-$("saveTab").addEventListener("click", saveThisPage);
-
-$("reveal").addEventListener("click", () => {
-  const showing = tokenInput.type === "text";
-  tokenInput.type = showing ? "password" : "text";
+function toggleReveal() {
+  const input = $("token");
+  const showing = input.type === "text";
+  input.type = showing ? "password" : "text";
   $("reveal").textContent = showing ? "Show" : "Hide";
+  $("reveal").setAttribute("aria-pressed", String(!showing));
+}
+
+// ── Boot ────────────────────────────────────────────────────────────────────
+
+async function init() {
+  // Opened as a full tab (Safari always shows the options page that way):
+  // center the column instead of pinning a popup-width strip to the corner.
+  if (AS_OPTIONS || window.innerWidth >= 560) document.documentElement.classList.add("in-tab");
+  $("shortcutLink").hidden = !shortcutsPage();
+  const { token = "", account = "" } = await api.storage.local.get(["token", "account"]);
+  state.token = S.cleanToken(token);
+  state.account = account || "";
+  renderShortcut();
+  if (AS_OPTIONS) {
+    show("settings");
+  } else if (!state.token) {
+    show("connect");
+  } else {
+    show("save");
+    startSave();
+  }
+}
+
+// Connected from the web app while this page is open: catch up.
+api.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local" || !changes.token) return;
+  state.token = S.cleanToken(changes.token.newValue || "");
+  if (changes.account) state.account = changes.account.newValue || "";
+  if (app.dataset.view === "settings") renderSettings();
 });
 
-// Enter in the token field is the same as clicking the primary button.
-tokenInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") saveAndConnect();
+$("backBtn").addEventListener("click", back);
+$("settingsBtn").addEventListener("click", () => show("settings"));
+$("connectBtn").addEventListener("click", openConnect);
+$("useTokenBtn").addEventListener("click", () => show("token"));
+$("actionBtn").addEventListener("click", onAction);
+$("openBtn").addEventListener("click", () => openTab(S.LIBRARY_URL));
+$("settingsConnectBtn").addEventListener("click", openConnect);
+$("settingsTokenBtn").addEventListener("click", () => show("token"));
+$("disconnectBtn").addEventListener("click", disconnect);
+$("shortcutLink").addEventListener("click", () => {
+  if (shortcutsPage()) openTab(shortcutsPage());
+});
+$("saveTokenBtn").addEventListener("click", saveToken);
+$("reveal").addEventListener("click", toggleReveal);
+$("token").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") saveToken();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && state.stack.length > 1) {
+    e.preventDefault();
+    back();
+  }
 });
 
-baseUrlInput.placeholder = DEFAULT_BASE_URL;
-
-document.addEventListener("DOMContentLoaded", load);
+document.addEventListener("DOMContentLoaded", init);
