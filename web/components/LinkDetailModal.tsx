@@ -4,7 +4,6 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, StatusChangeHandler, UserNote, CardShareMode } from '@/lib/types';
 import SourceByline from './SourceByline';
 import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, CircleCheck, Check, Network, Play, Youtube, ImageOff, Image as ImageIcon, Layers, Share2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, StickyNote, Waypoints, Upload, RefreshCw, Link2Off } from 'lucide-react';
-import { getPlatform } from '@/lib/platform';
 import SimpleMarkdown from './SimpleMarkdown';
 import PosterImage from './ui/PosterImage';
 import { openExternal } from '@/lib/share';
@@ -535,9 +534,6 @@ export default function LinkDetailModal({
         remoteSims && remoteSims.id === link.id ? remoteSims.sims : null,
     );
 
-    // Branded source credit, matching the card: YouTube channel in red, X
-    // author (@handle from the URL) in the X grey, everything else muted.
-    const isYouTube = getPlatform(link.url) === 'youtube' || link.sourceType === 'youtube';
     // The source byline is rendered by the shared <SourceByline> — don't
     // reintroduce per-view platform/author derivation here.
 

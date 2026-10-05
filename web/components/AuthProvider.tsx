@@ -305,6 +305,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })();
         return () => { cancelled = true; };
         // retryNonce drives "Try again" on the restricted screen here too.
+        // Mount + retry only: the helpers are re-created every render, so
+        // listing them would re-run the workspace lookup on every render.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [retryNonce]);
 
     // ── Real sign-in path: web always; native only when REQUIRE_AUTH is on. ──
@@ -372,7 +375,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         return () => { cancelled = true; unsub(); };
         // retryNonce re-runs resolution (onAuthChange re-fires with the
-        // current user on resubscribe) after a failed workspace setup.
+        // current user on resubscribe) after a failed workspace setup. The
+        // helpers are re-created every render; listing them would resubscribe
+        // the auth listener on every render.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [retryNonce]);
 
     // Workspace is unresolvable → Firestore-backed error reporting is dead with

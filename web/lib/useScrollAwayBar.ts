@@ -18,6 +18,7 @@ export function useScrollAwayBar(resetKey: unknown): boolean {
     const lastY = useRef(0);
     const lastTarget = useRef<EventTarget | null>(null);
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a tab change resets the bar to shown
     useEffect(() => { setHidden(false); lastTarget.current = null; }, [resetKey]);
 
     useEffect(() => {

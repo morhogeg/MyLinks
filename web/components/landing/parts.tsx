@@ -21,6 +21,8 @@ import type { DemoCard, DemoKind } from './demoData';
  */
 export function LiveMark({ size = 24, className = '', ...rest }: ComponentProps<typeof CitationMark>) {
     const [mounted, setMounted] = useState(false);
+    // Mount detection for a hydration-safe swap (see above).
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- runs once, after hydration, by design
     useEffect(() => setMounted(true), []);
     if (!mounted) {
         return (

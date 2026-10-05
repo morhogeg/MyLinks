@@ -228,7 +228,6 @@ export default function SwipeDeck({
         // and be dealt by the self-heal effect with pos unchanged — keyed only
         // on pos, the measure never re-ran and the stack rendered collapsed at
         // height 0 (the build-1067 first-tap bug).
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pos, current?.id]);
 
     const settle = () => {

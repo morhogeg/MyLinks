@@ -120,9 +120,7 @@ export default function AnalyzingBanner({ state }: { state: AnalyzingState | nul
     // hand-off between banner sources can't flash a lower number. The finish
     // frame (done) always completes to 100%.
     let pct = Math.round(Math.min(100, Math.max(0, done ? 100 : shown.progress)));
-    // eslint-disable-next-line react-hooks/refs
     pct = done ? 100 : Math.max(pct, maxPct.current);
-    // eslint-disable-next-line react-hooks/refs
     maxPct.current = pct;
 
     const phase = phaseStatus(shown.kind, pct, shown.stageStep);

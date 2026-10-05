@@ -31,6 +31,7 @@ export function useInView<T extends HTMLElement>(
         // No IntersectionObserver (or SSR hydration on an ancient engine):
         // show everything rather than leaving the page blank at opacity 0.
         if (typeof IntersectionObserver === 'undefined') {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- no observer to subscribe to: show the content
             setSeen(true);
             return;
         }
@@ -187,6 +188,7 @@ export function useSequence(
         // Reduced motion skips straight to the finished state — the point of
         // these demos is the RESULT; the choreography is the flourish.
         if (prefersReducedMotion()) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- each activation restarts the scripted demo
             setStep(stepCount);
             return;
         }

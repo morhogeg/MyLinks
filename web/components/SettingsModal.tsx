@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { User } from '@/lib/types';
 import { X, RefreshCw, ChevronLeft } from 'lucide-react';
 import { readLocalAiConsent } from '@/lib/aiConsent';
@@ -215,15 +215,14 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
     };
 
     // AI-consent timestamp for the "Privacy & AI" section.
-    const [aiConsentAt, setAiConsentAt] = useState<number | null>(null);
+    // Read fresh each time the sheet opens (Settings only mounts client-side,
+    // after sign-in, so localStorage is available here).
+    const aiConsentAt = useMemo(() => (isOpen ? readLocalAiConsent() : null), [isOpen]);
 
     // Private-collections PIN management (change / turn off). The PIN is first
     // created from the collection edit sheet; here it can only be maintained.
     const { hasPin } = usePrivacyLock(uid);
     const [pinModal, setPinModal] = useState<null | 'change' | 'disable'>(null);
-    useEffect(() => {
-        if (isOpen) setAiConsentAt(readLocalAiConsent());
-    }, [isOpen]);
 
     // On phones Settings is a real full-screen page (slides in, fills the screen,
     // clears the notch); on desktop it stays a centered modal.
@@ -278,7 +277,10 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
     useEffect(() => {
         if (isOpen && uid) {
             // Deep-link: open straight to the digest screen (main → Reminders &
-            // Digest) so Back still walks out one level at a time.
+            // Digest) so Back still walks out one level at a time. Reset on
+            // open on purpose: a key remount would drop the sheet's open/close
+            // transition.
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- reset the nav stack each time the sheet opens
             setStack(initialSection === 'digest' ? ['main', 'resurfacing']
                 : initialSection === 'stats' ? ['main', 'stats']
                     : initialSection === 'extension' || initialSection === 'extension-connect' ? ['main', 'extension'] : ['main']);

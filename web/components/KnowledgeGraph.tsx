@@ -734,6 +734,9 @@ export default function KnowledgeGraph({
     // The pointer handlers live outside React's render cycle, so they read the
     // model through a ref that tracks the latest build.
     const modelRef = useRef<GraphModel | null>(null);
+    // Latest-ref pattern, like the handler refs above: written in render, read
+    // only by the canvas event handlers (never during render).
+    // eslint-disable-next-line react-hooks/immutability
     modelRef.current = model;
 
     // ── Selection panel data ─────────────────────────────────────────────────

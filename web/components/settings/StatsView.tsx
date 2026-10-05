@@ -237,6 +237,7 @@ export function StatsView({ uid, onOpenFacet, restoreScroll }: {
 
     useEffect(() => {
         let cancelled = false;
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- clear the last load's error as a new load starts
         setFailed(false);
         loadStats(uid)
             .then((s) => {
