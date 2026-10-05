@@ -26,6 +26,13 @@ account through a hook that exists only on the localhost emulator origin; see
 `web/lib/firebase.ts`). That still takes a manual pass on a phone
 (SOURCE_OF_TRUTH §4 task 11).
 
+**The browser extension** has its own runs. `tests/10-browser-extension.spec.ts`
+(part of `npm test`) loads the real `extension/` into Chromium and connects it
+through the web app. `npm run test:extension` runs `extension/*.spec.ts`: the
+extension alone against a stub share_ingest on a random port (no emulators, no
+dev server, none of the shared ports). `npm run extension:assets` regenerates
+the Chrome Web Store images in `extension/store/`.
+
 **Known bugs** are written as `test.fail()` with a reason. They pass while the
 bug exists. Once the bug is fixed, Playwright reports an unexpected pass, and
 you delete the `test.fail` line.
