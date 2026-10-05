@@ -36,8 +36,9 @@ interface SettingsModalProps {
     onReplayTour?: () => void;
     /** Deep-link the sheet straight to a sub-screen on open: the digest
         settings (main → Reminders & Digest) or Insights (main → Insights,
-        used by the feed's "Back to Insights" chip). */
-    initialSection?: 'digest' | 'stats';
+        used by the feed's "Back to Insights" chip), or the browser extension
+        (`/?connect=extension`, sent by the extension's Connect button). */
+    initialSection?: 'digest' | 'stats' | 'extension';
     /** Insights row tapped: open the library filtered to this facet. The
         HANDLER owns closing the sheet (page.tsx closes it, then hands the
         request to Feed). */
@@ -276,7 +277,9 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
         if (isOpen && uid) {
             // Deep-link: open straight to the digest screen (main → Reminders &
             // Digest) so Back still walks out one level at a time.
-            setStack(initialSection === 'digest' ? ['main', 'resurfacing'] : initialSection === 'stats' ? ['main', 'stats'] : ['main']);
+            setStack(initialSection === 'digest' ? ['main', 'resurfacing']
+                : initialSection === 'stats' ? ['main', 'stats']
+                    : initialSection === 'extension' ? ['main', 'extension'] : ['main']);
             // Forget last session's offsets — a fresh open of Settings should
             // always start at the top, not where a previous visit left off.
             scrollByView.current.clear();
@@ -379,7 +382,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
 
                         {view === 'story' && <StoryView />}
 
-                        {view === 'extension' && <ExtensionView uid={uid || null} />}
+                        {view === 'extension' && <ExtensionView uid={uid || null} account={accountEmail} autoConnect={initialSection === 'extension'} />}
 
                         {view === 'resurfacing' && (
                             <ResurfacingView

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Bell, BellRing, Sun, Moon, Monitor, Clock, Compass, Lock, BarChart3, Heart, Crown, Puzzle, Upload } from 'lucide-react';
 import { policyUrl, openExternal } from '@/lib/share';
 import { isNativeApp } from '@/lib/api';
+import { chromeWebStoreUrl } from '@/lib/extension';
 import ProfileAvatar from '../ProfileAvatar';
 import DataExport from './DataExport';
 import { accountTitle, isPrivateRelay } from './AccountSection';
@@ -137,17 +138,15 @@ export function MainView({
             <List>
                 <NavRow tile={<BarChart3 className="w-[17px] h-[17px]" />} title="Insights" onClick={() => go('stats')} />
                 {/* Desktop capture. On native the row stays (people set up their
-                    Mac from their phone), with a sub-line saying it's a computer
-                    thing so the tap isn't a surprise. The extension is real and
-                    works, but it is not in any store yet (installed by hand,
-                    extension/README.md), so the sub-line says "preview" on both
-                    platforms rather than reading like a one-click install. Kept,
-                    not hidden: this screen is the only place to see or reset the
-                    token an installed extension uses. */}
+                    computer from their phone) with a sub-line saying it's a
+                    computer thing. The sub-line is honest about the store: until
+                    the Chrome Web Store listing exists (lib/extension.ts) it
+                    says "Coming soon" rather than reading like an install. Kept
+                    either way: this screen also holds the token and Reset. */}
                 <NavRow
                     tile={<Puzzle className="w-[16px] h-[16px]" />}
                     title="Browser extension"
-                    sub={isNativeApp() ? 'Desktop preview, installed by hand' : 'Preview, installed by hand'}
+                    sub={isNativeApp() ? 'For Chrome on your computer' : chromeWebStoreUrl() ? 'Chrome, Edge, and Brave' : 'Coming soon to Chrome'}
                     onClick={() => go('extension')}
                 />
             </List>
