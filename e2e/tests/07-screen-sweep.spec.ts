@@ -60,10 +60,17 @@ async function sweep(page: Page, label: string) {
 
 for (const scheme of ['light', 'dark'] as const) {
     test(`every main screen renders cleanly (${scheme})`, async ({ page }) => {
+        // The app's theme is its own setting (localStorage `theme`, default
+        // dark), not the OS preference, so set it directly.
+        await page.addInitScript((t) => { try { localStorage.setItem('theme', t); } catch { /* */ } }, scheme);
         await page.emulateMedia({ colorScheme: scheme });
         const errors = collectPageErrors(page);
         await openAsReturningUser(page, LIBRARY);
         await expect(page.getByRole('heading', { name: 'Sourdough starter guide' })).toBeVisible();
+        // Light mode is a `light` class on <html>; dark is the default (no class).
+        const html = page.locator('html');
+        if (scheme === 'light') await expect(html).toHaveClass(/\blight\b/);
+        else await expect(html).not.toHaveClass(/\blight\b/);
         await sweep(page, scheme);
         expect(errors).toEqual([]);
     });
