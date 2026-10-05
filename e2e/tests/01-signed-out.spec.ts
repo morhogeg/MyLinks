@@ -47,3 +47,31 @@ test.describe('signed-out visitor @desktop', () => {
         await expect(footer.getByRole('link', { name: /support@/ })).toHaveAttribute('href', /^mailto:support@/);
     });
 });
+
+// Theme: a first-time visitor starts in whatever their device is set to
+// (owner decision 2026-10-05); anyone who already has a saved theme keeps it.
+for (const scheme of ['light', 'dark'] as const) {
+    test(`first visit follows the device appearance (${scheme}) @desktop`, async ({ page }) => {
+        await page.emulateMedia({ colorScheme: scheme });
+        await hideDevChrome(page);
+        await installBackend(page, null);
+        await page.goto('/');
+        const html = page.locator('html');
+        if (scheme === 'light') await expect(html).toHaveClass(/\blight\b/);
+        else await expect(html).not.toHaveClass(/\blight\b/);
+        // Follows a live change too (Auto mode), e.g. iOS switching at sunset.
+        await page.emulateMedia({ colorScheme: scheme === 'light' ? 'dark' : 'light' });
+        if (scheme === 'light') await expect(html).not.toHaveClass(/\blight\b/);
+        else await expect(html).toHaveClass(/\blight\b/);
+    });
+}
+
+test('a saved theme wins over the device appearance', async ({ page }) => {
+    await page.addInitScript(() => { try { localStorage.setItem('theme', 'dark'); } catch { /* */ } });
+    await page.emulateMedia({ colorScheme: 'light' });
+    await hideDevChrome(page);
+    await installBackend(page, null);
+    await page.goto('/');
+    await page.waitForTimeout(500);
+    await expect(page.locator('html')).not.toHaveClass(/\blight\b/);
+});
