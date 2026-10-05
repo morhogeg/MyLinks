@@ -1306,6 +1306,35 @@ The multi-user auth work described below **was** fully written but not live:
     (5 workspaces, 0 failed cards); nothing to apply. The tool stays for any
     future use (`functions/tools/convert_quota_failed_to_waiting.py`).
 
+26b. **[ ] Browser extension on the Chrome Web Store — CODE READY 2026-10-05,
+    not published.** Popup saves on open with honest states (incl. "Saved for
+    later" for waiting saves); one-click connect via content script `connect.js`
+    on `https://mymachina.app/*` + `window.postMessage` handshake (token never
+    sent to a page; root `/` only, so `/s` `/c` share pages can't trigger it);
+    paste-token kept under Advanced. **No host permissions:** `share_ingest`
+    echoes `chrome-extension://` / `safari-web-extension://` origins
+    (`_EXTENSION_ORIGIN_RE`, `share_ingest` only, no credentials; B1).
+    Settings → Browser extension rewritten (`web/lib/extension.ts`
+    placeholders `CHROME_WEB_STORE_ITEM_ID`, `MAC_APP_STORE_URL`; deep links
+    `/?settings=extension`, `/?connect=extension`). Packaging:
+    `node extension/scripts/package.mjs` → `extension/dist/*.zip`. **Owner
+    steps:** `extension/store/LISTING.md` (5 USD developer account, upload,
+    listing + data-use answers, submit; then set `CHROME_WEB_STORE_ITEM_ID` and
+    redeploy web). Decisions taken: host permission stays dropped; "Web
+    history" unticked (only pages the user explicitly saves are sent).
+
+26c. **[ ] Machina for Safari on the Mac App Store — BUILDS LOCALLY 2026-10-05.**
+    Committed project `safari/MachinaSafari.xcodeproj` (app
+    `com.morhogeg.machina.safari`, extension `….safari.extension`, separate
+    App Store record, macOS 14+); `./safari/build-safari.sh` builds + verifies
+    (ad-hoc), copies `/extension` in at build time. CI `mac-app-store.yml`
+    (manual dispatch only, `confirm: mac`). **Owner steps:**
+    `safari/store/LISTING.md` §6 (Mac Installer cert, ASC record, archive/
+    upload, TestFlight for Mac, screenshots, review notes). Needs B1 live
+    (shipped with this merge). Not verified: Safari runtime, signing for the
+    store. iOS Safari extension: plan in `safari/README.md`, deferred to
+    post-launch (touches the fragile iOS signing pipeline).
+
 ### 🟡 P2 — security/cost hardening & honest product surface
 
 11a1. **[x] Owner QA on build 1219 — ✅ ALL CONFIRMED ON DEVICE 2026-07-27.**
@@ -2521,6 +2550,24 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-10-05 (evening) — BROWSER EXTENSION STORE-READY + MACHINA FOR SAFARI
+  PROJECT; B1 CORS SHIPPED.** Branch `claude/app-launch-qa-a29d1f`. Two
+  parallel sessions, merged + verified centrally: Chrome (`7254510` ..
+  `dfc8e90`, §4 26b) and Safari (`a398ddb`, §4 26c); the Safari session's
+  shared-code requests (B1 CORS, A1–A7, C1–C2) were relayed to and built by the
+  Chrome session. Integration bug caught on merge: the new options page
+  `popup.html?view=settings` broke the Safari bundle check; fixed
+  `b6c8d05`. **Verified on the merged branch:** E2E 65 passed / 4 skipped
+  (desktop-only), extension Playwright 13/13, popup + background unit checks,
+  package check, rules 106/106, pytest 1348, tsc 0, em-dash clean, Safari app
+  rebuilt + verified (ad-hoc). Reviewed B1 by hand (full-match regex, one
+  endpoint, no credentials). **NOT verified:** Safari runtime; production CORS
+  through the Hosting rewrite until the deploy below; store reviews.
+  **Deploy:** `Deploy-Functions: share_ingest` + Vercel. No TestFlight (the
+  app only gets the rewritten Settings → Browser extension screen; it rides
+  the next build). The privacy policy now has an extension paragraph, dated
+  2026-10-05.
 
 - **2026-10-05 (later) — SHIPPED: waiting saves round 2, theme follows the
   device, Share Extension waiting state.** Branch `claude/app-launch-qa-a29d1f`.
