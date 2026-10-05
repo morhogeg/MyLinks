@@ -151,36 +151,46 @@ export const TOTAL_SEC = TOTAL_FRAMES / FPS;
  * A "\n" is a hard break on screen only. No em dashes, no literal "AI", no
  * "second brain", no "library" (verify).
  */
+/**
+ * (2026-10-03, owner via the Meta ad 3 session) The narrator's direction for
+ * a Gemini read (voice Sulafat): this clip's tone is gentle, caring and
+ * encouraging, a thoughtful friend nudging you, never guilt. `style` is each
+ * line's acting note, `pace` replaces the house pace. Not yet used: the
+ * Gemini voicing pipeline is not on this branch (the clip is still voiced
+ * by Kokoro, which ignores both fields).
+ */
+const PACE = 'Unhurried and warm, about 145 words a minute; let sentences breathe.';
+
 export const CAPTIONS = [
   // THE OPENING: the habit, then the problem (no chapter word: `open`)
-  { at: 16, to: 96, open: true, text: 'You save things\nto come back to later.' },
-  { at: 112, to: 188, open: true, text: 'But most of them,\nyou never open again.' },
+  { at: 16, to: 96, open: true, text: 'You save things\nto come back to later.', style: 'Warm and knowing, gentle.', pace: PACE },
+  { at: 112, to: 188, open: true, text: 'But most of them,\nyou never open again.', style: 'Softly honest, a touch wistful, no guilt.', pace: PACE },
   // the turn: the saves gather into the point as the name is said
-  { at: 192, to: 256, open: true, text: 'Machina brings them\nback to you.' },
+  { at: 192, to: 256, open: true, text: 'Machina brings them\nback to you.', style: 'The turn: kind and uplifting, a smile.', pace: PACE },
   // (round 3, owner: "too thin, expand on the feature") Revisit opens on
   // what has come due: a reminder the user set (the app's Remind me: Smart
   // review, or a day) lands under "Due now"; its row lifts after "reminder,"
-  { at: OPEN + 16, to: OPEN + 104, text: 'Your saves come back\nwhen you want them.' },
+  { at: OPEN + 16, to: OPEN + 104, text: 'Your saves come back\nwhen you want them.', style: 'Reassuring, a sense of being in control.', pace: PACE },
   // (round 5, reworded round 6: owner, "why focus on smart review?") USE:
   // the reminder's own sheet, its choices named plainly; the top row (the
   // app's "Smart review": tomorrow, then 1 week and 1 month) lifts on "three
   // times"
-  { at: OPEN + 144, to: OPEN + 256, text: 'Later today, this weekend,\nor three times, so it sticks.' },
+  { at: OPEN + 144, to: OPEN + 256, text: 'Later today, this weekend,\nor three times, so it sticks.', style: "A light, lilting list; a playful little lift on 'so it sticks'.", pace: PACE },
   // the save opens on its summary, then down to its Key Points
-  { at: OPEN + 320, to: OPEN + 408, text: 'Open one, and the key points\nare already there.' },
+  { at: OPEN + 320, to: OPEN + 408, text: 'Open one, and the key points\nare already there.', style: 'Pleased and easy.', pace: PACE },
   // the "Do this" list: the app writes a step only for a save that calls for
   // one (web/lib/takeaway.ts); its first row lifts in the pause after
   // "action,", then the V60 step is ticked off (the app's "Marked as done")
-  { at: OPEN + 128 + U, to: OPEN + 256 + U, text: 'When a save calls for action,\nMachina turns it into a to-do.' },
+  { at: OPEN + 128 + U, to: OPEN + 256 + U, text: 'When a save calls for action,\nMachina turns it into a to-do.', style: 'Practical, a little energised.', pace: PACE },
   // "This week in Machina" is tapped open in the silence before this line;
   // it unfolds on "Every week," and rises into view on "Machina brings back"
-  { at: OPEN + 384 + U, to: OPEN + 496 + U, text: 'Every week, Machina brings back\nwhat’s worth remembering.' },
+  { at: OPEN + 384 + U, to: OPEN + 496 + U, text: 'Every week, Machina brings back\nwhat’s worth remembering.', style: 'Warm and steady, a gentle weekly ritual.', pace: PACE },
   // the themes land as "themes" is said; the Standout rises into view on
   // "the one save worth rereading" and lifts as the glide lands
-  { at: OPEN + 576 + U, to: OPEN + 688 + U, text: 'The themes of your week,\nand the one save worth rereading.' },
+  { at: OPEN + 576 + U, to: OPEN + 688 + U, text: 'The themes of your week,\nand the one save worth rereading.', style: "Thoughtful and savouring; slower on 'worth rereading'.", pace: PACE },
   // the close: the name (the drawn wordmark wipes in as it is said), then
   // the tagline (owner, 2026-09-28: every launch film ends on it, once)
-  { at: OPEN + 960 + U, to: TOTAL_FRAMES, place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4 },
+  { at: OPEN + 960 + U, to: TOTAL_FRAMES, place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4, style: 'A warm, assured sign-off; the name proud, then the tagline unhurried and sincere.', pace: PACE },
 ];
 
 /**
