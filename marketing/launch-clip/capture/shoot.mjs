@@ -17,6 +17,9 @@
  *            (not in the pilot reel; kept for the feature clips)
  *   recall   Revisit → "This week in Machina", the weekly recap, opened and
  *            read down to its standout and its question
+ *   findClip the FIND feature clip: the feed, then search in your own words,
+ *            close matches, a source jump, and the card opened (data
+ *            beside the clip, see writeClipTakesData)
  *   askfull  (the ASK feature clip) the feed → Ask → the question → the
  *            answer and its sources → a source opened and closed → the
  *            suggested follow-up → its answer → its Graph chip
@@ -42,11 +45,11 @@ import { fileURLToPath } from 'node:url';
 import { startServer } from './server.mjs';
 import { openDevice } from './device.mjs';
 import { Take } from './recorder.mjs';
-import * as AD_TODO from './ad-todo.mjs';
-import { NOTE_READ, SHOTS_DIR, renderPost, renderShots, shotsCard, sourceCards } from './clip-save.mjs';
-import { AD_CARD_ID, DEMO_ESSAY_ID, adCard } from './ad-card.mjs';
 import { ADASK_TED, ASK, CAPTURE_USER, CARDS, SAVE, SEARCH, SYNTHESIS, TRIP_ASK } from './library.mjs';
 import { tripDocs } from './ad-trip.mjs';
+import { NOTE_READ, SHOTS_DIR, renderPost, renderShots, shotsCard, sourceCards } from './clip-save.mjs';
+import { AD_CARD_ID, DEMO_ESSAY_ID, adCard } from './ad-card.mjs';
+import * as AD_TODO from './ad-todo.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.join(here, '..', 'public', 'reel', 'app');
@@ -434,299 +437,6 @@ const takes = {
     return t.save();
   },
 
-  // ─────────────────────────────────────────────────────── revisitClip
-  // The REVISIT feature clip (clips/revisit-timeline.mjs). The same week as
-  // `recall`, seeded the same way, recorded for a slower read: the Revisit
-  // tab settled on its "Do this" list, the recap opened (60fps), read down in
-  // 3pt steps (half the camera's rounding correction of the reel's 6pt), and
-  // then the recap's Standout TAPPED: the save it points to opens, the app's
-  // own transition at 60fps. `recall` itself is untouched (the reel's take).
-  async revisitClip() {
-    const refs = [...new Set([...SYNTHESIS.themes.flatMap((x) => x.cardIds), SYNTHESIS.standoutCardId])].map((id) => {
-      const c = CARDS.find((x) => x.id === id);
-      return { id, title: c.title, category: c.category };
-    });
-    await fresh(async () => {
-      await page.evaluate(
-        ([uid, syn, todos, due]) => {
-          for (const p of window.__capture.list(`users/${uid}/digests/`)) window.__capture.remove(p);
-          window.__capture.set(`users/${uid}/syntheses/${syn.weekId}`, syn);
-          for (const [id, text] of todos) {
-            const p = `users/${uid}/links/${id}`;
-            const cur = window.__capture.get(p);
-            if (cur) window.__capture.set(p, { ...cur, actionableTakeaway: text });
-          }
-          // (clip round 3) a reminder the user set on Four Thousand Weeks has
-          // come due: Revisit lists it first, under "Due now" (the app's own
-          // Smart review, the Remind me sheet's default)
-          const d = `users/${uid}/links/${due}`;
-          const cur = window.__capture.get(d);
-          if (cur)
-            window.__capture.set(d, {
-              ...cur,
-              reminderStatus: 'pending',
-              reminderProfile: 'smart',
-              reminderCount: 1,
-              nextReminderAt: Date.now() - 1_800_000,
-            });
-        },
-        [
-          UID,
-          { ...SYNTHESIS, weekId: isoWeekId(new Date()), cards: refs, createdAt: Date.now() - 3_600_000 },
-          CARDS.filter((c) => c.takeaway).map((c) => [c.id, c.takeaway]),
-          'fourthousand',
-        ],
-      );
-    });
-    const RECAP = {
-      recap: ['div[class*="border-accent/25"]'],
-      narrative: ['p', 'Five saves this week'],
-      recapTitle: ['div', SYNTHESIS.title],
-      theme1: ['section', 'Counting the time'],
-      theme2: ['section', 'Somewhere to be slow'],
-      theme1Link: ['section button', 'Four Thousand Weeks'],
-      standout: ['button', 'Standout'],
-      question: ['div[class*="bg-card-hover"]', 'Worth sitting with'],
-      todo: ['div[class*="divide-y"]', 'Call your parents'],
-      todoFirst: ['div[class*="ps-1.5"]', 'Call your parents'],
-      todoHeader: ['button', 'Do this'],
-      due: ['button', 'Four Thousand Weeks'],
-      dueRow: ['div[class*="rounded-2xl"][class*="border-border-subtle"]', 'Four Thousand Weeks'],
-      doneToast: ['[role=status]', 'Marked as done'],
-      dueHeader: ['button', 'Due now'],
-      todoLast: ['div[class*="ps-1.5"]', 'Tomorrow morning'],
-      revisitTab: R.revisitTab,
-    };
-    const CARD = {
-      dialog: R.dialog,
-      detailTitle: ['h2', 'The Tail End'],
-      back: ['button[aria-label="Back to Revisit"]'],
-    };
-    const t = new Take(dev, OUT, 'revisitClip');
-    // the Revisit tab, settled (the clip opens on it; no tab switch in shot)
-    await tab('Revisit').click();
-    await page.waitForTimeout(700);
-    t.mark('tab');
-    await t.snap({ rects: RECAP });
-
-    // (clip round 5, owner: "show the usefulness") the due save's bell: its
-    // reminder's own sheet, Smart review (a day, a week, a month: "1 of 3"),
-    // then closed with its X (in frame, where Cancel is not)
-    const SHEET = {
-      sheet: ['[role=dialog]'],
-      current: ['[role=dialog] div[class*="bg-accent/10"]'],
-      smart: ['[role=dialog] button[role=radio]', 'Smart review'],
-      close: ['[role=dialog] button[aria-label="Close"]'],
-      bell: ['button[aria-label^="Change the reminder"]'],
-    };
-    await t.freeze();
-    await visible(page.locator('button[aria-label^="Change the reminder"]')).click();
-    t.mark('bell');
-    await t.roll(40, { rects: SHEET, step: 1000 / 60 });
-    await t.thaw();
-    await page.waitForTimeout(600);
-    t.mark('sheet');
-    await t.snap({ rects: SHEET });
-    await t.freeze();
-    await visible(page.locator('[role=dialog] button[aria-label="Close"]')).click();
-    t.mark('sheetClose');
-    await t.roll(30, { rects: SHEET, step: 1000 / 60 });
-    await t.thaw();
-    await page.waitForTimeout(700);
-
-    // …and the save itself, opened: it comes back as its point (the summary,
-    // the key points), then back to Revisit
-    const DUE = {
-      dialog: R.dialog,
-      dueTitle: ['h2', 'Four Thousand Weeks'],
-      keyPoints: ['h2, h3, h4, strong, p', 'Key Points'],
-      back: ['button[aria-label="Back to Revisit"]'],
-      due: ['button', 'Four Thousand Weeks'],
-    };
-    await t.freeze();
-    await visible(page.locator('button', { hasText: 'Four Thousand Weeks' })).click();
-    t.mark('open');
-    await t.roll(40, { rects: DUE, step: 1000 / 60 });
-    await t.thaw();
-    await page.waitForTimeout(600);
-    t.mark('opened');
-    await t.snap({ rects: DUE });
-    await t.freeze();
-    await visible(page.locator('button[aria-label="Back to Revisit"]')).click();
-    t.mark('back');
-    await t.roll(40, { rects: { ...DUE, ...RECAP }, step: 1000 / 60 });
-    await t.thaw();
-    await page.waitForTimeout(700);
-    t.mark('tab2');
-    await t.snap({ rects: RECAP });
-
-    // (clip round 3) the V60 step, ticked off: the app's own "Marked as done"
-    // (the row leaves the list, the step stays on its card)
-    await t.freeze();
-    await visible(page.locator('div[class*="ps-1.5"]', { hasText: 'Tomorrow morning' }).getByRole('button', { name: 'Mark as done' })).click();
-    t.mark('tick');
-    await t.roll(40, { rects: RECAP, step: 1000 / 60 });
-    await t.thaw();
-    // (the toast has gone before the recap is opened)
-    await page.waitForTimeout(6000);
-    t.mark('ticked');
-    await t.snap({ rects: RECAP });
-
-    await t.freeze();
-    await visible(page.getByText('This week in Machina')).click();
-    t.mark('expand');
-    await t.roll(36, { rects: RECAP, step: 1000 / 60 });
-    await t.thaw();
-    await page.waitForTimeout(300);
-
-    await t.freeze();
-    await tagScroller('Counting the time');
-    t.mark('scroll');
-    await rollScroll(t, await scrollTargetFor('who would you call', 720), 3, RECAP);
-    await t.thaw();
-    await page.waitForTimeout(300);
-
-    // the Standout, tapped: the save it names opens over Revisit
-    await t.freeze();
-    await visible(page.locator('button', { hasText: 'Standout' })).click();
-    t.mark('card');
-    await t.roll(40, { rects: CARD, step: 1000 / 60 });
-    await t.thaw();
-    await page.waitForTimeout(600);
-    t.mark('cardSettled');
-    await t.snap({ rects: CARD });
-    return t.save();
-  },
-
-  // ─────────────────────────────────────────────────────────── adTodo
-  // Meta ad 3 (clips/ad-todo-timeline.mjs), round 5: "Share anything to
-  // Machina. From any app. Even screenshots. Analyzed, summarized, and linked
-  // to related saves." Four saves from four places land at the top of the
-  // feed (a YouTube video, an Instagram post, an article, a screenshot:
-  // capture/ad-todo.mjs); the feed is glided down, every card summarized;
-  // then the Graph view lays itself out, the saves linked. Rolls at 60fps. No
-  // recipe, money or workout card is in the store, and no Pro surface is
-  // seeded.
-  async adTodo() {
-    const shotsDir = path.join(here, '..', 'out', 'capture', 'app', 'out', AD_TODO.SHOTS_DIR);
-    await AD_TODO.renderPost(dev.browser, shotsDir);
-    const postUrl = `${server.url}/${AD_TODO.SHOTS_DIR}/post-1.png`;
-    const sources = AD_TODO.sourceCards(postUrl);
-    await fresh(async () => {
-      await page.evaluate(
-        ([uid, hidden, hiddenCols]) => {
-          for (const p of window.__capture.list(`users/${uid}/digests/`)) window.__capture.remove(p);
-          for (const p of window.__capture.list(`users/${uid}/syntheses/`)) window.__capture.remove(p);
-          for (const id of hidden) window.__capture.remove(`users/${uid}/links/${id}`);
-          for (const id of hiddenCols) window.__capture.remove(`users/${uid}/collections/${id}`);
-          // (the hidden cards leave no dangling links behind)
-          for (const p of window.__capture.list(`users/${uid}/links/`)) {
-            const cur = window.__capture.get(p);
-            if (cur?.relatedLinks) window.__capture.set(p, { ...cur, relatedLinks: cur.relatedLinks.filter((r) => !hidden.includes(r.id)) });
-          }
-        },
-        [UID, AD_TODO.HIDDEN, AD_TODO.HIDDEN_COLLECTIONS],
-      );
-    });
-    const t = new Take(dev, OUT, 'adTodo');
-    const F60 = 1000 / 60;
-    t.mark('home');
-    await t.snap({ rects: { firstCard: R.firstCard } });
-
-    // the four saves land at the top of the feed, one after another (a
-    // re-saved card keeps its doc and its links; a new one brings its links)
-    const linksOf = (id) =>
-      AD_TODO.LINKS.filter(([a]) => a === id).map(([, b, reason, common], k) => ({
-        id: b,
-        title: CARDS.find((c) => c.id === b).title,
-        reason,
-        similarity: 0.86 - k * 0.03,
-        commonConcepts: common,
-      }));
-    for (const { key, id, doc, reuse } of sources) {
-      await t.freeze();
-      await page.evaluate(
-        ([p, d, reuse, links]) => {
-          const cur = window.__capture.get(p);
-          window.__capture.set(p, reuse ? { ...cur, createdAt: Date.now() } : { ...d, relatedLinks: links, createdAt: Date.now() });
-        },
-        [linkPath(id), doc ?? null, !!reuse, linksOf(id)],
-      );
-      t.mark(`${key}Land`);
-      await t.roll(36, { rects: { firstCard: R.firstCard }, step: F60 });
-      await t.thaw();
-      await page.waitForTimeout(500);
-    }
-    // …and their related saves link back to them (the app links both ways)
-    await page.evaluate(
-      ([uid, links]) => {
-        for (const [a, b, reason, common] of links) {
-          const p = `users/${uid}/links/${b}`;
-          const cur = window.__capture.get(p);
-          const title = window.__capture.get(`users/${uid}/links/${a}`)?.title;
-          if (cur) window.__capture.set(p, { ...cur, relatedLinks: [...(cur.relatedLinks ?? []), { id: a, title, reason, similarity: 0.84, commonConcepts: common }] });
-        }
-      },
-      [UID, AD_TODO.LINKS],
-    );
-    await page.waitForTimeout(500);
-    t.mark('landed');
-    await t.snap({ rects: { firstCard: R.firstCard } });
-
-    // the feed, glided down: every save already summarized
-    await t.freeze();
-    await tagScroller('How to overcome your addiction');
-    t.mark('glide');
-    await rollScroll(t, 1500, 4, { firstCard: R.firstCard });
-    await t.thaw();
-    await page.evaluate(() => document.querySelector('[data-capture-scroller]')?.scrollTo({ top: 0, behavior: 'instant' }));
-    await page.waitForTimeout(400);
-
-    // (round 6) one card, opened to its Key Points: "pulls out the key points"
-    const KP = {
-      dialog: R.dialog,
-      keyPoints: ['[role=dialog] h1, [role=dialog] h2, [role=dialog] h3, [role=dialog] h4', 'Key Points'],
-      points: ['[role=dialog] ul', 'Pack for four days'],
-      title: ['[role=dialog] h2', 'One week, one small bag'],
-    };
-    const igCard = visible(page.locator(R.firstCard[0], { hasText: 'One week, one small bag' }));
-    await igCard.scrollIntoViewIfNeeded();
-    await page.waitForTimeout(400);
-    await t.freeze();
-    await igCard.click({ position: { x: 200, y: 20 } });
-    t.mark('kpOpen');
-    await t.roll(40, { rects: KP, step: F60 });
-    await t.thaw();
-    await page.waitForTimeout(500);
-    await t.freeze();
-    await tagScroller('Pack for four days and do one wash');
-    t.mark('kpScroll');
-    await rollScroll(t, await scrollTargetFor('keep one outfit in your personal bag', 640), 4, KP);
-    await t.thaw();
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(900);
-
-    // the Graph view: every save, linked to the ones it relates to
-    await visible(page.locator('button[aria-label^="View:"]')).click();
-    await page.waitForTimeout(700);
-    await page.locator('[role=radio]', { hasText: 'Graph' }).first().click();
-    await page.waitForTimeout(3500);
-    t.mark('graphSettled');
-    await t.snap({ rects: { canvas: ['canvas'] } });
-
-    // its largest cluster, then a second one, focused in turn: the saves each
-    // links light up together (the app's own cluster focus and zoom)
-    for (const [mark, label] of [['cluster', 'time'], ['cluster2', 'travel']]) {
-      await t.freeze();
-      await visible(page.locator('button[aria-pressed]', { hasText: label })).click();
-      t.mark(mark);
-      await t.roll(60, { rects: { canvas: ['canvas'] }, step: F60 });
-      await t.thaw();
-      await page.waitForTimeout(600);
-    }
-    return t.save();
-  },
-
   // ─────────────────────────────────────────────────────────── revisit
   async revisit() {
     await fresh();
@@ -871,6 +581,228 @@ const takes = {
     await tagScroller('Key Points');
     t.mark('detailScroll');
     await rollScroll(t, await scrollTargetFor('Samin Nosrat', 760), 5, DETAIL);
+    await t.thaw();
+    return t.save();
+  },
+
+  // ─────────────────────────────────────────────────────────── sources
+  // The SAVE clip's source tour: a YouTube video, a long-form X Article, an
+  // Instagram photo post, an article and a typed note, each arriving at the
+  // top of the feed, opened, and read down to what the app made of it (the
+  // Key moments with their timestamps, the Key Points, the "Do this"); the
+  // note is kept verbatim and summarized on demand ("Summarize with
+  // Machina"). The finished cards are written onto the store the way the
+  // backend writes them (capture/clip-save.mjs sourceCards). 60fps rolls.
+  async sources() {
+    const shotsDir = path.join(here, '..', 'out', 'capture', 'app', 'out', SHOTS_DIR);
+    await renderPost(dev.browser, shotsDir);
+    const postUrl = `${server.url}/${SHOTS_DIR}/post-1.png`;
+    await fresh();
+    const t = new Take(dev, OUT, 'sources');
+    const F60 = 1000 / 60;
+    const DETAIL = {
+      title: ['h2'],
+      moments: ['div', 'Explains that dopamine'],
+      moment1: ['li', '2:24'],
+      moment2: ['li', '6:44'],
+      moment3: ['li', '19:20'],
+      moment4: ['li', '26:20'],
+      keyPoints: ['h1,h2,h3,h4', 'Key Points'],
+      points: ['ul', ['Twenty pages a day', 'Pack for four days', 'Wanting the good things', 'Dopamine is not a pleasure']],
+      takeaway: ['div', ['Read twenty pages tonight', 'Lay out four days', 'Name one goal', 'Pick one tech-free zone']],
+      photo: ['img[src*="post-1"]'],
+      noteBody: ['div,p', 'Marco came by'],
+      summarize: ['button', ['Summarize with Machina', 'Reading your text']],
+      read: ['div', 'beam checks out'],
+      readPoints: ['ul', 'Cabinets and counters'],
+      tags: ['div', ['screen time', 'reading', 'carry-on', 'purpose', 'renovation']],
+    };
+    t.mark('home');
+    await t.snap({ rects: { firstCard: R.firstCard } });
+
+    // where each card's read-down stops: the bottom of this text at y (pt)
+    const STOP = {
+      youtube: ['Suggests turning off color', 720],
+      x: ['Write three lines', 740],
+      instagram: ['The caption adds', 760],
+      article: ['Name one goal', 760],
+      note: ['Summarize with Machina', 740],
+    };
+    for (const { id, doc } of sourceCards(postUrl)) {
+      const key = id.replace('src-', '');
+      // it arrives at the top of the feed
+      await t.freeze();
+      await page.evaluate(([p, d]) => window.__capture.set(p, { ...d, createdAt: Date.now() }), [linkPath(id), doc]);
+      t.mark(`${key}Land`);
+      await t.roll(36, { rects: { firstCard: R.firstCard }, step: F60 });
+      await t.thaw();
+      await page.waitForTimeout(600);
+      t.mark(`${key}Landed`);
+      await t.snap({ rects: { firstCard: R.firstCard } });
+
+      // opened
+      await t.freeze();
+      await visible(page.locator(R.firstCard[0]).first()).click({ position: { x: 120, y: 40 } });
+      t.mark(`${key}Open`);
+      await t.roll(40, { rects: DETAIL, step: F60 });
+      await t.thaw();
+      await page.waitForTimeout(500);
+
+      // read down to what the app made of it
+      await t.freeze();
+      // (the scroller is found from text only the open card shows: its title
+      // is also on the feed card behind it, which would scroll the feed)
+      const [txt, y] = STOP[key];
+      await tagScroller(txt);
+      t.mark(`${key}Scroll`);
+      await rollScroll(t, await scrollTargetFor(txt, y), 4, DETAIL);
+      await t.snap({ rects: DETAIL });
+      await t.thaw();
+
+      if (key === 'note') {
+        // "Summarize with Machina": the words stay; the read is asked for
+        let held = null;
+        await page.route('**/api/analyze', (route) => {
+          held = route;
+        });
+        await t.freeze();
+        await visible(page.getByRole('button', { name: /Summarize with Machina/ })).click();
+        t.mark('noteTap');
+        await t.roll(30, { rects: DETAIL, step: F60 });
+        await t.thaw();
+        for (let k = 0; k < 200 && !held; k++) await page.waitForTimeout(50);
+        if (!held) throw new Error('sources: /api/analyze was never called');
+        await t.freeze();
+        await held.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, link: NOTE_READ }) });
+        await page.unroute('**/api/analyze');
+        t.mark('noteRead');
+        await t.roll(48, { rects: DETAIL, step: F60 });
+        await t.thaw();
+        await page.waitForTimeout(500);
+        await t.freeze();
+        await tagScroller('Earliest start');
+        t.mark('noteReadScroll');
+        await rollScroll(t, await scrollTargetFor('Earliest start', 760), 4, DETAIL);
+        await t.snap({ rects: DETAIL });
+        await t.thaw();
+      }
+
+      // back to the feed for the next one
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(900);
+    }
+    return t.save();
+  },
+
+  // ─────────────────────────────────────────────────────────── findClip
+  // The FIND feature clip (clips/find-timeline.mjs), one continuous use of
+  // Home and its search: the feed scrolled (too many saves to scan), then
+  // the search's four sides, each on its own query from SEARCH.clip:
+  //  1. your own words: a card that shares no word with the query (meaning);
+  //  2. close matches: a query with a word no card has still gets the card
+  //     that has the others, under "Close matches", never a dead end;
+  //  3. a source, typed: the Sources row offers it, one tap shows every
+  //     save from there;
+  //  4. the first of them opened: its summary, right there.
+  // Queries are cleared a word at a time, as a held delete key does (the
+  // app's × moves focus in this browser and would need a second tap). App
+  // motion the clip plays at K = 2 is rolled at 60fps. Frames go under
+  // clips/find/, data beside the clip (writeClipTakesData), not into the
+  // reel's takes.json.
+  async findClip() {
+    await fresh();
+    const Q = SEARCH.clip;
+    const t = new Take(dev, OUT, 'clips/find/search');
+    const RECTS = {
+      search: R.search,
+      firstCard: R.firstCard,
+      marcella: ['main article.surface-card', 'Marcella'],
+      goloritze: ['main article.surface-card', 'Goloritz'],
+      closeMatches: ['main span', 'Close matches'],
+      sourceChip: ['main div[class*="mb-5"] button', Q.source.source],
+      sourcesRow: ['main div[class*="mb-5"]', 'Sources'],
+    };
+    t.mark('home');
+    await t.snap({ rects: RECTS });
+
+    // the hook: the feed, scrolled at speed (every save, too many to scan)
+    await t.freeze();
+    await tagScroller('Read Piranesi');
+    t.mark('scroll');
+    // (5pt steps: the clip eases this flick, and at its slow ends coarser
+    // steps alternated a hop and a hold; the camera cannot take up the
+    // rounding, the fixed chrome is in frame)
+    await rollScroll(t, 2700, 5, RECTS);
+    await page.evaluate(() => document.querySelector('[data-capture-scroller]').scrollTo({ top: 0, behavior: 'instant' }));
+    await t.advance();
+    t.mark('top');
+    await t.snap({ rects: RECTS });
+
+    await visible(page.getByPlaceholder('Search your saves')).click();
+    t.mark('focus');
+    await t.roll(16, { rects: RECTS, step: 1000 / 60 });
+
+    const type = async (mark, query) => {
+      t.mark(mark);
+      for (const ch of query) {
+        await page.keyboard.type(ch);
+        await t.advance();
+        await t.snap({ rects: RECTS });
+      }
+    };
+    /** step the frozen clock (debounce, request) until `ready` holds */
+    const until = async (what, ready, arg) => {
+      for (let k = 0; !(await page.evaluate(ready, arg)); k++) {
+        if (k > 300) throw new Error(`findClip: never ${what}`);
+        await page.waitForTimeout(20);
+        await t.advance(1000 / 60);
+      }
+    };
+    const clear = async (mark) => {
+      t.mark(mark);
+      while (await page.evaluate(() => document.activeElement?.value?.length ?? 0)) {
+        await page.keyboard.press('Control+Backspace');
+        await t.advance();
+        await t.snap({ rects: RECTS });
+      }
+    };
+
+    // 1. your own words
+    await type('typing1', Q.words.query);
+    await until('showed the meaning card', () =>
+      [...document.querySelectorAll('main article.surface-card h3')].some((h) => h.textContent.includes('Marcella')),
+    );
+    t.mark('result1');
+    await t.roll(24, { rects: RECTS, step: 1000 / 60 });
+
+    // 2. close matches (the literal tiers answer as it types; no request)
+    await clear('clear1');
+    await type('typing2', Q.close.query);
+    t.mark('result2');
+    await t.roll(24, { rects: RECTS, step: 1000 / 60 });
+
+    // 3. a source, typed, then tapped: the Sources row's own entrance, rolled
+    await clear('clear2');
+    await type('typing3', Q.source.query);
+    await until('offered the source', (name) => [...document.querySelectorAll('main div[class*="mb-5"] button')].some((b) => b.textContent.includes(name)), Q.source.source);
+    t.mark('sources');
+    await t.roll(24, { rects: RECTS, step: 1000 / 60 });
+    await visible(page.locator('main div[class*="mb-5"] button', { hasText: Q.source.source })).click();
+    t.mark('filtered');
+    await t.roll(36, { rects: RECTS, step: 1000 / 60 });
+    await t.thaw();
+    await page.waitForTimeout(400);
+
+    // 4. the first of them opened: the app's own open transition
+    const DETAIL = { ...RECTS, detailTitle: ['h2', ''] };
+    await t.freeze();
+    await visible(page.locator(R.firstCard[0])).click({ position: { x: 120, y: 40 } });
+    t.mark('detail');
+    await t.roll(40, { rects: DETAIL, step: 1000 / 60 });
+    await t.thaw();
+    return t.save();
+  },
+
   // ─────────────────────────────────────────────────────────── askfull
   // The ASK feature clip (clips/ask-timeline.mjs), in ONE continuous take so
   // the clip never swaps takes:
@@ -1039,112 +971,167 @@ const takes = {
     return t.save();
   },
 
-  // ─────────────────────────────────────────────────────────── sources
-  // The SAVE clip's source tour: a YouTube video, a long-form X Article, an
-  // Instagram photo post, an article and a typed note, each arriving at the
-  // top of the feed, opened, and read down to what the app made of it (the
-  // Key moments with their timestamps, the Key Points, the "Do this"); the
-  // note is kept verbatim and summarized on demand ("Summarize with
-  // Machina"). The finished cards are written onto the store the way the
-  // backend writes them (capture/clip-save.mjs sourceCards). 60fps rolls.
-  async sources() {
-    const shotsDir = path.join(here, '..', 'out', 'capture', 'app', 'out', SHOTS_DIR);
-    await renderPost(dev.browser, shotsDir);
-    const postUrl = `${server.url}/${SHOTS_DIR}/post-1.png`;
-    await fresh();
-    const t = new Take(dev, OUT, 'sources');
-    const F60 = 1000 / 60;
-    const DETAIL = {
-      title: ['h2'],
-      moments: ['div', 'Explains that dopamine'],
-      moment1: ['li', '2:24'],
-      moment2: ['li', '6:44'],
-      moment3: ['li', '19:20'],
-      moment4: ['li', '26:20'],
-      keyPoints: ['h1,h2,h3,h4', 'Key Points'],
-      points: ['ul', ['Twenty pages a day', 'Pack for four days', 'Wanting the good things', 'Dopamine is not a pleasure']],
-      takeaway: ['div', ['Read twenty pages tonight', 'Lay out four days', 'Name one goal', 'Pick one tech-free zone']],
-      photo: ['img[src*="post-1"]'],
-      noteBody: ['div,p', 'Marco came by'],
-      summarize: ['button', ['Summarize with Machina', 'Reading your text']],
-      read: ['div', 'beam checks out'],
-      readPoints: ['ul', 'Cabinets and counters'],
-      tags: ['div', ['screen time', 'reading', 'carry-on', 'purpose', 'renovation']],
+  // ─────────────────────────────────────────────────────── revisitClip
+  // The REVISIT feature clip (clips/revisit-timeline.mjs). The same week as
+  // `recall`, seeded the same way, recorded for a slower read: the Revisit
+  // tab settled on its "Do this" list, the recap opened (60fps), read down in
+  // 3pt steps (half the camera's rounding correction of the reel's 6pt), and
+  // then the recap's Standout TAPPED: the save it points to opens, the app's
+  // own transition at 60fps. `recall` itself is untouched (the reel's take).
+  async revisitClip() {
+    const refs = [...new Set([...SYNTHESIS.themes.flatMap((x) => x.cardIds), SYNTHESIS.standoutCardId])].map((id) => {
+      const c = CARDS.find((x) => x.id === id);
+      return { id, title: c.title, category: c.category };
+    });
+    await fresh(async () => {
+      await page.evaluate(
+        ([uid, syn, todos, due]) => {
+          for (const p of window.__capture.list(`users/${uid}/digests/`)) window.__capture.remove(p);
+          window.__capture.set(`users/${uid}/syntheses/${syn.weekId}`, syn);
+          for (const [id, text] of todos) {
+            const p = `users/${uid}/links/${id}`;
+            const cur = window.__capture.get(p);
+            if (cur) window.__capture.set(p, { ...cur, actionableTakeaway: text });
+          }
+          // (clip round 3) a reminder the user set on Four Thousand Weeks has
+          // come due: Revisit lists it first, under "Due now" (the app's own
+          // Smart review, the Remind me sheet's default)
+          const d = `users/${uid}/links/${due}`;
+          const cur = window.__capture.get(d);
+          if (cur)
+            window.__capture.set(d, {
+              ...cur,
+              reminderStatus: 'pending',
+              reminderProfile: 'smart',
+              reminderCount: 1,
+              nextReminderAt: Date.now() - 1_800_000,
+            });
+        },
+        [
+          UID,
+          { ...SYNTHESIS, weekId: isoWeekId(new Date()), cards: refs, createdAt: Date.now() - 3_600_000 },
+          CARDS.filter((c) => c.takeaway).map((c) => [c.id, c.takeaway]),
+          'fourthousand',
+        ],
+      );
+    });
+    const RECAP = {
+      recap: ['div[class*="border-accent/25"]'],
+      narrative: ['p', 'Five saves this week'],
+      recapTitle: ['div', SYNTHESIS.title],
+      theme1: ['section', 'Counting the time'],
+      theme2: ['section', 'Somewhere to be slow'],
+      theme1Link: ['section button', 'Four Thousand Weeks'],
+      standout: ['button', 'Standout'],
+      question: ['div[class*="bg-card-hover"]', 'Worth sitting with'],
+      todo: ['div[class*="divide-y"]', 'Call your parents'],
+      todoFirst: ['div[class*="ps-1.5"]', 'Call your parents'],
+      todoHeader: ['button', 'Do this'],
+      due: ['button', 'Four Thousand Weeks'],
+      dueRow: ['div[class*="rounded-2xl"][class*="border-border-subtle"]', 'Four Thousand Weeks'],
+      doneToast: ['[role=status]', 'Marked as done'],
+      dueHeader: ['button', 'Due now'],
+      todoLast: ['div[class*="ps-1.5"]', 'Tomorrow morning'],
+      revisitTab: R.revisitTab,
     };
-    t.mark('home');
-    await t.snap({ rects: { firstCard: R.firstCard } });
-
-    // where each card's read-down stops: the bottom of this text at y (pt)
-    const STOP = {
-      youtube: ['Suggests turning off color', 720],
-      x: ['Write three lines', 740],
-      instagram: ['The caption adds', 760],
-      article: ['Name one goal', 760],
-      note: ['Summarize with Machina', 740],
+    const CARD = {
+      dialog: R.dialog,
+      detailTitle: ['h2', 'The Tail End'],
+      back: ['button[aria-label="Back to Revisit"]'],
     };
-    for (const { id, doc } of sourceCards(postUrl)) {
-      const key = id.replace('src-', '');
-      // it arrives at the top of the feed
-      await t.freeze();
-      await page.evaluate(([p, d]) => window.__capture.set(p, { ...d, createdAt: Date.now() }), [linkPath(id), doc]);
-      t.mark(`${key}Land`);
-      await t.roll(36, { rects: { firstCard: R.firstCard }, step: F60 });
-      await t.thaw();
-      await page.waitForTimeout(600);
-      t.mark(`${key}Landed`);
-      await t.snap({ rects: { firstCard: R.firstCard } });
+    const t = new Take(dev, OUT, 'revisitClip');
+    // the Revisit tab, settled (the clip opens on it; no tab switch in shot)
+    await tab('Revisit').click();
+    await page.waitForTimeout(700);
+    t.mark('tab');
+    await t.snap({ rects: RECAP });
 
-      // opened
-      await t.freeze();
-      await visible(page.locator(R.firstCard[0]).first()).click({ position: { x: 120, y: 40 } });
-      t.mark(`${key}Open`);
-      await t.roll(40, { rects: DETAIL, step: F60 });
-      await t.thaw();
-      await page.waitForTimeout(500);
+    // (clip round 5, owner: "show the usefulness") the due save's bell: its
+    // reminder's own sheet, Smart review (a day, a week, a month: "1 of 3"),
+    // then closed with its X (in frame, where Cancel is not)
+    const SHEET = {
+      sheet: ['[role=dialog]'],
+      current: ['[role=dialog] div[class*="bg-accent/10"]'],
+      smart: ['[role=dialog] button[role=radio]', 'Smart review'],
+      close: ['[role=dialog] button[aria-label="Close"]'],
+      bell: ['button[aria-label^="Change the reminder"]'],
+    };
+    await t.freeze();
+    await visible(page.locator('button[aria-label^="Change the reminder"]')).click();
+    t.mark('bell');
+    await t.roll(40, { rects: SHEET, step: 1000 / 60 });
+    await t.thaw();
+    await page.waitForTimeout(600);
+    t.mark('sheet');
+    await t.snap({ rects: SHEET });
+    await t.freeze();
+    await visible(page.locator('[role=dialog] button[aria-label="Close"]')).click();
+    t.mark('sheetClose');
+    await t.roll(30, { rects: SHEET, step: 1000 / 60 });
+    await t.thaw();
+    await page.waitForTimeout(700);
 
-      // read down to what the app made of it
-      await t.freeze();
-      // (the scroller is found from text only the open card shows: its title
-      // is also on the feed card behind it, which would scroll the feed)
-      const [txt, y] = STOP[key];
-      await tagScroller(txt);
-      t.mark(`${key}Scroll`);
-      await rollScroll(t, await scrollTargetFor(txt, y), 4, DETAIL);
-      await t.snap({ rects: DETAIL });
-      await t.thaw();
+    // …and the save itself, opened: it comes back as its point (the summary,
+    // the key points), then back to Revisit
+    const DUE = {
+      dialog: R.dialog,
+      dueTitle: ['h2', 'Four Thousand Weeks'],
+      keyPoints: ['h2, h3, h4, strong, p', 'Key Points'],
+      back: ['button[aria-label="Back to Revisit"]'],
+      due: ['button', 'Four Thousand Weeks'],
+    };
+    await t.freeze();
+    await visible(page.locator('button', { hasText: 'Four Thousand Weeks' })).click();
+    t.mark('open');
+    await t.roll(40, { rects: DUE, step: 1000 / 60 });
+    await t.thaw();
+    await page.waitForTimeout(600);
+    t.mark('opened');
+    await t.snap({ rects: DUE });
+    await t.freeze();
+    await visible(page.locator('button[aria-label="Back to Revisit"]')).click();
+    t.mark('back');
+    await t.roll(40, { rects: { ...DUE, ...RECAP }, step: 1000 / 60 });
+    await t.thaw();
+    await page.waitForTimeout(700);
+    t.mark('tab2');
+    await t.snap({ rects: RECAP });
 
-      if (key === 'note') {
-        // "Summarize with Machina": the words stay; the read is asked for
-        let held = null;
-        await page.route('**/api/analyze', (route) => {
-          held = route;
-        });
-        await t.freeze();
-        await visible(page.getByRole('button', { name: /Summarize with Machina/ })).click();
-        t.mark('noteTap');
-        await t.roll(30, { rects: DETAIL, step: F60 });
-        await t.thaw();
-        for (let k = 0; k < 200 && !held; k++) await page.waitForTimeout(50);
-        if (!held) throw new Error('sources: /api/analyze was never called');
-        await t.freeze();
-        await held.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, link: NOTE_READ }) });
-        await page.unroute('**/api/analyze');
-        t.mark('noteRead');
-        await t.roll(48, { rects: DETAIL, step: F60 });
-        await t.thaw();
-        await page.waitForTimeout(500);
-        await t.freeze();
-        await tagScroller('Earliest start');
-        t.mark('noteReadScroll');
-        await rollScroll(t, await scrollTargetFor('Earliest start', 760), 4, DETAIL);
-        await t.snap({ rects: DETAIL });
-        await t.thaw();
-      }
+    // (clip round 3) the V60 step, ticked off: the app's own "Marked as done"
+    // (the row leaves the list, the step stays on its card)
+    await t.freeze();
+    await visible(page.locator('div[class*="ps-1.5"]', { hasText: 'Tomorrow morning' }).getByRole('button', { name: 'Mark as done' })).click();
+    t.mark('tick');
+    await t.roll(40, { rects: RECAP, step: 1000 / 60 });
+    await t.thaw();
+    // (the toast has gone before the recap is opened)
+    await page.waitForTimeout(6000);
+    t.mark('ticked');
+    await t.snap({ rects: RECAP });
 
-      // back to the feed for the next one
-      await page.keyboard.press('Escape');
-      await page.waitForTimeout(900);
-    }
+    await t.freeze();
+    await visible(page.getByText('This week in Machina')).click();
+    t.mark('expand');
+    await t.roll(36, { rects: RECAP, step: 1000 / 60 });
+    await t.thaw();
+    await page.waitForTimeout(300);
+
+    await t.freeze();
+    await tagScroller('Counting the time');
+    t.mark('scroll');
+    await rollScroll(t, await scrollTargetFor('who would you call', 720), 3, RECAP);
+    await t.thaw();
+    await page.waitForTimeout(300);
+
+    // the Standout, tapped: the save it names opens over Revisit
+    await t.freeze();
+    await visible(page.locator('button', { hasText: 'Standout' })).click();
+    t.mark('card');
+    await t.roll(40, { rects: CARD, step: 1000 / 60 });
+    await t.thaw();
+    await page.waitForTimeout(600);
+    t.mark('cardSettled');
+    await t.snap({ rects: CARD });
     return t.save();
   },
 
@@ -1261,6 +1248,9 @@ const takes = {
     await page.waitForTimeout(600);
     t.mark('dueHeld');
     await t.snap({ rects: DUE });
+    return t.save();
+  },
+
   // ─────────────────────────────────────────────────────────── adtrip
   // The trip ad (ads/trip-timeline.mjs), one continuous take:
   //   open     the Ask tab: the screen's fade and its mark's own launch,
@@ -1465,6 +1455,135 @@ const takes = {
     await t.thaw();
     return t.save();
   },
+
+  // ─────────────────────────────────────────────────────────── adTodo
+  // Meta ad 3 (clips/ad-todo-timeline.mjs), round 5: "Share anything to
+  // Machina. From any app. Even screenshots. Analyzed, summarized, and linked
+  // to related saves." Four saves from four places land at the top of the
+  // feed (a YouTube video, an Instagram post, an article, a screenshot:
+  // capture/ad-todo.mjs); the feed is glided down, every card summarized;
+  // then the Graph view lays itself out, the saves linked. Rolls at 60fps. No
+  // recipe, money or workout card is in the store, and no Pro surface is
+  // seeded.
+  async adTodo() {
+    const shotsDir = path.join(here, '..', 'out', 'capture', 'app', 'out', AD_TODO.SHOTS_DIR);
+    await AD_TODO.renderPost(dev.browser, shotsDir);
+    const postUrl = `${server.url}/${AD_TODO.SHOTS_DIR}/post-1.png`;
+    const sources = AD_TODO.sourceCards(postUrl);
+    await fresh(async () => {
+      await page.evaluate(
+        ([uid, hidden, hiddenCols]) => {
+          for (const p of window.__capture.list(`users/${uid}/digests/`)) window.__capture.remove(p);
+          for (const p of window.__capture.list(`users/${uid}/syntheses/`)) window.__capture.remove(p);
+          for (const id of hidden) window.__capture.remove(`users/${uid}/links/${id}`);
+          for (const id of hiddenCols) window.__capture.remove(`users/${uid}/collections/${id}`);
+          // (the hidden cards leave no dangling links behind)
+          for (const p of window.__capture.list(`users/${uid}/links/`)) {
+            const cur = window.__capture.get(p);
+            if (cur?.relatedLinks) window.__capture.set(p, { ...cur, relatedLinks: cur.relatedLinks.filter((r) => !hidden.includes(r.id)) });
+          }
+        },
+        [UID, AD_TODO.HIDDEN, AD_TODO.HIDDEN_COLLECTIONS],
+      );
+    });
+    const t = new Take(dev, OUT, 'adTodo');
+    const F60 = 1000 / 60;
+    t.mark('home');
+    await t.snap({ rects: { firstCard: R.firstCard } });
+
+    // the four saves land at the top of the feed, one after another (a
+    // re-saved card keeps its doc and its links; a new one brings its links)
+    const linksOf = (id) =>
+      AD_TODO.LINKS.filter(([a]) => a === id).map(([, b, reason, common], k) => ({
+        id: b,
+        title: CARDS.find((c) => c.id === b).title,
+        reason,
+        similarity: 0.86 - k * 0.03,
+        commonConcepts: common,
+      }));
+    for (const { key, id, doc, reuse } of sources) {
+      await t.freeze();
+      await page.evaluate(
+        ([p, d, reuse, links]) => {
+          const cur = window.__capture.get(p);
+          window.__capture.set(p, reuse ? { ...cur, createdAt: Date.now() } : { ...d, relatedLinks: links, createdAt: Date.now() });
+        },
+        [linkPath(id), doc ?? null, !!reuse, linksOf(id)],
+      );
+      t.mark(`${key}Land`);
+      await t.roll(36, { rects: { firstCard: R.firstCard }, step: F60 });
+      await t.thaw();
+      await page.waitForTimeout(500);
+    }
+    // …and their related saves link back to them (the app links both ways)
+    await page.evaluate(
+      ([uid, links]) => {
+        for (const [a, b, reason, common] of links) {
+          const p = `users/${uid}/links/${b}`;
+          const cur = window.__capture.get(p);
+          const title = window.__capture.get(`users/${uid}/links/${a}`)?.title;
+          if (cur) window.__capture.set(p, { ...cur, relatedLinks: [...(cur.relatedLinks ?? []), { id: a, title, reason, similarity: 0.84, commonConcepts: common }] });
+        }
+      },
+      [UID, AD_TODO.LINKS],
+    );
+    await page.waitForTimeout(500);
+    t.mark('landed');
+    await t.snap({ rects: { firstCard: R.firstCard } });
+
+    // the feed, glided down: every save already summarized
+    await t.freeze();
+    await tagScroller('How to overcome your addiction');
+    t.mark('glide');
+    await rollScroll(t, 1500, 4, { firstCard: R.firstCard });
+    await t.thaw();
+    await page.evaluate(() => document.querySelector('[data-capture-scroller]')?.scrollTo({ top: 0, behavior: 'instant' }));
+    await page.waitForTimeout(400);
+
+    // (round 6) one card, opened to its Key Points: "pulls out the key points"
+    const KP = {
+      dialog: R.dialog,
+      keyPoints: ['[role=dialog] h1, [role=dialog] h2, [role=dialog] h3, [role=dialog] h4', 'Key Points'],
+      points: ['[role=dialog] ul', 'Pack for four days'],
+      title: ['[role=dialog] h2', 'One week, one small bag'],
+    };
+    const igCard = visible(page.locator(R.firstCard[0], { hasText: 'One week, one small bag' }));
+    await igCard.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(400);
+    await t.freeze();
+    await igCard.click({ position: { x: 200, y: 20 } });
+    t.mark('kpOpen');
+    await t.roll(40, { rects: KP, step: F60 });
+    await t.thaw();
+    await page.waitForTimeout(500);
+    await t.freeze();
+    await tagScroller('Pack for four days and do one wash');
+    t.mark('kpScroll');
+    await rollScroll(t, await scrollTargetFor('keep one outfit in your personal bag', 640), 4, KP);
+    await t.thaw();
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(900);
+
+    // the Graph view: every save, linked to the ones it relates to
+    await visible(page.locator('button[aria-label^="View:"]')).click();
+    await page.waitForTimeout(700);
+    await page.locator('[role=radio]', { hasText: 'Graph' }).first().click();
+    await page.waitForTimeout(3500);
+    t.mark('graphSettled');
+    await t.snap({ rects: { canvas: ['canvas'] } });
+
+    // its largest cluster, then a second one, focused in turn: the saves each
+    // links light up together (the app's own cluster focus and zoom)
+    for (const [mark, label] of [['cluster', 'time'], ['cluster2', 'travel']]) {
+      await t.freeze();
+      await visible(page.locator('button[aria-pressed]', { hasText: label })).click();
+      t.mark(mark);
+      await t.roll(60, { rects: { canvas: ['canvas'] }, step: F60 });
+      await t.thaw();
+      await page.waitForTimeout(600);
+    }
+    return t.save();
+  },
 };
 
 /**
@@ -1511,6 +1630,53 @@ function writeTakesData() {
   console.log(`wrote ${path.relative(path.join(here, '..'), dest)} (${Object.keys(out).join(', ')})`);
 }
 
+/**
+ * A feature clip's own takes (named `clips/<clip>/<take>`, so their frames
+ * sit under public/reel/app/clips/, where writeTakesData does not look)
+ * keep their data BESIDE the clip: src/reels/clips/<clip>/takes.json, in the
+ * same format as the reel's. The clips are built on parallel branches, and
+ * one generated file shared by all of them could not merge. The clip hands
+ * its file to the kit (`addTakes`, src/reels/kit/takes.ts).
+ */
+function writeClipTakesData() {
+  const dir = path.join(OUT, 'clips');
+  if (!fs.existsSync(dir)) return;
+  for (const clip of fs.readdirSync(dir).sort()) {
+    const out = {};
+    for (const take of fs.readdirSync(path.join(dir, clip)).sort()) {
+      const f = path.join(dir, clip, take, 'manifest.json');
+      if (!fs.existsSync(f)) continue;
+      const m = JSON.parse(fs.readFileSync(f, 'utf8'));
+      // (the same summary writeTakesData makes: texts de-duplicated, rects
+      // in points rounded to half a point)
+      const texts = [];
+      const id = new Map();
+      const tid = (s) => (id.has(s) ? id.get(s) : (id.set(s, texts.length), texts.push(s) - 1));
+      const r1 = (v) => Math.round(v * 2) / 2;
+      out[`clips/${clip}/${take}`] = {
+        dpr: m.dpr,
+        fps: m.fps,
+        count: m.frames.length,
+        marks: m.marks,
+        texts,
+        frames: m.frames.map((fr) => ({
+          t: fr.text.map(tid),
+          r: Object.fromEntries(
+            Object.entries(fr.rects)
+              .filter(([, v]) => v)
+              .map(([k, v]) => [k, [r1(v.x), r1(v.y), r1(v.w), r1(v.h)]]),
+          ),
+        })),
+      };
+    }
+    if (!Object.keys(out).length) continue;
+    const dest = path.join(here, '..', 'src', 'reels', 'clips', clip, 'takes.json');
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.writeFileSync(dest, JSON.stringify(out) + '\n');
+    console.log(`wrote ${path.relative(path.join(here, '..'), dest)} (${Object.keys(out).join(', ')})`);
+  }
+}
+
 const results = {};
 for (const [name, run] of Object.entries(takes)) {
   if (ONLY && !ONLY.includes(name)) continue;
@@ -1520,6 +1686,7 @@ for (const [name, run] of Object.entries(takes)) {
   console.log(`✓ ${name}: ${m.frames.length} frames in ${((Date.now() - t0) / 1000).toFixed(0)}s`, JSON.stringify(m.marks));
 }
 writeTakesData();
+writeClipTakesData();
 if (dev.errors.length) console.log('page errors:', dev.errors.slice(0, 10));
 await dev.browser.close();
 await server.close();

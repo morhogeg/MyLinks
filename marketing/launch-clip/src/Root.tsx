@@ -286,6 +286,7 @@ export const RemotionRoot: React.FC = () => (
       width={FIND.WIDTH}
       height={FIND.HEIGHT}
       defaultProps={{ withAudio: false, withCaptions: false }}
+    />
     {/* the spoken editions with NO captions (2026-10-04, made for the owner's
         comparison; the final call kept the full captions) */}
     <Composition
