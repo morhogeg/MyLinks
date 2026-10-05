@@ -139,26 +139,34 @@ export const SCROLLS = [
  * `kicker` names the element the line is about. NO em dashes, no literal
  * "AI", no "second brain", no "library".
  */
+/**
+ * The narrator's direction (Gemini TTS, Sulafat, the house voice since
+ * 2026-10-05; this clip was on Kokoro before). Its tone: bright, capable and
+ * warm, a friend showing you something that just works; `style` is each line's
+ * acting note and `pace` replaces the house pace note.
+ */
+const PACE = 'Natural and easy, about 155 words a minute, unhurried between sentences.';
+
 export const CAPTIONS = [
   // the hook: the problem, over each app's own save list (owner, 2026-09-30:
   // the opening must say it plainly, saves scattered across apps, lost)
-  { at: 16, to: 152, text: 'Your saves are scattered across\ncountless apps, and impossible to find.', sizes: [54, 54] },
+  { at: 16, to: 152, text: 'Your saves are scattered across\ncountless apps, and impossible to find.', style: "Knowing and a little rueful, naming a frustration everyone shares; let 'impossible to find' land.", pace: PACE, sizes: [54, 54] },
   // the name, and the first thing it does
-  { at: 176, to: 296, kicker: 'Any app', text: 'Machina saves from any app.\nNo copying, no pasting.', until: 'the fifth share lands in the mark' },
+  { at: 176, to: 296, kicker: 'Any app', text: 'Machina saves from any app.\nNo copying, no pasting.', style: "The turn: warm and assured, a small proud smile on the name; 'No copying, no pasting' light and easy.", pace: PACE, until: 'the fifth share lands in the mark' },
   // the source tour (owner, 2026-09-29: show what each kind of save becomes)
-  { at: 368, to: 504, kicker: 'YouTube', text: 'Share a YouTube video.\nGet its key moments, with timestamps.', sizes: [54, 54], until: 'the four Key moments lift' },
-  { at: 528, to: 664, kicker: 'X', text: 'A long read on X, boiled down\nto the points that matter.', until: 'its Key Points lift' },
-  { at: 688, to: 824, kicker: 'Instagram & Facebook', text: 'Instagram and Facebook posts,\nsaved and summarized too.', until: 'the post lifts over its summary' },
-  { at: 848, to: 984, kicker: 'Articles', text: 'An article becomes\na summary you can act on.', until: 'its "Do this" lifts' },
-  { at: 1008, to: 1224, kicker: 'Notes', text: 'Your notes stay as you wrote them.\nSummarize them when you want.', until: "Machina's read opens under the note" },
+  { at: 368, to: 504, kicker: 'YouTube', text: 'Share a YouTube video.\nGet its key moments, with timestamps.', style: 'Bright and capable, showing a friend something that just works.', pace: PACE, sizes: [54, 54], until: 'the four Key moments lift' },
+  { at: 528, to: 664, kicker: 'X', text: 'A long read on X, boiled down\nto the points that matter.', style: "Easy and clear, a touch of relief on 'the points that matter'.", pace: PACE, until: 'its Key Points lift' },
+  { at: 688, to: 824, kicker: 'Instagram & Facebook', text: 'Instagram and Facebook posts,\nsaved and summarized too.', style: 'Light and matter-of-fact, keeping the rhythm going.', pace: PACE, until: 'the post lifts over its summary' },
+  { at: 848, to: 984, kicker: 'Articles', text: 'An article becomes\na summary you can act on.', style: "Assured, a little emphasis on 'act on'.", pace: PACE, until: 'its "Do this" lifts' },
+  { at: 1008, to: 1224, kicker: 'Notes', text: 'Your notes stay as you wrote them.\nSummarize them when you want.', style: "Gentle and respectful of the person's own words; then simply offering more.", pace: PACE, until: "Machina's read opens under the note" },
   // screenshots, then the card they become, read down
-  { at: 1264, to: 1400, kicker: 'Screenshots', text: 'Even screenshots get analyzed.\nUp to five become one card.', until: 'the screens are picked and saved' },
-  { at: 1408, to: 1576, kicker: 'Key points', text: 'It reads the text in them and\npulls out the key points.', until: 'the card opens on its Key Points' },
-  { at: 1584, to: 1696, kicker: 'Tags & links', text: 'Then it tags it, and links it to\nwhat you already saved.', until: 'the Related cards lift' },
+  { at: 1264, to: 1400, kicker: 'Screenshots', text: 'Even screenshots get analyzed.\nUp to five become one card.', style: 'Quietly impressed, as if this still delights you.', pace: PACE, until: 'the screens are picked and saved' },
+  { at: 1408, to: 1576, kicker: 'Key points', text: 'It reads the text in them and\npulls out the key points.', style: 'Clear and capable, even beats.', pace: PACE, until: 'the card opens on its Key Points' },
+  { at: 1584, to: 1696, kicker: 'Tags & links', text: 'Then it tags it, and links it to\nwhat you already saved.', style: 'Thoughtful, opening up at the end, the sense of things connecting.', pace: PACE, until: 'the Related cards lift' },
   // the close, on the lockup: the name (the drawn wordmark wipes in as it is
   // said), then the tagline, exactly as written (owner call 2026-09-28: every
   // launch film ends on it; it appears nowhere earlier in this clip)
-  { at: HITS.markStrike + 8, to: TOTAL_FRAMES, place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4 },
+  { at: HITS.markStrike + 8, to: TOTAL_FRAMES, place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', style: 'A confident, warm sign-off; the name proud, then the tagline unhurried and sincere.', pace: PACE, duck: 0.4 },
 ];
 
 /** the element words above the lines: 4 frames before each, leaving with it

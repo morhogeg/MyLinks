@@ -231,51 +231,63 @@ export const RECALL_LEN = real(HITS.lockup) - holdStart('recall');
  * the action it names is still playing on screen, and says so (`until`,
  * at most 4s past the voice). `npm run verify` enforces both.
  */
+/**
+ * The narrator's direction (Gemini TTS, Sulafat, the house voice since
+ * 2026-10-05; the reel was on Kokoro before). The reel tells the launch film's
+ * story, so it takes the FILM's tone and pace word for word (FILM_TONE /
+ * FILM_PACE in audio/synth-vo.py): the lines the two share then re-use the
+ * film's own takes (same direction, same words, same cache key), so the reel
+ * and the film say them the same way.
+ */
+const TONE =
+  'A calm, assured brand introduction for a launch film: warm, intimate and quietly confident, like a thoughtful founder telling you about something they care about. Cinematic and unhurried, never salesy, no announcer tone. This line: ';
+const PACE = 'Measured and cinematic, about 145 words a minute; room to breathe between sentences.';
+
 export const CAPTIONS = [
   // the problem, as the launch film opens: the saves hang where they were
   // kept while the narrator names it
-  { at: 16, to: 88, text: 'You save things everywhere.' },
-  { at: 96, to: 216, text: 'An article here. A recipe there.\nA video somewhere else.' },
-  { at: 224, to: 304, text: 'Saved, and rarely seen again.' },
+  { at: 16, to: 88, text: 'You save things everywhere.', style: TONE + 'Soft, intimate opener, a knowing half-smile, as if noticing something true about the listener.', pace: PACE },
+  { at: 96, to: 216, text: 'An article here. A recipe there.\nA video somewhere else.', style: TONE + 'Light, observational list, each item a small glance in a different direction; even rhythm.', pace: PACE },
+  { at: 224, to: 304, text: 'Saved, and rarely seen again.', style: TONE + 'Quiet and a little wistful, landing softly; the low point.', pace: PACE },
   // the answer: the saves collapse into the point, the brackets snap, and
   // the narrator introduces it. The screen shows only the NAME (the drawn
   // wordmark wipes in under the mark on "Machina"; scenes/Hook.tsx); the
   // spoken lead-in "Introducing" is voice only (`say`)
   // (`duck`: the music steps further back under the two brand lines, the
   // name and the promise; round 13, measured masked in the speech band)
-  { at: real(56), to: 410, place: 'mark', text: 'Machina.', say: 'Introducing Machina.', duck: 0.4 },
+  { at: real(56), to: 410, place: 'mark', text: 'Machina.', say: 'Introducing Machina.', style: TONE + 'The turn: warmth rises, assured and proud, a gentle reveal of the name.', pace: PACE, duck: 0.4 },
   // (2026-09-28, owner: the tagline is said once, at the end, so the promise
   // after the name is the App Store subtitle; it was "All your saves,
   // finally useful.")
-  { at: 416, to: 488, text: 'Never lose\nanother great find.' },
+  { at: 416, to: 488, text: 'Never lose\nanother great find.', style: TONE + 'A warm promise, simple and sure.', pace: PACE },
   // the share hold: from any app, into Machina (scenes/ShareBeat.tsx)
-  { at: holdStart('share') + 40, to: holdStart('share') + 176, text: 'Save anything, from anywhere.', until: 'the third share lands in the mark' },
+  { at: holdStart('share') + 40, to: holdStart('share') + 176, text: 'Save anything, from anywhere.', style: TONE + 'Bright, simple, confident.', pace: PACE, until: 'the third share lands in the mark' },
   // the modes hold: the Add dialog's three ways in
   // (to +122: within KICKER_BRIDGE of the next line, so SAVE stays up)
-  { at: holdStart('modes'), to: holdStart('modes') + 122, text: 'A link, a screenshot, or a note.', until: 'the tour is back on Link, the link pasted' },
+  { at: holdStart('modes'), to: holdStart('modes') + 122, text: 'A link, a screenshot, or a note.', style: TONE + 'Easy and light, three quick glances.', pace: PACE, until: 'the tour is back on Link, the link pasted' },
   // the phases (round 14, owner: say what Machina does while they tick; the
   // launch film's line, word for word, and the app's own words in the Add
   // dialog): on the first phase, so "reads" lands on "Reading the page" and
   // "summarizes" on "Writing the summary"
-  { at: real(HITS.phases[0]), to: real(HITS.cardLands) + 12, text: 'Machina reads it,\nsummarizes it, and files it.' },
+  { at: real(HITS.phases[0]), to: real(HITS.cardLands) + 12, text: 'Machina reads it,\nsummarizes it, and files it.', style: TONE + 'Crisp and capable, three even beats.', pace: PACE },
   // the card hold: the new card, opened
-  { at: holdStart('card') + 16, to: holdStart('card') + 152, text: 'Each save becomes a card,\nwith the key points pulled out.', until: 'the Key Points are highlighted' },
-  { at: onBeat(real(214)), to: real(HITS.found) + 24, text: 'Find it in your own words.' },
+  { at: holdStart('card') + 16, to: holdStart('card') + 152, text: 'Each save becomes a card,\nwith the key points pulled out.', style: TONE + 'Clear, and quietly impressed by the result.', pace: PACE, until: 'the Key Points are highlighted' },
+  { at: onBeat(real(214)), to: real(HITS.found) + 24, text: 'Find it in your own words.', style: TONE + 'Reassuring, with a small smile.', pace: PACE },
   // (round 13: the Ask and Connect chapter words land ON their cut, which is
   // on the beat again, and the line follows KICKER_LEAD frames later)
-  { at: real(HITS.askTap) + 4, to: real(HITS.chips[2]) + 8, text: 'Ask anything. Every answer comes straight from your saves.', until: 'the third source lands' },
+  { at: real(HITS.askTap) + 4, to: real(HITS.chips[2]) + 8, text: 'Ask anything. Every answer comes straight from your saves.', style: TONE + 'Inviting at first, then reassuring and trustworthy.', pace: PACE, until: 'the third source lands' },
   // (round 12, owner: say the app connects them ON ITS OWN)
-  { at: real(HITS.graph) + 4, to: holdStart('graph') + 56, text: 'Related saves find each other,\nall on their own.' },
+  { at: real(HITS.graph) + 4, to: holdStart('graph') + 56, text: 'Related saves find each other,\nall on their own.', style: TONE + 'Quiet wonder, a little delighted.', pace: PACE },
   // recall (scenes/Recall.tsx): the "Do this" list (round 12, owner: say the
   // app makes an action item where one is relevant; it writes one only for a
   // save that calls for an action), then the weekly recap, read slowly
-  { at: holdStart('recall') + 16, to: holdStart('recall') + TODO_LEN - 4, text: 'When a save calls for action,\nMachina turns it into a to-do.' },
-  { at: holdStart('recall') + TODO_LEN + 24, to: holdStart('recall') + TODO_LEN + 130, text: 'Every week, Machina brings back\nwhat’s worth remembering.' },
-  { at: holdStart('recall') + TODO_LEN + 136, to: holdStart('recall') + TODO_LEN + 256, text: 'The themes of your week,\nand the one save worth rereading.' },
+  { at: holdStart('recall') + 16, to: holdStart('recall') + TODO_LEN - 4, text: 'When a save calls for action,\nMachina turns it into a to-do.', style: TONE + 'Practical and warm, a light lift on the to-do.', pace: PACE },
+  { at: holdStart('recall') + TODO_LEN + 24, to: holdStart('recall') + TODO_LEN + 130, text: 'Every week, Machina brings back\nwhat’s worth remembering.', style: TONE + 'Warm and personal.', pace: PACE },
+  { at: holdStart('recall') + TODO_LEN + 136, to: holdStart('recall') + TODO_LEN + 256, text: 'The themes of your week,\nand the one save worth rereading.', style: TONE + 'Thoughtful and gentle, landing softly at the end.', pace: PACE },
   // the close: the name (the drawn wordmark wipes in as it is said), then
   // the tagline, set big in Geist and broken at its comma (owner call
   // 2026-09-28: every launch film ends on the tagline)
-  { at: onBeat(real(542)), to: real(600), place: 'lockup', text: 'Machina.\nEverything you save,\nfinally useful.', duck: 0.4 },
+  { at: onBeat(real(542)), to: real(600), place: 'lockup', text: 'Machina.\nEverything you save,\nfinally useful.', style: TONE + 'A confident, warm sign-off, unhurried; the tagline sincere, landing softly.', pace: PACE, duck: 0.4 },
 ];
 
 /**
