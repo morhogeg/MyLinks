@@ -1,0 +1,16 @@
+{
+  "name": "machina-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "description": "First-session user journeys: Playwright drives the real web app against the Firebase Auth + Firestore emulators (locked rules), with the Cloud Function endpoints stubbed.",
+  "type": "module",
+  "scripts": {
+    "pretest": "node -e \"require('fs').copyFileSync('../firestore.rules','./firestore.rules.copy')\"",
+    "test": "firebase emulators:exec --only auth,firestore --project demo-machina \"playwright test\"",
+    "test:against-running-emulators": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "firebase-tools": "^14.27.0"
+  }
+}

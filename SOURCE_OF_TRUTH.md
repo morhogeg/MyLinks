@@ -1128,6 +1128,49 @@ The multi-user auth work described below **was** fully written but not live:
     keyboard never covers inputs (LinkDetailModal category/tag, AddToCollection,
     AddLinkForm on iPhone SE); pull-to-refresh vs edge-swipe conflicts; failed
     card → Retry; Apple + Google sign-in; account deletion end-to-end.
+    **Now narrower (2026-10-04):** the web halves of failed-card Retry,
+    offline save, and account deletion are covered by the E2E suite (11b).
+    What's left here is truly native: share sheet, keyboard, haptics,
+    pull-to-refresh, real Apple/Google popups, StoreKit.
+
+11b. **[x] E2E user-journey suite — ADDED 2026-10-04** (`e2e/`, workflow
+    `e2e-journeys.yml` on `web/**`/`e2e/**`/`firestore.rules` pushes + PRs).
+    Playwright drives the real web app at iPhone size (plus a desktop pass)
+    against the Auth + Firestore emulators with the **live rules**; Cloud
+    Functions are stubbed. 40 tests: landing/legal, sign-up (incl. claim
+    endpoints down → self-serve workspace), consent/welcome/tour persistence,
+    first link save → pipeline hand-off → ready card, failed hand-off, free
+    limit → paywall, notes, duplicates, offline save, search, favorite/note/
+    archive/delete, collections, Ask (stream, sources, history, error, limit),
+    delete account (+ failure), two-account isolation, export, and a screen
+    sweep (every tab/view, light+dark, Hebrew, long titles; no console errors,
+    no sideways scroll). `npm test` in `e2e/`. Known bugs are `test.fail()`.
+    **Findings still open (owner decides / next session fixes):**
+    - **[ ] E1 — double error toast on any failed capture hand-off.**
+      `AddLinkForm.tsx`: the enqueue `catch` toasts "couldn't start", and the
+      card-snapshot effect (`linkCard.status === 'failed'`) toasts "couldn't
+      finish" for the same save. Encoded as a `test.fail` in
+      `03-capture.spec.ts`.
+    - **[ ] E2 — free save limit reads as an error.** A quota 429 arrives after
+      the placeholder is written, so the user sees the paywall AND a red
+      "Couldn't analyze" card with **Retry**, AND both toasts saying "Tap the
+      card to retry", and a retry just 429s again. Ties to 26a (is capture
+      gated?). Encoded as a `test.fail`.
+    - **[ ] E3 — "Note" vs "My notes".** A note saved via + → Note ("Note
+      saved") never appears in the **My notes** view (that view lists only the
+      comments added inside cards), so a new user's first note is "missing"
+      ("No notes yet"). Rename one of them, or list note cards there too.
+    - **[ ] E4 — web copy promises the browser extension**, which isn't public
+      (CAMPAIGN.md §2): Onboarding "Save your first thing", the empty-library
+      line (`Feed.tsx`), and tour step 1 (`OnboardingTour.tsx`), all web-only
+      branches. The iPhone copy is fine.
+    - **[ ] E5 (low) — every new workspace runs the graph migration on first
+      open** (`ensureGraphVersion`: two `rebuild_connections` calls on an empty
+      library) because `create_workspace` doesn't stamp `graphVersion`. That's
+      one cold function start per signup. Stamp it at creation.
+    - **[ ] E6 (low) — the tour is per device** (localStorage only), so a
+      returning user signing in on a second device (phone → desktop) sees "How
+      Machina works" again. Mirror it onto the user doc like `onboarded`.
 
 8a. **[x] Trademark clearance — CLOSED 2026-08-23 by owner decision.** Search
     run same day; the owner reviewed the one live conflict (US 6278707, Ionic
@@ -2459,6 +2502,31 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-10-04 — E2E USER-JOURNEY SUITE (40 tests) + 6 FINDINGS.** Branch
+  `claude/app-launch-qa-a29d1f`. Owner: "I don't have capacity to QA every
+  aspect, find the blind spots for real users." The backend was already well
+  covered (pytest, rules suite, canary, daily health). The gap was the
+  frontend: 7 pure-lib tests and no journey coverage. Added `e2e/` (see §4 11b):
+  Playwright + Auth/Firestore emulators with the live `firestore.rules`,
+  `demo-machina` project (can't reach prod), stubbed functions. One app change:
+  `web/lib/firebase.ts` exposes `window.__machinaE2E.signIn` **only inside the
+  existing localhost-emulator branch**, because headless Chromium can't
+  complete Google/Apple popups. New workflow `e2e-journeys.yml`.
+  **Verified:** `npm test` green 3 runs in a row locally (40/40, ~1.7 min;
+  the two known-bug tests count as expected failures); web tsc 0; eslint clean
+  on `firebase.ts`. **NOT verified:** the workflow on a GitHub runner (first
+  run happens on push). No artifact upload step, because the repo pins actions
+  by SHA and none exists for upload-artifact yet; failures print in the log.
+  **Findings:** E1–E6 in §4 11b. E1/E2 are the ones a real user hits at
+  launch. Also confirmed working (no change needed): self-serve workspace
+  creation when both claim transports are down; consent/onboarding/graph stamp
+  all persist under the locked rules; two accounts are isolated in the UI;
+  delete account wipes and signs out, and a failure keeps the user signed in.
+  **Side effect:** installing Playwright 1.63 garbage-collected older cached
+  browsers in `~/Library/Caches/ms-playwright` (chromium-1223, webkit-2287).
+  Other projects re-fetch them with `npx playwright install`.
+  **Owner steps:** decide E2 (with 26a) and E3; then the fixes are small.
 
 - **2026-10-02 — X LAUNCH CAMPAIGN REVIEWED AND ON MAIN; THREE META AD VIDEOS
   HANDED TO NEW SESSIONS.** Branch `claude/x-launch-content-video-prompts-flujr5`.
