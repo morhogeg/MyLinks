@@ -393,6 +393,7 @@ def test_entitlement_summary_adds_the_trial_and_import_fields(monkeypatch):
     monkeypatch.setattr(ent, "get_entitlement", lambda uid: dict(doc))
     import quota
     monkeypatch.setattr(quota, "quota_usage", lambda uid: {"saves": 2, "asks": 1, "imports": 40})
+    monkeypatch.setattr(ent, "_count_waiting", lambda uid: 0)
 
     summary = ent.entitlement_summary("u1")
     # Backward compatible: every field the shipped client reads is still here.
@@ -404,3 +405,4 @@ def test_entitlement_summary_adds_the_trial_and_import_fields(monkeypatch):
     assert summary["trialAnchorCards"] == ent.TRIAL_ANCHOR_CARDS
     assert summary["quotas"]["imports"]["used"] == 40
     assert summary["quotas"]["saves"]["used"] == 2
+    assert summary["waiting"] == 0

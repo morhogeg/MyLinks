@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, FormEvent } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Link, Plus, X, Upload, Loader2, Image as ImageIcon, StickyNote } from 'lucide-react';
 import { doc, onSnapshot } from 'firebase/firestore';
-import { saveLink, getUserTags, findLinkIdByUrl, createProcessingPlaceholder, startProcessingPlaceholder, createImagePlaceholder, markLinkFailed, createNoteCard, enrichNoteCard } from '@/lib/storage';
+import { saveLink, getUserTags, findLinkIdByUrl, createProcessingPlaceholder, startProcessingPlaceholder, createImagePlaceholder, markLinkFailed, markLinkWaiting, createNoteCard, enrichNoteCard } from '@/lib/storage';
 import { appCheckHeaders, db } from '@/lib/firebase';
 import { authHeaders } from '@/lib/auth';
 import { progressFor } from '@/lib/shareProgress';
@@ -17,7 +17,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
 import { compressImage } from '@/lib/image';
 import { hapticSuccess } from '@/lib/haptics';
-import { offerUpgradeFor } from '@/lib/entitlement';
+import { announceWaitingSave, isWaitingSave, offerUpgradeFor, saveWallAsWaiting, type WaitingSave } from '@/lib/entitlement';
 import ImageScanProgress from '@/components/ImageScanProgress';
 import VideoScanProgress from '@/components/VideoScanProgress';
 import LinkScanProgress from '@/components/LinkScanProgress';
@@ -166,9 +166,14 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
     const [linkCard, setLinkCard] = useState<{
         id: string;
         startedAt: number;          // shared ramp clock (card.processingStartedAt)
-        status: 'processing' | 'done' | 'failed';
+        status: 'processing' | 'done' | 'failed' | 'waiting';
         stage?: ProcessingStage;    // backend milestone, when present
     } | null>(null);
+    // Cards whose hand-off to the pipeline failed in THIS form (the enqueue
+    // catch below). That catch owns the one error toast for the save: the card
+    // also flips to `failed` under the snapshot listener, and its terminal
+    // effect must not toast the same failure a second time (finding E1).
+    const handoffFailedIds = useRef<Set<string>>(new Set());
     // Wall-clock tick (1s) that advances the ramp while a link is processing.
     const [nowTick, setNowTick] = useState(0);
     // Monotonic guard on the in-dialog %: never let the displayed number step back
@@ -291,8 +296,11 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                     if (data.status === 'processing') {
                         return { ...c, stage, startedAt: startedAt ?? c.startedAt };
                     }
-                    // Left processing: a real status = done, 'failed' = failed.
-                    return { ...c, status: data.status === 'failed' ? 'failed' : 'done' };
+                    // Left processing: a real status = done, 'failed' = failed,
+                    // 'waiting' = kept past the monthly allowance (read later).
+                    const next = data.status === 'failed' ? 'failed'
+                        : data.status === 'waiting' ? 'waiting' : 'done';
+                    return { ...c, status: next };
                 });
             },
             () => {
@@ -329,8 +337,17 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
             return () => clearTimeout(t);
         }
         if (linkCard.status === 'failed') {
-            // The card survives as a retryable `failed` card in the feed.
-            toast.error("Saved your link, but analysis couldn't finish. Tap the card to retry.");
+            // The card survives as a retryable `failed` card in the feed. One
+            // toast per failed save: when the hand-off itself failed, the
+            // enqueue catch has already said so.
+            if (!handoffFailedIds.current.has(linkCard.id)) {
+                toast.error("Saved your link, but analysis couldn't finish. Tap the card to retry.");
+            }
+            resetLinkSession();
+        }
+        if (linkCard.status === 'waiting') {
+            // Kept past the monthly allowance. The save response announces it
+            // (paywall or one calm line); the session just ends, quietly.
             resetLinkSession();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -413,21 +430,40 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
         }
     }
 
-    const parseResponse = async (response: Response) => {
+    const readBody = async (response: Response) => {
         const responseText = await response.text();
-        let data;
         try {
-            data = JSON.parse(responseText);
+            return JSON.parse(responseText);
         } catch {
             throw saveError('The analysis service returned an unexpected response. Please try again.', 'analyze_failed');
         }
+    };
+
+    const ensureOk = (response: Response, data: { success?: boolean; error?: string }) => {
         if (!response.ok || !data.success) {
-            // Free plan's monthly save wall: open the paywall, then fail the
-            // save with the server's own copy (the card still turns retryable).
+            // A quota wall that still refuses: open the paywall, then fail
+            // with the server's own copy.
             if (response.status === 429) offerUpgradeFor(data);
             throw saveError(data?.error || 'Failed to analyze. Please try again.', 'analyze_failed');
         }
         return data;
+    };
+
+    // A save kept past the monthly allowance (the card is `waiting`, read on
+    // the 1st or on upgrade). Not an error: the capture is recorded as a
+    // success, the form closes, and the user sees ONLY the paywall (free) or
+    // one calm line (Pro). Never a failed card, a Retry, or an error toast.
+    const finishWaitingSave = (waiting: WaitingSave) => {
+        trackSaveSucceeded('web_form');
+        trackFirstSave();
+        hapticSuccess();
+        const line = announceWaitingSave(waiting);
+        if (line) toast.info(line);
+        setUrl('');
+        clearImages();
+        setIsExpanded(false);
+        setIsLoading(false);
+        onLinkAdded();
     };
 
     // Enqueue an offline-saved link once the device is back online (see
@@ -570,6 +606,21 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                 const text = await response.text();
                 let resData: { success?: boolean; error?: string };
                 try { resData = JSON.parse(text); } catch { resData = {}; }
+                // Past the monthly allowance: the server kept the card as
+                // `waiting` (or, if it still answers with the save-wall 429,
+                // the client does), so this save is DONE, just read later.
+                let waiting: WaitingSave | null = response.ok && isWaitingSave(resData) ? resData : null;
+                const wall = waiting ? null : saveWallAsWaiting(response.status, resData);
+                if (wall) {
+                    await markLinkWaiting(uid, cardId);
+                    waiting = wall;
+                }
+                if (waiting) {
+                    setLinkCard(null);
+                    lastLinkPct.current = 0;
+                    finishWaitingSave(waiting);
+                    return;
+                }
                 if (!response.ok || !resData.success) {
                     if (response.status === 429) offerUpgradeFor(resData);
                     throw new Error(resData?.error || 'Could not start analysis. Please try again.');
@@ -578,6 +629,8 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                 // Couldn't hand the capture to the pipeline. The placeholder card
                 // exists, so flip it to a retryable `failed` card (never a stuck
                 // spinner) rather than lose it — the feed's Retry re-runs analysis.
+                // This catch owns the save's one error toast (see handoffFailedIds).
+                handoffFailedIds.current.add(cardId);
                 try {
                     await markLinkFailed(uid, cardId, enqueueErr instanceof Error ? enqueueErr.message : String(enqueueErr));
                 } catch {
@@ -710,13 +763,19 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                     throw saveError(`Could not save to Machina: ${writeErr instanceof Error ? writeErr.message : String(writeErr)}`, 'save_failed');
                 }
 
+                let waiting: WaitingSave | null = null;
                 try {
                     const response = await fetchWithTimeout(apiUrl('/api/share'), {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()), ...(await authHeaders()) },
                         body: JSON.stringify({ images: payload, cardId, uid }),
                     });
-                    await parseResponse(response);
+                    const body = await readBody(response);
+                    // Past the monthly allowance the set is stored and the card
+                    // waits for its read (see finishWaitingSave).
+                    waiting = response.ok && isWaitingSave(body) ? body : saveWallAsWaiting(response.status, body);
+                    if (waiting && !response.ok) await markLinkWaiting(uid, cardId);
+                    if (!waiting) ensureOk(response, body);
                 } catch (err) {
                     // Enqueue failed — flip the placeholder to a retryable failed
                     // card (never a stuck spinner), then surface the error.
@@ -727,6 +786,11 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                     }
                     if (err instanceof Error && 'category' in err) throw err;
                     throw saveError(err instanceof Error ? err.message : `Network error: ${String(err)}`, 'network');
+                }
+
+                if (waiting) {
+                    finishWaitingSave(waiting);
+                    return;
                 }
 
                 // Queued durably — the honest success moment for the CAPTURE,
@@ -773,7 +837,14 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                     if (netErr instanceof Error && 'category' in netErr) throw netErr;
                     throw saveError(netErr instanceof Error ? netErr.message : `Network error: ${String(netErr)}`, 'network');
                 }
-                data = await parseResponse(response);
+                data = await readBody(response);
+                // Past the monthly allowance the server stored the image and
+                // wrote a `waiting` card itself; there is nothing to save here.
+                if (response.ok && isWaitingSave(data)) {
+                    finishWaitingSave(data);
+                    return;
+                }
+                ensureOk(response, data);
                 // The backend returns the stored image's public URL as link.url.
             }
 

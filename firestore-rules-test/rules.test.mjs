@@ -448,6 +448,33 @@ test('a legacy past nextReminderAt survives an unrelated update, and can still b
   await assertSucceeds(deleteDoc(ref));
 });
 
+// ── links: a save kept past the monthly allowance (`waiting`) ─────────────────
+//
+// The server writes `status: 'waiting'` itself; the client writes it only as a
+// fallback when a server still answers the save wall with a 429
+// (lib/storage markLinkWaiting). That is an ordinary owner update of a card,
+// so no rule change: this pins it. The page snapshot those cards keep
+// (users/{uid}/capture_snapshots, functions/deferred_capture.py) is server-only:
+// no rule matches it, so even the owner can neither read nor write it.
+
+test('owner can mark their own card waiting (markLinkWaiting payload)', async () => {
+  const ref = doc(ownerDb(), 'users', OWNER_DOC, 'links', 'link1');
+  await assertSucceeds(updateDoc(ref, {
+    status: 'waiting', waitingAt: Date.now(),
+    processingStartedAt: deleteField(), processingStage: deleteField(), queuedAt: deleteField(),
+    pendingEnqueue: deleteField(), error: deleteField(), failedAt: deleteField(),
+  }));
+  await assertFails(updateDoc(doc(strangerDb(), 'users', OWNER_DOC, 'links', 'link1'), { status: 'waiting' }));
+});
+
+test('capture_snapshots are server-only, even for the owner', async () => {
+  const ref = doc(ownerDb(), 'users', OWNER_DOC, 'capture_snapshots', 'link1');
+  await assertFails(getDoc(ref));
+  await assertFails(setDoc(ref, { scrape: { text: 'forged' } }));
+  await assertFails(getDocs(collection(ownerDb(), 'users', OWNER_DOC, 'capture_snapshots')));
+  await assertFails(getDoc(doc(anonDb(), 'users', OWNER_DOC, 'capture_snapshots', 'link1')));
+});
+
 // ── analytics_events / client_errors: owner-only, client-appended ─────────────
 //
 // Self-hosted product analytics (lib/analytics.ts) and client error reports

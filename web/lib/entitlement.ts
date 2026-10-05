@@ -42,6 +42,12 @@ export interface Entitlement {
     /** How many cards start the trial clock (the server owns the number). */
     trialAnchorCards: number;
     quotas: { saves: QuotaMeter; asks: QuotaMeter; imports: QuotaMeter };
+    /**
+     * Saves kept past the monthly allowance and not read yet (`status:
+     * 'waiting'` cards). The server reads them on the 1st, or right away on an
+     * upgrade. 0 from a server that predates the field.
+     */
+    waiting: number;
 }
 
 /** Every metered kind. `imports` is a lifetime allowance, the others monthly. */
@@ -68,6 +74,7 @@ const FREE_ENTITLEMENT: Entitlement = {
         asks: { used: 0, limit: 0 },
         imports: { used: 0, limit: 0 },
     },
+    waiting: 0,
 };
 
 function num(v: unknown): number {
@@ -98,6 +105,7 @@ export function parseEntitlement(raw: unknown): Entitlement {
         // reads it says "10 things", so that is the fallback.
         trialAnchorCards: numOrNull(r.trialAnchorCards) ?? FREE_ENTITLEMENT.trialAnchorCards,
         quotas: { saves: meter('saves'), asks: meter('asks'), imports: meter('imports') },
+        waiting: num(r.waiting),
     };
 }
 
@@ -143,6 +151,57 @@ export function isUpgradeHint(data: unknown): data is UpgradeHint {
     const d = data as Record<string, unknown>;
     return d.upgrade === true
         && (d.kind === 'saves' || d.kind === 'asks' || d.kind === 'imports');
+}
+
+/**
+ * The 200 a capture endpoint answers for a save kept past the monthly
+ * allowance (functions/main.py `_waiting_response`): the card is saved as
+ * `waiting` and only the AI read waits. Not an error: never a failed card,
+ * never a Retry, never an error toast.
+ */
+export interface WaitingSave {
+    waiting: true;
+    /** True on the free plan (Pro's cap is an abuse ceiling: nothing to buy). */
+    upgrade?: boolean;
+    message?: string;
+}
+
+export function isWaitingSave(data: unknown): data is WaitingSave {
+    return !!data && typeof data === 'object' && (data as Record<string, unknown>).waiting === true;
+}
+
+/**
+ * A 429 that is the monthly SAVE wall (a server from before saves were kept,
+ * or a path that still refuses), as opposed to the rate limiter. The client
+ * then keeps the card as `waiting` itself, so the user sees the same thing
+ * either way. Returns the equivalent WaitingSave, or null.
+ */
+export function saveWallAsWaiting(status: number, data: unknown): WaitingSave | null {
+    if (status !== 429 || !data || typeof data !== 'object') return null;
+    const d = data as Record<string, unknown>;
+    if (d.kind !== 'saves') return null;
+    return { waiting: true, upgrade: d.upgrade === true, message: waitingSaveMessage(d.upgrade === true) };
+}
+
+/** The line a waiting save shows, mirroring deferred_capture.waiting_message. */
+export function waitingSaveMessage(upgrade: boolean): string {
+    return upgrade
+        ? 'Saved. Machina will read it on the 1st, or now with Pro.'
+        : 'Saved. Machina will read it on the 1st.';
+}
+
+/**
+ * Tell the user a save was kept for later: on the free plan the paywall opens
+ * (it names the backlog, so it IS the confirmation) and this returns null; on
+ * Pro it returns the one calm line the caller should show. Either way the
+ * capture flow shows nothing else.
+ */
+export function announceWaitingSave(data: WaitingSave): string | null {
+    if (data.upgrade) {
+        requestPaywall('saves');
+        return null;
+    }
+    return typeof data.message === 'string' && data.message ? data.message : waitingSaveMessage(false);
 }
 
 /** Whole days until `ts`, floored at 0; null when there is no date. */

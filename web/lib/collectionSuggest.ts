@@ -1,6 +1,7 @@
 import { doc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db } from './firebase';
 import { Collection, Link } from './types';
+import { isPending } from './feedUtils';
 
 /**
  * Client-side collection intelligence (M20-lite).
@@ -154,7 +155,7 @@ export function suggestNewCollections(
     dismissed: Set<string> = getDismissedSuggestions()
 ): CollectionSuggestion[] {
     // Only ready cards — processing/failed cards have no analysis to cluster on.
-    const ready = links.filter((l) => l.status !== 'processing' && l.status !== 'failed');
+    const ready = links.filter((l) => !isPending(l));
     if (ready.length < MIN_CLUSTER_SIZE) return [];
 
     const existingNames = new Set(collections.map((c) => normalize(c.name)));

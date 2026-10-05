@@ -10,7 +10,12 @@ export type LinkStatus = 'unread' | 'archived' | 'favorite';
 // LinkStatus (ready) or `failed` (retryable) — so a capture is never invisible
 // and never silently dropped. A card's `status` field holds one of these while
 // in-flight; the feed renders them as skeleton / retry cards.
-export type CaptureState = LinkStatus | 'processing' | 'failed';
+//
+// `waiting` is a save kept past the plan's monthly allowance: the card is saved
+// (URL, title, the user's own text) but not analyzed yet. The backend reads it
+// on the 1st, or right away on an upgrade (functions/deferred_capture.py). It
+// is not an error and has no Retry.
+export type CaptureState = LinkStatus | 'processing' | 'failed' | 'waiting';
 
 /**
  * Card status-change handler, shared by every surface that can change one
@@ -146,6 +151,8 @@ export interface Link {
   // went wrong and offer a retry that re-runs analysis for `url`.
   error?: string;
   failedAt?: number;
+  // When a `waiting` card was kept past the monthly allowance (epoch ms).
+  waitingAt?: number;
   metadata: LinkMetadata;
   // AI Analysis metadata. sourceType is 'web' | 'youtube' | 'image' | 'note'
   // (a 'note' is a URL-less thought captured directly — it has no `url`).

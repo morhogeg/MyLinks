@@ -157,9 +157,6 @@ def cleanup_deleted_card_logic(uid: str, link_id: str, data: Optional[dict]) -> 
     except Exception as e:
         logger.warning(f"Card-delete unpublish failed for {mask_uid(uid)}/{link_id}: {e}")
 
-    urls = card_blob_urls(data)
-    if not urls:
-        return report
     storage_key = (user_snap.to_dict() or {}).get("storageKey")
     owner_keys: Set[str] = {uid}
     if isinstance(storage_key, str) and storage_key:
@@ -169,6 +166,27 @@ def cleanup_deleted_card_logic(uid: str, link_id: str, data: Optional[dict]) -> 
         bucket = fb_storage.bucket()
     except Exception as e:
         logger.warning(f"Card-delete storage unavailable: {e}")
+        bucket = None
+
+    # A waiting card (deferred_capture) may own a capture snapshot: its doc
+    # and the post images it copied into Storage go with the card. Cheap for
+    # every other card (one missing-doc read).
+    report["snapshot_deleted"] = False
+    try:
+        from deferred_capture import delete_snapshot, snapshot_ref
+
+        def _delete_blob(url):
+            path = blob_path_for(url, bucket.name, owner_keys) if bucket is not None else None
+            if path:
+                bucket.blob(path).delete()
+        if snapshot_ref(db, uid, link_id).get().exists:
+            delete_snapshot(db, uid, link_id, _delete_blob)
+            report["snapshot_deleted"] = True
+    except Exception as e:
+        logger.warning(f"Card-delete snapshot cleanup failed: {e}")
+
+    urls = card_blob_urls(data)
+    if not urls or bucket is None:
         return report
     links_ref = user_ref.collection("links")
     for url in urls:

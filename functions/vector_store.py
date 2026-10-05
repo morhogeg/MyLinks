@@ -41,6 +41,7 @@ from google.cloud.firestore_v1.vector import Vector
 
 from ai_service import embedding_needs_repair
 from db import get_db
+from models import UNANALYZED_STATUSES
 
 logger = logging.getLogger(__name__)
 
@@ -287,7 +288,7 @@ def find_nearest_cards(db, uid: str, query_vector, limit: int,
                     if snap is None or getattr(snap, "exists", False) is not True:
                         continue
                     data = snap.to_dict() or {}
-                    if data.get("status") in ("processing", "failed"):
+                    if data.get("status") in UNANALYZED_STATUSES:
                         continue
                     data["vector_distance"] = (h.to_dict() or {}).get("vector_distance")
                     out.append((h.id, data))
