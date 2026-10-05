@@ -560,6 +560,20 @@ export const ASK_MORE = {
 export const SEARCH = {
   query: 'easy dinner, empty fridge',
   hits: ['marcella'],
+  // The FIND feature clip's searches (clips/find-timeline.mjs), each checked
+  // by `npm run verify` against the app's own matcher (web/lib/searchMatch.ts):
+  //  - words: shares no word with its one card (the reel's query);
+  //  - close: one word ("swim") is on no card, so no card has them all, and
+  //    the app's "Close matches" tier offers the one that has the rest (no
+  //    other save's title or tags carries any of its words);
+  //  - source: where it was saved; the Sources row offers it as you type
+  //    (sources match by name only, so the card grid under it is empty),
+  //    and one tap shows every save from there.
+  clip: {
+    words: { query: 'easy dinner, empty fridge', hits: ['marcella'] },
+    close: { query: 'sardinia swim spot', card: 'goloritze' },
+    source: { query: 'youtube', source: 'YouTube' },
+  },
 };
 
 /**

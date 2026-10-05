@@ -2557,6 +2557,21 @@ updated in all the other videos"): its lockup is "Machina." and the tagline on
 one line (50px, the Revisit clip's setting; owner 2026-09-29). On this
 branch MachinaReel still ends on the subtitle; `claude/clip-find` and
 `claude/clip-revisit` carry the reel's switch.
+**Slogan roles FLIPPED 2026-09-28 (owner decision, supersedes 09-19):** every
+launch film ENDS on the tagline **`Everything you save, finally useful.`**
+(wording and comma exact), said ONCE per film, never at both ends. Why: the
+tagline is the fixed brand line; `Never lose another great find` is App Store
+Subtitle copy that can change with search tests, which would date every posted
+film; and ending on the promise follows the story (problem → Machina →
+payoff). The film's introduction now reads "Machina. / Never lose another
+great find." (voice: "Introducing Machina. Never lose another great find."),
+the endcard's one line is the tagline in sentence-case Geist (it was the
+letterspaced uppercase subtitle), and the closing voice line is the tagline
+word for word and nothing else. The reel follows (its "All your saves,
+finally useful." after the name became "Never lose another great find."; its
+lockup is "Machina." + the tagline on two rows), and so does the FIND clip's
+lockup. `npm run verify` fails if any film ends on anything else or says the
+tagline earlier. The badge slot is still the space under the endcard line.
 
 *Short-form reels (PLANNED 2026-09-26, owner; the PILOT was built the same
 day on branch `claude/machina-reel-pilot`, NOT merged, see "What exists"
@@ -2670,6 +2685,8 @@ and `MachinaReelClean`, in `marketing/launch-clip/`. Script: the problem ("You
 save things everywhere." / "An article here. A recipe there. A video
 somewhere else." / "Saved, and rarely seen again."), "Introducing Machina."
 (the screen shows the drawn wordmark) "Never lose another great find." (was "All your saves, finally useful." until 2026-09-28),
+(the screen shows the drawn wordmark) "Never lose another great find." (was
+"All your saves, finally useful." until 2026-09-28),
 "Save anything, from anywhere." (a motion-graphics beat: saves shared from
 YouTube, Instagram and Safari, each card's Share button tapped and pulled
 into the mark; the native share sheet cannot be captured from the web build
@@ -2792,6 +2809,31 @@ it, Machina is named); scenes `src/reels/clips/ask/`, score
 pixel-identical before and after). **To render:** after `reel:app` +
 `reel:capture`, `npx remotion render src/index.ts MachinaAsk
 out/machina-ask.mp4` (launch-clip README, "Feature clip: Ask").
+**What exists (the FIND clip, 2026-09-28, branch `claude/clip-find`, built
+on the pilot branch, awaiting owner review, not merged):** `MachinaFind`
+(32.5s, 1080×1920, score + narrator + captions; mastered to −14 LUFS, true
+peak ≤ −1 dBTP; one finishing pass done), `MachinaFindSilent`, `MachinaFindClean`, in
+`marketing/launch-clip/`. Built to the owner's feature-video brief (the
+feature as the sole subject for a first-time viewer; a problem hook; three to
+five elements, each shown doing its job and why it matters; Machina named; a
+concrete takeaway). Script: "You saved it. But what was it called?" /
+"Machina finds it in your own words." (easy dinner, empty fridge → Marcella
+Hazan's sauce, no shared word) / "Only half remember it? You still get
+what's close." (sardinia swim spot → Cala Goloritzé under the app's "Close
+matches") / "Type where you saw it, and get everything from there." (youtube
+→ the Sources row → every saved video) / "Open it for the summary, and everything it
+connects to." / "Type what you remember. Get the one you meant." / "Machina.
+Everything you save, finally useful." (the reel's lockup; the tagline since
+2026-09-28). All real captured app UI
+(new take `findClip`); the clip keeps its own timeline, scenes, take data
+(beside the clip, registered with the kit's new `addTakes`, so the reel's
+`takes.json` is untouched), narrator dir and word timings, score, mix and
+verify section; the shared scripts and `Root.tsx` only gained a `find`
+entry. `MachinaReel` and `MachinaLaunch` render exactly as before (stills
+byte-identical, audio hashes unchanged). Details: launch-clip README, "The
+FIND clip". Found in the app while building it: a source typed into search
+(e.g. "youtube") shows its Sources chip over a "No matches" panel, because
+cards match on title, tags and summary but not on the source name.
 
 **Feature-clip briefs, FINAL against the pilot's kit (2026-09-26).** Shared
 by all five: **448 frames (7 bars at 112.5 BPM, 14.9s)**, vertical, built
@@ -3431,6 +3473,8 @@ exact-match, capped.
 
 - **2026-10-01 — Demo account: Mark Manson's essay replaces the old essay card.**
   Branch `claude/clip-ask`, not merged. Owner: no mentions of the previous author
+- **2026-10-01 — Demo account: Mark Manson's essay replaces the old essay card.**
+  Branch `claude/clip-find`, not merged. Owner: no mentions of the previous author
   anywhere. The demo account's essay card (`capture/library.mjs`) is now Mark
   Manson's "The Most Important Question of Your Life" (same age and topic
   cluster; its Related links and the Daily Brew deck follow), the capture
@@ -3499,6 +3543,90 @@ exact-match, capped.
   one of the app's suggested continuation chips, in close (the close tap's
   ripple no longer lingers on the chat's "+ New"). **Not verified:** nobody
   has listened on speakers.
+- **2026-10-04 — FIND clip and reel: the new caption motion (owner).** Branch
+  `claude/clip-find`, not merged. Owner's final call on captions: keep the
+  FULL narration, chunked as before (the headline captions and the
+  highlighter were dropped), in the new motion. `src/reels/kit/Type.tsx`
+  taken from `claude/ad-todo` (75d129f): `KineticLine` (same props) now
+  raises each line out of its own mask 3 frames before its first word (9
+  frames, ease-out quint, no blur) and rolls it up out of the mask in the 5
+  frames before it leaves. The kit is shared, so the reel's captions moved
+  too; the kicker word keeps its letter reveal (unchanged in that file).
+  Verified: `tsc`, `npm run verify` OK; 26 to 40-frame strips read around
+  three caption changes (FIND 116–141 and 656–695, reel 404–429): no line
+  held clipped at its mask edge, never two captions at once. FIND and reel
+  captioned editions re-rendered; the clean editions carry no captions.
+- **2026-10-04 — FIND clip re-voiced: Gemini TTS, Sulafat (owner).** Branch
+  `claude/clip-find`, not merged. The owner's new house narrator, with this
+  clip's own tone (relatable frustration turning into relief) and a
+  per-line acting note on every caption. The Gemini pipeline came over from
+  `claude/ad-todo` unchanged (`gemini_tts.py`, `vo-audition.py`,
+  `narration-run.py`, `narration-tts.yml`); `synth-vo.py` gained the engine
+  switch, with FIND on `gemini-3.8-flash-tts` and Kokoro for the film and reel
+  re-checked byte-identical. The seven lines were voiced once on GitHub
+  (narration request run 1, 7 of the day's 100 requests). The reads came out
+  FASTER than the 160 wpm directed (2.07 to 3.43s a line; "Type where you
+  saw it, and get everything from there." is 1.75s, about 340 wpm), so the
+  caption exits were re-timed to them (each leaves 0.47 to 0.6s after its
+  last word; the opening line now stays to frame 125). The picture's beats
+  are unchanged and the length is unchanged, 32.5s. The score keeps hats,
+  shakers, whooshes and risers out from under the voice (the static
+  pitfall); the narrator now sits 8.1 to 17.0dB over the music in the speech
+  band; −14.0 LUFS, −1.25 dBTP. Verified: `tsc`, `npm run verify` OK.
+  Not verified: nobody has listened (no audio here); `tempo` cannot run in
+  this container (its ffmpeg has no Rubber Band), so the fast line could only
+  be slowed by a new take.
+- **2026-09-29 — FIND clip: the tagline on one row.** Branch
+  `claude/clip-find`, not merged. Owner (phone screenshot): the final frame
+  should carry the tagline on ONE line under the wordmark. The FIND lockup
+  caption is now "Machina.\nEverything you save, finally useful." and its
+  statement is set at 48px (`Lockup` gained `lineSize`, default 60, so the
+  reel's two-row lockup is unchanged: its last frame re-rendered
+  byte-identical). Voice unchanged (the spoken words are the same). FIND
+  editions re-rendered; `tsc` and `npm run verify` OK; the last frame read
+  (the row spans 765px of 1080). Only the FIND clip was touched.
+- **2026-09-28 — Every film ends on the tagline (owner decision).** Branch
+  `claude/clip-find`, not merged. The film's introduction is now "Machina. /
+  Never lose another great find."; its endcard line and closing voice line
+  are "Everything you save, finally useful." (voice: those words alone). The
+  reel's line after the name became the subtitle and its lockup, like the
+  FIND clip's, is "Machina." + the tagline on two rows (`Lockup` breaks rows
+  at a `\n`). New verify gate: every film ends on the tagline, says it once,
+  and the voice matches. All voice lines re-synthesized (all fit), all three
+  mixes rebuilt (reel and FIND −14.0 LUFS / −1.25 dBTP), `.srt` re-emitted,
+  every edition of all three films re-rendered. Verified: `tsc`, `npm run
+  verify` OK; intro and endcard frames read in landscape and vertical (from
+  the rendered VO editions), reel and FIND lockups read; the tagline's voice
+  line cross-correlates with each VO edition's last 10s at exactly its
+  scheduled start (film 75.25s at 0.75, reel 76.80s at 0.79, FIND 28.27s at
+  0.91; the intro line and the score-only edition as controls: 0.05, 0.06).
+  Not verified by ear: nobody has listened.
+- **2026-09-28 — FIND clip finishing pass.** Branch `claude/clip-find`, not
+  merged. Fresh measured review of the full render: the one real defect was
+  the hook's scroll (full speed from rest, an instant reversal, a dead stop:
+  three velocity kicks); now an eased flick down and back, re-captured in
+  5pt steps (taking up the rounding with the camera jiggled the whole
+  device, the chrome being in frame; rule added to Motion language).
+  Earlier owner rounds today: "Open it" re-voiced ("Open it for the summary,
+  and everything it connects to."), its camera move slowed, the takeaway
+  moved off the card onto the empty search field. Verified: `tsc`, `npm run
+  verify` OK, no hop/stall in the render outside the intended cut, −14.0
+  LUFS, reel and film stills byte-identical (one film still flaked once at
+  61 px, then matched twice on re-render), film mix hashes unchanged. Not
+  verified: nobody has listened on speakers.
+- **2026-09-28 — FIND feature clip (second cut, owner brief).** Branch
+  `claude/clip-find`, not merged. Owner rejected the first cut (a trim of
+  the reel's Find beat) and gave a feature-video brief. Rebuilt as a 32.5s
+  explainer: a problem hook (the feed scrolled, "But what was it called?"),
+  Machina named, four elements of the real search (own words, close matches,
+  jump to a source, open the card with its related saves), a takeaway, the
+  reel's lockup. New `findClip` take; verify checks each search's claim from
+  the captured frames. Verified: `tsc`, `npm run verify` OK, the render
+  studied frame to frame and in transition strips (four one-frame faults
+  fixed; rules added to Motion language), −14.0 LUFS / −1.33 dBTP after
+  AAC, reel and film byte-identical. Not verified: nobody has listened on
+  speakers; Inter stands in for SF Pro; backend search hits are scripted.
+  Found: typing a source name shows "No matches" under its Sources chip.
 - **2026-09-27 — Highlight reel round 15: caret, shares, one face.** Branch
   `claude/machina-reel-pilot`, not merged. Owner on round 14: the input
   caret was jittery (0:26–0:28): it blinks on the browser's real clock, so

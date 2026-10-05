@@ -15,6 +15,8 @@ import * as TRIP from '../ads/trip-timeline.mjs';
 import { MachinaAdTrip } from './reels/ads/trip/MachinaAdTrip';
 import * as ASKTALK from '../ads/asktalk-timeline.mjs';
 import { MachinaAdAskTalk } from './reels/ads/asktalk/MachinaAdAskTalk';
+import * as FIND from '../clips/find-timeline.mjs';
+import { FindClip } from './reels/clips/find/FindClip';
 
 /**
  * Compositions:
@@ -255,5 +257,35 @@ export const RemotionRoot: React.FC = () => (
         defaultProps={{ shape: 'feed' as const, audioFile: 'ads/asktalk/score-vo.wav', withCaptions: true }}
       />
     </>
+    {/* the FIND feature clip (src/reels/clips/find, clips/find-timeline.mjs):
+        MachinaFind is the deliverable (score + narrator + captions);
+        Silent has no sound (stills, QA); Clean has no captions or kicker */}
+    <Composition
+      id="MachinaFind"
+      component={FindClip}
+      durationInFrames={FIND.TOTAL_FRAMES}
+      fps={FIND.FPS}
+      width={FIND.WIDTH}
+      height={FIND.HEIGHT}
+      defaultProps={{ withAudio: true, withCaptions: true }}
+    />
+    <Composition
+      id="MachinaFindSilent"
+      component={FindClip}
+      durationInFrames={FIND.TOTAL_FRAMES}
+      fps={FIND.FPS}
+      width={FIND.WIDTH}
+      height={FIND.HEIGHT}
+      defaultProps={{ withAudio: false, withCaptions: true }}
+    />
+    <Composition
+      id="MachinaFindClean"
+      component={FindClip}
+      durationInFrames={FIND.TOTAL_FRAMES}
+      fps={FIND.FPS}
+      width={FIND.WIDTH}
+      height={FIND.HEIGHT}
+      defaultProps={{ withAudio: false, withCaptions: false }}
+    />
   </>
 );

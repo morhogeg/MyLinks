@@ -1,0 +1,103 @@
+[
+ {
+  "frame": 16,
+  "text": "You saved it. But what was it called?",
+  "words": [
+   0.05,
+   0.407,
+   0.943,
+   1.67,
+   1.932,
+   2.286,
+   2.458,
+   2.587
+  ]
+ },
+ {
+  "frame": 128,
+  "text": "Makeena finds it in your own words.",
+  "words": [
+   0.03,
+   0.432,
+   0.864,
+   1.015,
+   1.166,
+   1.417,
+   1.618
+  ]
+ },
+ {
+  "frame": 304,
+  "text": "Only half remember it? You still get what\u2019s close.",
+  "words": [
+   0.03,
+   0.256,
+   0.482,
+   0.889,
+   1.26,
+   1.426,
+   1.674,
+   1.84,
+   2.13
+  ]
+ },
+ {
+  "frame": 448,
+  "text": "Type where you saw it, and get everything from there.",
+  "words": [
+   0.0,
+   0.16,
+   0.352,
+   0.481,
+   0.609,
+   0.737,
+   0.865,
+   0.993,
+   1.346,
+   1.506
+  ]
+ },
+ {
+  "frame": 576,
+  "text": "Open it for the summary, and everything it connects to.",
+  "words": [
+   0.05,
+   0.278,
+   0.415,
+   0.597,
+   0.78,
+   1.34,
+   1.465,
+   1.809,
+   1.903,
+   2.185
+  ]
+ },
+ {
+  "frame": 688,
+  "text": "Type what you remember. Get the one you meant.",
+  "words": [
+   0.03,
+   0.259,
+   0.488,
+   0.672,
+   1.52,
+   1.666,
+   1.812,
+   1.958,
+   2.104
+  ]
+ },
+ {
+  "frame": 848,
+  "text": "Makeena. Everything you save, finally useful.",
+  "words": [
+   0.03,
+   1.0,
+   1.503,
+   1.686,
+   2.45,
+   2.94
+  ]
+ }
+]

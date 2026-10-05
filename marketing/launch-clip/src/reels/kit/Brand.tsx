@@ -111,8 +111,8 @@ export const Lockup: React.FC<{
   /** 'label': the small letterspaced subtitle; 'statement': the line set
    *  big enough to read as the last thing the reel says (owner, round 4) */
   lineStyle?: 'label' | 'statement';
-  /** the statement's size in px (default 60); a longer line, such as the
-   *  tagline, sets it smaller so it stays on one line inside the frame */
+  /** the statement's size in px (default 60); a clip that keeps the tagline
+   *  on ONE row sets it smaller so the row fits the frame */
   lineSize?: number;
 }> = ({ frame, strike, line, lineStarts, markWidth = 262, wordWidth = 660, showLine = true, wordAt, lineStyle = 'label', lineSize = 60 }) => {
   // AnimatedMark's point strikes at u ≈ 0.56 of its launch, which runs at the

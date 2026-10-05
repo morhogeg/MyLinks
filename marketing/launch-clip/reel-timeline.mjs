@@ -244,8 +244,9 @@ export const CAPTIONS = [
   // (`duck`: the music steps further back under the two brand lines, the
   // name and the promise; round 13, measured masked in the speech band)
   { at: real(56), to: 410, place: 'mark', text: 'Machina.', say: 'Introducing Machina.', duck: 0.4 },
-  // (2026-09-28, owner: every launch film ENDS on the tagline, once; the
-  // App Store subtitle takes its place here, after the name)
+  // (2026-09-28, owner: the tagline is said once, at the end, so the promise
+  // after the name is the App Store subtitle; it was "All your saves,
+  // finally useful.")
   { at: 416, to: 488, text: 'Never lose\nanother great find.' },
   // the share hold: from any app, into Machina (scenes/ShareBeat.tsx)
   { at: holdStart('share') + 40, to: holdStart('share') + 176, text: 'Save anything, from anywhere.', until: 'the third share lands in the mark' },
@@ -272,8 +273,9 @@ export const CAPTIONS = [
   { at: holdStart('recall') + TODO_LEN + 24, to: holdStart('recall') + TODO_LEN + 130, text: 'Every week, Machina brings back\nwhat’s worth remembering.' },
   { at: holdStart('recall') + TODO_LEN + 136, to: holdStart('recall') + TODO_LEN + 256, text: 'The themes of your week,\nand the one save worth rereading.' },
   // the close: the name (the drawn wordmark wipes in as it is said), then
-  // the App Store subtitle, set big in the serif
-  { at: onBeat(real(542)), to: real(600), place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4 },
+  // the tagline, set big in Geist and broken at its comma (owner call
+  // 2026-09-28: every launch film ends on the tagline)
+  { at: onBeat(real(542)), to: real(600), place: 'lockup', text: 'Machina.\nEverything you save,\nfinally useful.', duck: 0.4 },
 ];
 
 /**

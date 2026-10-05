@@ -24,6 +24,18 @@ type TakeData = {
 
 export const TAKES = TAKES_JSON as unknown as Record<string, TakeData>;
 
+/**
+ * A feature clip's own takes. capture/shoot.mjs writes a clip's takes
+ * (named `clips/<clip>/<take>`) beside the clip, in src/reels/clips/<clip>/
+ * takes.json, not into the reel's file: clips are built on parallel
+ * branches, and one generated file could not merge. The clip hands its file
+ * over once, at import, and every helper below then reads those takes like
+ * the reel's.
+ */
+export const addTakes = (data: unknown) => {
+  Object.assign(TAKES, data as Record<string, TakeData>);
+};
+
 /** The iPhone screen the app was captured on, in points. */
 export const SCREEN = { w: 393, h: 852 } as const;
 

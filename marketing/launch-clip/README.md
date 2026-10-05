@@ -80,6 +80,12 @@ introduction names it with the App Store subtitle ("Machina. Never lose
 another great find."), and the film closes on the promise, the tagline
 "Everything you save, finally useful." (owner, 2026-09-28: every launch film
 ends on the tagline, said once). It deliberately avoids two framings the
+rest → nothing worth keeping stays buried.** The introduction names the
+product with the App Store subtitle ("Machina. Never lose another great
+find."), and the film closes on the tagline, "Everything you save, finally
+useful.": problem → Machina → payoff (owner call 2026-09-28; the tagline is
+the fixed brand line and is said once, at the end, while the subtitle can
+change with search tests). It deliberately avoids two framings the
 owner ruled out: it is **not** a learning app, and it does **not** sell
 "search by meaning" as the headline. The word *library* appears nowhere.
 
@@ -98,6 +104,7 @@ owner ruled out: it is **not** a learning app, and it does **not** sell
 | 26–29 | 1:05 | `DigestScene` | The weekly write-up, then the resurfaced save as its own beat |
 | 29–32 | 1:12.5 | `Endcard` | The bare mark, the wordmark, the tagline (`Everything you save, finally useful.`), which the voice-over also speaks after the name |
 | 29–32 | 1:12.5 | `Endcard` | The bare mark, the wordmark, the tagline (`Everything you save, finally useful.`), which the voice-over speaks word for word |
+| 29–32 | 1:12.5 | `Endcard` | The bare mark, the wordmark, the tagline (`Everything you save, finally useful.`), which the voice-over speaks word for word and alone |
 
 `Capture` / `Ask` / `Connect` print as a letterspaced kicker above the line on
 their own beats, so a viewer can place each act inside the film's three acts
@@ -106,6 +113,8 @@ kickers keep the act names. The subtitle is now the introduction's line and
 the endcard carries the tagline, 2026-09-28.)
 kickers keep the act names. The current subtitle's words, "Never lose another
 great find", are the introduction's line; the endcard carries the tagline.)
+introduction now carries the current subtitle, the endcard the tagline, and
+the kickers keep the act names.)
 
 **No em dashes anywhere a viewer can read** — the app-wide ban
 (`web/scripts/check-em-dash.mjs`) applies to burned-in captions, demo cards and
@@ -386,6 +395,20 @@ screen and the voice differ, if the tagline appears anywhere else in the film,
 or if the endcard still shows the subtitle. The space under the line is the slot
 for a real App Store badge or URL once the listing is live. Nothing else in the
 film claims availability.
+The endcard carries one line, the tagline `Everything you save, finally
+useful.` (wording and comma exact, sentence case), and the closing voice line is
+exactly those words and nothing else (owner calls 2026-09-17: screen and voice
+agree; 2026-09-28: every launch film ENDS on the tagline). The App Store
+subtitle moved to the introduction ("Machina. Never lose another great find.");
+it can change with search tests, and a film that ended on it would go out of
+date. The tagline is said once per film, never at both ends. `npm run verify`
+fails if the film, the reel or a clip ends on anything else or says the
+tagline earlier. To change the endcard line, change `Endcard.tsx`, the last
+`FILM_LINES` entry in `audio/synth-vo.py`, and the lockup captions in
+`reel-timeline.mjs` and `clips/*-timeline.mjs` together (verify ties them), then
+re-voice, re-mix and re-render every edition. The space under the line is the
+slot for a real App Store badge or URL once the listing is live. Nothing else in
+the film claims availability.
 
 # Reels
 
@@ -393,12 +416,16 @@ film claims availability.
 
 `MachinaReel` is an 81.6s vertical reel: the problem → "Introducing Machina.
 Never lose another great find." → "Save anything, from anywhere." (shares
+`MachinaReel` is an 81.6s vertical reel: the problem → "Introducing Machina."
+→ "Never lose another great find." → "Save anything, from anywhere." (shares
 from YouTube, Instagram and Safari into the mark) → "A link, a screenshot, or
 a note." (the Add dialog's tabs) → "Machina reads it, summarizes it, and files
 it." (the five phases) → the new card, opened → Find → Ask → Connect
 → the weekly recap, read → "Machina. Everything you save, finally useful."
 (2026-09-28, owner: every launch film ends on the tagline, once; the reel's
 earlier "All your saves, finally useful." became the subtitle). It has
+(the tagline, since 2026-09-28; it was the subtitle, which now follows the
+name, where "All your saves, finally useful." used to be). It has
 its own score, the film's narrator and word-timed captions. **Every pixel of
 app UI in it is the real, shipped web app**, driven and recorded frame by
 frame; nothing is a mockup or a rebuilt screen. The one exception is not
@@ -577,6 +604,7 @@ Round 15 (owner, on round 14):
 |---|---|---|
 | 0–288 | `Hook` | Ten real saves come into focus (0–64); the problem is named over them (the `problem` hold, 64–288): each named save lifts on its word, then all bleach |
 | 288–456 | `Hook` | They collapse into the point (320), the brackets snap (336); "Introducing Machina." (the drawn wordmark under the mark), the `name` hold (416–448), "Never lose another great find." |
+| 288–456 | `Hook` | They collapse into the point (320), the brackets snap (336); "Introducing Machina." (the drawn wordmark under the mark), the `name` hold (416–448), "Never lose another great find." (was "All your saves, finally useful." until 2026-09-28) |
 | 456–648 | `ShareBeat` | "Save anything, from anywhere.": YouTube, Instagram and Safari saves shared into the mark (the `share` hold) |
 | 648–736 | `Hook` → `Save` | The point drops to become the **+** (the iris opens at 688), the + is tapped, Add to Machina |
 | 736–880 | `SaveModes` | "A link, a screenshot, or a note.": Link, Image, Note, back to Link, the link pasted, Save tapped |
@@ -587,6 +615,7 @@ Round 15 (owner, on round 14):
 | 1696–1808 | `Connect` | The real graph (60fps; lingers 1744–1772); tap Revisit |
 | 1808–2254 | `Recall` | "Do this" (to 1952), then "This week in Machina", opened (1968) and read slowly: write-up, themes, Standout, question; thrown out into the lockup |
 | 2240–2448 | `End` | The mark launches (strike 2284), "Machina" (the wordmark), "Everything you save, finally useful." in Geist (50px, one line), held |
+| 2240–2448 | `End` | The mark launches (strike 2284), "Machina" (the wordmark), the tagline "Everything you save, / finally useful." in Geist on two rows, held |
 
 **The clock.** Scenes are written in SOURCE frames (the round-1 cut, 600
 frames). `MachinaReel` plays them at `K = 2` via `clockAt(frame)`; `HOLDS`
@@ -665,6 +694,8 @@ Fails on: overlapping captions or kickers; a caption the narrator doesn't say
 verbatim (or a word count that doesn't match its timing); a voice line that
 overruns its caption window; a lockup line that isn't the film's endcard
 line, the tagline, or a tagline used anywhere before the end; an em dash, a literal
+line, the tagline (and a tagline said anywhere before the close: the film-wide
+gate above the reel section); an em dash, a literal
 "AI", "second brain" or "library" in any caption, kicker, demo card,
 collection, Ask/search string, hook chip, or **any text on any captured frame
 the edit uses**; a clipped reel master or a hole in its per-bar level; a voice
@@ -1277,6 +1308,109 @@ mixes at −14 ±0.5 LUFS, true peak ≤ −1 dBTP. Sound: every line ≥ 6dB ov
 music in the speech band; nothing lands on a word (the lifts are silent; the
 shimmer after the strike sits between "Machina." and the tagline). Nobody has
 listened to either mix on speakers (no audio device here).
+## The FIND clip
+
+`MachinaFind` is a 32.5s vertical feature clip that explains Find to someone
+seeing it for the first time (owner brief, 2026-09-28: the feature as the
+sole subject, a hook on the problem, three to five elements each shown doing
+its job and why it matters, Machina named, a concrete takeaway). The reel's
+set, type, camera, narrator and lockup, on its own clock
+(`clips/find-timeline.mjs`: output frames, the reel's 112.5 BPM and K = 2).
+Every pixel of app UI is the real app. `MachinaFindSilent` (no sound) and
+`MachinaFindClean` (no captions or kickers) sit beside it.
+
+| Frames | Element (kicker) | What it shows, and the line |
+|---|---|---|
+| 0–144 | the hook | Home comes into focus; the feed is flicked down (24–84) and back up (84–114), both eased: "You saved it. But what was it called?" (16–100); the camera goes to the field as the narrator names the app, "Machina finds it in your own words." (128–208), the thumb taps it (144) |
+| 144–288 | Your own words | "easy dinner, empty fridge" types (160–208) under a rack focus, holds a beat whole, and ONE card lands (224): Marcella Hazan's tomato sauce, which shares no word with it; its ink ring on the next beat |
+| 288–432 | Close matches | deleted a word at a time (300); "sardinia swim spot" (320–354): no save says "swim", and the app's "Close matches" offers the one that has the rest, Cala Goloritzé (368). "Only half remember it? You still get what's close." (304–416) |
+| 432–576 | Where you saw it | "youtube" (464–476): the Sources row offers YouTube (7) as it types; one tap (496) and the feed is every video saved. "Type where you saw it, and get everything from there." (448–560) |
+| 576–688 | Open it | The first video tapped open (576): "Open it for the summary, and everything it connects to." (576–688); on "and" the camera travels down to its related saves (600–660) |
+| 688–784 | the takeaway | A cut on the beat to the empty search field: "Type what you remember. Get the one you meant." (688–776); thrown out of frame (768) |
+| 784–976 | the close | The reel's lockup: the mark strikes (832), "Machina. Everything you save, finally useful." (848; the tagline, said only here, on ONE row at 48px under the wordmark: owner, 2026-09-29; the reel sets it on two rows at 60px) |
+
+**Finishing pass (2026-09-28).** Measured the full render again (frame
+differences, phase-correlation shifts, 4-frame strips at every transition,
+caret regions per captured frame, the paper under a contrast stretch, the
+mix). One real defect: the hook's scroll started at full speed from rest,
+reversed on a single frame and stopped dead at the top (three velocity
+kicks). It is now a flick down and back, each eased in and out. The first
+try took up the capture's 45pt step rounding with the camera, as Recall
+does, and measured as the whole device jiggling ~45px, because here the
+fixed chrome is in frame; the scroll is instead re-captured in 5pt steps
+(540 frames) and shown at the nearest step: after, the shift per frame
+ramps 0 → 5 → 10 → 16px and back with no hop or hold. Checked and left
+alone: the one flagged jump is the intended cut to the takeaway (one frame,
+the next steady); the other phase-correlation flags sit inside zooms, where
+the estimator is unreliable and the frame difference is smooth; the
+paper's faint 1-code terraces match the approved reel's exactly (the
+dither survives the encode); the caret region is constant across every
+rolled frame.
+
+**What the searches claim is checked** (`npm run verify`, against the demo
+data and the captured frames): the own-words query shares no word with its
+card and finds it alone; the close-match query is answered with its one
+card under "Close matches"; the source is offered and one tap shows only its
+saves. Two honest limits of the app shaped the choices: sources match by
+publisher name only, so the card grid under the Sources row is empty (the app
+shows "No matches" there 11 captured frames after the typing; the tap lands
+before it), and the opened card shows the summary and related saves (the
+detail view has no recipe section). "Search by meaning" stays off the
+headline; the app's own "Meaning" badge on the found card is the app
+speaking. The queries are `SEARCH.clip` in `capture/library.mjs`.
+
+**One take, beside the clip.** `findClip` in `capture/shoot.mjs` is one
+continuous use of Home: the feed scrolled, then the three searches (each
+cleared a word at a time, as a held delete key does), the source tapped and
+the first video opened; the app's own motion rolled at 60fps. Its frames go
+under `public/reel/app/clips/find/` and its data beside the clip,
+`src/reels/clips/find/takes.json`, not into the reel's `takes.json` (one
+generated JSON line cannot merge across the parallel clip branches); the clip
+hands it to the kit with `addTakes` (`kit/takes.ts`).
+
+**Its own files** (the shared scripts only gained a `find` entry):
+`clips/find-timeline.mjs`; `src/reels/clips/find/` (`FindClip`, `Search`,
+`End`, the take data, `find-vo.json`); `audio/find-score.mjs` →
+`public/clips/find/score.wav` (regenerable, ignored); `node audio/mix-vo.mjs
+find` → `public/clips/find/score-vo.wav` (committed, mastered like the reel);
+`python3 audio/synth-vo.py find` → `out/vo/find/`; `scripts/find-stills.mjs`;
+the "find clip" section of `npm run verify`.
+
+**Its voice (2026-10-04, owner).** Gemini TTS, voice Sulafat
+(`gemini-3.8-flash-tts`), not the film's Kokoro: each video gets its own tone,
+and this one is relatable frustration turning into relief. Every caption
+carries its acting note (`style`) and the clip's pace note (`pace`) in
+`clips/find-timeline.mjs`. A line changed or re-directed needs a new take:
+the raw takes are voiced on GitHub (`.github/workflows/narration-tts.yml`, the
+repo's `GEMINI_API_KEY`) by committing `audio/narration-request.json` with its
+`run` bumped, and land in `audio/vo-takes/` (keyed by text and direction);
+`synth-vo.py find` then builds the lines from them offline. The shared daily
+quota is 100 requests, one per line. The reads ran faster than directed
+(about 160 to 340 words a minute), so the captions were re-timed to them:
+each leaves 0.47 to 0.6s after its last word and the picture carries on. The
+score keeps its noise sounds (hats, shakers, whooshes, risers) out from under
+the voice. This container's ffmpeg has no Rubber Band, so a line's `tempo`
+cannot be applied here.
+
+```bash
+npm run reel:app && CAPTURE_ONLY=findClip npm run reel:capture   # the clip's take (the others keep theirs)
+python3 audio/synth-vo.py find                                    # after a line changes (from the takes)
+node audio/find-score.mjs && node audio/mix-vo.mjs find           # after a timing change
+npm run verify
+npx remotion render src/index.ts MachinaFind out/machina-find.mp4
+node scripts/find-stills.mjs                                      # review stills → out/find-stills/
+```
+
+**Measured, not eyeballed.** Frame-to-frame differences over the whole render
+and 4-frame strips at every transition. Found that way and fixed (the camera
+rules below): a drift that stopped dead for a push, a rack focus that lost
+2px of focus in one frame, a Lift fighting the app's own spring, and a Lift
+whose removal (or whose lift reaching exactly 0) re-rastered the card on a
+still frame. After: no one-frame freeze or jump anywhere outside the typing
+and the scroll. Each tap's pad lands on the frame the app responds and its
+tick sounds; the narrator sits 8.1–17.0dB over the music in the speech band
+(the Gemini voice, noise sounds kept clear of it); the mix is −14.0 LUFS,
+−1.25 dBTP. Nobody has listened to it on speakers.
 
 ## Motion language
 
@@ -1334,6 +1468,8 @@ One family, Geist. Two voices (**`Type.tsx`**):
   TAGLINE (every launch film ends on it, 2026-09-28) in Geist at 60px, or
   smaller when the line is long (`lineSize`: the tagline is set at 50 so it
   stays on one line) (round 15: the reel's one face; the round-6
+  tagline in Geist at 60px, broken into rows at its comma by the `\n` in the
+  caption (round 15: the reel's one face; the round-6
   display serif was the only other face in 81 seconds and read as a font
   change, not as emphasis), words coming into focus on the narrator's
   timing, the wordmark wiping in as "Machina" is said.
@@ -1488,6 +1624,28 @@ that breaks it.
   separately, so a half-point box draws the lifted copy up to a point off its
   own pixels: a hop as the lift appears and again as it leaves (measured
   2.5px). Round the box outward to whole points before passing it to `Lift`.
+- **A stepped scroll with chrome in frame is captured fine** (the FIND
+  clip, measured). The camera can take up a stepped capture's rounding only
+  in a close-up: with the header or the device's edge in frame, the whole
+  device jiggles by up to a step. There, capture in steps small enough
+  (5pt) that the nearest step never shows as a hop at the ease's slow ends.
+- **A tilt ends on a change** (the FIND clip, measured). The frame a 3D tilt
+  reaches 0 the slab re-rasters as 2D: on a still shot that is a visible
+  one-frame change across the whole screen. Let the tilt finish on a frame
+  that already changes (a tap, a cut) or mid-move, not as the camera comes to
+  rest.
+- **Rack focus eases in and out.** Pulling focus onto a field is travel
+  between two states (EASE_IN_OUT); on a fast-start curve the rest of the
+  screen lost 2px of focus in one frame. Letting go of it as a result lands
+  is an arrival, and may be quick.
+- **Emphasis waits for the app's own arrival.** When the app animates an
+  element in (a result's card-enter spring), that IS the landing; the Lift
+  and ink ring follow on the next beat, once it has settled, on its settled
+  box. A second spring on top hung a frame at its overshoot, and a Lift that
+  followed the settling element hopped: capture boxes are measured to half a
+  point. A Lift is its own raster: keep it mounted (at a lift of at least
+  0.002) until the screen changes anyway; removing it, or letting it reach
+  exactly 0, re-rasters the element on a still frame.
 
 ### Sound to picture (`HITS`, `audio/reel-score.mjs`)
 
@@ -1510,6 +1668,9 @@ One voice config for everything Machina says (Kokoro `af_heart`, speed 0.95,
 are read from `CAPTIONS` in `reel-timeline.mjs` and spoken verbatim, one line
 per caption. The reel introduces Machina with the App Store subtitle and
 closes on the tagline, once, in short lines with air around them. Word timings are measured from the
+per caption. The reel names Machina with the App Store subtitle and closes on
+the tagline (owner call 2026-09-28: every film ends on the tagline, said once)
+in short lines with air around them. Word timings are measured from the
 synthesized audio (`src/reels/data/reel-vo.json`) and drive the kinetic type
 and the lockup's line. The mix ducks the score to 0.55 under the voice
 (the film uses 0.65); that puts the reel's voice at the film's

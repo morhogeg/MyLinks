@@ -4,6 +4,7 @@
  *
  *   node audio/mix-vo.mjs          # film: public/score.wav      → public/score-vo.wav
  *   node audio/mix-vo.mjs reel     # reel: public/reel-score.wav → public/reel-score-vo.wav
+ *   node audio/mix-vo.mjs find     # the FIND clip: public/clips/find/score.wav → score-vo.wav
  *
  * The music ducks under the voice — 35% down, 120ms ramps — which is what
  * keeps the VO effortless to hear without the score ever disappearing. One
@@ -62,6 +63,8 @@ const SCRIPTS = {
   trip: { vo: path.join(root, 'out', 'vo', 'trip'), score: 'ads/trip/score.wav', out: 'ads/trip/score-vo.wav', duck: 0.55 },
   // Meta ad 2, the "talking to a friend" edition (ads/asktalk-timeline.mjs)
   asktalk: { vo: path.join(root, 'out', 'vo', 'asktalk'), score: 'ads/asktalk/score.wav', out: 'ads/asktalk/score-vo.wav', duck: 0.55 },
+  // the FIND feature clip (clips/find-timeline.mjs, audio/find-score.mjs): the reel's balance
+  find: { vo: path.join(root, 'out', 'vo', 'find'), score: 'clips/find/score.wav', out: 'clips/find/score-vo.wav', duck: 0.55 },
 };
 const name = process.argv[2] ?? 'film';
 const script = SCRIPTS[name];
@@ -114,6 +117,8 @@ if (script.timeline) for (const c of (await import(script.timeline)).CAPTIONS) i
 if (name === 'asktalk') Object.assign(lineDuck, Object.fromEntries((await import('../ads/asktalk-timeline.mjs')).CAPTIONS.filter((c) => c.duck).map((c) => [c.at, c.duck])));
 if (name === 'trip') Object.assign(lineDuck, Object.fromEntries((await import('../ads/trip-timeline.mjs')).CAPTIONS.filter((c) => c.duck).map((c) => [c.at, c.duck])));
 if (name === 'ask') Object.assign(lineDuck, Object.fromEntries((await import('../clips/ask-timeline.mjs')).CAPTIONS.filter((c) => c.duck).map((c) => [c.at, c.duck])));
+// (the FIND clip's lines duck the same way, from its own timeline)
+if (name === 'find') for (const c of (await import('../clips/find-timeline.mjs')).CAPTIONS) if (c.duck) lineDuck[c.at] = c.duck;
 
 // duck envelope: 1 everywhere, dips to DUCK across each VO line
 const DUCK = script.duck;
@@ -165,7 +170,7 @@ let g = peak > 0.98 ? 0.98 / peak : 1;
 // Shorts and YouTube expect a finished mix (the round-12 mix measured −15.8).
 // A global gain, then a look-ahead limiter on the few transients that would
 // pass the ceiling. The film's mix is untouched (it has no MASTER).
-const MASTER = { reel: { lufs: -14, truePeak: -1 }, ask: { lufs: -14, truePeak: -1 }, trip: { lufs: -14, truePeak: -1 }, asktalk: { lufs: -14, truePeak: -1 } }[name] ?? script.master;
+const MASTER = { reel: { lufs: -14, truePeak: -1 }, ask: { lufs: -14, truePeak: -1 }, trip: { lufs: -14, truePeak: -1 }, asktalk: { lufs: -14, truePeak: -1 }, find: { lufs: -14, truePeak: -1 } }[name] ?? script.master;
 if (MASTER) {
   let gain = 10 ** ((MASTER.lufs - lufs(L, R, SR)) / 20);
   let ceiling = 10 ** ((MASTER.truePeak - 0.3) / 20);
