@@ -8,15 +8,26 @@ the SAME background queue every other capture uses (a ``pending_processing``
 job carrying the card's id and a charge token, picked up by
 ``process_link_background``), when one of these happens:
 
-* **Upgrade.** The entitlement turns Pro (``entitlement.sync_from_revenuecat``,
-  the RevenueCat sync and webhook; ``entitlement_http`` catches any other grant
-  path the next time the app opens). Waiting cards are enqueued oldest first.
-* **The monthly reset.** ``run_waiting_release`` (scheduled daily, see main.py)
-  enqueues each workspace's waiting cards oldest first, inside the CURRENT
-  month's remaining allowance. On the 1st that is the fresh allowance; on any
-  other day it is usually zero, so the run is a no-op for that workspace. Daily
-  rather than monthly so a failed run heals itself the next day and a unit
-  refunded mid-month (a failed analysis) is not left unused.
+* **Upgrade.** The entitlement turns Pro: every grant path writes
+  ``entitlements/{uid}``, and the trigger on that doc
+  (``main.release_waiting_on_upgrade`` → ``release_on_entitlement_write``)
+  enqueues the whole backlog oldest first, within the Pro ceiling.
+* **The next month.** ``run_waiting_release`` (scheduled daily, see main.py)
+  enqueues each workspace's backlog oldest first, but only from the part of the
+  month's allowance ABOVE a reserve kept for fresh saves
+  (``BACKLOG_RESERVE_FRACTION``), so this month's new saves never queue behind
+  last month's. In the last ``END_OF_MONTH_DAYS`` days of the UTC month the
+  reserve is released and the backlog may use whatever is left. Daily rather
+  than monthly so a failed run heals itself the next day and a unit refunded
+  mid-month (a failed analysis) is not left unused. That is also why the copy
+  says "next month", not "on the 1st".
+
+**Notes.** A note saved past the allowance is NOT a waiting card: it is the
+user's own words, so it stays a normal, visible, searchable card and only its
+AI organization (heading, tags, category, takeaway) waits. It carries
+``noteEnrichPending: true`` + ``noteEnrichWaitingAt`` instead, and is released
+the same way (same order, same allowance, one charged unit), as a job the
+worker hands to the existing note-enrichment path.
 
 Every release CHARGES one `saves` unit before enqueuing, so the backlog counts
 toward the allowance: a free user's waiting cards eat into the month they are
@@ -42,7 +53,9 @@ around the link, the quote flag) from the moment of capture, so nothing the
 user typed depends on the scrape job surviving.
 """
 
+import calendar
 import logging
+import math
 from datetime import datetime, timezone
 from typing import Callable, Optional
 
@@ -52,13 +65,24 @@ from google.cloud.firestore_v1.base_query import FieldFilter
 import capture_charge
 from db import get_db
 from log_safe import mask_uid
-from quota import meter as meter_quota, refund_quota
+from quota import meter as meter_quota, refund_quota, quota_usage, quota_limit
 from url_key import url_key
 
 logger = logging.getLogger(__name__)
 
 WAITING = "waiting"
 SNAPSHOT_COLLECTION = "capture_snapshots"
+# A note whose AI organization waits for room in the allowance (see Notes above).
+NOTE_PENDING = "noteEnrichPending"
+NOTE_WAITING_AT = "noteEnrichWaitingAt"
+
+# The daily sweep's backlog policy (owner decision 2026-10-05): this share of
+# the month's allowance is held back for NEW saves; the backlog only uses what
+# is above it...
+BACKLOG_RESERVE_FRACTION = 0.5
+# ...until the last this-many days of the UTC month, when it may use whatever
+# is left (an allowance unused by then would otherwise just expire).
+END_OF_MONTH_DAYS = 3
 
 # Most cards one release call enqueues: the same burst MAX_IMPORT_LINKS puts on
 # the queue, which process_link_background (max_instances) and the janitor's
@@ -102,8 +126,17 @@ def waiting_message(upgrade: bool) -> str:
     no em dashes, the client renders it verbatim). `upgrade` is False on Pro,
     whose cap is an abuse ceiling with nothing to upgrade to."""
     if upgrade:
-        return "Saved. Machina will read it on the 1st, or now with Pro."
-    return "Saved. Machina will read it on the 1st."
+        return "Saved. Machina will read it next month, or now with Pro."
+    return "Saved. Machina will read it next month."
+
+
+def is_pending_note(card: Optional[dict]) -> bool:
+    return isinstance(card, dict) and card.get(NOTE_PENDING) is True
+
+
+def note_pending_fields(now_ms: Optional[int] = None) -> dict:
+    """Fields that mark a saved note's AI organization as waiting."""
+    return {NOTE_PENDING: True, NOTE_WAITING_AT: now_ms or _now_ms()}
 
 
 def snapshot_ref(db, uid: str, card_id: str):
@@ -254,42 +287,64 @@ def delete_snapshot(db, uid: str, card_id: str,
 
 # ── Counting and releasing ───────────────────────────────────────────────────
 
+def _links(db, uid: str):
+    return db.collection("users").document(uid).collection("links")
+
+
 def _waiting_query(db, uid: str):
-    return (db.collection("users").document(uid).collection("links")
-            .where(filter=FieldFilter("status", "==", WAITING)))
+    return _links(db, uid).where(filter=FieldFilter("status", "==", WAITING))
+
+
+def _pending_notes_query(db, uid: str):
+    return _links(db, uid).where(filter=FieldFilter(NOTE_PENDING, "==", True))
+
+
+def _count(q) -> int:
+    count = getattr(q, "count", None)
+    if callable(count):
+        result = count().get()
+        return max(0, int(result[0][0].value))
+    return len(list(q.limit(_SCAN_PER_USER).stream()))
 
 
 def count_waiting(uid: str) -> int:
-    """How many of `uid`'s cards are waiting to be read (the paywall's number).
-    An aggregation query (one read per 1000 matches); 0 on any error, since it
-    feeds copy, never a gate."""
+    """How many of `uid`'s saves are waiting to be read: waiting cards plus
+    notes whose AI organization waits (the paywall's number). Aggregation
+    queries (one read per 1000 matches); 0 on any error, since it feeds copy,
+    never a gate."""
     if not uid:
         return 0
     try:
-        q = _waiting_query(get_db(), uid)
-        count = getattr(q, "count", None)
-        if callable(count):
-            result = count().get()
-            return max(0, int(result[0][0].value))
-        return len(list(q.limit(_SCAN_PER_USER).stream()))
+        db = get_db()
+        return _count(_waiting_query(db, uid)) + _count(_pending_notes_query(db, uid))
     except Exception as e:
         logger.warning("Waiting count failed (ignored) for %s: %s", mask_uid(uid), e)
         return 0
 
 
 def _age_key(card: dict) -> tuple:
+    """Oldest first: when the save was kept past the allowance (a waiting
+    card's `waitingAt`, a pending note's `noteEnrichWaitingAt`), else when it
+    was created."""
     def ms(v):
         return int(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
     t = ms(card.get("waitingAt"))
+    if t is None:
+        t = ms(card.get(NOTE_WAITING_AT))
     c = ms(card.get("createdAt"))
     return (t if t is not None else (c if c is not None else 0), c or 0)
 
 
 def waiting_cards(db, uid: str) -> list:
-    """`[(ref, card)]` for every waiting card of `uid`, oldest first. Sorted
-    here rather than by the query, so no composite index is needed."""
-    out = [(d.reference, d.to_dict() or {})
-           for d in _waiting_query(db, uid).limit(_SCAN_PER_USER).stream()]
+    """`[(ref, card)]` for every waiting card and pending note of `uid`,
+    oldest first. Sorted here rather than by the query, so no composite index
+    is needed."""
+    seen, out = set(), []
+    for q in (_waiting_query(db, uid), _pending_notes_query(db, uid)):
+        for d in q.limit(_SCAN_PER_USER).stream():
+            if d.id not in seen:
+                seen.add(d.id)
+                out.append((d.reference, d.to_dict() or {}))
     out.sort(key=lambda rc: _age_key(rc[1]))
     return out
 
@@ -341,16 +396,42 @@ def _release_job(uid: str, card_id: str, card: dict, snapshot: Optional[dict]) -
     return base
 
 
+def _note_job(uid: str, card_id: str) -> dict:
+    """The pending_processing doc that organizes a pending note (the worker's
+    `noteEnrich` branch, main._enrich_pending_note)."""
+    return {
+        "uid": uid,
+        "cardId": card_id,
+        "noteEnrich": True,
+        "source": "deferred",
+        "createdAt": datetime.now(timezone.utc).isoformat(),
+        "status": "queued",
+        "attempts": 0,
+        capture_charge.CHARGE_FIELD: capture_charge.token("saves"),
+    }
+
+
 def _enqueue_one(db, uid: str, card_ref) -> str:
-    """Flip one waiting card to queued and write its job, atomically.
-    Returns 'queued', 'gone' (no longer waiting: deleted, or another release
-    got there first) or 'empty' (nothing to analyze)."""
+    """Flip one waiting card to queued (or take one note off pending) and
+    write its job, atomically. Returns 'queued', 'gone' (no longer waiting:
+    deleted, or another release got there first) or 'empty' (nothing to
+    analyze)."""
     snap_ref = snapshot_ref(db, uid, card_ref.id)
     job_ref = db.collection("pending_processing").document()
 
     def _body(tx):
         snap = card_ref.get(transaction=tx)
         card = (snap.to_dict() or {}) if getattr(snap, "exists", False) else None
+        if is_pending_note(card) and not is_waiting(card):
+            # The note stays exactly as it is (a normal card); only the flag
+            # moves, so a second release can never enqueue it twice.
+            tx.update(card_ref, {
+                NOTE_PENDING: firestore.DELETE_FIELD,
+                NOTE_WAITING_AT: firestore.DELETE_FIELD,
+                "noteEnrichQueuedAt": _now_ms(),
+            })
+            tx.set(job_ref, _note_job(uid, card_ref.id))
+            return "queued"
         if not is_waiting(card):
             return "gone"
         s = snap_ref.get(transaction=tx)
@@ -436,33 +517,69 @@ def release_on_entitlement_write(uid: str, after: Optional[dict]) -> Optional[di
     return release_waiting(uid, "pro")
 
 
-def run_waiting_release(plan_for: Optional[Callable[[str], str]] = None) -> dict:
-    """The scheduled sweep: every workspace with waiting cards gets them
-    enqueued, oldest first, within this month's remaining allowance.
+def in_end_of_month_window(now: Optional[datetime] = None) -> bool:
+    """True in the last END_OF_MONTH_DAYS days of the UTC month (quota month
+    keys are UTC), when the backlog may use the reserve too."""
+    now = now or datetime.now(timezone.utc)
+    days = calendar.monthrange(now.year, now.month)[1]
+    return now.day > days - END_OF_MONTH_DAYS
 
-    One collection-group query on `status` (the COLLECTION_GROUP index the
-    processing janitor already declares in firestore.indexes.json), grouped by
-    workspace in Python. Workspaces are served oldest-backlog first, so a run
-    that hits ``_RUN_CAP`` leaves the newest backlogs for the next day."""
+
+def backlog_budget(uid: str, plan: str, now: Optional[datetime] = None) -> Optional[int]:
+    """How many backlog saves the daily sweep may release for `uid` now, or
+    None when saves are unmetered on `plan`.
+
+    The month's allowance minus a reserve of BACKLOG_RESERVE_FRACTION kept for
+    new saves, minus what is already used (new saves and backlog alike); in
+    the end-of-month window the reserve is released. On a 100-save free plan:
+    the backlog gets up to 50 from the 1st, fresh saves keep the other 50, and
+    in the last 3 days whatever is still unused goes to the backlog."""
+    limit = quota_limit("saves", plan)
+    if limit <= 0:
+        return None
+    used = int(quota_usage(uid).get("saves", 0) or 0)
+    if in_end_of_month_window(now):
+        return max(0, limit - used)
+    reserve = math.ceil(limit * BACKLOG_RESERVE_FRACTION)
+    return max(0, limit - reserve - used)
+
+
+def run_waiting_release(plan_for: Optional[Callable[[str], str]] = None,
+                        now: Optional[datetime] = None) -> dict:
+    """The scheduled sweep: every workspace's backlog (waiting cards and
+    pending notes) is enqueued oldest first, within ``backlog_budget``.
+
+    Two collection-group equality queries, grouped by workspace in Python:
+    `status` (the COLLECTION_GROUP index the processing janitor already
+    declares) and `noteEnrichPending` (its own fieldOverride in
+    firestore.indexes.json). Workspaces are served oldest-backlog first, so a
+    run that hits ``_RUN_CAP`` leaves the newest backlogs for the next day.
+    Upgrade releases (release_on_entitlement_write) ignore the reserve."""
     if plan_for is None:
         from entitlement import plan_for  # lazy: entitlement imports this module
     report = {"workspaces": 0, "released": 0, "still_waiting": 0, "errors": 0}
     db = get_db()
     by_uid = {}
-    try:
-        stream = (db.collection_group("links")
-                  .where(filter=FieldFilter("status", "==", WAITING))
-                  .limit(_SCAN_ALL).stream())
-        for doc in stream:
-            try:
-                owner = doc.reference.parent.parent.id
-            except Exception:
-                continue
-            if isinstance(owner, str) and owner:
+    seen = set()
+    for field, value in (("status", WAITING), (NOTE_PENDING, True)):
+        try:
+            stream = (db.collection_group("links")
+                      .where(filter=FieldFilter(field, "==", value))
+                      .limit(_SCAN_ALL).stream())
+            for doc in stream:
+                try:
+                    owner = doc.reference.parent.parent.id
+                except Exception:
+                    continue
+                if not isinstance(owner, str) or not owner or (owner, doc.id) in seen:
+                    continue
+                seen.add((owner, doc.id))
                 by_uid.setdefault(owner, []).append((doc.reference, doc.to_dict() or {}))
-    except Exception as e:
-        logger.error("Waiting-card sweep query failed: %s", e)
-        report["errors"] += 1
+        except Exception as e:
+            logger.error("Waiting-card sweep query failed (%s): %s", field, e)
+            report["errors"] += 1
+    if not by_uid:
+        logger.info("Waiting-card sweep: %s", report)
         return report
 
     for cards in by_uid.values():
@@ -479,7 +596,16 @@ def run_waiting_release(plan_for: Optional[Callable[[str], str]] = None) -> dict
             plan = plan_for(uid)
         except Exception:
             plan = "free"
-        r = release_waiting(uid, plan, limit=min(RELEASE_BATCH, room), cards=cards)
+        try:
+            budget = backlog_budget(uid, plan, now)
+        except Exception as e:
+            logger.warning("Backlog budget failed (skipped) for %s: %s", mask_uid(uid), e)
+            budget = 0
+        limit = min(RELEASE_BATCH, room) if budget is None else min(RELEASE_BATCH, room, budget)
+        if limit <= 0:
+            report["still_waiting"] += len(cards)
+            continue
+        r = release_waiting(uid, plan, limit=limit, cards=cards)
         report["released"] += r["released"]
         report["still_waiting"] += r["waiting"]
     logger.info("Waiting-card sweep: %s", report)

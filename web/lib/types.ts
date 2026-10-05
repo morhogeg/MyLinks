@@ -13,7 +13,7 @@ export type LinkStatus = 'unread' | 'archived' | 'favorite';
 //
 // `waiting` is a save kept past the plan's monthly allowance: the card is saved
 // (URL, title, the user's own text) but not analyzed yet. The backend reads it
-// on the 1st, or right away on an upgrade (functions/deferred_capture.py). It
+// next month, or right away on an upgrade (functions/deferred_capture.py). It
 // is not an error and has no Retry.
 export type CaptureState = LinkStatus | 'processing' | 'failed' | 'waiting';
 
@@ -153,6 +153,11 @@ export interface Link {
   failedAt?: number;
   // When a `waiting` card was kept past the monthly allowance (epoch ms).
   waitingAt?: number;
+  // A NOTE saved past the monthly allowance: the note itself is a normal card;
+  // only its AI organization (heading, tags, category) waits for the server to
+  // run it on upgrade or next month (functions/deferred_capture.py).
+  noteEnrichPending?: boolean;
+  noteEnrichWaitingAt?: number;
   metadata: LinkMetadata;
   // AI Analysis metadata. sourceType is 'web' | 'youtube' | 'image' | 'note'
   // (a 'note' is a URL-less thought captured directly — it has no `url`).

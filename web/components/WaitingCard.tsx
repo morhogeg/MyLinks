@@ -9,7 +9,7 @@ import { useEntitlement } from '@/components/EntitlementProvider';
  * A save kept past the plan's monthly allowance (`status: 'waiting'`).
  *
  * The capture succeeded; only the AI read waits (functions/deferred_capture.py):
- * Machina reads it on the 1st, or right away once the workspace is Pro. So this
+ * Machina reads it next month, or right away once the workspace is Pro. So this
  * is a calm, saved-looking card, not an error: no red, no warning glyph, and no
  * Retry (a retry could only hit the same allowance). The one action besides
  * Delete is the way to have it read now, which opens the paywall. On Pro (whose
@@ -50,10 +50,10 @@ export default function WaitingCard({ link, onDelete }: { link: Link; onDelete: 
 
                 <p className="flex-grow text-sm text-text-secondary leading-snug">
                     {isPro ? (
-                        'Saved. Machina will read it on the 1st.'
+                        'Saved. Machina will read it next month.'
                     ) : (
                         <>
-                            Saved. Machina will read it on the 1st, or{' '}
+                            Saved. Machina will read it next month, or{' '}
                             <button
                                 type="button"
                                 onClick={(e) => { e.stopPropagation(); openPaywall('saves'); }}

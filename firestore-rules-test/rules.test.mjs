@@ -467,6 +467,12 @@ test('owner can mark their own card waiting (markLinkWaiting payload)', async ()
   await assertFails(updateDoc(doc(strangerDb(), 'users', OWNER_DOC, 'links', 'link1'), { status: 'waiting' }));
 });
 
+test('owner can flag their own note for later organization (enrichNoteCard payload)', async () => {
+  const ref = doc(ownerDb(), 'users', OWNER_DOC, 'links', 'link1');
+  await assertSucceeds(updateDoc(ref, { noteEnrichPending: true, noteEnrichWaitingAt: Date.now() }));
+  await assertFails(updateDoc(doc(strangerDb(), 'users', OWNER_DOC, 'links', 'link1'), { noteEnrichPending: true }));
+});
+
 test('capture_snapshots are server-only, even for the owner', async () => {
   const ref = doc(ownerDb(), 'users', OWNER_DOC, 'capture_snapshots', 'link1');
   await assertFails(getDoc(ref));
