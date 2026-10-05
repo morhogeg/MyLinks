@@ -7,8 +7,7 @@
  *     made-up hosts of the store screenshots), so the popup,
  *     opened as a tab with `?tab=<id>`, can read the target tab's URL and
  *     title the way a real toolbar click grants through activeTab;
- *   - nothing else. The pinned dev `key` stays, so the id matches
- *     web/lib/extension.ts EXTENSION_DEV_ID.
+ *   - nothing else.
  * The extension's storage points `baseUrl` at the stub, which answers with
  * permissive CORS like a server would for an allowed origin.
  */
@@ -20,7 +19,6 @@ import { dirname, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 
 export const EXTENSION_SRC = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'extension');
-export const DEV_ID = 'gjegndcjhemlpeoiamfebeoaeegkelnk';
 export const GOOD_TOKEN = 'e2e_GoodToken_1234567890abc';
 
 export interface ShareCall { headers: Record<string, string | string[] | undefined>; body: Record<string, unknown> }
@@ -79,7 +77,7 @@ function extensionCopy(): string {
     cpSync(EXTENSION_SRC, dir, { recursive: true, filter: (p) => !p.includes(`${EXTENSION_SRC}/dist`) && !p.includes(`${EXTENSION_SRC}/store`) });
     const mf = JSON.parse(readFileSync(join(dir, 'manifest.json'), 'utf8'));
     // + the made-up hosts the store screenshots use (store-assets.spec.ts).
-    mf.host_permissions = [...mf.host_permissions, 'http://127.0.0.1/*', 'https://fieldnotes.example/*', 'https://yoman.example/*'];
+    mf.host_permissions = [...(mf.host_permissions ?? []), 'http://127.0.0.1/*', 'https://fieldnotes.example/*', 'https://yoman.example/*'];
     writeFileSync(join(dir, 'manifest.json'), JSON.stringify(mf, null, 2));
     return dir;
 }

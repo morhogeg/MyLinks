@@ -153,7 +153,7 @@ async function startSave() {
     renderResult(S.describeResult({ ok: false, status: 0, error: "bad-url", reason: where.reason }));
     return;
   }
-  ensurePort().postMessage({ type: "save", url: tab.url, title: tab.title || "" });
+  ensurePort().postMessage({ type: "save", url: tab.url, title: tab.title || "", tabId: tab.id });
 }
 
 function onAction() {
@@ -193,7 +193,9 @@ async function renderShortcut() {
     : "Tip: right click a link or selected text to save just that.";
 }
 
+// The browser's own shortcut settings page. Safari has none to open.
 function shortcutsPage() {
+  if (S.isSafariExtension()) return "";
   const ua = navigator.userAgent || "";
   if (/Edg\//.test(ua)) return "edge://extensions/shortcuts";
   return "chrome://extensions/shortcuts";
@@ -275,7 +277,10 @@ function toggleReveal() {
 // ── Boot ────────────────────────────────────────────────────────────────────
 
 async function init() {
-  if (AS_OPTIONS) app.classList.add("wide");
+  // Opened as a full tab (Safari always shows the options page that way):
+  // center the column instead of pinning a popup-width strip to the corner.
+  if (AS_OPTIONS || window.innerWidth >= 560) document.documentElement.classList.add("in-tab");
+  $("shortcutLink").hidden = !shortcutsPage();
   const { token = "", account = "" } = await api.storage.local.get(["token", "account"]);
   state.token = S.cleanToken(token);
   state.account = account || "";
@@ -307,7 +312,9 @@ $("openBtn").addEventListener("click", () => openTab(S.LIBRARY_URL));
 $("settingsConnectBtn").addEventListener("click", openConnect);
 $("settingsTokenBtn").addEventListener("click", () => show("token"));
 $("disconnectBtn").addEventListener("click", disconnect);
-$("shortcutLink").addEventListener("click", () => openTab(shortcutsPage()));
+$("shortcutLink").addEventListener("click", () => {
+  if (shortcutsPage()) openTab(shortcutsPage());
+});
 $("saveTokenBtn").addEventListener("click", saveToken);
 $("reveal").addEventListener("click", toggleReveal);
 $("token").addEventListener("keydown", (e) => {

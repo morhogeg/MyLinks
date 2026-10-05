@@ -10,11 +10,10 @@
 //   extension/dist/machina-extension/            the unpacked store build
 //   extension/dist/machina-extension-<v>.zip     upload this to the dashboard
 //
-// The store build differs from the folder you "Load unpacked" in two ways:
-//   - no "key": the store assigns the published id (a key in an upload is
-//     refused), so the dev id only applies to unpacked loads;
-//   - externally_connectable lists only https origins: a local dev server
-//     must never be able to hand a published extension a token.
+// The store build differs from the folder you "Load unpacked" in one way:
+// the connect content script runs on https origins only. A local dev server
+// must never be able to hand a published extension a token. (A "key", if
+// one is ever added for a fixed dev id, is dropped too: the store refuses it.)
 // Only the files the extension actually runs are copied. Tests, scripts,
 // icon sources and store assets stay out. Zero dependencies.
 import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync, statSync } from 'fs';
@@ -31,6 +30,7 @@ const SHIPPED = [
     'manifest.json',
     'background.js',
     'shared.js',
+    'connect.js',
     'popup.html',
     'popup.css',
     'popup.js',
@@ -99,6 +99,7 @@ const referenced = new Set([
     manifest.options_ui.page.split('?')[0],
     ...Object.values(manifest.icons),
     ...Object.values(manifest.action.default_icon),
+    ...(manifest.content_scripts || []).flatMap((c) => c.js || []),
 ]);
 for (const m of readFileSync(join(EXT, 'popup.html'), 'utf8').matchAll(/(?:src|href)="([^"#:]+)"/g)) referenced.add(m[1]);
 for (const m of readFileSync(join(EXT, 'background.js'), 'utf8').matchAll(/importScripts\("([^"]+)"\)/g)) referenced.add(m[1]);
@@ -116,10 +117,11 @@ for (const f of SHIPPED.filter((x) => !x.endsWith('.png'))) {
 // ── The store manifest ─────────────────────────────────────────────────────
 const storeManifest = JSON.parse(JSON.stringify(manifest));
 delete storeManifest.key;
-if (storeManifest.externally_connectable) {
-    storeManifest.externally_connectable.matches = storeManifest.externally_connectable.matches.filter((m) => m.startsWith('https://'));
-    if (!storeManifest.externally_connectable.matches.length) fail('externally_connectable has no https origin left');
+for (const cs of storeManifest.content_scripts || []) {
+    cs.matches = cs.matches.filter((m) => m.startsWith('https://'));
+    if (!cs.matches.length) fail('a content script has no https origin left');
 }
+if (storeManifest.host_permissions) storeManifest.host_permissions = storeManifest.host_permissions.filter((m) => m.startsWith('https://'));
 if (JSON.stringify(storeManifest).includes('localhost') || JSON.stringify(storeManifest).includes('127.0.0.1')) fail('store manifest still mentions a local origin');
 
 if (checkOnly) {

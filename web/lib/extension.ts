@@ -1,14 +1,13 @@
 /**
  * The Machina browser extension, seen from the web app.
  *
- * One-click connect: the extension lists the web app's origin in its manifest
- * (`externally_connectable`), which lets this page message it directly with
- * `chrome.runtime.sendMessage(extensionId, …)`. The browser delivers that
- * message to the extension with that exact id and nobody else, so the token
- * never touches another page or another extension. The extension, in turn,
- * only answers the root page of an allowed origin and checks the token with
- * the server before storing it (extension/background.js). Threat model:
- * extension/store/LISTING.md, "Security".
+ * One-click connect: the extension runs a tiny content script on this site
+ * (extension/connect.js). This page talks to it with `window.postMessage`,
+ * addressed to its own origin, and only listens to answers that come from its
+ * own window and origin. The content script relays to the extension, which
+ * only trusts the root page of an allowed origin and checks the token with the
+ * server before storing it. Same code in Chrome, Edge, Brave and Safari; no
+ * extension id needed. Threat model: extension/store/LISTING.md, "Security".
  *
  * The extension never sends the token back. To tell "connected to THIS
  * account" from "connected to some other account" it returns a short one-way
@@ -17,103 +16,103 @@
 
 /**
  * OWNER: the Chrome Web Store item id, once the listing exists (the 32-letter
- * id in the listing URL, chromewebstore.google.com/detail/<name>/<id>).
+ * id at the end of the listing URL, chromewebstore.google.com/detail/<id>).
  * Until it is set, Settings says "Coming soon to the Chrome Web Store" and
- * offers no install button. It can also come from the
- * NEXT_PUBLIC_CHROME_EXTENSION_ID env var at build time.
+ * offers no install button. Can also come from NEXT_PUBLIC_CHROME_EXTENSION_ID.
  */
 export const CHROME_WEB_STORE_ITEM_ID: string | null = null;
 
 /**
- * The id of the unpacked build in `extension/` (pinned by the public `key` in
- * its manifest, so every checkout loads with the same id). The store package
- * drops that key, so the store build gets its own id (above).
+ * OWNER: the Mac App Store URL of the Machina Safari app, once it is listed
+ * (https://apps.apple.com/app/id<number>). Until it is set, Safari users see
+ * "Coming soon to the Mac App Store". Can also come from
+ * NEXT_PUBLIC_MAC_APP_STORE_URL.
  */
-export const EXTENSION_DEV_ID = 'gjegndcjhemlpeoiamfebeoaeegkelnk';
+export const MAC_APP_STORE_URL: string | null = null;
 
 const ID_RE = /^[a-p]{32}$/;
+const MAS_RE = /^https:\/\/apps\.apple\.com\/[^\s]+$/;
 
-function storeItemId(): string | null {
-    const fromEnv = process.env.NEXT_PUBLIC_CHROME_EXTENSION_ID?.trim();
-    const id = fromEnv || CHROME_WEB_STORE_ITEM_ID;
-    return id && ID_RE.test(id) ? id : null;
-}
-
-/** The listing to install from, or null while the extension is not in the store. */
+/** The Chrome listing to install from, or null while it is not in the store. */
 export function chromeWebStoreUrl(): string | null {
-    const id = storeItemId();
-    return id ? `https://chromewebstore.google.com/detail/${id}` : null;
+    const id = process.env.NEXT_PUBLIC_CHROME_EXTENSION_ID?.trim() || CHROME_WEB_STORE_ITEM_ID;
+    return id && ID_RE.test(id) ? `https://chromewebstore.google.com/detail/${id}` : null;
 }
 
-/** Every extension id this page will hand a token to. */
-export function trustedExtensionIds(): string[] {
-    const ids = [storeItemId(), EXTENSION_DEV_ID].filter((x): x is string => !!x);
-    return [...new Set(ids)];
+/** The Mac App Store listing, or null while it is not there yet. */
+export function macAppStoreUrl(): string | null {
+    const url = process.env.NEXT_PUBLIC_MAC_APP_STORE_URL?.trim() || MAC_APP_STORE_URL;
+    return url && MAS_RE.test(url) ? url : null;
 }
 
-interface Runtime {
-    sendMessage: (id: string, msg: unknown, cb: (resp: unknown) => void) => void;
-    lastError?: { message?: string };
-}
+/** Where the extension can run, from this browser's point of view. */
+export type BrowserKind = 'chromium' | 'safari' | 'other';
 
-/** The page-side runtime, which Chromium only exposes when some installed
-    extension lists this origin in `externally_connectable`. */
-function pageRuntime(): Runtime | null {
-    if (typeof window === 'undefined') return null;
-    const w = window as unknown as { chrome?: { runtime?: Runtime } };
-    const rt = w.chrome?.runtime;
-    return rt && typeof rt.sendMessage === 'function' ? rt : null;
-}
-
-/** Desktop Chrome, Edge, Brave and friends: where the extension can run. */
-export function isDesktopChromium(): boolean {
-    if (typeof navigator === 'undefined') return false;
+export function browserKind(): BrowserKind {
+    if (typeof navigator === 'undefined') return 'other';
     const ua = navigator.userAgent || '';
-    if (/Android|iPhone|iPad|iPod|Mobile/i.test(ua)) return false;
+    if (/Android|iPhone|iPad|iPod|Mobile/i.test(ua)) return 'other';
     const brands = (navigator as unknown as { userAgentData?: { brands?: Array<{ brand: string }> } }).userAgentData?.brands;
-    if (brands?.some((b) => /Chromium|Google Chrome|Microsoft Edge|Brave/i.test(b.brand))) return true;
-    return /Chrome\/\d+/.test(ua) && !/OPR\/|Firefox\//.test(ua);
+    if (brands?.some((b) => /Chromium|Google Chrome|Microsoft Edge|Brave/i.test(b.brand))) return 'chromium';
+    if (/Chrome\/\d+|Chromium\/\d+|Edg\/\d+/.test(ua) && !/OPR\/|Firefox\//.test(ua)) return 'chromium';
+    if (/Safari\/\d+/.test(ua) && /Version\/\d+/.test(ua) && !/Firefox\/|FxiOS/.test(ua)) return 'safari';
+    return 'other';
 }
 
-function send<T>(id: string, msg: unknown, timeoutMs: number): Promise<T | null> {
-    const rt = pageRuntime();
-    if (!rt) return Promise.resolve(null);
+const FROM_PAGE = 'machina-web';
+const FROM_EXT = 'machina-extension';
+
+let seq = 0;
+function newId(): string {
+    seq += 1;
+    const rand = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2);
+    return `${seq}-${rand}`.slice(0, 64);
+}
+
+/** Ask the content script, wait for the answer with the same id. */
+function ask<T>(type: 'machina-ping' | 'machina-connect', payload: Record<string, unknown>, timeoutMs: number): Promise<T | null> {
+    if (typeof window === 'undefined') return Promise.resolve(null);
+    const id = newId();
     return new Promise((resolve) => {
-        let done = false;
-        const timer = setTimeout(() => { if (!done) { done = true; resolve(null); } }, timeoutMs);
-        try {
-            rt.sendMessage(id, msg, (resp) => {
-                if (done) return;
-                done = true;
-                clearTimeout(timer);
-                // Read lastError so Chrome doesn't log "Unchecked runtime.lastError".
-                void rt.lastError;
-                resolve((resp ?? null) as T | null);
-            });
-        } catch {
-            done = true;
+        const done = (value: T | null) => {
             clearTimeout(timer);
-            resolve(null);
-        }
+            window.removeEventListener('message', onMessage);
+            resolve(value);
+        };
+        const onMessage = (event: MessageEvent) => {
+            if (event.source !== window || event.origin !== window.location.origin) return;
+            const d = event.data as { source?: string; id?: string; reply?: T } | null;
+            if (!d || d.source !== FROM_EXT || d.id !== id) return;
+            done(d.reply ?? null);
+        };
+        const timer = setTimeout(() => done(null), timeoutMs);
+        window.addEventListener('message', onMessage);
+        window.postMessage({ source: FROM_PAGE, id, type, ...payload }, window.location.origin);
     });
 }
 
 export interface ExtensionStatus {
-    id: string;
     version: string;
     connected: boolean;
     tokenTag: string | null;
 }
 
-/** Find an installed Machina extension in this browser, or null. */
-export async function detectExtension(timeoutMs = 1500): Promise<ExtensionStatus | null> {
-    if (!pageRuntime()) return null;
-    const answers = await Promise.all(trustedExtensionIds().map(async (id) => {
-        const r = await send<{ ok?: boolean; version?: string; connected?: boolean; tokenTag?: string | null }>(
-            id, { type: 'machina-ping' }, timeoutMs);
-        return r && r.ok ? { id, version: String(r.version ?? ''), connected: !!r.connected, tokenTag: r.tokenTag ?? null } : null;
-    }));
-    return answers.find((a): a is ExtensionStatus => !!a) ?? null;
+/** Find the Machina extension in this browser (on this site), or null. */
+export async function detectExtension(timeoutMs = 1200): Promise<ExtensionStatus | null> {
+    const r = await ask<{ ok?: boolean; version?: string; connected?: boolean; tokenTag?: string | null }>('machina-ping', {}, timeoutMs);
+    return r && r.ok ? { version: String(r.version ?? ''), connected: !!r.connected, tokenTag: r.tokenTag ?? null } : null;
+}
+
+/** Call `fn` when the extension's content script announces itself. */
+export function onExtensionReady(fn: () => void): () => void {
+    if (typeof window === 'undefined') return () => {};
+    const handler = (event: MessageEvent) => {
+        if (event.source !== window || event.origin !== window.location.origin) return;
+        const d = event.data as { source?: string; type?: string } | null;
+        if (d && d.source === FROM_EXT && d.type === 'machina-ready') fn();
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
 }
 
 export type ConnectFailure = 'unavailable' | 'untrusted' | 'bad-token' | 'invalid' | 'network' | 'offline'
@@ -121,11 +120,10 @@ export type ConnectFailure = 'unavailable' | 'untrusted' | 'bad-token' | 'invali
 
 /** Hand this account's token to the extension. It checks the token with the
     server before keeping it, so `ok` means it can save right away. */
-export async function connectExtension(id: string, token: string, account?: string | null):
+export async function connectExtension(token: string, account?: string | null):
     Promise<{ ok: true } | { ok: false; reason: ConnectFailure }> {
-    if (!trustedExtensionIds().includes(id)) return { ok: false, reason: 'untrusted' };
-    const r = await send<{ ok?: boolean; reason?: ConnectFailure }>(
-        id, { type: 'machina-connect', token, account: account ?? '' }, 20000);
+    const r = await ask<{ ok?: boolean; reason?: ConnectFailure }>(
+        'machina-connect', { token, account: account ?? '' }, 20000);
     if (!r) return { ok: false, reason: 'unavailable' };
     return r.ok ? { ok: true } : { ok: false, reason: r.reason ?? 'unknown' };
 }

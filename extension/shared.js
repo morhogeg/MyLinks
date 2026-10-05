@@ -9,8 +9,9 @@
 (function (root) {
   "use strict";
 
-  // The API origin share_ingest lives on (Firebase Hosting rewrite). The only
-  // host this extension holds a permission for.
+  // The API origin share_ingest lives on (Firebase Hosting rewrite). No host
+  // permission: share_ingest admits extension origins for CORS (Safari never
+  // grants host permissions at install anyway).
   const API_ORIGIN = "https://secondbrain-app-94da2.web.app";
   // The Machina web app. Links a person should land on go here.
   const WEB_URL = "https://mymachina.app";
@@ -22,9 +23,9 @@
   const TOKEN_RE = /^[A-Za-z0-9_-]{16,128}$/;
 
   // The only hosts that may ever hand this extension a token. The manifest's
-  // externally_connectable list decides which of these are live in a given
-  // build (the store package drops localhost); this list stops a manifest edit
-  // alone from widening it.
+  // content_scripts matches decide which of these are live in a given build
+  // (the store package drops localhost); this list stops a manifest edit alone
+  // from widening it.
   const CONNECT_HOSTS = ["mymachina.app", "localhost", "127.0.0.1"];
 
   const SAVE_TIMEOUT_MS = 20000;
@@ -60,6 +61,11 @@
     return { ok: false, reason: "other" };
   }
 
+  // Safari's extension pages and worker live on safari-web-extension://.
+  function isSafariExtension() {
+    return typeof location !== "undefined" && location.protocol === "safari-web-extension:";
+  }
+
   const RESTRICTED_COPY = {
     missing: "Machina can't see this tab's address. Open a web page and try again.",
     browser: "Browser pages can't be saved. Open a web page and try again.",
@@ -67,6 +73,8 @@
     extension: "This page belongs to an extension, so it can't be saved.",
     other: "This page has no web address to save.",
   };
+
+  const SAFARI_ALLOW_COPY = "Safari hasn't let Machina see this page. Allow it in Safari Settings, Extensions, Machina, then try again.";
 
   // The server's own words, when it sent any, cleaned for one line. Strings a
   // user reads here never carry em dashes, so the server's become commas.
@@ -94,6 +102,12 @@
       return out("notoken", "Connect Machina first", "Connect this browser to your Machina account to start saving.", "connect");
     }
     if (r.error === "bad-url") {
+      // Safari hands over an empty address until the person allows Machina on
+      // the site; say how, instead of a dead end.
+      const safari = opts && typeof opts.safari === "boolean" ? opts.safari : isSafariExtension();
+      if (r.reason === "missing" && safari) {
+        return out("restricted", "Allow Machina on this website", SAFARI_ALLOW_COPY);
+      }
       return out("restricted", "Can't save this page", RESTRICTED_COPY[r.reason] || RESTRICTED_COPY.other);
     }
     if (r.error === "offline") {
@@ -160,7 +174,8 @@
   }
 
   // ── Who may hand over a token ─────────────────────────────────────────────
-  // Origins from manifest match patterns ("https://mymachina.app/*").
+  // Origins from manifest match patterns ("https://mymachina.app/*"), taken
+  // from the connect content script's matches.
   function connectOriginsFromMatches(matches) {
     const out = [];
     for (const m of matches || []) {
@@ -225,6 +240,8 @@
   root.MachinaShared = {
     API_ORIGIN,
     WEB_URL,
+    PAGE_SOURCE: "machina-web",
+    EXT_SOURCE: "machina-extension",
     CONNECT_URL,
     UPGRADE_URL,
     LIBRARY_URL,
@@ -233,6 +250,7 @@
     cleanToken,
     looksLikeToken,
     classifyUrl,
+    isSafariExtension,
     describeResult,
     badgeFor,
     connectOriginsFromMatches,

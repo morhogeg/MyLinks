@@ -58,8 +58,13 @@ html, body {
   width: 340px;
   padding: 14px 16px 16px;
 }
-/* The same page in the browser's extension options dialog or a tab. */
-.wrap.wide { width: auto; max-width: 420px; margin: 0 auto; }
+/* The same page as the options screen: Chrome shows it in a small dialog,
+   Safari always in a full tab. Fill the dialog; in a wide tab, a centered
+   column instead of a 340px strip pinned to the top left. */
+.in-tab .wrap { width: auto; max-width: 440px; margin: 0 auto; }
+@media (min-width: 560px) {
+  .in-tab .wrap { margin: 48px auto; padding: 20px 24px 24px; border: 1px solid var(--border); border-radius: 14px; }
+}
 
 /* ── Header ─────────────────────────────────────────────────────────────── */
 .head {

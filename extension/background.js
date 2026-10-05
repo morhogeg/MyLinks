@@ -2,11 +2,17 @@
 //
 // Every save goes through saveUrl() here, whichever way it started: the
 // toolbar popup, the keyboard shortcut (which opens the popup), or a right
-// click. The popup shows the result itself; a right click, or a popup closed
-// before the answer came back, gets a system notification instead. A badge on
+// click. The popup shows the result itself. A right click, or a popup closed
+// before the answer came back, gets a system notification instead, or, where
+// there are no notifications (Safari), a small toast on the page. A badge on
 // the toolbar icon mirrors the result for a few seconds either way.
 //
-// It also answers the Machina web app's one-click connect (onMessageExternal).
+// It also answers the Machina web app's one-click connect, relayed by the
+// connect.js content script.
+//
+// Every API that some browser lacks is feature-detected, so a missing one
+// (contextMenus on iOS Safari, notifications on Safari) never throws at the
+// top level and takes the worker down with it.
 
 importScripts("shared.js");
 
@@ -18,6 +24,9 @@ const MENU_LINK = "machina-save-link";
 const MENU_SELECTION = "machina-save-selection";
 const NOTIF_ID = "machina-save";
 const BADGE_RESET_MS = 4000;
+const OK_STATES = ["saved", "duplicate", "waiting"];
+
+const has = (obj, path) => path.split(".").reduce((o, k) => (o && o[k] !== undefined ? o[k] : undefined), obj) !== undefined;
 
 // ── Settings ────────────────────────────────────────────────────────────────
 
@@ -30,6 +39,8 @@ async function getSettings() {
 }
 
 // ── Badge ───────────────────────────────────────────────────────────────────
+// Safari ignores the badge color (webkit.org/b/267662), so the glyph alone
+// has to tell success from failure: a check, or "!".
 
 let badgeTimer = null;
 async function showBadge(state) {
@@ -47,30 +58,115 @@ async function showBadge(state) {
   }
 }
 
-// ── Notifications (right-click saves, or a popup closed early) ──────────────
-// What a click on the toast does is kept in storage.session, so it still works
-// after the worker has been suspended between the toast and the click.
+// ── Telling the person (no popup open) ──────────────────────────────────────
 
-async function notify(view) {
+const ACTION_URL = () => ({ upgrade: S.UPGRADE_URL, connect: S.CONNECT_URL, open: S.LIBRARY_URL });
+const ACTION_TEXT = { upgrade: "Get Pro", connect: "Connect", open: "Open Machina" };
+
+// A system notification. What a click does is kept in storage.session, so it
+// still works after the worker has been suspended between toast and click.
+async function systemNotify(view) {
   try {
     await api.storage.session.set({ notifAction: view.action || "" });
   } catch (_) {
     // No session storage (very old Chromium): the click just does nothing.
   }
-  try {
-    const opts = {
-      type: "basic",
-      iconUrl: api.runtime.getURL("icons/icon128.png"),
-      title: view.title,
-      message: view.detail || "",
-      priority: 0,
-    };
-    if (view.action === "upgrade") opts.buttons = [{ title: "Get Pro" }];
-    else if (view.action === "connect") opts.buttons = [{ title: "Connect" }];
-    api.notifications.create(NOTIF_ID, opts);
-  } catch (_) {
-    // Safari has no notifications API; the badge already told the story.
+  const opts = {
+    type: "basic",
+    iconUrl: api.runtime.getURL("icons/icon128.png"),
+    title: view.title,
+    message: view.detail || "",
+    priority: 0,
+  };
+  if (view.action === "upgrade" || view.action === "connect") opts.buttons = [{ title: ACTION_TEXT[view.action] }];
+  await api.notifications.create(NOTIF_ID, opts);
+}
+
+// Drawn into the page by scripting.executeScript, so it must be self-contained
+// (it is serialized, not closed over). Inline styles only: a page's CSP can
+// block a <style> element but not CSSOM writes. Text goes in as text.
+function machinaToast(view, link) {
+  const HOST_ID = "machina-extension-toast";
+  const old = document.getElementById(HOST_ID);
+  if (old) old.remove();
+  const dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const host = document.createElement("div");
+  host.id = HOST_ID;
+  const root = host.attachShadow ? host.attachShadow({ mode: "open" }) : host;
+  const set = (el, css) => { Object.assign(el.style, css); return el; };
+  set(host, { all: "initial", position: "fixed", top: "16px", right: "16px", zIndex: "2147483647" });
+  const box = set(document.createElement("div"), {
+    width: "300px", boxSizing: "border-box", padding: "12px 14px", borderRadius: "12px",
+    font: "13px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif",
+    background: dark ? "#1b1b20" : "#ffffff", color: dark ? "#e8e8ec" : "#111827",
+    border: "1px solid " + (dark ? "rgba(255,255,255,.12)" : "rgba(0,0,0,.10)"),
+    boxShadow: "0 12px 32px -8px rgba(0,0,0,.35)", direction: "ltr", textAlign: "left",
+  });
+  box.setAttribute("role", "status");
+  const title = set(document.createElement("div"), { fontWeight: "650", fontSize: "14px", paddingRight: "20px" });
+  title.textContent = (view.ok ? "✓ " : "! ") + view.title;
+  if (!view.ok) title.style.color = dark ? "#f87171" : "#b91c1c";
+  box.appendChild(title);
+  if (view.detail) {
+    const detail = set(document.createElement("div"), { marginTop: "3px", color: dark ? "#a8a8b3" : "#4b5563" });
+    detail.textContent = view.detail;
+    box.appendChild(detail);
   }
+  if (link && link.url) {
+    const a = set(document.createElement("a"), {
+      display: "inline-block", marginTop: "8px", fontWeight: "600", color: "inherit", textDecoration: "underline",
+    });
+    a.href = link.url;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.textContent = link.text;
+    box.appendChild(a);
+  }
+  const close = set(document.createElement("button"), {
+    position: "absolute", top: "8px", right: "8px", width: "24px", height: "24px", border: "0",
+    background: "transparent", color: "inherit", cursor: "pointer", fontSize: "16px", lineHeight: "24px",
+  });
+  close.setAttribute("aria-label", "Close");
+  close.textContent = "×";
+  close.addEventListener("click", () => host.remove());
+  set(box, { position: "relative" });
+  box.appendChild(close);
+  root.appendChild(box);
+  (document.body || document.documentElement).appendChild(host);
+  setTimeout(() => host.remove(), 8000);
+}
+
+async function pageToast(view, tabId) {
+  if (!tabId || !has(api, "scripting.executeScript")) return false;
+  const url = ACTION_URL()[view.action];
+  try {
+    await api.scripting.executeScript({
+      target: { tabId },
+      func: machinaToast,
+      args: [
+        { ok: OK_STATES.includes(view.state), title: view.title, detail: view.detail || "" },
+        url ? { url, text: ACTION_TEXT[view.action] } : null,
+      ],
+    });
+    return true;
+  } catch (_) {
+    // No access to that tab (a browser page, or access not granted).
+    return false;
+  }
+}
+
+// System notification where there is one (Chrome, Edge, Brave); otherwise a
+// toast on the page (Safari). The badge has already fired either way.
+async function notify(view, tabId) {
+  if (has(api, "notifications.create")) {
+    try {
+      await systemNotify(view);
+      return;
+    } catch (_) {
+      // Fall through to the page toast.
+    }
+  }
+  await pageToast(view, tabId);
 }
 
 async function runNotifAction(id) {
@@ -81,7 +177,7 @@ async function runNotifAction(id) {
   } catch (_) {
     // Nothing remembered.
   }
-  const url = { upgrade: S.UPGRADE_URL, connect: S.CONNECT_URL, open: S.LIBRARY_URL }[action];
+  const url = ACTION_URL()[action];
   if (url) api.tabs.create({ url }).catch(() => {});
   try {
     api.notifications.clear(NOTIF_ID, () => {});
@@ -90,12 +186,8 @@ async function runNotifAction(id) {
   }
 }
 
-try {
-  api.notifications.onClicked.addListener(runNotifAction);
-  api.notifications.onButtonClicked.addListener((id) => runNotifAction(id));
-} catch (_) {
-  // Safari: no notification events.
-}
+if (has(api, "notifications.onClicked")) api.notifications.onClicked.addListener(runNotifAction);
+if (has(api, "notifications.onButtonClicked")) api.notifications.onButtonClicked.addListener((id) => runNotifAction(id));
 
 // ── Talking to share_ingest ─────────────────────────────────────────────────
 
@@ -151,7 +243,7 @@ async function postSave({ url, note }) {
 
 // Save and report. `reporter` is the popup's port when the popup asked; if the
 // popup is gone by the time the answer comes back, a notification says it.
-async function saveUrl({ url, note, label }, reporter) {
+async function saveUrl({ url, note, label, tabId }, reporter) {
   const result = await postSave({ url, note });
   const view = S.describeResult(result, { withNote: !!note });
   await showBadge(view.state);
@@ -161,7 +253,7 @@ async function saveUrl({ url, note, label }, reporter) {
     const detail = name && (view.state === "saved" || view.state === "duplicate")
       ? `${name}. ${view.detail}`
       : view.detail;
-    notify({ ...view, detail });
+    await notify({ ...view, detail }, tabId);
   }
   return { result, view };
 }
@@ -169,11 +261,11 @@ async function saveUrl({ url, note, label }, reporter) {
 // Harmless token check: POST with no URL. share_ingest checks the token BEFORE
 // it looks for content, so a good token gets 400 "No URL or text found" and a
 // bad one 401/403. Nothing is saved and no save is counted.
-async function checkToken(token, baseUrlOverride) {
+async function checkToken(token) {
   const candidate = S.cleanToken(token);
   if (!S.looksLikeToken(candidate)) return { ok: false, reason: "bad-token", message: "That doesn't look like a Machina token." };
   if (isOffline()) return { ok: false, reason: "offline", message: "You're offline. Connect to the internet and try again." };
-  const baseUrl = baseUrlOverride || (await getSettings()).baseUrl;
+  const { baseUrl } = await getSettings();
   const r = await postJson(baseUrl, candidate, {}, 15000);
   if (r.status === 400) return { ok: true };
   if (r.status === 401 || r.status === 403) return { ok: false, reason: "invalid", message: "That token doesn't work. It may have been reset." };
@@ -194,6 +286,7 @@ async function storeToken(token, account) {
 // ── Context menus ───────────────────────────────────────────────────────────
 
 function createMenus() {
+  if (!has(api, "contextMenus.create")) return;
   api.contextMenus.removeAll(() => {
     api.contextMenus.create({ id: MENU_PAGE, title: "Save page to Machina", contexts: ["page"] });
     api.contextMenus.create({ id: MENU_LINK, title: "Save link to Machina", contexts: ["link"] });
@@ -204,22 +297,25 @@ function createMenus() {
 async function handleMenuClick(info, tab) {
   const pageUrl = info.pageUrl || (tab && tab.url) || "";
   const title = (tab && tab.title) || "";
+  const tabId = tab && typeof tab.id === "number" ? tab.id : null;
   if (info.menuItemId === MENU_LINK) {
-    return saveUrl({ url: info.linkUrl, label: info.linkUrl });
+    return saveUrl({ url: info.linkUrl, label: info.linkUrl, tabId });
   }
   if (info.menuItemId === MENU_SELECTION) {
     const note = (info.selectionText || "").trim();
-    return saveUrl({ url: pageUrl, note, label: title || pageUrl });
+    return saveUrl({ url: pageUrl, note, label: title || pageUrl, tabId });
   }
   if (info.menuItemId === MENU_PAGE) {
-    return saveUrl({ url: pageUrl, label: title || pageUrl });
+    return saveUrl({ url: pageUrl, label: title || pageUrl, tabId });
   }
   return null;
 }
 
-api.contextMenus.onClicked.addListener((info, tab) => {
-  handleMenuClick(info, tab);
-});
+if (has(api, "contextMenus.onClicked")) {
+  api.contextMenus.onClicked.addListener((info, tab) => {
+    handleMenuClick(info, tab);
+  });
+}
 
 api.runtime.onInstalled.addListener(async (details) => {
   createMenus();
@@ -230,19 +326,40 @@ api.runtime.onInstalled.addListener(async (details) => {
     if (!token) api.tabs.create({ url: S.CONNECT_URL }).catch(() => {});
   }
 });
-if (api.runtime.onStartup) api.runtime.onStartup.addListener(createMenus);
+if (has(api, "runtime.onStartup")) api.runtime.onStartup.addListener(createMenus);
+
+// ── Who is talking ──────────────────────────────────────────────────────────
+
+// One of this extension's own pages (the popup or the options page).
+function fromOwnPage(sender) {
+  return !!sender && sender.id === api.runtime.id &&
+    typeof sender.url === "string" && sender.url.startsWith(api.runtime.getURL(""));
+}
+
+// The connect content script on the Machina web app's root page.
+function connectOrigins() {
+  const scripts = api.runtime.getManifest().content_scripts || [];
+  const matches = [];
+  for (const cs of scripts) if ((cs.js || []).includes("connect.js")) matches.push(...(cs.matches || []));
+  return S.connectOriginsFromMatches(matches);
+}
+function fromWebApp(sender) {
+  return !!sender && sender.id === api.runtime.id && !!sender.tab &&
+    S.isTrustedConnectSender(sender, connectOrigins());
+}
 
 // ── The popup ───────────────────────────────────────────────────────────────
 
 api.runtime.onConnect.addListener((port) => {
-  if (port.name !== "machina-popup") return;
+  if (port.name !== "machina-popup" || (port.sender && !fromOwnPage(port.sender))) return;
   let open = true;
   port.onDisconnect.addListener(() => {
     open = false;
   });
   port.onMessage.addListener(async (msg) => {
     if (!msg || msg.type !== "save") return;
-    await saveUrl({ url: msg.url, label: msg.title }, (result, view) => {
+    const tabId = typeof msg.tabId === "number" ? msg.tabId : null;
+    await saveUrl({ url: msg.url, label: msg.title, tabId }, (result, view) => {
       if (!open) return false;
       try {
         port.postMessage({ type: "result", result, view });
@@ -254,44 +371,14 @@ api.runtime.onConnect.addListener((port) => {
   });
 });
 
-api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  // Only this extension's own pages talk on this channel.
-  if (!sender || sender.id !== api.runtime.id) return false;
-  if (msg && msg.type === "check-token") {
-    checkToken(msg.token).then(sendResponse, () => sendResponse({ ok: false, reason: "network", message: "Couldn't reach Machina." }));
-    return true;
-  }
-  if (msg && msg.type === "connect-token") {
-    // The popup's paste fallback: check first, store only a token that works.
-    (async () => {
-      const check = await checkToken(msg.token);
-      if (check.ok) await storeToken(msg.token, "");
-      sendResponse(check);
-    })();
-    return true;
-  }
-  if (msg && msg.type === "disconnect") {
-    api.storage.local.remove(["token", "connectedAt", "account"]).then(() => sendResponse({ ok: true }));
-    return true;
-  }
-  return false;
-});
-
 // ── One-click connect from the Machina web app ──────────────────────────────
-// Only the web app's own root page, on a host listed in BOTH the manifest's
-// externally_connectable and shared.js CONNECT_HOSTS, gets an answer. The
-// token is checked against the server before it is stored, and it is never
-// sent back out: the web app gets a short one-way tag instead.
+// Only the web app's own root page, on a host listed in BOTH the content
+// script's matches and shared.js CONNECT_HOSTS, gets an answer. The token is
+// checked against the server before it is stored, and it is never sent back
+// out: the web app gets a short one-way tag instead.
 
-function connectOrigins() {
-  const ec = api.runtime.getManifest().externally_connectable || {};
-  return S.connectOriginsFromMatches(ec.matches);
-}
-
-async function handleExternal(msg, sender) {
-  if (!S.isTrustedConnectSender(sender, connectOrigins())) return { ok: false, reason: "untrusted" };
-  const type = msg && msg.type;
-  if (type === "machina-ping") {
+async function handleWeb(msg) {
+  if (msg.type === "web-ping") {
     const { token } = await getSettings();
     return {
       ok: true,
@@ -300,21 +387,44 @@ async function handleExternal(msg, sender) {
       tokenTag: token ? await S.tokenTag(token) : null,
     };
   }
-  if (type === "machina-connect") {
-    const token = S.cleanToken(msg.token);
-    if (!S.looksLikeToken(token)) return { ok: false, reason: "bad-token" };
-    const check = await checkToken(token);
-    if (!check.ok) return { ok: false, reason: check.reason };
-    await storeToken(token, msg.account);
-    await showBadge("saved");
-    return { ok: true, tokenTag: await S.tokenTag(token) };
-  }
-  return { ok: false, reason: "unknown" };
+  const token = S.cleanToken(msg.token);
+  if (!S.looksLikeToken(token)) return { ok: false, reason: "bad-token" };
+  const check = await checkToken(token);
+  if (!check.ok) return { ok: false, reason: check.reason };
+  await storeToken(token, msg.account);
+  await showBadge("saved");
+  return { ok: true, tokenTag: await S.tokenTag(token) };
 }
 
-if (api.runtime.onMessageExternal) {
-  api.runtime.onMessageExternal.addListener((msg, sender, sendResponse) => {
-    handleExternal(msg, sender).then(sendResponse, () => sendResponse({ ok: false, reason: "error" }));
+api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  const type = msg && msg.type;
+  if (type === "web-ping" || type === "web-connect") {
+    if (!fromWebApp(sender)) {
+      sendResponse({ ok: false, reason: "untrusted" });
+      return false;
+    }
+    handleWeb(msg).then(sendResponse, () => sendResponse({ ok: false, reason: "error" }));
     return true;
-  });
-}
+  }
+
+  // Everything else is for this extension's own pages only.
+  if (!fromOwnPage(sender)) return false;
+  if (type === "check-token") {
+    checkToken(msg.token).then(sendResponse, () => sendResponse({ ok: false, reason: "network", message: "Couldn't reach Machina." }));
+    return true;
+  }
+  if (type === "connect-token") {
+    // The popup's paste fallback: check first, store only a token that works.
+    (async () => {
+      const check = await checkToken(msg.token);
+      if (check.ok) await storeToken(msg.token, "");
+      sendResponse(check);
+    })();
+    return true;
+  }
+  if (type === "disconnect") {
+    api.storage.local.remove(["token", "connectedAt", "account"]).then(() => sendResponse({ ok: true }));
+    return true;
+  }
+  return false;
+});

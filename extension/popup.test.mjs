@@ -66,7 +66,7 @@ function makeEl(id) {
     return el;
 }
 
-async function openPopup({ storage = {}, search = '', tab = { id: 7, url: 'https://example.com/a', title: 'An article' }, shortcut = 'Ctrl+Shift+S', reply } = {}) {
+async function openPopup({ storage = {}, search = '', tab = { id: 7, url: 'https://example.com/a', title: 'An article' }, shortcut = 'Ctrl+Shift+S', reply, protocol = 'chrome-extension:', width = 340, noCommands = false } = {}) {
     const els = new Map(ids.map((id) => [id, makeEl(id)]));
     const store = { ...storage };
     const sent = [];
@@ -104,8 +104,9 @@ async function openPopup({ storage = {}, search = '', tab = { id: 7, url: 'https
             get: async (id) => (tab && tab.id === id ? tab : null),
             create: async ({ url }) => { opened.push(url); },
         },
-        commands: { getAll: async () => [{ name: '_execute_action', shortcut }] },
+        commands: noCommands ? undefined : { getAll: async () => [{ name: '_execute_action', shortcut }] },
     };
+    const rootClasses = new Set();
     const docListeners = new Map();
     const document = {
         getElementById: (id) => {
@@ -114,13 +115,14 @@ async function openPopup({ storage = {}, search = '', tab = { id: 7, url: 'https
             return el;
         },
         addEventListener: (ev, fn) => docListeners.set(ev, fn),
+        documentElement: { classList: { add: (c) => rootClasses.add(c), contains: (c) => rootClasses.has(c) } },
     };
     const ctx = {
         document, chrome, console, Promise, setTimeout, clearTimeout, URL, URLSearchParams,
         TextEncoder, crypto: globalThis.crypto,
-        location: { search },
+        location: { search, protocol },
         navigator: { userAgent: 'Mozilla/5.0 Chrome/150.0' },
-        window: { close: () => { closed++; } },
+        window: { close: () => { closed++; }, innerWidth: width },
     };
     ctx.self = ctx;
     ctx.globalThis = ctx;
@@ -131,7 +133,7 @@ async function openPopup({ storage = {}, search = '', tab = { id: 7, url: 'https
     await settle();
     const $ = (id) => els.get(id);
     return {
-        $, store, sent, opened, portMessages,
+        $, store, sent, opened, portMessages, rootClasses,
         get closed() { return closed; },
         click: async (id) => { await $(id).listeners.get('click')(); await settle(); },
         key: async (id, key) => { await $(id).listeners.get('keydown')({ key, preventDefault() {} }); await settle(); },
@@ -204,7 +206,8 @@ const connected = { token: 'good-token-1234567890' };
     const p = await openPopup({ storage: connected });
     check('opens on the save screen', view(p) === 'save');
     check('shows the page title and host', p.$('pageTitle').textContent === 'An article' && p.$('pageHost').textContent === 'example.com');
-    check('asks the service worker to save this tab', p.portMessages[0] && p.portMessages[0].type === 'save' && p.portMessages[0].url === 'https://example.com/a', JSON.stringify(p.portMessages));
+    check('asks the service worker to save this tab', p.portMessages[0] && p.portMessages[0].type === 'save' && p.portMessages[0].url === 'https://example.com/a' && p.portMessages[0].tabId === 7, JSON.stringify(p.portMessages));
+    check('the popup is not laid out as a tab', !p.rootClasses.has('in-tab'));
     check('says Saving while it waits (no early done)', p.$('result').dataset.state === 'saving' && p.$('resultTitle').textContent === 'Saving');
     check('no action buttons while saving', !p.visible('actionBtn') && !p.visible('openBtn'));
     check('shortcut tip uses the real binding', p.$('shortcutHint').textContent === 'Tip: press Ctrl+Shift+S on any page to save it.', p.$('shortcutHint').textContent);
@@ -318,8 +321,26 @@ console.log('settings');
     check('?tab= aims the save at that tab', p.portMessages[0] && p.portMessages[0].url === 'https://example.org/x');
 }
 
-// ── 7. Every string a user reads is em-dash free ───────────────────────────
-for (const f of ['popup.js', 'popup.html', 'popup.css', 'background.js', 'shared.js', 'manifest.json', 'README.md']) {
+// ── 7. Safari ─────────────────────────────────────────────────────────────
+console.log('safari');
+{
+    // Safari hands over an empty address until Machina is allowed on the site.
+    const p = await openPopup({ storage: connected, protocol: 'safari-web-extension:', tab: { id: 5, url: '', title: '' } });
+    check('Safari, no address: says how to allow the site', p.$('resultTitle').textContent === 'Allow Machina on this website' && /Safari Settings, Extensions, Machina/.test(p.$('resultDetail').textContent) && p.portMessages.length === 0);
+}
+{
+    const p = await openPopup({ storage: connected, protocol: 'safari-web-extension:', search: '?view=settings', width: 1200, noCommands: true });
+    check('Safari options tab: centered column', p.rootClasses.has('in-tab'));
+    check('Safari: no shortcuts page to send people to', p.$('shortcutLink').hidden === true);
+    check('no commands API: the shortcut reads Not set, nothing throws', p.$('shortcutKeys').textContent === 'Not set');
+}
+{
+    const p = await openPopup({ storage: connected, search: '?view=settings' });
+    check('Chrome options dialog: fills the dialog too', p.rootClasses.has('in-tab') && p.$('shortcutLink').hidden === false);
+}
+
+// ── 8. Every string a user reads is em-dash free ───────────────────────────
+for (const f of ['popup.js', 'popup.html', 'popup.css', 'background.js', 'shared.js', 'connect.js', 'manifest.json', 'README.md']) {
     const body = readFileSync(`${DIR}/${f}`, 'utf8');
     const bad = body.split('\n').map((l, i) => [i + 1, l]).filter(([, l]) => l.includes('—'));
     check(`${f} has no em dashes`, bad.length === 0, bad.map(([n]) => `line ${n}`).join(', '));

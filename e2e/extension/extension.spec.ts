@@ -1,14 +1,10 @@
 import type { Page } from '@playwright/test';
-import { test, expect, article, DEV_ID, GOOD_TOKEN } from './fixtures';
+import { test, expect, article, GOOD_TOKEN } from './fixtures';
 
 // The real extension in real Chromium, against a stub share_ingest.
 // `npm run test:extension` in e2e/. No emulators, no dev server, no shared ports.
 
 const ARTICLE = article('How bridges carry their own weight', '<p>Arches push outward; cables pull inward.</p>');
-
-test('loads with the pinned dev id the web app trusts', async ({ ext }) => {
-    expect(ext.id).toBe(DEV_ID);
-});
 
 test('first install opens the web app connect page', async ({ ext }) => {
     await expect.poll(() => ext.context.pages().map((p) => p.url())).toContain('https://mymachina.app/?connect=extension');
@@ -91,16 +87,46 @@ test('right-click a selection saves the page with the quote', async ({ ext }) =>
     expect(call.body).toEqual({ url: `${ext.stub.origin}/bridges`, note: 'Arches push outward', noteKind: 'quote' });
 });
 
+test('no notifications API (as in Safari): a toast on the page says it, with a link', async ({ ext }) => {
+    await ext.connect();
+    ext.stub.reply = () => ({ status: 200, body: {
+        success: true, saved: true, waiting: true, upgrade: true, message: 'Saved. Machina will read it on the 1st, or now with Pro.',
+    } });
+    const { page, tabId } = await ext.openPage('/bridges', ARTICLE);
+    await ext.worker.evaluate(async ([url, id]) => {
+        // Newer Chromium also exposes the same APIs as `browser`; hide both.
+        for (const ns of [chrome, (globalThis as { browser?: object }).browser]) {
+            if (ns) Object.defineProperty(ns, 'notifications', { value: undefined, configurable: true });
+        }
+        await (self as unknown as { handleMenuClick: (i: object, t: object) => Promise<unknown> })
+            .handleMenuClick({ menuItemId: 'machina-save-page', pageUrl: url }, { id, title: 'Bridges', url });
+    }, [`${ext.stub.origin}/bridges`, tabId] as const);
+    const toast = page.locator('#machina-extension-toast');
+    await expect(toast).toBeAttached();
+    await expect(toast.getByRole('status')).toContainText('Saved for later');
+    await expect(toast.getByRole('link', { name: 'Get Pro' })).toHaveAttribute('href', 'https://mymachina.app/?paywall=saves');
+    await toast.getByRole('button', { name: 'Close' }).click();
+    await expect(toast).toHaveCount(0);
+});
+
 test('the web app root can connect; a share page and other sites cannot', async ({ ext }) => {
     // Through the stub server: it stands in for the real check (empty POST, 400).
     await ext.worker.evaluate((b) => chrome.storage.local.set({ baseUrl: b }), ext.stub.origin);
-    const send = (page: Page, msg: object) => page.evaluate(([id, m]) => new Promise((resolve) => {
-        const rt = (window as unknown as { chrome?: { runtime?: { sendMessage: (i: string, x: object, cb: (r: unknown) => void) => void } } }).chrome?.runtime;
-        if (!rt) return resolve('no runtime');
-        rt.sendMessage(id as string, m as object, (r) => resolve(r));
-    }), [DEV_ID, msg] as const);
+    // The web app's side of the handshake (web/lib/extension.ts): post to this
+    // window, wait for the content script's answer with the same id.
+    const send = (page: Page, msg: object) => page.evaluate((m) => new Promise((resolve) => {
+        const id = String(Math.random());
+        const t = setTimeout(() => resolve('no answer'), 1500);
+        window.addEventListener('message', (e) => {
+            const d = e.data as { source?: string; id?: string; reply?: unknown };
+            if (e.source !== window || !d || d.source !== 'machina-extension' || d.id !== id) return;
+            clearTimeout(t);
+            resolve(d.reply);
+        });
+        window.postMessage({ source: 'machina-web', id, ...m }, location.origin);
+    }), msg);
 
-    // http://localhost is in the dev manifest's externally_connectable.
+    // http://localhost is in the dev build's content-script matches.
     const port = new URL(ext.stub.origin).port;
     ext.stub.pages.set('/', '<!doctype html><title>app</title>');
     ext.stub.pages.set('/s', '<!doctype html><title>share</title>');
@@ -113,10 +139,19 @@ test('the web app root can connect; a share page and other sites cannot', async 
     expect(await send(share, { type: 'machina-connect', token: GOOD_TOKEN })).toEqual({ ok: false, reason: 'untrusted' });
     expect((await ext.storage()).token).toBeUndefined();
 
-    // 127.0.0.1 is listed too, but a page on another origin gets no runtime at all.
+    // A site the content script doesn't run on gets no answer at all.
+    await ext.context.route('https://other.example/', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<title>x</title>' }));
     const other = await ext.context.newPage();
-    await other.goto('data:text/html,<title>x</title>');
-    expect(await send(other, { type: 'machina-ping' })).toBe('no runtime');
+    await other.goto('https://other.example/');
+    expect(await send(other, { type: 'machina-ping' })).toBe('no answer');
+
+    // A frame on the web app's own origin: the content script doesn't run in frames.
+    ext.stub.pages.set('/framed', `<!doctype html><iframe src="http://localhost:${port}/"></iframe>`);
+    const framed = await ext.context.newPage();
+    await framed.goto(`http://localhost:${port}/framed`);
+    const frame = framed.frames()[1];
+    await frame.waitForLoadState();
+    expect(await send(frame as unknown as Page, { type: 'machina-ping' })).toBe('no answer');
 
     const r = await send(app, { type: 'machina-connect', token: GOOD_TOKEN, account: 'reader@example.com' });
     expect(r).toMatchObject({ ok: true });
@@ -148,6 +183,8 @@ test('paste a token: checked, then stored', async ({ ext }) => {
 
 test('keyboard: Connect is reachable and works from the keyboard', async ({ ext }) => {
     const popup = await ext.openPopup();
+    // Wait for the popup to pick its screen before tabbing through it.
+    await expect(popup.getByRole('heading', { name: 'Save anything in one click' })).toBeVisible();
     // Header gear first, then the primary action.
     await popup.keyboard.press('Tab');
     await expect(popup.getByRole('button', { name: 'Settings' })).toBeFocused();

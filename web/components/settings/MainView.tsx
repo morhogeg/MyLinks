@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Bell, BellRing, Sun, Moon, Monitor, Clock, Compass, Lock, BarChart3, Heart, Crown, Puzzle, Upload } from 'lucide-react';
 import { policyUrl, openExternal } from '@/lib/share';
 import { isNativeApp } from '@/lib/api';
-import { chromeWebStoreUrl } from '@/lib/extension';
+import { browserKind, chromeWebStoreUrl, macAppStoreUrl } from '@/lib/extension';
 import ProfileAvatar from '../ProfileAvatar';
 import DataExport from './DataExport';
 import { accountTitle, isPrivateRelay } from './AccountSection';
@@ -146,7 +146,9 @@ export function MainView({
                 <NavRow
                     tile={<Puzzle className="w-[16px] h-[16px]" />}
                     title="Browser extension"
-                    sub={isNativeApp() ? 'For Chrome on your computer' : chromeWebStoreUrl() ? 'Chrome, Edge, and Brave' : 'Coming soon to Chrome'}
+                    sub={isNativeApp() ? 'For Chrome or Safari on your computer'
+                        : browserKind() === 'safari' ? (macAppStoreUrl() ? 'Safari on your Mac' : 'Coming soon to Safari')
+                            : chromeWebStoreUrl() ? 'Chrome, Edge, and Brave' : 'Coming soon to Chrome'}
                     onClick={() => go('extension')}
                 />
             </List>

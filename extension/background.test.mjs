@@ -3,7 +3,7 @@
 //
 // Runs the real background.js + shared.js in a vm with stubbed chrome.* APIs
 // and a fake fetch, then drives the same events the browser would fire: the
-// web app's connect handshake (onMessageExternal), right-click saves, the
+// web app's connect handshake (relayed by connect.js), right-click saves, the
 // popup's port, notifications, install. Zero dependencies. Proves the wiring
 // and the security checks, not that Chrome loads the extension (that is the
 // Playwright run in e2e/extension).
@@ -92,7 +92,7 @@ check('timeout -> may still have saved', /may still have saved/.test(d({ ok: fal
 check('badges: saved/duplicate/waiting distinct, errors red', new Set(['saved', 'duplicate', 'waiting'].map((s) => S.badgeFor(s).color)).size === 3 && S.badgeFor('auth').color === '#DC2626');
 
 console.log('who may connect');
-const devOrigins = S.connectOriginsFromMatches(MANIFEST.externally_connectable.matches);
+const devOrigins = S.connectOriginsFromMatches(MANIFEST.content_scripts.find((c) => c.js.includes('connect.js')).matches);
 check('dev manifest allows mymachina.app + localhost', JSON.stringify(devOrigins.map((o) => o.host)) === '["mymachina.app","localhost","127.0.0.1"]', JSON.stringify(devOrigins));
 check('a manifest edit alone cannot add a host', S.connectOriginsFromMatches(['https://evil.example/*', 'https://*.mymachina.app/*', 'https://mymachina.app.evil.example/*']).length === 0);
 const trusted = (url, extra = {}) => S.isTrustedConnectSender({ url, origin: new URL(url).origin, frameId: 0, ...extra }, devOrigins);
@@ -112,16 +112,17 @@ check('localhost https needs the real list entry: refused', !trusted('https://lo
 
 // ── The service worker, in a sandbox ───────────────────────────────────────
 
-async function boot({ manifest = MANIFEST, storage = {}, online = true } = {}) {
+async function boot({ manifest = MANIFEST, storage = {}, online = true, noNotifications = false, noContextMenus = false, scriptingFails = false } = {}) {
     const store = { ...storage };
     const session = {};
     const fetches = [];
     const notifications = [];
+    const toasts = [];
     const tabsOpened = [];
     const badge = { text: '', color: '' };
     let fetchImpl = async () => ({ ok: false, status: 400, json: async () => ({ success: false, error: 'No URL or text found in shared content' }) });
     const events = {
-        onInstalled: ev(), onStartup: ev(), onConnect: ev(), onMessage: ev(), onMessageExternal: ev(),
+        onInstalled: ev(), onStartup: ev(), onConnect: ev(), onMessage: ev(),
         menuClicked: ev(), notifClicked: ev(), notifButton: ev(),
     };
     const chrome = {
@@ -130,7 +131,7 @@ async function boot({ manifest = MANIFEST, storage = {}, online = true } = {}) {
             getManifest: () => manifest,
             getURL: (p) => `chrome-extension://${EXT_ID}/${p}`,
             onInstalled: events.onInstalled, onStartup: events.onStartup, onConnect: events.onConnect,
-            onMessage: events.onMessage, onMessageExternal: events.onMessageExternal,
+            onMessage: events.onMessage,
         },
         storage: {
             local: {
@@ -148,12 +149,13 @@ async function boot({ manifest = MANIFEST, storage = {}, online = true } = {}) {
             setBadgeTextColor: async () => {},
             setBadgeText: async ({ text }) => { badge.text = text; },
         },
-        notifications: {
-            create: (id, opts) => { notifications.push({ id, ...opts }); },
+        notifications: noNotifications ? undefined : {
+            create: async (id, opts) => { notifications.push({ id, ...opts }); },
             clear: (id, cb) => cb && cb(),
             onClicked: events.notifClicked, onButtonClicked: events.notifButton,
         },
-        contextMenus: { removeAll: (cb) => cb(), create: () => {}, onClicked: events.menuClicked },
+        contextMenus: noContextMenus ? undefined : { removeAll: (cb) => cb(), create: () => {}, onClicked: events.menuClicked },
+        scripting: { executeScript: async (inj) => { if (scriptingFails) throw new Error('Cannot access contents of the page'); toasts.push(inj); return [{}]; } },
         tabs: { create: async ({ url }) => { tabsOpened.push(url); } },
     };
     const ctx = {
@@ -168,15 +170,19 @@ async function boot({ manifest = MANIFEST, storage = {}, online = true } = {}) {
     ctx.importScripts = (name) => { if (name !== 'shared.js') throw new Error(`importScripts(${name})`); vm.runInContext(sharedSrc, ctx); };
     vm.createContext(ctx);
     vm.runInContext(bgSrc, ctx);
-    const external = (msg, url) => new Promise((resolve) => {
-        const sender = { url, origin: new URL(url).origin, frameId: 0 };
-        events.onMessageExternal.fns[0](msg, sender, resolve);
+    // What connect.js forwards for the web app (machina-ping -> web-ping, ...).
+    const WEB = { 'machina-ping': 'web-ping', 'machina-connect': 'web-connect' };
+    const external = (msg, url, extra = {}) => new Promise((resolve) => {
+        const sender = { id: EXT_ID, url, origin: new URL(url).origin, frameId: 0, tab: { id: 1 }, ...extra };
+        const handled = events.onMessage.fns[0]({ ...msg, type: WEB[msg.type] || msg.type }, sender, resolve);
+        if (!handled) setTimeout(() => resolve('<ignored>'), 0);
     });
-    const internal = (msg, senderId = EXT_ID) => new Promise((resolve) => {
-        const handled = events.onMessage.fns[0](msg, { id: senderId }, resolve);
-        if (!handled) resolve('<ignored>');
+    const internal = (msg, senderId = EXT_ID, url = `chrome-extension://${EXT_ID}/popup.html`) => new Promise((resolve) => {
+        const handled = events.onMessage.fns[0](msg, { id: senderId, url }, resolve);
+        if (!handled) setTimeout(() => resolve('<ignored>'), 0);
     });
     return {
+        toasts,
         store, session, fetches, notifications, tabsOpened, badge, events, external, internal, ctx,
         respond: (status, body) => { fetchImpl = async () => ({ ok: status >= 200 && status < 300, status, json: async () => { if (body === undefined) throw new Error('no json'); return body; } }); },
         respondWith: (fn) => { fetchImpl = fn; },
@@ -221,15 +227,19 @@ console.log('connect handshake');
     bg.respondWith(async () => { throw new TypeError('Failed to fetch'); });
     r = await bg.external({ type: 'machina-connect', token: OTHER }, APP);
     check('offline connect says network and stores nothing new', r.reason === 'network' && bg.store.token === GOOD);
-    r = await bg.external({ type: 'something-else' }, APP);
-    check('unknown message types get nothing', r.ok === false && r.reason === 'unknown');
+    r = await bg.external({ type: 'disconnect' }, APP);
+    check('the web app cannot reach the popup-only messages', r === '<ignored>' && !!bg.store.token);
+    r = await bg.external({ type: 'machina-ping' }, APP, { tab: undefined });
+    check('a web-* message from no tab (not the content script) is refused', r.reason === 'untrusted');
+    r = await bg.external({ type: 'machina-ping' }, APP, { id: 'another-extension' });
+    check('a web-* message from another extension is refused', r.reason === 'untrusted');
     bg.respondWith(async () => ({ ok: false, status: 400, json: async () => ({}) }));
     await bg.external({ type: 'machina-connect', token: GOOD, account: 'x'.repeat(500) }, APP);
     check('the account label is capped', bg.store.account.length === 120);
 }
 {
     // What the store package ships: localhost stripped from the manifest.
-    const storeManifest = { ...MANIFEST, externally_connectable: { matches: ['https://mymachina.app/*'] } };
+    const storeManifest = { ...MANIFEST, content_scripts: [{ ...MANIFEST.content_scripts[0], matches: ['https://mymachina.app/*'] }] };
     const bg = await boot({ manifest: storeManifest });
     const r = await bg.external({ type: 'machina-connect', token: GOOD }, 'http://localhost:3100/');
     check('store build: a local page cannot connect', r.reason === 'untrusted' && bg.fetches.length === 0);
@@ -313,7 +323,7 @@ console.log('popup port');
     const bg = await boot({ storage: { token: GOOD } });
     bg.respond(200, { success: true, queued: true, id: 'q1' });
     const posted = [];
-    const port = { name: 'machina-popup', onDisconnect: ev(), onMessage: ev(), postMessage: (m) => posted.push(m) };
+    const port = { name: 'machina-popup', sender: { id: EXT_ID, url: `chrome-extension://${EXT_ID}/popup.html` }, onDisconnect: ev(), onMessage: ev(), postMessage: (m) => posted.push(m) };
     bg.events.onConnect.fns[0](port);
     port.onMessage.fns[0]({ type: 'save', url: 'https://example.com/p', title: 'P' });
     await settle();
@@ -331,6 +341,9 @@ console.log('popup port');
     const other = { name: 'someone-else', onDisconnect: ev(), onMessage: ev(), postMessage: () => {} };
     bg.events.onConnect.fns[0](other);
     check('ports with another name are ignored', other.onMessage.fns.length === 0);
+    const page = { name: 'machina-popup', sender: { id: EXT_ID, url: 'https://mymachina.app/', tab: { id: 1 } }, onDisconnect: ev(), onMessage: ev(), postMessage: () => {} };
+    bg.events.onConnect.fns[0](page);
+    check('a popup port from a web page is ignored', page.onMessage.fns.length === 0);
 }
 
 console.log('popup messages');
@@ -338,6 +351,8 @@ console.log('popup messages');
     const bg = await boot();
     let r = await bg.internal({ type: 'connect-token', token: GOOD }, 'some-other-extension');
     check('messages from other extensions are ignored', r === '<ignored>' && !bg.store.token);
+    r = await bg.internal({ type: 'connect-token', token: GOOD }, EXT_ID, 'https://mymachina.app/');
+    check('popup-only messages from a content script are ignored', r === '<ignored>' && !bg.store.token);
     bg.respond(403, {});
     r = await bg.internal({ type: 'connect-token', token: GOOD });
     check('paste fallback: a rejected token is not stored', r.ok === false && !bg.store.token && /doesn't work/.test(r.message));
@@ -360,10 +375,121 @@ console.log('install');
     check('an update opens nothing', up.tabsOpened.length === 0);
 }
 
+console.log('safari: no notifications, no menus');
+{
+    const bg = await boot({ storage: { token: GOOD }, noNotifications: true });
+    bg.respond(200, { success: true, saved: true, waiting: true, upgrade: true, message: 'Saved. Machina will read it on the 1st, or now with Pro.' });
+    await bg.menu({ menuItemId: 'machina-save-page', pageUrl: 'https://example.com/x' }, { id: 42, title: 'X', url: 'https://example.com/x' });
+    const t = bg.toasts.at(-1);
+    check('no notifications API: a toast is drawn on that tab instead', t && t.target.tabId === 42 && typeof t.func === 'function');
+    check('the toast carries the result and the upgrade link', t.args[0].title === 'Saved for later' && t.args[0].ok === true && t.args[1].url === 'https://mymachina.app/?paywall=saves' && t.args[1].text === 'Get Pro');
+    bg.respond(403, {});
+    await bg.menu({ menuItemId: 'machina-save-page', pageUrl: 'https://example.com/x' }, { id: 42, title: 'X', url: 'https://example.com/x' });
+    check('a revoked token toast links to Connect', bg.toasts.at(-1).args[1].url === 'https://mymachina.app/?connect=extension' && bg.toasts.at(-1).args[0].ok === false);
+    check('and no notification was attempted', bg.notifications.length === 0);
+}
+{
+    const bg = await boot({ storage: { token: GOOD }, noNotifications: true, scriptingFails: true });
+    bg.respond(200, { success: true, queued: true, id: 'q' });
+    let threw = false;
+    try { await bg.menu({ menuItemId: 'machina-save-page', pageUrl: 'https://example.com/x' }, { id: 4, title: 'X', url: 'https://example.com/x' }); } catch { threw = true; }
+    check('a tab the toast cannot reach: no crash, the badge still says it', !threw && bg.badge.text === '✓');
+}
+{
+    let threw = false;
+    let bg;
+    try {
+        bg = await boot({ noContextMenus: true, noNotifications: true });
+        await Promise.all(bg.events.onInstalled.fire({ reason: 'update' }));
+        await settle();
+    } catch (e) { threw = e; }
+    check('no contextMenus API (iOS Safari): the worker still loads', !threw && bg.events.onMessage.fns.length === 1, String(threw));
+}
+{
+    // The toast function itself, in a tiny fake DOM: text only, link, close.
+    const el = (tag) => {
+        const node = {
+            tag, style: {}, children: [], attrs: {}, listeners: {}, textContent: '',
+            appendChild(c) { this.children.push(c); return c; },
+            setAttribute(k, v) { this.attrs[k] = v; },
+            addEventListener(e, f) { this.listeners[e] = f; },
+            remove() { this.removed = true; },
+            attachShadow() { node.shadow = el('#shadow'); return node.shadow; },
+        };
+        return node;
+    };
+    const body = el('body');
+    const fakeDoc = { getElementById: () => null, createElement: el, body, documentElement: body };
+    const c = { document: fakeDoc, window: { matchMedia: () => ({ matches: true }) }, setTimeout: () => 0 };
+    vm.createContext(c);
+    const bgCtx = (await boot()).ctx;
+    vm.runInContext(`(${bgCtx.machinaToast.toString()})(${JSON.stringify({ ok: false, title: '<b>Reconnect</b>', detail: 'x' })}, ${JSON.stringify({ url: 'https://mymachina.app/?connect=extension', text: 'Connect' })})`, c);
+    const host = body.children[0];
+    const box = host.shadow.children[0];
+    check('toast: mounted in a shadow root, fixed at the top right', host.style.position === 'fixed' && host.style.right === '16px');
+    check('toast: markup in titles is shown as text, never parsed', box.children[0].textContent === '! <b>Reconnect</b>');
+    const link = box.children.find((n) => n.tag === 'a');
+    check('toast: the action is a real link that opens in a new tab', link && link.href === 'https://mymachina.app/?connect=extension' && link.target === '_blank' && /noopener/.test(link.rel));
+    check('toast: announced to screen readers and closable', box.attrs.role === 'status' && box.children.some((n) => n.attrs['aria-label'] === 'Close'));
+}
+
+console.log('connect.js (content script)');
+{
+    const connectSrc = readFileSync(`${DIR}/connect.js`, 'utf8');
+    const posted = [];
+    const forwarded = [];
+    let listener = null;
+    const win = {
+        location: { origin: 'https://mymachina.app' },
+        addEventListener: (t, fn) => { if (t === 'message') listener = fn; },
+        postMessage: (data, target) => posted.push({ data, target }),
+    };
+    win.top = win;
+    const c = {
+        window: win,
+        chrome: { runtime: { lastError: undefined, sendMessage: (m, cb) => { forwarded.push(m); cb({ ok: true, connected: false, tokenTag: null }); } } },
+    };
+    vm.createContext(c);
+    vm.runInContext(connectSrc, c);
+    check('announces itself to the page on load, to its own origin only', posted[0].data.type === 'machina-ready' && posted[0].target === 'https://mymachina.app');
+    const send = (data, extra = {}) => listener({ source: win, origin: 'https://mymachina.app', data, ...extra });
+    send({ source: 'machina-web', id: 'a1', type: 'machina-ping' });
+    check('relays a ping as web-ping and answers with the same id', forwarded.at(-1).type === 'web-ping' && posted.at(-1).data.id === 'a1' && posted.at(-1).data.reply.ok === true && posted.at(-1).target === 'https://mymachina.app');
+    send({ source: 'machina-web', id: 'a2', type: 'machina-connect', token: GOOD, account: 'me@example.com' });
+    check('relays a connect with the token and account', forwarded.at(-1).type === 'web-connect' && forwarded.at(-1).token === GOOD && forwarded.at(-1).account === 'me@example.com');
+    const before = forwarded.length;
+    send({ source: 'machina-web', id: 'b1', type: 'machina-ping' }, { source: {} });
+    check('ignores messages from another window (an iframe, an opener)', forwarded.length === before);
+    send({ source: 'machina-web', id: 'b2', type: 'machina-ping' }, { origin: 'https://evil.example' });
+    check('ignores messages from another origin', forwarded.length === before);
+    send({ source: 'machina-extension', id: 'b3', type: 'machina-ping' });
+    send({ source: 'machina-web', id: 'b4', type: 'disconnect' });
+    send({ source: 'machina-web', type: 'machina-ping' });
+    send('machina-ping');
+    check('ignores its own echoes, unknown types, missing ids, non-objects', forwarded.length === before);
+    const answer = JSON.stringify(posted.at(-1));
+    check('never posts a token back to the page', !answer.includes(GOOD));
+}
+{
+    const posted = [];
+    const win = { location: { origin: 'https://mymachina.app' }, addEventListener: () => { throw new Error('should not listen'); }, postMessage: (d) => posted.push(d) };
+    win.top = {};
+    const c = { window: win, chrome: { runtime: {} } };
+    vm.createContext(c);
+    vm.runInContext(readFileSync(`${DIR}/connect.js`, 'utf8'), c);
+    check('does nothing inside a frame', posted.length === 0);
+}
+
 console.log('manifest');
-check('permissions are exactly the documented four', JSON.stringify([...MANIFEST.permissions].sort()) === JSON.stringify(['activeTab', 'contextMenus', 'notifications', 'storage']));
-check('one host permission, the API origin', JSON.stringify(MANIFEST.host_permissions) === JSON.stringify([`${API}/*`]));
-check('no content scripts, no tabs/scripting/<all_urls>', !MANIFEST.content_scripts && !JSON.stringify(MANIFEST).includes('<all_urls>') && !MANIFEST.permissions.includes('tabs') && !MANIFEST.permissions.includes('scripting'));
+check('permissions are exactly the documented five', JSON.stringify([...MANIFEST.permissions].sort()) === JSON.stringify(['activeTab', 'contextMenus', 'notifications', 'scripting', 'storage']));
+check('no host permissions at all (share_ingest admits extension origins)', !MANIFEST.host_permissions && !MANIFEST.optional_host_permissions);
+check('one content script, connect.js, on the web app (plus local dev)', MANIFEST.content_scripts.length === 1
+    && JSON.stringify(MANIFEST.content_scripts[0].js) === '["connect.js"]'
+    && MANIFEST.content_scripts[0].matches.every((m) => /^(https:\/\/mymachina\.app|http:\/\/localhost|http:\/\/127\.0\.0\.1)\/\*$/.test(m))
+    && MANIFEST.content_scripts[0].all_frames === false);
+check('no externally_connectable, no key, no background.scripts', !MANIFEST.externally_connectable && !MANIFEST.key && !MANIFEST.background.scripts);
+check('no tabs permission, no <all_urls>', !JSON.stringify(MANIFEST).includes('<all_urls>') && !MANIFEST.permissions.includes('tabs'));
+check('Safari keys kept: notifications permission and open_in_tab', MANIFEST.permissions.includes('notifications') && MANIFEST.options_ui.open_in_tab === false);
 check('the shortcut opens the popup', !!MANIFEST.commands._execute_action);
 
 console.log(failures === 0 ? '\nAll background checks passed.' : `\n${failures} FAILURES`);

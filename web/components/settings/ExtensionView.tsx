@@ -8,8 +8,8 @@ import ConfirmDialog from '@/components/ConfirmDialog';
 import { copyToClipboard, openExternal } from '@/lib/share';
 import { isNativeApp } from '@/lib/api';
 import {
-    chromeWebStoreUrl, connectExtension, connectFailureText, detectExtension, isDesktopChromium, tokenTag,
-    type ExtensionStatus,
+    browserKind, chromeWebStoreUrl, connectExtension, connectFailureText, detectExtension, macAppStoreUrl,
+    onExtensionReady, tokenTag, type ExtensionStatus,
 } from '@/lib/extension';
 import { LargeTitle, SectionHeader, Footnote } from './primitives';
 
@@ -58,6 +58,18 @@ function PrimaryButton({ children, onClick, disabled, busy }: { children: ReactN
 
 const SMALL_BTN = 'inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-card-hover border border-border-subtle text-[13px] font-semibold text-text hover:border-border-strong transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-default';
 
+function ComingSoonButton() {
+    return (
+        <button
+            type="button"
+            disabled
+            className="mt-3 inline-flex w-full items-center justify-center h-11 px-4 rounded-xl border border-border-subtle bg-card-hover text-[15px] font-semibold text-text-muted cursor-default"
+        >
+            Coming soon
+        </button>
+    );
+}
+
 function Mono({ children }: { children: ReactNode }) {
     return <code dir="ltr" className="font-mono text-[13px] text-text">{children}</code>;
 }
@@ -87,8 +99,12 @@ export function ExtensionView({
     autoConnect?: boolean;
 }) {
     const native = isNativeApp();
-    const [desktop] = useState(() => !native && isDesktopChromium());
+    // Where the extension can run: desktop Chrome/Edge/Brave, or Safari on a Mac.
+    const [kind] = useState(() => (native ? 'other' : browserKind()));
+    const desktop = kind !== 'other';
+    const safari = kind === 'safari';
     const storeUrl = chromeWebStoreUrl();
+    const masUrl = macAppStoreUrl();
 
     // ── The account's token ─────────────────────────────────────────────────
     const [token, setToken] = useState<string | null>(null);
@@ -134,10 +150,14 @@ export function ExtensionView({
         void tick();
         const onFocus = () => { void refreshExt(); };
         window.addEventListener('focus', onFocus);
+        // The content script says hello when it arrives (Safari: right after
+        // the person allows Machina on this site).
+        const offReady = onExtensionReady(() => { void refreshExt(); });
         return () => {
             stop = true;
             if (timer) clearTimeout(timer);
             window.removeEventListener('focus', onFocus);
+            offReady();
         };
     }, [desktop, refreshExt]);
 
@@ -152,7 +172,7 @@ export function ExtensionView({
         if (!ext || !token) return;
         setConnectState('busy');
         setConnectError('');
-        const r = await connectExtension(ext.id, token, account);
+        const r = await connectExtension(token, account);
         if (r.ok) {
             setConnectState('idle');
             await refreshExt();
@@ -199,7 +219,7 @@ export function ExtensionView({
             // The extension in THIS browser gets the new token straight away.
             let pushed = false;
             if (ext) {
-                const r = await connectExtension(ext.id, cfg.token, account);
+                const r = await connectExtension(cfg.token, account);
                 pushed = r.ok;
                 await refreshExt();
             }
@@ -215,13 +235,13 @@ export function ExtensionView({
     if (native) {
         main = (
             <StatusLine icon={<ChevronRight className="w-[14px] h-[14px]" />} title="Set it up on your computer">
-                Open mymachina.app in Chrome, Edge, or Brave on your computer and come back to this screen there.
+                Open mymachina.app in Chrome, Edge, Brave, or Safari on your computer and come back to this screen there.
             </StatusLine>
         );
     } else if (!desktop) {
         main = (
             <>
-                <StatusLine icon={<ChevronRight className="w-[14px] h-[14px]" />} title="Works in Chrome, Edge, and Brave">
+                <StatusLine icon={<ChevronRight className="w-[14px] h-[14px]" />} title="Works in Chrome, Edge, Brave, and Safari">
                     Open Machina in one of those browsers on a computer to add it.
                 </StatusLine>
                 {storeUrl && <PrimaryButton onClick={() => openExternal(storeUrl)}>View in the Chrome Web Store</PrimaryButton>}
@@ -230,6 +250,26 @@ export function ExtensionView({
     } else if (ext === undefined) {
         main = (
             <StatusLine icon={<Loader2 className="w-[14px] h-[14px] animate-spin" />} title="Looking for the extension" />
+        );
+    } else if (ext === null && safari) {
+        main = (
+            <>
+                <StatusLine icon={<span className="text-[12px] font-bold">1</span>} title={masUrl ? 'Get Machina for Safari' : 'Coming soon to the Mac App Store'}>
+                    {masUrl
+                        ? 'Free, from the Mac App Store. Open the app once, then turn on the extension in Safari.'
+                        : 'Machina for Safari is on its way. Once it is in the Mac App Store, you will get it from here.'}
+                </StatusLine>
+                {masUrl ? (
+                    <PrimaryButton onClick={() => openExternal(masUrl)}>View in the Mac App Store</PrimaryButton>
+                ) : (
+                    <ComingSoonButton />
+                )}
+                <div className="mt-3 rounded-xl bg-surface-inset px-3 py-2.5 text-[13.5px] text-text-secondary leading-snug">
+                    <span className="font-semibold text-text">Already have it?</span> Safari asks before an extension can
+                    see a website. In Safari, open Settings, then Extensions, choose Machina, and allow it on
+                    mymachina.app. This page notices and connects it.
+                </div>
+            </>
         );
     } else if (ext === null) {
         main = storeUrl ? (
@@ -247,13 +287,7 @@ export function ExtensionView({
                 <StatusLine icon={<span className="text-[12px] font-bold">1</span>} title="Coming soon to the Chrome Web Store">
                     The Machina extension is on its way. Once it is in the store, you will add it from here in one click.
                 </StatusLine>
-                <button
-                    type="button"
-                    disabled
-                    className="mt-3 inline-flex w-full items-center justify-center h-11 px-4 rounded-xl border border-border-subtle bg-card-hover text-[15px] font-semibold text-text-muted cursor-default"
-                >
-                    Coming soon
-                </button>
+                <ComingSoonButton />
             </>
         );
     } else if (connectedHere) {
@@ -293,7 +327,7 @@ export function ExtensionView({
         <div className="pb-2">
             <LargeTitle>Browser extension</LargeTitle>
             <p className="px-1 text-[15px] text-text-secondary leading-snug">
-                Save any page from your desktop browser in one click. Works in Chrome, Edge, and Brave.
+                Save any page from your desktop browser in one click. Works in Chrome, Edge, Brave, and Safari.
             </p>
 
             <SectionHeader>{connectedHere ? 'Status' : 'Get started'}</SectionHeader>

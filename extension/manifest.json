@@ -6,7 +6,6 @@
   "version": "1.2.0",
   "homepage_url": "https://mymachina.app",
   "minimum_chrome_version": "116",
-  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1aextbs5HybvmVX9O/noOF04ETkApzaBaVZ34RNLs4zif2Qa6EIiPz+vNIO0xVWHBNU0oBYKAYIHQ2timvzd/VOtqkmgxE3S3XF6Q3Hzsqtcnass19zy92gVOwEiT2sooh4CdwG/KA5oN2ipSLypUIBATtnZI9QIx6nOXmKtUXNwv8Mc6ugWyRVoVFUNA2WtFtitQ3P6ALPWMPRc51XpJtawCzgkIBeTtB8HIwAgwURBKkpzhJBPph8heB6L7uItERbCKLrMmrsROFVIjWZR7kh3TTLw28iqPKR4cTlZ/KV/tvxGbC6VPMlrKrkjTBMc+9BroKdEvPTkagiirwwwbwIDAQAB",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
@@ -29,11 +28,15 @@
   "background": {
     "service_worker": "background.js"
   },
-  "permissions": ["activeTab", "contextMenus", "storage", "notifications"],
-  "host_permissions": ["https://secondbrain-app-94da2.web.app/*"],
-  "externally_connectable": {
-    "matches": ["https://mymachina.app/*", "http://localhost/*", "http://127.0.0.1/*"]
-  },
+  "permissions": ["activeTab", "contextMenus", "storage", "notifications", "scripting"],
+  "content_scripts": [
+    {
+      "matches": ["https://mymachina.app/*", "http://localhost/*", "http://127.0.0.1/*"],
+      "js": ["connect.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ],
   "commands": {
     "_execute_action": {
       "suggested_key": {
