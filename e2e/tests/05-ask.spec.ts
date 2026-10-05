@@ -58,9 +58,12 @@ test('ask: the conversation is kept in the chat history', async ({ page }) => {
     });
     await ask(page, 'What did I save about Kubernetes?');
     await expect(page.getByText('Kubernetes uses a flat pod network.')).toBeVisible();
-    await expect.poll(async () => (await adminList(`users/${user.uid}/chats`)).length, { timeout: 20_000 }).toBeGreaterThan(0);
-    const [chatDoc] = await adminList(`users/${user.uid}/chats`);
-    expect(JSON.stringify(chatDoc.data)).toContain('flat pod network');
+    // The chat doc is created on the QUESTION and updated with the answer a
+    // debounce later, so wait for the answer itself, not just for a doc.
+    await expect.poll(
+        async () => JSON.stringify((await adminList(`users/${user.uid}/chats`)).map((c) => c.data)),
+        { timeout: 20_000 },
+    ).toContain('flat pod network');
 });
 
 test('ask: backend down shows a recoverable error, not a blank screen', async ({ page }) => {
