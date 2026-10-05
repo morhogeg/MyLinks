@@ -190,10 +190,11 @@ test('keyboard: Connect is reachable and works from the keyboard', async ({ ext 
     await expect(popup.getByRole('button', { name: 'Settings' })).toBeFocused();
     await popup.keyboard.press('Tab');
     await expect(popup.getByRole('button', { name: 'Connect to Machina' })).toBeFocused();
-    const opened = ext.context.waitForEvent('page', (p) => p.url().startsWith('https://mymachina.app/?connect=extension'));
     // Opening the tab closes the popup, so the key press can outlive its page.
     await popup.keyboard.press('Enter').catch(() => {});
-    await opened;
+    // Poll the open tabs (as the first-install test does): a tab the extension
+    // creates can report about:blank at its 'page' event, before it navigates.
+    await expect.poll(() => ext.context.pages().map((p) => p.url())).toContain('https://mymachina.app/?connect=extension');
 });
 
 declare const chrome: {
