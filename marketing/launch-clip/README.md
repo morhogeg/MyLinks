@@ -1008,6 +1008,9 @@ Then the YouTube line broke mid-sentence ("Share a YouTube video. Get its /
 key moments…"), so "Get its" arrived with the first sentence (a row arrives
 whole on its first spoken word); it now breaks at the sentence, and verify
 fails any caption row that starts a new sentence mid-row.
+Owner (2026-10-04): captions move in the new kit motion (`KineticLine` from
+`claude/ad-todo`): each line rises out of its own mask just before its first
+word and rolls up out of it before it leaves; no blur cascade.
 Owner (2026-10-01): the Articles card is now Mark
 Manson's "The Most Important Question of Your Life" (key points and "Do this"
 true to it; take `sources` re-captured, his name gone from every frame), the

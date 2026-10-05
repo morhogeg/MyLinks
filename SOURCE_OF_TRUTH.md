@@ -3968,6 +3968,16 @@ exact-match, capped.
   as is: the reel's recap read has five 2.3px hitches (its take's 5pt steps
   among 6pt ones; `scenes/Recall.tsx` assumes 6pt). `takes.json` is
   generated: merge sibling clips' takes by re-running the capture.
+- **2026-10-04 — SAVE clip: captions in the new motion (owner, all videos).**
+  Branch `claude/clip-save`, not merged. Owner, relayed from the ad session
+  and confirmed here: the full narration stays as captions, in the new motion.
+  `src/reels/kit/Type.tsx` taken from `claude/ad-todo` (75d129f): each line of
+  `KineticLine` rises out of its own mask 3 frames before its first word (9
+  frames, ease-out quint, no blur) and rolls up out of it in the 5 frames
+  before `to`; the word-by-word blur cascade is gone. Same props, so every
+  caption and the end-card tagline switch with no other change. Checked on
+  stills around the caption changes: no line held clipped at its mask, never
+  two captions at once. Not listened to on speakers.
 - **2026-10-01 — SAVE clip: Mark Manson's essay.** Branch `claude/clip-save`,
   not merged. Owner: replace the previous essay's author with Mark Manson. The Articles card is now
   Mark Manson's "The Most Important Question of Your Life" (key points and "Do
