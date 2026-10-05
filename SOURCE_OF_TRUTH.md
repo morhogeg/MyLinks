@@ -2567,7 +2567,11 @@ exact-match, capped.
   **Deploy:** `Deploy-Functions: share_ingest` + Vercel. No TestFlight (the
   app only gets the rewritten Settings → Browser extension screen; it rides
   the next build). The privacy policy now has an extension paragraph, dated
-  2026-10-05.
+  2026-10-05. **SHIPPED as merge `89be304`:** Vercel green, deploy-functions
+  (`share_ingest`) green, python-tests green. e2e-journeys failed once
+  (37282898209): a race in MY chat-history test (the chat doc exists on the
+  question, the answer lands a debounce later; a slow runner read in between),
+  not an app bug. Fixed to poll for the answer (`433cee3`); rerun green.
 
 - **2026-10-05 (later) — SHIPPED: waiting saves round 2, theme follows the
   device, Share Extension waiting state.** Branch `claude/app-launch-qa-a29d1f`.
