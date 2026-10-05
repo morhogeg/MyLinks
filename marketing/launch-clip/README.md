@@ -75,6 +75,11 @@ and the problem it ends ("Machina. Never lose another great find."), and the
 film closes on the payoff, the tagline, "Everything you save, finally useful."
 (owner call 2026-09-28: problem → Machina → payoff; the tagline is said once,
 at the end). It deliberately avoids two framings the
+rest → nothing worth keeping stays buried.** Problem → Machina → payoff: the
+introduction names it with the App Store subtitle ("Machina. Never lose
+another great find."), and the film closes on the promise, the tagline
+"Everything you save, finally useful." (owner, 2026-09-28: every launch film
+ends on the tagline, said once). It deliberately avoids two framings the
 owner ruled out: it is **not** a learning app, and it does **not** sell
 "search by meaning" as the headline. The word *library* appears nowhere.
 
@@ -351,6 +356,20 @@ the introduction's line instead; the tagline appears ONCE, at the end
 (`npm run verify` fails a film, reel or clip that repeats it earlier or ends
 on anything else). The space under the line is the slot for a real App Store
 badge or URL once the listing is live. Nothing else
+The endcard carries one line, the tagline `Everything you save, finally
+useful.` (exact wording, comma included), and the voice-over speaks exactly
+that line with nothing under it (owner 2026-09-17: screen and voice agree;
+owner 2026-09-28: every launch film ENDS on the tagline). The tagline is the
+fixed brand line; the App Store subtitle `Never lose another great find` can
+change with search tests, which would date every posted film, so it lives in
+the introduction cue (`timeline.mjs`, the "Introducing" beat) instead and
+appears only once. The tagline is set in sentence case, not the tracked
+capitals the short subtitle wore. `npm run verify` gates all of it (the
+endcard line is the tagline, the closing voice line matches it word for word,
+no caption carries it, the introduction carries the subtitle). If the
+subtitle changes in the listing, update the introduction cue and its voice
+line in `audio/synth-vo.py`, re-run the voice and the mix, and re-render;
+the endcard never changes. The space under the tagline is the slot for a real App Store badge or URL once the listing is live. Nothing else
 in the film claims availability.
 The endcard carries one line, the tagline, **"Everything you save, finally
 useful."**, exactly as written (comma and full stop, sentence case, Geist 600),
@@ -1325,6 +1344,10 @@ downward to become the + button and must not cross type. **Type never sits
 on UI:** `BandScrim` fades any app screen that rises into the band (opaque
 to 510px, clear by 720px), and shots aim their subjects below 720px.
 Anything that holds is rounded to whole pixels (the film's shimmer lesson).
+**Text never drifts slower than a pixel a frame** (Ask clip): Chromium lays
+glyphs on whole pixels, so a line under a slow push steps a pixel at a time
+(the lockup's 2.5% push measured ~5,000 pixels of the line jumping at once
+every ~28 frames). Push the paths (the mark, the wordmark) and hold the text.
 
 ### Curves (`curves.ts`): each one has a job
 
@@ -1443,6 +1466,25 @@ that breaks it.
   settled box, not each frame's measured one, which moves by half points and
   makes the copy hop a pixel a frame. Never show a lifted copy and its screen's
   own copy at once: the lift leaves while the screen is still soft.
+- **A pinned scroll rises; it doesn't jump** (Ask clip). A capture that keeps
+  a chat pinned to its bottom (the app's own auto-scroll, done per frame)
+  lifts everything a line at a time: the camera takes each jump up and gives
+  it back over a few frames (`pinned`/`eased` in the Ask clip's scene).
+- **A tap that opens a screen plays in a still frame** (Ask clip): frame the
+  tapped element and the space the new screen opens into, in one move that
+  comes to rest as the finger lands, and let the app's own transition play
+  with the camera still. A camera move over the app's crossfade smears both.
+- **A tilt never settles inside a shot** (Ask clip). On the frame `rx`/`ry`
+  reach 0 the slab switches from a 3D to a 2D transform and re-rasters: every
+  line of text on it pops at once (measured: four times the change of the
+  frames around it). Settle a tilt under a cut, or don't tilt a shot whose
+  text is read. (The reel's Revisit and Connect openings settle a tilt this
+  way; not measured in the reel.)
+- **Lift a whole-point box** (Ask clip). Capture boxes are measured to half a
+  point; Chromium snaps the lifted box and the image inside it to whole pixels
+  separately, so a half-point box draws the lifted copy up to a point off its
+  own pixels: a hop as the lift appears and again as it leaves (measured
+  2.5px). Round the box outward to whole points before passing it to `Lift`.
 
 ### Sound to picture (`HITS`, `audio/reel-score.mjs`)
 
@@ -1490,3 +1532,290 @@ Enforced by `npm run verify` where a machine can check:
 - the real wordmark and glyph only (`Brand.tsx` wraps `ui/Brand.tsx`'s shipped
   path data);
 - nothing claims App Store availability.
+
+## Feature clip: Ask (`MachinaAsk`)
+
+`MachinaAsk` is a 33.1s vertical explainer of Ask for someone seeing it for the
+first time (owner brief, 2026-09-28: the feature as the sole subject, a hook
+that frames what Ask unlocks, Machina named, three to five elements each shown in
+action with why it matters, a concrete takeaway, a light nod to Machina). It
+is the highlight reel's design language, built from `src/reels/kit/`
+unchanged: the paper set, Geist kinetic type, the kit's camera, `AppShot`,
+`Lift` and `Tap`, the reel's curves and cuts, the same narrator, a score from
+the same instruments on the same 112.5 BPM grid, and the reel's lockup.
+
+| Frames | Beat | What it shows, and the line |
+|---|---|---|
+| 0–144 | hook | The Home feed, scrolling ever faster (everything you have saved), cut at speed; the line speaks from 0.5s (the voice runs it straight through: Kokoro paused 0.22s after "knowledge", so the caption is marked `tight` and `synth-vo.py` closes pauses inside it) and leaves at 120, so the last rush into Ask plays clean: "Your saves hold more knowledge than you remember." (owner, round 2: the hook frames the knowledge Ask reaches, not search) |
+| 144–192 | the name | Ask opens, its mark plays the app's own launch (the point strikes on a beat), under the app's promise "Answers come only from your 24 saves, with sources you can open": "With Machina, you just ask." |
+| 192–272 | 1. your own words | The question types: "Ask in your own words. No keywords, no folders." |
+| 272–384 | 2. from your saves | Send; the answer streams in: "The answer is written from your own saves." |
+| 384–528 | 3. sources | The three sources lift on beats; the first is tapped and The Tail End's own card opens on the passage the answer drew on, which lifts: "Every answer shows its sources. Tap one to check it." |
+| 528–688 | 4. follow-ups | The card closes (the finger leaves with it), then the line starts and the camera moves in close on the continuations the app suggests under the answer ("Compare the Time saves", "More on 'The Tail End'", "What else did I save on time?"); the chosen one lifts and is tapped on "asks the next question"; a second answer and its sources: "Keep going. One tap asks the next question." (owner, round 3: the old cut left the close tap's ripple on the chat's "+ New", which read as the tap the line meant) |
+| 688–800 | 5. connections | Its Graph chip: the two cited saves lit and linked among the rest: "Then see how those saves connect." Then the takeaway: "Ask once. Get the answer, and the proof." |
+| 800–992 | close | Thrown out into the lockup: "Machina." then the tagline on one line at 50px, "Everything you save, finally useful." (as the Revisit clip sets it) (owner 2026-09-28: every launch film ends on the tagline; the clip never says the App Store subtitle), the end card held 1.96s after the last word |
+
+**Finishing pass (2026-09-28, fresh eyes, measured).** The script, order
+and lines are unchanged. Three fixes: the hook was wordless for its first
+1.6s, so it now speaks from 0.5s (a feed decides in the first second) and
+leaves a beat before the cut; the end card held 1.3s after its last word, so
+it now holds 1.8s (one beat longer; the owner's ~2s rule for the reel), with a
+verify gate (≥1.6s); and the take's streamed frames carried a caret blinking
+on the real clock (measured: on and off by turns), off-frame in this cut but
+now hidden at capture. Measured clean and left alone: every cut changes on
+one frame, every tap lands on the frame the app answers, no dead frames
+before the lockup, every line ≥3.4dB over the music in the speech band.
+Found and NOT fixed here: faint banding rings in the paper's cool pools
+(lossless stills show 11–12 levels when contrast-stretched; the reel's end
+frame shows the same). It is the kit's `Paper`, shared with the approved
+reel, and the fix (dither before quantization) changes the reel's pixels, so
+it is left for its own round.
+
+**One take, one clock.** Every app frame is one continuous use of the real
+app, `askfull` in `capture/shoot.mjs` (the same demo account; the capture
+server answers the follow-up with `ASK_MORE` from `capture/library.mjs`, and
+any other question exactly as before, so the reel's takes are unchanged). The
+app's thinking line ("Searching your …", banned wording) is not in the take:
+the first words of each answer are released before its first frame. The
+clip is written in output frames on the reel's grid (`clips/ask-timeline.mjs`,
+`reel-timeline.mjs` its template): every cut and tap on a beat, each tap on
+the frame the app answers it (measured per tap). K = 2 still means the reel's
+steady pace: a frame captured at 30fps lasts two output frames, one captured
+at 60fps lasts one.
+
+**Found by measuring the render** (frame differences, phase correlation,
+full-resolution crops), fixed in the clip, the general ones written into the
+Motion language above:
+- a camera glide over the app's crossfade smeared both: the card opens in a
+  still frame, on the touch;
+- a half-point `Lift` box hopped 2.5px as the passage lifted and settled;
+- the lockup's line stepped a pixel every ~28 frames under the slow push:
+  the mark and wordmark keep the push, the line holds (the reel's `End.tsx`
+  uses the same push; not measured there);
+- a settling tilt popped every line of text on the frame it reached 0;
+- the second answer streams with the conversation pinned to its bottom (the
+  app's auto-scroll, which the stepped clock would freeze), so each new line
+  lifted everything 24pt at once: the camera takes each jump up and gives it
+  back over 8 frames;
+- the graph view draws its nodes over its first frames: the cut joins it 8
+  frames in, while the layout is still blooming.
+
+```bash
+npm run reel:app && CAPTURE_ONLY=askfull npm run reel:capture   # the take (or all takes)
+python3 audio/synth-vo.py ask                                   # → out/vo/ask/, src/reels/clips/ask/vo.json
+node audio/clips/ask-score.mjs && node audio/mix-vo.mjs ask     # → public/ask-score-vo.wav (−14 LUFS)
+npm run verify                                                  # the reel's gates + "clip: ask"
+npx remotion render src/index.ts MachinaAsk out/machina-ask.mp4 # also MachinaAskSilent, MachinaAskClean
+```
+
+Its parts: `clips/ask-timeline.mjs` (the clock, lines, hits), `src/reels/clips/ask/`
+(`MachinaAsk.tsx`, `AskScene.tsx`, `End.tsx`, `vo.json`), `audio/clips/ask-score.mjs`,
+the `askfull` take, `ASK_MORE` in the demo account, and one entry each in
+`synth-vo.py`, `mix-vo.mjs`, `verify.mjs` and `Root.tsx`. The "clip: ask"
+gates add: it opens on its hook, names Machina before the close, puts every
+cut and tap on a beat, and has no banned word or thinking line on any frame
+of its take. The narrator's word timings and the mixed audio are committed;
+the take's PNGs regenerate from the app like the reel's. Nobody has listened
+to the mix on speakers; its balance, clarity and loudness are measured.
+
+## Meta ad: The trip (`MachinaAdTrip`)
+
+Meta ad 2 of 3 (Instagram and Facebook: Reels, Stories, Feed; doubles as an
+organic Reel): **the Ask ad**, the chat shown off. Each of the three Meta ads
+sells one feature (ad 1, what one save becomes; ad 3, a screenshot that
+becomes a to-do). The branch keeps its first concept's name. 25.1s, 9:16 and
+4:5.
+
+**How it got here.** Round 1 opened on a Sardinia trip saved across five apps
+(owner: it reads as a travel app). Round 2 opened on what Machina is. Round 3
+used the Ask clip's lines (owner: neither one feature nor the whole app).
+Round 4 is the script the owner wrote line by line with Claude: a hook that
+asks a question, then the range of the chat, from a simple answer to the
+themes and connections across your saves, and a call to action. Round 5
+(owner: "It's perfect", two notes): the real graph opens on "you never
+noticed" with the three connected saves lit, and "Download Machina." is said
+but no longer shown. Round 6 (owner, from the phone): the empty chat's "More
+ideas" is out of shot; the cut into the graph was jittery, so the graph joins
+once its layout has calmed, plays slower than captured with each output frame
+blended from the two captured frames around it (the nodes glide), holds a beat
+longer and settles under a gentle camera move; and each pile's list moves (a
+newer save slides in at the top, staggered pile to pile).
+
+| Frames | Beat | What it shows, and the line |
+|---|---|---|
+| 0–88 | hook | Frame 0 is the poster: five piles, each an app's own save list with its mark (Instagram · Saved, YouTube · Watch later, Safari · Reading List, Facebook · Saved, Photos · Screenshots), two real demo saves in each; in four of them a newer save slides in at the top during the hook, staggered (round 6). The line is up, whole, from frame 0 and spoken from 0.27s: "What if your saves could talk back?" |
+| 48–144 | the name | The piles drift apart and gather into the point, the brackets snap (2.9s) and the wordmark wipes in as the name is said: "With Machina, they can." The mark and wordmark leave, pushing in as they soften |
+| 144–272 | a simple question | CUT to a fresh chat, close on the composer: "What did that TED talk say about procrastination?" types itself. Send is tapped and the cut to its answer lands on the touch: a short answer from one save, its source under it. "Ask it about anything you've saved." |
+| 272–360 | a big question | CUT to the Home feed rushing past, accelerating; CUT to a new chat, "What do my saves say about time?" typed; Send; one answer streams in, woven from three saves. "Even across hundreds of saves, / you get one clear answer." (one sentence, two captions) |
+| 360–544 | themes and connections | The answer's first line, the theme it found ("Your saves keep circling one idea…"), lifts; the three saves it connected (Wait But Why, TED on YouTube, @naval on X: three marks) lift one by one on "you never noticed"; the camera eases down onto the questions the app suggests next and comes to rest as the finger lands on the answer's **Graph** chip; CUT on the touch into the real graph, those three saves lit and linked among the rest (framed below its category legend), held while the line finishes. "And it finds the themes and connections / you never noticed." |
+| 544–736 | close | Thrown out into the lockup; the mark strikes and the wordmark wipes in as "Download Machina." is said (voice only, no caption: owner, round 5). Then the tagline on one line, exactly `Everything you save, finally useful.`, held 1.6s after the last word. Nothing under it: that space is kept clear for the App Store badge once the listing is live |
+
+**The answers.** The simple one (`ADASK_TED` in `capture/library.mjs`) is
+written from the TED talk's own card and names it by its title. The big one
+is the Ask clip's owner-approved `ASK` exchange (The Tail End, Tim Urban's
+talk, Naval's thread). The suggested next questions are the real app's.
+
+**What is real and what is scripted.** Every app frame is the real, shipped
+web app, one continuous take, `adask` (`capture/shoot.mjs`): the feed
+scrolled, a fresh chat, the first question typed and answered, "+ New", the
+second question typed and answered, its Graph chip tapped and the graph
+recorded at 60fps. Scripted, as for the Ask clip: the two
+answers and which cards they cite (answered by the capture server). The
+account's "29 saves" promise line never enters the frame (the composer is
+framed below it, and the big question cuts from the typed composer straight to
+its answer), so "hundreds of saves" is said about what Machina handles, not
+claimed of the demo account. The feed rush stops short of the feed's first
+recipe card (`FEED_STEPS`). The account also carries the trip's saves from
+rounds 1–3 (`TRIP_CARDS`, written by the take); the hook's Photos pile shows
+one of them. No images of any kind.
+
+The piles are the ad's own graphic (the SAVE clip's hook-pile pattern), not
+rebuilt app UI: a mark as the Machina app draws it, the list's name, and
+titles of real demo saves (verify checks). No other app's UI is drawn. The
+app's thinking line is not in the take. No plan is named (Ask is free up to
+20 questions a month), no price, no "free", and no availability claim beyond
+the owner's call to action, "Download Machina." (round 3).
+
+**Two shapes, one scene** (`src/reels/ads/trip/format.ts`, the film's
+`useFraming()` idea in the ad's own folder): 9:16 keeps every line, logo and
+key app moment inside Meta's safe zone (nothing in the top 270px, the bottom
+670px or 65px from a side; the line at 346px, the app's hero moments between
+about 720 and 1240px, checked on stills with the zone drawn over them); 4:5
+moves the line to 120px and every camera aim up by 170px, piles and lockup
+re-laid for the shape. The share sheet does not appear in this ad, so there is
+no share-beat slot to replace.
+
+Compositions: **`MachinaAdTrip`** (9:16, score + narrator + captions, the
+main cut), **`MachinaAdTripMusic`** (9:16, score + captions, no narrator; its
+own −14 LUFS master of the bed), **`MachinaAdTripFeed`** (4:5, score +
+narrator + captions). The poster is frame 0 of the 9:16 cut, cropped square
+from the line through the piles.
+
+```bash
+npm run reel:app && CAPTURE_ONLY=adask node capture/shoot.mjs    # the take
+python3 audio/synth-vo.py trip                 # narrator → out/vo/trip/, src/reels/ads/trip/vo.json
+node audio/ads/trip-score.mjs                  # bed + music-only master → public/ads/trip/
+node audio/mix-vo.mjs trip                     # narrator mix → public/ads/trip/score-vo.wav (committed)
+npm run verify                                 # "── ad: trip"
+node scripts/ad-trip-stills.mjs && python3 scripts/ad-trip-sheet.py [--safe]   # stills, contact sheets, poster
+npx remotion render src/index.ts MachinaAdTrip out/ads/trip/machina-ad-trip.mp4
+npx remotion render src/index.ts MachinaAdTripMusic out/ads/trip/machina-ad-trip-music.mp4
+npx remotion render src/index.ts MachinaAdTripFeed out/ads/trip/machina-ad-trip-feed.mp4
+```
+
+Note: `shoot.mjs` rewrites `src/reels/data/takes.json` from the takes on
+disk only; with just `adtrip` captured it drops the others' data. This
+branch's `takes.json` is the committed file with the `adtrip` entry added by
+script; on merge, regenerate it by capturing every take.
+
+Its parts: `ads/trip-timeline.mjs`, `src/reels/ads/trip/` (`MachinaAdTrip`,
+`Piles`, `AskChat`, `End`, `AdCaptions`, `format`, `vo.json`),
+`audio/ads/trip-score.mjs`, `audio/ads/trip-verify.mjs`,
+`capture/ad-trip.mjs`, `scripts/ad-trip-stills.mjs`, `scripts/ad-trip-sheet.py`,
+`ADASK_TED` and `TRIP_CARDS` in the demo account, the `adask` take, and one entry each in
+`shoot.mjs`, `server.mjs`, `synth-vo.py`, `mix-vo.mjs`, `verify.mjs` and
+`Root.tsx`. The "ad: trip" gates: no caption overlap, at most 8 words up at
+once, the hook up from frame 0 and spoken by 0.5s, the mark formed by 4.5s,
+Machina named, the close "Download Machina." then exactly the tagline, held ≥ 1.6s, at most 30s;
+the narrator mirrors, fits and leaves on time; no em dash, "AI", "second
+brain", "library", "share sheet", "bookmarks", price, "free", plan or
+availability claim (the one "Download Machina." aside); the piles are real demo saves; the simple answer names
+its save by its title and the big one cites three platforms; no banned word, thinking line
+or recipe on any frame of the take; both mixes at −14 LUFS ±0.5 and ≤ −1
+dBTP; every line ≥ 3dB over the music in the speech band.
+
+**Open, for the owner:** it runs 25.1s, over the 15–20s aim (the graph
+added 2.1s); the call to action is said but not burned in, so sound-off
+viewers see only the wordmark there;
+"Download Machina." is only true once the listing is live (the paid ads run
+after launch; don't post the organic Reel before then); nobody has listened to
+the mix on speakers (measured only). The `adtrip` take (rounds 1–3) is still
+in `takes.json` and `shoot.mjs`, unused by this cut.
+
+## Meta ad 2, "talking to a friend" edition (`MachinaAdAskTalk`)
+
+The same Ask ad in a new voice (owner-approved script, 2026-10-03), built
+beside round 6 (`MachinaAdTrip*`, kept as it is) so the two can be compared or
+A/B tested. One real person talking to a friend: a question the viewer answers
+in their head, two specific saves, "That's exactly why we made Machina", the
+feature said once, each feature line ending on "so you…", the brand and the
+tagline. No call to action on screen or in the voice (Meta's Install button is
+the call to action). 29.9s, 9:16 and 4:5.
+
+| Frames | What you see | What's said |
+|---|---|---|
+| 0–160 | Frame 0, the poster: the five piles (round 6's, newer saves sliding in), the first caption up whole | "You save the good stuff for a reason. / So why does most of it / slip your mind?" |
+| 160–280 | The YouTube pile lifts forward on "talk", the TED talk lit; then the Safari pile on "article", The Tail End lit; the piles go soft | "The talk that made it all click. / The article you meant to come back to." |
+| 272–376 | They gather into the point, the brackets snap, the wordmark wipes in on the spoken name; mark and wordmark leave | "That's exactly why we made Machina." |
+| 376–448 | CUT to the chat, close on the composer: "What did that TED talk say about procrastination?" types itself; Send | "Now you can ask your saves anything." |
+| 448–584 | Its answer streams in; on "one clear answer" the answer itself lifts | "It reads across all your saves… / so you get one clear answer." |
+| 568–720 | CUT to a new chat, "What do my saves say about time?"; Send; the theme (the answer's first line) lifts and holds; the three sources lift on "so you see"; its Graph chip is tapped and the real graph opens, those saves lit and linked | "It even finds what connects them… / so you see / the theme running through your saves." |
+| 720–896 | Thrown out into the lockup: the mark strikes, the wordmark wipes in on "Machina", the tagline on one line, held 1.67s | "Machina. / Everything you save, finally useful." |
+
+**Real and scripted:** the same as round 6 (the `adask` take, the two scripted
+answers, no feed rush in this edition). The two saves the pain line names are
+the two the chat answers from. **Built from:** `ads/asktalk-timeline.mjs`,
+`src/reels/ads/asktalk/` (`MachinaAdAskTalk`, `Piles` with the named piles,
+`AskChat` without the feed, `End`, `vo.json`; captions and framing shared from
+`../trip/`), `audio/ads/asktalk-score.mjs`, `audio/ads/asktalk-verify.mjs`
+("── ad: asktalk"), `scripts/ad-asktalk-stills.mjs`, and one entry each in
+`synth-vo.py`, `mix-vo.mjs`, `verify.mjs` and `Root.tsx`. Its gates are round
+6's with the close "Machina." then the tagline, no call to action anywhere, and
+chunks of at most 8 words (`splits`). Captions longer than ~28 characters now
+break into two balanced rows inside the 65px margins (`AdCaptions`, shared, so
+round 6 picks this up on its next render).
+
+```bash
+python3 audio/synth-vo.py asktalk && node audio/ads/asktalk-score.mjs && node audio/mix-vo.mjs asktalk
+npm run verify                                         # "── ad: asktalk"
+node scripts/ad-asktalk-stills.mjs && python3 scripts/ad-trip-sheet.py asktalk [--safe]
+npx remotion render src/index.ts MachinaAdAskTalk out/ads/asktalk/machina-ad-asktalk.mp4   # also …Music, …Feed
+```
+
+### Both editions' narrator: Gemini TTS, Sulafat (2026-10-04)
+
+Both Meta ad 2 editions are voiced by Gemini TTS (`gemini-3.8-flash-tts`,
+voice Sulafat), no longer Kokoro. Each caption carries its acting note
+(`style`) and the video's `pace`; the takes are voiced on GitHub
+(`.github/workflows/narration-tts.yml`, triggered by a push of
+`audio/narration-request.json`) and committed to `audio/vo-takes/`, keyed by
+words + direction, so `synth-vo.py trip|asktalk` rebuilds them offline. Word
+timings for Gemini lines come from forced alignment (`pip install pocketsphinx
+scipy`; its bundled English model, offline; the old voiced-run estimate is the
+fallback, and it misplaced words around Gemini's pauses, e.g. "one clear
+answer" by a second). The quota: 100 requests a day AND 10 a minute per model
+on the shared key; a request voices only the lines with no take yet.
+
+Re-timed to the reads: round 6 is now **27.7s** (was 25.1s: a longer hook, a
+beat after "With Machina, they can.", a beat on "…one clear answer.", and a
+longer end card for the slower tagline; the mark forms at 3.7s). The talking
+edition stays **29.9s** ("It reads across…" got 1.5 beats, taken from the
+theme line's hold and the gap before the lockup; the graph shows ~1.6s, was
+~2.1s).
+
+### More detail, and no cut into the graph (2026-10-04, owner)
+
+Both editions gain one line on a real feature the take already showed: every
+answer shows the save it came from. Round 6, after "Ask it about anything
+you've saved.": "And it shows you exactly which save it came from."; the
+talking edition, after "…one clear answer.": "And it shows you exactly which
+saves it used." The camera eases down onto the first answer's source chip
+(clear of the bottom band) and the chip lifts on "which". The cut into the
+graph is gone: the chat pushes in on the Graph chip and fades as the graph
+grows out of that point (`INTO`, 18 frames), and the graph holds 2–3 beats
+longer. Round 6 is **30.7s**, the talking edition **33.9s**; the owner
+approved going past the brief's 30s (the gate is now 35s).
+
+### Captions: the mask-rise motion (2026-10-04, owner)
+
+Owner, after comparing versions of Meta ad 3: full captions, in the new
+motion, across every video. `src/reels/kit/Type.tsx` comes from
+`claude/ad-todo` (75d129f): each line rises out of its own mask 3 frames
+before its first word (9 frames, ease-out quint, no blur) and rolls up out of
+it in the 5 frames before it leaves. `AdCaptions` (shared by both editions)
+now ends each caption by the frame the next one starts to rise, so two are
+never up at once (checked on stills at every hand-off).
+
+**Open:** the name arrives at ~10s (the script spends its first 10s on the
+viewer's problem), not by ~3s as the original Meta brief asked; 29.9s, at
+Meta's 30s limit; nobody has listened to the mix on speakers.

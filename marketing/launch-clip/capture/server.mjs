@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ASK, CAPTURE_USER, CARDS, SEARCH } from './library.mjs';
+import { ADASK_TED, ASK, ASK_MORE, CAPTURE_USER, CARDS, SEARCH, TRIP_ASK, TRIP_CARDS } from './library.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(here, '..', 'out', 'capture', 'app', 'out');
@@ -53,7 +53,8 @@ const json = (res, code, body) => {
 };
 
 const cardSource = (id) => {
-  const c = CARDS.find((x) => x.id === id);
+  // (the trip ad's cards are written by its own take, not seeded)
+  const c = CARDS.find((x) => x.id === id) ?? TRIP_CARDS.find((x) => x.id === id);
   return { id, title: c.title, category: c.category, sourceName: c.sourceName ?? null, url: c.url || null };
 };
 
@@ -100,7 +101,11 @@ export function startServer(port = 4600) {
           Connection: 'keep-alive',
         });
         res.flushHeaders?.();
-        chat = { res, sent: 0, text: ASK.answer, sourcesSent: false };
+        // (the ASK clip's follow-up: any other question gets ASK_MORE)
+        // (the Ask ad's questions get their own answers)
+        const own = [TRIP_ASK, ADASK_TED].find((r) => r.question === body.question);
+        const reply = own ?? (body.question === undefined || body.question === ASK.question ? ASK : ASK_MORE);
+        chat = { res, sent: 0, text: reply.answer, sources: reply.sources, sourcesSent: false };
         return;
       }
       case '/api/client-error':
@@ -150,7 +155,7 @@ export function startServer(port = 4600) {
         finishChat: () => {
           if (!chat) return;
           if (chat.sent < chat.text.length) sse(chat.res, { type: 'token', text: chat.text.slice(chat.sent) });
-          sse(chat.res, { type: 'sources', sources: ASK.sources.map(cardSource) });
+          sse(chat.res, { type: 'sources', sources: (chat.sources ?? ASK.sources).map(cardSource) });
           sse(chat.res, { type: 'done' });
           chat.res.end();
           chat = null;

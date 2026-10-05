@@ -544,6 +544,18 @@ export const ASK = {
   sources: ['tailend', 'procrastinator', 'naval'],
 };
 
+/**
+ * The ASK clip's follow-up: the answer's own suggested next question ("What
+ * else did I save on time?", a chip the app builds from the cited cards),
+ * tapped. Any question other than ASK.question gets this answer, so the
+ * reel's takes are unchanged. Written from the demo account's real saves.
+ */
+export const ASK_MORE = {
+  answer:
+    'Two more saves on time. Four Thousand Weeks argues for doing fewer things, on purpose. Perfect Days shows what that looks like on an ordinary Tuesday.',
+  sources: ['fourthousand', 'perfectdays'],
+};
+
 /** The Find beat. The query shares no word with the one card it lands on. */
 export const SEARCH = {
   query: 'easy dinner, empty fridge',
@@ -584,6 +596,136 @@ export const SYNTHESIS = {
 export const SAVE = {
   id: 'tailend',
   url: 'waitbutwhy.com/2015/12/the-tail-end.html',
+};
+
+/**
+ * THE TRIP AD (ads/trip-timeline.mjs, "The trip you already planned"): a
+ * Sardinia trip researched in five apps. These cards are NOT in `CARDS`, so
+ * the other videos' takes (and the Ask clip's "your 24 saves") are untouched:
+ * the ad's own take (`adtrip` in capture/shoot.mjs) writes them onto the store
+ * the way the backend writes a finished card (capture/ad-trip.mjs). Together
+ * with `goloritze` above they are the trip.
+ *
+ * Every fact is true and was checked (2026-10-02): Bosa's pastel houses climb
+ * the hill below the 12th-century Malaspina castle, on the Temo, Sardinia's
+ * only navigable river; boats from Cala Gonone run the Gulf of Orosei to Cala
+ * Luna and the Bue Marino cave (a guided walk of about 800m, once home to
+ * monk seals); Su Nuraxi at Barumini is a Bronze Age nuraghe, a central tower
+ * later ringed by four more and a village, a UNESCO World Heritage Site since
+ * 1997; Alghero was settled by Catalans in 1372, still speaks Algherese
+ * Catalan and signs its streets in both languages; culurgiones come from
+ * Ogliastra (PGI "Culurgionis d'Ogliastra" since 2015), filled with potato,
+ * pecorino and mint. The Instagram handle, the YouTube channel, the Facebook
+ * page and Dana's message are invented (no real account says these things);
+ * Dana is the friend of the demo account's "Birthday idea for Dana". No
+ * images, no thumbnails. No recipe: culurgiones appear only as a place to eat.
+ */
+export const TRIP_CARDS = [
+  {
+    id: 'bosa',
+    url: 'https://www.instagram.com/pastelrivertowns/',
+    title: 'Bosa, on the Temo',
+    summary:
+      "Pastel houses climb the hill below Bosa's Malaspina castle, above the Temo, the only navigable river in Sardinia. Walk up to the castle for the view over the rooftops and the river.",
+    category: 'Travel',
+    tags: ['sardinia', 'towns'],
+    concepts: ['travel'],
+    sourceType: 'web',
+    sourceName: '@pastelrivertowns',
+    readTime: 1,
+    age: 12,
+    status: 'unread',
+  },
+  {
+    id: 'orosei',
+    url: 'https://www.youtube.com/@footpathandferry',
+    title: 'A boat day on the Gulf of Orosei',
+    summary:
+      'Boats leave Cala Gonone for the cliffs of the Gulf of Orosei: a stop at Cala Luna, then a guided walk into the Bue Marino sea cave, where monk seals once lived.',
+    category: 'Travel',
+    tags: ['sardinia', 'boats', 'beaches'],
+    concepts: ['travel'],
+    sourceType: 'youtube',
+    sourceName: 'YouTube',
+    youtubeChannel: 'Footpath & Ferry',
+    readTime: 11,
+    age: 8,
+    status: 'unread',
+  },
+  {
+    id: 'nuraxi',
+    url: 'https://en.wikipedia.org/wiki/Su_Nuraxi_(Barumini)',
+    title: 'Su Nuraxi di Barumini',
+    summary:
+      "Sardinia's best-known nuraghe: a Bronze Age stone tower, later ringed by four more towers and a village. A UNESCO World Heritage Site since 1997.",
+    category: 'Travel',
+    tags: ['sardinia', 'history'],
+    concepts: ['travel', 'history'],
+    sourceType: 'web',
+    sourceName: 'Wikipedia',
+    readTime: 6,
+    age: 16,
+    status: 'unread',
+  },
+  {
+    id: 'alghero',
+    url: 'https://www.facebook.com/twocoastspostcards/',
+    title: "Alghero, Sardinia's Catalan town",
+    summary:
+      'Catalan settlers arrived in 1372, and Algherese, a Catalan dialect, is still spoken. The old town sits inside its sea walls, and its street signs are in Italian and Catalan.',
+    category: 'Travel',
+    tags: ['sardinia', 'towns'],
+    concepts: ['travel', 'language'],
+    sourceType: 'web',
+    sourceName: 'Two Coasts Postcards',
+    readTime: 2,
+    age: 21,
+    status: 'unread',
+  },
+  {
+    id: 'danatips',
+    url: 'capture://screenshot/dana-sardinia.png',
+    title: "Dana's Sardinia tips",
+    summary:
+      "Dana's message: when you are in Ogliastra, order culurgiones. The pasta parcels of potato, pecorino and mint come from there.",
+    category: 'Travel',
+    tags: ['sardinia', 'from-dana'],
+    concepts: ['travel', 'recommendation'],
+    sourceType: 'image',
+    sourceName: 'Screenshot',
+    readTime: 1,
+    age: 4,
+    status: 'unread',
+  },
+];
+
+/**
+ * The trip ad's question and its answer, from three saves on three platforms
+ * (Instagram, YouTube, a screenshot: three different marks on the source
+ * chips). Each sentence states only what its cited card says, and names the
+ * card by its title.
+ */
+export const TRIP_ASK = {
+  question: 'What should we do in Sardinia?',
+  answer: [
+    'Three of your saves make a plan for the east coast.',
+    '',
+    "Cala Goloritzé, Sardinia: the trail down from the Golgo plateau takes about an hour, so start early. A boat day on the Gulf of Orosei leaves Cala Gonone for Cala Luna and the Bue Marino sea cave. And Dana's Sardinia tips: in Ogliastra, order culurgiones. They come from there.",
+  ].join('\n'),
+  sources: ['goloritze', 'orosei', 'danatips'],
+};
+
+/**
+ * The Ask ad's first question (round 4 of ads/trip-timeline.mjs): a simple
+ * question about one save, answered from that save alone, in the words of
+ * its card (`procrastinator` above). The ad's second question is ASK.question,
+ * answered with ASK (owner-approved in the Ask clip).
+ */
+export const ADASK_TED = {
+  question: 'What did that TED talk say about procrastination?',
+  answer:
+    'Inside the mind of a master procrastinator: an Instant Gratification Monkey keeps grabbing the wheel from your rational decision-maker, and only the Panic Monster of a deadline takes it back. So the goals with no deadline are the ones that quietly never happen.',
+  sources: ['procrastinator'],
 };
 
 export { DAY };
