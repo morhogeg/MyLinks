@@ -13,6 +13,7 @@ on:
       - "web/**"
       - "!web/ios/**"
       - "e2e/**"
+      - "extension/**"
       - "firestore.rules"
       - ".github/workflows/e2e-journeys.yml"
   pull_request:
@@ -20,6 +21,7 @@ on:
       - "web/**"
       - "!web/ios/**"
       - "e2e/**"
+      - "extension/**"
       - "firestore.rules"
       - ".github/workflows/e2e-journeys.yml"
 
@@ -62,6 +64,18 @@ jobs:
         run: |
           npm ci
           npx playwright install --with-deps chromium
+
+      - name: Browser extension (unit tests + package check)
+        run: |
+          node extension/popup.test.mjs
+          node extension/background.test.mjs
+          node extension/scripts/package.mjs --check
+
+      - name: Browser extension in Chromium (stub backend)
+        working-directory: e2e
+        env:
+          CI: "true"
+        run: npm run test:extension
 
       - name: Run journeys
         working-directory: e2e

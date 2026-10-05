@@ -189,6 +189,8 @@ export interface BackendOptions {
     /** What the workspace claim answers. 'create' mirrors claim_workspace for a new account. */
     claim?: 'create' | 'down';
     entitlement?: Record<string, unknown>;
+    /** The ingest token get_share_config hands out (default 'tok'). */
+    shareToken?: string;
     /** Override any /api/<path> handler; return undefined to fall through to the default. */
     handlers?: Record<string, (call: ApiCall, route: Route) => Promise<void> | void>;
 }
@@ -268,7 +270,13 @@ export async function installBackend(page: Page, user: TestUser | null, opts: Ba
         if (call.path.endsWith('/rebuild_connections')) {
             return json(route, 200, { result: { done: true, nextCursor: null, processed: 0, embedded: 0, updated: 0, skipped: 0, failed: 0 } });
         }
-        if (call.path.endsWith('/get_share_config')) return json(route, 200, { result: { endpoint: '', token: 'tok' } });
+        if (call.path.endsWith('/get_share_config')) {
+            // A real-shaped answer when a test asks for a token (fetchShareConfig
+            // refuses an empty endpoint); the old placeholder otherwise.
+            return json(route, 200, { result: opts.shareToken
+                ? { endpoint: 'https://secondbrain-app-94da2.web.app/api/share', token: opts.shareToken }
+                : { endpoint: '', token: 'tok' } });
+        }
         return json(route, 404, { error: { message: 'not stubbed', status: 'NOT_FOUND' } });
     });
 
