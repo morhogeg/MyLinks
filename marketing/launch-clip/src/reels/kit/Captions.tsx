@@ -1,5 +1,7 @@
 import React from 'react';
-import { AbsoluteFill } from 'remotion';
+import { AbsoluteFill, useCurrentFrame } from 'remotion';
+import { NIGHT, stageLight } from '../../look';
+import { Dither, Haze } from './Paper';
 import { KineticLine, Kicker } from './Type';
 
 /**
@@ -24,24 +26,28 @@ export type WordTiming = { frame: number | null; words: number[] }[];
 export const SLOTS = { kicker: 290, top: 346 };
 
 /**
- * The band the type lives in is paper: app screens that rise into it fade
- * out under a gradient of the set tone (opaque to BAND.solid, clear by
- * BAND.clear), so the camera can frame the app big without type ever sitting
- * on UI. Subjects are aimed below BAND.clear.
+ * The band the type lives in is the night set itself: app screens that rise
+ * into it fade out under a replica of the set (the same light, haze and
+ * dither as Paper, so the seam cannot show), opaque to BAND.solid and clear
+ * by BAND.clear, so the camera can frame the app big without type ever
+ * sitting on UI. Subjects are aimed below BAND.clear.
  */
 export const BAND = { solid: 510, clear: 720 };
 
 /** `band`: a video that sets its type higher (a feature clip, `slots` on
  *  Captions) moves its scrim up with it; the default is the reel's */
-export const BandScrim: React.FC<{ opacity?: number; band?: { solid: number; clear: number } }> = ({ opacity = 1, band = BAND }) => (
-  <AbsoluteFill
-    style={{
-      pointerEvents: 'none',
-      opacity,
-      background: `linear-gradient(180deg, #EEF0F4 0px, #EEF0F4 ${band.solid}px, rgba(238,240,244,0) ${band.clear}px)`,
-    }}
-  />
-);
+export const BandScrim: React.FC<{ opacity?: number; band?: { solid: number; clear: number } }> = ({ opacity = 1, band = BAND }) => {
+  const frame = useCurrentFrame();
+  const mask = `linear-gradient(180deg, #000 0px, #000 ${band.solid}px, rgba(0,0,0,0) ${band.clear}px)`;
+  return (
+    <AbsoluteFill style={{ pointerEvents: 'none', opacity, WebkitMaskImage: mask, maskImage: mask }}>
+      <AbsoluteFill style={{ background: NIGHT.set }} />
+      <AbsoluteFill style={{ background: stageLight(Math.sin(frame / 180) * 0.5) }} />
+      <Haze frame={frame} />
+      <Dither />
+    </AbsoluteFill>
+  );
+};
 
 export const Captions: React.FC<{
   frame: number;

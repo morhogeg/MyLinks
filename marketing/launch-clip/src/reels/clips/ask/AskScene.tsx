@@ -208,7 +208,7 @@ export const AskScene: React.FC<{ f: number }> = ({ f }) => {
     <AbsoluteFill>
       <AppShot take={T} i={i} cam={view} motion={motion}>
         {/* Send: a light tap on the dark button; the cut lands on the touch */}
-        <Tap x={send.x} y={send.y} tone="light" t={tapAt(f, S.send)} />
+        <Tap x={send.x} y={send.y} tone="dark" t={tapAt(f, S.send)} />
         {f >= S.sources &&
           f < S.citeTap &&
           CHIPS.map((key, k) => {

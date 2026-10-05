@@ -12,3 +12,5 @@ public/reel-score.wav
 # The ASK feature clip's score, regenerable the same way
 # (`node audio/clips/ask-score.mjs` rewrites it byte-identically).
 public/ask-score.wav
+# dev-only entries (one composition each, for stills while takes are captured)
+src/_dev/

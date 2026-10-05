@@ -208,7 +208,7 @@ export const App: React.FC<{ f: number }> = ({ f }) => {
           {f >= HITS.pick && stripIn > 0.01 && stripOut < 1 && (
             <Lift take={T} i={di} rect={[strip[0] - 4, strip[1] - 4, strip[2] + 8, strip[3] + 8]} radius={14} lift={stripIn * 0.35} rise={2} grow={0.015} ring={0.5 * stripIn} opacity={1 - stripOut} />
           )}
-          <Tap x={save.x} y={save.y} tone="light" t={prog(f, HITS.saveTap - 5, HITS.saveTap + 9, linear)} />
+          <Tap x={save.x} y={save.y} tone="dark" t={prog(f, HITS.saveTap - 5, HITS.saveTap + 9, linear)} />
         </AppShot>
       )}
     </AbsoluteFill>

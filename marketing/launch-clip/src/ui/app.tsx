@@ -252,9 +252,10 @@ export const PLATFORM_INK: Record<string, string> = {
   youtube: 'rgb(255, 0, 0)',
   instagram: 'rgb(225, 48, 108)',
   facebook: 'rgb(24, 119, 242)',
-  // The app's PLATFORM_RGB silver (191,201,214) is tuned for the dark theme
-  // and disappears on white; on the light grade X wears its light-mode black.
-  x: 'rgb(15, 20, 25)',
+  // The app's PLATFORM_RGB silver (191,201,214), the dark theme's own: the
+  // films are on the night set since 2026-10-05 (the light grade wore X's
+  // light-mode black, which vanishes on dark)
+  x: 'rgb(191, 201, 214)',
 };
 
 /** The app's platform marks — the same lucide icons `platformIcon` returns. */

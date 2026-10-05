@@ -77,7 +77,7 @@ export const SaveModes: React.FC<{ u: number }> = ({ u }) => {
             </React.Fragment>
           );
         })}
-        <Tap x={save.x} y={save.y} tone="light" t={prog(u, SAVE - 5, SAVE + 9, linear)} />
+        <Tap x={save.x} y={save.y} tone="dark" t={prog(u, SAVE - 5, SAVE + 9, linear)} />
       </AppShot>
     </AbsoluteFill>
   );

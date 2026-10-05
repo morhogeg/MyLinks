@@ -1,5 +1,6 @@
 import React from 'react';
 import { AbsoluteFill, useCurrentFrame, random } from 'remotion';
+import { NIGHT, stageLight } from '../look';
 
 /**
  * The camera rig. Everything the "camera" does — push in, drift, tilt off-axis,
@@ -83,51 +84,59 @@ export const Grain: React.FC<{ opacity?: number }> = ({ opacity = 0.055 }) => {
   const ox = Math.floor(random(`gx${frame}`) * 220);
   const oy = Math.floor(random(`gy${frame}`) * 220);
   return (
-    <AbsoluteFill
-      style={{
-        backgroundImage: GRAIN_TILE,
-        backgroundPosition: `${ox}px ${oy}px`,
-        opacity,
-        mixBlendMode: 'overlay',
-        pointerEvents: 'none',
-      }}
-    />
+    <>
+      <AbsoluteFill
+        style={{
+          backgroundImage: GRAIN_TILE,
+          backgroundPosition: `${ox}px ${oy}px`,
+          opacity,
+          mixBlendMode: 'overlay',
+          pointerEvents: 'none',
+        }}
+      />
+      {/* on the night set an overlay barely touches the blacks, so the
+          shadows get their own, finer pass: screened, a third as strong */}
+      <AbsoluteFill
+        style={{
+          backgroundImage: GRAIN_TILE,
+          backgroundPosition: `${(ox + 97) % 220}px ${(oy + 53) % 220}px`,
+          opacity: opacity * 0.34,
+          mixBlendMode: 'screen',
+          pointerEvents: 'none',
+        }}
+      />
+    </>
   );
 };
 
-/** The set's base tone — a shade under the app's #F9FAFB so the white phone
- *  screen still separates from the world behind it. Every scene and the Film
- *  root share this one constant. */
-export const SET_BG = '#EEF0F4';
+/** The set's base tone: the NIGHT set (src/look.ts), a hair under the app's
+ *  #050505 so a screen's own black still reads as a lit panel. Every scene
+ *  and the Film root share this one constant. (It was the light grade's
+ *  #EEF0F4 until 2026-10-05.) */
+export const SET_BG = NIGHT.set;
 
 /**
- * Vignette — on a light grade this is a whisper, not a hand. It is a cool
- * slate darkening at the very edge of frame, just enough to give the frame a
- * lens; the heavy black vignette of the dark grade read as smoke on paper.
+ * Vignette: on the night set the frame's edges fall away to black, the way
+ * a lit stage does; it frames the light without crushing the product.
  */
 export const Vignette: React.FC<{ strength?: number }> = ({ strength = 1 }) => (
   <AbsoluteFill style={{ pointerEvents: 'none' }}>
     <AbsoluteFill
       style={{
-        background: `radial-gradient(128% 108% at 50% 42%, rgba(30,38,54,0) 58%, rgba(30,38,54,${
-          0.14 * strength
-        }) 100%)`,
+        background: `radial-gradient(76% 60% at 50% 50%, rgba(0,0,0,0) 38%, rgba(0,0,0,${(0.5 * strength).toFixed(3)}) 78%, rgba(0,0,0,${(0.72 * strength).toFixed(3)}) 100%)`,
       }}
     />
   </AbsoluteFill>
 );
 
 /**
- * A scrim under the captions. On the light grade it is the paper itself rising
- * to meet the type: a soft wash of the set tone, so a dark line keeps its edge
- * over a busy card without a subtitle BOX, which is the thing that reads as
- * cheap.
+ * A scrim under the captions: the night itself rising to meet the type, so a
+ * white line keeps its edge over a busy screen without a subtitle BOX.
  */
 export const CaptionScrim: React.FC<{ opacity?: number }> = ({ opacity = 1 }) => (
   <AbsoluteFill
     style={{
-      background:
-        'linear-gradient(180deg, rgba(238,240,244,0) 62%, rgba(238,240,244,0.55) 84%, rgba(238,240,244,0.88) 100%)',
+      background: 'linear-gradient(180deg, rgba(2,2,3,0) 58%, rgba(2,2,3,0.6) 82%, rgba(2,2,3,0.9) 100%)',
       opacity,
       pointerEvents: 'none',
     }}
@@ -135,93 +144,49 @@ export const CaptionScrim: React.FC<{ opacity?: number }> = ({ opacity = 1 }) =>
 );
 
 /**
- * The set: a daylight studio. A bright top pool (the softbox), the paper-toned
- * ground falling away slightly at the edges, and two slow-drifting cool pools
- * so a held shot never reads as a flat fill.
+ * The set: the NIGHT stage (src/look.ts). A soft top light, the cool key
+ * light behind the product, two coloured pools for depth. `intensity` scales
+ * the key, `backlight` adds a tighter, brighter pool right behind the device
+ * so its silhouette separates from the dark.
  */
 export const Stage: React.FC<{
   intensity?: number;
   drift?: number;
-  /**
-   * A brighter elliptical pool behind the device — the light-grade backlight.
-   * On paper-white the separation job flips: the phone's dark titanium body
-   * cuts its own silhouette, and this pool lifts the wall behind it toward
-   * white so the shot has depth instead of an even grey field.
-   */
   backlight?: number;
 }> = ({ intensity = 1, drift = 0, backlight = 0 }) => (
   <AbsoluteFill style={{ background: SET_BG, overflow: 'hidden' }}>
-    <AbsoluteFill
-      style={{
-        background:
-          'radial-gradient(70% 58% at 50% 34%, rgba(255,255,255,0.95) 0%, rgba(250,251,253,0.55) 44%, rgba(238,240,244,0) 100%)',
-        opacity: intensity,
-        transform: `translateY(${drift * 30}px)`,
-      }}
-    />
+    <AbsoluteFill style={{ background: stageLight(drift, { key: 0.6 + 0.6 * intensity }) }} />
     {backlight > 0 && (
       <div
         style={{
           position: 'absolute',
           left: '50%',
-          top: '44%',
+          top: '46%',
           transform: 'translate(-50%, -50%)',
           width: 1180,
           height: 1180,
           borderRadius: '50%',
-          background:
-            'radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.4) 34%, rgba(255,255,255,0.1) 58%, rgba(255,255,255,0) 74%)',
+          background: `radial-gradient(circle, rgba(${NIGHT.key},0.34) 0%, rgba(${NIGHT.key},0.14) 36%, rgba(${NIGHT.key},0.04) 58%, rgba(${NIGHT.key},0) 74%)`,
           filter: 'blur(40px)',
           opacity: backlight,
         }}
       />
     )}
-    <div
-      style={{
-        position: 'absolute',
-        width: 1400,
-        height: 900,
-        left: -260 + drift * 60,
-        top: -220,
-        background:
-          'radial-gradient(circle, rgba(52,64,84,0.05) 0%, rgba(52,64,84,0) 62%)',
-        filter: 'blur(30px)',
-        opacity: intensity,
-      }}
-    />
-    <div
-      style={{
-        position: 'absolute',
-        width: 1100,
-        height: 800,
-        right: -220 - drift * 40,
-        bottom: -260,
-        background:
-          'radial-gradient(circle, rgba(52,64,84,0.06) 0%, rgba(52,64,84,0) 64%)',
-        filter: 'blur(36px)',
-        opacity: intensity,
-      }}
-    />
   </AbsoluteFill>
 );
 
-/** A soft contact shadow under the device — on the light set this is what
- *  gives the phone weight; the glow-style separation belongs to the dark grade. */
-export const FloorGlow: React.FC<{ y?: number; w?: number; opacity?: number }> = ({
-  y = 880,
-  w = 780,
-  opacity = 0.5,
-}) => (
+/** Under the device, light: a cool pool on the floor (the night grade's
+ *  separation), with a tight dark core where the device sits, for weight. */
+export const FloorGlow: React.FC<{ y?: number; w?: number; opacity?: number }> = ({ y = 880, w = 780, opacity = 0.5 }) => (
   <div
     style={{
       position: 'absolute',
       left: '50%',
       top: y,
       transform: 'translateX(-50%)',
-      width: w,
-      height: 120,
-      background:
-        'radial-gradient(50% 50% at 50% 50%, rgba(24,32,48,0.5) 0%, rgba(24,32,48,0) 72%)',
+      width: w * 1.3,
+      height: 150,
+      background: `radial-gradient(50% 50% at 50% 50%, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0) 30%), radial-gradient(50% 50% at 50% 50%, rgba(${NIGHT.key},0.3) 0%, rgba(${NIGHT.key},0) 72%)`,
       opacity,
       filter: 'blur(18px)',
     }}

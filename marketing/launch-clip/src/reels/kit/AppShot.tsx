@@ -2,14 +2,18 @@ import React, { useMemo } from 'react';
 import { AbsoluteFill, Img } from 'remotion';
 import type { Cam } from './camera';
 import { SCREEN, frameSrc, type Rect } from './takes';
+import { NIGHT } from '../../look';
 
 /**
  * A captured frame of the REAL app, shown as a floating iPhone screen.
  *
  * No device mockup, no rebuilt UI: the pixels are a screenshot of the shipped
- * app (capture/), framed as a glass slab with the iPhone's display corner
- * radius, a hairline edge and a soft studio shadow. The camera (camera.ts)
- * decides which part of the screen fills the frame.
+ * app (capture/, in its dark theme), framed as a glass slab with the
+ * iPhone's display corner radius, lit like a product on the night set: a rim
+ * of light on its edge (brightest along the top), the screen's own glow
+ * spilling onto the set around it (`glow`: the capture itself, blurred and
+ * saturated, behind the slab), and a deep shadow under it. The camera
+ * (camera.ts) decides which part of the screen fills the frame.
  *
  * Children are overlays in SCREEN POINTS (393 × 852): taps, lifts, highlights.
  * They ride the same camera, so a tap drawn at the Save button's box stays on
@@ -48,6 +52,8 @@ export const AppShot: React.FC<{
   cropRadius?: number;
   /** 0–1 a slow glass sheen across the slab. */
   sheen?: number;
+  /** 0–1 the screen's own light spilling onto the set (default 1) */
+  glow?: number;
 }> = ({
   take,
   i,
@@ -63,6 +69,7 @@ export const AppShot: React.FC<{
   crop,
   cropRadius = 24,
   sheen = 0,
+  glow = 1,
 }) => {
   const id = useMemo(() => `ms${uid++}`, []);
   const { cx, cy, z: zoom, fx, fy, rx, ry, rz } = cam;
@@ -139,8 +146,26 @@ export const AppShot: React.FC<{
           transformOrigin: `${cx * z}px ${cy * z}px`,
         }}
       >
-        {/* the studio shadow, on the visible box (an iris has none: it is a
-            window being cut, not an object) */}
+        {/* the screen's own light on the set: the capture, blurred and
+            saturated, behind the slab (the whole slab only: an iris is a
+            window being cut, a crop is an element lifted off its screen) */}
+        {!iris && !crop && glow > 0 && (
+          <Img
+            src={src}
+            style={{
+              position: 'absolute',
+              left: -W * 0.04,
+              top: -H * 0.03,
+              width: W * 1.08,
+              height: H * 1.06,
+              maxWidth: 'none',
+              opacity: 0.42 * glow * opacity,
+              filter: `blur(${(70 / s).toFixed(1)}px) saturate(1.7) brightness(1.5)`,
+              borderRadius: SCREEN_RADIUS * z,
+            }}
+          />
+        )}
+        {/* the shadow under it, on the visible box (an iris has none) */}
         {!iris && shadow > 0 && (
           <div
             style={{
@@ -151,9 +176,9 @@ export const AppShot: React.FC<{
               height: box.h,
               borderRadius: box.r,
               boxShadow: [
-                `0 ${1.5 * z}px ${3 * z}px rgba(16,24,40,${0.08 * shadow})`,
-                `0 ${22 * z}px ${60 * z}px -${14 * z}px rgba(24,32,48,${0.34 * shadow})`,
-                `0 ${60 * z}px ${120 * z}px -${40 * z}px rgba(24,32,48,${0.22 * shadow})`,
+                `0 ${2 * z}px ${5 * z}px rgba(0,0,0,${0.5 * shadow})`,
+                `0 ${26 * z}px ${70 * z}px -${12 * z}px rgba(0,0,0,${0.78 * shadow})`,
+                `0 ${70 * z}px ${130 * z}px -${36 * z}px rgba(0,0,0,${0.6 * shadow})`,
               ].join(', '),
             }}
           />
@@ -165,7 +190,7 @@ export const AppShot: React.FC<{
             borderRadius: crop ? undefined : SCREEN_RADIUS * z,
             overflow: 'hidden',
             clipPath: clip,
-            background: crop ? undefined : '#F9FAFB',
+            background: crop ? undefined : '#050505',
           }}
         >
           <Img src={src} style={{ width: '100%', height: '100%', display: 'block', filter: filters || undefined }} />
@@ -199,7 +224,8 @@ export const AppShot: React.FC<{
             />
           )}
         </div>
-        {/* the glass edge */}
+        {/* the rim: a hairline of light around the glass, brightest along
+            its top edge (the key light is above and behind) */}
         {!iris && (
           <div
             style={{
@@ -209,7 +235,10 @@ export const AppShot: React.FC<{
               width: box.w,
               height: box.h,
               borderRadius: box.r,
-              boxShadow: `inset 0 0 0 ${Math.max(1, 0.6 * zoom) / s}px rgba(16,24,40,0.10)`,
+              boxShadow: [
+                `inset 0 0 0 ${Math.max(1, 0.55 * zoom) / s}px rgba(255,255,255,0.11)`,
+                `inset 0 ${Math.max(1, 0.9 * zoom) / s}px 0 rgba(255,255,255,0.16)`,
+              ].join(', '),
             }}
           />
         )}
@@ -250,7 +279,8 @@ export const Lift: React.FC<{
   /** extra scale at lift 1 */
   grow?: number;
   opacity?: number;
-  /** a soft ink ring, 0–1 (emphasis without recolouring the app) */
+  /** a ring of light, 0–1, with a soft halo (emphasis without recolouring
+   *  the app; it was an ink ring on the light grade) */
   ring?: number;
   dx?: number;
   dy?: number;
@@ -271,9 +301,10 @@ export const Lift: React.FC<{
         transform: `translate(${dx}px, ${dy - lift * rise}px) scale(${scale * (1 + lift * grow)})`,
         transformOrigin: 'center center',
         boxShadow: [
-          `0 ${1 + lift * 3}px ${2 + lift * 6}px rgba(16,24,40,${0.06 + lift * 0.08})`,
-          `0 ${lift * 18}px ${lift * 40}px -${lift * 8}px rgba(24,32,48,${lift * 0.32})`,
-          ring > 0 ? `0 0 0 ${1.2 + ring * 1.2}px rgba(20,20,27,${ring * 0.55})` : '',
+          `0 ${1 + lift * 3}px ${2 + lift * 6}px rgba(0,0,0,${0.3 + lift * 0.2})`,
+          `0 ${lift * 18}px ${lift * 40}px -${lift * 8}px rgba(0,0,0,${lift * 0.7})`,
+          ring > 0 ? `0 0 0 ${1 + ring * 0.9}px rgba(236,239,246,${ring * 0.62})` : '',
+          ring > 0 ? `0 0 ${10 + ring * 16}px ${ring * 2}px rgba(${NIGHT.glow},${ring * 0.42})` : '',
         ]
           .filter(Boolean)
           .join(', '),
@@ -291,10 +322,13 @@ export const Lift: React.FC<{
  * A fingertip, drawn where the capture script actually tapped (a box from the
  * take). `t` runs 0–1 over the gesture: the pad lands (~0.35) and lifts into a
  * ripple. iOS draws no touches, so this is the reel's one piece of added UI,
- * kept deliberately neutral: ink at low alpha, the app's own tap shape.
+ * kept deliberately neutral: white (or ink, on a light control) at low
+ * alpha, the app's own tap shape.
  */
-/** `tone: 'light'` for a tap on a dark control (the filled Save button) */
-export const Tap: React.FC<{ x: number; y: number; t: number; size?: number; tone?: 'dark' | 'light' }> = ({ x, y, t, size = 34, tone = 'dark' }) => {
+/** `tone` is the ripple's colour: 'light' (the default on the night look:
+ *  the app is dark), 'dark' for a tap on a light control (in the dark theme
+ *  the filled Save and Send buttons and the + are light) */
+export const Tap: React.FC<{ x: number; y: number; t: number; size?: number; tone?: 'dark' | 'light' }> = ({ x, y, t, size = 34, tone = 'light' }) => {
   if (t <= 0 || t >= 1) return null;
   const rgb = tone === 'light' ? '255,255,255' : '20,20,27';
   const k = tone === 'light' ? 2 : 1;

@@ -179,8 +179,8 @@ export const AskChat: React.FC<{ f: number }> = ({ f }) => {
       <AbsoluteFill style={grow}>
       <AppShot take={T} i={i} cam={view} motion={motion}>
         {/* Send: a light tap on the dark button; the cut lands on the touch */}
-        <Tap x={send1.x} y={send1.y} tone="light" t={tapAt(f, S.send)} />
-        <Tap x={send2.x} y={send2.y} tone="light" t={f >= S.ask2 ? tapAt(f, S.send2) : 0} />
+        <Tap x={send1.x} y={send1.y} tone="dark" t={tapAt(f, S.send)} />
+        <Tap x={send2.x} y={send2.y} tone="dark" t={f >= S.ask2 ? tapAt(f, S.send2) : 0} />
         {source > 0.01 && (
           <Lift take={T} i={i} rect={wholePoints(rectOf(T, i, 'chip'))} radius={12} lift={source} rise={5} grow={0.04} ring={0.7 * source} />
         )}

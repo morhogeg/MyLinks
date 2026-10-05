@@ -121,7 +121,7 @@ export const Remind: React.FC<{ f: number }> = ({ f }) => {
           {smartIn > 0.01 && smartOut < 1 && (
             <Lift take={T} i={SHEET_I} rect={[smart[0] - 2, smart[1] - 2, smart[2] + 4, smart[3] + 4]} radius={12} lift={smartIn * 0.35} rise={2} grow={0.012} ring={0.5 * smartIn} opacity={1 - smartOut} />
           )}
-          <Tap x={save.x} y={save.y} tone="light" t={prog(f, HITS.saveTap - 7, HITS.saveTap + 12, linear)} />
+          <Tap x={save.x} y={save.y} tone="dark" t={prog(f, HITS.saveTap - 7, HITS.saveTap + 12, linear)} />
         </AppShot>
       )}
     </AbsoluteFill>

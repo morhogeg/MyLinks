@@ -1,6 +1,7 @@
 import React from 'react';
 import { sans } from '../../fonts';
 import { EASE_IN_OUT, EASE_MODAL, mix, prog } from './curves';
+import { NIGHT, typeGlow } from '../../look';
 
 /**
  * Kinetic type. Two voices, one family (Geist, the brand face):
@@ -12,15 +13,17 @@ import { EASE_IN_OUT, EASE_MODAL, mix, prog } from './curves';
  *  - the KICKER: the pillar word (SAVE / FIND / ASK / CONNECT / REVISIT), a
  *    small letterspaced label above the line that names the chapter.
  *
- * Type rules (README "Motion language"): ink on paper, never colour; the line
+ * Type rules (README "Motion language"): white on the night set, never colour; the line
  * is 56px/1.12 weight 600, tracking -0.028em, two lines at most in a 980px
  * measure (about 10 words);
  * nothing moves sub-pixel on a hold (whole-pixel rounding, the film's
  * shimmer lesson).
  */
 
-export const INK = 'rgba(17,24,39,0.96)';
-export const INK_SOFT = 'rgba(75,85,99,0.82)';
+/** (the night look, 2026-10-05: white on the night set; the names are the
+ *  light grade's, kept so every scene picks the new type up unchanged) */
+export const INK = NIGHT.ink;
+export const INK_SOFT = NIGHT.inkSoft;
 
 /** frames the whole line takes to leave, and its curve: eased in AND out
  *  (round 13: on EASE_MODAL half the fade happened on the first frame, so a
@@ -65,7 +68,7 @@ export const KineticLine: React.FC<{
   const outStart = to - from - HEAD_OUT;
   let w = -1;
   return (
-    <div style={{ width, display: 'flex', flexDirection: 'column', alignItems: align === 'center' ? 'center' : 'flex-start', gap: 2 }}>
+    <div style={{ width, display: 'flex', flexDirection: 'column', alignItems: align === 'center' ? 'center' : 'flex-start', gap: 2, filter: typeGlow(0.8) }}>
       {lines.map((words, li) => {
         const firstWord = w + 1;
         w += words.length;

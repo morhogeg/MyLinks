@@ -5,6 +5,7 @@ import { AnimatedMark, CitationGlyph, MARK_LAUNCH_FRAMES, Wordmark } from '../..
 import { PLATFORM_INK, PlatformMark } from '../../ui/app';
 import { EASE_MODAL, mix, prog } from './curves';
 import { INK, INK_SOFT } from './Type';
+import { NIGHT, typeGlow } from '../../look';
 
 /**
  * Brand pieces for reels. The mark and the wordmark are the app's own
@@ -19,7 +20,9 @@ export type SaveKind = 'youtube' | 'instagram' | 'x' | 'web' | 'screenshot';
  * the app's citation chip (a leading mark, a title) on purpose: the same
  * saves come back as citation chips in the Ask beat. Platform marks are the
  * app's own (lucide, as the film uses them), in the app's PLATFORM_RGB hues;
- * a web save wears a bookmark, a screenshot the image glyph.
+ * a web save wears a bookmark, a screenshot the image glyph. On the night
+ * set it is dark glass: the app's card tone, a hairline of light on its top
+ * edge, a deep shadow.
  */
 export const SaveChip: React.FC<{ kind: SaveKind; title: string; style?: React.CSSProperties }> = ({
   kind,
@@ -27,7 +30,7 @@ export const SaveChip: React.FC<{ kind: SaveKind; title: string; style?: React.C
   style,
 }) => {
   const platform = kind === 'youtube' || kind === 'instagram' || kind === 'x';
-  const hue = platform ? PLATFORM_INK[kind] : 'rgb(75,85,99)';
+  const hue = platform ? PLATFORM_INK[kind] : 'rgb(196,202,216)';
   return (
     <div
       style={{
@@ -37,10 +40,10 @@ export const SaveChip: React.FC<{ kind: SaveKind; title: string; style?: React.C
         height: 78,
         padding: '0 28px 0 13px',
         borderRadius: 22,
-        background: '#FFFFFF',
-        border: '1px solid rgba(16,24,40,0.07)',
+        background: 'linear-gradient(180deg, #1D1D21 0%, #141417 100%)',
+        border: `1px solid ${NIGHT.cardEdge}`,
         boxShadow:
-          '0 1px 2px rgba(16,24,40,0.06), 0 14px 34px -12px rgba(24,32,48,0.28), 0 30px 60px -30px rgba(24,32,48,0.2)',
+          'inset 0 1px 0 rgba(255,255,255,0.07), 0 1px 2px rgba(0,0,0,0.5), 0 16px 38px -12px rgba(0,0,0,0.8), 0 34px 64px -30px rgba(0,0,0,0.7)',
         fontFamily: sans,
         whiteSpace: 'nowrap',
         ...style,
@@ -56,7 +59,7 @@ export const SaveChip: React.FC<{ kind: SaveKind; title: string; style?: React.C
           alignItems: 'center',
           justifyContent: 'center',
           color: hue,
-          background: platform ? hue.replace('rgb(', 'rgba(').replace(')', ', 0.11)') : 'rgba(20,20,27,0.06)',
+          background: platform ? hue.replace('rgb(', 'rgba(').replace(')', ', 0.16)') : 'rgba(255,255,255,0.07)',
         }}
       >
         {platform ? (
@@ -81,9 +84,9 @@ export const MarkAssembly: React.FC<{ close: number; dot: number; width: number;
   close,
   dot,
   width,
-  color = '#14141B',
+  color = NIGHT.ink,
 }) => (
-  <div style={{ width, color, lineHeight: 0 }}>
+  <div style={{ width, color, lineHeight: 0, filter: typeGlow(1.2) }}>
     <CitationGlyph assembly={close} dot={dot} style={{ width: '100%', height: 'auto', overflow: 'visible' }} />
   </div>
 );
@@ -124,14 +127,31 @@ export const Lockup: React.FC<{
   const word = prog(frame, wordAt ?? strike + 2, (wordAt ?? strike + 2) + 14, EASE_MODAL);
   const big = lineStyle === 'statement';
   const sub = prog(frame, strike + 20, strike + 40, EASE_MODAL);
+  // the strike's light: a burst behind the mark, out and gone in a second
+  const burst = prog(frame, strike - 1, strike + 26, (t) => t);
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
+      {frame >= strike - 1 && burst < 1 && (
+        <div
+          style={{
+            position: 'absolute',
+            left: '50%',
+            top: markWidth * 0.43,
+            width: markWidth * 5,
+            height: markWidth * 5,
+            transform: `translate(-50%, -50%) scale(${(0.35 + 0.9 * Math.sqrt(burst)).toFixed(4)})`,
+            borderRadius: '50%',
+            background: `radial-gradient(circle, rgba(225,232,255,${(0.55 * (1 - burst) ** 1.6).toFixed(4)}) 0%, rgba(${NIGHT.glow},${(0.22 * (1 - burst) ** 1.6).toFixed(4)}) 28%, rgba(${NIGHT.glow},0) 62%)`,
+            pointerEvents: 'none',
+          }}
+        />
+      )}
       <div
         style={{
           width: markWidth,
-          color: '#14141B',
+          color: NIGHT.ink,
           lineHeight: 0,
-          filter: `drop-shadow(0 ${10 + bloom * 10}px ${34 + bloom * 40}px rgba(24,32,48,${0.2 + bloom * 0.18}))`,
+          filter: `drop-shadow(0 0 ${22 + bloom * 34}px rgba(${NIGHT.glow},${(0.32 + bloom * 0.4).toFixed(3)}))`,
           transform: `scale(${mix(0.96, 1, prog(frame, start, strike + 10))})`,
           // nothing waits on screen: the mark's first state (four corner
           // ticks) appears only as its launch begins (round 11)
@@ -144,11 +164,11 @@ export const Lockup: React.FC<{
         style={{
           width: wordWidth,
           marginTop: 70,
-          color: '#14141B',
+          color: NIGHT.ink,
           lineHeight: 0,
           clipPath: `inset(-10% ${(1 - word) * 100}% -10% 0)`,
           transform: `translateY(${Math.round((1 - word) * 12)}px)`,
-          filter: 'drop-shadow(0 4px 26px rgba(24,32,48,0.14))',
+          filter: typeGlow(1.1),
         }}
       >
         <Wordmark style={{ width: '100%', height: 'auto' }} />
@@ -179,6 +199,7 @@ export const Lockup: React.FC<{
             textTransform: big ? undefined : 'uppercase',
             color: big ? INK : INK_SOFT,
             whiteSpace: 'nowrap',
+            filter: big ? typeGlow(1) : undefined,
           }}
         >
           {row
