@@ -5,7 +5,8 @@ name: Python tests
 # installed dependencies and plain pytest.
 on:
   push:
-    branches: [main]
+    # TEMP (launch audit): run on the audit branch too; revert before merge.
+    branches: [main, claude/launch-audit]
     paths:
       - "functions/**"
       - ".github/workflows/python-tests.yml"
