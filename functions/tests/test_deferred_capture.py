@@ -244,6 +244,24 @@ def test_scrape_only_job_snapshots_the_page_and_keeps_the_card_waiting(world, mo
     assert world.jobs() == {} and world.quota.refunds == 0
 
 
+def test_a_snapshot_that_lands_after_the_release_is_dropped(world, monkeypatch):
+    """Upgrade raced the scrape: the card is already queued (it will be read
+    live), so the late snapshot and its copied images are not kept."""
+    db = world.make(limit=100, used=100)
+    monkeypatch.setattr(main, "_fetch_post_images", lambda urls: [(b"jpg", "image/jpeg")] if urls else [])
+    monkeypatch.setattr(scraper, "scrape_url", lambda url, body=None: {
+        "title": "T", "text": "body " * 50, "image_urls": ["https://cdn.example/1.jpg"]})
+    deleted = []
+    monkeypatch.setattr(main, "_owned_blob_deleter", lambda uid: deleted.append)
+    body = _json(main.share_ingest(_Req({"url": "https://example.com/race"})))
+    (path,) = world.jobs()
+    db.docs[f"users/u1/links/{body['id']}"]["status"] = "processing"  # released first
+    world.run_job(path)
+    assert "scrape" not in db.docs.get(f"users/u1/capture_snapshots/{body['id']}", {})
+    assert len(deleted) == 1 and deleted[0].startswith("https://firebasestorage.googleapis.com/")
+    assert db.docs[f"users/u1/links/{body['id']}"]["status"] == "processing"
+
+
 def test_a_pdf_or_a_dead_page_is_not_snapshotted():
     assert deferred_capture.snapshot_from_scrape({"document_bytes": b"%PDF", "title": "x"}) is None
     assert deferred_capture.snapshot_from_scrape(scraper._fetch_failure("not_found")) is None

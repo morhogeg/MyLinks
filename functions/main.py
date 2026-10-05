@@ -5735,8 +5735,8 @@ def _snapshot_capture(ref, uid: str, data: dict) -> None:
         card_ref = db.collection('users').document(uid).collection('links').document(card_id)
         scraped = scrape_url(url, data.get("body"))
         snap = deferred_capture.snapshot_from_scrape(scraped)
+        stored = []
         if snap is not None:
-            stored = []
             try:
                 key = storage_key_for(uid)
                 for i, (img, mime) in enumerate(_fetch_post_images(snap.get("image_urls"))):
@@ -5744,24 +5744,25 @@ def _snapshot_capture(ref, uid: str, data: dict) -> None:
                     stored.append(_store_image(f"post_thumbs/{key}/snap-{card_id}-{i}.{ext}", img, mime))
             except Exception as e:
                 logger.warning(f"Snapshot image copy failed (live URLs kept): {e}")
-                stored = []
             if stored:
                 snap["image_urls"] = stored
-            deferred_capture.store_snapshot(db, uid, card_id, snap, stored)
-        if not isinstance(scraped, dict) or scraped.get("fetch_error"):
-            return
-        title = (scraped.get("title") or "").strip()[:300]
-        extras = {k: v for k, v in _scrape_extras(url_key(url), scraped).items()
-                  if k in ("finalUrlKey", "sourcePlatform")}
-        note = _shared_note_entry(data.get("userNoteText"), scraped)
+        fetched = isinstance(scraped, dict) and not scraped.get("fetch_error")
+        title = (scraped.get("title") or "").strip()[:300] if fetched else ""
+        extras = ({k: v for k, v in _scrape_extras(url_key(url), scraped).items()
+                   if k in ("finalUrlKey", "sourcePlatform")} if fetched else {})
+        note = _shared_note_entry(data.get("userNoteText"), scraped) if fetched else None
+        snap_ref = deferred_capture.snapshot_ref(db, uid, card_id)
 
         def _body(tx):
             current = card_ref.get(transaction=tx)
             card = (current.to_dict() or {}) if current.exists else None
             # Only a card that is still waiting: once released (or deleted),
-            # the worker owns it.
+            # the worker owns it and a late snapshot would just be litter.
             if not deferred_capture.is_waiting(card):
                 return False
+            if snap is not None:
+                tx.set(snap_ref, deferred_capture.snapshot_payload(uid, card_id, snap, stored),
+                       merge=True)
             update = dict(extras)
             if title:
                 update["title"] = title
@@ -5773,7 +5774,14 @@ def _snapshot_capture(ref, uid: str, data: dict) -> None:
             if update:
                 tx.update(card_ref, update)
             return True
-        capture_charge.run_transaction(db, _body)
+        if not capture_charge.run_transaction(db, _body) and stored:
+            # Released or deleted meanwhile: the copied images belong to no one.
+            try:
+                deleter = _owned_blob_deleter(uid)
+                for u in stored:
+                    deleter(u)
+            except Exception as e:
+                logger.warning(f"Snapshot image cleanup failed: {e}")
     except Exception as e:
         logger.warning(f"Snapshot capture failed (the page will be read live later): {e}")
     finally:

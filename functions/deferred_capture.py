@@ -207,11 +207,14 @@ def scrape_from_snapshot(snap: dict) -> dict:
     return scraped
 
 
-def store_snapshot(db, uid: str, card_id: str, scrape: dict, stored_image_urls=None) -> None:
+def snapshot_payload(uid: str, card_id: str, scrape: dict, stored_image_urls=None) -> dict:
+    """The fields the scrape-only job merges into the snapshot doc (the share's
+    own `job` fields are already there). `storedImageUrls` are the post images
+    copied into our Storage, deleted together with the snapshot."""
     data = {"uid": uid, "cardId": card_id, "scrape": scrape, "scrapedAt": _now_ms()}
     if stored_image_urls:
         data["storedImageUrls"] = list(stored_image_urls)
-    snapshot_ref(db, uid, card_id).set(data, merge=True)
+    return data
 
 
 def load_snapshot(db, uid: str, card_id: str) -> Optional[dict]:

@@ -1,6 +1,12 @@
 import type { Link } from './types';
 import type { AnchorSims } from './similarity';
 
+// Mid-capture, failed, or a save waiting for its read: no concepts or vector to
+// relate yet. Local (not feedUtils.isPending) so this module stays importable
+// by the node --test runner, which needs explicit file extensions.
+const notAnalyzed = (l: Pick<Link, 'status'>) =>
+    l.status === 'processing' || l.status === 'failed' || l.status === 'waiting';
+
 /**
  * Related cards for the open-card view — live, not just the save-time snapshot.
  *
@@ -200,7 +206,7 @@ export function relatedSimCandidates(link: Link, allLinks: Link[]): string[] {
     const scored: Array<{ id: string; n: number }> = [];
     for (const other of allLinks) {
         if (other.id === link.id) continue;
-        if (other.status === 'processing' || other.status === 'failed') continue;
+        if (notAnalyzed(other)) continue;
         let n = 0;
         for (const c of new Set((other.concepts ?? []).map((s) => (s || '').toLowerCase()))) {
             if (mine.has(c) && !generic.has(c)) n++;
@@ -251,7 +257,7 @@ export function getRelatedCards(
     for (const other of allLinks) {
         if (entries.length >= MAX_RELATED) break;
         if (used.has(other.id)) continue;
-        if (other.status === 'processing' || other.status === 'failed') continue;
+        if (notAnalyzed(other)) continue;
         const rel = other.relatedLinks?.find((r) => r.id === link.id);
         if (!rel) continue;
         used.add(other.id);
@@ -274,7 +280,7 @@ export function getRelatedCards(
     for (const other of allLinks) {
         if (used.has(other.id)) continue;
         // Skip in-flight / failed captures — nothing meaningful to relate to.
-        if (other.status === 'processing' || other.status === 'failed') continue;
+        if (notAnalyzed(other)) continue;
 
         // Only SPECIFIC concepts corroborate a tie (and are worth naming in the
         // reason / chips): a concept the whole library carries says nothing
