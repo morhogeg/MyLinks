@@ -35,6 +35,15 @@ MAX_PROMPT_CATEGORIES = 20
 MAX_PROMPT_TAG_LENGTH = 60
 MAX_PROMPT_CATEGORY_LENGTH = 40
 
+# Version of the "See also" relatedness logic, stamped as `graphVersion` on
+# every brand-new workspace. MUST equal GRAPH_VERSION in
+# web/lib/rebuildConnections.ts: the client's ensureGraphVersion recomputes
+# the whole library (two `rebuild_connections` calls) whenever the doc's
+# stamp is lower, so an unstamped new workspace paid one cold function start
+# per signup to "migrate" an empty library. Bump both together;
+# tests/test_workspace_graph_version.py fails the build if they drift.
+GRAPH_VERSION = 2
+
 # Defaults for a brand-new workspace. Mirrors DEFAULT_SETTINGS in
 # web/lib/useUserSettings.ts — keep the two in sync.
 DEFAULT_USER_SETTINGS = {
@@ -190,6 +199,11 @@ def create_workspace(auth_uid: str, email: Optional[str] = None) -> str:
             # The tombstone lookup above already ran (entitlement.py
             # TRIAL_CLOCK_CHECKED): skip the fallback re-check.
             'trialClockChecked': True,
+            # An empty library is already current: without this stamp the
+            # client's graph migration runs on first open for nothing. Only
+            # on a NEW doc; the re-link branch above may be a legacy library
+            # whose connections genuinely need recomputing.
+            'graphVersion': GRAPH_VERSION,
         }
         if email:
             doc['email'] = email

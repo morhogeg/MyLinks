@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import {
-    Share, MoreHorizontal, Puzzle, MousePointerClick, Plus, Upload, Clock, ArrowRight,
+    Share, MoreHorizontal, Plus, Upload, Clock, ArrowRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { CitationGlyph } from '@/components/ui/Wordmark';
@@ -26,8 +26,11 @@ import { linkedProviders } from '@/lib/auth';
  *   2. Save your first    -> the platform's real capture surface, taught in
  *      thing                 place: the iOS share sheet on native (including the
  *                            one-time "More… -> enable Machina" step nothing
- *                            else in the app explains), the extension and the
- *                            plus button on the web.
+ *                            else in the app explains), the plus button and
+ *                            the iPhone share sheet on the web. Nothing here
+ *                            names the browser extension: it is not in any
+ *                            store yet (extension/README.md), so it is not a
+ *                            first-run promise.
  *   3. Not now            -> an empty library is allowed. Saying so plainly
  *                            beats a dismiss affordance the user has to hunt for.
  *
@@ -144,17 +147,17 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
                                 <li>
                                     <FlowRow
                                         n={2}
-                                        icon={<Puzzle className="w-[18px] h-[18px]" />}
-                                        title="Add the browser extension"
-                                        body="Get the Machina extension for Chrome, Edge, or Brave. Settings, then Browser extension, has the steps and your token."
+                                        icon={<Share className="w-[18px] h-[18px]" />}
+                                        title="Share from your iPhone"
+                                        body="With Machina on your iPhone, tap Share in Safari, YouTube, or X and pick Machina. The card shows up here too."
                                     />
                                 </li>
                                 <li>
                                     <FlowRow
                                         n={3}
-                                        icon={<MousePointerClick className="w-[18px] h-[18px]" />}
-                                        title="Click it on any page"
-                                        body="One click clips the whole page. Machina reads it and files it. No folders to manage."
+                                        icon={<CitationGlyph className="w-[18px] h-[18px]" />}
+                                        title="Machina files it"
+                                        body="It reads the page, writes a clean summary, and files it for you. No folders to manage."
                                     />
                                 </li>
                             </>
@@ -175,7 +178,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
                             title="Save your first thing"
                             body={native
                                 ? 'Share to Machina from Safari, YouTube, or any other app. It takes 20 seconds to set up.'
-                                : 'Use the plus button here, or add the browser extension and clip any page in one click.'}
+                                : 'Use the plus button here, or share to Machina from your iPhone.'}
                             onClick={() => { hapticLight(); setShowHow(true); }}
                         />
                         <FlowRow

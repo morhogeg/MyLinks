@@ -1,7 +1,7 @@
 'use client';
 
 import { httpsCallable } from 'firebase/functions';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, limit, query, updateDoc } from 'firebase/firestore';
 import { db, functions } from './firebase';
 
 /**
@@ -11,6 +11,11 @@ import { db, functions } from './firebase';
  * (see ensureGraphVersion). v2: distance-gated candidates + adversarial
  * verification prompt + similarity floor, killing forced connections like
  * "both use standardized benchmarking".
+ *
+ * Mirrored as GRAPH_VERSION in functions/link_service.py, which stamps it on
+ * every brand-new workspace so a signup never "migrates" an empty library.
+ * Bump both together: functions/tests/test_workspace_graph_version.py fails
+ * if they differ.
  */
 export const GRAPH_VERSION = 2;
 
@@ -98,6 +103,18 @@ export function ensureGraphVersion(uid: string): void {
         const snap = await getDoc(userRef);
         const current = (snap.data()?.graphVersion as number | undefined) ?? 1;
         if (current >= GRAPH_VERSION) return;
+        // An empty library has nothing to recompute: stamp it and skip the
+        // callable (two cold function calls). create_workspace stamps new
+        // workspaces itself; this covers the ones it didn't write, i.e. the
+        // client-side fallback (AuthProvider.createWorkspaceClientSide, whose
+        // locked create rule does not allow the field) and any doc created
+        // before the server stamp shipped. A card saved after this check is
+        // analyzed by the current backend, so the stamp stays true.
+        const anyCard = await getDocs(query(collection(db, 'users', uid, 'links'), limit(1)));
+        if (anyCard.empty) {
+            await updateDoc(userRef, { graphVersion: GRAPH_VERSION });
+            return;
+        }
         const { updated, failed } = await rebuildConnections(uid, undefined, { force: true });
         // A partially failed run must not stamp: `failed` counts cards whose
         // recompute genuinely errored (embed/LLM/write — the backend counts
