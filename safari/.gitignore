@@ -1,0 +1,6 @@
+# Xcode per-user state and local build output (safari/build/ is also covered
+# by the repo-wide build/ rule).
+xcuserdata/
+*.xcuserstate
+DerivedData/
+build/
