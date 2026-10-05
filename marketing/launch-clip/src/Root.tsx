@@ -6,6 +6,9 @@ import { Film } from './Film';
 import { MachinaReel } from './reels/MachinaReel';
 import { RevisitClipCompositions } from './reels/clips/revisit';
 import { AdTodoCompositions } from './reels/ads/todo';
+import * as SAVE from '../clips/save-timeline.mjs';
+import { SaveClip } from './reels/clips/save/SaveClip';
+import { AdCardCompositions } from './reels/ads/card/Compositions';
 
 /**
  * Compositions:
@@ -120,5 +123,37 @@ export const RemotionRoot: React.FC = () => (
     {/* the REVISIT feature clip (clips/revisit-timeline.mjs) */}
     <RevisitClipCompositions />
     <AdTodoCompositions />
+    {/* the SAVE feature clip (src/reels/clips/save, clips/save-timeline.mjs):
+        MachinaClipSave (score + narrator + captions, the deliverable), Silent
+        (captions, no sound), Clean (no sound, no captions or kickers) */}
+    <Composition
+      id="MachinaClipSave"
+      component={SaveClip}
+      durationInFrames={SAVE.TOTAL_FRAMES}
+      fps={SAVE.FPS}
+      width={SAVE.WIDTH}
+      height={SAVE.HEIGHT}
+      defaultProps={{ withAudio: true, withCaptions: true, audioFile: 'clips/save/score-vo.wav' }}
+    />
+    <Composition
+      id="MachinaClipSaveSilent"
+      component={SaveClip}
+      durationInFrames={SAVE.TOTAL_FRAMES}
+      fps={SAVE.FPS}
+      width={SAVE.WIDTH}
+      height={SAVE.HEIGHT}
+      defaultProps={{ withAudio: false, withCaptions: true }}
+    />
+    <Composition
+      id="MachinaClipSaveClean"
+      component={SaveClip}
+      durationInFrames={SAVE.TOTAL_FRAMES}
+      fps={SAVE.FPS}
+      width={SAVE.WIDTH}
+      height={SAVE.HEIGHT}
+      defaultProps={{ withAudio: false, withCaptions: false }}
+    />
+    {/* Meta ad 1, "What one save becomes" (src/reels/ads/card) */}
+    <AdCardCompositions />
   </>
 );

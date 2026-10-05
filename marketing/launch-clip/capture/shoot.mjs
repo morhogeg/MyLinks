@@ -35,6 +35,8 @@ import { openDevice } from './device.mjs';
 import { Take } from './recorder.mjs';
 import { ASK, CAPTURE_USER, CARDS, SAVE, SEARCH, SYNTHESIS } from './library.mjs';
 import * as AD_TODO from './ad-todo.mjs';
+import { NOTE_READ, SHOTS_DIR, renderPost, renderShots, shotsCard, sourceCards } from './clip-save.mjs';
+import { AD_CARD_ID, DEMO_ESSAY_ID, adCard } from './ad-card.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.join(here, '..', 'public', 'reel', 'app');
@@ -737,6 +739,352 @@ const takes = {
       await t.roll(16, { rects: { card: ['.surface-card', ['The Most Important Question of Your Life', 'Dieter Rams', 'Steve Jobs'][k]] } });
     }
     await t.thaw();
+    return t.save();
+  },
+
+  // ─────────────────────────────────────────────────────────── saveclip
+  // The SAVE feature clip (clips/save-timeline.mjs): three screenshots of one
+  // recipe post picked in the Add dialog's Image tab, saved as ONE card, read
+  // in the background (the feed's own "Saving…" card), opened, and read down
+  // to its Key Points, tags and Related cards. Rolls at 60fps: the clip plays
+  // the app at half speed, like the reel. (capture/clip-save.mjs has the
+  // screenshots and the card the backend returns.)
+  async saveclip() {
+    const shotsDir = path.join(here, '..', 'out', 'capture', 'app', 'out', SHOTS_DIR);
+    const files = await renderShots(dev.browser, shotsDir);
+    const urls = files.map((f) => `${server.url}/${SHOTS_DIR}/${path.basename(f)}`);
+    await fresh();
+    const t = new Take(dev, OUT, 'saveclip');
+    const F60 = 1000 / 60;
+    const D = {
+      dialog: R.dialog,
+      tabImage: ['[role=dialog] button', 'Image'],
+      dropzone: ['[role=dialog] label, [role=dialog] div', 'Tap to add images'],
+      hint: ['[role=dialog] p, [role=dialog] div', 'Screens of one post'],
+      strip: ['[role=dialog] ol, [role=dialog] ul, [role=dialog] div', 'Screens of one post'],
+      save: ['[role=dialog] button', 'Save'],
+    };
+    t.mark('home');
+    await t.snap({ rects: { plus: R.plus } });
+
+    // + : the dialog's own entrance
+    await t.freeze();
+    await visible(page.locator(R.plus[0])).click();
+    t.mark('dialogOpen');
+    await t.roll(20, { rects: { dialog: R.dialog }, step: F60 });
+    await t.thaw();
+
+    // the Image tab
+    await page.waitForTimeout(250);
+    await t.freeze();
+    await visible(page.locator('[role=dialog]').getByRole('button', { name: 'Image', exact: true })).click();
+    t.mark('modeImage');
+    await t.roll(24, { rects: D, step: F60 });
+    await t.thaw();
+
+    // three screens of one post, picked (the photo picker is native; the
+    // dialog shows them the moment they are chosen)
+    await page.locator('#image-upload').setInputFiles(files);
+    await until('Screens of one post');
+    await page.waitForTimeout(600);
+    t.mark('picked');
+    await t.roll(24, { rects: D, step: F60 });
+    await t.thaw();
+
+    // Save: the placeholder card is written; /api/share is held until time
+    // is frozen, so the dialog's close is recorded from its first frame
+    let held = null;
+    await page.route('**/api/share', (route) => {
+      held = route;
+    });
+    await visible(page.getByRole('button', { name: 'Save', exact: true })).click();
+    for (let k = 0; k < 200 && !held; k++) await page.waitForTimeout(50);
+    if (!held) throw new Error('saveclip: /api/share was never called');
+    const cardPath = await page.evaluate(
+      (uid) =>
+        window.__capture
+          .list(`users/${uid}/links/`)
+          .find((p) => window.__capture.get(p)?.status === 'processing') ?? null,
+      UID,
+    );
+    if (!cardPath) throw new Error('saveclip: no processing card was written');
+    await t.freeze();
+    t.mark('saving');
+    await held.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, cardId: cardPath.split('/').pop() }) });
+    await page.unroute('**/api/share');
+    await t.roll(60, { rects: { dialog: R.dialog, toast: ['[role=status]'], firstCard: R.firstCard }, step: F60 });
+    // the feed's own working card while the screenshots are read
+    t.mark('reading');
+    await t.roll(60, { rects: { toast: ['[role=status]'], firstCard: R.firstCard }, step: F60 });
+
+    // the backend finishes: the placeholder becomes the card
+    await page.evaluate(
+      ([p, card]) => {
+        const cur = window.__capture.get(p) ?? {};
+        const { processingStartedAt, ...rest } = cur;
+        void processingStartedAt;
+        window.__capture.set(p, { ...rest, ...card });
+      },
+      [cardPath, shotsCard(urls)],
+    );
+    await page.waitForTimeout(150);
+    t.mark('done');
+    await t.roll(48, { rects: { toast: ['[role=status]'], firstCard: R.firstCard }, step: F60 });
+    await t.thaw();
+    await page.waitForTimeout(800);
+    t.mark('landed');
+    await t.snap({ rects: { firstCard: R.firstCard } });
+
+    // open it, then read down: the screenshots, the gist, the Key Points, the
+    // recipe, the "Do this", the tags and the Related cards
+    const DETAIL = {
+      gallery: ['[aria-label^="Screenshots"]'],
+      detailTitle: ['h2', 'Crispy smashed potatoes'],
+      keyPoints: ['h1,h2,h3,h4', 'Key Points'],
+      points: ['ul', 'Boil first'],
+      ingredients: ['ul', 'small waxy potatoes'],
+      takeaway: ['div', 'Make them this week'],
+      tags: ['div', 'side dish'],
+      related: ['h1,h2,h3,h4,div,span', 'Related cards'],
+      related1: ['button,a,div', "Marcella Hazan"],
+      related2: ['button,a,div', 'Samin Nosrat'],
+    };
+    await t.freeze();
+    await visible(page.locator(R.firstCard[0]).first()).click({ position: { x: 120, y: 40 } });
+    t.mark('detail');
+    await t.roll(40, { rects: DETAIL, step: F60 });
+    await t.thaw();
+    await page.waitForTimeout(500);
+    await t.freeze();
+    await tagScroller('Key Points');
+    t.mark('detailScroll');
+    await rollScroll(t, await scrollTargetFor('Samin Nosrat', 760), 5, DETAIL);
+    await t.thaw();
+    return t.save();
+  },
+
+  // ─────────────────────────────────────────────────────────── sources
+  // The SAVE clip's source tour: a YouTube video, a long-form X Article, an
+  // Instagram photo post, an article and a typed note, each arriving at the
+  // top of the feed, opened, and read down to what the app made of it (the
+  // Key moments with their timestamps, the Key Points, the "Do this"); the
+  // note is kept verbatim and summarized on demand ("Summarize with
+  // Machina"). The finished cards are written onto the store the way the
+  // backend writes them (capture/clip-save.mjs sourceCards). 60fps rolls.
+  async sources() {
+    const shotsDir = path.join(here, '..', 'out', 'capture', 'app', 'out', SHOTS_DIR);
+    await renderPost(dev.browser, shotsDir);
+    const postUrl = `${server.url}/${SHOTS_DIR}/post-1.png`;
+    await fresh();
+    const t = new Take(dev, OUT, 'sources');
+    const F60 = 1000 / 60;
+    const DETAIL = {
+      title: ['h2'],
+      moments: ['div', 'Explains that dopamine'],
+      moment1: ['li', '2:24'],
+      moment2: ['li', '6:44'],
+      moment3: ['li', '19:20'],
+      moment4: ['li', '26:20'],
+      keyPoints: ['h1,h2,h3,h4', 'Key Points'],
+      points: ['ul', ['Twenty pages a day', 'Pack for four days', 'Wanting the good things', 'Dopamine is not a pleasure']],
+      takeaway: ['div', ['Read twenty pages tonight', 'Lay out four days', 'Name one goal', 'Pick one tech-free zone']],
+      photo: ['img[src*="post-1"]'],
+      noteBody: ['div,p', 'Marco came by'],
+      summarize: ['button', ['Summarize with Machina', 'Reading your text']],
+      read: ['div', 'beam checks out'],
+      readPoints: ['ul', 'Cabinets and counters'],
+      tags: ['div', ['screen time', 'reading', 'carry-on', 'purpose', 'renovation']],
+    };
+    t.mark('home');
+    await t.snap({ rects: { firstCard: R.firstCard } });
+
+    // where each card's read-down stops: the bottom of this text at y (pt)
+    const STOP = {
+      youtube: ['Suggests turning off color', 720],
+      x: ['Write three lines', 740],
+      instagram: ['The caption adds', 760],
+      article: ['Name one goal', 760],
+      note: ['Summarize with Machina', 740],
+    };
+    for (const { id, doc } of sourceCards(postUrl)) {
+      const key = id.replace('src-', '');
+      // it arrives at the top of the feed
+      await t.freeze();
+      await page.evaluate(([p, d]) => window.__capture.set(p, { ...d, createdAt: Date.now() }), [linkPath(id), doc]);
+      t.mark(`${key}Land`);
+      await t.roll(36, { rects: { firstCard: R.firstCard }, step: F60 });
+      await t.thaw();
+      await page.waitForTimeout(600);
+      t.mark(`${key}Landed`);
+      await t.snap({ rects: { firstCard: R.firstCard } });
+
+      // opened
+      await t.freeze();
+      await visible(page.locator(R.firstCard[0]).first()).click({ position: { x: 120, y: 40 } });
+      t.mark(`${key}Open`);
+      await t.roll(40, { rects: DETAIL, step: F60 });
+      await t.thaw();
+      await page.waitForTimeout(500);
+
+      // read down to what the app made of it
+      await t.freeze();
+      // (the scroller is found from text only the open card shows: its title
+      // is also on the feed card behind it, which would scroll the feed)
+      const [txt, y] = STOP[key];
+      await tagScroller(txt);
+      t.mark(`${key}Scroll`);
+      await rollScroll(t, await scrollTargetFor(txt, y), 4, DETAIL);
+      await t.snap({ rects: DETAIL });
+      await t.thaw();
+
+      if (key === 'note') {
+        // "Summarize with Machina": the words stay; the read is asked for
+        let held = null;
+        await page.route('**/api/analyze', (route) => {
+          held = route;
+        });
+        await t.freeze();
+        await visible(page.getByRole('button', { name: /Summarize with Machina/ })).click();
+        t.mark('noteTap');
+        await t.roll(30, { rects: DETAIL, step: F60 });
+        await t.thaw();
+        for (let k = 0; k < 200 && !held; k++) await page.waitForTimeout(50);
+        if (!held) throw new Error('sources: /api/analyze was never called');
+        await t.freeze();
+        await held.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, link: NOTE_READ }) });
+        await page.unroute('**/api/analyze');
+        t.mark('noteRead');
+        await t.roll(48, { rects: DETAIL, step: F60 });
+        await t.thaw();
+        await page.waitForTimeout(500);
+        await t.freeze();
+        await tagScroller('Earliest start');
+        t.mark('noteReadScroll');
+        await rollScroll(t, await scrollTargetFor('Earliest start', 760), 4, DETAIL);
+        await t.snap({ rects: DETAIL });
+        await t.thaw();
+      }
+
+      // back to the feed for the next one
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(900);
+    }
+    return t.save();
+  },
+
+  // ─────────────────────────────────────────────────────────── adcard
+  // Meta ad 1, "What one save becomes" (round 5: an article, not a video):
+  // Mark Manson's essay (capture/ad-card.mjs) arrives at the top of the feed
+  // as a fresh share, is opened, and is read down in fine steps: the gist,
+  // the Key Points, the Related cards; then "See in graph"; back on the card,
+  // its bell, "Remind me", Save; the reminder coming due in the feed. 60fps rolls.
+  async adcard() {
+    // the demo's copy of the essay goes: the share is the only one
+    await fresh(() => page.evaluate((p) => window.__capture.remove(p), linkPath(DEMO_ESSAY_ID)));
+    const t = new Take(dev, OUT, 'adcard');
+    const F60 = 1000 / 60;
+    const DETAIL = {
+      title: ['h2'],
+      gist: ['p,div', 'Everybody wants the rewards'],
+      keyPoints: ['h1,h2,h3,h4', 'Key Points'],
+      points: ['ul', 'Wanting the good things'],
+      takeaway: ['div', 'Name one goal'],
+      relatedHead: ['h3', 'Related cards'],
+      related1: ['div.group', 'Choosing the game you are willing'],
+      related2: ['div.group', 'Do what you love'],
+      related3: ['div.group', 'Finding the cause worth'],
+      seeGraph: ['button', 'See in graph'],
+    };
+    t.mark('home');
+    await t.snap({ rects: { firstCard: R.firstCard } });
+
+    // it arrives at the top of the feed
+    await t.freeze();
+    await page.evaluate(([p, d]) => window.__capture.set(p, { ...d, createdAt: Date.now() }), [linkPath(AD_CARD_ID), adCard()]);
+    t.mark('land');
+    await t.roll(36, { rects: { firstCard: R.firstCard }, step: F60 });
+    await t.thaw();
+    await page.waitForTimeout(600);
+    t.mark('landed');
+    await t.snap({ rects: { firstCard: R.firstCard } });
+
+    // opened
+    await t.freeze();
+    await visible(page.locator(R.firstCard[0]).first()).click({ position: { x: 120, y: 40 } });
+    t.mark('open');
+    await t.roll(48, { rects: DETAIL, step: F60 });
+    await t.thaw();
+    await page.waitForTimeout(500);
+
+    // read all the way down, in fine steps (the ad plays parts of this at
+    // its own pace): the last Related card's reason ends at 800pt
+    await t.freeze();
+    await tagScroller('Wanting the good things');
+    t.mark('scroll');
+    await rollScroll(t, await scrollTargetFor('Finding the cause worth', 800), 3, DETAIL);
+    await t.snap({ rects: DETAIL });
+    await t.thaw();
+
+    // "See in graph": the same ties as a map, this card in focus (the
+    // app's own graph opening, 2.5s at 60fps, as the reel's take records it)
+    await t.freeze();
+    await visible(page.getByRole('button', { name: 'See this card in the graph' })).click();
+    t.mark('graph');
+    await t.roll(150, { rects: { canvas: ['canvas'] }, step: F60 });
+    await t.thaw();
+
+    // back on the card: its bell, "Remind me", Smart review, Save (the app's
+    // own sheet over its own scrim; the ad lifts the sheet off its screen)
+    const REMIND = {
+      bell: ['button[aria-label="Set reminder"]'],
+      sheet: ['[role=dialog][aria-label="Set reminder"]'],
+      smart: ['button,label,div[role=radio]', 'Smart review'],
+      save: ['button', 'Save'],
+      toast: ['li[data-sonner-toast],[role=status]', 'Reminder set'],
+    };
+    await visible(page.getByText('Back to card')).click();
+    await page.waitForTimeout(900);
+    // the card from its top, the header's bell in reach
+    await page.evaluate(() => document.querySelector('[data-capture-scroller]')?.scrollTo({ top: 0, behavior: 'instant' }));
+    await page.waitForTimeout(400);
+    t.mark('back');
+    await t.snap({ rects: { ...DETAIL, ...REMIND } });
+    await t.freeze();
+    await visible(page.locator(REMIND.bell[0])).click();
+    t.mark('remind');
+    await t.roll(40, { rects: REMIND, step: F60 });
+    await t.thaw();
+    await page.waitForTimeout(500);
+    await t.freeze();
+    await visible(page.getByText('Smart review', { exact: true })).click();
+    t.mark('smart');
+    await t.roll(16, { rects: REMIND, step: F60 });
+    await t.thaw();
+    await page.waitForTimeout(300);
+    await t.freeze();
+    await visible(page.getByRole('dialog', { name: 'Set reminder' }).getByRole('button', { name: 'Save', exact: true })).click();
+    t.mark('set');
+    await t.roll(60, { rects: REMIND, step: F60 });
+    await t.thaw();
+    await page.waitForTimeout(4500); // the toast has gone
+
+    // tomorrow, 9:00: the backend flags the reminder due (reminder_service),
+    // and the feed's own "Reminders due" strip carries it (Feed.tsx)
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(900);
+    await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+    await page.waitForTimeout(300);
+    const DUE = { strip: ['div.rounded-2xl', 'Reminders due'], dueRow: ['button', 'The Most Important Question'], firstCard: R.firstCard };
+    t.mark('feed');
+    await t.snap({ rects: DUE });
+    await t.freeze();
+    await page.evaluate((p) => window.__capture.merge(p, { reminderDue: true, reminderDueAt: Date.now() }), linkPath(AD_CARD_ID));
+    t.mark('due');
+    await t.roll(40, { rects: DUE, step: F60 });
+    await t.thaw();
+    await page.waitForTimeout(600);
+    t.mark('dueHeld');
+    await t.snap({ rects: DUE });
     return t.save();
   },
 };

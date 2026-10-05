@@ -1,0 +1,3 @@
+# Regenerable like ../../reel-score.wav: `node audio/clips/save-score.mjs`
+# rewrites it byte-identically. The mixed score-vo.wav is committed.
+score.wav

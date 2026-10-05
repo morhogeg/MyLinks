@@ -70,6 +70,11 @@ rest → nothing worth keeping stays buried.** The film introduces Machina with
 the App Store subtitle ("Machina. Never lose another great find.") and closes
 on the tagline, "Everything you save, finally useful.": problem → Machina →
 payoff (owner, 2026-09-28: every launch film ENDS on the tagline, once). It deliberately avoids two framings the
+rest → nothing worth keeping stays buried.** The introduction names the product
+and the problem it ends ("Machina. Never lose another great find."), and the
+film closes on the payoff, the tagline, "Everything you save, finally useful."
+(owner call 2026-09-28: problem → Machina → payoff; the tagline is said once,
+at the end). It deliberately avoids two framings the
 owner ruled out: it is **not** a learning app, and it does **not** sell
 "search by meaning" as the headline. The word *library* appears nowhere.
 
@@ -87,12 +92,15 @@ owner ruled out: it is **not** a learning app, and it does **not** sell
 | 23–26 | 0:57.5 | `CollectionsScene` | The organising that is yours |
 | 26–29 | 1:05 | `DigestScene` | The weekly write-up, then the resurfaced save as its own beat |
 | 29–32 | 1:12.5 | `Endcard` | The bare mark, the wordmark, the tagline (`Everything you save, finally useful.`), which the voice-over also speaks after the name |
+| 29–32 | 1:12.5 | `Endcard` | The bare mark, the wordmark, the tagline (`Everything you save, finally useful.`), which the voice-over speaks word for word |
 
 `Capture` / `Ask` / `Connect` print as a letterspaced kicker above the line on
 their own beats, so a viewer can place each act inside the film's three acts
 without being told. (They were the App Store subtitle until 2026-08-26; the
 kickers keep the act names. The subtitle is now the introduction's line and
 the endcard carries the tagline, 2026-09-28.)
+kickers keep the act names. The current subtitle's words, "Never lose another
+great find", are the introduction's line; the endcard carries the tagline.)
 
 **No em dashes anywhere a viewer can read** — the app-wide ban
 (`web/scripts/check-em-dash.mjs`) applies to burned-in captions, demo cards and
@@ -344,6 +352,21 @@ the introduction's line instead; the tagline appears ONCE, at the end
 on anything else). The space under the line is the slot for a real App Store
 badge or URL once the listing is live. Nothing else
 in the film claims availability.
+The endcard carries one line, the tagline, **"Everything you save, finally
+useful."**, exactly as written (comma and full stop, sentence case, Geist 600),
+and the closing voice line speaks those words and nothing else (owner calls
+2026-09-17: screen and voice agree; 2026-09-28: every launch film ends on the
+tagline). Why the tagline and not the App Store subtitle: the tagline is the
+brand line and stays fixed, while the subtitle ("Never lose another great find")
+is listing copy that can change with search tests, which would date every posted
+film. The subtitle's words moved to the introduction. To change the ending line:
+edit `src/scenes/Endcard.tsx` and the last line of `FILM_LINES` in
+`audio/synth-vo.py` together, re-run `python3 audio/synth-vo.py` and `node
+audio/mix-vo.mjs`, and re-render every edition; `npm run verify` fails if the
+screen and the voice differ, if the tagline appears anywhere else in the film,
+or if the endcard still shows the subtitle. The space under the line is the slot
+for a real App Store badge or URL once the listing is live. Nothing else in the
+film claims availability.
 
 # Reels
 
@@ -887,6 +910,351 @@ true peak ≤ −1 dBTP, every line 3dB+ over the music in the speech band.
 only); the narrator is Gemini TTS, its word times ESTIMATED from the audio
 (no speech recogniser can be fetched here; about ±0.2s); the ad has not been through Meta's ad review; the app's font here is
 Inter standing in for SF Pro (see "Font" above).
+## Feature clip: SAVE
+
+`MachinaClipSave` is a 62.7s vertical video about one feature, saving, for
+someone seeing Machina for the first time (owner brief, 2026-09-28: the
+feature as the sole subject, the app named, a hook on the problem, each
+element shown doing its job, a concrete close; owner, 2026-09-29: saving is a
+CORE feature, show what EVERY kind of save becomes, the clip may run longer).
+It is a new video in the reel's design language, not a cut of the reel.
+
+| Frames | Element | What is shown (the line) |
+|---|---|---|
+| 0–152 | the problem | six apps' own save lists, each with its mark: YouTube · Watch later, Instagram · Saved, X · Bookmarks, Safari · Reading List, Facebook · Saved, Photos · Screenshots (frame 0, the poster); a new save drops into each on "scattered"; on "impossible to find" they blur and bleach ("Your saves are scattered across countless apps, and impossible to find.") |
+| 136–336 | the name, ANY APP | they collapse into the mark, the wordmark wipes in on "Machina"; five shares a beat apart (YouTube, Instagram, X, Facebook, Safari) fly in (192–288) ("Machina saves from any app. No copying, no pasting.") |
+| 304–512 | YOUTUBE | the point becomes the +, the app irises open (336); the video's card lands at the top of the feed, tapped open (392): its Key moments, each timestamp lifted in turn (440–464) ("Share a YouTube video. Get its key moments, with timestamps.") |
+| 512–672 | X | a long-form X Article lands, opened (552), its Key Points lifted (608) ("A long read on X, boiled down to the points that matter.") |
+| 672–832 | INSTAGRAM & FACEBOOK | an Instagram photo post lands, opened (712): the post's photo lifted over its summary (760) ("Instagram and Facebook posts, saved and summarized too.") |
+| 832–992 | ARTICLES | Mark Manson's essay ("The Most Important Question of Your Life") lands, opened (872), read down to its Key Points; its "Do this" lifted (968) ("An article becomes a summary you can act on.") |
+| 992–1232 | NOTES | a typed note lands, opened (1032), verbatim; "Summarize with Machina" tapped (1088), "Reading your text…", Machina's read opens under the untouched note (1120) and is read down ("Your notes stay as you wrote them. Summarize them when you want.") |
+| 1232–1392 | SCREENSHOTS | a cut to the feed, + tapped (1256); the real Add dialog rises (1264), Image tab (1296), three screens of one recipe post picked (1328), Save (1368) ("Even screenshots get analyzed. Up to five become one card.") |
+| 1392–1576 | KEY POINTS | the feed's own "Reading 3 screenshots…" card, the card it becomes (1432), opened (1480): the screenshots, the gist, the Key Points lifted (1568) ("It reads the text in them and pulls out the key points.") |
+| 1576–1696 | TAGS & LINKS | read on down past the "Do this"; the tags lift (1640), then the two Related cards (1648, 1664) ("Then it tags it, and links it to what you already saved.") |
+| 1696–1880 | the close | thrown into the lockup: the mark strikes (1752), MACHINA wipes in on the spoken name, then the tagline on one line, word by word, held 1.2s ("Machina. Everything you save, finally useful.") |
+
+**How it got here.** Round 1 rebuilt the clip to the owner's brief (the
+first cut, a re-edit of the reel's Save chapter, was rejected), then took the
+owner's line notes (no "share sheet"; screenshots "get analyzed"). Round 2 was
+a measured finishing pass, no re-concept: the Add dialog opened as a double
+exposure (the app fades its dialog in over its own scrim, so a lifted crop of
+those frames shows the feed's type through it; it now rises from the settled
+frame over a screen already racked out); the camera zoomed through the pick
+and smeared the screenshots arriving (it reframes first, the pick lands on a
+still frame); Save showed two dialogs (the lift now settles away while the
+screen is soft); the landed card's lift hopped a pixel a frame (it followed
+the app's arrival spring: held on the settled box); the mark's exit blinked
+(EASE_MODAL fade → EASE_IN_OUT, every lift exit too); three taps touched a
+frame or two late; the tags got their own lift (the line says "tags it");
+frame 0 (the poster) now reads. Verify gained a gate for each new class.
+Then the owner's tagline decision (2026-09-28: every launch film ends on
+"Everything you save, finally useful."): the close became "Machina. /
+Everything you save, / finally useful." in place of "Save it once. Machina
+does the rest." (a takeaway line before the lockup would have run the clip to
+about 34s), the clip grew 24 frames so the tagline holds 1.2s, and verify
+checks the close is the tagline, exactly, said nowhere earlier, and that the
+clip never says the App Store subtitle. The close is a `KineticLine`, not the
+`Lockup`'s own line: that one splits on spaces only and drops a row break.
+Round 3 (owner, 2026-09-29: "not detailed enough … we have a ton of great
+abilities, SHOW THEM") added the source tour, one real-app card per kind of
+save, each opened on what the app made of it: the YouTube card's Key moments
+with timestamps (copied from a real card on the owner's phone), a long-form X
+Article's Key Points, an Instagram photo post read from caption and photo, an
+essay's Key Points and "Do this", and a note kept verbatim and summarized on
+request. The shares montage grew to five (Facebook and X added). Notes come
+before Screenshots (the owner's plan had them after) so the tour is one
+continuous take and the clip still ends on the recipe card's tags and links.
+Two script lines were fitted to what the app does: X is "a post on X, even a
+long article" (the app reads X Articles; it does not unroll whole threads),
+and YouTube's key moments need Pro (free cards are filed from the title and
+description; the clip names no plan). 62.7s.
+Round 4 (owner, 2026-09-30: the first frame must say the problem, saves
+scattered across apps and impossible to find, and show YouTube, Instagram,
+Facebook and the rest, not a generic save icon): the hook is now six piles,
+each an app's own save list with its mark and four real demo saves, and the
+line is "You save things in every app. Then you can never find them." Frame 0
+is the six piles, full and legible. Verify reads the piles' title lists.
+Round 5 (owner line notes, 2026-09-30: say it with value, well phrased): the
+hook became "Your saves are scattered across countless apps, and impossible
+to find." (set at 54px so it keeps two lines); X, "A long read on X, boiled
+down to the points that matter." (was "…even a long article, comes back as the
+key points."); Instagram & Facebook, "Instagram and Facebook posts, saved and
+summarized too." (was "…it reads the caption and the photo.", which states
+a given, not a benefit). Picture unchanged.
+Round 6 (owner, 2026-10-01): the Photos · Screenshots pile shows pictures, not
+titles (three screenshot thumbnails, the clip's own invented posts copied
+small into `public/clips/save/hook/`; a new one slides in on "scattered"),
+and the tagline sits on ONE line under the wordmark (52px), as in the reel.
+Then the YouTube line broke mid-sentence ("Share a YouTube video. Get its /
+key moments…"), so "Get its" arrived with the first sentence (a row arrives
+whole on its first spoken word); it now breaks at the sentence, and verify
+fails any caption row that starts a new sentence mid-row.
+Owner (2026-10-01): the Articles card is now Mark
+Manson's "The Most Important Question of Your Life" (key points and "Do this"
+true to it; take `sources` re-captured, his name gone from every frame), the
+Safari share is that essay, and Safari's Reading List in the hook leads with
+Marcella Hazan's sauce. (The demo account's old essay card was then replaced
+everywhere: see the next entry.) The demo account's card was untouched (other
+videos use it).
+
+**What is real and what is scripted.** Every app frame is the real app. The
+source tour is take `sources` (`capture/shoot.mjs`): each finished card is
+written onto the store the way the backend writes it and opened in the real
+detail view; the note's "Summarize with Machina" is really tapped and
+`/api/analyze` answers with a scripted read (`capture/clip-save.mjs`
+`sourceCards`, `NOTE_READ`). The YouTube card is the app's own output for a
+real video (Big Think Clips, "How to overcome your addiction to technology"),
+copied from the owner's phone; the X Article's author, the Instagram handle,
+the Facebook page in the montage and the note are invented (as the demo
+invents its Instagram handles); the essay is Mark Manson's, summarized true to
+it; the Instagram photo is a text graphic drawn for the clip, no third-party
+image. The screenshots section is a new
+take `saveclip` (`capture/shoot.mjs`, same demo account): the screenshots are
+picked into the Image tab's real file input, the app writes its real
+placeholder card and banner, and `/api/share` is held until the clock is frozen
+so the close is recorded. Scripted, as for the reel: the three screenshots
+(`capture/clip-save.mjs`: an invented cook's post, no platform chrome or
+third-party image) and the card the backend returns for them, written the way
+the backend writes a recipe (Key Points, Ingredients, Steps, tags, a "Do this",
+Related cards pointing at two real demo saves). The share sheet is native (the
+iOS Share Extension takes a link, text or up to five images), so it is the
+reel's share gesture, not rebuilt iOS UI. Nothing claims collections are filled
+automatically (they are not).
+
+**Built from the kit.** `clips/save-timeline.mjs` is the clock (the reel's
+grid, 112.5 BPM; app rolls captured at 60fps and played one per output frame,
+the reel's half speed). Scenes in `src/reels/clips/save/`: `Hook.tsx`,
+`Shares.tsx`, `Sources.tsx` (the source tour: landings, the app's own opens,
+lifts on each card's key part, stepped scrolls compensated like the reel's),
+`App.tsx`, `End.tsx` (the kit's `Lockup` plus a `KineticLine` for the
+tagline). Kickers name each element; multi-word
+kickers use non-breaking spaces (the kit's `Kicker` sets each letter as an
+inline block, where a plain space collapses: "ANYAPP"). Lifts leave by fading
+at full lift (see Camera below).
+
+Sound: `audio/clips/save-score.mjs`, from the shared instruments; nothing
+lands on a word (bells on the Related cards masked their line to 2.4dB and
+were moved after it; the tour's lifts are silent, its taps tick). Every line
+≥ 5.3dB over the music in the speech band; mastered −14 LUFS, true peak
+−1.25 dBTP.
+
+```bash
+CAPTURE_ONLY=sources,saveclip node capture/shoot.mjs   # the takes (after reel:app)
+python3 audio/synth-vo.py save      # the narrator → out/vo/save/, src/reels/clips/save/vo.json
+node audio/clips/save-score.mjs     # the score   → public/clips/save/score.wav
+node audio/mix-vo.mjs save          # the mix     → public/clips/save/score-vo.wav (committed)
+npm run verify                      # "── clip: save"
+npx remotion render src/index.ts MachinaClipSave out/clips/machina-clip-save.mp4
+```
+
+Also `MachinaClipSaveSilent` and `MachinaClipSaveClean`. Verify's clip section
+holds the reel's caption, dwell, grid, banned-word and loudness gates to the
+clip, and adds: Machina named in a line and in the close, about 30s, no plain
+space in a kicker, the saves shown are real demo saves, the take has every
+mark the cut plays, every tap's pad touches on its hit, no exit on a
+fast-start curve, and the landed card's lift box within 2pt of the app's.
+
+## Meta ad 1: "What one save becomes"
+
+`MachinaAdCard` is a 36.8s vertical ad for Instagram and Facebook (Reels,
+Stories, Feed) and an organic Reel: what one save becomes. Round 5 (owner,
+2026-10-03) rebuilt it around SAVES, not videos, in the voice of one person
+talking to a friend: a question the viewer answers in their head, three
+small, specific pains, "That's exactly why we made Machina.", one
+instruction said once, and every feature line ending on "so you…". The
+hero card is an article (Mark Manson's "The Most Important Question of Your
+Life"). Branch `claude/ad-card`.
+
+| Frames | What you see | What's said (on screen in chunks of at most 8 words) |
+|---|---|---|
+| 0–116 | frame 0 is the poster: four apps' save lists (Safari · Reading List, X · Bookmarks, Instagram · Saved, Photos · Screenshots), real demo titles and the ad's own screenshots, the first chunk already set; a new save drops into each, then they grey out (80) | "How many things did you save this month… and never open again?" |
+| 116–332 | the camera visits the pain: the Reading List, the article on top (120); X's Bookmarks, Naval's thread on top (192); Photos, a friend's message about a hike sliding in (264, 280) | "The article you promised yourself you'd read… the thread you bookmarked at midnight… the screenshot you swore you'd remember." |
+| 328–401 | the lists gather into one point, the mark snaps (352), MACHINA wipes in on the spoken name; no caption (round 7: the drawn name is the only text) | "That's exactly why we made Machina." (said, not shown) |
+| 400–504 | the article (high left, from the top), the thread (mid right, from the right), the screenshot (low left, from the left), each tilted, held a moment, Share tapped (424, 448, 472), pulled in (440, 464, 488) | "From any app, just share it to Machina." |
+| 464–640 | the point becomes the + (464), the app opens (488); the article lands and is tapped open (528): its gist; one scroll; the Key Points lift (600) | "It reads what you save and pulls out the key points… so you'll always remember why you kept it." |
+| 640–784 | on down: its Related cards (Naval's thread, Jobs' Stanford address, Bret Victor's talk) lift (672); "See in graph" (720), the real graph, its ties lit | "It links each save to what you saved before… so you see how your ideas connect." |
+| 776–992 | back on the card: its bell (792), "Remind me" lifted off its screen, Smart review ringed and held (808), Save (880); a cut to the feed (920), TOMORROW over the line, "Reminders due", the article in it, lifted (944) | "Then pick a time, and Machina brings it back… so you actually get back to it." |
+| 992–1166 | thrown into the lockup: the mark strikes (1032), MACHINA on the spoken name, the tagline on one line, held 1.6s after the voice | "Machina. Everything you save, finally useful." |
+
+**How it got here.** Round 1 (21.0s) read the card down section by section
+("Get the key moments, with timestamps." / "The whole talk, down to what
+matters." / "Tagged, and linked to what you already saved."). Round 2 (owner:
+"linked to what you saved should also show the graph") added "See in graph"
+and the real graph (23.1s). Round 3 (owner, 2026-10-02) rewrote the script:
+the hook in six words ("Saved for later? Later never comes."), "instead" in
+the share line, "Get … / Get the key points." for the card, the video never
+called a "talk" (verify fails the word), and, the key note, the payoff answers
+the pain: the reminder and its return, in the launch films' words ("brings it
+back", "Ready when you are."). The card is open by 6.7s (was 7.2s with a
+longer hook). Round 4 (owner, on device: the share card appeared before its
+line; "pacing is too fast and jittery"): the card now lifts out only on "Share
+it to Machina instead.", and the cut was re-timed from a frame-by-frame
+measure of the render (the mean change between frames): a camera key out of
+time order had snapped the Key moments shot mid-move (verify now fails any
+key out of order); the camera braked into the card's tap (it now settles
+first); the Key moments lift a beat apart, not an 8th; the two scrolls and the
+pan down the reminder sheet take 1.6s (the Key Points scroll, ~570pt, 2.1s;
+it was 1.1s). Measured after: no jump between frames except the four cuts.
+29.3s.
+Round 5 (owner, 2026-10-03: "why are you focused on videos?"; write it like
+one real person talking to a friend): the ad is about saves, not one video.
+New script (above), new picture around it: four apps' save lists (the SAVE
+clip's pile cards, no recipe; the Photos list's screenshots drawn for the ad,
+`scripts/ad-card-shots.mjs`), the three saves the hook named shared into the
+mark, and the take re-shot on the essay card (`capture/ad-card.mjs`: the
+demo's copy is removed and the essay arrives fresh, its Key Points and "Do
+this" as the SAVE clip wrote them true to the essay, its Related row the demo's
+own connections). Captions are chunks of the narrator's own words, each
+arriving with its first spoken word (`|` in the timeline, `AdCaptions.tsx`).
+The narrator's "…" pauses are long in this voice, so lines start a breath
+(0.3s) after the line before, not on the next 8th; taps and cuts stay on the
+grid. 36.8s (owner: about 30–35s; under 35 would need a faster voice).
+
+Round 6 (owner, 2026-10-03): the reminder and everything after it had too
+little time on screen, so Smart review holds ~1s longer and the rest follows
+(Save 880, the due strip 920, the lockup 1008). "1 a.m." became "at midnight"
+because the voice said it badly. The Safari, X and Instagram lists now slide
+new saves in, like the Photos strip. No ellipsis on screen (verify fails one;
+the narrator's pauses stay in `say`). The three shares enter from the top,
+the right and the left and settle in three places around the mark, so the
+saves read as coming from all over. The reminder line is split in two, the
+TOMORROW kicker on the second. 38.9s.
+
+Round 7 (owner, 2026-10-03): "That's exactly why we made Machina." is said
+but not shown (`place: 'voice'` in the timeline); the drawn MACHINA is the
+only text on the name beat. The shares are scattered wider (high left, mid
+right, low left, each at its own tilt) and slower: 24 frames apart, each held
+still a moment before its tap. Everything after the shares moved one bar-half
+(32 frames) later. 39.9s.
+
+Round 8 (owner, 2026-10-03, on device): "the screenshot you swore you'd
+remember." was grey: the hook's focused list (zIndex 2) sat over the caption
+layer and its frosted card washed the type out; captions now sit at zIndex 10.
+The graph no longer hard-cuts to the card: it goes soft and fades while the
+card fades in soft and pulls into focus (14 frames). The reminder is slower:
+a second on the card before the bell, Smart review held longer, Save at 944.
+The app's "Reminder set" toast covered a Related card, so the screen stays
+soft behind it (the sheet's blur is held) and the toast reads on its own; the
+cut to tomorrow happens under that blur and racks into focus. 42.1s.
+
+Round 9 (owner, 2026-10-04): a new narrator, Gemini 3.8 Flash TTS, voice
+Sulafat (the house narrator), with this ad's own tone ("knowing, wry,
+relatable, then a satisfying payoff"; the reminder is the hero). Each caption
+carries its acting note (`style`) and pace; the four pain lines are tightened
+(`tempo: 1.1`, `maxPause: 0.2`). The engine is Meta ad 3's
+(`audio/gemini_tts.py`), ported into `synth-vo.py`; every other script stays
+on Kokoro. Voicing runs on GitHub (`.github/workflows/narration-tts.yml`, the
+repo's `GEMINI_API_KEY`): pushing `audio/narration-request.json` voices the
+lines and commits the raw takes to `audio/vo-takes/` (keyed by words + model
++ voice + direction: editing a note re-voices that line); `synth-vo.py
+adcard` then builds the lines locally with no key. The read runs longer, so
+`scripts/ad-card-layout.py` re-times the picture to it: each line after the
+previous one's measured speech (0.2s after a pain line, 0.3s otherwise), its
+section's beats moving with it, in whole 8ths. Whooshes, risers, hats and the
+shaker drop to a third while the narrator speaks (noise under this voice
+reads as static). Word times are estimated from the audio (±0.2s), not
+recognised. 43.7s.
+
+Round 10 (owner, 2026-10-04, for every video): HEADLINE captions. The
+narrator still says every word; the screen shows each line's point in 2–5
+words (`heads` in the timeline: [the spoken word it lands on, the
+headline]), drawn with the kit's `Headline` (Meta ad 3's motion: each line
+rises out of a mask in one move, no blur, an ink highlighter sweeps under the
+`*marked*` phrase; it replaces the word-by-word reveal the owner called
+"dated and laggy"). A headline arrives 3 frames before its word and rolls out
+as the next arrives. Ad 1's headlines: "Saved it. / *Never* opened it."
+(the poster, frame 0), "That *article*", "That *thread*", "That
+*screenshot*", "Share from *any app*", "Every save, *read*", "The *key
+points*, pulled out", "Remember *why you saved it*", "*Linked* to what you
+saved", "Your ideas, *connected*", "Pick a *time*", "It *comes back*",
+"And you *actually* go back" (under TOMORROW). The name beat stays
+uncaptioned (owner, round 7, re-confirmed); the relayed headlines' trailing
+"…" were dropped (owner, round 6: no ellipsis on screen). Verify now checks
+headlines (2–5 words, on a real spoken word, one line over the app) instead
+of on-screen = narration.
+
+Round 11 (owner, 2026-10-04, final call for every video, after comparing ad
+3's versions: "the full captions and the new animation"): round 10's
+headlines are reverted; the captions are the full narration again, in the
+round-5 chunks, drawn with the kit's new `KineticLine` (taken from
+`claude/ad-todo` 75d129f: each row rises out of its own mask 3 frames before
+its first word, no blur, and rolls up out in the 5 frames before it leaves).
+`AdCaptions.tsx` now ends every chunk 4 frames before the next one's first
+word, across lines too, so two captions never show at once (checked frame by
+frame around a handover and a two-row chunk). The name beat stays
+uncaptioned and there is no "…" on screen.
+
+**The Meta spec, and how the ad meets it.** 43.7s (owner, round 5: about
+30–35s; round 6's slower reminder took it over; verify notes over 35s and
+fails over 45s). Frame 0 is a legible picture with the
+first chunk set on it, so the hook lands with the sound off. At most 8 words
+on screen at once (the TOMORROW kicker counts). The mark arrives with "That's
+exactly why we made Machina." (~11s), by the owner's script, not by 3s as the
+first brief asked. Safe zones (9:16): the line at 346px, under Meta's top
+270px; the lists, the shares, the mark, every lifted element and the tagline
+above Meta's bottom 670px (y 1250). No App Store badge, no "available", no
+price, no "free", no plan (Key Points, Related cards and reminders are on both
+plans). No recipe anywhere; the graph is framed under its legend chips (they
+name every category, "cooking" among them).
+
+**Three renders, one scene code.** `src/reels/ads/card/format.ts` frames the
+same scenes for three shapes (the film's `useFraming()` idea): `tall` 9:16,
+`feed` 4:5 (1080×1350: the line at 92px, everything below it 150px higher, a
+lockup centred for the shape) and `square` 1:1 (the poster). Reframed, not
+cropped. Compositions: **`MachinaAdCard`** (9:16, score + narrator + captions,
+the main cut), **`MachinaAdCardMusic`** (9:16, score + captions, no narrator:
+the A/B test), **`MachinaAdCardFeed`** (4:5, score + narrator + captions),
+plus `MachinaAdCardSilent` / `MachinaAdCardFeedSilent` (stills, QA) and
+`MachinaAdCardPoster` (1:1, frame 0 is the thumbnail).
+
+**What is real and what is scripted.** Every app frame is the real, shipped
+app (take `adcard`, `capture/shoot.mjs`): the essay card lands in the feed,
+is opened in the real detail view and scrolled in 3pt steps, its "See in
+graph" opens the real graph, and its reminder is the app's own flow, really
+tapped (the bell, the "Remind me" sheet, Save, the toast). Scripted, as the
+backend's part: the card as the backend writes an article
+(`capture/clip-save.mjs` `src-article`: gist, Key Points and "Do this" true to
+Mark Manson's essay), its Related row (the demo's own connections, with their
+reasons), and the reminder coming due ("tomorrow"), written the way
+`reminder_service` flags it, so the feed shows its real "Reminders due" strip.
+The opening lists and the shares are the kit's brand graphics, not app UI: an
+app's mark as the Machina app draws it, the name of its save list, real demo
+titles, and screenshots drawn for the ad (a friend's message about the Tour du
+Mont Blanc, a list of books, James Clear's line, the SAVE clip's packing post).
+The lock-screen push ("Time to revisit") is native iOS and is not shown
+(`PUSH_SLOT`). The dates on screen are the capture day's.
+
+**The share slot.** The iOS share sheet is native and cannot be captured from
+the web build, so the share beat is the kit's brand gesture (`Share.tsx`),
+drawn entirely inside `SHARE_SLOT` (frames 88–136 in
+`ads/card-timeline.mjs`). A real iPhone screen recording of Share → Machina
+can replace it later, cut for cut, without touching the rest of the edit.
+
+```bash
+# after npm run reel:app (the real app, built for capture)
+CAPTURE_ONLY=adcard node capture/shoot.mjs   # the take (the other takes' PNGs must be on disk: takes.json is written from every take there)
+python3 audio/synth-vo.py adcard             # the narrator → out/vo/adcard/, src/reels/ads/card/vo.json
+node audio/ads/card-score.mjs                # the score   → public/ads/card/score.wav
+node audio/mix-vo.mjs adcard                 # the main mix → public/ads/card/score-vo.wav (committed)
+node audio/mix-vo.mjs adcardMusic            # the A/B mix, no narrator → public/ads/card/score-music.wav (committed)
+npm run verify                               # "── ad: card"
+node scripts/ad-card-stills.mjs              # every beat, both shapes, contact sheets, the poster → out/ads/card/
+npx remotion render src/index.ts MachinaAdCard out/ads/card/machina-ad-card.mp4
+npx remotion render src/index.ts MachinaAdCardMusic out/ads/card/machina-ad-card-music.mp4
+npx remotion render src/index.ts MachinaAdCardFeed out/ads/card/machina-ad-card-feed.mp4
+```
+
+Its gates (`audio/ads/card-verify.mjs`, run by `npm run verify`) hold the SAVE
+clip's caption, dwell, grid, tap, exit, banned-word and loudness gates to the
+ad, and add the Meta spec: 15–30s (a note over 20s), a poster line on frame 0
+and the voice by 0.5s, the mark by ~3.5s, at most 8 words on screen, the
+tagline exact and held 1.6s (a kicker counts toward the 8 words), no "talk", "share sheet", "bookmarks", "free", price,
+plan or availability in what the ad says, no recipe on any frame of the take
+it plays, the 9:16 safe zones (the line, the +, the hero line), and both
+mixes at −14 ±0.5 LUFS, true peak ≤ −1 dBTP. Sound: every line ≥ 6dB over the
+music in the speech band; nothing lands on a word (the lifts are silent; the
+shimmer after the strike sits between "Machina." and the tagline). Nobody has
+listened to either mix on speakers (no audio device here).
 
 ## Motion language
 
@@ -1057,6 +1425,24 @@ that breaks it.
 - **A read that runs out of page hands its motion to the camera** in one
   eased curve (the Revisit clip's `GLIDE`): the page scrolls until it ends
   and the camera carries the same motion on. Never a stop and a second start.
+  and motion blur follows the net motion (camera + scroll).
+- **Lifts are gone before their screen moves fast.** A `Lift` is a sharp
+  copy outside the screen's motion blur: thrown with its screen, it stays
+  crisp over a smeared page. Take it away with `opacity` at full lift, not by
+  easing `lift` to 0: any lift above 0 draws the copy ~1pt below its own
+  pixels (at the usual 0.35 the rise cancels it), so a lift easing down sags
+  and snaps back on removal (measured: the reel's Key Points sink 3px over
+  reel frames 1176–1190 and snap back at 1192; the kit is unchanged so the
+  reel renders as approved).
+- **Lift a settled frame, and hold a lift on a settled box** (SAVE round 2).
+  An element the app animates in (a dialog fading in over its scrim) is lifted
+  from its settled frame and given its own arrival, or its see-through
+  in-between frames double-expose whatever sits behind the crop; and the
+  screen behind racks out before it arrives, so it never fades in over sharp
+  type. A `Lift` on something the app is still springing into place uses the
+  settled box, not each frame's measured one, which moves by half points and
+  makes the copy hop a pixel a frame. Never show a lifted copy and its screen's
+  own copy at once: the lift leaves while the screen is still soft.
 
 ### Sound to picture (`HITS`, `audio/reel-score.mjs`)
 

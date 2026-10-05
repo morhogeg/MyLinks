@@ -2506,7 +2506,7 @@ same words; the tagline line under the rule was cut so screen and voice agree.
 So the "one slot to swap for a badge" note above is now the empty space under
 the subtitle, and the tagline's best-placed appearance is the promotional text,
 not the film. The library caption reads "From now on, lose nothing." (comma).
-**Slogan roles settled 2026-09-19 (owner, after asking "which one is it?"):**
+**Slogan roles settled 2026-09-19 (SUPERSEDED 2026-09-28, below; owner, after asking "which one is it?"):**
 the film's introduction line is the TAGLINE ("Machina. / Everything you save,
 finally useful.", replacing "one place for all your saved links", which
 volunteered Machina into the link-saver category and undersold screenshots
@@ -2526,6 +2526,21 @@ endcard carries the tagline, which the voice says after the name; the reel
 and the REVISIT clip close on it too (the reel's early "All your saves,
 finally useful." became the subtitle). `npm run verify` fails any of them that
 repeats the tagline before the end or ends on anything else.
+**Slogan roles flipped 2026-09-28 (owner decision): every launch film ENDS on
+the tagline.** The endcard's one line is "Everything you save, finally
+useful." (exact wording, comma included, set in sentence case), and the
+closing voice line says those words and nothing else; the introduction is now
+"Machina. / Never lose another great find." (voice: "Introducing Machina.
+Never lose another great find."). The tagline appears once per film, at the
+end. Why: the tagline is the brand line and stays fixed; the subtitle is App
+Store copy that can change with search tests and would date every posted film;
+and problem → Machina → payoff ends on the payoff. `npm run verify` holds it
+(tagline once, on the endcard, screen = voice word for word; the introduction
+carries the subtitle). All seven editions re-rendered. NOT changed: the
+highlight reel (`MachinaReel`, branch `claude/machina-reel-pilot`) still
+closes on "Machina. Never lose another great find."; it needs its own owner
+call and round (its verify gate now checks that line against the App Store
+subtitle rather than the film's endcard).
 
 *Short-form reels (PLANNED 2026-09-26, owner; the PILOT was built the same
 day on branch `claude/machina-reel-pilot`, NOT merged, see "What exists"
@@ -2711,6 +2726,29 @@ Points. Round 6 rewrote the beginning's lines in plain words ("But most of
 them, you never open again." / "Your saves come back when you want them." /
 "Later today, this weekend, or three times, so it sticks." / "Open one, and
 the key points are already there."); 55.5s. How to render: the launch-clip README, "Feature clip: REVISIT".
+**What exists (feature clip: SAVE, 2026-09-29, branch `claude/clip-save`,
+awaiting owner review, not merged):** `MachinaClipSave` (62.7s, 1080×1920,
+score + narrator + captions; mastered −14 LUFS, true peak −1.25 dBTP), plus
+`MachinaClipSaveSilent` and `MachinaClipSaveClean`, in
+`marketing/launch-clip/`. Built to the owner's feature-video brief, then
+widened (2026-09-29: saving is a core feature, show every kind of save).
+Hook (round 4, owner 2026-09-30): six apps' own save lists, each with its
+mark (YouTube Watch later, Instagram Saved, X Bookmarks, Safari Reading List,
+Facebook Saved, Photos Screenshots), "Your saves are scattered across
+countless apps, and impossible to find." → the name → ANY APP (five shares into the mark) → the SOURCE TOUR, one real-app
+card each: YouTube (Key moments with timestamps), X (a long-form X Article's
+Key Points), Instagram & Facebook (a photo post read from caption and photo),
+Articles (Key Points and a "Do this"), Notes (kept verbatim, "Summarize with
+Machina" on request) → SCREENSHOTS (the real Add dialog's Image tab, three
+screens → one card) → KEY POINTS → TAGS & LINKS → "Machina. Everything you
+save, finally useful." on the lockup. Takes `sources` and `saveclip`
+(`capture/shoot.mjs`; scripted cards in `capture/clip-save.mjs`). Clock
+`clips/save-timeline.mjs`, scenes `src/reels/clips/save/`, score
+`audio/clips/save-score.mjs`; verify has a clip section. **To render:** after
+`reel:app`, `CAPTURE_ONLY=sources,saveclip node capture/shoot.mjs`, then
+`npx remotion render src/index.ts MachinaClipSave
+out/clips/machina-clip-save.mp4`; the launch-clip README's "Feature clip:
+SAVE" has the audio commands and the frame table.
 
 **Feature-clip briefs, FINAL against the pilot's kit (2026-09-26).** Shared
 by all five: **448 frames (7 bars at 112.5 BPM, 14.9s)**, vertical, built
@@ -3099,6 +3137,141 @@ exact-match, capped.
   hook is 10 words on screen (the owner's line); nobody has listened on
   speakers; `takes.json` = committed takes + `adTodo` (re-capture all takes
   when the three ad branches merge); not through Meta's ad review.
+- **2026-10-04 — META AD 1, ROUND 11: FULL CAPTIONS, NEW MOTION.** Branch
+  `claude/ad-card`, not merged. Owner's final caption call for every video
+  (relayed from ad 3, confirmed here): full narration captions in the new
+  mask-rise motion. Round 10's headlines reverted (timeline, AdCaptions,
+  verify back to round 9); `kit/Type.tsx` from `claude/ad-todo` 75d129f.
+  Chunks now hand over with a 4-frame gap (the new motion rises 3 frames
+  early), so no two captions overlap. Verify clean; 43.7s; mixes unchanged.
+- **2026-10-04 — META AD 1, ROUND 10: HEADLINE CAPTIONS.** Branch
+  `claude/ad-card`, not merged. Owner decision for every video (relayed from
+  the ad 3 session, confirmed here): the screen shows each line's point in
+  2–5 words with the kit's new `Headline` (taken from `claude/ad-todo`
+  724655d, appended to `kit/Type.tsx`; `KineticLine` kept), the narrator still
+  says every word. 13 headlines in `heads` per caption; `AdCaptions.tsx`
+  rewritten to draw them (TOMORROW kicker kept). Owner calls kept over the
+  relay: no caption on "That's exactly why we made Machina." and no "…" on
+  screen. Verify gates swapped to headline rules. Narration, picture timing
+  and length unchanged (43.7s). Open: nobody has watched the new motion on a
+  phone.
+- **2026-10-04 — META AD 1, ROUND 9: GEMINI TTS NARRATOR (SULAFAT).**
+  Branch `claude/ad-card`, not merged. Owner-approved (relayed from the ad 3
+  session, confirmed here): re-voice with Gemini 3.8 Flash TTS, Sulafat, with
+  this ad's own tone and a direction per line. Took ad 3's engine unchanged
+  (`gemini_tts.py`, `vo-audition.py`, `narration-run.py`,
+  `.github/workflows/narration-tts.yml`) and ported its `synth-vo.py` engine
+  switch (`ENGINE = {"adcard": "gemini"}`; Kokoro scripts re-generate their
+  word timings identically). Voiced on GitHub after the 07:00 UTC reset: 11
+  requests, each line once; runs 1 and 2 stopped on a per-minute 429 (limit
+  10, shared with other sessions) after 3 and 5 lines, run 3 finished the
+  last 3 (the kept takes are re-used, so no line was voiced twice). New
+  `scripts/ad-card-layout.py` re-times the picture to the read; whooshes,
+  risers, hats and shaker drop to a third under the voice. 43.7s (length
+  gate now fails over 45s; the pain-line dwell minimum is 0.2s). Verify
+  clean; mixes −14.0 LUFS, ≤ −1.25 dBTP. Open: nobody has listened; word
+  times are estimates (±0.2s); "midnight…" may end clipped.
+- **2026-10-03 — META AD 1, ROUND 8: GREY CAPTION FIXED; A SOFTER, SLOWER
+  REMINDER.** Branch `claude/ad-card`, not merged. Owner, on device: "the
+  screenshot you…" was grey (the hook's focused list, zIndex 2, sat over the
+  captions; captions are now zIndex 10); the graph → reminder cut was abrupt
+  (now a 14-frame focus-pull dissolve); the reminder was jittery and fast (a
+  second on the card before the bell, Smart review held longer); the "Reminder
+  set" toast covered a card (the screen stays soft behind it until after the
+  cut to tomorrow). 42.1s; the length gate now fails over 43s. Verify clean;
+  mixes −14.0 LUFS, ≤ −1.25 dBTP.
+- **2026-10-03 — META AD 1, ROUND 7: THE NAME UNCAPTIONED; SHARES
+  SCATTERED AND SLOWER.** Branch `claude/ad-card`, not merged. Owner: don't
+  show "That's exactly why we made Machina." (the narrator still says it; the
+  drawn MACHINA is the only text there), and the three shares should be more
+  scattered and slower. They now settle high left, mid right and low left,
+  each tilted, 24 frames apart (was 16) and held before the tap; everything
+  after moved 32 frames later, so the ad is 39.9s (verify fails over 40s).
+  Verify clean; mixes −14.0 LUFS, ≤ −1.25 dBTP.
+- **2026-10-03 — META AD 1, ROUND 6: SLOWER REMINDER, LIVE LISTS, SAVES
+  FROM EVERYWHERE.** Branch `claude/ad-card`, not merged. Owner notes, each
+  done: (1) from the reminder on, the screens were too fast: Smart review is
+  held ~1s longer, Save lands at 880, the due strip at 920/944, the lockup at
+  1008, so the ad is now 38.9s (verify notes it over 35s; it fails above 40s);
+  (2) "1 a.m." was voiced badly: the line now says "at midnight"; (3) the
+  hook's Safari, X and Instagram lists now slide in new saves like the Photos
+  strip did (tiles drawn by `scripts/ad-card-shots.mjs`; the X list's third
+  post is the SAVE clip's own invented @marginalia post, now allowed by the
+  title gate); (4) no ellipsis on screen (the narrator keeps its pauses in
+  `say`; verify fails a "…" in caption text); (5) the three shares come from
+  three sides of the screen (above from the top, right, left) and settle
+  around the mark before it pulls them in. The reminder line is split into
+  two lines ("Then pick a time, and Machina brings it back" / "so you actually
+  get back to it." with the TOMORROW kicker). Verify clean; mixes −14.0 LUFS,
+  ≤ −1.25 dBTP. Open: still over the owner's 30–35s; nobody has listened on
+  speakers; the push is not shown (`PUSH_SLOT`).
+- **2026-10-03 — META AD 1, ROUND 5: SAVES, NOT VIDEOS; A FRIEND'S VOICE.**
+  Branch `claude/ad-card`, not merged. Owner: the ad was stuck on one YouTube
+  video (the first brief's hero); it is about what ANY save becomes, voiced
+  like one person talking to a friend. New approved script: "How many things
+  did you save this month… and never open again? The article… the thread…
+  the screenshot… That's exactly why we made Machina. From any app, just share
+  it to Machina. It reads what you save and pulls out the key points… so
+  you'll always remember why you kept it. It links each save… so you see how
+  your ideas connect. Then pick a time, and Machina brings it back… so you
+  actually get back to it." then the tagline. New picture: four apps' save
+  lists (no recipe; screenshots drawn for the ad), three shares, the take
+  re-shot on Mark Manson's essay card (Key Points, Related, graph, reminder,
+  due strip). Captions are chunks of the narrator's words. 36.8s (owner asked
+  ~30–35s; the voice's "…" pauses cost the rest). Verify clean. Open: nobody
+  has listened on speakers; the mark arrives at ~11s (the script names
+  Machina there), not by 3s.
+- **2026-10-02 — META AD 1, ROUND 4: THE CARD WAITS FOR ITS LINE; CALMER,
+  SMOOTH PACING.** Branch `claude/ad-card`, not merged. Owner on device: the
+  share card appeared during "Later never comes." (now only on "Share it to
+  Machina instead."), and the cut was "too fast and jittery". Measured the
+  render frame by frame: a camera key out of time order snapped the Key
+  moments shot (fixed; verify gate added), the camera braked into the card's
+  tap, lifts popped 8 frames apart, the Key Points scroll and the sheet pan
+  were too fast. Re-timed: lifts a beat apart, 1.6–2.1s scrolls, every move at
+  rest before the next tap. 29.3s (under Meta's 30s cap); the mark now
+  assembles at 3.7s, with the card. Verify clean. Open: nobody has listened on
+  speakers.
+- **2026-10-02 — META AD 1, ROUND 3: NEW SCRIPT, THE REMINDER IS THE
+  PAYOFF.** Branch `claude/ad-card`, not merged. Owner rewrote the script
+  with me: "Saved for later? / Later never comes. / Share it to Machina
+  instead. / Get the moments that matter, timestamped. / Get the key points. /
+  Linked to what you already saved. / Pick a time. Machina brings it back. /
+  Ready when you are." then the tagline. The pain ("later never comes") is now
+  answered by the real reminder flow (bell → "Remind me", Smart review → Save
+  → "Reminder set") and its return (a cut to tomorrow 9:00 AM, the feed's
+  "Reminders due" strip); "Ready when you are." is the launch film's own line;
+  never "talk" (verify gate). 26.3s (owner asks: graph + reminder). Verify
+  clean; all three renders exit 0. Open: nobody has listened on speakers; the
+  lock-screen push is native and not shown (`PUSH_SLOT` for a real recording);
+  on-screen dates are the capture day's ("Sat, Oct 3").
+- **2026-10-02 — META AD 1, ROUND 2: THE GRAPH AFTER THE RELATED CARDS.**
+  Branch `claude/ad-card`, not merged. Owner: "linked to what you saved" should
+  also show the graph. The take `adcard` now ends on the Related section's own
+  "See in graph", and the ad cuts on that tap to the real graph, the talk in
+  focus with its three ties lit. 23.1s (was 21.0s). Verify clean; all three
+  renders −14.0 LUFS, true peak ≤ −1.2 dBTP after encoding. Still open: nobody
+  has listened on speakers.
+- **2026-10-02 — META AD 1, "WHAT ONE SAVE BECOMES" (the card and its key
+  points).** Branch `claude/ad-card` (from `claude/clip-save`, `main` merged
+  in), **not merged**: the owner reviews first. Compositions `MachinaAdCard`
+  (9:16, the main cut), `MachinaAdCardMusic` (9:16, no narrator, the A/B test),
+  `MachinaAdCardFeed` (4:5), plus `MachinaAdCardPoster` (1:1 thumbnail) and
+  silent QA cuts; all in `src/reels/ads/card/`, timeline `ads/card-timeline.mjs`,
+  take `adcard` (`capture/shoot.mjs`, data `capture/ad-card.mjs`), score
+  `audio/ads/card-score.mjs`, gates `audio/ads/card-verify.mjs` (run by `npm run
+  verify`). The hook is the Watch later pile with the SAVE clip's real YouTube
+  card on top ("That talk you saved for later? / You'll never get to it.", set
+  on frame 0), the share into the mark, then the card in the real app: Key
+  moments, gist, Key Points, tags and a Related row (three demo saves, the one
+  scripted part), closing on the tagline. 21.0s (the aim was ≤ 20s; the
+  tagline's 1.6s hold costs the last second). Both mixes −14.0 LUFS, −1.25
+  dBTP; verify clean; 9:16 safe zones checked on stills. **Open:** nobody has
+  listened on speakers; the share beat is a brand graphic in a marked slot
+  (`SHARE_SLOT`) a real iPhone share recording can replace; the talk's length
+  was not verified, so no line says "thirty minutes"; `takes.json` was
+  regenerated from a fresh capture of every take (generated, never hand-merge).
+  README: `marketing/launch-clip/README.md`, "Meta ad 1".
 - **2026-10-02 — X LAUNCH CAMPAIGN REVIEWED AND ON MAIN; THREE META AD VIDEOS
   HANDED TO NEW SESSIONS.** Branch `claude/x-launch-content-video-prompts-flujr5`.
   Docs and marketing only (no `web/` or `functions/` change, nothing deployed).
@@ -3391,6 +3564,117 @@ exact-match, capped.
   as is: the reel's recap read has five 2.3px hitches (its take's 5pt steps
   among 6pt ones; `scenes/Recall.tsx` assumes 6pt). `takes.json` is
   generated: merge sibling clips' takes by re-running the capture.
+- **2026-10-01 — SAVE clip: Mark Manson's essay.** Branch `claude/clip-save`,
+  not merged. Owner: replace the previous essay's author with Mark Manson. The Articles card is now
+  Mark Manson's "The Most Important Question of Your Life" (key points and "Do
+  this" true to the essay), the Safari share is the same essay, and Safari's
+  Reading List in the hook no longer lists the old essay. Take
+  `sources` re-captured: his name is on no frame of the clip. NOT changed:
+  the demo account still had the old essay's card (the next entry replaces
+  it everywhere; checked: no rendered video ever showed it, only the unused
+  `revisit` take's data).
+- **2026-10-01 — SAVE clip round 6.** Branch `claude/clip-save`, not merged.
+  Owner: the tagline on the end card on one line (now 52px, one row); the
+  hook's Photos · Screenshots pile shows screenshot pictures instead of titles
+  (the clip's own invented posts, small copies in `public/clips/save/hook/`).
+  The YouTube line breaks at its sentence ("Get its" was showing before it
+  was said); verify fails a caption row that starts a new sentence mid-row.
+  Not listened to on speakers.
+- **2026-09-30 — SAVE clip round 5: lines that say the value.** Branch
+  `claude/clip-save`, not merged. Owner line notes: the hook is now "Your
+  saves are scattered across countless apps, and impossible to find."; X is
+  "A long read on X, boiled down to the points that matter."; Instagram &
+  Facebook is "Instagram and Facebook posts, saved and summarized too." Voice,
+  score and mix regenerated; picture unchanged. Not listened to on speakers.
+- **2026-09-30 — SAVE clip round 4: the opening says the problem.** Branch
+  `claude/clip-save`, not merged. Owner: the first frame must convey saves
+  scattered across apps and impossible to find, with YouTube, Instagram,
+  Facebook and the rest shown, not a generic save icon. The hook's generic
+  chips became six piles, each an app's own save list with its mark and real
+  demo saves; a new save drops into each on "every app", and they blur away
+  on "never find them". New line: "You save things in every app. Then you can
+  never find them." (was "Great finds get lost in open tabs, screenshots and
+  bookmarks."). The hook's bells (on the old line's words) became soft ticks
+  on the drops. Verify reads the piles' titles. Not listened to on speakers.
+- **2026-09-29 — SAVE clip round 3: every kind of save, shown.** Branch
+  `claude/clip-save`, not merged. Owner: "not detailed enough … this is a CORE
+  feature … SHOW THEM", with a YouTube card from the phone (Key moments with
+  timestamps). The clip is now 62.7s: after the name and five shares, a source
+  tour opens one real-app card per kind of save (YouTube Key moments lifted
+  one by one; an X Article's Key Points; an Instagram photo post read from
+  caption and photo; an essay down to its "Do this"; a note kept
+  verbatim, "Summarize with Machina" tapped, Machina's read opening under it),
+  then the screenshots, key points, tags and links as before, and the tagline.
+  New take `sources`; the other takes are byte-identical in `takes.json`.
+  Fitted to the code: X Articles yes, whole-thread unrolling no (the line
+  says "a post on X, even a long article"); YouTube key moments are Pro (the
+  clip names no plan). Notes moved before Screenshots so the tour is one take.
+  Verify: the duration gate is now 45–75s; share titles must be tour cards;
+  the tour's cards, note read and every captured frame pass the bans; taps
+  in `Sources.tsx` are gated too. Not listened to on speakers.
+- **2026-09-29 — SAVE clip ends on the tagline.** Branch `claude/clip-save`,
+  not merged. The 2026-09-28 tagline decision was first applied only to the
+  80s launch film (below) and those renders were sent, when the owner meant
+  this session's video: the SAVE clip. Its close is now "Machina. /
+  Everything you save, / finally useful." (voice word for word; was "Save it
+  once. Machina does the rest."), the clip is 32.8s (+24 frames so the line
+  holds 1.2s), voice, score and mix regenerated, and verify fails if the close
+  is not the tagline, if the tagline is said earlier, or if the clip says the
+  App Store subtitle. The other feature clips and the reel are on their own
+  branches (`claude/clip-ask`, `clip-find`, `clip-revisit`,
+  `machina-reel-pilot`), none merged. Not listened to on speakers.
+- **2026-09-28 — Launch film ends on the tagline (owner decision).** Branch
+  `claude/clip-save`, not merged. `MachinaLaunch` now ends on "Everything you
+  save, finally useful." (endcard line and closing voice, word for word,
+  nothing else) and the introduction reads "Machina. / Never lose another great
+  find." (the subtitle's words; the tagline is said once, at the end). Why:
+  the tagline is fixed brand copy, the subtitle can change with App Store search
+  tests. Captions, `audio/synth-vo.py`, the endcard, the voice lines and the
+  mix regenerated; verify gains a brand-lines gate; all seven editions
+  (landscape, vertical, silent, clean, vertical silent, VO, vertical VO)
+  re-rendered, and the introduction and endcard frames were read in both
+  formats. The reel's lockup line gate now checks the App Store subtitle, and
+  the reel itself is unchanged (it still ends on the subtitle: flagged for the
+  owner). The closing voice was checked by its synthesized text and timing,
+  not by ear: no audio playback here.
+- **2026-09-28 — Feature clip: SAVE, round 2 (finishing pass).** Branch
+  `claude/clip-save`, not merged. A measured review of the 32s render (frame
+  differences, phase correlation, strips at every seam), no re-concept: script,
+  order, lines, mix and length unchanged. Fixed: the Add dialog opened as a
+  double exposure (the app's own entrance fades it in over its scrim, so the
+  lifted frames showed the feed's text through it: it now rises from a settled
+  frame over a screen already out of focus); the camera zoomed through the
+  pick, smearing the screenshots as they arrived (it now reframes first and
+  holds for the pick); Save showed two dialogs at once (the lifted one shrank
+  over the screen: it now settles away while the screen is still soft); the
+  landed card's lift flickered a pixel a frame (it followed the app's spring;
+  held on the settled box); the mark's exit blinked (fast-start fade); three
+  taps touched a frame or two late. Added: the tags lift as the read-down
+  settles (the line says "tags it"; only the Related cards were lifted); frame
+  0, the poster, now reads. Verify gains three gates (taps touch on their hit,
+  no fast-start exits, a lift's box within 2pt of the app's). Reel, film and
+  their mixes unchanged (compared). Not changed: faint 1-level rings in the
+  kit's `Paper` under a 12× contrast stretch (shared by the reel and the film).
+  Not listened to on speakers.
+- **2026-09-28 — Feature clip: SAVE (rebuilt to the owner's brief).**
+  Branch `claude/clip-save`, not merged. The first cut re-edited the reel's
+  Save chapter; the owner rejected it ("expand on the save feature, not just
+  cut a part of the original") and gave a brief: ~30s, the feature alone,
+  Machina named, a problem hook, 3–5 elements shown working with why they
+  matter, a concrete takeaway. Rebuilt as `MachinaClipSave` (32.0s, see §8):
+  one save, a screenshotted recipe post, followed from any app → the Image
+  tab (3 screens → one card) → the feed reading it → Key Points → tags and
+  Related cards → "Save it once. Machina does the rest." New real-app take
+  `saveclip` (screenshots and the returned card scripted in
+  `capture/clip-save.mjs`). Found on the way: the kit's `Lift` draws its copy
+  ~1pt low whenever lift > 0, so lifts that ease out sag ~3px and snap back
+  (the reel's Key Points, reel frames 1176–1192); the clip fades its lifts at
+  full lift instead, kit and reel unchanged. The reel's other takes and its
+  frames and mixes are unchanged (compared). Owner refinement: no "share
+  sheet" in the voice ("Machina saves from any app. No copying, no
+  pasting."), and the screenshot line leads into the reading ("Even
+  screenshots get analyzed. Up to five become one card." → "It reads the
+  text in them…"). Not listened to on speakers.
 - **2026-09-27 — Highlight reel round 15: caret, shares, one face.** Branch
   `claude/machina-reel-pilot`, not merged. Owner on round 14: the input
   caret was jittery (0:26–0:28): it blinks on the browser's real clock, so

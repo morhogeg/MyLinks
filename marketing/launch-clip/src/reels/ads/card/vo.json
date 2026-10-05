@@ -1,0 +1,170 @@
+[
+ {
+  "frame": 8,
+  "text": "How many things did you save this month\u2026 and never open again?",
+  "words": [
+   0.02,
+   0.179,
+   0.378,
+   0.656,
+   0.815,
+   0.974,
+   1.173,
+   1.622,
+   2.16,
+   2.338,
+   2.605,
+   2.828
+  ]
+ },
+ {
+  "frame": 116,
+  "text": "The article you promised yourself you'd read\u2026",
+  "words": [
+   0.03,
+   0.237,
+   0.651,
+   0.858,
+   1.423,
+   1.889,
+   2.2
+  ]
+ },
+ {
+  "frame": 200,
+  "text": "the thread you bookmarked at midnight\u2026",
+  "words": [
+   0.01,
+   0.175,
+   0.464,
+   0.629,
+   1.173,
+   1.297
+  ]
+ },
+ {
+  "frame": 272,
+  "text": "the screenshot you swore you'd remember.",
+  "words": [
+   0.03,
+   0.266,
+   0.915,
+   1.151,
+   1.506,
+   1.86
+  ]
+ },
+ {
+  "frame": 356,
+  "text": "That's exactly why we made Makeena.",
+  "words": [
+   0.03,
+   0.403,
+   0.83,
+   1.043,
+   1.203,
+   1.47
+  ]
+ },
+ {
+  "frame": 425,
+  "text": "From any app, just share it to Makeena.",
+  "words": [
+   0.02,
+   0.241,
+   0.419,
+   0.94,
+   1.146,
+   1.393,
+   1.516,
+   1.64
+  ]
+ },
+ {
+  "frame": 528,
+  "text": "It reads what you save and pulls out the key points\u2026 so you'll always remember why you kept it.",
+  "words": [
+   0.03,
+   0.172,
+   0.456,
+   0.693,
+   0.882,
+   1.119,
+   1.309,
+   1.593,
+   1.782,
+   1.972,
+   2.261,
+   2.83,
+   2.951,
+   3.235,
+   3.518,
+   3.882,
+   4.044,
+   4.206,
+   4.408
+  ]
+ },
+ {
+  "frame": 696,
+  "text": "It links each save to what you saved before\u2026 so you see how your ideas connect.",
+  "words": [
+   0.03,
+   0.186,
+   0.498,
+   0.888,
+   1.148,
+   1.304,
+   1.764,
+   1.972,
+   2.284,
+   2.95,
+   3.114,
+   3.332,
+   3.55,
+   3.769,
+   4.041,
+   4.369
+  ]
+ },
+ {
+  "frame": 872,
+  "text": "Then pick a time, and Makeena brings it back\u2026",
+  "words": [
+   0.03,
+   0.23,
+   0.43,
+   0.51,
+   0.99,
+   1.17,
+   1.53,
+   2.115,
+   2.25
+  ]
+ },
+ {
+  "frame": 1040,
+  "text": "so you actually get back to it.",
+  "words": [
+   0.01,
+   0.167,
+   0.475,
+   1.055,
+   1.264,
+   1.525,
+   1.771
+  ]
+ },
+ {
+  "frame": 1152,
+  "text": "Makeena. Everything you save, finally useful.",
+  "words": [
+   0.03,
+   1.1,
+   1.698,
+   1.883,
+   2.72,
+   3.155
+  ]
+ }
+]

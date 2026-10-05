@@ -120,34 +120,37 @@ WORD_TIMING = {"reel": os.path.join(ROOT, "src", "reels", "data", "reel-vo.json"
 
 def clip_script(name):
     """A feature clip's captions, read from clips/<name>-timeline.mjs and
-    spoken as written (the reel's rules: `say` when it differs, "\\n" on screen
-    only, "Machina" respelled for the voice)."""
-    js = (
-        f"import('./clips/{name}-timeline.mjs').then(m => console.log(JSON.stringify("
-        "{ fps: m.FPS, captions: m.CAPTIONS })))"
-    )
+    spoken as written (see timeline_script: `say` when it differs, "\\n" on
+    screen only, "Machina" respelled for the voice)."""
+    return timeline_script(f"./clips/{name}-timeline.mjs")
+
+
+# ── the SAVE feature clip ────────────────────────────────────────────────────
+#   python3 audio/synth-vo.py save  →  out/vo/save/line-NN.wav + manifest.json,
+#                                      src/reels/clips/save/vo.json
+# Read from CAPTIONS in clips/save-timeline.mjs and spoken as written, exactly
+# as the reel's lines are (same voice, same respelling, same timing measure).
+def timeline_script(module):
+    """(start, window, spoken text) for each caption of a clip timeline."""
+    js = f"import('{module}').then(m => console.log(JSON.stringify({{ fps: m.FPS, captions: m.CAPTIONS }})))"
     raw = subprocess.run(["node", "-e", js], cwd=ROOT, check=True, capture_output=True, text=True).stdout
     data = json.loads(raw)
+    fps = data["fps"]
     return [
         {
             "frame": c["at"],
-            "start": c["at"] / data["fps"],
-            "window": (c["to"] - c["at"]) / data["fps"],
+            "start": c["at"] / fps,
+            "window": (c["to"] - c["at"]) / fps,
             "text": " ".join((c.get("say") or c["text"]).split()).replace("Machina", SAY_NAME),
-            # a clip or ad may set its own delivery speed per line (the Meta ad
-            # 3 script, round 6: a natural conversational pace)
             "speed": c.get("speed", SPEED),
-            # Gemini TTS only (VO_ENGINE=gemini): the line's own acting note, and
-            # the words as performed, with inline vocal tags (<chuckle>,
-            # <short pause>…) and the real name; Kokoro ignores both, and the
-            # word timing, manifest and captions keep the plain words above
+            # Gemini TTS only (ENGINE / VO_ENGINE=gemini): the line's acting
+            # note, the words as performed (the real name; gemini_tts spells it
+            # for its ear), the longest pause kept inside it, its tempo and its
+            # pace note; Kokoro ignores them all
             "style": c.get("style"),
             "tts": " ".join((c.get("tts") or c.get("say") or c["text"]).split()),
-            # and the longest pause kept inside it (seconds; gemini_tts.cap_pauses)
             "max_pause": c.get("maxPause"),
-            # and its tempo (1.1 = 10% quicker, pitch kept; gemini_tts.stretch)
             "tempo": c.get("tempo"),
-            # and its pace note, replacing the house one (gemini_tts.direct)
             "pace": c.get("pace"),
         }
         for c in data["captions"]
@@ -169,6 +172,19 @@ ENGINE = {"adtodo": "gemini"}
 # and its Gemini model (GEMINI_TTS_MODEL overrides): Flash TTS, the model the
 # owner auditioned (re-voiced 2026-10-04; the Flash-Lite takes stay in vo-takes/)
 GEMINI_MODEL = {"adtodo": "gemini-3.8-flash-tts"}
+SCRIPTS["save"] = (lambda: timeline_script("./clips/save-timeline.mjs"), os.path.join(VO, "save"))
+WORD_TIMING["save"] = os.path.join(ROOT, "src", "reels", "clips", "save", "vo.json")
+
+# Meta ad 1, "What one save becomes" (ads/card-timeline.mjs)
+SCRIPTS["adcard"] = (lambda: timeline_script("./ads/card-timeline.mjs"), os.path.join(VO, "adcard"))
+WORD_TIMING["adcard"] = os.path.join(ROOT, "src", "reels", "ads", "card", "vo.json")
+
+# a script's own engine (VO_ENGINE overrides): Meta ad 1 is voiced by Gemini
+# TTS, Sulafat (owner, 2026-10-03, the house narrator); everything else stays
+# on Kokoro
+ENGINE["adcard"] = "gemini"
+# and its Gemini model (GEMINI_TTS_MODEL overrides)
+GEMINI_MODEL["adcard"] = "gemini-3.8-flash-tts"
 
 
 def speech_runs(samples, sr, gap=0.09):
