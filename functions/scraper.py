@@ -824,7 +824,7 @@ def linkedin_author_from_url(url: str) -> Optional[str]:
     `linkedinAuthor` in web/lib/platform.tsx.
     """
     try:
-        from urllib.parse import urlparse, urlsplit, urlunsplit, parse_qsl, urlencode
+        from urllib.parse import urlparse
         parsed = urlparse(url)
         host = parsed.hostname or ''
         if host.startswith('www.'):

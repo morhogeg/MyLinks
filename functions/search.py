@@ -15,7 +15,6 @@ from firebase_admin import firestore
 from google.cloud import firestore as gc_firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
 from google.cloud.firestore_v1.vector import Vector
-from google.cloud.firestore_v1.base_vector_query import DistanceMeasure
 from google import genai
 
 from db import get_db

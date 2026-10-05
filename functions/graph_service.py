@@ -3,14 +3,13 @@ import json
 import os
 from typing import List, Dict, Optional
 from firebase_admin import firestore
-# DistanceMeasure is NOT re-exported by firebase_admin.firestore on the pinned
-# firebase-admin (6.9.0) — referencing firestore.DistanceMeasure raised
-# AttributeError on EVERY find_related_links call in prod (See-also candidates
-# silently empty since at least 2026-07-27). Import it from the real module,
-# exactly as search.py does.
-from google.cloud.firestore_v1.base_vector_query import DistanceMeasure
+# NOTE: DistanceMeasure is NOT re-exported by firebase_admin.firestore on the
+# pinned firebase-admin (6.9.0); referencing firestore.DistanceMeasure raised
+# AttributeError on every find_related_links call in prod (2026-07-27). If a
+# vector query comes back here, import it from
+# google.cloud.firestore_v1.base_vector_query, as vector_store.py does.
 from google.cloud.firestore_v1.vector import Vector
-from ai_service import GeminiService, GEMINI_ANALYSIS_MODEL, embedding_needs_repair
+from ai_service import GeminiService, GEMINI_ANALYSIS_MODEL
 import vector_store
 from vector_store import card_payload, mirror_vector_write, stored_vector, vector_needs_repair
 from log_safe import mask_uid

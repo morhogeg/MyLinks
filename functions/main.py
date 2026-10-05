@@ -17,7 +17,6 @@ import re
 import json
 import hmac
 import hashlib
-import html as _html
 import logging
 import requests
 from typing import Optional
@@ -45,17 +44,17 @@ options.set_global_options(max_instances=20)
 from db import get_db, ensure_app
 from url_key import url_key
 from log_safe import mask_uid
-from models import LinkStatus, ReminderStatus, UNANALYZED_STATUSES
+from models import LinkStatus, UNANALYZED_STATUSES
 from ai_service import GeminiService, AnalysisError
 from link_service import (
-    save_link_to_firestore, get_user_tags, get_user_vocabulary, is_hebrew,
+    save_link_to_firestore, get_user_vocabulary,
     canonical_category, run_category_migration,
     ensure_ingest_token, rotate_ingest_token, find_user_by_ingest_token,
     link_exists_for_url, pending_exists_for_url, find_data_uid_by_auth_uid,
-    delete_user_data, create_workspace, storage_key_for, delete_shares_for_owner,
+    delete_user_data, create_workspace, storage_key_for,
     write_account_tombstone,
 )
-from reminder_service import handle_reminder_intent, set_reminder, run_reminder_check, format_local_time
+from reminder_service import handle_reminder_intent, set_reminder, run_reminder_check
 from graph_service import GraphService
 from vector_store import card_payload, mirror_vector_write
 # NOTE: `scraper` is imported lazily inside the functions that actually scrape
@@ -63,10 +62,12 @@ from vector_store import card_payload, mirror_vector_write
 # pulls in, e.g. BeautifulSoup) off the import path of functions that never
 # scrape — like the hot image-analysis path in analyze_image — so their cold
 # starts stay lighter.
-from search import (
+# sync_link_embedding and search_links are deployed functions: Firebase finds
+# them in THIS module's namespace, so the imports are load-bearing.
+from search import (  # noqa: F401
     sync_link_embedding, search_links, perform_search_logic, perform_hybrid_search,
-    build_embedding_text, rerank_candidates, keyword_query_tokens,
-    keyword_match_score, keyword_scan_cards, EmbeddingService, EMBED_TEXT_VERSION,
+    build_embedding_text, rerank_candidates,
+    keyword_scan_cards, EmbeddingService, EMBED_TEXT_VERSION,
     extract_quoted_phrases, pin_title_phrases, missing_title_phrases,
     anchor_phrases_for, is_exclusion_question, demote_cards_by_titles,
     is_recency_question, recent_cards, category_cards,

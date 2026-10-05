@@ -666,7 +666,6 @@ def _render_shared_card(card: dict, share_url: str, og_preview: Optional[dict] =
     title = card.get("title") or "Shared card"
     summary = card.get("summary") or ""
     detailed = card.get("detailedSummary") or ""
-    source = card.get("sourceName") or card.get("category") or ""
     image = _share_card_image(card)
     original = card.get("url") or ""
     tags = card.get("tags") or []
