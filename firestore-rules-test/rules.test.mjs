@@ -209,6 +209,7 @@ const CLIENT_WRITES = {
   privacyLock: { hash: 'x', salt: 'y', iterations: 1 }, // lib/privacyLock
   graphVersion: 2,                                   // lib/rebuildConnections
   dismissedSuggestions: arrayUnion('tag:politics'),  // lib/collectionSuggest dismissSuggestion
+  tourSeenAt: 1,                                     // lib/tourSeen (tour seen on any device)
 };
 
 for (const [field, value] of Object.entries(CLIENT_WRITES)) {
@@ -265,6 +266,7 @@ const MISTYPED = {
   privacyLock: 'pin',
   graphVersion: '2',
   dismissedSuggestions: 'tag:politics',
+  tourSeenAt: 'yes',
 };
 
 for (const [field, value] of Object.entries(MISTYPED)) {
@@ -308,6 +310,21 @@ test('self-serve create cannot carry server-owned fields', async () => {
       setDoc(doc(strangerDb(), 'users', STRANGER_AUTH), { authUids: [STRANGER_AUTH], createdAt: now, ...extra }),
     );
   }
+});
+
+test('self-serve create cannot carry graphVersion or tourSeenAt (birth fields only)', async () => {
+  // Deliberately NOT widened for E5/E6: the client fallback leaves both off
+  // and lib/rebuildConnections stamps graphVersion with an UPDATE instead.
+  const now = Date.now();
+  for (const extra of [{ graphVersion: 2 }, { tourSeenAt: now }]) {
+    await assertFails(
+      setDoc(doc(strangerDb(), 'users', STRANGER_AUTH), { authUids: [STRANGER_AUTH], createdAt: now, onboarded: false, ...extra }),
+    );
+  }
+});
+
+test('a stranger cannot mark the tour seen on someone else\'s doc', async () => {
+  await assertFails(updateDoc(doc(strangerDb(), 'users', OWNER_DOC), { tourSeenAt: 1 }));
 });
 
 test('self-serve create may carry the email (AuthProvider payload shape)', async () => {

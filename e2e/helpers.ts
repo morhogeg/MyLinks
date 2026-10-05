@@ -147,6 +147,8 @@ export async function seedWorkspace(user: TestUser, extra: Record<string, unknow
         createdAt: Date.now(),
         onboarded: false,
         trialClockChecked: true,
+        // create_workspace stamps link_service.GRAPH_VERSION (= the web's).
+        graphVersion: 2,
         email: user.email,
         ...extra,
     });

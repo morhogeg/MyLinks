@@ -3344,7 +3344,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                     Icon: Inbox, title: 'Your Machina is empty',
                                     body: isNativeApp()
                                         ? 'Share a link to Machina from any app, or tap + to add one here. Machina reads it, tags it, and files it for you.'
-                                        : 'Tap + to save your first link, or add the browser extension to clip any page. Machina reads it, tags it, and files it for you.',
+                                        : 'Tap + to save your first link, or share one from your iPhone. Machina reads it, tags it, and files it for you.',
                                 };
                             return (
                         <div className="text-center py-16 px-6 animate-fade-in">

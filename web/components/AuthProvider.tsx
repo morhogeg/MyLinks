@@ -19,6 +19,7 @@ import {
     initPushListeners, refreshPushRegistration, unregisterPush,
     readLocalPushPrompt, writeLocalPushPrompt,
 } from '@/lib/push';
+import { reconcileTourSeen } from '@/lib/tourSeen';
 import LoginScreen from '@/components/LoginScreen';
 import SignedOutWeb from '@/components/SignedOutWeb';
 import Onboarding from '@/components/Onboarding';
@@ -293,6 +294,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 attachUserDoc(userDoc.id, userDoc.data());
                 reconcileAiConsent(userDoc.id, userDoc.data());
                 attachPush(userDoc.id, userDoc.data());
+                reconcileTourSeen(userDoc.id, userDoc.data(), false);
             } catch (err) {
                 console.error('Failed to look up user:', err);
                 reportError(err, 'auth-legacy-native-lookup');
@@ -345,10 +347,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     // First run for a fresh workspace: the backend returns
                     // `created` on creation and stamps `onboarded: false` on
                     // the doc (covers a reload before dismissal).
-                    setNeedsOnboarding(
-                        (dataDoc.created || dataDoc.data?.onboarded === false)
-                        && !welcomeDismissedLocally(dataDoc.id),
-                    );
+                    const fresh = !!dataDoc.created || dataDoc.data?.onboarded === false;
+                    // Synchronous, before setLoading(false) below: app/page.tsx
+                    // decides whether to show the tour from the local key.
+                    reconcileTourSeen(dataDoc.id, dataDoc.data, fresh);
+                    setNeedsOnboarding(fresh && !welcomeDismissedLocally(dataDoc.id));
                 } else {
                     setRestricted(true);
                     setRestrictedDetail(lastResolveDetail);
@@ -580,6 +583,9 @@ async function createWorkspaceClientSide(
         const d = linkedNow.docs[0];
         return { id: d.id, data: d.data(), created: false };
     }
+    // No `graphVersion` here, unlike create_workspace: the locked create rule
+    // allows only these birth fields. ensureGraphVersion stamps an empty
+    // library without calling the backend, so this costs one doc write.
     const payload: Record<string, unknown> = {
         authUids: [authUid],
         createdAt: Date.now(),
