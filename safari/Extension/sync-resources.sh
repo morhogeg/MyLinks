@@ -87,7 +87,12 @@ for war in m.get("web_accessible_resources") or []:
         if "*" not in r:
             refs.append(r)
 
-missing = sorted({r for r in refs if not os.path.isfile(os.path.join(dest, r.lstrip("/")))})
+# A page ref may carry a query or fragment (options_ui "popup.html?view=settings"):
+# the file on disk is the part before it.
+def ref_path(r):
+    return r.split("#", 1)[0].split("?", 1)[0].lstrip("/")
+
+missing = sorted({r for r in refs if not os.path.isfile(os.path.join(dest, ref_path(r)))})
 if missing:
     for r in missing:
         print(f"error: extension/manifest.json references '{r}', which is not in the bundle")
