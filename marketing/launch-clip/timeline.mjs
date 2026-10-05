@@ -99,19 +99,20 @@ export const SUBTITLES = [
   // fast, needs breaks) and their VO speaks at 0.9 speed (synth-vo.py).
   { bar: 1.05, bars: 0.85, place: 'bottom', text: 'You save things everywhere.' },
   { bar: 2.0, bars: 1.35, place: 'bottom', text: 'An article here. A video there. A thread somewhere else.' },
-  { bar: 3.6, bars: 0.7, place: 'bottom', text: 'Multiple apps, countless saved links.' },
+  // Starts 0.2 bar earlier (was 3.6/0.7; 2026-10-04): Sulafat's read of this
+  // line runs 3.1s, which did not fit before line 4. The caption still ends on
+  // 4.3, so the silent beat before the loss line is unchanged.
+  { bar: 3.4, bars: 0.9, place: 'bottom', text: 'Multiple apps, countless saved links.' },
   // A DELIBERATE BEAT OF SILENCE (bars 4.3–4.8) — the first wrong pile opens
   // with no words at all, then the truth lands over the second one. Owner's
   // wording ("rarely", not "never" — bold but honest), on the bar-4 minor.
   { bar: 4.8, bars: 1.3, place: 'bottom', text: 'Saved, and rarely seen again.' },
   // The turn is an INTRODUCTION now (owner call, round 13b) — the film stops
   // describing and presents the product by name. 2026-09-19 (owner): the line
-  // after the name is the PROMISE (the product tagline), not "one place for
-  // all your saved links", which volunteered Machina into the link-saver
-  // category and undersold screenshots and notes. 2026-09-28 (owner): every
-  // launch film ENDS on the tagline, once; the App Store subtitle, which can
-  // change with search tests, moves up here into the introduction.
-  { bar: 6.45, bars: 1.35, place: 'bottom', kicker: 'Introducing', text: 'Machina.\nNever lose another great find.' },
+  // after the name was the PROMISE (the product tagline). 2026-10-04 (owner):
+  // the tagline moves to the END (the endcard and the closing line), and the
+  // turn just introduces the name.
+  { bar: 6.45, bars: 1.35, place: 'bottom', kicker: 'Introducing', text: 'Machina.' },
   // Value first (owner note, round 13c): anything + anywhere. No tap-count
   // claim — the share sheet is two touches (owner correction).
   { bar: 8.35, bars: 1.25, place: 'left', kicker: 'Capture', text: 'Save anything, from anywhere.' },

@@ -7,13 +7,13 @@ import { drift, prog, ramp, EASE_MODAL, EASE_OUT } from '../film/anim';
 import { sans } from '../fonts';
 
 /**
- * The endcard: the bare mark, the drawn wordmark, the product TAGLINE,
- * ink on paper, the light grade's closing statement.
+ * The endcard: the bare mark, the drawn wordmark, the tagline — ink on
+ * paper, the light grade's closing statement.
  *
- * The line is the tagline, `Everything you save, finally useful.` (owner
- * call 2026-09-28: every launch film ends on it, once; it is the fixed brand
- * line, where the App Store subtitle can change with search tests and would
- * date every posted film; the subtitle moved to the introduction).
+ * The letterspaced line is the TAGLINE, `Everything you save, finally useful`
+ * (owner call 2026-10-04: the film ends on it, and it no longer opens the
+ * film; the App Store subtitle `Never lose another great find` held this slot
+ * from 2026-08-26 until then).
  *
  * The mark is the BARE glyph, not the app-icon tile — `docs/BRANDING.md` makes
  * the same call for the header ("a rounded container there reads as a shrunken
@@ -28,10 +28,9 @@ import { sans } from '../fonts';
  * No price, no urgency, no "download now" — the film's whole argument is that
  * the product is quiet and confident, and a hard sell in the last four seconds
  * would retract it. The endcard closes on ONE line, the tagline, and the voice
- * says the same words after the name (owner calls 2026-09-17 and 2026-09-28:
- * screen and voice agree, nothing else under it). The space under it is the
- * slot for a real App Store badge or URL once the listing is live. (It
- * deliberately does NOT claim
+ * says the same words (owner call 2026-09-17: the screen and the voice agree).
+ * The space under the line is the slot for a real App
+ * Store badge or URL once the listing is live. (It deliberately does NOT claim
  * anything about learning: Machina is not a learning app.)
  */
 export const Endcard: React.FC = () => {
@@ -116,7 +115,7 @@ export const Endcard: React.FC = () => {
             transform: `translateY(${(1 - tag) * 8}px)`,
           }}
         >
-          Everything you save, finally useful.
+          Everything you save, finally useful
         </div>
       </AbsoluteFill>
     </AbsoluteFill>

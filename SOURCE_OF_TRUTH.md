@@ -3872,6 +3872,122 @@ exact-match, capped.
   kit + a README "Motion language" section so later videos share one
   design language. The pilot prompt and five feature briefs are in §8
   "Short-form reels". Docs only; nothing under `web/` or `functions/` changed.
+- **2026-10-04 (night) — LAUNCH FILM ENDS ON THE TAGLINE.** Branch
+  `claude/film-gemini-vo`. Owner: the final frame uses the tagline
+  "Everything you save, finally useful", and it leaves the beginning.
+  - **Endcard and closing voice line:** both are the tagline now. They were the
+    App Store subtitle, "Never lose another great find", which this film no
+    longer says.
+  - **The turn:** it is "Introducing Machina." alone, on screen and in the
+    voice; its tempo and pause cap were dropped (the line is short now).
+  - **Voicing:** 2 new Gemini takes (Sulafat, run 3); both fit as performed.
+  - **verify** now fails if the tagline appears anywhere but the endcard and
+    the last line.
+  - **Verified:** `tsc`, verify, and stills of the endcard and the turn in
+    both formats (the tagline fits under the wordmark). Re-mixed; both spoken
+    editions were rendered and sent.
+  - **Not verified:** nobody has listened. The App Store listing's own subtitle
+    is untouched (docs/APP_STORE.md).
+
+- **2026-10-04 (final) — LAUNCH FILM: FULL CAPTIONS IN THE NEW MOTION.**
+  Branch `claude/film-gemini-vo`. The owner's final call for every video
+  (relayed from `claude/ad-todo`, 75d129f / 6187257): "I like the new version
+  with the full captions and the new animation". This SUPERSEDES the headline
+  and hold entries below.
+  - **Removed:** headlines are gone (`heads`, `Headline`/`Headlines`, their
+    verify check); the captions are the full lines again, layouts and act
+    kickers as before.
+  - **New motion** (`src/film/Subtitles.tsx`): it replaces the fade-and-slide
+    in EVERY edition.
+    - Each line rises out of its own mask over 9 frames (ease-out quint, no
+      blur), 3 frames before the narrator's first word (from `src/film/vo.json`).
+    - Lines are 2 frames apart, with the kicker first.
+    - It rolls out in the last 5 frames of its caption; the accent rule grows
+      and shrinks with it.
+  - **verify:** checks that the early arrival never lands on the previous
+    caption's way out. The tightest hand-over is 3 clear frames.
+  - **Checked by eye:** frames 240–280 (line 2 to line 3, the tightest
+    hand-over) and holds in every layout, both formats. Never two at once, and
+    no line sits clipped on a hold.
+  - **Rendered and sent:** MachinaLaunchVO and MachinaLaunchVerticalVO. The
+    NoSubs compositions stay, unrendered.
+
+- **2026-10-04 (later still) — LAUNCH FILM: CAPTIONS ON HOLD, A NO-SUBTITLE
+  SPOKEN EDITION.** Branch `claude/film-gemini-vo`. Owner, relayed from
+  `claude/ad-todo` (commit 98e1afa): the grey highlight was "terrible", and
+  they are "not convinced at all we need these captions — it makes things
+  super busy". The headline captions are ON HOLD until the owner decides.
+  - The highlight is gone: a `*phrase*` mark renders as plain text.
+  - New compositions `MachinaLaunchVONoSubs` / `MachinaLaunchVerticalVONoSubs`
+    have the narrator and no captions; both were rendered and sent.
+  - `MachinaLaunchVO` / `MachinaLaunchVerticalVO` still carry the headlines;
+    the `withSubtitles` and `headlines` props on `Film` switch any edition.
+    No new captioned renders until the owner chooses.
+
+- **2026-10-04 (later) — LAUNCH FILM: HEADLINE CAPTIONS IN THE SPOKEN
+  EDITIONS.** Branch `claude/film-gemini-vo`. The owner's call for every video
+  (relayed from `claude/ad-todo`, recorded there in §9): the screen shows each
+  line's point in 2–5 words and the narrator still says every word. The old
+  caption motion was called "dated and laggy".
+  - **Where:** MachinaLaunchVO and MachinaLaunchVerticalVO only (`headlines`
+    prop on `Film`). The other editions (MachinaLaunch, MachinaLaunchSilent,
+    MachinaLaunchVertical, MachinaLaunchVerticalSilent) keep their full captions, since nothing else carries the words
+    there. **Owner to confirm** that split.
+  - **How:**
+    - `SUBTITLES` gains `heads` per line: [index of the spoken word it lands
+      on, headline]; `text` stays for the music-only editions and the .srt.
+    - `src/film/Headline.tsx` is the ad's `Headline` (same motion), plus an
+      `align` option; this branch has no reels kit to append to.
+    - `src/film/Headlines.tsx` lays them out on the film's layouts: the
+      landscape left column, centred low on device-less beats, the vertical
+      top band; one line everywhere.
+    - A headline arrives 3 frames before its word and holds until the next.
+    - The word times come from `src/film/vo.json`, which `synth-vo.py film`
+      now writes.
+    - The act kickers (CAPTURE / ASK / CONNECT) are gone from the spoken
+      editions; the tagline and endcard are untouched.
+  - **Also:** `gemini_tts.py` was re-taken from `claude/ad-todo`. Its
+    `stretch` now pads before Rubber Band, so lines 2, 3 and 5 keep their last
+    word's decay; line fits are unchanged.
+  - **Verified:** `tsc` passes. `npm run verify` now checks the 17 headlines
+    (2–5 words, one line, a real spoken anchor). Stills of every headline beat
+    in both editions show one line, clear of the device and inside the frame.
+    Both editions were re-rendered and sent.
+  - **Not verified:** no one has watched the motion or listened. Headline
+    timing rides on estimated word times (about ±0.2s).
+
+- **2026-10-04 — LAUNCH FILM RE-VOICED BY GEMINI TTS (SULAFAT).** Branch
+  `claude/film-gemini-vo` (from `main`; not merged, no PR). Marketing only (no
+  `web/` or `functions/` change, nothing deployed). The film's narration moves
+  from Kokoro to Gemini `gemini-3.8-flash-tts`, voice Sulafat, with "Machina"
+  said the Latin way (MAH-kee-nah).
+  - **Engine:** taken from `claude/ad-todo`. `gemini_tts.py`, `vo-audition.py`,
+    `narration-run.py` and `narration-tts.yml` were copied unchanged. The rest
+    was ported into main's `audio/synth-vo.py`: the per-script
+    `ENGINE`/`GEMINI_MODEL` maps (`film` only) and the per-line
+    `style`/`tts`/`max_pause`/`tempo`/`pace`. `VO_ENGINE=kokoro` output stays
+    byte-identical to main.
+  - **Direction:** this film has its own tone, not the ads' "lively and quick"
+    one. It is a calm, assured brand introduction at about 145 words a minute,
+    with an acting note on each line (`FILM_LINES`).
+  - **Voicing:** 14 requests, each line voiced once; takes are in
+    `audio/vo-takes/`. Run 1 hit a 429 after 5 lines (the per-model limit
+    reads "limit: 10"); run 2 voiced the other 9.
+  - **Fit:**
+    - Lines 1, 4 and 6–14 fit as performed (tempo 1.0).
+    - Line 5 (the introduction) runs at tempo 1.1, with pauses capped at 0.3s.
+    - **Re-timed:** "Multiple apps, countless saved links." starts at bar 3.4
+      (was 3.6, 0.9 bars instead of 0.7). Its caption still ends on 4.3, so the
+      silent beat before the loss line is unchanged. Lines 2 and 3 run at tempo
+      1.08 with pauses capped at 0.25s. Nothing else in the film moved.
+    - Gemini lines also must end 0.15s before the next line starts.
+  - **Verified:** `tsc` and `npm run verify` pass; `public/score-vo.wav` is
+    re-mixed; MachinaLaunchVO and MachinaLaunchVerticalVO were rendered and sent
+    to the owner.
+  - **Not verified:** nobody has listened to the read yet. Word times in the
+    manifest are estimated from the audio (about ±0.2s), not recognised; the
+    film's captions don't use them.
+
 - **2026-10-02 — X LAUNCH CAMPAIGN REVIEWED AND ON MAIN; THREE META AD VIDEOS
   HANDED TO NEW SESSIONS.** Branch `claude/x-launch-content-video-prompts-flujr5`.
   Docs and marketing only (no `web/` or `functions/` change, nothing deployed).
