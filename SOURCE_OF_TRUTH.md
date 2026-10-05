@@ -2522,7 +2522,7 @@ exact-match, capped.
   functions "all" (omit `Deploy-Functions:`; new `release_waiting_on_upgrade`,
   `release_waiting_saves`, `force_release_waiting_saves`; `search.py`/
   `vector_store.py`/`digest_service.py` changed); deploy-rules (`tourSeenAt`);
-  a TestFlight build (old builds render a `waiting` card as a blank card and
+  a TestFlight build (inferred, not tested: old builds don't know `waiting`, so they likely show it as an unanalyzed card and
   toast "Saved to Machina"). No index/hosting change, no backfill.
 
 - **2026-10-04 — E2E USER-JOURNEY SUITE (40 tests) + 6 FINDINGS.** Branch
