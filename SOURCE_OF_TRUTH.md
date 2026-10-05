@@ -1146,31 +1146,26 @@ The multi-user auth work described below **was** fully written but not live:
     sweep (every tab/view, light+dark, Hebrew, long titles; no console errors,
     no sideways scroll). `npm test` in `e2e/`. Known bugs are `test.fail()`.
     **Findings still open (owner decides / next session fixes):**
-    - **[ ] E1 — double error toast on any failed capture hand-off.**
-      `AddLinkForm.tsx`: the enqueue `catch` toasts "couldn't start", and the
-      card-snapshot effect (`linkCard.status === 'failed'`) toasts "couldn't
-      finish" for the same save. Encoded as a `test.fail` in
-      `03-capture.spec.ts`.
-    - **[ ] E2 — free save limit reads as an error.** A quota 429 arrives after
-      the placeholder is written, so the user sees the paywall AND a red
-      "Couldn't analyze" card with **Retry**, AND both toasts saying "Tap the
-      card to retry", and a retry just 429s again. Ties to 26a (is capture
-      gated?). Encoded as a `test.fail`.
-    - **[ ] E3 — "Note" vs "My notes".** A note saved via + → Note ("Note
-      saved") never appears in the **My notes** view (that view lists only the
-      comments added inside cards), so a new user's first note is "missing"
-      ("No notes yet"). Rename one of them, or list note cards there too.
-    - **[ ] E4 — web copy promises the browser extension**, which isn't public
-      (CAMPAIGN.md §2): Onboarding "Save your first thing", the empty-library
-      line (`Feed.tsx`), and tour step 1 (`OnboardingTour.tsx`), all web-only
-      branches. The iPhone copy is fine.
-    - **[ ] E5 (low) — every new workspace runs the graph migration on first
-      open** (`ensureGraphVersion`: two `rebuild_connections` calls on an empty
-      library) because `create_workspace` doesn't stamp `graphVersion`. That's
-      one cold function start per signup. Stamp it at creation.
-    - **[ ] E6 (low) — the tour is per device** (localStorage only), so a
-      returning user signing in on a second device (phone → desktop) sees "How
-      Machina works" again. Mirror it onto the user doc like `onboarded`.
+    - **[x] E1 — FIXED 2026-10-05:** one toast per failed hand-off (the
+      enqueue `catch` records the card id; the snapshot effect skips it).
+    - **[x] E2 — FIXED 2026-10-05 via "save it, analyze it later" (26a).**
+    - **[x] E3 — FIXED 2026-10-05:** My notes lists note cards (+ → Note) as
+      their own entries beside per-card comments (`lib/notes.ts`
+      `isWrittenNote`; shared text and Ask answers excluded; private cards
+      still excluded). `e2e/tests/08-notes.spec.ts`.
+    - **[x] E4 — FIXED 2026-10-05:** web onboarding, tour step 1 and the empty
+      library name only + and the iPhone share sheet. Settings → Browser
+      extension kept (it manages the extension token), sub-line "Preview,
+      installed by hand". `e2e/tests/09-first-run.spec.ts`.
+    - **[x] E5 — FIXED 2026-10-05:** `create_workspace` stamps `graphVersion`
+      (`link_service.GRAPH_VERSION`; `test_workspace_graph_version.py` fails on
+      drift from `web/lib/rebuildConnections.ts`); `ensureGraphVersion` stamps
+      an empty library without calling `rebuild_connections`. Locked create
+      rule deliberately unchanged.
+    - **[x] E6 — FIXED 2026-10-05:** tour seen = `tourSeenAt` on the user doc
+      (`lib/tourSeen`, reconciled in AuthProvider, doc wins; a fresh workspace
+      ignores a device key left by another account). Added to the user-doc
+      update allowlist in both rules files.
 
 8a. **[x] Trademark clearance — CLOSED 2026-08-23 by owner decision.** Search
     run same day; the owner reviewed the one live conflict (US 6278707, Ionic
@@ -1276,16 +1271,19 @@ The multi-user auth work described below **was** fully written but not live:
     `functions/**` change (or bump `functions/.deploy-ping`) so
     deploy-functions writes them into `functions/.env`, and cut a TestFlight
     build so the public key is baked in.
-26a. **[ ] Owner decision: is capture gated on the free plan? (found 2026-10-02.)**
-    §7.1 and item 26 both say "capture is never gated". But `functions/quota.py`
-    refuses the 101st free save of the month with a 429 ("You've used all 100
-    free saves this month. Upgrade to Machina Pro…"), and the build-1334 QA list
-    expects exactly that ("free-limit share → Monthly limit reached"). So the
-    code gates capture at 100/month and the principle says it never does.
-    Marketing now follows the code: `marketing/x-launch/CAMPAIGN.md` T24 says
-    "the free plan keeps 100 saves and 20 questions a month". Decide which one
-    wins. If capture should truly never be gated, the cap has to move off the
-    save and onto the analysis, and T24 changes with it.
+26a. **[x] DECIDED 2026-10-05 (owner): capture is never gated; the cap moved
+    onto the analysis.** Past 100 free saves (or Pro's 1000 ceiling) a save is
+    kept as `status: 'waiting'` with a server-only page snapshot
+    (`users/{uid}/capture_snapshots/{cardId}`, scrape only, no Gemini), and read
+    on upgrade (Firestore trigger `release_waiting_on_upgrade` on
+    `entitlements/{uid}`) or within the month's allowance (daily
+    `release_waiting_saves`, 00:15 UTC; admin `force_release_waiting_saves`).
+    Each release charges one save unit (backlog counts toward Pro's 1000).
+    Bulk import keeps its lifetime allowance + paywall; notes past the limit are
+    saved verbatim without AI; screenshot-enrich still 429s. Code:
+    `functions/deferred_capture.py`, `web/components/WaitingCard.tsx`.
+    **Still open:** CAMPAIGN.md T24 copy ("100 saves a month") and the Share
+    Extension's "Making your card" hint (needs Swift); see §9 2026-10-05.
 
 ### 🟡 P2 — security/cost hardening & honest product surface
 
@@ -2502,6 +2500,30 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-10-05 — E2E FINDINGS FIXED BY THREE PARALLEL SESSIONS, MERGED +
+  VERIFIED ON `claude/app-launch-qa-a29d1f`. NOT SHIPPED.** Owner approved
+  "save it, analyze it later" (26a) and asked for sessions per bug, merged and
+  tested centrally. **A** (`d7100f6`, `f723d8e`): the save limit defers analysis
+  instead of failing (see 26a) and E1 is fixed; the two E2E `test.fail` known
+  bugs now pass normally. **B** (`908c6fb`): E3, My notes includes note cards.
+  **C** (`355c1c1`): E4 extension copy, E5 graphVersion at birth, E6 tour per
+  account (`tourSeenAt`, rules allowlist). Plus `70ceeb9`: the screen sweep's
+  "light" pass had been rendering dark (theme is the app's own localStorage
+  setting, default dark, not the OS preference); it now sets it and asserts.
+  **Verified on the merged branch:** E2E 53/53 (iPhone + desktop), rules tests
+  105/105, pytest 1296, py_compile, web tsc 0, eslint 0 errors on touched files,
+  em-dash clean, web lib tests 55/55 (Node 22). Reviewed by hand: the release
+  trigger can't loop (quota charges go to `usage_quotas`, not `entitlements`);
+  a per-card transaction rechecks `waiting` so overlapping releases refund.
+  **NOT verified:** anything deployed (the entitlements trigger, the scheduler,
+  `count()` aggregation, queue bursts); device behavior (Share Extension text,
+  waiting card in light/dark/Hebrew on a phone). **Deploy when shipped:**
+  functions "all" (omit `Deploy-Functions:`; new `release_waiting_on_upgrade`,
+  `release_waiting_saves`, `force_release_waiting_saves`; `search.py`/
+  `vector_store.py`/`digest_service.py` changed); deploy-rules (`tourSeenAt`);
+  a TestFlight build (old builds render a `waiting` card as a blank card and
+  toast "Saved to Machina"). No index/hosting change, no backfill.
 
 - **2026-10-04 — E2E USER-JOURNEY SUITE (40 tests) + 6 FINDINGS.** Branch
   `claude/app-launch-qa-a29d1f`. Owner: "I don't have capacity to QA every
