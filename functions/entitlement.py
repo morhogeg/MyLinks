@@ -428,7 +428,9 @@ def entitlement_summary(uid: str) -> dict:
     # Additive only: `trialAnchorAt`, `trialAnchorCards` and the `imports` meter
     # are new fields on an otherwise unchanged shape, so an older client that
     # does not read them keeps working exactly as it did. A trial with a null
-    # trialAnchorAt has not started its 14 days yet.
+    # trialAnchorAt has not started its 14 days yet. `waiting` is how many
+    # saves past the monthly allowance are kept unread (deferred_capture);
+    # the paywall says so.
     return {
         "plan": plan,
         "source": doc.get("source"),
@@ -441,7 +443,13 @@ def entitlement_summary(uid: str) -> dict:
             "asks": {"used": used.get("asks", 0), "limit": quota_limit("asks", plan)},
             "imports": {"used": used.get("imports", 0), "limit": quota_limit("imports", plan)},
         },
+        "waiting": _count_waiting(uid),
     }
+
+
+def _count_waiting(uid: str) -> int:
+    from deferred_capture import count_waiting  # lazy: keeps the import graph flat
+    return count_waiting(uid)
 
 
 # ── RevenueCat ────────────────────────────────────────────────────────────────

@@ -266,6 +266,9 @@ USER_SUBCOLLECTIONS = (
     # Server-only card embedding vectors (vector_store.py) — no client rule,
     # but they are this user's data and must go with the account.
     'vectors',
+    # Server-only page snapshots of saves kept past the monthly allowance
+    # (deferred_capture.py). Same posture as `vectors`.
+    'capture_snapshots',
 )
 
 _SHARE_TYPE_COLLECTIONS = {
