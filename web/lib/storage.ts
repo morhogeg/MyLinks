@@ -1,4 +1,4 @@
-import { collection, addDoc, setDoc, updateDoc, deleteDoc, deleteField, doc, query, where, limit, orderBy, getDocs, getDoc, serverTimestamp, QueryDocumentSnapshot, DocumentData, arrayUnion, arrayRemove, writeBatch, runTransaction } from 'firebase/firestore';
+import { collection, addDoc, setDoc, updateDoc, deleteDoc, deleteField, doc, query, where, limit, orderBy, getDocs, getDoc, QueryDocumentSnapshot, DocumentData, arrayUnion, arrayRemove, writeBatch, runTransaction } from 'firebase/firestore';
 import { db, appCheckHeaders } from './firebase';
 import { authHeaders } from './auth';
 import { apiUrl, fetchWithTimeout } from './api';
@@ -8,6 +8,7 @@ import { AnalyzeResponse, Link, LinkMetadata, LinkStatus, User, UserNote } from 
 import { canonicalCategory } from './category';
 import { urlKey } from './urlKey';
 import { getNotes } from './notes';
+import { getTimestampNumber } from './feedUtils';
 
 /**
  * Normalize a Firestore link doc into a safe `Link`.
@@ -31,7 +32,11 @@ export function toLink(doc: QueryDocumentSnapshot<DocumentData>): Link {
         category: typeof data.category === 'string' ? data.category : 'General',
         tags: Array.isArray(data.tags) ? data.tags : [],
         status: data.status ?? 'unread',
-        createdAt: data.createdAt ?? 0,
+        // One shape for every reader: legacy cards hold a Firestore Timestamp
+        // (pre-2026-10-05 notes, Image-tab screenshots, saved answers), an ISO
+        // string or unix seconds. Readers that treat it as ms (getTimeAgo) read
+        // a Timestamp as year ~4000 and printed "just now" forever.
+        createdAt: getTimestampNumber(data.createdAt),
         metadata: {
             originalTitle: md.originalTitle ?? '',
             estimatedReadTime: md.estimatedReadTime ?? 0,
@@ -274,11 +279,11 @@ export async function saveLink(uid: string, linkData: Partial<Link>): Promise<vo
 
     await addDoc(linksRef, {
         ...cleanData,
-        // serverTimestamp() so ordering is consistent across devices/clocks and
-        // survives offline replay. Feed's getTimestampNumber already tolerates a
-        // Firestore Timestamp (via toMillis), so sorting stays correct; the
-        // pending-write value simply reads as 0 until the server resolves it.
-        createdAt: serverTimestamp(),
+        // Epoch ms, like every other writer (the share trigger, the processing
+        // placeholder). NOT serverTimestamp(): Firestore orders by type before
+        // value, so a Timestamp sorts above every numeric createdAt and the card
+        // sat at the top of the feed's newest-first pages forever.
+        createdAt: Date.now(),
         status: 'unread',
         isRead: false
     });
@@ -327,7 +332,7 @@ export async function createNoteCard(uid: string, text: string): Promise<string>
         isRead: false,
         sourceType: 'note',
         sourceName: 'Note',
-        createdAt: serverTimestamp(),
+        createdAt: Date.now(), // epoch ms: see saveLink
         // Let the sync_link_embedding trigger vectorize it → searchable + askable.
         needsEmbedding: true,
         metadata: { originalTitle: firstLine, estimatedReadTime: Math.max(1, Math.round(words / 200)) },

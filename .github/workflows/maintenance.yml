@@ -28,6 +28,7 @@ on:
         options:
           - migrate_share_owners
           - backfill_storage_keys
+          - normalize_created_at
       args:
         description: "Extra arguments (e.g. `--all`, or a uid)"
         required: false
@@ -117,7 +118,7 @@ jobs:
         run: |
           set -euo pipefail
           case "$TOOL" in
-            migrate_share_owners|backfill_storage_keys) ;;
+            migrate_share_owners|backfill_storage_keys|normalize_created_at) ;;
             *) echo "::error::unknown tool"; exit 1 ;;
           esac
           flags=()
