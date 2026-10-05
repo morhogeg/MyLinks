@@ -745,16 +745,30 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     /// The mark SETTLES rather than vanishing: the work it was reporting on has
     /// resolved, so it holds the locked frame under a steady light — the same
     /// "at rest, not gone" grammar as the app's own resolved beat.
-    private func completeScanSuccess(then: @escaping () -> Void) {
+    ///
+    /// `waitingHint` (past the monthly allowance): the save is kept but NOT
+    /// analyzed yet (status `waiting`, functions/deferred_capture.py), so
+    /// "Making your card" would be false. Say "Saved ✓" plus when it will be
+    /// read, hide the % (nothing is running), skip the app's analyzing hand-off,
+    /// and hold the frame long enough to read.
+    private func completeScanSuccess(waitingHint: String? = nil, then: @escaping () -> Void) {
         DispatchQueue.main.async {
             self.displayLink?.invalidate()
             self.displayLink = nil
             self.sweepView.isHidden = true
             self.citationMark.settle()
+            self.checkLabel.alpha = 0
+            if let waitingHint = waitingHint {
+                self.percentLabel.alpha = 0
+                self.phaseLabel.text = "Saved ✓"
+                self.hintLabel.text = waitingHint
+                self.clearPendingShareHint()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.4) { then() }
+                return
+            }
             // Keep the live % visible (the ✓ rides the copy, not the counter) and
             // leave the bar at its accent curve width — do NOT fill it.
             self.percentLabel.alpha = 1
-            self.checkLabel.alpha = 0
             self.phaseLabel.text = "Saved ✓ · Making your card"
             self.hintLabel.text = "The card finishes on its own in Machina."
             // Hand the app EXACTLY this % (the hint carries progress + start
@@ -811,7 +825,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     /// (the quota wall). The card then stays up with the ✕ instead of
     /// auto-dismissing after 1.6s.
     private func showResult(_ message: String, success: Bool, neutral: Bool = false,
-                            stickyHint: String? = nil) {
+                            stickyHint: String? = nil, waitingHint: String? = nil) {
         DispatchQueue.main.async {
             // Idempotency guard: a real network response and the watchdog can both
             // call this. Whichever lands first owns the UI; later calls are dropped
@@ -828,7 +842,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
                 if success {
                     // Save acknowledged — show the honest "saved, still analyzing"
                     // frame (bar stays mid-flight), then finish.
-                    self.completeScanSuccess { self.finish() }
+                    self.completeScanSuccess(waitingHint: waitingHint) { self.finish() }
                 } else {
                     // Stop the cosmetic scan and surface the message on the card.
                     self.displayLink?.invalidate()
@@ -860,6 +874,13 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
             // Generic (non-image) HUD path.
             self.card.isHidden = false
             self.label.text = message
+            if let waitingHint = waitingHint {
+                self.label.text = message + "\n\n" + waitingHint
+                self.spinner.stopAnimating()
+                self.spinner.isHidden = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.4) { self.finish() }
+                return
+            }
             if let stickyHint = stickyHint {
                 self.label.text = message + "\n\n" + stickyHint
                 self.spinner.stopAnimating()
@@ -877,6 +898,27 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
                 }
             }
         }
+    }
+
+    /// 2xx + `waiting: true`: saved past the monthly allowance, analysis deferred
+    /// (functions/deferred_capture.py). The server's `message` owns the wording
+    /// ("Saved. Machina will read it next month, or now with Pro."); its leading
+    /// "Saved." is dropped because the headline already says it. On the free plan
+    /// (`upgrade: true`) leave the same one-shot paywall hint the quota wall uses,
+    /// so the next app open shows the waiting count and the upgrade.
+    private func showWaitingResult(_ body: [String: Any]) {
+        if (body["upgrade"] as? Bool) == true,
+           let defaults = UserDefaults(suiteName: Self.appGroup) {
+            defaults.set("saves", forKey: "pendingPaywallKind")
+            defaults.set(Date().timeIntervalSince1970, forKey: "pendingPaywallAt")
+        }
+        var hint = ((body["message"] as? String) ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if hint.hasPrefix("Saved.") {
+            hint = String(hint.dropFirst("Saved.".count)).trimmingCharacters(in: .whitespaces)
+        }
+        if hint.isEmpty { hint = "Machina will read it next month." }
+        showResult("Saved ✓", success: true, waitingHint: hint)
     }
 
     /// The free plan's monthly quota refused this save (429 + `upgrade: true`).
@@ -1377,6 +1419,8 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
                 let body = (try? JSONSerialization.jsonObject(with: responseData)) as? [String: Any]
                 if (body?["duplicate"] as? Bool) == true {
                     showDuplicateResult()
+                } else if (body?["waiting"] as? Bool) == true {
+                    showWaitingResult(body ?? [:])
                 } else if let total = body?["savedFirstOf"] as? Int, total > 1 {
                     // Shared text held several links: only the first became a
                     // card, the rest ride along in its note. Say so.
