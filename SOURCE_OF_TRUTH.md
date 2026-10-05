@@ -233,7 +233,19 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (2026-09-25): install build **1336** (screenshot-completion rebuild + Machina-mark round; 1335 was the first cut), then the 1334 steps below if not yet done
+> ## 🚨 OWNER ACTION (2026-10-05): install build **1346** (waiting saves, My notes, first-run fixes, theme follows the device)
+>
+> Merge `adf023b`; backend, rules and web all live (§9 2026-10-05). QA on
+> 1346: (1) on a FREE test account past 100 saves, share a link from Safari:
+> the sheet says "Saved ✓ / Machina will read it next month, or now with Pro";
+> the card shows "Waiting to be read" (no red, no Retry); the next app open
+> shows the paywall with "N saves waiting". (2) + → Note, then View → My notes:
+> the note is listed. (3) Fresh install on a light-mode phone: the app opens
+> in light (a brief dark flash at cold launch is a known native leftover).
+> (4) Sign in on a second device: no tour. (5) New account: no extension
+> mention on web onboarding. Owner-only: none (convert script found 0 cards).
+>
+> ## (superseded) OWNER ACTION (2026-09-25): install build **1336** (screenshot-completion rebuild + Machina-mark round; 1335 was the first cut), then the 1334 steps below if not yet done
 >
 > **1335** (run #335, merge `2cbfdbf`; backend live via functions #116/#117)
 > rebuilds "Add screenshots" on Facebook/LinkedIn partial cards: review strip
@@ -1290,10 +1302,9 @@ The multi-user auth work described below **was** fully written but not live:
     upgrade releases ignore it. Copy says "next month" everywhere. The Share
     Extension shows "Saved ✓" + the server's message for `waiting: true`
     (`c27f20a`). CAMPAIGN.md T24 left as is (owner: "No").
-    **[ ] OWNER STEP after the deploy:** `cd functions && python
-    tools/convert_quota_failed_to_waiting.py --all` (dry run, read the counts),
-    then `--apply`. Turns cards that failed under the old save-limit 429 into
-    waiting cards (writes only, no Gemini).
+    **[x] Convert script run 2026-10-05:** dry run on prod found 0 cards
+    (5 workspaces, 0 failed cards); nothing to apply. The tool stays for any
+    future use (`functions/tools/convert_quota_failed_to_waiting.py`).
 
 ### 🟡 P2 — security/cost hardening & honest product surface
 
@@ -2527,7 +2538,17 @@ exact-match, capped.
   **Verified on the merged branch before shipping:** E2E 59/59, rules 106/106,
   pytest 1308, tsc 0, em-dash clean, lib tests 55/55. **Deploy:** functions
   "all" (index `links.noteEnrichPending` deploys first), deploy-rules
-  (`tourSeenAt`), TestFlight. Build number and run results: see the next entry.
+  (`tourSeenAt`), TestFlight. **SHIPPED as merge `adf023b`:** Vercel green;
+  deploy-functions run 37279314066 green (unscoped "all", index first);
+  deploy-rules 37279314100 green; python-tests, rules-tests green; the new
+  `e2e-journeys.yml` passed on its FIRST GitHub run (37279314059); TestFlight
+  run #346 → **build 1346** built + uploaded green (first full compile of the
+  Share Extension change; it compiled). Convert script dry run on prod:
+  5 workspaces, 0 failed cards, so nothing to apply (owner step closed).
+  **Push gotcha:** `git push` from `~/MyLinks` hung on the osxkeychain helper
+  (likely a hidden keychain prompt); pushing with
+  `git -c credential.helper= -c "credential.helper=!gh auth git-credential" push …`
+  worked (gh is logged in with repo+workflow scopes).
   **In flight (not in this ship):** Chrome extension and Safari extension
   sessions.
 
