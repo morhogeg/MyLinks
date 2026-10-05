@@ -1282,8 +1282,18 @@ The multi-user auth work described below **was** fully written but not live:
     Bulk import keeps its lifetime allowance + paywall; notes past the limit are
     saved verbatim without AI; screenshot-enrich still 429s. Code:
     `functions/deferred_capture.py`, `web/components/WaitingCard.tsx`.
-    **Still open:** CAMPAIGN.md T24 copy ("100 saves a month") and the Share
-    Extension's "Making your card" hint (needs Swift); see §9 2026-10-05.
+    **Follow-ups (2026-10-05, `2f9b18d`):** notes past the limit stay normal
+    cards flagged `noteEnrichPending` and get their AI tags on upgrade or from
+    the daily sweep (one unit each). The daily sweep keeps
+    `BACKLOG_RESERVE_FRACTION` (0.5) of the month's allowance (free AND Pro)
+    for new saves, released in the last `END_OF_MONTH_DAYS` (3) UTC days;
+    upgrade releases ignore it. Copy says "next month" everywhere. The Share
+    Extension shows "Saved ✓" + the server's message for `waiting: true`
+    (`c27f20a`). CAMPAIGN.md T24 left as is (owner: "No").
+    **[ ] OWNER STEP after the deploy:** `cd functions && python
+    tools/convert_quota_failed_to_waiting.py --all` (dry run, read the counts),
+    then `--apply`. Turns cards that failed under the old save-limit 429 into
+    waiting cards (writes only, no Gemini).
 
 ### 🟡 P2 — security/cost hardening & honest product surface
 
@@ -2500,6 +2510,26 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-10-05 (later) — SHIPPED: waiting saves round 2, theme follows the
+  device, Share Extension waiting state.** Branch `claude/app-launch-qa-a29d1f`.
+  Owner decisions: notes get AI tags on upgrade (3); backlog policy and old
+  failed cards "whatever is best" (4, 6): see 26a follow-ups; no marketing
+  change (7); new users start in the device's appearance (10); shared text
+  stays out of My notes (11); ship, the Swift fix, and the App Store at web
+  launch (1, 2, 9 = yes). **Theme (`1ca855d`):** an unsaved theme resolves to
+  `system` (Auto) in ThemeProvider and the layout bootstrap script; existing
+  users keep their saved value (it has always been written back, so 'dark').
+  The Capacitor `backgroundColor` is still `#050505`, so a light-mode phone
+  may flash dark for an instant at cold launch (native change, not done).
+  **Share Extension (`c27f20a`):** typechecked with `swiftc` against the iOS
+  16.4 simulator SDK only; the TestFlight build is its first full compile.
+  **Verified on the merged branch before shipping:** E2E 59/59, rules 106/106,
+  pytest 1308, tsc 0, em-dash clean, lib tests 55/55. **Deploy:** functions
+  "all" (index `links.noteEnrichPending` deploys first), deploy-rules
+  (`tourSeenAt`), TestFlight. Build number and run results: see the next entry.
+  **In flight (not in this ship):** Chrome extension and Safari extension
+  sessions.
 
 - **2026-10-05 — E2E FINDINGS FIXED BY THREE PARALLEL SESSIONS, MERGED +
   VERIFIED ON `claude/app-launch-qa-a29d1f`. NOT SHIPPED.** Owner approved
