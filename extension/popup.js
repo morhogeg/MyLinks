@@ -40,7 +40,7 @@ const VIEWS = {
   connect: { el: "viewConnect", heading: "Machina" },
   save: { el: "viewSave", heading: "Machina" },
   settings: { el: "viewSettings", heading: "Settings" },
-  token: { el: "viewToken", heading: "Use a token" },
+  token: { el: "viewToken", heading: "Machina" },
 };
 
 function show(name, { push = true } = {}) {
@@ -96,6 +96,7 @@ function renderPage(tab) {
   const title = (tab && tab.title) || "";
   $("pageTitle").textContent = title && title !== url ? title : host || "";
   $("pageHost").textContent = title && title !== url ? host : "";
+  $("pageCard").hidden = !$("pageTitle").textContent;
 }
 
 function renderSaving() {

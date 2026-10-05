@@ -273,6 +273,7 @@ for (const [url, expect] of [
     ['', /can't see this tab/],
 ]) {
     const p = await openPopup({ storage: connected, tab: { id: 3, url, title: '' } });
+    if (!url) check('no address and no title: the empty page card is hidden', p.$('pageCard').hidden === true);
     check(`${url || '(no url)'}: explained, nothing sent`, p.$('resultTitle').textContent === "Can't save this page" && expect.test(p.$('resultDetail').textContent) && p.portMessages.length === 0, p.$('resultDetail').textContent);
 }
 {

@@ -7,7 +7,9 @@
   "scripts": {
     "pretest": "node -e \"require('fs').copyFileSync('../firestore.rules','./firestore.rules.copy')\"",
     "test": "firebase emulators:exec --only auth,firestore --project demo-machina \"playwright test\"",
-    "test:against-running-emulators": "playwright test"
+    "test:against-running-emulators": "playwright test",
+    "test:extension": "playwright test -c playwright.extension.config.ts",
+    "extension:assets": "STORE_ASSETS=1 playwright test -c playwright.extension.config.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
