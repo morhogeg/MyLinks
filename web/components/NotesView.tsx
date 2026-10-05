@@ -3,20 +3,27 @@
 import { useMemo, useState } from 'react';
 import { Search, StickyNote, X, ChevronRight } from 'lucide-react';
 import type { CardNotes } from '@/lib/notes';
-import type { Link } from '@/lib/types';
+import type { Link, UserNote } from '@/lib/types';
 import { getDirection } from '@/lib/rtl';
+import { getTimestampNumber } from '@/lib/feedUtils';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { useNow } from '@/lib/useNow';
 import SourceByline from './SourceByline';
 
 /**
- * My Notes — every personal note across the library, grouped BY CARD (device
- * QA on build 1137: ungrouped rows made note↔card attachment ambiguous). One
- * container per noted card, ordered by its newest note: the card reads as a
- * compact header (thumbnail when the card has one, title, source, note count),
- * and all of its notes stack beneath it on an accent-tinted panel, newest
- * first. Tapping anywhere in the group opens the card's detail modal revealed
- * at its notes section (Feed passes `scrollToNotes`).
+ * My Notes — everything the user wrote themselves, one entry per card, newest
+ * first. Two kinds of entry share the list (lib/notes getNoteGroups):
+ *   - Personal notes, grouped BY CARD (device QA on build 1137: ungrouped rows
+ *     made note↔card attachment ambiguous). The card reads as a compact header
+ *     (thumbnail when the card has one, title, source, note count), and all of
+ *     its notes stack beneath it on accent-tinted panels, newest first.
+ *     Tapping opens the card's detail revealed at its notes section (Feed
+ *     passes `scrollToNotes`).
+ *   - Note cards saved via + → Note (E2E finding E3: a note saved from the
+ *     capture sheet used to be missing here, so a new user's first note looked
+ *     lost). The entry IS the note: its text leads, with the Note byline and
+ *     time beneath, and any personal notes added to it since stack below.
+ *     Tapping opens the note at the top.
  *
  * Pure client-side: the parent passes the already privacy/pending-filtered
  * groups (Feed merges the live window with the full-library snapshot, so
@@ -45,7 +52,8 @@ export default function NotesView({
     loading,
     onOpenCard,
 }: {
-    /** Noted cards with their notes, newest group first (lib/notes getNoteGroups). */
+    /** Noted cards with their notes, plus written note cards, newest entry
+        first (lib/notes getNoteGroups). */
     groups: CardNotes[];
     /** True while the full-library snapshot is still being fetched — older
         notes may still be on their way. */
@@ -56,28 +64,65 @@ export default function NotesView({
     // The shared ticking clock (lib/useNow) — SSR-safe and render-pure.
     const now = useNow();
 
-    const totalNotes = useMemo(
-        () => groups.reduce((sum, g) => sum + g.notes.length, 0),
-        [groups],
-    );
-
-    // Search: a title match keeps the whole group; otherwise the group narrows
-    // to just its matching notes — so results always show WHY they matched.
-    const searching = !!query.trim();
-    const shown = useMemo(() => {
-        const q = query.trim().toLowerCase();
-        if (!q) return groups;
-        const out: CardNotes[] = [];
+    // Scale, split by kind: notes you wrote as cards vs. notes on other cards.
+    const scale = useMemo(() => {
+        let written = 0, onCards = 0, notedCards = 0;
         for (const g of groups) {
-            if (g.link.title.toLowerCase().includes(q)) { out.push(g); continue; }
-            const hits = g.notes.filter((n) => n.text.toLowerCase().includes(q));
-            if (hits.length > 0) out.push({ ...g, notes: hits });
+            if (g.body) written++;
+            onCards += g.notes.length;
+            if (g.notes.length > 0) notedCards++;
         }
-        return out;
+        return { written, onCards, notedCards };
+    }, [groups]);
+
+    // Search: a title match (or, for a note card, a match in its text) keeps
+    // the whole entry; otherwise the entry narrows to just its matching notes,
+    // so results always show WHY they matched.
+    const searching = !!query.trim();
+    const { shown, matches } = useMemo(() => {
+        const q = query.trim().toLowerCase();
+        if (!q) return { shown: groups, matches: 0 };
+        const out: CardNotes[] = [];
+        let count = 0;
+        for (const g of groups) {
+            if (g.link.title.toLowerCase().includes(q) || (g.body && g.body.toLowerCase().includes(q))) {
+                out.push(g);
+                count += (g.body ? 1 : 0) + g.notes.length;
+                continue;
+            }
+            const hits = g.notes.filter((n) => n.text.toLowerCase().includes(q));
+            if (hits.length > 0) { out.push({ ...g, notes: hits }); count += hits.length; }
+        }
+        return { shown: out, matches: count };
     }, [groups, query]);
-    const shownNotes = useMemo(
-        () => shown.reduce((sum, g) => sum + g.notes.length, 0),
-        [shown],
+    const plural = (n: number, word: string) => `${n.toLocaleString()} ${word}${n === 1 ? '' : 's'}`;
+    const scaleLine = scale.written > 0 && scale.onCards > 0
+        ? `${plural(scale.written, 'note')} · ${scale.onCards.toLocaleString()} more on ${plural(scale.notedCards, 'card')}`
+        : scale.written > 0
+            ? plural(scale.written, 'note')
+            : `${plural(scale.onCards, 'note')} on ${plural(scale.notedCards, 'card')}`;
+
+    // The personal notes on a card — the content this view exists for. Each is
+    // the SAME bordered accent panel the detail modal renders notes in (one
+    // visual language for "your note" everywhere); discrete blocks with real
+    // borders survive both themes, unlike a faint full-bleed tint (device QA on
+    // build 1140).
+    const renderNotes = (notes: UserNote[]) => (
+        <div className="px-3 pb-3 space-y-2">
+            {notes.map((n) => {
+                const noteRtl = getDirection(n.text) === 'rtl';
+                return (
+                    <div key={n.id} dir={noteRtl ? 'rtl' : 'ltr'} className="rounded-xl bg-accent/[0.06] border border-accent/15 px-3.5 py-3">
+                        <p className={`text-[15px] text-text whitespace-pre-wrap leading-relaxed ${noteRtl ? 'font-hebrew' : ''}`}>
+                            {n.text}
+                        </p>
+                        <span className="mt-1.5 block text-[11px] font-medium text-text-muted/60">
+                            {timeAgo(n.updatedAt ?? n.createdAt, now, noteRtl)}
+                        </span>
+                    </div>
+                );
+            })}
+        </div>
     );
 
     return (
@@ -112,9 +157,7 @@ export default function NotesView({
             {/* One quiet line of scale — or of results while searching. */}
             {groups.length > 0 && (
                 <p className="text-[12px] text-text-muted px-1.5 mb-3" aria-live="polite">
-                    {searching
-                        ? `${shownNotes.toLocaleString()} matching note${shownNotes === 1 ? '' : 's'}`
-                        : `${totalNotes.toLocaleString()} note${totalNotes === 1 ? '' : 's'} on ${groups.length.toLocaleString()} card${groups.length === 1 ? '' : 's'}`}
+                    {searching ? plural(matches, 'matching note') : scaleLine}
                 </p>
             )}
 
@@ -132,8 +175,8 @@ export default function NotesView({
                             {groups.length === 0 ? <StickyNote className="w-6 h-6" /> : <Search className="w-6 h-6" />}
                         </span>
                         {groups.length === 0 ? (
-                            <p className="text-[14px] text-text-muted leading-snug max-w-[260px]">
-                                No notes yet. Open any card and tap “Add a note”. Everything you write collects here.
+                            <p className="text-[14px] text-text-muted leading-snug max-w-[280px]">
+                                No notes yet. Tap + and choose Note to write one, or open any card and tap “Add a note”. Everything you write collects here.
                             </p>
                         ) : (
                             <p className="text-[14px] text-text-muted leading-snug max-w-[260px]">
@@ -144,20 +187,75 @@ export default function NotesView({
                 )
             ) : (
                 <div className="space-y-4">
-                    {shown.map(({ link, notes }, index) => {
-                        const titleRtl = getDirection(link.title, link.language) === 'rtl';
+                    {shown.map(({ link, notes, body }, index) => {
+                        const open = () => onOpenCard(link);
+                        const entryProps = {
+                            onClick: open,
+                            role: 'button',
+                            tabIndex: 0,
+                            onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } },
+                            style: { ['--enter-delay' as string]: `${Math.min(index, 12) * 14}ms` },
+                            className: 'group surface-card animate-card-enter rounded-[20px] border border-border-subtle bg-card shadow-[var(--shadow-card)] overflow-hidden cursor-pointer transition-all duration-150 [@media(hover:hover)]:hover:border-accent/40 [@media(hover:hover)]:hover:shadow-[var(--shadow-card-hover)] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
+                        };
                         const colorStyle = getCategoryColorStyle(link.category);
+
+                        // A note card the user wrote: the entry IS the note. Its
+                        // text leads (dir="auto" so Hebrew reads right-to-left on
+                        // its own), the Note byline and age sit beneath, and any
+                        // personal notes added to it since follow as panels.
+                        if (body) {
+                            const bodyRtl = getDirection(body) === 'rtl';
+                            // A long note's AI heading reads above the text; a
+                            // first-line title (short note, or before enrichment)
+                            // would just repeat the text's opening.
+                            const heading = link.title && !body.startsWith(link.title.replace(/…$/, '')) ? link.title : null;
+                            const headingRtl = !!heading && getDirection(heading, link.language) === 'rtl';
+                            const writtenAt = getTimestampNumber(link.createdAt) || now;
+                            const preview = body.length > 80 ? `${body.slice(0, 80)}…` : body;
+                            return (
+                                <div
+                                    key={link.id}
+                                    {...entryProps}
+                                    aria-label={`Note: ${preview}${notes.length > 0 ? `, ${notes.length === 1 ? 'one more note' : `${notes.length} more notes`}` : ''}`}
+                                >
+                                    {/* Mirrors per note direction, like the card
+                                        header below: a Hebrew note puts its byline
+                                        and age on the right, chevron at the logical end. */}
+                                    <div dir={bodyRtl ? 'rtl' : 'ltr'} className="relative ps-4 pe-3 py-3">
+                                        {link.category && (
+                                            <span
+                                                className="absolute start-0 inset-y-2.5 w-1.5 rounded-full"
+                                                style={{ backgroundColor: colorStyle.backgroundColor }}
+                                                aria-hidden
+                                            />
+                                        )}
+                                        {heading && (
+                                            <h3 dir="auto" className={`mb-1 line-clamp-2 font-semibold text-[15px] leading-snug text-text transition-colors [@media(hover:hover)]:group-hover:text-accent ${headingRtl ? 'font-hebrew' : ''}`}>
+                                                {heading}
+                                            </h3>
+                                        )}
+                                        <p dir="auto" className={`line-clamp-6 text-[15px] text-text whitespace-pre-wrap leading-relaxed ${bodyRtl ? 'font-hebrew' : ''}`}>
+                                            {body}
+                                        </p>
+                                        <div className="mt-2 flex items-center gap-1.5 min-w-0 text-[11px] text-text-muted">
+                                            <SourceByline link={link} />
+                                            <span aria-hidden className="text-text-muted/60">·</span>
+                                            <span className="shrink-0 font-medium text-text-muted/80">{timeAgo(writtenAt, now, bodyRtl)}</span>
+                                            <ChevronRight className="ms-auto w-4 h-4 shrink-0 text-text-muted/60 rtl:rotate-180" />
+                                        </div>
+                                    </div>
+                                    {notes.length > 0 && renderNotes(notes)}
+                                </div>
+                            );
+                        }
+
+                        const titleRtl = getDirection(link.title, link.language) === 'rtl';
                         const thumb = link.metadata?.thumbnailUrl;
                         return (
                             <div
                                 key={link.id}
-                                onClick={() => onOpenCard(link)}
-                                role="button"
-                                tabIndex={0}
+                                {...entryProps}
                                 aria-label={`${link.title}: ${notes.length === 1 ? 'one note' : `${notes.length} notes`}`}
-                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenCard(link); } }}
-                                style={{ ['--enter-delay' as string]: `${Math.min(index, 12) * 14}ms` }}
-                                className="group surface-card animate-card-enter rounded-[20px] border border-border-subtle bg-card shadow-[var(--shadow-card)] overflow-hidden cursor-pointer transition-all duration-150 [@media(hover:hover)]:hover:border-accent/40 [@media(hover:hover)]:hover:shadow-[var(--shadow-card-hover)] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
                             >
                                 {/* Card header — the anchor the notes hang from. Mirrors
                                     per card language so Hebrew cards read right-to-left
@@ -192,27 +290,7 @@ export default function NotesView({
                                     )}
                                     <ChevronRight className="w-4 h-4 shrink-0 text-text-muted/60 rtl:rotate-180" />
                                 </div>
-
-                                {/* The notes — the content this view exists for. Each is
-                                    the SAME bordered accent panel the detail modal renders
-                                    notes in (one visual language for "your note" everywhere);
-                                    discrete blocks with real borders survive both themes,
-                                    unlike a faint full-bleed tint (device QA on build 1140). */}
-                                <div className="px-3 pb-3 space-y-2">
-                                    {notes.map((n) => {
-                                        const noteRtl = getDirection(n.text) === 'rtl';
-                                        return (
-                                            <div key={n.id} dir={noteRtl ? 'rtl' : 'ltr'} className="rounded-xl bg-accent/[0.06] border border-accent/15 px-3.5 py-3">
-                                                <p className={`text-[15px] text-text whitespace-pre-wrap leading-relaxed ${noteRtl ? 'font-hebrew' : ''}`}>
-                                                    {n.text}
-                                                </p>
-                                                <span className="mt-1.5 block text-[11px] font-medium text-text-muted/60">
-                                                    {timeAgo(n.updatedAt ?? n.createdAt, now, noteRtl)}
-                                                </span>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
+                                {renderNotes(notes)}
                             </div>
                         );
                     })}
