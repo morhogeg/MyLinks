@@ -1,4 +1,5 @@
 import { AskHints, Link } from './types';
+import { isPending } from './feedUtils';
 
 export type { AskHints } from './types';
 
@@ -64,7 +65,7 @@ function toMs(createdAt: number | string | undefined): number {
 
 /** Cards that are fully analyzed (skip in-flight and failed captures). */
 function readyLinks(links: Link[]): Link[] {
-    return links.filter(l => l.status !== 'processing' && l.status !== 'failed');
+    return links.filter(l => !isPending(l));
 }
 
 /** A title short enough to sit inside a chip; null if unusable.

@@ -1,5 +1,5 @@
 import { Link } from './types';
-import { getTimestampNumber } from './feedUtils';
+import { getTimestampNumber, isPending } from './feedUtils';
 import { overlap, toVector, genericConcepts, qualifyLiveTie, liveScore, STRONG, MAX_RELATED } from './related';
 import type { PoolSims } from './similarity';
 
@@ -158,7 +158,7 @@ export async function buildGraphModel(
     options?: BuildOptions,
 ): Promise<GraphModel | null> {
     // Only settled cards participate — in-flight/failed captures have no analysis.
-    const settled = links.filter((l) => l.status !== 'processing' && l.status !== 'failed');
+    const settled = links.filter((l) => !isPending(l));
     // Node cap (MAX_GRAPH_CARDS): keep pinned cards, then the connected ones,
     // newest first.
     const pinned = new Set(pinIds ?? []);

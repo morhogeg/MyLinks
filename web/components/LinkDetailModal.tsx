@@ -12,6 +12,7 @@ import { getCategoryColorStyle } from '@/lib/colors';
 import CategoryInput from './CategoryInput';
 import TagInput from './TagInput';
 import { hasHebrew, getDominantDirection } from '@/lib/rtl';
+import { isPending } from '@/lib/feedUtils';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import { useVisualViewport } from '@/lib/useVisualViewport';
 import { getRelatedCards, relatedSimCandidates } from '@/lib/related';
@@ -454,7 +455,7 @@ export default function LinkDetailModal({
     const autoReadIds = useRef<Set<string>>(new Set());
     useEffect(() => {
         if (!isOpen || link.isRead) return;
-        if (link.status === 'processing' || link.status === 'failed') return;
+        if (isPending({ status: link.status })) return;
         const id = link.id;
         if (autoReadIds.current.has(id)) return;
         const markRead = () => {

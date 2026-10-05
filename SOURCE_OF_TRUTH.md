@@ -1128,6 +1128,44 @@ The multi-user auth work described below **was** fully written but not live:
     keyboard never covers inputs (LinkDetailModal category/tag, AddToCollection,
     AddLinkForm on iPhone SE); pull-to-refresh vs edge-swipe conflicts; failed
     card → Retry; Apple + Google sign-in; account deletion end-to-end.
+    **Now narrower (2026-10-04):** the web halves of failed-card Retry,
+    offline save, and account deletion are covered by the E2E suite (11b).
+    What's left here is truly native: share sheet, keyboard, haptics,
+    pull-to-refresh, real Apple/Google popups, StoreKit.
+
+11b. **[x] E2E user-journey suite — ADDED 2026-10-04** (`e2e/`, workflow
+    `e2e-journeys.yml` on `web/**`/`e2e/**`/`firestore.rules` pushes + PRs).
+    Playwright drives the real web app at iPhone size (plus a desktop pass)
+    against the Auth + Firestore emulators with the **live rules**; Cloud
+    Functions are stubbed. 40 tests: landing/legal, sign-up (incl. claim
+    endpoints down → self-serve workspace), consent/welcome/tour persistence,
+    first link save → pipeline hand-off → ready card, failed hand-off, free
+    limit → paywall, notes, duplicates, offline save, search, favorite/note/
+    archive/delete, collections, Ask (stream, sources, history, error, limit),
+    delete account (+ failure), two-account isolation, export, and a screen
+    sweep (every tab/view, light+dark, Hebrew, long titles; no console errors,
+    no sideways scroll). `npm test` in `e2e/`. Known bugs are `test.fail()`.
+    **Findings still open (owner decides / next session fixes):**
+    - **[x] E1 — FIXED 2026-10-05:** one toast per failed hand-off (the
+      enqueue `catch` records the card id; the snapshot effect skips it).
+    - **[x] E2 — FIXED 2026-10-05 via "save it, analyze it later" (26a).**
+    - **[x] E3 — FIXED 2026-10-05:** My notes lists note cards (+ → Note) as
+      their own entries beside per-card comments (`lib/notes.ts`
+      `isWrittenNote`; shared text and Ask answers excluded; private cards
+      still excluded). `e2e/tests/08-notes.spec.ts`.
+    - **[x] E4 — FIXED 2026-10-05:** web onboarding, tour step 1 and the empty
+      library name only + and the iPhone share sheet. Settings → Browser
+      extension kept (it manages the extension token), sub-line "Preview,
+      installed by hand". `e2e/tests/09-first-run.spec.ts`.
+    - **[x] E5 — FIXED 2026-10-05:** `create_workspace` stamps `graphVersion`
+      (`link_service.GRAPH_VERSION`; `test_workspace_graph_version.py` fails on
+      drift from `web/lib/rebuildConnections.ts`); `ensureGraphVersion` stamps
+      an empty library without calling `rebuild_connections`. Locked create
+      rule deliberately unchanged.
+    - **[x] E6 — FIXED 2026-10-05:** tour seen = `tourSeenAt` on the user doc
+      (`lib/tourSeen`, reconciled in AuthProvider, doc wins; a fresh workspace
+      ignores a device key left by another account). Added to the user-doc
+      update allowlist in both rules files.
 
 8a. **[x] Trademark clearance — CLOSED 2026-08-23 by owner decision.** Search
     run same day; the owner reviewed the one live conflict (US 6278707, Ionic
@@ -1233,16 +1271,29 @@ The multi-user auth work described below **was** fully written but not live:
     `functions/**` change (or bump `functions/.deploy-ping`) so
     deploy-functions writes them into `functions/.env`, and cut a TestFlight
     build so the public key is baked in.
-26a. **[ ] Owner decision: is capture gated on the free plan? (found 2026-10-02.)**
-    §7.1 and item 26 both say "capture is never gated". But `functions/quota.py`
-    refuses the 101st free save of the month with a 429 ("You've used all 100
-    free saves this month. Upgrade to Machina Pro…"), and the build-1334 QA list
-    expects exactly that ("free-limit share → Monthly limit reached"). So the
-    code gates capture at 100/month and the principle says it never does.
-    Marketing now follows the code: `marketing/x-launch/CAMPAIGN.md` T24 says
-    "the free plan keeps 100 saves and 20 questions a month". Decide which one
-    wins. If capture should truly never be gated, the cap has to move off the
-    save and onto the analysis, and T24 changes with it.
+26a. **[x] DECIDED 2026-10-05 (owner): capture is never gated; the cap moved
+    onto the analysis.** Past 100 free saves (or Pro's 1000 ceiling) a save is
+    kept as `status: 'waiting'` with a server-only page snapshot
+    (`users/{uid}/capture_snapshots/{cardId}`, scrape only, no Gemini), and read
+    on upgrade (Firestore trigger `release_waiting_on_upgrade` on
+    `entitlements/{uid}`) or within the month's allowance (daily
+    `release_waiting_saves`, 00:15 UTC; admin `force_release_waiting_saves`).
+    Each release charges one save unit (backlog counts toward Pro's 1000).
+    Bulk import keeps its lifetime allowance + paywall; notes past the limit are
+    saved verbatim without AI; screenshot-enrich still 429s. Code:
+    `functions/deferred_capture.py`, `web/components/WaitingCard.tsx`.
+    **Follow-ups (2026-10-05, `2f9b18d`):** notes past the limit stay normal
+    cards flagged `noteEnrichPending` and get their AI tags on upgrade or from
+    the daily sweep (one unit each). The daily sweep keeps
+    `BACKLOG_RESERVE_FRACTION` (0.5) of the month's allowance (free AND Pro)
+    for new saves, released in the last `END_OF_MONTH_DAYS` (3) UTC days;
+    upgrade releases ignore it. Copy says "next month" everywhere. The Share
+    Extension shows "Saved ✓" + the server's message for `waiting: true`
+    (`c27f20a`). CAMPAIGN.md T24 left as is (owner: "No").
+    **[ ] OWNER STEP after the deploy:** `cd functions && python
+    tools/convert_quota_failed_to_waiting.py --all` (dry run, read the counts),
+    then `--apply`. Turns cards that failed under the old save-limit 429 into
+    waiting cards (writes only, no Gemini).
 
 ### 🟡 P2 — security/cost hardening & honest product surface
 
@@ -2459,6 +2510,75 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-10-05 (later) — SHIPPED: waiting saves round 2, theme follows the
+  device, Share Extension waiting state.** Branch `claude/app-launch-qa-a29d1f`.
+  Owner decisions: notes get AI tags on upgrade (3); backlog policy and old
+  failed cards "whatever is best" (4, 6): see 26a follow-ups; no marketing
+  change (7); new users start in the device's appearance (10); shared text
+  stays out of My notes (11); ship, the Swift fix, and the App Store at web
+  launch (1, 2, 9 = yes). **Theme (`1ca855d`):** an unsaved theme resolves to
+  `system` (Auto) in ThemeProvider and the layout bootstrap script; existing
+  users keep their saved value (it has always been written back, so 'dark').
+  The Capacitor `backgroundColor` is still `#050505`, so a light-mode phone
+  may flash dark for an instant at cold launch (native change, not done).
+  **Share Extension (`c27f20a`):** typechecked with `swiftc` against the iOS
+  16.4 simulator SDK only; the TestFlight build is its first full compile.
+  **Verified on the merged branch before shipping:** E2E 59/59, rules 106/106,
+  pytest 1308, tsc 0, em-dash clean, lib tests 55/55. **Deploy:** functions
+  "all" (index `links.noteEnrichPending` deploys first), deploy-rules
+  (`tourSeenAt`), TestFlight. Build number and run results: see the next entry.
+  **In flight (not in this ship):** Chrome extension and Safari extension
+  sessions.
+
+- **2026-10-05 — E2E FINDINGS FIXED BY THREE PARALLEL SESSIONS, MERGED +
+  VERIFIED ON `claude/app-launch-qa-a29d1f`. NOT SHIPPED.** Owner approved
+  "save it, analyze it later" (26a) and asked for sessions per bug, merged and
+  tested centrally. **A** (`d7100f6`, `f723d8e`): the save limit defers analysis
+  instead of failing (see 26a) and E1 is fixed; the two E2E `test.fail` known
+  bugs now pass normally. **B** (`908c6fb`): E3, My notes includes note cards.
+  **C** (`355c1c1`): E4 extension copy, E5 graphVersion at birth, E6 tour per
+  account (`tourSeenAt`, rules allowlist). Plus `70ceeb9`: the screen sweep's
+  "light" pass had been rendering dark (theme is the app's own localStorage
+  setting, default dark, not the OS preference); it now sets it and asserts.
+  **Verified on the merged branch:** E2E 53/53 (iPhone + desktop), rules tests
+  105/105, pytest 1296, py_compile, web tsc 0, eslint 0 errors on touched files,
+  em-dash clean, web lib tests 55/55 (Node 22). Reviewed by hand: the release
+  trigger can't loop (quota charges go to `usage_quotas`, not `entitlements`);
+  a per-card transaction rechecks `waiting` so overlapping releases refund.
+  **NOT verified:** anything deployed (the entitlements trigger, the scheduler,
+  `count()` aggregation, queue bursts); device behavior (Share Extension text,
+  waiting card in light/dark/Hebrew on a phone). **Deploy when shipped:**
+  functions "all" (omit `Deploy-Functions:`; new `release_waiting_on_upgrade`,
+  `release_waiting_saves`, `force_release_waiting_saves`; `search.py`/
+  `vector_store.py`/`digest_service.py` changed); deploy-rules (`tourSeenAt`);
+  a TestFlight build (inferred, not tested: old builds don't know `waiting`, so they likely show it as an unanalyzed card and
+  toast "Saved to Machina"). No index/hosting change, no backfill.
+
+- **2026-10-04 — E2E USER-JOURNEY SUITE (40 tests) + 6 FINDINGS.** Branch
+  `claude/app-launch-qa-a29d1f`. Owner: "I don't have capacity to QA every
+  aspect, find the blind spots for real users." The backend was already well
+  covered (pytest, rules suite, canary, daily health). The gap was the
+  frontend: 7 pure-lib tests and no journey coverage. Added `e2e/` (see §4 11b):
+  Playwright + Auth/Firestore emulators with the live `firestore.rules`,
+  `demo-machina` project (can't reach prod), stubbed functions. One app change:
+  `web/lib/firebase.ts` exposes `window.__machinaE2E.signIn` **only inside the
+  existing localhost-emulator branch**, because headless Chromium can't
+  complete Google/Apple popups. New workflow `e2e-journeys.yml`.
+  **Verified:** `npm test` green 3 runs in a row locally (40/40, ~1.7 min;
+  the two known-bug tests count as expected failures); web tsc 0; eslint clean
+  on `firebase.ts`. **NOT verified:** the workflow on a GitHub runner (first
+  run happens on push). No artifact upload step, because the repo pins actions
+  by SHA and none exists for upload-artifact yet; failures print in the log.
+  **Findings:** E1–E6 in §4 11b. E1/E2 are the ones a real user hits at
+  launch. Also confirmed working (no change needed): self-serve workspace
+  creation when both claim transports are down; consent/onboarding/graph stamp
+  all persist under the locked rules; two accounts are isolated in the UI;
+  delete account wipes and signs out, and a failure keeps the user signed in.
+  **Side effect:** installing Playwright 1.63 garbage-collected older cached
+  browsers in `~/Library/Caches/ms-playwright` (chromium-1223, webkit-2287).
+  Other projects re-fetch them with `npx playwright install`.
+  **Owner steps:** decide E2 (with 26a) and E3; then the fixes are small.
 
 - **2026-10-02 — X LAUNCH CAMPAIGN REVIEWED AND ON MAIN; THREE META AD VIDEOS
   HANDED TO NEW SESSIONS.** Branch `claude/x-launch-content-video-prompts-flujr5`.

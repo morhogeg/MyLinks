@@ -45,7 +45,7 @@ options.set_global_options(max_instances=20)
 from db import get_db, ensure_app
 from url_key import url_key
 from log_safe import mask_uid
-from models import LinkStatus, ReminderStatus
+from models import LinkStatus, ReminderStatus, UNANALYZED_STATUSES
 from ai_service import GeminiService, AnalysisError
 from link_service import (
     save_link_to_firestore, get_user_tags, get_user_vocabulary, is_hebrew,
@@ -79,6 +79,8 @@ from rate_limit import check_rate_limit, client_ip, RateLimitBackendError
 from quota import meter as meter_quota, refund_quota, quota_message
 # At-most-once refunds for queued captures (see the module docstring).
 import capture_charge
+# Saves past the monthly allowance: kept as `waiting` cards, analyzed later.
+import deferred_capture
 from entitlement import (
     plan_for, entitlement_summary, sync_from_revenuecat, resolve_workspace_for_app_user,
     rc_configured, RevenueCatError, run_trial_nudges, entitlement_source,
@@ -809,6 +811,75 @@ def _quota_blocked(uid: str, kind: str, headers: dict = None, plan: str = None,
             mimetype='application/json',
         )
     return None
+
+
+def _over_save_allowance(blocked) -> Optional[dict]:
+    """When `blocked` (a `_quota_blocked(uid, "saves")` result) is the monthly
+    save wall, its `{upgrade, used, limit}`; otherwise None.
+
+    A save past the wall is not refused: the capture paths keep it as a
+    `waiting` card (deferred_capture) and only the analysis waits. Reading the
+    429 the gate already built keeps ONE metering point, which every capture
+    test stubs at `_quota_blocked`."""
+    if blocked is None or getattr(blocked, "status_code", None) != 429:
+        return None
+    try:
+        body = json.loads(blocked.get_data(as_text=True))
+    except Exception:
+        return None
+    if not isinstance(body, dict) or body.get("kind") != "saves":
+        return None
+    return {"upgrade": bool(body.get("upgrade")), "used": body.get("used"),
+            "limit": body.get("limit")}
+
+
+_CARD_ID_RE = re.compile(r'[A-Za-z0-9_-]{1,128}')
+
+
+def _valid_card_id(card_id) -> bool:
+    return isinstance(card_id, str) and bool(_CARD_ID_RE.fullmatch(card_id))
+
+
+def _waiting_response(uid: str, card_id: str, over: dict, headers: dict, **extra) -> https_fn.Response:
+    """200 for a save kept past the monthly wall. A success, deliberately:
+    the capture IS saved, so every client's success branch (the share
+    extension's "Saved", the browser extension's notification, which shows
+    `message`) is the truthful one. `waiting` + `upgrade` let the web app open
+    the paywall with the backlog count instead of an error."""
+    body = {
+        "success": True,
+        "saved": True,
+        "queued": False,
+        "waiting": True,
+        "id": card_id,
+        "kind": "saves",
+        "upgrade": over.get("upgrade", False),
+        "used": over.get("used"),
+        "limit": over.get("limit"),
+        "waitingCount": deferred_capture.count_waiting(uid),
+        "message": deferred_capture.waiting_message(over.get("upgrade", False)),
+    }
+    body.update(extra)
+    return https_fn.Response(json.dumps(body), status=200, headers=headers,
+                             mimetype='application/json')
+
+
+def _defer_to_card(uid: str, card_id: Optional[str], new_card: dict, update: Optional[dict] = None):
+    """Write the waiting card for a deferred save: update the client's own
+    placeholder (`card_id`), or create `new_card`. Returns the card ref, or
+    None when the client's placeholder does not exist (deleted mid-save)."""
+    links = get_db().collection('users').document(uid).collection('links')
+    if card_id:
+        card_ref = links.document(card_id)
+        if not card_ref.get().exists:
+            return None
+        fields = deferred_capture.waiting_update()
+        fields.update(update or {})
+        card_ref.update(fields)
+        return card_ref
+    card_ref = links.document()
+    card_ref.set(new_card)
+    return card_ref
 
 
 # App Check enforcement flag. When falsy, verification is attempted and logged
@@ -1944,7 +2015,7 @@ def backfill_embeddings(req: https_fn.Request) -> https_fn.Response:
                 d = doc.to_dict() or {}
                 # Skip cards not yet in a searchable state (processing/failed) —
                 # the pipeline/trigger embeds those when they settle.
-                if d.get("status") in ("processing", "failed"):
+                if d.get("status") in UNANALYZED_STATUSES:
                     totals["skipped"] += 1
                     continue
                 if not force and d.get("embeddingVersion") == EMBED_TEXT_VERSION:
@@ -2993,6 +3064,9 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
     # (refund_uid, kind) of a quota unit charged by THIS request, so the 5xx
     # handler can refund it — a failed image save must not consume a unit.
     charged = None
+    # Set when the save is past the monthly wall: the image is kept as a
+    # `waiting` card instead of being analyzed now.
+    over = None
 
     try:
         data = _json_object(req)
@@ -3025,10 +3099,15 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
                 return rl
             # Monthly save quota (an image is a save) — metered only after input
             # validation passes, so a rejected request doesn't consume a unit.
+            # Past the wall an inline image is still kept (stored + a `waiting`
+            # card, below); only its analysis waits.
             q = _quota_blocked(uid, "saves", headers)
             if q:
-                return q
-            charged = (uid, "saves")
+                over = _over_save_allowance(q)
+                if over is None or not image_b64:
+                    return q
+            else:
+                charged = (uid, "saves")
 
         # 1. Obtain image bytes.
         # Preferred path: the client sends the (already compressed) bytes inline,
@@ -3068,6 +3147,18 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
 
         if len(image_bytes) > MAX_IMAGE_BYTES:
             return _error_response("Image is too large", 413, headers)
+
+        if over is not None:
+            # Kept, not refused: the server writes the card here (the client's
+            # sync path normally saves the returned analysis itself), so the
+            # client only has to show the paywall.
+            import uuid
+            stored_url = _store_image(f"screenshots/{storage_key_for(uid)}/{uuid.uuid4().hex}.jpg",
+                                      image_bytes, mime_type)
+            card_ref = _defer_to_card(uid, None, deferred_capture.new_waiting_card(
+                url=stored_url, title="Screenshot", source_type="image", mime_type=mime_type))
+            logger.info(f"Image kept waiting for {_mask_uid(uid)}")
+            return _waiting_response(uid, card_ref.id, over, headers, image=True)
 
         # 2. Analyze with AI
         ai = GeminiService()
@@ -3239,6 +3330,46 @@ def _claim_offline_enqueue(uid: str, card_id) -> Optional[bool]:
     return capture_charge.run_transaction(db, _body)
 
 
+def _defer_url_capture(uid: str, url: str, card_id, over: dict, headers: dict, *,
+                       body: str = "", explicit_note: str = "", shared_rest: str = "",
+                       note_kind=None, extra_urls=None) -> https_fn.Response:
+    """Keep a link saved past the monthly wall: a `waiting` card now (the
+    client's placeholder when it sent `card_id`, else a new card), the share's
+    own text kept beside it, any reminder in the note set from NOW, and a
+    scrape-only job that snapshots the page while it is still there. No unit
+    is charged; the analysis is charged when the card is released."""
+    if card_id and not _valid_card_id(card_id):
+        return _error_response("Invalid card", 400, headers)
+    source = "web" if card_id else "share"
+    card_ref = _defer_to_card(uid, card_id, deferred_capture.new_waiting_card(
+        url=url, title=_capture_placeholder_title(url, False)))
+    if card_ref is None:
+        return _error_response("Card not found", 404, headers)
+    db = get_db()
+    deferred_capture.save_job_fields(db, uid, card_ref.id, {
+        "body": body, "userNoteText": (shared_rest or "")[:MAX_NOTE_LENGTH],
+        "noteKind": note_kind, "source": source,
+    })
+    if note_kind != 'quote' and explicit_note.strip():
+        _apply_reminder_intent(uid, card_ref.id, explicit_note.strip())
+    job = _pending_url_doc(uid, url, card_id=card_ref.id, body=body, source=source)
+    job["snapshotOnly"] = True
+    if shared_rest:
+        job["userNoteText"] = shared_rest[:MAX_NOTE_LENGTH]
+    try:
+        db.collection('pending_processing').document().set(job)
+    except Exception as e:
+        # The card is saved either way; without a snapshot the page is simply
+        # read live when the card is released.
+        logger.warning(f"Snapshot job not queued (the card still waits): {e}")
+    logger.info(f"Share ingest kept a link waiting for {_mask_uid(uid)}")
+    extra = {"url": url}
+    if extra_urls:
+        extra["savedFirstOf"] = 1 + len(extra_urls)
+        extra["otherUrls"] = extra_urls[:20]
+    return _waiting_response(uid, card_ref.id, over, headers, **extra)
+
+
 @https_fn.on_request(max_instances=10)
 def share_ingest(req: https_fn.Request) -> https_fn.Response:
     """
@@ -3386,12 +3517,20 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                 q = _quota_blocked(uid, "saves", headers)
                 if q:
                     return q
-            else:
+            # Past the monthly save wall, the set is still stored and kept as a
+            # `waiting` card; only its analysis waits (deferred_capture).
+            over = None
+            if enrich_ref is None:
                 # ONE save unit for the whole set — a multi-screenshot card is one save.
                 q = _quota_blocked(uid, "saves", headers)
                 if q:
-                    return q
-            charged = (uid, "saves")
+                    over = _over_save_allowance(q)
+                    if over is None:
+                        return q
+                    if data.get('cardId') and not _valid_card_id(data.get('cardId')):
+                        return _error_response("Invalid card", 400, headers)
+            if over is None:
+                charged = (uid, "saves")
 
             stored_urls = []
             try:
@@ -3401,9 +3540,29 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                         f"screenshots/{storage_key_for(uid)}/{uuid.uuid4().hex}.{ext}", img_bytes, mime))
             except Exception as e:
                 logger.error(f"Multi-image store failed: {e}", exc_info=True)
-                charged = None
-                refund_quota(uid, "saves")
+                if charged:
+                    charged = None
+                    refund_quota(uid, "saves")
                 return _server_error(headers, e)
+
+            if over is not None:
+                title = "Screenshot" if len(stored_urls) == 1 else f"{len(stored_urls)} screenshots"
+                image_fields = {"url": stored_urls[0], "sourceType": "image", "title": title,
+                                "mimeType": decoded[0][1]}
+                if len(stored_urls) > 1:
+                    image_fields["imageUrls"] = stored_urls
+                card_ref = _defer_to_card(
+                    uid, data.get('cardId') or None,
+                    deferred_capture.new_waiting_card(
+                        url=stored_urls[0], title=title, source_type="image",
+                        image_urls=stored_urls, mime_type=decoded[0][1]),
+                    update=image_fields)
+                if card_ref is None:
+                    return _error_response("Card not found", 404, headers)
+                _apply_reminder_intent(uid, card_ref.id, data.get('note'))
+                logger.info(f"Share ingest kept {len(stored_urls)}-image card waiting for {_mask_uid(uid)}")
+                return _waiting_response(uid, card_ref.id, over, headers,
+                                         image=True, count=len(stored_urls))
 
             process_ref = get_db().collection('pending_processing').document()
             if enrich_ref is not None:
@@ -3479,7 +3638,20 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                     return _error_response("Invalid image URL", 400, headers)
             q = _quota_blocked(uid, "saves", headers)
             if q:
-                return q
+                # A Retry past the monthly wall: the images are already ours,
+                # so the card simply waits for its read instead of failing again.
+                over = _over_save_allowance(q)
+                retry_card = data.get('cardId')
+                if over is None or not _valid_card_id(retry_card):
+                    return q
+                card_ref = _defer_to_card(uid, retry_card, {}, update={
+                    "url": image_urls_in[0], "sourceType": "image",
+                    **({"imageUrls": list(image_urls_in)} if len(image_urls_in) > 1 else {}),
+                })
+                if card_ref is None:
+                    return _error_response("Card not found", 404, headers)
+                return _waiting_response(uid, card_ref.id, over, headers,
+                                         image=True, count=len(image_urls_in))
             charged = (uid, "saves")
             process_ref = get_db().collection('pending_processing').document()
             queue_doc = {
@@ -3530,11 +3702,16 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                 return _error_response("Image is too large", 413, headers)
 
             # Monthly save quota — a shared image becomes a save; meter before we
-            # store it and enqueue the paid background job.
+            # store it and enqueue the paid background job. Past the wall the
+            # image is still stored and kept as a `waiting` card.
             q = _quota_blocked(uid, "saves", headers)
+            over = None
             if q:
-                return q
-            charged = (uid, "saves")
+                over = _over_save_allowance(q)
+                if over is None:
+                    return q
+            else:
+                charged = (uid, "saves")
 
             mime_type = _safe_image_mime(data.get('mimeType'))
             ext = 'png' if 'png' in mime_type else 'jpg'
@@ -3545,9 +3722,17 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
             except Exception as e:
                 logger.error(f"Share image store failed: {e}", exc_info=True)
                 # Nothing was saved: give back the unit metered above.
-                charged = None
-                refund_quota(uid, "saves")
+                if charged:
+                    charged = None
+                    refund_quota(uid, "saves")
                 return _server_error(headers, e)
+
+            if over is not None:
+                card_ref = _defer_to_card(uid, None, deferred_capture.new_waiting_card(
+                    url=stored_url, title="Screenshot", source_type="image", mime_type=mime_type))
+                _apply_reminder_intent(uid, card_ref.id, data.get('note'))
+                logger.info(f"Share ingest kept an image waiting for {_mask_uid(uid)}")
+                return _waiting_response(uid, card_ref.id, over, headers, image=True)
 
             db = get_db()
             process_ref = db.collection('pending_processing').document()
@@ -3582,11 +3767,20 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
             if not note_text:
                 return _error_response("No URL or text found in shared content", 400, headers)
             # Monthly save quota (a note is a save) — meter before the write
-            # and the paid Gemini analysis below.
+            # and the paid Gemini analysis below. Past the wall the note is
+            # STILL saved, verbatim: it is the user's own words, complete and
+            # searchable as they are, so it becomes an ordinary note card (not a
+            # `waiting` one). Only its AI heading/tags wait: it is marked
+            # `noteEnrichPending` and organized on upgrade or next month
+            # (deferred_capture).
             q = _quota_blocked(uid, "saves", headers)
+            over = None
             if q:
-                return q
-            charged = (uid, "saves")
+                over = _over_save_allowance(q)
+                if over is None:
+                    return q
+            else:
+                charged = (uid, "saves")
             note_text = note_text[:MAX_NOTE_LENGTH]
             card_ref = get_db().collection('users').document(uid).collection('links').document()
             # verbatim: shared text is kept as the user sent it (see
@@ -3594,9 +3788,19 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
             # sync_link_embedding (which fires on this create) generates one.
             link_data = _note_link_data({}, note_text, verbatim=True)
             link_data["needsEmbedding"] = True
+            if over is not None:
+                link_data.update(deferred_capture.note_pending_fields())
             card_ref.set(link_data)
             charged = None  # the card exists; _enrich_shared_note owns the unit now
             logger.info(f"Share ingest saved note for {_mask_uid(uid)}")
+            if over is not None:
+                return https_fn.Response(
+                    json.dumps({"success": True, "saved": True, "id": card_ref.id, "note": True,
+                                "enriched": False, "kind": "saves",
+                                "upgrade": over["upgrade"], "used": over["used"],
+                                "limit": over["limit"]}),
+                    status=200, headers=headers, mimetype='application/json'
+                )
             enriched = _enrich_shared_note(uid, card_ref, note_text)
             return https_fn.Response(
                 json.dumps({"success": True, "saved": True, "id": card_ref.id, "note": True,
@@ -3649,10 +3853,16 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
 
         # Monthly save quota — a genuinely new (non-duplicate) URL becomes a save;
         # meter before enqueuing the paid background job. Duplicates returned
-        # above are NOT counted.
+        # above are NOT counted. Past the wall the save is kept anyway, as a
+        # `waiting` card, and only the analysis waits (deferred_capture).
         q = _quota_blocked(uid, "saves", headers)
         if q:
-            return q
+            over = _over_save_allowance(q)
+            if over is None:
+                return q
+            return _defer_url_capture(uid, url, card_id, over, headers, body=body,
+                                      explicit_note=explicit_note, shared_rest=shared_rest,
+                                      note_kind=note_kind, extra_urls=extra_urls)
         charged = (uid, "saves")
 
         db = get_db()
@@ -5197,7 +5407,8 @@ def _card_accepts_screenshots(card) -> bool:
     """
     if not isinstance(card, dict):
         return False
-    if card.get("status") in (LinkStatus.PROCESSING.value, LinkStatus.FAILED.value):
+    if card.get("status") in (LinkStatus.PROCESSING.value, LinkStatus.FAILED.value,
+                              LinkStatus.WAITING.value):
         return False
     if card.get("sourceType") not in (None, "web"):
         return False
@@ -5483,6 +5694,196 @@ def _shared_note_entry(text, scraped: dict):
     return {"id": uuid.uuid4().hex[:12], "text": t, "createdAt": now_ms}
 
 
+def _derived_note_title(text: str) -> str:
+    """The title the Note tab derives from a note's text (web/lib/storage.ts
+    splitNoteText): its first non-empty line, cut at 90 characters."""
+    lines = [ln.strip() for ln in (text or "").strip().split("\n")]
+    first = next((ln for ln in lines if ln), "Note")
+    return f"{first[:90].rstrip()}…" if len(first) > 90 else first
+
+
+def _enrich_typed_note(uid: str, card_ref, card: dict, text: str) -> bool:
+    """Server-side twin of the Note tab's enrichNoteCard (web/lib/storage.ts),
+    for a note whose organization waited: tags, category, concepts, language
+    and the takeaway (set or cleared); the AI heading only for a long-form note
+    still wearing its derived title. The note's own words are never touched.
+    On failure the unit is refunded and the card stays as written."""
+    try:
+        ai = GeminiService()
+        tags, cats = get_user_vocabulary(uid)
+        analysis = ai.analyze_text(text, existing_tags=tags, existing_categories=cats)
+        if not isinstance(analysis, dict):
+            raise AnalysisError("Note analysis returned nothing")
+        full = _note_link_data(analysis, text)
+        update = {
+            "category": full["category"],
+            "concepts": full["concepts"],
+            "language": full["language"],
+            "metadata.actionableTakeaway": full["metadata"].get("actionableTakeaway") or gc_firestore.DELETE_FIELD,
+            "needsEmbedding": True,
+        }
+        if full.get("tags"):
+            update["tags"] = full["tags"]
+        ai_title = (analysis.get("title") or "").strip()
+        derived = _derived_note_title(text)
+        if (card.get("summary") or "").strip() and ai_title and ai_title != derived \
+                and card.get("title") == derived:
+            update["title"] = ai_title
+        card_ref.update(update)
+        return True
+    except Exception as e:
+        logger.error(f"Pending note enrichment failed (card kept as written): {e}", exc_info=True)
+        refund_quota(uid, "saves")
+        return False
+
+
+def _enrich_pending_note(ref, uid: str, data: dict) -> None:
+    """Organize a note released by deferred_capture (`noteEnrich` job).
+
+    The job's charge token is claimed first: from then on this run either
+    spends the unit (enrichment landed) or refunds it (both enrich paths refund
+    their own failures; a missing or changed card is refunded here). Shared
+    text uses the share-sheet path (_enrich_shared_note), a typed note its
+    Note-tab twin. A job whose token is already gone (refunded by the queue
+    prune) does no paid work and puts the note back to pending."""
+    db = get_db()
+    card_id = data.get("cardId")
+    try:
+        kind = capture_charge.claim(db, ref)
+        if not uid or not _valid_card_id(card_id):
+            if kind:
+                refund_quota(uid, kind)
+            return
+        card_ref = db.collection('users').document(uid).collection('links').document(card_id)
+        snap = card_ref.get()
+        card = (snap.to_dict() or {}) if snap.exists else None
+        if kind is None:
+            if card is not None:
+                card_ref.update({**deferred_capture.note_pending_fields(),
+                                 "noteEnrichQueuedAt": gc_firestore.DELETE_FIELD})
+            return
+        text = ((card or {}).get("summary") or (card or {}).get("title") or "").strip()
+        if not card or card.get("sourceType") != NOTE_SOURCE_TYPE or not text:
+            refund_quota(uid, kind)
+            return
+        if card.get("captureType") == TEXT_CAPTURE_TYPE:
+            _enrich_shared_note(uid, card_ref, text[:MAX_NOTE_LENGTH])
+        else:
+            _enrich_typed_note(uid, card_ref, card, text[:MAX_NOTE_LENGTH])
+        try:
+            card_ref.update({"noteEnrichQueuedAt": gc_firestore.DELETE_FIELD})
+        except Exception:
+            pass
+    except Exception as e:
+        logger.warning(f"Pending note enrichment aborted: {e}")
+    finally:
+        try:
+            ref.delete()
+        except Exception:
+            pass
+
+
+def _owned_blob_deleter(uid: str):
+    """A function that deletes one of `uid`'s own Storage blobs by its
+    download URL (and refuses anything else, card_cleanup.blob_path_for)."""
+    from card_cleanup import blob_path_for
+    bucket = storage.bucket()
+    keys = {uid, storage_key_for(uid)}
+
+    def _delete(url: str) -> None:
+        path = blob_path_for(url, bucket.name, keys)
+        if path:
+            bucket.blob(path).delete()
+    return _delete
+
+
+def _drop_snapshot(uid: str, card_id) -> None:
+    """Delete a card's capture snapshot (doc + copied post images) once the
+    card has been analyzed. Best-effort."""
+    if not uid or not card_id:
+        return
+    try:
+        deleter = _owned_blob_deleter(uid)
+    except Exception:
+        deleter = None
+    deferred_capture.delete_snapshot(get_db(), uid, card_id, deleter)
+
+
+def _snapshot_capture(ref, uid: str, data: dict) -> None:
+    """The scrape-only half of a save kept past the monthly wall.
+
+    Reads the page NOW (no Gemini: scrape_url is plain HTTP + parsing), keeps
+    what analysis will need in the card's snapshot doc, copies up to two post
+    images into our Storage (social CDN image URLs expire), and gives the
+    waiting card the page's real title and the user's shared note. The card
+    stays `waiting`; nothing here is charged. Any failure just means the page
+    is read live when the card is released."""
+    from scraper import scrape_url
+    card_id = data.get("cardId")
+    url = data.get("url")
+    db = get_db()
+    try:
+        if not card_id or not isinstance(url, str):
+            return
+        card_ref = db.collection('users').document(uid).collection('links').document(card_id)
+        scraped = scrape_url(url, data.get("body"))
+        snap = deferred_capture.snapshot_from_scrape(scraped)
+        stored = []
+        if snap is not None:
+            try:
+                key = storage_key_for(uid)
+                for i, (img, mime) in enumerate(_fetch_post_images(snap.get("image_urls"))):
+                    ext = 'png' if 'png' in mime else 'jpg'
+                    stored.append(_store_image(f"post_thumbs/{key}/snap-{card_id}-{i}.{ext}", img, mime))
+            except Exception as e:
+                logger.warning(f"Snapshot image copy failed (live URLs kept): {e}")
+            if stored:
+                snap["image_urls"] = stored
+        fetched = isinstance(scraped, dict) and not scraped.get("fetch_error")
+        title = (scraped.get("title") or "").strip()[:300] if fetched else ""
+        extras = ({k: v for k, v in _scrape_extras(url_key(url), scraped).items()
+                   if k in ("finalUrlKey", "sourcePlatform")} if fetched else {})
+        note = _shared_note_entry(data.get("userNoteText"), scraped) if fetched else None
+        snap_ref = deferred_capture.snapshot_ref(db, uid, card_id)
+
+        def _body(tx):
+            current = card_ref.get(transaction=tx)
+            card = (current.to_dict() or {}) if current.exists else None
+            # Only a card that is still waiting: once released (or deleted),
+            # the worker owns it and a late snapshot would just be litter.
+            if not deferred_capture.is_waiting(card):
+                return False
+            if snap is not None:
+                tx.set(snap_ref, deferred_capture.snapshot_payload(uid, card_id, snap, stored),
+                       merge=True)
+            update = dict(extras)
+            if title:
+                update["title"] = title
+                update["metadata.originalTitle"] = title
+            if note:
+                notes = [n for n in (card.get("userNotes") or []) if isinstance(n, dict)]
+                if note["text"] not in {(n.get("text") or "").strip() for n in notes}:
+                    update["userNotes"] = notes + [note]
+            if update:
+                tx.update(card_ref, update)
+            return True
+        if not capture_charge.run_transaction(db, _body) and stored:
+            # Released or deleted meanwhile: the copied images belong to no one.
+            try:
+                deleter = _owned_blob_deleter(uid)
+                for u in stored:
+                    deleter(u)
+            except Exception as e:
+                logger.warning(f"Snapshot image cleanup failed: {e}")
+    except Exception as e:
+        logger.warning(f"Snapshot capture failed (the page will be read live later): {e}")
+    finally:
+        try:
+            ref.delete()
+        except Exception:
+            pass
+
+
 @firestore_fn.on_document_created(
     document="pending_processing/{doc_id}",
     memory=1024,
@@ -5534,6 +5935,14 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
     # we neither duplicate it nor overwrite the client's createdAt/ordering.
     # SHARE path: no cardId, so we create the placeholder card here.
     existing_card_id = data.get("cardId")
+    if data.get("snapshotOnly"):
+        # A save kept past the monthly wall: snapshot the page, analyze later.
+        _snapshot_capture(ref, uid, data)
+        return
+    if data.get("noteEnrich"):
+        # A note saved past the wall, now released: organize it.
+        _enrich_pending_note(ref, uid, data)
+        return
     if data.get("enrich") and existing_card_id:
         # Screenshots completing an EXISTING partial card: a different job
         # shape (update in place, never a placeholder, never a failed card).
@@ -5622,7 +6031,16 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             log_to_firestore(task_id, f"Scraping content for: {url}")
             ref.update({"status": "scraping"})
             _write_stage(card_ref, "scraping")
-            scraped_raw = scrape_url(url, original_body)
+            # A released waiting card reads the page as it was when it was
+            # SAVED (deferred_capture): the post may since have been deleted
+            # or walled. No snapshot (or an unreadable one) → read it live.
+            stored = (deferred_capture.load_snapshot(get_db(), uid, existing_card_id)
+                      if data.get("fromSnapshot") and existing_card_id else None)
+            if stored and isinstance(stored.get("scrape"), dict):
+                scraped_raw = deferred_capture.scrape_from_snapshot(stored["scrape"])
+                scraped_raw.setdefault("source_url", url)
+            else:
+                scraped_raw = scrape_url(url, original_body)
 
             # Ensure scraped is a dict
             if isinstance(scraped_raw, dict):
@@ -5857,6 +6275,8 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
 
         # Successful cleanup
         ref.delete()
+        if data.get("source") == "deferred":
+            _drop_snapshot(uid, existing_card_id)
 
     except Exception as e:
         logger.error(f"Background processing error: {e}", exc_info=True)
@@ -5920,6 +6340,8 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             ref.delete()
         except Exception:
             pass
+        if data.get("source") == "deferred":
+            _drop_snapshot(uid, existing_card_id)
 
 
 # ─────────────────────────────────────────────
@@ -5972,7 +6394,10 @@ def run_processing_janitor() -> dict:
     can't retry. This sweep is the backstop: it ages those out so they become
     visible, retryable failed cards.
 
-    Uses a collection-group query so it doesn't scan every user. NOTE: the
+    Only `processing` cards are ever matched: a `waiting` card (a save kept
+    past the monthly wall, deferred_capture) has no clock to run out and is
+    never aged, failed or refunded here. Uses a collection-group query so it
+    doesn't scan every user. NOTE: the
     default single-field indexes cover COLLECTION scope only — this query needs
     the `status` field enabled at COLLECTION_GROUP scope, declared as a
     fieldOverride in firestore.indexes.json (it 400'd in prod without it,
@@ -6191,6 +6616,42 @@ def sweep_stuck_processing(event: scheduler_fn.ScheduledEvent) -> None:
     """
     run_processing_janitor()
     run_category_migration()
+
+
+# Waiting saves (deferred_capture): every workspace's waiting cards are
+# enqueued oldest first within the month's remaining allowance. Daily, just
+# after the UTC month rolls over on the 1st (quota month keys are UTC); on any
+# other day a workspace at its cap has no room, so the run costs one query.
+@scheduler_fn.on_schedule(schedule="15 0 * * *", max_instances=1, timeout_sec=540, memory=512)
+def release_waiting_saves(event: scheduler_fn.ScheduledEvent) -> None:
+    """Daily 00:15 UTC: analyze waiting saves that now fit the allowance."""
+    deferred_capture.run_waiting_release()
+
+
+@https_fn.on_request(max_instances=1, timeout_sec=540)
+def force_release_waiting_saves(req: https_fn.Request) -> https_fn.Response:
+    """Manual trigger for the waiting-saves sweep (admin-gated)."""
+    guard = _require_admin(req)
+    if guard:
+        return guard
+    try:
+        report = deferred_capture.run_waiting_release()
+        return https_fn.Response(json.dumps(report, indent=2), status=200, mimetype="application/json")
+    except Exception as e:
+        logger.error(f"Manual waiting-saves sweep failed: {e}")
+        return https_fn.Response(f"Error: {e}", status=500)
+
+
+@firestore_fn.on_document_written(document="entitlements/{uid}", max_instances=5,
+                                  timeout_sec=300)
+def release_waiting_on_upgrade(event: firestore_fn.Event[firestore_fn.Change[firestore_fn.DocumentSnapshot]]) -> None:
+    """Going Pro reads the waiting saves. Every grant path writes the
+    entitlement doc (RevenueCat sync and webhook, founder and trial grants,
+    a hand edit), so this one trigger is the upgrade hook for all of them. The
+    cards go onto the normal throttled queue; see deferred_capture."""
+    uid = (event.params or {}).get("uid")
+    after = event.data.after.to_dict() if event.data and event.data.after else None
+    deferred_capture.release_on_entitlement_write(uid, after)
 
 
 @https_fn.on_request(max_instances=1)

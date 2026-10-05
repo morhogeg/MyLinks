@@ -1,0 +1,5 @@
+node_modules/
+firestore.rules.copy
+test-results/
+playwright-report/
+*.log

@@ -4,6 +4,7 @@ import { updateLinkStatus, updateLinkTags, updateLinkCategory, updateLinkTitle, 
 import { newShareId, publishCard, removeLinkFromCollection, unpublishCard } from '@/lib/collections';
 import { shareLink, shareUrlFor } from '@/lib/share';
 import { useToast } from '@/components/Toast';
+import { announceWaitingSave } from '@/lib/entitlement';
 
 /**
  * The card action handlers that depend only on [uid, toast] — extracted verbatim
@@ -169,7 +170,14 @@ export function useLinkActions(
     const handleRetryProcessing = useCallback(async (link: Link) => {
         if (!uid) return;
         try {
-            await retryFailedLink(uid, link);
+            const r = await retryFailedLink(uid, link);
+            if (r.waiting) {
+                // Past the monthly allowance: kept for later, not failed. The
+                // paywall (free) or one calm line (Pro) says so; nothing else.
+                const line = announceWaitingSave(r.waiting);
+                if (line) toast.info(line);
+                return;
+            }
             toast.success('Retrying analysis…');
         } catch {
             toast.error("Couldn't analyze that link. Please try again.");

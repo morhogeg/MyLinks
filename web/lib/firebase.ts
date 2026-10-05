@@ -118,4 +118,14 @@ if (typeof window !== 'undefined'
     connectFunctionsEmulator(functions, 'localhost', 5001);
     // AUTH_PHASE_1: Connect Auth emulator
     connectAuthEmulator(auth, "http://localhost:9099");
+    // E2E sign-in hook (e2e/): the app only offers Google/Apple popups, which a
+    // headless browser can't complete, so the suite signs in with an emulator
+    // email account through this. Lives inside the emulator branch, so it can
+    // only ever reach the local Auth emulator — never exists on a real origin.
+    import('firebase/auth').then(({ signInWithEmailAndPassword }) => {
+        (window as unknown as { __machinaE2E?: unknown }).__machinaE2E = {
+            signIn: (email: string, password: string) =>
+                signInWithEmailAndPassword(auth, email, password).then((c) => c.user.uid),
+        };
+    });
 }

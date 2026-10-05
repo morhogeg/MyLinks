@@ -57,7 +57,7 @@ import ManageCollectionCardsSheet from './ManageCollectionCardsSheet';
 import MobileSubheader from './MobileSubheader';
 import NotesView from './NotesView';
 import KnowledgeGraph from './KnowledgeGraph';
-import { getNoteGroups } from '@/lib/notes';
+import { getNoteGroups, isWrittenNote } from '@/lib/notes';
 import LoadMoreSentinel from './feed/LoadMoreSentinel';
 import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, AlarmClock, CheckCircle2, CheckSquare, CheckCheck, Layers, List, Image as ImageIcon, Share2, Globe, Plus, Pencil, Newspaper, CalendarCheck, Lock, BookOpenCheck, ChevronLeft, BarChart3, StickyNote, Waypoints, Upload } from 'lucide-react';
 import { usePullToRefresh } from '@/lib/usePullToRefresh';
@@ -1315,8 +1315,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // The groups behind My Notes: live window ∪ full-library snapshot (window
     // docs win — they're the live snapshot), gated by the same pending/privacy
     // rules as the main feed, then grouped card-by-card (a card's notes stay
-    // together). Private cards' notes never appear here, locked or not — same
-    // as Insights.
+    // together; a note card the user wrote is its own entry). Private cards'
+    // notes and private note cards never appear here, locked or not — same as
+    // Insights.
     const noteGroups = useMemo(() => {
         if (viewMode !== 'notes') return [];
         const seen = new Set(links.map((l) => l.id));
@@ -1549,11 +1550,12 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     }, [uid, toast]);
 
     // A card opened FROM My Notes reveals its notes section (the user tapped a
-    // note — land them on it). One-shot: cleared when the modal stack closes so
-    // feed/search opens stay top-anchored.
+    // note — land them on it). A note card the user wrote opens at the top
+    // instead: the note itself is the thing they tapped. One-shot: cleared when
+    // the modal stack closes so feed/search opens stay top-anchored.
     const [detailScrollToNotes, setDetailScrollToNotes] = useState(false);
     const openCardFromNotes = useCallback((link: Link) => {
-        setDetailScrollToNotes(true);
+        setDetailScrollToNotes(!isWrittenNote(link));
         setActiveLinkId(link.id);
     }, []);
     useEffect(() => {
@@ -3344,7 +3346,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                     Icon: Inbox, title: 'Your Machina is empty',
                                     body: isNativeApp()
                                         ? 'Share a link to Machina from any app, or tap + to add one here. Machina reads it, tags it, and files it for you.'
-                                        : 'Tap + to save your first link, or add the browser extension to clip any page. Machina reads it, tags it, and files it for you.',
+                                        : 'Tap + to save your first link, or share one from your iPhone. Machina reads it, tags it, and files it for you.',
                                 };
                             return (
                         <div className="text-center py-16 px-6 animate-fade-in">

@@ -1,8 +1,11 @@
 import { Link } from '@/lib/types';
 
 // Pending captures (M3): processing/failed cards are surfaced separately, pinned
-// above the feed, and excluded from the normal filtered feed + every facet.
-export const isPending = (l: Link) => l.status === 'processing' || l.status === 'failed';
+// above the feed, and excluded from the normal filtered feed + every facet. A
+// `waiting` card (saved past the monthly allowance, not analyzed yet) is
+// pending too: it has no summary, tags or category for any of those surfaces.
+export const isPending = (l: Pick<Link, 'status'>) =>
+    l.status === 'processing' || l.status === 'failed' || l.status === 'waiting';
 
 // Consistent millisecond timestamp from a number, ISO string, or Firestore
 // Timestamp. Module-scope + pure so it's a stable dependency for memoization.

@@ -49,9 +49,11 @@ service cloud.firestore {
     //   dismissedSuggestions  lib/collectionSuggest dismissSuggestion
     //                  (arrayUnion of declined suggestion keys, so a
     //                  dismissal follows the user across devices)
+    //   tourSeenAt     lib/tourSeen ("How Machina works" seen on any device)
     function clientWritableUserKeys() {
       return ['timezone', 'settings', 'aiConsentAt', 'pushPromptedAt',
-              'onboarded', 'privacyLock', 'graphVersion', 'dismissedSuggestions'];
+              'onboarded', 'privacyLock', 'graphVersion', 'dismissedSuggestions',
+              'tourSeenAt'];
     }
 
     // The TYPE each client-writable field must have when present. The key
@@ -70,7 +72,8 @@ service cloud.firestore {
         && (!('onboarded' in d) || d.onboarded is bool)
         && (!('privacyLock' in d) || d.privacyLock is map)
         && (!('graphVersion' in d) || d.graphVersion is number)
-        && (!('dismissedSuggestions' in d) || d.dismissedSuggestions is list);
+        && (!('dismissedSuggestions' in d) || d.dismissedSuggestions is list)
+        && (!('tourSeenAt' in d) || d.tourSeenAt is number);
     }
 
     // Server-only capture charge token (functions/capture_charge.py): the

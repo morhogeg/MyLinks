@@ -1,0 +1,85 @@
+import { test, expect } from '@playwright/test';
+import {
+    adminGet, collectPageErrors, createAuthUser, expectNoHorizontalOverflow, hideDevChrome,
+    installBackend, openAccountSettings, openAsNewUser, signIn,
+} from '../helpers';
+
+// The first five minutes of a brand-new account. Every write here goes through
+// the live firestore.rules, so a rules regression that blocks a first-run write
+// (consent, onboarding, graph stamp) fails these tests.
+
+test('new account: consent → welcome → tour → empty library @desktop', async ({ page }) => {
+    const errors = collectPageErrors(page);
+    const user = await createAuthUser('signup');
+    await hideDevChrome(page);
+    const calls = await installBackend(page, user);
+    await page.goto('/');
+    await signIn(page, user);
+
+    // 1. AI consent (App Review 5.1.1/5.1.2) comes before anything else.
+    await expect(page.getByRole('heading', { name: 'Machina uses AI' })).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+    await page.getByRole('button', { name: 'I understand, continue' }).click();
+
+    // 2. Welcome. Mentions the trial because the entitlement says trial.
+    await expect(page.getByRole('heading', { name: /Bring what you/ })).toBeVisible();
+    await expect(page.getByText(/free for your first 14 days/)).toBeVisible();
+    await page.getByRole('button', { name: /^Not now/ }).click();
+
+    // 3. Tour, then the empty library.
+    const tour = page.getByRole('dialog', { name: 'How Machina works' });
+    await expect(tour).toBeVisible();
+    await tour.getByRole('button', { name: 'Skip' }).click();
+    await expect(page.getByRole('heading', { name: 'Your Machina is empty' })).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+
+    // The workspace claim carried a verified-token Bearer header.
+    const claim = calls.find((c) => c.path.endsWith('/claim_workspace'));
+    expect(claim?.auth).toMatch(/^Bearer /);
+
+    // Consent and onboarding were persisted to the user doc (survive reinstall).
+    await expect.poll(async () => (await adminGet(`users/${user.uid}`))?.aiConsentAt).toBeTruthy();
+    await expect.poll(async () => (await adminGet(`users/${user.uid}`))?.onboarded).toBe(true);
+
+    // Background graph migration stamps the doc, so it doesn't re-run every open.
+    await expect.poll(async () => (await adminGet(`users/${user.uid}`))?.graphVersion, { timeout: 20_000 }).toBeTruthy();
+
+    expect(errors).toEqual([]);
+});
+
+test('reload after sign-up goes straight to the library (no repeat screens)', async ({ page }) => {
+    const { user } = await openAsNewUser(page);
+    await expect.poll(async () => (await adminGet(`users/${user.uid}`))?.onboarded).toBe(true);
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Your Machina is empty' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Machina uses AI' })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: /Bring what you/ })).toHaveCount(0);
+    await expect(page.getByRole('dialog', { name: 'How Machina works' })).toHaveCount(0);
+});
+
+test('sign-up survives the claim endpoints being down (self-serve workspace under locked rules)', async ({ page }) => {
+    const errors = collectPageErrors(page);
+    const user = await createAuthUser('claimdown');
+    await hideDevChrome(page);
+    await installBackend(page, user, { claim: 'down' });
+    await page.goto('/');
+    await signIn(page, user);
+
+    // Lands on consent, not the "couldn't set up your workspace" screen.
+    await expect(page.getByRole('heading', { name: 'Machina uses AI' })).toBeVisible({ timeout: 30_000 });
+    const doc = await adminGet(`users/${user.uid}`);
+    expect(doc?.authUids).toEqual([user.uid]);
+    expect(doc?.onboarded).toBe(false);
+    expect(errors).toEqual([]);
+});
+
+test('sign out returns to the landing page and stays signed out on reload', async ({ page }) => {
+    const { user } = await openAsNewUser(page);
+    await openAccountSettings(page, user.email);
+    // signOutUser() reloads the page itself (clears in-memory state).
+    await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: 'Sign out' }).click()]);
+    await expect(page.getByRole('button', { name: 'Get started' }).first()).toBeVisible();
+    await page.goto('/');
+    await expect(page.getByRole('button', { name: 'Get started' }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Add to Machina' })).toHaveCount(0);
+});

@@ -10,6 +10,7 @@ import { useSheetDrag, useIsMobile } from '@/lib/useSheetDrag';
 import { cardThumbnailUrl } from '@/lib/cardThumbnail';
 import { isHttpUrl } from '@/lib/url';
 import { isCardShareStale } from '@/lib/collections';
+import { isPending } from '@/lib/feedUtils';
 
 interface CardActionSheetProps {
     link: Link;
@@ -108,7 +109,7 @@ export default function CardActionSheet({
         // Navigation, like "Open source" — sits above the state toggles. An
         // in-flight or failed capture has no connections yet, so it never
         // offers this.
-        ...(onOpenInGraph && link.status !== 'processing' && link.status !== 'failed' ? [{
+        ...(onOpenInGraph && !isPending(link) ? [{
             key: 'graph',
             label: 'See in graph',
             icon: <Waypoints className="w-5 h-5" />,

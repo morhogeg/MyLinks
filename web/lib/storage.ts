@@ -2,7 +2,7 @@ import { collection, addDoc, setDoc, updateDoc, deleteDoc, deleteField, doc, que
 import { db, appCheckHeaders } from './firebase';
 import { authHeaders } from './auth';
 import { apiUrl, fetchWithTimeout } from './api';
-import { offerUpgradeFor } from './entitlement';
+import { offerUpgradeFor, isWaitingSave, saveWallAsWaiting, type WaitingSave } from './entitlement';
 
 import { AnalyzeResponse, Link, LinkMetadata, LinkStatus, User, UserNote } from './types';
 import { canonicalCategory } from './category';
@@ -238,6 +238,27 @@ export async function markLinkFailed(uid: string, id: string, error: string): Pr
 }
 
 /**
+ * Keep a capture card as `waiting`: saved, not analyzed until the 1st or an
+ * upgrade (functions/deferred_capture.py). The server normally writes this
+ * itself when a save crosses the monthly allowance; the client writes it when
+ * a server answers the old way (a save-wall 429), so the card never turns into
+ * a red `failed` card with a Retry that could only hit the same wall. The
+ * processing clocks go, so nothing ages it.
+ */
+export async function markLinkWaiting(uid: string, id: string): Promise<void> {
+    await updateDoc(doc(db, 'users', uid, 'links', id), {
+        status: 'waiting',
+        waitingAt: Date.now(),
+        processingStartedAt: deleteField(),
+        processingStage: deleteField(),
+        queuedAt: deleteField(),
+        pendingEnqueue: deleteField(),
+        error: deleteField(),
+        failedAt: deleteField(),
+    });
+}
+
+/**
  * Save a new link to Firestore
  */
 export async function saveLink(uid: string, linkData: Partial<Link>): Promise<void> {
@@ -374,7 +395,22 @@ export async function enrichNoteCard(uid: string, cardId: string, text: string,
             headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()), ...(await authHeaders()) },
             body: JSON.stringify({ text: text.trim(), existingTags, existingCategories, uid }),
         });
-        if (!response.ok) return; // e.g. the note branch isn't deployed — leave the note as-is.
+        if (!response.ok) {
+            // Past the monthly allowance the note stays exactly as saved (a
+            // normal, searchable card) and its organization waits: flag it so
+            // the server enriches it on upgrade or next month
+            // (functions/deferred_capture.py). Not for the edit-path heading.
+            if (!opts.titleOnly) {
+                const body = await response.json().catch(() => null);
+                if (saveWallAsWaiting(response.status, body)) {
+                    await updateDoc(doc(db, 'users', uid, 'links', cardId), {
+                        noteEnrichPending: true,
+                        noteEnrichWaitingAt: Date.now(),
+                    });
+                }
+            }
+            return; // otherwise e.g. the note branch isn't deployed: leave the note as-is.
+        }
 
         const data = await response.json().catch(() => null);
         const l = data?.link;
@@ -493,7 +529,12 @@ export function mergeImportedTags(modelTags: string[], imported?: string[]): str
     return out;
 }
 
-export async function retryFailedLink(uid: string, link: Link): Promise<void> {
+/**
+ * Returns `{ waiting }` when the retry crossed the monthly allowance: the card
+ * is then kept as `waiting` (read next month or on upgrade) rather than failed
+ * again, and the caller announces it (lib/entitlement announceWaitingSave).
+ */
+export async function retryFailedLink(uid: string, link: Link): Promise<{ waiting?: WaitingSave }> {
     const linkRef = doc(db, 'users', uid, 'links', link.id);
     // Optimistic: show the processing skeleton immediately. Stamp when this retry
     // began so the server-side janitor ages the card out from *now* (not its
@@ -518,12 +559,19 @@ export async function retryFailedLink(uid: string, link: Link): Promise<void> {
             const text = await response.text();
             let data: { success?: boolean; error?: string };
             try { data = JSON.parse(text); } catch { data = {}; }
+            // Past the allowance the server keeps the card waiting itself.
+            if (response.ok && isWaitingSave(data)) return { waiting: data };
+            const wall = saveWallAsWaiting(response.status, data);
+            if (wall) {
+                await markLinkWaiting(uid, link.id);
+                return { waiting: wall };
+            }
             if (!response.ok || !data.success) {
                 if (response.status === 429) offerUpgradeFor(data);
                 throw new Error(data?.error || 'Could not restart analysis. Please try again.');
             }
             // Queued — the background worker flips this card to ready/failed.
-            return;
+            return {};
         } catch (err) {
             try {
                 await updateDoc(linkRef, {
@@ -563,6 +611,13 @@ export async function retryFailedLink(uid: string, link: Link): Promise<void> {
             data = JSON.parse(text) as AnalyzeResponse;
         } catch {
             throw new Error('The analysis service returned an unexpected response.');
+        }
+        // /api/analyze cannot know the card, so the save wall still answers
+        // 429 here: keep the card waiting instead of failing it again.
+        const wall = saveWallAsWaiting(response.status, data);
+        if (wall) {
+            await markLinkWaiting(uid, link.id);
+            return { waiting: wall };
         }
         if (!response.ok || !data.success || !data.link) {
             if (response.status === 429) offerUpgradeFor(data);
@@ -614,6 +669,7 @@ export async function retryFailedLink(uid: string, link: Link): Promise<void> {
             // Preserve the original createdAt — a successful retry should update
             // the card in place, not teleport it to the top of the feed.
         });
+        return {};
     } catch (err) {
         // Re-mark as failed so it stays a visible, retryable card — never lost.
         // Guard this write in its own try: if it also fails (e.g. offline), we

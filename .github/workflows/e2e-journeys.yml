@@ -1,0 +1,70 @@
+name: E2E user journeys
+
+# First-session journeys (e2e/): Playwright drives the real Next.js app against
+# the Firebase Auth + Firestore emulators loaded with the LIVE firestore.rules,
+# with the Cloud Function endpoints stubbed (no Gemini, no prod data, no cost).
+# Catches the frontend regressions the Python and rules suites can't see: a
+# broken sign-up, a capture that never reaches the pipeline, a screen that
+# throws, a client write the rules silently reject.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - "!web/ios/**"
+      - "e2e/**"
+      - "firestore.rules"
+      - ".github/workflows/e2e-journeys.yml"
+  pull_request:
+    paths:
+      - "web/**"
+      - "!web/ios/**"
+      - "e2e/**"
+      - "firestore.rules"
+      - ".github/workflows/e2e-journeys.yml"
+
+# Least-privilege token: nothing here uses GITHUB_TOKEN.
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-journeys-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  journeys:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            web/package-lock.json
+            e2e/package-lock.json
+
+      - name: Set up Java (emulator runtime)
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Install e2e dependencies + Chromium
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run journeys
+        working-directory: e2e
+        env:
+          CI: "true"
+        run: npm test
