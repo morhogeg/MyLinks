@@ -1,0 +1,196 @@
+[
+ {
+  "frame": 8,
+  "text": "Okay, be honest. How many things did you save this month\u2026 and never open again?",
+  "words": [
+   0.03,
+   0.35,
+   0.492,
+   1.06,
+   1.188,
+   1.348,
+   1.571,
+   1.699,
+   1.827,
+   1.987,
+   2.146,
+   2.69,
+   2.846,
+   3.081,
+   3.276
+  ]
+ },
+ {
+  "frame": 128,
+  "text": "That video you\u2019d watch later.",
+  "words": [
+   0.03,
+   0.295,
+   0.613,
+   0.931,
+   1.249
+  ]
+ },
+ {
+  "frame": 184,
+  "text": "The post you loved.",
+  "words": [
+   0.02,
+   0.168,
+   0.353,
+   0.501
+  ]
+ },
+ {
+  "frame": 216,
+  "text": "That article.",
+  "words": [
+   0.01,
+   0.239
+  ]
+ },
+ {
+  "frame": 240,
+  "text": "The screenshot you swore you\u2019d remember.",
+  "words": [
+   0.03,
+   0.223,
+   0.754,
+   0.948,
+   1.237,
+   1.527
+  ]
+ },
+ {
+  "frame": 312,
+  "text": "They\u2019re all still out there, buried across a dozen different apps.",
+  "words": [
+   0.03,
+   0.287,
+   0.415,
+   0.607,
+   0.736,
+   1.61,
+   2.065,
+   2.38,
+   2.47,
+   2.74,
+   3.19
+  ]
+ },
+ {
+  "frame": 432,
+  "text": "That\u2019s exactly why we made Makeena.",
+  "words": [
+   0.02,
+   0.358,
+   0.745,
+   0.938,
+   1.083,
+   1.325
+  ]
+ },
+ {
+  "frame": 504,
+  "text": "From any app, just share to Makeena.",
+  "words": [
+   0.01,
+   0.235,
+   0.415,
+   0.8,
+   1.013,
+   1.269,
+   1.397
+  ]
+ },
+ {
+  "frame": 568,
+  "text": "Videos, posts, articles, screenshots\u2026 it all lands in one place.",
+  "words": [
+   0.03,
+   0.471,
+   0.956,
+   1.507,
+   2.223,
+   2.498,
+   2.718,
+   3.049,
+   3.214,
+   3.434
+  ]
+ },
+ {
+  "frame": 704,
+  "text": "Then Makeena gets to work.",
+  "words": [
+   0.04,
+   0.362,
+   0.878,
+   1.2,
+   1.393
+  ]
+ },
+ {
+  "frame": 776,
+  "text": "It analyzes every save, summarizes it, and pulls out the key points\u2026 so you\u2019ll always remember why you kept it.",
+  "words": [
+   0.03,
+   0.171,
+   0.595,
+   0.987,
+   1.269,
+   1.977,
+   2.165,
+   2.353,
+   2.636,
+   2.824,
+   3.012,
+   3.2,
+   3.577,
+   3.718,
+   4.047,
+   4.377,
+   4.91,
+   5.098,
+   5.287,
+   5.522
+  ]
+ },
+ {
+  "frame": 960,
+  "text": "It even connects each save to related ones you\u2019ve kept before\u2026 so your ideas start building on each other.",
+  "words": [
+   0.04,
+   0.313,
+   0.534,
+   0.933,
+   1.154,
+   1.376,
+   1.599,
+   1.953,
+   2.174,
+   2.484,
+   2.706,
+   3.34,
+   3.477,
+   3.705,
+   3.98,
+   4.254,
+   4.805,
+   4.942,
+   5.17
+  ]
+ },
+ {
+  "frame": 1168,
+  "text": "Makeena. Everything you save, finally useful.",
+  "words": [
+   0.03,
+   0.87,
+   1.341,
+   1.513,
+   2.01,
+   2.5
+  ]
+ }
+]

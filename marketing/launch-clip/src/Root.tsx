@@ -1,7 +1,11 @@
 import React from 'react';
 import { Composition } from 'remotion';
 import { FPS, HEIGHT, TOTAL_FRAMES, WIDTH } from '../timeline.mjs';
+import * as REEL from '../reel-timeline.mjs';
 import { Film } from './Film';
+import { MachinaReel } from './reels/MachinaReel';
+import { RevisitClipCompositions } from './reels/clips/revisit';
+import { AdTodoCompositions } from './reels/ads/todo';
 
 /**
  * Compositions:
@@ -13,6 +17,11 @@ import { Film } from './Film';
  *
  * The vertical editions are the SAME scene code reframed through
  * `film/format.ts` — device centred and lower, captions centred at the top.
+ *
+ * The highlight reel (src/reels, its own clock in reel-timeline.mjs):
+ *  - MachinaReel        20s, 1080×1920, score + narrator + captions (the deliverable)
+ *  - MachinaReelSilent  captions, no sound
+ *  - MachinaReelClean   no sound, no captions or kickers (the lockup stays)
  */
 export const RemotionRoot: React.FC = () => (
   <>
@@ -80,5 +89,36 @@ export const RemotionRoot: React.FC = () => (
       height={WIDTH}
       defaultProps={{ withAudio: true, withSubtitles: true, audioFile: 'score-vo.wav' }}
     />
+    {/* the highlight reel */}
+    <Composition
+      id="MachinaReel"
+      component={MachinaReel}
+      durationInFrames={REEL.TOTAL_FRAMES}
+      fps={REEL.FPS}
+      width={REEL.WIDTH}
+      height={REEL.HEIGHT}
+      defaultProps={{ withAudio: true, withCaptions: true, audioFile: 'reel-score-vo.wav' }}
+    />
+    <Composition
+      id="MachinaReelSilent"
+      component={MachinaReel}
+      durationInFrames={REEL.TOTAL_FRAMES}
+      fps={REEL.FPS}
+      width={REEL.WIDTH}
+      height={REEL.HEIGHT}
+      defaultProps={{ withAudio: false, withCaptions: true }}
+    />
+    <Composition
+      id="MachinaReelClean"
+      component={MachinaReel}
+      durationInFrames={REEL.TOTAL_FRAMES}
+      fps={REEL.FPS}
+      width={REEL.WIDTH}
+      height={REEL.HEIGHT}
+      defaultProps={{ withAudio: false, withCaptions: false }}
+    />
+    {/* the REVISIT feature clip (clips/revisit-timeline.mjs) */}
+    <RevisitClipCompositions />
+    <AdTodoCompositions />
   </>
 );

@@ -1,0 +1,3 @@
+# Regenerable like public/reel-score.wav: `node audio/clips/revisit-score.mjs`
+# rewrites it byte-identically (the synth is seeded). The mix (score-vo.wav) is committed.
+score.wav

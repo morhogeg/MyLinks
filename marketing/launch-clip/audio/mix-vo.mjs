@@ -1,21 +1,66 @@
 /**
- * Voice-over mix: score.wav + the Kokoro lines (out/vo/line-NN.wav, placed at
- * their caption bars from out/vo/manifest.json) → public/score-vo.wav.
+ * Voice-over mix: a score + its narrator lines (out/vo/…/line-NN.wav, placed
+ * at their start times from the script's manifest.json) → one wav.
+ *
+ *   node audio/mix-vo.mjs          # film: public/score.wav      → public/score-vo.wav
+ *   node audio/mix-vo.mjs reel     # reel: public/reel-score.wav → public/reel-score-vo.wav
  *
  * The music ducks under the voice — 35% down, 120ms ramps — which is what
- * keeps the VO effortless to hear without the score ever disappearing.
+ * keeps the VO effortless to hear without the score ever disappearing. One
+ * mix for every script, like one voice (audio/synth-vo.py).
  *
- *   node audio/mix-vo.mjs     (run AFTER `npm run score` and synth-vo.py)
+ * (run AFTER the score and synth-vo.py for the same script)
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BAR } from '../timeline.mjs';
+import { limit, lufs, truePeak } from './loudness.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(here, '..');
-const voDir = path.join(root, 'out', 'vo');
+
+// `duck` is how far the music sits under a spoken line. The film's 0.65 is the
+// balance the owner has listened to; the reel's bed runs drums under almost
+// every line, so it ducks deeper to put the voice at the SAME level over its
+// music (npm run verify measures both and compares).
+const SCRIPTS = {
+  film: { vo: path.join(root, 'out', 'vo'), score: 'score.wav', out: 'score-vo.wav', duck: 0.65 },
+  reel: { vo: path.join(root, 'out', 'vo', 'reel'), score: 'reel-score.wav', out: 'reel-score-vo.wav', duck: 0.55 },
+  // the REVISIT feature clip: the reel's balance and master, its own files
+  // (`timeline` gives its per-line ducks, `master` its delivery spec)
+  revisit: {
+    vo: path.join(root, 'out', 'vo', 'revisit'),
+    score: 'clips/revisit/score.wav',
+    out: 'clips/revisit/score-vo.wav',
+    duck: 0.55,
+    timeline: '../clips/revisit-timeline.mjs',
+    master: { lufs: -14, truePeak: -1 },
+  },
+  // Meta ad 3 (TODO): the main cut (narrator over the score) and the A/B cut
+  // with no narrator (`noVoice`: the score alone, mastered the same way)
+  adtodo: {
+    vo: path.join(root, 'out', 'vo', 'adtodo'),
+    score: 'ads/todo/score.wav',
+    out: 'ads/todo/score-vo.wav',
+    duck: 0.55,
+    timeline: '../clips/ad-todo-timeline.mjs',
+    master: { lufs: -14, truePeak: -1 },
+  },
+  'adtodo-music': {
+    vo: path.join(root, 'out', 'vo', 'adtodo-music'),
+    score: 'ads/todo/score.wav',
+    out: 'ads/todo/score-music.wav',
+    duck: 1,
+    noVoice: true,
+    master: { lufs: -14, truePeak: -1 },
+  },
+};
+const name = process.argv[2] ?? 'film';
+const script = SCRIPTS[name];
+if (!script) throw new Error(`unknown script ${name}; one of ${Object.keys(SCRIPTS).join(', ')}`);
+const voDir = script.vo;
 
 const readWav = (p) => {
   const b = fs.readFileSync(p);
@@ -39,7 +84,7 @@ const readWav = (p) => {
   return { ...fmt, frames, samples: out };
 };
 
-const score = readWav(path.join(root, 'public', 'score.wav'));
+const score = readWav(path.join(root, 'public', script.score));
 const SR = score.rate;
 const N = score.frames;
 const L = new Float64Array(N);
@@ -49,17 +94,29 @@ for (let i = 0; i < N; i++) {
   R[i] = score.samples[i * 2 + 1];
 }
 
-const manifest = JSON.parse(fs.readFileSync(path.join(voDir, 'manifest.json'), 'utf8'));
+const manifest = script.noVoice ? [] : JSON.parse(fs.readFileSync(path.join(voDir, 'manifest.json'), 'utf8'));
+fs.mkdirSync(voDir, { recursive: true });
+// a reel line may duck the music further than the rest (`duck` on its caption
+// in reel-timeline.mjs, keyed by the frame the line starts on)
+const lineDuck =
+  name === 'reel'
+    ? Object.fromEntries((await import('../reel-timeline.mjs')).CAPTIONS.filter((c) => c.duck).map((c) => [c.at, c.duck]))
+    : {};
+// (a feature clip names its own timeline)
+if (script.timeline) for (const c of (await import(script.timeline)).CAPTIONS) if (c.duck) lineDuck[c.at] = c.duck;
 
 // duck envelope: 1 everywhere, dips to DUCK across each VO line
-const DUCK = 0.65;
+const DUCK = script.duck;
 const RAMP = Math.round(0.12 * SR);
 const duck = new Float64Array(N).fill(1);
 const voL = new Float64Array(N);
 
 for (const line of manifest) {
   const wav = readWav(path.join(voDir, line.file));
-  const start = Math.round(line.bar * BAR * SR);
+  // the film's manifest places lines by bar (kept exactly as it always was,
+  // so the film's mix stays bit-identical); other scripts carry seconds
+  const startSec = line.bar !== undefined ? line.bar * BAR : line.start;
+  const start = Math.round(startSec * SR);
   const ratio = wav.rate / SR;
   const outFrames = Math.floor(wav.frames / ratio);
   for (let i = 0; i < outFrames; i++) {
@@ -74,10 +131,11 @@ for (const line of manifest) {
   }
   const d0 = Math.max(0, start - RAMP);
   const d1 = Math.min(N, start + outFrames + RAMP);
+  const D = lineDuck[line.frame] ?? DUCK;
   for (let i = d0; i < d1; i++) {
-    let g = DUCK;
-    if (i < start) g = 1 - (1 - DUCK) * ((i - d0) / RAMP);
-    else if (i > start + outFrames) g = DUCK + (1 - DUCK) * ((i - start - outFrames) / RAMP);
+    let g = D;
+    if (i < start) g = 1 - (1 - D) * ((i - d0) / RAMP);
+    else if (i > start + outFrames) g = D + (1 - D) * ((i - start - outFrames) / RAMP);
     duck[i] = Math.min(duck[i], g);
   }
 }
@@ -90,7 +148,43 @@ for (let i = 0; i < N; i++) {
   R[i] = r;
   peak = Math.max(peak, Math.abs(l), Math.abs(r));
 }
-const g = peak > 0.98 ? 0.98 / peak : 1;
+let g = peak > 0.98 ? 0.98 / peak : 1;
+
+// The reel is mastered for the feeds it plays in (round 13): −14 LUFS
+// integrated, true peaks at or under −1 dBTP, which is where Reels, TikTok,
+// Shorts and YouTube expect a finished mix (the round-12 mix measured −15.8).
+// A global gain, then a look-ahead limiter on the few transients that would
+// pass the ceiling. The film's mix is untouched (it has no MASTER).
+const MASTER = { reel: { lufs: -14, truePeak: -1 } }[name] ?? script.master;
+if (MASTER) {
+  let gain = 10 ** ((MASTER.lufs - lufs(L, R, SR)) / 20);
+  let ceiling = 10 ** ((MASTER.truePeak - 0.3) / 20);
+  let out = null;
+  for (let pass = 0; pass < 6; pass++) {
+    const l = L.map((v) => v * gain);
+    const r = R.map((v) => v * gain);
+    limit(l, r, SR, ceiling);
+    const I = lufs(l, r, SR);
+    const tp = truePeak(l, r);
+    out = { l, r, I, tp };
+    // (0.2 dB under the spec: meters and the render's AAC encode disagree by
+    // about that much on inter-sample peaks)
+    const tpMax = MASTER.truePeak - 0.2;
+    if (Math.abs(I - MASTER.lufs) < 0.05 && tp <= tpMax) break;
+    gain *= 10 ** ((MASTER.lufs - I) / 20);
+    if (tp > tpMax) ceiling *= 10 ** ((tpMax - tp - 0.05) / 20);
+  }
+  L.set(out.l);
+  R.set(out.r);
+  g = 1;
+  // verify.mjs measures the voice against the bed by subtracting the ducked
+  // bed from this mix; it needs the gain the whole mix was given
+  fs.writeFileSync(
+    path.join(voDir, 'mix.json'),
+    JSON.stringify({ gain, lufs: +out.I.toFixed(2), truePeak: +out.tp.toFixed(2) }, null, 1),
+  );
+  console.log(`mastered: gain ${(20 * Math.log10(gain)).toFixed(2)}dB → ${out.I.toFixed(2)} LUFS, ${out.tp.toFixed(2)} dBTP`);
+}
 
 const bytes = N * 4;
 const out = Buffer.alloc(44 + bytes);
@@ -111,6 +205,6 @@ for (let i = 0; i < N; i++) {
   out.writeInt16LE(Math.round(Math.max(-1, Math.min(1, L[i] * g)) * 32767), 44 + i * 4);
   out.writeInt16LE(Math.round(Math.max(-1, Math.min(1, R[i] * g)) * 32767), 44 + i * 4 + 2);
 }
-const outPath = path.join(root, 'public', 'score-vo.wav');
+const outPath = path.join(root, 'public', script.out);
 fs.writeFileSync(outPath, out);
 console.log(`wrote ${outPath} — ${(bytes / 1e6).toFixed(1)}MB, peak gain ${g.toFixed(3)}, ${manifest.length} VO lines`);

@@ -12,6 +12,10 @@ palette rather than the app's graphite ground, so the film opens and closes in
 the same light. Act one's loss reads in the same grade: the platform panels
 *bleach out* into the paper rather than sinking into black.
 
+The same project builds the **short-form reels** (1080×1920, 15–20s) from a
+shared kit; see [Reels](#reels) and [Motion language](#motion-language) at
+the end. The film's timeline, captions and voice are untouched by them.
+
 ```bash
 cd marketing/launch-clip
 npm install
@@ -62,8 +66,10 @@ into one point of light that the brackets close around, and the middle acts
 follow what the product actually does, in order: **saving was never the hard part → Machina reads
 what you save → summarized, tagged and filed → so you can find it again → then
 ask it anything → answers built from what you saved → every save connects to the
-rest → nothing worth keeping stays buried.** The film closes on the subtitle,
-"Never lose another great find." It deliberately avoids two framings the
+rest → nothing worth keeping stays buried.** The film introduces Machina with
+the App Store subtitle ("Machina. Never lose another great find.") and closes
+on the tagline, "Everything you save, finally useful.": problem → Machina →
+payoff (owner, 2026-09-28: every launch film ENDS on the tagline, once). It deliberately avoids two framings the
 owner ruled out: it is **not** a learning app, and it does **not** sell
 "search by meaning" as the headline. The word *library* appears nowhere.
 
@@ -80,12 +86,13 @@ owner ruled out: it is **not** a learning app, and it does **not** sell
 | 20–23 | 0:50 | `GraphScene` | Edges draw in staggered — connections being found, not a diagram revealed |
 | 23–26 | 0:57.5 | `CollectionsScene` | The organising that is yours |
 | 26–29 | 1:05 | `DigestScene` | The weekly write-up, then the resurfaced save as its own beat |
-| 29–32 | 1:12.5 | `Endcard` | The bare mark, the wordmark, the App Store subtitle (`Never lose another great find`), which the voice-over also speaks |
+| 29–32 | 1:12.5 | `Endcard` | The bare mark, the wordmark, the tagline (`Everything you save, finally useful.`), which the voice-over also speaks after the name |
 
 `Capture` / `Ask` / `Connect` print as a letterspaced kicker above the line on
 their own beats, so a viewer can place each act inside the film's three acts
 without being told. (They were the App Store subtitle until 2026-08-26; the
-endcard now carries the current subtitle, the kickers keep the act names.)
+kickers keep the act names. The subtitle is now the introduction's line and
+the endcard carries the tagline, 2026-09-28.)
 
 **No em dashes anywhere a viewer can read** — the app-wide ban
 (`web/scripts/check-em-dash.mjs`) applies to burned-in captions, demo cards and
@@ -227,6 +234,41 @@ spoken editions; the plain compositions are untouched. edge-tts (Azure neural
 voices) was tried first and is BLOCKED here — the egress proxy refuses
 WebSockets — which is why the pipeline is local Kokoro.
 
+### Gemini TTS: a directed narrator (built, not yet heard)
+
+Kokoro reads every line with the same flat prosody. Google's
+`gemini-3.8-flash-tts` (September 2026) is directed: the words go in verbatim,
+and a separate note sets the delivery ("a real person talking to a friend…
+unhurried… no sales emphasis"). `audio/gemini_tts.py` adds it as a second
+engine for the SAME pipeline: `synth-vo.py` writes the same `line-NN.wav`,
+manifest and word timings, so every clip, ad, mix and verify gate works
+unchanged. A caption may carry its own `style` note.
+
+**Where it runs.** Cloud sessions can't reach Google's API and don't hold a
+key, so new lines are voiced ON GITHUB by `.github/workflows/narration-tts.yml`
+(owner-approved 2026-10-03), or locally with `GEMINI_API_KEY` set and the
+host allowed. The workflow runs
+with the repo's existing `GEMINI_API_KEY` secret (the one the Cloud Functions
+use; never printed). Edit `audio/narration-request.json` (voices to audition,
+scripts to voice and in which voice), commit, push: the workflow commits the
+takes back to the same branch as `audio/vo-takes/*.flac`, one per line, keyed
+by model, voice, direction and words. Every session then re-uses them with no
+key and no network:
+
+```bash
+git pull                                              # after the workflow's commit
+python3 audio/vo-audition.py                          # 2 lines × 6 voices → out/vo/audition/
+GEMINI_VOICE=Sulafat VO_ENGINE=gemini python3 audio/synth-vo.py adtodo   # from the takes
+node audio/mix-vo.mjs adtodo                          # then re-time and re-render as usual
+```
+
+The key's tier matters: the free tier allows 10 TTS requests a day (a script
+is one per line); on the paid tier a 48s ad is about 1,200 audio tokens,
+around a cent. Kokoro stays the default until the owner picks a Gemini voice
+by ear; then it becomes the one narrator for every video. Gemini voices read
+the words differently from Kokoro, so a re-voiced video's lines get new
+lengths and its picture is re-timed to them.
+
 ## The score
 
 `audio/score.mjs` — no dependencies, deterministic (seeded LCG, so every render
@@ -290,8 +332,775 @@ The endcard is the **bare** Citation mark — not the app-icon tile.
 there reads as a shrunken app icon rather than as the brand mark"), and full-frame
 the grey squircle read as a screenshot of an icon instead of as an identity.
 
-The endcard carries one line, the App Store subtitle, and the voice-over speaks
-the same words (owner call 2026-09-17; the tagline that used to sit under a rule
-beneath it was cut so screen and voice agree). The space under the subtitle is
-the slot for a real App Store badge or URL once the listing is live. Nothing else
+The endcard carries one line, the TAGLINE, `Everything you save, finally
+useful.` (exact wording, comma and period; set in the endcard's letterspaced
+capitals), and the voice-over says the name and then the same words, nothing
+else under it (owner calls 2026-09-17 and 2026-09-28). Why the tagline and not
+the App Store subtitle: the tagline is the fixed brand line, while the
+subtitle is store copy that can change with search tests and would leave every
+posted film out of date. The subtitle, "Never lose another great find.", is
+the introduction's line instead; the tagline appears ONCE, at the end
+(`npm run verify` fails a film, reel or clip that repeats it earlier or ends
+on anything else). The space under the line is the slot for a real App Store
+badge or URL once the listing is live. Nothing else
 in the film claims availability.
+
+# Reels
+
+## The highlight reel (pilot)
+
+`MachinaReel` is an 81.6s vertical reel: the problem → "Introducing Machina.
+Never lose another great find." → "Save anything, from anywhere." (shares
+from YouTube, Instagram and Safari into the mark) → "A link, a screenshot, or
+a note." (the Add dialog's tabs) → "Machina reads it, summarizes it, and files
+it." (the five phases) → the new card, opened → Find → Ask → Connect
+→ the weekly recap, read → "Machina. Everything you save, finally useful."
+(2026-09-28, owner: every launch film ends on the tagline, once; the reel's
+earlier "All your saves, finally useful." became the subtitle). It has
+its own score, the film's narrator and word-timed captions. **Every pixel of
+app UI in it is the real, shipped web app**, driven and recorded frame by
+frame; nothing is a mockup or a rebuilt screen. The one exception is not
+app UI: the share beat (`scenes/ShareBeat.tsx`) is a brand motion graphic,
+because the iOS share sheet and the share extension are native and cannot
+be captured from the web build. It shows each save as a card wearing its
+app's mark (the app's own lucide marks; a compass for Safari) with an iOS
+Share button that is tapped, and the card is pulled into the Machina mark.
+It rebuilds no iOS UI and shows no third-party image.
+
+**How it got here.** Round 1 (20s) was too fast; round 2 changed too much;
+round 3 played round 1 slower with the owner's asks in place; round 4's
+variable speed was rejected for a steady pace (round 5: constant 2× on the
+beat, 60fps graph); round 6 was the Apple-level pass (the name on the drawn
+wordmark, a serif close, focus-in captions). Round 7 (this one, owner):
+- the weekly recap was "way too fast": it is now its own 9.6s scene
+  (`scenes/Recall.tsx`, output frames) that opens the recap and reads it,
+  pausing on the write-up, the themes, the Standout and the closing
+  question, with a second line: "The themes of your week, and the one save
+  worth rereading.";
+- "Save anything, from anywhere.": the Add dialog walks its three real tabs,
+  Link → Image ("Up to 5 screenshots become one card") → Note → Link, each
+  tapped on a beat, before the link is pasted (`scenes/SaveModes.tsx`, the
+  `modes` hold; the save take now records the tabs at 60fps);
+- "Introducing Machina. All your saves, finally useful." after the problem
+  (the close stays the subtitle);
+- key features stay on screen longer: LINGER holds (`adv > 0` in `HOLDS`)
+  let a shot keep drifting slowly on the search result, the answer and its
+  sources, and the graph, and the card hold is longer; the cut's pace is
+  unchanged.
+
+Round 8 (owner: sharing from any app is a key feature; no screen recording):
+a `share` hold after the name, three shares (YouTube, Instagram, Safari)
+pulled into the mark on "Save anything, from anywhere.", and the Add
+dialog's tab tour re-captioned "A link, a screenshot, or a note."
+
+Round 9 (owner QA on round 8): the first share card and the SAVE kicker
+arrived while "All your saves, finally useful." was still up; they now wait
+for it to leave (share hold 176 frames; `SHARE_STARTS` and the tour's `MODES`
+live in `reel-timeline.mjs`, read by the scenes and the score). Save is now
+tapped inside the tour (a light tap, visible on the dark button), so the
+source clock resumes straight into the phases; before, the tap fell after the
+hold and its ring drifted over the phases, and the camera jumped for one frame
+at the seam (the `dKeys` key now sits exactly at source 141).
+
+Round 10 (owner: drop the rule beside the chapter words; a finishing pass):
+the kickers (SAVE, FIND, ASK, CONNECT, REVISIT) are the word alone, centred
+optically (no tracking after the last letter). Finishing fixes from an
+every-beat still review: the floated "Saved to Machina" toast no longer
+overlaps the app's own (it hands over as the dialog drops) and floats the
+settled capture frame with a tight crop (no dark backdrop sliver); Recall
+opens on a settled header (the capture's MACHINA → Revisit crossfade was
+visible for its first frames); an `end` linger holds the finished end card
+~2s instead of ~1s.
+
+Round 11 (owner: the last SAVE line "lingered"; a comprehensive polish):
+text is timed to the voice, not to the picture's length. **The dwell rule**:
+a line leaves 0.3–1.2s after the narrator finishes it, or up to 4s when it
+names an action still playing (`until`); `npm run verify` enforces it with
+the synthesized line lengths. Chapter words (kickers) are on screen only with
+their chapter's narration, arrive 4 frames before each line, leave in the
+line's own 6-frame blur-and-rise on the same frame, and bridge gaps under 24
+frames. With the lines no longer covering dead picture, the card hold
+(224 → 192) and the found and graph lingers (48 → 32) were trimmed; the end
+mark no longer waits as four static corner ticks before its launch.
+
+Round 12 (owner: Revisit should say the app makes an action item where one
+is relevant; Connect should say it connects on its own; the Link / Image /
+Note tour was jittery):
+- **Jitter, found and fixed in the kit.** `AppShot` used to size the slab by
+  the zoom (width = 393 × z); Chromium snaps a replaced element's painted size
+  to whole pixels, so a slow push rescaled the capture in 1px jumps every few
+  frames (measured: the tour changed on alternate frames only). The slab is
+  now laid out at a fixed zoom and placed and scaled with ONE transform
+  (translate + scale): its left/top offset snapped the same way, a 1px hop
+  every ~7 frames on a slow drift. Measured after: the tour changes evenly on
+  every frame. Every slow move in the reel is smoother; a frame at rest looks
+  the same as before (checked against the previous render).
+- **Revisit opens on "Do this"**, the app's own to-do list of the steps it
+  wrote for saves that call for one (`web/lib/takeaway.ts`: written only when
+  the content supports a concrete action). The recall take is re-shot with
+  three such saves carrying their step (the Tail End's, plus the tomato
+  sauce and the V60 method; `capture/library.mjs` `takeaway`), and the Tail
+  End's row lifts on "When a save calls for action, Machina turns it into a
+  to-do." The recap then plays as before (`TODO_LEN` frames later; the first
+  read scrolls away the 294pt the list adds).
+- The recap's 6pt scroll steps no longer hop: the camera takes up each step's
+  rounding, and motion blur follows the NET motion on screen (camera + scroll),
+  so text that is barely moving is no longer smeared.
+- Connect: "Related saves find each other, all on their own."
+
+Round 13 (a finishing pass with fresh eyes; the script, the order, the
+lines and the length are unchanged). Everything below was found by
+measuring the render (frame-to-frame differences, phase correlation, 4-frame
+strips at every transition, the mix in the speech band), not by eye:
+- **Clean cuts.** Ask's two hard cuts (to the composer, to the answer) each
+  drew a smeared in-between frame, and the first frame after them was
+  motion-blurred too: two camera keys a frame apart were interpolated at the
+  half-frames a 2× clock samples, and the velocity for motion blur spanned the
+  cut. In the kit now: keys at most a frame apart are a cut (the camera holds,
+  then jumps), and `camVelocity` measures the last OUTPUT frame, reading a cut
+  forward. Measured after: each cut changes on exactly one frame.
+- **The dive keeps its speed.** The dive into the Graph chip froze for one
+  frame just before the cut (its last key sat a frame short of it); it now
+  ends on the cut. The pull-back, drift and dive before it are one move that
+  comes to rest as the finger lands, then accelerates (it used to stop and
+  start twice in a second).
+- **The card's read-down glides.** The detail view's scroll is captured in
+  5pt steps; it hopped 12px on its first frame and then every few frames. The
+  camera now takes up each step's rounding, as Recall's recap does.
+- **Back on the beat.** Round 11's lingers added 24, 52 and 20 frames, which
+  slid everything after them off the grid: the whole Ask hero (the sources,
+  the three citation bells, the Graph tap, the impact on the cut into the
+  graph) sat on 8ths and 16ths between the kicks, and the Link / Image / Note
+  hold started on a 16th (source 141), so its taps did too. The lingers now
+  add 32, 48 and 16 (the same total: nothing after the graph moves) and the
+  modes hold sits at source 144, where the phases start (they still start on
+  the same frame). The share beat's taps and landings are on beats
+  (`SHARE_BEAT`). `npm run verify` checks the grid.
+- **Taps that cause things.** The card's tap now lands on the frame the app
+  opens it and the tick sounds (it landed 4 frames after both). Save is tapped
+  8 frames before the phases appear (it was 22: a visible lag).
+- **Lines leave, they don't blink.** A line's exit put half its fade on the
+  first frame (EASE_MODAL); it is now an 8-frame fade eased in and out.
+- **The name breathes.** The mark and wordmark glide up together (eased in and
+  out, not a jump off the rest), the lockup pushes in 4% while the name and
+  the shares hold (it sat dead still for seconds), and when the brackets part
+  the point leaves in one move instead of dropping 70px first.
+- **The dialog drop.** The screen behind now stays out of focus until the
+  dialog has gone and racks into focus on the feed as the card lands (for
+  three frames the fading dialog's text sat over the sharpening feed).
+- **The first frame is a picture.** It was white (the reel "opened out of
+  white"), which is what a feed or a link preview shows before playing; the
+  saves now come into focus from a soft scatter that is already on frame 0.
+- **No banding.** The set's soft gradients stepped into faint concentric rings
+  one code value apart (Chromium draws gradients in 8 bits), visible at 1:1
+  and made blocky by the encoder. A fixed fine dither on the paper (`Dither`
+  in `Paper.tsx`, under the app and the type) dissolves them.
+- **The sound.** The narrator is now at least 3dB over the music in the
+  speech band on every line (500 Hz – 4 kHz, where masking happens). The
+  closing line was 3dB UNDER it (the melody's last note landed on "find.") and
+  the name barely over it (a shimmer on the word "Machina"): the last note now
+  lands after the line, the shimmer after the name, and the music ducks
+  further under the two brand lines (`duck` on their captions). The mix is
+  mastered for the feeds: −14 LUFS integrated, true peak −1.25 dBTP (it was
+  −15.8 LUFS), a gain and a look-ahead limiter in `mix-vo.mjs` (at most 2dB on
+  a few transients); the film's mix is byte-identical.
+
+Round 14 (owner: "perfect"; one note, say what Machina does while the phases
+tick, using the launch film's line): "Machina reads it, summarizes it, and
+files it." now plays over the five phases, the film's own take reused byte
+for byte (same voice, same text) and the app's own words in the Add dialog.
+It starts on the first phase, so "reads" lands on "Reading the page" and
+"summarizes" on "Writing the summary", and "files it" ends as the save
+completes; it leaves 1.1s after the voice, as the card settles. The tour's
+line stays 6 frames longer so SAVE stays on screen from the tour through the
+card (no blink between lines). Measured: the line sits 4.8dB over the music
+in the speech band; every gate passes.
+
+Round 15 (owner, on round 14):
+- **The caret flickered** in the Add dialog's fields (0:26–0:28) and in
+  Find's search field: the text caret blinks on the browser's real clock, not
+  the capture's stepped one, so across rolled frames it was on or off at
+  random (measured: it toggled on half of the 24 frames after each tab tap).
+  `capture/recorder.mjs` now hides the caret in rolled frames; a typed
+  character's frame keeps it (a keystroke restarts the blink). Re-captured;
+  measured after: the caret region is constant through every roll.
+- **Shares come from anywhere.** Each share enters from its own edge and rests
+  in its own part of the frame: YouTube from the left to the upper left,
+  Instagram from the right to the lower right, Safari up from the bottom to
+  below the name (`SOURCES` in `ShareBeat.tsx`); timing and sound unchanged.
+- **One face.** The closing line is set in Geist, like every other line (the
+  owner asked for a call; see the lockup under "Motion language").
+
+| Output frames | Scene | What it does |
+|---|---|---|
+| 0–288 | `Hook` | Ten real saves come into focus (0–64); the problem is named over them (the `problem` hold, 64–288): each named save lifts on its word, then all bleach |
+| 288–456 | `Hook` | They collapse into the point (320), the brackets snap (336); "Introducing Machina." (the drawn wordmark under the mark), the `name` hold (416–448), "Never lose another great find." |
+| 456–648 | `ShareBeat` | "Save anything, from anywhere.": YouTube, Instagram and Safari saves shared into the mark (the `share` hold) |
+| 648–736 | `Hook` → `Save` | The point drops to become the **+** (the iris opens at 688), the + is tapped, Add to Machina |
+| 736–880 | `SaveModes` | "A link, a screenshot, or a note.": Link, Image, Note, back to Link, the link pasted, Save tapped |
+| 880–1008 | `Save` | "Machina reads it, summarizes it, and files it." over the five real phases, an 8th apart; saved; the dialog drops; the card lands (992) |
+| 1008–1200 | `CardDetail` | The new card opened: summary, **Key Points** (the `card` hold) |
+| 1200–1360 | `Find` | "easy dinner, empty fridge" → the one card it means (1264; lingers 1280–1320) → tap Ask |
+| 1360–1696 | `Ask` | The question → the answer and three sources (1504–1552; lingers 1560–1620) → the dive into the Graph chip |
+| 1696–1808 | `Connect` | The real graph (60fps; lingers 1744–1772); tap Revisit |
+| 1808–2254 | `Recall` | "Do this" (to 1952), then "This week in Machina", opened (1968) and read slowly: write-up, themes, Standout, question; thrown out into the lockup |
+| 2240–2448 | `End` | The mark launches (strike 2284), "Machina" (the wordmark), "Everything you save, finally useful." in Geist (50px, one line), held |
+
+**The clock.** Scenes are written in SOURCE frames (the round-1 cut, 600
+frames). `MachinaReel` plays them at `K = 2` via `clockAt(frame)`; `HOLDS`
+stop the source clock while an output-frame scene plays (`problem`,
+`card`), each starting on a source 8th and lasting whole beats so the grid
+holds. `real(src)` places a source event in the output, which is how the
+score's sound design follows the picture. Captions, kickers, the narrator
+and the lockup are in output frames, each line starting on a beat
+(`onBeat`). `CLOCK.perFrame` in `camera.ts` keeps motion blur per output
+frame.
+
+Compositions: **`MachinaReel`** (score + narrator + captions, the
+deliverable), **`MachinaReelSilent`** (captions, no audio: stills and QA),
+**`MachinaReelClean`** (no captions or kickers; the lockup keeps its line).
+
+```bash
+cd web && npm ci && cd -          # once: the app's own dependencies
+cd marketing/launch-clip && npm install
+npm run reel:app      # the real app, built for capture          → out/capture/app
+npm run reel:capture  # shoot the four takes (DPR 4, ~150MB)     → public/reel/app/, src/reels/data/takes.json
+npm run reel:vo       # the narrator (local Kokoro, see above)   → out/vo/reel/, src/reels/data/reel-vo.json
+npm run reel:score    # score + sound design, then the voice mix → public/reel-score-vo.wav
+npm run verify        # film AND reel gates (below)
+npm run reel:stills   # review stills                            → out/reel-stills/
+npm run reel:render   # → out/machina-reel.mp4
+```
+
+The narrator's word timings, the takes' data and the mixed audio are
+committed, so on a fresh clone a render needs only `reel:app` + `reel:capture`
+(the PNGs are gitignored: they regenerate from the app, which is also what
+stops the reel drifting away from the shipped UI).
+
+### How the real app is captured
+
+- **`capture/build-app.mjs`** copies `web/` and builds it as a static export
+  with the `firebase/*` imports aliased to `capture/shims/`: an in-memory
+  Firestore (`store.ts`, reads and listeners resolve on a macrotask so a paused
+  clock cannot stall them), auth permanently signed in as a demo user, and
+  callables posted to the local server. `web/` itself is not modified.
+- **`capture/library.mjs`** is the demo account: 24 real, deliberately
+  interesting saves (Wait But Why's *The Tail End*, Mark Manson, Dieter Rams,
+  Marcella Hazan, the Webb telescope, a Piranesi screenshot…), 30 edges, five
+  collections and today's Daily Brew. No "AI" category or card anywhere.
+- **`capture/server.mjs`** serves the build and answers `/api/*` the way the
+  backend would: it streams the Ask answer word by word and sends its sources,
+  and returns the search hit.
+- **`capture/device.mjs`** is an iPhone-sized page: 393×852 points at DPR 4,
+  touch, safe-area insets, a 9:41 status bar.
+- **`capture/recorder.mjs` + `shoot.mjs`** record four takes (`save`, `find`,
+  `ask`, `recall`; `revisit`, the review deck, is kept for the feature
+  clips). The page's clock is stepped one frame (33.3ms) at a time
+  and CSS animations are paused and seeked, so the app's own motion (the phases
+  ticking, the answer streaming, the graph laying itself out, the deck's fling
+  and KEEP stamp) is recorded frame-exact. Each frame also records the text on
+  screen and the boxes the camera aims at (`src/reels/data/takes.json`).
+
+**What is scripted, and what is not.** Every screen is the app rendering real
+data through its real code. What stands in for the backend is scripted: the
+answer's text and which cards it cites (`ASK`), the search hit (`SEARCH`),
+and the moment each phase completes. The reel shows each phase on its 8th note
+rather than at the capture's pace. The app's "Searching your …" thinking line
+is never shown, because its wording is banned for reels; `npm run verify`
+checks the frames the edit uses.
+
+**Font.** The app asks for `system-ui`, which is SF Pro on an iPhone. SF cannot
+be installed here, so fontconfig maps `system-ui` to Inter, the closest open
+face (`prepareFonts()` in `device.mjs`). This is a stand-in: on a real iPhone
+the same screens render in SF Pro. (While doing this we found that the web app
+never applies its self-hosted Geist: `--font-geist-sans` is set on `<body>`,
+but the Tailwind font token resolves at `:root`, where the variable doesn't
+exist. Logged in `SOURCE_OF_TRUTH.md` §9; `web/` was not changed.)
+
+### Gates (`npm run verify`, reel section)
+
+Fails on: overlapping captions or kickers; a caption the narrator doesn't say
+verbatim (or a word count that doesn't match its timing); a voice line that
+overruns its caption window; a lockup line that isn't the film's endcard
+line, the tagline, or a tagline used anywhere before the end; an em dash, a literal
+"AI", "second brain" or "library" in any caption, kicker, demo card,
+collection, Ask/search string, hook chip, or **any text on any captured frame
+the edit uses**; a clipped reel master or a hole in its per-bar level; a voice
+sitting more than 3dB lower over the music than it does in the film. Round
+13 added: a hold that doesn't start on an 8th or doesn't add whole beats (the
+grid); a narrator line less than 3dB over the music in the speech band
+(500 Hz – 4 kHz); a reel mix off −14 LUFS by more than 0.5 LU, or with true
+peaks over −1 dBTP (`audio/loudness.mjs` measures both, BS.1770).
+
+Nobody has listened to the reel mix on speakers yet (the render box has no
+audio device); the balance, the clarity and the loudness are only measured.
+
+## Feature clip: REVISIT ("what you save comes back to you")
+
+`MachinaClipRevisit` is a 55.5s vertical clip, the reel's companion, built
+from the kit plus one new kit primitive (`kit/scroll.ts`, below) and optional
+kit props (rounds 3 and 4). It opens on the PROBLEM (round 4), then one
+continuous use of the real app (take `revisitClip`), whose clock starts at
+`OPEN` (256): the scenes read `f - OPEN`, captions and the score are absolute.
+
+| Frames | What it does |
+|---|---|
+| 0–176 | THE PROBLEM (`Opening.tsx`): ten real saves where they were kept, legible from frame 0; "You save things to come back to later." / "But most of them, you never open again.", and they bleach into the paper on "never" |
+| 176–256 | THE TURN: "Machina brings them back to you.": they gather into one point just after the name, the brackets snap round it (the mark), and the point opens as an iris onto the Revisit tab |
+| 256–380 | "Due now": a reminder set on Four Thousand Weeks lifts on "when you want them" ("Your saves come back when you want them."); the chapter word REVISIT arrives with this line |
+| 384–704 | (round 5) USE: its bell opens the reminder's own sheet ("Later today, this weekend, or three times, so it sticks."; the top row, the app's tomorrow / 1 week / 1 month, lifts on "three times"); closed with its X; the save opens on its summary and the camera goes down to its Key Points ("Open one, and the key points are already there."); back to the list |
+| 704–896 | The "Do this" list: "When a save calls for action, Machina turns it into a to-do."; The Tail End's row lifts; a step is ticked off at 848, the app's "Marked as done" toast in frame |
+| 896–1024 | Into the reading window; "This week in Machina" tapped open at 944; it unfolds on "Every week," and rises on "Machina brings back what's worth remembering." |
+| 1024–1264 | The recap READ: the write-up held, the two themes and their saves on "The themes of your week," (each hold drifts: `CREEP`), then ONE glide onto the Standout |
+| 1264–1376 | The Standout lifts; its question is read in silence |
+| 1376–1472 | The Standout tapped: The Tail End opens, the camera easing up to its title |
+| 1472–1664 | Thrown out into the lockup: "Machina. Everything you save, finally useful." |
+
+Everything is in OUTPUT frames on the reel's grid (112.5 BPM, 16 frames a
+beat); 60fps app motion plays one captured frame per output frame (the
+reel's K = 2). Lines start on beats; taps, lifts and the strike on 8ths.
+
+**Its own files** (so the four clips merge without touching each other):
+the clock `clips/revisit-timeline.mjs`; the scenes
+`src/reels/clips/revisit/` (registered in `src/Root.tsx` by one line); the
+take `revisitClip` in `capture/shoot.mjs`; the narrator
+`python3 audio/synth-vo.py revisit` (→ `out/vo/revisit/`,
+`src/reels/clips/revisit/vo.json`); the score
+`audio/clips/revisit-score.mjs` (→ `public/clips/revisit/score.wav`,
+gitignored) and `node audio/mix-vo.mjs revisit` (→
+`public/clips/revisit/score-vo.wav`, committed, mastered to −14 LUFS);
+the gates `audio/clips/revisit-verify.mjs` (run by `npm run verify`).
+
+```bash
+CAPTURE_ONLY=revisitClip npm run reel:capture    # after reel:app; the take (~130MB PNGs)
+python3 audio/synth-vo.py revisit                # only after a line or its timing changes
+node audio/clips/revisit-score.mjs && node audio/mix-vo.mjs revisit
+npm run verify
+npx remotion render src/index.ts MachinaClipRevisit out/machina-clip-revisit.mp4
+```
+
+`src/reels/data/takes.json` is generated: `npm run reel:capture` rewrites it
+from every take on disk. If two clip branches both add a take, resolve the
+merge by keeping both takes in `capture/shoot.mjs` and re-running the
+capture, not by hand.
+
+**Found while making it (measured, not eyeballed):**
+- **The capture's scroll snaps to whole points.** Its even 2.99pt steps land
+  as 3pt with two 2pt steps in 281, and a camera correction that assumes
+  even steps hops 2.3px at each (the first cut had one on the rise). The
+  reel's own recall take has five 5pt steps among its 6pt ones and
+  `scenes/Recall.tsx` assumes 6pt, so the reel's recap read carries five such
+  hitches; the reel was left exactly as it is (the clip's rule), and
+  `kit/scroll.ts` is the fix if a later round wants it.
+- **The camera's correction moves the fixed chrome too.** So the recap is read
+  from a window where the app's header sits under the band's solid paper and
+  its tab bar below the frame, and the camera only leaves it once the page
+  has stopped.
+- **One motion, not two.** The last read and the move onto the Standout first
+  ran as a scroll that decelerated to ~5px a frame and a camera move that
+  accelerated again; they are now one eased glide (`GLIDE`), the page taking
+  the first 293pt and the camera the rest.
+- **The first frame after a click is unchanged.** The Standout's tap now
+  lands on the next one, the first frame the app visibly answers.
+
+**Round 2 (a finishing pass with fresh eyes; script, order, lines, length
+and every frame boundary unchanged).** Measured on the render:
+- **The themes hold was dead still for a full second** (frames 380–409, no
+  frame-to-frame change): the reading window's "breath" was 0.03 of zoom
+  over nine seconds. Widening the zoom would bring the app's chrome into the
+  window, so the PAGE drifts instead: while a read is held it creeps on a
+  few points (`CREEP`: 12 under the write-up, 9 under the themes), rest to
+  rest, so the reads around it start and end exactly as before. Measured
+  after: the holds move up to 0.7 and 0.9px a frame, nothing is still
+  outside the end card. `npm run verify` now fails a hold between reads with
+  no creep.
+- **Left as they are, deliberately:** the end card's last 1.7s is still, as
+  the reel's is (the lockup is shared and owner-approved); the paper's soft
+  pools show faint one-code-value rings when a still is contrast-stretched
+  tenfold, in the render and slightly blockier in the encode. That is the
+  shared `Paper` (round 13's dither), and changing it would change the
+  reel's pixels, which this pass must not.
+
+**Round 3 (owner, on round 2: "too thin, expand a bit more about this
+feature"; "why is there a huge white gap at the top?"; then, 2026-09-28,
+every launch film ends on the tagline).**
+- **More of the feature, all real.** Revisit now opens on "Due now": a
+  reminder the user set (the app's Remind me: Smart review, or a day) comes
+  back under it ("Set a reminder, and a save comes back when it's due.", a
+  new line), and after the to-do line a step is ticked off: the app removes
+  the row and shows its own "Marked as done" toast, framed in shot. The recap
+  and the Standout opening its save follow unchanged (+208 frames).
+- **The gap.** The reel keeps its type at 290 / 346px so Reels and TikTok's
+  top UI never covers it, and scrims the app to 720px; played anywhere else
+  that reads as a dead band. The clip sets its own, higher: kicker 200, line
+  256, scrim solid to 420 and clear by 600, the app aimed just under it (the
+  kit's `Captions` take `slots` and `BandScrim` a `band`; the defaults are
+  the reel's, which renders exactly as before for this change). The kicker
+  still sits below the top ~10% those apps cover.
+- **The tagline close.** The lockup's line is now "Everything you save,
+  finally useful.", set at 50px (`Lockup` `lineSize`) so it stays on one
+  line; the last melody note moved after "useful.".
+
+**Round 4 (owner: "the current one is good, but there is no proper opening:
+present the issue, then our solutions").** An 8.5s opening in the reel's hook
+language (kit `SaveChip` and `MarkAssembly`; `Opening.tsx`): the habit ("You
+save things to come back to later."), the problem ("But you rarely go back
+to them.", the film's honest "rarely", not "never"), and the turn ("Machina
+brings them back to you."), the saves gathering into the mark whose point
+opens as the iris onto the app. The saves shown are the ones Revisit brings
+back later (Four Thousand Weeks, The Tail End, the tomato sauce, the V60
+video, Piranesi). Frame 0, the poster a feed shows, already reads (the
+cascade into focus began before it). The app part is unchanged, 256 frames
+later. verify now requires the clip to open on the problem, with the chapter
+word only after it.
+
+**Round 5 (owner: "add a bit more info, to show the usefulness"; both beats
+approved).** USE, 5 bars spliced in after "Due now" (`USE` in the timeline;
+every later event moved by `USE.len`): the due save's bell opens its
+reminder's own sheet, where Smart review lifts ("Smart review brings it back
+after a day, a week, and a month.", matching the app's "Tomorrow · then 1
+week & 1 month"); its X closes it (in frame, where Cancel is not); the save
+opens on its summary and the camera goes down to its Key Points ("It comes
+back as the point, not just a link."); "‹ Revisit" back to the list (under
+the band, so no drawn tap). The demo card Four Thousand Weeks now carries
+three Key Points (`capture/library.mjs`, no "Do this": the list is
+unchanged). The camera's return to the list is 48 frames (32 peaked at
+47px/frame).
+
+**Round 6 (owner: "the beginning is terrible… why focus on smart review? What
+is 'it comes back as a point'? Fix the entire beginning").** Same shots, the
+writing redone in plain, benefit-first words: no menu names, nothing a
+viewer has to decode. "But most of them, you never open again." (they bleach
+on "never"); "Your saves come back when you want them."; "Later today, this
+weekend, or three times, so it sticks." (the three-times row lifts on "three
+times"); "Open one, and the key points are already there."
+
+## Meta ad 3: "Save anything" (compositions `MachinaAdTodo*`)
+
+Branch `claude/ad-todo`. One of three short ads for Instagram and Facebook
+(Reels, Stories, Feed), made from the kit. **Round 6, the owner's approved
+script (2026-10-03):** one real person talking to a friend, not an ad
+reading out features (owner on round 5: "far too slim, the narration sounds
+robotic… explain further and talk more"). **Voiced by Gemini TTS** (owner's
+pick, 2026-10-03): Sulafat, a playful acting note on every line, inline tags
+(`<chuckle>`, `<sigh>`), "Machina" said the Latin way (MAH-kee-nah); on
+Flash-Lite TTS until the Flash model's daily quota allows the Flash re-voice.
+See "Gemini TTS" under The voice-over. (Earlier cuts used Kokoro: long lines
+at 1.1× sounded rushed and flat; the house read at 0.95 was better but still
+robotic to the owner.)
+Each line is set on screen in chunks (≤8 words), each arriving with its first
+word (`chunks` in the timeline, `src/reels/ads/todo/Chunks.tsx`). Nothing says or shows "Download". Rounds
+1–5 are in git history. Its files keep their `todo` names so the three ad
+branches still merge cleanly. Nothing in it is a Pro surface; it names no
+plan and never says "free".
+
+**57.3s** (1720 frames; the brief asked 30–40s: the approved words, read by
+Gemini), laid out FROM the measured read, something new on screen at least
+every 3s (verify checks), the app at its real speed:
+
+| Time | Picture | Line (spoken; burned in, in chunks) |
+|---|---|---|
+| 0.0–6.1s | **The pain.** Frame 0 is the poster: real saves of every kind from the demo account, scattered, in the kit's `SaveChip` (1.3×). On "How many things" a ripple runs through them; on "never" they grey out | "Okay, be honest. How many things did you save this month… and never open again?" (the question on screen from frame 0; "Okay, be honest." spoken over it, voice at 0.27s) |
+| 6.1–17.1s | **Each one named.** The video, the post, the article, the screenshot each light up, lifting off the page, on its word | "That video you'd watch later." / "The post you loved." / "That article." / "The screenshot you swore you'd remember." |
+| 17.1–22.4s | **Buried.** They drift apart, blur and fade | "They're all still out there, buried across a dozen different apps." |
+| 22.4–25.6s | **The answer.** They rush into one point; the brackets snap round it on "Machina" (24.0s); the point opens as an iris onto the app | "That's exactly why we made Machina." |
+| 25.6–33.6s | **Save.** A YouTube video, an Instagram post, an article and a screenshot land at the top of the feed, each on its word, each showing where it came from | "From any app, just share to Machina." / "Videos, posts, articles, screenshots… it all lands in one place." |
+| 33.6–43.7s | **What it does.** A glide down the feed, every save already summarized; a cut onto the Instagram post as it is tapped open, read down to its Key Points, which lift on "key points" | "Then Machina gets to work." / "It analyzes every save, summarizes it, and pulls out the key points… so you'll always remember why you kept it." |
+| 43.7–50.4s | **Linked.** A cut into the Graph view as the app zooms onto a lit cluster ("time"), then onto a second ("travel") | "It even connects each save to related ones you've kept before… so your ideas start building on each other." |
+| 50.4–57.3s | **Close.** Thrown into the kit's lockup: the mark strikes, the wordmark wipes in on "Machina", the tagline on one line, held 1.7s. Nothing under it (the slot for the App Store badge) | "Machina. Everything you save, finally useful." (the name is the wordmark, not set again in the band) |
+
+**Compositions:** `MachinaAdTodo` (9:16, score + narrator + captions, the main
+cut), `MachinaAdTodoMusic` (9:16, score + captions, no narrator: the A/B cut),
+`MachinaAdTodoFeed` (4:5, 1080 × 1350, score + narrator + captions);
+`MachinaAdTodoSilent` / `MachinaAdTodoFeedSilent` for stills.
+
+**Two shapes, one set of scenes** (`src/reels/ads/todo/frame.ts`, the film's
+`useFraming()` idea): the tall cut keeps the line at the kit's 346px slot (out
+of Meta's top 270px), scrims the app under it to 490 / 600px, and aims every
+tap and hero moment between ~570 and 1250px, above the bottom 670px Meta
+covers with the caption, profile and Install button, and 65px in from the
+sides. The Feed cut has no platform UI over the picture: the line moves up to
+130px and the picture rises 190px with it. Checked on stills of every beat
+with the zones drawn (`python3 scripts/ad-todo-sheet.py --zones`).
+
+**What is real and what is scripted.** Every pixel of app UI is the shipped
+web app (merged with `main` on 2026-10-02), captured as take `adTodo`; the
+graph is the app's own Graph view and its cluster focus (the capture taps the
+"time" then the "travel" chip off camera; the cuts land on the app's zoom);
+the opened post and its Key Points are the app's own card view, tapped open. Scripted, in
+`capture/ad-todo.mjs`: two new saves the backend would have returned, each
+written the way it writes that kind, with their related saves (both ways,
+with reasons): the YouTube card is the app's real output for a real video,
+copied from the owner's phone (the SAVE clip's); the Instagram post is
+invented (the demo's @slowcoasts, its photo a text graphic drawn for the ad).
+The article and the screenshot are the demo account's own cards (Mark
+Manson's essay, Piranesi), re-saved with their links intact. The take
+removes the recipe cards and their collection (owner, 2026-10-02) and, for
+Meta's ad review, the money and workout cards (and the links to them), and
+seeds no Daily Brew or weekly recap. The hook's saves are titles of real
+saves in the demo account, in the kit's `SaveChip`. The iOS share sheet is not
+shown (it cannot be captured from the web build): the saves rush into the mark
+instead, the kit's brand gesture for sharing.
+
+**Its own files:** `clips/ad-todo-timeline.mjs` (the clock); scenes in
+`src/reels/ads/todo/` (one line in `src/Root.tsx`); the take `adTodo` in
+`capture/shoot.mjs` with its material in `capture/ad-todo.mjs`; the narrator
+`python3 audio/synth-vo.py adtodo` (→ `out/vo/adtodo/`,
+`src/reels/ads/todo/vo.json`); the score `audio/ads/todo-score.mjs` (→
+`public/ads/todo/score.wav`, gitignored) and two mixes,
+`node audio/mix-vo.mjs adtodo` and `adtodo-music` (→ `score-vo.wav`,
+`score-music.wav`, committed, both −14 LUFS); the gates
+`audio/ads/todo-verify.mjs` (run by `npm run verify`). `mix-vo.mjs` gained one
+option for it, `noVoice` (the music-only master).
+
+```bash
+npm run reel:app                               # after merging main
+CAPTURE_ONLY=adTodo npm run reel:capture       # the take (784 frames, ~8 min)
+python3 audio/synth-vo.py adtodo               # only after a line or its timing changes
+node audio/ads/todo-score.mjs && node audio/mix-vo.mjs adtodo && node audio/mix-vo.mjs adtodo-music
+npm run verify
+node scripts/ad-todo-stills.mjs && python3 scripts/ad-todo-sheet.py --zones   # review stills, sheets, the poster
+npx remotion render src/index.ts MachinaAdTodo out/ads/machina-ad-todo.mp4
+npx remotion render src/index.ts MachinaAdTodoMusic out/ads/machina-ad-todo-music.mp4
+npx remotion render src/index.ts MachinaAdTodoFeed out/ads/machina-ad-todo-feed.mp4
+```
+
+`CAPTURE_ONLY=adTodo` rewrites `src/reels/data/takes.json` with only the takes
+whose PNGs are on disk. This branch's `takes.json` is the committed one plus
+`adTodo`; the other takes were deliberately NOT re-shot, because re-capturing
+`revisitClip` from the merged app (Revisit now has a Done list) would move that
+clip's frames under its timeline. When the ad branches merge, keep every take
+in `shoot.mjs` and re-capture, as the clips' rule says.
+
+**The ad's gates** (`npm run verify`, on top of the clip rules): the hook is
+the first caption, its question whole on frame 0, its voice heard by 0.5s;
+the mark snaps on the spoken "Machina"; every chunk ≤8 words and word for
+word what the narrator says; until the lockup, something new on screen at
+least every 3s; the close is "Machina." then the tagline, exactly, last, its
+final word landed 1.6s+ before the end; "Download" nowhere; ≤ 62s; no "share
+sheet", "bookmarks", "free", a price, "App Store", "available" or a plan name
+in what the ad says; no recipe card, Pro surface or plan legible on any
+captured frame or in the four saves it seeds; both mixes at −14 LUFS ±0.5,
+true peak ≤ −1 dBTP, every line 3dB+ over the music in the speech band.
+
+**Not verified:** nobody has listened to either mix on speakers (measured
+only); the narrator is Gemini TTS, its word times ESTIMATED from the audio
+(no speech recogniser can be fetched here; about ±0.2s); the ad has not been through Meta's ad review; the app's font here is
+Inter standing in for SF Pro (see "Font" above).
+
+## Motion language
+
+The rules every Machina video follows, and the kit component that implements
+each (`src/reels/kit/`). A new reel is a timeline file, a set of takes and a
+few scenes built from these parts; it should not need new motion primitives.
+
+### Palette and grade
+
+Light only: **ink on paper**. The set is the film's paper (`SET_BG`, a shade
+under the app's `#F9FAFB` so a white screen still separates), lit by
+**`Paper`** (a daylight pool where the type lives, a lift behind the product,
+two slow cool pools, dithered by **`Dither`** so its soft gradients never band
+into rings) and finished by **`Lens`** (the film's grain and a whisper
+of vignette). Colour comes only from the app's own pixels (category pills,
+platform marks) and the app's tokens (`PLATFORM_INK` in `SaveChip`); the
+reel's own type is `INK`/`INK_SOFT`. Emphasis is a lift and an ink ring
+(**`Lift`**), never a recolour. Where the app itself would darken the frame
+(the Add dialog's black scrim), the element is **lifted off its screen**
+(`AppShot` `crop`) instead, so the grade never flips. Never: dark flips,
+neon, glow, glitch, chromatic aberration, colour casts.
+
+### Type
+
+One family, Geist. Two voices (**`Type.tsx`**):
+
+- **The line (`KineticLine`)** is what the narrator says: 56px, 1.12 leading,
+  weight 600, −0.028em, at most two lines in a 980px measure (about ten
+  words). Each LINE arrives when the narrator reaches its first word (the
+  measured timing); its words cascade 1.5 frames apart, each coming into
+  focus (12px blur → sharp, a 0.28em lift, `EASE_MODAL`, 7 frames). The line
+  leaves as one, an 8-frame soft-focus fade eased in and out (round 13: never
+  a fast-start curve on an exit, it reads as a blink), finishing on the caption's end
+  frame. Never a mask rise, never a lone word parked at the left edge.
+  `\n` is a hard break; `sizes` sets a size per line.
+- **The kicker (`Kicker`)** names the chapter (SAVE / FIND / ASK / CONNECT /
+  REVISIT): 25px, weight 650, uppercase, tracking settling 0.62→0.44em,
+  letters coming into focus 0.8 frames apart, the word alone (no rule).
+  It is on screen only while its chapter's narration is: in 4 frames before
+  each line, out WITH the line in the line's own gesture, gaps under 24
+  frames bridged. Restraint is the point: the energy of a cut belongs to the
+  picture. A feature clip OPENS on its chapter word: already formed on
+  frame 0 (its letters came into focus over the 12 frames before), a beat
+  before the first line, then the rule above (`KICKERS` in
+  `clips/revisit-timeline.mjs`).
+- **The dwell rule.** Text is timed to the voice, never stretched to fill a
+  shot: a line leaves 0.3–1.2s after the narrator finishes it. A line that
+  names an action still playing may stay until that action lands, at most
+  4s past the voice, and says so in the timeline (`until`). When the words
+  are done the picture carries on alone; if that leaves a dead stretch, the
+  shot is too long, so trim the hold rather than keep the text. `npm run
+  verify` enforces the rule.
+- **The lockup (`Lockup` in `Brand.tsx`)** uses the drawn wordmark, never typed
+  letters. The closing line is a statement (`lineStyle="statement"`): the
+  TAGLINE (every launch film ends on it, 2026-09-28) in Geist at 60px, or
+  smaller when the line is long (`lineSize`: the tagline is set at 50 so it
+  stays on one line) (round 15: the reel's one face; the round-6
+  display serif was the only other face in 81 seconds and read as a font
+  change, not as emphasis), words coming into focus on the narrator's
+  timing, the wordmark wiping in as "Machina" is said.
+
+Layout (**`Captions.tsx`**; a video may pass its own `slots` and `band`, as
+the Revisit clip does to sit higher): `SLOTS` puts the kicker at 290px and the line at
+346px, in the upper band clear of Reels/TikTok chrome (which covers roughly
+the top 12% and the bottom quarter). Every line lives there, the hook's
+tagline included: it sits above the mark, because the mark's point leaves
+downward to become the + button and must not cross type. **Type never sits
+on UI:** `BandScrim` fades any app screen that rises into the band (opaque
+to 510px, clear by 720px), and shots aim their subjects below 720px.
+Anything that holds is rounded to whole pixels (the film's shimmer lesson).
+
+### Curves (`curves.ts`): each one has a job
+
+| Curve | Value | Job | In the pilot |
+|---|---|---|---|
+| `EASE_MODAL` | `cubic-bezier(0.32, 0.72, 0, 1)`, the app's `--ease-modal` | arriving and settling | caption words, camera landings, the dialog arriving, the wordmark wipe |
+| `EASE_SPRING` | `cubic-bezier(0.34, 1.56, 0.64, 1)`, the app's `--ease-spring` | physical arrivals (the only overshoot) | brackets snapping shut, the ink point, chips and the new card lifting |
+| `EASE_FLING` | `cubic-bezier(0.22, 1, 0.36, 1)`, the deck's own fling | things thrown | caption exits, the dialog dropping away into the feed |
+| `EASE_IN_OUT` | `cubic-bezier(0.65, 0, 0.35, 1)` | travel between two holds | feed → search field, answer → sources, the iris, the point's travel |
+| `EASE_GATHER` | accelerating, cubic-in | moves that must end at speed | the saves collapsing; a camera diving into a hard cut |
+
+Linear is for one thing only: a slow drift under a hold, so a held shot is
+never dead still.
+
+### Transition vocabulary
+
+In order of appearance; nothing outside this list.
+
+1. **Match cut by shape.** The gathered point of ink travels to where the +
+   button will be and becomes it (`Hook` → `Save`, timed in
+   `scenes/handoff.ts`).
+2. **Iris.** The + button opens into its screen (`AppShot` `iris`).
+3. **Lift.** An element leaves its screen with its own depth: the Add dialog
+   (`AppShot` `crop`), the new card, the citation chips (`Lift`).
+4. **Same-pixels hand-over.** Two takes that show the same screen swap under
+   one camera, which makes the swap invisible (`Save` rides `findKeys` until the
+   search tap). **Never dissolve between two takes:** they double-expose.
+   **Open the thing:** a tap on an element and the app's own transition into
+   it (the new card → its detail view; the recap banner → the recap).
+5. **Cut on the beat.** A hard cut on a beat line or an 8th (Find → Ask, the
+   composer, the answer, Connect → Recall, the card's detail back to the feed). Two camera
+   keys at most a frame apart are the cut: nothing is drawn between them, and
+   `camVelocity` reads a cut forward, so the first frame of a new shot is sharp.
+6. **Dive into a cut.** The camera accelerates into the tapped element
+   (`EASE_GATHER`) and cuts on the downbeat to *inside* the next screen, which
+   fills the frame and pulls back (`EASE_MODAL`): Ask's Graph chip → the graph.
+7. **Throw out.** The camera throws the last screen out of frame
+   (directional motion blur) into the lockup (`Recall` → `End`).
+
+Every change of screen is motivated by a finger: a `Tap` (the reel's one
+piece of added UI, since iOS draws no touches) lands on the element that
+causes it, and the cut lands on the touch.
+
+### Pacing (`clock.ts`, `reel-timeline.mjs`)
+
+The cut is written at 112.5 BPM (16 frames a beat) and played at ONE steady
+speed, 2× (owner, round 5: "keep a steady pace"; a variable speed was
+rejected). The score runs at the same 112.5 BPM on the output clock, so a
+source 8th is an output beat: **cuts, taps and sound design land on the
+beat, and every narrator line starts on one.** Any app motion the reel
+shows must be captured at 60fps so it does not step at this speed. A caption stays up until its line has been
+spoken and its last word has landed (verify fails a voice line that overruns
+its caption). Motion blur is what a 180° shutter would give (σ ≈ 0.14 × px
+per frame, directional, capped at 10px) and never appears on a hold.
+
+**The grid rule (round 13).** A hold (`HOLDS`) may start on an 8th, but what
+it adds to the output (`len − adv × K`) must be whole beats, or everything
+after it slides off the beat while still looking "in sync" with the sound
+design (which follows the picture). A linger that shows a moment longer is
+lengthened by a beat, never by a few frames. `npm run verify` fails a hold
+that breaks it.
+
+### Camera (`camera.ts`, `AppShot`)
+
+- **Aim by screen point.** A key names a point of the app's 393×852 screen
+  (`cx`, `cy`), where it goes in the frame (`fx`, `fy`) and the zoom `z` in px
+  per point. Boxes come from the capture (`rectOf`), so a shot targets "the
+  chips" or "the search field" by name. Zoom interpolates in log space and
+  stays at or under the capture's DPR (4), so the app is never upscaled soft.
+- **Close-ups are 2D.** 3D tilt (under 10°) is for establishing moves only:
+  Home after the iris, the graph pull-back, the Revisit tab. It settles out
+  before anything must be read.
+- **A dive lands inside the app.** The first frame after a dive's cut is
+  filled edge to edge by the next screen; the floating slab, its shadow and
+  its display radius (`SCREEN_RADIUS`, 55pt) appear as the camera pulls back.
+- **Rack focus** (`AppShot` `focus`) keeps the eye on what matters, e.g. the
+  typed query over the app's live suggestions.
+- **A cut is two keys at most a frame apart** (round 13): `camAt` holds the
+  first and jumps to the second, never interpolating between them (a slowed
+  clock samples half-frames), and `camVelocity` measures what moved since the
+  last OUTPUT frame, reading a cut forward. A dive's last key sits ON its cut,
+  so it is still at speed on the frame before it.
+- **A move that starts from rest eases in** (EASE_IN_OUT); EASE_MODAL's fast
+  start is for arrivals that already carry speed, or a camera answering a tap
+  on the frame the app responds.
+- **A stepped capture never hops.** When the app scrolls in captured steps
+  (the card's read-down, the recap), the camera takes up each step's rounding
+  and motion blur follows the net motion (camera + scroll). **`steppedScroll`**
+  (`kit/scroll.ts`) does it: ease the read in page POINTS and it returns the
+  nearest captured step and the correction, from each step's MEASURED
+  position (a capture's steps are not even: the browser snaps a scroll to
+  whole points, and assuming even steps hops 2.3px at each short one).
+- **Read with the chrome out of frame.** The correction moves the whole
+  captured screen, the app's fixed header and tab bar included, so a stepped
+  read is framed with the header under the band's solid paper and the tab
+  bar below the frame (the Revisit clip's reading window); the camera leaves
+  that window only once the page has stopped.
+- **A read that runs out of page hands its motion to the camera** in one
+  eased curve (the Revisit clip's `GLIDE`): the page scrolls until it ends
+  and the camera carries the same motion on. Never a stop and a second start.
+
+### Sound to picture (`HITS`, `audio/reel-score.mjs`)
+
+Every sound-design event is keyed to a named frame in `HITS` that the picture
+also uses: a tick on each tap, a whoosh on the dive, an impact where the point
+lands, on the cut into the graph and on the lockup's strike. **Risers end on
+the reveal they lead into** (`RISERS`). One chord per bar
+(`BAR_CHORDS`), from the film's instruments (`audio/synth.mjs`, shared), so the
+reels and the film sound like one brand. Move a `HITS` frame and the picture
+and the sound move together (the share beat's `SHARE_BEAT` and the tour's
+`MODES` work the same way inside their holds). **A tap lands on the frame the
+app responds and the tick sounds** (the pad touches at 35% of the `Tap`
+gesture). **Nothing sounds on a word the narrator has to land:** a melody note
+or a shimmer goes after the word, not on it (round 13).
+
+### Narrator (`audio/synth-vo.py reel`)
+
+One voice config for everything Machina says (Kokoro `af_heart`, speed 0.95,
+"Machina" spoken "Makeena"). **The captions are the script:** the reel's lines
+are read from `CAPTIONS` in `reel-timeline.mjs` and spoken verbatim, one line
+per caption. The reel introduces Machina with the App Store subtitle and
+closes on the tagline, once, in short lines with air around them. Word timings are measured from the
+synthesized audio (`src/reels/data/reel-vo.json`) and drive the kinetic type
+and the lockup's line. The mix ducks the score to 0.55 under the voice
+(the film uses 0.65); that puts the reel's voice at the film's
+voice-over-music balance, which verify measures. The two brand lines (the
+name and the promise) duck it to 0.4 (`duck` on their captions). Verify also
+holds every line at least 3dB over the music in the speech band, and the
+finished mix is mastered to the feeds' −14 LUFS, true peak ≤ −1 dBTP
+(`mix-vo.mjs reel`: a gain, then a look-ahead limiter; `audio/loudness.mjs`).
+
+### Brand bans
+
+Enforced by `npm run verify` where a machine can check:
+
+- no literal **"AI"**, no **"second brain"**, and never the word **"library"**,
+  on screen or in voice (verify);
+- no em dashes in captions, voice or demo strings (verify);
+- not a learning app, and "search by meaning" is not the headline (Find says
+  "in your own words");
+- **no mockups:** app pixels only come from captures (`AppShot` takes nothing
+  else); the only added UI is the `Tap`;
+- no third-party frames or thumbnails (demo cards hide thumbnails); platform
+  marks only as the app draws them;
+- the real wordmark and glyph only (`Brand.tsx` wraps `ui/Brand.tsx`'s shipped
+  path data);
+- nothing claims App Store availability.
