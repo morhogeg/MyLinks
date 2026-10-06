@@ -16,6 +16,7 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 import pytest
+from types import SimpleNamespace
 
 import digest_service as ds
 import main
@@ -111,7 +112,7 @@ def _run_ticks(monkeypatch, clock, users, outcomes, minutes):
     monkeypatch.setattr(ds, "get_db", lambda: db)
     calls = []
 
-    def fake_synthesis(uid, user_data, links=None, force=False, week_id=None):
+    def fake_synthesis(uid, user_data, links=None, force=False, week_id=None, push_hold=None):
         calls.append(week_id)
         return outcomes[len(calls) - 1]
 
@@ -234,3 +235,223 @@ def test_send_digests_runs_on_a_real_timeout():
     import ai_service
     worst_user_s = ai_service.SYNTHESIS_CALL_TIMEOUT_MS * ai_service.SYNTHESIS_ATTEMPTS / 1000 + 4 + 30
     assert ds.DIGEST_TICK_BUDGET_S + worst_user_s < ds.DIGEST_CADENCE_MINUTES * 60
+
+
+# ── RV-7 (a): a late delivery lands in the app; its push is held ────────────
+# A period stays open for 6 hours, so a digest due at 21:00 could push at
+# 02:00. Late by more than 2 hours, or late at all inside 22:00-07:00 local,
+# it is delivered in-app only. On time it pushes, at whatever hour the user
+# chose (someone who picked 23:00 still gets their 23:00 push).
+
+def _push_holds(monkeypatch, clock, settings, at):
+    users = {"u1": {"settings": dict(settings, digest_enabled=True, digest_day=6), "timezone": "UTC"}}
+    monkeypatch.setattr(ds, "get_db", lambda: _UsersDb(users))
+    seen = []
+
+    def fake_digest(uid, user_data, force=False, period=None, push_hold=None):
+        seen.append(push_hold)
+        return {"sent": True, "card_count": 1}
+
+    monkeypatch.setattr(ds, "build_and_send_digest", fake_digest)
+    clock.at = at
+    ds.run_digest_check()
+    return seen
+
+
+def test_an_on_time_digest_pushes(monkeypatch, clock):
+    assert _push_holds(monkeypatch, clock, {"digest_hour": 9}, SUNDAY_9 + timedelta(minutes=5)) == [None]
+
+
+def test_a_digest_more_than_two_hours_late_is_in_app_only(monkeypatch, clock):
+    assert _push_holds(monkeypatch, clock, {"digest_hour": 9},
+                       SUNDAY_9 + timedelta(hours=2, minutes=5)) == ["late"]
+
+
+def test_a_late_digest_at_night_is_in_app_only(monkeypatch, clock):
+    sunday_21 = SUNDAY_9 + timedelta(hours=12)
+    assert _push_holds(monkeypatch, clock, {"digest_hour": 21},
+                       sunday_21 + timedelta(minutes=100)) == ["quiet_hours"]  # 22:40
+
+
+def test_a_digest_the_user_set_for_late_evening_still_pushes_on_time(monkeypatch, clock):
+    sunday_23 = SUNDAY_9 + timedelta(hours=14)
+    assert _push_holds(monkeypatch, clock, {"digest_hour": 23},
+                       sunday_23 + timedelta(minutes=5)) == [None]
+
+
+def test_the_late_synthesis_push_is_held_too(monkeypatch, clock):
+    users = {"u1": dict(_SYNTH_USER)}
+    monkeypatch.setattr(ds, "get_db", lambda: _UsersDb(users))
+    seen = []
+    monkeypatch.setattr(ds, "build_and_send_synthesis",
+                        lambda uid, user_data, links=None, force=False, week_id=None, push_hold=None:
+                        seen.append(push_hold) or {"sent": True})
+    clock.at = SUNDAY_9 + timedelta(hours=3)
+    ds.run_digest_check()
+    assert seen == ["late"]
+
+
+def test_a_held_digest_is_written_and_settled_without_a_push(monkeypatch):
+    import push_service
+    from tests.test_digest_delivery import RecordingDB, _recent_cards
+    rec = RecordingDB()
+    monkeypatch.setattr(ds, "get_db", lambda: rec)
+    monkeypatch.setattr(ds, "is_pro", lambda uid: True)
+    monkeypatch.setattr(ds, "fetch_candidate_links", lambda uid: _recent_cards())
+    monkeypatch.setattr(push_service, "send_push", lambda *a, **k: pytest.fail("pushed a held digest"))
+
+    res = ds.build_and_send_digest("u1", {"settings": {"digest_channels": ["push"]}, "fcmTokens": ["t"]},
+                                   period=SUNDAY_9, push_hold="late")
+
+    assert res["sent"] is True and res["channels"] == ["in_app"] and res["push_held"] == "late"
+    assert rec.written  # the in-app digest exists
+
+
+def test_a_held_synthesis_is_written_without_a_push(monkeypatch):
+    import ai_service
+    import push_service
+    from tests.test_digest_delivery import RecordingDB, _recent_cards
+    rec = RecordingDB()
+    monkeypatch.setattr(ds, "get_db", lambda: rec)
+    monkeypatch.setattr(ds, "is_pro", lambda uid: True)
+    monkeypatch.setattr(ai_service, "GeminiService", lambda: type("G", (), {
+        "synthesize_week": lambda self, c: {"title": "T", "narrative": "n"}})())
+    monkeypatch.setattr(push_service, "send_push", lambda *a, **k: pytest.fail("pushed a held synthesis"))
+
+    res = ds.build_and_send_synthesis("u1", {"settings": {}, "fcmTokens": ["t"]}, _recent_cards(),
+                                      week_id="2026-W40", push_hold="quiet_hours")
+
+    assert res["sent"] is True and res["channels"] == ["in_app"] and res["push_held"] == "quiet_hours"
+
+
+# ── RV-7 (b): the walk resumes where the last tick stopped ──────────────────
+# Each tick walked users in uid order and stopped after its budget, so when
+# ticks kept running out, the same first users were served every time and
+# the tail never was.
+
+class _PagedUsersDb:
+    """users/{uid} streamed in id order with start_after / end_at, plus the
+    scheduler_state doc the walk keeps its place in."""
+
+    def __init__(self, users, state=None):
+        self.users = users
+        self.state = dict(state or {})
+
+    def collection(self, name):
+        if name == ds.SCHEDULER_STATE_COLLECTION:
+            state = self.state
+            return SimpleNamespace(document=lambda doc_id: SimpleNamespace(
+                get=lambda: SimpleNamespace(exists=doc_id in state,
+                                            to_dict=lambda: dict(state.get(doc_id) or {})),
+                set=lambda data, merge=False: state.__setitem__(doc_id, dict(data))))
+        assert name == "users"
+        return _PagedUsersQuery(self.users)
+
+
+class _PagedUsersQuery:
+    def __init__(self, users, after=None, until=None):
+        self.users, self.after, self.until = users, after, until
+
+    def select(self, fields):
+        return self
+
+    def order_by(self, field):
+        assert field == "__name__"
+        return self
+
+    def start_after(self, cursor):
+        return _PagedUsersQuery(self.users, cursor["__name__"], self.until)
+
+    def end_at(self, cursor):
+        return _PagedUsersQuery(self.users, self.after, cursor["__name__"])
+
+    def stream(self):
+        for uid in sorted(self.users):
+            if (self.after is None or uid > self.after) and (self.until is None or uid <= self.until):
+                yield SimpleNamespace(id=uid, to_dict=lambda u=uid: dict(self.users[u]))
+
+    def document(self, uid):
+        users = self.users
+        return SimpleNamespace(set=lambda data, merge=False: users[uid].update(data))
+
+
+def _walk_ticks(monkeypatch, db, ticks, budget_s=ds.DIGEST_TICK_BUDGET_S):
+    tick_clock = SimpleNamespace(t=0.0)
+    monkeypatch.setattr(ds, "time", SimpleNamespace(monotonic=lambda: tick_clock.t))
+    monkeypatch.setattr(ds, "get_db", lambda: db)
+    monkeypatch.setattr(ds, "digest_due_at", lambda *a, **k: SUNDAY_9)
+    monkeypatch.setattr(ds, "synthesis_due_at", lambda *a, **k: None)
+    served = []
+
+    def slow_digest(uid, user_data, force=False, period=None, push_hold=None):
+        served[-1].append(uid)
+        tick_clock.t += 100  # each user takes 100 of the tick's 180 seconds
+        return {"sent": False, "skipped": "write_failed"}
+
+    monkeypatch.setattr(ds, "build_and_send_digest", slow_digest)
+    for _ in range(ticks):
+        served.append([])
+        ds.run_digest_check(budget_s=budget_s)
+    return served
+
+
+def test_each_tick_starts_where_the_last_one_stopped(monkeypatch):
+    users = {u: {"settings": {"digest_enabled": True}} for u in "abcde"}
+    db = _PagedUsersDb(users)
+    served = _walk_ticks(monkeypatch, db, 3)
+    assert served == [["a", "b"], ["c", "d"], ["e", "a"]]
+    assert db.state["digestWalk"]["resumeAfter"] == "a"
+
+
+def test_a_full_lap_starts_the_next_walk_from_the_top(monkeypatch):
+    users = {u: {"settings": {"digest_enabled": True}} for u in "abc"}
+    db = _PagedUsersDb(users, state={"digestWalk": {"resumeAfter": "a"}})
+    served = _walk_ticks(monkeypatch, db, 1, budget_s=10_000)
+    assert served == [["b", "c", "a"]]
+    assert db.state["digestWalk"]["resumeAfter"] is None
+
+
+# ── RV-7 (c): a failing synthesis is tried at most 3 times per period ───────
+
+def test_a_failing_synthesis_stops_after_three_attempts(monkeypatch, clock):
+    users = {"u1": dict(_SYNTH_USER)}
+    calls = _run_ticks(monkeypatch, clock, users,
+                       [{"sent": False, "skipped": "synthesis_failed"}] * 10,
+                       minutes=[0, 30, 60, 90, 120, 150, 180])
+    assert len(calls) == ds.SYNTHESIS_MAX_PERIOD_ATTEMPTS == 3
+    assert users["u1"]["synthesisRun"]["n"] == 3 and users["u1"]["synthesisRun"]["ok"] is False
+
+
+def test_the_attempt_cap_is_per_period(clock):
+    clock.at = SUNDAY_9 + timedelta(minutes=40)
+    this_week = int((SUNDAY_9 + timedelta(minutes=5)).timestamp() * 1000)
+    last_week = int((SUNDAY_9 - timedelta(days=7)).timestamp() * 1000)
+    settings = _SYNTH_USER["settings"]
+    assert ds.is_synthesis_due(settings, "UTC", {"at": this_week, "ok": False, "n": 2}) is True
+    assert ds.is_synthesis_due(settings, "UTC", {"at": this_week, "ok": False, "n": 3}) is False
+    assert ds.is_synthesis_due(settings, "UTC", {"at": last_week, "ok": False, "n": 3}) is True
+
+
+def test_the_real_walk_queries_resume_after_the_saved_uid(monkeypatch):
+    pytest.importorskip("google.cloud.firestore_v1.query")
+    from google.auth.credentials import AnonymousCredentials
+    from google.cloud import firestore
+    from google.cloud.firestore_v1.document import DocumentReference
+    from google.cloud.firestore_v1.query import Query
+
+    built, saved = [], []
+    monkeypatch.setattr(Query, "stream", lambda self, *a, **k: built.append(self._to_protobuf()) or iter([]))
+    monkeypatch.setattr(DocumentReference, "get", lambda self, *a, **k: SimpleNamespace(
+        exists=True, to_dict=lambda: {"resumeAfter": "uid9"}))
+    monkeypatch.setattr(DocumentReference, "set", lambda self, data, merge=False: saved.append((self.path, data)))
+    monkeypatch.setattr(ds, "get_db", lambda: firestore.Client(project="p", credentials=AnonymousCredentials()))
+
+    ds.run_digest_check()
+
+    tail, head = built
+    assert tail.start_at.before is False
+    assert tail.start_at.values[0].reference_value.endswith("/documents/users/uid9")
+    assert head.end_at.values[0].reference_value.endswith("/documents/users/uid9")
+    assert [f.field_path for f in tail.select.fields][:2] == ["settings", "timezone"]
+    # The lap completed, so the next walk starts at the top.
+    assert saved == [("scheduler_state/digestWalk", {"resumeAfter": None, "at": saved[0][1]["at"]})]

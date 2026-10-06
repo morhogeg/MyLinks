@@ -32,7 +32,7 @@ from typing import Optional, List
 
 from google.cloud import firestore
 
-from db import get_db
+from db import get_db, SCHEDULER_STATE_COLLECTION
 from entitlement import is_pro
 from log_safe import mask_uid
 from models import UNANALYZED_STATUSES
@@ -431,7 +431,8 @@ def _write_inapp_synthesis(uid: str, synth: dict, cards: List[dict], week_id: st
 
 
 def build_and_send_synthesis(uid: str, user_data: dict, links: Optional[List[dict]] = None,
-                             force: bool = False, week_id: Optional[str] = None) -> dict:
+                             force: bool = False, week_id: Optional[str] = None,
+                             push_hold: Optional[str] = None) -> dict:
     """Generate the weekly "What you learned" synthesis and deliver it.
 
     Always writes the in-app special card (that's the primary surface), and
@@ -443,6 +444,7 @@ def build_and_send_synthesis(uid: str, user_data: dict, links: Optional[List[dic
     one read. `week_id` pins the ISO week the scheduled period belongs to
     (run_digest_check derives it from the period's target, so a retry later
     in the catch-up window lands on the same doc); default: the current week.
+    `push_hold` (run_digest_check, see push_hold_reason) delivers in-app only.
     """
     from ai_service import GeminiService, AnalysisError
 
@@ -506,11 +508,16 @@ def build_and_send_synthesis(uid: str, user_data: dict, links: Optional[List[dic
     result["channels"].append("in_app")
 
     # Push (native iOS)
-    if "push" in channels and not user_data.get("fcmTokens"):
+    if "push" in channels and push_hold:
+        # Delivered late (see push_hold_reason): the recap is in the app,
+        # the notification is not sent.
+        result["push_held"] = push_hold
+        logger.info(f"Synthesis: push held for {mask_uid(uid)} ({push_hold})")
+    elif "push" in channels and not user_data.get("fcmTokens"):
         # Same visibility the curated path has — a missing token is the one
         # failure the user can never see from the app.
         logger.info(f"Synthesis: user {mask_uid(uid)} has push channel but no device tokens")
-    if "push" in channels and user_data.get("fcmTokens"):
+    elif "push" in channels and user_data.get("fcmTokens"):
         from push_service import send_push  # lazy: keeps cold starts light
         try:
             # A locked recap must not promise a body the tap can't show.
@@ -631,13 +638,15 @@ def _prune_old_digests(uid: str, keep: int = DIGEST_RETENTION) -> None:
 # ─────────────────────────────────────────────────────────────────────────
 
 def build_and_send_digest(uid: str, user_data: dict, force: bool = False,
-                          period: Optional[datetime] = None) -> dict:
+                          period: Optional[datetime] = None,
+                          push_hold: Optional[str] = None) -> dict:
     """
     Build a curated digest for one user and deliver it on their chosen
     channels. `force=True` ignores schedule/empty checks (used by the
     "send one now" preview button). `period` is the scheduled period's local
     target time (run_digest_check); it names the digest doc and, on the legacy
-    synthesis route, the ISO week. Default: now.
+    synthesis route, the ISO week. Default: now. `push_hold` (run_digest_check,
+    see push_hold_reason) delivers in-app only.
 
     Returns a per-user result dict.
     """
@@ -655,7 +664,8 @@ def build_and_send_digest(uid: str, user_data: dict, force: bool = False,
     # its own candidates, after its per-week dedupe check.
     if is_legacy_synthesis_mode(settings):
         week_id = _week_id(period.astimezone(timezone.utc)) if period else None
-        return build_and_send_synthesis(uid, user_data, None, force=force, week_id=week_id)
+        return build_and_send_synthesis(uid, user_data, None, force=force, week_id=week_id,
+                                        push_hold=push_hold)
 
     # Curated digests are Pro-only (Machina Pro). Checked after the synthesis
     # branch on purpose: the synthesis path has its own locked-teaser handling.
@@ -695,7 +705,12 @@ def build_and_send_digest(uid: str, user_data: dict, force: bool = False,
         delivered_any = True
 
     # Push (native iOS)
-    if "push" in channels:
+    if "push" in channels and push_hold:
+        # Delivered late (see push_hold_reason): the digest is in the app,
+        # the notification is not sent.
+        result["push_held"] = push_hold
+        logger.info(f"Digest: push held for {mask_uid(uid)} ({push_hold})")
+    elif "push" in channels:
         if user_data.get("fcmTokens"):
             from push_service import send_push  # lazy: keeps cold starts light
             period = "Daily" if frequency == "daily" else "Weekly"
@@ -748,6 +763,20 @@ DIGEST_CATCHUP = timedelta(hours=6)
 # A failed attempt waits this long before a later tick retries it: a synthesis
 # attempt is a paid model call plus a candidate read.
 DIGEST_RETRY_AFTER = timedelta(minutes=30)
+# ...and a synthesis is attempted at most this many times per period (each
+# attempt is up to two model calls). The count rides the run stamp
+# (synthesisRun.n): the per-week syntheses/{weekId} doc exists only once a
+# recap is delivered, and the app renders whatever is there.
+SYNTHESIS_MAX_PERIOD_ATTEMPTS = 3
+# A push is for the moment the user picked. Within the catch-up window a
+# period can be delivered hours late (a digest due at 21:00 could push at
+# 02:00), so a late one lands in the app without its push: more than
+# DIGEST_PUSH_LATE_AFTER late, or late at all (past DIGEST_ON_TIME) inside the
+# user's night, QUIET_HOURS local. An on-time delivery pushes at whatever hour
+# the user chose: someone who picked 23:00 still gets their 23:00 push.
+DIGEST_PUSH_LATE_AFTER = timedelta(hours=2)
+DIGEST_ON_TIME = timedelta(minutes=15)
+QUIET_HOURS = (22, 7)  # [22:00, 07:00) local
 # Skips no retry can change: they settle the period like a delivery does.
 _SETTLED_SKIPS = frozenset({"no_cards", "pro_required", "already_sent_this_week",
                             "not_enough_cards"})
@@ -774,20 +803,48 @@ def _fired_window(settings: dict, tz_name: Optional[str],
     return None
 
 
-def _period_open(target: datetime, last_run) -> bool:
+def _stamp_at(last_run):
+    """The ms timestamp of a run stamp, or None."""
+    at = last_run.get("at") if isinstance(last_run, dict) else None
+    return None if isinstance(at, bool) or not isinstance(at, (int, float)) else at
+
+
+def _stamp_attempts(last_run) -> int:
+    """Attempts the stamp records for its period (1 for stamps that predate
+    the count)."""
+    n = last_run.get("n") if isinstance(last_run, dict) else None
+    return n if isinstance(n, int) and not isinstance(n, bool) and n > 0 else 1
+
+
+def _period_open(target: datetime, last_run, max_attempts: Optional[int] = None) -> bool:
     """True while the period whose window opened at `target` still needs a
     run: nothing recorded since `target`, or only a failed attempt at least
-    DIGEST_RETRY_AFTER ago. `last_run` is the {"at": ms, "ok": bool} stamp
+    DIGEST_RETRY_AFTER ago (and, with `max_attempts`, fewer failed attempts
+    than that). `last_run` is the {"at": ms, "ok": bool, "n": attempts} stamp
     run_digest_check leaves after each attempt (absent before the first)."""
-    at = last_run.get("at") if isinstance(last_run, dict) else None
-    if isinstance(at, bool) or not isinstance(at, (int, float)):
-        return True
-    if at < target.timestamp() * 1000:
+    at = _stamp_at(last_run)
+    if at is None or at < target.timestamp() * 1000:
         return True
     if last_run.get("ok") is True:
         return False
+    if max_attempts and _stamp_attempts(last_run) >= max_attempts:
+        return False
     now_ms = _local_now(None).timestamp() * 1000
     return now_ms - at >= DIGEST_RETRY_AFTER.total_seconds() * 1000
+
+
+def push_hold_reason(target: datetime, tz_name: Optional[str]) -> Optional[str]:
+    """Why a scheduled delivery for the period that opened at `target` should
+    skip its push ("late", "quiet_hours"), or None to push (see
+    DIGEST_PUSH_LATE_AFTER)."""
+    local = _local_now(tz_name)
+    late = local - target
+    if late > DIGEST_PUSH_LATE_AFTER:
+        return "late"
+    start, end = QUIET_HOURS
+    if late > DIGEST_ON_TIME and (local.hour >= start or local.hour < end):
+        return "quiet_hours"
+    return None
 
 
 def run_settled(result: dict) -> bool:
@@ -807,7 +864,8 @@ def _synthesis_enabled(settings: dict) -> bool:
 def synthesis_due_at(settings: dict, tz_name: Optional[str], last_run=None) -> Optional[datetime]:
     """Weekly synthesis due-gate: the local target time of the period that is
     due now (the user's synthesis_day at their digest hour, up to
-    DIGEST_CATCHUP late, not yet settled per `last_run`), or None.
+    DIGEST_CATCHUP late, not yet settled per `last_run`, fewer than
+    SYNTHESIS_MAX_PERIOD_ATTEMPTS failed attempts), or None.
     build_and_send_synthesis is also idempotent per ISO week (the
     syntheses/{weekId} doc), so a lost run stamp can't double-send."""
     if not _synthesis_enabled(settings):
@@ -815,7 +873,7 @@ def synthesis_due_at(settings: dict, tz_name: Optional[str], last_run=None) -> O
     fired = _fired_window(settings, tz_name)
     if fired is None or fired.weekday() != int(settings.get("synthesis_day", 6)):
         return None
-    return fired if _period_open(fired, last_run) else None
+    return fired if _period_open(fired, last_run, SYNTHESIS_MAX_PERIOD_ATTEMPTS) else None
 
 
 def is_synthesis_due(settings: dict, tz_name: Optional[str], last_run=None) -> bool:
@@ -871,23 +929,73 @@ def is_due(settings: dict, tz_name: Optional[str], last_sent_ms: Optional[int],
 DIGEST_TICK_BUDGET_S = 180
 
 
-def _record_run(db, uid: str, field: str, ok: bool) -> None:
-    """Stamp the scheduled attempt (see _period_open). Best effort: a lost
-    stamp only means one more cheap check, deduped by the period's own guard."""
+def _record_run(db, uid: str, field: str, ok: bool, target: Optional[datetime] = None,
+                last_run=None) -> None:
+    """Stamp the scheduled attempt (see _period_open), counting the attempts
+    made for the period that opened at `target` (`last_run` is the stamp the
+    scan read). Best effort: a lost stamp only means one more cheap check,
+    deduped by the period's own guard."""
+    n = 1
+    at = _stamp_at(last_run)
+    if target is not None and at is not None and at >= target.timestamp() * 1000:
+        n = _stamp_attempts(last_run) + 1
     try:
         db.collection("users").document(uid).set(
-            {field: {"at": int(_local_now(None).timestamp() * 1000), "ok": bool(ok)}},
+            {field: {"at": int(_local_now(None).timestamp() * 1000), "ok": bool(ok), "n": n}},
             merge=True)
     except Exception as e:
         logger.warning(f"Digest run stamp {field} failed for {mask_uid(uid)}: {type(e).__name__}")
+
+
+# Where the last deferred walk stopped (scheduler_state/digestWalk): the next
+# tick starts after that user and wraps to the front, so a tick that runs out
+# of budget hands the rest of the line to the next one instead of serving the
+# same first users again.
+_WALK_STATE_DOC = "digestWalk"
+
+
+def _walk_state(db):
+    return db.collection(SCHEDULER_STATE_COLLECTION).document(_WALK_STATE_DOC)
+
+
+def _walk_resume_after(db) -> Optional[str]:
+    """The uid the last deferred walk stopped after, or None. Never raises."""
+    try:
+        snap = _walk_state(db).get()
+        uid = (snap.to_dict() or {}).get("resumeAfter") if snap.exists else None
+    except Exception as e:
+        logger.warning(f"Digest walk cursor unreadable ({type(e).__name__}); walking from the top")
+        return None
+    return uid if isinstance(uid, str) and uid and "/" not in uid else None
+
+
+def _save_walk_resume_after(db, uid: Optional[str]) -> None:
+    try:
+        _walk_state(db).set({"resumeAfter": uid,
+                             "at": int(_local_now(None).timestamp() * 1000)})
+    except Exception as e:
+        logger.warning(f"Digest walk cursor not saved ({type(e).__name__})")
+
+
+def _user_walk(db, fields: List[str], resume_after: Optional[str]):
+    """Every user doc (field-masked), in id order from just after
+    `resume_after`, wrapping around to it; from the top when None."""
+    users = db.collection("users")
+    if not resume_after:
+        yield from users.select(fields).stream()
+        return
+    cursor = {"__name__": resume_after}
+    yield from users.select(fields).order_by("__name__").start_after(cursor).stream()
+    yield from users.select(fields).order_by("__name__").end_at(cursor).stream()
 
 
 def run_digest_check(budget_s: float = DIGEST_TICK_BUDGET_S) -> dict:
     """
     Scheduled entry point. Walks every user, sends a digest to those who are
     due, records each attempt (see _period_open), and stops starting new
-    users once `budget_s` is spent (they catch up next tick). Returns a
-    summary report (mirrors run_reminder_check's shape).
+    users once `budget_s` is spent (they catch up next tick, which starts
+    after the last user this one started). Returns a summary report (mirrors
+    run_reminder_check's shape).
     """
     db = get_db()
     logger.info("Starting digest check…")
@@ -909,9 +1017,11 @@ def run_digest_check(budget_s: float = DIGEST_TICK_BUDGET_S) -> dict:
     # timezone, lastDigestSentAt, fcmTokens, and the run stamps — never the
     # rest of the user doc. Because these fields cover the full send path, no
     # per-DUE-user re-fetch is needed.
-    scan = db.collection("users").select(
-        ["settings", "timezone", "lastDigestSentAt", "fcmTokens", "digestRun", "synthesisRun"]
-    ).stream()
+    resume_after = _walk_resume_after(db)
+    last_started = None
+    scan = _user_walk(
+        db, ["settings", "timezone", "lastDigestSentAt", "fcmTokens", "digestRun", "synthesisRun"],
+        resume_after)
     for user_doc in scan:
         if time.monotonic() - started > budget_s:
             report["deferred"] = True
@@ -919,6 +1029,7 @@ def run_digest_check(budget_s: float = DIGEST_TICK_BUDGET_S) -> dict:
             break
         report["users_checked"] += 1
         uid = user_doc.id
+        last_started = uid
         user_data = user_doc.to_dict() or {}
         settings = _settings_of(user_data)
 
@@ -933,14 +1044,17 @@ def run_digest_check(budget_s: float = DIGEST_TICK_BUDGET_S) -> dict:
                 period = digest_due_at(settings, user_data.get("timezone"),
                                        user_data.get("lastDigestSentAt"), user_data.get("digestRun"))
                 if period is not None:
-                    res = build_and_send_digest(uid, user_data, force=False, period=period)
-                    _record_run(db, uid, "digestRun", run_settled(res))
+                    res = build_and_send_digest(
+                        uid, user_data, force=False, period=period,
+                        push_hold=push_hold_reason(period, user_data.get("timezone")))
+                    _record_run(db, uid, "digestRun", run_settled(res),
+                                period, user_data.get("digestRun"))
                     if res.get("sent"):
                         report["digests_sent"] += 1
                         report["cards_delivered"] += res.get("card_count", 0)
             except Exception as e:
                 if period is not None:
-                    _record_run(db, uid, "digestRun", False)
+                    _record_run(db, uid, "digestRun", False, period, user_data.get("digestRun"))
                 err = f"Digest failed for {mask_uid(uid)}: {e}"
                 logger.error(err)
                 report["errors"].append(err)
@@ -957,16 +1071,25 @@ def run_digest_check(budget_s: float = DIGEST_TICK_BUDGET_S) -> dict:
             if target is not None:
                 synth_res = build_and_send_synthesis(
                     uid, user_data, None, force=False,
-                    week_id=_week_id(target.astimezone(timezone.utc)))
-                _record_run(db, uid, "synthesisRun", run_settled(synth_res))
+                    week_id=_week_id(target.astimezone(timezone.utc)),
+                    push_hold=push_hold_reason(target, user_data.get("timezone")))
+                _record_run(db, uid, "synthesisRun", run_settled(synth_res),
+                            target, user_data.get("synthesisRun"))
                 if synth_res.get("sent"):
                     report["syntheses_sent"] += 1
         except Exception as e:
             if target is not None:
-                _record_run(db, uid, "synthesisRun", False)
+                _record_run(db, uid, "synthesisRun", False, target, user_data.get("synthesisRun"))
             err = f"Synthesis failed for {mask_uid(uid)}: {e}"
             logger.error(err)
             report["errors"].append(err)
+
+    # Keep the walk's place: a deferred tick hands the next one the users
+    # after the last it started; a full lap starts the next walk at the top.
+    if report["deferred"] and last_started:
+        _save_walk_resume_after(db, last_started)
+    elif not report["deferred"] and resume_after:
+        _save_walk_resume_after(db, None)
 
     logger.info(f"Digest check complete: {report}")
     return report

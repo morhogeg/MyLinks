@@ -204,7 +204,7 @@ def test_legacy_synthesis_mode_still_routes_to_the_synthesis_path(monkeypatch):
     # start getting a curated digest instead of their recap.
     routed = {}
 
-    def fake_synthesis(uid, user_data, links, force=False, week_id=None):
+    def fake_synthesis(uid, user_data, links, force=False, week_id=None, push_hold=None):
         routed["uid"] = uid
         routed["links"] = links
         return {"uid": uid, "sent": True, "channels": ["in_app"], "card_count": 3,

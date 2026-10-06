@@ -20,7 +20,7 @@ from google.cloud.firestore_v1.vector import Vector
 from google.cloud.firestore_v1.base_vector_query import DistanceMeasure
 from google import genai
 
-from db import get_db
+from db import get_db, SCHEDULER_STATE_COLLECTION
 from models import UNANALYZED_STATUSES
 from log_safe import mask_uid
 from ai_service import (embedding_needs_repair, collect_notes_text, _is_retryable_error,
@@ -1927,9 +1927,7 @@ EMBED_REPAIR_SCAN = 50
 EMBED_REPAIR_BACKOFF_MS = 60 * 60 * 1000
 _REPAIR_STAMP = "embedRepairRequestedAt"
 _repair_query_warned = False
-# Server-only bookkeeping for scheduled sweeps (no client rule allows it).
-SCHEDULER_STATE_COLLECTION = "scheduler_state"
-_REPAIR_STATE_DOC = "embedRepair"
+_REPAIR_STATE_DOC = "embedRepair"  # in SCHEDULER_STATE_COLLECTION (db.py)
 
 
 def _repair_cursor(state_ref) -> Optional[str]:

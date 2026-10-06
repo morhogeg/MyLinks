@@ -88,7 +88,8 @@ def test_digest_scan_survives_a_non_map_settings_value(monkeypatch):
     monkeypatch.setattr(ds, "synthesis_due_at", lambda *a, **k: None)
     sent = []
     monkeypatch.setattr(ds, "build_and_send_digest",
-                        lambda uid, user_data, force=False, period=None: sent.append(uid) or {"sent": True, "card_count": 1})
+                        lambda uid, user_data, force=False, period=None, push_hold=None:
+                        sent.append(uid) or {"sent": True, "card_count": 1})
 
     report = ds.run_digest_check()
 

@@ -81,7 +81,7 @@ def test_slim_scan_uses_field_mask_and_streams(monkeypatch):
 
     sent_for = []
 
-    def fake_build(uid, user_data, force=False, period=None):
+    def fake_build(uid, user_data, force=False, period=None, push_hold=None):
         sent_for.append((uid, period))
         # The send path must find its fields present in the masked doc.
         assert "settings" in user_data
