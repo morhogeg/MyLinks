@@ -260,7 +260,7 @@ _COMPLETE_TAIL = ('.', '!', '?', '…', ':', ';', ')', ']', '"', "'", '”', '�
                   '】', '〉', '》')
 # Trailing code points that only modify the character before them (emoji
 # variation selectors, zero-width joiner): look past them at the real last one.
-_TAIL_MODIFIERS = '️︎‍'
+_TAIL_MODIFIERS = '\ufe0f\ufe0e\u200d'
 
 
 def _ends_complete(t: str) -> bool:

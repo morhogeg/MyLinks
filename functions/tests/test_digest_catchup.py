@@ -228,4 +228,9 @@ def test_send_digests_runs_on_a_real_timeout():
         assert endpoint.timeoutSeconds == 540
     else:  # offline stub decorator: check the declaration itself
         assert 'schedule="*/5 * * * *", max_instances=1, timeout_sec=540' in open(main.__file__).read()
-    assert ds.DIGEST_TICK_BUDGET_S < ds.DIGEST_CADENCE_MINUTES * 60
+    # The last user a tick starts (worst case: a synthesis, i.e. two model
+    # calls plus the backoff, plus ~30s of reads and the push) still finishes
+    # before the next tick, so two ticks never work on the same user at once.
+    import ai_service
+    worst_user_s = ai_service.SYNTHESIS_CALL_TIMEOUT_MS * ai_service.SYNTHESIS_ATTEMPTS / 1000 + 4 + 30
+    assert ds.DIGEST_TICK_BUDGET_S + worst_user_s < ds.DIGEST_CADENCE_MINUTES * 60

@@ -384,8 +384,8 @@ def _write_inapp_synthesis(uid: str, synth: dict, cards: List[dict], week_id: st
     is the upgrade moment.
 
     Returns True on a successful write, False if it failed — the caller gates
-    `sent`/`lastDigestSentAt` on this so a swallowed write error isn't reported
-    as a delivered synthesis (which would also suppress the next retry).
+    `sent` on this so a swallowed write error isn't reported as a delivered
+    synthesis (which would also settle the period and suppress the retry).
     """
     by_id = _card_index(cards)
     referenced_ids = set()
@@ -498,8 +498,8 @@ def build_and_send_synthesis(uid: str, user_data: dict, links: Optional[List[dic
     result["locked"] = not pro
 
     # Primary surface: write the in-app special card. If this fails, the
-    # synthesis wasn't delivered — don't report it sent or stamp the send time
-    # (that would suppress the next retry). Mirrors build_and_send_digest.
+    # synthesis wasn't delivered — don't report it sent (that would settle the
+    # period and suppress the next retry). Mirrors build_and_send_digest.
     if not _write_inapp_synthesis(uid, synth, cards, week_id, pro=pro):
         result["skipped"] = "write_failed"
         return result
@@ -862,11 +862,13 @@ def is_due(settings: dict, tz_name: Optional[str], last_sent_ms: Optional[int],
     return digest_due_at(settings, tz_name, last_sent_ms, last_run) is not None
 
 
-# How long one scheduler tick may spend starting deliveries. Kept under the
-# 5-minute cadence on purpose: a tick that ends before the next one starts can
-# never race it into a double send, and anyone it did not reach is still in
-# their catch-up window next tick. send_digests' timeout_sec is the backstop.
-DIGEST_TICK_BUDGET_S = 240
+# How long one scheduler tick may spend starting deliveries. Kept well under
+# the 5-minute cadence on purpose: the last user a tick starts can still take
+# about a minute (a synthesis is up to two 25s model calls plus reads and a
+# push), and a tick that ends before the next one starts can never race it
+# into a double send. Anyone it did not reach is still in their catch-up
+# window next tick. send_digests' timeout_sec is the backstop.
+DIGEST_TICK_BUDGET_S = 180
 
 
 def _record_run(db, uid: str, field: str, ok: bool) -> None:

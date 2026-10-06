@@ -6847,7 +6847,8 @@ def force_check_reminders(req: https_fn.Request) -> https_fn.Response:
 # minute. MUST stay in sync with digest_service.DIGEST_CADENCE_MINUTES.
 # timeout_sec: the 60s default killed a tick mid-walk as soon as one weekly
 # synthesis (a model call) ran long. The walk itself stops starting new users
-# after DIGEST_TICK_BUDGET_S (240s, under the cadence); 540s is the backstop.
+# after DIGEST_TICK_BUDGET_S (180s, so even a slow last user ends before the
+# next tick); 540s is the backstop.
 @scheduler_fn.on_schedule(schedule="*/5 * * * *", max_instances=1, timeout_sec=540)
 def send_digests(event: scheduler_fn.ScheduledEvent) -> None:
     """Every 5 min: deliver curated digests to users whose schedule is due now."""

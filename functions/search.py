@@ -775,10 +775,11 @@ KEYWORD_SCAN_CAP = 1000
 # — megabytes per query, and the dominant cost of a 5-10s search (owner QA,
 # 2026-08-07). The search bar only needs what scores the card (keyword_match_score),
 # ranks it (rerank_candidates) and identifies it, so it asks Firestore for
-# exactly those fields. NOT used by ask_brain, which grounds its answer in the
-# full card body and must keep fetching complete documents. `isPrivate` and
-# `collectionIds` ride along for the privacy strip: without them a private card
-# found by its words came back looking public, and no later filter could tell.
+# exactly those fields. ask_brain, which grounds its answer in the full card
+# body, scans with the same projection and then fetches only the winners whole
+# (keyword_scan_full). `isPrivate` and `collectionIds` ride along for the
+# privacy strip: without them a private card found by its words came back
+# looking public, and no later filter could tell.
 SEARCH_SCAN_FIELDS = [
     "title", "summary", "tags", "concepts", "sourceName", "category",
     "userNote", "userNotes", "createdAt", "status", "isPrivate", "collectionIds",

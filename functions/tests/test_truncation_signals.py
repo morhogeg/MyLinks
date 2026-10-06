@@ -18,7 +18,8 @@ from ai_service import _analysis_cut_off, _text_cut_off
 
 @pytest.mark.parametrize("text", [
     "これはテストです。", "本当ですか？", "素晴らしい！", "यह सही है।", "هل هذا صحيح؟",
-    "اردو کا جملہ۔", "Il a dit «oui»", "Great week 🎉", "Done 👍🏽", "With love ❤️",
+    "اردو کا جملہ۔", "Il a dit «oui»", "Great week 🎉", "Done 👍🏽",
+    "With love \u2764\ufe0f",  # heart + emoji variation selector
     "「引用」", "（注）",
 ])
 def test_whole_summaries_in_other_scripts_are_not_cut(text):
