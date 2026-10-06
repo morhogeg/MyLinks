@@ -161,7 +161,7 @@ export default function CollectionsGallery({
                             )}
                             {/* Public badge. */}
                             {c.isPublic && !c.isPrivate && (
-                                <span className="absolute top-2 start-2 flex items-center gap-1 px-1.5 py-0.5 rounded-full backdrop-blur-sm bg-black/55 text-[9px] font-bold uppercase tracking-wide text-white">
+                                <span className="absolute top-2 start-2 flex items-center gap-1 px-1.5 py-0.5 rounded-full backdrop-blur-sm bg-black/55 text-[10px] font-bold uppercase tracking-wide text-white">
                                     <Globe className="w-2.5 h-2.5" /> Shared
                                 </span>
                             )}
@@ -230,7 +230,7 @@ export default function CollectionsGallery({
                             </span>
                         )}
                         {s.thumbnails.length > 0 && <div className="absolute inset-0 bg-gradient-to-t from-card/90 to-transparent" />}
-                        <span className="absolute top-2 start-2 flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-accent/85 text-[9px] font-bold uppercase tracking-wide text-accent-ink">
+                        <span className="absolute top-2 start-2 flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-accent/85 text-[10px] font-bold uppercase tracking-wide text-accent-ink">
                             <CitationGlyph className="w-2.5 h-2.5" /> Suggested
                         </span>
                         {onDismissSuggestion && (

@@ -272,7 +272,7 @@ function ListCard({
                         {/* Category chip — secondary labeling next to the source;
                             the colour bar on the row edge is the primary cue (M-P3). */}
                         <span
-                            className="shrink-0 max-w-[120px] px-1.5 py-px rounded-full text-[9px] leading-4 font-bold uppercase tracking-wider truncate"
+                            className="shrink-0 max-w-[120px] px-1.5 py-px rounded-full text-[10px] leading-4 font-bold uppercase tracking-wider truncate"
                             style={{ backgroundColor: colorStyle.backgroundColor, color: colorStyle.color }}
                             title={link.category}
                         >

@@ -534,7 +534,7 @@ function Card({
                         {isMeaningMatch && (
                             <span
                                 title="Found by meaning, not by matching words"
-                                className="shrink-0 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-accent/12 text-accent"
+                                className="shrink-0 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-accent/12 text-accent"
                             >
                                 Meaning
                             </span>
@@ -658,7 +658,7 @@ function Card({
                                         e.stopPropagation();
                                         onTagClick?.(tag);
                                     }}
-                                    className="relative z-10 inline-flex items-center text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-fill-subtle text-text-muted/60 group-hover:text-accent group-hover:bg-accent/10 hover:!bg-accent/20 hover:!text-accent active:scale-95 transition-all border border-transparent group-hover:border-accent/10 cursor-pointer after:absolute after:-inset-x-[3px] after:-inset-y-2"
+                                    className="relative z-10 inline-flex items-center text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-fill-subtle text-text-muted/60 group-hover:text-accent group-hover:bg-accent/10 hover:!bg-accent/20 hover:!text-accent active:scale-95 transition-all border border-transparent group-hover:border-accent/10 cursor-pointer after:absolute after:-inset-x-[3px] after:-inset-y-2"
                                 >
                                     {parents && <span className="opacity-40 font-normal me-0.5">{parents}/</span>}
                                     {leaf}

@@ -648,7 +648,7 @@ export default function LinkDetailModal({
                                     onClick={goBack}
                                     title="Back to previous card"
                                     aria-label="Back to previous card"
-                                    className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-text-muted hover:text-text hover:bg-card-hover transition-colors"
+                                    className="shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl flex items-center justify-center text-text-muted hover:text-text hover:bg-card-hover transition-colors"
                                 >
                                     <ChevronLeft className="w-5 h-5" />
                                 </button>
@@ -667,7 +667,7 @@ export default function LinkDetailModal({
                                     onClick={onClose}
                                     title={`Back to ${backTo}`}
                                     aria-label={`Back to ${backTo}`}
-                                    className="shrink-0 h-10 ps-1.5 pe-2.5 rounded-xl flex items-center gap-0.5 text-text-muted hover:text-text hover:bg-card-hover transition-colors"
+                                    className="shrink-0 h-10 pointer-coarse:h-11 ps-1.5 pe-2.5 rounded-xl flex items-center gap-0.5 text-text-muted hover:text-text hover:bg-card-hover transition-colors"
                                 >
                                     <ChevronLeft className="w-5 h-5 rtl:rotate-180" />
                                     <span className="text-[13px] font-medium">{backTo}</span>
@@ -679,7 +679,7 @@ export default function LinkDetailModal({
                             onClick={() => onReadStatusChange(link.id, !link.isRead)}
                             title={link.isRead ? 'Mark as unread' : 'Mark as read'}
                             aria-label={link.isRead ? 'Mark as unread' : 'Mark as read'}
-                            className={`shrink-0 h-10 w-10 rounded-xl flex items-center justify-center transition-colors ${link.isRead
+                            className={`shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl flex items-center justify-center transition-colors ${link.isRead
                                 ? 'bg-card-hover text-text'
                                 : 'text-text-muted/50 hover:text-text hover:bg-card-hover'
                                 }`}
@@ -697,7 +697,7 @@ export default function LinkDetailModal({
                             // marker, which has never had a container. The reminder
                             // button below KEEPS its blue chip — a bell has no fill
                             // state, so there the background is the only signal.
-                            className={`shrink-0 h-10 w-10 rounded-xl flex items-center justify-center transition-colors ${link.status === 'favorite'
+                            className={`shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl flex items-center justify-center transition-colors ${link.status === 'favorite'
                                 ? 'text-star'
                                 : 'text-text-muted hover:text-star hover:bg-card-hover'
                                 }`}
@@ -708,7 +708,7 @@ export default function LinkDetailModal({
                             onClick={handleToggleReminder}
                             title={isReminderActive ? `Reminder active (next: ${nextReminderDate?.toLocaleDateString()})` : 'Set reminder'}
                             aria-label={isReminderActive ? 'Reminder active' : 'Set reminder'}
-                            className={`shrink-0 h-10 w-10 rounded-xl flex items-center justify-center transition-colors ${isReminderActive
+                            className={`shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl flex items-center justify-center transition-colors ${isReminderActive
                                 ? 'bg-blue-500/10 text-blue-500'
                                 : 'text-text-muted hover:text-blue-500 hover:bg-card-hover'
                                 }`}
@@ -724,7 +724,7 @@ export default function LinkDetailModal({
                                 onClick={() => onAddToCollection(link)}
                                 title="Add to collection"
                                 aria-label="Add to collection"
-                                className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors"
+                                className="shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl flex items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors"
                             >
                                 <Layers className="w-[18px] h-[18px]" />
                             </button>
@@ -734,7 +734,7 @@ export default function LinkDetailModal({
                                 onClick={() => onShare(link)}
                                 title="Share"
                                 aria-label="Share this card"
-                                className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors"
+                                className="shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl flex items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors"
                             >
                                 <Share2 className="w-[18px] h-[18px]" />
                             </button>
@@ -746,7 +746,7 @@ export default function LinkDetailModal({
                                 onClick={() => onShare(link, 'update')}
                                 title="Update public link"
                                 aria-label="Update public link"
-                                className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors"
+                                className="shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl flex items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors"
                             >
                                 <RefreshCw className="w-[18px] h-[18px]" />
                             </button>
@@ -756,7 +756,7 @@ export default function LinkDetailModal({
                                 onClick={() => onShare(link, 'stop')}
                                 title="Stop sharing"
                                 aria-label="Stop sharing this card"
-                                className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors"
+                                className="shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl flex items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors"
                             >
                                 <Link2Off className="w-[18px] h-[18px]" />
                             </button>
@@ -773,7 +773,7 @@ export default function LinkDetailModal({
                                    for no reason a reader could decode. State now
                                    shows as icon + a brighter glyph, and hover
                                    matches every sibling. */
-                                className={`shrink-0 h-10 w-10 rounded-xl flex items-center justify-center transition-colors hover:text-accent hover:bg-card-hover ${link.hideThumbnail ? 'text-text' : 'text-text-muted'
+                                className={`shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl flex items-center justify-center transition-colors hover:text-accent hover:bg-card-hover ${link.hideThumbnail ? 'text-text' : 'text-text-muted'
                                     }`}
                             >
                                 {link.hideThumbnail ? <ImageIcon className="w-[18px] h-[18px]" /> : <ImageOff className="w-[18px] h-[18px]" />}
@@ -793,7 +793,7 @@ export default function LinkDetailModal({
                         onClick={() => onDelete(link.id)}
                         title="Delete"
                         aria-label="Delete"
-                        className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-text-muted hover:text-danger hover:bg-danger/10 transition-colors"
+                        className="shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl flex items-center justify-center text-text-muted hover:text-danger hover:bg-danger/10 transition-colors"
                     >
                         <Trash2 className="w-[18px] h-[18px]" />
                     </button>
@@ -804,7 +804,7 @@ export default function LinkDetailModal({
                             rel="noopener noreferrer"
                             title={link.sourceType === 'image' ? 'View original image' : 'Open source'}
                             aria-label={link.sourceType === 'image' ? 'View original image' : 'Open source'}
-                            className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors"
+                            className="shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl flex items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors"
                         >
                             <ExternalLink className="w-[18px] h-[18px]" />
                         </a>
@@ -813,7 +813,7 @@ export default function LinkDetailModal({
                         onClick={onClose}
                         aria-label="Close"
                         title="Close"
-                        className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-text-muted hover:text-text hover:bg-card-hover transition-colors"
+                        className="shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl flex items-center justify-center text-text-muted hover:text-text hover:bg-card-hover transition-colors"
                     >
                         <X className="w-[18px] h-[18px]" />
                     </button>
@@ -1067,7 +1067,7 @@ export default function LinkDetailModal({
                                                         setIsEditingCategory(true);
                                                     }}
                                                     aria-label="Edit category"
-                                                    className="opacity-0 group-hover/cat:opacity-100 transition-opacity p-1.5 -ms-1.5 hover:bg-fill-subtle rounded-md"
+                                                    className="opacity-0 group-hover/cat:opacity-100 [@media(hover:none)]:opacity-60 focus-visible:opacity-100 transition-opacity p-1.5 -ms-1.5 hover:bg-fill-subtle rounded-md"
                                                 >
                                                     <Pencil className="w-3.5 h-3.5 text-text-muted/40 hover:text-text-muted" />
                                                 </button>
@@ -1160,7 +1160,7 @@ export default function LinkDetailModal({
                                     onClick={() => { if (isSingleFieldNote) startEditNoteCard(); else { setTitleDraft(link.title); setIsEditingTitle(true); } }}
                                     aria-label={isSingleFieldNote ? 'Edit note' : 'Edit title'}
                                     title={isSingleFieldNote ? 'Edit note' : 'Edit title'}
-                                    className={`inline-flex items-center justify-center align-middle ms-2 w-7 h-7 rounded-lg text-text-muted hover:text-text hover:bg-fill-subtle focus:opacity-100 transition-colors ${isNote ? '' : 'opacity-0 group-hover/title:opacity-100 transition-opacity'}`}
+                                    className={`inline-flex items-center justify-center relative align-middle ms-2 w-7 h-7 after:absolute after:-inset-2 rounded-lg text-text-muted hover:text-text hover:bg-fill-subtle focus:opacity-100 transition-colors ${isNote ? '' : 'opacity-0 group-hover/title:opacity-100 [@media(hover:none)]:opacity-60 transition-opacity'}`}
                                 >
                                     <Pencil className="w-[18px] h-[18px]" />
                                 </button>
@@ -1248,7 +1248,7 @@ export default function LinkDetailModal({
                                                                 onClick={startEditSummary}
                                                                 aria-label="Edit summary"
                                                                 title="Edit summary"
-                                                                className={`absolute top-0 inline-flex items-center justify-center w-8 h-8 rounded-lg text-text-muted hover:text-text hover:bg-fill-subtle opacity-0 group-hover/summary:opacity-100 focus:opacity-100 transition-opacity ${isRtl ? 'left-0' : 'right-0'}`}
+                                                                className={`absolute top-0 inline-flex items-center justify-center w-8 h-8 after:absolute after:-inset-1.5 rounded-lg text-text-muted hover:text-text hover:bg-fill-subtle opacity-0 group-hover/summary:opacity-100 [@media(hover:none)]:opacity-60 focus:opacity-100 transition-opacity ${isRtl ? 'left-0' : 'right-0'}`}
                                                             >
                                                                 <Pencil className="w-4 h-4" />
                                                             </button>
@@ -1648,7 +1648,7 @@ export default function LinkDetailModal({
                                                         {getTimeAgo(n.updatedAt ?? n.createdAt, now)}
                                                     </span>
                                                 </div>
-                                                <div className={`absolute top-2 flex items-center gap-0.5 opacity-0 group-hover/note:opacity-100 focus-within:opacity-100 transition-opacity ${isRtl ? 'left-2' : 'right-2'}`}>
+                                                <div className={`absolute top-2 flex items-center gap-0.5 opacity-0 group-hover/note:opacity-100 [@media(hover:none)]:opacity-60 focus-within:opacity-100 transition-opacity ${isRtl ? 'left-2' : 'right-2'}`}>
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); startEditNote(n); }}
                                                         aria-label="Edit note"

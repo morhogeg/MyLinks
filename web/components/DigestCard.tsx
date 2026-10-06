@@ -197,7 +197,7 @@ export function ResurfacedCardRow({ card, onOpen, trailing }: {
                     <SourceByline link={{ url: card.url ?? undefined, sourceName: card.sourceName ?? undefined }} />
                     {card.category && (
                         <span
-                            className="shrink-0 max-w-[120px] px-1.5 py-px rounded-full text-[9px] leading-4 font-bold uppercase tracking-wider truncate"
+                            className="shrink-0 max-w-[120px] px-1.5 py-px rounded-full text-[10px] leading-4 font-bold uppercase tracking-wider truncate"
                             style={{ backgroundColor: colorStyle.backgroundColor, color: colorStyle.color }}
                             title={card.category}
                         >

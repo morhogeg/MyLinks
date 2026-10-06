@@ -367,7 +367,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                     {!showBack && (
                         <button
                             onClick={closeSettings}
-                            className="h-8 w-8 flex items-center justify-center text-text-muted hover:text-text transition-colors cursor-pointer"
+                            className="relative h-8 w-8 after:absolute after:-inset-1.5 flex items-center justify-center text-text-muted hover:text-text transition-colors cursor-pointer"
                             aria-label="Close settings"
                         >
                             <X className="w-[17px] h-[17px]" strokeWidth={2.3} />
