@@ -21,6 +21,7 @@ Rules this module keeps:
 
 import logging
 import re
+from datetime import datetime, timezone
 from typing import Iterable, List, Optional, Set
 from urllib.parse import unquote, urlsplit
 
@@ -110,9 +111,10 @@ def _unpublish_card_share(db, uid: str, share_id) -> bool:
         return False  # already stopped: idempotent re-delivery
     # Same effect as share_service._unpublish_share_logic (page gone, owner
     # row tombstoned so the id stays this owner's), but the tombstone is an
-    # UPDATE, not a merge-set: if account deletion removed the owner row in
-    # the meantime, the batch fails instead of re-creating a row that names a
-    # deleted account (account deletion then removes the page itself).
+    # UPDATE, not a merge-set: it must never re-create a row that names a
+    # deleted account. (Account deletion retires the row to an ownerless
+    # tombstone and removes the page itself; racing it, this only restamps
+    # that tombstone.)
     from datetime import datetime, timezone
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     batch = db.batch()
@@ -121,6 +123,21 @@ def _unpublish_card_share(db, uid: str, share_id) -> bool:
     batch.commit()
     _delete_share_previews(share_id)
     return True
+
+
+def _account_sweep_running(user_data: dict) -> bool:
+    """True while an account deletion is sweeping this workspace. Only a
+    recent `deletingAt` counts: a sweep that died part-way used to leave
+    `deleting` set for good, and every card deleted afterwards kept its
+    public page and its images (launch audit ACCT-6)."""
+    if not user_data.get("deleting"):
+        return False
+    started = user_data.get("deletingAt")
+    if isinstance(started, bool) or not isinstance(started, (int, float)):
+        return False
+    from link_service import DELETING_FLAG_TTL_MS
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    return now_ms - started < DELETING_FLAG_TTL_MS
 
 
 def cleanup_deleted_card_logic(uid: str, link_id: str, data: Optional[dict]) -> dict:
@@ -145,7 +162,7 @@ def cleanup_deleted_card_logic(uid: str, link_id: str, data: Optional[dict]) -> 
         # Account deletion in progress/done: it sweeps shares and blobs itself.
         report["skipped"] = "no-user"
         return report
-    if (user_snap.to_dict() or {}).get("deleting"):
+    if _account_sweep_running(user_snap.to_dict() or {}):
         # delete_user_data flags the workspace before it deletes the cards
         # (the user doc goes last), so its per-card deletes land here while
         # the doc still exists. The account sweep owns that cleanup.

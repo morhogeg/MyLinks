@@ -278,6 +278,9 @@ class _SweepDoc:
     def delete(self):
         self._log.append(f"{self._coll}/{self.id}")
 
+    def set(self, data, merge=False):
+        self._log.append(f"set:{self._coll}/{self.id}:{data.get('ownerUid')}")
+
     def get(self):
         return self
 
@@ -378,7 +381,9 @@ def test_delete_user_data_sweeps_everything(monkeypatch):
     for path in ("pending_processing/p1", "task_logs/t1", "entitlements/ws-1",
                  "usage_quotas/ws-1", "synthesis_vault/ws-1__2026-W30",
                  "shared_cards/share-a", "shared_answers/share-b",
-                 "shared_owners/share-a", "shared_owners/share-b",
+                 # Owner rows are retired to an ownerless tombstone, not
+                 # deleted (ACCT-3): the circulated ids stay claimed.
+                 "set:shared_owners/share-a:__deleted__", "set:shared_owners/share-b:__deleted__",
                  "previews/share-a", "previews/share-b", "users/ws-1"):
         assert path in log, path
 

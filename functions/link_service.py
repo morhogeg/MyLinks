@@ -253,10 +253,42 @@ def delete_user_data(uid: str) -> int:
     # the still-present user doc and run a per-card share/blob cleanup that
     # this sweep already owns (card_cleanup skips while this flag is set).
     # update(), not set(): a workspace doc that is already gone stays gone.
+    # `deletingAt` bounds the flag (card_cleanup honours it for
+    # DELETING_FLAG_TTL_MS only): a sweep that dies part-way used to leave
+    # `deleting` set for good, and every card the user deleted afterwards
+    # kept its public page and its images (launch audit ACCT-6).
     try:
-        user_ref.update({'deleting': True})
+        user_ref.update({'deleting': True, 'deletingAt': _now_ms()})
     except Exception as e:
-        logger.info(f"Could not flag workspace as deleting (continuing): {e}")
+        logger.info(f"Could not flag workspace as deleting (continuing): {type(e).__name__}")
+    try:
+        deleted += _sweep_workspace(db, uid, user_ref)
+    except Exception:
+        # The account stays (the caller keeps the Auth user so a retry can
+        # finish): give its card cleanup back.
+        try:
+            user_ref.update({'deleting': firestore.DELETE_FIELD, 'deletingAt': firestore.DELETE_FIELD})
+        except Exception:
+            pass
+        raise
+    user_ref.delete()
+    deleted += 1
+    logger.info(f"Deleted {deleted} docs for user workspace")
+    return deleted
+
+
+# How long card_cleanup trusts a workspace's `deleting` flag. A real sweep
+# finishes well inside it; an older flag is a sweep that died.
+DELETING_FLAG_TTL_MS = 10 * 60 * 1000
+
+
+def _now_ms() -> int:
+    return int(datetime.now(timezone.utc).timestamp() * 1000)
+
+
+def _sweep_workspace(db, uid: str, user_ref) -> int:
+    """Everything delete_user_data removes before the user doc itself."""
+    deleted = 0
     # Subcollections survive the parent user doc's deletion and must each be
     # swept explicitly: the M12 weekly recaps, the user's margin notes on
     # them, in-app digests, self-hosted analytics and crash reports.
@@ -281,9 +313,6 @@ def delete_user_data(uid: str) -> int:
     # deleted account's /s, /c and /a pages stayed live forever with nobody
     # able to unpublish them.
     deleted += delete_shares_for_owner(uid)
-    user_ref.delete()
-    deleted += 1
-    logger.info(f"Deleted {deleted} docs for user workspace")
     return deleted
 
 
@@ -308,10 +337,27 @@ _SHARE_TYPE_COLLECTIONS = {
 }
 
 
+_LEGACY_SHARE_TYPES = {"shared_cards": "card", "shared_collections": "collection"}
+
+# Owner of a share id whose account was deleted. Matches no account.
+DELETED_SHARE_OWNER = "__deleted__"
+
+
+def _retire_owner_row(ref, share_type) -> None:
+    """Overwrite a deleted account's `shared_owners` row with an ownerless
+    tombstone. Deleting the row freed the id: a circulated /s, /c or /a link
+    keeps naming it, so any other account could publish its own page under
+    it and every old copy of the link would show that page (launch audit
+    ACCT-3; unpublish keeps a tombstone for the same reason). The new row
+    holds no uid, so nothing of the deleted account remains in it."""
+    ref.set({"ownerUid": DELETED_SHARE_OWNER, "type": share_type, "unpublishedAt": _now_ms()})
+
+
 def delete_shares_for_owner(uid: str) -> int:
-    """Delete every public share owned by `uid` (snapshot + owner map +
-    previews). Returns the number of docs deleted; best-effort per share so
-    one failure never blocks the rest of the account deletion."""
+    """Delete every public share owned by `uid` (snapshot + previews) and
+    retire its owner row (see _retire_owner_row). Returns the number of docs
+    removed; best-effort per share so one failure never blocks the rest of
+    the account deletion."""
     db = get_db()
     deleted = 0
     owners = db.collection('shared_owners').where(filter=FieldFilter('ownerUid', '==', uid)).stream()
@@ -330,7 +376,7 @@ def delete_shares_for_owner(uid: str) -> int:
             else:
                 db.collection(public_coll).document(share_id).delete()
                 deleted += 1
-            owner_doc.reference.delete()
+            _retire_owner_row(owner_doc.reference, share_type)
             deleted += 1
             try:
                 from share_service import _delete_share_previews
@@ -351,10 +397,9 @@ def delete_shares_for_owner(uid: str) -> int:
                 try:
                     doc.reference.delete()
                     deleted += 1
-                    owner_ref = db.collection('shared_owners').document(doc.id)
-                    if owner_ref.get().exists:
-                        owner_ref.delete()
-                        deleted += 1
+                    _retire_owner_row(db.collection('shared_owners').document(doc.id),
+                                      _LEGACY_SHARE_TYPES[coll])
+                    deleted += 1
                     try:
                         from share_service import _delete_share_previews
                         _delete_share_previews(doc.id)
