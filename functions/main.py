@@ -3255,10 +3255,38 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
 # Share Ingestion (iOS Share Extension / browser extension)
 # ─────────────────────────────────────────────
 
-_URL_IN_TEXT_RE = re.compile(r'https?://[^\s<>"]+', re.I)
+# CJK punctuation (U+3000-303F: 。、「」 and the ideographic space) and the
+# full/halfwidth forms (U+FF00-FFEF: ，．（）) end a URL: Chinese and Japanese
+# text puts no space after a link, so "…/article。谢谢" used to save the whole
+# run as the URL (a 404, a FAILED card). web/components/AddLinkForm.tsx
+# formatUrl mirrors both rules.
+_URL_IN_TEXT_RE = re.compile(r'https?://[^\s<>"　-〿＀-￯]+', re.I)
 # Punctuation that ends a sentence around a URL, never the URL itself:
-# "read this (https://a.com/x)." must save https://a.com/x.
-_URL_TRAILING_PUNCT = ').,;:!?"\'”’»]>'
+# "read this (https://a.com/x)." must save https://a.com/x. Includes the
+# ellipsis and the Hebrew gershayim/geresh (״ ׳) Hebrew text puts after one.
+_URL_TRAILING_PUNCT = ').,;:!?"\'”’»]>…״׳'
+# A shared `url` value with no scheme: a host with a dot in it, an optional
+# port and path, no spaces ("www.nytimes.com/2026/…", "example.com/a"). The
+# iOS Share Extension sends `{"url": s}` when the URL item arrives as such a
+# string; it is saved as https://… instead of failing "No URL or text found".
+_BARE_HOST_URL_RE = re.compile(r'(?:[\w-]+\.)+[^\W\d_]{2,}(?::\d{1,5})?(?:[/?#]\S*)?')
+# Shared TEXT (no URL) is the user's own words and becomes the card's body
+# verbatim, so it is kept whole up to this many characters: even at 4 bytes
+# per character in UTF-8 that is ~800 KB, safely under Firestore's 1 MiB
+# document limit with the card's other fields. Only the first MAX_NOTE_LENGTH
+# characters go to analysis.
+MAX_SHARED_TEXT_LENGTH = 200_000
+
+
+def _with_scheme(value):
+    """A bare host/path `url` value gets https:// in front (see
+    _BARE_HOST_URL_RE); anything else is returned unchanged."""
+    if not isinstance(value, str):
+        return value
+    v = value.strip()
+    if v and "://" not in v and _BARE_HOST_URL_RE.fullmatch(v):
+        return f"https://{v}"
+    return value
 
 
 def _trim_url(raw: str) -> str:
@@ -3844,7 +3872,10 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
             )
 
         url, shared_rest, extra_urls = _split_shared_text(
-            data.get('url'), data.get('text'), data.get('shared'))
+            _with_scheme(data.get('url')), data.get('text'), data.get('shared'))
+        if url and len(url) > MAX_URL_LENGTH:
+            # The same ceiling analyze_link, analyze_image and the import hold.
+            return _error_response("URL is too long", 400, headers)
         if not url:
             # NOTE PATH — shared plain text with no URL is a first-class note card,
             # not an error. The card is written FIRST, with the text exactly as
@@ -3870,7 +3901,11 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                     return q
             else:
                 charged = (uid, "saves")
-            note_text = note_text[:MAX_NOTE_LENGTH]
+            # Kept whole (up to MAX_SHARED_TEXT_LENGTH): it was cut at 30,000
+            # characters while the response said `saved: true`. Only the
+            # analysis below reads the first MAX_NOTE_LENGTH.
+            text_cut = len(note_text) > MAX_SHARED_TEXT_LENGTH
+            note_text = note_text[:MAX_SHARED_TEXT_LENGTH]
             card_ref = get_db().collection('users').document(uid).collection('links').document()
             # verbatim: shared text is kept as the user sent it (see
             # _note_link_data). A fresh note has no vector yet — flag it so
@@ -3882,18 +3917,20 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
             card_ref.set(link_data)
             charged = None  # the card exists; _enrich_shared_note owns the unit now
             logger.info(f"Share ingest saved note for {_mask_uid(uid)}")
+            # Said, never silent: a text past the ceiling was kept only up to it.
+            cut = {"truncated": True} if text_cut else {}
             if over is not None:
                 return https_fn.Response(
                     json.dumps({"success": True, "saved": True, "id": card_ref.id, "note": True,
                                 "enriched": False, "kind": "saves",
                                 "upgrade": over["upgrade"], "used": over["used"],
-                                "limit": over["limit"]}),
+                                "limit": over["limit"], **cut}),
                     status=200, headers=headers, mimetype='application/json'
                 )
-            enriched = _enrich_shared_note(uid, card_ref, note_text)
+            enriched = _enrich_shared_note(uid, card_ref, note_text[:MAX_NOTE_LENGTH])
             return https_fn.Response(
                 json.dumps({"success": True, "saved": True, "id": card_ref.id, "note": True,
-                            "enriched": enriched}),
+                            "enriched": enriched, **cut}),
                 status=200, headers=headers, mimetype='application/json'
             )
 

@@ -43,9 +43,14 @@ interface AddLinkFormProps {
     onDialogCardChange?: (cardId: string | null) => void;
 }
 
-// Sentence punctuation that trails a pasted URL but is never part of it
-// (mirrors functions/main.py _URL_TRAILING_PUNCT).
-const URL_TRAILING_PUNCT = /[).,;:!?"'”’»\]>]+$/;
+// Sentence punctuation that trails a pasted URL but is never part of it,
+// including the ellipsis and the Hebrew gershayim/geresh (mirrors
+// functions/main.py _URL_TRAILING_PUNCT).
+const URL_TRAILING_PUNCT = /[).,;:!?"'”’»\]>…״׳]+$/;
+// A URL in pasted text. CJK punctuation (U+3000-303F) and full/halfwidth forms
+// (U+FF00-FFEF) end it: Chinese and Japanese text puts no space after a link
+// (mirrors functions/main.py _URL_IN_TEXT_RE).
+const URL_IN_TEXT = /https?:\/\/[^\s<>"　-〿＀-￯]+/i;
 
 const validHttpUrl = (candidate: string): string => {
     try {
@@ -66,7 +71,7 @@ const validHttpUrl = (candidate: string): string => {
 const formatUrl = (input: string): string => {
     const text = input.trim();
     if (!text) return '';
-    const found = text.match(/https?:\/\/[^\s<>"]+/i);
+    const found = text.match(URL_IN_TEXT);
     if (found) {
         let raw = found[0];
         const trimmed = raw.replace(URL_TRAILING_PUNCT, '');

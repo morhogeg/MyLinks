@@ -869,6 +869,80 @@ def test_a_new_daily_plan_replaces_an_unfinished_one(world):
     assert len(world.jobs()) == 60 and world.quota.used == 60
 
 
+# ── CAP-17/18/20/21: what share_ingest takes from a share ────────────────────
+
+@pytest.mark.parametrize("text,url", [
+    ("看这个 https://example.com/article。谢谢", "https://example.com/article"),
+    ("https://example.com/a，然后", "https://example.com/a"),
+    ("「https://example.com/jp」を見て", "https://example.com/jp"),
+    ("כתבה https://www.ynet.co.il/a״", "https://www.ynet.co.il/a"),
+    ("שווה https://www.ynet.co.il/x׳ קריאה", "https://www.ynet.co.il/x"),
+    ("and then https://example.com/a…", "https://example.com/a"),
+    # Letters in other scripts are part of an address: kept.
+    ("https://例え.jp/パス", "https://例え.jp/パス"),
+])
+def test_cjk_and_hebrew_punctuation_ends_a_shared_url(text, url):
+    assert main._split_shared_text(text)[0] == url
+
+
+def test_a_cjk_share_queues_the_url_without_the_sentence(env, monkeypatch):
+    from tests.test_capture_edge_cases import _json
+    _share_stubs(monkeypatch)
+    db = env.make({})
+    body = _json(_share({"text": "看这个 https://example.com/article。谢谢"}))
+    (job,) = _jobs(db).values()
+    assert body["url"] == job["url"] == "https://example.com/article"
+
+
+def test_the_web_form_mirrors_the_url_rules():
+    form = (FUNCTIONS.parent / "web/components/AddLinkForm.tsx").read_text(encoding="utf-8")
+    assert r'[^\s<>"　-〿＀-￯]+' in form
+    assert r"…״׳]+$" in form
+
+
+@pytest.mark.parametrize("raw,url", [
+    ("www.nytimes.com/2026/10/01/world/x.html", "https://www.nytimes.com/2026/10/01/world/x.html"),
+    ("example.com/article", "https://example.com/article"),
+    ("  news.ycombinator.com  ", "https://news.ycombinator.com"),
+])
+def test_a_bare_host_url_value_is_saved_with_https(env, monkeypatch, raw, url):
+    from tests.test_capture_edge_cases import _json
+    _share_stubs(monkeypatch)
+    db = env.make({})
+    resp = _share({"url": raw})
+    assert resp.status_code == 200 and _json(resp)["queued"] is True
+    (job,) = _jobs(db).values()
+    assert job["url"] == url
+
+
+@pytest.mark.parametrize("value", ["localhost/x", "1.2.3.4/x", "mailto:a@b.com", "two words.com"])
+def test_only_a_host_shaped_value_gets_a_scheme(value):
+    assert main._with_scheme(value) == value
+
+
+def test_an_overlong_shared_url_is_refused_before_any_charge(env, monkeypatch):
+    charges = []
+    _share_stubs(monkeypatch, charges)
+    db = env.make({})
+    resp = _share({"url": "https://example.com/" + "a" * main.MAX_URL_LENGTH})
+    assert resp.status_code == 400 and charges == [] and _jobs(db) == {}
+
+
+@pytest.mark.parametrize("length,kept,cut", [(40_000, 40_000, False), (250_000, 200_000, True)])
+def test_long_shared_text_is_kept_whole_and_only_its_start_analyzed(env, monkeypatch, length, kept, cut):
+    from tests.test_capture_edge_cases import _json
+    _share_stubs(monkeypatch)
+    db = env.make({})
+    analyzed = []
+    monkeypatch.setattr(main, "_enrich_shared_note",
+                        lambda uid, ref, text: analyzed.append(len(text)) or True)
+    body = _json(_share({"text": "w" * length}))
+    (card,) = _cards(db).values()
+    assert len(card["summary"]) == kept and body["saved"] is True
+    assert analyzed == [main.MAX_NOTE_LENGTH]
+    assert body.get("truncated", False) is cut
+
+
 def test_the_enrich_sweep_has_a_collection_group_index():
     import json
     overrides = json.loads((FUNCTIONS.parent / "firestore.indexes.json").read_text())["fieldOverrides"]
