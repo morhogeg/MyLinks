@@ -75,7 +75,12 @@ export const functions = getFunctions(app);
 import { initializeAppCheck, ReCaptchaV3Provider, getToken, type AppCheck } from "firebase/app-check";
 
 let appCheck: AppCheck | null = null;
-if (typeof window !== 'undefined') {
+// Browser only, as documented (SOURCE_OF_TRUTH §4 task 5): NOT inside the iOS
+// app. reCAPTCHA can't attest the WKWebView's capacitor:// origin, so with the
+// key baked into a native build every /api call would await a token fetch that
+// fails (and the reCAPTCHA badge could show). Native needs its own provider
+// (App Attest) before APPCHECK_ENFORCE can ever be turned on.
+if (typeof window !== 'undefined' && window.location.protocol !== 'capacitor:') {
     const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
     if (siteKey) {
         appCheck = initializeAppCheck(app, {
