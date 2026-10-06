@@ -841,7 +841,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                 <div className="mb-4 rounded-2xl border border-accent/25 bg-card overflow-hidden shadow-lg shadow-accent/5 animate-in fade-in slide-in-from-top-1 duration-300">
                     <div className="flex items-center gap-3 px-4 py-3 border-b border-border-subtle">
                         <div className="w-9 h-9 shrink-0 rounded-xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-md shadow-accent/20">
-                            <Bell className="w-[18px] h-[18px] text-white" />
+                            <Bell className="w-[18px] h-[18px] text-accent-ink" />
                         </div>
                         <div className="flex-grow min-w-0">
                             <div className="text-[15px] font-bold text-text">Reminders due</div>
@@ -2598,7 +2598,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             <Filter className="w-4 h-4" />
                             <span>Filter</span>
                             {activeMobileFilters > 0 && (
-                                <span className="flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold bg-white/25 text-white">
+                                <span className="flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold bg-accent-ink/15 text-accent-ink">
                                     {activeMobileFilters}
                                 </span>
                             )}

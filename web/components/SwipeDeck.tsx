@@ -442,7 +442,7 @@ export default function SwipeDeck({
                             onClick={deal}
                             className={onExit
                                 ? 'inline-flex items-center gap-2 h-10 px-4 rounded-full bg-card border border-border-subtle text-text-secondary hover:text-text hover:bg-card-hover transition-colors cursor-pointer text-sm font-semibold'
-                                : 'inline-flex items-center gap-2 h-10 px-5 rounded-full text-white transition-opacity hover:opacity-90 cursor-pointer text-sm font-semibold'}
+                                : 'inline-flex items-center gap-2 h-10 px-5 rounded-full text-accent-ink transition-opacity hover:opacity-90 cursor-pointer text-sm font-semibold'}
                             style={onExit ? undefined : { backgroundImage: 'var(--accent-gradient)' }}
                         >
                             Review {Math.min(sessionSize, poolCount)} more
@@ -451,7 +451,7 @@ export default function SwipeDeck({
                     {onExit && (
                         <button
                             onClick={onExit}
-                            className="inline-flex items-center gap-2 h-10 px-5 rounded-full text-white transition-opacity hover:opacity-90 cursor-pointer text-sm font-semibold"
+                            className="inline-flex items-center gap-2 h-10 px-5 rounded-full text-accent-ink transition-opacity hover:opacity-90 cursor-pointer text-sm font-semibold"
                             style={{ backgroundImage: 'var(--accent-gradient)' }}
                         >
                             Done

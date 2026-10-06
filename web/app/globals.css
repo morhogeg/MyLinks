@@ -7,7 +7,9 @@
   --card-hover: #1a1a1a;
   --text: #E5E5E5;
   --text-secondary: #A0A0A0;
-  --text-muted: #666666;
+  /* #858585: 5.5 / 5.1 / 4.7:1 on background / card / card-hover (WCAG AA).
+     #666666 was 3.0-3.6:1. */
+  --text-muted: #858585;
   --foreground: #E5E5E5;
   --border: rgba(255, 255, 255, 0.05);
   /* Lumen (dark): --accent is no longer a hue — it is the neutral EMPHASIS
@@ -78,7 +80,9 @@
   --card-hover: #F3F4F6;
   --text: #111827;
   --text-secondary: #4B5563;
-  --text-muted: #9CA3AF;
+  /* #68707C: 4.8 / 5.0 / 4.6:1 on background / card / card-hover (WCAG AA).
+     #9CA3AF was 2.3-2.5:1. */
+  --text-muted: #68707C;
   --foreground: #111827;
   --border: rgba(0, 0, 0, 0.05);
   /* Monolith (light): graphite emphasis on the porcelain ground. */

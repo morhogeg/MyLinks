@@ -96,7 +96,7 @@ export default function SimpleMarkdown({ content, className = '', isCompact = fa
             }
 
             elements.push(
-                <h3 key={key++} dir="auto" className={`font-bold text-text uppercase tracking-wide ${isCompact ? 'text-[11px] mt-6 mb-3' : 'text-base mt-8 mb-5 border-b border-red-500 pb-2'} ${isRtl ? 'text-right' : 'text-left'}`}>
+                <h3 key={key++} dir="auto" className={`font-bold text-text uppercase tracking-wide ${isCompact ? 'text-[11px] mt-6 mb-3' : 'text-base mt-8 mb-5 border-b border-border-subtle pb-2'} ${isRtl ? 'text-right' : 'text-left'}`}>
                     {headingText}
                 </h3>
             );
