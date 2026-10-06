@@ -2585,8 +2585,8 @@ exact-match, capped.
   **Verified:**
   pytest 1,904 (from 1,360), ruff F and py_compile clean, tsc 0, eslint 0/0
   on the whole web project, unit 79/79, em-dash gate, static export build;
-  CI E2E and Python green on `a0e80b2`, rules on `043ae65` (unchanged since;
-  E2E on the final web fix `88d078a` still running at this commit).
+  CI E2E green on `88d078a` (the last code commit), Python on `a0e80b2`
+  (the last backend one), rules on `043ae65` (unchanged since).
   **NOT verified:** any Swift
   (no toolchain: the next TestFlight build is the first compile), anything
   on a device, production, live Gemini or RevenueCat. Everything is in

@@ -135,12 +135,11 @@ formats, tooling, cost trims and robustness gaps.
   whole project; unit tests 79/79 (`lib` + build scripts); the em-dash gate
   (now parser-based) clean on 196 files; the production static export builds.
 - CI on GitHub (Playwright journeys against the Firebase emulators, which
-  can't be downloaded here): E2E journeys (67 passed, 4 skipped; extension
-  journeys 13 passed) and the Python suite green on `a0e80b2`, the last
-  backend commit; Firestore rules tests green on `043ae65` (rules unchanged
-  since). E2E on `88d078a`, the final web fix, was still running when this
-  was written. The E2E run covers the new Google-emulator sign-in the
-  stricter create rule required.
+  can't be downloaded here): E2E journeys green on `88d078a`, the last code
+  commit (67 passed, 4 skipped; extension journeys 13 passed); the Python
+  suite green on `a0e80b2`, the last backend commit; Firestore rules tests
+  green on `043ae65` (rules unchanged since). The E2E run covers the new
+  Google-emulator sign-in the stricter create rule required.
 - Browser extension: unit checks locally; its Chromium journeys in CI.
 - Renders in Chromium (temporary harness pages, deleted after): touch
   targets on a phone vs desktop (44pt only on touch), category chip
