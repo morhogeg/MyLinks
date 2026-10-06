@@ -376,6 +376,25 @@ jobs:
             -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
             -authenticationKeyPath ~/private_keys/AuthKey_${ASC_KEY_ID}.p8
 
+      # Native SDK versions are not pinned yet: Package.resolved in git holds
+      # only capacitor-swift-pm, so firebase-ios-sdk and GoogleSignIn float
+      # within their ranges on every archive (launch audit IOS-5). Record what
+      # this build actually resolved, so a binary can be traced to its SDKs.
+      # To pin: commit the file printed here from a green build, then add
+      # -onlyUsePackageVersionsFromResolvedFile to the archive command.
+      - name: Record resolved Swift packages
+        if: always()
+        working-directory: web/ios/App
+        run: |
+          R=App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+          [ -f "$R" ] || exit 0
+          {
+            echo "### Swift packages resolved for this build"
+            echo '```json'
+            cat "$R"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Export IPA
         working-directory: web/ios/App
         env:
