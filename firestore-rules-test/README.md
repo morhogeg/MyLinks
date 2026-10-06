@@ -20,7 +20,10 @@ the app's **real** client access patterns before it is deployed
   the rules): every real client write succeeds, and `createdAt`, `authUids`,
   `ingestToken`, `fcmTokens`, `lastDigestSentAt`, `email` are refused.
 - Self-serve workspace creation is allowed for the caller's own doc id only,
-  with `createdAt` stamped as now (no backdating into the founders' grant).
+  with `createdAt` stamped as now (no backdating into the founders' grant),
+  only for a Google or Apple sign-in, and with no `email` but the account's
+  own (the tests build those tokens with `signUpDb()`; the default test
+  context's provider is `custom`, which is refused).
 - `rate_limits`, `pending_processing`, `task_logs`, `usage_quotas`,
   `entitlements`, `synthesis_vault`, `server_errors`, `client_error_reports`
   are denied to every client.

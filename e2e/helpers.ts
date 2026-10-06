@@ -28,20 +28,34 @@ export async function resetEmulators() {
 
 // ── Auth ──────────────────────────────────────────────────────────────────
 
-export interface TestUser { uid: string; email: string; password: string }
+/** `idToken` is the fake Google ID token the account signs in with (signIn). */
+export interface TestUser { uid: string; email: string; idToken: string }
 
 let userSeq = 0;
+/**
+ * A Google account on the Auth emulator, signed in the way real users are.
+ * The locked create rule lets only google.com / apple.com sign-ins mint a
+ * workspace (the self-serve fallback the claim-down journeys exercise), so an
+ * email/password test account would be refused there. The emulator takes an
+ * unsigned JSON "ID token" for a fake IdP; signing in with the same one again
+ * (signIn below) lands on the same Firebase user.
+ */
 export async function createAuthUser(label = 'user'): Promise<TestUser> {
-    const email = `${label}-${Date.now()}-${userSeq++}@e2e.test`;
-    const password = 'e2e-password-1';
-    const res = await fetch(`${AUTH}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=${API_KEY}`, {
+    const local = `${label}-${Date.now()}-${userSeq++}`;
+    const email = `${local}@e2e.test`;
+    const idToken = JSON.stringify({ sub: `e2e-${local}`, email, email_verified: true });
+    const res = await fetch(`${AUTH}/identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=${API_KEY}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, returnSecureToken: true }),
+        body: JSON.stringify({
+            requestUri: 'http://localhost',
+            postBody: `providerId=google.com&id_token=${encodeURIComponent(idToken)}`,
+            returnSecureToken: true,
+        }),
     });
     const body = await res.json();
-    if (!res.ok) throw new Error(`auth signUp failed: ${JSON.stringify(body)}`);
-    return { uid: body.localId, email, password };
+    if (!res.ok) throw new Error(`auth signInWithIdp failed: ${JSON.stringify(body)}`);
+    return { uid: body.localId, email, idToken };
 }
 
 /**
@@ -65,9 +79,9 @@ export async function hideDevChrome(page: Page) {
 export async function signIn(page: Page, user: TestUser) {
     await page.waitForFunction(() => Boolean((window as unknown as { __machinaE2E?: unknown }).__machinaE2E));
     await page.evaluate(
-        ([e, p]) => (window as unknown as { __machinaE2E: { signIn: (a: string, b: string) => Promise<string> } })
-            .__machinaE2E.signIn(e, p),
-        [user.email, user.password] as const,
+        (token) => (window as unknown as { __machinaE2E: { signIn: (t: string) => Promise<string> } })
+            .__machinaE2E.signIn(token),
+        user.idToken,
     );
 }
 

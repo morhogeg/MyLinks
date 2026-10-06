@@ -100,6 +100,18 @@ const ownerDb = () => testEnv.authenticatedContext(OWNER_AUTH).firestore();
 const strangerDb = () => testEnv.authenticatedContext(STRANGER_AUTH).firestore();
 const anonDb = () => testEnv.unauthenticatedContext().firestore();
 
+// A brand-new account signed in the way the app signs people in: Google or
+// Apple, with the account's own address in the token. The plain contexts above
+// carry the emulator's default provider ('custom'), which the self-serve
+// create rule refuses (only google.com / apple.com may mint a workspace).
+const NEW_EMAIL = 's@example.com';
+const signUpDb = (provider = 'google.com', email = NEW_EMAIL) => testEnv
+  .authenticatedContext(STRANGER_AUTH, {
+    ...(email ? { email, email_verified: true } : {}),
+    firebase: { sign_in_provider: provider },
+  })
+  .firestore();
+
 // ── users/{uid}: the workspace doc ───────────────────────────────────────────
 
 test('owner can get their user doc', async () => {
@@ -157,7 +169,7 @@ test('new account CAN create its own workspace doc (self-serve fallback)', async
   // createdAt must be "now": the rule refuses a backdated birth date (a
   // founder-grant forgery), so the payload mirrors AuthProvider's Date.now().
   await assertSucceeds(
-    setDoc(doc(strangerDb(), 'users', STRANGER_AUTH), {
+    setDoc(doc(signUpDb(), 'users', STRANGER_AUTH), {
       authUids: [STRANGER_AUTH], createdAt: Date.now(), onboarded: false,
     }),
   );
@@ -165,21 +177,21 @@ test('new account CAN create its own workspace doc (self-serve fallback)', async
 
 test('self-serve create is denied for any other doc id', async () => {
   await assertFails(
-    setDoc(doc(strangerDb(), 'users', 'some-other-id'), { authUids: [STRANGER_AUTH] }),
+    setDoc(doc(signUpDb(), 'users', 'some-other-id'), { authUids: [STRANGER_AUTH] }),
   );
 });
 
 test('self-serve create cannot seed extra or foreign accounts into authUids', async () => {
   await assertFails(
-    setDoc(doc(strangerDb(), 'users', STRANGER_AUTH), {
+    setDoc(doc(signUpDb(), 'users', STRANGER_AUTH), {
       authUids: [STRANGER_AUTH, OWNER_AUTH],
     }),
   );
   await assertFails(
-    setDoc(doc(strangerDb(), 'users', STRANGER_AUTH), { authUids: [OWNER_AUTH] }),
+    setDoc(doc(signUpDb(), 'users', STRANGER_AUTH), { authUids: [OWNER_AUTH] }),
   );
   await assertFails(
-    setDoc(doc(strangerDb(), 'users', STRANGER_AUTH), { createdAt: 1 }),
+    setDoc(doc(signUpDb(), 'users', STRANGER_AUTH), { createdAt: 1 }),
   );
 });
 
@@ -188,7 +200,62 @@ test('self-serve create cannot take over an EXISTING doc (bare setDoc = update t
   // under rules, and the update rule rejects a non-linked writer. (The id
   // check would also fail it, belt and braces.)
   await assertFails(
-    setDoc(doc(strangerDb(), 'users', OWNER_DOC), { authUids: [STRANGER_AUTH] }),
+    setDoc(doc(signUpDb(), 'users', OWNER_DOC), { authUids: [STRANGER_AUTH] }),
+  );
+});
+
+// ACCT-2 (launch audit): the doc's `email` named the deleted account whose
+// trial clock (and founder grant) the workspace inherited, and the rule took
+// any value. It must now be the signed-in account's own address, and only a
+// Google or Apple sign-in (the providers the app offers, the same allowlist
+// claim_workspace applies) may mint a workspace at all.
+test('self-serve create may carry ONLY the account\'s own email', async () => {
+  for (const email of ['tester@example.com', 'founder@machina.example', '', 'S@example.com ']) {
+    await assertFails(
+      setDoc(doc(signUpDb(), 'users', STRANGER_AUTH), {
+        authUids: [STRANGER_AUTH], createdAt: Date.now(), onboarded: false, email,
+      }),
+    );
+  }
+  await assertFails(
+    setDoc(doc(signUpDb(), 'users', STRANGER_AUTH), {
+      authUids: [STRANGER_AUTH], createdAt: Date.now(), onboarded: false, email: ['tester@example.com'],
+    }),
+  );
+});
+
+test('an account whose token has no email cannot name one', async () => {
+  const noEmail = () => signUpDb('apple.com', null);
+  await assertFails(
+    setDoc(doc(noEmail(), 'users', STRANGER_AUTH), {
+      authUids: [STRANGER_AUTH], createdAt: Date.now(), onboarded: false, email: 'tester@example.com',
+    }),
+  );
+  await assertSucceeds(
+    setDoc(doc(noEmail(), 'users', STRANGER_AUTH), {
+      authUids: [STRANGER_AUTH], createdAt: Date.now(), onboarded: false,
+    }),
+  );
+});
+
+test('self-serve create needs a Google or Apple sign-in', async () => {
+  for (const provider of ['custom', 'password', 'anonymous', 'phone', 'github.com', 'facebook.com']) {
+    await assertFails(
+      setDoc(doc(signUpDb(provider), 'users', STRANGER_AUTH), {
+        authUids: [STRANGER_AUTH], createdAt: Date.now(), onboarded: false,
+      }),
+    );
+  }
+  // The plain test context (default provider 'custom') is refused too.
+  await assertFails(
+    setDoc(doc(strangerDb(), 'users', STRANGER_AUTH), {
+      authUids: [STRANGER_AUTH], createdAt: Date.now(), onboarded: false,
+    }),
+  );
+  await assertSucceeds(
+    setDoc(doc(signUpDb('apple.com'), 'users', STRANGER_AUTH), {
+      authUids: [STRANGER_AUTH], createdAt: Date.now(), onboarded: false, email: NEW_EMAIL,
+    }),
   );
 });
 
@@ -288,18 +355,18 @@ test('owner cannot grow or shrink authUids from the client', async () => {
 test('self-serve create must stamp createdAt as now, not a backdated founder date', async () => {
   const now = Date.now();
   await assertSucceeds(
-    setDoc(doc(strangerDb(), 'users', STRANGER_AUTH), { authUids: [STRANGER_AUTH], createdAt: now, onboarded: false }),
+    setDoc(doc(signUpDb(), 'users', STRANGER_AUTH), { authUids: [STRANGER_AUTH], createdAt: now, onboarded: false }),
   );
 });
 
 test('self-serve create with a backdated, missing, or non-numeric createdAt is denied', async () => {
   for (const createdAt of [0, 1, Date.now() - 24 * 3600 * 1000, 'now', null]) {
     await assertFails(
-      setDoc(doc(strangerDb(), 'users', STRANGER_AUTH), { authUids: [STRANGER_AUTH], createdAt, onboarded: false }),
+      setDoc(doc(signUpDb(), 'users', STRANGER_AUTH), { authUids: [STRANGER_AUTH], createdAt, onboarded: false }),
     );
   }
   await assertFails(
-    setDoc(doc(strangerDb(), 'users', STRANGER_AUTH), { authUids: [STRANGER_AUTH], onboarded: false }),
+    setDoc(doc(signUpDb(), 'users', STRANGER_AUTH), { authUids: [STRANGER_AUTH], onboarded: false }),
   );
 });
 
@@ -307,7 +374,7 @@ test('self-serve create cannot carry server-owned fields', async () => {
   const now = Date.now();
   for (const extra of [{ ingestToken: 'a' }, { fcmTokens: ['t'] }, { plan: 'pro' }, { settings: {} }]) {
     await assertFails(
-      setDoc(doc(strangerDb(), 'users', STRANGER_AUTH), { authUids: [STRANGER_AUTH], createdAt: now, ...extra }),
+      setDoc(doc(signUpDb(), 'users', STRANGER_AUTH), { authUids: [STRANGER_AUTH], createdAt: now, ...extra }),
     );
   }
 });
@@ -318,7 +385,7 @@ test('self-serve create cannot carry graphVersion or tourSeenAt (birth fields on
   const now = Date.now();
   for (const extra of [{ graphVersion: 2 }, { tourSeenAt: now }]) {
     await assertFails(
-      setDoc(doc(strangerDb(), 'users', STRANGER_AUTH), { authUids: [STRANGER_AUTH], createdAt: now, onboarded: false, ...extra }),
+      setDoc(doc(signUpDb(), 'users', STRANGER_AUTH), { authUids: [STRANGER_AUTH], createdAt: now, onboarded: false, ...extra }),
     );
   }
 });
@@ -329,8 +396,8 @@ test('a stranger cannot mark the tour seen on someone else\'s doc', async () => 
 
 test('self-serve create may carry the email (AuthProvider payload shape)', async () => {
   await assertSucceeds(
-    setDoc(doc(strangerDb(), 'users', STRANGER_AUTH), {
-      authUids: [STRANGER_AUTH], createdAt: Date.now(), onboarded: false, email: 's@example.com',
+    setDoc(doc(signUpDb(), 'users', STRANGER_AUTH), {
+      authUids: [STRANGER_AUTH], createdAt: Date.now(), onboarded: false, email: NEW_EMAIL,
     }),
   );
 });

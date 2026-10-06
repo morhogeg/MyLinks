@@ -21,8 +21,9 @@ So these tests don't check Gemini output or scraping. Those live in
 
 **What's not covered at all:** the native iOS shell. That means the share
 extension, WKWebView quirks, haptics, the keyboard, StoreKit purchases, push,
-and real Apple/Google sign-in popups (tests sign in with an emulator email
-account through a hook that exists only on the localhost emulator origin; see
+and real Apple/Google sign-in popups (tests sign in with the Auth emulator's
+fake Google credential, so the rules see a real google.com sign-in, through a
+hook that exists only on the localhost emulator origin; see
 `web/lib/firebase.ts`). That still takes a manual pass on a phone
 (SOURCE_OF_TRUTH §4 task 11).
 
