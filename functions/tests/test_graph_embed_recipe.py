@@ -92,3 +92,26 @@ def test_whole_library_backfill_uses_the_same_recipe():
 
     assert texts[0] == search.build_embedding_text(_CARD)
     assert doc.updates[0]["embeddingVersion"] == search.EMBED_TEXT_VERSION
+
+
+# ── RV-10: one input cap for every embed site ───────────────────────────────
+
+def test_backfill_and_trigger_embed_the_same_characters():
+    import ai_service
+
+    sent = []
+    fake_client = SimpleNamespace(models=SimpleNamespace(
+        embed_content=lambda model, contents, config: sent.append(contents)
+        or SimpleNamespace(embeddings=[SimpleNamespace(values=[0.6, 0.8])])))
+    long_text = "word " * 2000  # 10,000 characters, past the cap
+
+    backfill = ai_service.GeminiService.__new__(ai_service.GeminiService)
+    backfill.client = fake_client
+    backfill.embed_text(long_text)               # graph backfill, pipelines
+
+    trigger = search.EmbeddingService.__new__(search.EmbeddingService)
+    trigger.client, trigger.model = fake_client, "models/gemini-embedding-001"
+    trigger.generate_embedding(long_text)        # sync_link_embedding
+
+    assert search._EMBED_TEXT_MAX_CHARS == ai_service.EMBED_TEXT_MAX_CHARS
+    assert sent[0] == sent[1] == long_text[:ai_service.EMBED_TEXT_MAX_CHARS]

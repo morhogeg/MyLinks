@@ -70,6 +70,13 @@ GEMINI_ASK_MODEL = "gemini-3.1-flash-lite"
 GEMINI_FALLBACK_MODEL = "gemini-3.5-flash-lite"
 EMBEDDING_MODEL = "models/gemini-embedding-001"
 EMBEDDING_DIMENSIONS = 768
+# gemini-embedding-001 accepts ~2048 input tokens. Every embed site cuts its
+# text at this many characters (roughly that many tokens): the Firestore
+# trigger (search.EmbeddingService), embed_text below (pipelines, graph
+# backfills) and search.build_embedding_text, so the same card text always
+# becomes the same vector. The backfill used to cut at 9,000 and the trigger
+# at 8,000. Defined here, not in search.py, because search imports this module.
+EMBED_TEXT_MAX_CHARS = 8000
 
 # Hard wall-clock ceiling for ONE Gemini HTTP call (milliseconds), applied at
 # the client so it covers every surface — analysis, vision, video, Ask, and
@@ -2686,7 +2693,7 @@ Return ONLY a JSON object matching the schema (title, narrative, themes[title,in
             try:
                 result = self.client.models.embed_content(
                     model=EMBEDDING_MODEL,
-                    contents=text[:9000],
+                    contents=text[:EMBED_TEXT_MAX_CHARS],
                     config={"output_dimensionality": EMBEDDING_DIMENSIONS,
                             "task_type": "RETRIEVAL_DOCUMENT"}
                 )

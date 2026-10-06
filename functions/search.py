@@ -23,7 +23,8 @@ from google import genai
 from db import get_db
 from models import UNANALYZED_STATUSES
 from log_safe import mask_uid
-from ai_service import embedding_needs_repair, collect_notes_text, _is_retryable_error
+from ai_service import (embedding_needs_repair, collect_notes_text, _is_retryable_error,
+                        EMBED_TEXT_MAX_CHARS)
 import vector_store
 from vector_store import VECTOR_FIELD, card_payload, mirror_vector_write, vector_needs_repair
 from rate_limit import check_rate_limit
@@ -75,8 +76,9 @@ EMBED_TEXT_VERSION = 5
 # a conservative character budget (roughly that many tokens) so a long
 # detailedSummary can never overflow the model input. The most important fields
 # (title, summary, details) are placed first, so truncation only ever drops the
-# lower-value tail (tags/concepts/highlights).
-_EMBED_TEXT_MAX_CHARS = 8000
+# lower-value tail (tags/concepts/highlights). One cap for every embed site
+# (ai_service.EMBED_TEXT_MAX_CHARS), so the trigger and the backfills agree.
+_EMBED_TEXT_MAX_CHARS = EMBED_TEXT_MAX_CHARS
 
 
 def build_embedding_text(data: dict) -> str:
