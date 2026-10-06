@@ -43,9 +43,16 @@ export const AskScene: React.FC = () => {
   // on-axis is the move that says "this is the point" without a caption doing
   // it — and the citations are the point of the whole film.
   const rotY = 0; // zero 3D — crispness over drama (round 13f)
-  // from the question, down onto the answer and its three chips — then onto
-  // the Graph chip itself as the finger lands
-  const target = ramp(f, [140, 300], [300, 375], EASE_IN_OUT) + dive * 95;
+  // first on the composer, where the question is being TYPED (the empty
+  // state's glowing mark above it), then up to the sent question as it lands
+  // at the top (on the night set the old framing, on the top of the screen,
+  // was a black slab while the typing ran out of shot); from the question,
+  // down onto the answer and its three chips — then onto the Graph chip
+  // itself as the finger lands
+  const typingAim = fr.vertical ? 460 : 500;
+  const target =
+    (f < 140 ? ramp(f, [98, 128], [typingAim, 300], EASE_IN_OUT) : ramp(f, [140, 300], [300, 375], EASE_IN_OUT)) +
+    dive * 95;
   // vertical: bias the device down so its top clears the two-line caption
   // block (owner screenshot note, round 13c — same fix library/digest carry)
   const y = fr.focusY(target, scale * fr.scaleMul) + drift(f, 3, 300) + (fr.vertical ? 170 : 0);

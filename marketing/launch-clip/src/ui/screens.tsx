@@ -846,7 +846,10 @@ export const AskScreen: React.FC<{
                 flexDirection: 'column',
                 alignItems: 'center',
                 paddingTop: 60,
-                opacity: 1 - Math.min(1, typed / 6),
+                // the empty state holds while the question is typed (it is
+                // the frame's light while the camera watches the composer),
+                // and gives way to the question as it is sent
+                opacity: 1,
               }}
             >
               <div style={{ color: T.accent, width: 34, height: 39, filter: `drop-shadow(0 0 18px ${T.accentRing})` }}>
