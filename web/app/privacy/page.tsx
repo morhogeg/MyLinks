@@ -364,6 +364,14 @@ export default function PrivacyPage() {
           uploaded images and your sign-in record. You can also email us and we will delete the
           account for you. Deletion is not reversible, so export first if you want a copy.
         </p>
+        <p className="mt-4 leading-relaxed text-text-secondary">
+          Two small records outlive an account, and neither holds your content. So that deleting
+          and re-creating an account does not restart the free trial, we keep a one-way hash of
+          your email address with the date your first account was created; it cannot be turned
+          back into your address and is used for nothing else. Abuse-prevention counters (how
+          many requests an account or network address made in the last hour or day) expire on
+          their own within a day.
+        </p>
       </Section>
 
       <Section id="rights" n={10} title="Your rights">
