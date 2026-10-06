@@ -249,4 +249,31 @@ The AI fixes were made on a separate branch, reviewed by a second agent
 | RV-11 | low | A resumed graph migration restarted its phase if the checkpoint card was deleted | fixed `7bbdad7` |
 | PRIV-1 | medium (privacy) | Found while checking WEB-21: the app's prompt vocabulary (read from its newest cards including private ones) went into the Gemini prompt unfiltered on /api/analyze and /api/analyze-image | fixed `e2c7c44` (server builds it, private cards left out) |
 
+## Backend: capture pipeline (CAP)
+
+| ID | Sev | Finding | Status |
+|---|---|---|---|
+| CAP-1 | high | The janitor deleted queue jobs that were still running (aged from queueing, not from start): the card failed and Retry charged again | CAPFIX-1 |
+| CAP-2 | high | Retry and the web Image tab charged up front and kept the unit when the app gave up at 60 s (videos, PDFs, slow pages) | CAPFIX-2 |
+| CAP-3 | medium | The worker wasn't idempotent: a redelivered job made a second card, a late job overwrote a good Retry, a redelivered enrich refunded twice | CAPFIX-3 |
+| CAP-4 | medium | Large pages ran the scraper out of memory (~80 MB per MB of dense HTML parsed), and a killed instance skips the refund | fixed `9017d1c` (2 MB parse cap, cut on a UTF-8 boundary) |
+| CAP-5 | medium | `set_global_options` gives every function gen-1 CPU shares and concurrency 1 | accepted for launch: a cost decision, and concurrency above 1 needs a thread-safety pass first (FINAL-REPORT §4) |
+| CAP-6 | medium | Backlog releases and imports share the 10 worker slots with live saves | CAPFIX-6 |
+| CAP-7 | medium | An exception after the card was written turned a finished capture into FAILED, with no refund | CAPFIX-7 |
+| CAP-8 | medium | Shared screenshots were stored twice; deleting the card left the original | CAPFIX-8 |
+| CAP-9 | medium | LinkedIn login walls, 999 and 404 pages became "ready" cards built from raw markup | fixed `924ae91` |
+| CAP-10 | medium | Saved X and Instagram URLs, with the sharer's tracking tokens, went to unaffiliated relays whose images were trusted; the privacy policy didn't name them | fixed `a0e6e66` (path only, no relay images, policy names them) |
+| CAP-11 | medium | Every capture read the user's entire library for the prompt's vocabulary | fixed `ae5909c` (newest 500, projected) |
+| CAP-12 | medium | The SSRF guard refused every international domain name | fixed `066d4b6` |
+| CAP-13 | low | Healthy queued cards could fill the janitor's 200-card window and hide a stuck one | CAPFIX-13 |
+| CAP-14 | low | "Add screenshots" never timed out and had no at-most-once refund | CAPFIX-14 |
+| CAP-15 | low | Retry on a trial burned the 3-per-hour video budget on links that aren't videos | CAPFIX-15 |
+| CAP-16 | low | The text shared with an Instagram or Facebook link never reached the model | fixed `a0e6e66` |
+| CAP-17 | low | URL extraction kept CJK and Hebrew punctuation; CJK read time was always 1 minute | read time fixed `c0c9012`; URL extraction CAPFIX-17 |
+| CAP-18 | low | A link without `https://` in the share `url` field was rejected | CAPFIX-18 |
+| CAP-19 | low | The screenshot-enrich path stored model output without the usual length caps | CAPFIX-19 |
+| CAP-20 | low | Page titles and share URLs had no size limit (a huge title broke the card) | titles fixed `c0c9012`; share URL length CAPFIX-20 |
+| CAP-21 | low | Shared text over 30,000 characters was silently cut | CAPFIX-21 |
+| CAP-22 | low (plausible) | A Gemini RECITATION block made a capture permanently unsaveable | fixed `dc8019f` (one retry in the model's own words; not testable against live Gemini here) |
+
 <!-- BACKEND -->

@@ -233,6 +233,20 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
+> ## 🚨 OWNER ACTION (2026-10-06): launch audit, branch `claude/launch-audit` (NOT merged, NOT deployed)
+>
+> A full launch audit (206 findings: 11 areas, every high fixed) sits on
+> `claude/launch-audit`. Read `docs/launch-audit/FINAL-REPORT.md` first; each
+> finding with its commit is in `docs/launch-audit/01-findings.md`. To ship:
+> (1) review, then merge via `/ship`: deploy ALL functions (indexes first;
+> new `links.needsEmbedding`), the rules (self-serve workspace create is now
+> Google/Apple-only with the token's own email), Vercel; (2) TestFlight: first
+> compile of the share-extension Swift and the Facebook-SDK strip; (3) the
+> 15-minute device pass in the report §4; (4) App Store Connect: privacy label
+> rows (Purchase History, Device ID) and a Terms of Use link (3.1.2(c));
+> (5) `normalize_created_at` dry run, then `--apply`. The 1346 QA below still
+> applies to what is live today.
+>
 > ## 🚨 OWNER ACTION (2026-10-05): install build **1346** (waiting saves, My notes, first-run fixes, theme follows the device)
 >
 > Merge `adf023b`; backend, rules and web all live (§9 2026-10-05). QA on
