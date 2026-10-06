@@ -82,6 +82,19 @@ class GraphService:
                 logger.info(f"Distance gate dropped {len(candidates) - len(near)}/{len(candidates)} candidates")
             candidates = near
 
+            # PRIVACY: an effectively-private card (its own flag, or a
+            # private/PIN collection) must never reach the verifier's Gemini
+            # prompt below, nor become a relatedLink of an open card, whose
+            # Related list would then show its title. A failed collection
+            # lookup fails closed (every collection member is dropped).
+            from search import PrivacyGate  # lazy: search registers Functions at import
+            public = PrivacyGate(uid, db=self.db).strip(
+                [dict(data, id=doc_id) for doc_id, data in candidates])
+            public_ids = {c["id"] for c in public}
+            if len(public_ids) < len(candidates):
+                logger.info(f"Privacy gate dropped {len(candidates) - len(public_ids)} candidate(s)")
+            candidates = [(doc_id, data) for doc_id, data in candidates if doc_id in public_ids]
+
             if not candidates:
                 logger.info("No vector candidates within relatedness distance")
                 return []
