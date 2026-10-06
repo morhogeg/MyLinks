@@ -2989,13 +2989,17 @@ def search_links_http(req: https_fn.Request) -> https_fn.Response:
 
         meta = {}
         links = perform_hybrid_search(uid, query_text, limit, meta=meta)
-        # PRIVACY: same strip as Ask (1h above). The web client hides private
-        # cards from search itself, but this twin serves the native shell over
-        # plain HTTP and a PIN-locked client must not receive a private card's
-        # title and summary in a response body it never renders. Belt-and-
-        # braces fallback mirrors Ask: never serve un-stripped on a filter bug.
+        # PRIVACY: perform_hybrid_search already dropped effectively-private
+        # cards from both halves, before its relevance judge sent anything to
+        # Gemini. This second pass guards the response body (a PIN-locked
+        # client must not receive a private card's title and summary it never
+        # renders) and reuses the collection verdict the search read, so it
+        # costs no second read. Belt-and-braces fallback mirrors Ask: never
+        # serve un-stripped on a filter bug.
         try:
-            links = strip_private_cards(links, private_collection_ids(uid))
+            private_ids = (meta["private_ids"] if "private_ids" in meta
+                           else private_collection_ids(uid))
+            links = strip_private_cards(links, private_ids)
         except Exception as e:
             logger.error(f"search_links_http privacy strip failed: {e}")
             links = [c for c in links

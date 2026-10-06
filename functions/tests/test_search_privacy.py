@@ -7,11 +7,15 @@ A card is effectively private when it carries `isPrivate` or sits in a private
     return an empty set, which reads exactly like "no private collections", so
     one Firestore blip made every PIN-locked collection's cards public to Ask
     and search.
+  - AUTH-2: the search bar's relevance judge is a Gemini call that reads each
+    candidate's title and summary. Private cards must leave BOTH retrieval
+    halves before it runs, not only the response afterwards.
 
 Offline: Firestore is faked at each module's boundary; Gemini never runs.
 """
 
 import json
+import types
 
 import pytest
 
@@ -131,3 +135,120 @@ def test_search_twin_fails_closed_when_the_lookup_fails(monkeypatch):
     monkeypatch.setattr(main, "private_collection_ids", lambda uid: None)
     resp = main.search_links_http(_Req(json_body={"query": "dogs", "uid": "u1"}))
     assert [c["id"] for c in json.loads(resp.body)["links"]] == ["plain"]
+
+
+# ── AUTH-2: private cards never reach the search judge (a Gemini call) ──────
+# The judge prompt carries each candidate's title, summary head, tags and
+# concepts. The strip used to run only in the HTTP handler, AFTER the judge.
+
+class _JudgeModels:
+    def __init__(self, reply):
+        self.prompts = []
+        self.reply = reply
+
+    def generate_content(self, model, contents, config=None):
+        self.prompts.append(contents)
+        return types.SimpleNamespace(text=self.reply)
+
+
+def _judge(monkeypatch, reply="[]"):
+    models = _JudgeModels(reply)
+    monkeypatch.setattr(search, "_get_genai_client",
+                        lambda timeout_ms: types.SimpleNamespace(models=models))
+    return models
+
+
+def _vres(cid, title, dist, **extra):
+    return {"id": cid, "title": title, "summary": f"{title} summary",
+            "vector_distance": dist, "createdAt": 1, **extra}
+
+
+_PRIVATE_NEIGHBOURS = [
+    _vres("pub", "Sourdough basics", 0.30),
+    _vres("flag", "Sourdough fertility diary", 0.31, isPrivate=True),
+    _vres("vault", "Sourdough divorce notes", 0.32, collectionIds=["vault"]),
+    _vres("open", "Sourdough in a shared folder", 0.33, collectionIds=["open"]),
+]
+
+
+def _no_keyword_hits(uid, q, exclude_ids=None, limit=10, fields=None):
+    return []
+
+
+def test_private_candidates_never_reach_the_judge_prompt(monkeypatch):
+    models = _judge(monkeypatch, reply='[{"n": 1, "evidence": "Sourdough basics"}]')
+    monkeypatch.setattr(search, "perform_search_logic", lambda uid, q, limit: list(_PRIVATE_NEIGHBOURS))
+    monkeypatch.setattr(search, "keyword_scan_cards", _no_keyword_hits)
+    monkeypatch.setattr(search, "private_collection_ids", lambda uid: {"vault"})
+
+    out = search.perform_hybrid_search("u1", "sourdough", limit=10)
+
+    (prompt,) = models.prompts
+    assert "fertility" not in prompt and "divorce" not in prompt
+    assert "Sourdough basics" in prompt and "shared folder" in prompt
+    assert [c["id"] for c in out] == ["pub"]
+
+
+def test_failed_lookup_keeps_every_collection_member_from_the_judge(monkeypatch):
+    models = _judge(monkeypatch)
+    monkeypatch.setattr(search, "perform_search_logic", lambda uid, q, limit: list(_PRIVATE_NEIGHBOURS))
+    monkeypatch.setattr(search, "keyword_scan_cards", _no_keyword_hits)
+    monkeypatch.setattr(search, "private_collection_ids", lambda uid: None)
+
+    search.perform_hybrid_search("u1", "sourdough", limit=10)
+
+    (prompt,) = models.prompts
+    assert "Sourdough basics" in prompt
+    assert "shared folder" not in prompt and "divorce" not in prompt
+
+
+def test_private_keyword_hits_never_reach_the_response(monkeypatch):
+    monkeypatch.setattr(search, "judge_relevance", lambda q, c, **kw: None)
+    monkeypatch.setattr(search, "perform_search_logic", lambda uid, q, limit: [])
+    monkeypatch.setattr(search, "keyword_scan_cards",
+                        lambda uid, q, exclude_ids=None, limit=10, fields=None: [
+                            {"id": "pub", "title": "muffins", "createdAt": 1},
+                            {"id": "flag", "title": "muffins", "isPrivate": True, "createdAt": 1},
+                            {"id": "vault", "title": "muffins", "collectionIds": ["vault"], "createdAt": 1}])
+    monkeypatch.setattr(search, "private_collection_ids", lambda uid: {"vault"})
+    meta = {}
+    out = search.perform_hybrid_search("u1", "muffins", limit=10, meta=meta)
+    assert [c["id"] for c in out] == ["pub"]
+    assert meta["private_ids"] == {"vault"}
+
+
+def test_no_collection_member_means_no_lookup_read(monkeypatch):
+    monkeypatch.setattr(search, "judge_relevance", lambda q, c, **kw: None)
+    monkeypatch.setattr(search, "perform_search_logic",
+                        lambda uid, q, limit: [_vres("pub", "Sourdough basics", 0.30)])
+    monkeypatch.setattr(search, "keyword_scan_cards", _no_keyword_hits)
+    monkeypatch.setattr(search, "private_collection_ids",
+                        lambda uid: pytest.fail("read the collections with no member in sight"))
+    meta = {}
+    assert [c["id"] for c in search.perform_hybrid_search("u1", "sourdough", meta=meta)] == ["pub"]
+    assert meta["private_ids"] == set()
+
+
+def test_keyword_projection_carries_the_privacy_fields():
+    # Without them a private card found by its words came back looking public.
+    assert {"isPrivate", "collectionIds"} <= set(search.SEARCH_SCAN_FIELDS)
+
+
+def test_search_twin_end_to_end_strips_before_the_judge(monkeypatch):
+    monkeypatch.setattr(main.https_fn, "Response", _Resp)
+    monkeypatch.setattr(main, "check_rate_limit", lambda *a, **k: True)
+    monkeypatch.setattr(main, "REQUIRE_AUTH", False)
+    monkeypatch.setattr(main, "APPCHECK_ENFORCE", False)
+    models = _judge(monkeypatch, reply='[{"n": 1, "evidence": "Sourdough basics"}]')
+    monkeypatch.setattr(search, "perform_search_logic", lambda uid, q, limit: list(_PRIVATE_NEIGHBOURS))
+    monkeypatch.setattr(search, "keyword_scan_cards", _no_keyword_hits)
+    monkeypatch.setattr(search, "private_collection_ids", lambda uid: {"vault"})
+    # The handler's own strip reuses the verdict the search read.
+    monkeypatch.setattr(main, "private_collection_ids",
+                        lambda uid: pytest.fail("second collections read"))
+
+    resp = main.search_links_http(_Req(json_body={"query": "sourdough", "uid": "u1"}))
+
+    assert resp.status == 200
+    assert [c["id"] for c in json.loads(resp.body)["links"]] == ["pub"]
+    assert "fertility" not in models.prompts[0] and "divorce" not in models.prompts[0]

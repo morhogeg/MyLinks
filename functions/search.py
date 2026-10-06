@@ -754,10 +754,12 @@ KEYWORD_SCAN_CAP = 1000
 # 2026-08-07). The search bar only needs what scores the card (keyword_match_score),
 # ranks it (rerank_candidates) and identifies it, so it asks Firestore for
 # exactly those fields. NOT used by ask_brain, which grounds its answer in the
-# full card body and must keep fetching complete documents.
+# full card body and must keep fetching complete documents. `isPrivate` and
+# `collectionIds` ride along for the privacy strip: without them a private card
+# found by its words came back looking public, and no later filter could tell.
 SEARCH_SCAN_FIELDS = [
     "title", "summary", "tags", "concepts", "sourceName", "category",
-    "userNote", "userNotes", "createdAt", "status",
+    "userNote", "userNotes", "createdAt", "status", "isPrivate", "collectionIds",
 ]
 
 
@@ -1376,6 +1378,38 @@ def strip_private_cards(cards: List[dict], private_ids: Optional[set]) -> List[d
     return [c for c in cards if c and not is_effectively_private(c, private_ids)]
 
 
+def in_some_collection(card) -> bool:
+    """True when the card belongs to at least one collection: the only cards
+    whose privacy depends on the private-collection lookup."""
+    ids = card.get("collectionIds") if isinstance(card, dict) else None
+    return isinstance(ids, list) and len(ids) > 0
+
+
+class PrivacyGate:
+    """`strip_private_cards` for one request, reading the user's private
+    collection ids at most once and only when a card actually sits in a
+    collection (most searches never need the read). `ids` is what the strip
+    used: the set read, None after a failed read (fail closed), or an empty
+    set when no card ever needed it."""
+
+    _UNREAD = object()
+
+    def __init__(self, uid: str, db=None):
+        self._uid, self._db = uid, db
+        self._ids = self._UNREAD
+
+    @property
+    def ids(self) -> Optional[set]:
+        return set() if self._ids is self._UNREAD else self._ids
+
+    def strip(self, cards: List[dict]) -> List[dict]:
+        cards = [c for c in (cards or []) if c]
+        if self._ids is self._UNREAD and any(in_some_collection(c) for c in cards):
+            self._ids = (private_collection_ids(self._uid) if self._db is None
+                         else private_collection_ids(self._uid, db=self._db))
+        return strip_private_cards(cards, self.ids)
+
+
 def category_cards(uid: str, category: str, limit: int = 10) -> List[dict]:
     """The newest settled cards in one exact `category` — the ground truth
     behind "my <Category> saves" chips (the client sends the stored category
@@ -1727,7 +1761,14 @@ def perform_hybrid_search(uid: str, query_text: str, limit: int = 20,
     `meta`, when given, receives `mode`: "judge" (the LLM verdict served) or
     "gate" (the strong-distance fallback served) so a bad result can be traced
     to the path that produced it without log access; the client records a
-    non-judge mode once per session in client_errors.
+    non-judge mode once per session in client_errors. It also receives
+    `private_ids`, the private-collection verdict the privacy strip used, so a
+    caller's own belt-and-braces strip needs no second read.
+
+    PRIVACY: effectively-private cards leave BOTH halves before anything else
+    sees them. The judge sends each candidate's title, summary head, tags and
+    concepts to Gemini; the strip used to run only in the HTTP handler, after
+    the judge had already read every private candidate.
 
     Degrades instead of failing: if the vector half errors transiently, the
     lexical half still serves (an outage must not blank the search bar). Only
@@ -1745,6 +1786,7 @@ def perform_hybrid_search(uid: str, query_text: str, limit: int = 20,
     topic = search_topic_of(query_text)
     if topic != query_text:
         logger.info(f"Hybrid search: query reduced to topic ({len(topic)} chars)")
+    privacy = PrivacyGate(uid)
     with ThreadPoolExecutor(max_workers=2) as pool:
         vector_future = pool.submit(perform_search_logic, uid, topic, 30)
         keyword_future = pool.submit(
@@ -1757,6 +1799,8 @@ def perform_hybrid_search(uid: str, query_text: str, limit: int = 20,
             if "SEMANTIC_SEARCH_NOT_CONFIGURED" in str(e):
                 raise
             logger.error(f"Hybrid search: vector half failed, degrading to keyword-only: {e}")
+        # Before the judge (a Gemini call) ever sees a candidate.
+        vector_results = privacy.strip(vector_results)
 
         # The judge rides the keyword scan's tail: the vector half usually
         # resolves first, so the LLM call runs while the 1000-card scan is
@@ -1788,9 +1832,11 @@ def perform_hybrid_search(uid: str, query_text: str, limit: int = 20,
         except Exception as e:
             logger.error(f"Hybrid search: keyword scan failed: {e}")
             keyword_hits = []
+        keyword_hits = privacy.strip(keyword_hits)
 
     if meta is not None:
         meta["mode"] = "judge" if judged is not None else "gate"
+        meta["private_ids"] = privacy.ids
     logger.info(f"Hybrid search served by {'judge' if judged is not None else 'distance gates'}")
 
     if judged is not None:
