@@ -33,6 +33,14 @@ enum ShareProgressCurve {
 /// neutral EMPHASIS token — porcelain on a graphite ground — and affordance
 /// comes from contrast, never from a purple. Nothing in this file may reach for
 /// a hue again. Keep these values in step with globals.css.
+/// The ✕ stays a 30pt circle, but answers touches across 44pt, Apple's minimum
+/// target (7pt beyond each edge). Hit-testing still stops at the card's bounds.
+final class HitExpandedButton: UIButton {
+    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+        bounds.insetBy(dx: -7, dy: -7).contains(point)
+    }
+}
+
 enum Lumen {
     // Emphasis (porcelain). --accent is the fill; --accent-2/-3 are the discrete
     // stops of --accent-gradient (linear-gradient(135deg, #FFFFFF, #CBD2E0)).
@@ -49,7 +57,9 @@ enum Lumen {
     // Ink.
     static let text = UIColor(red: 0xE5 / 255.0, green: 0xE5 / 255.0, blue: 0xE5 / 255.0, alpha: 1)          // --text
     static let textSecondary = UIColor(red: 0xA0 / 255.0, green: 0xA0 / 255.0, blue: 0xA0 / 255.0, alpha: 1) // --text-secondary
-    static let textMuted = UIColor(red: 0x66 / 255.0, green: 0x66 / 255.0, blue: 0x66 / 255.0, alpha: 1)     // --text-muted
+    // --text-muted #858585 (raised from #666666 on 2026-10-06 for WCAG AA: 5.1:1
+    // on the card; the hint line carries the quota and "first 5 of N" messages).
+    static let textMuted = UIColor(red: 0x85 / 255.0, green: 0x85 / 255.0, blue: 0x85 / 255.0, alpha: 1)     // --text-muted
 
     // Materials — the dark values of the theme-aware fill/hairline tokens.
     static let fillSubtle = UIColor(white: 1, alpha: 0.05)   // --fill-subtle
@@ -100,10 +110,10 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     private let card = UIView()
     private let spinner = UIActivityIndicatorView(style: .medium)
     private let label = UILabel()
-    private let cardCloseButton = UIButton(type: .system)
+    private let cardCloseButton = HitExpandedButton(type: .system)
 
     // MARK: Close (✕) button on the scan card
-    private let scanCloseButton = UIButton(type: .system)
+    private let scanCloseButton = HitExpandedButton(type: .system)
 
     // MARK: Background upload session (survives the extension being dismissed)
     // A foreground URLSession is cancelled when the extension UI goes away, so we
@@ -751,7 +761,9 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     /// "Making your card" would be false. Say "Saved ✓" plus when it will be
     /// read, hide the % (nothing is running), skip the app's analyzing hand-off,
     /// and hold the frame long enough to read.
-    private func completeScanSuccess(waitingHint: String? = nil, then: @escaping () -> Void) {
+    private func completeScanSuccess(waitingHint: String? = nil,
+                                     title: String = "Saved ✓ · Making your card",
+                                     then: @escaping () -> Void) {
         DispatchQueue.main.async {
             self.displayLink?.invalidate()
             self.displayLink = nil
@@ -769,7 +781,9 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
             // Keep the live % visible (the ✓ rides the copy, not the counter) and
             // leave the bar at its accent curve width — do NOT fill it.
             self.percentLabel.alpha = 1
-            self.phaseLabel.text = "Saved ✓ · Making your card"
+            // The caller's line ("Saved the first of 3 links ✓"), not always
+            // the default: a hard-coded title here swallowed that message.
+            self.phaseLabel.text = title
             self.hintLabel.text = "The card finishes on its own in Machina."
             // Hand the app EXACTLY this % (the hint carries progress + start
             // clock) so its loader continues the ramp instead of restarting.
@@ -842,7 +856,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
                 if success {
                     // Save acknowledged — show the honest "saved, still analyzing"
                     // frame (bar stays mid-flight), then finish.
-                    self.completeScanSuccess(waitingHint: waitingHint) { self.finish() }
+                    self.completeScanSuccess(waitingHint: waitingHint, title: message) { self.finish() }
                 } else {
                     // Stop the cosmetic scan and surface the message on the card.
                     self.displayLink?.invalidate()
@@ -1317,13 +1331,24 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         // copy found there into the Keychain and drop it from the plist, so
         // the first share after an app update still works without a relaunch.
         var token = KeychainStore.get(account: KeychainStore.ingestTokenAccount)
+        var fromLegacyPlist = false
         if token == nil, let legacy = defaults?.string(forKey: "ingestToken"), !legacy.isEmpty {
             if KeychainStore.set(legacy, account: KeychainStore.ingestTokenAccount) {
                 defaults?.removeObject(forKey: "ingestToken")
             }
             token = legacy
+            fromLegacyPlist = true
         }
         let stored = defaults?.string(forKey: "shareEndpoint") ?? ""
+        // A Keychain item outlives the app. After delete + reinstall the token
+        // is still here while the App Group, where ShareConfigPlugin.save
+        // writes the endpoint in the same call, is empty. Sharing before the
+        // app is opened again must not post into the PREVIOUS account's
+        // library: drop the orphan, as AppDelegate does on first launch.
+        if token != nil, !fromLegacyPlist, stored.isEmpty {
+            KeychainStore.delete(account: KeychainStore.ingestTokenAccount)
+            token = nil
+        }
         // The token is only ever posted to the app's own hosts. A stored
         // endpoint that fails the allowlist falls back to the built-in one
         // rather than being trusted.
@@ -1376,7 +1401,12 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
             withIdentifier: "group.com.morhogeg.machina.share-upload.\(UUID().uuidString)")
         config.sharedContainerIdentifier = Self.appGroup
         config.isDiscretionary = false
-        config.sessionSendsLaunchEvents = true
+        // false: nothing in the app implements
+        // application(_:handleEventsForBackgroundURLSession:), so letting iOS
+        // relaunch Machina in the background when an upload finishes only
+        // booted the web view (and counted an "app open") for nobody. The
+        // transfer itself completes either way.
+        config.sessionSendsLaunchEvents = false
         let session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
         backgroundSession = session
 
@@ -1453,7 +1483,17 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
                 // main.py returns 503 for that on purpose, not 429.
                 showResult("Machina is busy. Try again in a minute", success: false)
             } else {
-                showResult("Couldn't save (\(code))", success: false)
+                // A 4xx carries the server's own short reason ("Image too
+                // large", "No link or text found"); a bare status code meant
+                // nothing to anyone. Anything else gets plain copy.
+                let body = (try? JSONSerialization.jsonObject(with: responseData)) as? [String: Any]
+                let serverText = ((body?["error"] as? String) ?? "")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                if (400...499).contains(code), !serverText.isEmpty, serverText.count <= 120 {
+                    showResult(serverText, success: false)
+                } else {
+                    showResult("Couldn't save. Try again", success: false)
+                }
             }
         }
         // The background daemon has read the body file by the time didComplete
