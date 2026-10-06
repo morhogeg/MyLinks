@@ -351,7 +351,10 @@ def _require_admin(req, headers: dict = None):
     """
     expected = os.environ.get("ADMIN_TOKEN", "")
     provided = req.headers.get("X-Admin-Token", "")
-    if not expected or not hmac.compare_digest(provided, expected):
+    # Bytes, not str: compare_digest raises TypeError on a non-ASCII str,
+    # which answered 500 and confirmed the endpoint exists (ACCT-14).
+    if not expected or not hmac.compare_digest(
+            provided.encode("utf-8", "surrogateescape"), expected.encode("utf-8")):
         logger.warning("Blocked unauthorized admin endpoint access")
         return _error_response("Not found", 404, headers)
     return None
@@ -4551,12 +4554,81 @@ class _DeleteAccountError(Exception):
 
 def _user_doc_before_delete(uid: str) -> dict:
     """The user doc, read BEFORE it is deleted: the Storage sweep needs
-    `storageKey`, the tombstone needs `createdAt`. Best-effort, {} on error."""
+    `storageKey`, the tombstone needs `createdAt`. {} when the doc is gone. A
+    failed read raises: without `storageKey` the sweep would miss the user's
+    newer images, and once the workspace is deleted nothing could find them."""
     try:
         snap = get_db().collection('users').document(uid).get()
-        return (snap.to_dict() or {}) if snap.exists else {}
-    except Exception:
-        return {}
+    except Exception as e:
+        logger.error("Failed to read the account before deletion: %s", type(e).__name__)
+        raise _DeleteAccountError("Failed to delete account data")
+    return (snap.to_dict() or {}) if snap.exists else {}
+
+
+# Storage deletes in flight at once during account deletion. A big library
+# is thousands of blobs; one at a time it outran the app's 60 s wait.
+_ACCOUNT_BLOB_DELETE_WORKERS = 16
+
+
+def _is_not_found(exc: Exception) -> bool:
+    return getattr(exc, "code", None) == 404 or type(exc).__name__ == "NotFound"
+
+
+def _delete_account_storage(uid: str, storage_key: Optional[str]) -> int:
+    """Delete every Storage object the account owns: screenshots and post
+    thumbnails under the legacy uid-keyed prefixes AND the opaque storage key
+    (blobs written after 2026-09-16 live under the latter). A blob that is
+    already gone (a concurrent retry got there first) is fine; any other
+    failure raises. Returns the number of blobs."""
+    from concurrent.futures import ThreadPoolExecutor
+    bucket = storage.bucket()
+    keys = {uid} | ({storage_key} if storage_key else set())
+    blobs = [
+        blob
+        for key in sorted(keys)
+        for prefix in (f"screenshots/{key}/", f"post_thumbs/{key}/")
+        for blob in bucket.list_blobs(prefix=prefix)
+    ]
+
+    def _drop(blob):
+        try:
+            blob.delete()
+        except Exception as e:
+            if not _is_not_found(e):
+                raise
+
+    with ThreadPoolExecutor(max_workers=_ACCOUNT_BLOB_DELETE_WORKERS) as pool:
+        list(pool.map(_drop, blobs))  # re-raises the first failure
+    return len(blobs)
+
+
+def _delete_auth_user_best_effort(auth_uid: str) -> None:
+    try:
+        admin_auth.delete_user(auth_uid)
+    except admin_auth.UserNotFoundError:
+        pass
+    except Exception as e:
+        logger.warning("Could not delete a linked auth user: %s", type(e).__name__)
+
+
+def _delete_rc_subscriber_best_effort(app_user_id: str) -> None:
+    """Remove the account's RevenueCat customer record (its app user id is
+    the Auth uid; see web/lib/purchases.ts). Best-effort: the App Store keeps
+    the subscription itself either way, and a RevenueCat outage must never
+    block an account deletion."""
+    try:
+        from entitlement import RC_API_BASE, rc_configured, _rc_secret
+        if not rc_configured() or not app_user_id:
+            return
+        resp = requests.delete(
+            f"{RC_API_BASE}/subscribers/{requests.utils.quote(app_user_id, safe='')}",
+            headers={"Authorization": f"Bearer {_rc_secret()}", "Accept": "application/json"},
+            timeout=5,
+        )
+        if resp.status_code not in (200, 201, 204, 404):
+            logger.warning("RevenueCat subscriber delete answered HTTP %s", resp.status_code)
+    except Exception as e:
+        logger.warning("RevenueCat subscriber delete failed: %s", type(e).__name__)
 
 
 def _delete_account_logic(auth_uid: str, email: str = None) -> dict:
@@ -4576,25 +4648,28 @@ def _delete_account_logic(auth_uid: str, email: str = None) -> dict:
         # Remember when this email's first workspace was created, so a
         # re-signup does not restart the trial clock (link_service tombstone).
         write_account_tombstone(email or before.get('email'), before.get('createdAt'))
+        # Storage FIRST, while the workspace (and its storageKey) still
+        # exists: if this fails, the account is kept and a retry finds it and
+        # finishes. It used to run after the Firestore sweep as best-effort,
+        # so a failure reported success with the images still stored, and a
+        # retry found no workspace and never swept Storage again (ACCT-4).
+        try:
+            _delete_account_storage(uid, storage_key)
+        except Exception as e:
+            logger.error("Failed to delete storage objects for account: %s", type(e).__name__)
+            raise _DeleteAccountError("Failed to delete account data")
         try:
             delete_user_data(uid)
         except Exception as e:
-            logger.error("Failed to delete Firestore data for account: %s", e)
+            logger.error("Failed to delete Firestore data for account: %s", type(e).__name__)
             raise _DeleteAccountError("Failed to delete account data")
-        # Best-effort: remove the user's screenshots and post thumbnails from
-        # Storage — under the legacy uid-keyed prefixes AND the opaque storage
-        # key (blobs written after 2026-09-16 live under the latter).
-        try:
-            bucket = storage.bucket()
-            keys = {uid}
-            if storage_key:
-                keys.add(storage_key)
-            for key in keys:
-                for prefix in (f"screenshots/{key}/", f"post_thumbs/{key}/"):
-                    for blob in bucket.list_blobs(prefix=prefix):
-                        blob.delete()
-        except Exception as e:
-            logger.warning("Failed to delete storage objects for account: %s", e)
+        # Other sign-ins linked to this workspace (a legacy multi-linked
+        # account): their Auth records hold the user's email and name too.
+        linked = before.get('authUids')
+        for other in linked if isinstance(linked, list) else []:
+            if isinstance(other, str) and other and other != auth_uid:
+                _delete_auth_user_best_effort(other)
+        _delete_rc_subscriber_best_effort(auth_uid)
 
     # Delete the Firebase Auth user last so the login can't be reused.
     try:
