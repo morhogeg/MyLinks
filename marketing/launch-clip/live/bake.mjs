@@ -118,6 +118,10 @@ for (const f of new Set(Object.values(stillFrames(session)))) {
   stillFiles[f] = `media/stills/${f}.webp`;
 }
 
+// the soundtrack: the narrated mix when there is one (npm run live:voice)
+const narrated = path.join(clip, 'out', 'live', 'media', 'score-vo.wav');
+const scoreWav = fs.existsSync(narrated) ? narrated : path.join(clip, 'out', 'live', 'media', 'score.wav');
+
 // 4. the index the page reads: marks + rects, and where the live media is
 const slim = (t) => ({ dpr: t.dpr, fps: t.fps, count: t.count, screen: t.screen, marks: t.marks, flags: t.flags, rects: t.rects, files: [] });
 fs.writeFileSync(
@@ -131,7 +135,7 @@ fs.writeFileSync(
       fps: FPS,
       cards: Object.fromEntries(Object.entries(cardFiles).map(([k, v]) => [k, `media/${v}`])),
       stills: stillFiles,
-      score: fs.existsSync(path.join(clip, 'out', 'live', 'media', 'score.wav')) ? 'media/score.mp3' : null,
+      score: fs.existsSync(scoreWav) ? 'media/score.mp3' : null,
     },
   }),
 );
@@ -139,7 +143,6 @@ fs.writeFileSync(
 // 5. score and font
 // (MP3: the one audio format every browser plays and every static host,
 // claude.ai artifacts included, serves)
-const scoreWav = path.join(clip, 'out', 'live', 'media', 'score.wav');
 if (fs.existsSync(scoreWav)) {
   execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-i', scoreWav, '-c:a', 'libmp3lame', '-b:a', '192k', path.join(MEDIA, 'score.mp3')]);
 }

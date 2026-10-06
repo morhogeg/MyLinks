@@ -799,15 +799,16 @@ Enforced by `npm run verify` where a machine can check:
 
 # The live film (`live/`)
 
-**Machina in Motion**: a 65-second film of the real app, in one continuous
-take, that runs as a web page (a 3D stage the visitor's browser draws) and
-renders frame-exact to MP4 from the same page. Built 2026-10-06 on the reel
+**Machina in Motion**: a 66-second narrated film of the real app, in one
+continuous take, that runs as a web page (a 3D stage the visitor's browser
+draws) and renders frame-exact to MP4 from the same page. Built 2026-10-06 on the reel
 kit's capture; branch `claude/live-film`, not merged.
 
 ```bash
 npm run reel:app        # the real app, built with Firebase swapped for the demo account
 npm run live:capture    # → out/live/takes/{session,cards}  (~20 min at 3x)
 npm run live:score      # → out/live/media/score.wav (the bake makes its MP3)
+npm run live:voice      # the narrator over the score → out/live/media/score-vo.wav (needs Kokoro, below)
 npm run live:verify     # copy rules on every app frame the edit uses + the film's words
 npm run live:render     # → out/live/machina-in-motion-landscape.mp4  (add -- --format portrait)
 npm run live:bake       # → out/live/site/  the live page, ~14 MB, host anywhere static
@@ -870,9 +871,11 @@ addition), so its connections, the Ask citation and its graph node all hold.
 - **The Add dialog** rises out of the + while the phone dims and steps back
   (the app's own black scrim would otherwise darken the frame), stays live
   while it works, then folds down into the slot where the new card appears.
-- **The words** are the reel's owner-approved lines; the film opens on the
-  App Store subtitle and ends on the tagline. In 9:16 a band of the same
-  paper fades any screen that rises under them (the reel's BandScrim).
+- **The words** (`film/words.js`) are the reel's owner-approved lines, and
+  the narrator speaks them. The film opens on the app and the ring of saves
+  with no words (owner, 2026-10-06: the subtitle line is not needed at the
+  start) and ends on the tagline. In 9:16 a band of the same paper fades any
+  screen that rises under them (the reel's BandScrim).
 
 ## Live and rendered, one page
 
@@ -897,7 +900,27 @@ strikes into a downbeat (the tempo is set so it lands on bar 26). Sound design
 sits on the picture's events (taps, the five phases, each Ask source, the
 mark). **Verified numerically only; someone still has to listen to it.**
 
+## The narrator (`npm run live:voice`)
+
+The house narrator, the same voice as the launch film and the reel (Kokoro
+`af_heart` at 0.95, run locally; "Machina" respelled "Makeena" for its ear;
+setup in "The voice-over" above). **The captions are the script:**
+`audio/synth-vo.py live` reads `voiceOf` in `film/words.js`, one line per
+caption, starting 0.1 s after the caption starts arriving, and fails if a
+line would still be speaking when its caption leaves (the Revisit beat holds
+3.4 s for that reason). `audio/mix-vo.mjs live` lays the lines over the
+score: the score sits 6 dB down (it is mastered on its own), ducks to 0.65
+under each line, to 0.4 under the Ask answer (the score is fullest there)
+and the tagline (the brand line, as in the reel), then the mix is mastered to
+−14 LUFS, true peak ≤ −1 dBTP. The render muxes this mix when it is newer
+than the score.
+
 ## Gates (`npm run live:verify`)
+
+The narrator: the lines it spoke must still be the film's words at the
+film's times (a stale voice fails), every line sits 3 dB or more over the
+music in the speech band (the reel's bar), and the mix is at −14 LUFS /
+≤ −1 dBTP.
 
 Every string the app showed on every captured frame the edit uses, plus the
 film's own words: no "AI", no "second brain", never "Machina AI", no em dash,

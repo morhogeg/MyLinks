@@ -4,6 +4,7 @@
  *
  *   node audio/mix-vo.mjs          # film: public/score.wav      → public/score-vo.wav
  *   node audio/mix-vo.mjs reel     # reel: public/reel-score.wav → public/reel-score-vo.wav
+ *   node audio/mix-vo.mjs live     # live film: out/live/media/score.wav → score-vo.wav
  *
  * The music ducks under the voice — 35% down, 120ms ramps — which is what
  * keeps the VO effortless to hear without the score ever disappearing. One
@@ -25,10 +26,18 @@ const root = path.join(here, '..');
 // balance the owner has listened to; the reel's bed runs drums under almost
 // every line, so it ducks deeper to put the voice at the SAME level over its
 // music (npm run verify measures both and compares).
+// The live film's bed is the film's own synth (live/score.mjs), so it takes
+// the film's duck; its score and mix live with the rest of its media. That
+// bed is mastered on its own (−14 LUFS), so it sits 6dB down (`bed`) before the
+// voice goes over it; the master then brings the whole mix back up.
+const LIVE_MEDIA = path.join(root, 'out', 'live', 'media');
 const SCRIPTS = {
   film: { vo: path.join(root, 'out', 'vo'), score: 'score.wav', out: 'score-vo.wav', duck: 0.65 },
   reel: { vo: path.join(root, 'out', 'vo', 'reel'), score: 'reel-score.wav', out: 'reel-score-vo.wav', duck: 0.55 },
+  live: { vo: path.join(root, 'out', 'vo', 'live'), score: path.join(LIVE_MEDIA, 'score.wav'), out: path.join(LIVE_MEDIA, 'score-vo.wav'), duck: 0.65, bed: 0.5 },
 };
+// a script's score and mix are in public/ unless given as a full path
+const inPublic = (f) => (path.isAbsolute(f) ? f : path.join(root, 'public', f));
 const name = process.argv[2] ?? 'film';
 const script = SCRIPTS[name];
 if (!script) throw new Error(`unknown script ${name}; one of ${Object.keys(SCRIPTS).join(', ')}`);
@@ -56,14 +65,15 @@ const readWav = (p) => {
   return { ...fmt, frames, samples: out };
 };
 
-const score = readWav(path.join(root, 'public', script.score));
+const score = readWav(inPublic(script.score));
 const SR = score.rate;
 const N = score.frames;
 const L = new Float64Array(N);
 const R = new Float64Array(N);
+const BED = script.bed ?? 1;
 for (let i = 0; i < N; i++) {
-  L[i] = score.samples[i * 2];
-  R[i] = score.samples[i * 2 + 1];
+  L[i] = score.samples[i * 2] * BED;
+  R[i] = score.samples[i * 2 + 1] * BED;
 }
 
 const manifest = JSON.parse(fs.readFileSync(path.join(voDir, 'manifest.json'), 'utf8'));
@@ -100,7 +110,8 @@ for (const line of manifest) {
   }
   const d0 = Math.max(0, start - RAMP);
   const d1 = Math.min(N, start + outFrames + RAMP);
-  const D = lineDuck[line.frame] ?? DUCK;
+  // (a live-film line carries its own `duck` in the manifest, from words.js)
+  const D = line.duck ?? lineDuck[line.frame] ?? DUCK;
   for (let i = d0; i < d1; i++) {
     let g = D;
     if (i < start) g = 1 - (1 - D) * ((i - d0) / RAMP);
@@ -123,8 +134,9 @@ let g = peak > 0.98 ? 0.98 / peak : 1;
 // integrated, true peaks at or under −1 dBTP, which is where Reels, TikTok,
 // Shorts and YouTube expect a finished mix (the round-12 mix measured −15.8).
 // A global gain, then a look-ahead limiter on the few transients that would
-// pass the ceiling. The film's mix is untouched (it has no MASTER).
-const MASTER = { reel: { lufs: -14, truePeak: -1 } }[name];
+// pass the ceiling. The live film is mastered the same way, for the same
+// feeds. The film's mix is untouched (it has no MASTER).
+const MASTER = { reel: { lufs: -14, truePeak: -1 }, live: { lufs: -14, truePeak: -1 } }[name];
 if (MASTER) {
   let gain = 10 ** ((MASTER.lufs - lufs(L, R, SR)) / 20);
   let ceiling = 10 ** ((MASTER.truePeak - 0.3) / 20);
@@ -150,7 +162,7 @@ if (MASTER) {
   // bed from this mix; it needs the gain the whole mix was given
   fs.writeFileSync(
     path.join(voDir, 'mix.json'),
-    JSON.stringify({ gain, lufs: +out.I.toFixed(2), truePeak: +out.tp.toFixed(2) }, null, 1),
+    JSON.stringify({ gain, bed: BED, lufs: +out.I.toFixed(2), truePeak: +out.tp.toFixed(2) }, null, 1),
   );
   console.log(`mastered: gain ${(20 * Math.log10(gain)).toFixed(2)}dB → ${out.I.toFixed(2)} LUFS, ${out.tp.toFixed(2)} dBTP`);
 }
@@ -174,6 +186,6 @@ for (let i = 0; i < N; i++) {
   out.writeInt16LE(Math.round(Math.max(-1, Math.min(1, L[i] * g)) * 32767), 44 + i * 4);
   out.writeInt16LE(Math.round(Math.max(-1, Math.min(1, R[i] * g)) * 32767), 44 + i * 4 + 2);
 }
-const outPath = path.join(root, 'public', script.out);
+const outPath = inPublic(script.out);
 fs.writeFileSync(outPath, out);
 console.log(`wrote ${outPath} — ${(bytes / 1e6).toFixed(1)}MB, peak gain ${g.toFixed(3)}, ${manifest.length} VO lines`);

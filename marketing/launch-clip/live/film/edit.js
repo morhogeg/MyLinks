@@ -58,7 +58,8 @@ export function makeEdit(session) {
     hold('graphHold', ['revisitOpen', -1], 1.3),
     // (the first frame after the tap is the Revisit view mounting: blank)
     play('revisit', ['revisitOpen', 1], 'revisitHold'),
-    hold('revHold', 'revisitHold', 2.4),
+    // (3.4s: the narrator's Revisit line runs 3.4s and must finish on its beat)
+    hold('revHold', 'revisitHold', 3.4),
     play('expand', 'expand', 'recapScroll', { fps: 60 }),
     hold('expHold', ['recapScroll', -1], 1.0),
     glide('recap', 'recapScroll', ['end', -1], 4.0),

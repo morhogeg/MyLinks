@@ -2546,8 +2546,7 @@ native iOS share sheet, so that beat is a brand graphic.
 - **Four feature clips** sit on their own branches, each awaiting owner review:
   SAVE `claude/clip-save`, FIND `claude/clip-find`, ASK `claude/clip-ask`,
   REVISIT `claude/clip-revisit`.
-- **The live film, "Machina in Motion"** (65s, 16:9 + 9:16, plus a live web
-  page of the same film) is on branch `claude/live-film` (built 2026-10-06 on
+- **The live film, "Machina in Motion"** (66s, narrated, 16:9 + 9:16) is on branch `claude/live-film` (built 2026-10-06 on
   the reel kit + today's `main`), awaiting owner review. One continuous take
   of the real app (boot → save → find → ask → graph → Revisit), composed in a
   3D set with an orbit camera, lifts, a ring of the account's saves and the
@@ -2841,7 +2840,18 @@ exact-match, capped.
   15 MB limit). Chapter times now live in `film/edit.js` (`chaptersOf`), read
   by both pages. Why the live page did not open is NOT verified (no device
   here); likely an iPhone web view that never preloads video, so its loading
-  screen never cleared.
+  screen never cleared. **Then (owner): "Where is the narration? And don't
+  start with 'never lose another great find', it's not needed."** The film
+  now opens with no words, and the house narrator (Kokoro `af_heart`, as the
+  launch film and the reel) speaks every caption: `film/words.js` holds the
+  words (picture, voice and copy checks read it), `audio/synth-vo.py live` +
+  `audio/mix-vo.mjs live` make `out/live/media/score-vo.wav` (score 6 dB down,
+  ducked under each line, mastered −14 LUFS / −1.2 dBTP), and the render muxes
+  it. The Revisit beat holds 1 s longer so its line fits (film now 66.2s; the
+  score's tempo follows the edit). **Verified:** every line fits its caption;
+  every line sits ≥ 4.7 dB over the music in the speech band (the reel's bar is
+  3 dB); `live:verify` green. **NOT verified:** nobody has listened to the
+  narrated mix.
 
 - **2026-10-05 (evening) — BROWSER EXTENSION STORE-READY + MACHINA FOR SAFARI
   PROJECT; B1 CORS SHIPPED.** Branch `claude/app-launch-qa-a29d1f`. Two

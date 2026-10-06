@@ -9,8 +9,9 @@
  *   node live/render.mjs --from 20 --to 30       (a range, for checking a beat)
  *   --fps 60 (default) · --workers 3 · --takes takes-dpr1 · --crf 16 · --silent
  *
- * The score (out/live/media/score.wav, live/score.mjs) is muxed in unless
- * --silent.
+ * The soundtrack is muxed in unless --silent: the narrated mix
+ * (out/live/media/score-vo.wav, npm run live:voice) when it is current, else
+ * the bare score (out/live/media/score.wav, live/score.mjs).
  */
 
 import fs from 'node:fs';
@@ -121,8 +122,13 @@ if (STILLS) {
   const out = path.join(OUT, `machina-in-motion-${FORMAT}${suffix}.mp4`);
   const picture = path.join(partsDir, 'picture.mp4');
   execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', list, '-c', 'copy', picture]);
-  // the score (live/score.mjs), unless --silent or it has not been made
-  const score = path.join(OUT, 'media', 'score.wav');
+  // the soundtrack, unless --silent: the narrated mix (audio/mix-vo.mjs live)
+  // when it is there and current, else the bare score (live/score.mjs)
+  const narrated = path.join(OUT, 'media', 'score-vo.wav');
+  const bare = path.join(OUT, 'media', 'score.wav');
+  const current = fs.existsSync(narrated) && (!fs.existsSync(bare) || fs.statSync(narrated).mtimeMs >= fs.statSync(bare).mtimeMs);
+  if (fs.existsSync(narrated) && !current) console.warn('  ! score-vo.wav is older than score.wav: muxing the bare score (npm run live:voice)');
+  const score = current ? narrated : bare;
   if (!args.includes('--silent') && fs.existsSync(score)) {
     execFileSync('ffmpeg', [
       '-loglevel', 'error', '-y', '-i', picture, '-ss', String(from), '-t', String(to - from), '-i', score,

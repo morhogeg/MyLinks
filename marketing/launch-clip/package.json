@@ -17,6 +17,7 @@
     "reel:render": "remotion render src/index.ts MachinaReel out/machina-reel.mp4",
     "live:capture": "node live/shoot.mjs",
     "live:score": "node live/score.mjs",
+    "live:voice": "python3 audio/synth-vo.py live && node audio/mix-vo.mjs live",
     "live:verify": "node live/verify.mjs",
     "live:render": "node live/render.mjs",
     "live:bake": "node live/bake.mjs",

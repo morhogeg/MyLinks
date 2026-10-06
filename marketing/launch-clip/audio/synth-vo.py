@@ -3,9 +3,11 @@
 #
 #   python3 audio/synth-vo.py          # the launch film (default)
 #   python3 audio/synth-vo.py reel     # the highlight reel
+#   python3 audio/synth-vo.py live     # the live film (marketing/launch-clip/live)
 #
 #   film →  out/vo/line-NN.wav + out/vo/manifest.json
 #   reel →  out/vo/reel/line-NN.wav + out/vo/reel/manifest.json
+#   live →  out/vo/live/line-NN.wav + out/vo/live/manifest.json
 #
 # ONE NARRATOR. Every Machina video speaks with the voice config below (the
 # film's, owner-approved): Kokoro `af_heart` at 0.95, "Machina" respelled for
@@ -112,7 +114,28 @@ def reel_script():
     return out
 
 
-SCRIPTS = {"film": (film_script, VO), "reel": (reel_script, os.path.join(VO, "reel"))}
+def live_script():
+    """The live film's captions (live/film/words.js, voiceOf), read from the
+    film's own clock, spoken as written: each line starts as its caption
+    arrives and must be finished before that caption leaves."""
+    js = (
+        "Promise.all([import('./live/media.mjs'), import('./live/film/edit.js'), import('./live/film/words.js')])"
+        ".then(([m, e, w]) => { const S = e.makeEdit(m.buildIndex('out/live/' + (process.env.LIVE_TAKES || 'takes')).takes.session);"
+        " console.log(JSON.stringify(w.voiceOf(S.at, S.dur))); })"
+    )
+    raw = subprocess.run(["node", "-e", js], cwd=ROOT, check=True, capture_output=True, text=True).stdout
+    return [
+        {"start": l["start"], "window": l["window"], "text": l["text"].replace("Machina", SAY_NAME), "speed": SPEED,
+         **({"duck": l["duck"]} if "duck" in l else {})}
+        for l in json.loads(raw)
+    ]
+
+
+SCRIPTS = {
+    "film": (film_script, VO),
+    "reel": (reel_script, os.path.join(VO, "reel")),
+    "live": (live_script, os.path.join(VO, "live")),
+}
 
 # Scripts whose captions reveal word by word get the timing of every word,
 # measured from the synthesized audio, written where the picture can read it.
@@ -210,6 +233,8 @@ def main():
             entry = {"bar": line["bar"], **entry}
         if "frame" in line:
             entry = {"frame": line["frame"], **entry}
+        if "duck" in line:
+            entry["duck"] = line["duck"]
         manifest.append(entry)
         if name in WORD_TIMING:
             timing.append({

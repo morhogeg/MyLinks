@@ -15,7 +15,7 @@ const W = (u, v) => ({ tx: u - 196.5, ty: v - 426 });
 export const landscape = {
   name: 'landscape',
   size: { w: 1920, h: 1080 },
-  captions: { hook: 'bottom', side: 'left' },
+  captions: { side: 'left' },
   camDefaults: { tx: 0, ty: 0, tz: 0, zoom: 1, yaw: 0, pitch: 0, roll: 0, lens: 2400, fx: 960, fy: 540, focus: 0, dof: 0 },
   /** the opening ring of saves: radius, tilt (deg, front swings low), orbit
    *  speed (rad/s), card scale, how far side cards turn in (deg) */
@@ -109,7 +109,7 @@ export const landscape = {
 export const portrait = {
   name: 'portrait',
   size: { w: 1080, h: 1920 },
-  captions: { hook: 'top', side: 'top' },
+  captions: { side: 'top' },
   camDefaults: { tx: 0, ty: 0, tz: 0, zoom: 1, yaw: 0, pitch: 0, roll: 0, lens: 2600, fx: 540, fy: 1160, focus: 0, dof: 0 },
   ring: { R: 760, tilt: -30, speed: 0.22, phase: 0.4, s: 0.82, turn: 14, y: 40 },
   askSpots: [
