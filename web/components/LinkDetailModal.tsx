@@ -1301,6 +1301,10 @@ export default function LinkDetailModal({
                                             both states so it sees the transition. */}
                                         {(isPartialCapture || (!!link.enrichedAt && link.sourceType !== 'image' && !isNote) || !!link.enrichStatus) && (
                                             <ScreenshotEnrich
+                                                // One instance per card: moving to a related
+                                                // partial card must not carry the picked
+                                                // screenshots (and the "Analyze") across.
+                                                key={link.id}
                                                 link={link}
                                                 uid={uid}
                                                 isRtl={isRtl}

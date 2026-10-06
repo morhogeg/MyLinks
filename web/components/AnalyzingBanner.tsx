@@ -95,10 +95,15 @@ export default function AnalyzingBanner({ state }: { state: AnalyzingState | nul
             setVisible(true);
             return;
         }
-        // active just went false — if we were showing, finish gracefully.
-        if (visible && !done) {
-            setDone(true);
-            setShown((s) => (s ? { ...s, progress: 100 } : s));
+        // active just went false — if we were showing, finish gracefully. A
+        // progress/kind change during the finish frame runs the cleanup below,
+        // which clears the timer; re-arm it then, or the banner sticks on
+        // "Saved to Machina 100%".
+        if (visible && (!done || !hideTimer.current)) {
+            if (!done) {
+                setDone(true);
+                setShown((s) => (s ? { ...s, progress: 100 } : s));
+            }
             hideTimer.current = setTimeout(() => {
                 setVisible(false);
                 setDone(false);

@@ -643,11 +643,19 @@ export async function retryFailedLink(uid: string, link: Link): Promise<{ waitin
             tags: mergeImportedTags(l.tags ?? [], link.importedTags),
             category: canonicalCategory(l.category ?? '') || 'General',
             language: l.language ?? 'en',
+            // The whole map the server built: a retried YouTube card keeps its
+            // videoId, thumbnail, channel, duration and key moments, and an
+            // X/Instagram card its cover. Writing three fields here replaced
+            // the map and dropped all of that (launch audit WEB-7).
             metadata: {
+                ...(l.metadata ?? {}),
                 originalTitle: l.metadata?.originalTitle ?? '',
                 estimatedReadTime: l.metadata?.estimatedReadTime ?? 0,
                 actionableTakeaway: l.metadata?.actionableTakeaway ?? null,
             },
+            // The free plan's "Pro feature" line for a video; cleared when a
+            // retry no longer warrants it.
+            proFeature: l.proFeature ?? deleteField(),
             sourceType: l.sourceType || 'web',
             sourceName: l.sourceName ?? null,
             // Capture honesty (PM-1C). Written on EVERY retry, null included: a
