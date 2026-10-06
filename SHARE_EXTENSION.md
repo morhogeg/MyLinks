@@ -34,11 +34,16 @@ Share sheet ──▶ ShareExt (separate process)
 The extension runs in its own process and can't see the WebView's Firebase
 session, so it can't fetch its own ingest token. Instead:
 
-1. On login the web app calls the existing `get_share_config` callable → gets
-   `{ endpoint, token }`.
-2. `shareConfig.ts` passes them to the native `ShareConfig.save(...)` plugin.
-3. The plugin writes them into `UserDefaults(suiteName: "group.com.morhogeg.machina")`.
-4. The extension reads them from the same App Group when it runs.
+1. Once the workspace resolves and the account has accepted the AI notice,
+   `AuthProvider` hands the doc's `ingestToken` (or `get_share_config` as a
+   fallback) to `shareConfig.ts`.
+2. `shareConfig.ts` passes `{ endpoint, token }` to the native
+   `ShareConfig.save(...)` plugin.
+3. The plugin stores the **token in the shared Keychain** (`KeychainStore.swift`,
+   this-device-only, access group = the App Group) and the **endpoint** in
+   `UserDefaults(suiteName: "group.com.morhogeg.machina")`.
+4. The extension reads both when it runs. A token with no endpoint is an
+   orphan from a deleted install and is dropped (sign in first).
 
 App Group id (must match in all four places — both entitlements, the plugin, and
 the view controller): **`group.com.morhogeg.machina`**.

@@ -18,6 +18,13 @@ on:
           with no sign-in UI to recover with. Leave OFF for every normal build.
         type: boolean
         default: false
+      marketing_version:
+        description: >-
+          Version shown on the App Store (e.g. 1.0.1). Leave empty to keep the
+          project's MARKETING_VERSION. Every release after an approved one must
+          be HIGHER, or App Store Connect rejects the upload.
+        type: string
+        default: ""
   # PUSH-TO-BUILD: cloud sessions can't call the dispatch API (403 for the
   # GitHub App integration), so moving this branch is the programmatic trigger:
   #   git push -f origin main:trigger/testflight
@@ -325,7 +332,20 @@ jobs:
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          # Through env, never interpolated into the script (injection-safe).
+          MARKETING_VERSION_INPUT: ${{ inputs.marketing_version }}
         run: |
+          # Optional App Store version override (dispatch input). A push
+          # trigger has no inputs, so it keeps the project's value.
+          MV_ARGS=()
+          if [ -n "${MARKETING_VERSION_INPUT:-}" ]; then
+            if ! [[ "$MARKETING_VERSION_INPUT" =~ ^[0-9]+(\.[0-9]+){1,2}$ ]]; then
+              echo "::error::marketing_version must look like 1.0.1, got '$MARKETING_VERSION_INPUT'"
+              exit 1
+            fi
+            MV_ARGS=("MARKETING_VERSION=$MARKETING_VERSION_INPUT")
+            echo "Marketing version: $MARKETING_VERSION_INPUT"
+          fi
           # SIGNED archive (automatic signing) — do NOT "optimize" this to an
           # unsigned archive + sign-at-export: build 1018 shipped that way and
           # LOST the App Group entitlement (group.com.morhogeg.machina), which
@@ -346,6 +366,7 @@ jobs:
             -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/App.xcarchive" \
             CURRENT_PROJECT_VERSION=${{ steps.bn.outputs.value }} \
+            ${MV_ARGS[@]+"${MV_ARGS[@]}"} \
             -allowProvisioningUpdates \
             -authenticationKeyID "$ASC_KEY_ID" \
             -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
