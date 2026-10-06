@@ -244,6 +244,8 @@ def test_client_fallback_workspace_inherits_the_deleted_accounts_trial_clock(mon
         tombstones={tid: {"firstCreatedAt": first}},
     )
     monkeypatch.setattr(ent, "get_db", lambda: db)
+    # The lookup keys on the Auth account's email, not the doc's.
+    monkeypatch.setattr(ent, "_verified_account_email", lambda auth_uid: "again@example.com")
 
     doc = ent.get_entitlement("u1")
     # The grant's ceiling is measured from the ORIGINAL first sign-up.
@@ -271,6 +273,7 @@ def test_fallback_workspace_without_a_tombstone_is_only_marked(monkeypatch):
     created = launch + 5 * DAY
     db = _EntDb(user={"createdAt": created, "email": "new@example.com"}, tombstones={})
     monkeypatch.setattr(ent, "get_db", lambda: db)
+    monkeypatch.setattr(ent, "_verified_account_email", lambda auth_uid: "new@example.com")
     ent.get_entitlement("u1")
     user = db.store["users"]["u1"]
     assert user["createdAt"] == created

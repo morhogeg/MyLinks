@@ -5023,8 +5023,13 @@ def entitlement_sync_http(req: https_fn.Request) -> https_fn.Response:
         return _server_error(headers, e, "Entitlement sync failed")
 
 
-# RevenueCat event types that change whether the `pro` entitlement is active.
-# Anything else (TEST, SUBSCRIBER_ALIAS, …) is acknowledged and ignored.
+# RevenueCat event types the handler knows by name. This is NOT the gate:
+# every event that names an app user is re-synced, because the handler
+# re-reads the subscriber from RevenueCat's REST API and never takes a date
+# from the body, so an extra sync costs one lookup while a skipped one left
+# `proUntil` stale (SUBSCRIPTION_EXTENDED, REFUND_REVERSED and
+# TEMPORARY_ENTITLEMENT_GRANT used to be dropped). An unlisted type is only
+# logged, so a type RevenueCat adds later is noticed and still handled.
 # TRANSFER: a restore on a device signed into a DIFFERENT account moved the
 # App Store purchase between app user ids — both sides must be re-synced (the
 # old one loses Pro, the new one gains it). Its body carries
@@ -5032,7 +5037,12 @@ def entitlement_sync_http(req: https_fn.Request) -> https_fn.Response:
 _RC_EVENTS = frozenset((
     "INITIAL_PURCHASE", "RENEWAL", "PRODUCT_CHANGE", "CANCELLATION",
     "EXPIRATION", "BILLING_ISSUE", "UNCANCELLATION", "TRANSFER",
+    "SUBSCRIPTION_EXTENDED", "REFUND_REVERSED", "TEMPORARY_ENTITLEMENT_GRANT",
+    "NON_RENEWING_PURCHASE", "SUBSCRIPTION_PAUSED", "SUBSCRIBER_ALIAS",
 ))
+# The only type never synced: the dashboard's "Send test event" names a
+# made-up app user.
+_RC_IGNORED_EVENTS = frozenset(("TEST",))
 
 
 def _rc_transfer(event: dict) -> https_fn.Response:
@@ -5082,7 +5092,9 @@ def revenuecat_webhook(req: https_fn.Request) -> https_fn.Response:
         logger.warning("revenuecat_webhook called but REVENUECAT_WEBHOOK_AUTH is unset")
         return _error_response("Webhook not configured", 503)
     provided = (req.headers.get("Authorization") or "").strip()
-    if not hmac.compare_digest(provided, expected):
+    # Bytes, not str: compare_digest raises TypeError on a non-ASCII str, which
+    # turned a junk header into a 500 instead of this 401. Still constant-time.
+    if not hmac.compare_digest(provided.encode("utf-8"), expected.encode("utf-8")):
         logger.warning("revenuecat_webhook: bad Authorization header")
         return _error_response("Unauthorized", 401)
     if not rc_configured():
@@ -5093,8 +5105,8 @@ def revenuecat_webhook(req: https_fn.Request) -> https_fn.Response:
     if not isinstance(event, dict):
         return _error_response("Invalid event body", 400)
     etype = str(event.get("type") or "")
-    if etype not in _RC_EVENTS:
-        logger.info("revenuecat_webhook: ignoring event type %s", etype or "?")
+    if etype in _RC_IGNORED_EVENTS:
+        logger.info("revenuecat_webhook: ignoring event type %s", etype)
         return https_fn.Response(json.dumps({"ok": True, "ignored": etype}), status=200,
                                  mimetype='application/json')
 
@@ -5105,6 +5117,13 @@ def revenuecat_webhook(req: https_fn.Request) -> https_fn.Response:
             return _server_error(None, e, "Webhook processing failed")
 
     app_user_id = event.get("app_user_id") or event.get("original_app_user_id")
+    if not isinstance(app_user_id, str) or not app_user_id:
+        # Nothing to re-read: the sync needs the app user id itself.
+        logger.info("revenuecat_webhook: %s names no app user", etype or "?")
+        return https_fn.Response(json.dumps({"ok": True, "ignored": etype}), status=200,
+                                 mimetype='application/json')
+    if etype not in _RC_EVENTS:
+        logger.info("revenuecat_webhook: unlisted event type %s, re-syncing anyway", etype or "?")
     aliases = event.get("aliases") or []
     try:
         uid = resolve_workspace_for_app_user(app_user_id, aliases)
@@ -5456,6 +5475,14 @@ def share_page(req: https_fn.Request) -> https_fn.Response:
             return https_fn.Response(_share_not_found_html(), status=404, headers=nf_headers)
 
         data = snap.to_dict() or {}
+        if kind == "card":
+            # The card behind the page went private (or was deleted) after it
+            # was shared: the page goes too, even if the app's "Stop sharing"
+            # never landed. Fails closed. Collection and answer snapshots carry
+            # no card ids, so they are only as current as their last publish.
+            from share_service import shared_card_withdrawn
+            if shared_card_withdrawn(db, share_id, data):
+                return https_fn.Response(_share_not_found_html(), status=404, headers=nf_headers)
         if kind == "collection":
             html_out = _render_shared_collection(data, share_url)
         elif kind == "answer":
@@ -6895,11 +6922,15 @@ def send_digests(event: scheduler_fn.ScheduledEvent) -> None:
 
 
 # Trial nudge: one push, 48h before a reverse trial ends (entitlement.py).
-# Six-hourly is plenty: the window is two days wide and the doc is stamped
-# (nudgedAt) so nobody is pinged twice.
-@scheduler_fn.on_schedule(schedule="0 */6 * * *", max_instances=1)
+# Hourly so the push can wait for the user's own daytime (09:00-20:59 in the
+# zone on their doc): at fixed six-hourly UTC ticks about a quarter of them
+# landed at night. Same single Cloud Scheduler job, so no added scheduler
+# cost; a sweep is one indexed query plus a user-doc read per un-nudged
+# candidate. The doc is claimed (nudgedAt) in a transaction before the push,
+# so overlapping sweeps never ping anyone twice.
+@scheduler_fn.on_schedule(schedule="0 * * * *", max_instances=1)
 def trial_nudges(event: scheduler_fn.ScheduledEvent) -> None:
-    """Every 6h: warn trials that end within 48h (Machina Pro)."""
+    """Hourly: warn trials that end within 48h, in local daytime (Machina Pro)."""
     run_trial_nudges()
 
 

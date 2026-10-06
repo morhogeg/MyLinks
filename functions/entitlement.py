@@ -216,13 +216,32 @@ def _user_created_at(uid: str) -> Optional[int]:
 TRIAL_CLOCK_CHECKED = "trialClockChecked"
 
 
+def _verified_account_email(auth_uid: str) -> Optional[str]:
+    """The email on Firebase Auth account `auth_uid`, as its sign-in provider
+    (Google / Apple) verified it. None when the account has no email or no
+    longer exists; any other Auth error raises."""
+    from firebase_admin import auth as admin_auth  # lazy: only a first grant needs it
+    try:
+        user = admin_auth.get_user(auth_uid)
+    except admin_auth.UserNotFoundError:
+        return None
+    email = getattr(user, "email", None)
+    return email if isinstance(email, str) and email else None
+
+
 def _created_at_for_new_grant(uid: str) -> Optional[int]:
     """`createdAt` to base a brand-new grant on. For a workspace that skipped
     the server's creation path, first apply the deleted-account lookup
     (link_service.inherited_created_at — the same rule create_workspace uses),
     so deleting an account and signing up again through the client fallback
     cannot restart the trial clock. Writes the corrected createdAt and the
-    marker back, so the lookup runs at most once per workspace."""
+    marker back, so the lookup runs at most once per workspace.
+
+    The email the lookup keys on comes from the Firebase Auth account linked
+    to the workspace, never from the doc. The client fallback writes the doc
+    itself, so its `email` was whatever the client chose: naming a deleted
+    account's address inherited THAT account's createdAt (a founder's year of
+    Pro, or a creation-date oracle), and leaving it out reset the clock."""
     ref = get_db().collection("users").document(uid)
     snap = ref.get()
     if not snap.exists:
@@ -236,7 +255,13 @@ def _created_at_for_new_grant(uid: str) -> Optional[int]:
         # module's get_db so both stay on one client (and one test seam).
         from link_service import email_tombstone_id, TOMBSTONE_COLLECTION  # lazy: avoids a cycle
         inherited = created
-        tid = email_tombstone_id(data.get("email"))
+        # A fallback-created doc is keyed by its own auth uid (the create rule
+        # insists); a legacy phone-keyed doc names its account in authUids.
+        linked = data.get("authUids")
+        auth_uid = uid
+        if isinstance(linked, list) and linked and uid not in linked and isinstance(linked[0], str):
+            auth_uid = linked[0]
+        tid = email_tombstone_id(_verified_account_email(auth_uid))
         if tid:
             tomb = get_db().collection(TOMBSTONE_COLLECTION).document(tid).get()
             first = (tomb.to_dict() or {}).get("firstCreatedAt") if tomb.exists else None
@@ -356,6 +381,27 @@ def _mark_trial_settled(uid: str) -> None:
     _TRIAL_SETTLED.add(uid)
 
 
+def _run_transaction(db, fn):
+    """Run ``fn(transaction)`` in a Firestore transaction (retried on
+    contention, so ``fn`` reads and writes only through the transaction).
+    Tests swap this for a direct call."""
+    from google.cloud import firestore  # lazy: the hot paths here never need it
+
+    @firestore.transactional
+    def _txn(tx):
+        return fn(tx)
+    return _txn(db.transaction())
+
+
+def _trial_clock_unstarted(doc: Optional[dict]) -> bool:
+    """True only for a reverse trial whose 14-day clock has not started. A
+    founder, a subscriber, and a doc written before the anchor rule shipped
+    (which already carries trialEndsAt) are all settled forever."""
+    doc = doc or {}
+    return (doc.get("source") == "trial"
+            and not doc.get("trialAnchorAt") and not doc.get("trialEndsAt"))
+
+
 def count_cards(uid: str, cap: int) -> int:
     """How many cards `uid` has, counted only up to `cap`.
 
@@ -386,11 +432,8 @@ def maybe_start_trial(uid: str) -> bool:
     if not uid or uid in _TRIAL_SETTLED:
         return False
     try:
-        doc = get_entitlement(uid)
-        # Only an unstarted reverse trial has a clock to start. A founder, a
-        # subscriber, and a doc written before this rule shipped (which already
-        # carries trialEndsAt) are all settled forever.
-        if doc.get("source") != "trial" or doc.get("trialAnchorAt") or doc.get("trialEndsAt"):
+        # Only an unstarted reverse trial has a clock to start.
+        if not _trial_clock_unstarted(get_entitlement(uid)):
             _mark_trial_settled(uid)
             return False
         if count_cards(uid, TRIAL_ANCHOR_CARDS) < TRIAL_ANCHOR_CARDS:
@@ -401,18 +444,36 @@ def maybe_start_trial(uid: str) -> bool:
         # this needs the user doc (one read, once per workspace, ever).
         created = _user_created_at(uid) or now
         ends = trial_ends_from_anchor(created, now)
-        get_db().collection(_COLLECTION).document(uid).set({
-            "trialAnchorAt": now,
-            "trialEndsAt": ends,
-            "proUntil": ends,
-            "plan": PLAN_PRO,
-            "source": "trial",
-            "updatedAt": now,
-        }, merge=True)
+        db = get_db()
+        ref = db.collection(_COLLECTION).document(uid)
+
+        def _start(tx) -> bool:
+            # Re-read inside the transaction and write only if the clock is
+            # STILL unstarted. The read above is a snapshot: a purchase synced
+            # from RevenueCat (or another instance anchoring this workspace)
+            # can land before this write, and a plain merge would overwrite
+            # it, cutting an annual subscriber back to the trial's end date.
+            snap = ref.get(transaction=tx)
+            if not _trial_clock_unstarted(snap.to_dict() if snap.exists else None):
+                return False
+            tx.set(ref, {
+                "trialAnchorAt": now,
+                "trialEndsAt": ends,
+                "proUntil": ends,
+                "plan": PLAN_PRO,
+                "source": "trial",
+                "updatedAt": now,
+            }, merge=True)
+            return True
+
+        started = _run_transaction(db, _start)
+        # Either way the workspace is settled: the clock started here, or
+        # something else (a purchase, another instance) settled it first.
         _mark_trial_settled(uid)
-        logger.info("Trial clock started for %s at %d cards, ends %s",
-                    mask_uid(uid), TRIAL_ANCHOR_CARDS, ends)
-        return True
+        if started:
+            logger.info("Trial clock started for %s at %d cards, ends %s",
+                        mask_uid(uid), TRIAL_ANCHOR_CARDS, ends)
+        return started
     except Exception as e:
         logger.warning("Trial anchor check failed (ignored) for %s: %s", mask_uid(uid), e)
         return False
@@ -642,6 +703,67 @@ def restore_vaulted_syntheses(uid: str, limit: int = 8) -> int:
 
 NUDGE_WINDOW_MS = 48 * 60 * 60 * 1000
 
+# Local hours a trial nudge may land in: 09:00 to 20:59 on the user's own
+# clock (users/{uid}.timezone, written from the device). The sweep runs
+# hourly (main.trial_nudges), so a workspace outside these hours is simply
+# left for a later sweep. The window opens 48 hours before the trial ends and
+# any 24 hours hold every local hour once, so a trial that enters it with a
+# day or more left is always reached in daytime.
+NUDGE_LOCAL_HOURS = range(9, 21)
+
+# Candidates per query page, and the most pages one sweep reads. Already
+# nudged docs still match the query (nudgedAt is filtered in Python, so the
+# existing (source, trialEndsAt) index serves it), so a sweep pages through
+# the whole window rather than stopping at one page.
+_NUDGE_PAGE = 500
+_NUDGE_MAX_PAGES = 20
+
+
+def _user_zone(tz_name):
+    """ZoneInfo for an IANA zone name, or None when missing or unknown."""
+    if not isinstance(tz_name, str) or not tz_name:
+        return None
+    try:
+        from zoneinfo import ZoneInfo
+        return ZoneInfo(tz_name)
+    except Exception:
+        return None
+
+
+def nudge_hour_ok(tz_name: Optional[str], now_ms: int) -> bool:
+    """May a trial nudge go out now? Only between 09:00 and 20:59 local.
+
+    A workspace with no usable zone is sent on the first sweep. That is rare
+    (the app writes the device zone on every sign-in when the doc has none),
+    and it is still a sane hour: the window opens exactly 48 hours before
+    trialEndsAt, which was set at the moment of the tenth save (or of sign-up,
+    for the 60-day ceiling), so the first hourly sweep after it opens lands
+    within about an hour of a clock time this user was active. A fixed
+    fallback zone would only guess: daytime in UTC or Israel is the middle of
+    the night in the Americas."""
+    zone = _user_zone(tz_name)
+    if zone is None:
+        return True
+    return datetime.fromtimestamp(now_ms / 1000, zone).hour in NUDGE_LOCAL_HOURS
+
+
+def _claim_nudge(db, ref, now_ms: int) -> bool:
+    """Stamp `nudgedAt` in a transaction BEFORE the push goes out, so two
+    sweeps that overlap (Cloud Scheduler delivers at least once, and the admin
+    trigger can run beside the hourly one) never both send. False when the doc
+    is already stamped, or is no longer a running Pro trial (a purchase that
+    landed after the sweep's query)."""
+    def _claim(tx) -> bool:
+        snap = ref.get(transaction=tx)
+        cur = (snap.to_dict() or {}) if snap.exists else {}
+        ends = _to_ms(cur.get("trialEndsAt"))
+        if (cur.get("nudgedAt") or cur.get("source") != "trial" or cur.get("plan") != PLAN_PRO
+                or ends is None or ends <= now_ms):
+            return False
+        tx.set(ref, {"nudgedAt": now_ms, "updatedAt": now_ms}, merge=True)
+        return True
+    return _run_transaction(db, _claim)
+
 
 def _weekday_phrase(ends_ms: int, tz_name: Optional[str], now_ms: int) -> str:
     """'today' / 'tomorrow' / 'Sunday' in the user's local time."""
@@ -673,12 +795,16 @@ def trial_nudge_copy(ends_ms: int, saves: int, asks: int, tz_name: Optional[str]
 
 
 def run_trial_nudges() -> dict:
-    """Push a one-time heads-up to trials ending within the next 48 hours.
+    """Push a one-time heads-up to trials ending within the next 48 hours, in
+    the user's local daytime (see NUDGE_LOCAL_HOURS / nudge_hour_ok).
 
     Queries entitlements where source == 'trial' and trialEndsAt falls in
     (now, now + 48h]; `nudgedAt` is filtered in Python so the query needs only
-    the (source, trialEndsAt) composite index. Stamps nudgedAt whether or not
-    the device had a push token, so nobody is retried every six hours.
+    the (source, trialEndsAt) composite index. A candidate outside its local
+    daytime is skipped and seen again by the next hourly sweep. One that is
+    sent is claimed first (_claim_nudge), and the claim stands whether or not
+    the device had a push token, so nobody is retried every hour; only a push
+    that raises releases it for the next sweep.
 
     A trial whose clock has not started yet has a null trialEndsAt, which a
     range filter excludes by definition: nobody is warned about an end date
@@ -690,40 +816,62 @@ def run_trial_nudges() -> dict:
     from quota import quota_usage
 
     now = _now_ms()
-    report = {"candidates": 0, "nudged": 0, "no_tokens": 0, "errors": 0}
+    report = {"candidates": 0, "nudged": 0, "no_tokens": 0, "deferred": 0, "errors": 0}
     db = get_db()
-    docs = (
+    query = (
         db.collection(_COLLECTION)
         .where(filter=FieldFilter("source", "==", "trial"))
         .where(filter=FieldFilter("trialEndsAt", ">", now))
         .where(filter=FieldFilter("trialEndsAt", "<=", now + NUDGE_WINDOW_MS))
-        .limit(500)
-        .get()
+        .order_by("trialEndsAt")
     )
-    for d in docs:
-        data = d.to_dict() or {}
-        if data.get("nudgedAt"):
-            continue
-        if data.get("plan") != PLAN_PRO:
-            continue
-        uid = d.id
-        report["candidates"] += 1
+    last = None
+    for _page in range(_NUDGE_MAX_PAGES):
+        page = query.start_after(last) if last is not None else query
+        docs = list(page.limit(_NUDGE_PAGE).get())
+        for d in docs:
+            _nudge_one(db, d, now, report, send_push, quota_usage)
+        if len(docs) < _NUDGE_PAGE:
+            break
+        last = docs[-1]
+    logger.info("Trial nudges: %s", report)
+    return report
+
+
+def _nudge_one(db, d, now: int, report: dict, send_push, quota_usage) -> None:
+    """One candidate of run_trial_nudges. Never raises; failures are counted."""
+    data = d.to_dict() or {}
+    if data.get("nudgedAt") or data.get("plan") != PLAN_PRO:
+        return
+    uid = d.id
+    report["candidates"] += 1
+    try:
+        user = db.collection("users").document(uid).get()
+        tz_name = (user.to_dict() or {}).get("timezone") if user.exists else None
+        if not nudge_hour_ok(tz_name, now):
+            report["deferred"] += 1
+            return
+        if not _claim_nudge(db, d.reference, now):
+            return
         try:
-            user = db.collection("users").document(uid).get()
-            tz_name = (user.to_dict() or {}).get("timezone") if user.exists else None
             usage = quota_usage(uid)
             title, body = trial_nudge_copy(
                 int(data.get("trialEndsAt")), int(usage.get("saves", 0)),
                 int(usage.get("asks", 0)), tz_name, now,
             )
             result = send_push(uid, title, body, {"view": "settings"})
-            if result.get("sent"):
-                report["nudged"] += 1
-            elif result.get("skipped") == "no_tokens":
-                report["no_tokens"] += 1
-            d.reference.set({"nudgedAt": now, "updatedAt": now}, merge=True)
-        except Exception as e:
-            report["errors"] += 1
-            logger.warning("Trial nudge failed for %s: %s", mask_uid(uid), e)
-    logger.info("Trial nudges: %s", report)
-    return report
+        except Exception:
+            # Nothing went out: release the claim so the next sweep retries.
+            try:
+                d.reference.set({"nudgedAt": None}, merge=True)
+            except Exception as release_err:
+                logger.warning("Trial nudge claim not released for %s: %s",
+                               mask_uid(uid), release_err)
+            raise
+        if result.get("sent"):
+            report["nudged"] += 1
+        elif result.get("skipped") == "no_tokens":
+            report["no_tokens"] += 1
+    except Exception as e:
+        report["errors"] += 1
+        logger.warning("Trial nudge failed for %s: %s", mask_uid(uid), e)

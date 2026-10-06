@@ -4,7 +4,7 @@
 
 
 import { Fragment, useState, useEffect, useRef, useMemo, useCallback, cloneElement, type ReactElement } from 'react';
-import { Link, LinkStatus, Collection, WeeklySynthesis, CuratedDigest, DigestCardRef, UserNote } from '@/lib/types';
+import { Link, LinkStatus, Collection, WeeklySynthesis, CuratedDigest, DigestCardRef, UserNote, CardShareMode } from '@/lib/types';
 import { getColorStyleByKey, getCategoryColorStyle, assignCategoryColors } from '@/lib/colors';
 import { platformIcon, platformColor, type PlatformKey } from '@/lib/platform';
 import DigestView from './DigestView';
@@ -70,7 +70,7 @@ import { PUSH_INTENT_EVENT, PUSH_FOREGROUND_EVENT, consumePendingPushIntent, rea
 import { isNativeApp } from '@/lib/api';
 import { reportError } from '@/lib/errorReporter';
 import PushNudge from './PushNudge';
-import { deleteCollection, createCollection, addLinksToCollection, isShareStale, updateCollection, unpublishCollection, batchedUpdate } from '@/lib/collections';
+import { deleteCollection, createCollection, addLinksToCollection, isShareStale, updateCollection, unpublishCollection, unpublishCard, batchedUpdate } from '@/lib/collections';
 import { useCollectionLinks } from '@/lib/useCollectionLinks';
 import { suggestNewCollections, dismissSuggestion, getDismissedSuggestions, loadDismissedSuggestions, type CollectionSuggestion } from '@/lib/collectionSuggest';
 import ShareCollectionSheet from './ShareCollectionSheet';
@@ -372,6 +372,17 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         handleRemoveFromCollection,
         handleShareCard,
     } = useLinkActions(uid, toast, handleLocalEdit);
+    // A private card (own flag or a private collection's member) can't have a
+    // public link: the server refuses to publish one. Say so instead of
+    // opening the share sheet on a link that would never work. Update and Stop
+    // only ever touch an existing page, so they stay available.
+    const shareCard = useCallback((link: Link, mode: CardShareMode = 'share') => {
+        if (mode === 'share' && isEffectivelyPrivateCard(link)) {
+            toast.error("Private cards can't have a public link. Remove it from Private to share it.");
+            return;
+        }
+        void handleShareCard(link, mode);
+    }, [handleShareCard, isEffectivelyPrivateCard, toast]);
     // The import sheet, offered from the empty library (the same sheet the
     // first run and Settings open).
     const [importing, setImporting] = useState(false);
@@ -1865,16 +1876,58 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // Making something private with no PIN yet routes through first-time PIN
     // setup, then runs the pending action (pinSetupAction, declared with the
     // overlay states above, drives that modal).
+
+    // A card that turns private must not keep its own public /s page. The
+    // server already refuses to render one (share_page checks the card on
+    // every view); stopping the share also deletes the snapshot, so the page
+    // can't come back if the card leaves Private later. Best-effort: returns
+    // how many could not be stopped, for the caller's toast.
+    const stopPublicCardLinks = useCallback(async (cards: Link[]): Promise<number> => {
+        if (!uid || cards.length === 0) return 0;
+        const results = await Promise.allSettled(cards.map((l) => unpublishCard(uid, l)));
+        results.forEach((r, i) => {
+            if (r.status === 'fulfilled') handleLocalEdit(cards[i].id, { shareId: undefined, sharePublishedAt: undefined });
+        });
+        return results.filter((r) => r.status === 'rejected').length;
+    }, [uid, handleLocalEdit]);
+    // Members of a collection that still have their own public link, among
+    // the cards this device has loaded (live window, search snapshot, opened
+    // cards). A member never loaded here keeps its snapshot, but the server
+    // already serves "not found" for it while it is private.
+    const sharedMembersOf = (colId: string): Link[] => {
+        const found = new Map<string, Link>();
+        for (const pool of [links, libraryLinks, Object.values(fetchedCards)]) {
+            for (const l of pool) {
+                if (l.shareId && (l.collectionIds ?? []).includes(colId) && !found.has(l.id)) found.set(l.id, l);
+            }
+        }
+        return Array.from(found.values());
+    };
+    // Every member of a collection that just turned private is private too:
+    // take their own public links down and say so. Silent when none had one.
+    const stopMemberLinks = async (col: Collection) => {
+        const shared = sharedMembersOf(col.id);
+        if (shared.length === 0) return false;
+        const failed = await stopPublicCardLinks(shared);
+        const n = shared.length;
+        if (failed > 0) {
+            toast.error(`“${col.name}” is now private, but ${failed === 1 ? '1 public card link' : `${failed} public card links`} couldn't be stopped. Stop sharing from each card's menu.`);
+        } else {
+            toast.success(`“${col.name}” is now private, and ${n === 1 ? '1 public card link stops' : `${n} public card links stop`} working within a minute.`);
+        }
+        return true;
+    };
     const makeCollectionPrivate = async (col: Collection) => {
         if (!uid) return;
         try {
             // A collection can't be private AND have a public page.
             if (col.isPublic) await unpublishCollection(uid, col);
             await updateCollection(uid, col.id, { isPrivate: true });
-            toast.success(`“${col.name}” is now private`);
         } catch {
             toast.error("Couldn't make the collection private. Please try again.");
+            return;
         }
+        if (!(await stopMemberLinks(col))) toast.success(`“${col.name}” is now private`);
     };
     const handleToggleCollectionPrivate = (col: Collection) => {
         if (!uid) return;
@@ -1897,13 +1950,40 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         try {
             await updateDoc(doc(db, 'users', uid, 'links', link.id), { isPrivate });
             handleLocalEdit(link.id, { isPrivate });
-            toast.success(isPrivate
-                ? 'Moved to Private. Find it in the Private view'
-                : 'Removed from Private');
         } catch {
             toast.error("Couldn't update the card. Please try again.");
+            return;
         }
-    }, [uid, toast, handleLocalEdit]);
+        if (!isPrivate) {
+            toast.success('Removed from Private');
+            return;
+        }
+        // Its own public link goes (see stopPublicCardLinks).
+        let note = '';
+        if (link.shareId) {
+            if (await stopPublicCardLinks([link])) {
+                toast.error("Moved to Private, but its public link couldn't be stopped. Stop sharing from the card's menu.");
+                return;
+            }
+            note = ' Its public link stops working within a minute.';
+        }
+        // A PUBLIC COLLECTION page is a frozen snapshot that carries no card
+        // ids, so the server can't drop one member from it: it keeps showing
+        // the card until the owner updates the page (its Share sheet says
+        // the page is out of date). Say so rather than imply it's gone.
+        const pages = collections
+            .filter((c) => c.isPublic && c.shareId && (link.collectionIds ?? []).includes(c.id))
+            .map((c) => `“${c.name}”`);
+        if (pages.length > 0) {
+            const list = pages.length > 3 ? `${pages.slice(0, 3).join(', ')} and ${pages.length - 3} more` : pages.join(', ');
+            note += pages.length === 1
+                ? ` It's still on your public page ${list} until you update it.`
+                : ` It's still on your public pages ${list} until you update them.`;
+        }
+        toast.success(note
+            ? `Moved to Private. Find it in the Private view.${note}`
+            : 'Moved to Private. Find it in the Private view');
+    }, [uid, toast, handleLocalEdit, collections, stopPublicCardLinks]);
     const handleToggleCardPrivate = useCallback((link: Link) => {
         // "Remove from Private" is only reachable inside the unlocked Private
         // view, so no extra gate; hiding a card never needs the vault open.
@@ -2524,7 +2604,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                 onUpdateReminder={handleOpenReminderModal}
                                 onTagClick={handleToggleTag}
                                 onAddToCollection={handleAddToCollection}
-                                onShare={handleShareCard}
+                                onShare={shareCard}
                                 onTogglePrivate={handleToggleCardPrivate}
                                 onToggleThumbnail={handleToggleThumbnail}
                                 onOpenInGraph={isEffectivelyPrivateCard(link) ? undefined : openInGraphFromMenu}
@@ -3681,7 +3761,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                             onReadStatusChange={handleReadStatusChange}
                                             onUpdateReminder={handleOpenReminderModal}
                                             onAddToCollection={handleAddToCollection}
-                                            onShare={handleShareCard}
+                                            onShare={shareCard}
                                             onTogglePrivate={handleToggleCardPrivate}
                                             onOpenInGraph={isEffectivelyPrivateCard(link) ? undefined : openInGraphFromMenu}
                                             cardCollections={cardCollectionsByLink.get(link.id)}
@@ -3723,7 +3803,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                     onToggleSelection={toggleSelection}
                                     onTagClick={handleToggleTag}
                                     onAddToCollection={handleAddToCollection}
-                                    onShare={handleShareCard}
+                                    onShare={shareCard}
                                     onTogglePrivate={handleToggleCardPrivate}
                                     onToggleThumbnail={handleToggleThumbnail}
                                     onOpenInGraph={isEffectivelyPrivateCard(link) ? undefined : openInGraphFromMenu}
@@ -3890,7 +3970,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                     excludeRelatedIds={linkStack}
                     onOpenInGraph={isEffectivelyPrivateCard(activeLink) ? undefined : openInGraphFromOpenCard}
                     onAddToCollection={(link) => setAddToCollectionLink(link)}
-                    onShare={handleShareCard}
+                    onShare={shareCard}
                     onToggleThumbnail={handleToggleThumbnail}
                     scrollToNotes={detailScrollToNotes}
                     scrollToRelated={detailScrollToRelated}
@@ -3948,6 +4028,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                 collection={editingCollection}
                 isOpen={collectionFormOpen}
                 onClose={() => setCollectionFormOpen(false)}
+                onMadePrivate={(col) => { void stopMemberLinks(col); }}
             />
 
             {/* Add / remove cards in a collection */}

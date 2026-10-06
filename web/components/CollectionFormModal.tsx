@@ -26,6 +26,9 @@ interface CollectionFormModalProps {
     onClose: () => void;
     /** Fired with the (new or existing) collection id after a successful save. */
     onSaved?: (id: string) => void;
+    /** Fired after an edit turned an existing collection private, so the
+        parent can take its members' own public card links down. */
+    onMadePrivate?: (collection: Collection) => void;
 }
 
 /**
@@ -39,6 +42,7 @@ export default function CollectionFormModal({
     isOpen,
     onClose,
     onSaved,
+    onMadePrivate,
 }: CollectionFormModalProps) {
     const toast = useToast();
     const isEdit = !!collection;
@@ -120,6 +124,7 @@ export default function CollectionFormModal({
                 });
                 toast.success('Collection updated');
                 onSaved?.(collection.id);
+                if (isPrivate && !collection.isPrivate) onMadePrivate?.({ ...collection, name: trimmed, isPrivate: true });
             } else {
                 const id = await createCollection(uid, {
                     name: trimmed,

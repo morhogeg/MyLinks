@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Collection, Link } from '@/lib/types';
 import { Check, Search, LayoutGrid } from 'lucide-react';
-import { addLinksToCollection, removeLinksFromCollection } from '@/lib/collections';
+import { addLinksToCollection, removeLinksFromCollection, unpublishCard } from '@/lib/collections';
 import { useToast } from '@/components/Toast';
 import { useVisualViewport } from '@/lib/useVisualViewport';
 import { useScrollLock } from '@/lib/useScrollLock';
@@ -111,7 +111,25 @@ export default function ManageCollectionCardsSheet({
                     addLinksToCollection(uid, toAdd, collection.id),
                     removeLinksFromCollection(uid, toRemove, collection.id),
                 ])
-                    .then(() => toast.success(summarizeDiff(toAdd.length, toRemove.length)))
+                    .then(async () => {
+                        const summary = summarizeDiff(toAdd.length, toRemove.length);
+                        // Joining a private collection makes a card private, and a
+                        // private card must not keep its own public /s page (same
+                        // rule as AddToCollectionSheet). Best-effort per card.
+                        const added = new Set(toAdd);
+                        const shared = collection.isPrivate ? links.filter((l) => added.has(l.id) && l.shareId) : [];
+                        if (shared.length === 0) {
+                            toast.success(summary);
+                            return;
+                        }
+                        const results = await Promise.allSettled(shared.map((l) => unpublishCard(uid, l)));
+                        const failed = results.filter((r) => r.status === 'rejected').length;
+                        if (failed > 0) {
+                            toast.error(`${summary}. ${failed === 1 ? '1 public card link' : `${failed} public card links`} couldn't be stopped. Stop sharing from each card's menu.`);
+                        } else {
+                            toast.success(`${summary}. ${shared.length === 1 ? 'Its public card link stops' : `${shared.length} public card links stop`} working within a minute.`);
+                        }
+                    })
                     .catch(() => toast.error("Couldn't update the collection. Please try again."));
             }
         }
