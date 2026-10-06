@@ -45,6 +45,11 @@ class FakeUsersCollection:
     def get(self):  # pragma: no cover
         raise AssertionError("run_digest_check must stream(), not get() the users collection")
 
+    # The per-period run stamp (digestRun / synthesisRun) after an attempt.
+    def document(self, uid):
+        runs = self._recorder.setdefault("runs", {})
+        return type("_Ref", (), {"set": lambda _s, data, merge=False: runs.setdefault(uid, {}).update(data)})()
+
 
 class FakeDB:
     def __init__(self, docs, recorder):
@@ -69,28 +74,35 @@ def test_slim_scan_uses_field_mask_and_streams(monkeypatch):
     monkeypatch.setattr(ds, "get_db", lambda: FakeDB(docs, recorder))
 
     # Only carol is "due"; alice enabled-but-not-due; bob disabled.
-    def fake_is_due(settings, tz, last):
-        return settings.get("digest_enabled") and last is None
+    period = datetime(2026, 7, 20, 9, 0, tzinfo=timezone.utc)
+
+    def fake_due_at(settings, tz, last, last_run=None):
+        return period if settings.get("digest_enabled") and last is None else None
 
     sent_for = []
 
-    def fake_build(uid, user_data, force=False):
-        sent_for.append(uid)
+    def fake_build(uid, user_data, force=False, period=None):
+        sent_for.append((uid, period))
         # The send path must find its fields present in the masked doc.
         assert "settings" in user_data
         return {"sent": True, "card_count": 3}
 
-    monkeypatch.setattr(ds, "is_due", fake_is_due)
+    monkeypatch.setattr(ds, "digest_due_at", fake_due_at)
+    monkeypatch.setattr(ds, "synthesis_due_at", lambda *a, **k: None)
     monkeypatch.setattr(ds, "build_and_send_digest", fake_build)
 
     report = ds.run_digest_check()
 
-    # Field mask requested exactly the fields is_due + the send path need.
-    assert set(recorder["selected"]) == {"settings", "timezone", "lastDigestSentAt", "fcmTokens"}
+    # Field mask requested exactly the fields the gates + the send path need.
+    assert set(recorder["selected"]) == {"settings", "timezone", "lastDigestSentAt", "fcmTokens",
+                                         "digestRun", "synthesisRun"}
     assert recorder["streamed"] is True
     # The bulky field never reached the send path (masked out).
     assert report["users_checked"] == 3
     assert report["users_enabled"] == 2  # alice + carol enabled
-    assert sent_for == ["carol"]         # only the due one
+    assert sent_for == [("carol", period)]  # only the due one, for its period
     assert report["digests_sent"] == 1
     assert report["cards_delivered"] == 3
+    # The settled period is stamped, so later ticks skip it.
+    assert recorder["runs"]["carol"]["digestRun"]["ok"] is True
+    assert set(recorder["runs"]) == {"carol"}

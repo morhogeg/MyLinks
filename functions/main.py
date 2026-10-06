@@ -6822,21 +6822,23 @@ def force_check_reminders(req: https_fn.Request) -> https_fn.Response:
 # Curated Digest (push)
 # ─────────────────────────────────────────────
 
-# Cadence MUST match DIGEST_CADENCE_MINUTES in digest_service.py — is_due() uses
-# it as the match window, so a mismatch means missed or double-checked sends.
-# Every 15 min keeps the user-doc scan cost at 1/3 of the old 5-min cadence
-# (it grows linearly with user count); delivery lands within one tick of the
-# chosen digest_hour:digest_minute, and the daily 20h / weekly 6d dup-guard
-# prevents double-sends.
+# Cadence MUST match DIGEST_CADENCE_MINUTES in digest_service.py: a period is
+# due from the first tick at or after the user's digest_hour:digest_minute.
+# Missed ticks and failed runs catch up for digest_service.DIGEST_CATCHUP (6h),
+# and the per-period run stamps plus the daily 20h / weekly 6d guard prevent
+# double-sends.
 # UNIX-CRON, deliberately, not "every 5 minutes": the App Engine syntax
 # anchors the tick to DEPLOY time, so ticks landed at arbitrary offsets
 # (:06/:21/:36/:51 in prod) and a user-chosen minute could never line up
 # with them. Unix-cron is anchored to the clock, so the grid matches the
 # Schedule picker's 5-minute increments and delivery lands ON the chosen
 # minute. MUST stay in sync with digest_service.DIGEST_CADENCE_MINUTES.
-@scheduler_fn.on_schedule(schedule="*/5 * * * *", max_instances=1)
+# timeout_sec: the 60s default killed a tick mid-walk as soon as one weekly
+# synthesis (a model call) ran long. The walk itself stops starting new users
+# after DIGEST_TICK_BUDGET_S (240s, under the cadence); 540s is the backstop.
+@scheduler_fn.on_schedule(schedule="*/5 * * * *", max_instances=1, timeout_sec=540)
 def send_digests(event: scheduler_fn.ScheduledEvent) -> None:
-    """Every 15 min: deliver curated digests to users whose schedule is due now."""
+    """Every 5 min: deliver curated digests to users whose schedule is due now."""
     from digest_service import run_digest_check
     run_digest_check()
 

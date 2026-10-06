@@ -121,6 +121,13 @@ SMALL_JSON_MAX_OUTPUT_TOKENS = 4096  # tag follow-up, screenshot platform
 # every one of them, in full, on one call.
 SYNTHESIS_MAX_CARDS = 80
 SYNTHESIS_SUMMARY_CHARS = 600
+# The synthesis runs inside the send_digests tick (one walk over every user)
+# and the "send one now" callable's 60s, so one call may not hold either the
+# way GEMINI_CALL_TIMEOUT_MS x 3 attempts could (~4.5 minutes): its own
+# per-call timeout and a single retry, ~52s at worst. A bounded 80-card input
+# normally answers in well under 15s.
+SYNTHESIS_CALL_TIMEOUT_MS = 25000
+SYNTHESIS_ATTEMPTS = 2
 
 # Safety thresholds for the ASK (RAG) calls only. Ask answers questions about
 # the user's OWN saved content, so the configurable harm categories are set to
@@ -2492,7 +2499,9 @@ Return ONLY a JSON object matching the schema (title, narrative, themes[title,in
             # narrative debrief — hold it ABOVE the 0.2 extraction default so the
             # prose doesn't go flat, while staying grounded by the prompt's rules.
             config_extra={"response_schema": WeeklySynthesis, "temperature": 0.6,
-                          "max_output_tokens": SYNTHESIS_MAX_OUTPUT_TOKENS},
+                          "max_output_tokens": SYNTHESIS_MAX_OUTPUT_TOKENS,
+                          "http_options": {"timeout": SYNTHESIS_CALL_TIMEOUT_MS}},
+            attempts=SYNTHESIS_ATTEMPTS,
         )
 
         # Guard against hallucinated ids — keep only ones we actually supplied.
