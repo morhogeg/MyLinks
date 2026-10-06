@@ -115,6 +115,7 @@ if (voFiles.every((f) => fs.existsSync(f))) {
     return { text: l.text, db: powerDb(speechBand(voice, SR)) - powerDb(speechBand(music, SR)) };
   });
   const worst = rows.reduce((a, b) => (b.db < a.db ? b : a));
+  if (process.env.VERBOSE) for (const r of rows) console.log(`    ${r.db.toFixed(1).padStart(5)}dB  ${r.text}`);
   const I = lufs(ch(mix, 0), ch(mix, 1), SR);
   const tp = truePeak(ch(mix, 0), ch(mix, 1));
   console.log(`  narrator: ${rows.length} lines, voice over music in the speech band min ${worst.db.toFixed(1)}dB ("${worst.text.slice(0, 30)}…"); mix ${I.toFixed(1)} LUFS, ${tp.toFixed(1)} dBTP`);

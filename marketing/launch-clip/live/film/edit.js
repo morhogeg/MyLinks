@@ -11,10 +11,11 @@ import { glide, hold, makeSeq, play } from './seq.js';
 /** @param {{marks: Record<string, number>, count: number, flags?: Record<string, number[]>}} session */
 export function makeEdit(session) {
   const flash = session.flags?.['Close matches'] ?? [];
-  return makeSeq(session, [
+  const seq = makeSeq(session, [
     play('boot', 'arrive', 'exit', { fps: 30 }),
     play('bootExit', 'exit', 'home', { fps: 60 }),
-    hold('home', 'home', 6.6),
+    // (8.8s: the ring orbits under the narrator's opening lines, words.js)
+    hold('home', 'home', 8.8),
     play('dialog', 'dialogOpen', 'modeImage', { fps: 30 }),
     hold('dialogSet', ['modeImage', -1], 0.6),
     play('modeImage', 'modeImage', 'modeNote', { fps: 60 }),
@@ -68,6 +69,12 @@ export function makeEdit(session) {
     // recap had started to fade)
     hold('outro', ['end', -1], 5.6),
   ]);
+  // the gather: the ring of saves spirals into the phone, 1.9s before the Add
+  // dialog opens. The opening's beats (the spiral, the band coming in, the
+  // camera settling, "Save anything") hang off it, so a longer orbit moves
+  // them together.
+  seq.at.gather = seq.at.dialog - 1.9;
+  return seq;
 }
 
 /**

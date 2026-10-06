@@ -62,14 +62,14 @@ const CH = {
 const PROG = (bar) => {
   const t = at(bar);
   if (t < A.home + 2.2) return 'F';
-  if (t < A.home + 5.4) return bar % 2 ? 'C' : 'F';
+  if (t < A.gather + 0.7) return bar % 2 ? 'C' : 'F';
   if (t >= STRIKE - 0.01) return 'C';
-  return ['C', 'G', 'Am', 'F'][(bar - barOf(A.home + 5.4)) % 4];
+  return ['C', 'G', 'Am', 'F'][(bar - barOf(A.gather + 0.7)) % 4];
 };
 
 // how much of the band plays, by where the film is
 const density = (t) => {
-  if (t < A.home + 5.6) return 0.42;
+  if (t < A.gather + 0.9) return 0.42;
   if (t < A.findHome) return 0.62;
   if (t < A.askHome) return 0.78;
   if (t < A.graph) return 1.0;
@@ -77,7 +77,7 @@ const density = (t) => {
   if (t < A.outro) return 0.66;
   return 0.3;
 };
-const drumsFrom = A.home + 5.75; // the saves arrive in the phone
+const drumsFrom = A.gather + 1.05; // the saves arrive in the phone
 const drumsTo = A.outro - 0.2; // the outro breathes
 
 const BARS = Math.ceil(TOTAL / BAR);
@@ -90,7 +90,7 @@ for (let bar = 0; bar < BARS; bar++) {
   const drums = t0 >= drumsFrom - 0.05 && t0 < drumsTo;
 
   // ── pad: open and high for the open; centred once the band plays
-  const lift = t0 < A.home + 5.4 ? 12 : 0;
+  const lift = t0 < A.gather + 0.7 ? 12 : 0;
   const padLevel = 0.1 + 0.07 * d;
   ch.upper.forEach((m, i) => pad(t0, len, m + lift, padLevel * (i === 0 ? 1 : 0.85), ((i / 3) * 2 - 1) * 0.55));
   pad(t0, len, ch.bass + 12, padLevel * 0.6, 0);
@@ -166,11 +166,11 @@ sub(A.home, 43, 0.18, 0.4);
 [0.35, 0.6, 0.85, 1.1, 1.35, 1.6, 1.85].forEach((dt, i) =>
   bell(A.home + dt, [84, 88, 91, 86, 89, 93, 95][i], 0.026, i % 2 ? 0.45 : -0.45, 1.3),
 );
-riser(A.home + 3.4, 2.2, 0.08);
-whoosh(A.home + 4.95, 0.75, 0.09, -0.35);
-whoosh(A.home + 5.05, 0.7, 0.09, 0.35);
-impact(A.home + 5.85, 0.3);
-sub(A.home + 5.85, 36, 0.26, 0.6);
+riser(A.gather - 1.3, 2.2, 0.08);
+whoosh(A.gather + 0.25, 0.75, 0.09, -0.35);
+whoosh(A.gather + 0.35, 0.7, 0.09, 0.35);
+impact(A.gather + 1.15, 0.3);
+sub(A.gather + 1.15, 36, 0.26, 0.6);
 
 // SAVE: the +, the dialog lifting, three ways in, the paste, Save
 const TAPS = [
@@ -284,7 +284,7 @@ for (let i = 0; i < n * 2; i++) {
   if (v >= 32700) clips++;
 }
 const sections = [
-  ['open', 0, A.home + 5.6], ['save', A.home + 5.6, A.findHome], ['find', A.findHome, A.askHome],
+  ['open', 0, A.gather + 0.9], ['save', A.gather + 0.9, A.findHome], ['find', A.findHome, A.askHome],
   ['ask', A.askHome, A.graph], ['connect', A.graph, A.revisit], ['revisit', A.revisit, A.outro], ['outro', A.outro, TOTAL],
 ];
 console.log(`score: ${TOTAL.toFixed(2)}s, ${(60 / BEAT).toFixed(1)} BPM, strike on bar ${BARS_TO_STRIKE} at ${STRIKE.toFixed(2)}s`);

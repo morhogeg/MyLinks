@@ -15,7 +15,7 @@ const W = (u, v) => ({ tx: u - 196.5, ty: v - 426 });
 export const landscape = {
   name: 'landscape',
   size: { w: 1920, h: 1080 },
-  captions: { side: 'left' },
+  captions: { open: 'bottom', side: 'left' },
   camDefaults: { tx: 0, ty: 0, tz: 0, zoom: 1, yaw: 0, pitch: 0, roll: 0, lens: 2400, fx: 960, fy: 540, focus: 0, dof: 0 },
   /** the opening ring of saves: radius, tilt (deg, front swings low), orbit
    *  speed (rad/s), card scale, how far side cards turn in (deg) */
@@ -30,7 +30,7 @@ export const landscape = {
   slabPose: (A, end) => [
     { t: 0, ry: 0, rx: 0 },
     { t: A.home + 1.5, ry: 2.5, rx: -1 },
-    { t: A.home + 5.6, ry: 0, rx: 0 },
+    { t: A.gather + 0.9, ry: 0, rx: 0 },
     { t: A.landed, ry: 0 },
     { t: A.outro, ry: 0, rx: 0 },
     { t: end, ry: 0, rx: 0 },
@@ -39,16 +39,18 @@ export const landscape = {
     const side = 1380; // the slab's x when the words sit on the left
     return [
       // OPEN: the app booting on a slab seen from the side, turning to face us
-      { t: 0, ...W(196.5, 426), zoom: 0.86, yaw: -26, pitch: 10, fx: 960, fy: 540, lens: 1900 },
-      { t: A.boot + 1.8, zoom: 0.93, yaw: -10, pitch: 4 },
+      // (a little smaller and higher than the ring's framing: the narrator's
+      // opening lines sit under the phone)
+      { t: 0, ...W(196.5, 426), zoom: 0.8, yaw: -26, pitch: 10, fx: 960, fy: 470, lens: 1900 },
+      { t: A.boot + 1.8, zoom: 0.86, yaw: -10, pitch: 4 },
       // the app's own push-through: the camera leans in with it
-      { t: A.bootExit + 0.35, zoom: 1.04, yaw: -2, pitch: 1, lens: 2200 },
-      { t: A.home, zoom: 1.0, yaw: 0, pitch: 0, lens: 2400 },
+      { t: A.bootExit + 0.35, zoom: 0.95, yaw: -2, pitch: 1, lens: 2200 },
+      { t: A.home, zoom: 0.9, yaw: 0, pitch: 0, fy: 470, lens: 2400 },
       // pull back: everything this person saved, orbiting it
       { t: A.home + 1.4, zoom: 0.66, yaw: 10, pitch: -6, fy: 520, lens: 1800, dof: 0.5, ease: MODAL },
-      { t: A.home + 4.4, zoom: 0.72, yaw: 2, pitch: -3.5 },
+      { t: A.gather - 0.3, zoom: 0.72, yaw: 2, pitch: -3.5 },
       // the saves spiral in; the phone, holding all of it, comes to rest
-      { t: A.home + 5.6, zoom: 0.86, yaw: 0, pitch: 0, fy: 540, lens: 2300, dof: 0, ease: GLIDE },
+      { t: A.gather + 0.9, zoom: 0.86, yaw: 0, pitch: 0, fy: 540, lens: 2300, dof: 0, ease: GLIDE },
       { t: A.dialog, zoom: 0.95, fx: side, lens: 2400, ease: GLIDE },
       // SAVE: the Add dialog floats off the screen; a slow look across it
       { t: A.dialogSet + 0.3, ...W(196.5, 426), zoom: 1.12, yaw: 5, pitch: -2, ease: MODAL },
@@ -109,7 +111,7 @@ export const landscape = {
 export const portrait = {
   name: 'portrait',
   size: { w: 1080, h: 1920 },
-  captions: { side: 'top' },
+  captions: { open: 'top', side: 'top' },
   camDefaults: { tx: 0, ty: 0, tz: 0, zoom: 1, yaw: 0, pitch: 0, roll: 0, lens: 2600, fx: 540, fy: 1160, focus: 0, dof: 0 },
   ring: { R: 760, tilt: -30, speed: 0.22, phase: 0.4, s: 0.82, turn: 14, y: 40 },
   askSpots: [
@@ -121,7 +123,7 @@ export const portrait = {
   slabPose: (A, end) => [
     { t: 0, ry: 0, rx: 0 },
     { t: A.home + 1.5, ry: 2.5, rx: -1 },
-    { t: A.home + 5.6, ry: 0, rx: 0 },
+    { t: A.gather + 0.9, ry: 0, rx: 0 },
     { t: end, ry: 0, rx: 0 },
   ],
   camera: (A, end) => {
@@ -132,8 +134,8 @@ export const portrait = {
       { t: A.bootExit + 0.35, zoom: 1.34, yaw: -2, pitch: 1, lens: 2300 },
       { t: A.home, zoom: 1.28, yaw: 0, pitch: 0, lens: 2600, fy: 1000 },
       { t: A.home + 1.4, zoom: 0.82, yaw: 10, pitch: -7, fy: 1080, lens: 1900, dof: 0.5, ease: MODAL },
-      { t: A.home + 4.4, zoom: 0.88, yaw: 2, pitch: -4 },
-      { t: A.home + 5.6, zoom: 1.08, yaw: 0, pitch: 0, fy: 1120, lens: 2400, dof: 0, ease: GLIDE },
+      { t: A.gather - 0.3, zoom: 0.88, yaw: 2, pitch: -4 },
+      { t: A.gather + 0.9, zoom: 1.08, yaw: 0, pitch: 0, fy: 1120, lens: 2400, dof: 0, ease: GLIDE },
       { t: A.dialog, zoom: 1.22, ...full, lens: 2600, ease: GLIDE },
       // SAVE
       { t: A.dialogSet + 0.3, ...W(196.5, 426), zoom: 1.4, yaw: 5, pitch: -2, ease: MODAL },

@@ -28,6 +28,8 @@ import { wordsOf } from './words.js';
 export const SCREEN = { w: 393, h: 852 };
 /** world px per screen point */
 const LW = 1;
+/** Mip levels for the ring's cards: 1071 px (the 3× capture) down to 67 px. */
+const MIP_LEVELS = 5;
 /** the iPhone 15/16 Pro display corner radius, points */
 const SCREEN_RADIUS = 55;
 
@@ -237,7 +239,67 @@ export function buildFilm({ stage, index, captions, overlay, format, video }) {
     p.s = p.base;
     p.cardId = id;
     p.k = k;
+    p.ptW = r[2];
     p.visible = false;
+    // The card as a small mip pyramid (canvases, built once its image is in):
+    // each frame lays the plane out at the level nearest the card's size on
+    // screen and blends in the next one, so its texture is never shrunk more
+    // than 2× (trilinear filtering, by hand). Drawn straight from the 3×
+    // capture, a ring card on screen at a fifth of that broke its text up
+    // differently every frame: the ring shimmered.
+    const W0 = r[2] * d;
+    const H0 = r[3] * d;
+    const mips = [];
+    let level = -1;
+    const build = () => {
+      if (mips.length) return true;
+      if (!img.complete || !img.naturalWidth) return false;
+      let prev = null;
+      for (let lv = 0; lv < MIP_LEVELS; lv++) {
+        const cv = document.createElement('canvas');
+        cv.className = 'cropcanvas';
+        cv.width = Math.max(1, Math.round(W0 / 2 ** lv));
+        cv.height = Math.max(1, Math.round(H0 / 2 ** lv));
+        const g = cv.getContext('2d');
+        g.imageSmoothingEnabled = true;
+        g.imageSmoothingQuality = 'high';
+        if (prev) g.drawImage(prev, 0, 0, cv.width, cv.height);
+        else if (LIVE) g.drawImage(img, 0, 0, cv.width, cv.height);
+        else {
+          // the card's own rect in its full captured frame
+          const k2 = img.naturalWidth / SCREEN.w;
+          g.drawImage(img, r[0] * k2, r[1] * k2, r[2] * k2, r[3] * k2, 0, 0, cv.width, cv.height);
+        }
+        cv.style.opacity = '0';
+        el.appendChild(cv);
+        mips.push(cv);
+        prev = cv;
+      }
+      img.style.display = 'none';
+      return true;
+    };
+    /** Pick the levels for a card `screenW` frame px wide (call before p.s is set). */
+    p.mip = (screenW) => {
+      if (!build()) return;
+      const lf = Math.min(MIP_LEVELS - 1, Math.max(0, Math.log2(W0 / Math.max(1, screenW))));
+      const lo = Math.floor(lf);
+      if (lo !== level) {
+        // lay the plane out at this level's size; its scale makes up the rest
+        level = lo;
+        const k2 = 2 ** lo;
+        p.w = W0 / k2;
+        p.h = H0 / k2;
+        p.base = (LW / d) * k2;
+        el.style.width = `${p.w}px`;
+        el.style.height = `${p.h}px`;
+        el.style.borderRadius = `${(24 * d) / k2}px`;
+      }
+      const f = lf - lo;
+      mips.forEach((cv, lv) => {
+        const o = lv === lo ? '1' : lv === lo + 1 && f > 0.004 ? f.toFixed(3) : '0';
+        if (cv.style.opacity !== o) cv.style.opacity = o;
+      });
+    };
     CONST.push(p);
   });
   const cardById = (id) => CONST.find((p) => p.cardId === id);
@@ -485,10 +547,10 @@ export function buildFilm({ stage, index, captions, overlay, format, video }) {
       let ry = 0;
       let rx = 0;
       const stagger = rand(k + 3) * 0.28;
-      if (t < A.home + 6.4) {
+      if (t < A.gather + 1.7) {
         // opening: the ring tightens in from wide, orbits, then spirals into
         // the screen
-        const g = prog(t, A.home + 4.7 + stagger, A.home + 5.75 + stagger, GATHER);
+        const g = prog(t, A.gather + stagger, A.gather + 1.05 + stagger, GATHER);
         const r = mix(RG.R * 1.85, RG.R, openIn) * (1 - g);
         const q = ringAt(k, t - A.home, r);
         x = q.x;
@@ -497,7 +559,7 @@ export function buildFilm({ stage, index, captions, overlay, format, video }) {
         sc = RG.s * mix(1, 0.12, g);
         ry = Math.sin(q.a) * RG.turn * (1 - g);
         rx = -RG.tilt * 0.35 * (1 - g);
-        op = clamp(openIn * 1.6) * (1 - prog(t, A.home + 5.45 + stagger, A.home + 5.8 + stagger, EXIT));
+        op = clamp(openIn * 1.6) * (1 - prog(t, A.gather + 0.75 + stagger, A.gather + 1.1 + stagger, EXIT));
         vis = op > 0.001;
       } else if (srcIdx >= 0 && t > A.sources && t < A.graph + 0.4) {
         // Ask: the three sources rise beside the answer
@@ -526,6 +588,8 @@ export function buildFilm({ stage, index, captions, overlay, format, video }) {
         op = clamp(b * 1.6) * (1 - prog(t, A.outro + 1.2 + stagger * 0.6, A.outro + 1.55 + stagger * 0.6, EXIT));
         vis = op > 0.001;
       }
+      // the card's texture level, from its size on screen (r[2] pt wide in the world at LW × sc)
+      if (vis) p.mip(p.ptW * LW * sc * stage.project([x, y, z]).scale);
       Object.assign(p, { visible: vis, x, y, z, s: p.base * sc, ry, rx, opacity: op });
     });
 
