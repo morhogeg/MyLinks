@@ -203,6 +203,24 @@ const RECENT_ANSWERS_FOR_CONTEXT = 2;
  *  (MAX_HISTORY_ITEMS in functions/main.py). Keep the two in step. */
 const HISTORY_TURNS = 6;
 
+/** The longest question ask_brain accepts (MAX_QUESTION_LENGTH in
+ *  functions/main.py). The composer stops there instead of letting the server
+ *  refuse it, which used to fail the same way on every retry. */
+const MAX_QUESTION_CHARS = 2000;
+const QUESTION_TOO_LONG = 'That question is too long. Keep it under 2,000 characters and try again.';
+const GENERIC_ASK_ERROR = 'Something went wrong reaching Machina. Please try again.';
+
+/** What a failed ask says in the chat. The backend's user-facing errors are
+ *  whole sentences ("Too many requests. Please slow down.", the quota line);
+ *  its raw validation and server errors are bare fragments ("Internal server
+ *  error", "question is too long") that used to land in the bubble verbatim.
+ *  Fragments become plain copy here; callers still report the raw text. */
+function askErrorCopy(raw: string | undefined): string {
+    const msg = (raw ?? '').trim();
+    if (/question is too long/i.test(msg)) return QUESTION_TOO_LONG;
+    return /[.!?]$/.test(msg) ? msg : GENERIC_ASK_ERROR;
+}
+
 export type AskOrigin =
     | 'free'      // typed question → genuine library search
     | 'card'      // a chip about one specific card we suggested
@@ -1188,7 +1206,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                             if (!isStale()) patchAt({ ungrounded: true });
                             trackAskNoCitations();
                         } else if (evt.type === 'error') {
-                            accError = evt.error || 'Something went wrong reaching Machina. Please try again.';
+                            accError = askErrorCopy(evt.error);
                             if (!isStale()) {
                                 setIsThinking(false);
                                 patchAt({ content: accError, error: true });
@@ -1253,7 +1271,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
             } else {
                 const errAnswer: ChatMessage = {
                     role: 'assistant',
-                    content: data.error || 'Something went wrong reaching Machina. Please try again.',
+                    content: askErrorCopy(data.error),
                     error: true,
                 };
                 // Record what failed (status + sanitized backend message) so
@@ -1539,8 +1557,10 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                                         </div>
                                     )}
 
-                                    {/* One-tap retry for the most recent failed exchange. */}
-                                    {m.error && i === messages.length - 1 && !busy && (
+                                    {/* One-tap retry for the most recent failed exchange
+                                        (not for a too-long question: the same text
+                                        would only be refused again). */}
+                                    {m.error && i === messages.length - 1 && !busy && m.content !== QUESTION_TOO_LONG && (
                                         <button
                                             onClick={retryLast}
                                             className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-card border border-border-subtle text-text-secondary text-[13px] font-medium hover:border-accent/40 hover:text-text transition-colors cursor-pointer"
@@ -1764,6 +1784,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                         onKeyDown={handleKeyDown}
                         onFocus={handleFocus}
                         rows={1}
+                        maxLength={MAX_QUESTION_CHARS}
                         placeholder={uid ? 'Ask about anything you’ve saved…' : 'Loading your library…'}
                         disabled={!uid}
                         // Majority direction, not any-Hebrew-flips-RTL: typing an
@@ -1797,6 +1818,12 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                         </IconButton>
                     )}
                 </div>
+                {/* Said only once the cap is reached, where the typing stops. */}
+                {input.length >= MAX_QUESTION_CHARS && (
+                    <p className="mt-1.5 ms-1 text-[12px] text-text-muted">
+                        Questions can be up to 2,000 characters.
+                    </p>
+                )}
                 <p className="hidden sm:block text-center text-[11px] text-text-muted mt-2">
                     Answers are grounded only in what you&apos;ve saved.
                 </p>

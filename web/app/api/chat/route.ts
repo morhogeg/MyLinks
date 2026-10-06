@@ -35,10 +35,16 @@ const CHAT_BACKEND_URL =
     process.env.CHAT_BACKEND_URL ||
     'https://us-central1-secondbrain-app-94da2.cloudfunctions.net/ask_brain';
 
+// The chat shows `error` verbatim, so every error this route writes is copy a
+// person can read; the technical detail goes to the server log only.
+const UNREACHABLE = "Machina couldn't be reached right now. Please try again in a minute.";
+const BAD_REQUEST = 'Something went wrong sending your question. Please try again.';
+
 export async function POST(request: NextRequest): Promise<NextResponse | Response> {
     const parsed = await readJsonBody(request, MAX_BODY_BYTES);
     if ('error' in parsed) {
-        return NextResponse.json({ success: false, error: parsed.error }, { status: parsed.status });
+        console.error(`[api/chat] rejected request body: ${parsed.error}`);
+        return NextResponse.json({ success: false, error: BAD_REQUEST }, { status: parsed.status });
     }
     const body = parsed.body;
 
@@ -83,10 +89,10 @@ export async function POST(request: NextRequest): Promise<NextResponse | Respons
             headers: { 'Content-Type': 'application/json' },
         });
     } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        return NextResponse.json(
-            { success: false, error: `Could not reach the brain backend: ${message}` },
-            { status: 502 }
-        );
+        // "fetch failed", a DNS error, the upstream timeout: for the logs, not
+        // the chat bubble (this used to read "Could not reach the brain
+        // backend: fetch failed").
+        console.error('[api/chat] upstream request failed:', error);
+        return NextResponse.json({ success: false, error: UNREACHABLE }, { status: 502 });
     }
 }
