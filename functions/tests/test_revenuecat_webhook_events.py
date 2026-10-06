@@ -1,11 +1,18 @@
-"""RevenueCat webhook: how the shared secret is compared.
+"""RevenueCat webhook: which events re-sync, and how the secret is compared.
 
+  - Every event that names an app user re-reads the subscriber from
+    RevenueCat (the body is never trusted for dates), so a type the handler
+    did not list (SUBSCRIPTION_EXTENDED, REFUND_REVERSED,
+    TEMPORARY_ENTITLEMENT_GRANT, or one RevenueCat adds later) can no longer
+    leave `proUntil` stale. TEST is the one type that is never synced.
   - The Authorization check compares bytes, so a non-ASCII header is a plain
     401 instead of a TypeError (500) out of hmac.compare_digest.
 
 Offline: workspace resolution and the RevenueCat sync are faked at main's
 module boundary, like test_account_lifecycle's TRANSFER cases.
 """
+
+import json
 
 import pytest
 
@@ -54,6 +61,52 @@ def synced(monkeypatch):
 def _post(event, auth=SECRET):
     headers = {} if auth is None else {"Authorization": auth}
     return main.revenuecat_webhook(_Req(body={"event": event}, headers=headers))
+
+
+@pytest.mark.parametrize("etype", [
+    "SUBSCRIPTION_EXTENDED", "REFUND_REVERSED", "TEMPORARY_ENTITLEMENT_GRANT",
+    "NON_RENEWING_PURCHASE", "SUBSCRIPTION_PAUSED",
+    "SOME_TYPE_REVENUECAT_ADDS_NEXT_YEAR",
+])
+def test_any_event_naming_an_app_user_resyncs_it(synced, etype):
+    res = _post({"type": etype, "app_user_id": "auth-a"})
+    assert res.status == 200
+    assert synced == [("ws-a", "auth-a")]
+    assert json.loads(res.body)["plan"] == "pro"
+
+
+@pytest.mark.parametrize("etype", ["INITIAL_PURCHASE", "RENEWAL", "EXPIRATION", "CANCELLATION"])
+def test_the_original_billing_events_still_resync(synced, etype):
+    assert _post({"type": etype, "app_user_id": "auth-a"}).status == 200
+    assert synced == [("ws-a", "auth-a")]
+
+
+def test_a_test_event_is_acknowledged_and_never_synced(synced):
+    res = _post({"type": "TEST", "app_user_id": "auth-a"})
+    assert res.status == 200
+    assert json.loads(res.body)["ignored"] == "TEST"
+    assert synced == []
+
+
+def test_an_event_with_no_app_user_is_acknowledged_without_a_sync(synced):
+    res = _post({"type": "SUBSCRIPTION_EXTENDED"})
+    assert res.status == 200
+    assert synced == []
+    # A malformed id is not something to look up either (and never a 5xx,
+    # which RevenueCat would retry for days).
+    assert _post({"type": "RENEWAL", "app_user_id": 12345}).status == 200
+    assert synced == []
+
+
+def test_original_app_user_id_is_used_when_app_user_id_is_absent(synced):
+    assert _post({"type": "REFUND_REVERSED", "original_app_user_id": "auth-a"}).status == 200
+    assert synced == [("ws-a", "auth-a")]
+
+
+def test_transfer_keeps_its_both_sides_resync(synced):
+    res = _post({"type": "TRANSFER", "transferred_from": ["auth-old"], "transferred_to": ["auth-new"]})
+    assert res.status == 200
+    assert synced == [("ws-old", "auth-old"), ("ws-new", "auth-new")]
 
 
 # ── Authorization header ─────────────────────────────────────────────────────

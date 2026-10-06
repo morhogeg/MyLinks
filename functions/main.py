@@ -4939,8 +4939,13 @@ def entitlement_sync_http(req: https_fn.Request) -> https_fn.Response:
         return _server_error(headers, e, "Entitlement sync failed")
 
 
-# RevenueCat event types that change whether the `pro` entitlement is active.
-# Anything else (TEST, SUBSCRIBER_ALIAS, …) is acknowledged and ignored.
+# RevenueCat event types the handler knows by name. This is NOT the gate:
+# every event that names an app user is re-synced, because the handler
+# re-reads the subscriber from RevenueCat's REST API and never takes a date
+# from the body, so an extra sync costs one lookup while a skipped one left
+# `proUntil` stale (SUBSCRIPTION_EXTENDED, REFUND_REVERSED and
+# TEMPORARY_ENTITLEMENT_GRANT used to be dropped). An unlisted type is only
+# logged, so a type RevenueCat adds later is noticed and still handled.
 # TRANSFER: a restore on a device signed into a DIFFERENT account moved the
 # App Store purchase between app user ids — both sides must be re-synced (the
 # old one loses Pro, the new one gains it). Its body carries
@@ -4948,7 +4953,12 @@ def entitlement_sync_http(req: https_fn.Request) -> https_fn.Response:
 _RC_EVENTS = frozenset((
     "INITIAL_PURCHASE", "RENEWAL", "PRODUCT_CHANGE", "CANCELLATION",
     "EXPIRATION", "BILLING_ISSUE", "UNCANCELLATION", "TRANSFER",
+    "SUBSCRIPTION_EXTENDED", "REFUND_REVERSED", "TEMPORARY_ENTITLEMENT_GRANT",
+    "NON_RENEWING_PURCHASE", "SUBSCRIPTION_PAUSED", "SUBSCRIBER_ALIAS",
 ))
+# The only type never synced: the dashboard's "Send test event" names a
+# made-up app user.
+_RC_IGNORED_EVENTS = frozenset(("TEST",))
 
 
 def _rc_transfer(event: dict) -> https_fn.Response:
@@ -5011,8 +5021,8 @@ def revenuecat_webhook(req: https_fn.Request) -> https_fn.Response:
     if not isinstance(event, dict):
         return _error_response("Invalid event body", 400)
     etype = str(event.get("type") or "")
-    if etype not in _RC_EVENTS:
-        logger.info("revenuecat_webhook: ignoring event type %s", etype or "?")
+    if etype in _RC_IGNORED_EVENTS:
+        logger.info("revenuecat_webhook: ignoring event type %s", etype)
         return https_fn.Response(json.dumps({"ok": True, "ignored": etype}), status=200,
                                  mimetype='application/json')
 
@@ -5023,6 +5033,13 @@ def revenuecat_webhook(req: https_fn.Request) -> https_fn.Response:
             return _server_error(None, e, "Webhook processing failed")
 
     app_user_id = event.get("app_user_id") or event.get("original_app_user_id")
+    if not isinstance(app_user_id, str) or not app_user_id:
+        # Nothing to re-read: the sync needs the app user id itself.
+        logger.info("revenuecat_webhook: %s names no app user", etype or "?")
+        return https_fn.Response(json.dumps({"ok": True, "ignored": etype}), status=200,
+                                 mimetype='application/json')
+    if etype not in _RC_EVENTS:
+        logger.info("revenuecat_webhook: unlisted event type %s, re-syncing anyway", etype or "?")
     aliases = event.get("aliases") or []
     try:
         uid = resolve_workspace_for_app_user(app_user_id, aliases)
