@@ -91,8 +91,8 @@ export async function POST(request: NextRequest): Promise<NextResponse | Respons
     } catch (error) {
         // "fetch failed", a DNS error, the upstream timeout: for the logs, not
         // the chat bubble (this used to read "Could not reach the brain
-        // backend: fetch failed").
-        console.error('[api/chat] upstream request failed:', error);
+        // backend: fetch failed"). A caller that hung up (Stop) is not one.
+        if (!request.signal.aborted) console.error('[api/chat] upstream request failed:', error);
         return NextResponse.json({ success: false, error: UNREACHABLE }, { status: 502 });
     }
 }
