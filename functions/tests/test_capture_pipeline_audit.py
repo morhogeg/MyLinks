@@ -474,3 +474,58 @@ def test_a_placeholder_deleted_while_queued_takes_its_screenshots_with_it(storag
     storage_world.env.run_worker()
     assert list(storage_world.bucket.blobs) == [paths[1]]
     assert storage_world.env.refunds == ["saves"]
+
+
+# ── CAP-13: the card janitor finds dead cards by age ─────────────────────────
+
+@pytest.fixture
+def honest_limit(monkeypatch):
+    """Make the fake honour .limit(n) the way Firestore does."""
+    def limit(self, n):
+        q = tcc._Query(self.db, self.match, self.filters)
+        q.n = n
+        return q
+    real_stream = tcc._Query.stream
+
+    def stream(self):
+        out = list(real_stream(self))
+        n = getattr(self, "n", None)
+        return iter(out[:n] if n else out)
+    monkeypatch.setattr(tcc._Query, "limit", limit)
+    monkeypatch.setattr(tcc._Query, "stream", stream)
+
+
+def test_a_big_healthy_import_no_longer_hides_a_dead_card(env, honest_limit):
+    now = tcc.NOW_MS
+    docs = {f"users/a-importer/links/c{i:03d}": {"status": "processing", "queuedAt": now - 60_000,
+                                                 "createdAt": now} for i in range(200)}
+    docs["users/z-user/links/stuck"] = {"status": "processing", "processingStartedAt": now - 40 * 60_000,
+                                        "createdAt": now - 40 * 60_000, "charge": {"kind": "saves"}}
+    db = env.make(docs)
+    report = env.janitor()
+    assert db.docs["users/z-user/links/stuck"]["status"] == "failed"
+    assert report["failed_out"] == 1 and env.refunds == ["saves"]
+    assert all(db.docs[f"users/a-importer/links/c{i:03d}"]["status"] == "processing" for i in range(200))
+
+
+def test_the_janitor_falls_back_to_the_status_scan_while_the_index_builds(env, monkeypatch):
+    db = env.make({"users/u1/links/stuck": {"status": "processing",
+                                            "processingStartedAt": tcc.NOW_MS - 40 * 60_000}})
+    real_stream = tcc._Query.stream
+
+    def stream(self):
+        if len([f for f in self.filters if f is not None]) > 1:
+            raise RuntimeError("400 The query requires an index")
+        return real_stream(self)
+    monkeypatch.setattr(tcc._Query, "stream", stream)
+    report = env.janitor()
+    assert db.docs["users/u1/links/stuck"]["status"] == "failed"
+    assert any("age query" in e for e in report["errors"])
+
+
+def test_the_janitor_age_queries_have_collection_group_indexes():
+    import json
+    indexes = json.loads((FUNCTIONS.parent / "firestore.indexes.json").read_text())["indexes"]
+    pairs = {tuple(f["fieldPath"] for f in ix["fields"]) for ix in indexes
+             if ix["collectionGroup"] == "links" and ix["queryScope"] == "COLLECTION_GROUP"}
+    assert ("status", "processingStartedAt") in pairs and ("status", "queuedAt") in pairs

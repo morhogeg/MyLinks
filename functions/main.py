@@ -6659,6 +6659,50 @@ def _iso_ms(value) -> Optional[int]:
     return _to_ms(value)
 
 
+_JANITOR_BATCH = 200
+
+
+def _stuck_processing_cards(db, cutoff: int, queued_cutoff: int, report: dict) -> list:
+    """The `processing` cards old enough to be dead, found by AGE.
+
+    Two collection-group queries, one per clock: `processingStartedAt` older
+    than the timeout (work started and never finished) and `queuedAt` older
+    than the queue window (a job never picked up). Each is ordered by its
+    clock, so the OLDEST come first and each tick works the backlog down. The
+    old `status == processing` scan read the first 200 in document-path order
+    and filtered by age afterwards, so 200 healthy queued import cards in one
+    workspace hid another user's card killed 40 minutes earlier.
+
+    Needs the (status, processingStartedAt) and (status, queuedAt)
+    COLLECTION_GROUP composite indexes in firestore.indexes.json (a default
+    index is COLLECTION-scoped only: the janitor 400'd every 5 minutes on
+    that once, until 2026-07-28). Until they are built the old scan runs, so
+    a fresh deploy never stops the sweep. Every writer of a processing card
+    stamps one of the two clocks; the per-card checks in the caller still
+    decide."""
+    found = {}
+    try:
+        for field, bound in (("processingStartedAt", cutoff), ("queuedAt", queued_cutoff)):
+            query = (db.collection_group("links")
+                     .where(filter=FieldFilter("status", "==", LinkStatus.PROCESSING.value))
+                     .where(filter=FieldFilter(field, "<", bound))
+                     .limit(_JANITOR_BATCH))
+            for doc in query.stream():
+                found.setdefault(getattr(doc.reference, "path", None) or doc.id, doc)
+        return list(found.values())
+    except Exception as e:
+        logger.warning(f"Janitor age query failed, using the status scan: {e}")
+        report["errors"].append(f"age query: {e}")
+    try:
+        return list(db.collection_group("links").where(
+            filter=FieldFilter("status", "==", LinkStatus.PROCESSING.value)
+        ).limit(_JANITOR_BATCH).stream())
+    except Exception as e:
+        logger.error(f"Janitor query failed: {e}")
+        report["errors"].append(str(e))
+        return []
+
+
 def run_processing_janitor() -> dict:
     """Flip cards stuck in `processing` past the timeout to a retryable FAILED.
 
@@ -6670,31 +6714,18 @@ def run_processing_janitor() -> dict:
 
     Only `processing` cards are ever matched: a `waiting` card (a save kept
     past the monthly wall, deferred_capture) has no clock to run out and is
-    never aged, failed or refunded here. Uses a collection-group query so it
-    doesn't scan every user. NOTE: the
-    default single-field indexes cover COLLECTION scope only — this query needs
-    the `status` field enabled at COLLECTION_GROUP scope, declared as a
-    fieldOverride in firestore.indexes.json (it 400'd in prod without it,
-    every 5 minutes, until 2026-07-28). Age is measured from
-    `processingStartedAt` when present (a retry preserves the old `createdAt`),
-    falling back to `createdAt`.
+    never aged, failed or refunded here. The cards are found BY AGE
+    (_stuck_processing_cards). Age is measured from `processingStartedAt`
+    when present (a retry preserves the old `createdAt`), falling back to
+    `createdAt`.
     """
     db = get_db()
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     cutoff = now_ms - _PROCESSING_TIMEOUT_MS
+    queued_cutoff = now_ms - _QUEUED_TIMEOUT_MS
     report = {"scanned": 0, "failed_out": 0, "errors": []}
 
-    try:
-        stuck = db.collection_group("links").where(
-            filter=FieldFilter("status", "==", LinkStatus.PROCESSING.value)
-        ).limit(200).stream()
-    except Exception as e:
-        logger.error(f"Janitor query failed: {e}")
-        report["errors"].append(str(e))
-        return report
-
-    queued_cutoff = now_ms - _QUEUED_TIMEOUT_MS
-    for doc in stuck:
+    for doc in _stuck_processing_cards(db, cutoff, queued_cutoff, report):
         report["scanned"] += 1
         d = doc.to_dict() or {}
         started = _to_ms(d.get("processingStartedAt"))
