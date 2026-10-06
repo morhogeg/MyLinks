@@ -565,9 +565,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
 
     // Weekly syntheses (M12), newest first — [0] is the in-app "What you
     // learned" feed card; the whole run is the Digest section's archive.
-    const [syntheses, setSyntheses] = useState<WeeklySynthesis[]>([]);
+    const [rawSyntheses, setSyntheses] = useState<WeeklySynthesis[]>([]);
     const [dismissedSynthesisWeek, setDismissedSynthesisWeek] = useState<string | null>(null);
-    const latestSynthesis = syntheses[0] ?? null;
     // The user's own notes on each week (weekId → notes), stored apart from the
     // function-written synthesis docs — see lib/synthesis.ts.
     const [synthesisNotes, setSynthesisNotes] = useState<Map<string, UserNote[]>>(new Map());
@@ -575,7 +574,39 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // Curated digest history — the dedicated Digest section (written
     // server-side to users/{uid}/digests; the in-app view is the always-on
     // surface, push/email are extra delivery channels).
-    const [digests, setDigests] = useState<CuratedDigest[]>([]);
+    const [rawDigests, setDigests] = useState<CuratedDigest[]>([]);
+
+    // Revisit renders the card refs a digest or synthesis stored when it was
+    // written, and the server checks privacy only then. While the vault is
+    // locked, a card made private since must not show there (REC-17): drop
+    // every ref this tab knows to be effectively private. The whole library is
+    // fetched once when Revisit opens locked (below), so old cards are known
+    // too. (A synthesis's prose was written then and can't be redacted here.)
+    const lockedPrivateIds = useMemo(() => {
+        if (!vaultLocked) return null;
+        const ids = new Set<string>();
+        for (const l of links) if (isEffectivelyPrivateCard(l)) ids.add(l.id);
+        for (const l of libraryLinks) if (isEffectivelyPrivateCard(l)) ids.add(l.id);
+        return ids.size ? ids : null;
+    }, [vaultLocked, links, libraryLinks, isEffectivelyPrivateCard]);
+    const syntheses = useMemo(() => {
+        if (!lockedPrivateIds) return rawSyntheses;
+        return rawSyntheses.map((s) => {
+            const cards = (s.cards ?? []).filter((c) => !lockedPrivateIds.has(c.id));
+            const standoutHidden = !!s.standoutCardId && lockedPrivateIds.has(s.standoutCardId);
+            return cards.length === (s.cards ?? []).length && !standoutHidden
+                ? s
+                : { ...s, cards, ...(standoutHidden ? { standoutCardId: null, standoutReason: undefined } : {}) };
+        });
+    }, [rawSyntheses, lockedPrivateIds]);
+    const latestSynthesis = syntheses[0] ?? null;
+    const digests = useMemo(() => {
+        if (!lockedPrivateIds) return rawDigests;
+        return rawDigests.map((d) => {
+            const cards = d.cards.filter((c) => !lockedPrivateIds.has(c.id));
+            return cards.length === d.cards.length ? d : { ...d, cards };
+        });
+    }, [rawDigests, lockedPrivateIds]);
 
     // First-run notifications nudge (native only, once per account). By the
     // time Feed mounts, AuthProvider has reconciled the user-doc mirror
@@ -1722,6 +1753,18 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // or list: a status filter, a facet chip, a tapped Insights row (search
     // asks for itself). Once per selection: a failed fetch re-arms
     // ensureLibrary, and re-running on that alone would retry in a loop.
+    // Revisit while the vault is locked: fetch the whole library once, so the
+    // privacy filter on digests and syntheses (lockedPrivateIds) knows every
+    // card they can name, not only the loaded pages. Once per visit: a failed
+    // fetch re-arms ensureLibrary (a new identity), and re-running on that
+    // alone would retry in a loop while offline.
+    const revisitLibraryAskedRef = useRef(false);
+    useEffect(() => {
+        const want = vaultLocked && hasPin === true && (viewMode === 'digest' || viewMode === 'digestDetail');
+        if (want && !revisitLibraryAskedRef.current) ensureLibrary();
+        revisitLibraryAskedRef.current = want;
+    }, [vaultLocked, hasPin, viewMode, ensureLibrary]);
+
     const libraryAskedRef = useRef('');
     useEffect(() => {
         const key = viewMode === 'grid' || viewMode === 'list' ? capKey : '';
