@@ -90,6 +90,10 @@ import { useScrollLock } from '@/lib/useScrollLock';
 // Stable no-op for card slots that don't wire up an action (pending cards).
 const noop = () => { };
 
+// How many cards a library-wide filtered view adds per load-more: one feed
+// page's worth (useLinks PAGE_SIZE).
+const RENDER_STEP = 150;
+
 /**
  * Main feed component displaying saved links
  * Features:
@@ -192,6 +196,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         semanticOnlyIds,
         partialIds,
         reminderCount,
+        filtersNeedLibrary,
     // LIVE query in — literal matching is instant per keystroke; the semantic
     // ids arrive debounced and append below the literal tiers.
     } = useFeedFilters(visibleLinks, searchQuery, libraryLinks, privateCollectionIds, semanticIds);
@@ -199,6 +204,31 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // BEFORE the children render, so every chip, dot and graph node reads the
     // same assignment. Sticky per device: a new save never recolors the rest.
     useMemo(() => assignCategoryColors(visibleLinks.map((l) => l.category)), [visibleLinks]);
+    // True while a filtered view waits on the full-library fetch it asked for
+    // (see filtersNeedLibrary): older matches are still on their way.
+    const checkingLibrary = isLoadingLibrary && filtersNeedLibrary && !searchQuery.trim();
+    // A filtered view unions in the whole library, which can be thousands of
+    // cards ("Unread" on a big library); mounting them in one go would freeze
+    // a phone. Such a view renders a feed page's worth at a time and the
+    // load-more sentinel grows it, the way it grows the window. The limit
+    // belongs to one filter selection and starts over when it changes.
+    const capKey = filtersNeedLibrary && !searchQuery.trim()
+        ? [filter, ...[selectedCategory, selectedTags, selectedSources, selectedCollections].map((set) => [...set].sort().join(','))].join('|')
+        : '';
+    const [renderCap, setRenderCap] = useState({ key: '', limit: RENDER_STEP });
+    const renderLimit = renderCap.key === capKey ? renderCap.limit : RENDER_STEP;
+    const shownLinks = useMemo(
+        () => (capKey && filteredLinks.length > renderLimit ? filteredLinks.slice(0, renderLimit) : filteredLinks),
+        [capKey, filteredLinks, renderLimit]
+    );
+    const moreToShow = shownLinks.length < filteredLinks.length;
+    // Once the snapshot has landed, such a view already holds every match:
+    // another window page would add nothing to it.
+    const libraryCoversView = !!capKey && libraryLinks.length > 0 && !isLoadingLibrary;
+    const handleLoadMore = useCallback(() => {
+        if (moreToShow) setRenderCap({ key: capKey, limit: renderLimit + RENDER_STEP });
+        else loadMore();
+    }, [moreToShow, capKey, renderLimit, loadMore]);
     // Where the literal hits end and the meaning-only hits begin. useFeedFilters
     // sorts literal matches first and meaning-only ones last, so the boundary is
     // one index — but ONLY under the default sort, the only one that tiers by
@@ -264,18 +294,20 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     };
     /** The result list cut into segments, each with the divider that opens it
      *  (null for the leading segment when it has none). Off search this is
-     *  one undivided segment (or the Reminders view's time groups). */
+     *  one undivided segment (or the Reminders view's time groups). Cuts
+     *  only exist while searching or in Reminders, which are never capped,
+     *  so slicing the shown list keeps every divider index valid. */
     const resultSegments = useMemo(() => {
         const cuts = [partialSplit, meaningSplit, ...reminderSplits.map((r) => r.idx)].filter((i) => i >= 0).sort((a, b) => a - b);
         const segs: { start: number; links: Link[] }[] = [];
         let prev = 0;
         for (const c of cuts) {
-            if (c > prev) segs.push({ start: prev, links: filteredLinks.slice(prev, c) });
+            if (c > prev) segs.push({ start: prev, links: shownLinks.slice(prev, c) });
             prev = c;
         }
-        segs.push({ start: prev, links: filteredLinks.slice(prev) });
+        segs.push({ start: prev, links: shownLinks.slice(prev) });
         return segs;
-    }, [filteredLinks, partialSplit, meaningSplit, reminderSplits]);
+    }, [shownLinks, partialSplit, meaningSplit, reminderSplits]);
     const [activeLinkId, setActiveLinkId] = useState<string | null>(null);
     // Live copies of cards opened from OUTSIDE the loaded feed pages: Ask
     // citations, a dup-save redirect, a push tap, the reminder strip, My Notes,
@@ -1073,9 +1105,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // Selection toolbar extras: select everything the current view shows, tag
     // the selection, or add it to a collection (the same sheet a single card
     // uses, in bulk mode).
-    const allVisibleSelected = filteredLinks.length > 0 && filteredLinks.every((l) => selectedIds.has(l.id));
+    const allVisibleSelected = shownLinks.length > 0 && shownLinks.every((l) => selectedIds.has(l.id));
     const handleSelectAllVisible = () => {
-        setSelectedIds(allVisibleSelected ? new Set() : new Set(filteredLinks.map((l) => l.id)));
+        setSelectedIds(allVisibleSelected ? new Set() : new Set(shownLinks.map((l) => l.id)));
     };
     const handleBulkAddTag = async (tag: string) => {
         if (!uid) return;
@@ -1632,6 +1664,18 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         window.scrollTo({ top: 0 });
         onLibraryFacetApplied?.();
     }, [libraryFacet, onLibraryFacetApplied, openNotesView, setSelectedCategory, setSelectedTags, setSelectedSources, setSelectedCollections, setFilter]);
+
+    // A filtered view answers from the whole library (useFeedFilters unions
+    // the full snapshot in), so fetch it the moment one is applied on the grid
+    // or list: a status filter, a facet chip, a tapped Insights row (search
+    // asks for itself). Once per selection: a failed fetch re-arms
+    // ensureLibrary, and re-running on that alone would retry in a loop.
+    const libraryAskedRef = useRef('');
+    useEffect(() => {
+        const key = viewMode === 'grid' || viewMode === 'list' ? capKey : '';
+        if (key && key !== libraryAskedRef.current) ensureLibrary();
+        libraryAskedRef.current = key;
+    }, [capKey, viewMode, ensureLibrary]);
 
     // True while the Insights-applied facet is still exactly what the feed
     // shows. The user changing ANYTHING (adding/removing a facet, searching,
@@ -3241,16 +3285,17 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                     })()}
                     {/* Library-fetch status. Matches from the loaded window render
                         immediately; while the one-time full-library fetch is still
-                        in flight, older cards may be missing — show a subtle line
-                        above the grid instead of blocking the results. The empty
-                        state owns the no-results case (spinner there). */}
-                    {(viewMode === 'grid' || viewMode === 'list') && filteredLinks.length > 0 && searchingLibrary && (
+                        in flight (a search, or a filtered view), older cards may
+                        be missing — show a subtle line above the grid instead of
+                        blocking the results. The empty state owns the no-results
+                        case (spinner there). */}
+                    {(viewMode === 'grid' || viewMode === 'list') && filteredLinks.length > 0 && (searchingLibrary || checkingLibrary) && (
                         <div className="flex items-center gap-2 mb-4 text-xs" aria-live="polite">
                             {/* Same sentence as Ask's first drafting beat, so it
                                 gets the same orb — a library search looks like a
                                 library search wherever it happens. */}
                             <CitationMark state="searching" size={20} />
-                            <span className="text-text-muted font-medium">Searching your library…</span>
+                            <span className="text-text-muted font-medium">{searchingLibrary ? 'Searching your library…' : 'Checking your whole library…'}</span>
                         </div>
                     )}
                     {viewMode === 'collection' ? (
@@ -3331,12 +3376,12 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             // end: one quiet line — no icon tile, no heading, no
                             // Clear CTA (the bar's own × already clears). The full
                             // empty state below is for SETTLED states only.
-                            if (searchQuery && (searchingLibrary || searchingMeaning)) {
+                            if ((searchQuery && (searchingLibrary || searchingMeaning)) || checkingLibrary) {
                                 return (
                                     <div className="flex items-center justify-center gap-2 py-24 px-6 animate-fade-in">
                                         <span className="text-accent"><CitationMark state="searching" size={18} /></span>
                                         <span className="text-sm font-medium text-text-muted">
-                                            {searchingLibrary ? 'Searching your library…' : 'Searching by meaning…'}
+                                            {checkingLibrary ? 'Checking your whole library…' : searchingLibrary ? 'Searching your library…' : 'Searching by meaning…'}
                                         </span>
                                     </div>
                                 );
@@ -3454,6 +3499,15 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                     Ask Machina instead
                                 </button>
                             )}
+                            {/* Only the loaded pages were checked (the full-library
+                                fetch failed, or this view never asks for it): older
+                                cards may still match, so this is not a verdict yet.
+                                Reminders is complete without it (useLinks keeps
+                                every pending one live). */}
+                            {hasMore && filter !== 'reminders'
+                                && !((filtersNeedLibrary || searchQuery.trim()) && libraryLinks.length > 0) && (
+                                <LoadMoreSentinel hasMore onLoadMore={loadMore} />
+                            )}
                         </div>
                             );
                         })()
@@ -3500,7 +3554,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                 (meaningSplit) — the rows below it share no word
                                 with the query. -1 while not searching, so the
                                 list is untouched off search. */}
-                            {filteredLinks.flatMap((link, idx) => {
+                            {shownLinks.flatMap((link, idx) => {
                                 // cv-card: off-screen rows skip layout/paint (3.15).
                                 const row = (
                                     <div key={link.id} className="cv-card">
@@ -3528,7 +3582,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                 const divider = dividerAt(idx);
                                 return divider ? [divider, row] : row;
                             })}
-                            <LoadMoreSentinel hasMore={hasMore} onLoadMore={loadMore} />
+                            <LoadMoreSentinel hasMore={moreToShow || (hasMore && !libraryCoversView)} onLoadMore={handleLoadMore} />
                         </div>
                     ) : (
                         <>
@@ -3581,7 +3635,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                 </Fragment>
                             ));
                         })()}
-                        <LoadMoreSentinel hasMore={hasMore} onLoadMore={loadMore} />
+                        <LoadMoreSentinel hasMore={moreToShow || (hasMore && !libraryCoversView)} onLoadMore={handleLoadMore} />
                         </>
                     )}
                 </div>
