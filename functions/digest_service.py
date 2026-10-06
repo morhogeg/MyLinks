@@ -23,6 +23,7 @@ rewritten, so an existing workspace keeps working untouched. `digest_topic` /
 `digest_topics` only ever fed the by-topic style and are now ignored.
 """
 
+import re
 import random
 import logging
 from datetime import datetime, timezone, timedelta
@@ -294,6 +295,38 @@ def _card_index(cards: List[dict]) -> dict:
     return {c["id"]: c for c in cards if c.get("id")}
 
 
+# The synthesis title is model output over the week's saves, i.e. over page
+# text a third party wrote, and it lands on a lock screen as Machina speaking.
+# Only plain words go out: markdown, HTML and anything URL-shaped are removed
+# and the result is capped (push_service's own 200-char cap is for payload
+# size, not for what a notification title should read like).
+PUSH_TITLE_MAX_CHARS = 80
+SYNTHESIS_PUSH_FALLBACK_TITLE = "What you learned this week"
+_MD_LINK_RE = re.compile(r"!?\[([^\]]*)\]\([^)]*\)")
+# Scheme/www URLs, plus bare domains on the TLDs a lure would use. A general
+# "word.word/path" rule would also eat titles like "Node.js/Deno".
+_URLISH_RE = re.compile(
+    r"(?:https?://|www\.)\S+"
+    r"|\b[\w-]+(?:\.[\w-]+)*\.(?:com|net|org|io|co|app|xyz|info|biz|me|ly|link|"
+    r"click|top|site|online|shop|live|ru|cn|tk)\b(?:/\S*)?",
+    re.IGNORECASE)
+_HTML_TAG_RE = re.compile(r"<[^>]*>")
+_MD_MARK_RE = re.compile(r"[*_`#>~|\\]+")
+
+
+def push_safe_title(title, fallback: str = SYNTHESIS_PUSH_FALLBACK_TITLE) -> str:
+    """`title` as plain notification text: markdown links reduced to their
+    words, URLs and HTML dropped, emphasis marks removed, whitespace squeezed,
+    capped at PUSH_TITLE_MAX_CHARS on a word boundary. Pure."""
+    t = _MD_LINK_RE.sub(r"\1", str(title or ""))
+    t = _HTML_TAG_RE.sub(" ", t)
+    t = _URLISH_RE.sub(" ", t)
+    t = " ".join(_MD_MARK_RE.sub(" ", t).split()).strip(" -:;,")
+    if len(t) > PUSH_TITLE_MAX_CHARS:
+        t = t[:PUSH_TITLE_MAX_CHARS].rsplit(" ", 1)[0].rstrip(" -:;,") + "…"
+    return t or fallback
+
+
 def synthesis_teaser(narrative: str, max_len: int = 160) -> str:
     """The first sentence of the narrative, for the locked (free-plan) card.
 
@@ -477,7 +510,7 @@ def build_and_send_synthesis(uid: str, user_data: dict, links: List[dict], force
             )
             push_result = send_push(
                 uid,
-                synth.get("title") or "What you learned this week",
+                push_safe_title(synth.get("title")),
                 push_body,
                 {"view": "digest"},
             )
