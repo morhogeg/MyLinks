@@ -2811,6 +2811,23 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
                             yield "data: " + json.dumps(
                                 {"type": "ungrounded"}
                             ) + "\n\n"
+                        elif kind == "incomplete":
+                            # The model stopped before finishing an answer
+                            # that is already on screen (finish_reason in
+                            # `payload`). It used to end with "done" as if it
+                            # were whole. Say it was cut off, leave a durable
+                            # trail, and give the ask back.
+                            _record_server_error(
+                                "ask_brain (stream)",
+                                AnalysisError(f"answer stream incomplete (finish_reason={payload})"),
+                                uid=uid)
+                            if charged:
+                                refund_quota(*charged)
+                            yield "data: " + json.dumps({
+                                "type": "error", "reason": "incomplete",
+                                "error": "Machina's answer was cut off. Please ask again.",
+                            }) + "\n\n"
+                            return
                     yield "data: " + json.dumps({"type": "done"}) + "\n\n"
                 except Exception as stream_exc:
                     # Mirror _server_error: log full detail, emit a sanitized

@@ -847,12 +847,15 @@ def _valid_cited_ids(cited, cards: list) -> list:
 
 
 def _parse_cited_marker(full_text: str) -> list:
-    """Extract the raw id list from a `[[CITED: id1, id2]]` marker in `full_text`.
+    """Extract the raw ids from EVERY `[[CITED: id1, id2]]` marker in
+    `full_text`, unioned in order of first appearance.
 
     Returns the trimmed, comma-split ids exactly as the model wrote them (no
     validation against the supplied cards — callers pass the result through
-    `_valid_cited_ids` for that). Missing or unparseable marker → empty list.
-    A marker cut off at the very end of the text (max-length/interrupted
+    `_valid_cited_ids` for that). No marker → empty list. The model is told
+    to write one marker on the last line but sometimes cites inline as well
+    ("The maple cake [[CITED: a]] bakes…"); every marker it wrote counts. A
+    marker cut off at the very end of the text (max-length/interrupted
     generation: `[[CITED: id1, id2` with no closing `]]`) still yields its
     ids — the model DID name them; dropping them flagged real grounded
     answers as ungrounded. Pure, so the streaming path's marker handling is
@@ -860,13 +863,53 @@ def _parse_cited_marker(full_text: str) -> list:
     """
     if not full_text:
         return []
+    out, seen = [], set()
     try:
-        m = re.search(r"\[\[CITED:([^\[\]]*?)(?:\]\]|$)", full_text, re.DOTALL)
+        for m in re.finditer(r"\[\[CITED:([^\[\]]*?)(?:\]\]|$)", full_text):
+            for t in m.group(1).split(","):
+                t = t.strip()
+                if t and t not in seen:
+                    seen.add(t)
+                    out.append(t)
     except Exception:
         return []
-    if not m:
-        return []
-    return [t.strip() for t in m.group(1).split(",") if t.strip()]
+    return out
+
+
+# A complete citation marker anywhere in streamed prose, plus the horizontal
+# space around it, so "cake [[CITED: a]] bakes" reads "cake bakes" and
+# "cake [[CITED: a]]." reads "cake.".
+_CITED_MARKER_RE = re.compile(r"[ \t]*\[\[CITED:[^\[\]]*\]\]([ \t]*)")
+
+
+def _strip_cited_markers(text: str) -> str:
+    """Remove every COMPLETE citation marker from prose, wherever it sits,
+    keeping one space when it stood between two words. Pure."""
+    if not text or "[[CITED:" not in text:
+        return text
+    return _CITED_MARKER_RE.sub(lambda m: " " if m.group(1) else "", text)
+
+
+# Finish reasons that mean the model ended the answer itself. None (the SDK
+# reported nothing) and UNSPECIFIED count as complete: an unknown is not
+# evidence of a cut.
+_COMPLETE_FINISH_REASONS = (None, "STOP", "FINISH_REASON_UNSPECIFIED")
+
+
+def _finish_reason_name(response) -> Optional[str]:
+    """The first candidate's finish_reason as a bare name ("STOP",
+    "MAX_TOKENS", "SAFETY", …), or None when the response carries none.
+    Accepts the SDK enum or a plain string. Never raises."""
+    try:
+        cands = getattr(response, "candidates", None) or []
+        fr = getattr(cands[0], "finish_reason", None) if cands else None
+    except Exception:
+        return None
+    if fr is None:
+        return None
+    name = getattr(fr, "name", None) or getattr(fr, "value", None) or fr
+    name = str(name).rsplit(".", 1)[-1].strip().upper()
+    return name or None
 
 
 _EMPTY_LIBRARY_ANSWER_EN = ("I couldn't find anything in your library about that yet. "
@@ -1850,8 +1893,11 @@ Return JSON: {"platform": one of "x","instagram","threads","tiktok","youtube","l
         Yields ("token", text) tuples as the answer streams in, then a final
         ("citedIds", [str]) tuple with the ids the model used, and — when the
         answer ended up with NO valid citation — a trailing ("ungrounded", True)
-        tuple. Reuses the same grounding/system instructions as
-        `answer_from_context` so answer quality and Hebrew handling are preserved.
+        tuple. When the model stopped before finishing an answer that already
+        reached the user (finish_reason MAX_TOKENS, SAFETY, …) the tokens are
+        followed by ("incomplete", <finish_reason>) and nothing else. Reuses the
+        same grounding/system instructions as `answer_from_context` so answer
+        quality and Hebrew handling are preserved.
 
         Because schema-constrained JSON cannot be streamed token-by-token, the
         model instead writes a plain-text answer and ends with a machine-readable
@@ -1986,6 +2032,9 @@ Return JSON: {"platform": one of "x","instagram","threads","tiktok","youtube","l
         isolated = False
         pending_filter_note = ""
         full_text = ""
+        # Set when the answer that streamed stopped before the model finished
+        # it (finish_reason MAX_TOKENS / SAFETY / RECITATION / …).
+        incomplete = None
         attempt_idx = 0
         while attempt_idx < len(attempts):
             attempt_model, attempt_prompt = attempts[attempt_idx]
@@ -1994,8 +2043,8 @@ Return JSON: {"platform": one of "x","instagram","threads","tiktok","youtube","l
             # accumulation into the next run.
             buffer = ""
             full_text = ""
-            marker_seen = False
             emitted = False
+            last_chunk = None
             try:
                 stream = self.client.models.generate_content_stream(
                     model=attempt_model,
@@ -2009,31 +2058,28 @@ Return JSON: {"platform": one of "x","instagram","threads","tiktok","youtube","l
                             "safety_settings": _ASK_SAFETY_SETTINGS},
                 )
                 for chunk in stream:
+                    # The final chunk carries the finish_reason (often with no
+                    # text): keep it for the completeness check below. The
+                    # stream object itself has no `.response`, so reading the
+                    # reason from it always said "unknown".
+                    last_chunk = chunk
                     piece = getattr(chunk, "text", None)
                     if not piece:
                         continue
                     full_text += piece
-                    if marker_seen:
-                        # Past the marker — accumulate into full_text only, emit nothing.
-                        continue
-                    # Scrub complete in-context ids and image constructs BEFORE
-                    # deciding what to emit (full_text above keeps the raw
-                    # stream — the citation marker is parsed from it, so
-                    # scrubbing here can't touch it). An image still arriving
-                    # is held back (_image_hold_index) so it leaves whole or
-                    # not at all; whatever is emitted is defanged.
-                    buffer = _remove_images(_scrub_ids(buffer + piece))
-                    marker_idx = buffer.find(MARKER)
-                    if marker_idx != -1:
-                        # Emit everything before the marker, then stop emitting.
-                        head = _strip_unsafe_markup(buffer[:marker_idx])
-                        if head:
-                            emitted = True
-                            yield ("token", head)
-                        marker_seen = True
-                        buffer = ""
-                        continue
+                    # Scrub complete in-context ids, citation markers and image
+                    # constructs BEFORE deciding what to emit (full_text above
+                    # keeps the raw stream — citations are parsed from it, so
+                    # scrubbing here can't touch them). A marker the model
+                    # wrote MID-answer is removed and the prose after it keeps
+                    # streaming; emission used to stop at the first marker,
+                    # dropping the rest of the answer. An incomplete marker or
+                    # image is held back until it completes; trailing spaces
+                    # wait for the next word so a removed marker can't leave a
+                    # double space; whatever is emitted is defanged.
+                    buffer = _remove_images(_strip_cited_markers(_scrub_ids(buffer + piece)))
                     emit_to = min(_safe_emit_point(buffer), _image_hold_index(buffer))
+                    emit_to = len(buffer[:emit_to].rstrip(" \t"))
                     if emit_to > 0:
                         emitted = True
                         yield ("token", _defang_images(buffer[:emit_to]))
@@ -2045,9 +2091,20 @@ Return JSON: {"platform": one of "x","instagram","threads","tiktok","youtube","l
                 # marked done and the ask unit is silently kept.
                 if not full_text.strip():
                     raise EmptyGenerationError(
-                        f"Empty answer stream ({_gen_failure_reason(getattr(stream, 'response', None))})")
-                # Flush any remaining buffered text that turned out not to be a marker.
-                tail = _strip_unsafe_markup(buffer) if not marker_seen else ""
+                        f"Empty answer stream ({_gen_failure_reason(last_chunk)})")
+                # The model stopped before finishing (MAX_TOKENS, SAFETY, …).
+                # Nothing on screen yet: a clean failure, try the next rung.
+                # Something on screen: it cannot be retracted or completed, so
+                # it is reported as incomplete instead of ending as if done.
+                finish = _finish_reason_name(last_chunk)
+                if finish not in _COMPLETE_FINISH_REASONS:
+                    if not emitted:
+                        raise EmptyGenerationError(
+                            f"Answer stream stopped early ({_gen_failure_reason(last_chunk)})")
+                    incomplete = finish
+                # Flush the held tail; a citation marker cut off at the very
+                # end is not prose.
+                tail = _strip_unsafe_markup(buffer.split(MARKER, 1)[0])
                 if tail:
                     yield ("token", tail)
                 break  # this attempt completed — don't try the remaining fallbacks
@@ -2108,6 +2165,14 @@ Return JSON: {"platform": one of "x","instagram","threads","tiktok","youtube","l
                 logger.error("Ask stream attempt %d (model %s) produced no output — "
                              "trying next fallback: %s", attempt_idx, attempt_model, e)
                 attempt_idx += 1
+
+        # Part of an answer is on screen but the model never finished it: say
+        # so (the caller turns this into an error event and refunds the ask)
+        # rather than closing it with citations as if it were whole.
+        if incomplete:
+            logger.warning("ask stream ended incomplete (finish_reason=%s)", incomplete)
+            yield ("incomplete", incomplete)
+            return
 
         # The answer streamed successfully — if the filter rescue had to withhold
         # anything, disclose it now (appended prose, never silence).
