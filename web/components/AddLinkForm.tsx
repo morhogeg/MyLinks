@@ -46,11 +46,11 @@ interface AddLinkFormProps {
 // Sentence punctuation that trails a pasted URL but is never part of it,
 // including the ellipsis and the Hebrew gershayim/geresh (mirrors
 // functions/main.py _URL_TRAILING_PUNCT).
-const URL_TRAILING_PUNCT = /[).,;:!?"'”’»\]>…״׳]+$/;
+const URL_TRAILING_PUNCT = /[).,;:!?"'”’»\]>…\u05f4\u05f3]+$/;
 // A URL in pasted text. CJK punctuation (U+3000-303F) and full/halfwidth forms
 // (U+FF00-FFEF) end it: Chinese and Japanese text puts no space after a link
 // (mirrors functions/main.py _URL_IN_TEXT_RE).
-const URL_IN_TEXT = /https?:\/\/[^\s<>"　-〿＀-￯]+/i;
+const URL_IN_TEXT = /https?:\/\/[^\s<>"\u3000-\u303f\uff00-\uffef]+/i;
 
 const validHttpUrl = (candidate: string): string => {
     try {

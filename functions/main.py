@@ -3260,11 +3260,11 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
 # text puts no space after a link, so "…/article。谢谢" used to save the whole
 # run as the URL (a 404, a FAILED card). web/components/AddLinkForm.tsx
 # formatUrl mirrors both rules.
-_URL_IN_TEXT_RE = re.compile(r'https?://[^\s<>"　-〿＀-￯]+', re.I)
+_URL_IN_TEXT_RE = re.compile(r'https?://[^\s<>"\u3000-\u303f\uff00-\uffef]+', re.I)
 # Punctuation that ends a sentence around a URL, never the URL itself:
 # "read this (https://a.com/x)." must save https://a.com/x. Includes the
 # ellipsis and the Hebrew gershayim/geresh (״ ׳) Hebrew text puts after one.
-_URL_TRAILING_PUNCT = ').,;:!?"\'”’»]>…״׳'
+_URL_TRAILING_PUNCT = ').,;:!?"\'”’»]>…\u05f4\u05f3'
 # A shared `url` value with no scheme: a host with a dot in it, an optional
 # port and path, no spaces ("www.nytimes.com/2026/…", "example.com/a"). The
 # iOS Share Extension sends `{"url": s}` when the URL item arrives as such a
@@ -7196,9 +7196,10 @@ def sweep_stuck_processing(event: scheduler_fn.ScheduledEvent) -> None:
 
 
 # Waiting saves (deferred_capture): every workspace's waiting cards are
-# enqueued oldest first within the month's remaining allowance. Daily, just
-# after the UTC month rolls over on the 1st (quota month keys are UTC); on any
-# other day a workspace at its cap has no room, so the run costs one query.
+# planned oldest first within the month's remaining allowance, and queued a
+# slice at a time (the first here, the rest by sweep_stuck_processing). Daily,
+# just after the UTC month rolls over on the 1st (quota month keys are UTC); on
+# any other day a workspace at its cap has no room, so the run costs one query.
 @scheduler_fn.on_schedule(schedule="15 0 * * *", max_instances=1, timeout_sec=540, memory=512)
 def release_waiting_saves(event: scheduler_fn.ScheduledEvent) -> None:
     """Daily 00:15 UTC: analyze waiting saves that now fit the allowance."""

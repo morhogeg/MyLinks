@@ -896,8 +896,8 @@ def test_a_cjk_share_queues_the_url_without_the_sentence(env, monkeypatch):
 
 def test_the_web_form_mirrors_the_url_rules():
     form = (FUNCTIONS.parent / "web/components/AddLinkForm.tsx").read_text(encoding="utf-8")
-    assert r'[^\s<>"　-〿＀-￯]+' in form
-    assert r"…״׳]+$" in form
+    assert r'[^\s<>"\u3000-\u303f\uff00-\uffef]+' in form
+    assert r"…\u05f4\u05f3]+$" in form
 
 
 @pytest.mark.parametrize("raw,url", [
