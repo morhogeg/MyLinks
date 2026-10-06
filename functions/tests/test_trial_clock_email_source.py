@@ -16,7 +16,6 @@ import hashlib
 import types
 from datetime import datetime, timezone
 
-import firebase_admin.auth as fb_auth
 import pytest
 
 import entitlement as ent
@@ -73,6 +72,7 @@ class _Db:
 @pytest.fixture
 def auth_accounts(monkeypatch):
     """Firebase Auth as a dict: auth uid -> email (None = no email)."""
+    import firebase_admin.auth as fb_auth  # here, like the storage fakes elsewhere
     accounts = {}
     looked_up = []
 
