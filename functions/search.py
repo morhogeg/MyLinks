@@ -6,8 +6,10 @@ Handles embedding generation and vector search queries.
 import os
 import re
 import json
+import time
+import random
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional, Any
 from firebase_functions import firestore_fn, https_fn
@@ -17,10 +19,11 @@ from google.cloud.firestore_v1.base_query import FieldFilter
 from google.cloud.firestore_v1.vector import Vector
 from google import genai
 
-from db import get_db
+from db import get_db, SCHEDULER_STATE_COLLECTION
 from models import UNANALYZED_STATUSES
 from log_safe import mask_uid
-from ai_service import embedding_needs_repair, collect_notes_text
+from ai_service import (embedding_needs_repair, collect_notes_text, _is_retryable_error,
+                        EMBED_TEXT_MAX_CHARS)
 import vector_store
 from vector_store import VECTOR_FIELD, card_payload, mirror_vector_write, vector_needs_repair
 from rate_limit import check_rate_limit
@@ -72,8 +75,9 @@ EMBED_TEXT_VERSION = 5
 # a conservative character budget (roughly that many tokens) so a long
 # detailedSummary can never overflow the model input. The most important fields
 # (title, summary, details) are placed first, so truncation only ever drops the
-# lower-value tail (tags/concepts/highlights).
-_EMBED_TEXT_MAX_CHARS = 8000
+# lower-value tail (tags/concepts/highlights). One cap for every embed site
+# (ai_service.EMBED_TEXT_MAX_CHARS), so the trigger and the backfills agree.
+_EMBED_TEXT_MAX_CHARS = EMBED_TEXT_MAX_CHARS
 
 
 def build_embedding_text(data: dict) -> str:
@@ -94,17 +98,19 @@ def build_embedding_text(data: dict) -> str:
     unit-tested offline.
     """
     data = data or {}
-    title = (data.get("title") or "").strip()
-    summary = (data.get("summary") or "").strip()
-    detailed = (data.get("detailedSummary") or "").strip()
+    # Every field is coerced (see _text_items): one malformed client-written
+    # value must cost the card a field, not its embedding.
+    title = _scalar_text(data.get("title")).strip()
+    summary = _scalar_text(data.get("summary")).strip()
+    detailed = _scalar_text(data.get("detailedSummary")).strip()
     # The user's own annotations — high-signal, their words, not the model's.
     # Merges the legacy `userNote` string + the multi-note `userNotes` array.
     note = collect_notes_text(data).strip()
-    tags = ", ".join(t for t in (data.get("tags") or []) if t)
-    concepts = ", ".join(c for c in (data.get("concepts") or []) if c)
-    meta = data.get("metadata") or {}
-    takeaway = (meta.get("actionableTakeaway") or "").strip()
-    highlights = [str(h) for h in (data.get("videoHighlights") or []) if h]
+    tags = ", ".join(_text_items(data.get("tags")))
+    concepts = ", ".join(_text_items(data.get("concepts")))
+    meta = data.get("metadata") if isinstance(data.get("metadata"), dict) else {}
+    takeaway = _scalar_text(meta.get("actionableTakeaway")).strip()
+    highlights = _text_items(data.get("videoHighlights"))
 
     parts = []
     if title:
@@ -164,16 +170,31 @@ def keyword_query_tokens(question: str) -> set:
     return tokens
 
 
+def _text_items(val) -> List[str]:
+    """The non-empty string items of a stored list field; [] for any other
+    shape. Card docs are client-written: one None tag, a numeric concept or a
+    string where a list belongs used to raise inside the haystack join and
+    take keyword search down for every query in that library."""
+    if not isinstance(val, (list, tuple)):
+        return []
+    return [x for x in val if isinstance(x, str) and x]
+
+
+def _scalar_text(val) -> str:
+    """A stored scalar field as text ("" for a missing/None value)."""
+    return "" if val is None else str(val)
+
+
 def _card_haystack(data: dict) -> str:
-    return " ".join(str(x) for x in [
-        data.get("title", ""), data.get("summary", ""),
-        " ".join(data.get("tags", []) or []),
+    return " ".join([
+        _scalar_text(data.get("title")), _scalar_text(data.get("summary")),
+        " ".join(_text_items(data.get("tags"))),
         # Concepts too: an Ask chip can anchor on a concept ("what else did I
         # save on Resilience?") that appears ONLY in the concepts array — with
         # concepts absent from the haystack the lexical fallback and rerank
         # boost were blind to exactly the label the chip promised to find.
-        " ".join(data.get("concepts", []) or []),
-        data.get("sourceName", ""), data.get("category", ""),
+        " ".join(_text_items(data.get("concepts"))),
+        _scalar_text(data.get("sourceName")), _scalar_text(data.get("category")),
         # The user's own notes are searchable too — a literal word they wrote
         # should surface the card in keyword fallback and rerank. Covers both the
         # legacy string and the multi-note array.
@@ -705,12 +726,15 @@ def judge_relevance(query_text: str, candidates: List[dict], *,
     # ai_service), and the candidate list carries the user's Hebrew cards on
     # EVERY query — without this the judge silently blanks and search falls
     # back to the distance-gate wall, which is exactly the bug being fixed.
-    from ai_service import GEMINI_ANALYSIS_MODEL, _ASK_SAFETY_SETTINGS
+    from ai_service import GEMINI_ANALYSIS_MODEL, _ASK_SAFETY_SETTINGS, JUDGE_MAX_OUTPUT_TOKENS
     result = client.models.generate_content(
         model=GEMINI_ANALYSIS_MODEL,
         contents=build_judge_prompt(query_text, candidates),
         config={"temperature": 0, "response_mime_type": "application/json",
-                "safety_settings": _ASK_SAFETY_SETTINGS},
+                "safety_settings": _ASK_SAFETY_SETTINGS,
+                # A verdict for 20 candidates is under 1k tokens; a reply cut
+                # by the cap does not parse and falls back to the gates.
+                "max_output_tokens": JUDGE_MAX_OUTPUT_TOKENS},
     )
     text = getattr(result, "text", None)
     if not text:
@@ -752,11 +776,14 @@ KEYWORD_SCAN_CAP = 1000
 # — megabytes per query, and the dominant cost of a 5-10s search (owner QA,
 # 2026-08-07). The search bar only needs what scores the card (keyword_match_score),
 # ranks it (rerank_candidates) and identifies it, so it asks Firestore for
-# exactly those fields. NOT used by ask_brain, which grounds its answer in the
-# full card body and must keep fetching complete documents.
+# exactly those fields. ask_brain, which grounds its answer in the full card
+# body, scans with the same projection and then fetches only the winners whole
+# (keyword_scan_full). `isPrivate` and `collectionIds` ride along for the
+# privacy strip: without them a private card found by its words came back
+# looking public, and no later filter could tell.
 SEARCH_SCAN_FIELDS = [
     "title", "summary", "tags", "concepts", "sourceName", "category",
-    "userNote", "userNotes", "createdAt", "status",
+    "userNote", "userNotes", "createdAt", "status", "isPrivate", "collectionIds",
 ]
 
 
@@ -790,19 +817,40 @@ def keyword_scan_cards(uid: str, query_text: str, exclude_ids: set = None,
     for doc in query.stream():
         if doc.id in exclude_ids:
             continue
-        data = doc.to_dict() or {}
-        # Mid-flight/failed captures have no settled content to ground an
-        # answer in (matches recent_cards/category_cards) — and the anchor
-        # rescue PINS its results to the front, so a failed placeholder must
-        # never qualify.
-        if data.get("status") in UNANALYZED_STATUSES:
-            continue
-        score = keyword_match_score(data, tokens)
-        if score > 0:
-            scored.append((score, normalize_card_for_search(data, doc.id)))
+        try:
+            data = doc.to_dict() or {}
+            # Mid-flight/failed captures have no settled content to ground an
+            # answer in (matches recent_cards/category_cards) — and the anchor
+            # rescue PINS its results to the front, so a failed placeholder must
+            # never qualify.
+            if data.get("status") in UNANALYZED_STATUSES:
+                continue
+            score = keyword_match_score(data, tokens)
+            if score > 0:
+                scored.append((score, normalize_card_for_search(data, doc.id)))
+        except Exception as e:
+            # One malformed card costs only itself: an error here used to
+            # abort the scan, i.e. lexical search for every query.
+            logger.warning(f"Keyword scan skipped one malformed card ({type(e).__name__})")
 
     scored.sort(key=lambda s: s[0], reverse=True)
     return [d for _, d in scored[:limit]]
+
+
+def keyword_scan_full(uid: str, query_text: str, exclude_ids: set = None,
+                      limit: int = 10) -> List[dict]:
+    """keyword_scan_cards for Ask: scan the light projection (the fields the
+    scorer reads, SEARCH_SCAN_FIELDS), then fetch only the winners whole.
+
+    Ask grounds its answer in the full card body, so its scans used to stream
+    up to KEYWORD_SCAN_CAP COMPLETE documents (embedding vector included)
+    each, several times per question. Same matches, same order; a winner
+    that vanished or went mid-capture between the two reads is dropped."""
+    hits = keyword_scan_cards(uid, query_text, exclude_ids, limit, SEARCH_SCAN_FIELDS)
+    if not hits:
+        return []
+    full = {c["id"]: c for c in cards_by_ids(uid, [h["id"] for h in hits])}
+    return [full[h["id"]] for h in hits if h["id"] in full]
 
 
 def rerank_candidates(question: str, candidates: List[dict], top_k: int = 10) -> List[dict]:
@@ -1009,12 +1057,20 @@ def missing_quoted_phrases(question: str, cards: List[dict]) -> List[str]:
     return missing_title_phrases(extract_quoted_phrases(question), cards)
 
 
+# Each anchor the retrieval missed costs ask_brain a lexical scan of the
+# newest KEYWORD_SCAN_CAP cards. Chips anchor one or two titles; a typed
+# question quoting dozens of phrases (2,000 chars of "a" "b" "c"… was 287
+# scans) must not buy one scan apiece.
+MAX_ANCHOR_PHRASES = 4
+
+
 def anchor_phrases_for(question: str, anchor_titles: List[str] = None,
                        excluded_titles: List[str] = None) -> List[str]:
     """Every title phrase ask_brain must GUARANTEE in context: the question's
     quoted titles plus the client's structured `anchorTitles` hint — minus
     anything the user excluded ("what else … besides X" must not re-pin X).
-    Deduped by normalized form, original order kept."""
+    Deduped by normalized form, original order kept, at most
+    MAX_ANCHOR_PHRASES."""
     raw = extract_quoted_phrases(question) + [
         str(t).strip() for t in (anchor_titles or []) if str(t).strip()
     ]
@@ -1028,6 +1084,8 @@ def anchor_phrases_for(question: str, anchor_titles: List[str] = None,
             continue
         seen.add(na)
         out.append(a)
+        if len(out) >= MAX_ANCHOR_PHRASES:
+            break
     return out
 
 
@@ -1042,12 +1100,23 @@ _EXCLUSION_RE = re.compile(
     r"\b(besides|other than|apart from|aside from|except|excluding)\b",
     re.IGNORECASE,
 )
+# The Hebrew forms ('חוץ מ"X"', מלבד, למעט). The English pattern alone left a
+# Hebrew "what else besides X" re-presenting X as a new find. Hebrew words
+# carry clitic prefixes ("ומלבד"), and the "from" of חוץ מ is a prefix on the
+# NEXT word ("חוץ מהמתכון"), so \b can't be the boundary. "מחוץ ל" (outside)
+# and "משרד החוץ" (foreign ministry) don't match. "בנוסף ל" (in addition to)
+# adds rather than excludes ("בנוסף לזה, איך מכינים את הרוטב?"), and English
+# has no such rule either.
+_HE_EXCLUSION_RE = re.compile(
+    r"(?<!\w)ו?(?:חוץ\s*מ|מלבד(?!\w)|למעט(?!\w))"
+)
 
 
 def is_exclusion_question(question: str) -> bool:
     """True when the question EXPLICITLY excludes already-known sources.
     Quoted spans (card titles) are ignored — only the user's own words vote."""
-    return bool(_EXCLUSION_RE.search(_strip_quoted(question)))
+    text = _strip_quoted(question)
+    return bool(_EXCLUSION_RE.search(text) or _HE_EXCLUSION_RE.search(text))
 
 
 # ── Conversational follow-ups: which text to RETRIEVE for ───────────────────
@@ -1077,10 +1146,20 @@ _META_FOLLOWUP_TOKENS = {
     "bullet", "points", "list", "steps",
     "קצר", "בקצרה", "תקצר", "ארוך", "הרחב", "הרחיב", "פרט", "בפירוט",
     "סכם", "סיכום", "תמצת", "נקודות", "רשימה", "פשוט",
-    # Continuation / politeness ("go on", "again", "please", "thanks")
-    "explain", "continue", "again", "repeat", "more", "less", "please",
-    "thanks", "thank", "ok", "okay", "sure", "yeah", "yep",
-    "הסבר", "תסביר", "המשך", "תמשיך", "שוב", "בבקשה", "תודה", "אוקיי", "יותר",
+    # Continuation ("go on", "again")
+    "explain", "continue", "again", "repeat", "more", "less",
+    "הסבר", "תסביר", "המשך", "תמשיך", "שוב", "יותר",
+}
+
+# Politeness is NEUTRAL: it neither names a topic nor asks for anything. It
+# used to sit in the meta vocabulary above, so a bare "thanks" (or "ok",
+# "תודה") read as a context-free follow-up, i.e. a RESTATE request: the model
+# re-sent the previous answer and the user paid an ask for it. Now these words
+# are ignored when classifying a turn: "shorter please" is still a restate,
+# "thanks" alone is not (ask_brain answers it as a social turn).
+_POLITENESS_TOKENS = {
+    "please", "thanks", "thank", "ok", "okay", "sure", "yeah", "yep",
+    "בבקשה", "תודה", "אוקיי",
 }
 
 
@@ -1088,11 +1167,78 @@ def is_context_free_followup(question: str) -> bool:
     """True when the question carries no topic of its own — every content token
     is meta (a language, a length, a "go on"), or there are no content tokens
     at all ("why?", "and?"). Such text can only be understood against the turn
-    before it, so retrieving for it is retrieving for noise. Pure."""
+    before it, so retrieving for it is retrieving for noise. Politeness alone
+    ("thanks", "ok please") asks for nothing and is NOT one. Pure."""
+    words = {w for w in re.split(r"[\W_]+", (question or "").lower(), flags=re.UNICODE) if w}
+    if words and words <= _POLITENESS_TOKENS:
+        return False  # "ok" is too short to be a token at all, so check the words
     tokens = keyword_query_tokens(question)
     if not tokens:
         return True
-    return tokens <= _META_FOLLOWUP_TOKENS
+    content = tokens - _POLITENESS_TOKENS
+    if not content:
+        return False
+    return content <= _META_FOLLOWUP_TOKENS
+
+
+# ── Social turns: "thanks", "תודה" ──────────────────────────────────────────
+# A message that only thanks is not a question. ask_brain answers it in one
+# line, before retrieval, with no model call and no charge. CLOSED vocabulary
+# on purpose: every word must be a social word, at least one must be a
+# thank-you (not just filler), a question mark disqualifies, and so does
+# length. Acknowledgements ("ok", "great", "perfect", "סבבה") and affirmations
+# ("yes", "sure") are deliberately NOT enough on their own: they may be
+# accepting an offer the previous answer made ("Want the full steps?" ->
+# "ok"), which the model must see. Next to a thank-you they are filler
+# ("ok, thanks", "great, thanks!").
+_SOCIAL_ANCHORS = {
+    "thanks", "thank", "thx", "thanx", "tnx", "ty", "tysm", "cheers",
+    "appreciate", "appreciated",
+    "תודה", "ותודה", "תודות", "תנקס",
+}
+# Acknowledgements: filler next to a thank-you, never a social turn alone.
+_ACK_TOKENS = {
+    "ok", "okay", "okey", "kk", "alright", "noted", "understood", "gotcha", "got",
+    "great", "cool", "nice", "perfect", "awesome", "amazing", "excellent",
+    "wonderful", "brilliant", "fantastic", "good", "sweet", "neat", "wow",
+    "helpful", "helps", "helped",
+    "אוקיי", "אוקי", "בסדר", "מעולה", "סבבה", "יופי", "אחלה", "מגניב", "הבנתי",
+    "מצוין", "נהדר", "מושלם", "נפלא", "וואו", "תותח", "קיבלתי", "סגור", "אלוף",
+    "אלופה", "טוב",
+}
+_SOCIAL_FILLERS = {
+    "you", "so", "much", "a", "lot", "very", "really", "it", "that", "this",
+    "all", "for", "the", "help", "lol", "haha",
+    "רבה", "לך", "לכם", "ממש", "מאוד", "על", "זה", "הרבה", "העזרה",
+} | _ACK_TOKENS
+_SOCIAL_EMOJI = set("👍🙏❤🙂😊👌💪🔥🤩😍✨🎉🙌💯")
+_SOCIAL_MAX_CHARS = 60
+_SOCIAL_MAX_WORDS = 6
+
+
+def is_social_turn(question: str) -> bool:
+    """True when the whole message only thanks ("thanks!", "ok, thanks",
+    "תודה רבה", "👍"). Pure."""
+    text = (question or "").strip()
+    if not text or len(text) > _SOCIAL_MAX_CHARS or "?" in text or "؟" in text:
+        return False
+    words = [w for w in re.split(r"[\W_]+", text.lower(), flags=re.UNICODE) if w]
+    if not words:
+        return any(ch in _SOCIAL_EMOJI for ch in text)
+    if len(words) > _SOCIAL_MAX_WORDS:
+        return False
+    return (any(w in _SOCIAL_ANCHORS for w in words)
+            and all(w in _SOCIAL_ANCHORS or w in _SOCIAL_FILLERS for w in words))
+
+
+def social_reply(question: str, history=None) -> str:
+    """The one-line answer to a social turn, in the user's language: Hebrew
+    when they wrote Hebrew (or sent only emoji in a Hebrew conversation)."""
+    text = question or ""
+    hebrew = bool(_HEBREW_RE.search(text))
+    if not hebrew and not any(ch.isalpha() for ch in text):
+        hebrew = conversation_language(history) == "Hebrew"
+    return "בשמחה." if hebrew else "You're welcome."
 
 
 # The OTHER kind of follow-up that can't be retrieved for on its own: one that
@@ -1139,15 +1285,41 @@ def is_referential_followup(question: str) -> bool:
     return len(keyword_query_tokens(question)) <= _MAX_REFERENTIAL_TOKENS
 
 
+# Yes/no answers to the previous turn. Like politeness they name no subject,
+# so a turn made only of them is never the TOPIC a later follow-up is about.
+_AFFIRMATION_TOKENS = {
+    "yes", "yeah", "yep", "yup", "no", "nope", "nah",
+    "כן", "לא", "בטח", "ברור",
+}
+
+
+def _is_reaction_turn(text: str) -> bool:
+    """True when a user turn only reacts to the answer before it: a thank-you
+    ("thanks", "תודה רבה", "👍"), an acknowledgement ("great", "got it"),
+    politeness ("ok please", "sure") or a yes/no. It names no subject, so it
+    can never be what a later "in Hebrew" or "who published this?" is about.
+    Politeness used to be skipped here as a side effect of reading as a
+    restate request; once it stopped being one (AI-4), "thanks" became the
+    subject of the next follow-up. Pure."""
+    if is_social_turn(text):
+        return True
+    words = {w for w in re.split(r"[\W_]+", (text or "").lower(), flags=re.UNICODE) if w}
+    reactions = _POLITENESS_TOKENS | _AFFIRMATION_TOKENS | _SOCIAL_ANCHORS | _ACK_TOKENS
+    return bool(words & reactions) and words <= (reactions | _SOCIAL_FILLERS)
+
+
 def _last_topical_user_turn(history) -> Optional[str]:
     """The most recent user turn that stated a subject of its own — the thing a
     follow-up is really asking about. Skips turns that are themselves
-    follow-ups, so a chain of them still resolves to the real question."""
+    follow-ups, and turns that only react to an answer ("thanks", "ok",
+    "yes"), so a chain of them still resolves to the real question."""
     for item in reversed(history):
         if not isinstance(item, dict) or item.get("role") != "user":
             continue
         prior = str(item.get("content") or "").strip()
-        if prior and not is_context_free_followup(prior) and not is_referential_followup(prior):
+        if (prior and not _is_reaction_turn(prior)
+                and not is_context_free_followup(prior)
+                and not is_referential_followup(prior)):
             return prior
     return None
 
@@ -1335,33 +1507,76 @@ def demote_cards_by_titles(titles: List[str], cards: List[dict]):
 # so the server must enforce the same promise: a private card must never be
 # retrieved into the model's context or cited in an answer.
 
-def private_collection_ids(uid: str) -> set:
+def private_collection_ids(uid: str, db=None) -> Optional[set]:
     """Ids of the user's private collections (one small read per ask).
-    On a read failure returns an empty set — card-level `isPrivate` filtering
-    still applies; only collection-inherited privacy degrades, and the error
-    is logged so it is visible."""
+
+    Returns None when the read fails, NOT an empty set. An empty set means
+    "this user has no private collections", and answering that after a
+    Firestore blip made collection-inherited privacy fail OPEN: Ask and search
+    then treated a PIN-locked collection's cards as public. Every consumer
+    goes through `is_effectively_private`, which reads None as "any collection
+    might be private" and drops every card that sits in one (fail closed).
+    Logged without the exception text, whose document path carries the uid."""
     try:
-        db = get_db()
+        db = db or get_db()
         docs = (db.collection("users").document(uid).collection("collections")
                 .where(filter=FieldFilter("isPrivate", "==", True)).stream())
         return {d.id for d in docs}
     except Exception as e:
-        logger.error(f"private_collection_ids read failed: {e}")
-        return set()
+        logger.error(f"private_collection_ids read failed for {mask_uid(uid)} "
+                     f"({type(e).__name__}); collection members treated as private")
+        return None
 
 
-def is_effectively_private(data: dict, private_ids: set) -> bool:
-    """Card-level flag OR membership in any private collection."""
+def is_effectively_private(data: dict, private_ids: Optional[set]) -> bool:
+    """Card-level flag OR membership in any private collection. `private_ids`
+    None (the lookup failed) fails CLOSED: membership in ANY collection counts."""
     if data.get("isPrivate"):
         return True
     ids = data.get("collectionIds")
-    return isinstance(ids, list) and any(i in private_ids for i in ids)
+    if not isinstance(ids, list) or not ids:
+        return False
+    if private_ids is None:
+        return True
+    return any(isinstance(i, str) and i in private_ids for i in ids)
 
 
-def strip_private_cards(cards: List[dict], private_ids: set) -> List[dict]:
+def strip_private_cards(cards: List[dict], private_ids: Optional[set]) -> List[dict]:
     """Drop effectively-private (and degenerate falsy) cards from a retrieval
-    result."""
+    result. `private_ids` None fails closed (see is_effectively_private)."""
     return [c for c in cards if c and not is_effectively_private(c, private_ids)]
+
+
+def in_some_collection(card) -> bool:
+    """True when the card belongs to at least one collection: the only cards
+    whose privacy depends on the private-collection lookup."""
+    ids = card.get("collectionIds") if isinstance(card, dict) else None
+    return isinstance(ids, list) and len(ids) > 0
+
+
+class PrivacyGate:
+    """`strip_private_cards` for one request, reading the user's private
+    collection ids at most once and only when a card actually sits in a
+    collection (most searches never need the read). `ids` is what the strip
+    used: the set read, None after a failed read (fail closed), or an empty
+    set when no card ever needed it."""
+
+    _UNREAD = object()
+
+    def __init__(self, uid: str, db=None):
+        self._uid, self._db = uid, db
+        self._ids = self._UNREAD
+
+    @property
+    def ids(self) -> Optional[set]:
+        return set() if self._ids is self._UNREAD else self._ids
+
+    def strip(self, cards: List[dict]) -> List[dict]:
+        cards = [c for c in (cards or []) if c]
+        if self._ids is self._UNREAD and any(in_some_collection(c) for c in cards):
+            self._ids = (private_collection_ids(self._uid) if self._db is None
+                         else private_collection_ids(self._uid, db=self._db))
+        return strip_private_cards(cards, self.ids)
 
 
 def category_cards(uid: str, category: str, limit: int = 10) -> List[dict]:
@@ -1410,12 +1625,59 @@ _RECENCY_RE = re.compile(
     r"past few days|catch me up|recap)\b",
     re.IGNORECASE,
 )
+# The same intent in Hebrew: "מה שמרתי השבוע?", "...לאחרונה", "השמירה
+# האחרונה", "בשבוע שעבר". The English pattern alone sent a Hebrew "what did I
+# save this week?" to semantic retrieval for the phrase, i.e. topically
+# arbitrary cards. Up to two clitic prefixes may lead (ו/ה/ב/ל/מ/ש/כ:
+# "מהשבוע", "ובשבוע שעבר"), so the boundary is "no word character before",
+# not \b. A bare "שבוע" ("a week") or "אחרון" ("last", as in the last chapter)
+# is not enough on its own.
+_HE_RECENCY_RE = re.compile(
+    r"(?<!\w)[והבלמשכ]{0,2}(?:"
+    r"אתמול|לאחרונה|"
+    r"ה?שבוע (?:שעבר|האחרון)|ה?חודש (?:שעבר|האחרון)|ה?ימים האחרונים|"
+    r"ה?שמיר(?:ה|ות) ה?אחרונ(?:ה|ות)|ה?אחרו(?:ן|נה|נים|נות) ששמרתי"
+    r")(?!\w)"
+)
+# השבוע / החודש / היום are also plain "the week / the month / the day": "השבוע
+# הראשון עם תינוק" (the first week with a newborn), "החודש התשיעי" (the ninth
+# month), "סדר היום" (the daily schedule), "בסוף השבוע" (the weekend). Read as
+# "this week / this month / today" every time, they pinned the newest saves in
+# front of ordinary questions. A bare form now counts only when no ordinal or
+# number follows it, it is not the tail of a fixed phrase (סוף / תחילת / ימי /
+# סדר …), and the question is about saving (a save verb anywhere in it) or the
+# form closes the clause ("מה יש לי מהשבוע?").
+_HE_BARE_PERIOD_RE = re.compile(r"(?<!\w)[והבלמשכ]{0,2}(?:השבוע|החודש|היום)(?!\w)")
+_HE_ORDINAL_AFTER_RE = re.compile(
+    r"\s+(?:ה?[-־]?\d|(?:הראשון|השני|השלישי|הרביעי|החמישי|השישי|השביעי|השמיני|"
+    r"התשיעי|העשירי|העשרים|השלושים|הארבעים)(?!\w))")
+_HE_PHRASE_HEAD_RE = re.compile(
+    r"(?<!\w)[והבלמשכ]{0,2}(?:סוף|תחילת|אמצע|ימי|סדר|שעות|מנת|חצי|ראש)\s+$")
+_HE_SAVE_VERB_RE = re.compile(
+    r"(?<!\w)[והשכ]{0,2}(?:שמרתי|שמרת|שמרנו|שמרתם|שמרתן|נשמר|נשמרה|נשמרו|"
+    r"הוספתי|הוספת|הוספנו|הוספתם|נוסף|נוספה|נוספו|קראתי|קראת|קראנו)(?!\w)")
+_HE_CLAUSE_END_RE = re.compile(r"\s*(?:הזה|הזאת|הזו)?\s*(?:[?!.,;:؟]|$)")
+
+
+def _he_bare_period_is_recency(text: str) -> bool:
+    """A bare השבוע / החודש / היום in `text` that reads as "this week / this
+    month / today" (see _HE_BARE_PERIOD_RE). Pure."""
+    about_saving = bool(_HE_SAVE_VERB_RE.search(text))
+    for m in _HE_BARE_PERIOD_RE.finditer(text):
+        after = text[m.end():]
+        if _HE_ORDINAL_AFTER_RE.match(after) or _HE_PHRASE_HEAD_RE.search(text[:m.start()]):
+            continue
+        if about_saving or _HE_CLAUSE_END_RE.match(after):
+            return True
+    return False
 
 
 def is_recency_question(question: str) -> bool:
     """True when the question is about recently-saved cards (time-anchored).
     Quoted spans (card titles) are ignored — only the user's own words vote."""
-    return bool(_RECENCY_RE.search(_strip_quoted(question)))
+    text = _strip_quoted(question)
+    return bool(_RECENCY_RE.search(text) or _HE_RECENCY_RE.search(text)
+                or _he_bare_period_is_recency(text))
 
 
 def recent_cards(uid: str, limit: int = 12) -> List[dict]:
@@ -1470,18 +1732,28 @@ class EmbeddingService:
             logger.error("Gemini client not initialized - cannot generate embeddings! Set GEMINI_API_KEY environment variable.")
             raise Exception("GEMINI_API_KEY not configured. Please set the GEMINI_API_KEY environment variable in Firebase Cloud Functions.")
 
-        try:
-            result = self.client.models.embed_content(
-                model=self.model,
-                # Guard the model's input limit — the v2 recipe folds in
-                # detailedSummary, so the assembled text can be long.
-                contents=text[:_EMBED_TEXT_MAX_CHARS],
-                config={"output_dimensionality": 768, "task_type": task_type}
-            )
-            return result.embeddings[0].values
-        except Exception as e:
-            logger.error(f"Embedding generation failed: {e}")
-            raise Exception(f"Gemini Embedding failed: {str(e)}")
+        # A document embed (the trigger, backfills: background work) gets one
+        # retry with jitter on a transient error; it used to fail on the first
+        # blip. A query embed is on the search bar's clock and fails fast:
+        # search degrades to its keyword half instead.
+        attempts = 2 if task_type == "RETRIEVAL_DOCUMENT" else 1
+        for attempt in range(attempts):
+            try:
+                result = self.client.models.embed_content(
+                    model=self.model,
+                    # Guard the model's input limit — the v2 recipe folds in
+                    # detailedSummary, so the assembled text can be long.
+                    contents=text[:_EMBED_TEXT_MAX_CHARS],
+                    config={"output_dimensionality": 768, "task_type": task_type}
+                )
+                return result.embeddings[0].values
+            except Exception as e:
+                if attempt < attempts - 1 and _is_retryable_error(e):
+                    logger.warning(f"Embedding attempt {attempt + 1} failed ({type(e).__name__}); retrying")
+                    time.sleep(0.5 + random.uniform(0, 0.5))
+                    continue
+                logger.error(f"Embedding generation failed: {e}")
+                raise Exception(f"Gemini Embedding failed: {str(e)}")
 
 
 @firestore_fn.on_document_written(document="users/{uid}/links/{linkId}")
@@ -1594,28 +1866,144 @@ def sync_link_embedding(event: firestore_fn.Event[firestore_fn.Change[firestore_
         try:
             vector = service.generate_embedding(text_to_embed)
         except Exception as embed_err:
-            # Embed failed: flag for backfill and drop any drift/degenerate value
-            # rather than leaving something un-searchable in place silently.
             logger.error(f"Embedding failed for {link_id}, flagging needsEmbedding: {embed_err}")
-            update = {"needsEmbedding": True, "embedding_vector": firestore.DELETE_FIELD}
-            doc_ref.update(update)
-            mirror_vector_write(doc_ref, update, db=db)
+            _flag_failed_embed(doc_ref, data, db)
             return
 
-        if vector:
-            logger.info(f"Vector generated (len={len(vector)}). Updating document...")
-            update = {
-                "embedding_vector": Vector(vector),
-                "embeddingVersion": EMBED_TEXT_VERSION,
-                "needsEmbedding": firestore.DELETE_FIELD,
-            }
-        else:
-            update = {"needsEmbedding": True, "embedding_vector": firestore.DELETE_FIELD}
+        if not vector:
+            _flag_failed_embed(doc_ref, data, db)
+            return
+        logger.info(f"Vector generated (len={len(vector)}). Updating document...")
+        update = {
+            "embedding_vector": Vector(vector),
+            "embeddingVersion": EMBED_TEXT_VERSION,
+            "needsEmbedding": firestore.DELETE_FIELD,
+        }
         doc_ref.update(card_payload(update, db))
         mirror_vector_write(doc_ref, update, db=db)
 
     except Exception as e:
         logger.error(f"Error in sync_link_embedding: {e}")
+
+
+def _flag_failed_embed(doc_ref, data: dict, db) -> None:
+    """After a failed embed: leave the card flagged `needsEmbedding` for the
+    repair sweep (repair_flagged_embeddings).
+
+    A VALID stored vector stays. Edits re-flag cards that already have one
+    (title, summary, notes), and the failure path used to delete it along
+    with the flag: one transient embedding error made an edited card
+    invisible to search until something re-embedded it. Only a value that
+    can't serve search anyway (list drift, degenerate) is dropped, as before.
+    Writes nothing when the card is already flagged and its vector is valid,
+    so the write can't re-fire this trigger into a loop."""
+    if vector_needs_repair(doc_ref, data, db=db):
+        update = {"needsEmbedding": True, "embedding_vector": firestore.DELETE_FIELD}
+        doc_ref.update(update)
+        mirror_vector_write(doc_ref, update, db=db)
+    elif not data.get("needsEmbedding"):
+        doc_ref.update({"needsEmbedding": True})
+
+
+# ── Repair sweep: cards left flagged needsEmbedding ─────────────────────────
+# Nothing re-ran the embed trigger for a card whose embed failed until that
+# card's NEXT write, so a transient outage could leave a card unsearchable
+# (or on a stale vector after an edit) indefinitely. The janitor tick
+# (main.sweep_stuck_processing) calls this: it TOUCHES a few flagged cards
+# (one bookkeeping field), which re-fires sync_link_embedding, so the one
+# embed site does the work under its own rate limits and retry. Bounded per
+# tick, and a card is re-requested at most once an hour.
+# The query needs `needsEmbedding` indexed at COLLECTION_GROUP scope (the
+# fieldOverride in firestore.indexes.json); without it the query fails and
+# the sweep logs it once per instance and does nothing.
+# The scan pages through the flagged cards in document-path order and keeps
+# its place between ticks (scheduler_state/embedRepair), wrapping to the
+# start once it reaches the end. A fixed limit(EMBED_REPAIR_SCAN) from the
+# start saw the SAME cards every tick: a front of unanalyzed or backed-off
+# cards starved every flagged card behind it.
+EMBED_REPAIR_BATCH = 10
+EMBED_REPAIR_SCAN = 50
+EMBED_REPAIR_BACKOFF_MS = 60 * 60 * 1000
+_REPAIR_STAMP = "embedRepairRequestedAt"
+_repair_query_warned = False
+_REPAIR_STATE_DOC = "embedRepair"  # in SCHEDULER_STATE_COLLECTION (db.py)
+
+
+def _repair_cursor(state_ref) -> Optional[str]:
+    """The card path the previous tick stopped at, or None (start from the
+    top). A missing, unreadable or malformed value is None. Never raises."""
+    try:
+        snap = state_ref.get()
+        path = (snap.to_dict() or {}).get("cursor") if snap.exists else None
+    except Exception as e:
+        logger.warning(f"Embedding repair cursor unreadable ({type(e).__name__}); scanning from the top")
+        return None
+    parts = path.split("/") if isinstance(path, str) else []
+    if len(parts) >= 4 and len(parts) % 2 == 0 and parts[-2] == "links" and all(parts):
+        return path
+    return None
+
+
+def repair_flagged_embeddings(db=None) -> dict:
+    """Re-fire the embed trigger for up to EMBED_REPAIR_BATCH flagged cards,
+    continuing where the previous tick's scan stopped. Never raises (it rides
+    the janitor's tick)."""
+    global _repair_query_warned
+    report = {"scanned": 0, "requested": 0, "cleared": 0, "errors": 0}
+    try:
+        db = db or get_db()
+        now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+        state_ref = db.collection(SCHEDULER_STATE_COLLECTION).document(_REPAIR_STATE_DOC)
+        cursor = _repair_cursor(state_ref)
+        query = (db.collection_group("links")
+                 .where(filter=FieldFilter("needsEmbedding", "==", True))
+                 .order_by("__name__"))
+        if cursor:
+            # A position, not a snapshot: valid even if that card is gone.
+            query = query.start_after({"__name__": db.document(cursor)})
+        last_path = None
+        batch_full = False
+        for doc in query.limit(EMBED_REPAIR_SCAN).stream():
+            report["scanned"] += 1
+            last_path = doc.reference.path
+            try:
+                d = doc.to_dict() or {}
+                if d.get("status") in UNANALYZED_STATUSES:
+                    continue  # the capture pipeline embeds it when it settles
+                if not build_embedding_text(d):
+                    # Nothing to embed, ever (the trigger skips it too): drop
+                    # the flag so it stops taking a place in the scan.
+                    doc.reference.update({"needsEmbedding": firestore.DELETE_FIELD})
+                    report["cleared"] += 1
+                    continue
+                last = d.get(_REPAIR_STAMP)
+                if isinstance(last, (int, float)) and now_ms - last < EMBED_REPAIR_BACKOFF_MS:
+                    continue
+                doc.reference.update({_REPAIR_STAMP: now_ms})  # re-fires sync_link_embedding
+                report["requested"] += 1
+            except Exception as e:
+                report["errors"] += 1
+                logger.warning(f"Embedding repair skipped one card ({type(e).__name__})")
+            if report["requested"] >= EMBED_REPAIR_BATCH:
+                batch_full = True
+                break
+        # Continue after the last card examined; a short page that ran to
+        # its end means the scan reached the last flagged card: wrap.
+        next_cursor = last_path if (batch_full or report["scanned"] >= EMBED_REPAIR_SCAN) else None
+        if next_cursor != cursor:
+            try:
+                state_ref.set({"cursor": next_cursor, "at": now_ms})
+            except Exception as e:
+                logger.warning(f"Embedding repair cursor not saved ({type(e).__name__})")
+    except Exception as e:
+        report["errors"] += 1
+        if not _repair_query_warned:
+            _repair_query_warned = True
+            logger.warning(f"Embedding repair sweep unavailable ({type(e).__name__}: {e}); "
+                           "is the needsEmbedding collection-group index deployed?")
+    if report["requested"] or report["cleared"]:
+        logger.info(f"Embedding repair sweep: {report}")
+    return report
 
 
 def perform_search_logic(uid: str, query_text: str, limit: int = 10) -> List[dict]:
@@ -1715,7 +2103,14 @@ def perform_hybrid_search(uid: str, query_text: str, limit: int = 20,
     `meta`, when given, receives `mode`: "judge" (the LLM verdict served) or
     "gate" (the strong-distance fallback served) so a bad result can be traced
     to the path that produced it without log access; the client records a
-    non-judge mode once per session in client_errors.
+    non-judge mode once per session in client_errors. It also receives
+    `private_ids`, the private-collection verdict the privacy strip used, so a
+    caller's own belt-and-braces strip needs no second read.
+
+    PRIVACY: effectively-private cards leave BOTH halves before anything else
+    sees them. The judge sends each candidate's title, summary head, tags and
+    concepts to Gemini; the strip used to run only in the HTTP handler, after
+    the judge had already read every private candidate.
 
     Degrades instead of failing: if the vector half errors transiently, the
     lexical half still serves (an outage must not blank the search bar). Only
@@ -1733,6 +2128,7 @@ def perform_hybrid_search(uid: str, query_text: str, limit: int = 20,
     topic = search_topic_of(query_text)
     if topic != query_text:
         logger.info(f"Hybrid search: query reduced to topic ({len(topic)} chars)")
+    privacy = PrivacyGate(uid)
     with ThreadPoolExecutor(max_workers=2) as pool:
         vector_future = pool.submit(perform_search_logic, uid, topic, 30)
         keyword_future = pool.submit(
@@ -1745,6 +2141,8 @@ def perform_hybrid_search(uid: str, query_text: str, limit: int = 20,
             if "SEMANTIC_SEARCH_NOT_CONFIGURED" in str(e):
                 raise
             logger.error(f"Hybrid search: vector half failed, degrading to keyword-only: {e}")
+        # Before the judge (a Gemini call) ever sees a candidate.
+        vector_results = privacy.strip(vector_results)
 
         # The judge rides the keyword scan's tail: the vector half usually
         # resolves first, so the LLM call runs while the 1000-card scan is
@@ -1776,9 +2174,11 @@ def perform_hybrid_search(uid: str, query_text: str, limit: int = 20,
         except Exception as e:
             logger.error(f"Hybrid search: keyword scan failed: {e}")
             keyword_hits = []
+        keyword_hits = privacy.strip(keyword_hits)
 
     if meta is not None:
         meta["mode"] = "judge" if judged is not None else "gate"
+        meta["private_ids"] = privacy.ids
     logger.info(f"Hybrid search served by {'judge' if judged is not None else 'distance gates'}")
 
     if judged is not None:
@@ -1819,21 +2219,44 @@ def perform_hybrid_search(uid: str, query_text: str, limit: int = 20,
     return ranked
 
 
+def clamp_search_limit(raw, default: int = 10, cap: int = 50) -> int:
+    """A client-supplied result count as an int in [1, cap]; anything
+    unusable (a string, a dict, NaN, Infinity) is `default`."""
+    try:
+        limit = int(raw)
+    except (TypeError, ValueError, OverflowError):
+        limit = default
+    return max(1, min(limit, cap))
+
+
 @https_fn.on_call(max_instances=10)
 def search_links(req: https_fn.CallableRequest) -> Any:
     """
     Callable Function: Perform semantic search.
     Input: { query: string, limit?: number }
+
+    DEPRECATED: web and native both call the HTTP twin (search_links_http),
+    but this stays deployed (removing it takes a deploy-time delete), so it is
+    held to the twin's guards: App Check under APPCHECK_ENFORCE, a string
+    query within MAX_QUESTION_LENGTH, a clamped limit, and the private strip
+    (inside perform_hybrid_search, before its judge sees a candidate).
     """
     uid = None
     try:
         # Prefer the verified caller; fall back to the client uid only while
         # REQUIRE_AUTH is off (staged rollout).
         from link_service import find_data_uid_by_auth_uid
-        from main import REQUIRE_AUTH
+        from main import REQUIRE_AUTH, APPCHECK_ENFORCE, MAX_QUESTION_LENGTH
+        logger.info("search_links callable called (deprecated; clients use search_links_http)")
+        # The callable transport verifies an App Check token itself and sets
+        # req.app only when it is valid; enforce it like _require_app_check.
+        if APPCHECK_ENFORCE and getattr(req, "app", None) is None:
+            raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+                                      message="App Check verification failed")
+        data = req.data if isinstance(req.data, dict) else {}
         uid = find_data_uid_by_auth_uid(req.auth.uid) if req.auth else None
-        if not uid and not REQUIRE_AUTH and req.data:
-            uid = req.data.get("uid") or req.data.get("test_uid")
+        if not uid and not REQUIRE_AUTH and data:
+            uid = data.get("uid") or data.get("test_uid")
         if not uid:
             raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.UNAUTHENTICATED, message="User must be authenticated")
 
@@ -1843,13 +2266,14 @@ def search_links(req: https_fn.CallableRequest) -> Any:
         from main import _callable_rate_limited
         _callable_rate_limited("search-uid", uid)
 
-        query_text = req.data.get("query")
-        limit = req.data.get("limit", 10)
-
-        if not query_text:
+        query_text = data.get("query")
+        if not isinstance(query_text, str) or not query_text.strip():
             raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT, message="Query text is required")
+        query_text = query_text.strip()
+        if len(query_text) > MAX_QUESTION_LENGTH:
+            raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT, message="Query is too long")
 
-        links = perform_hybrid_search(uid, query_text, limit)
+        links = perform_hybrid_search(uid, query_text, clamp_search_limit(data.get("limit", 10)))
         return {"links": links}
 
     except https_fn.HttpsError:

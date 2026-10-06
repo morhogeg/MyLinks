@@ -7,6 +7,12 @@ from firebase_admin import initialize_app, firestore
 
 _db = None
 
+# Server-only bookkeeping for the scheduled sweeps: where a paged walk stopped
+# (scheduler_state/embedRepair in search.py, scheduler_state/digestWalk in
+# digest_service.py). No client rule matches it, so only the Admin SDK can
+# read or write it.
+SCHEDULER_STATE_COLLECTION = "scheduler_state"
+
 
 def ensure_app():
     """Initialize the default Firebase app if it isn't already.

@@ -1057,11 +1057,12 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
         // refers to. The backend can't recover this from the prose, and without
         // it a follow-up gets told the library has nothing on the card that is
         // literally on screen above it. Newest answers first, so the freshest
-        // subject wins the server's cap.
+        // subject wins the server's cap. A "You're welcome." reply cites
+        // nothing, so it doesn't take one of the slots.
         const contextIds = [...new Set(
             [...baseMsgs]
                 .reverse()
-                .filter(m => m.role === 'assistant')
+                .filter(m => m.role === 'assistant' && !m.social)
                 .slice(0, RECENT_ANSWERS_FOR_CONTEXT)
                 .flatMap(m => (m.sources ?? []).map(sc => sc.id))
                 .filter(Boolean),
@@ -1101,6 +1102,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
         let accContent = '';
         let accSources: ChatSource[] = [];
         let accUngrounded = false;
+        let accSocial = false;
         let accError: string | null = null;
 
         /** Persist a backgrounded exchange to its own chat doc — unless a newer
@@ -1134,6 +1136,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
             if (!accContent) return null;
             const answer: ChatMessage = { role: 'assistant', content: accContent, sources: accSources };
             if (accUngrounded) answer.ungrounded = true;
+            if (accSocial) answer.social = true;
             return [...withUser, answer];
         };
 
@@ -1265,6 +1268,10 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                             accUngrounded = true;
                             if (!isStale()) patchAt({ ungrounded: true });
                             trackAskNoCitations();
+                        } else if (evt.type === 'social') {
+                            // A reply to a thank-you: kept out of contextIds.
+                            accSocial = true;
+                            if (!isStale()) patchAt({ social: true });
                         } else if (evt.type === 'error') {
                             accError = askErrorCopy(evt.error);
                             if (!isStale()) {
@@ -1309,6 +1316,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                     content: data.answer || "I couldn't find an answer for that.",
                     sources: data.sources || [],
                     ungrounded: Boolean(data.ungrounded),
+                    ...(data.social ? { social: true } : {}),
                 };
                 trackFirstAsk();
                 if (data.ungrounded) trackAskNoCitations();

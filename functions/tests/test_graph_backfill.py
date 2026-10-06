@@ -154,3 +154,74 @@ def test_all_candidates_past_ceiling_returns_empty_without_llm():
     svc._verify_relationships_with_llm = lambda *a, **k: (
         pytest.fail("LLM called despite empty candidate set"))
     assert svc.find_related_links("new", "N", "S", [0.1] * 4, [], "uid") == []
+
+
+# ── RV-11: a deleted checkpoint card does not restart the phase ─────────────
+
+class _PagedLinks:
+    """Pages by document id like Firestore's order_by('__name__'): a cursor
+    is a POSITION, valid whether or not that card still exists."""
+
+    def __init__(self, docs):
+        self._docs = sorted(docs, key=lambda d: d.id)
+        self._after = None
+        self._limit = None
+
+    def order_by(self, field):
+        assert field == "__name__"
+        return self
+
+    def start_after(self, cursor):
+        self._after = cursor["__name__"] if isinstance(cursor, dict) else cursor.id
+        return self
+
+    def limit(self, n):
+        self._limit = n
+        return self
+
+    def stream(self):
+        docs = [d for d in self._docs if self._after is None or d.id > self._after]
+        return iter(docs[: self._limit])
+
+    def document(self, doc_id):
+        exists = any(d.id == doc_id for d in self._docs)
+        return SimpleNamespace(get=lambda: SimpleNamespace(exists=exists, id=doc_id))
+
+
+def _paged_service(docs):
+    links = _PagedLinks(docs)
+    svc = GraphService.__new__(GraphService)
+    svc.db = SimpleNamespace(collection=lambda name: SimpleNamespace(
+        document=lambda uid: SimpleNamespace(collection=lambda sub: links)))
+    svc.ai = SimpleNamespace(client=None, embed_text=lambda text: None)
+    return svc
+
+
+def test_a_deleted_checkpoint_card_resumes_after_its_id():
+    # c3 was the last card of the previous page and has since been deleted.
+    docs = [_Doc(f"c{i}", {"title": "", "summary": ""}) for i in (1, 2, 4, 5, 6)]
+    res = _paged_service(docs).backfill_batch("uid", phase="relate", cursor="c3", limit=2)
+    assert res["nextCursor"] == "c5"  # page was c4, c5, not c1, c2 again
+    assert res["processed"] == 2 and res["done"] is False
+
+
+def test_the_cursor_is_a_document_position_in_the_real_query(monkeypatch):
+    pytest.importorskip("google.cloud.firestore_v1.query")
+    from google.auth.credentials import AnonymousCredentials
+    from google.cloud import firestore
+    from google.cloud.firestore_v1.document import DocumentReference
+    from google.cloud.firestore_v1.query import Query
+
+    built = []
+    monkeypatch.setattr(Query, "stream", lambda self, *a, **k: built.append(self._to_protobuf()) or iter([]))
+    # Offline: resuming must not need the checkpoint card itself.
+    monkeypatch.setattr(DocumentReference, "get", lambda self, *a, **k: pytest.fail("read the checkpoint card"))
+    svc = GraphService.__new__(GraphService)
+    svc.db = firestore.Client(project="p", credentials=AnonymousCredentials())
+    svc.ai = SimpleNamespace(client=None, embed_text=lambda text: None)
+
+    svc.backfill_batch("u1", phase="embed", cursor="c3", limit=20)
+
+    start = built[0].start_at
+    assert start.before is False  # start AFTER the checkpoint
+    assert start.values[0].reference_value.endswith("/documents/users/u1/links/c3")

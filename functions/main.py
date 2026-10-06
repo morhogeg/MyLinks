@@ -66,14 +66,14 @@ from vector_store import card_payload, mirror_vector_write
 # them in THIS module's namespace, so the imports are load-bearing.
 from search import (  # noqa: F401
     sync_link_embedding, search_links, perform_search_logic, perform_hybrid_search,
-    build_embedding_text, rerank_candidates,
-    keyword_scan_cards, EmbeddingService, EMBED_TEXT_VERSION,
+    build_embedding_text, rerank_candidates, keyword_query_tokens,
+    keyword_match_score, keyword_scan_cards, keyword_scan_full, EmbeddingService, EMBED_TEXT_VERSION,
     extract_quoted_phrases, pin_title_phrases, missing_title_phrases,
     anchor_phrases_for, is_exclusion_question, demote_cards_by_titles,
     is_recency_question, recent_cards, category_cards,
     private_collection_ids, strip_private_cards, apply_distance_threshold,
     resolve_followup, conversation_language,
-    pin_cards_by_ids, cards_by_ids,
+    pin_cards_by_ids, cards_by_ids, repair_flagged_embeddings,
 )
 from rate_limit import check_rate_limit, client_ip, RateLimitBackendError
 # Monthly per-user soft quotas (report 3.2). Imports only db + stdlib (no cycle).
@@ -2416,6 +2416,11 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
     # can refund it — a failed ask must not consume a unit (mirrors analyze_*).
     charged = None
     uid = None
+    # One wall-clock budget for the whole request, retrieval and every model
+    # call, inside Hosting's 60s (ai_service.ASK_DEADLINE_S). When it runs out
+    # the model ladder stops with AskDeadlineExceeded, refunded below.
+    from ai_service import ask_deadline, AskDeadlineExceeded, refundable_answer
+    deadline = ask_deadline()
 
     try:
         data = _json_object(req)
@@ -2461,6 +2466,33 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
             return _error_response("question is required", 400, headers)
         if len(question) > MAX_QUESTION_LENGTH:
             return _error_response("question is too long", 400, headers)
+
+        # A thank-you is not a question. It used to read as a "restate"
+        # follow-up: the model re-sent the previous answer and the user paid
+        # an ask for it. Answer it in one line instead, before the quota
+        # meter, retrieval and any model call (search.is_social_turn). A bare
+        # "ok" or "great" still reaches the model: it may accept an offer.
+        # The reply is marked `social` so the client leaves it out of the
+        # recent answers whose citations it sends back as `contextIds`: a
+        # "You're welcome." cites nothing and would only push the answer the
+        # conversation is about out of that window.
+        from search import is_social_turn, social_reply
+        if is_social_turn(question):
+            reply = social_reply(question, history)
+            if want_stream:
+                def _social_stream():
+                    yield "data: " + json.dumps({"type": "token", "text": reply}) + "\n\n"
+                    yield "data: " + json.dumps({"type": "social"}) + "\n\n"
+                    yield "data: " + json.dumps({"type": "sources", "sources": []}) + "\n\n"
+                    yield "data: " + json.dumps({"type": "done"}) + "\n\n"
+
+                return https_fn.Response(_social_stream(), status=200,
+                                         headers={**headers, "Cache-Control": "no-cache"},
+                                         mimetype="text/event-stream")
+            return https_fn.Response(
+                json.dumps({"success": True, "answer": reply, "citedIds": [],
+                            "sources": [], "ungrounded": False, "social": True}),
+                status=200, headers=headers, mimetype='application/json')
 
         # Monthly ask quota — meter before the retrieval + paid Gemini answer.
         q = _quota_blocked(uid, "asks", headers)
@@ -2524,8 +2556,12 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         # embedding API down). Track it: if EVERY retrieval path failed and
         # nothing was assembled, the honest response is a retryable error with
         # the ask unit refunded — NOT the canned "your library is empty"
-        # answer, which gaslights a user with hundreds of saves.
+        # answer, which gaslights a user with hundreds of saves. The vector
+        # half is tracked on its own: it is THE retrieval (the keyword half is
+        # a literal scan of the newest cards), so when it failed an empty
+        # result proves nothing about the library (see 1j).
         retrieval_errors = 0
+        vector_failed = False
         try:
             candidates = perform_search_logic(uid, retrieval_query, limit=30)
             # Quality-gate the nearest-neighbour output exactly like the
@@ -2539,16 +2575,19 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         except Exception as e:
             logger.error(f"ask_brain retrieval failed: {e}")
             retrieval_errors += 1
+            vector_failed = True
             cards = []
 
         # 1b. Hybrid retrieval: add lexical keyword matches vector search may
         #     have missed (e.g. a word literally in a card's title, or a card
         #     with no embedding yet). Merge, keeping reranked vector results
         #     first, then keyword hits, deduped. Shared scan lives in search.py
-        #     (same one the search bar's hybrid path uses).
+        #     (same one the search bar's hybrid path uses); every Ask scan
+        #     reads the light field projection and fetches only its winners
+        #     whole (keyword_scan_full), not 1,000 complete documents.
         try:
             have = {c.get("id") for c in cards}
-            cards = cards + keyword_scan_cards(uid, retrieval_query, exclude_ids=have, limit=5)
+            cards = cards + keyword_scan_full(uid, retrieval_query, exclude_ids=have, limit=5)
         except Exception as e:
             logger.error(f"ask_brain keyword fallback failed: {e}")
             retrieval_errors += 1
@@ -2562,7 +2601,7 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         if hints.get("concept"):
             try:
                 have = {c.get("id") for c in cards}
-                cards = keyword_scan_cards(
+                cards = keyword_scan_full(
                     uid, hints["concept"], exclude_ids=have, limit=6) + cards
             except Exception as e:
                 logger.error(f"ask_brain concept-hint scan failed: {e}")
@@ -2663,7 +2702,7 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
             if anchors:
                 for phrase in missing_title_phrases(anchors, cards):
                     have = {c.get("id") for c in cards}
-                    cards = cards + keyword_scan_cards(
+                    cards = cards + keyword_scan_full(
                         uid, phrase, exclude_ids=have, limit=2)
                 cards, _ = pin_title_phrases(anchors, cards)
         except Exception as e:
@@ -2693,12 +2732,15 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         #     a private card must never reach the model or the citations.
         #     Runs after ALL merges so every retrieval source is covered, and
         #     before the cap so the context refills with public cards.
+        #     A failed private-collection lookup comes back as None and fails
+        #     CLOSED (every collection member is dropped), as does a filter bug.
         try:
             cards = strip_private_cards(cards, private_collection_ids(uid))
         except Exception as e:
             # Belt-and-braces: never serve un-stripped context on a filter bug.
             logger.error(f"ask_brain privacy strip failed: {e}")
-            cards = [c for c in cards if not c.get("isPrivate")]
+            cards = [c for c in cards
+                     if c and not c.get("isPrivate") and not c.get("collectionIds")]
 
         # Cards flagged out of Ask context (`askExcluded` on the link doc).
         # 2026-07-24 incident: ONE card's stored text trips Gemini's
@@ -2715,14 +2757,16 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         # 1j. Retrieval infrastructure failed AND nothing was assembled → this
         #     is an outage, not an empty library. Refund and return a
         #     retryable error instead of "try saving a few links" (which is a
-        #     lie to a user with hundreds of cards). A PARTIAL failure with
-        #     usable cards still answers normally.
-        if not cards and retrieval_errors >= 2:
+        #     lie to a user with hundreds of cards). The VECTOR half failing
+        #     is enough: an embedding outage used to slip through whenever the
+        #     literal keyword scan still ran (and, as usual, found nothing). A
+        #     PARTIAL failure with usable cards still answers normally.
+        if not cards and (vector_failed or retrieval_errors >= 2):
             if charged:
                 refund_quota(*charged)
                 charged = None
             return _error_response(
-                "Machina couldn't search your library right now. Please try again in a minute.",
+                "Machina couldn't search your library just now. Try again in a moment.",
                 503, headers)
 
         # 1k. Nothing retrieved (empty/off-topic library): the reply is the
@@ -2753,10 +2797,17 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         slim = []
         for i, c in enumerate(cards):
             notes = c.get("userNotes")
+            # A note or shared-text card's `summary` IS the user's own text (up
+            # to MAX_NOTE_LENGTH), not a 2-4 sentence blurb, so in the deep
+            # window it gets the deep budget: Ask used to see only its first
+            # 1,500 characters.
+            own_text = (c.get("sourceType") == NOTE_SOURCE_TYPE
+                        or c.get("captureType") in (TEXT_CAPTURE_TYPE, "answer"))
+            summary_cap = ASK_DETAIL_MAX_CHARS if own_text and i < ASK_DEEP_CARDS else 1500
             s = {
                 "id": c.get("id"),
                 "title": str(c.get("title", "Untitled"))[:300],
-                "summary": str(c.get("summary", ""))[:1500],
+                "summary": str(c.get("summary", ""))[:summary_cap],
                 "category": str(c.get("category", "General"))[:60],
                 "tags": _cap_list(c.get("tags"), 15, 60),
                 # Publisher/source so the model can answer questions that name it
@@ -2777,7 +2828,9 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
                 ],
             }
             if i < ASK_DEEP_CARDS:
-                detail = (c.get("detailedSummary") or "").strip()
+                # A verbatim text card keeps the AI's write-up parked in
+                # aiDetailedSummary (its detailedSummary is empty by design).
+                detail = str(c.get("detailedSummary") or c.get("aiDetailedSummary") or "").strip()
                 if detail:
                     s["detailedSummary"] = detail[:ASK_DETAIL_MAX_CHARS]
                 takeaway = _card_takeaway(c)
@@ -2812,11 +2865,25 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
             by_id = {c.get("id"): c for c in cards}
 
             def _event_stream():
+                # At most one refund per request, whichever path gives the
+                # ask back (a no-answer, a cut-off answer, a failure).
+                refunded = []
+                # The text the user saw: a no-answer or a cut-off is refunded
+                # only while it is short (ai_service.refundable_answer).
+                shown = []
+
+                def _refund_once():
+                    if charged and not refunded:
+                        refunded.append(True)
+                        refund_quota(*charged)
+
                 try:
                     for kind, payload in ai.answer_from_context_stream(
                             question, slim, history, excluded_titles=excluded_titles,
-                            answer_language=answer_language, followup=followup):
+                            answer_language=answer_language, followup=followup,
+                            deadline=deadline):
                         if kind == "token":
+                            shown.append(payload)
                             yield "data: " + json.dumps(
                                 {"type": "token", "text": payload}
                             ) + "\n\n"
@@ -2838,6 +2905,31 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
                             yield "data: " + json.dumps(
                                 {"type": "ungrounded"}
                             ) + "\n\n"
+                        elif kind == "noAnswer":
+                            # The model said the saves don't cover the
+                            # question: an honest answer, not charged, as
+                            # long as it reads like one (short, no list).
+                            if refundable_answer("".join(shown)):
+                                _refund_once()
+                        elif kind == "incomplete":
+                            # The model stopped before finishing an answer
+                            # that is already on screen (finish_reason in
+                            # `payload`). It used to end with "done" as if it
+                            # were whole. Say it was cut off, leave a durable
+                            # trail, and give the ask back when it was cut
+                            # early (an answer that ran into the output cap
+                            # delivered its content).
+                            _record_server_error(
+                                "ask_brain (stream)",
+                                AnalysisError(f"answer stream incomplete (finish_reason={payload})"),
+                                uid=uid)
+                            if refundable_answer("".join(shown), allow_lists=True):
+                                _refund_once()
+                            yield "data: " + json.dumps({
+                                "type": "error", "reason": "incomplete",
+                                "error": "Machina's answer was cut off. Please ask again.",
+                            }) + "\n\n"
+                            return
                     yield "data: " + json.dumps({"type": "done"}) + "\n\n"
                 except Exception as stream_exc:
                     # Mirror _server_error: log full detail, emit a sanitized
@@ -2846,10 +2938,11 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
                     # durably, and refund the ask unit this request charged.
                     logger.error("ask_brain stream error: %s", stream_exc, exc_info=True)
                     _record_server_error("ask_brain (stream)", stream_exc, uid=uid)
-                    if charged:
-                        refund_quota(*charged)
+                    _refund_once()
                     msg = (
-                        "Machina couldn't generate an answer right now. Please try again in a minute."
+                        "Machina took too long to answer. Please try again in a moment."
+                        if isinstance(stream_exc, AskDeadlineExceeded)
+                        else "Machina couldn't generate an answer right now. Please try again in a minute."
                         if isinstance(stream_exc, AnalysisError)
                         else "Internal server error"
                     )
@@ -2870,7 +2963,13 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         result = ai.answer_from_context(question, slim, history, attempts=2,
                                         excluded_titles=excluded_titles,
                                         answer_language=answer_language,
-                                        followup=followup)
+                                        followup=followup, deadline=deadline)
+        # The model said the saves don't cover the question ("answered":
+        # false): an honest answer, not an ungrounded one, and not charged
+        # while it reads like one (short, no list; see refundable_answer).
+        if result.get("noAnswer") and charged and refundable_answer(result.get("answer")):
+            refund_quota(*charged)
+            charged = None
 
         # If the answer only succeeded after filter-probe isolation excluded or
         # partially filtered card(s) (Gemini's prompt filter rejects their text
@@ -2920,12 +3019,17 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
 
     except AnalysisError as e:
         # The Gemini answer call failed even after the in-service model
-        # fallback. Refund the metered unit, record the failure durably, and
-        # return a message that names the failing subsystem (still sanitized —
-        # no exception detail crosses to the client).
+        # fallback, or the request's time budget ran out first (503: the
+        # remaining attempts were skipped so the reply lands before Hosting
+        # and the client give up). Refund the metered unit, record the failure
+        # durably, and return a message that names the failing subsystem
+        # (still sanitized — no exception detail crosses to the client).
         if charged:
             refund_quota(*charged)
         _record_server_error("ask_brain", e, uid=uid)
+        if isinstance(e, AskDeadlineExceeded):
+            return _server_error(
+                headers, e, "Machina took too long to answer. Please try again in a moment.", 503)
         return _server_error(
             headers, e,
             "Machina couldn't generate an answer right now. Please try again in a minute.",
@@ -3002,7 +3106,8 @@ def search_links_http(req: https_fn.Request) -> https_fn.Response:
             if rl:
                 return rl
 
-        query_text = (data.get('query') or '').strip()
+        query_text = data.get('query')
+        query_text = query_text.strip() if isinstance(query_text, str) else ''
         if not query_text:
             return _error_response("query is required", 400, headers)
         if len(query_text) > MAX_QUESTION_LENGTH:
@@ -3010,22 +3115,27 @@ def search_links_http(req: https_fn.Request) -> https_fn.Response:
 
         try:
             limit = int(data.get('limit', 10))
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             limit = 10
         limit = max(1, min(limit, 50))
 
         meta = {}
         links = perform_hybrid_search(uid, query_text, limit, meta=meta)
-        # PRIVACY: same strip as Ask (1h above). The web client hides private
-        # cards from search itself, but this twin serves the native shell over
-        # plain HTTP and a PIN-locked client must not receive a private card's
-        # title and summary in a response body it never renders. Belt-and-
-        # braces fallback mirrors Ask: never serve un-stripped on a filter bug.
+        # PRIVACY: perform_hybrid_search already dropped effectively-private
+        # cards from both halves, before its relevance judge sent anything to
+        # Gemini. This second pass guards the response body (a PIN-locked
+        # client must not receive a private card's title and summary it never
+        # renders) and reuses the collection verdict the search read, so it
+        # costs no second read. Belt-and-braces fallback mirrors Ask: never
+        # serve un-stripped on a filter bug.
         try:
-            links = strip_private_cards(links, private_collection_ids(uid))
+            private_ids = (meta["private_ids"] if "private_ids" in meta
+                           else private_collection_ids(uid))
+            links = strip_private_cards(links, private_ids)
         except Exception as e:
             logger.error(f"search_links_http privacy strip failed: {e}")
-            links = [c for c in links if c and not c.get("isPrivate")]
+            links = [c for c in links
+                     if c and not c.get("isPrivate") and not c.get("collectionIds")]
         return https_fn.Response(
             # `mode` names the path that served ("judge" | "gate") so an odd
             # result is diagnosable from the response alone.
@@ -6801,6 +6911,7 @@ def sweep_stuck_processing(event: scheduler_fn.ScheduledEvent) -> None:
     """
     run_processing_janitor()
     run_category_migration()
+    repair_flagged_embeddings()  # cards left needsEmbedding after a failed embed (search.py)
 
 
 # Waiting saves (deferred_capture): every workspace's waiting cards are
@@ -6902,21 +7013,24 @@ def force_check_reminders(req: https_fn.Request) -> https_fn.Response:
 # Curated Digest (push)
 # ─────────────────────────────────────────────
 
-# Cadence MUST match DIGEST_CADENCE_MINUTES in digest_service.py — is_due() uses
-# it as the match window, so a mismatch means missed or double-checked sends.
-# Every 15 min keeps the user-doc scan cost at 1/3 of the old 5-min cadence
-# (it grows linearly with user count); delivery lands within one tick of the
-# chosen digest_hour:digest_minute, and the daily 20h / weekly 6d dup-guard
-# prevents double-sends.
+# Cadence MUST match DIGEST_CADENCE_MINUTES in digest_service.py: a period is
+# due from the first tick at or after the user's digest_hour:digest_minute.
+# Missed ticks and failed runs catch up for digest_service.DIGEST_CATCHUP (6h),
+# and the per-period run stamps plus the daily 20h / weekly 6d guard prevent
+# double-sends.
 # UNIX-CRON, deliberately, not "every 5 minutes": the App Engine syntax
 # anchors the tick to DEPLOY time, so ticks landed at arbitrary offsets
 # (:06/:21/:36/:51 in prod) and a user-chosen minute could never line up
 # with them. Unix-cron is anchored to the clock, so the grid matches the
 # Schedule picker's 5-minute increments and delivery lands ON the chosen
 # minute. MUST stay in sync with digest_service.DIGEST_CADENCE_MINUTES.
-@scheduler_fn.on_schedule(schedule="*/5 * * * *", max_instances=1)
+# timeout_sec: the 60s default killed a tick mid-walk as soon as one weekly
+# synthesis (a model call) ran long. The walk itself stops starting new users
+# after DIGEST_TICK_BUDGET_S (180s, so even a slow last user ends before the
+# next tick); 540s is the backstop.
+@scheduler_fn.on_schedule(schedule="*/5 * * * *", max_instances=1, timeout_sec=540)
 def send_digests(event: scheduler_fn.ScheduledEvent) -> None:
-    """Every 15 min: deliver curated digests to users whose schedule is due now."""
+    """Every 5 min: deliver curated digests to users whose schedule is due now."""
     from digest_service import run_digest_check
     run_digest_check()
 

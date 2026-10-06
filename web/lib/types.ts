@@ -552,6 +552,10 @@ export interface ChatMessage {
   // citation, even after a stricter re-ask). The UI drops the "grounded" promise
   // and shows a downgrade notice in place of the source chips.
   ungrounded?: boolean;
+  // True on an ASSISTANT reply to a thank-you ("You're welcome."). It cites
+  // nothing, so it is left out of the recent answers whose cited cards travel
+  // with the next question as contextIds.
+  social?: boolean;
   // The structured chip intent this USER question was sent with, persisted so
   // a retry re-sends the same intent instead of silently degrading to prose.
   hints?: AskHints;

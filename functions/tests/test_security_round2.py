@@ -82,11 +82,14 @@ def test_digest_scan_survives_a_non_map_settings_value(monkeypatch):
                     "lastDigestSentAt": None, "fcmTokens": ["t"]}),
     ]
     monkeypatch.setattr(ds, "get_db", lambda: DigestFakeDB(docs, recorder))
-    monkeypatch.setattr(ds, "is_due", lambda settings, tz, last: bool(settings.get("digest_enabled")))
-    monkeypatch.setattr(ds, "is_synthesis_due", lambda settings, tz: False)
+    period = datetime.now(timezone.utc)
+    monkeypatch.setattr(ds, "digest_due_at",
+                        lambda settings, tz, last, last_run=None: period if settings.get("digest_enabled") else None)
+    monkeypatch.setattr(ds, "synthesis_due_at", lambda *a, **k: None)
     sent = []
     monkeypatch.setattr(ds, "build_and_send_digest",
-                        lambda uid, user_data, force=False: sent.append(uid) or {"sent": True, "card_count": 1})
+                        lambda uid, user_data, force=False, period=None, push_hold=None:
+                        sent.append(uid) or {"sent": True, "card_count": 1})
 
     report = ds.run_digest_check()
 
