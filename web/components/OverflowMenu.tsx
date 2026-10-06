@@ -89,7 +89,7 @@ function Menu({
                 role="menu"
                 aria-label={ariaLabel}
                 style={{ position: 'fixed', left, width: WIDTH, ...vertical }}
-                className="z-[91] rounded-xl bg-card border border-border-strong shadow-2xl overflow-hidden py-1 animate-in fade-in zoom-in-95 duration-150"
+                className="z-[91] rounded-xl bg-card border border-border-strong shadow-2xl overflow-hidden py-1 animate-pop-in duration-150"
                 onClick={(e) => e.stopPropagation()}
             >
                 {items.map((item) => (

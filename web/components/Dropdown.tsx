@@ -78,7 +78,7 @@ export default function Dropdown({
                 <div
                     role="listbox"
                     aria-label={ariaLabel}
-                    className={`absolute top-[calc(100%+6px)] z-50 min-w-[11rem] p-1 rounded-xl bg-card border border-border-subtle shadow-[var(--shadow-card)] animate-in fade-in zoom-in-95 duration-150 ${align === 'right' ? 'right-0' : 'left-0'}`}
+                    className={`absolute top-[calc(100%+6px)] z-50 min-w-[11rem] p-1 rounded-xl bg-card border border-border-subtle shadow-[var(--shadow-card)] animate-pop-in duration-150 ${align === 'right' ? 'right-0' : 'left-0'}`}
                 >
                     {options.map(opt => {
                         const active = opt.value === value;

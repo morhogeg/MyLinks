@@ -98,7 +98,7 @@ export default function CategoryInput({
 
             {isOpen && (value.trim() !== '' || filteredCategories.length > 0) && (
                 <div
-                    className="absolute top-full start-0 mt-1 w-48 bg-card border border-border-strong rounded-lg shadow-xl z-50 overflow-hidden flex flex-col py-1 animate-in fade-in zoom-in-95 duration-200 max-h-60 overflow-y-auto"
+                    className="absolute top-full start-0 mt-1 w-48 bg-card border border-border-strong rounded-lg shadow-xl z-50 overflow-hidden flex flex-col py-1 animate-pop-in duration-200 max-h-60 overflow-y-auto"
                     onClick={(e) => e.stopPropagation()}
                 >
                     {filteredCategories.map(category => (

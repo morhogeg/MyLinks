@@ -395,7 +395,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                                 label="Pick date & time"
                             />
                             {selected === 'custom' && (
-                                <div className="px-1.5 pb-4 space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                                <div className="px-1.5 pb-4 space-y-2 animate-fade-in duration-200">
                                     <div className="grid grid-cols-2 gap-2">
                                         <input
                                             type="date"

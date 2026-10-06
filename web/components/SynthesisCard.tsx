@@ -133,7 +133,7 @@ export default function SynthesisCard({
     );
 
     return (
-        <div className="mb-4 rounded-2xl border border-accent/25 bg-card overflow-hidden shadow-lg shadow-accent/5 animate-in fade-in slide-in-from-top-1 duration-300">
+        <div className="mb-4 rounded-2xl border border-accent/25 bg-card overflow-hidden shadow-lg shadow-accent/5 animate-fade-in duration-300">
             {/* Header. In the feed it's the collapse toggle; in the archive it's
                 a static masthead for the piece. */}
             {alwaysOpen ? (

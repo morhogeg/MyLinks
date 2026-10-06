@@ -310,6 +310,26 @@ html {
   animation: fade-in 0.2s ease-out;
 }
 
+/* Menus and popovers (Dropdown, OverflowMenu, tag and category pickers):
+   a quick fade with a slight grow from the trigger. Replaces the tw-animate
+   classes (animate-in zoom-in-95 ...) they used to carry, which compile to
+   nothing because that plugin was never installed. */
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-pop-in {
+  animation: pop-in 0.14s var(--ease-modal, ease-out);
+}
+
 .animate-slide-in-left {
   animation: slide-in-left 0.25s var(--ease-spring, ease-out);
 }
@@ -717,6 +737,7 @@ a {
   .animate-boot-bkt-r,
   .animate-boot-dot,
   .animate-boot-glow,
+  .animate-pop-in,
   .animate-fade-in {
     animation-duration: 0.01ms !important;
     animation-delay: 0ms !important;

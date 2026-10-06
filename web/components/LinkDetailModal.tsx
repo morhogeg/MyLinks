@@ -1180,7 +1180,7 @@ export default function LinkDetailModal({
                         </h2>
                     )}
 
-                    <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <div className="animate-fade-in duration-300">
                         {/* Card ↔ open are ONE thought at two zoom levels: the card
                             summary is the canonical lead, shown (bolded) at the top of
                             the open view, then the deeper Key Points / Conclusions

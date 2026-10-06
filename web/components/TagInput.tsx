@@ -263,7 +263,7 @@ export default function TagInput({
     const desktopDropdown = (
         <div
             ref={dropdownRef}
-            className="fixed z-[100] overflow-hidden rounded-xl shadow-2xl bg-background border border-border-strong animate-in fade-in zoom-in-95 duration-150"
+            className="fixed z-[100] overflow-hidden rounded-xl shadow-2xl bg-background border border-border-strong animate-pop-in duration-150"
             style={{
                 top: coords?.openUpwards ? undefined : (coords?.top ? coords.top + 4 : 0),
                 bottom: coords?.openUpwards ? (coords?.bottom ? coords.bottom + 4 : 0) : undefined,
@@ -307,7 +307,7 @@ export default function TagInput({
                        typed tag name scrolled out of view while you were typing it,
                        which made the field feel like it wasn't taking input. Matches
                        the 14rem dropdown more closely too. */
-                    className={`text-xs bg-fill-subtle border border-accent/30 rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-accent w-44 animate-in fade-in zoom-in-95 duration-200 ${className}`}
+                    className={`text-xs bg-fill-subtle border border-accent/30 rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-accent w-44 animate-pop-in duration-200 ${className}`}
                 />
             )}
             {isOpen && typeof document !== 'undefined' && createPortal(isMobile ? mobileSheet : desktopDropdown, document.body)}
