@@ -1930,7 +1930,13 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // motion + session tallies confirm each action, and stacked success toasts
     // were covering the deck's Undo/Archive/Remind/Keep buttons.
     const swipeArchive = useCallback((link: Link) => handleStatusChange(link.id, 'archived', { silent: true }), [handleStatusChange]);
-    const swipeResetStatus = useCallback((link: Link) => handleStatusChange(link.id, 'unread', { silent: true }), [handleStatusChange]);
+    // Undo of a left swipe. The deck hands back the card as it was when it was
+    // archived, so put THAT status back: archiving a starred card drops the
+    // star (one `status` field), and a hardcoded 'unread' kept it dropped.
+    const swipeResetStatus = useCallback(
+        (link: Link) => handleStatusChange(link.id, link.status === 'favorite' ? 'favorite' : 'unread', { silent: true }),
+        [handleStatusChange],
+    );
     // Right swipe = Keep: the card does NOT move, change status, or get favorited
     // — it only rests from review sessions for a cooldown (reviewQueue
     // REVIEWED_REST_DAYS). `keep` false is the deck's Undo, which clears the stamp.
