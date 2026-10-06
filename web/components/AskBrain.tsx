@@ -11,7 +11,7 @@ import { isHttpUrl } from '@/lib/url';
 import { breakIntoParagraphs, normalizeListMarkers } from '@/lib/answerLayout';
 import SourceByline from '@/components/SourceByline';
 import { linkPlatform, platformIcon, platformColor, screenshotSource } from '@/lib/platform';
-import { appCheckHeaders } from '@/lib/firebase';
+import { appCheckHeaders, db } from '@/lib/firebase';
 import { authHeaders } from '@/lib/auth';
 import { apiUrl, isNativeApp, fetchWithTimeout } from '@/lib/api';
 import { track, trackFirstAsk, trackAskNoCitations, trackAskSuggestionUsed, trackAskFollowupUsed, trackAskStopped } from '@/lib/analytics';
@@ -22,6 +22,8 @@ import { buildAskSuggestions, buildFollowUps, newestReadyLink, iso, fullTitle, A
 import { subscribeChats, createChat, updateChat, deleteChat } from '@/lib/chats';
 import { answerRefFor, saveAnswerAsCard } from '@/lib/answerCards';
 import { unpublishAnswer } from '@/lib/answerShare';
+import { copyToClipboard } from '@/lib/share';
+import { doc, getDoc } from 'firebase/firestore';
 import { hapticLight } from '@/lib/haptics';
 import { useToast } from '@/components/Toast';
 import ShareAnswerSheet from './ShareAnswerSheet';
@@ -139,19 +141,24 @@ const ANSWER_ACTION_CLS =
  *  When the answer has citations, the copied text carries them along as a
  *  "Sources:" list — a pasted answer keeps its proof. */
 function CopyButton({ text, sources }: { text: string; sources?: ChatSource[] }) {
+    const toast = useToast();
     const [copied, setCopied] = useState(false);
     const onCopy = async () => {
-        try {
-            let full = text;
-            if (sources && sources.length > 0) {
-                full += '\n\nSources:\n' + sources
-                    .map(s => (s.url ? `- ${s.title} - ${s.url}` : `- ${s.title}`))
-                    .join('\n');
-            }
-            await navigator.clipboard.writeText(full);
+        let full = text;
+        if (sources && sources.length > 0) {
+            full += '\n\nSources:\n' + sources
+                .map(s => (s.url ? `- ${s.title} - ${s.url}` : `- ${s.title}`))
+                .join('\n');
+        }
+        // copyToClipboard falls back to execCommand inside the WKWebView, where
+        // the async Clipboard API is often missing or rejects; a failure is
+        // said out loud instead of a silent no-op.
+        if (await copyToClipboard(full)) {
             setCopied(true);
             setTimeout(() => setCopied(false), 1500);
-        } catch { /* clipboard unavailable — silently no-op */ }
+        } else {
+            toast.error("Couldn't copy the answer.");
+        }
     };
     return (
         <button
@@ -787,6 +794,21 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
         } finally {
             setSavingIdx(null);
         }
+    };
+
+    /** "Saved" opens the card it made, unless that card has since been
+     *  deleted: then "Saved" opened "no longer in your library" and the answer
+     *  could never be kept again. A card outside the loaded window is looked
+     *  up before deciding; if the lookup fails it opens as before. */
+    const openSavedAnswer = async (idx: number, cardId: string) => {
+        if (!uid || links.some((l) => l.id === cardId)) { onOpenLink(cardId); return; }
+        let gone = false;
+        try {
+            gone = !(await getDoc(doc(db, 'users', uid, 'links', cardId))).exists();
+        } catch { /* can't tell: open it as before */ }
+        if (!gone) { onOpenLink(cardId); return; }
+        patchMessageAt(idx, { savedCardId: undefined });
+        toast.info('That card was deleted. Tap Save to keep this answer again.');
     };
 
     // ── Conversation actions ──────────────────────────────────────────────────
@@ -1564,7 +1586,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                                                         saved={!!m.savedCardId}
                                                         busy={savingIdx === i}
                                                         onSave={() => void saveAnswer(i)}
-                                                        onOpen={() => m.savedCardId && onOpenLink(m.savedCardId)}
+                                                        onOpen={() => { if (m.savedCardId) void openSavedAnswer(i, m.savedCardId); }}
                                                     />
                                                     <button
                                                         onClick={() => { hapticLight(); setShareIdx(i); }}
