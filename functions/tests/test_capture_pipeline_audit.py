@@ -286,3 +286,57 @@ def test_a_redelivered_note_job_does_not_put_the_organized_note_back(env, monkey
     note = db.docs["users/u1/links/n1"]
     assert note["title"] == "Organized" and "noteEnrichPending" not in note
     assert env.refunds == []
+
+
+# ── CAP-7: nothing after the card write can fail a finished capture ──────────
+
+def _boom(*a, **k):
+    raise RuntimeError("sibling is the only copy and its write failed")
+
+
+def _web_job_world(env):
+    return env.make({"users/u1/links/c1": {"status": "processing", "processingStartedAt": tcc.NOW_MS,
+                                           "url": "https://example.com/a"},
+                     tcc.JOB: tcc._job(charge={"kind": "saves"}, reminderText="remind me tomorrow")})
+
+
+def test_a_failed_vector_mirror_flags_the_card_instead_of_failing_it(env, monkeypatch):
+    db = _web_job_world(env)
+    monkeypatch.setattr(main, "mirror_vector_write", _boom)
+    env.run_worker()
+    card = db.docs["users/u1/links/c1"]
+    assert card["status"] == "unread" and card["title"] == "Read" and "error" not in card
+    assert card["needsEmbedding"] is True
+    assert env.refunds == [] and tcc.JOB not in db.docs
+
+
+def test_a_failed_bookkeeping_write_keeps_the_card_and_still_sets_the_reminder(env, monkeypatch):
+    db = _web_job_world(env)
+    db.docs.pop("users/u1")  # the lastSavedLinkId stamp now raises NotFound
+    reminders = []
+    monkeypatch.setattr(main, "_apply_reminder_intent", lambda uid, lid, body: reminders.append(body))
+    env.run_worker()
+    assert db.docs["users/u1/links/c1"]["status"] == "unread"
+    assert reminders == ["remind me tomorrow"] and env.refunds == []
+
+
+def test_a_failed_job_cleanup_keeps_the_card(env, monkeypatch):
+    db = _web_job_world(env)
+    real_delete = _Ref.delete
+
+    def delete(self):
+        if self.path == tcc.JOB:
+            raise RuntimeError("deadline exceeded")
+        return real_delete(self)
+    monkeypatch.setattr(_Ref, "delete", delete)
+    env.run_worker()
+    assert db.docs["users/u1/links/c1"]["status"] == "unread" and env.refunds == []
+
+
+def test_a_failed_vector_mirror_never_fails_a_completed_screenshot_read(env, monkeypatch):
+    db = _enrich_world(env, monkeypatch)
+    monkeypatch.setattr(main, "mirror_vector_write", _boom)
+    _deliver(db, "pending_processing/e1", dict(db.docs["pending_processing/e1"]))
+    card = db.docs["users/u1/links/c1"]
+    assert card["title"] == "Full post" and "enrichStatus" not in card
+    assert card["needsEmbedding"] is True and env.refunds == []

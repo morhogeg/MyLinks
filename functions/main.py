@@ -5620,6 +5620,7 @@ def _enrich_card_with_images(ref, task_id: str, uid: str, card_ref, data: dict) 
         logger.info("Enrich job already started or finished by another run; skipping")
         return
     log_to_firestore(task_id, "Screenshot enrich started", data={"cardId": card_id}, uid=uid)
+    written = False
     try:
         if outcome == capture_charge.CARD_SETTLED:
             # The card stopped being a settled web card while the job waited
@@ -5699,10 +5700,19 @@ def _enrich_card_with_images(ref, task_id: str, uid: str, card_ref, data: dict) 
         else:
             update["needsEmbedding"] = True
         card_ref.update(card_payload(update, get_db()))
-        mirror_vector_write(card_ref, update, db=get_db())
+        written = True
+        # The read is saved; nothing after this may turn it into a failure.
+        _mirror_vector_or_flag(card_ref, update, get_db())
         log_to_firestore(task_id, "Screenshot enrich complete", data={"cardId": card_id}, uid=uid)
         ref.delete()
     except Exception as e:
+        if written:
+            logger.error(f"Post-save step failed; the completed card is kept: {e}", exc_info=True)
+            try:
+                ref.delete()
+            except Exception:
+                pass
+            return
         logger.error(f"Screenshot enrich failed for {_mask_uid(uid)}/{card_id}: {e}", exc_info=True)
         # share_ingest metered the enrich as a save; it produced nothing.
         refund_quota(uid, "saves")
@@ -5765,6 +5775,23 @@ def _write_capture_card(card_ref, data: dict) -> tuple:
     the charge token, all in one transaction. Returns ``(written,
     removed_charge_kind)``."""
     return capture_charge.finalize_card(get_db(), card_ref, lambda cur: _merge_card_write(data, cur))
+
+
+def _mirror_vector_or_flag(card_ref, fields: dict, db, *, replace: bool = False) -> None:
+    """Mirror a just-written card's vector to its sibling doc (vector_store).
+
+    The mirror raises by design once the sibling is the only copy (phase 3).
+    The card is already saved by then, so a failure must not fail the
+    capture: flag the card `needsEmbedding` instead, and sync_link_embedding
+    writes the vector (card and sibling) again."""
+    try:
+        mirror_vector_write(card_ref, fields, replace=replace, db=db)
+    except Exception as e:
+        logger.error(f"Vector mirror failed; card flagged for re-embedding: {type(e).__name__}: {e}")
+        try:
+            card_ref.update({"needsEmbedding": True})
+        except Exception as flag_err:
+            logger.error(f"Could not flag the card for re-embedding: {flag_err}")
 
 
 def _refund_job(uid: str, job_ref) -> None:
@@ -6161,6 +6188,9 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
     scraped = {"html": "", "title": "", "text": ""}
     # Assumed Pro until the video path reads the plan; only YouTube cares.
     pro = True
+    # Set the moment the analyzed card is written: from then on a failure is
+    # bookkeeping, never a reason to mark the capture FAILED.
+    card_written = False
 
     try:
         # 1. Scrape content (only once). Image jobs are NOT scraped: their `url`
@@ -6394,14 +6424,22 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
                 logger.info("Card deleted during processing; result dropped")
                 ref.delete()
                 return
+            card_written = True
             link_id = card_id
-            mirror_vector_write(card_ref, link_data, replace=True, db=db)
+            saved_ref = card_ref
         else:
             link_id = save_link_to_firestore(uid, card_payload(link_data, db))
-            mirror_vector_write(
-                db.collection('users').document(uid).collection('links').document(link_id),
-                link_data, replace=True, db=db)
-        db.collection('users').document(uid).update({'lastSavedLinkId': link_id})
+            card_written = True
+            saved_ref = db.collection('users').document(uid).collection('links').document(link_id)
+
+        # The card is SAVED. Everything below is bookkeeping, and none of it
+        # may turn the finished capture into a FAILED card: that overwrote a
+        # ready card and refunded nothing (its token was already spent).
+        _mirror_vector_or_flag(saved_ref, link_data, db, replace=True)
+        try:
+            db.collection('users').document(uid).update({'lastSavedLinkId': link_id})
+        except Exception as stamp_err:
+            logger.warning(f"lastSavedLinkId not recorded (card kept): {type(stamp_err).__name__}: {stamp_err}")
 
         # 6. Check for reminder intent. Own guard: the card is already saved,
         # and a bad parse (a hostile share note) must not flip it to FAILED.
@@ -6413,11 +6451,22 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         logger.info(f"Processing complete for {data.get('source', 'unknown')} item")
 
         # Successful cleanup
-        ref.delete()
         if data.get("source") == "deferred":
             _drop_snapshot(uid, existing_card_id)
+        ref.delete()
 
     except Exception as e:
+        if card_written:
+            # A step AFTER the successful card write failed (cleanup, most
+            # likely the queue doc delete). The capture itself is done: keep
+            # the card exactly as written, no refund (the charge bought it),
+            # and just try to clear the job.
+            logger.error(f"Post-save step failed; the saved card is kept: {e}", exc_info=True)
+            try:
+                ref.delete()
+            except Exception:
+                pass
+            return
         logger.error(f"Background processing error: {e}", exc_info=True)
 
         # M3 — never drop a capture. Mark the visible card as a retryable FAILED
