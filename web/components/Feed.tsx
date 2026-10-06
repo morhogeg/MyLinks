@@ -4,7 +4,7 @@
 
 
 import { Fragment, useState, useEffect, useRef, useMemo, useCallback, cloneElement, type ReactElement } from 'react';
-import { Link, Collection, WeeklySynthesis, CuratedDigest, DigestCardRef, UserNote } from '@/lib/types';
+import { Link, LinkStatus, Collection, WeeklySynthesis, CuratedDigest, DigestCardRef, UserNote } from '@/lib/types';
 import { getColorStyleByKey, getCategoryColorStyle, assignCategoryColors } from '@/lib/colors';
 import { platformIcon, platformColor, type PlatformKey } from '@/lib/platform';
 import DigestView from './DigestView';
@@ -59,7 +59,7 @@ import NotesView from './NotesView';
 import KnowledgeGraph from './KnowledgeGraph';
 import { getNoteGroups, isWrittenNote } from '@/lib/notes';
 import LoadMoreSentinel from './feed/LoadMoreSentinel';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, AlarmClock, CheckCircle2, CheckSquare, CheckCheck, Layers, List, Image as ImageIcon, Share2, Globe, Plus, Pencil, Newspaper, CalendarCheck, Lock, BookOpenCheck, ChevronLeft, BarChart3, StickyNote, Waypoints, Upload } from 'lucide-react';
+import { Search, Inbox, Archive, ArchiveRestore, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, AlarmClock, CheckCircle2, CheckSquare, CheckCheck, Layers, List, Image as ImageIcon, Share2, Globe, Plus, Pencil, Newspaper, CalendarCheck, Lock, BookOpenCheck, ChevronLeft, BarChart3, StickyNote, Waypoints, Upload } from 'lucide-react';
 import { usePullToRefresh } from '@/lib/usePullToRefresh';
 import { useProcessingBanner } from '@/lib/useProcessingBanner';
 import { cardStartMs } from '@/lib/shareProgress';
@@ -1092,18 +1092,56 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // with no per-doc side effects to preserve.
     const linkRefs = (ids: string[]) => ids.map((id) => doc(db, 'users', uid!, 'links', id));
 
-    const handleBulkArchive = async () => {
-        if (!uid) return;
-        const ids = Array.from(selectedIds);
+    // Write a status per card, batched as above. A batch is all-or-nothing,
+    // so ONE selected card deleted on another device used to sink its whole
+    // chunk: when a batch fails, fall back to per-card writes and keep the
+    // ones that land. Resolves to the ids written.
+    const writeStatuses = async (changes: Map<string, LinkStatus>): Promise<string[]> => {
+        const ids = Array.from(changes.keys());
         try {
-            await batchedUpdate(linkRefs(ids), (batch, ref) => batch.update(ref, { status: 'archived' }));
-            ids.forEach((id) => patchLink(id, { status: 'archived' }));
-            toast.success(`Archived ${ids.length} link${ids.length === 1 ? '' : 's'}`);
+            await batchedUpdate(linkRefs(ids), (batch, ref) => batch.update(ref, { status: changes.get(ref.id)! }));
+            return ids;
         } catch {
-            toast.error("Couldn't archive some links. Please try again.");
+            const results = await Promise.allSettled(linkRefs(ids).map((ref) => updateDoc(ref, { status: changes.get(ref.id)! })));
+            return ids.filter((_, i) => results[i].status === 'fulfilled');
         }
+    };
+
+    // Archive the selection, or under the Archived filter bring it back. The
+    // toast carries Undo, which puts back the status each card had (a starred
+    // card gets its star back).
+    const handleBulkStatus = async () => {
+        if (!uid) return;
+        const target: LinkStatus = filter === 'archived' ? 'unread' : 'archived';
+        const ids = Array.from(selectedIds);
+        const known = new Map([...libraryLinks, ...links].map((l) => [l.id, l.status]));
+        const previous = new Map(ids.map((id) => {
+            const status = known.get(id);
+            return [id, (status === 'favorite' || status === 'archived' ? status : 'unread') as LinkStatus];
+        }));
         setSelectedIds(new Set());
         setIsSelectionMode(false);
+        const done = await writeStatuses(new Map(ids.map((id) => [id, target])));
+        done.forEach((id) => handleLocalEdit(id, { status: target }));
+        if (done.length === 0) {
+            toast.error(target === 'archived'
+                ? "Couldn't archive those links. Please try again."
+                : "Couldn't unarchive those links. Please try again.");
+            return;
+        }
+        const verb = target === 'archived' ? 'Archived' : 'Unarchived';
+        toast.success(done.length === ids.length
+            ? `${verb} ${done.length} link${done.length === 1 ? '' : 's'}`
+            : `${verb} ${done.length} of ${ids.length} links`, {
+            label: 'Undo',
+            onClick: () => {
+                const restore = new Map(done.map((id) => [id, previous.get(id) ?? 'unread']));
+                void writeStatuses(restore).then((back) => {
+                    back.forEach((id) => handleLocalEdit(id, { status: restore.get(id)! }));
+                    if (back.length < restore.size) toast.error("Couldn't undo that for every link.");
+                });
+            },
+        });
     };
 
     // Selection toolbar extras: select everything the current view shows, tag
@@ -2566,13 +2604,13 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                 <span className="text-xs font-bold text-accent px-1.5 tabular-nums">{selectedIds.size}</span>
                                 {bulkExtraButtons('h-8 w-8')}
                                 <button
-                                    onClick={handleBulkArchive}
+                                    onClick={handleBulkStatus}
                                     disabled={selectedIds.size === 0}
-                                    title="Archive selected"
-                                    aria-label="Archive selected"
+                                    title={filter === 'archived' ? 'Unarchive selected' : 'Archive selected'}
+                                    aria-label={filter === 'archived' ? 'Unarchive selected' : 'Archive selected'}
                                     className="h-8 w-8 inline-flex items-center justify-center rounded-full text-accent cursor-pointer hover:bg-accent hover:text-accent-ink transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                                 >
-                                    <Archive className="w-4 h-4" />
+                                    {filter === 'archived' ? <ArchiveRestore className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
                                 </button>
                                 <button
                                     onClick={() => setConfirmBulkDelete(true)}
@@ -2799,12 +2837,13 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                     />
                                 )}
                                 <button
-                                    onClick={handleBulkArchive}
+                                    onClick={handleBulkStatus}
                                     disabled={selectedIds.size === 0}
-                                    title="Archive selected"
+                                    title={filter === 'archived' ? 'Unarchive selected' : 'Archive selected'}
+                                    aria-label={filter === 'archived' ? 'Unarchive selected' : 'Archive selected'}
                                     className="h-7 w-7 inline-flex items-center justify-center rounded-full text-accent cursor-pointer hover:bg-accent hover:text-accent-ink transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                                 >
-                                    <Archive className="w-4 h-4" />
+                                    {filter === 'archived' ? <ArchiveRestore className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
                                 </button>
                                 <button
                                     onClick={() => setConfirmBulkDelete(true)}
