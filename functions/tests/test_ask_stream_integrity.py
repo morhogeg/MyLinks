@@ -169,3 +169,49 @@ def test_endpoint_reports_a_cut_off_stream_and_refunds(monkeypatch):
     assert not any(e["type"] == "done" for e in events)
     assert refunds == [("u1", "asks")]
     assert errors and "MAX_TOKENS" in errors[0]
+
+
+# ── RV-3: a cut-off is refunded when it is a real early cut ─────────────────
+# A 16k-token answer that hit the output cap delivered its content; refunding
+# it made "write until you hit the cap" free.
+
+def _cut_stream(monkeypatch, pieces, reason):
+    monkeypatch.setattr(main.https_fn, "Response", _Resp)
+    monkeypatch.setattr(main, "check_rate_limit", lambda *a, **k: True)
+    monkeypatch.setattr(main, "REQUIRE_AUTH", False)
+    monkeypatch.setattr(main, "APPCHECK_ENFORCE", False)
+    monkeypatch.setattr(main, "plan_for", lambda uid: "pro")
+    monkeypatch.setattr(main, "meter_quota",
+                        lambda *a, **k: {"ok": True, "remaining": 1, "used": 1, "limit": 2, "plan": "pro"})
+    monkeypatch.setattr(main, "perform_search_logic", lambda *a, **k: list(CARDS))
+    monkeypatch.setattr(main, "apply_distance_threshold", lambda r, **k: r)
+    monkeypatch.setattr(main, "rerank_candidates", lambda q, c, top_k=10: list(c))
+    monkeypatch.setattr(main, "keyword_scan_full", lambda *a, **k: [])
+    monkeypatch.setattr(main, "private_collection_ids", lambda uid: set())
+    monkeypatch.setattr(main, "_record_server_error", lambda *a, **k: None)
+    refunds = []
+    monkeypatch.setattr(main, "refund_quota", lambda *a: refunds.append(a))
+
+    class _Gemini:
+        def answer_from_context_stream(self, question, cards, history=None, **kwargs):
+            for p in pieces:
+                yield ("token", p)
+            yield ("incomplete", reason)
+
+    monkeypatch.setattr(main, "GeminiService", _Gemini)
+    resp = main.ask_brain(_Req(json_body={"uid": "u1", "question": "list everything", "stream": True}))
+    events = [json.loads(line[len("data: "):]) for line in "".join(resp.body).split("\n\n") if line]
+    return events, refunds
+
+
+def test_a_long_cut_off_answer_is_reported_but_charged(monkeypatch):
+    step = "1. Mix the flour with the butter until it looks like sand.\n"
+    events, refunds = _cut_stream(monkeypatch, [step] * 300, "MAX_TOKENS")
+    assert events[-1]["type"] == "error" and events[-1]["reason"] == "incomplete"
+    assert refunds == []
+
+
+def test_an_early_cut_with_a_list_started_is_refunded(monkeypatch):
+    events, refunds = _cut_stream(monkeypatch, ["Here are the steps:\n1. Mix"], "SAFETY")
+    assert events[-1]["reason"] == "incomplete"
+    assert refunds == [("u1", "asks")]

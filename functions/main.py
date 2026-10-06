@@ -2389,7 +2389,7 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
     # One wall-clock budget for the whole request, retrieval and every model
     # call, inside Hosting's 60s (ai_service.ASK_DEADLINE_S). When it runs out
     # the model ladder stops with AskDeadlineExceeded, refunded below.
-    from ai_service import ask_deadline, AskDeadlineExceeded
+    from ai_service import ask_deadline, AskDeadlineExceeded, refundable_answer
     deadline = ask_deadline()
 
     try:
@@ -2838,6 +2838,9 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
                 # At most one refund per request, whichever path gives the
                 # ask back (a no-answer, a cut-off answer, a failure).
                 refunded = []
+                # The text the user saw: a no-answer or a cut-off is refunded
+                # only while it is short (ai_service.refundable_answer).
+                shown = []
 
                 def _refund_once():
                     if charged and not refunded:
@@ -2850,6 +2853,7 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
                             answer_language=answer_language, followup=followup,
                             deadline=deadline):
                         if kind == "token":
+                            shown.append(payload)
                             yield "data: " + json.dumps(
                                 {"type": "token", "text": payload}
                             ) + "\n\n"
@@ -2873,19 +2877,24 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
                             ) + "\n\n"
                         elif kind == "noAnswer":
                             # The model said the saves don't cover the
-                            # question: an honest answer, not charged.
-                            _refund_once()
+                            # question: an honest answer, not charged, as
+                            # long as it reads like one (short, no list).
+                            if refundable_answer("".join(shown)):
+                                _refund_once()
                         elif kind == "incomplete":
                             # The model stopped before finishing an answer
                             # that is already on screen (finish_reason in
                             # `payload`). It used to end with "done" as if it
                             # were whole. Say it was cut off, leave a durable
-                            # trail, and give the ask back.
+                            # trail, and give the ask back when it was cut
+                            # early (an answer that ran into the output cap
+                            # delivered its content).
                             _record_server_error(
                                 "ask_brain (stream)",
                                 AnalysisError(f"answer stream incomplete (finish_reason={payload})"),
                                 uid=uid)
-                            _refund_once()
+                            if refundable_answer("".join(shown), allow_lists=True):
+                                _refund_once()
                             yield "data: " + json.dumps({
                                 "type": "error", "reason": "incomplete",
                                 "error": "Machina's answer was cut off. Please ask again.",
@@ -2926,8 +2935,9 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
                                         answer_language=answer_language,
                                         followup=followup, deadline=deadline)
         # The model said the saves don't cover the question ("answered":
-        # false): an honest answer, not an ungrounded one, and not charged.
-        if result.get("noAnswer") and charged:
+        # false): an honest answer, not an ungrounded one, and not charged
+        # while it reads like one (short, no list; see refundable_answer).
+        if result.get("noAnswer") and charged and refundable_answer(result.get("answer")):
             refund_quota(*charged)
             charged = None
 
