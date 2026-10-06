@@ -2310,7 +2310,10 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // collection Manage cards is editing (also reachable from the gallery and
     // the Collection: banner, so it too may differ from the open one).
     const { links: openCollectionMembers, loading: openCollectionLoading } = useCollectionLinks(uid, openCollectionId);
-    const { links: shareCollectionMembers } = useCollectionLinks(uid, shareCollection?.id ?? null);
+    // Loading OR still only the cache's answer: Firestore answers from the
+    // local cache first, and that set can be partial (only members this device
+    // has seen). The share sheet must not freeze a public page from it.
+    const { links: shareCollectionMembers, loading: shareMembersLoading, fromCache: shareMembersFromCache } = useCollectionLinks(uid, shareCollection?.id ?? null);
     const { links: manageCollectionMembers } = useCollectionLinks(uid, manageCardsCollection?.id ?? null);
 
     // What a public page may contain: the complete member set minus pending
@@ -3879,6 +3882,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                     collection={collections.find(c => c.id === shareCollection.id) ?? shareCollection}
                     memberLinks={shareableMembers}
                     excludedPrivateCount={shareExcludedPrivateCount}
+                    membersLoading={shareMembersLoading || shareMembersFromCache}
                     isOpen={!!shareCollection}
                     onClose={() => setShareCollection(null)}
                 />
