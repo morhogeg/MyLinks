@@ -2094,7 +2094,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         { value: 'read', label: 'Read', icon: <CheckCircle2 className="w-4 h-4 text-success" /> },
         { value: 'favorite', label: 'Favorites', icon: <Star className="w-4 h-4 text-star fill-star" /> },
         // Reminders lives here as a Show option (was a separate toolbar button).
-        { value: 'reminders', label: reminderCount > 0 ? `Reminders (${reminderCount})` : 'Reminders', icon: <Bell className="w-4 h-4 text-blue-500" /> },
+        { value: 'reminders', label: reminderCount > 0 ? `Reminders (${reminderCount})` : 'Reminders', icon: <Bell className="w-4 h-4 text-info" /> },
         { value: 'archived', label: 'Archived', icon: <Archive className="w-4 h-4 text-text-secondary" /> },
         // Private cards (Photos-Hidden model) — only offered once the privacy
         // vault exists or something is already in it; entering is PIN-gated.

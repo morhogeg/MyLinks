@@ -7,6 +7,7 @@ import { COLOR_KEYS, getColorStyleByKey } from '@/lib/colors';
 import { createCollection, updateCollection, unpublishCollection } from '@/lib/collections';
 import { usePrivacyLock } from '@/lib/privacyLock';
 import PinLockModal from './PinLockModal';
+import { Toggle } from './settings/primitives';
 import { useToast } from '@/components/Toast';
 import { useVisualViewport } from '@/lib/useVisualViewport';
 import { useScrollLock } from '@/lib/useScrollLock';
@@ -249,21 +250,18 @@ export default function CollectionFormModal({
                                         : ''}
                                 </p>
                             </div>
-                            <button
-                                type="button"
-                                role="switch"
-                                aria-checked={isPrivate}
-                                aria-label="Private collection"
-                                onClick={() => {
+                            {/* The app's one switch (iOS size, RTL-aware), not a
+                                smaller hand-drawn copy (launch audit DS-6). */}
+                            <Toggle
+                                on={isPrivate}
+                                label="Private collection"
+                                onChange={() => {
                                     if (isPrivate) { setIsPrivate(false); return; }
                                     // First private collection ever → set up the vault PIN.
                                     if (hasPin) setIsPrivate(true);
                                     else setPinSetupOpen(true);
                                 }}
-                                className={`relative w-11 h-[26px] rounded-full transition-colors shrink-0 ${isPrivate ? 'bg-accent' : 'bg-fill-strong'}`}
-                            >
-                                <span className={`absolute top-[3px] w-5 h-5 rounded-full bg-white shadow transition-all ${isPrivate ? 'start-[21px]' : 'start-[3px]'}`} />
-                            </button>
+                            />
                         </div>
                     </div>
                 </div>

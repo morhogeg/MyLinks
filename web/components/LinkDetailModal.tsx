@@ -709,8 +709,8 @@ export default function LinkDetailModal({
                             title={isReminderActive ? `Reminder active (next: ${nextReminderDate?.toLocaleDateString()})` : 'Set reminder'}
                             aria-label={isReminderActive ? 'Reminder active' : 'Set reminder'}
                             className={`shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl flex items-center justify-center transition-colors ${isReminderActive
-                                ? 'bg-blue-500/10 text-blue-500'
-                                : 'text-text-muted hover:text-blue-500 hover:bg-card-hover'
+                                ? 'bg-info/10 text-info'
+                                : 'text-text-muted hover:text-info hover:bg-card-hover'
                                 }`}
                         >
                             {isReminderActive ? <Bell className="w-[18px] h-[18px]" /> : <BellOff className="w-[18px] h-[18px]" />}

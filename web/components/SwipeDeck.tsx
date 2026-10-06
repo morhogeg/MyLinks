@@ -562,7 +562,7 @@ export default function SwipeDeck({
                 <DeckAction label="Undo" hint={ACTION_HINTS.undo} onClick={undo} disabled={!lastAction} buttonClassName="text-text-muted hover:text-text">
                     <RotateCcw className="w-5 h-5" />
                 </DeckAction>
-                <DeckAction label="← Archive" hint={ACTION_HINTS.archive} onClick={() => fling('left')} buttonClassName="text-blue-500 hover:bg-blue-500 hover:text-white border-blue-500/30">
+                <DeckAction label="← Archive" hint={ACTION_HINTS.archive} onClick={() => fling('left')} buttonClassName="text-info hover:bg-info hover:text-white border-info/30">
                     <Archive className="w-6 h-6" />
                 </DeckAction>
                 <DeckAction label="↑ Remind" hint={ACTION_HINTS.remind} onClick={() => fling('up')} buttonClassName="text-accent hover:bg-accent hover:text-accent-ink border-accent/30">
@@ -608,7 +608,7 @@ function DeckAction({ children, onClick, label, hint, disabled, buttonClassName 
 function ActionHelp({ onClose }: { onClose: () => void }) {
     const rows: { icon: React.ReactNode; label: string; hint: string }[] = [
         { icon: <Check className="w-4 h-4 text-success" />, label: 'Keep', hint: ACTION_HINTS.keep },
-        { icon: <Archive className="w-4 h-4 text-blue-500" />, label: 'Archive', hint: ACTION_HINTS.archive },
+        { icon: <Archive className="w-4 h-4 text-info" />, label: 'Archive', hint: ACTION_HINTS.archive },
         { icon: <Bell className="w-4 h-4 text-accent" />, label: 'Remind', hint: ACTION_HINTS.remind },
         { icon: <RotateCcw className="w-4 h-4 text-text-muted" />, label: 'Undo', hint: ACTION_HINTS.undo },
     ];
