@@ -2571,6 +2571,19 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-06 (night) — CARD HEADER ROUND 2 (owner QA on 1348).** (1)
+  The Revisit header bunched the icons left with a hole before ⋯; on a
+  phone the action group now dissolves into the row (`display: contents`)
+  and the row is `justify-between`, so back, read, favorite, reminder, ⋯ and
+  close are spaced evenly (mock-rendered at 375/390/430pt; NOT seen in the
+  app). (2) Read and reminder lose their "on" chip: icon only, like the
+  star; an active reminder is now a filled blue bell. (3) The summary
+  paragraph has no pencil any more (the floating one and the legacy "Edit
+  summary" button): edit pencils are for the headline and category. Kept:
+  "Edit text" on a TEXT card (the body is the user's own words, nothing else
+  edits it) and the pencil on the user's own My notes. All in
+  `LinkDetailModal.tsx`. **Verified:** tsc 0, eslint 0, em-dash gate.
+
 - **2026-10-06 (evening) — CARD HEADER FROM REVISIT: bell no longer
   clipped.** Owner screenshot: a card opened from Revisit cut the reminder
   bell in half. Cause: the header action row scrolls sideways with its
@@ -2586,7 +2599,8 @@ exact-match, capped.
   file, em-dash gate. **NOT verified:** rendered on a phone or in a browser
   (widths were worked out from the classes); QA on the next TestFlight
   build: open a card from Revisit, check the row fits and ⋯ offers Delete
-  and Open source.
+  and Open source. **Shipped** as merge `594410f`, TestFlight run #348 →
+  **build 1348** green.
 
 - **2026-10-06 (later) — LAUNCH AUDIT SHIPPED: merge `7c82ffa`, build
   1347.** Owner said ship. `claude/launch-audit` merged to `main` with no
