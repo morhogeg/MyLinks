@@ -161,17 +161,20 @@ class GraphService:
 
         Pure repair: idempotent and safe to re-run. Returns per-user counts.
         """
+        from search import build_embedding_text, EMBED_TEXT_VERSION  # lazy: see find_related_links
         links_ref = self.db.collection('users').document(uid).collection('links')
         docs = list(links_ref.stream())
 
         # Pass 1 — backfill missing embeddings (reused as query vectors below).
+        # Same recipe and version stamp as every other embed site (see
+        # backfill_batch): a title+summary vector is a different, thinner one.
         embeddings: Dict[str, List[float]] = {}
         embedded = 0
         for doc in docs:
             d = doc.to_dict() or {}
             if not (d.get('needsEmbedding') or vector_needs_repair(doc.reference, d, self.db)):
                 continue
-            text = f"{d.get('title', '')}\n{d.get('summary', '')}".strip()
+            text = build_embedding_text(d)
             if not text:
                 continue
             try:
@@ -183,6 +186,7 @@ class GraphService:
                 continue
             try:
                 update = {'embedding_vector': Vector(emb),
+                          'embeddingVersion': EMBED_TEXT_VERSION,
                           'needsEmbedding': firestore.DELETE_FIELD}
                 doc.reference.update(card_payload(update, self.db))
                 mirror_vector_write(doc.reference, update, db=self.db)
@@ -250,6 +254,7 @@ class GraphService:
         `nextCursor` (last id seen), and `done` (True when the page was short,
         i.e. the collection is exhausted). Idempotent — safe to re-run.
         """
+        from search import build_embedding_text, EMBED_TEXT_VERSION  # lazy: see find_related_links
         links_ref = self.db.collection('users').document(uid).collection('links')
         q = links_ref.order_by('__name__')
         if cursor:
@@ -267,14 +272,22 @@ class GraphService:
                 # Repair anything unsearchable: missing, list-typed (schema
                 # drift), degenerate/poisoned, or explicitly flagged — not just
                 # "field absent" (which missed drift/poison and left cards dead).
+                # Embedded with the SAME recipe (build_embedding_text: detail,
+                # notes, takeaway, concepts…) and version stamp as the trigger
+                # and the pipeline. It used to embed title + summary only and
+                # stamp nothing, so every card this phase touched sat in vector
+                # space as a thinner card and looked out of date to
+                # backfill_embeddings.
                 needs = d.get('needsEmbedding') or vector_needs_repair(doc.reference, d, self.db)
-                if not needs or not text:
+                embed_text = build_embedding_text(d)
+                if not needs or not embed_text:
                     skipped += 1
                     continue
                 try:
-                    emb = self.ai.embed_text(text)
+                    emb = self.ai.embed_text(embed_text)
                     if emb:
                         update = {'embedding_vector': Vector(emb),
+                                  'embeddingVersion': EMBED_TEXT_VERSION,
                                   'needsEmbedding': firestore.DELETE_FIELD}
                         doc.reference.update(card_payload(update, self.db))
                         mirror_vector_write(doc.reference, update, db=self.db)
