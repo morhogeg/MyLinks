@@ -216,13 +216,32 @@ def _user_created_at(uid: str) -> Optional[int]:
 TRIAL_CLOCK_CHECKED = "trialClockChecked"
 
 
+def _verified_account_email(auth_uid: str) -> Optional[str]:
+    """The email on Firebase Auth account `auth_uid`, as its sign-in provider
+    (Google / Apple) verified it. None when the account has no email or no
+    longer exists; any other Auth error raises."""
+    from firebase_admin import auth as admin_auth  # lazy: only a first grant needs it
+    try:
+        user = admin_auth.get_user(auth_uid)
+    except admin_auth.UserNotFoundError:
+        return None
+    email = getattr(user, "email", None)
+    return email if isinstance(email, str) and email else None
+
+
 def _created_at_for_new_grant(uid: str) -> Optional[int]:
     """`createdAt` to base a brand-new grant on. For a workspace that skipped
     the server's creation path, first apply the deleted-account lookup
     (link_service.inherited_created_at — the same rule create_workspace uses),
     so deleting an account and signing up again through the client fallback
     cannot restart the trial clock. Writes the corrected createdAt and the
-    marker back, so the lookup runs at most once per workspace."""
+    marker back, so the lookup runs at most once per workspace.
+
+    The email the lookup keys on comes from the Firebase Auth account linked
+    to the workspace, never from the doc. The client fallback writes the doc
+    itself, so its `email` was whatever the client chose: naming a deleted
+    account's address inherited THAT account's createdAt (a founder's year of
+    Pro, or a creation-date oracle), and leaving it out reset the clock."""
     ref = get_db().collection("users").document(uid)
     snap = ref.get()
     if not snap.exists:
@@ -236,7 +255,13 @@ def _created_at_for_new_grant(uid: str) -> Optional[int]:
         # module's get_db so both stay on one client (and one test seam).
         from link_service import email_tombstone_id, TOMBSTONE_COLLECTION  # lazy: avoids a cycle
         inherited = created
-        tid = email_tombstone_id(data.get("email"))
+        # A fallback-created doc is keyed by its own auth uid (the create rule
+        # insists); a legacy phone-keyed doc names its account in authUids.
+        linked = data.get("authUids")
+        auth_uid = uid
+        if isinstance(linked, list) and linked and uid not in linked and isinstance(linked[0], str):
+            auth_uid = linked[0]
+        tid = email_tombstone_id(_verified_account_email(auth_uid))
         if tid:
             tomb = get_db().collection(TOMBSTONE_COLLECTION).document(tid).get()
             first = (tomb.to_dict() or {}).get("firstCreatedAt") if tomb.exists else None
