@@ -72,7 +72,7 @@ from search import (
     is_recency_question, recent_cards, category_cards,
     private_collection_ids, strip_private_cards, apply_distance_threshold,
     resolve_followup, conversation_language,
-    pin_cards_by_ids, cards_by_ids,
+    pin_cards_by_ids, cards_by_ids, repair_flagged_embeddings,
 )
 from rate_limit import check_rate_limit, client_ip, RateLimitBackendError
 # Monthly per-user soft quotas (report 3.2). Imports only db + stdlib (no cycle).
@@ -6721,6 +6721,7 @@ def sweep_stuck_processing(event: scheduler_fn.ScheduledEvent) -> None:
     """
     run_processing_janitor()
     run_category_migration()
+    repair_flagged_embeddings()  # cards left needsEmbedding after a failed embed (search.py)
 
 
 # Waiting saves (deferred_capture): every workspace's waiting cards are

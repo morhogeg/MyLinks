@@ -6,8 +6,10 @@ Handles embedding generation and vector search queries.
 import os
 import re
 import json
+import time
+import random
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional, Any
 from firebase_functions import firestore_fn, https_fn
@@ -21,7 +23,7 @@ from google import genai
 from db import get_db
 from models import UNANALYZED_STATUSES
 from log_safe import mask_uid
-from ai_service import embedding_needs_repair, collect_notes_text
+from ai_service import embedding_needs_repair, collect_notes_text, _is_retryable_error
 import vector_store
 from vector_store import VECTOR_FIELD, card_payload, mirror_vector_write, vector_needs_repair
 from rate_limit import check_rate_limit
@@ -1589,18 +1591,28 @@ class EmbeddingService:
             logger.error("Gemini client not initialized - cannot generate embeddings! Set GEMINI_API_KEY environment variable.")
             raise Exception("GEMINI_API_KEY not configured. Please set the GEMINI_API_KEY environment variable in Firebase Cloud Functions.")
 
-        try:
-            result = self.client.models.embed_content(
-                model=self.model,
-                # Guard the model's input limit — the v2 recipe folds in
-                # detailedSummary, so the assembled text can be long.
-                contents=text[:_EMBED_TEXT_MAX_CHARS],
-                config={"output_dimensionality": 768, "task_type": task_type}
-            )
-            return result.embeddings[0].values
-        except Exception as e:
-            logger.error(f"Embedding generation failed: {e}")
-            raise Exception(f"Gemini Embedding failed: {str(e)}")
+        # A document embed (the trigger, backfills: background work) gets one
+        # retry with jitter on a transient error; it used to fail on the first
+        # blip. A query embed is on the search bar's clock and fails fast:
+        # search degrades to its keyword half instead.
+        attempts = 2 if task_type == "RETRIEVAL_DOCUMENT" else 1
+        for attempt in range(attempts):
+            try:
+                result = self.client.models.embed_content(
+                    model=self.model,
+                    # Guard the model's input limit — the v2 recipe folds in
+                    # detailedSummary, so the assembled text can be long.
+                    contents=text[:_EMBED_TEXT_MAX_CHARS],
+                    config={"output_dimensionality": 768, "task_type": task_type}
+                )
+                return result.embeddings[0].values
+            except Exception as e:
+                if attempt < attempts - 1 and _is_retryable_error(e):
+                    logger.warning(f"Embedding attempt {attempt + 1} failed ({type(e).__name__}); retrying")
+                    time.sleep(0.5 + random.uniform(0, 0.5))
+                    continue
+                logger.error(f"Embedding generation failed: {e}")
+                raise Exception(f"Gemini Embedding failed: {str(e)}")
 
 
 @firestore_fn.on_document_written(document="users/{uid}/links/{linkId}")
@@ -1713,28 +1725,105 @@ def sync_link_embedding(event: firestore_fn.Event[firestore_fn.Change[firestore_
         try:
             vector = service.generate_embedding(text_to_embed)
         except Exception as embed_err:
-            # Embed failed: flag for backfill and drop any drift/degenerate value
-            # rather than leaving something un-searchable in place silently.
             logger.error(f"Embedding failed for {link_id}, flagging needsEmbedding: {embed_err}")
-            update = {"needsEmbedding": True, "embedding_vector": firestore.DELETE_FIELD}
-            doc_ref.update(update)
-            mirror_vector_write(doc_ref, update, db=db)
+            _flag_failed_embed(doc_ref, data, db)
             return
 
-        if vector:
-            logger.info(f"Vector generated (len={len(vector)}). Updating document...")
-            update = {
-                "embedding_vector": Vector(vector),
-                "embeddingVersion": EMBED_TEXT_VERSION,
-                "needsEmbedding": firestore.DELETE_FIELD,
-            }
-        else:
-            update = {"needsEmbedding": True, "embedding_vector": firestore.DELETE_FIELD}
+        if not vector:
+            _flag_failed_embed(doc_ref, data, db)
+            return
+        logger.info(f"Vector generated (len={len(vector)}). Updating document...")
+        update = {
+            "embedding_vector": Vector(vector),
+            "embeddingVersion": EMBED_TEXT_VERSION,
+            "needsEmbedding": firestore.DELETE_FIELD,
+        }
         doc_ref.update(card_payload(update, db))
         mirror_vector_write(doc_ref, update, db=db)
 
     except Exception as e:
         logger.error(f"Error in sync_link_embedding: {e}")
+
+
+def _flag_failed_embed(doc_ref, data: dict, db) -> None:
+    """After a failed embed: leave the card flagged `needsEmbedding` for the
+    repair sweep (repair_flagged_embeddings).
+
+    A VALID stored vector stays. Edits re-flag cards that already have one
+    (title, summary, notes), and the failure path used to delete it along
+    with the flag: one transient embedding error made an edited card
+    invisible to search until something re-embedded it. Only a value that
+    can't serve search anyway (list drift, degenerate) is dropped, as before.
+    Writes nothing when the card is already flagged and its vector is valid,
+    so the write can't re-fire this trigger into a loop."""
+    if vector_needs_repair(doc_ref, data, db=db):
+        update = {"needsEmbedding": True, "embedding_vector": firestore.DELETE_FIELD}
+        doc_ref.update(update)
+        mirror_vector_write(doc_ref, update, db=db)
+    elif not data.get("needsEmbedding"):
+        doc_ref.update({"needsEmbedding": True})
+
+
+# ── Repair sweep: cards left flagged needsEmbedding ─────────────────────────
+# Nothing re-ran the embed trigger for a card whose embed failed until that
+# card's NEXT write, so a transient outage could leave a card unsearchable
+# (or on a stale vector after an edit) indefinitely. The janitor tick
+# (main.sweep_stuck_processing) calls this: it TOUCHES a few flagged cards
+# (one bookkeeping field), which re-fires sync_link_embedding, so the one
+# embed site does the work under its own rate limits and retry. Bounded per
+# tick, and a card is re-requested at most once an hour.
+# Needs the `needsEmbedding` field enabled at COLLECTION_GROUP scope (a
+# fieldOverride in firestore.indexes.json); until then the query fails and
+# the sweep logs it and does nothing.
+EMBED_REPAIR_BATCH = 10
+EMBED_REPAIR_SCAN = 50
+EMBED_REPAIR_BACKOFF_MS = 60 * 60 * 1000
+_REPAIR_STAMP = "embedRepairRequestedAt"
+_repair_query_warned = False
+
+
+def repair_flagged_embeddings(db=None) -> dict:
+    """Re-fire the embed trigger for up to EMBED_REPAIR_BATCH flagged cards.
+    Never raises (it rides the janitor's tick)."""
+    global _repair_query_warned
+    report = {"scanned": 0, "requested": 0, "cleared": 0, "errors": 0}
+    try:
+        db = db or get_db()
+        now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+        flagged = (db.collection_group("links")
+                   .where(filter=FieldFilter("needsEmbedding", "==", True))
+                   .limit(EMBED_REPAIR_SCAN).stream())
+        for doc in flagged:
+            report["scanned"] += 1
+            try:
+                d = doc.to_dict() or {}
+                if d.get("status") in UNANALYZED_STATUSES:
+                    continue  # the capture pipeline embeds it when it settles
+                if not build_embedding_text(d):
+                    # Nothing to embed, ever (the trigger skips it too): drop
+                    # the flag so it stops taking a place in the scan.
+                    doc.reference.update({"needsEmbedding": firestore.DELETE_FIELD})
+                    report["cleared"] += 1
+                    continue
+                last = d.get(_REPAIR_STAMP)
+                if isinstance(last, (int, float)) and now_ms - last < EMBED_REPAIR_BACKOFF_MS:
+                    continue
+                doc.reference.update({_REPAIR_STAMP: now_ms})  # re-fires sync_link_embedding
+                report["requested"] += 1
+            except Exception as e:
+                report["errors"] += 1
+                logger.warning(f"Embedding repair skipped one card ({type(e).__name__})")
+            if report["requested"] >= EMBED_REPAIR_BATCH:
+                break
+    except Exception as e:
+        report["errors"] += 1
+        if not _repair_query_warned:
+            _repair_query_warned = True
+            logger.warning(f"Embedding repair sweep unavailable ({type(e).__name__}: {e}); "
+                           "is the needsEmbedding collection-group index deployed?")
+    if report["requested"] or report["cleared"]:
+        logger.info(f"Embedding repair sweep: {report}")
+    return report
 
 
 def perform_search_logic(uid: str, query_text: str, limit: int = 10) -> List[dict]:
