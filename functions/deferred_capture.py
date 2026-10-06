@@ -35,7 +35,10 @@ read in, and a Pro user's backlog counts toward the 1000/month abuse ceiling
 (otherwise "save 10,000 links on the free plan, then subscribe" would buy
 unbounded analysis for one month's price). Cards that do not fit keep waiting.
 A single call enqueues at most ``RELEASE_BATCH`` cards, the same burst size a
-bulk import already puts on the queue.
+bulk import already puts on the queue. The daily sweep decides its cards once
+a day but queues them ``RELEASE_SLICE`` at a time, one slice per janitor tick
+(``release_next_slice``), so a large backlog never holds every worker
+instance while live saves wait behind it.
 
 **Snapshot.** For a link, the page is scraped at save time when that needs no
 Gemini (it never does: ``scraper.scrape_url`` is plain HTTP + parsing), and the
@@ -89,6 +92,15 @@ END_OF_MONTH_DAYS = 3
 # queued window are already sized for. More waiting cards are picked up by the
 # next run.
 RELEASE_BATCH = 200
+# The daily sweep does not put its whole plan on the queue at once: it shares
+# process_link_background's 10 instances with every live save, and a 3,000-card
+# release was ~2.5 hours of worker time during which share-sheet saves sat
+# invisible behind it and web placeholders were failed by the janitor. The
+# plan (which cards, decided once a day) is written as slices of this many
+# cards; the daily run releases the first, the 5-minute janitor tick one more
+# each (release_next_slice). 3,000 cards drain in about five hours.
+RELEASE_SLICE = 50
+SLICE_COLLECTION = "waiting_release_slices"
 # How many waiting cards one workspace's release reads before sorting. Far
 # above any real backlog; it only bounds a pathological one.
 _SCAN_PER_USER = 5000
@@ -454,6 +466,33 @@ def _enqueue_one(db, uid: str, card_ref) -> str:
     return capture_charge.run_transaction(db, _body)
 
 
+def _release_one(db, uid: str, plan: str, card_ref) -> str:
+    """Charge one `saves` unit on `plan` and enqueue one waiting card (or
+    pending note). Returns 'queued', 'quota' (the allowance refused; nothing
+    charged), or why nothing was enqueued ('gone', 'empty', 'error'), in
+    which case the unit is given back."""
+    r = meter_quota(uid, "saves", plan=plan)
+    if not r.get("ok"):
+        return "quota"
+    try:
+        outcome = _enqueue_one(db, uid, card_ref)
+    except Exception as e:
+        logger.error("Waiting-card release failed for %s: %s", mask_uid(uid), e)
+        outcome = "error"
+    if outcome == "queued":
+        return outcome
+    # Charged but nothing was enqueued: give the unit back.
+    refund_quota(uid, "saves")
+    if outcome == "empty":
+        # Nothing to analyze (a client-written waiting card with no URL):
+        # leave it as an ordinary saved card instead of waiting forever.
+        try:
+            card_ref.update({"status": "unread", "waitingAt": firestore.DELETE_FIELD})
+        except Exception:
+            pass
+    return outcome
+
+
 def release_waiting(uid: str, plan: str, *, limit: int = RELEASE_BATCH, cards=None) -> dict:
     """Enqueue `uid`'s waiting cards for analysis, oldest first, charging one
     `saves` unit each on `plan`, until the allowance or `limit` runs out.
@@ -473,28 +512,14 @@ def release_waiting(uid: str, plan: str, *, limit: int = RELEASE_BATCH, cards=No
             if report["released"] >= limit:
                 report["stopped"] = "batch"
                 break
-            r = meter_quota(uid, "saves", plan=plan)
-            if not r.get("ok"):
+            outcome = _release_one(db, uid, plan, card_ref)
+            if outcome == "quota":
                 report["stopped"] = "quota"
                 break
-            try:
-                outcome = _enqueue_one(db, uid, card_ref)
-            except Exception as e:
-                logger.error("Waiting-card release failed for %s: %s", mask_uid(uid), e)
-                outcome = "error"
             if outcome == "queued":
                 report["released"] += 1
-                continue
-            # Charged but nothing was enqueued: give the unit back.
-            refund_quota(uid, "saves")
-            skipped += 1
-            if outcome == "empty":
-                # Nothing to analyze (a client-written waiting card with no URL):
-                # leave it as an ordinary saved card instead of waiting forever.
-                try:
-                    card_ref.update({"status": "unread", "waitingAt": firestore.DELETE_FIELD})
-                except Exception:
-                    pass
+            else:
+                skipped += 1
         report["waiting"] = max(0, report["waiting"] - report["released"] - skipped)
         if report["released"]:
             logger.info("Released %d waiting card(s) for %s (plan=%s, stopped=%s)",
@@ -544,10 +569,90 @@ def backlog_budget(uid: str, plan: str, now: Optional[datetime] = None) -> Optio
     return max(0, limit - reserve - used)
 
 
+def _slice_id(run_ms: int, seq: int) -> str:
+    """Slice doc ids sort in release order: by run, then by position."""
+    return f"{run_ms:013d}-{seq:04d}"
+
+
+def _write_plan(db, entries: list, run_ms: int) -> int:
+    """Replace any unreleased plan with `entries`, as slices of RELEASE_SLICE.
+    A leftover slice from an earlier day is dropped, not merged: today's plan
+    re-picks those cards if they are still eligible. Returns the slice count."""
+    for doc in list(db.collection(SLICE_COLLECTION).stream()):
+        doc.reference.delete()
+    slices = 0
+    for seq, start in enumerate(range(0, len(entries), RELEASE_SLICE)):
+        db.collection(SLICE_COLLECTION).document(_slice_id(run_ms, seq)).set(
+            {"runAt": run_ms, "seq": seq, "entries": entries[start:start + RELEASE_SLICE]})
+        slices += 1
+    return slices
+
+
+def release_next_slice(db=None) -> dict:
+    """Release the oldest planned slice (at most RELEASE_SLICE cards) through
+    the transactional per-card release, then drop the slice. The daily run
+    releases the first slice itself; the 5-minute janitor tick
+    (main.sweep_stuck_processing) releases one more each time, so a backlog
+    never takes all of the worker's instances from live saves.
+
+    A card that is no longer waiting (released by an upgrade, deleted, its
+    account gone) is skipped before anything is charged; a workspace whose
+    allowance refuses a card keeps the rest of its slice waiting for the next
+    day's plan. Re-running a slice that was cut short is harmless for the
+    same reasons. Returns ``{released, gone, kept, slice}``; never raises."""
+    report = {"released": 0, "gone": 0, "kept": 0, "slice": None}
+    try:
+        db = db or get_db()
+        docs = list(db.collection(SLICE_COLLECTION).limit(1).stream())
+        if not docs:
+            return report
+        slice_doc = docs[0]
+        report["slice"] = slice_doc.id
+        exhausted = set()
+        for entry in (slice_doc.to_dict() or {}).get("entries") or []:
+            uid = entry.get("uid") if isinstance(entry, dict) else None
+            card_id = entry.get("cardId") if isinstance(entry, dict) else None
+            if not isinstance(uid, str) or not uid or not isinstance(card_id, str) or not card_id:
+                continue
+            if uid in exhausted:
+                report["kept"] += 1
+                continue
+            card_ref = _links(db, uid).document(card_id)
+            try:
+                snap = card_ref.get()
+                card = (snap.to_dict() or {}) if getattr(snap, "exists", False) else None
+            except Exception as e:
+                logger.warning("Planned card unreadable (kept waiting) for %s: %s", mask_uid(uid), e)
+                report["kept"] += 1
+                continue
+            if not (is_waiting(card) or is_pending_note(card)):
+                report["gone"] += 1
+                continue
+            outcome = _release_one(db, uid, entry.get("plan") or "free", card_ref)
+            if outcome == "queued":
+                report["released"] += 1
+            elif outcome == "quota":
+                exhausted.add(uid)
+                report["kept"] += 1
+            elif outcome == "error":
+                report["kept"] += 1
+            else:
+                report["gone"] += 1
+        slice_doc.reference.delete()
+    except Exception as e:
+        logger.warning("Waiting-card slice release failed: %s", e)
+    if report["released"]:
+        logger.info("Waiting-card slice %s: %s", report["slice"], report)
+    return report
+
+
 def run_waiting_release(plan_for: Optional[Callable[[str], str]] = None,
                         now: Optional[datetime] = None) -> dict:
     """The scheduled sweep: every workspace's backlog (waiting cards and
-    pending notes) is enqueued oldest first, within ``backlog_budget``.
+    pending notes) is PLANNED oldest first, within ``backlog_budget``, and
+    the first RELEASE_SLICE cards of the plan are enqueued now; the janitor
+    tick releases the rest a slice at a time (release_next_slice). Which cards
+    are eligible is still decided once a day, here.
 
     Two collection-group equality queries, grouped by workspace in Python:
     `status` (the COLLECTION_GROUP index the processing janitor already
@@ -557,7 +662,8 @@ def run_waiting_release(plan_for: Optional[Callable[[str], str]] = None,
     Upgrade releases (release_on_entitlement_write) ignore the reserve."""
     if plan_for is None:
         from entitlement import plan_for  # lazy: entitlement imports this module
-    report = {"workspaces": 0, "released": 0, "still_waiting": 0, "errors": 0}
+    report = {"workspaces": 0, "released": 0, "still_waiting": 0, "errors": 0,
+              "planned": 0, "slices": 0}
     db = get_db()
     by_uid = {}
     seen = set()
@@ -585,11 +691,13 @@ def run_waiting_release(plan_for: Optional[Callable[[str], str]] = None,
     for cards in by_uid.values():
         cards.sort(key=lambda rc: _age_key(rc[1]))
     order = sorted(by_uid, key=lambda u: _age_key(by_uid[u][0][1]))
+    entries = []
+    total = 0
     for uid in order:
         cards = by_uid[uid]
-        room = _RUN_CAP - report["released"]
+        total += len(cards)
+        room = _RUN_CAP - len(entries)
         if room <= 0:
-            report["still_waiting"] += len(cards)
             continue
         report["workspaces"] += 1
         try:
@@ -603,10 +711,17 @@ def run_waiting_release(plan_for: Optional[Callable[[str], str]] = None,
             budget = 0
         limit = min(RELEASE_BATCH, room) if budget is None else min(RELEASE_BATCH, room, budget)
         if limit <= 0:
-            report["still_waiting"] += len(cards)
             continue
-        r = release_waiting(uid, plan, limit=limit, cards=cards)
-        report["released"] += r["released"]
-        report["still_waiting"] += r["waiting"]
+        entries.extend({"uid": uid, "cardId": ref.id, "plan": plan} for ref, _card in cards[:limit])
+    report["planned"] = len(entries)
+    run_ms = int((now or datetime.now(timezone.utc)).timestamp() * 1000)
+    try:
+        report["slices"] = _write_plan(db, entries, run_ms)
+    except Exception as e:
+        logger.error("Waiting-card plan not written: %s", e)
+        report["errors"] += 1
+    first = release_next_slice(db) if report["slices"] else {"released": 0, "gone": 0}
+    report["released"] = first["released"]
+    report["still_waiting"] = max(0, total - first["released"] - first["gone"])
     logger.info("Waiting-card sweep: %s", report)
     return report

@@ -8,6 +8,7 @@ prunes it. Each test names the audit item it pins.
 
 import ast
 import types
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
@@ -801,6 +802,71 @@ def test_retry_never_calls_the_sync_analyze_endpoints():
 def test_the_image_tab_never_calls_the_sync_image_endpoint():
     form = _ts_code((FUNCTIONS.parent / "web/components/AddLinkForm.tsx").read_text(encoding="utf-8"))
     assert "/api/analyze-image" not in form and "createImagePlaceholder(" in form
+
+
+# ── CAP-6: the waiting-saves backlog is released in slices ───────────────────
+
+import deferred_capture  # noqa: E402
+import tests.test_deferred_capture as tdc  # noqa: E402
+
+world = tdc.world  # the deferred-capture harness (a fixture), bound like `env`
+DAY_MS = 24 * 60 * 60 * 1000
+
+
+def _waiting(uid, n, base):
+    return {f"users/{uid}/links/w{i:03d}": {"status": "waiting", "waitingAt": base + i, "createdAt": base + i,
+                                            "url": f"https://e.com/{uid}/{i}", "sourceType": "web"}
+            for i in range(n)}
+
+
+def test_the_daily_release_queues_one_slice_and_the_janitor_tick_the_rest(world, monkeypatch):
+    base = tcc.NOW_MS - 20 * DAY_MS
+    world.make({**_waiting("u1", 70, base), "users/u2": {}, **_waiting("u2", 50, base + 1000)},
+               limit=1000, used=0, plan="pro")
+    report = deferred_capture.run_waiting_release(plan_for=lambda uid: "pro", now=tdc.FIRST)
+    jobs = list(world.jobs().values())
+    assert len(jobs) == 50 and all(j["cardId"].startswith("w") for j in jobs)
+    assert report["planned"] == 120 and report["slices"] == 3 and report["released"] == 50
+    assert report["still_waiting"] == 70
+    # The oldest backlog goes first: all 50 are u1's oldest cards.
+    assert {j["uid"] for j in jobs} == {"u1"}
+
+    # The 5-minute janitor tick releases one more slice each time.
+    monkeypatch.setattr(main, "run_category_migration", lambda: None)
+    main.sweep_stuck_processing.__wrapped__(None)
+    assert len(world.jobs()) == 100
+    main.sweep_stuck_processing.__wrapped__(None)
+    assert len(world.jobs()) == 120 and world.quota.used == 120
+    assert deferred_capture.release_next_slice()["slice"] is None  # plan done
+
+
+def test_a_planned_card_the_allowance_no_longer_fits_keeps_waiting(world):
+    world.make(_waiting("u1", 60, tcc.NOW_MS - 20 * DAY_MS), limit=1000, used=0, plan="pro")
+    deferred_capture.run_waiting_release(plan_for=lambda uid: "pro", now=tdc.FIRST)
+    world.quota.used = world.quota.limit  # fresh saves used up the month meanwhile
+    report = deferred_capture.release_next_slice()
+    assert report["released"] == 0 and report["kept"] == 10
+    waiting = [c for c in world.cards().values() if c["status"] == "waiting"]
+    assert len(waiting) == 10 and world.quota.refunds == 0
+
+
+def test_a_planned_card_deleted_before_its_slice_costs_nothing(world):
+    db = world.make(_waiting("u1", 51, tcc.NOW_MS - 20 * DAY_MS), limit=1000, used=0, plan="pro")
+    deferred_capture.run_waiting_release(plan_for=lambda uid: "pro", now=tdc.FIRST)
+    db.docs.pop("users/u1/links/w050")  # the user deleted it
+    used = world.quota.used
+    report = deferred_capture.release_next_slice()
+    assert report == {"released": 0, "gone": 1, "kept": 0, "slice": report["slice"]}
+    assert world.quota.used == used and world.quota.refunds == 0
+
+
+def test_a_new_daily_plan_replaces_an_unfinished_one(world):
+    db = world.make(_waiting("u1", 60, tcc.NOW_MS - 20 * DAY_MS), limit=1000, used=0, plan="pro")
+    deferred_capture.run_waiting_release(plan_for=lambda uid: "pro", now=tdc.FIRST)
+    deferred_capture.run_waiting_release(plan_for=lambda uid: "pro", now=tdc.FIRST + timedelta(days=1))
+    slices = [k for k in db.docs if k.startswith(deferred_capture.SLICE_COLLECTION + "/")]
+    assert slices == []  # the second run planned (and released) only the 10 still waiting
+    assert len(world.jobs()) == 60 and world.quota.used == 60
 
 
 def test_the_enrich_sweep_has_a_collection_group_index():

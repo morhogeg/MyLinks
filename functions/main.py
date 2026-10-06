@@ -7140,17 +7140,21 @@ def run_processing_janitor() -> dict:
     return report
 
 
-@scheduler_fn.on_schedule(schedule="every 5 minutes", max_instances=1)
+@scheduler_fn.on_schedule(schedule="every 5 minutes", max_instances=1, timeout_sec=300)
 def sweep_stuck_processing(event: scheduler_fn.ScheduledEvent) -> None:
     """Every 5 min: age out captures stuck in `processing` (see run_processing_janitor).
 
-    Also carries the one-shot category-case backfill. It rides an existing tick
-    rather than getting its own schedule because it runs once and then costs a
-    single marker read forever after; a dedicated job would be permanent
-    infrastructure for a one-time fix. It never raises, so the janitor's real
-    work is unaffected either way.
+    Also releases the next slice of the day's waiting-saves plan
+    (deferred_capture.release_next_slice): the daily run puts only the first
+    slice on the queue, so the backlog never takes every worker instance from
+    live saves. And it carries the one-shot category-case backfill, which
+    rides an existing tick rather than getting its own schedule because it
+    runs once and then costs a single marker read forever after; a dedicated
+    job would be permanent infrastructure for a one-time fix. Neither raises,
+    so the janitor's real work is unaffected either way.
     """
     run_processing_janitor()
+    deferred_capture.release_next_slice()
     run_category_migration()
 
 
