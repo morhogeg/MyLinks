@@ -21,6 +21,7 @@ import { ChatMessage, ChatSource, ChatSession, Link } from '@/lib/types';
 import { buildAskSuggestions, buildFollowUps, newestReadyLink, iso, fullTitle, AskHints, ClassifiableCard } from '@/lib/askSuggestions';
 import { subscribeChats, createChat, updateChat, deleteChat } from '@/lib/chats';
 import { answerRefFor, saveAnswerAsCard } from '@/lib/answerCards';
+import { unpublishAnswer } from '@/lib/answerShare';
 import { hapticLight } from '@/lib/haptics';
 import { useToast } from '@/components/Toast';
 import ShareAnswerSheet from './ShareAnswerSheet';
@@ -861,9 +862,31 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
             .catch((e) => reportError(e, 'ask-rename-chat'));
     };
 
+    /** Public answer pages a chat has published (messages[].shareId). The
+     *  chat doc is the ONLY record of those ids. */
+    const sharedPagesOf = (id: string): string[] => {
+        const msgs = id === activeChatId ? messages : chats.find((c) => c.id === id)?.messages ?? [];
+        return msgs.map((m) => m.shareId).filter((s): s is string => !!s);
+    };
+
     const confirmDeleteChat = () => {
         if (!uid || !chatToDelete) return;
         const id = chatToDelete;
+        // Take the chat's public answer pages down with it: once the doc is
+        // gone nothing remembers their ids, so they could never be stopped.
+        // Best effort, in parallel with the delete (which never waits on it);
+        // a page that would not come down is said out loud.
+        const shareIds = sharedPagesOf(id);
+        if (shareIds.length) {
+            void Promise.allSettled(shareIds.map((s) => unpublishAnswer(uid, s))).then((results) => {
+                const failed = results.filter((r) => r.status === 'rejected');
+                if (!failed.length) return;
+                reportError((failed[0] as PromiseRejectedResult).reason, 'ask-delete-chat-unpublish');
+                toast.error(failed.length === 1
+                    ? "Chat deleted, but its shared answer page couldn't be taken down."
+                    : `Chat deleted, but ${failed.length} of its shared answer pages couldn't be taken down.`);
+            });
+        }
         // Orphan any backgrounded answer still headed for this doc.
         chatOwnerGenRef.current.delete(id);
         deleteChat(uid, id).catch((e) => reportError(e, 'ask-delete-chat'));
@@ -1877,7 +1900,12 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                 onClose={() => setChatToDelete(null)}
                 onConfirm={confirmDeleteChat}
                 title="Delete this chat?"
-                message="This permanently removes the conversation from your history. Your saved cards aren’t affected."
+                message={`This permanently removes the conversation from your history. Your saved cards aren’t affected.${(() => {
+                    const n = chatToDelete ? sharedPagesOf(chatToDelete).length : 0;
+                    return !n ? '' : n === 1
+                        ? ' Its shared answer page stops working within a minute.'
+                        : ` Its ${n} shared answer pages stop working within a minute.`;
+                })()}`}
                 confirmLabel="Delete"
                 cancelLabel="Keep it"
                 variant="danger"
