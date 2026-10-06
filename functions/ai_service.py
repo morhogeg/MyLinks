@@ -81,6 +81,24 @@ EMBEDDING_DIMENSIONS = 768
 # FAILED card always gets to run. Override via GEMINI_CALL_TIMEOUT_MS.
 GEMINI_CALL_TIMEOUT_MS = int(os.environ.get("GEMINI_CALL_TIMEOUT_MS", "90000") or 90000)
 
+# Ask's wall-clock budget, for the WHOLE request (retrieval included). Hosting
+# gives a rewritten function 60s and the client gives up about then, while one
+# Gemini call may take GEMINI_CALL_TIMEOUT_MS (90s) and the buffered ladder can
+# make a dozen calls inside ask_brain's 120s timeout: an Ask could be killed
+# mid-ladder long after the user had given up, its ask unit charged and never
+# refunded. Under the deadline every Ask call carries a short per-request
+# timeout (like the search judge's client), a retry or rung that could not
+# start with ASK_MIN_CALL_S left is skipped, and AskDeadlineExceeded (an
+# AnalysisError) reaches ask_brain, which refunds and answers 503.
+ASK_DEADLINE_S = float(os.environ.get("ASK_DEADLINE_S", "50") or 50)
+ASK_CALL_TIMEOUT_MS = int(os.environ.get("ASK_CALL_TIMEOUT_MS", "20000") or 20000)
+ASK_MIN_CALL_S = 3.0
+
+
+def ask_deadline(budget_s: float = None) -> float:
+    """The monotonic deadline `budget_s` (default ASK_DEADLINE_S) from now."""
+    return time.monotonic() + (ASK_DEADLINE_S if budget_s is None else budget_s)
+
 # Safety thresholds for the ASK (RAG) calls only. Ask answers questions about
 # the user's OWN saved content, so the configurable harm categories are set to
 # BLOCK_NONE — Gemini's safety filter false-positives on innocuous non-English
@@ -146,6 +164,11 @@ class EmptyGenerationError(AnalysisError):
     def __init__(self, message: str, prompt_blocked: bool = False):
         super().__init__(message)
         self.prompt_blocked = prompt_blocked
+
+
+class AskDeadlineExceeded(AnalysisError):
+    """Ask's per-request budget (ASK_DEADLINE_S) ran out before an answer was
+    produced: the remaining ladder rungs were skipped, not attempted."""
 
 
 def _prompt_blocked(response) -> bool:
@@ -976,6 +999,30 @@ class GeminiService:
         ) if self.api_key else None
         self.model = GEMINI_ANALYSIS_MODEL
 
+    # The Ask deadline in force (a time.monotonic() value), set by the two
+    # answer methods for their duration; None for every other surface.
+    _deadline = None
+
+    def _call_config(self, config: dict) -> dict:
+        """`config` for one Gemini call: unchanged outside Ask; under the Ask
+        deadline it gains a per-request timeout (ASK_CALL_TIMEOUT_MS, or what
+        is left of the budget), and AskDeadlineExceeded is raised instead when
+        too little is left to start another call."""
+        if self._deadline is None:
+            return config
+        left = self._deadline - time.monotonic()
+        if left < ASK_MIN_CALL_S:
+            raise AskDeadlineExceeded(
+                f"Ask time budget ({ASK_DEADLINE_S:.0f}s) spent; remaining attempts skipped")
+        return {**config, "http_options": {"timeout": int(min(ASK_CALL_TIMEOUT_MS, left * 1000))}}
+
+    def _budget_allows(self, wait_s: float) -> bool:
+        """Under the Ask deadline: True when waiting `wait_s` still leaves room
+        for another call. Always True outside Ask."""
+        if self._deadline is None:
+            return True
+        return self._deadline - time.monotonic() - wait_s >= ASK_MIN_CALL_S
+
     def _generate_json(self, contents: list, what: str, config_extra: dict = None,
                        model: str = None, attempts: int = _MAX_GENERATE_ATTEMPTS) -> dict:
         """Call Gemini with a structured-output (response_schema) config and
@@ -1018,11 +1065,14 @@ class GeminiService:
         # than failing the save if every attempt comes back cut off.
         truncated_best = None
         for attempt in range(attempts):
+            # Under the Ask deadline: a short per-call timeout, or
+            # AskDeadlineExceeded (propagates as is) when the budget is spent.
+            call_config = self._call_config(config)
             try:
                 response = self.client.models.generate_content(
                     model=model or self.model,
                     contents=contents,
-                    config=config,
+                    config=call_config,
                 )
                 text = _response_text(response)
                 if not text:
@@ -1068,11 +1118,15 @@ class GeminiService:
             except Exception as e:
                 last_error = e
                 logger.warning(f"Gemini {what} attempt {attempt + 1} failed: {e}")
-                # Retry ONLY transient errors, and only while attempts remain.
-                # Non-retryable errors (schema/safety/empty/bad-shape) fail fast.
+                # Retry ONLY transient errors, and only while attempts remain
+                # (and, under the Ask deadline, while the wait leaves time for
+                # the call). Non-retryable errors (schema/safety/empty/bad-shape)
+                # fail fast.
                 if attempt < attempts - 1 and _is_retryable_error(e):
-                    time.sleep(_retry_delay(attempt))
-                    continue
+                    delay = _retry_delay(attempt)
+                    if self._budget_allows(delay):
+                        time.sleep(delay)
+                        continue
                 break
 
         # A truncated result in hand beats raising: the retry it triggered may
@@ -1556,12 +1610,14 @@ Return JSON: {"platform": one of "x","instagram","threads","tiktok","youtube","l
         an answer: a 1-token call is enough for prompt_feedback to report an
         input block, and a blocked prompt fails before generation, so probes
         are fast and near-free. Transport errors count as NOT blocked — an
-        outage must not cascade the probe ladder into dropping every card."""
+        outage must not cascade the probe ladder into dropping every card.
+        A spent Ask budget is not a transport error: AskDeadlineExceeded
+        propagates and ends the rescue."""
+        config = self._call_config({"max_output_tokens": 1, "temperature": 0.0,
+                                    "safety_settings": _ASK_SAFETY_SETTINGS})
         try:
             resp = self.client.models.generate_content(
-                model=GEMINI_ANALYSIS_MODEL, contents=[prompt],
-                config={"max_output_tokens": 1, "temperature": 0.0,
-                        "safety_settings": _ASK_SAFETY_SETTINGS})
+                model=GEMINI_ANALYSIS_MODEL, contents=[prompt], config=config)
             return _prompt_blocked(resp)
         except Exception as e:
             logger.warning("ask filter probe errored (counted as not blocked): %s", e)
@@ -1696,12 +1752,13 @@ Return JSON: {"platform": one of "x","instagram","threads","tiktok","youtube","l
         """
         if not self.client:
             raise AnalysisError("Gemini API key is not configured (GEMINI_API_KEY).")
+        config = self._call_config({"temperature": 0.2,
+                                    "safety_settings": _ASK_SAFETY_SETTINGS})
         try:
             resp = self.client.models.generate_content(
                 model=GEMINI_ANALYSIS_MODEL,
                 contents=[prompt],
-                config={"temperature": 0.2,
-                        "safety_settings": _ASK_SAFETY_SETTINGS},
+                config=config,
             )
         except Exception as exc:
             raise AnalysisError(f"AI answer (plain mode) failed: {exc}")
@@ -1738,6 +1795,8 @@ Return JSON: {"platform": one of "x","instagram","threads","tiktok","youtube","l
         try:
             return self._generate_json([prompt], what, config_extra=cfg,
                                        model=GEMINI_ASK_MODEL, attempts=attempts)
+        except AskDeadlineExceeded:
+            raise  # no time left for the fallback model either
         except EmptyGenerationError as e:
             if e.prompt_blocked:
                 # The INPUT was rejected — the fallback model runs the same
@@ -1760,7 +1819,39 @@ Return JSON: {"platform": one of "x","instagram","threads","tiktok","youtube","l
                             attempts: int = _MAX_GENERATE_ATTEMPTS,
                             excluded_titles: list = None,
                             answer_language: str = None,
-                            followup: dict = None) -> dict:
+                            followup: dict = None,
+                            deadline: float = None) -> dict:
+        """`_answer_from_context` under the Ask `deadline` (a time.monotonic()
+        value from ask_deadline(); None = no budget). Every model call it makes
+        then runs on a short per-call timeout, and a rung that cannot start in
+        time raises AskDeadlineExceeded instead of being attempted."""
+        self._deadline = deadline
+        try:
+            return self._answer_from_context(question, cards, history, attempts,
+                                             excluded_titles, answer_language, followup)
+        finally:
+            self._deadline = None
+
+    def answer_from_context_stream(self, question: str, cards: list, history: list = None,
+                                   excluded_titles: list = None,
+                                   answer_language: str = None,
+                                   followup: dict = None,
+                                   deadline: float = None):
+        """`_answer_from_context_stream` under the Ask `deadline` (see
+        answer_from_context). A rung already streaming is never cut; the next
+        one is skipped once the budget is spent."""
+        self._deadline = deadline
+        try:
+            yield from self._answer_from_context_stream(
+                question, cards, history, excluded_titles, answer_language, followup)
+        finally:
+            self._deadline = None
+
+    def _answer_from_context(self, question: str, cards: list, history: list = None,
+                             attempts: int = _MAX_GENERATE_ATTEMPTS,
+                             excluded_titles: list = None,
+                             answer_language: str = None,
+                             followup: dict = None) -> dict:
         """Answer a user question grounded ONLY in their saved cards (RAG).
 
         `cards` is a list of dicts with id/title/summary/category/tags. Returns
@@ -1864,6 +1955,8 @@ Return JSON: {"platform": one of "x","instagram","threads","tiktok","youtube","l
                         logger.warning("ask rescued at sweep stage: %s (%d cards)",
                                        stage_name, len(stage_cards))
                         break
+                    except AskDeadlineExceeded:
+                        raise  # out of time: the remaining stages are skipped
                     except AnalysisError as stage_exc:
                         last_exc = stage_exc
                         logger.warning("ask sweep stage '%s' failed: %s",
@@ -1929,10 +2022,10 @@ Return JSON: {"platform": one of "x","instagram","threads","tiktok","youtube","l
         return {"answer": answer, "citedIds": [], "ungrounded": True,
                 "droppedCardIds": dropped_ids, "filteredCards": filtered_cards}
 
-    def answer_from_context_stream(self, question: str, cards: list, history: list = None,
-                                   excluded_titles: list = None,
-                                   answer_language: str = None,
-                                   followup: dict = None):
+    def _answer_from_context_stream(self, question: str, cards: list, history: list = None,
+                                    excluded_titles: list = None,
+                                    answer_language: str = None,
+                                    followup: dict = None):
         """Streaming variant of `answer_from_context` (RAG over saved cards).
 
         Yields ("token", text) tuples as the answer streams in, then a final
@@ -2094,17 +2187,20 @@ Return JSON: {"platform": one of "x","instagram","threads","tiktok","youtube","l
             full_text = ""
             emitted = False
             last_chunk = None
+            # Match the non-streaming answer path: this is a grounded, factual
+            # answer, so keep temperature low for stability (without this the
+            # stream would silently run at the ~1.0 default), and relax the
+            # configurable safety thresholds — the user is querying their OWN
+            # saved content. Under the Ask deadline this also sets the per-call
+            # timeout, or raises AskDeadlineExceeded out of the generator when
+            # no time is left to start this rung.
+            call_config = self._call_config({"temperature": 0.2,
+                                             "safety_settings": _ASK_SAFETY_SETTINGS})
             try:
                 stream = self.client.models.generate_content_stream(
                     model=attempt_model,
                     contents=[attempt_prompt],
-                    # Match the non-streaming answer path: this is a grounded,
-                    # factual answer, so keep temperature low for stability
-                    # (without this the stream would silently run at the ~1.0
-                    # default), and relax the configurable safety thresholds —
-                    # the user is querying their OWN saved content.
-                    config={"temperature": 0.2,
-                            "safety_settings": _ASK_SAFETY_SETTINGS},
+                    config=call_config,
                 )
                 for chunk in stream:
                     # The final chunk carries the finish_reason (often with no

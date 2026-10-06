@@ -2386,6 +2386,11 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
     # can refund it — a failed ask must not consume a unit (mirrors analyze_*).
     charged = None
     uid = None
+    # One wall-clock budget for the whole request, retrieval and every model
+    # call, inside Hosting's 60s (ai_service.ASK_DEADLINE_S). When it runs out
+    # the model ladder stops with AskDeadlineExceeded, refunded below.
+    from ai_service import ask_deadline, AskDeadlineExceeded
+    deadline = ask_deadline()
 
     try:
         data = _json_object(req)
@@ -2825,7 +2830,8 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
                 try:
                     for kind, payload in ai.answer_from_context_stream(
                             question, slim, history, excluded_titles=excluded_titles,
-                            answer_language=answer_language, followup=followup):
+                            answer_language=answer_language, followup=followup,
+                            deadline=deadline):
                         if kind == "token":
                             yield "data: " + json.dumps(
                                 {"type": "token", "text": payload}
@@ -2878,7 +2884,9 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
                     _record_server_error("ask_brain (stream)", stream_exc, uid=uid)
                     _refund_once()
                     msg = (
-                        "Machina couldn't generate an answer right now. Please try again in a minute."
+                        "Machina took too long to answer. Please try again in a moment."
+                        if isinstance(stream_exc, AskDeadlineExceeded)
+                        else "Machina couldn't generate an answer right now. Please try again in a minute."
                         if isinstance(stream_exc, AnalysisError)
                         else "Internal server error"
                     )
@@ -2899,7 +2907,7 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         result = ai.answer_from_context(question, slim, history, attempts=2,
                                         excluded_titles=excluded_titles,
                                         answer_language=answer_language,
-                                        followup=followup)
+                                        followup=followup, deadline=deadline)
         # The model said the saves don't cover the question ("answered":
         # false): an honest answer, not an ungrounded one, and not charged.
         if result.get("noAnswer") and charged:
@@ -2954,12 +2962,17 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
 
     except AnalysisError as e:
         # The Gemini answer call failed even after the in-service model
-        # fallback. Refund the metered unit, record the failure durably, and
-        # return a message that names the failing subsystem (still sanitized —
-        # no exception detail crosses to the client).
+        # fallback, or the request's time budget ran out first (503: the
+        # remaining attempts were skipped so the reply lands before Hosting
+        # and the client give up). Refund the metered unit, record the failure
+        # durably, and return a message that names the failing subsystem
+        # (still sanitized — no exception detail crosses to the client).
         if charged:
             refund_quota(*charged)
         _record_server_error("ask_brain", e, uid=uid)
+        if isinstance(e, AskDeadlineExceeded):
+            return _server_error(
+                headers, e, "Machina took too long to answer. Please try again in a moment.", 503)
         return _server_error(
             headers, e,
             "Machina couldn't generate an answer right now. Please try again in a minute.",
