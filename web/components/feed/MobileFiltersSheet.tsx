@@ -5,6 +5,7 @@ import { X, Tag as TagIcon, Globe, ChevronRight } from 'lucide-react';
 import Dropdown, { type DropdownOption } from '../Dropdown';
 import TagExplorer from '../TagExplorer';
 import { getCategoryColorStyle } from '@/lib/colors';
+import { useSheetA11y } from './useSheetA11y';
 import { useSheetDrag, useIsMobile } from '@/lib/useSheetDrag';
 import type { FilterType } from '@/lib/useFeedFilters';
 
@@ -68,26 +69,31 @@ export default function MobileFiltersSheet({
     // Bottom sheet on phones (drag-to-dismiss), centered modal on desktop (no drag).
     const isMobile = useIsMobile();
     const { sheetRef, scrimRef, handleProps } = useSheetDrag({ onClose, enabled: isMobile });
+    const { titleId, closeRef } = useSheetA11y(isOpen, onClose);
     if (!isOpen) return null;
     return (
         <div className="fixed inset-0 z-50 flex flex-col justify-end sm:items-center sm:justify-center sm:p-4 isolate">
             <div
                 ref={scrimRef}
-                className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
+                className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fade-in"
                 onClick={onClose}
             />
             <div
                 ref={sheetRef}
-                className="relative bg-background rounded-t-3xl border-t border-border-subtle shadow-2xl px-5 pt-3 pb-8 max-h-[85vh] overflow-y-auto overscroll-contain scrollbar-soft animate-in slide-in-from-bottom duration-300 sm:rounded-3xl sm:border sm:max-w-lg sm:w-full sm:max-h-[80vh] sm:pb-6"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby={titleId}
+                className="relative bg-background rounded-t-3xl border-t border-border-subtle shadow-2xl px-5 pt-3 pb-8 max-h-[85vh] overflow-y-auto overscroll-contain scrollbar-soft animate-slide-up sm:rounded-3xl sm:border sm:max-w-lg sm:w-full sm:max-h-[80vh] sm:pb-6"
             >
                 <div {...handleProps}>
                 <div className="sm:hidden mx-auto mb-3 h-1 w-10 rounded-full bg-text-muted/30" />
                 <div className="flex items-center justify-between mb-5">
-                    <h3 className="text-base font-bold text-text">Filters</h3>
+                    <h3 id={titleId} className="text-base font-bold text-text">Filters</h3>
                     <button
+                        ref={closeRef}
                         onClick={onClose}
                         aria-label="Close filters"
-                        className="p-1.5 rounded-full text-text-muted hover:text-text hover:bg-card-hover transition-colors"
+                        className="relative p-1.5 rounded-full text-text-muted hover:text-text hover:bg-card-hover transition-colors after:absolute after:-inset-1.5"
                     >
                         <X className="w-5 h-5" />
                     </button>
