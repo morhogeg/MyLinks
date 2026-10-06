@@ -146,10 +146,13 @@ export function collection(parent: unknown, ...segments: string[]): CollectionRe
   return new CollectionReference(joinPath([base, ...segments]));
 }
 
+/** Ids a capture asked for, per collection path (captureApi.nextId). */
+const forcedIds = new Map<string, string[]>();
+
 export function doc(parent: unknown, ...segments: string[]): DocumentReference {
   const base = parent instanceof DocumentReference || parent instanceof CollectionReference ? parent.path : '';
   if (parent instanceof CollectionReference && segments.length === 0) {
-    return new DocumentReference(joinPath([base, newId()]));
+    return new DocumentReference(joinPath([base, forcedIds.get(base)?.shift() ?? newId()]));
   }
   return new DocumentReference(joinPath([base, ...segments]));
 }
@@ -473,5 +476,11 @@ export const captureApi = {
     notify();
   },
   get: (path: string) => docs.get(path),
+  /** The next auto-id the app mints in `colPath` is `id` (live/shoot.mjs:
+   *  the card a take saves keeps the demo library's id, so every seeded
+   *  connection, citation and graph node still points at it). */
+  nextId: (colPath: string, id: string) => {
+    forcedIds.set(colPath, [...(forcedIds.get(colPath) ?? []), id]);
+  },
   list: (prefix: string) => [...docs.keys()].filter((k) => k.startsWith(prefix)),
 };

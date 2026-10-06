@@ -14,7 +14,13 @@
     "reel:vo": "python3 audio/synth-vo.py reel",
     "reel:score": "node audio/reel-score.mjs && node audio/mix-vo.mjs reel",
     "reel:stills": "node scripts/reel-stills.mjs",
-    "reel:render": "remotion render src/index.ts MachinaReel out/machina-reel.mp4"
+    "reel:render": "remotion render src/index.ts MachinaReel out/machina-reel.mp4",
+    "live:capture": "node live/shoot.mjs",
+    "live:score": "node live/score.mjs",
+    "live:verify": "node live/verify.mjs",
+    "live:render": "node live/render.mjs",
+    "live:bake": "node live/bake.mjs",
+    "live:serve": "node live/serve.mjs"
   },
   "dependencies": {
     "@remotion/bundler": "^4.0.501",

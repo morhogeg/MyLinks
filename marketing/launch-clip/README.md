@@ -796,3 +796,116 @@ Enforced by `npm run verify` where a machine can check:
 - the real wordmark and glyph only (`Brand.tsx` wraps `ui/Brand.tsx`'s shipped
   path data);
 - nothing claims App Store availability.
+
+# The live film (`live/`)
+
+**Machina in Motion**: a 65-second film of the real app, in one continuous
+take, that runs as a web page (a 3D stage the visitor's browser draws) and
+renders frame-exact to MP4 from the same page. Built 2026-10-05 on the reel
+kit's capture; branch `claude/live-film`, not merged.
+
+```bash
+npm run reel:app        # the real app, built with Firebase swapped for the demo account
+npm run live:capture    # → out/live/takes/{session,cards}  (~20 min at 3x)
+npm run live:score      # → out/live/media/score.wav (the bake makes its MP3)
+npm run live:verify     # copy rules on every app frame the edit uses + the film's words
+npm run live:render     # → out/live/machina-in-motion-landscape.mp4  (add -- --format portrait)
+npm run live:bake       # → out/live/site/  the live page, ~14 MB, host anywhere static
+npm run live:serve      # the page against the PNG capture (dev), or `-- --site` for the baked one
+```
+
+## What it shows, and why it is one take
+
+`live/shoot.mjs` records ONE continuous session of the shipped app on the
+capture device: the boot (brackets close, the point strikes, MACHINA, the
+push-through), then + → Add to Machina (Link / Image / Note) → a link pasted →
+the five save phases → the card landing → opened and read to its "Do this" →
+closed → a plain-words search ("somewhere quiet to swim in Italy" finds the
+Sardinia cove; the app badges it MEANING) → Ask ("What do my saves say about
+time?") → the streamed answer and its three sources → the Graph chip → the
+graph with those three lit → Revisit → the "Do this" list (the saved card's
+own to-do) → "This week in Machina" opened and read to its standout. Because
+it is one session, **the film never cuts**: every transition in it is the
+app's own navigation. A second take (`cards`) snaps sixteen saves as the feed
+draws them, for the opening ring and the Ask sources.
+
+The demo account is `capture/library.mjs` minus the two recipe cards and the
+"Cook this week" collection (owner, 2026-10-02: no cooking content in new
+films). The saved card keeps its library id (`captureApi.nextId`, a shim
+addition), so its connections, the Ask citation and its graph node all hold.
+
+## How the picture is made
+
+- **Every pixel of app UI is a captured frame.** A *lift* (the Add dialog
+  floating off the phone, the new card, the found card, the "Do this" line,
+  Revisit's first to-do) is the same frame cropped onto its own plane, so it is
+  the app's own pixels, moving with the app. Nothing is redrawn. The only
+  drawn things are the set (paper, light, shadows), the brand mark at the end
+  (the shipped path data), the words, a soft tap ring, the bracket viewfinder
+  and the Ask threads.
+- **`film/edit.js` is the clock.** Which captured frame the screen shows,
+  moment by moment, laid out from the capture's marks; the camera keys
+  (`film/formats.js`), the captions, the lifts and the score all hang off its
+  labels, so retiming one hold moves everything with it.
+- **`engine/`** is a small dependency-free stage: an orbit camera over CSS 3D
+  planes (`stage.js`), depth of field from the camera's focus distance, keyed
+  motion through monotone cubics that glide through their marks
+  (`track.js`), the app's own curves (`ease.js`), and the reel kit's kinetic
+  type rebuilt for the DOM (`type.js`).
+- **The camera** only tilts hard in 3D while nothing must be read (the boot,
+  the ring, the swings between chapters, the Ask three-quarter view) and comes
+  back to frontal for reading. Close-ups stay at or under the capture's 3 px
+  per point.
+- **The Add dialog** rises out of the + while the phone dims and steps back
+  (the app's own black scrim would otherwise darken the frame), stays live
+  while it works, then folds down into the slot where the new card appears.
+- **The words** are the reel's owner-approved lines; the film opens on the
+  App Store subtitle and ends on the tagline. In 9:16 a band of the same
+  paper fades any screen that rises under them (the reel's BandScrim).
+
+## Live and rendered, one page
+
+`main.js` runs the same page two ways. **Rendered** (`?render`,
+`live/render.mjs`): no clock; Playwright steps `window.__film.seek(t)`, waits
+for every image to decode, screenshots, pipes to ffmpeg; the screen and the
+lifts are the capture's PNGs, so every frame is exact. **Live** (the baked
+site): `bake.mjs` lays the screen out on the film's clock as one 786×1704
+video (5 MB, H.264 plus a VP9 copy for browsers without H.264), and the page
+uses that video as its clock, so the screen can never drift from the 3D
+around it. Lifts draw from the same video into canvases (or from a still,
+for the two moments a lift shows a frame the screen is not showing). Cards
+are WebP crops. The score plays muted until the viewer turns it on.
+
+## The score
+
+`live/score.mjs`: the film's own instruments (`audio/synth.mjs`), arranged on
+the live film's clock and mastered like the reel (−14 LUFS, ≤ −1 dBTP). Air
+for the boot and the ring, the band in as the saves spiral into the phone,
+fullest over Ask, breathing through Revisit, and out for the outro so the mark
+strikes into a downbeat (the tempo is set so it lands on bar 26). Sound design
+sits on the picture's events (taps, the five phases, each Ask source, the
+mark). **Verified numerically only; someone still has to listen to it.**
+
+## Gates (`npm run live:verify`)
+
+Every string the app showed on every captured frame the edit uses, plus the
+film's own words: no "AI", no "second brain", never "Machina AI", no em dash,
+no recipe or cooking content, and no "library" (so, as in the reel, the Ask
+thinking line "Searching your …" is never shown: the question holds over those
+frames).
+
+## Environment notes (hard-won)
+
+- The headless Chromium here has **no H.264 decoder** (real Chrome, Safari,
+  Edge and Firefox do): the baked site ships a VP9 WebM next to the MP4 and
+  picks with `canPlayType`. The MP4 render is unaffected (it uses PNGs).
+- **Seeking needs byte ranges**: `python -m http.server` cannot serve them, so
+  a paused deep link shows black lifts there. `live/serve.mjs` serves ranges;
+  so does every real static host.
+- One capture artifact to step around: a frame snapped right after the clock
+  resumes can catch an animation restarting (the recap's last snap faded), so
+  the edit holds the frame before `end`.
+- Found while capturing, NOT fixed here (app bug, reported): on the phone
+  layout, tapping the search field's × while the caret is in it does not
+  clear the query. The blur unmounts Done, the field widens and the × slides
+  out from under the tap. The shoot taps Done first.

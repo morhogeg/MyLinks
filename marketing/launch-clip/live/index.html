@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Machina in Motion</title>
+<link rel="icon" href="data:,">
+<meta name="description" content="Machina, the real app, in one continuous take: save, find, ask, connect, revisit.">
+<style>
+  /* Tokens: the film's set and ink (marketing/launch-clip/src/film/effects.tsx
+     SET_BG, src/reels/kit/Type.tsx INK) and the app's light theme
+     (web/app/globals.css .light). The film is graded light: ink on paper. */
+  :root {
+    --paper: #EEF0F4;
+    --paper-hi: #F9FAFB;
+    --ink: rgba(17, 24, 39, 0.96);
+    --ink-solid: #22222A;
+    --ink-soft: rgba(75, 85, 99, 0.82);
+    --ink-muted: #9CA3AF;
+    --card: #ffffff;
+    --hairline: rgba(16, 24, 40, 0.07);
+    --shade: 16, 24, 40;
+    --control-bg: rgba(255, 255, 255, 0.72);
+    --control-ink: #111827;
+    --ease-modal: cubic-bezier(0.32, 0.72, 0, 1);
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    color-scheme: light;
+  }
+  @font-face {
+    font-family: 'Geist';
+    src: url('media/fonts/Geist-Variable.woff2') format('woff2');
+    font-weight: 100 900;
+    font-display: block;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--paper); overflow: hidden; }
+  body { font-family: 'Geist', ui-sans-serif, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+
+  #app { position: fixed; inset: 0; }
+  .frame { position: absolute; left: 0; top: 0; overflow: hidden; transform-origin: 0 0; background: var(--paper); contain: strict; }
+
+  /* the set: the film's paper, a daylight pool, two cool pools, a dither */
+  .paper { position: absolute; inset: 0; pointer-events: none; }
+  .paper .pool { position: absolute; border-radius: 50%; }
+  .paper .day { left: 50%; top: 46%; width: 2300px; height: 2300px; transform: translate(-50%, -50%);
+    background: radial-gradient(circle closest-side, rgba(255,255,255,0.86) 0%, rgba(255,255,255,0.7) 14%,
+      rgba(255,255,255,0.5) 28%, rgba(255,255,255,0.31) 42%, rgba(255,255,255,0.16) 56%, rgba(255,255,255,0.06) 72%,
+      rgba(255,255,255,0.015) 86%, rgba(255,255,255,0) 100%); }
+  .paper .cool1 { left: -560px; bottom: -760px; width: 1400px; height: 1400px;
+    background: radial-gradient(circle, rgba(52,64,84,0.07) 0%, rgba(52,64,84,0) 62%); }
+  .paper .cool2 { right: -520px; top: -560px; width: 1200px; height: 1200px;
+    background: radial-gradient(circle, rgba(52,64,84,0.055) 0%, rgba(52,64,84,0) 64%); }
+  .paper .dither { position: absolute; inset: 0; opacity: 1;
+    background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Cfilter id='d' x='0' y='0' width='100%25' height='100%25' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0.86 0 0 0 -0.43'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23d)'/%3E%3C/svg%3E"); }
+
+  .view { position: absolute; inset: 0; transform-style: preserve-3d; }
+  .world { position: absolute; width: 0; height: 0; transform-style: preserve-3d; }
+  .plane { position: absolute; left: 0; top: 0; transform-origin: 50% 50%; backface-visibility: hidden; }
+
+  .slab { overflow: hidden; background: var(--card); }
+  .slab .screen { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .slab .glass { position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(115deg, rgba(255,255,255,0) 40%, rgba(255,255,255,0.16) 50%, rgba(255,255,255,0) 60%);
+    background-size: 300% 100%; background-position: 50% 0; mix-blend-mode: screen; }
+  .slab .ink { position: absolute; inset: 0; background: var(--ink-solid); opacity: 0; }
+
+  .shadow .soft { position: absolute; inset: 0; border-radius: inherit; background: rgb(var(--shade)); }
+
+  .crop { overflow: hidden; background: var(--card); }
+  .crop .cropimg { position: absolute; left: 0; top: 0; transform-origin: 0 0; display: block; max-width: none; }
+  .crop .cropcanvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+  .slab video.screen { object-fit: fill; }
+
+  /* 2D layers over the set */
+  .threads, .marks svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+  .thread { fill: none; stroke: var(--ink); stroke-width: 1.7; stroke-linecap: round; }
+  .thread-dot { fill: var(--ink); }
+  .finder path { fill: none; stroke: var(--ink); stroke-width: 3.2; stroke-linecap: butt; stroke-linejoin: miter; }
+  .taps { position: absolute; inset: 0; pointer-events: none; }
+  .tap { position: absolute; left: 0; top: 0; border-radius: 50%; transform-origin: 50% 50%;
+    border: 2px solid rgba(17, 24, 39, 0.38); background: radial-gradient(circle, rgba(17,24,39,0.16) 0%, rgba(17,24,39,0.06) 55%, rgba(17,24,39,0) 72%); }
+
+  .brand { position: absolute; width: 0; height: 0; color: var(--ink-solid); pointer-events: none; }
+  .brand .mark { position: absolute; left: -112px; top: -104px; width: 224px; height: 208px; overflow: visible; }
+  .brand .mark path, .brand .mark circle { fill: currentColor; }
+  .brand .wordmark { position: absolute; left: 0; top: 148px; height: 28px; width: auto; transform: translateX(-50%); fill: currentColor; stroke: currentColor; }
+
+  .type { position: absolute; inset: 0; pointer-events: none; color: var(--ink); }
+  .cue { position: absolute; }
+  .cue .line { font-size: 58px; line-height: 1.12; font-weight: 600; letter-spacing: -0.028em; }
+  .cue .w { display: inline-block; will-change: transform, filter, opacity; }
+  .cue .kicker { font-size: 23px; font-weight: 650; color: var(--ink-soft); margin-bottom: 24px; white-space: nowrap; }
+  .cue .kicker span { display: inline-block; }
+  .cue-left { left: 168px; top: 50%; transform: translateY(-50%); width: 820px; }
+  .cue-bottom { left: 0; right: 0; bottom: 110px; text-align: center; }
+  .cue-end { left: 0; right: 0; top: 682px; text-align: center; }
+  .cue.hook .line { font-size: 62px; }
+  /* a soft daylight behind words that sit over moving saves */
+  .cue-bottom::before { content: ''; position: absolute; left: 50%; top: 50%; width: 1500px; height: 260px;
+    transform: translate(-50%, -50%); z-index: -1; border-radius: 50%;
+    background: radial-gradient(closest-side, rgba(242,244,247,0.92), rgba(242,244,247,0.55) 55%, rgba(242,244,247,0)); }
+  .cue-bottom { isolation: isolate; }
+  .cue.tagline .line { font-size: 40px; font-weight: 500; letter-spacing: -0.02em; color: var(--ink-soft); }
+
+  .paper.band { display: none; }
+  .fmt-portrait .paper.band { display: block; background: var(--paper);
+    -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 540px, transparent 730px);
+    mask-image: linear-gradient(to bottom, #000 0, #000 540px, transparent 730px); }
+  /* 9:16: every line in the top band, centred (clear of Reels / Shorts chrome) */
+  .fmt-portrait .cue-left, .fmt-portrait .cue-top { left: 70px; right: 70px; top: 238px; transform: none; width: auto; text-align: center; }
+  .fmt-portrait .cue .line { font-size: 60px; }
+  .fmt-portrait .cue .kicker { font-size: 25px; margin-bottom: 22px; }
+  .fmt-portrait .cue.hook .line { font-size: 64px; }
+  .fmt-portrait .cue-end { top: 1010px; }
+  .fmt-portrait .cue.tagline .line { font-size: 44px; }
+
+  /* player chrome (live only) */
+  .controls { position: fixed; left: 50%; bottom: max(16px, env(safe-area-inset-bottom)); transform: translateX(-50%);
+    width: min(720px, calc(100vw - 32px)); display: flex; align-items: center; gap: 14px; padding: 10px 14px;
+    border-radius: 999px; background: var(--control-bg); color: var(--control-ink);
+    backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4);
+    box-shadow: 0 0 0 0.5px rgba(16,24,40,0.08), 0 10px 30px -12px rgba(16,24,40,0.25);
+    transition: opacity 0.5s var(--ease-modal), transform 0.5s var(--ease-modal); font-size: 13px; }
+  .controls.idle { opacity: 0; transform: translate(-50%, 8px); pointer-events: none; }
+  .controls button { appearance: none; border: 0; background: none; color: inherit; cursor: pointer; padding: 0;
+    width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; flex: none; }
+  .controls button:hover { background: rgba(16,24,40,0.06); }
+  .controls svg { width: 18px; height: 18px; }
+  .scrub { position: relative; flex: 1; height: 30px; cursor: pointer; touch-action: none; }
+  .scrub .rail { position: absolute; left: 0; right: 0; top: 14px; height: 2px; border-radius: 2px; background: rgba(16,24,40,0.14); }
+  .scrub .fill { position: absolute; left: 0; top: 14px; height: 2px; border-radius: 2px; background: var(--control-ink); }
+  .scrub .tick { position: absolute; top: 11px; width: 2px; height: 8px; margin-left: -1px; border-radius: 1px;
+    background: rgba(17,24,39,0.28); cursor: pointer; }
+  .scrub .tick::after { content: ''; position: absolute; inset: -10px -8px; }
+  .scrub .tick.on { background: rgba(17,24,39,0.8); }
+  .chapter { font-size: 11px; font-weight: 650; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(17,24,39,0.7);
+    min-width: 64px; }
+  .scrub .knob { position: absolute; top: 9px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%;
+    background: var(--control-ink); box-shadow: 0 1px 4px rgba(16,24,40,0.3); }
+  .time { font-variant-numeric: tabular-nums; color: rgba(17,24,39,0.6); min-width: 76px; text-align: right; }
+  .loading { position: fixed; inset: 0; display: grid; place-items: center; color: var(--ink-soft); font-size: 14px;
+    letter-spacing: 0.02em; transition: opacity 0.6s var(--ease-modal); }
+  .loading.gone { opacity: 0; pointer-events: none; }
+  .lens { position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(120% 120% at 50% 45%, rgba(16,24,40,0) 58%, rgba(16,24,40,0.07) 100%); }
+  body.render .controls, body.render .loading { display: none; }
+  @media (max-width: 640px) { .chapter { display: none; } .time { min-width: 0; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="frame" id="frame">
+    <div class="paper"><div class="pool day"></div><div class="pool cool1"></div><div class="pool cool2"></div><div class="dither"></div></div>
+    <div class="view"><div class="world"></div></div>
+    <!-- 9:16 only: the same paper again, over the set, fading out below the
+         words, so a screen that rises into the top band slips under them
+         (the reel kit's BandScrim) -->
+    <div class="paper band" aria-hidden="true"><div class="pool day"></div><div class="pool cool1"></div><div class="pool cool2"></div><div class="dither"></div></div>
+    <svg class="threads"></svg>
+    <div class="marks"></div>
+    <div class="taps"></div>
+    <div class="brand" style="display:none">
+      <svg class="mark" viewBox="288 292 448 416" aria-hidden="true">
+        <path class="bl" d="M296 300 L396 300 L396 358 L354 358 L354 642 L396 642 L396 700 L296 700 Z"/>
+        <path class="br" d="M728 300 L628 300 L628 358 L670 358 L670 642 L628 642 L628 700 L728 700 Z"/>
+        <circle class="dot" cx="512" cy="500" r="52"/>
+      </svg>
+      <svg class="wordmark" viewBox="0 -8 3455 438" stroke-width="12" role="img" aria-label="Machina">
+        <path d="M 0.0 422.0 L 0.0 0.0 L 44.2 0.0 L 194.0 322.4 L 343.8 0.0 L 388.0 0.0 L 388.0 422.0 L 346.0 422.0 L 346.0 95.0 L 194.0 422.0 L 42.0 95.0 L 42.0 422.0 Z M 765.3 0.0 L 810.7 0.0 L 661.4 422.0 L 616.0 422.0 Z M 765.3 0.0 L 810.7 0.0 L 960.0 422.0 L 914.6 422.0 Z M 715.1 253.2 L 860.9 253.2 L 875.8 295.2 L 700.2 295.2 Z M 1482.0 385.9 A 186.0 219.0 0 1 1 1482.0 36.1 L 1458.5 70.9 A 144.0 177.0 0 1 0 1458.5 351.1 Z M 1743.0 0.0 L 1785.0 0.0 L 1785.0 422.0 L 1743.0 422.0 Z M 2001.0 0.0 L 2043.0 0.0 L 2043.0 422.0 L 2001.0 422.0 Z M 1785.0 190.0 L 2001.0 190.0 L 2001.0 232.0 L 1785.0 232.0 Z M 2283.0 0.0 L 2325.0 0.0 L 2325.0 422.0 L 2283.0 422.0 Z M 2565.0 0.0 L 2607.0 0.0 L 2607.0 422.0 L 2565.0 422.0 Z M 2841.0 0.0 L 2883.0 0.0 L 2883.0 422.0 L 2841.0 422.0 Z M 2565.0 0.0 L 2615.2 0.0 L 2883.0 422.0 L 2832.8 422.0 Z M 3260.3 0.0 L 3305.7 0.0 L 3156.4 422.0 L 3111.0 422.0 Z M 3260.3 0.0 L 3305.7 0.0 L 3455.0 422.0 L 3409.6 422.0 Z M 3210.1 253.2 L 3355.9 253.2 L 3370.8 295.2 L 3195.2 295.2 Z"/>
+      </svg>
+    </div>
+    <div class="type"></div>
+    <div class="lens"></div>
+  </div>
+  <div class="controls idle" id="controls">
+    <button id="play" aria-label="Play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l10.5-6.5z"/></svg></button>
+    <div class="scrub" id="scrub" role="slider" aria-label="Seek" tabindex="0"><div class="rail"></div><div class="fill"></div><div class="knob"></div></div>
+    <span class="chapter" id="chapter"></span>
+    <span class="time" id="time">0:00 / 0:00</span>
+    <button id="sound" aria-label="Sound on" hidden></button>
+  </div>
+  <div class="loading" id="loading">Loading the app…</div>
+</div>
+<script type="module" src="main.js"></script>
+</body>
+</html>

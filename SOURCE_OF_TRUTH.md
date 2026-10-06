@@ -1178,6 +1178,16 @@ The multi-user auth work described below **was** fully written but not live:
       (`lib/tourSeen`, reconciled in AuthProvider, doc wins; a fresh workspace
       ignores a device key left by another account). Added to the user-doc
       update allowlist in both rules files.
+    - **[ ] E7 — OPEN (found 2026-10-06 by the live-film capture, not by the
+      suite): the search field's × misses while the caret is in the field
+      (phone layout).** Tapping × blurs the input on pointer-down, `Done`
+      unmounts (`searchFocused` false), the field widens and the × slides
+      ~53pt right, so the click lands on the input and the query stays.
+      Reproduced in Chromium touch emulation (`Feed.tsx` ~2513: × at x 292 →
+      345); after tapping Done first, × clears. NOT verified on a device.
+      Likely fix (one line, not made): the same `onPointerDown={(e) =>
+      e.preventDefault()}` guard the Done button already has, on both ×
+      buttons.
 
 8a. **[x] Trademark clearance — CLOSED 2026-08-23 by owner decision.** Search
     run same day; the owner reviewed the one live conflict (US 6278707, Ionic
@@ -2536,6 +2546,14 @@ native iOS share sheet, so that beat is a brand graphic.
 - **Four feature clips** sit on their own branches, each awaiting owner review:
   SAVE `claude/clip-save`, FIND `claude/clip-find`, ASK `claude/clip-ask`,
   REVISIT `claude/clip-revisit`.
+- **The live film, "Machina in Motion"** (65s, 16:9 + 9:16, plus a live web
+  page of the same film) is on branch `claude/live-film` (built 2026-10-06 on
+  the reel kit + today's `main`), awaiting owner review. One continuous take
+  of the real app (boot → save → find → ask → graph → Revisit), composed in a
+  3D set with an orbit camera, lifts, a ring of the account's saves and the
+  brand mark at the end; scored on the film's clock. Everything is in
+  `marketing/launch-clip/live/`; how and why is the README's "The live film"
+  section. Live page (private): https://claude.ai/artifact/KbYCE5dCq9hEps1obkAYWk
 - **Three Meta ads** (Instagram/Facebook, 15 to 20s, 9:16 + 4:5) are in
   production in three sessions spawned 2026-10-02, each on its own branch:
   1. **What one save becomes**, the YouTube card's key moments and key points
@@ -2768,6 +2786,49 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-10-06 — LIVE FILM "MACHINA IN MOTION" BUILT: the real app in one
+  continuous take, staged in 3D, scored; 16:9 + 9:16 MP4s and a live web page.
+  NOT MERGED.** Branch `claude/live-film` (= `claude/machina-reel-pilot` with
+  `origin/main` merged in, so the capture is today's app). Owner asked for a
+  premium, cinematic animation of the app's key features, then: "make sure you
+  show the actual app, no mockups". Everything is in
+  `marketing/launch-clip/live/`; the README's "The live film" section has the
+  how and why. **What it is:** ONE continuous capture of the shipped app on the
+  demo account (`live/shoot.mjs`: boot → + → Link/Image/Note → the five save
+  phases → the card → its "Do this" → Find "somewhere quiet to swim in Italy"
+  → Ask "What do my saves say about time?" and its three sources → Graph →
+  Revisit's Do this list → "This week in Machina"), so the film never cuts.
+  It is composed in a CSS 3D set (`live/engine/`): an orbit camera, depth of
+  field, lifts that are the app's own pixels cropped onto planes, a ring of
+  sixteen real saves that spirals into the phone, threads from each Ask source
+  to its card, the Add dialog rising out of the + and folding into the feed,
+  and an endcard where the phone shrinks into the mark's point and the
+  brackets close. Words are the reel's approved lines (opens on the subtitle,
+  ends on the tagline); demo account minus the two recipe cards. Score: the
+  film's synth arranged on the film's clock (`live/score.mjs`), mastered −14
+  LUFS / ≤ −1 dBTP. **Outputs (out/, regenerated, not in git):**
+  `out/live/machina-in-motion-landscape.mp4` and `…-portrait.mp4` (65s,
+  1920×1080 and 1080×1920, 60fps, with score) and the baked live page
+  `out/live/site/` (≈13 MB: one 5 MB screen video plus a VP9 copy, the score
+  as MP3; the page uses the video as its clock), published as a private claude.ai artifact:
+  https://claude.ai/artifact/KbYCE5dCq9hEps1obkAYWk. **Shared-kit changes (additive, reel unaffected):**
+  `capture/server.mjs` takes extra scripted search answers;
+  `capture/shims/store.ts` gains `captureApi.nextId` (the saved card keeps its
+  library id, so its connections, citation and graph node hold).
+  **Verified:** `npm run live:verify` (1,135 app frames, 368 distinct strings,
+  17 caption lines: no "AI", "second brain", em dash, recipe content or
+  "library"; the Ask thinking line is held over, as in the reel); web tsc 0,
+  and `web/` + `functions/` are identical to `main`; the live page plays in
+  headless Chromium with the video as its clock and seeks (with byte ranges);
+  every beat reviewed as rendered stills in both formats. **NOT verified:**
+  nobody has listened to the score; the live page on a real phone or in
+  Safari (this Chromium has no H.264 decoder, so only the VP9 path ran here);
+  the page inside the claude.ai artifact frame. **Found, not fixed:** §4 11b
+  E7 (the search field's × misses while the caret is in it). **Owner steps:**
+  watch both cuts and the live page; listen to the score; decide whether the
+  live page gets a home on mymachina.app (it is self-contained static files; a
+  `/film` route or a link from the landing hero would be a separate change).
 
 - **2026-10-05 (evening) — BROWSER EXTENSION STORE-READY + MACHINA FOR SAFARI
   PROJECT; B1 CORS SHIPPED.** Branch `claude/app-launch-qa-a29d1f`. Two

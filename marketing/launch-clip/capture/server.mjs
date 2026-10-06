@@ -57,7 +57,12 @@ const cardSource = (id) => {
   return { id, title: c.title, category: c.category, sourceName: c.sourceName ?? null, url: c.url || null };
 };
 
-export function startServer(port = 4600) {
+/**
+ * `search` adds scripted search answers on top of the library's one (query,
+ * lowercased → card ids), for a film whose Find beat asks something else
+ * (live/shoot.mjs).
+ */
+export function startServer(port = 4600, { search = {} } = {}) {
   /** The Ask stream in flight, released by `advanceChat`. */
   let chat = null;
   const log = [];
@@ -88,7 +93,7 @@ export function startServer(port = 4600) {
           return res.end();
         }
         const q = String(body.query ?? '').trim().toLowerCase();
-        const hits = q === SEARCH.query.toLowerCase() ? SEARCH.hits : [];
+        const hits = q === SEARCH.query.toLowerCase() ? SEARCH.hits : search[q] ?? [];
         return json(res, 200, { links: hits.map((id) => ({ id })), mode: 'judge' });
       }
       case '/api/share':
