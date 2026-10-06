@@ -1050,12 +1050,21 @@ _EXCLUSION_RE = re.compile(
     r"\b(besides|other than|apart from|aside from|except|excluding)\b",
     re.IGNORECASE,
 )
+# The Hebrew forms ('חוץ מ"X"', מלבד, למעט, בנוסף ל). The English pattern
+# alone left a Hebrew "what else besides X" re-presenting X as a new find.
+# Hebrew words carry clitic prefixes ("ומלבד"), and the "from/to" of חוץ מ /
+# בנוסף ל is a prefix on the NEXT word ("חוץ מהמתכון"), so \b can't be the
+# boundary. "מחוץ ל" (outside) and "משרד החוץ" (foreign ministry) don't match.
+_HE_EXCLUSION_RE = re.compile(
+    r"(?<!\w)ו?(?:חוץ\s*מ|מלבד(?!\w)|למעט(?!\w)|בנוסף\s*ל)"
+)
 
 
 def is_exclusion_question(question: str) -> bool:
     """True when the question EXPLICITLY excludes already-known sources.
     Quoted spans (card titles) are ignored — only the user's own words vote."""
-    return bool(_EXCLUSION_RE.search(_strip_quoted(question)))
+    text = _strip_quoted(question)
+    return bool(_EXCLUSION_RE.search(text) or _HE_EXCLUSION_RE.search(text))
 
 
 # ── Conversational follow-ups: which text to RETRIEVE for ───────────────────
@@ -1531,12 +1540,27 @@ _RECENCY_RE = re.compile(
     r"past few days|catch me up|recap)\b",
     re.IGNORECASE,
 )
+# The same intent in Hebrew: "מה שמרתי השבוע?", "...לאחרונה", "השמירה
+# האחרונה", "בשבוע שעבר". The English pattern alone sent a Hebrew "what did I
+# save this week?" to semantic retrieval for the phrase, i.e. topically
+# arbitrary cards. Up to two clitic prefixes may lead (ו/ה/ב/ל/מ/ש/כ:
+# "מהשבוע", "ובשבוע שעבר"), so the boundary is "no word character before",
+# not \b. A bare "שבוע" ("a week") or "אחרון" ("last", as in the last chapter)
+# is not enough on its own.
+_HE_RECENCY_RE = re.compile(
+    r"(?<!\w)[והבלמשכ]{0,2}(?:"
+    r"השבוע|החודש|היום|אתמול|לאחרונה|"
+    r"ה?שבוע (?:שעבר|האחרון)|ה?חודש (?:שעבר|האחרון)|ה?ימים האחרונים|"
+    r"ה?שמיר(?:ה|ות) ה?אחרונ(?:ה|ות)|ה?אחרו(?:ן|נה|נים|נות) ששמרתי"
+    r")(?!\w)"
+)
 
 
 def is_recency_question(question: str) -> bool:
     """True when the question is about recently-saved cards (time-anchored).
     Quoted spans (card titles) are ignored — only the user's own words vote."""
-    return bool(_RECENCY_RE.search(_strip_quoted(question)))
+    text = _strip_quoted(question)
+    return bool(_RECENCY_RE.search(text) or _HE_RECENCY_RE.search(text))
 
 
 def recent_cards(uid: str, limit: int = 12) -> List[dict]:
