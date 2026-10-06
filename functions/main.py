@@ -5539,6 +5539,19 @@ def _merge_tags(existing, fresh) -> list:
     return out[:12]
 
 
+def _job_progress(ref, fields: dict) -> None:
+    """Best-effort breadcrumb on the queue doc (its `status`, for operators).
+
+    Never fails a capture: the user sees the CARD, not the job, and the job
+    doc may be gone mid-run (an operator cleared the queue, or a prune). A
+    `404 No document to update` here used to turn a healthy capture into a
+    FAILED card, keep its Gemini spend, and make the user pay again on Retry."""
+    try:
+        ref.update(fields)
+    except Exception as e:
+        logger.warning(f"Queue breadcrumb {fields.get('status')!r} not recorded: {type(e).__name__}: {e}")
+
+
 def _enrich_stage(card_ref, stage: str) -> None:
     """Tell the open card which step the screenshot read is on ("reading" →
     "analyzing" → "connecting"), so its progress is anchored to real work and
@@ -5586,7 +5599,7 @@ def _enrich_card_with_images(ref, task_id: str, uid: str, card_ref, data: dict) 
         if not image_urls:
             raise ValueError("No screenshots to read")
 
-        ref.update({"status": "downloading_image"})
+        _job_progress(ref, {"status": "downloading_image"})
         _enrich_stage(card_ref, "reading")
         image_parts = []
         for img_url in image_urls:
@@ -5596,7 +5609,7 @@ def _enrich_card_with_images(ref, task_id: str, uid: str, card_ref, data: dict) 
 
         existing_tags, existing_categories = get_user_vocabulary(uid)
         ai = GeminiService()
-        ref.update({"status": "analyzing_image"})
+        _job_progress(ref, {"status": "analyzing_image"})
         _enrich_stage(card_ref, "analyzing")
         analysis = ai.analyze_text_with_images(
             _enrich_context_text(card), image_parts,
@@ -6088,7 +6101,7 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         # itself; scraping it only cost a second download.
         if not is_image:
             log_to_firestore(task_id, f"Scraping content for: {url}", uid=uid)
-            ref.update({"status": "scraping"})
+            _job_progress(ref, {"status": "scraping"})
             _write_stage(card_ref, "scraping")
             # A released waiting card reads the page as it was when it was
             # SAVED (deferred_capture): the post may since have been deleted
@@ -6115,7 +6128,7 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
 
         # 2. Analyze with AI
         log_to_firestore(task_id, "Starting AI analysis", data={"scrapedTitle": scraped.get("title")}, uid=uid)
-        ref.update({"status": "analyzing", "scrapedTitle": scraped.get("title", "")})
+        _job_progress(ref, {"status": "analyzing", "scrapedTitle": scraped.get("title", "")})
 
         db = get_db()
         existing_tags, existing_categories = get_user_vocabulary(uid)
@@ -6139,7 +6152,7 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
                 # — and analyze the whole set as one document.
                 image_urls = queued_image_urls[:MAX_CARD_IMAGES]
                 log_to_firestore(task_id, f"Downloading {len(image_urls)} images", uid=uid)
-                ref.update({"status": "downloading_image"})
+                _job_progress(ref, {"status": "downloading_image"})
                 image_parts = []
                 for img_url in image_urls:
                     img_response = safe_get(img_url, timeout=30)
@@ -6149,13 +6162,13 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
 
                 url = image_urls[0]
                 log_to_firestore(task_id, f"Starting AI analysis of {len(image_parts)} images", uid=uid)
-                ref.update({"status": "analyzing_image", "storageUrl": url})
+                _job_progress(ref, {"status": "analyzing_image", "storageUrl": url})
                 analysis = ai.analyze_images(image_parts, existing_tags=existing_tags,
                                              existing_categories=existing_categories)
                 screenshot_parts = image_parts
             else:
                 log_to_firestore(task_id, f"Downloading image bytes from: {url}", uid=uid)
-                ref.update({"status": "downloading_image"})
+                _job_progress(ref, {"status": "downloading_image"})
                 img_response = safe_get(url, timeout=30)
                 img_response.raise_for_status()
                 image_bytes = img_response.content
@@ -6167,7 +6180,7 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
                 url = public_url
 
                 log_to_firestore(task_id, "Starting AI image analysis", uid=uid)
-                ref.update({"status": "analyzing_image", "storageUrl": public_url})
+                _job_progress(ref, {"status": "analyzing_image", "storageUrl": public_url})
                 analysis = ai.analyze_image(image_bytes, mime_type, existing_tags=existing_tags,
                                             existing_categories=existing_categories)
                 screenshot_parts = [(image_bytes, mime_type)]
@@ -6205,7 +6218,7 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         # 4. Build link document
         final_title = analysis.get("title", scraped.get("title", "Untitled"))
         log_to_firestore(task_id, "Saving processed link to brain", data={"finalTitle": final_title}, uid=uid)
-        ref.update({"status": "saving"})
+        _job_progress(ref, {"status": "saving"})
 
         # Determine source type
         is_youtube = scraped.get("content_type") == "youtube"
@@ -6444,6 +6457,20 @@ def _to_ms(value) -> Optional[int]:
     return None
 
 
+def _iso_ms(value) -> Optional[int]:
+    """`_to_ms` for queue-doc stamps, which are ISO-8601 strings
+    (`createdAt`, `startedAt`); None for anything unparseable."""
+    if isinstance(value, str):
+        try:
+            dt = datetime.fromisoformat(value)
+        except ValueError:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return int(dt.timestamp() * 1000)
+    return _to_ms(value)
+
+
 def run_processing_janitor() -> dict:
     """Flip cards stuck in `processing` past the timeout to a retryable FAILED.
 
@@ -6541,17 +6568,30 @@ def run_processing_janitor() -> dict:
     report["queue_pruned"] = 0
     try:
         cutoff_iso = datetime.fromtimestamp(cutoff / 1000, tz=timezone.utc).isoformat()
-        queued_cutoff_iso = datetime.fromtimestamp(
-            (now_ms - _QUEUED_TIMEOUT_MS) / 1000, tz=timezone.utc).isoformat()
         stale_jobs = db.collection("pending_processing").where(
             filter=FieldFilter("createdAt", "<", cutoff_iso)
         ).limit(200).stream()
         for doc in stale_jobs:
             job = doc.to_dict() or {}
-            # Never started, and still inside the longer queue window: it is
-            # waiting for capacity, not dead. Leave it alone.
-            if job.get("status") == "queued" and str(job.get("createdAt") or "") >= queued_cutoff_iso:
-                continue
+            if job.get("status") == "queued":
+                # Never started, and still inside the longer queue window: it
+                # is waiting for capacity, not dead. Leave it alone.
+                created = _iso_ms(job.get("createdAt"))
+                if created is not None and created >= queued_cutoff:
+                    continue
+            else:
+                # STARTED: its age counts from when a worker picked it up
+                # (`startedAt`), not from when it was enqueued. A job can wait
+                # far longer than the timeout for a worker (a 200-link import,
+                # the waiting-saves release, retry backoff); pruning on
+                # `createdAt` deleted such a job WHILE it ran, so its next
+                # write 404'd and a healthy capture turned FAILED. Only a doc
+                # with no start stamp falls back to `createdAt`.
+                started_job = _iso_ms(job.get("startedAt"))
+                if started_job is None:
+                    started_job = _iso_ms(job.get("createdAt"))
+                if started_job is not None and started_job >= cutoff:
+                    continue
             # A job still holding its charge token never handed it to a card
             # (abandoned in the queue, or its placeholder write failed), so no
             # card refund can cover it: refund it here, once.
