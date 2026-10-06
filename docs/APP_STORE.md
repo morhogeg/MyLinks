@@ -503,6 +503,14 @@ build configs, so no iPad screenshots are needed.
       that has never signed into that account.
 - [ ] Enter metadata per §2 (all copy is final and owner-approved — pure
       transcription into Connect).
+- [ ] **Terms of Use link for the subscription** (Guideline 3.1.2(c), added
+      by the launch audit 2026-10-06). An app with an auto-renewable
+      subscription must link its Terms of Use (EULA) in the metadata, not
+      only in the app: either end the Description with
+      `Terms of Use: https://mymachina.app/terms`, or set that page as the
+      custom License Agreement (App Information → License Agreement). The
+      in-app paywall already shows price per period, the renewal line,
+      Restore, and Terms / Privacy links.
 - [ ] Take the 6 screenshots per §4.
 - [x] `TARGETED_DEVICE_FAMILY = 1` (iPhone-only) — already set in all build configs.
 - [ ] Verify the AI-consent screen (§4 task 6) is in the submitted build before
