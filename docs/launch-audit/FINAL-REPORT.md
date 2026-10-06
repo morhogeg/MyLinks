@@ -1,8 +1,9 @@
 # Machina launch audit: final report
 
-Branch `claude/launch-audit` (not merged, not deployed). Every finding, its
-status and its commit are in `01-findings.md`; the product map is in
-`00-app-map.md`.
+Branch `claude/launch-audit`, merged to `main` as `7c82ffa` and shipped on
+2026-10-06: Cloud Functions, indexes, Firestore rules, web, and TestFlight
+build 1347 (SOURCE_OF_TRUTH §9 has the runs). Every finding, its status and
+its commit are in `01-findings.md`; the product map is in `00-app-map.md`.
 
 ## 1. Verdict: ready with caveats
 
@@ -12,13 +13,13 @@ were type-checked and linted, and the visual ones rendered and measured; the
 full suites pass locally and in CI. What stands between this branch and the
 App Store is work that can't be done from this machine:
 
-1. **Ship it.** Merge to `main` through `/ship`: Vercel, the Cloud Functions
-   (all of them, indexes first), the Firestore rules, and a TestFlight build.
-   None of this is deployed.
-2. **Compile and smoke-test the iOS changes.** There is no Swift toolchain
-   here, so the share-extension edits have never been compiled, and the
-   Facebook-SDK strip and the plist and asset changes never built. The next
-   TestFlight build is their first; then a 15-minute device pass (section 4).
+1. **Ship it.** Done on 2026-10-06 (`7c82ffa`): all Cloud Functions
+   (indexes first), the Firestore rules and TestFlight build 1347, every run
+   green; Vercel deploys on push (not checked from the cloud session).
+2. **Smoke-test the iOS changes on a device.** The share-extension Swift,
+   the Facebook-SDK strip and the plist and asset changes compiled for the
+   first time in build 1347; nothing has run on a device yet: the
+   15-minute device pass (section 4).
 3. **App Store Connect**: the privacy label rows and the Terms of Use link
    (section 4).
 
@@ -154,8 +155,9 @@ formats, tooling, cost trims and robustness gaps.
   1,752 KB / 524 KB after (production build, home page).
 
 **Not verified (couldn't be run here)**
-- Any Swift: no toolchain. The share-extension changes compile for the first
-  time in the next TestFlight build.
+- Any Swift: no toolchain here. The share-extension changes compiled in CI
+  for build 1347, after this report was written; they have not run on a
+  device.
 - Anything on a device: VoiceOver, native sign-in cancel, push permission
   flows, the share sheet, haptics, Dynamic Type.
 - Production: no deploy, no production data read or written, no live Gemini
@@ -169,20 +171,17 @@ formats, tooling, cost trims and robustness gaps.
 Each line: what, and why it can't be done here.
 
 **Ship and compile (owner, in this order)**
-- Merge `claude/launch-audit` to `main` via `/ship`. Vercel deploys on push.
-  Functions deploy automatically on `functions/**` changes; this branch
-  changes most of them, so deploy all (no `Deploy-Functions:` scope line),
-  and indexes go first (new: two `links` composite indexes for the janitor,
-  `links.enrichStatus` and `links.needsEmbedding` overrides; the janitor
-  falls back to its old scan while they build). The Firestore rules
-  changed (Google/Apple-only self-serve workspace create), so the rules
-  deploy runs too. Not done: deploying is the owner's call, and nothing here
-  may push to `main`.
-- TestFlight build (`git push -f origin main:trigger/testflight`): first
-  compile of the share-extension Swift (IOS-4, 7, 10-13, 17), the
-  Facebook-SDK strip (IOS-3) and the plist/asset changes. No Swift toolchain
-  in this environment.
-- Device pass on that build, about 15 minutes: share 6+ screenshots
+- Done 2026-10-06, on the owner's go-ahead: merged to `main` as `7c82ffa`
+  via `/ship`. Vercel deploys on push; all functions deployed (no
+  `Deploy-Functions:` scope line), indexes first (two `links` composite
+  indexes for the janitor, `links.enrichStatus`, `links.needsEmbedding` and
+  `client_errors.createdAt` overrides; the janitor falls back to its old
+  scan while they build); the rules deploy ran too (Google/Apple-only
+  self-serve workspace create).
+- Done 2026-10-06: TestFlight build 1347, the first compile of the
+  share-extension Swift (IOS-4, 7, 10-13, 17), the Facebook-SDK strip
+  (IOS-3) and the plist/asset changes. All green in CI.
+- Device pass on build 1347, about 15 minutes: share 6+ screenshots
   (extension shows; "first 5 of N"); share with VoiceOver on (result is
   spoken); save one screenshot from the + sheet and Retry a failed card
   (both now run in the background and finish on their own); cancel Apple and

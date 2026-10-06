@@ -233,21 +233,27 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
-> ## 🚨 OWNER ACTION (2026-10-06): launch audit, branch `claude/launch-audit` (NOT merged, NOT deployed)
+> ## 🚨 OWNER ACTION (2026-10-06): install build **1347** (launch audit, shipped)
 >
-> A full launch audit (207 findings: 11 areas, every high fixed) sits on
-> `claude/launch-audit`. Read `docs/launch-audit/FINAL-REPORT.md` first; each
-> finding with its commit is in `docs/launch-audit/01-findings.md`. To ship:
-> (1) review, then merge via `/ship`: deploy ALL functions (indexes first;
-> new `links.needsEmbedding`), the rules (self-serve workspace create is now
-> Google/Apple-only with the token's own email), Vercel; (2) TestFlight: first
-> compile of the share-extension Swift and the Facebook-SDK strip; (3) the
-> 15-minute device pass in the report §4; (4) App Store Connect: privacy label
-> rows (Purchase History, Device ID) and a Terms of Use link (3.1.2(c));
-> (5) `normalize_created_at` dry run, then `--apply`. The 1346 QA below still
-> applies to what is live today.
+> The launch audit (207 findings, every high fixed) is merged as `7c82ffa`
+> and live: all 47 Cloud Functions (indexes first, canary OK), the Firestore
+> rules (locked posture re-verified), Vercel (deploys on push; not checked
+> from the cloud session), and TestFlight **build 1347**
+> (the share-extension Swift and the Facebook-SDK strip compiled and
+> uploaded green). Read `docs/launch-audit/FINAL-REPORT.md`; each finding
+> with its commit is in `docs/launch-audit/01-findings.md`. Owner steps
+> left: (1) the 15-minute device pass on 1347 (report §4: 6+ screenshots in
+> the share sheet, the result spoken with VoiceOver, a screenshot save and a
+> Retry finishing in the background, cancelled Apple/Google sign-in, Don't
+> Allow on notifications, a shared card made Private, deleting a test
+> account with images); the 1346 QA below also applies to 1347; (2) App
+> Store Connect: privacy label rows (Purchase History, Device ID) and a
+> Terms of Use link (3.1.2(c)); (3) `normalize_created_at` (WEB-3): Actions
+> → Maintenance → tool `normalize_created_at`, first with `apply` unticked
+> (dry run), then ticked; (4) commit the full `Package.resolved` from a Mac
+> (IOS-5).
 >
-> ## 🚨 OWNER ACTION (2026-10-05): install build **1346** (waiting saves, My notes, first-run fixes, theme follows the device)
+> ## (superseded by 1347, QA still applies) OWNER ACTION (2026-10-05): install build **1346** (waiting saves, My notes, first-run fixes, theme follows the device)
 >
 > Merge `adf023b`; backend, rules and web all live (§9 2026-10-05). QA on
 > 1346: (1) on a FREE test account past 100 saves, share a link from Safari:
@@ -2565,8 +2571,27 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-10-06 — LAUNCH AUDIT, branch `claude/launch-audit` (NOT merged,
-  NOT deployed).** Owner asked for a fix-first, Apple-grade launch audit.
+- **2026-10-06 (later) — LAUNCH AUDIT SHIPPED: merge `7c82ffa`, build
+  1347.** Owner said ship. `claude/launch-audit` merged to `main` with no
+  scope line, so the whole functions codebase deployed. Deploy Cloud
+  Functions #124 (`37489702139`): indexes first (2 composite, 3
+  single-field, additions only), then 47 functions updated, 0 created, 0
+  deleted, no 409 retry; pipeline canary OK (card to `unread` in ~10 s).
+  Deploy Firestore rules #18 (`37489702247`): rules tests green, deployed,
+  anonymous GET /users → 403 (locked). CI on the merge green: Python #147,
+  E2E #32, rules tests #23. iOS → TestFlight #347 (`37489719705`) → **build
+  1347**: the audit's share-extension Swift and the Facebook-SDK strip
+  compiled on the first try (ARCHIVE and EXPORT succeeded, entitlements
+  verified, uploaded). Vercel deploys on push; NOT verified from here (the
+  cloud session's network policy blocks the site). Gotchas: in auto mode
+  the session's permission check blocked the push to `main` until the
+  owner authorized it in chat; `git merge -F -` doesn't read stdin, so
+  pass the message as a file. Not run: `normalize_created_at` (owner, §4
+  banner).
+
+- **2026-10-06 — LAUNCH AUDIT, branch `claude/launch-audit` (merged and
+  shipped the same day, entry above).** Owner asked for a fix-first,
+  Apple-grade launch audit.
   Eight read-only area audits plus my own passes found **207 findings (24
   high)**: 196 fixed, 3 partial, 5 accepted with the reason, 1 owner-only.
   Three fix branches ran in parallel (account/billing/sharing, AI/search/
