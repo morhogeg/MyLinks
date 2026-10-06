@@ -9,6 +9,7 @@ import { sans } from '../../../fonts';
 import { INK, INK_SOFT } from '../../kit/Type';
 import { Wordmark } from '../../../ui/Brand';
 import { useAdFrame } from './format';
+import { NIGHT, typeGlow } from '../../../look';
 
 /**
  * The hook and the name (the SAVE and REVISIT clips' hook-pile pattern).
@@ -68,14 +69,14 @@ const PileCard: React.FC<{ p: Pile; soft: number; drop: number }> = ({ p, soft, 
         width: PILE_W,
         padding: '22px 24px 14px',
         borderRadius: 32,
-        background: '#FFFFFF',
-        border: '1px solid rgba(16,24,40,0.07)',
-        boxShadow: '0 1px 2px rgba(16,24,40,0.06), 0 22px 52px -18px rgba(24,32,48,0.3), 0 44px 80px -40px rgba(24,32,48,0.2)',
+        background: 'linear-gradient(180deg, #1D1D21 0%, #141417 100%)',
+        border: `1px solid ${NIGHT.cardEdge}`,
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.07), 0 1px 2px rgba(0,0,0,0.5), 0 22px 52px -18px rgba(0,0,0,0.85), 0 44px 80px -40px rgba(0,0,0,0.7)',
         fontFamily: sans,
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        <span style={{ width: 58, height: 58, borderRadius: 17, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: ink, background: tint(ink, 0.12) }}>
+        <span style={{ width: 58, height: 58, borderRadius: 17, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: ink, background: tint(ink, 0.16) }}>
           {p.kind === 'safari' ? <Compass size={34} strokeWidth={1.9} /> : p.kind === 'photos' ? <ImageIcon size={32} strokeWidth={1.9} /> : <PlatformMark kind={p.kind} size={34} />}
         </span>
         <span style={{ minWidth: 0 }}>
@@ -89,12 +90,12 @@ const PileCard: React.FC<{ p: Pile; soft: number; drop: number }> = ({ p, soft, 
       <div
         style={{
           transform: `translateY(${Math.round(-ROW * (p.drop ? 1 - drop : 0))}px)`,
-          filter: soft > 0.01 ? `blur(${(soft * 4).toFixed(2)}px) grayscale(${soft.toFixed(3)})` : undefined,
+          filter: soft > 0.01 ? `blur(${(soft * 4).toFixed(2)}px) grayscale(${soft.toFixed(3)}) brightness(${(1 - 0.45 * soft).toFixed(3)})` : undefined,
           opacity: 1 - 0.5 * soft,
         }}
       >
         {(p.drop ? [p.drop, ...p.titles] : p.titles).map((t, k) => (
-          <div key={k} style={{ height: ROW, display: 'flex', alignItems: 'center', borderTop: '1px solid rgba(16,24,40,0.07)', opacity: p.drop && k === 0 ? Math.min(1, drop * 1.4) : 1 }}>
+          <div key={k} style={{ height: ROW, display: 'flex', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.09)', opacity: p.drop && k === 0 ? Math.min(1, drop * 1.4) : 1 }}>
             <span
               style={{
                 fontSize: 25,
@@ -192,7 +193,7 @@ export const Piles: React.FC<{ f: number }> = ({ f }) => {
 
       <AbsoluteFill
         style={{
-          background: `radial-gradient(38% 22% at 50% ${((C.y / L.height) * 100).toFixed(2)}%, rgba(255,255,255,${0.9 * flash}) 0%, rgba(255,255,255,0) 70%)`,
+          background: `radial-gradient(38% 22% at 50% ${((C.y / L.height) * 100).toFixed(2)}%, rgba(225,232,255,${(0.85 * flash).toFixed(3)}) 0%, rgba(${NIGHT.glow},${(0.3 * flash).toFixed(3)}) 30%, rgba(${NIGHT.glow},0) 65%)`,
         }}
       />
 
@@ -205,7 +206,7 @@ export const Piles: React.FC<{ f: number }> = ({ f }) => {
             width: MARK_W,
             transform: `translate(-50%, -50%) scale(${markScale})`,
             opacity: 1 - exit,
-            filter: `drop-shadow(0 ${10 + flash * 10}px ${30 + flash * 40}px rgba(24,32,48,${0.22 + flash * 0.2}))${exit > 0.001 ? ` blur(${(exit * 6).toFixed(2)}px)` : ''}`,
+            filter: `drop-shadow(0 0 ${22 + flash * 34}px rgba(${NIGHT.glow},${(0.32 + flash * 0.4).toFixed(3)}))${exit > 0.001 ? ` blur(${(exit * 6).toFixed(2)}px)` : ''}`,
           }}
         >
           <MarkAssembly close={close} dot={0} width={MARK_W} />
@@ -218,7 +219,8 @@ export const Piles: React.FC<{ f: number }> = ({ f }) => {
                 width: dotR * 2,
                 height: dotR * 2,
                 borderRadius: '50%',
-                background: '#14141B',
+                background: NIGHT.ink,
+                boxShadow: `0 0 26px 6px rgba(${NIGHT.glow},0.6)`,
                 transform: `translate(-50%, -50%) scale(${dot})`,
               }}
             />
@@ -236,9 +238,9 @@ export const Piles: React.FC<{ f: number }> = ({ f }) => {
             transform: `translate(-50%, 0) translateY(${Math.round((1 - wm) * 10 + wmOut * 8)}px)`,
             clipPath: `inset(-20% ${((1 - wm) * 100).toFixed(2)}% -20% 0)`,
             opacity: 1 - wmOut,
-            color: '#14141B',
+            color: NIGHT.ink,
             lineHeight: 0,
-            filter: `drop-shadow(0 4px 24px rgba(24,32,48,0.14))${wm < 0.999 || wmOut > 0.001 ? ` blur(${((1 - wm) * 4 + wmOut * 6).toFixed(2)}px)` : ''}`,
+            filter: `${typeGlow(1.1)}${wm < 0.999 || wmOut > 0.001 ? ` blur(${((1 - wm) * 4 + wmOut * 6).toFixed(2)}px)` : ''}`,
           }}
         >
           <Wordmark style={{ width: '100%', height: 'auto' }} />

@@ -11,6 +11,7 @@ import { INK, INK_SOFT } from '../../kit/Type';
 import { Wordmark } from '../../../ui/Brand';
 import { useAdFrame } from './format';
 import { AD_PLUS } from './handoff';
+import { NIGHT, typeGlow } from '../../../look';
 
 /**
  * The hook and the name (round 5: saves, not videos). Frame 0, the poster:
@@ -85,14 +86,14 @@ const PileCard: React.FC<{ p: Pile; pending: number; grey: number }> = ({ p, pen
         width: 440,
         padding: '26px 26px 20px',
         borderRadius: 34,
-        background: '#FFFFFF',
-        border: '1px solid rgba(16,24,40,0.07)',
-        boxShadow: '0 1px 2px rgba(16,24,40,0.06), 0 22px 52px -18px rgba(24,32,48,0.3), 0 44px 80px -40px rgba(24,32,48,0.2)',
+        background: 'linear-gradient(180deg, #1D1D21 0%, #141417 100%)',
+        border: `1px solid ${NIGHT.cardEdge}`,
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.07), 0 1px 2px rgba(0,0,0,0.5), 0 22px 52px -18px rgba(0,0,0,0.85), 0 44px 80px -40px rgba(0,0,0,0.7)',
         fontFamily: sans,
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
-        <span style={{ width: 66, height: 66, borderRadius: 19, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: ink, background: tint(ink, 0.12) }}>
+        <span style={{ width: 66, height: 66, borderRadius: 19, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: ink, background: tint(ink, 0.16) }}>
           {p.kind === 'safari' ? <Compass size={38} strokeWidth={1.9} /> : p.kind === 'photos' ? <ImageIcon size={36} strokeWidth={1.9} /> : <PlatformMark kind={p.kind} size={38} />}
         </span>
         <span style={{ minWidth: 0 }}>
@@ -100,14 +101,14 @@ const PileCard: React.FC<{ p: Pile; pending: number; grey: number }> = ({ p, pen
           <span style={{ display: 'block', marginTop: 2, fontSize: 23, fontWeight: 560, color: INK_SOFT }}>{p.list}</span>
         </span>
       </div>
-      <div style={{ marginTop: 16, height: ROW * 3, overflow: 'hidden', filter: grey > 0.01 ? `blur(${(grey * 4).toFixed(2)}px) grayscale(${grey.toFixed(3)})` : undefined, opacity: 1 - 0.5 * grey }}>
+      <div style={{ marginTop: 16, height: ROW * 3, overflow: 'hidden', filter: grey > 0.01 ? `blur(${(grey * 4).toFixed(2)}px) grayscale(${grey.toFixed(3)}) brightness(${(1 - 0.45 * grey).toFixed(3)})` : undefined, opacity: 1 - 0.5 * grey }}>
         {/* the strip: `pending` tiles are still off to the left; each arrival slides it right */}
         <div style={{ display: 'flex', gap: SHOT_GAP, paddingTop: 8, transform: `translateX(${Math.round(-(SHOT_W + SHOT_GAP) * pending)}px)` }}>
           {p.shots.map((f, k) => (
             <Img
               key={f}
               src={staticFile(`ads/card/hook/${f}`)}
-              style={{ width: SHOT_W, height: ROW * 3 - 16, flexShrink: 0, objectFit: 'cover', objectPosition: 'left top', borderRadius: 10, border: '1px solid rgba(16,24,40,0.08)', opacity: Math.min(1, Math.max(0, 1 + k - pending)) }}
+              style={{ width: SHOT_W, height: ROW * 3 - 16, flexShrink: 0, objectFit: 'cover', objectPosition: 'left top', borderRadius: 10, border: '1px solid rgba(255,255,255,0.10)', opacity: Math.min(1, Math.max(0, 1 + k - pending)) }}
             />
           ))}
         </div>
@@ -202,7 +203,7 @@ export const Hook: React.FC<{ f: number }> = ({ f }) => {
 
       <AbsoluteFill
         style={{
-          background: `radial-gradient(38% 22% at 50% ${(markY / 1920) * 100}%, rgba(255,255,255,${0.9 * flash}) 0%, rgba(255,255,255,0) 70%)`,
+          background: `radial-gradient(38% 22% at 50% ${(markY / 1920) * 100}%, rgba(225,232,255,${(0.85 * flash).toFixed(3)}) 0%, rgba(${NIGHT.glow},${(0.3 * flash).toFixed(3)}) 30%, rgba(${NIGHT.glow},0) 65%)`,
         }}
       />
 
@@ -214,7 +215,7 @@ export const Hook: React.FC<{ f: number }> = ({ f }) => {
             top: markY,
             transform: `translate(-50%, -50%) scale(${markScale * drift})`,
             opacity: 1 - part,
-            filter: `drop-shadow(0 ${10 + flash * 10}px ${30 + flash * 40}px rgba(24,32,48,${0.22 + flash * 0.2}))`,
+            filter: `drop-shadow(0 0 ${22 + flash * 34}px rgba(${NIGHT.glow},${(0.32 + flash * 0.4).toFixed(3)}))`,
           }}
         >
           <MarkAssembly close={Math.max(0, close * (1 - part * 0.35))} dot={0} width={MARK_W} />
@@ -231,9 +232,9 @@ export const Hook: React.FC<{ f: number }> = ({ f }) => {
             transform: `translate(-50%, 0) translateY(${Math.round((1 - wm) * 10)}px)`,
             clipPath: `inset(-20% ${((1 - wm) * 100).toFixed(2)}% -20% 0)`,
             opacity: 1 - part,
-            color: '#14141B',
+            color: NIGHT.ink,
             lineHeight: 0,
-            filter: `drop-shadow(0 4px 24px rgba(24,32,48,0.14))${wm < 0.999 ? ` blur(${((1 - wm) * 4).toFixed(2)}px)` : ''}`,
+            filter: `${typeGlow(1.1)}${wm < 0.999 ? ` blur(${((1 - wm) * 4).toFixed(2)}px)` : ''}`,
           }}
         >
           <Wordmark style={{ width: '100%', height: 'auto' }} />
@@ -249,9 +250,9 @@ export const Hook: React.FC<{ f: number }> = ({ f }) => {
             width: dotR * 2,
             height: dotR * 2,
             borderRadius: '50%',
-            background: '#14141B',
+            background: NIGHT.ink,
             transform: `translate(-50%, -50%) scale(${dot * dotScale})`,
-            boxShadow: `0 ${8 + flash * 8}px ${26 + flash * 30}px rgba(24,32,48,${0.3 + flash * 0.2})`,
+            boxShadow: `0 0 ${18 + flash * 30}px ${4 + flash * 6}px rgba(${NIGHT.glow},${(0.45 + flash * 0.35).toFixed(3)})`,
             opacity: 1 - prog(f, HITS.toApp + 2, HITS.toApp + 16, EASE_IN_OUT),
           }}
         />

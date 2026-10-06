@@ -6,6 +6,7 @@ import { EASE_GATHER, EASE_IN_OUT, EASE_MODAL, EASE_SPRING, mix, prog } from '..
 import { MarkAssembly, SaveChip, type SaveKind } from '../kit/Brand';
 import { Wordmark } from '../../ui/Brand';
 import { HANDOFF } from './handoff';
+import { NIGHT, typeGlow } from '../../look';
 
 /**
  * 0:00 – 4.3s. Saves everywhere → one point → the mark.
@@ -165,7 +166,7 @@ export const Hook: React.FC<{ f: number; out: number }> = ({ f, out }) => {
                   transform: `translate(-50%, -50%) rotate(${p.r}deg) scale(${p.s})`,
                   opacity: p.o * alpha,
                   zIndex: p.e > 0.01 ? 2 : 1,
-                  filter: [p.blur > 0.2 ? `blur(${p.blur}px)` : '', p.grey > 0.01 ? `grayscale(${p.grey})` : ''].join(' ').trim() || undefined,
+                  filter: [p.blur > 0.2 ? `blur(${p.blur}px)` : '', p.grey > 0.01 ? `grayscale(${p.grey}) brightness(${(1 - 0.5 * p.grey).toFixed(3)})` : ''].join(' ').trim() || undefined,
                 }}
               >
                 <SaveChip kind={c.kind} title={c.title} />
@@ -174,10 +175,10 @@ export const Hook: React.FC<{ f: number; out: number }> = ({ f, out }) => {
           }),
         )}
 
-      {/* the landing: a lift of white light */}
+      {/* the landing: a burst of light where everything gathered */}
       <AbsoluteFill
         style={{
-          background: `radial-gradient(38% 22% at 50% ${(markY / 1920) * 100}%, rgba(255,255,255,${0.9 * flash}) 0%, rgba(255,255,255,0) 70%)`,
+          background: `radial-gradient(42% 24% at 50% ${(markY / 1920) * 100}%, rgba(225,232,255,${(0.85 * flash).toFixed(3)}) 0%, rgba(${NIGHT.glow},${(0.3 * flash).toFixed(3)}) 30%, rgba(${NIGHT.glow},0) 65%)`,
         }}
       />
 
@@ -190,7 +191,7 @@ export const Hook: React.FC<{ f: number; out: number }> = ({ f, out }) => {
             top: markY,
             transform: `translate(-50%, -50%) scale(${markScale * push})`,
             opacity: 1 - part,
-            filter: `drop-shadow(0 ${10 + flash * 10}px ${30 + flash * 40}px rgba(24,32,48,${0.22 + flash * 0.2}))`,
+            filter: `drop-shadow(0 0 ${22 + flash * 34}px rgba(${NIGHT.glow},${(0.32 + flash * 0.4).toFixed(3)}))`,
           }}
         >
           <MarkAssembly close={Math.max(0, close * (1 - part * 0.35))} dot={0} width={MARK_W} />
@@ -208,16 +209,16 @@ export const Hook: React.FC<{ f: number; out: number }> = ({ f, out }) => {
             transform: `translate(-50%, 0) translateY(${Math.round((1 - wm) * 10)}px)`,
             clipPath: `inset(-20% ${((1 - wm) * 100).toFixed(2)}% -20% 0)`,
             opacity: 1 - part,
-            color: '#14141B',
+            color: NIGHT.ink,
             lineHeight: 0,
-            filter: `drop-shadow(0 4px 24px rgba(24,32,48,0.14))${wm < 0.999 ? ` blur(${((1 - wm) * 4).toFixed(2)}px)` : ''}`,
+            filter: `${typeGlow(1.1)}${wm < 0.999 ? ` blur(${((1 - wm) * 4).toFixed(2)}px)` : ''}`,
           }}
         >
           <Wordmark style={{ width: '100%', height: 'auto' }} />
         </div>
       )}
 
-      {/* the point: everything gathered, then the + button's ink */}
+      {/* the point: everything gathered, a dot of light, then the + button (white in the dark app) */}
       {dot > 0 && f < HANDOFF.end && (
         <div
           style={{
@@ -227,9 +228,9 @@ export const Hook: React.FC<{ f: number; out: number }> = ({ f, out }) => {
             width: dotR * 2,
             height: dotR * 2,
             borderRadius: '50%',
-            background: '#14141B',
+            background: NIGHT.ink,
             transform: `translate(-50%, -50%) scale(${dot * dotScale})`,
-            boxShadow: `0 ${8 + flash * 8}px ${26 + flash * 30}px rgba(24,32,48,${0.3 + flash * 0.2})`,
+            boxShadow: `0 0 ${18 + flash * 30}px ${4 + flash * 6}px rgba(${NIGHT.glow},${(0.45 + flash * 0.35).toFixed(3)})`,
             opacity: 1 - prog(f, HANDOFF.iris + 2, HANDOFF.end, EASE_MODAL),
           }}
         />

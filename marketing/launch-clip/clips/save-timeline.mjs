@@ -150,9 +150,9 @@ const PACE = 'Natural and easy, about 155 words a minute, unhurried between sent
 export const CAPTIONS = [
   // the hook: the problem, over each app's own save list (owner, 2026-09-30:
   // the opening must say it plainly, saves scattered across apps, lost)
-  { at: 16, to: 152, text: 'Your saves are scattered across\ncountless apps, and impossible to find.', style: "Knowing and a little rueful, naming a frustration everyone shares; let 'impossible to find' land.", pace: PACE, sizes: [54, 54] },
+  { at: 16, to: 158, text: 'Your saves are scattered across\ncountless apps, and impossible to find.', style: "Knowing and a little rueful, naming a frustration everyone shares; let 'impossible to find' land.", pace: PACE, sizes: [54, 54] },
   // the name, and the first thing it does
-  { at: 176, to: 296, kicker: 'Any app', text: 'Machina saves from any app.\nNo copying, no pasting.', style: "The turn: warm and assured, a small proud smile on the name; 'No copying, no pasting' light and easy.", pace: PACE, until: 'the fifth share lands in the mark' },
+  { at: 176, to: 318, kicker: 'Any app', text: 'Machina saves from any app.\nNo copying, no pasting.', style: "The turn: warm and assured, a small proud smile on the name; 'No copying, no pasting' light and easy.", pace: PACE, until: 'the fifth share lands in the mark' },
   // the source tour (owner, 2026-09-29: show what each kind of save becomes)
   { at: 368, to: 504, kicker: 'YouTube', text: 'Share a YouTube video.\nGet its key moments, with timestamps.', style: 'Bright and capable, showing a friend something that just works.', pace: PACE, sizes: [54, 54], until: 'the four Key moments lift' },
   { at: 528, to: 664, kicker: 'X', text: 'A long read on X, boiled down\nto the points that matter.', style: "Easy and clear, a touch of relief on 'the points that matter'.", pace: PACE, until: 'its Key Points lift' },
@@ -162,7 +162,7 @@ export const CAPTIONS = [
   // screenshots, then the card they become, read down
   { at: 1264, to: 1400, kicker: 'Screenshots', text: 'Even screenshots get analyzed.\nUp to five become one card.', style: 'Quietly impressed, as if this still delights you.', pace: PACE, until: 'the screens are picked and saved' },
   { at: 1408, to: 1576, kicker: 'Key points', text: 'It reads the text in them and\npulls out the key points.', style: 'Clear and capable, even beats.', pace: PACE, until: 'the card opens on its Key Points' },
-  { at: 1584, to: 1696, kicker: 'Tags & links', text: 'Then it tags it, and links it to\nwhat you already saved.', style: 'Thoughtful, opening up at the end, the sense of things connecting.', pace: PACE, until: 'the Related cards lift' },
+  { at: 1584, to: 1698, kicker: 'Tags & links', text: 'Then it tags it, and links it to\nwhat you already saved.', style: 'Thoughtful, opening up at the end, the sense of things connecting.', pace: PACE, until: 'the Related cards lift' },
   // the close, on the lockup: the name (the drawn wordmark wipes in as it is
   // said), then the tagline, exactly as written (owner call 2026-09-28: every
   // launch film ends on it; it appears nowhere earlier in this clip)

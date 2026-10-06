@@ -1,7 +1,7 @@
 import React from "react";
 import { AbsoluteFill } from "remotion";
 import { HEAD_LEAD, KineticLine } from "../../kit/Type";
-import type { WordTiming } from "../../kit/Captions";
+import { BandScrim, type WordTiming } from "../../kit/Captions";
 import { useAdFrame } from "./format";
 
 type AdCaption = {
@@ -143,18 +143,12 @@ export const AdCaptions: React.FC<{
   );
 };
 
-/** the band the line lives in is paper: app screens fade out under it */
+/** the band the line lives in is the night set itself: app screens fade
+ *  out under the kit's BandScrim (the set's own light, haze and dither under
+ *  a mask), in this shape's band */
 export const AdBandScrim: React.FC<{ opacity?: number }> = ({
   opacity = 1,
 }) => {
   const { band } = useAdFrame();
-  return (
-    <AbsoluteFill
-      style={{
-        pointerEvents: "none",
-        opacity,
-        background: `linear-gradient(180deg, #EEF0F4 0px, #EEF0F4 ${band.solid}px, rgba(238,240,244,0) ${band.clear}px)`,
-      }}
-    />
-  );
+  return <BandScrim opacity={opacity} band={band} />;
 };

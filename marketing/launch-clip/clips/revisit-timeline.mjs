@@ -49,7 +49,7 @@ export const TAKE = 'revisitClip';
 export const OPEN = 256;
 export const OPENING = {
   focus: [0, 24], // the saves come into focus (a soft scatter is already there on frame 0)
-  bleach: 152, // …bleach into the paper on "never" (round 6)
+  bleach: 136, // …sink into the dark on "never" (round 6; the Gemini read says it 16 frames sooner)
   gather: [176, 200], // …gather into one point, landing just after "Machina"
   snap: 208, // the brackets snap round it: the mark
   iris: [224, 256], // the point opens onto the Revisit tab
@@ -77,7 +77,7 @@ export const HITS = {
   dueLift: 48, // (round 3) the reminder that came due lifts, in the pause after "reminder,"
   dueDrop: 104, // …and settles back
   bell: 128, // (round 5) its bell, tapped: the reminder's sheet slides up
-  smartLift: 200, // the top row (Smart review) lifts on "three times"
+  smartLift: 216, // the top row (Smart review) lifts on "three times" (the Gemini read)
   smartDrop: 248, // …and settles back
   cancel: 264, // its X: the sheet goes
   openTap: 304, // the due save, tapped: it opens on its summary
@@ -139,7 +139,8 @@ export const SLOTS = { kicker: 200, top: 256 };
 export const BAND = { solid: 420, clear: 600 };
 
 /** the end: the finished lockup holds ~1.8s once its line is whole */
-export const TOTAL_FRAMES = OPEN + 1088 + U;
+// (+32 over the Kokoro cut: the lockup holds ~2.2s after the voice)
+export const TOTAL_FRAMES = OPEN + 1120 + U;
 export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 
 /**
@@ -163,10 +164,10 @@ const PACE = 'Unhurried and warm, about 145 words a minute; let sentences breath
 
 export const CAPTIONS = [
   // THE OPENING: the habit, then the problem (no chapter word: `open`)
-  { at: 16, to: 96, open: true, text: 'You save things\nto come back to later.', style: 'Warm and knowing, gentle.', pace: PACE },
-  { at: 112, to: 188, open: true, text: 'But most of them,\nyou never open again.', style: 'Softly honest, a touch wistful, no guilt.', pace: PACE },
+  { at: 16, to: 90, open: true, text: 'You save things\nto come back to later.', style: 'Warm and knowing, gentle.', pace: PACE },
+  { at: 96, to: 180, open: true, text: 'But most of them,\nyou never open again.', style: 'Softly honest, a touch wistful, no guilt.', pace: PACE },
   // the turn: the saves gather into the point as the name is said
-  { at: 192, to: 256, open: true, text: 'Machina brings them\nback to you.', style: 'The turn: kind and uplifting, a smile.', pace: PACE },
+  { at: 192, to: 266, open: true, text: 'Machina brings them\nback to you.', style: 'The turn: kind and uplifting, a smile.', pace: PACE },
   // (round 3, owner: "too thin, expand on the feature") Revisit opens on
   // what has come due: a reminder the user set (the app's Remind me: Smart
   // review, or a day) lands under "Due now"; its row lifts after "reminder,"
@@ -175,19 +176,19 @@ export const CAPTIONS = [
   // the reminder's own sheet, its choices named plainly; the top row (the
   // app's "Smart review": tomorrow, then 1 week and 1 month) lifts on "three
   // times"
-  { at: OPEN + 144, to: OPEN + 256, text: 'Later today, this weekend,\nor three times, so it sticks.', style: "A light, lilting list; a playful little lift on 'so it sticks'.", pace: PACE },
+  { at: OPEN + 144, to: OPEN + 274, text: 'Later today, this weekend,\nor three times, so it sticks.', style: "A light, lilting list; a playful little lift on 'so it sticks'.", pace: PACE },
   // the save opens on its summary, then down to its Key Points
-  { at: OPEN + 320, to: OPEN + 408, text: 'Open one, and the key points\nare already there.', style: 'Pleased and easy.', pace: PACE },
+  { at: OPEN + 320, to: OPEN + 424, text: 'Open one, and the key points\nare already there.', style: 'Pleased and easy.', pace: PACE },
   // the "Do this" list: the app writes a step only for a save that calls for
   // one (web/lib/takeaway.ts); its first row lifts in the pause after
   // "action,", then the V60 step is ticked off (the app's "Marked as done")
-  { at: OPEN + 128 + U, to: OPEN + 256 + U, text: 'When a save calls for action,\nMachina turns it into a to-do.', style: 'Practical, a little energised.', pace: PACE },
+  { at: OPEN + 128 + U, to: OPEN + 258 + U, text: 'When a save calls for action,\nMachina turns it into a to-do.', style: 'Practical, a little energised.', pace: PACE },
   // "This week in Machina" is tapped open in the silence before this line;
   // it unfolds on "Every week," and rises into view on "Machina brings back"
-  { at: OPEN + 384 + U, to: OPEN + 496 + U, text: 'Every week, Machina brings back\nwhat’s worth remembering.', style: 'Warm and steady, a gentle weekly ritual.', pace: PACE },
+  { at: OPEN + 384 + U, to: OPEN + 498 + U, text: 'Every week, Machina brings back\nwhat’s worth remembering.', style: 'Warm and steady, a gentle weekly ritual.', pace: PACE },
   // the themes land as "themes" is said; the Standout rises into view on
   // "the one save worth rereading" and lifts as the glide lands
-  { at: OPEN + 576 + U, to: OPEN + 688 + U, text: 'The themes of your week,\nand the one save worth rereading.', style: "Thoughtful and savouring; slower on 'worth rereading'.", pace: PACE },
+  { at: OPEN + 576 + U, to: OPEN + 726 + U, text: 'The themes of your week,\nand the one save worth rereading.', style: "Thoughtful and savouring; slower on 'worth rereading'.", pace: PACE },
   // the close: the name (the drawn wordmark wipes in as it is said), then
   // the tagline (owner, 2026-09-28: every launch film ends on it, once)
   { at: OPEN + 960 + U, to: TOTAL_FRAMES, place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4, style: 'A warm, assured sign-off; the name proud, then the tagline unhurried and sincere.', pace: PACE },

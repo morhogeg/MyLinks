@@ -5,6 +5,7 @@ import { MarkAssembly, SaveChip, type SaveKind } from '../../kit/Brand';
 import { Wordmark } from '../../../ui/Brand';
 import { EASE_GATHER, EASE_IN_OUT, EASE_MODAL, EASE_SPRING, mix, prog } from '../../kit/curves';
 import { useShape } from './frame';
+import { NIGHT, typeGlow } from '../../../look';
 
 /**
  * 1 THE PAIN and 2 THE ANSWER, in the reel's hook language (kit SaveChip,
@@ -124,10 +125,10 @@ export const Hook: React.FC<{ f: number }> = ({ f }) => {
                   top: p.y,
                   transform: `translate(-50%, -50%) rotate(${p.r}deg) scale(${p.s})`,
                   opacity: p.o * alpha,
-                  filter: [p.blur > 0.2 ? `blur(${p.blur.toFixed(2)}px)` : '', p.grey > 0.01 ? `grayscale(${p.grey.toFixed(3)})` : ''].join(' ').trim() || undefined,
+                  filter: [p.blur > 0.2 ? `blur(${p.blur.toFixed(2)}px)` : '', p.grey > 0.01 ? `grayscale(${p.grey.toFixed(3)}) brightness(${(1 - 0.45 * p.grey).toFixed(3)})` : ''].join(' ').trim() || undefined,
                 }}
               >
-                <SaveChip kind={c.kind} title={c.title} style={p.lit > 0.01 ? { boxShadow: `0 1px 2px rgba(16,24,40,0.06), 0 ${Math.round(18 + 22 * p.lit)}px ${Math.round(40 + 40 * p.lit)}px -14px rgba(24,32,48,${(0.28 + 0.2 * p.lit).toFixed(3)}), 0 0 0 ${(2 * p.lit).toFixed(2)}px rgba(20,20,27,${(0.55 * p.lit).toFixed(3)})` } : undefined} />
+                <SaveChip kind={c.kind} title={c.title} style={p.lit > 0.01 ? { boxShadow: `inset 0 1px 0 rgba(255,255,255,0.07), 0 ${Math.round(18 + 22 * p.lit)}px ${Math.round(40 + 40 * p.lit)}px -14px rgba(0,0,0,${(0.8 + 0.1 * p.lit).toFixed(3)}), 0 0 0 ${(1.5 * p.lit).toFixed(2)}px rgba(236,239,246,${(0.6 * p.lit).toFixed(3)}), 0 0 ${Math.round(26 * p.lit)}px rgba(${NIGHT.glow},${(0.4 * p.lit).toFixed(3)})` } : undefined} />
               </div>
             );
           }));
@@ -136,7 +137,7 @@ export const Hook: React.FC<{ f: number }> = ({ f }) => {
       {/* the landing: a lift of white light */}
       <AbsoluteFill
         style={{
-          background: `radial-gradient(38% 22% at 50% ${((P.y / height) * 100).toFixed(2)}%, rgba(255,255,255,${0.9 * flash}) 0%, rgba(255,255,255,0) 70%)`,
+          background: `radial-gradient(38% 22% at 50% ${((P.y / height) * 100).toFixed(2)}%, rgba(225,232,255,${(0.85 * flash).toFixed(3)}) 0%, rgba(${NIGHT.glow},${(0.3 * flash).toFixed(3)}) 30%, rgba(${NIGHT.glow},0) 65%)`,
         }}
       />
 
@@ -149,7 +150,7 @@ export const Hook: React.FC<{ f: number }> = ({ f }) => {
             top: P.y,
             transform: 'translate(-50%, -50%)',
             opacity: 1 - part,
-            filter: `drop-shadow(0 ${10 + flash * 10}px ${30 + flash * 40}px rgba(24,32,48,${0.22 + flash * 0.2}))`,
+            filter: `drop-shadow(0 0 ${22 + flash * 34}px rgba(${NIGHT.glow},${(0.32 + flash * 0.4).toFixed(3)}))`,
           }}
         >
           <MarkAssembly close={Math.max(0, close * (1 - part * 0.35))} dot={0} width={MARK_W} />
@@ -168,11 +169,11 @@ export const Hook: React.FC<{ f: number }> = ({ f }) => {
               left: P.x - WORD_W / 2,
               top: P.y + MARK_W / 2 + 56,
               width: WORD_W,
-              color: '#14141B',
+              color: NIGHT.ink,
               lineHeight: 0,
               clipPath: `inset(-10% ${((1 - word) * 100).toFixed(2)}% -10% 0)`,
               transform: `translateY(${Math.round((1 - word) * 12)}px)`,
-              filter: 'drop-shadow(0 4px 26px rgba(24,32,48,0.14))',
+              filter: typeGlow(1.1),
               opacity: 1 - part,
             }}
           >
@@ -191,9 +192,9 @@ export const Hook: React.FC<{ f: number }> = ({ f }) => {
             width: POINT_R * 2,
             height: POINT_R * 2,
             borderRadius: '50%',
-            background: '#14141B',
+            background: NIGHT.ink,
             transform: `translate(-50%, -50%) scale(${dot})`,
-            boxShadow: `0 ${8 + flash * 8}px ${26 + flash * 30}px rgba(24,32,48,${0.3 + flash * 0.2})`,
+            boxShadow: `0 0 ${18 + flash * 30}px ${4 + flash * 6}px rgba(${NIGHT.glow},${(0.45 + flash * 0.35).toFixed(3)})`,
             opacity: 1 - prog(f, HITS.iris[0], HITS.iris[0] + 8, EASE_MODAL),
           }}
         />

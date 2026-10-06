@@ -7,6 +7,7 @@ import { PLATFORM_INK, PlatformMark } from '../../../ui/app';
 import { Tap } from '../../kit/AppShot';
 import { EASE_GATHER, EASE_MODAL, EASE_SPRING, mix, prog } from '../../kit/curves';
 import { INK, INK_SOFT } from '../../kit/Type';
+import { NIGHT, typeGlow } from '../../../look';
 
 /**
  * ANY APP: "Machina saves from any app. No copying, no pasting."
@@ -47,16 +48,16 @@ const Card: React.FC<{ s: Source; share: number }> = ({ s, share }) => (
       width: 780,
       padding: '30px 34px 30px 30px',
       borderRadius: 38,
-      background: '#FFFFFF',
-      border: '1px solid rgba(16,24,40,0.07)',
-      boxShadow: '0 1px 2px rgba(16,24,40,0.06), 0 24px 60px -18px rgba(24,32,48,0.3), 0 50px 90px -40px rgba(24,32,48,0.22)',
+      background: 'linear-gradient(180deg, #1D1D21 0%, #141417 100%)',
+      border: `1px solid ${NIGHT.cardEdge}`,
+      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.07), 0 1px 2px rgba(0,0,0,0.5), 0 22px 52px -18px rgba(0,0,0,0.85), 0 44px 80px -40px rgba(0,0,0,0.7)',
       fontFamily: sans,
       display: 'flex',
       alignItems: 'center',
       gap: 26,
     }}
   >
-    <span style={{ width: 92, height: 92, borderRadius: 24, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: ink(s), background: tint(ink(s), 0.11) }}>
+    <span style={{ width: 92, height: 92, borderRadius: 24, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: ink(s), background: tint(ink(s), 0.16) }}>
       {s.kind === 'safari' ? <Compass size={50} strokeWidth={1.9} /> : <PlatformMark kind={s.kind} size={50} />}
     </span>
     <span style={{ flex: 1, minWidth: 0 }}>
@@ -74,8 +75,8 @@ const Card: React.FC<{ s: Source; share: number }> = ({ s, share }) => (
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        color: share > 0 ? '#FFFFFF' : INK,
-        background: share > 0 ? `rgba(20,20,27,${0.9 * share})` : 'rgba(20,20,27,0.06)',
+        color: share > 0 ? '#101016' : INK,
+        background: share > 0 ? `rgba(233,233,242,${(0.92 * share).toFixed(3)})` : 'rgba(255,255,255,0.08)',
         transform: `scale(${1 - 0.08 * Math.sin(Math.min(1, share) * Math.PI)})`,
       }}
     >
@@ -131,7 +132,8 @@ export const Shares: React.FC<{ f: number }> = ({ f }) => (
                 width: 60,
                 height: 60,
                 borderRadius: '50%',
-                border: `3px solid rgba(20,20,27,${0.45 * (1 - ring)})`,
+                border: `3px solid rgba(236,239,246,${(0.55 * (1 - ring)).toFixed(3)})`,
+                  boxShadow: `0 0 18px rgba(${NIGHT.glow},${(0.35 * (1 - ring)).toFixed(3)})`,
                 transform: `translate(-50%, -50%) scale(${mix(0.6, 4.2, ring)})`,
               }}
             />
@@ -145,7 +147,8 @@ export const Shares: React.FC<{ f: number }> = ({ f }) => (
                 width: 36,
                 height: 36,
                 borderRadius: '50%',
-                background: 'rgba(20,20,27,0.9)',
+                background: NIGHT.ink,
+              boxShadow: `0 0 22px 5px rgba(${NIGHT.glow},0.55)`,
                 transform: `translate(-50%, -50%) scale(${1 + 0.35 * p})`,
                 opacity: p,
               }}

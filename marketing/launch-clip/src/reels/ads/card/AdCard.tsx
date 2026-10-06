@@ -3,6 +3,7 @@ import { AbsoluteFill, Audio, staticFile, useCurrentFrame } from 'remotion';
 import { CAPTIONS, FPS, HITS, THROW_LEN } from '../../../../ads/card-timeline.mjs';
 import { sans } from '../../../fonts';
 import VO from './vo.json';
+import { BandScrim } from '../../kit/Captions';
 import { CLOCK } from '../../kit/camera';
 import { prog } from '../../kit/curves';
 import { Lens, Paper } from '../../kit/Paper';
@@ -23,18 +24,11 @@ import { End } from './End';
  * `tall` 9:16, `feed` 4:5, `square` 1:1 (the poster).
  */
 
-/** the paper band the app fades out under, from the shape's framing */
+/** the night band the app fades out under (the kit's BandScrim: the set's
+ *  own light under a mask), from the shape's framing */
 const AdBandScrim: React.FC<{ opacity: number }> = ({ opacity }) => {
   const { band } = useAdFrame();
-  return (
-    <AbsoluteFill
-      style={{
-        pointerEvents: 'none',
-        opacity,
-        background: `linear-gradient(180deg, #EEF0F4 0px, #EEF0F4 ${band.solid}px, rgba(238,240,244,0) ${band.clear}px)`,
-      }}
-    />
-  );
+  return <BandScrim opacity={opacity} band={band} />;
 };
 
 export const AdCard: React.FC<{

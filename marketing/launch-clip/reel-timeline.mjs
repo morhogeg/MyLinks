@@ -247,8 +247,8 @@ export const CAPTIONS = [
   // the problem, as the launch film opens: the saves hang where they were
   // kept while the narrator names it
   { at: 16, to: 88, text: 'You save things everywhere.', style: TONE + 'Soft, intimate opener, a knowing half-smile, as if noticing something true about the listener.', pace: PACE },
-  { at: 96, to: 216, text: 'An article here. A recipe there.\nA video somewhere else.', style: TONE + 'Light, observational list, each item a small glance in a different direction; even rhythm.', pace: PACE },
-  { at: 224, to: 304, text: 'Saved, and rarely seen again.', style: TONE + 'Quiet and a little wistful, landing softly; the low point.', pace: PACE },
+  { at: 96, to: 218, text: 'An article here. A recipe there.\nA video somewhere else.', style: TONE + 'Light, observational list, each item a small glance in a different direction; even rhythm.', pace: PACE },
+  { at: 224, to: 314, text: 'Saved, and rarely seen again.', style: TONE + 'Quiet and a little wistful, landing softly; the low point.', pace: PACE },
   // the answer: the saves collapse into the point, the brackets snap, and
   // the narrator introduces it. The screen shows only the NAME (the drawn
   // wordmark wipes in under the mark on "Machina"; scenes/Hook.tsx); the
@@ -259,7 +259,7 @@ export const CAPTIONS = [
   // (2026-09-28, owner: the tagline is said once, at the end, so the promise
   // after the name is the App Store subtitle; it was "All your saves,
   // finally useful.")
-  { at: 416, to: 488, text: 'Never lose\nanother great find.', style: TONE + 'A warm promise, simple and sure.', pace: PACE },
+  { at: 416, to: 492, text: 'Never lose\nanother great find.', style: TONE + 'A warm promise, simple and sure.', pace: PACE },
   // the share hold: from any app, into Machina (scenes/ShareBeat.tsx)
   { at: holdStart('share') + 40, to: holdStart('share') + 176, text: 'Save anything, from anywhere.', style: TONE + 'Bright, simple, confident.', pace: PACE, until: 'the third share lands in the mark' },
   // the modes hold: the Add dialog's three ways in
@@ -281,9 +281,9 @@ export const CAPTIONS = [
   // recall (scenes/Recall.tsx): the "Do this" list (round 12, owner: say the
   // app makes an action item where one is relevant; it writes one only for a
   // save that calls for an action), then the weekly recap, read slowly
-  { at: holdStart('recall') + 16, to: holdStart('recall') + TODO_LEN - 4, text: 'When a save calls for action,\nMachina turns it into a to-do.', style: TONE + 'Practical and warm, a light lift on the to-do.', pace: PACE },
+  { at: holdStart('recall') + 16, to: holdStart('recall') + TODO_LEN - 2, text: 'When a save calls for action,\nMachina turns it into a to-do.', style: TONE + 'Practical and warm, a light lift on the to-do.', pace: PACE },
   { at: holdStart('recall') + TODO_LEN + 24, to: holdStart('recall') + TODO_LEN + 130, text: 'Every week, Machina brings back\nwhat’s worth remembering.', style: TONE + 'Warm and personal.', pace: PACE },
-  { at: holdStart('recall') + TODO_LEN + 136, to: holdStart('recall') + TODO_LEN + 256, text: 'The themes of your week,\nand the one save worth rereading.', style: TONE + 'Thoughtful and gentle, landing softly at the end.', pace: PACE },
+  { at: holdStart('recall') + TODO_LEN + 136, to: holdStart('recall') + TODO_LEN + 263, text: 'The themes of your week,\nand the one save worth rereading.', style: TONE + 'Thoughtful and gentle, landing softly at the end.', pace: PACE },
   // the close: the name (the drawn wordmark wipes in as it is said), then
   // the tagline, set big in Geist and broken at its comma (owner call
   // 2026-09-28: every launch film ends on the tagline)
