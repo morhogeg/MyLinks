@@ -1070,13 +1070,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // Tag Explorer → Rename / Merge / Delete, library-wide (lib/tagOps). The
     // exact stored spellings to sweep come from every card loaded here (live
     // window + search snapshot); the snapshot is patched so search agrees.
-    const tagVariants = (tag: string): string[] => {
-        const out = new Set<string>();
-        for (const pool of [links, libraryLinks]) {
-            for (const l of pool) for (const t of l.tags) if (tagMatches(t, tag)) out.add(t);
-        }
-        return Array.from(out);
-    };
     const retagLocal = (from: string, to: string | null) => {
         for (const l of libraryLinks) {
             if (l.tags.some((t) => tagMatches(t, from))) patchLink(l.id, { tags: retagList(l.tags, from, to) });
@@ -1091,7 +1084,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     const handleRenameTag = async (from: string, to: string) => {
         if (!uid) return;
         try {
-            const n = await renameTag(uid, from, to, tagVariants(from));
+            const n = await renameTag(uid, from, to);
             retagLocal(from, to);
             toast.success(`Updated ${n} card${n === 1 ? '' : 's'}`);
         } catch {
@@ -1101,7 +1094,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     const handleDeleteTag = async (tag: string) => {
         if (!uid) return;
         try {
-            const n = await deleteTag(uid, tag, tagVariants(tag));
+            const n = await deleteTag(uid, tag);
             retagLocal(tag, null);
             toast.success(`Removed from ${n} card${n === 1 ? '' : 's'}`);
         } catch {
