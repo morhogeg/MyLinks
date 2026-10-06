@@ -161,6 +161,32 @@ export function graphSafeLink(l: Link): Link {
     };
 }
 
+/**
+ * Everything buildGraphModel reads from the cards, as one string: two pools
+ * with the same key build the same model. The view rebuilds only when this
+ * changes, because `links` is a new array on every Firestore snapshot (opening
+ * an unread card marks it read 1.5s later) and every rebuild threw away the
+ * layout, the selection and the camera under the user.
+ */
+export function graphStructureKey(links: Link[]): string {
+    const parts: string[] = [];
+    for (const raw of links) {
+        if (isPending(raw)) continue;
+        const l = graphSafeLink(raw);
+        parts.push([
+            l.id,
+            getTimestampNumber(l.createdAt),
+            l.title,
+            l.category,
+            (l.concepts ?? []).join('\u0001'),
+            l.tags.join('\u0001'),
+            (l.relatedLinks ?? []).map((r) => `${r.id}:${r.similarity ?? ''}`).join(','),
+            l.embedding_vector ? 'v' : '',
+        ].join('\u0002'));
+    }
+    return parts.join('\u0003');
+}
+
 export function nodeRadius(degree: number): number {
     return Math.min(16, 5 + 3 * Math.sqrt(degree));
 }
