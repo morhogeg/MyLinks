@@ -43,14 +43,16 @@ const PROVIDER_LABEL: Record<AuthProviderId, string> = { apple: 'Apple', google:
  *    above the fold made the screen feel like a warning page.
  */
 export function AccountView({
-    accountEmail, displayName, photoURL, providerLabel, signOut, onClose, onDelete, deleteError,
+    accountEmail, displayName, photoURL, providerLabel, signOut, signingOut, onDelete, deleteError,
 }: {
     accountEmail: string | null;
     displayName: string | null;
     photoURL: string | null;
     providerLabel: string;
+    /** Closes Settings and signs out, or asks first (SettingsModal). */
     signOut: () => void;
-    onClose: () => void;
+    /** The unsynced-changes check before sign-out is running. */
+    signingOut: boolean;
     onDelete: () => void;
     deleteError: string | null;
 }) {
@@ -134,8 +136,8 @@ export function AccountView({
 
             <div className="mt-7" />
             <List>
-                <RowShell tile={<LogOut className="w-[16px] h-[16px]" />} onClick={() => { onClose(); signOut(); }}>
-                    <RowText title="Sign out" />
+                <RowShell tile={<LogOut className="w-[16px] h-[16px]" />} onClick={signingOut ? undefined : signOut}>
+                    <RowText title={signingOut ? 'Signing out…' : 'Sign out'} />
                 </RowShell>
             </List>
 

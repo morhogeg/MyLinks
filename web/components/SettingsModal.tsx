@@ -7,6 +7,7 @@ import { readLocalAiConsent } from '@/lib/aiConsent';
 import { useTheme } from './ThemeProvider';
 import { useAuth } from './AuthProvider';
 import { deleteAccount } from '@/lib/auth';
+import { hasUnsyncedWrites } from '@/lib/localData';
 import { isNativeApp } from '@/lib/api';
 import { openExternal } from '@/lib/share';
 import { useEntitlement } from './EntitlementProvider';
@@ -203,6 +204,25 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
         }
     };
 
+    // Sign-out deletes this device's Firestore cache (lib/localData.ts) and
+    // with it any edit the server hasn't acknowledged yet, typically one made
+    // offline. Check first (instant when nothing is pending) and ask before
+    // losing anything.
+    const [checkingSignOut, setCheckingSignOut] = useState(false);
+    const [unsyncedWarning, setUnsyncedWarning] = useState(false);
+    const requestSignOut = async () => {
+        if (checkingSignOut) return;
+        setCheckingSignOut(true);
+        const unsynced = await hasUnsyncedWrites();
+        setCheckingSignOut(false);
+        if (unsynced) {
+            setUnsyncedWarning(true);
+            return;
+        }
+        onClose();
+        void signOut();
+    };
+
     // An App Store subscription belongs to the Apple ID, not to this account:
     // deleting the account does not stop the billing. Say so in the confirm,
     // with the way to cancel, while there is still time to act on it.
@@ -385,8 +405,8 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                                 displayName={displayName}
                                 photoURL={photoURL}
                                 providerLabel={providerLabel}
-                                signOut={signOut}
-                                onClose={onClose}
+                                signOut={() => { void requestSignOut(); }}
+                                signingOut={checkingSignOut}
                                 onDelete={() => { setDeleteError(null); setShowDeleteConfirm(true); }}
                                 deleteError={deleteError}
                             />
@@ -514,6 +534,17 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                 }
                 confirmLabel={deleting ? 'Deleting…' : 'Delete account'}
                 cancelLabel="Cancel"
+                variant="danger"
+            />
+
+            <ConfirmDialog
+                isOpen={unsyncedWarning}
+                onClose={() => setUnsyncedWarning(false)}
+                onConfirm={() => { onClose(); void signOut(); }}
+                title="Some changes haven’t synced"
+                message="Your latest edits are only on this device, usually because it’s offline. Signing out now deletes them. Reconnect and wait a moment to keep them."
+                confirmLabel="Sign out anyway"
+                cancelLabel="Stay signed in"
                 variant="danger"
             />
 
