@@ -67,14 +67,16 @@ const ANSWER_DISALLOWED = ['img'];
 
 /** One component map per direction, built once at module load rather than per
  *  render. Every heading level maps to ONE modest size: a model's # choice must
- *  never shout inside a chat bubble. */
+ *  never shout inside a chat bubble. Headings and code are sized relative to
+ *  the answer (1em, and the 13:15 ratio), so they keep their proportion when
+ *  the answer scales with the reader's text size (see ANSWER_TEXT_CLS). */
 function answerComponents(dir: 'rtl' | 'ltr'): Components {
     return {
         // Mini-subheadings the structure prompt asks for on long answers.
-        h1: ({ children }) => <h4 dir={dir} className="text-[15px] font-bold text-text mt-3 mb-1 first:mt-0">{children}</h4>,
-        h2: ({ children }) => <h4 dir={dir} className="text-[15px] font-bold text-text mt-3 mb-1 first:mt-0">{children}</h4>,
-        h3: ({ children }) => <h4 dir={dir} className="text-[15px] font-bold text-text mt-3 mb-1 first:mt-0">{children}</h4>,
-        h4: ({ children }) => <h4 dir={dir} className="text-[15px] font-bold text-text mt-3 mb-1 first:mt-0">{children}</h4>,
+        h1: ({ children }) => <h4 dir={dir} className="text-[1em] font-bold text-text mt-3 mb-1 first:mt-0">{children}</h4>,
+        h2: ({ children }) => <h4 dir={dir} className="text-[1em] font-bold text-text mt-3 mb-1 first:mt-0">{children}</h4>,
+        h3: ({ children }) => <h4 dir={dir} className="text-[1em] font-bold text-text mt-3 mb-1 first:mt-0">{children}</h4>,
+        h4: ({ children }) => <h4 dir={dir} className="text-[1em] font-bold text-text mt-3 mb-1 first:mt-0">{children}</h4>,
         p: ({ children }) => <p dir={dir} className="mb-2 last:mb-0">{children}</p>,
         ul: ({ children }) => <ul dir={dir} className="list-disc ps-5 mb-2 last:mb-0 space-y-1">{children}</ul>,
         ol: ({ children }) => <ol dir={dir} className="list-decimal ps-5 mb-2 last:mb-0 space-y-1">{children}</ol>,
@@ -89,10 +91,17 @@ function answerComponents(dir: 'rtl' | 'ltr'): Components {
                 {children}
             </a>
         ) : <span>{children}</span>,
-        code: ({ children }) => <code className="px-1 py-0.5 rounded bg-card-hover text-[13px] font-mono">{children}</code>,
+        code: ({ children }) => <code className="px-1 py-0.5 rounded bg-card-hover text-[length:calc(13em/15)] font-mono">{children}</code>,
     };
 }
 const ANSWER_COMPONENTS = { ltr: answerComponents('ltr'), rtl: answerComponents('rtl') };
+
+/** An answer is the longest text anyone reads in Ask, so it follows the
+ *  reader's system text size (iOS Dynamic Type) through the same
+ *  --reading-scale the card's `.reading-prose` uses (lib/useReadingScale).
+ *  Not that class itself: it pins 1rem (16px) and, being unlayered, would
+ *  override the answer's designed 15px. 15px at the default size. */
+const ANSWER_TEXT_CLS = 'text-[length:calc(15px*var(--reading-scale,1))]';
 
 /** Renders an assistant answer as Markdown, styled to match the chat.
  *
@@ -284,10 +293,12 @@ const SLOW_AFTER_MS = 20_000;
 /** Staged "what Machina is doing" status shown while waiting for the answer —
  *  honest theater (mirrors the real pipeline) that makes the wait legible
  *  instead of three anonymous dots. Remounts per ask. `OrbStatus` owns the
- *  swap, so the orb and the phrase change as one gesture. */
-function ThinkingIndicator({ origin }: { origin: AskOrigin }) {
+ *  swap, so the orb and the phrase change as one gesture. Each phrase is also
+ *  handed to `onPhrase` for Ask's screen-reader status line. */
+function ThinkingIndicator({ origin, onPhrase }: { origin: AskOrigin; onPhrase?: (phrase: string) => void }) {
     const stages = [...THINKING_STAGES[origin], SLOW_STAGE];
     const [stage, setStage] = useState(0);
+    const phrase = stages[stage].phrase;
 
     useEffect(() => {
         const t1 = setTimeout(() => setStage(1), 1600);
@@ -295,6 +306,7 @@ function ThinkingIndicator({ origin }: { origin: AskOrigin }) {
         const t3 = setTimeout(() => setStage(3), SLOW_AFTER_MS);
         return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
     }, []);
+    useEffect(() => { onPhrase?.(phrase); }, [phrase, onPhrase]);
 
     return (
         <div className="flex justify-start">
@@ -324,7 +336,7 @@ function ThinkingIndicator({ origin }: { origin: AskOrigin }) {
                     the same split put a porcelain mark against a grey label. */}
                 <OrbStatus
                     orb="clamp"
-                    label={stages[stage].phrase}
+                    label={phrase}
                     stageKey={stage}
                     size={26}
                     entry="trace"
@@ -397,6 +409,9 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
     // pre-first-token wait). Together they gate the Stop affordance.
     const [isStreaming, setIsStreaming] = useState(false);
     const busy = isThinking || isStreaming;
+    // What the screen-reader status line says: the thinking phrase while
+    // waiting, then "Answer ready" or the error. Never the streaming text.
+    const [liveStatus, setLiveStatus] = useState('');
     const scrollRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -1255,6 +1270,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                             if (!isStale()) {
                                 setIsThinking(false);
                                 patchAt({ content: accError, error: true });
+                                setLiveStatus(accError);
                             }
                             // Surface the failure in client_errors — the backend
                             // message is sanitized, so record what the user saw
@@ -1267,7 +1283,10 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                             // The ask was metered: keep the free plan's "N of 20
                             // left" line current, as the buffered path does.
                             if (!isPro) void refreshEntitlement();
-                            if (!isStale()) hapticLight();
+                            if (!isStale()) {
+                                hapticLight();
+                                setLiveStatus('Answer ready');
+                            }
                         }
                     }
                 }
@@ -1296,6 +1315,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                 if (!isPro) void refreshEntitlement();
                 if (isStale()) { commitDetached([...withUser, answer]); return; }
                 setMessages(prev => [...prev, answer]);
+                setLiveStatus('Answer ready');
                 hapticLight();
                 // Buffered path (native): the whole answer just landed at once —
                 // show it from the top, question first.
@@ -1312,6 +1332,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                 void refreshEntitlement();
                 if (isStale()) { commitDetached([...withUser, wallAnswer]); return; }
                 setMessages(prev => [...prev, wallAnswer]);
+                setLiveStatus(wallAnswer.content);
                 openPaywall('asks');
             } else {
                 const errAnswer: ChatMessage = {
@@ -1324,6 +1345,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                 reportError(new Error(`ask failed (HTTP ${res.status}): ${data.error || 'unknown'}`), 'ask-send');
                 if (isStale()) { commitDetached([...withUser, errAnswer]); return; }
                 setMessages(prev => [...prev, errAnswer]);
+                setLiveStatus(errAnswer.content);
             }
         } catch (e) {
             // A deliberate abort (Stop / a newer send) is not a user-facing error.
@@ -1343,6 +1365,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                 return;
             }
             setMessages(prev => [...prev, errAnswer]);
+            setLiveStatus(errAnswer.content);
         } finally {
             // Only the current generation owns these — a superseded run must not
             // clear the newer stream's thinking state or abort controller.
@@ -1448,7 +1471,9 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                     {!isEmpty && (
                         <button
                             onClick={newChat}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-text-muted text-xs font-medium hover:text-text active:bg-card-hover transition-colors cursor-pointer"
+                            // The pill draws 24px tall; the ::after stretches the
+                            // tap target to 44pt without changing the look.
+                            className="relative after:absolute after:inset-x-0 after:-inset-y-2.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-text-muted text-xs font-medium hover:text-text active:bg-card-hover transition-colors cursor-pointer"
                         >
                             <Plus className="w-3.5 h-3.5" />
                             New
@@ -1562,7 +1587,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                                                     // Errors keep a subtle container so they stand out.
                                                     ? 'px-4 py-3 rounded-2xl rounded-bl-md text-[15px] leading-relaxed bg-red-500/10 border border-red-500/20 text-text whitespace-pre-wrap'
                                                     // AI answer: plain text on the page (no bubble), like Gemini.
-                                                    : 'px-1 text-[15px] leading-relaxed text-text'
+                                                    : `px-1 ${ANSWER_TEXT_CLS} leading-relaxed text-text`
                                         }
                                     >
                                         {/* User and error bubbles stay plain text; assistant answers render Markdown. */}
@@ -1733,7 +1758,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                             </div>
                         ))}
 
-                        {isThinking && <ThinkingIndicator origin={askOrigin} />}
+                        {isThinking && <ThinkingIndicator origin={askOrigin} onPhrase={setLiveStatus} />}
 
                         {/* Content-aware one-tap follow-ups once the latest answer has
                             settled (empty when the turn can't produce a tailored set). */}
@@ -1799,7 +1824,8 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                         <button
                             onClick={() => setFreshCard(null)}
                             aria-label="Dismiss"
-                            className="shrink-0 p-1.5 rounded-full text-text-muted hover:text-text transition-colors cursor-pointer"
+                            // 26px drawn, 44pt to the finger (the ::after).
+                            className="relative after:absolute after:-inset-[9px] shrink-0 p-1.5 rounded-full text-text-muted hover:text-text transition-colors cursor-pointer"
                         >
                             <X className="w-3.5 h-3.5" />
                         </button>
@@ -1830,6 +1856,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                         onFocus={handleFocus}
                         rows={1}
                         maxLength={MAX_QUESTION_CHARS}
+                        aria-label="Ask Machina"
                         placeholder={uid ? 'Ask about anything you’ve saved…' : 'Loading your library…'}
                         disabled={!uid}
                         // Majority direction, not any-Hebrew-flips-RTL: typing an
@@ -1844,7 +1871,8 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                             onClick={stopGeneration}
                             aria-label="Stop generating"
                             variant="secondary"
-                            className="shrink-0"
+                            // 36px drawn, 44pt to the finger (the ::after).
+                            className="shrink-0 relative after:absolute after:-inset-1"
                         >
                             <Square className="w-3.5 h-3.5 fill-current" />
                         </IconButton>
@@ -1857,7 +1885,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                             disabled={!uid || !input.trim()}
                             aria-label="Send"
                             variant="primary"
-                            className="shrink-0"
+                            className="shrink-0 relative after:absolute after:-inset-1"
                         >
                             <ArrowUp className="w-5 h-5" />
                         </IconButton>
@@ -1885,6 +1913,12 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                 : 'flex min-h-[360px]'
                 }`}
         >
+            {/* The one status line a screen reader hears: always mounted (a
+                live region that appears with its text is often not read),
+                fed the thinking phrase, then "Answer ready" or the error. The
+                streaming answer itself is deliberately NOT live. */}
+            <div className="sr-only" role="status" aria-live="polite">{liveStatus}</div>
+
             {/* Desktop: persistent history panel beside the chat. */}
             {!isMobile && (
                 <ChatHistorySidebar
