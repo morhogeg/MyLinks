@@ -187,4 +187,24 @@ Severity is the auditor's, re-rated where the code showed otherwise.
 | L-1 | low-med | Digest time always 12-hour | fixed `5d2109a` |
 | L-2 | low | Four relative-time functions with different rules | fixed `52b24c6` |
 
+## Backend: account, billing, notifications, sharing (ACCT)
+
+| ID | Sev | Finding | Status |
+|---|---|---|---|
+| ACCT-1 | high | Any one user could stop reminders for every user: a card with `title: null` (or `reminders_channel: [{}]`) raised outside any try, and the shared, oldest-first due query kept it at the head | fixed `ae23ee0`, `fb8319d` (each user isolated; fields coerced; schedule computed before the push) |
+| ACCT-2 | medium | A client-created workspace could claim a deleted account's trial clock (a founder's free year) and learn when that account was created | fixed `ba3f1cc`, `ff04e7a` (server keys on the verified Auth email; create rule requires Google/Apple and the token's own email) |
+| ACCT-3 | medium | After account deletion, its circulated share links could be re-claimed by another account (phishing under mymachina.app) | fixed `2c2021e` (ownerless tombstone instead of deleting the owner row) |
+| ACCT-4 | medium | Account deletion could leave images in Storage, report success, and a retry could never fix it | fixed `44ce394` (Storage swept first; failures keep the account for a retry; parallel deletes) |
+| ACCT-5 | medium | Making a card private didn't take down its public pages | fixed `4744c35`, `7df9e6c`; collection and answer snapshots carry no card ids, so a card made private stays on a public collection page until it is updated (the toast says so) |
+| ACCT-6 | low | A failed deletion left `deleting: True` set for good, disabling card cleanup | fixed `2c2021e` (`deletingAt`, trusted for 10 minutes; cleared on failure) |
+| ACCT-7 | low | Storage keys could be minted twice by concurrent workers, leaving images outside every cleanup | fixed `2861544` (transactional mint) |
+| ACCT-8 | low | Deletion left data behind: RevenueCat customer, other linked logins, rate-limit rows (ids name a phone number or IP), task_logs rows without a uid, and the email hash undisclosed | fixed `44ce394` (RevenueCat best-effort, linked logins, `expireAt` on rate-limit rows), `5a3cecf` (policy names the email hash and counters); rate-limit pruning and task_logs uid: see below |
+| ACCT-9 | low | Masked phone uids in logs could be reversed by brute force | fixed `44ce394` (keyed HMAC); per-doc error logs carry the exception type only (`ae23ee0`) |
+| ACCT-10 | low | Account deletion doesn't require a recent sign-in | accepted for launch: Apple accounts already re-authenticate (token revocation); adding a Google re-sign-in step on iOS can't be device-tested here, and a broken deletion is an App Store rejection. Post-launch, with a device |
+| ACCT-11 | low | The RevenueCat webhook ignored events that change access (extended, refund reversed, temporary grant) | fixed `29f5e00` |
+| ACCT-12 | low | The trial-start write could overwrite a just-synced subscription | fixed `d8f03af` |
+| ACCT-13 | low | Trial-ending pushes could arrive at night | fixed `4d67339` (hourly, 09:00-20:59 local, claimed once) |
+| ACCT-14 | low | A non-ASCII token header crashed the admin and webhook checks (500, confirming the endpoints) | fixed `44ce394` (admin), `3092cc5` (webhook) |
+| ACCT-15 | low | Found while fixing ACCT-12: `sync_from_revenuecat` writes the trial fields from a non-transactional read, so a trial clock started in the same instant is wiped | accepted: it matters only if that subscription later lapses, and the worst case is a second 14-day trial |
+
 <!-- BACKEND -->
