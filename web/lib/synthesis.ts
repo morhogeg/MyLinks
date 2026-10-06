@@ -38,6 +38,10 @@ function toSynthesis(d: QueryDocumentSnapshot<DocumentData>): WeeklySynthesis {
         cards: (data.cards as WeeklySynthesis['cards']) || [],
         cardCount: data.cardCount || 0,
         createdAt: data.createdAt || 0,
+        // Free plan: the backend writes a LOCKED shape (title + teaser, the full
+        // body in the functions-only vault; digest_service.locked_synthesis_doc).
+        // Dropping these flags rendered a blank recap with no Unlock button.
+        ...(data.locked === true ? { locked: true, teaser: typeof data.teaser === 'string' ? data.teaser : '' } : {}),
     };
 }
 
