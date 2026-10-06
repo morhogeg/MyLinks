@@ -651,8 +651,11 @@ export default function LinkDetailModal({
                     — they sat hard against the top edge and read as vertically
                     off-centre (owner, 2026-07-27). On a notched device the inset is
                     now added to the normal padding rather than standing in for it. */}
-                <div className="flex items-center gap-2 p-3 sm:p-4 pt-[calc(0.75rem+env(safe-area-inset-top))] sm:pt-[calc(1rem+env(safe-area-inset-top))] border-b border-border-subtle/60">
-                    <div className="flex items-center gap-1 sm:gap-1.5 min-w-0 flex-1 overflow-x-auto scrollbar-hide">
+                <div className={`flex items-center gap-2 ${compactHeader ? 'justify-between sm:justify-start' : ''} p-3 sm:p-4 pt-[calc(0.75rem+env(safe-area-inset-top))] sm:pt-[calc(1rem+env(safe-area-inset-top))] border-b border-border-subtle/60`}>
+                    {/* In the compact Revisit header this group dissolves into the
+                        row (display: contents) on a phone, so back, read, favorite,
+                        reminder, More and Close are spaced evenly edge to edge. */}
+                    <div className={`${compactHeader ? 'contents sm:flex' : 'flex'} items-center gap-1 sm:gap-1.5 min-w-0 flex-1 overflow-x-auto scrollbar-hide`}>
                         {/* Back to the previous card — only when opened from another
                             card's Related list. Distinct from Close (X), which
                             dismisses the whole stack. */}
@@ -686,15 +689,17 @@ export default function LinkDetailModal({
                                     <ChevronLeft className="w-5 h-5 rtl:rotate-180" />
                                     <span className="text-[13px] font-medium">{backTo}</span>
                                 </button>
-                                <span className="shrink-0 mx-0.5 h-5 w-px bg-border-subtle" aria-hidden="true" />
+                                <span className="hidden sm:block shrink-0 mx-0.5 h-5 w-px bg-border-subtle" aria-hidden="true" />
                             </>
                         )}
                         <button
                             onClick={() => onReadStatusChange(link.id, !link.isRead)}
                             title={link.isRead ? 'Mark as unread' : 'Mark as read'}
                             aria-label={link.isRead ? 'Mark as unread' : 'Mark as read'}
+                            // Icon only, no chip when on (owner, 2026-10-06): the
+                            // check vs the faded circle already says read/unread.
                             className={`shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl flex items-center justify-center transition-colors ${link.isRead
-                                ? 'bg-card-hover text-text'
+                                ? 'text-text'
                                 : 'text-text-muted/50 hover:text-text hover:bg-card-hover'
                                 }`}
                         >
@@ -708,9 +713,8 @@ export default function LinkDetailModal({
                             // says "on" louder than any background could, and the
                             // tinted square read as a stray highlight next to the
                             // flat icons beside it. Matches ListCard's favorite
-                            // marker, which has never had a container. The reminder
-                            // button below KEEPS its blue chip — a bell has no fill
-                            // state, so there the background is the only signal.
+                            // marker, which has never had a container. Read and
+                            // reminder follow the same rule.
                             className={`shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl flex items-center justify-center transition-colors ${link.status === 'favorite'
                                 ? 'text-star'
                                 : 'text-text-muted hover:text-star hover:bg-card-hover'
@@ -722,12 +726,14 @@ export default function LinkDetailModal({
                             onClick={handleToggleReminder}
                             title={isReminderActive ? `Reminder active (next: ${nextReminderDate?.toLocaleDateString()})` : 'Set reminder'}
                             aria-label={isReminderActive ? 'Reminder active' : 'Set reminder'}
+                            // On = a filled blue bell, like the filled star; off =
+                            // the outlined bell-off. No chip either way.
                             className={`shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl flex items-center justify-center transition-colors ${isReminderActive
-                                ? 'bg-info/10 text-info'
+                                ? 'text-info'
                                 : 'text-text-muted hover:text-info hover:bg-card-hover'
                                 }`}
                         >
-                            {isReminderActive ? <Bell className="w-[18px] h-[18px]" /> : <BellOff className="w-[18px] h-[18px]" />}
+                            {isReminderActive ? <Bell className="w-[18px] h-[18px] fill-current" /> : <BellOff className="w-[18px] h-[18px]" />}
                         </button>
 
                         {/* Divider between status toggles and the "do something with it" actions. */}
@@ -1255,29 +1261,12 @@ export default function LinkDetailModal({
                                         ) : (
                                             <>
                                                 {showLead && (
-                                                    <div className={`group/summary relative ${detailBody ? 'mb-6' : ''}`}>
+                                                    <div className={detailBody ? 'mb-6' : undefined}>
                                                         <SimpleMarkdown
                                                             content={link.summary}
                                                             isRtl={isRtl}
                                                             className="reading-prose"
                                                         />
-                                                        {/* Non-note summaries keep a quiet hover pencil to correct
-                                                            AI output. Notes are edited via the single pencil on the
-                                                            title (the whole note is one field), so no body control.
-                                                            A TEXT card gets neither: hover doesn't exist on a phone,
-                                                            and a pencil floating over the first line collides with
-                                                            the user's own words — it gets the labelled control below
-                                                            the text instead. */}
-                                                        {!isSingleFieldNote && !isTextCard && onUpdateSummary && (
-                                                            <button
-                                                                onClick={startEditSummary}
-                                                                aria-label="Edit summary"
-                                                                title="Edit summary"
-                                                                className={`absolute top-0 inline-flex items-center justify-center w-8 h-8 after:absolute after:-inset-1.5 rounded-lg text-text-muted hover:text-text hover:bg-fill-subtle opacity-0 group-hover/summary:opacity-100 [@media(hover:none)]:opacity-60 focus:opacity-100 transition-opacity ${isRtl ? 'left-0' : 'right-0'}`}
-                                                            >
-                                                                <Pencil className="w-4 h-4" />
-                                                            </button>
-                                                        )}
                                                     </div>
                                                 )}
                                                 {/* A text card's body is the user's own words, so its edit
@@ -1291,16 +1280,11 @@ export default function LinkDetailModal({
                                                         <Pencil className="w-3.5 h-3.5" /> Edit text
                                                     </button>
                                                 )}
-                                                {/* Legacy prose-only cards hide the lead to avoid a
-                                                    duplicate — still let the user correct the summary. */}
-                                                {!showLead && !isSingleFieldNote && onUpdateSummary && (
-                                                    <button
-                                                        onClick={startEditSummary}
-                                                        className="mb-4 inline-flex items-center gap-1.5 text-xs font-bold text-text-muted/60 hover:text-accent transition-colors"
-                                                    >
-                                                        <Pencil className="w-3.5 h-3.5" /> Edit summary
-                                                    </button>
-                                                )}
+                                                {/* No edit control on Machina's summary paragraph
+                                                    (owner, 2026-10-06): the pencil is for the
+                                                    headline and the category only. A text card's
+                                                    body is the user's own words, so it keeps
+                                                    "Edit text" above. */}
                                             </>
                                         )}
                                         {/* Directly under the lead, above the deeper
