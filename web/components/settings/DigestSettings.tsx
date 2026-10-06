@@ -23,6 +23,7 @@ export const COUNT_OPTIONS = [3, 5, 7, 10];
 
 // Wheel-picker columns (Schedule). Hour index 0 = "12" (12 AM / 12 PM).
 export const HOURS12 = Array.from({ length: 12 }, (_, i) => (i === 0 ? '12' : String(i)));
+export const HOURS24 = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
 // 5-minute increments, matching the send_digests cron grid (*/5). Offering
 // minute precision the scheduler cannot honour is what made a 16:10 digest
 // arrive at 16:21 and read as broken. Every value here is a real tick.
@@ -30,12 +31,21 @@ export const MINUTE_STEP = 5;
 export const MINUTES = Array.from({ length: 60 / MINUTE_STEP }, (_, i) => String(i * MINUTE_STEP).padStart(2, '0'));
 export const AMPM = ['AM', 'PM'];
 
-// "4:24 PM" / "9:00 AM" — 12-hour local formatting for the digest summary.
-export const formatTime = (hour: number, minute: number) => {
-    const h12 = hour % 12 === 0 ? 12 : hour % 12;
-    const ampm = hour < 12 ? 'AM' : 'PM';
-    return `${h12}:${String(minute).padStart(2, '0')} ${ampm}`;
+/** Whether this device's locale writes times on a 24-hour clock (he-IL,
+ *  en-GB, ...). Settings used to show 12-hour times to everyone while the
+ *  reminder sheet and Revisit followed the locale (L-1). */
+export const uses24HourClock = (): boolean => {
+    try {
+        const cycle = new Intl.DateTimeFormat(undefined, { hour: 'numeric' }).resolvedOptions().hourCycle;
+        return cycle === 'h23' || cycle === 'h24';
+    } catch {
+        return false;
+    }
 };
+
+// "4:25 PM" / "16:25": the digest time in the device's own clock style.
+export const formatTime = (hour: number, minute: number) =>
+    new Date(2000, 0, 1, hour, minute).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 
 export function ResurfacingView({
     settings, setSettings, cadenceLabel, scheduleValue, go,
@@ -121,7 +131,7 @@ function SkipEmptyLabel() {
                 </button>
             </div>
             {open && (
-                <p className="text-[12.5px] text-text-muted mt-1.5 leading-snug max-w-[30ch] animate-in fade-in slide-in-from-top-1 duration-200">
+                <p className="text-[12.5px] text-text-muted mt-1.5 leading-snug max-w-[30ch] animate-fade-in">
                     When there&apos;s nothing new worth surfacing, no digest is sent, so you never get an empty notification.
                 </p>
             )}
@@ -131,6 +141,8 @@ function SkipEmptyLabel() {
 
 export function ScheduleView({ settings, setSettings }: { settings: Settings; setSettings: SetSettings }) {
     const weekly = settings.digest_frequency === 'weekly';
+    // Read once per mount: the device's clock style doesn't change under us.
+    const [clock24] = useState(uses24HourClock);
     const hourIdx = settings.digest_hour % 12;         // 0 => "12"
     const ampmIdx = settings.digest_hour < 12 ? 0 : 1;
     const minuteIdx = Math.min(60 / MINUTE_STEP - 1, Math.round(settings.digest_minute / MINUTE_STEP));
@@ -138,6 +150,8 @@ export function ScheduleView({ settings, setSettings }: { settings: Settings; se
         const hour = (h12 % 12) + (pm === 1 ? 12 : 0);
         setSettings((p) => ({ ...p, digest_hour: hour, digest_minute: minute }));
     };
+    const commitTime24 = (hour: number, minute: number) =>
+        setSettings((p) => ({ ...p, digest_hour: hour, digest_minute: minute }));
     return (
         <>
             <LargeTitle>Schedule</LargeTitle>
@@ -166,9 +180,18 @@ export function ScheduleView({ settings, setSettings }: { settings: Settings; se
                             label="Day"
                         />
                     )}
-                    <Wheel items={HOURS12} index={hourIdx} onChange={(i) => commitTime(i, minuteIdx * MINUTE_STEP, ampmIdx)} className="flex-1" label="Hour" />
-                    <Wheel items={MINUTES} index={minuteIdx} onChange={(i) => commitTime(hourIdx, i * MINUTE_STEP, ampmIdx)} className="flex-1" label="Minute" />
-                    <Wheel items={AMPM} index={ampmIdx} onChange={(i) => commitTime(hourIdx, minuteIdx * MINUTE_STEP, i)} className="flex-1" label="AM or PM" />
+                    {clock24 ? (
+                        <>
+                            <Wheel items={HOURS24} index={settings.digest_hour} onChange={(i) => commitTime24(i, minuteIdx * MINUTE_STEP)} className="flex-1" label="Hour" />
+                            <Wheel items={MINUTES} index={minuteIdx} onChange={(i) => commitTime24(settings.digest_hour, i * MINUTE_STEP)} className="flex-1" label="Minute" />
+                        </>
+                    ) : (
+                        <>
+                            <Wheel items={HOURS12} index={hourIdx} onChange={(i) => commitTime(i, minuteIdx * MINUTE_STEP, ampmIdx)} className="flex-1" label="Hour" />
+                            <Wheel items={MINUTES} index={minuteIdx} onChange={(i) => commitTime(hourIdx, i * MINUTE_STEP, ampmIdx)} className="flex-1" label="Minute" />
+                            <Wheel items={AMPM} index={ampmIdx} onChange={(i) => commitTime(hourIdx, minuteIdx * MINUTE_STEP, i)} className="flex-1" label="AM or PM" />
+                        </>
+                    )}
                 </div>
             </div>
             <Footnote>Your digest arrives at this time.</Footnote>
