@@ -812,7 +812,18 @@ npm run live:verify     # copy rules on every app frame the edit uses + the film
 npm run live:render     # → out/live/machina-in-motion-landscape.mp4  (add -- --format portrait)
 npm run live:bake       # → out/live/site/  the live page, ~14 MB, host anywhere static
 npm run live:serve      # the page against the PNG capture (dev), or `-- --site` for the baked one
+npm run live:player     # → out/live/player/  the two cuts on a plain video page (what the link plays)
 ```
+
+**The film's home is the two MP4s.** The shared link plays them on a plain
+video page (`player.mjs` + `player.html`): the browser's own player, a 16:9 /
+9:16 switch, and the film's chapters with their timecodes (`chaptersOf` in
+`film/edit.js`, the same list the live page's scrubber marks). Each cut ships
+as H.264 MP4 with a VP9 WebM fallback, 1080p60 at ~1.6 Mb/s, ~14 MB a file
+so it fits a host that takes 15 MB a file (claude.ai artifacts); the film is
+flat paper and type, so this holds up next to the 6 Mb/s master. The live 3D
+page did not open for the owner (2026-10-06, likely an iPhone web view that
+never preloads its video, not verified), so it is not what the link shows.
 
 ## What it shows, and why it is one take
 

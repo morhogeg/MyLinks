@@ -81,3 +81,19 @@ export function stillFrames(session) {
   for (let i = m.done; i < m.landed; i++) if (session.rects[i]?.dialog) dialogLast = i;
   return { dialogSettled: m.modeImage - 1, dialogLast };
 }
+
+/**
+ * The film's chapters, in seconds on the film's clock (A = makeEdit().at):
+ * the live page's scrubber marks and the video page's chapter list
+ * (live/player.mjs) both read them from here.
+ */
+export function chaptersOf(A) {
+  return [
+    { t: 0, name: 'Open' },
+    { t: A.home + 5.7, name: 'Save' },
+    { t: A.findHome - 0.3, name: 'Find' },
+    { t: A.askHome - 0.2, name: 'Ask' },
+    { t: A.graph - 0.1, name: 'Connect' },
+    { t: A.revisit - 0.15, name: 'Revisit' },
+  ];
+}

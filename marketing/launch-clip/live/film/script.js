@@ -22,7 +22,7 @@
 
 import { rig } from '../engine/track.js';
 import { EXIT, GATHER, GLIDE, INOUT, MODAL, SPRING, clamp, mix, prog } from '../engine/ease.js';
-import { makeEdit, stillFrames } from './edit.js';
+import { chaptersOf, makeEdit, stillFrames } from './edit.js';
 
 export const SCREEN = { w: 393, h: 852 };
 /** world px per screen point */
@@ -648,14 +648,7 @@ export function buildFilm({ stage, index, captions, overlay, format, video }) {
   return {
     duration: end,
     at: A,
-    chapters: [
-      { t: 0, name: 'Open' },
-      { t: A.home + 5.7, name: 'Save' },
-      { t: A.findHome - 0.3, name: 'Find' },
-      { t: A.askHome - 0.2, name: 'Ask' },
-      { t: A.graph - 0.1, name: 'Connect' },
-      { t: A.revisit - 0.15, name: 'Revisit' },
-    ],
+    chapters: chaptersOf(A),
     update,
     frameAt: (t) => S.frameAt(t),
   };

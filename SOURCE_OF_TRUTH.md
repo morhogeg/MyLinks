@@ -2553,7 +2553,10 @@ native iOS share sheet, so that beat is a brand graphic.
   3D set with an orbit camera, lifts, a ring of the account's saves and the
   brand mark at the end; scored on the film's clock. Everything is in
   `marketing/launch-clip/live/`; how and why is the README's "The live film"
-  section. Live page (private): https://claude.ai/artifact/KbYCE5dCq9hEps1obkAYWk
+  section. **The film is the two MP4s.** The shared link (private) plays them
+  as a plain video page with chapters (`live/player.mjs`):
+  https://claude.ai/artifact/KbYCE5dCq9hEps1obkAYWk. The live 3D page did not
+  open for the owner, so it is no longer published (its code stays in `live/`).
 - **Three Meta ads** (Instagram/Facebook, 15 to 20s, 9:16 + 4:5) are in
   production in three sessions spawned 2026-10-02, each on its own branch:
   1. **What one save becomes**, the YouTube card's key moments and key points
@@ -2829,6 +2832,16 @@ exact-match, capped.
   watch both cuts and the live page; listen to the score; decide whether the
   live page gets a home on mymachina.app (it is self-contained static files; a
   `/film` route or a link from the landing hero would be a separate change).
+  **Follow-up (same day):** the owner could not open the live page and asked
+  for the film as a video file. Both cuts went to the owner as MP4s (1080p60,
+  H.264 + AAC, ~27 MB share copies of the masters), and the artifact link now
+  plays them on a plain video page (`live/player.mjs` + `live/player.html`:
+  native player, 16:9 / 9:16 switch, the film's chapters with timecodes, each
+  cut as H.264 MP4 plus a VP9 WebM fallback, ~14 MB a file to fit the host's
+  15 MB limit). Chapter times now live in `film/edit.js` (`chaptersOf`), read
+  by both pages. Why the live page did not open is NOT verified (no device
+  here); likely an iPhone web view that never preloads video, so its loading
+  screen never cleared.
 
 - **2026-10-05 (evening) — BROWSER EXTENSION STORE-READY + MACHINA FOR SAFARI
   PROJECT; B1 CORS SHIPPED.** Branch `claude/app-launch-qa-a29d1f`. Two
