@@ -5391,6 +5391,14 @@ def share_page(req: https_fn.Request) -> https_fn.Response:
             return https_fn.Response(_share_not_found_html(), status=404, headers=nf_headers)
 
         data = snap.to_dict() or {}
+        if kind == "card":
+            # The card behind the page went private (or was deleted) after it
+            # was shared: the page goes too, even if the app's "Stop sharing"
+            # never landed. Fails closed. Collection and answer snapshots carry
+            # no card ids, so they are only as current as their last publish.
+            from share_service import shared_card_withdrawn
+            if shared_card_withdrawn(db, share_id, data):
+                return https_fn.Response(_share_not_found_html(), status=404, headers=nf_headers)
         if kind == "collection":
             html_out = _render_shared_collection(data, share_url)
         elif kind == "answer":
