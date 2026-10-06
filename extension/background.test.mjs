@@ -171,7 +171,7 @@ async function boot({ manifest = MANIFEST, storage = {}, online = true, noNotifi
     vm.createContext(ctx);
     vm.runInContext(bgSrc, ctx);
     // What connect.js forwards for the web app (machina-ping -> web-ping, ...).
-    const WEB = { 'machina-ping': 'web-ping', 'machina-connect': 'web-connect' };
+    const WEB = { 'machina-ping': 'web-ping', 'machina-connect': 'web-connect', 'machina-disconnect': 'web-disconnect' };
     const external = (msg, url, extra = {}) => new Promise((resolve) => {
         const sender = { id: EXT_ID, url, origin: new URL(url).origin, frameId: 0, tab: { id: 1 }, ...extra };
         const handled = events.onMessage.fns[0]({ ...msg, type: WEB[msg.type] || msg.type }, sender, resolve);
@@ -236,6 +236,26 @@ console.log('connect handshake');
     bg.respondWith(async () => ({ ok: false, status: 400, json: async () => ({}) }));
     await bg.external({ type: 'machina-connect', token: GOOD, account: 'x'.repeat(500) }, APP);
     check('the account label is capped', bg.store.account.length === 120);
+}
+
+console.log('sign-out on the web app disconnects only its own account');
+{
+    const bg = await boot();
+    const APP = 'https://mymachina.app/';
+    bg.respond(400, { success: false, error: 'No URL or text found in shared content' });
+    await bg.external({ type: 'machina-connect', token: GOOD, account: 'me@example.com' }, APP);
+    let r = await bg.external({ type: 'machina-disconnect', tokenTag: await S.tokenTag(OTHER) }, APP);
+    check('another account signing out leaves this connection alone', r.ok === false && r.reason === 'other-account' && bg.store.token === GOOD);
+    r = await bg.external({ type: 'machina-disconnect' }, APP);
+    check('a disconnect without a tag changes nothing', r.ok === false && bg.store.token === GOOD);
+    r = await bg.external({ type: 'machina-disconnect', tokenTag: await S.tokenTag(GOOD) }, 'https://evil.example/');
+    check('a disconnect from another site is refused', r.reason === 'untrusted' && bg.store.token === GOOD);
+    r = await bg.external({ type: 'machina-disconnect', tokenTag: await S.tokenTag(GOOD) }, APP);
+    check('the same account signing out disconnects it', r.ok === true && !bg.store.token && !bg.store.account && !bg.store.connectedAt);
+    r = await bg.external({ type: 'machina-ping' }, APP);
+    check('ping afterwards: not connected', r.connected === false && r.tokenTag === null);
+    r = await bg.external({ type: 'machina-disconnect', tokenTag: await S.tokenTag(GOOD) }, APP);
+    check('disconnecting when nothing is connected is fine', r.ok === true && r.connected === false);
 }
 {
     // What the store package ships: localhost stripped from the manifest.
@@ -457,6 +477,8 @@ console.log('connect.js (content script)');
     check('relays a ping as web-ping and answers with the same id', forwarded.at(-1).type === 'web-ping' && posted.at(-1).data.id === 'a1' && posted.at(-1).data.reply.ok === true && posted.at(-1).target === 'https://mymachina.app');
     send({ source: 'machina-web', id: 'a2', type: 'machina-connect', token: GOOD, account: 'me@example.com' });
     check('relays a connect with the token and account', forwarded.at(-1).type === 'web-connect' && forwarded.at(-1).token === GOOD && forwarded.at(-1).account === 'me@example.com');
+    send({ source: 'machina-web', id: 'a3', type: 'machina-disconnect', tokenTag: 'abc123def456', token: GOOD });
+    check('relays a disconnect with the tag only, never a token', forwarded.at(-1).type === 'web-disconnect' && forwarded.at(-1).tokenTag === 'abc123def456' && !('token' in forwarded.at(-1)));
     const before = forwarded.length;
     send({ source: 'machina-web', id: 'b1', type: 'machina-ping' }, { source: {} });
     check('ignores messages from another window (an iframe, an opener)', forwarded.length === before);

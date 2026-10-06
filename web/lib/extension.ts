@@ -70,7 +70,11 @@ function newId(): string {
 }
 
 /** Ask the content script, wait for the answer with the same id. */
-function ask<T>(type: 'machina-ping' | 'machina-connect', payload: Record<string, unknown>, timeoutMs: number): Promise<T | null> {
+function ask<T>(
+    type: 'machina-ping' | 'machina-connect' | 'machina-disconnect',
+    payload: Record<string, unknown>,
+    timeoutMs: number,
+): Promise<T | null> {
     if (typeof window === 'undefined') return Promise.resolve(null);
     const id = newId();
     return new Promise((resolve) => {
@@ -126,6 +130,24 @@ export async function connectExtension(token: string, account?: string | null):
         'machina-connect', { token, account: account ?? '' }, 20000);
     if (!r) return { ok: false, reason: 'unavailable' };
     return r.ok ? { ok: true } : { ok: false, reason: r.reason ?? 'unknown' };
+}
+
+/**
+ * Signing out of the website: disconnect the extension in this browser, but
+ * only when it holds THIS account's token (it compares the one-way tag), so a
+ * shared computer stops filing pages into the departing library while someone
+ * else's connected extension is left alone. Never throws; with no extension
+ * installed it just waits out the short timeout.
+ */
+export async function disconnectExtensionFor(token: string, timeoutMs = 600): Promise<boolean> {
+    try {
+        const tag = await tokenTag(token);
+        if (!tag) return false;
+        const r = await ask<{ ok?: boolean }>('machina-disconnect', { tokenTag: tag }, timeoutMs);
+        return !!r?.ok;
+    } catch {
+        return false;
+    }
 }
 
 /** Same one-way tag as extension/shared.js tokenTag. */

@@ -401,6 +401,18 @@ async function handleWeb(msg) {
       tokenTag: token ? await S.tokenTag(token) : null,
     };
   }
+  if (msg.type === "web-disconnect") {
+    // The web app signed out. Forget the token only when it is THAT
+    // account's (same one-way tag), so signing out of one account on a
+    // shared computer never disconnects someone else's extension.
+    const { token: stored } = await getSettings();
+    if (!stored) return { ok: true, connected: false };
+    if (!msg.tokenTag || (await S.tokenTag(stored)) !== msg.tokenTag) {
+      return { ok: false, reason: "other-account" };
+    }
+    await api.storage.local.remove(["token", "connectedAt", "account", "baseUrl"]);
+    return { ok: true, connected: false };
+  }
   const token = S.cleanToken(msg.token);
   if (!S.looksLikeToken(token)) return { ok: false, reason: "bad-token" };
   const check = await checkToken(token);
@@ -412,7 +424,7 @@ async function handleWeb(msg) {
 
 api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   const type = msg && msg.type;
-  if (type === "web-ping" || type === "web-connect") {
+  if (type === "web-ping" || type === "web-connect" || type === "web-disconnect") {
     if (!fromWebApp(sender)) {
       sendResponse({ ok: false, reason: "untrusted" });
       return false;

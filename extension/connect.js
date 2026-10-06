@@ -18,7 +18,11 @@
   const api = typeof browser !== "undefined" && browser.runtime ? browser : chrome;
   const FROM_PAGE = "machina-web";
   const FROM_EXT = "machina-extension";
-  const TYPES = { "machina-ping": "web-ping", "machina-connect": "web-connect" };
+  const TYPES = {
+    "machina-ping": "web-ping",
+    "machina-connect": "web-connect",
+    "machina-disconnect": "web-disconnect",
+  };
 
   function post(payload) {
     window.postMessage(Object.assign({ source: FROM_EXT }, payload), window.location.origin);
@@ -34,6 +38,9 @@
     if (msg.type === "machina-connect") {
       forward.token = typeof msg.token === "string" ? msg.token : "";
       forward.account = typeof msg.account === "string" ? msg.account : "";
+    }
+    if (msg.type === "machina-disconnect") {
+      forward.tokenTag = typeof msg.tokenTag === "string" ? msg.tokenTag.slice(0, 64) : "";
     }
     try {
       api.runtime.sendMessage(forward, (resp) => {

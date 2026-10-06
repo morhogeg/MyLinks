@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { Page } from '@playwright/test';
 import { test, expect, article, GOOD_TOKEN } from './fixtures';
 
@@ -158,6 +159,15 @@ test('the web app root can connect; a share page and other sites cannot', async 
     expect(JSON.stringify(r)).not.toContain(GOOD_TOKEN);
     expect(await ext.storage()).toMatchObject({ token: GOOD_TOKEN, account: 'reader@example.com' });
     expect(await send(app, { type: 'machina-ping' })).toMatchObject({ ok: true, connected: true });
+
+    // Signing out of the web app (web/lib/extension.ts disconnectExtensionFor)
+    // disconnects only an extension holding that account's token.
+    const tag = (t: string) => createHash('sha256').update(`machina-ext:${t}`).digest('hex').slice(0, 12);
+    expect(await send(app, { type: 'machina-disconnect', tokenTag: tag('someone-else') })).toEqual({ ok: false, reason: 'other-account' });
+    expect((await ext.storage()).token).toBe(GOOD_TOKEN);
+    expect(await send(app, { type: 'machina-disconnect', tokenTag: tag(GOOD_TOKEN) })).toEqual({ ok: true, connected: false });
+    expect((await ext.storage()).token).toBeUndefined();
+    expect(await send(app, { type: 'machina-ping' })).toMatchObject({ ok: true, connected: false });
 });
 
 test('the options page is settings and saves nothing', async ({ ext }) => {

@@ -80,6 +80,9 @@ function settleWithin(p: Promise<unknown>, ms: number): Promise<void> {
 
 /** The share-sheet sync held back until the AI notice is accepted. */
 let pendingShareSync: { docId: string; docToken?: string } | null = null;
+// This workspace's ingest token, from the user doc: sign-out on the web uses
+// it to disconnect a browser extension that holds the same token.
+let currentIngestToken: string | undefined;
 
 /**
  * Best-effort, fire-and-forget side effects once the data doc is known: hand the
@@ -95,6 +98,7 @@ function attachUserDoc(docId: string, data: Record<string, unknown> | undefined,
     // Pass the doc's ingestToken so the bridge needs NO backend call at all
     // (the callable is only a fallback for a token-less first launch).
     const docToken = typeof data?.ingestToken === 'string' ? data.ingestToken : undefined;
+    currentIngestToken = docToken;
     if (consented) {
         pendingShareSync = null;
         syncShareConfigToNative(docId, docToken);
@@ -302,6 +306,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             await unregisterPush();
         } catch {
             // Dead tokens are also pruned server-side on the next send.
+        }
+        // Web: a browser extension connected to this account would keep
+        // saving into it after sign-out (a shared computer). Disconnect it;
+        // one connected to a different account is left alone.
+        if (!isNativeApp() && currentIngestToken) {
+            const { disconnectExtensionFor } = await import('@/lib/extension');
+            await disconnectExtensionFor(currentIngestToken);
         }
         await signOutUser();
         setUid(null);
