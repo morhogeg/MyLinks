@@ -621,6 +621,24 @@ def test_a_superseded_read_never_marks_the_newer_one_failed(env, monkeypatch):
     assert env.refunds == ["saves"]  # its own unit still comes back
 
 
+def test_a_screenshot_read_is_clamped_like_any_new_card(env, monkeypatch):
+    """CAP-19: the enrich path wrote the model's fields raw."""
+    db = _enrich_world(env, monkeypatch)
+    huge = {"title": "T" * 5000, "summary": "S", "tags": [f"tag{i}-" + "x" * 500 for i in range(40)],
+            "concepts": [f"c{i}" + "y" * 500 for i in range(100)], "category": "Z" * 500,
+            "language": "l" * 100, "actionableTakeaway": "a" * 5000}
+    monkeypatch.setattr(main, "GeminiService", lambda: types.SimpleNamespace(
+        embed_text=lambda t: None, analyze_text_with_images=lambda *a, **k: dict(huge)))
+    _deliver(db, "pending_processing/e1", dict(db.docs["pending_processing/e1"]))
+    card = db.docs["users/u1/links/c1"]
+    assert 0 < len(card["title"]) <= 300
+    assert len(card["tags"]) <= main.MAX_CARD_TAGS and all(len(t) <= main.MAX_TAG_LENGTH for t in card["tags"])
+    assert len(card["concepts"]) == main.MAX_CARD_CONCEPTS
+    assert all(len(c) <= main.MAX_TAG_LENGTH for c in card["concepts"])
+    assert len(card["category"]) <= main.MAX_CATEGORY_LENGTH and len(card["language"]) <= 16
+    assert len(card["metadata"]["actionableTakeaway"]) == main.MAX_TAKEAWAY_LENGTH
+
+
 def test_the_enrich_sweep_has_a_collection_group_index():
     import json
     overrides = json.loads((FUNCTIONS.parent / "firestore.indexes.json").read_text())["fieldOverrides"]

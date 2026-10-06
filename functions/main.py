@@ -5598,6 +5598,11 @@ def _enrich_error_message(e: Exception) -> str:
     return "Something went wrong reading the screenshots. Please try again."
 
 
+# A screenshot read's title: the same ceiling an imported or snapshotted page
+# title gets (MAX_IMPORT_TITLE_LENGTH, _snapshot_capture).
+_MAX_ENRICH_TITLE_LENGTH = 300
+
+
 def _enrich_card_with_images(ref, task_id: str, uid: str, card_ref, data: dict) -> None:
     """Complete a partial card with the user's screenshots of the post.
 
@@ -5680,15 +5685,22 @@ def _enrich_card_with_images(ref, task_id: str, uid: str, card_ref, data: dict) 
         )
 
         now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+        # The model's fields are clamped exactly as _build_link_data clamps a
+        # new card's: the screenshots are user-supplied images a hostile post
+        # can steer, and tags/category/concepts feed every later prompt for
+        # this workspace (get_user_vocabulary).
         update = {
-            "title": (analysis.get("title") or "").strip() or card.get("title") or "Untitled",
+            "title": _clip(analysis.get("title"), _MAX_ENRICH_TITLE_LENGTH) or card.get("title") or "Untitled",
             "summary": analysis.get("summary"),
             "detailedSummary": analysis.get("detailedSummary") or card.get("detailedSummary") or "",
-            "tags": _merge_tags(card.get("tags"), analysis.get("tags")),
-            "concepts": analysis.get("concepts") or card.get("concepts") or [],
-            "category": canonical_category(analysis.get("category", "")) or card.get("category") or "General",
-            "language": analysis.get("language") or card.get("language") or "en",
-            "metadata.actionableTakeaway": analysis.get("actionableTakeaway"),
+            "tags": _merge_tags(card.get("tags"),
+                                _clip_list(analysis.get("tags"), MAX_CARD_TAGS, MAX_TAG_LENGTH)),
+            "concepts": (_clip_list(analysis.get("concepts"), MAX_CARD_CONCEPTS, MAX_TAG_LENGTH)
+                         or card.get("concepts") or []),
+            "category": (canonical_category(_clip(analysis.get("category", ""), MAX_CATEGORY_LENGTH))
+                         or card.get("category") or "General"),
+            "language": _clip(analysis.get("language"), 16) or card.get("language") or "en",
+            "metadata.actionableTakeaway": _clip_or_none(analysis.get("actionableTakeaway"), MAX_TAKEAWAY_LENGTH),
             "metadata.estimatedReadTime": max(
                 int((card.get("metadata") or {}).get("estimatedReadTime") or 0),
                 _estimate_read_time(" ".join(str(analysis.get(k) or "") for k in ("summary", "detailedSummary")))),
