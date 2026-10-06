@@ -31,7 +31,7 @@ for (const arg of process.argv.slice(2)) {
     imageFormat: 'jpeg',
     jpegQuality: 96,
     concurrency: 2,
-    output,
+    outputLocation: output,
     browserExecutable,
     chromiumOptions: { gl: 'angle-egl' },
     timeoutInMilliseconds: 120000,
