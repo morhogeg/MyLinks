@@ -154,7 +154,7 @@ export default function LoginScreen({
                             <GoogleGlyph />
                             {busy === 'google' ? 'Signing in…' : 'Continue with Google'}
                         </button>
-                        {error && <p className="mt-3 text-[13px] text-red-500">{error}</p>}
+                        {error && <p role="alert" className="mt-3 text-[13px] text-danger">{error}</p>}
                     </>
                 )}
             </div>

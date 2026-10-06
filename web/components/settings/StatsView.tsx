@@ -271,7 +271,7 @@ export function StatsView({ uid, onOpenFacet, restoreScroll }: {
                 <LargeTitle>Insights</LargeTitle>
                 <button
                     onClick={() => setAttempt((a) => a + 1)}
-                    className="mt-2 inline-flex items-center gap-1.5 text-sm text-red-400 hover:text-red-300 transition-colors cursor-pointer"
+                    className="mt-2 inline-flex items-center gap-1.5 text-sm text-danger hover:opacity-80 transition-opacity cursor-pointer"
                 >
                     <RefreshCw className="w-4 h-4" />
                     Couldn&apos;t load your stats. Retry

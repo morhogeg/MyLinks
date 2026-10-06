@@ -97,7 +97,7 @@ function Menu({
                         key={item.label}
                         role="menuitem"
                         onClick={(e) => { e.stopPropagation(); item.onClick(); onClose(); }}
-                        className={`w-full flex items-center gap-2.5 px-3 py-3 min-h-[44px] text-sm font-medium transition-colors ${item.danger ? 'text-red-400 hover:bg-red-500/10' : 'text-text hover:bg-fill-subtle'}`}
+                        className={`w-full flex items-center gap-2.5 px-3 py-3 min-h-[44px] text-sm font-medium transition-colors ${item.danger ? 'text-danger hover:bg-danger/10' : 'text-text hover:bg-fill-subtle'}`}
                     >
                         <span className="shrink-0">{item.icon}</span>
                         {item.label}

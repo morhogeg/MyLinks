@@ -150,7 +150,7 @@ export default function TagExplorer({
                         <button
                             disabled={working}
                             onClick={() => confirmDelete ? void runManage(() => onDeleteTag(node.fullName)) : setConfirmDelete(true)}
-                            className="px-2.5 py-1 rounded-lg text-[12px] font-semibold text-red-500 hover:bg-red-500/10 disabled:opacity-40"
+                            className="px-2.5 py-1 rounded-lg text-[12px] font-semibold text-danger hover:bg-danger/10 disabled:opacity-40"
                         >
                             {confirmDelete ? `Remove from ${cards}?` : 'Delete'}
                         </button>

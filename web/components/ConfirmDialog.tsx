@@ -101,7 +101,7 @@ export default function ConfirmDialog({
             >
                 {/* Header */}
                 <div className="flex items-start gap-4 mb-4">
-                    <div className={`mt-1 p-2 rounded-xl flex-shrink-0 ${variant === 'danger' ? 'bg-red-500/10 text-red-400' : 'bg-accent/10 text-accent'
+                    <div className={`mt-1 p-2 rounded-xl flex-shrink-0 ${variant === 'danger' ? 'bg-danger/10 text-danger' : 'bg-accent/10 text-accent'
                         }`}>
                         <AlertTriangle className="w-6 h-6" />
                     </div>

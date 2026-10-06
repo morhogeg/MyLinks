@@ -70,6 +70,15 @@
      ground and the black one on a light ground. Brand-mandated, not ours. */
   --apple-button: #FFFFFF;
   --apple-button-ink: #000000;
+  /* Status colors (danger / warning / success / the favorite star). One token
+     each, so light mode can darken them: Tailwind's red-400, amber-500,
+     green-500 and yellow-500 read at 2-3:1 on the light ground. Light values
+     are red-600, amber-700, green-700 (text, 4.5:1+) and amber-600 for the
+     star (an icon, 3:1+). Brand marks (YouTube red) keep their own color. */
+  --danger: #F87171;
+  --warning: #F59E0B;
+  --success: #22C55E;
+  --star: #EAB308;
   /* Shared spring-ish easing for lifts/entrances. */
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   /* The one modal-entrance curve (M-P2): Apple's no-overshoot push/present easing.
@@ -126,6 +135,10 @@
   --tabbar-inactive: var(--text-secondary);
   --apple-button: #000000;
   --apple-button-ink: #FFFFFF;
+  --danger: #DC2626;
+  --warning: #B45309;
+  --success: #15803D;
+  --star: #D97706;
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-modal: cubic-bezier(0.32, 0.72, 0, 1);
 }
@@ -150,6 +163,10 @@
   --color-tile-ink: var(--tile-ink);
   --color-apple-button: var(--apple-button);
   --color-apple-button-ink: var(--apple-button-ink);
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+  --color-success: var(--success);
+  --color-star: var(--star);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }

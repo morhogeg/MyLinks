@@ -611,7 +611,7 @@ export default function LinkDetailModal({
                     <button
                         onPointerDown={() => { noteActionRef.current = 'delete'; }}
                         onClick={() => deleteNote(editingNoteId as string)}
-                        className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-text-muted/70 hover:text-red-400 transition-all ${isRtl ? 'mr-auto' : 'ml-auto'}`}
+                        className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-text-muted/70 hover:text-danger transition-all ${isRtl ? 'mr-auto' : 'ml-auto'}`}
                     >
                         <Trash2 className="w-3.5 h-3.5" /> {isRtl ? 'מחק' : 'Delete'}
                     </button>
@@ -710,8 +710,8 @@ export default function LinkDetailModal({
                             // button below KEEPS its blue chip — a bell has no fill
                             // state, so there the background is the only signal.
                             className={`shrink-0 h-10 w-10 rounded-xl flex items-center justify-center transition-colors ${link.status === 'favorite'
-                                ? 'text-yellow-500'
-                                : 'text-text-muted hover:text-yellow-500 hover:bg-card-hover'
+                                ? 'text-star'
+                                : 'text-text-muted hover:text-star hover:bg-card-hover'
                                 }`}
                         >
                             <Star className={`w-[18px] h-[18px] ${link.status === 'favorite' ? 'fill-current' : ''}`} />
@@ -805,7 +805,7 @@ export default function LinkDetailModal({
                         onClick={() => onDelete(link.id)}
                         title="Delete"
                         aria-label="Delete"
-                        className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-text-muted hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                        className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-text-muted hover:text-danger hover:bg-danger/10 transition-colors"
                     >
                         <Trash2 className="w-[18px] h-[18px]" />
                     </button>
@@ -1661,7 +1661,7 @@ export default function LinkDetailModal({
                                                         title="Delete note"
                                                         className="p-1.5 hover:bg-fill-subtle rounded-md"
                                                     >
-                                                        <Trash2 className="w-4 h-4 text-text-muted/50 hover:text-red-400" />
+                                                        <Trash2 className="w-4 h-4 text-text-muted/50 hover:text-danger" />
                                                     </button>
                                                 </div>
                                             </div>

@@ -416,7 +416,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                                             className="w-full bg-fill-subtle border border-border-subtle rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25 [&::-webkit-calendar-picker-indicator]:opacity-60"
                                         />
                                     </div>
-                                    <p aria-live="polite" className={`text-[12.5px] leading-snug px-0.5 ${customInPast ? 'text-red-400' : 'text-text-muted'}`}>
+                                    <p aria-live="polite" className={`text-[12.5px] leading-snug px-0.5 ${customInPast ? 'text-danger' : 'text-text-muted'}`}>
                                         {customTs === null
                                             ? 'Pick a date to continue.'
                                             : customInPast
@@ -432,7 +432,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                             <button
                                 onClick={handleTurnOff}
                                 disabled={saving}
-                                className="w-full flex items-center gap-3 px-1.5 py-3.5 min-h-[52px] text-left text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="w-full flex items-center gap-3 px-1.5 py-3.5 min-h-[52px] text-left text-danger transition-colors hover:bg-danger/10 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <span className="w-6 shrink-0 flex items-center justify-center">
                                     <BellOff className="w-5 h-5" />

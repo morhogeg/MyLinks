@@ -44,7 +44,7 @@ const VARIANT: Record<ButtonVariant, string> = {
     ghost:
         'text-text-secondary hover:text-text hover:bg-card-hover',
     danger:
-        'bg-card border border-border-subtle text-red-400 hover:bg-red-500/10 hover:border-red-500/40',
+        'bg-card border border-border-subtle text-danger hover:bg-danger/10 hover:border-danger/40',
 };
 
 const BASE =

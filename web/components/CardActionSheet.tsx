@@ -125,7 +125,7 @@ export default function CardActionSheet({
         {
             key: 'favorite',
             label: isFavorite ? 'Remove from favorites' : 'Add to favorites',
-            icon: <Star className={`w-5 h-5 ${isFavorite ? 'fill-yellow-500 text-yellow-500' : ''}`} />,
+            icon: <Star className={`w-5 h-5 ${isFavorite ? 'fill-star text-star' : ''}`} />,
             active: isFavorite,
             onClick: () => onStatusChange(link.id, isFavorite ? 'unread' : 'favorite', { from: link.status }),
         },
@@ -252,7 +252,7 @@ export default function CardActionSheet({
                             }}
                             className={`w-full flex items-center gap-4 px-5 py-3.5 min-h-[52px] text-[15px] font-medium transition-colors active:bg-fill-strong ${
                                 row.danger
-                                    ? 'text-red-400 hover:bg-red-500/10'
+                                    ? 'text-danger hover:bg-danger/10'
                                     : row.active
                                         ? 'text-accent hover:bg-accent/10'
                                         : 'text-text hover:bg-fill-subtle'

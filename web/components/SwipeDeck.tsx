@@ -543,7 +543,7 @@ export default function SwipeDeck({
                 <DeckAction label="↑ Remind" hint={ACTION_HINTS.remind} onClick={() => fling('up')} buttonClassName="text-accent hover:bg-accent hover:text-accent-ink border-accent/30">
                     <Bell className="w-6 h-6" />
                 </DeckAction>
-                <DeckAction label="Keep →" hint={ACTION_HINTS.keep} onClick={() => fling('right')} buttonClassName="text-green-500 hover:bg-green-500 hover:text-white border-green-500/30">
+                <DeckAction label="Keep →" hint={ACTION_HINTS.keep} onClick={() => fling('right')} buttonClassName="text-success hover:bg-success/15 border-success/30">
                     <Check className="w-6 h-6" />
                 </DeckAction>
             </div>
@@ -582,7 +582,7 @@ function DeckAction({ children, onClick, label, hint, disabled, buttonClassName 
  *  explains all four actions at once, right above the buttons they describe. */
 function ActionHelp({ onClose }: { onClose: () => void }) {
     const rows: { icon: React.ReactNode; label: string; hint: string }[] = [
-        { icon: <Check className="w-4 h-4 text-green-500" />, label: 'Keep', hint: ACTION_HINTS.keep },
+        { icon: <Check className="w-4 h-4 text-success" />, label: 'Keep', hint: ACTION_HINTS.keep },
         { icon: <Archive className="w-4 h-4 text-blue-500" />, label: 'Archive', hint: ACTION_HINTS.archive },
         { icon: <Bell className="w-4 h-4 text-accent" />, label: 'Remind', hint: ACTION_HINTS.remind },
         { icon: <RotateCcw className="w-4 h-4 text-text-muted" />, label: 'Undo', hint: ACTION_HINTS.undo },
@@ -700,8 +700,8 @@ const CardFace = memo(function CardFace({ link, onToggleFavorite }: { link: Link
                         aria-pressed={isFavorite}
                         /* -my-2 keeps the 40px tap target from growing the header row. */
                         className={`shrink-0 -my-2 -me-1.5 h-10 w-10 rounded-xl flex items-center justify-center transition-colors ${isFavorite
-                            ? 'bg-yellow-500/10 text-yellow-500'
-                            : 'text-text-muted hover:text-yellow-500 hover:bg-card-hover'
+                            ? 'bg-star/10 text-star'
+                            : 'text-text-muted hover:text-star hover:bg-card-hover'
                             }`}
                     >
                         <Star className={`w-[18px] h-[18px] ${isFavorite ? 'fill-current' : ''}`} />

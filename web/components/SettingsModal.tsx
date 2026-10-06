@@ -483,7 +483,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                             {loadError && (
                                 <button
                                     onClick={() => loadSettings()}
-                                    className="mr-auto inline-flex items-center gap-1.5 text-sm text-red-400 hover:text-red-300 transition-colors cursor-pointer"
+                                    className="mr-auto inline-flex items-center gap-1.5 text-sm text-danger hover:opacity-80 transition-opacity cursor-pointer"
                                 >
                                     <RefreshCw className="w-4 h-4" />
                                     Couldn&apos;t load settings. Retry

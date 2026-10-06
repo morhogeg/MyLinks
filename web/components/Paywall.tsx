@@ -325,7 +325,7 @@ export default function Paywall({
                     )}
 
                     {note && (
-                        <p role="status" className="mt-3 text-center text-[13px] text-amber-500 leading-snug">{note}</p>
+                        <p role="status" className="mt-3 text-center text-[13px] text-warning leading-snug">{note}</p>
                     )}
 
                     <div className="mt-4 flex items-center justify-center gap-4 text-[12.5px] text-text-muted">

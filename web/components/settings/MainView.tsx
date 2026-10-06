@@ -184,7 +184,7 @@ export function MainView({
                 )}
                 <NavRow tile={<Clock className="w-[17px] h-[17px]" />} title="Reminders & Digest" value={remindersOrDigest ? 'On' : 'Off'} onClick={() => go('resurfacing')} />
             </List>
-            {pushNote && <p className="text-[12px] text-amber-500 leading-snug px-2 pt-1.5">{pushNote}</p>}
+            {pushNote && <p className="text-[12px] text-warning leading-snug px-2 pt-1.5">{pushNote}</p>}
 
             {/* Private collections — only once a PIN exists (it's created the
                 first time a collection is marked Private, in the edit sheet). */}

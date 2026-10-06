@@ -137,7 +137,7 @@ export default function DigestCard({
                                     <span className="ml-auto inline-flex items-center gap-3">
                                         <button
                                             onClick={() => onDelete(digest.id)}
-                                            className="text-[12px] font-semibold text-red-500 hover:text-red-400 transition-colors cursor-pointer"
+                                            className="text-[12px] font-semibold text-danger hover:opacity-80 transition-opacity cursor-pointer"
                                         >
                                             Delete digest
                                         </button>
@@ -151,7 +151,7 @@ export default function DigestCard({
                                 ) : (
                                     <button
                                         onClick={() => setConfirmDelete(true)}
-                                        className="ml-auto inline-flex items-center gap-1.5 text-[12px] font-semibold text-text-muted hover:text-red-500 transition-colors cursor-pointer"
+                                        className="ml-auto inline-flex items-center gap-1.5 text-[12px] font-semibold text-text-muted hover:text-danger transition-colors cursor-pointer"
                                     >
                                         <Trash2 className="w-3.5 h-3.5" /> Delete
                                     </button>
