@@ -2759,10 +2759,17 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         slim = []
         for i, c in enumerate(cards):
             notes = c.get("userNotes")
+            # A note or shared-text card's `summary` IS the user's own text (up
+            # to MAX_NOTE_LENGTH), not a 2-4 sentence blurb, so in the deep
+            # window it gets the deep budget: Ask used to see only its first
+            # 1,500 characters.
+            own_text = (c.get("sourceType") == NOTE_SOURCE_TYPE
+                        or c.get("captureType") in (TEXT_CAPTURE_TYPE, "answer"))
+            summary_cap = ASK_DETAIL_MAX_CHARS if own_text and i < ASK_DEEP_CARDS else 1500
             s = {
                 "id": c.get("id"),
                 "title": str(c.get("title", "Untitled"))[:300],
-                "summary": str(c.get("summary", ""))[:1500],
+                "summary": str(c.get("summary", ""))[:summary_cap],
                 "category": str(c.get("category", "General"))[:60],
                 "tags": _cap_list(c.get("tags"), 15, 60),
                 # Publisher/source so the model can answer questions that name it
@@ -2783,7 +2790,9 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
                 ],
             }
             if i < ASK_DEEP_CARDS:
-                detail = (c.get("detailedSummary") or "").strip()
+                # A verbatim text card keeps the AI's write-up parked in
+                # aiDetailedSummary (its detailedSummary is empty by design).
+                detail = str(c.get("detailedSummary") or c.get("aiDetailedSummary") or "").strip()
                 if detail:
                     s["detailedSummary"] = detail[:ASK_DETAIL_MAX_CHARS]
                 takeaway = _card_takeaway(c)
