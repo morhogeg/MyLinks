@@ -73,3 +73,61 @@ def test_a_max_tokens_result_is_retried():
     svc, calls = _service((_RECIPE, "MAX_TOKENS"), (_RECIPE, "STOP"))
     svc._generate_json(["p"], "text analysis", attempts=3)
     assert len(calls) == 2
+
+
+# ── RV-4: a bare cut last line in detailedSummary is caught again ───────────
+# The 2026-08-22 incident (cad0e81) was an early stop with clean JSON and
+# finish_reason STOP: the last Key Points bullet read "- מנכ". AI-13 narrowed
+# detailedSummary to the unclosed-bold check, so MAX_TOKENS never saw it and
+# the fragment was stored. The bare-letter test is back for the LAST line,
+# minus the recipe-style lines AI-13 was protecting.
+
+_INCIDENT = {"title": "t", "summary": "הארגון קיים מפגש.", "category": "News", "tags": ["a"],
+             "detailedSummary": "**נקודות עיקריות**\n- הארגון קיים מפגש\n- מנכ"}
+
+
+@pytest.mark.parametrize("detail", [
+    "- מנכ",                                                         # the incident, alone
+    "**נקודות עיקריות**\n- הארגון קיים מפגש\n- מנכ",                 # ... after an unpunctuated bullet
+    "## נקודות עיקריות\n- הארגון קיים מפגש בבאר שבע.\n- מנכ",
+    "## Key Points\n- The study ran for 12 weeks.\n- Participants who slept more report",
+    "## Key Points\n- The study ran for 12 weeks.\n\nResearchers found that partic",
+    "## Key Points\n- The study ran for 12 weeks.\n## Steps",          # a heading with nothing under it
+    "## Key Points\n- Sleep matters,",                               # stopped between clauses
+])
+def test_a_cut_last_line_is_flagged(detail):
+    assert _analysis_cut_off({"summary": "Fine.", "detailedSummary": detail}) is True
+
+
+@pytest.mark.parametrize("detail", [
+    "## Steps\n1. Mix\n2. Serve warm",
+    "## Ingredients\n- 500g pasta\n- 2 lemons\n\n## Steps\n1. Boil the pasta\n2. Serve warm",
+    "## Ingredients\n- 2 cups flour\n- 1 tsp salt",
+    "## Key Points\n- **Sleep** improves memory.\n- Naps help too.",
+    "## Key Points\n- Great week 🎉",
+    "## Key Points\n- Read *Meditations* (Hays translation)",
+    "---",
+])
+def test_whole_detail_endings_are_not_flagged(detail):
+    assert _analysis_cut_off({"summary": "Fine.", "detailedSummary": detail}) is False
+
+
+def test_the_incident_is_retried_and_the_clean_take_stored():
+    import json
+    clean = dict(_INCIDENT, detailedSummary="**נקודות עיקריות**\n- הארגון קיים מפגש\n- מנכ\"ל החברה נאם.")
+    svc, calls = _service((json.dumps(_INCIDENT, ensure_ascii=False), "STOP"),
+                          (json.dumps(clean, ensure_ascii=False), "STOP"))
+    data = svc._generate_json(["x"], "image analysis", attempts=3)
+    assert len(calls) == 2
+    assert data["detailedSummary"].endswith("נאם.")
+
+
+def test_the_last_line_check_buys_at_most_one_extra_call():
+    import json
+    longer = dict(_INCIDENT, detailedSummary=_INCIDENT["detailedSummary"] + "\n- עוד שור")
+    svc, calls = _service((json.dumps(_INCIDENT, ensure_ascii=False), "STOP"),
+                          (json.dumps(longer, ensure_ascii=False), "STOP"),
+                          (json.dumps(_INCIDENT, ensure_ascii=False), "STOP"))
+    data = svc._generate_json(["x"], "image analysis", attempts=3)
+    assert len(calls) == 2  # one retry for this signal, not two
+    assert data["detailedSummary"] == longer["detailedSummary"]  # the fullest fragment

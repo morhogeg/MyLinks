@@ -324,31 +324,86 @@ def _list_tail_cut_off(items) -> bool:
     return t.endswith(('-', '–', '־', ',', '،', ';'))
 
 
-def _analysis_cut_off(data: dict, finish_reason: Optional[str] = None) -> bool:
-    """True when an analysis dict looks truncated mid-generation.
+# A bulleted or numbered line of detailedSummary: "- 500g pasta", "2. Serve warm".
+_DETAIL_ITEM_RE = re.compile(r"^\s*(?:[-*•+]|\d+[.)])\s+")
+# A last line ending on one of these stopped between words or clauses.
+_DETAIL_CUT_TAIL = (",", "،", "-", "–", "־")
+
+
+def _detail_cut_off(text) -> bool:
+    """True when detailedSummary's LAST line trails off mid-generation.
+
+    The 2026-08-22 incident (cad0e81): the last Key Points bullet read
+    "- מנכ", the JSON closed cleanly and finish_reason was STOP. Recipe steps
+    and ingredient lines end on a bare word as a matter of style ("2. Serve
+    warm", "- 500g pasta"), which AI-13 stopped flagging. So, on the last line:
+    - a prose line or heading ending on a letter or digit is cut;
+    - a list item of ONE word ending on a letter or digit is cut ("- מנכ");
+    - a longer item is cut only when the list it ends is otherwise punctuated
+      (Key Points bullets end with a period; a recipe's steps do not);
+    - any line ending on a comma or a hyphen is cut (a horizontal rule is not).
+    """
+    if not isinstance(text, str):
+        return False
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    if not lines:
+        return False
+    last = lines[-1]
+    core = last.rstrip(_TAIL_MODIFIERS) or last
+    if core.endswith(_DETAIL_CUT_TAIL):
+        return bool(core.strip("-*_ "))  # "---" is a rule, not a cut
+    if unicodedata.category(core[-1])[0] not in ("L", "N"):
+        return False  # punctuation, a closer, an emoji: a whole line
+    item = _DETAIL_ITEM_RE.match(last)
+    if not item:
+        return True
+    if len(last[item.end():].split()) < 2:
+        return True
+    siblings = []
+    for ln in reversed(lines[:-1]):
+        if not _DETAIL_ITEM_RE.match(ln):
+            break
+        siblings.append(ln)
+    return bool(siblings) and all(_ends_complete(ln) for ln in siblings)
+
+
+def _analysis_cut_reason(data: dict, finish_reason: Optional[str] = None) -> Optional[str]:
+    """Why an analysis dict looks truncated mid-generation, or None.
 
     The main signal is the model's own: finish_reason MAX_TOKENS means the
     output was cut. Beyond that, conservative shape checks: the `summary` with
     the full truncation heuristic (its prompt demands a period on every
-    sentence), the `detailedSummary` for an unclosed bold only (its recipe
-    steps and list items routinely end on a bare word: "5. Serve warm"), a
-    PRESENT-but-empty summary (the degenerate cousin: valid JSON, no content),
-    and the list fields' last element for high-confidence signatures only
-    (see _list_tail_cut_off). Each false positive costs a full extra analysis
-    call. Non-analysis schemas (BrainAnswer, WeeklySynthesis) lack every
-    checked field and pass through untouched unless the model hit MAX_TOKENS.
+    sentence), the `detailedSummary` for an unclosed bold, a PRESENT-but-empty
+    summary (the degenerate cousin: valid JSON, no content), the list fields'
+    last element for high-confidence signatures only (see _list_tail_cut_off),
+    and detailedSummary's last line ("detail_tail", see _detail_cut_off; it
+    can misfire on a whole card ending on a one-word ingredient, so
+    _generate_json spends at most one extra call on it). Each false positive
+    costs a full extra analysis call. Non-analysis schemas (BrainAnswer,
+    WeeklySynthesis) lack every checked field and pass through untouched
+    unless the model hit MAX_TOKENS.
     """
     if finish_reason == "MAX_TOKENS":
-        return True
+        return "max_tokens"
     if _text_cut_off(data.get("summary")):
-        return True
+        return "summary"
     detail = data.get("detailedSummary")
     if isinstance(detail, str) and detail.count('**') % 2 == 1:
-        return True
+        return "detail_bold"
     s = data.get("summary")
     if isinstance(s, str) and not s.strip():
-        return True
-    return any(_list_tail_cut_off(data.get(f)) for f in _ANALYSIS_LIST_FIELDS)
+        return "empty_summary"
+    if any(_list_tail_cut_off(data.get(f)) for f in _ANALYSIS_LIST_FIELDS):
+        return "list_tail"
+    if _detail_cut_off(detail):
+        return "detail_tail"
+    return None
+
+
+def _analysis_cut_off(data: dict, finish_reason: Optional[str] = None) -> bool:
+    """True when an analysis dict looks truncated mid-generation (see
+    _analysis_cut_reason)."""
+    return _analysis_cut_reason(data, finish_reason) is not None
 
 
 # How many times _generate_json attempts a Gemini call before giving up.
@@ -1187,6 +1242,7 @@ class GeminiService:
         # Best truncated-looking result seen so far: a fragment is still better
         # than failing the save if every attempt comes back cut off.
         truncated_best = None
+        detail_tail_retried = False
         for attempt in range(attempts):
             # Under the Ask deadline: the rest of the budget as this call's
             # timeout, or AskDeadlineExceeded (propagates as is) when it is spent.
@@ -1231,12 +1287,17 @@ class GeminiService:
                     # remaining attempt on a clean take, but NEVER fail the
                     # save over it — if retries stay cut off (or none remain),
                     # the fullest fragment is returned below.
-                    if _analysis_cut_off(data, _finish_reason_name(response)):
+                    cut = _analysis_cut_reason(data, _finish_reason_name(response))
+                    if cut:
                         if (truncated_best is None
                                 or len(str(data.get("detailedSummary") or ""))
                                 > len(str(truncated_best.get("detailedSummary") or ""))):
                             truncated_best = data
-                        if attempt < attempts - 1:
+                        # detailedSummary's last-line check buys ONE retry at
+                        # most: a second hit keeps the fullest fragment.
+                        retry_ok = not (cut == "detail_tail" and detail_tail_retried)
+                        detail_tail_retried = detail_tail_retried or cut == "detail_tail"
+                        if attempt < attempts - 1 and retry_ok:
                             logger.warning(
                                 f"Gemini {what} attempt {attempt + 1} looks "
                                 "truncated mid-sentence — retrying")
