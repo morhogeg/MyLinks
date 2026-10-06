@@ -6830,11 +6830,15 @@ def send_digests(event: scheduler_fn.ScheduledEvent) -> None:
 
 
 # Trial nudge: one push, 48h before a reverse trial ends (entitlement.py).
-# Six-hourly is plenty: the window is two days wide and the doc is stamped
-# (nudgedAt) so nobody is pinged twice.
-@scheduler_fn.on_schedule(schedule="0 */6 * * *", max_instances=1)
+# Hourly so the push can wait for the user's own daytime (09:00-20:59 in the
+# zone on their doc): at fixed six-hourly UTC ticks about a quarter of them
+# landed at night. Same single Cloud Scheduler job, so no added scheduler
+# cost; a sweep is one indexed query plus a user-doc read per un-nudged
+# candidate. The doc is claimed (nudgedAt) in a transaction before the push,
+# so overlapping sweeps never ping anyone twice.
+@scheduler_fn.on_schedule(schedule="0 * * * *", max_instances=1)
 def trial_nudges(event: scheduler_fn.ScheduledEvent) -> None:
-    """Every 6h: warn trials that end within 48h (Machina Pro)."""
+    """Hourly: warn trials that end within 48h, in local daytime (Machina Pro)."""
     run_trial_nudges()
 
 
