@@ -129,7 +129,7 @@ export default function CategoryInput({
 
                     {filteredCategories.length === 0 && !isNew && (
                         <div className="px-3 py-2 text-xs text-text-muted italic">
-                            Type to create...
+                            Type to create…
                         </div>
                     )}
                 </div>

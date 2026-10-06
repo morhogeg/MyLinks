@@ -891,7 +891,7 @@ export default function LinkDetailModal({
                                             />
                                             <div className="absolute inset-0 bg-black/40 opacity-0 [@media(hover:hover)]:group-hover/img:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
                                                 <span className="text-white text-xs font-bold px-3 py-1.5 bg-black/60 rounded-full backdrop-blur-md border border-white/20">
-                                                    Click to View Original
+                                                    Open the original
                                                 </span>
                                             </div>
                                         </div>
@@ -1621,7 +1621,7 @@ export default function LinkDetailModal({
                                     className="inline-flex items-center gap-1 text-xs font-bold text-text-muted/50 hover:text-accent transition-all bg-fill-subtle hover:bg-fill-strong px-2 py-1 rounded-lg border border-dashed border-border-strong hover:border-accent/30"
                                 >
                                     <Plus className="w-3 h-3" />
-                                    <span>Add Tag</span>
+                                    <span>Add tag</span>
                                 </button>
                             )}
                         </div>

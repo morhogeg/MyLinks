@@ -44,7 +44,7 @@ export default function MobileTagExplorerDrawer({
                 <div className="flex-none p-4 border-b border-border-strong flex justify-between items-center bg-card/50 backdrop-blur-xl z-10 safe-pt">
                     <h2 id={titleId} className="text-base font-bold flex items-center gap-2">
                         <TagIcon className="w-4 h-4 text-accent" />
-                        Filter Tags
+                        Filter tags
                     </h2>
                     <button
                         ref={closeRef}

@@ -8,7 +8,7 @@ import { track } from '@/lib/analytics';
 import { LargeTitle, SectionHeader, Footnote, List, RowShell, RowText, Chevron } from './primitives';
 
 /**
- * Settings → Insights: a birds-eye view of the library, computed entirely
+ * Settings → Insights: a bird's-eye view of the library, computed entirely
  * on-device (see lib/stats.ts). Magnitude marks (tiles, weekly chart, sources)
  * stay single-hue accent — there, length carries the meaning. Category bars and
  * tag pills wear the app-wide identity colors (`getCategoryColorStyle`), so a
@@ -298,7 +298,7 @@ export function StatsView({ uid, onOpenFacet, restoreScroll }: {
                         <BarChart3 className="w-6 h-6" />
                     </span>
                     <p className="text-[14px] text-text-muted leading-snug max-w-[240px]">
-                        Nothing to chart yet. Save a few links and this becomes your library&apos;s birds-eye view.
+                        Nothing to chart yet. Save a few links and this becomes your library&apos;s bird&apos;s-eye view.
                     </p>
                 </div>
             </>

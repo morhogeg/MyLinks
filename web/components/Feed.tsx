@@ -2635,7 +2635,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             onBack={closeNotesView}
                             backLabel={notesFromInsights ? 'Back to Insights' : 'Back to your library'}
                             icon={<StickyNote className="w-5 h-5" />}
-                            title="My Notes"
+                            title="My notes"
                         />
                     </div>
                 ) : null}
@@ -2970,7 +2970,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             <button
                                 onClick={() => openNotesView()}
                                 title="All your notes, with their cards"
-                                aria-label="My Notes"
+                                aria-label="My notes"
                                 className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
                             >
                                 <StickyNote className="w-4 h-4" />
@@ -3176,8 +3176,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             <button
                                 onClick={toggleTagExplorer}
                                 className="w-10 h-10 rounded-xl bg-card border border-border-subtle flex items-center justify-center text-text-muted hover:text-accent hover:border-accent/30 transition-all shadow-sm"
-                                title="Expand Tags Explorer"
-                                aria-label="Expand Tags Explorer"
+                                title="Expand the tag explorer"
+                                aria-label="Expand the tag explorer"
                             >
                                 <TagIcon className="w-5 h-5 transition-transform hover:scale-110" />
                             </button>
@@ -3785,7 +3785,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                         onBack={closeNotesView}
                         backLabel={notesFromInsights ? 'Back to Insights' : 'Back to your library'}
                         icon={<StickyNote className="w-5 h-5" />}
-                        title="My Notes"
+                        title="My notes"
                     />
                     <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-4" style={{ paddingBottom: '1rem' }}>
                         <NotesView

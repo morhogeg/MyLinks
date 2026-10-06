@@ -291,7 +291,7 @@ export default function TagExplorer({
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Filter tags..."
+                    placeholder="Filter tags…"
                     className="w-full bg-fill-subtle border border-border-subtle rounded-xl pl-8 pr-3 py-1.5 text-xs text-text placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent/30 transition-all"
                 />
             </div>
