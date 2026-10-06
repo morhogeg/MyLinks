@@ -1,5 +1,6 @@
 'use client';
 
+import { contentLang } from '@/lib/rtl';
 import React from 'react';
 
 interface SimpleMarkdownProps {
@@ -175,5 +176,5 @@ export default function SimpleMarkdown({ content, className = '', isCompact = fa
     // Flush any remaining list items
     flushList();
 
-    return <div className={`${className} ${isRtl ? 'text-right' : 'text-left'}`} dir="auto">{elements}</div>;
+    return <div className={`${className} ${isRtl ? 'text-right' : 'text-left'}`} dir="auto" lang={contentLang(content)}>{elements}</div>;
 }

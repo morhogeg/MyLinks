@@ -10,7 +10,7 @@ import { openExternal } from '@/lib/share';
 import { getCategoryColorStyle } from '@/lib/colors';
 import CategoryInput from './CategoryInput';
 import TagInput from './TagInput';
-import { hasHebrew, getDominantDirection } from '@/lib/rtl';
+import { hasHebrew, getDominantDirection, contentLang } from '@/lib/rtl';
 import { isPending } from '@/lib/feedUtils';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import { useVisualViewport } from '@/lib/useVisualViewport';
@@ -1163,6 +1163,7 @@ export default function LinkDetailModal({
                         // one); for a link it edits just the title.
                         <h2
                             dir="auto"
+                            lang={contentLang(link.title)}
                             className={`group/title font-bold text-2xl text-text leading-tight mb-4 ${isRtl ? 'text-right' : ''}`}
                         >
                             {link.title}

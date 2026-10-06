@@ -15,7 +15,7 @@ import { getCategoryColorStyle } from '@/lib/colors';
 import CategoryInput from './CategoryInput';
 import CardActionSheet from './CardActionSheet';
 import WaitingCard from './WaitingCard';
-import { hasHebrew } from '@/lib/rtl';
+import { hasHebrew, contentLang } from '@/lib/rtl';
 import { isHttpUrl } from '@/lib/url';
 import { getNotes } from '@/lib/notes';
 
@@ -613,6 +613,7 @@ function Card({
                     announced, not only colored. */}
                 <h3
                     dir="auto"
+                    lang={contentLang(link.title)}
                     className={`font-bold text-base sm:text-lg text-text transition-colors leading-tight ${isRtl ? 'text-right' : ''}`}
                 >
                     <button

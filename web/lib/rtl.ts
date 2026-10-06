@@ -51,3 +51,14 @@ export function getDominantDirection(text: string, fallback: 'rtl' | 'ltr' = 'lt
     if (rtl === 0 && ltr === 0) return fallback;
     return rtl > ltr ? 'rtl' : 'ltr';
 }
+
+/**
+ * The `lang` for a piece of the user's content: "he" when it is mostly
+ * Hebrew, otherwise none (the page's English). `dir` alone only flips the
+ * layout; VoiceOver picks its voice from `lang`, so Hebrew titles and
+ * summaries were read with the English voice. Set it on the content element
+ * itself, not on a container that also holds English chrome.
+ */
+export function contentLang(text: string | null | undefined): 'he' | undefined {
+    return text && hasHebrew(text) && getDominantDirection(text) === 'rtl' ? 'he' : undefined;
+}

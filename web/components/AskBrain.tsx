@@ -6,7 +6,7 @@ import type { OrbState } from '@/components/ui/CitationMark';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
-import { getDominantDirection } from '@/lib/rtl';
+import { getDominantDirection, contentLang } from '@/lib/rtl';
 import { isHttpUrl } from '@/lib/url';
 import { breakIntoParagraphs, normalizeListMarkers } from '@/lib/answerLayout';
 import SourceByline from '@/components/SourceByline';
@@ -1579,6 +1579,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                                         dir={m.role === 'assistant' && !m.error
                                             ? getDominantDirection(m.content, answerDirFor(i) ?? 'ltr')
                                             : 'auto'}
+                                        lang={contentLang(m.content)}
                                         className={
                                             m.role === 'user'
                                                 // User message: a compact accent pill.

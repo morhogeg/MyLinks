@@ -3,7 +3,7 @@
 import { memo, useRef, useState } from 'react';
 import { Link, StatusChangeHandler, CardShareMode } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
-import { getDirection } from '@/lib/rtl';
+import { getDirection, contentLang } from '@/lib/rtl';
 import { linkPlatform, platformIcon, platformColor, PLATFORM_LABELS, xHandle, prettyHost } from '@/lib/platform';
 import { hapticLight, hapticMedium } from '@/lib/haptics';
 import { Star, Check, Trash2, StickyNote, Lock, MoreHorizontal, EyeOff } from 'lucide-react';
@@ -223,7 +223,7 @@ function ListCard({
                 {/* Headline + metadata. The title owns the full content width —
                     only the star (and the checkbox in selection mode) sit beside it. */}
                 <div className="flex-1 min-w-0 ps-1">
-                    <h3 className={`font-semibold text-[15px] leading-snug text-text ${isRtl ? 'font-hebrew' : ''}`}>
+                    <h3 lang={contentLang(link.title)} className={`font-semibold text-[15px] leading-snug text-text ${isRtl ? 'font-hebrew' : ''}`}>
                         {/* A checkbox in selection mode, so the selected state
                             is announced, not only colored. The clamp lives on
                             the inner span: a button renders as one inline
