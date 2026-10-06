@@ -129,7 +129,7 @@ def endpoint(monkeypatch):
     monkeypatch.setattr(main, "perform_search_logic", lambda *a, **k: list(CARDS))
     monkeypatch.setattr(main, "apply_distance_threshold", lambda r, **k: r)
     monkeypatch.setattr(main, "rerank_candidates", lambda q, c, top_k=10: list(c))
-    monkeypatch.setattr(main, "keyword_scan_cards", lambda *a, **k: [])
+    monkeypatch.setattr(main, "keyword_scan_full", lambda *a, **k: [])
     monkeypatch.setattr(main, "private_collection_ids", lambda uid: set())
     refunds = []
     monkeypatch.setattr(main, "refund_quota", lambda *a: refunds.append(a))

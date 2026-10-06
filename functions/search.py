@@ -813,6 +813,22 @@ def keyword_scan_cards(uid: str, query_text: str, exclude_ids: set = None,
     return [d for _, d in scored[:limit]]
 
 
+def keyword_scan_full(uid: str, query_text: str, exclude_ids: set = None,
+                      limit: int = 10) -> List[dict]:
+    """keyword_scan_cards for Ask: scan the light projection (the fields the
+    scorer reads, SEARCH_SCAN_FIELDS), then fetch only the winners whole.
+
+    Ask grounds its answer in the full card body, so its scans used to stream
+    up to KEYWORD_SCAN_CAP COMPLETE documents (embedding vector included)
+    each, several times per question. Same matches, same order; a winner
+    that vanished or went mid-capture between the two reads is dropped."""
+    hits = keyword_scan_cards(uid, query_text, exclude_ids, limit, SEARCH_SCAN_FIELDS)
+    if not hits:
+        return []
+    full = {c["id"]: c for c in cards_by_ids(uid, [h["id"] for h in hits])}
+    return [full[h["id"]] for h in hits if h["id"] in full]
+
+
 def rerank_candidates(question: str, candidates: List[dict], top_k: int = 10) -> List[dict]:
     """Rerank vector-search candidates down to the best `top_k` for the model.
 
@@ -1017,12 +1033,20 @@ def missing_quoted_phrases(question: str, cards: List[dict]) -> List[str]:
     return missing_title_phrases(extract_quoted_phrases(question), cards)
 
 
+# Each anchor the retrieval missed costs ask_brain a lexical scan of the
+# newest KEYWORD_SCAN_CAP cards. Chips anchor one or two titles; a typed
+# question quoting dozens of phrases (2,000 chars of "a" "b" "c"… was 287
+# scans) must not buy one scan apiece.
+MAX_ANCHOR_PHRASES = 4
+
+
 def anchor_phrases_for(question: str, anchor_titles: List[str] = None,
                        excluded_titles: List[str] = None) -> List[str]:
     """Every title phrase ask_brain must GUARANTEE in context: the question's
     quoted titles plus the client's structured `anchorTitles` hint — minus
     anything the user excluded ("what else … besides X" must not re-pin X).
-    Deduped by normalized form, original order kept."""
+    Deduped by normalized form, original order kept, at most
+    MAX_ANCHOR_PHRASES."""
     raw = extract_quoted_phrases(question) + [
         str(t).strip() for t in (anchor_titles or []) if str(t).strip()
     ]
@@ -1036,6 +1060,8 @@ def anchor_phrases_for(question: str, anchor_titles: List[str] = None,
             continue
         seen.add(na)
         out.append(a)
+        if len(out) >= MAX_ANCHOR_PHRASES:
+            break
     return out
 
 

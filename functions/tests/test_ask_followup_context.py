@@ -100,7 +100,7 @@ def seen(monkeypatch):
 
     monkeypatch.setattr(main, "perform_search_logic", fake_search)
     monkeypatch.setattr(main, "rerank_candidates", fake_rerank)
-    monkeypatch.setattr(main, "keyword_scan_cards", fake_keyword)
+    monkeypatch.setattr(main, "keyword_scan_full", fake_keyword)
     monkeypatch.setattr(main, "apply_distance_threshold", lambda r, **k: r)
     monkeypatch.setattr(main, "private_collection_ids", lambda uid: set())
 

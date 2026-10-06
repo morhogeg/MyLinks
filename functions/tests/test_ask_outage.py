@@ -45,7 +45,7 @@ def env(monkeypatch):
 
 
 def test_embedding_down_and_no_literal_hit_is_a_retryable_503(monkeypatch, env):
-    monkeypatch.setattr(main, "keyword_scan_cards", lambda *a, **k: [])
+    monkeypatch.setattr(main, "keyword_scan_full", lambda *a, **k: [])
     resp = main.ask_brain(_Req(json_body={"uid": "u1", "question": "what did I learn about sleep"}))
     assert resp.status == 503
     assert json.loads(resp.body)["error"] == (
@@ -55,7 +55,7 @@ def test_embedding_down_and_no_literal_hit_is_a_retryable_503(monkeypatch, env):
 
 
 def test_embedding_down_but_a_literal_hit_still_answers(monkeypatch, env):
-    monkeypatch.setattr(main, "keyword_scan_cards",
+    monkeypatch.setattr(main, "keyword_scan_full",
                         lambda *a, **k: [{"id": "sleep", "title": "Sleep hygiene"}])
     resp = main.ask_brain(_Req(json_body={"uid": "u1", "question": "what did I learn about sleep"}))
     assert resp.status == 200

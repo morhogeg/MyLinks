@@ -66,7 +66,7 @@ from vector_store import card_payload, mirror_vector_write
 from search import (
     sync_link_embedding, search_links, perform_search_logic, perform_hybrid_search,
     build_embedding_text, rerank_candidates, keyword_query_tokens,
-    keyword_match_score, keyword_scan_cards, EmbeddingService, EMBED_TEXT_VERSION,
+    keyword_match_score, keyword_scan_cards, keyword_scan_full, EmbeddingService, EMBED_TEXT_VERSION,
     extract_quoted_phrases, pin_title_phrases, missing_title_phrases,
     anchor_phrases_for, is_exclusion_question, demote_cards_by_titles,
     is_recency_question, recent_cards, category_cards,
@@ -2546,10 +2546,12 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         #     have missed (e.g. a word literally in a card's title, or a card
         #     with no embedding yet). Merge, keeping reranked vector results
         #     first, then keyword hits, deduped. Shared scan lives in search.py
-        #     (same one the search bar's hybrid path uses).
+        #     (same one the search bar's hybrid path uses); every Ask scan
+        #     reads the light field projection and fetches only its winners
+        #     whole (keyword_scan_full), not 1,000 complete documents.
         try:
             have = {c.get("id") for c in cards}
-            cards = cards + keyword_scan_cards(uid, retrieval_query, exclude_ids=have, limit=5)
+            cards = cards + keyword_scan_full(uid, retrieval_query, exclude_ids=have, limit=5)
         except Exception as e:
             logger.error(f"ask_brain keyword fallback failed: {e}")
             retrieval_errors += 1
@@ -2563,7 +2565,7 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         if hints.get("concept"):
             try:
                 have = {c.get("id") for c in cards}
-                cards = keyword_scan_cards(
+                cards = keyword_scan_full(
                     uid, hints["concept"], exclude_ids=have, limit=6) + cards
             except Exception as e:
                 logger.error(f"ask_brain concept-hint scan failed: {e}")
@@ -2664,7 +2666,7 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
             if anchors:
                 for phrase in missing_title_phrases(anchors, cards):
                     have = {c.get("id") for c in cards}
-                    cards = cards + keyword_scan_cards(
+                    cards = cards + keyword_scan_full(
                         uid, phrase, exclude_ids=have, limit=2)
                 cards, _ = pin_title_phrases(anchors, cards)
         except Exception as e:

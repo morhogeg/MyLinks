@@ -361,7 +361,7 @@ def test_ask_with_no_retrieved_cards_refunds_the_ask(monkeypatch):
     monkeypatch.setattr(main, "meter_quota", lambda *a, **k: {"ok": True, "remaining": 1, "used": 1, "limit": 2, "plan": "free"})
     monkeypatch.setattr(main, "perform_search_logic", lambda *a, **k: [])
     monkeypatch.setattr(main, "rerank_candidates", lambda q, c, top_k=10: list(c))
-    monkeypatch.setattr(main, "keyword_scan_cards", lambda *a, **k: [])
+    monkeypatch.setattr(main, "keyword_scan_full", lambda *a, **k: [])
     monkeypatch.setattr(main, "apply_distance_threshold", lambda r, **k: r)
     monkeypatch.setattr(main, "private_collection_ids", lambda uid: set())
     refunds = []
