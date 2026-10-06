@@ -339,6 +339,17 @@ export default function SwipeDeck({
         setDrag({ x, y });
     };
 
+    // The OS took the gesture (an edge swipe, a call, the page scrolling):
+    // end the drag where it is, never as a swipe. Without this the deck stayed
+    // in 'dragging' with the last offset, and the next plain tap's pointerup
+    // read that stale offset and committed Keep or Archive (REC-19).
+    const onPointerCancel = () => {
+        if (phase !== 'dragging') return;
+        moved.current = false;
+        setPhase('idle');
+        setDrag({ x: 0, y: 0 });
+    };
+
     const onPointerUp = () => {
         if (phase !== 'dragging') return;
         const { x, y } = drag;
@@ -478,7 +489,10 @@ export default function SwipeDeck({
                     onClick={() => { hapticLight(); setHelpOpen((o) => !o); }}
                     aria-label="What do these buttons do?"
                     aria-expanded={helpOpen}
-                    className={`absolute start-0 h-7 w-7 -ms-1 rounded-full flex items-center justify-center transition-colors cursor-pointer [@media(hover:hover)]:hidden ${helpOpen ? 'text-accent bg-accent/10' : 'text-text-muted'}`}
+                    // 28px drawn, 44pt to the finger (the ::after). z-40: the
+                    // button touches the card stack (z-30) below, and the
+                    // target's lower edge must win over the card's corner.
+                    className={`absolute start-0 z-40 h-7 w-7 -ms-1 after:absolute after:-inset-2 rounded-full flex items-center justify-center transition-colors cursor-pointer [@media(hover:hover)]:hidden ${helpOpen ? 'text-accent bg-accent/10' : 'text-text-muted'}`}
                 >
                     <Info className="w-[18px] h-[18px]" />
                 </button>
@@ -513,6 +527,7 @@ export default function SwipeDeck({
                             onPointerDown={isTop ? onPointerDown : undefined}
                             onPointerMove={isTop ? onPointerMove : undefined}
                             onPointerUp={isTop ? onPointerUp : undefined}
+                            onPointerCancel={isTop ? onPointerCancel : undefined}
                             onTransitionEnd={isTop && phase === 'exiting' ? finishExit : undefined}
                             className={`absolute inset-0 ${isTop ? 'cursor-grab active:cursor-grabbing z-30' : 'z-10'}`}
                             style={{
@@ -608,7 +623,8 @@ function ActionHelp({ onClose }: { onClose: () => void }) {
             <button
                 onClick={onClose}
                 aria-label="Close"
-                className="absolute top-2 end-2 h-7 w-7 rounded-full flex items-center justify-center text-text-muted hover:text-text transition-colors cursor-pointer"
+                // 28px drawn, 44pt to the finger (the ::after).
+                className="absolute top-2 end-2 h-7 w-7 after:absolute after:-inset-2 rounded-full flex items-center justify-center text-text-muted hover:text-text transition-colors cursor-pointer"
             >
                 <X className="w-4 h-4" />
             </button>
