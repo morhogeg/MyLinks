@@ -1099,13 +1099,15 @@ _EXCLUSION_RE = re.compile(
     r"\b(besides|other than|apart from|aside from|except|excluding)\b",
     re.IGNORECASE,
 )
-# The Hebrew forms ('חוץ מ"X"', מלבד, למעט, בנוסף ל). The English pattern
-# alone left a Hebrew "what else besides X" re-presenting X as a new find.
-# Hebrew words carry clitic prefixes ("ומלבד"), and the "from/to" of חוץ מ /
-# בנוסף ל is a prefix on the NEXT word ("חוץ מהמתכון"), so \b can't be the
-# boundary. "מחוץ ל" (outside) and "משרד החוץ" (foreign ministry) don't match.
+# The Hebrew forms ('חוץ מ"X"', מלבד, למעט). The English pattern alone left a
+# Hebrew "what else besides X" re-presenting X as a new find. Hebrew words
+# carry clitic prefixes ("ומלבד"), and the "from" of חוץ מ is a prefix on the
+# NEXT word ("חוץ מהמתכון"), so \b can't be the boundary. "מחוץ ל" (outside)
+# and "משרד החוץ" (foreign ministry) don't match. "בנוסף ל" (in addition to)
+# adds rather than excludes ("בנוסף לזה, איך מכינים את הרוטב?"), and English
+# has no such rule either.
 _HE_EXCLUSION_RE = re.compile(
-    r"(?<!\w)ו?(?:חוץ\s*מ|מלבד(?!\w)|למעט(?!\w)|בנוסף\s*ל)"
+    r"(?<!\w)ו?(?:חוץ\s*מ|מלבד(?!\w)|למעט(?!\w))"
 )
 
 
@@ -1631,18 +1633,50 @@ _RECENCY_RE = re.compile(
 # is not enough on its own.
 _HE_RECENCY_RE = re.compile(
     r"(?<!\w)[והבלמשכ]{0,2}(?:"
-    r"השבוע|החודש|היום|אתמול|לאחרונה|"
+    r"אתמול|לאחרונה|"
     r"ה?שבוע (?:שעבר|האחרון)|ה?חודש (?:שעבר|האחרון)|ה?ימים האחרונים|"
     r"ה?שמיר(?:ה|ות) ה?אחרונ(?:ה|ות)|ה?אחרו(?:ן|נה|נים|נות) ששמרתי"
     r")(?!\w)"
 )
+# השבוע / החודש / היום are also plain "the week / the month / the day": "השבוע
+# הראשון עם תינוק" (the first week with a newborn), "החודש התשיעי" (the ninth
+# month), "סדר היום" (the daily schedule), "בסוף השבוע" (the weekend). Read as
+# "this week / this month / today" every time, they pinned the newest saves in
+# front of ordinary questions. A bare form now counts only when no ordinal or
+# number follows it, it is not the tail of a fixed phrase (סוף / תחילת / ימי /
+# סדר …), and the question is about saving (a save verb anywhere in it) or the
+# form closes the clause ("מה יש לי מהשבוע?").
+_HE_BARE_PERIOD_RE = re.compile(r"(?<!\w)[והבלמשכ]{0,2}(?:השבוע|החודש|היום)(?!\w)")
+_HE_ORDINAL_AFTER_RE = re.compile(
+    r"\s+(?:ה?[-־]?\d|(?:הראשון|השני|השלישי|הרביעי|החמישי|השישי|השביעי|השמיני|"
+    r"התשיעי|העשירי|העשרים|השלושים|הארבעים)(?!\w))")
+_HE_PHRASE_HEAD_RE = re.compile(
+    r"(?<!\w)[והבלמשכ]{0,2}(?:סוף|תחילת|אמצע|ימי|סדר|שעות|מנת|חצי|ראש)\s+$")
+_HE_SAVE_VERB_RE = re.compile(
+    r"(?<!\w)[והשכ]{0,2}(?:שמרתי|שמרת|שמרנו|שמרתם|שמרתן|נשמר|נשמרה|נשמרו|"
+    r"הוספתי|הוספת|הוספנו|הוספתם|נוסף|נוספה|נוספו|קראתי|קראת|קראנו)(?!\w)")
+_HE_CLAUSE_END_RE = re.compile(r"\s*(?:הזה|הזאת|הזו)?\s*(?:[?!.,;:؟]|$)")
+
+
+def _he_bare_period_is_recency(text: str) -> bool:
+    """A bare השבוע / החודש / היום in `text` that reads as "this week / this
+    month / today" (see _HE_BARE_PERIOD_RE). Pure."""
+    about_saving = bool(_HE_SAVE_VERB_RE.search(text))
+    for m in _HE_BARE_PERIOD_RE.finditer(text):
+        after = text[m.end():]
+        if _HE_ORDINAL_AFTER_RE.match(after) or _HE_PHRASE_HEAD_RE.search(text[:m.start()]):
+            continue
+        if about_saving or _HE_CLAUSE_END_RE.match(after):
+            return True
+    return False
 
 
 def is_recency_question(question: str) -> bool:
     """True when the question is about recently-saved cards (time-anchored).
     Quoted spans (card titles) are ignored — only the user's own words vote."""
     text = _strip_quoted(question)
-    return bool(_RECENCY_RE.search(text) or _HE_RECENCY_RE.search(text))
+    return bool(_RECENCY_RE.search(text) or _HE_RECENCY_RE.search(text)
+                or _he_bare_period_is_recency(text))
 
 
 def recent_cards(uid: str, limit: int = 12) -> List[dict]:
