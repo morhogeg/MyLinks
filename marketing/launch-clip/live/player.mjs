@@ -5,6 +5,7 @@
  *
  *   node live/player.mjs [--force]   →   out/live/player/
  *   node live/player.mjs --page      the page and posters only (no encodes)
+ *   node live/player.mjs --cut portrait   one cut only (the page is always written)
  *
  * Reads the masters live/render.mjs writes (out/live/machina-in-motion-
  * landscape.mp4 / -portrait.mp4) and packs each cut for a static host that
@@ -30,6 +31,7 @@ const DIR = path.join(OUT, 'player');
 const TAKES = path.join(OUT, process.env.LIVE_TAKES ?? 'takes');
 const FORCE = process.argv.includes('--force');
 const PAGE_ONLY = process.argv.includes('--page');
+const CUT = process.argv.includes('--cut') ? process.argv[process.argv.indexOf('--cut') + 1] : null;
 const LIMIT = 15e6;
 const VIDEO_KBPS = 1620;
 const POSTER_T = 7.4; // the hook line, fully in, over the ring of cards
@@ -38,7 +40,7 @@ fs.mkdirSync(DIR, { recursive: true });
 const stale = (out, src) => FORCE || !fs.existsSync(out) || fs.statSync(out).mtimeMs < fs.statSync(src).mtimeMs;
 const ff = (args) => execFileSync('ffmpeg', ['-loglevel', 'error', '-y', ...args], { stdio: 'inherit' });
 
-for (const cut of ['landscape', 'portrait']) {
+for (const cut of ['landscape', 'portrait'].filter((c) => !CUT || c === CUT)) {
   const master = path.join(OUT, `machina-in-motion-${cut}.mp4`);
   if (!fs.existsSync(master)) throw new Error(`no master for ${cut}: run node live/render.mjs --format ${cut} first`);
   const log = path.join(OUT, `player-pass-${cut}`);
