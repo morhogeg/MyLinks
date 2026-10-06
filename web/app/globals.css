@@ -82,6 +82,19 @@
   /* Archive / reminder blue. Light uses blue-600: blue-500 text on the light
      ground is 3.7:1, under the 4.5:1 text bar. */
   --info: #3B82F6;
+  /* Category chip text (lib/colors.ts `ink`), one per palette slot. Dark
+     keeps each hue's -500 except slate, blue, red, pink and indigo (-400),
+     which read under 4.5:1 on their tint. Light uses -700/-800. */
+  --cat-ink-purple: rgb(148 163 184);
+  --cat-ink-blue: rgb(96 165 250);
+  --cat-ink-green: rgb(34 197 94);
+  --cat-ink-yellow: rgb(234 179 8);
+  --cat-ink-red: rgb(248 113 113);
+  --cat-ink-pink: rgb(244 114 182);
+  --cat-ink-indigo: rgb(129 140 248);
+  --cat-ink-teal: rgb(20 184 166);
+  --cat-ink-orange: rgb(249 115 22);
+  --cat-ink-cyan: rgb(6 182 212);
   /* Shared spring-ish easing for lifts/entrances. */
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   /* The one modal-entrance curve (M-P2): Apple's no-overshoot push/present easing.
@@ -143,6 +156,16 @@
   --success: #15803D;
   --star: #D97706;
   --info: #2563EB;
+  --cat-ink-purple: rgb(51 65 85);
+  --cat-ink-blue: rgb(29 78 216);
+  --cat-ink-green: rgb(22 101 52);
+  --cat-ink-yellow: rgb(133 77 14);
+  --cat-ink-red: rgb(185 28 28);
+  --cat-ink-pink: rgb(190 24 93);
+  --cat-ink-indigo: rgb(67 56 202);
+  --cat-ink-teal: rgb(15 118 110);
+  --cat-ink-orange: rgb(154 52 18);
+  --cat-ink-cyan: rgb(21 94 117);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-modal: cubic-bezier(0.32, 0.72, 0, 1);
 }

@@ -73,7 +73,7 @@ export default function CategoryInput({
                 aria-label="Category"
                 className={`uppercase font-black tracking-widest px-2 py-0.5 rounded-lg outline-none focus:ring-1 focus:ring-accent/50 bg-fill-strong ${className}`}
                 style={{
-                    color: colorStyle.color,
+                    color: colorStyle.ink,
                     minWidth: '80px'
                 }}
                 value={value}
@@ -110,7 +110,7 @@ export default function CategoryInput({
                         >
                             <span
                                 className="font-bold uppercase tracking-wider"
-                                style={{ color: getCategoryColorStyle(category).color }}
+                                style={{ color: getCategoryColorStyle(category).ink }}
                             >
                                 {category}
                             </span>

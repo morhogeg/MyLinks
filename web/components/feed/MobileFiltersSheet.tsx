@@ -178,7 +178,7 @@ export default function MobileFiltersSheet({
                                                 }`}
                                             style={isSelected ? {
                                                 backgroundColor: colorStyle.backgroundColor,
-                                                color: colorStyle.color,
+                                                color: colorStyle.ink,
                                                 borderColor: colorStyle.backgroundColor,
                                             } : undefined}
                                         >

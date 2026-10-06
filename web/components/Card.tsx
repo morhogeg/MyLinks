@@ -492,7 +492,7 @@ function Card({
                                                     className="text-[10px] uppercase font-black tracking-widest px-2 py-1 rounded-lg inline-block cursor-pointer hover:brightness-110 transition-all group/chip whitespace-nowrap"
                                                     style={{
                                                         backgroundColor: colorStyle.backgroundColor,
-                                                        color: colorStyle.color,
+                                                        color: colorStyle.ink,
                                                     }}
                                                     onClick={(e) => {
                                                         e.stopPropagation();

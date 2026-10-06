@@ -703,7 +703,7 @@ const CardFace = memo(function CardFace({ link, onToggleFavorite }: { link: Link
             <div className="flex items-center justify-between gap-2 mb-4">
                 <span
                     className="text-[10px] uppercase font-black tracking-widest px-2 py-1 rounded-lg whitespace-nowrap"
-                    style={{ backgroundColor: colorStyle.backgroundColor, color: colorStyle.color }}
+                    style={{ backgroundColor: colorStyle.backgroundColor, color: colorStyle.ink }}
                 >
                     {link.category}
                 </span>

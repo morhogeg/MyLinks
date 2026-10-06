@@ -111,7 +111,7 @@ export function CardView({ card, compact = false, dense = false, className = '' 
                     <div dir="ltr" className="mb-0.5 flex h-5 w-full items-center justify-between gap-2">
                         <span
                             className="inline-block whitespace-nowrap rounded-md px-1.5 py-0.5 text-[8px] font-black uppercase tracking-widest"
-                            style={{ backgroundColor: colorStyle.backgroundColor, color: colorStyle.color }}
+                            style={{ backgroundColor: colorStyle.backgroundColor, color: colorStyle.ink }}
                         >
                             {card.category}
                         </span>
@@ -178,7 +178,7 @@ export function CardView({ card, compact = false, dense = false, className = '' 
                 <div dir="ltr" className="flex items-center justify-between w-full h-7 mb-1">
                     <span
                         className="text-[10px] uppercase font-black tracking-widest px-2 py-1 rounded-lg inline-block whitespace-nowrap"
-                        style={{ backgroundColor: colorStyle.backgroundColor, color: colorStyle.color }}
+                        style={{ backgroundColor: colorStyle.backgroundColor, color: colorStyle.ink }}
                     >
                         {card.category}
                     </span>

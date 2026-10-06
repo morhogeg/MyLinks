@@ -198,7 +198,7 @@ export function ResurfacedCardRow({ card, onOpen, trailing }: {
                     {card.category && (
                         <span
                             className="shrink-0 max-w-[120px] px-1.5 py-px rounded-full text-[10px] leading-4 font-bold uppercase tracking-wider truncate"
-                            style={{ backgroundColor: colorStyle.backgroundColor, color: colorStyle.color }}
+                            style={{ backgroundColor: colorStyle.backgroundColor, color: colorStyle.ink }}
                             title={card.category}
                         >
                             {card.category}

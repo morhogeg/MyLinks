@@ -1052,7 +1052,7 @@ export default function LinkDetailModal({
                                                     className="text-[10px] uppercase font-black tracking-widest px-2.5 py-1.5 rounded-lg inline-block cursor-pointer hover:brightness-110 transition-all flex items-center shadow-lg shadow-black/5"
                                                     style={{
                                                         backgroundColor: colorStyle.backgroundColor,
-                                                        color: colorStyle.color,
+                                                        color: colorStyle.ink,
                                                     }}
                                                     onClick={(e) => {
                                                         e.stopPropagation();

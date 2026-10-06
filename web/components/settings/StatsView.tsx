@@ -170,7 +170,7 @@ function CountPills({ items, onOpen, colored }: { items: { name: string; count: 
             {items.map((t) => {
                 const colorStyle = colored ? getCategoryColorStyle(t.name) : null;
                 const style = colorStyle
-                    ? { backgroundColor: colorStyle.backgroundColor, borderColor: colorStyle.borderColor, color: colorStyle.color }
+                    ? { backgroundColor: colorStyle.backgroundColor, borderColor: colorStyle.borderColor, color: colorStyle.ink }
                     : undefined;
                 const toneCls = colorStyle ? '' : 'bg-card border-border-subtle text-text-secondary';
                 return onOpen ? (
