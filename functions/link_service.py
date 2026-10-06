@@ -313,7 +313,35 @@ def _sweep_workspace(db, uid: str, user_ref) -> int:
     # deleted account's /s, /c and /a pages stayed live forever with nobody
     # able to unpublish them.
     deleted += delete_shares_for_owner(uid)
+    # The waiting-saves release plan lists (uid, cardId) pairs for a few hours
+    # (deferred_capture.release_next_slice); this account's leave with it.
+    deleted += _drop_release_slice_entries(db, uid)
     return deleted
+
+
+def _drop_release_slice_entries(db, uid: str) -> int:
+    """Remove `uid`'s entries from the waiting-saves release slices. Returns
+    how many were removed. Best-effort: the release already skips cards that
+    no longer exist, so this only keeps the uid out of a short-lived queue."""
+    removed = 0
+    try:
+        for snap in db.collection('waiting_release_slices').stream():
+            entries = (snap.to_dict() or {}).get('entries') or []
+            keep = [e for e in entries if not (isinstance(e, dict) and e.get('uid') == uid)]
+            if len(keep) == len(entries):
+                continue
+            try:
+                if keep:
+                    snap.reference.update({'entries': keep})
+                else:
+                    snap.reference.delete()
+                removed += len(entries) - len(keep)
+            except Exception as e:
+                # The slice was released meanwhile: nothing left to clean.
+                logger.info(f"Release slice changed during account deletion: {type(e).__name__}")
+    except Exception as e:
+        logger.warning(f"Release slice sweep failed (continuing): {type(e).__name__}")
+    return removed
 
 
 # Every client-facing subcollection under users/{uid}. Keep in step with

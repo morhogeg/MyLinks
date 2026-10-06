@@ -5382,6 +5382,10 @@ def revenuecat_webhook(req: https_fn.Request) -> https_fn.Response:
                              mimetype='application/json')
 
 
+# A rate_limits row older than this (by its window's start) is pruned by the
+# janitor. Every bucket's window is an hour (_RATE_LIMITS).
+_RATE_LIMIT_ROW_TTL_S = 24 * 60 * 60
+
 # How long a client_error_reports record lives. Same policy as server_errors.
 _CLIENT_ERROR_TTL_DAYS = 14
 # Whole-body cap. A report is a message + stack + a few short fields; anything
@@ -7418,9 +7422,33 @@ def run_processing_janitor() -> dict:
         logger.error(f"client_errors prune failed: {e}")
         report["errors"].append(f"client_errors: {e}")
 
+    # rate_limits pruning. A row's id names an account or a network address,
+    # and the privacy policy (section 9) says these counters go within a day;
+    # nothing removed them before (launch audit ACCT-8). `window_start` (epoch
+    # seconds) is on every row, including those written before `expireAt`
+    # existed, and every bucket's window is an hour, so a row whose window
+    # began over a day ago is dead.
+    report["rate_limits_pruned"] = 0
+    try:
+        rl_refs = [
+            doc.reference
+            for doc in db.collection("rate_limits").where(
+                filter=FieldFilter("window_start", "<=", int(now_dt.timestamp()) - _RATE_LIMIT_ROW_TTL_S)
+            ).limit(400).stream()
+        ]
+        if rl_refs:
+            batch = db.batch()
+            for ref in rl_refs:
+                batch.delete(ref)
+            batch.commit()
+            report["rate_limits_pruned"] = len(rl_refs)
+    except Exception as e:
+        logger.error(f"rate_limits prune failed: {type(e).__name__}")
+        report["errors"].append(f"rate_limits: {type(e).__name__}")
+
     if (report["failed_out"] or report["enrich_failed_out"] or report["queue_pruned"] or report["logs_pruned"]
             or report["server_errors_pruned"] or report["client_error_reports_pruned"]
-            or report["client_errors_pruned"]):
+            or report["client_errors_pruned"] or report["rate_limits_pruned"]):
         logger.info(f"Processing janitor: {report}")
     return report
 

@@ -220,3 +220,49 @@ def test_rate_limit_rows_carry_an_expiry(monkeypatch):
     assert rate_limit.check_rate_limit("ask:+972501234567", 5, 3600) is True
     assert written["count"] == 1
     assert written["expireAt"].timestamp() == 1_000_000 + 3600 + rate_limit._EXPIRE_SLACK_S
+
+
+# ── release slices and rate-limit rows (follow-ups to CAP-6 / ACCT-8) ───────
+
+def test_account_deletion_drops_its_waiting_release_entries():
+    import link_service
+    import deferred_capture
+    assert deferred_capture.SLICE_COLLECTION == "waiting_release_slices"
+
+    class _Ref:
+        def __init__(self, store, id): self._store, self._id = store, id
+        def update(self, data): self._store[self._id].update(data)
+        def delete(self): self._store.pop(self._id)
+
+    class _Snap:
+        def __init__(self, store, id): self.reference, self._d = _Ref(store, id), store[id]
+        def to_dict(self): return dict(self._d)
+
+    store = {
+        "a": {"entries": [{"uid": "u1", "cardId": "c1"}, {"uid": "u2", "cardId": "c2"}]},
+        "b": {"entries": [{"uid": "u1", "cardId": "c3"}]},
+        "c": {"entries": [{"uid": "u3", "cardId": "c4"}]},
+    }
+
+    class _Coll:
+        def stream(self): return [_Snap(store, k) for k in list(store)]
+
+    class _Db:
+        def collection(self, name):
+            assert name == "waiting_release_slices"
+            return _Coll()
+
+    assert link_service._drop_release_slice_entries(_Db(), "u1") == 2
+    assert store == {"a": {"entries": [{"uid": "u2", "cardId": "c2"}]},
+                     "c": {"entries": [{"uid": "u3", "cardId": "c4"}]}}
+
+
+def test_the_janitor_prunes_day_old_rate_limit_rows():
+    """The privacy policy says these counters go within a day; the janitor
+    deletes rows whose window began over a day ago (all windows are 1 h)."""
+    import inspect
+    src = inspect.getsource(main.run_processing_janitor)
+    assert 'db.collection("rate_limits").where(' in src
+    assert '"window_start", "<=", int(now_dt.timestamp()) - _RATE_LIMIT_ROW_TTL_S' in src
+    assert main._RATE_LIMIT_ROW_TTL_S == 24 * 60 * 60
+    assert {w for (_, w, _) in main._RATE_LIMITS.values()} == {3600}
