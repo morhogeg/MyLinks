@@ -41,7 +41,6 @@ import { CitationGlyph } from './ui/Wordmark';
 import Masonry from './Masonry';
 import ReminderModal from './ReminderModal';
 import SwipeDeck from './SwipeDeck';
-import AskBrain from './AskBrain';
 import LinkDetailModal from './LinkDetailModal';
 import SynthesisCard from './SynthesisCard';
 import ConfirmDialog from './ConfirmDialog';
@@ -56,7 +55,7 @@ import CollectionFormModal from './CollectionFormModal';
 import ManageCollectionCardsSheet from './ManageCollectionCardsSheet';
 import MobileSubheader from './MobileSubheader';
 import NotesView from './NotesView';
-import KnowledgeGraph from './KnowledgeGraph';
+import dynamic from 'next/dynamic';
 import { getNoteGroups, isWrittenNote } from '@/lib/notes';
 import LoadMoreSentinel from './feed/LoadMoreSentinel';
 import { Search, Inbox, Archive, ArchiveRestore, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, AlarmClock, CheckCircle2, CheckSquare, CheckCheck, Layers, List, Image as ImageIcon, Share2, Globe, Plus, Pencil, Newspaper, CalendarCheck, Lock, BookOpenCheck, ChevronLeft, BarChart3, StickyNote, Waypoints, Upload } from 'lucide-react';
@@ -87,6 +86,17 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { useScrollLock } from '@/lib/useScrollLock';
 import { scrollBehavior } from '@/lib/motion';
+
+// Ask (react-markdown and its remark plugins) and the knowledge graph are the
+// biggest views, and many sessions never open them: they load on first use
+// instead of with the app (launch audit OWN-9). FeedContent prefetches both
+// once the library is up, so the first tap rarely waits.
+const AskBrain = dynamic(() => import('./AskBrain'), { ssr: false, loading: () => <LazyViewPlaceholder /> });
+const KnowledgeGraph = dynamic(() => import('./KnowledgeGraph'), { ssr: false, loading: () => <LazyViewPlaceholder /> });
+
+function LazyViewPlaceholder() {
+    return <div className="min-h-[60vh]" aria-busy="true" />;
+}
 
 // Stable no-op for card slots that don't wire up an action (pending cards).
 const noop = () => { };
@@ -121,6 +131,13 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // Links subscription + pull-refresh (R-3: useLinks). Windowed (report 3.15):
     // loadMore grows the subscription window; hasMore gates the scroll sentinel.
     const { links, windowIds, isLoading, handlePullRefresh, loadMore, hasMore } = useLinks(uid, toast);
+    // Fetch the Ask and graph code once the library is on screen (see the
+    // dynamic imports above), so opening either rarely waits for it.
+    useEffect(() => {
+        if (isLoading) return;
+        const t = window.setTimeout(() => { void import('./AskBrain'); void import('./KnowledgeGraph'); }, 1500);
+        return () => window.clearTimeout(t);
+    }, [isLoading]);
     // Links saved offline in a session that ended before reconnecting.
     useResumeOfflineSaves(uid);
     // Collections — declared before the filter pipeline so private-collection
