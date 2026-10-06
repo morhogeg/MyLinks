@@ -124,6 +124,7 @@ export function MainView({
                 <RowShell>
                     <RowText title="Theme" />
                     <Segmented
+                        label="Theme"
                         value={theme}
                         onChange={(v) => setTheme(v as typeof theme)}
                         iconOnly

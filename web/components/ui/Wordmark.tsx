@@ -11,14 +11,19 @@
 /** The Citation mark, static and locked. Tight viewBox (288 292 448 416): the
  *  ink is 432×400 in a 1024 canvas, so the full artboard would render at ~8px
  *  in a 20px slot and float off any text's centre. */
-export function CitationGlyph({ className = '' }: { className?: string }) {
+export function CitationGlyph({ className = '', label }: {
+    className?: string;
+    /** Name it only where the mark stands alone. Next to the wordmark or a
+        label ("Machina Pro", "Suggested") it is decoration, and naming it
+        made VoiceOver say "Machina Machina". */
+    label?: string;
+}) {
     return (
         <svg
             viewBox="288 292 448 416"
             className={className}
             fill="currentColor"
-            role="img"
-            aria-label="Machina"
+            {...(label ? { role: 'img', 'aria-label': label } : { 'aria-hidden': true })}
         >
             <path d="M296 300 L396 300 L396 358 L354 358 L354 642 L396 642 L396 700 L296 700 Z" />
             <path d="M728 300 L628 300 L628 358 L670 358 L670 642 L628 642 L628 700 L728 700 Z" />

@@ -349,10 +349,13 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                     {showBack ? (
                         <button
                             onClick={leaveSubscreen}
-                            className="inline-flex items-center gap-0.5 -ml-1.5 pr-2 py-1 rounded-2xl text-[16px] font-medium text-accent hover:opacity-80 transition-opacity cursor-pointer"
-                            aria-label="Back"
+                            className="inline-flex items-center gap-0.5 -ms-1.5 pe-2 py-1 rounded-2xl text-[16px] font-medium text-accent hover:opacity-80 transition-opacity cursor-pointer"
+                            // The name carries the visible word ("Back to
+                            // Settings"), so Voice Control's "tap Settings"
+                            // finds it; a bare "Back" hid that label.
+                            aria-label={backLabel.length > 12 ? 'Back' : `Back to ${backLabel}`}
                         >
-                            <ChevronLeft className="w-[22px] h-[22px]" strokeWidth={2.4} />
+                            <ChevronLeft className="w-[22px] h-[22px] rtl:rotate-180" strokeWidth={2.4} aria-hidden="true" />
                             <span className="truncate max-w-[9rem]">{backLabel.length > 12 ? 'Back' : backLabel}</span>
                         </button>
                     ) : (

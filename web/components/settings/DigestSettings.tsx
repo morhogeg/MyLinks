@@ -145,6 +145,7 @@ export function ScheduleView({ settings, setSettings }: { settings: Settings; se
                 <RowShell>
                     <RowText title="Frequency" />
                     <Segmented
+                        label="Frequency"
                         value={settings.digest_frequency}
                         onChange={(v) => setSettings((p) => ({ ...p, digest_frequency: v as 'daily' | 'weekly' }))}
                         options={[{ value: 'daily', label: 'Daily' }, { value: 'weekly', label: 'Weekly' }]}

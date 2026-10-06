@@ -1076,6 +1076,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                             <button
                                 type="button"
                                 onClick={() => setActiveTab('link')}
+                                aria-pressed={activeTab === 'link'}
                                 className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'link'
                                     ? 'bg-accent/10 text-accent shadow-sm border border-accent/20'
                                     : 'text-text-muted hover:text-text'
@@ -1086,6 +1087,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                             <button
                                 type="button"
                                 onClick={() => setActiveTab('image')}
+                                aria-pressed={activeTab === 'image'}
                                 className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'image'
                                     ? 'bg-accent/10 text-accent shadow-sm border border-accent/20'
                                     : 'text-text-muted hover:text-text'
@@ -1096,6 +1098,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                             <button
                                 type="button"
                                 onClick={() => setActiveTab('note')}
+                                aria-pressed={activeTab === 'note'}
                                 className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'note'
                                     ? 'bg-accent/10 text-accent shadow-sm border border-accent/20'
                                     : 'text-text-muted hover:text-text'

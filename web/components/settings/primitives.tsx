@@ -150,14 +150,19 @@ export function Toggle({ on, onChange, label }: { on: boolean; onChange: () => v
     );
 }
 
-export function Segmented<T extends string>({ value, options, onChange, iconOnly = false, widthClass }: { value: T; options: { value: T; label: string; icon?: ReactNode }[]; onChange: (v: T) => void; iconOnly?: boolean; widthClass?: string }) {
+export function Segmented<T extends string>({ value, options, onChange, iconOnly = false, widthClass, label }: { value: T; options: { value: T; label: string; icon?: ReactNode }[]; onChange: (v: T) => void; iconOnly?: boolean; widthClass?: string; label?: string }) {
+    // A radio group: the choice is announced ("Dark, selected, 3 of 3"), not
+    // only drawn as a filled pill.
     return (
-        <div className={`flex items-center gap-1 ml-auto ${iconOnly ? '-me-1' : `p-1 rounded-2xl bg-card-hover border border-border-subtle ${widthClass || 'w-full'}`}`}>
+        <div role="radiogroup" aria-label={label} className={`flex items-center gap-1 ml-auto ${iconOnly ? '-me-1' : `p-1 rounded-2xl bg-card-hover border border-border-subtle ${widthClass || 'w-full'}`}`}>
             {options.map((o) => {
                 const active = o.value === value;
                 return (
                     <button
                         key={o.value}
+                        type="button"
+                        role="radio"
+                        aria-checked={active}
                         onClick={() => onChange(o.value)}
                         aria-label={iconOnly ? o.label : undefined}
                         title={iconOnly ? o.label : undefined}
