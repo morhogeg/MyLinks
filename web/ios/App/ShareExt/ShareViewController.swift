@@ -183,6 +183,16 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         sweepStaleShareTempFiles()
         setupGenericUI()
         setupScanUI()
+        // Reading a big item (an iCloud-optimised original, several photos)
+        // can take seconds before any HUD appears. If nothing is up after a
+        // beat, show the "Saving to Machina…" card with its ✕, so the sheet is
+        // never a dimmed screen with no way out. The delay keeps a fast share
+        // from flashing the card before the scan HUD replaces it.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+            guard let self = self, !self.finished, !self.resultShown,
+                  !self.isImageFlow, !self.isLinkFlow, !self.isTextFlow else { return }
+            self.card.isHidden = false
+        }
         handleShare()
     }
 
@@ -310,7 +320,9 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     }
 
     /// Dismiss the share extension immediately. The background upload session
-    /// continues independently, so closing here does not cancel the save.
+    /// continues independently, so closing here does not cancel the save. A
+    /// close while the item is still being read DOES cancel it: upload()
+    /// refuses to start once finish() has run, so nothing is sent.
     @objc private func closeTapped() {
         finish()
     }
@@ -1325,6 +1337,9 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     // MARK: - Networking
 
     private func upload(payload: [String: Any]) {
+        // Closed (✕) while the item was still loading: the user left before
+        // anything was sent, so send nothing.
+        guard !finished else { return }
         let defaults = UserDefaults(suiteName: Self.appGroup)
         // The token lives in the shared Keychain (KeychainStore). A build
         // that predates it left the token in the App Group plist: migrate a
