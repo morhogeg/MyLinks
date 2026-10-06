@@ -55,12 +55,16 @@ export const Endcard: React.FC = () => {
   // the wordmark wipes in as the narrator says the name
   const word = prog(f, SAY_NAME - 8, SAY_NAME + 8, EASE_MODAL);
   const float = Math.round(drift(f, 4, 300));
+  // the digest leaves through the dark; the set's light comes up out of it
+  const setUp = prog(f, 0, 8, EASE_OUT);
 
   const MARK_W = 184;
 
   return (
     <AbsoluteFill style={{ background: SET_BG }}>
-      <Stage intensity={0.7} />
+      <AbsoluteFill style={{ opacity: setUp }}>
+        <Stage intensity={0.7} />
+      </AbsoluteFill>
 
       <AbsoluteFill
         style={{

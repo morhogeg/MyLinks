@@ -79,9 +79,12 @@ export const Scatter: React.FC = () => {
   const camY = -(siloPos[WRONG_A].y * wA + siloPos[WRONG_B].y * wB) * 0.6 + drift(f, 6, 320);
 
   const out = 1 - prog(f, 363, 375);
+  // the boot dissolves to the dark; the set comes up out of it rather than
+  // switching on (on the light grade both sides of the cut were paper)
+  const inFade = prog(f, 0, 6, EASE_OUT);
 
   return (
-    <AbsoluteFill style={{ background: SET_BG, opacity: out }}>
+    <AbsoluteFill style={{ background: SET_BG, opacity: out * inFade }}>
       {/* the set lit a little brighter than the product beats: the piles are
           small dark glass, and they must read as things in the dark */}
       <Stage intensity={0.95} backlight={0.42} />
