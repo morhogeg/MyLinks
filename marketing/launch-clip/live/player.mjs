@@ -12,7 +12,7 @@
  * takes at most 15 MB a file (claude.ai artifacts): H.264 MP4 first, VP9 WebM
  * for browsers without H.264, both 1080p60 at ~1.6 Mb/s (the film is flat
  * paper and type, so this holds up next to the 6 Mb/s master), plus a poster
- * (the hook over the ring) and the page, live/player.html, with the film's
+ * (the ring of saves around the phone) and the page, live/player.html, with the film's
  * chapters (film/edit.js) written in. Encodes are skipped when the output is
  * newer than its master, unless --force.
  */
@@ -34,7 +34,7 @@ const PAGE_ONLY = process.argv.includes('--page');
 const CUT = process.argv.includes('--cut') ? process.argv[process.argv.indexOf('--cut') + 1] : null;
 const LIMIT = 15e6;
 const VIDEO_KBPS = 1620;
-const POSTER_T = 7.4; // the hook line, fully in, over the ring of cards
+const POSTER_T = 7.4; // the ring of saves, fully formed around the phone
 
 fs.mkdirSync(DIR, { recursive: true });
 const stale = (out, src) => FORCE || !fs.existsSync(out) || fs.statSync(out).mtimeMs < fs.statSync(src).mtimeMs;

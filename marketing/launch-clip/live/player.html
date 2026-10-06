@@ -47,7 +47,7 @@
 
   /* the film's width follows the window, so the whole room fits one screen */
   .sheet {
-    --screen-w: min(100vw - 2 * var(--gutter), max(18rem, min(1280px, (100vh - 18rem) * 16 / 9)));
+    --screen-w: min(100vw - 2 * var(--gutter), max(18rem, min(1280px, (100vh - 18.75rem) * 16 / 9)));
     --sheet-w: var(--screen-w);
     width: var(--sheet-w);
     max-width: 100%;
@@ -56,11 +56,11 @@
     gap: clamp(14px, 2.4vh, 24px);
   }
   @supports (height: 100svh) {
-    .sheet { --screen-w: min(100vw - 2 * var(--gutter), max(18rem, min(1280px, (100svh - 18rem) * 16 / 9))); }
+    .sheet { --screen-w: min(100vw - 2 * var(--gutter), max(18rem, min(1280px, (100svh - 18.75rem) * 16 / 9))); }
   }
-  .sheet[data-cut="portrait"] { --screen-w: min(100vw - 2 * var(--gutter), max(15rem, (100vh - 14rem) * 9 / 16)); }
+  .sheet[data-cut="portrait"] { --screen-w: min(100vw - 2 * var(--gutter), max(15rem, (100vh - 16.5rem) * 9 / 16)); }
   @supports (height: 100svh) {
-    .sheet[data-cut="portrait"] { --screen-w: min(100vw - 2 * var(--gutter), max(15rem, (100svh - 14rem) * 9 / 16)); }
+    .sheet[data-cut="portrait"] { --screen-w: min(100vw - 2 * var(--gutter), max(15rem, (100svh - 16.5rem) * 9 / 16)); }
   }
 
   .slate {
