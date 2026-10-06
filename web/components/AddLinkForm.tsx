@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, FormEvent } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Link, Plus, X, Upload, Loader2, Image as ImageIcon, StickyNote } from 'lucide-react';
 import { doc, onSnapshot } from 'firebase/firestore';
-import { saveLink, getUserTags, findLinkIdByUrl, startProcessingPlaceholder, createImagePlaceholder, markLinkFailed, markLinkWaiting, startNoteCard, enrichNoteCard } from '@/lib/storage';
+import { findLinkIdByUrl, startProcessingPlaceholder, createImagePlaceholder, markLinkFailed, markLinkWaiting, startNoteCard, enrichNoteCard } from '@/lib/storage';
 import { appCheckHeaders, db } from '@/lib/firebase';
 import { authHeaders } from '@/lib/auth';
 import { progressFor } from '@/lib/shareProgress';
@@ -90,10 +90,11 @@ const youTubeId = (input: string): string | null => {
     return match ? match[1] : null;
 };
 
-// Analysis can be slow on a cold function start, but it must never hang
-// forever. Abort the request after a generous ceiling and surface a clear
-// message instead of an indefinite spinner.
-const ANALYZE_TIMEOUT_MS = 60_000;
+// The image upload (/api/share stores the images and queues the read; no
+// analysis runs in that request) must never hang forever on a bad connection.
+// Abort after a generous ceiling and surface a clear message instead of an
+// indefinite spinner.
+const UPLOAD_TIMEOUT_MS = 60_000;
 
 // Multi-screenshot cards: how many ordered images may become ONE card. Mirrors
 // the backend's MAX_CARD_IMAGES — keep the two in step.
@@ -147,15 +148,15 @@ async function settleWithin<T>(p: Promise<T>, ms: number): Promise<Settled<T>> {
 
 const fetchWithTimeout = async (input: string, init: RequestInit) => {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
+    const timer = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
     try {
         return await fetch(input, { ...init, signal: controller.signal });
     } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') {
-            // HONEST copy: the synchronous save did NOT complete — nothing was
-            // persisted and nothing will appear in the feed. Tell the truth and
-            // invite a retry (the URL stays in the field, so retry is one tap).
-            throw saveError('That took too long, so nothing was saved. Your link is still here: tap Save to try again.', 'timeout');
+            // HONEST copy: the card is in the feed (marked failed), but whether
+            // the server received the images before the connection gave up is
+            // unknown. If it did, the card still finishes in the background.
+            throw saveError('The upload took too long. If it doesn’t finish in your library shortly, please add it again.', 'timeout');
         }
         throw err;
     } finally {
@@ -175,9 +176,9 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
     const [note, setNote] = useState('');
     const [activeTab, setActiveTab] = useState<'link' | 'image' | 'note'>('link');
     // Image capture: an ORDERED list of up to MAX_IMAGES screenshots that become
-    // ONE card. One image keeps today's fast sync path; 2+ go through the
-    // background pipeline. The strip below is the ordering answer — the order is
-    // visible and editable (drag to reorder), never whatever the OS handed back.
+    // ONE card, read by the background pipeline (one image or five). The strip
+    // below is the ordering answer — the order is visible and editable (drag to
+    // reorder), never whatever the OS handed back.
     const [images, setImages] = useState<PickedImage[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -603,9 +604,8 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
             // (instant feed feedback) and enqueue the URL into the SAME background
             // pipeline the iOS share sheet uses. Analysis finishes asynchronously
             // and flips this very card to ready/failed — the capture is durable
-            // the moment the placeholder is written. (Note & Image stay
-            // synchronous below — see the report: images upload inline bytes the
-            // trigger path doesn't handle, and a note is near-instant.)
+            // the moment the placeholder is written. (Images take the same
+            // durable path below; a note is written first and enriched after.)
             setProgress(0);
             lastLinkPct.current = 0;
 
@@ -805,173 +805,78 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
         setProgress(0);
 
         try {
-            // Fetch existing tags to pass to AI for reuse (non-critical).
-            let existingTags: string[] = [];
+            // IMAGE CAPTURE: one screenshot, or an ordered set that becomes ONE
+            // card. Durable, like every other capture: a `processing`
+            // placeholder card first, then each image compressed IN THE
+            // CONFIRMED ORDER and handed to /api/share, which stores them and
+            // enqueues one background job that flips this same card to
+            // ready/failed. A single image used to wait on the synchronous
+            // image-analysis endpoint instead: this form gave up at 60 seconds
+            // while the server ran on, charged the save and stored the
+            // screenshot with no card, and the user was told nothing was saved.
+            const single = images.length === 1;
+            const errorTag = single ? 'capture.image' : 'capture.images';
+            const payload: { data: string; mimeType: string }[] = [];
+            for (const im of images) {
+                const compressed = await compressImage(im.file);
+                payload.push({ data: compressed.base64, mimeType: compressed.mimeType });
+            }
+            setProgress((p) => Math.max(p, 45));
+
+            let cardId: string;
             try {
-                existingTags = await getUserTags(uid);
-            } catch {
-                // Proceed without tag context — purely an optimization.
+                cardId = await createImagePlaceholder(uid, images.length);
+            } catch (writeErr) {
+                reportError(writeErr, `${errorTag}.placeholder`);
+                throw saveError(single ? SAVE_COPY.image : SAVE_COPY.images, 'save_failed');
             }
 
-            let data;
-
-            if (images.length >= 2) {
-                // MULTI-IMAGE MODE — the ordered set becomes ONE card via the
-                // background pipeline (4-5 dense screenshots at high resolution
-                // don't fit the sync endpoint's budget; single images below keep
-                // the fast path). Durable: a `processing` placeholder card first,
-                // then compress each image IN THE CONFIRMED ORDER and hand the
-                // set to /api/share, which stores them and enqueues one job that
-                // flips this same card to ready/failed.
-                const payload: { data: string; mimeType: string }[] = [];
-                for (const im of images) {
-                    const compressed = await compressImage(im.file);
-                    payload.push({ data: compressed.base64, mimeType: compressed.mimeType });
-                }
-                setProgress((p) => Math.max(p, 45));
-
-                let cardId: string;
+            let waiting: WaitingSave | null = null;
+            try {
+                const response = await fetchWithTimeout(apiUrl('/api/share'), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()), ...(await authHeaders()) },
+                    body: JSON.stringify({ images: payload, cardId, uid }),
+                });
+                const body = await readBody(response);
+                // Past the monthly allowance the images are stored and the card
+                // waits for its read (see finishWaitingSave).
+                waiting = response.ok && isWaitingSave(body) ? body : saveWallAsWaiting(response.status, body);
+                if (waiting && !response.ok) await markLinkWaiting(uid, cardId);
+                if (!waiting) ensureOk(response, body);
+            } catch (err) {
+                // Enqueue failed: flip the placeholder to a retryable failed
+                // card (never a stuck spinner), then surface the error.
                 try {
-                    cardId = await createImagePlaceholder(uid, images.length);
-                } catch (writeErr) {
-                    reportError(writeErr, 'capture.images.placeholder');
-                    throw saveError(SAVE_COPY.images, 'save_failed');
+                    await markLinkFailed(uid, cardId, err instanceof Error ? err.message : String(err));
+                } catch {
+                    // Best-effort; the processing janitor ages it out otherwise.
                 }
+                if (err instanceof Error && 'category' in err) throw err;
+                reportError(err, `${errorTag}.enqueue`);
+                throw saveError(SAVE_COPY.network, 'network');
+            }
 
-                let waiting: WaitingSave | null = null;
-                try {
-                    const response = await fetchWithTimeout(apiUrl('/api/share'), {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()), ...(await authHeaders()) },
-                        body: JSON.stringify({ images: payload, cardId, uid }),
-                    });
-                    const body = await readBody(response);
-                    // Past the monthly allowance the set is stored and the card
-                    // waits for its read (see finishWaitingSave).
-                    waiting = response.ok && isWaitingSave(body) ? body : saveWallAsWaiting(response.status, body);
-                    if (waiting && !response.ok) await markLinkWaiting(uid, cardId);
-                    if (!waiting) ensureOk(response, body);
-                } catch (err) {
-                    // Enqueue failed — flip the placeholder to a retryable failed
-                    // card (never a stuck spinner), then surface the error.
-                    try {
-                        await markLinkFailed(uid, cardId, err instanceof Error ? err.message : String(err));
-                    } catch {
-                        // Best-effort; the processing janitor ages it out otherwise.
-                    }
-                    if (err instanceof Error && 'category' in err) throw err;
-                    reportError(err, 'capture.images.enqueue');
-                    throw saveError(SAVE_COPY.network, 'network');
-                }
-
-                if (waiting) {
-                    finishWaitingSave(waiting);
-                    return;
-                }
-
-                // Queued durably — the honest success moment for the CAPTURE,
-                // not the analysis. Deliberately NO progress-100 frame here: the
-                // ack only means the set was queued, and snapping the banner to
-                // "Done" while the card still reads "Saving" is the exact
-                // dishonest finish the video path was cured of (2026-08-01).
-                // Close now; the feed's processing card + Firestore pill carry
-                // the real ramp until the card actually resolves.
-                trackSaveSucceeded('web_form');
-                trackFirstSave();
-                clearImages();
-                setIsExpanded(false);
-                hapticSuccess();
-                toast.success('Saved. Reading your screenshots in the background.');
-                onLinkAdded();
+            if (waiting) {
+                finishWaitingSave(waiting);
                 return;
             }
 
-            {
-                // IMAGE MODE — compress client-side, then send the inline bytes to
-                // the backend, which both analyzes AND stores the image (via the
-                // admin SDK, bypassing storage.rules that block client writes).
-                const compressed = await compressImage(images[0].file);
-                // Real milestone: the image is compressed and on its way — push
-                // past the "scanning" phase into "reading text".
-                setProgress((p) => Math.max(p, 45));
-
-                let response;
-                try {
-                    response = await fetchWithTimeout(apiUrl('/api/analyze-image'), {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()), ...(await authHeaders()) },
-                        body: JSON.stringify({
-                            imageBytes: compressed.base64,
-                            mimeType: compressed.mimeType,
-                            existingTags,
-                            uid,
-                        }),
-                    });
-                } catch (netErr) {
-                    // Preserve a categorized error (e.g. the timeout) as-is; only a
-                    // genuine transport failure gets wrapped as 'network'.
-                    if (netErr instanceof Error && 'category' in netErr) throw netErr;
-                    reportError(netErr, 'capture.image.network');
-                    throw saveError(SAVE_COPY.network, 'network');
-                }
-                data = await readBody(response);
-                // Past the monthly allowance the server stored the image and
-                // wrote a `waiting` card itself; there is nothing to save here.
-                if (response.ok && isWaitingSave(data)) {
-                    finishWaitingSave(data);
-                    return;
-                }
-                ensureOk(response, data);
-                // The backend returns the stored image's public URL as link.url.
-            }
-
-            // Save to Firestore.
-            try {
-                await saveLink(uid, {
-                    url: data.link.url,
-                    title: data.link.title,
-                    summary: data.link.summary,
-                    detailedSummary: data.link.detailedSummary,
-                    tags: data.link.tags,
-                    category: data.link.category,
-                    language: data.link.language,
-                    metadata: {
-                        originalTitle: data.link.metadata.originalTitle,
-                        estimatedReadTime: data.link.metadata.estimatedReadTime,
-                        actionableTakeaway: data.link.metadata.actionableTakeaway,
-                    },
-                    sourceType: 'image',
-                    sourceName: data.link.sourceName,
-                    // Screenshot provenance the backend read off the image (the
-                    // app's mark + @handle on the byline). This list is a
-                    // whitelist: a field left out here is silently dropped, which
-                    // is exactly how the first two rounds of the byline fix never
-                    // reached a card saved from this tab (2026-09-10).
-                    sourceHandle: data.link.sourceHandle,
-                    sourcePlatform: data.link.sourcePlatform,
-                    concepts: data.link.concepts,
-                    relatedLinks: data.link.relatedLinks,
-                });
-            } catch (saveErr) {
-                reportError(saveErr, 'capture.image.save');
-                throw saveError(SAVE_COPY.image, 'save_failed');
-            }
-
-            // The capture landed and is persisted — record it (image tab only;
-            // link and note captures returned durably above).
+            // Queued durably: the honest success moment for the CAPTURE, not
+            // the analysis. Deliberately NO progress-100 frame here: the ack
+            // only means the images were queued, and snapping the banner to
+            // "Done" while the card still reads "Saving" is the exact dishonest
+            // finish the video path was cured of (2026-08-01). Close now; the
+            // feed's processing card + Firestore pill carry the real ramp until
+            // the card actually resolves.
             trackSaveSucceeded('web_form');
             trackFirstSave();
-
-            // Let the scan progress (link, image, or video) land on "Done!" first.
-            setProgress(100);
-            await new Promise((r) => setTimeout(r, 550));
-
-            setUrl('');
-            setNote('');
             clearImages();
             setIsExpanded(false);
-            hapticSuccess(); // the save landed — a satisfying success buzz on device
-            toast.success('Saved to Machina');
+            hapticSuccess();
+            toast.success(single
+                ? 'Saved. Reading your screenshot in the background.'
+                : 'Saved. Reading your screenshots in the background.');
             onLinkAdded();
         } catch (err) {
             // Record a SHORT, FIXED failure category (never raw error text). An

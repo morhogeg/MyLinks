@@ -684,6 +684,125 @@ def test_analyze_link_reads_the_video_budget_only_for_a_video(monkeypatch):
     assert len(spent) == 1 and watched == [1]
 
 
+# ── CAP-2: Retry and the Image tab go through the durable queue ──────────────
+
+def _share(body):
+    from tests.test_capture_edge_cases import _Req
+    return main.share_ingest(_Req(body))
+
+
+def _jobs(db):
+    return {k: v for k, v in db.docs.items() if k.startswith("pending_processing/")}
+
+
+@pytest.mark.parametrize("status", ["failed", "processing"])
+def test_url_retry_enqueues_the_failed_card_itself(env, monkeypatch, status):
+    """`processing`: the client flipped the card before asking (it does);
+    `failed`: that optimistic write never landed."""
+    from tests.test_capture_edge_cases import _json
+    charges = []
+    _share_stubs(monkeypatch, charges)
+    db = env.make({"users/u1/links/c1": {"status": status, "url": "https://example.com/a",
+                                         "error": "timed out"}})
+    resp = _share({"url": "https://example.com/a", "cardId": "c1"})
+    body = _json(resp)
+    assert resp.status_code == 200 and body["queued"] is True
+    (job,) = _jobs(db).values()
+    assert job["cardId"] == "c1" and job["url"] == "https://example.com/a"
+    assert job["charge"] == {"kind": "saves"} and job["source"] == "web"
+    assert charges == ["saves"]
+
+
+@pytest.mark.parametrize("cards,code", [
+    # Another user's card: it simply isn't in the caller's workspace.
+    ({"users/u2/links/c1": {"status": "failed", "url": "https://example.com/a"}}, 404),
+    # A finished card is not retryable: no second charge, no second read.
+    ({"users/u1/links/c1": {"status": "unread", "url": "https://example.com/a"}}, 409),
+    ({"users/u1/links/c1": {"status": "waiting", "url": "https://example.com/a"}}, 409),
+])
+def test_url_retry_refuses_a_card_that_is_not_the_callers_or_not_retryable(env, monkeypatch, cards, code):
+    charges = []
+    _share_stubs(monkeypatch, charges)
+    db = env.make(cards)
+    resp = _share({"url": "https://example.com/a", "cardId": "c1"})
+    assert resp.status_code == code
+    assert charges == [] and _jobs(db) == {}
+
+
+def test_a_retried_import_keeps_its_folder_tags(env, monkeypatch):
+    _share_stubs(monkeypatch)
+    db = env.make({"users/u1/links/c1": {"status": "failed", "url": "https://example.com/a", "tags": [],
+                                         "importedAt": 1, "importedTags": ["Reading/Longform"],
+                                         "collectionIds": ["col1"]}})
+    _share({"url": "https://example.com/a", "cardId": "c1"})
+    (path, job), = _jobs(db).items()
+    _deliver(db, path, job)
+    card = db.docs["users/u1/links/c1"]
+    assert card["status"] == "unread" and card["tags"] == ["ai", "Reading/Longform"]
+    assert card["collectionIds"] == ["col1"] and card["importedTags"] == ["Reading/Longform"]
+
+
+def test_an_image_capture_for_a_missing_placeholder_stores_nothing(storage_world):
+    import base64
+    db = storage_world.make({})
+    b64 = base64.b64encode(b"\xff\xd8\xff" + b"x" * 64).decode()
+    resp = _share({"images": [{"data": b64, "mimeType": "image/jpeg"}], "cardId": "gone"})
+    assert resp.status_code == 404
+    assert storage_world.stores == [] and _jobs(db) == {}
+
+
+def test_a_single_image_capture_completes_its_placeholder_in_the_background(storage_world):
+    """The web Image tab's new path: placeholder first, then /api/share."""
+    import base64
+    from tests.test_capture_edge_cases import _json
+    db = storage_world.make({"users/u1/links/c1": {"status": "processing", "processingStartedAt": tcc.NOW_MS,
+                                                   "url": "", "sourceType": "image", "createdAt": 111}})
+    b64 = base64.b64encode(b"\xff\xd8\xff" + b"x" * 64).decode()
+    body = _json(_share({"images": [{"data": b64, "mimeType": "image/jpeg"}], "cardId": "c1"}))
+    assert body["queued"] is True
+    _run_job_of(db, body)
+    card = db.docs["users/u1/links/c1"]
+    assert card["status"] == "unread" and card["sourceType"] == "image" and card["createdAt"] == 111
+    assert card["url"] == _storage_url(storage_world.stores[0]) and len(storage_world.stores) == 1
+
+
+def test_the_sync_analyze_endpoints_get_a_gigabyte():
+    for fn in (main.analyze_link, main.analyze_image):
+        endpoint = getattr(fn, "__firebase_endpoint__", None)
+        if endpoint is None:
+            pytest.skip("firebase-functions SDK not installed (offline fakes)")
+        assert endpoint.availableMemoryMb == 1024
+
+
+def _ts_code(text):
+    """TypeScript source with its comments removed (string contents here never
+    hold `//` or `/*`, so a plain regex is enough for these scans)."""
+    import re
+    return re.sub(r"//[^\n]*", "", re.sub(r"/\*.*?\*/", "", text, flags=re.S))
+
+
+def _ts_function(path, name):
+    """The code of one top-level `export async function name(...)`."""
+    text = (FUNCTIONS.parent / path).read_text(encoding="utf-8")
+    start = text.index(f"export async function {name}(")
+    nxt = text.find("\nexport ", start + 1)
+    return _ts_code(text[start: nxt if nxt != -1 else len(text)])
+
+
+def test_retry_never_calls_the_sync_analyze_endpoints():
+    """A Retry used to POST /api/analyze (cut at 60 s by every caller while
+    the function ran on, charged and discarded the result)."""
+    retry = _ts_function("web/lib/storage.ts", "retryFailedLink")
+    assert "/api/analyze" not in retry
+    assert "apiUrl('/api/share')" in retry
+    assert "url: link.url" in retry and "cardId: link.id" in retry
+
+
+def test_the_image_tab_never_calls_the_sync_image_endpoint():
+    form = _ts_code((FUNCTIONS.parent / "web/components/AddLinkForm.tsx").read_text(encoding="utf-8"))
+    assert "/api/analyze-image" not in form and "createImagePlaceholder(" in form
+
+
 def test_the_enrich_sweep_has_a_collection_group_index():
     import json
     overrides = json.loads((FUNCTIONS.parent / "firestore.indexes.json").read_text())["fieldOverrides"]

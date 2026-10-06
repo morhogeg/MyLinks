@@ -2150,7 +2150,9 @@ def debug_status(req: https_fn.Request) -> https_fn.Response:
         return _server_error(exc=e, message="Debug failed")
 
 
-@https_fn.on_request(max_instances=10, timeout_sec=120)
+# 1 GiB: parsing a large page (or a PDF) can pass the 256 MiB default, and Cloud
+# Run's CPU share scales with memory, which shortens every analysis.
+@https_fn.on_request(max_instances=10, timeout_sec=120, memory=1024)
 def analyze_link(req: https_fn.Request) -> https_fn.Response:
     """
     HTTP endpoint for analyzing URLs immediately (Synchronous).
@@ -3085,7 +3087,7 @@ def _similarity_http(req, headers: dict) -> https_fn.Response:
         return _server_error(headers, e, "Similarity failed")
 
 
-@https_fn.on_request(max_instances=10, timeout_sec=120)
+@https_fn.on_request(max_instances=10, timeout_sec=120, memory=1024)  # see analyze_link
 def analyze_image(req: https_fn.Request) -> https_fn.Response:
     """HTTP endpoint for analyzing Images immediately (Synchronous)."""
     if req.method == 'OPTIONS':
@@ -3349,6 +3351,30 @@ def _pending_url_doc(uid: str, url: str, *, card_id: Optional[str] = None,
     return doc
 
 
+# Statuses a card may be in when a capture names it by `cardId`: the processing
+# placeholder the web client writes first (or a failed card it flipped back to
+# processing for Retry), or a failed card. Anything else is a finished card a
+# new job must not overwrite or pay to read again.
+_CAPTURE_TARGET_STATUSES = (LinkStatus.PROCESSING.value, LinkStatus.FAILED.value)
+
+
+def _capture_target_error(uid: str, card_id, headers: dict):
+    """None when `card_id` names one of the CALLER's own cards that is waiting
+    for its analysis; otherwise the error response, before anything is
+    stored or charged: 400 for a malformed id, 404 for a card that is not in
+    the caller's workspace (another user's card simply isn't there), 409 for
+    one already finished (a client that gets 409 leaves the card alone)."""
+    if not _valid_card_id(card_id):
+        return _error_response("Invalid card", 400, headers)
+    snap = get_db().collection('users').document(uid).collection('links').document(card_id).get()
+    card = (snap.to_dict() or {}) if snap.exists else None
+    if card is None:
+        return _error_response("Card not found", 404, headers)
+    if card.get("status") not in _CAPTURE_TARGET_STATUSES:
+        return _error_response("This card is already saved.", 409, headers)
+    return None
+
+
 def _claim_offline_enqueue(uid: str, card_id) -> Optional[bool]:
     """Clear an offline-saved card's `pendingEnqueue` flag, atomically.
     True: this caller cleared it and should enqueue. False: already cleared
@@ -3560,6 +3586,13 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                 q = _quota_blocked(uid, "saves", headers)
                 if q:
                     return q
+            elif data.get('cardId'):
+                # The web capture's own placeholder: it must be the caller's
+                # and still waiting, checked before anything is stored or
+                # charged (a missing one used to leave the stored set behind).
+                bad = _capture_target_error(uid, data.get('cardId'), headers)
+                if bad:
+                    return bad
             # Past the monthly save wall, the set is still stored and kept as a
             # `waiting` card; only its analysis waits (deferred_capture).
             over = None
@@ -3688,6 +3721,10 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
             for u in image_urls_in:
                 if not isinstance(u, str) or len(u) > MAX_URL_LENGTH or not u.startswith(allowed_prefixes):
                     return _error_response("Invalid image URL", 400, headers)
+            if data.get('cardId'):
+                bad = _capture_target_error(uid, data.get('cardId'), headers)
+                if bad:
+                    return bad
             q = _quota_blocked(uid, "saves", headers)
             if q:
                 # A Retry past the monthly wall: the images are already ours,
@@ -3887,6 +3924,17 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                 json.dumps({"success": True, "duplicate": True, "url": url}),
                 status=200, headers=headers, mimetype='application/json'
             )
+
+        # A card named by `cardId` (the durable web capture's placeholder, or a
+        # failed card's Retry, web/lib/storage.ts retryFailedLink) must be the
+        # caller's own and still waiting for its analysis. The worker then
+        # finalizes that card in place, keeping its user-owned fields and its
+        # import tags, through the same durable queue as every capture, so a
+        # slow page no longer races the 60-second request limit.
+        if card_id and not data.get('offlineEnqueue'):
+            bad = _capture_target_error(uid, card_id, headers)
+            if bad:
+                return bad
 
         # A link saved OFFLINE (web/lib/offlineSave.ts): the card carries
         # `pendingEnqueue`, and more than one path (the form's reconnect
@@ -5819,7 +5867,14 @@ def _merge_card_write(new: dict, current: dict) -> dict:
     for key in _USER_OWNED_CARD_FIELDS:
         if key in current:
             out[key] = current[key]
-    out["tags"] = _merge_tags(current.get("tags"), new.get("tags"))[:MAX_CARD_TAGS]
+    fresh_tags = new.get("tags")
+    if new.get("status") != LinkStatus.FAILED.value and current.get("importedTags"):
+        # An imported card's folder / export tags become real tags when its
+        # analysis lands. The import's own job carries them, but a Retry's
+        # job does not: the card does. Same rule as the first run
+        # (_merge_import_tags): the model's tags lead, the user's filing follows.
+        fresh_tags = _merge_import_tags(fresh_tags, current.get("importedTags"))
+    out["tags"] = _merge_tags(current.get("tags"), fresh_tags)[:MAX_CARD_TAGS]
     notes = [n for n in (current.get("userNotes") or []) if isinstance(n, dict)]
     have = {(n.get("text") or "").strip() for n in notes}
     for n in new.get("userNotes") or []:
