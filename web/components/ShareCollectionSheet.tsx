@@ -28,6 +28,13 @@ interface ShareCollectionSheetProps {
      *  never make it onto the public page. Shown so the count on the sheet and
      *  the count on the page never silently disagree. */
     excludedPrivateCount: number;
+    /** True while `memberLinks` may still be incomplete: the member query has
+     *  not answered yet, or only the local cache has (Firestore answers from
+     *  the cache first, and that answer can hold just the members this device
+     *  has seen). Publishing then would freeze a partial snapshot onto the
+     *  live page, and "changed since you published" would be judged against
+     *  it, so both wait. */
+    membersLoading?: boolean;
     isOpen: boolean;
     onClose: () => void;
 }
@@ -47,6 +54,7 @@ export default function ShareCollectionSheet({
     collection,
     memberLinks,
     excludedPrivateCount,
+    membersLoading = false,
     isOpen,
     onClose,
 }: ShareCollectionSheetProps) {
@@ -75,7 +83,10 @@ export default function ShareCollectionSheet({
     const { sheetRef, scrimRef, handleProps } = useSheetDrag({ onClose, enabled: isMobile });
 
     const isPublic = !!collection.isPublic && !!collection.shareId;
-    const stale = useMemo(() => isShareStale(collection, memberLinks), [collection, memberLinks]);
+    const stale = useMemo(
+        () => !membersLoading && isShareStale(collection, memberLinks),
+        [collection, memberLinks, membersLoading],
+    );
     const url = collection.shareId ? shareUrlFor(`/c?id=${collection.shareId}`) : null;
     const style = getColorStyleByKey(collection.color || collection.name);
     const thumbs = useMemo(
@@ -103,7 +114,7 @@ export default function ShareCollectionSheet({
         : null;
 
     const doPublish = async () => {
-        if (!uid || busy) return;
+        if (!uid || busy || membersLoading) return;
         setBusy('publish');
         try {
             await publishCollection(uid, collection, memberLinks);
@@ -207,11 +218,11 @@ export default function ShareCollectionSheet({
                         <div className="px-3.5 py-2.5 flex items-center gap-2 text-xs text-text-muted">
                             <Layers className="w-3.5 h-3.5 shrink-0" />
                             <span className="flex-1 truncate">
-                                {count} {count === 1 ? 'card' : 'cards'}
+                                {membersLoading ? 'Counting cards…' : `${count} ${count === 1 ? 'card' : 'cards'}`}
                                 {collection.description ? ` · ${collection.description}` : ''}
                             </span>
                         </div>
-                        {(excludedLine || capped || screenshotCount > 0) && (
+                        {!membersLoading && (excludedLine || capped || screenshotCount > 0) && (
                             <div className="px-3.5 pb-2.5 -mt-1 space-y-0.5 text-xs text-text-muted">
                                 {screenshotCount > 0 && (
                                     <p>Includes {screenshotCount} {screenshotCount === 1 ? 'screenshot' : 'screenshots'}, shown as images on the page.</p>
@@ -225,20 +236,22 @@ export default function ShareCollectionSheet({
                     {!isPublic ? (
                         <>
                             <p className="text-sm text-text-muted leading-relaxed">
-                                Sharing creates a page with a snapshot of these {count === 1 ? 'card' : `${count} cards`}:
+                                Sharing creates a page with a snapshot of {membersLoading ? 'its cards' : `these ${count === 1 ? 'card' : `${count} cards`}`}:
                                 titles, summaries, sources and thumbnails. Anyone with the link can view it; nothing
                                 identifies you, and your library stays private.
-                                {excludedLine ? ` ${excludedLine}` : ''}
+                                {!membersLoading && excludedLine ? ` ${excludedLine}` : ''}
                             </p>
                             <button
                                 onClick={doPublish}
-                                disabled={!uid || busy !== null || count === 0}
+                                disabled={!uid || busy !== null || membersLoading || count === 0}
                                 className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-accent text-accent-ink font-semibold hover:bg-accent-hover transition-colors disabled:opacity-40"
                             >
                                 <Globe className="w-4 h-4" />
                                 {busy === 'publish' ? 'Creating…' : 'Create share link'}
                             </button>
-                            {count === 0 && (
+                            {membersLoading ? (
+                                <p className="text-xs text-text-muted text-center">Loading every card in this collection…</p>
+                            ) : count === 0 && (
                                 <p className="text-xs text-text-muted text-center">Add a card first. An empty collection has nothing to show.</p>
                             )}
                         </>
