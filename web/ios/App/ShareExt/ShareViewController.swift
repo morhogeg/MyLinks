@@ -660,7 +660,13 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     }
 
     /// Vertical sweep that loops top -> bottom, matching @keyframes scan-sweep.
+    /// Under Reduce Motion there is no sweep: the progress bar and the phase
+    /// line already say what is happening (launch audit IOS-12).
     private func startSweepAnimation() {
+        if UIAccessibility.isReduceMotionEnabled {
+            sweepView.isHidden = true
+            return
+        }
         let band = sweepView.bounds.height
         let travel = previewView.bounds.height
         let anim = CABasicAnimation(keyPath: "transform.translation.y")
@@ -811,6 +817,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         DispatchQueue.main.async {
             guard !self.resultShown else { return }
             self.resultShown = true
+            UIAccessibility.post(notification: .announcement, argument: "Already in your library")
             self.displayLink?.invalidate()
             self.displayLink = nil
             self.clearPendingShareHint()
@@ -858,6 +865,10 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
             // so we never flip a shown error into a (false) success or vice-versa.
             guard !self.resultShown else { return }
             self.resultShown = true
+            // VoiceOver hears the outcome; the sheet otherwise changes in
+            // silence (launch audit IOS-12).
+            UIAccessibility.post(notification: .announcement,
+                                 argument: [message, waitingHint ?? stickyHint].compactMap { $0 }.joined(separator: ". "))
 
             // A hard failure means no card is coming, so drop the hand-off flag:
             // otherwise the app, opened next, floats an "Analyzing" banner for a
