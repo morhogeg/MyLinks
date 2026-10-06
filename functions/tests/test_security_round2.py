@@ -161,6 +161,15 @@ def test_user_vocabulary_caps_each_item(monkeypatch):
             return [_Doc({"tags": ["a" * 300, "b"], "category": "c" * 300}),
                     _Doc({"tags": ["b"], "category": "Fine"})]
 
+        def select(self, fields):
+            return self
+
+        def order_by(self, field, direction=None):
+            return self
+
+        def limit(self, n):
+            return self
+
     class _Db:
         def collection(self, *_):
             return self

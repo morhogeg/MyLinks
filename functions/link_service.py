@@ -597,9 +597,7 @@ def get_user_tags(uid: str) -> list:
     # digest_service's lazy ai_service/push_service imports).
     from search import is_effectively_private, private_collection_ids
 
-    db = get_db()
-    links_ref = db.collection('users').document(uid).collection('links')
-    docs = links_ref.get()
+    docs = _vocabulary_docs(uid)
 
     private_ids = private_collection_ids(uid)
     counts = {}
@@ -621,6 +619,25 @@ def get_user_tags(uid: str) -> list:
     return [tag for tag, _ in ranked[:MAX_PROMPT_TAGS]]
 
 
+# The prompt's tag and category vocabulary comes from the user's most recent
+# cards, not the whole library. Reading every card on every save cost one read
+# per card per capture (an import of k links into a library of N was ~k*N
+# reads), each full document still carrying its embedding (launch audit
+# CAP-11). Recent cards carry the vocabulary worth reusing; usage ranking and
+# the prompt caps were already discarding the long tail.
+VOCAB_SCAN_LIMIT = 500
+# Everything the vocabulary scan and is_effectively_private read.
+_VOCAB_FIELDS = ['tags', 'category', 'isPrivate', 'collectionIds']
+
+
+def _vocabulary_docs(uid: str):
+    links_ref = get_db().collection('users').document(uid).collection('links')
+    return (links_ref.select(_VOCAB_FIELDS)
+            .order_by('createdAt', direction=firestore.Query.DESCENDING)
+            .limit(VOCAB_SCAN_LIMIT)
+            .get())
+
+
 def get_user_vocabulary(uid: str) -> tuple:
     """The user's tag AND category vocabulary, from ONE pass over their cards.
 
@@ -640,9 +657,7 @@ def get_user_vocabulary(uid: str) -> tuple:
     """
     from search import is_effectively_private, private_collection_ids
 
-    db = get_db()
-    links_ref = db.collection('users').document(uid).collection('links')
-    docs = links_ref.get()
+    docs = _vocabulary_docs(uid)
 
     private_ids = private_collection_ids(uid)
     tag_counts = {}
