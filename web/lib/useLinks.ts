@@ -49,6 +49,8 @@ export function useLinks(uid: string | null | undefined, toast: ReturnType<typeo
     const [refreshedTop, setRefreshedTop] = useState<Link[] | null>(null);
     // Docs the backend has flagged `reminderDue` — see the second subscription.
     const [reminderLinks, setReminderLinks] = useState<Link[]>([]);
+    // Docs with a reminder still scheduled — see the third subscription.
+    const [pendingReminderLinks, setPendingReminderLinks] = useState<Link[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     // A workspace change unmounts Feed (AuthProvider gates children behind the
@@ -119,9 +121,9 @@ export function useLinks(uid: string | null | undefined, toast: ReturnType<typeo
     }, [pages, refreshedTop]);
 
     // Ids on a loaded page. A page keeps its cards live; a card held only by
-    // the reminder overlay below can drop out of `links` while it is open
-    // (clearing the reminder does exactly that), so Feed listens to such a
-    // card on its own.
+    // the reminder overlays below can drop out of `links` while it is open
+    // (clearing or cancelling the reminder does exactly that), so Feed
+    // listens to such a card on its own.
     const windowIds = useMemo(() => new Set(windowLinks.map((l) => l.id)), [windowLinks]);
 
     // More on the server while the LAST page came back full. While a just-
@@ -149,15 +151,40 @@ export function useLinks(uid: string | null | undefined, toast: ReturnType<typeo
         return () => unsubscribe();
     }, [uid]);
 
-    // Merge the due-reminder docs into the window. Window docs win on id conflict
-    // (they carry the freshest snapshot); reminder docs outside the window are
-    // appended so the reminder strip and deep-links can reach old cards.
+    // Pending-reminder sync. A reminder is set on a card the user wants back,
+    // which is very often an OLD one, so the Reminders filter, its count and
+    // Revisit's later-today list (all derived from `links`) missed every
+    // scheduled reminder past the loaded pages. Same shape as the due listener
+    // above: a single-field equality query (no composite index, no orderBy),
+    // naturally small (only cards with a reminder still scheduled), merged
+    // below.
+    useEffect(() => {
+        if (!uid) return;
+        const linksRef = collection(db, 'users', uid, 'links');
+        const q = query(linksRef, where('reminderStatus', '==', 'pending'));
+        const unsubscribe = onSnapshot(q, (snapshot: QuerySnapshot<DocumentData>) => {
+            setPendingReminderLinks(snapshot.docs.map(toLink));
+        }, (error: Error) => {
+            reportError(error, 'useLinks-pending-reminders');
+        });
+        return () => unsubscribe();
+    }, [uid]);
+
+    // Merge the reminder docs (due, then pending) into the window. Window docs
+    // win on id conflict (they carry the freshest snapshot); reminder docs
+    // outside the window are appended so the reminder strip, the Reminders
+    // view and deep-links can reach old cards.
     const links = useMemo(() => {
-        if (reminderLinks.length === 0) return windowLinks;
+        if (reminderLinks.length === 0 && pendingReminderLinks.length === 0) return windowLinks;
         const seen = new Set(windowLinks.map((l) => l.id));
-        const extra = reminderLinks.filter((l) => !seen.has(l.id));
+        const extra: Link[] = [];
+        for (const l of reminderLinks.concat(pendingReminderLinks)) {
+            if (seen.has(l.id)) continue;
+            seen.add(l.id);
+            extra.push(l);
+        }
         return extra.length ? windowLinks.concat(extra) : windowLinks;
-    }, [windowLinks, reminderLinks]);
+    }, [windowLinks, reminderLinks, pendingReminderLinks]);
 
     // Open the next page after the last card currently loaded. A no-op until
     // the last page has arrived full (the sentinel can fire twice in a row),
