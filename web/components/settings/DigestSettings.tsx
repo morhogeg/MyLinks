@@ -105,7 +105,7 @@ export function ResurfacingView({
             <SectionHeader>Weekly synthesis</SectionHeader>
             <List tight>
                 <RowShell>
-                    <RowText title="Weekly synthesis" sub={'An AI recap of what you learned this week'} />
+                    <RowText title="Weekly synthesis" sub={'A recap of what you learned this week'} />
                     <Toggle on={settings.synthesis_enabled} onChange={() => setSettings((p) => ({ ...p, synthesis_enabled: !p.synthesis_enabled }))} />
                 </RowShell>
                 {settings.synthesis_enabled && (
