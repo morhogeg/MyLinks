@@ -2663,12 +2663,15 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         #     a private card must never reach the model or the citations.
         #     Runs after ALL merges so every retrieval source is covered, and
         #     before the cap so the context refills with public cards.
+        #     A failed private-collection lookup comes back as None and fails
+        #     CLOSED (every collection member is dropped), as does a filter bug.
         try:
             cards = strip_private_cards(cards, private_collection_ids(uid))
         except Exception as e:
             # Belt-and-braces: never serve un-stripped context on a filter bug.
             logger.error(f"ask_brain privacy strip failed: {e}")
-            cards = [c for c in cards if not c.get("isPrivate")]
+            cards = [c for c in cards
+                     if c and not c.get("isPrivate") and not c.get("collectionIds")]
 
         # Cards flagged out of Ask context (`askExcluded` on the link doc).
         # 2026-07-24 incident: ONE card's stored text trips Gemini's
@@ -2995,7 +2998,8 @@ def search_links_http(req: https_fn.Request) -> https_fn.Response:
             links = strip_private_cards(links, private_collection_ids(uid))
         except Exception as e:
             logger.error(f"search_links_http privacy strip failed: {e}")
-            links = [c for c in links if c and not c.get("isPrivate")]
+            links = [c for c in links
+                     if c and not c.get("isPrivate") and not c.get("collectionIds")]
         return https_fn.Response(
             # `mode` names the path that served ("judge" | "gate") so an odd
             # result is diagnosable from the response alone.

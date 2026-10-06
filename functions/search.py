@@ -1336,32 +1336,43 @@ def demote_cards_by_titles(titles: List[str], cards: List[dict]):
 # so the server must enforce the same promise: a private card must never be
 # retrieved into the model's context or cited in an answer.
 
-def private_collection_ids(uid: str) -> set:
+def private_collection_ids(uid: str, db=None) -> Optional[set]:
     """Ids of the user's private collections (one small read per ask).
-    On a read failure returns an empty set — card-level `isPrivate` filtering
-    still applies; only collection-inherited privacy degrades, and the error
-    is logged so it is visible."""
+
+    Returns None when the read fails, NOT an empty set. An empty set means
+    "this user has no private collections", and answering that after a
+    Firestore blip made collection-inherited privacy fail OPEN: Ask and search
+    then treated a PIN-locked collection's cards as public. Every consumer
+    goes through `is_effectively_private`, which reads None as "any collection
+    might be private" and drops every card that sits in one (fail closed).
+    Logged without the exception text, whose document path carries the uid."""
     try:
-        db = get_db()
+        db = db or get_db()
         docs = (db.collection("users").document(uid).collection("collections")
                 .where(filter=FieldFilter("isPrivate", "==", True)).stream())
         return {d.id for d in docs}
     except Exception as e:
-        logger.error(f"private_collection_ids read failed: {e}")
-        return set()
+        logger.error(f"private_collection_ids read failed for {mask_uid(uid)} "
+                     f"({type(e).__name__}); collection members treated as private")
+        return None
 
 
-def is_effectively_private(data: dict, private_ids: set) -> bool:
-    """Card-level flag OR membership in any private collection."""
+def is_effectively_private(data: dict, private_ids: Optional[set]) -> bool:
+    """Card-level flag OR membership in any private collection. `private_ids`
+    None (the lookup failed) fails CLOSED: membership in ANY collection counts."""
     if data.get("isPrivate"):
         return True
     ids = data.get("collectionIds")
-    return isinstance(ids, list) and any(i in private_ids for i in ids)
+    if not isinstance(ids, list) or not ids:
+        return False
+    if private_ids is None:
+        return True
+    return any(isinstance(i, str) and i in private_ids for i in ids)
 
 
-def strip_private_cards(cards: List[dict], private_ids: set) -> List[dict]:
+def strip_private_cards(cards: List[dict], private_ids: Optional[set]) -> List[dict]:
     """Drop effectively-private (and degenerate falsy) cards from a retrieval
-    result."""
+    result. `private_ids` None fails closed (see is_effectively_private)."""
     return [c for c in cards if c and not is_effectively_private(c, private_ids)]
 
 
