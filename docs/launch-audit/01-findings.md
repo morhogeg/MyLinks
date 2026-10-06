@@ -58,14 +58,14 @@ Severity is the auditor's, re-rated where the code showed otherwise.
 | WEB-18 | low | One malformed character entity failed a whole bookmarks import | fixed `c214bff` |
 | WEB-19 | low | Single-image saves showed raw browser errors and could lose the capture when backgrounded | fixed: errors `6c0db61`; durability with CAP-2 (below) |
 | WEB-20 | low | Bulk archive had no Undo and no bulk unarchive | fixed `f52f88f` |
-| WEB-21 | low (cost) | Each note save read up to 600 documents for the prompt's vocabulary | see PRIV-1 (the client no longer builds it) |
+| WEB-21 | low (cost) | Each note save read up to 600 documents for the prompt's vocabulary | see PRIV-1: the server builds the vocabulary now; the app's own reads go with the capture merge |
 
 ## Web: sign-in, settings, consent, billing (AUTH)
 
 | ID | Sev | Finding | Status |
 |---|---|---|---|
 | AUTH-1 | high | The share sheet worked before AI consent (App Review 5.1.2); consent was cached device-wide | fixed `4a3ae74` |
-| AUTH-2 | high | Search sent private cards to Gemini | see the backend fix branch below |
+| AUTH-2 | high | Search sent private cards to Gemini | fixed `0a8920d` (see the AI section) |
 | AUTH-3 | medium | A slow account deletion was reported as failed, and every retry then failed | fixed `5077234` |
 | AUTH-4 | medium | Sign-outs the app didn't trigger (account disabled elsewhere) ran no purge | fixed `4a3ae74` |
 | AUTH-5 | medium | The privacy policy's "complete list" was wrong in three places | fixed `1f4e247` |
@@ -206,5 +206,47 @@ Severity is the auditor's, re-rated where the code showed otherwise.
 | ACCT-13 | low | Trial-ending pushes could arrive at night | fixed `4d67339` (hourly, 09:00-20:59 local, claimed once) |
 | ACCT-14 | low | A non-ASCII token header crashed the admin and webhook checks (500, confirming the endpoints) | fixed `44ce394` (admin), `3092cc5` (webhook) |
 | ACCT-15 | low | Found while fixing ACCT-12: `sync_from_revenuecat` writes the trial fields from a non-transactional read, so a trial clock started in the same instant is wiped | accepted: it matters only if that subscription later lapses, and the worst case is a second 14-day trial |
+
+## Backend: AI, Ask, search, digests (AI) and the review of its fixes (RV)
+
+The AI fixes were made on a separate branch, reviewed by a second agent
+(which found RV-1..RV-11 in them), fixed again, re-reviewed, and merged in
+`d387b59`.
+
+| ID | Sev | Finding | Status |
+|---|---|---|---|
+| AI-1 | high | A saved page's prompt injection could leak other cards to a third party with zero clicks, through Markdown images in Ask answers | fixed `37ddb5e` (client renders no images or non-http links), `a063f0f` (server strips them) |
+| AI-2 | high at scale | `send_digests` dropped users silently once a tick ran past 60 s | fixed `e5efbdd`, `8129498`, `0c9675f` |
+| AI-3 | medium | Ask's time budgets didn't line up: users saw the wrong error and lost an ask | fixed `1d1a2c1`, `0964852`, `8c0a098` |
+| AI-4 | medium | "thanks" re-sent the previous answer and charged an ask | fixed `9459551`, `3be3059` |
+| AI-5 | medium | An honest "your saves don't cover that" got a caution banner, a second Gemini call, and a charge | fixed `ae79b75`, `d7ba245` |
+| AI-6 | medium | An embedding outage told the user their library was empty | fixed `3e19c43` |
+| AI-7 | medium | One transient embedding failure deleted a card's valid vector, and nothing repaired it | fixed `4351e9a`, `5123455` |
+| AI-8 | medium | Streamed answers could end early with no signal | fixed `1967209` |
+| AI-9 | medium | Hebrew "this week" and "what else besides" questions weren't recognized | fixed `019e17c`, `51eefd5` |
+| AI-10 | medium | Ask only saw the first 1,500 characters of notes and shared text | fixed `5dd5f58` |
+| AI-11 | medium (latent) | The graph migration could never finish for libraries over ~343 cards | fixed `61bb158`, `7bbdad7` |
+| AI-12 | low-medium | No output-token cap on generation calls; synthesis input uncapped | fixed `196504d` |
+| AI-13 | low-medium (cost) | The truncation check misfired on non-Latin endings and recipe steps, tripling analysis calls | fixed `d23bffd`, `e201c6c` |
+| AI-14 | low-medium | Ask ran a full-document library scan per keyword step, with no cap on quoted anchors | fixed `bb9f889` |
+| AI-15 | low | One malformed card broke keyword search for every query | fixed `74c634c` |
+| AI-16 | low | Long web chats eventually failed with "Body too large" | fixed `0964852` (history capped) |
+| AI-17 | low | Stop didn't cancel the request | fixed `3cb6beb` |
+| AI-18 | low | The unused but deployed `search_links` callable skipped the HTTP twin's guards | fixed `efa5b81` |
+| AI-19 | low | The private-collection lookup failed open | fixed `0178e8d` |
+| AUTH-2 | high | Search sent private cards to the Gemini relevance judge | fixed `0a8920d` |
+| GRAPH-PRIV | medium | "See also" sent private candidates to the Gemini verifier | fixed `812e6ee` |
+| RV-1 | high | A "thanks" turn became the subject of the next follow-up (regression from AI-4) | fixed `3be3059` |
+| RV-2 | medium-high | The 20 s per-call timeout cut long answers (every long iOS answer) | fixed `8c0a098` (buffered calls get the budget; streams send their own server timeout) |
+| RV-3 | medium | "No answer" and cut-off refunds could be triggered on purpose (unmetered model calls) | fixed `d7ba245` (refund only short no-answers and early cut-offs) |
+| RV-4 | medium | AI-13 brought back the cut-off Hebrew card it was meant to keep fixed | fixed `e201c6c` |
+| RV-5 | medium | The AI-7 repair sweep had no index and could stall on the same 50 cards | fixed `5123455` (index; paged with a saved cursor) |
+| RV-6 | medium | Hebrew recency/exclusion detection fired on ordinary questions ("the first week with a newborn") | fixed `51eefd5` |
+| RV-7 | low-medium | Digest catch-up could push at night, starve tail users, and retry a failing synthesis every 30 minutes | fixed `0c9675f` (late or night deliveries in-app only; rotating walk; 3 tries) |
+| RV-8 | low | "ok" and "great", sent to accept an offer, got "You're welcome." | fixed `200cfd1` |
+| RV-9 | low | The branch conflicted with this one in two import blocks | resolved in the merge `d387b59` |
+| RV-10 | low | Backfill and trigger embedded long cards with different input caps | fixed `b1d1a37` |
+| RV-11 | low | A resumed graph migration restarted its phase if the checkpoint card was deleted | fixed `7bbdad7` |
+| PRIV-1 | medium (privacy) | Found while checking WEB-21: the app's prompt vocabulary (read from its newest cards including private ones) went into the Gemini prompt unfiltered on /api/analyze and /api/analyze-image | fixed `e2c7c44` (server builds it, private cards left out) |
 
 <!-- BACKEND -->
