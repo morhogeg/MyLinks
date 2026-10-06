@@ -3611,8 +3611,12 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                 # screenshot…" the moment the request returns; the worker
                 # clears it on either outcome.
                 all_urls = enrich_prior_urls + stored_urls
+                # `enrichJobId` names the job that owns this read: the janitor
+                # finds it there to refund a read that never finished, and a
+                # superseded job never marks a newer read failed.
                 enrich_ref.update({"enrichStatus": "processing", "enrichStartedAt": now_ms,
                                    "enrichStage": "queued", "enrichCount": len(all_urls),
+                                   "enrichJobId": process_ref.id,
                                    "enrichError": gc_firestore.DELETE_FIELD})
                 process_ref.set({
                     "uid": uid,
@@ -3627,7 +3631,12 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                     "createdAt": datetime.now(timezone.utc).isoformat(),
                     "status": "queued",
                     "attempts": 0,
+                    # The unit metered above, refundable at most once
+                    # (capture_charge): by the worker's failure path or the
+                    # janitor's timeout, whichever claims it first.
+                    capture_charge.CHARGE_FIELD: capture_charge.token("saves"),
                 })
+                charged = None  # the token owns the unit now
                 logger.info(f"Share ingest queued {len(stored_urls)}-screenshot enrich for {_mask_uid(uid)}")
                 return https_fn.Response(
                     json.dumps({"success": True, "queued": True, "id": process_ref.id,
@@ -5690,6 +5699,7 @@ def _enrich_card_with_images(ref, task_id: str, uid: str, card_ref, data: dict) 
             "enrichStatus": gc_firestore.DELETE_FIELD,
             "enrichStage": gc_firestore.DELETE_FIELD,
             "enrichError": gc_firestore.DELETE_FIELD,
+            "enrichJobId": gc_firestore.DELETE_FIELD,
             "enrichedAt": now_ms,
             "enrichCount": len(image_urls),
         }
@@ -5702,6 +5712,9 @@ def _enrich_card_with_images(ref, task_id: str, uid: str, card_ref, data: dict) 
         card_ref.update(card_payload(update, get_db()))
         written = True
         # The read is saved; nothing after this may turn it into a failure.
+        # The charge bought it: take the token off the job (no refund), so a
+        # job doc left behind can never be refunded by the queue prune.
+        _spend_job_charge(ref)
         _mirror_vector_or_flag(card_ref, update, get_db())
         log_to_firestore(task_id, "Screenshot enrich complete", data={"cardId": card_id}, uid=uid)
         ref.delete()
@@ -5714,17 +5727,50 @@ def _enrich_card_with_images(ref, task_id: str, uid: str, card_ref, data: dict) 
                 pass
             return
         logger.error(f"Screenshot enrich failed for {_mask_uid(uid)}/{card_id}: {e}", exc_info=True)
-        # share_ingest metered the enrich as a save; it produced nothing.
-        refund_quota(uid, "saves")
+        # share_ingest metered the enrich as a save; it produced nothing. At
+        # most once: the refund claims the job's charge token, which the
+        # janitor's timeout refund would claim too.
+        _refund_job(uid, ref)
         try:
-            card_ref.update({"enrichStatus": "failed", "enrichError": _enrich_error_message(e),
-                             "enrichStage": gc_firestore.DELETE_FIELD})
+            _fail_enrich(card_ref, _enrich_error_message(e), job_id=ref.id)
         except Exception as write_err:
             logger.error(f"Could not record enrich failure: {write_err}")
         try:
             ref.delete()
         except Exception:
             pass
+
+
+# What a screenshot read that never finished says (the janitor's timeout).
+_ENRICH_TIMEOUT_MESSAGE = "Reading the screenshots took too long. Please try again."
+
+
+def _fail_enrich(card_ref, message: str, *, job_id: Optional[str] = None,
+                 older_than_ms: Optional[int] = None) -> bool:
+    """Mark a card's screenshot read failed, in a transaction, but only while
+    that read is still in flight (`enrichStatus: 'processing'`) and, for a
+    worker (`job_id`), still ITS read: a newer "Add screenshots" names another
+    job in `enrichJobId`, and a read that already finished has no
+    `enrichStatus`, and neither is ever overwritten. The janitor passes
+    `older_than_ms` so the age is re-checked inside the transaction. Returns
+    True when the card was marked."""
+    def _body(tx):
+        snap = card_ref.get(transaction=tx)
+        card = (snap.to_dict() or {}) if getattr(snap, "exists", False) else None
+        if card is None or card.get("enrichStatus") != "processing":
+            return False
+        owner = card.get("enrichJobId")
+        if job_id and owner and owner != job_id:
+            return False
+        if older_than_ms is not None:
+            asked = _to_ms(card.get("enrichStartedAt"))
+            if asked is not None and asked > older_than_ms:
+                return False
+        tx.update(card_ref, {"enrichStatus": "failed", "enrichError": message,
+                             "enrichStage": gc_firestore.DELETE_FIELD,
+                             "enrichJobId": gc_firestore.DELETE_FIELD})
+        return True
+    return capture_charge.run_transaction(get_db(), _body)
 
 
 class _FetchFailed(Exception):
@@ -5792,6 +5838,16 @@ def _mirror_vector_or_flag(card_ref, fields: dict, db, *, replace: bool = False)
             card_ref.update({"needsEmbedding": True})
         except Exception as flag_err:
             logger.error(f"Could not flag the card for re-embedding: {flag_err}")
+
+
+def _spend_job_charge(job_ref) -> None:
+    """A job whose paid work LANDED while its token stayed on the job (the
+    screenshot enrich): take the token off without refunding it, so a job doc
+    that outlives the run is never refunded by the queue prune."""
+    try:
+        capture_charge.claim(get_db(), job_ref)
+    except Exception as e:
+        logger.warning(f"Could not spend the job's charge: {e}")
 
 
 def _refund_job(uid: str, job_ref) -> None:
@@ -6703,6 +6759,66 @@ def _stuck_processing_cards(db, cutoff: int, queued_cutoff: int, report: dict) -
         return []
 
 
+def _enrich_job_alive(job_ref, cutoff: int, queued_cutoff: int) -> bool:
+    """Is the job behind a screenshot read still legitimately pending? Queued
+    and inside the queue window (waiting for a worker, not stuck), or started
+    less than the timeout ago (running now). Gone, or older than that: dead."""
+    snap = job_ref.get()
+    job = (snap.to_dict() or {}) if getattr(snap, "exists", False) else None
+    if job is None:
+        return False
+    if job.get("status") == "queued":
+        created = _iso_ms(job.get("createdAt"))
+        return created is not None and created >= queued_cutoff
+    started = _iso_ms(job.get("startedAt"))
+    if started is None:
+        started = _iso_ms(job.get("createdAt"))
+    return started is not None and started >= cutoff
+
+
+def _sweep_stuck_enrich(db, cutoff: int, queued_cutoff: int, report: dict) -> int:
+    """Fail screenshot reads stuck at `enrichStatus: 'processing'` past the
+    timeout (measured from `enrichStartedAt`, stamped when the screenshots
+    were sent), unless their job is still legitimately pending, and give the
+    unit back once: the refund claims the job's charge token (capture_charge),
+    so it never repeats the worker's own failure refund or the queue prune's.
+    A read with no job named (sent before `enrichJobId` existed) carries no
+    token and is only marked. Needs the `enrichStatus` COLLECTION_GROUP
+    index (firestore.indexes.json). Returns how many reads were failed."""
+    failed_out = 0
+    try:
+        docs = list(db.collection_group("links").where(
+            filter=FieldFilter("enrichStatus", "==", "processing")
+        ).limit(_JANITOR_BATCH).stream())
+    except Exception as e:
+        logger.error(f"Janitor enrich query failed: {e}")
+        report["errors"].append(f"enrich: {e}")
+        return 0
+    for doc in docs:
+        d = doc.to_dict() or {}
+        if d.get("enrichStatus") != "processing":
+            continue
+        asked = _to_ms(d.get("enrichStartedAt"))
+        if asked is not None and asked > cutoff:
+            continue
+        try:
+            owner = doc.reference.parent.parent.id
+            job_id = d.get("enrichJobId")
+            job_ref = db.collection("pending_processing").document(job_id) if _valid_card_id(job_id) else None
+            if job_ref is not None and _enrich_job_alive(job_ref, cutoff, queued_cutoff):
+                continue
+            if not _fail_enrich(doc.reference, _ENRICH_TIMEOUT_MESSAGE, older_than_ms=cutoff):
+                continue
+        except Exception as e:
+            logger.error(f"Janitor failed to time out enrich {doc.id}: {e}")
+            report["errors"].append(f"enrich {doc.id}: {e}")
+            continue
+        failed_out += 1
+        if job_ref is not None and isinstance(owner, str) and owner:
+            _refund_job(owner, job_ref)
+    return failed_out
+
+
 def run_processing_janitor() -> dict:
     """Flip cards stuck in `processing` past the timeout to a retryable FAILED.
 
@@ -6774,6 +6890,13 @@ def run_processing_janitor() -> dict:
                 owner = None
             if isinstance(owner, str) and owner:
                 refund_quota(owner, refund_kind)
+
+    # Screenshot reads ("Add screenshots") that never finished. A hard-killed
+    # enrich run never reached its failure path, so the card said "Reading
+    # your screenshot" forever and its unit was never given back. Runs before
+    # the queue prune so the job is still there to tell a read that is merely
+    # waiting for a worker from a dead one.
+    report["enrich_failed_out"] = _sweep_stuck_enrich(db, cutoff, queued_cutoff, report)
 
     # Stale pending_processing queue docs. A hard-killed job (timeout/OOM) never
     # reaches the trigger's cleanup `ref.delete()`, so its queue doc lives
@@ -6940,7 +7063,7 @@ def run_processing_janitor() -> dict:
         logger.error(f"client_errors prune failed: {e}")
         report["errors"].append(f"client_errors: {e}")
 
-    if (report["failed_out"] or report["queue_pruned"] or report["logs_pruned"]
+    if (report["failed_out"] or report["enrich_failed_out"] or report["queue_pruned"] or report["logs_pruned"]
             or report["server_errors_pruned"] or report["client_error_reports_pruned"]
             or report["client_errors_pruned"]):
         logger.info(f"Processing janitor: {report}")

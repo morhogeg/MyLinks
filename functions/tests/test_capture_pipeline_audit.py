@@ -529,3 +529,100 @@ def test_the_janitor_age_queries_have_collection_group_indexes():
     pairs = {tuple(f["fieldPath"] for f in ix["fields"]) for ix in indexes
              if ix["collectionGroup"] == "links" and ix["queryScope"] == "COLLECTION_GROUP"}
     assert ("status", "processingStartedAt") in pairs and ("status", "queuedAt") in pairs
+
+
+# ── CAP-14: "Add screenshots" times out, and refunds at most once ────────────
+
+def test_an_enrich_request_queues_a_charged_job_the_card_names(storage_world):
+    import base64
+    from tests.test_capture_edge_cases import _Req, _json
+    db = storage_world.make({"users/u1/links/c1": {"status": "unread", "sourceType": "web",
+                                                   "url": "https://facebook.com/p/1"}})
+    b64 = base64.b64encode(b"\xff\xd8\xff" + b"x" * 64).decode()
+    body = _json(main.share_ingest(_Req({"images": [{"data": b64, "mimeType": "image/jpeg"}],
+                                         "enrichCardId": "c1"})))
+    job = db.docs[f"pending_processing/{body['id']}"]
+    assert job["enrich"] is True and job["charge"] == {"kind": "saves"}
+    card = db.docs["users/u1/links/c1"]
+    assert card["enrichStatus"] == "processing" and card["enrichJobId"] == body["id"]
+
+
+OLD_ENRICH = tcc.NOW_MS - 20 * 60 * 1000
+
+
+def _stuck_enrich(env, *, job=None, job_id="e1", asked=OLD_ENRICH):
+    docs = {"users/u1/links/c1": {"status": "unread", "sourceType": "web", "url": "https://facebook.com/p/1",
+                                  "title": "Partial", "enrichStatus": "processing",
+                                  "enrichStartedAt": asked, **({"enrichJobId": job_id} if job_id else {})}}
+    if job is not None:
+        docs[f"pending_processing/{job_id}"] = {"uid": "u1", "cardId": "c1", "enrich": True, "isImage": True,
+                                                "url": "https://s/a.png", "imageUrls": ["https://s/a.png"],
+                                                "charge": {"kind": "saves"}, **job}
+    return env.make(docs)
+
+
+def test_the_janitor_times_out_a_dead_screenshot_read_and_refunds_once(env):
+    db = _stuck_enrich(env, job={"status": "analyzing_image", "createdAt": _iso(20), "startedAt": _iso(19)})
+    report = env.janitor()
+    card = db.docs["users/u1/links/c1"]
+    assert card["enrichStatus"] == "failed" and "took too long" in card["enrichError"]
+    assert report["enrich_failed_out"] == 1 and env.refunds == ["saves"]
+    env.janitor()  # the prune removes the dead job: nothing to refund twice
+    assert env.refunds == ["saves"] and "pending_processing/e1" not in db.docs
+
+
+def test_the_janitor_leaves_a_read_whose_job_still_waits_for_a_worker(env):
+    db = _stuck_enrich(env, job={"status": "queued", "createdAt": _iso(20)})
+    env.janitor()
+    assert db.docs["users/u1/links/c1"]["enrichStatus"] == "processing" and env.refunds == []
+
+
+def test_the_janitor_leaves_a_fresh_read_alone(env):
+    db = _stuck_enrich(env, job={"status": "queued", "createdAt": _iso(1)}, asked=tcc.NOW_MS - 60_000)
+    env.janitor()
+    assert db.docs["users/u1/links/c1"]["enrichStatus"] == "processing" and env.refunds == []
+
+
+def test_a_read_from_before_job_ids_is_only_marked(env):
+    db = _stuck_enrich(env, job_id=None)
+    env.janitor()
+    assert db.docs["users/u1/links/c1"]["enrichStatus"] == "failed" and env.refunds == []
+
+
+def test_the_janitor_refund_and_a_redelivered_job_never_both_happen(env, monkeypatch):
+    db = _enrich_world(env, monkeypatch, fail=True)
+    db.docs["users/u1/links/c1"].update({"enrichStartedAt": OLD_ENRICH, "enrichJobId": "e1"})
+    event = dict(db.docs["pending_processing/e1"])
+    # Its worker started 19 minutes ago and was killed: the janitor times
+    # the read out and refunds it (and prunes the dead job).
+    db.docs["pending_processing/e1"].update({"status": "analyzing_image", "createdAt": _iso(20),
+                                             "startedAt": _iso(19)})
+    env.janitor()
+    assert env.refunds == ["saves"]
+    _deliver(db, "pending_processing/e1", event)  # a late redelivery of the trigger
+    assert env.refunds == ["saves"]
+
+
+def test_the_worker_refund_and_the_janitor_never_both_happen(env, monkeypatch):
+    db = _enrich_world(env, monkeypatch, fail=True)
+    db.docs["users/u1/links/c1"].update({"enrichStartedAt": OLD_ENRICH, "enrichJobId": "e1"})
+    _deliver(db, "pending_processing/e1", dict(db.docs["pending_processing/e1"]))
+    assert env.refunds == ["saves"]
+    env.janitor()
+    assert env.refunds == ["saves"]
+
+
+def test_a_superseded_read_never_marks_the_newer_one_failed(env, monkeypatch):
+    db = _enrich_world(env, monkeypatch, fail=True)
+    db.docs["users/u1/links/c1"]["enrichJobId"] = "newer"  # the user sent more screenshots since
+    _deliver(db, "pending_processing/e1", dict(db.docs["pending_processing/e1"]))
+    card = db.docs["users/u1/links/c1"]
+    assert card["enrichStatus"] == "processing" and card["enrichJobId"] == "newer"
+    assert env.refunds == ["saves"]  # its own unit still comes back
+
+
+def test_the_enrich_sweep_has_a_collection_group_index():
+    import json
+    overrides = json.loads((FUNCTIONS.parent / "firestore.indexes.json").read_text())["fieldOverrides"]
+    entry = next(o for o in overrides if o["collectionGroup"] == "links" and o["fieldPath"] == "enrichStatus")
+    assert {"order": "ASCENDING", "queryScope": "COLLECTION_GROUP"} in entry["indexes"]

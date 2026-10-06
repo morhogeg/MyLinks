@@ -241,7 +241,9 @@ def test_enrich_on_a_deleted_card_just_clears_the_queue(seams):
     card = _Ref(None, ref_id="gone")
     main._enrich_card_with_images(queue, "q1", "u1", card, queue.doc)
     assert queue.deleted
-    assert card.updates and card.updates[-1]["enrichStatus"] == "failed"
+    # Nothing is written to a card that no longer exists (in Firestore that
+    # update is a 404, and it must never re-create the card).
+    assert card.updates == []
 
 
 def test_worker_routes_enrich_jobs_before_any_placeholder_logic(monkeypatch):
