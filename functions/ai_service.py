@@ -87,10 +87,13 @@ GEMINI_CALL_TIMEOUT_MS = int(os.environ.get("GEMINI_CALL_TIMEOUT_MS", "90000") o
 # Gemini call may take GEMINI_CALL_TIMEOUT_MS (90s) and the buffered ladder can
 # make a dozen calls inside ask_brain's 120s timeout: an Ask could be killed
 # mid-ladder long after the user had given up, its ask unit charged and never
-# refunded. Under the deadline every Ask call carries a short per-request
-# timeout (like the search judge's client), a retry or rung that could not
-# start with ASK_MIN_CALL_S left is skipped, and AskDeadlineExceeded (an
-# AnalysisError) reaches ask_brain, which refunds and answers 503.
+# refunded. Under the deadline every Ask call carries a per-request timeout
+# taken from what is left of the budget (see GeminiService._call_config), a
+# retry or rung that could not start with ASK_MIN_CALL_S left is skipped, and
+# AskDeadlineExceeded (an AnalysisError) reaches ask_brain, which refunds and
+# answers 503. ASK_CALL_TIMEOUT_MS is the short timeout for what should never
+# take long: a stream's gap between chunks and a 1-token filter probe. A
+# buffered answer is NOT capped by it: a long answer legitimately takes longer.
 ASK_DEADLINE_S = float(os.environ.get("ASK_DEADLINE_S", "50") or 50)
 ASK_CALL_TIMEOUT_MS = int(os.environ.get("ASK_CALL_TIMEOUT_MS", "20000") or 20000)
 ASK_MIN_CALL_S = 3.0
@@ -390,6 +393,18 @@ def _is_retryable_error(exc: Exception) -> bool:
     if "timeout" in name or "connection" in name:
         return True
     return False
+
+
+def _is_timeout_error(exc: Exception) -> bool:
+    """True when a Gemini call ran out of time: a client-side timeout
+    (TimeoutError, httpx's ReadTimeout/ConnectTimeout, …) or the server's own
+    deadline (504 / DEADLINE_EXCEEDED). Duck-typed like _is_retryable_error."""
+    if isinstance(exc, TimeoutError) or getattr(exc, "code", None) == 504:
+        return True
+    status = getattr(exc, "status", None)
+    if isinstance(status, str) and status.strip().upper() == "DEADLINE_EXCEEDED":
+        return True
+    return "timeout" in type(exc).__name__.lower()
 
 
 def _retry_delay(attempt: int) -> float:
@@ -1062,18 +1077,42 @@ class GeminiService:
     # answer methods for their duration; None for every other surface.
     _deadline = None
 
-    def _call_config(self, config: dict) -> dict:
-        """`config` for one Gemini call: unchanged outside Ask; under the Ask
-        deadline it gains a per-request timeout (ASK_CALL_TIMEOUT_MS, or what
-        is left of the budget), and AskDeadlineExceeded is raised instead when
-        too little is left to start another call."""
+    def _call_config(self, config: dict, stream: bool = False, probe: bool = False) -> dict:
+        """`config` for one Gemini call: unchanged outside Ask. Under the Ask
+        deadline AskDeadlineExceeded is raised when too little is left to
+        start another call; otherwise the call gets a per-request timeout
+        shaped by how its reply arrives:
+
+        - buffered (the default): the whole answer comes back in ONE response,
+          so the call may use everything left of the budget. The native app
+          asks for a buffered answer, and capping it at ASK_CALL_TIMEOUT_MS
+          failed every answer that took longer than that to generate (a 502
+          after a same-model retry and a starved fallback, where the
+          pre-budget code answered).
+        - `stream`: google-genai turns the timeout into the client's per-read
+          timeout AND an X-Server-Timeout header, which the server applies to
+          the WHOLE stream. The read timeout stays ASK_CALL_TIMEOUT_MS (a
+          stalled stream is still dropped); the server is told the rest of
+          the budget explicitly, so a rung already streaming is cut only when
+          the budget itself runs out. An explicit header is kept as is: the
+          SDK derives one only when none is set (populate_server_timeout_header,
+          google-genai 1.75).
+        - `probe`: a 1-token filter probe, which never takes long, keeps
+          ASK_CALL_TIMEOUT_MS.
+        """
         if self._deadline is None:
             return config
         left = self._deadline - time.monotonic()
         if left < ASK_MIN_CALL_S:
             raise AskDeadlineExceeded(
                 f"Ask time budget ({ASK_DEADLINE_S:.0f}s) spent; remaining attempts skipped")
-        return {**config, "http_options": {"timeout": int(min(ASK_CALL_TIMEOUT_MS, left * 1000))}}
+        short_ms = int(min(ASK_CALL_TIMEOUT_MS, left * 1000))
+        if stream:
+            return {**config, "http_options": {
+                "timeout": short_ms, "headers": {"X-Server-Timeout": str(int(left))}}}
+        if probe:
+            return {**config, "http_options": {"timeout": short_ms}}
+        return {**config, "http_options": {"timeout": int(left * 1000)}}
 
     def _budget_allows(self, wait_s: float) -> bool:
         """Under the Ask deadline: True when waiting `wait_s` still leaves room
@@ -1127,8 +1166,8 @@ class GeminiService:
         # than failing the save if every attempt comes back cut off.
         truncated_best = None
         for attempt in range(attempts):
-            # Under the Ask deadline: a short per-call timeout, or
-            # AskDeadlineExceeded (propagates as is) when the budget is spent.
+            # Under the Ask deadline: the rest of the budget as this call's
+            # timeout, or AskDeadlineExceeded (propagates as is) when it is spent.
             call_config = self._call_config(config)
             try:
                 response = self.client.models.generate_content(
@@ -1192,8 +1231,11 @@ class GeminiService:
                 # Retry ONLY transient errors, and only while attempts remain
                 # (and, under the Ask deadline, while the wait leaves time for
                 # the call). Non-retryable errors (schema/safety/empty/bad-shape)
-                # fail fast.
-                if attempt < attempts - 1 and _is_retryable_error(e):
+                # fail fast. Under the Ask deadline a TIMEOUT is not retried on
+                # the same model: the call had the whole remaining budget, so
+                # what is left (if anything) belongs to the fallback model.
+                if (attempt < attempts - 1 and _is_retryable_error(e)
+                        and not (self._deadline is not None and _is_timeout_error(e))):
                     delay = _retry_delay(attempt)
                     if self._budget_allows(delay):
                         time.sleep(delay)
@@ -1687,7 +1729,7 @@ Return JSON: {"platform": one of "x","instagram","threads","tiktok","youtube","l
         A spent Ask budget is not a transport error: AskDeadlineExceeded
         propagates and ends the rescue."""
         config = self._call_config({"max_output_tokens": 1, "temperature": 0.0,
-                                    "safety_settings": _ASK_SAFETY_SETTINGS})
+                                    "safety_settings": _ASK_SAFETY_SETTINGS}, probe=True)
         try:
             resp = self.client.models.generate_content(
                 model=GEMINI_ANALYSIS_MODEL, contents=[prompt], config=config)
@@ -1902,8 +1944,9 @@ Return JSON: {"platform": one of "x","instagram","threads","tiktok","youtube","l
                             deadline: float = None) -> dict:
         """`_answer_from_context` under the Ask `deadline` (a time.monotonic()
         value from ask_deadline(); None = no budget). Every model call it makes
-        then runs on a short per-call timeout, and a rung that cannot start in
-        time raises AskDeadlineExceeded instead of being attempted."""
+        then runs on a timeout taken from what is left of the budget (see
+        _call_config), and a rung that cannot start in time raises
+        AskDeadlineExceeded instead of being attempted."""
         self._deadline = deadline
         try:
             return self._answer_from_context(question, cards, history, attempts,
@@ -1917,8 +1960,10 @@ Return JSON: {"platform": one of "x","instagram","threads","tiktok","youtube","l
                                    followup: dict = None,
                                    deadline: float = None):
         """`_answer_from_context_stream` under the Ask `deadline` (see
-        answer_from_context). A rung already streaming is never cut; the next
-        one is skipped once the budget is spent."""
+        answer_from_context). A rung already streaming runs until the budget
+        itself is spent (the server is told what is left; the client only
+        drops a stream that stalls for ASK_CALL_TIMEOUT_MS); the next rung is
+        skipped once the budget is spent."""
         self._deadline = deadline
         try:
             yield from self._answer_from_context_stream(
@@ -2270,12 +2315,14 @@ Return JSON: {"platform": one of "x","instagram","threads","tiktok","youtube","l
             # answer, so keep temperature low for stability (without this the
             # stream would silently run at the ~1.0 default), and relax the
             # configurable safety thresholds — the user is querying their OWN
-            # saved content. Under the Ask deadline this also sets the per-call
-            # timeout, or raises AskDeadlineExceeded out of the generator when
-            # no time is left to start this rung.
+            # saved content. Under the Ask deadline this also sets the stream's
+            # read timeout and server deadline (see _call_config), or raises
+            # AskDeadlineExceeded out of the generator when no time is left to
+            # start this rung.
             call_config = self._call_config({"temperature": 0.2,
                                              "safety_settings": _ASK_SAFETY_SETTINGS,
-                                             "max_output_tokens": ASK_MAX_OUTPUT_TOKENS})
+                                             "max_output_tokens": ASK_MAX_OUTPUT_TOKENS},
+                                            stream=True)
             try:
                 stream = self.client.models.generate_content_stream(
                     model=attempt_model,

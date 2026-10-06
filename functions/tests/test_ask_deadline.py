@@ -10,6 +10,14 @@ short per-call timeout and no call starts once the request's budget
 
 Offline and instant: a fake clock replaces ai_service's `time`, and the fake
 Gemini client "hangs" by advancing that clock by its whole per-call timeout.
+
+RV-2: the per-call timeout is shaped by how the reply arrives. A buffered
+call (the native app asks for one buffered answer) gets the whole remaining
+budget and is not retried on the same model after a timeout: capped at 20s,
+every answer that took longer to generate failed with a 502 after ~50s. A
+stream keeps the 20s as its client READ timeout, and the server is told the
+rest of the budget explicitly (google-genai otherwise sends the 20s as the
+X-Server-Timeout of the whole stream).
 """
 
 import json
@@ -89,13 +97,14 @@ def env(monkeypatch):
 def test_hanging_model_fails_inside_the_budget_and_refunds(env):
     resp = main.ask_brain(_Req(json_body={"uid": "u1", "question": "how do I cook the pasta?"}))
 
-    assert resp.status in (502, 503)
+    assert resp.status == 503
+    assert json.loads(resp.body)["error"] == "Machina took too long to answer. Please try again in a moment."
     assert env.refunds == [("u1", "asks")]
-    # Never past the budget, and no single call allowed the old 90s.
+    # Never past the budget, and no call allowed the old 90s.
     assert env.clock.t - env.start <= ai_service.ASK_DEADLINE_S + 1e-6
-    assert env.models.timeouts and all(t <= ai_service.ASK_CALL_TIMEOUT_MS for t in env.models.timeouts)
-    # Ask model twice (a retry), then the fallback model on what was left.
-    assert len(env.models.timeouts) == 3 and env.models.timeouts[2] < ai_service.ASK_CALL_TIMEOUT_MS
+    # One buffered call with the whole budget; after its timeout neither a
+    # same-model retry nor the fallback model had time to start.
+    assert env.models.timeouts == [int(ai_service.ASK_DEADLINE_S * 1000)]
 
 
 def test_budget_spent_in_retrieval_skips_the_model_with_a_friendly_503(monkeypatch, env):
@@ -151,3 +160,163 @@ def test_other_surfaces_keep_the_client_timeout(env):
     env.models.generate_content = generate
     main.GeminiService()._generate_json(["analyze"], "text analysis")
     assert "http_options" not in seen[0]
+
+
+# ── RV-2: the timeout follows how the reply arrives ────────────────────────
+
+def _svc_with_budget(env, left_s):
+    svc = main.GeminiService()
+    svc._deadline = env.clock.t + left_s
+    return svc
+
+
+def test_a_stream_reads_on_a_short_timeout_and_tells_the_server_the_budget(env):
+    cfg = _svc_with_budget(env, 45)._call_config({"temperature": 0.2}, stream=True)
+    assert cfg["http_options"] == {"timeout": ai_service.ASK_CALL_TIMEOUT_MS,
+                                   "headers": {"X-Server-Timeout": "45"}}
+    assert cfg["temperature"] == 0.2
+    late = _svc_with_budget(env, 6.5)._call_config({}, stream=True)
+    assert late["http_options"] == {"timeout": 6500, "headers": {"X-Server-Timeout": "6"}}
+
+
+def test_a_buffered_call_gets_the_whole_remaining_budget(env):
+    cfg = _svc_with_budget(env, 45)._call_config({"temperature": 0.2})
+    assert cfg["http_options"] == {"timeout": 45000}
+
+
+def test_a_filter_probe_keeps_the_short_timeout(env):
+    seen = []
+
+    def generate(model, contents, config=None):
+        seen.append(config["http_options"])
+        return SimpleNamespace(text="", prompt_feedback=None)
+
+    env.models.generate_content = generate
+    _svc_with_budget(env, 45)._probe_prompt_blocked("prompt")
+    assert seen == [{"timeout": ai_service.ASK_CALL_TIMEOUT_MS}]
+
+
+def test_stream_rungs_tell_the_server_the_remaining_budget(env):
+    seen = []
+
+    def stream(model, contents, config=None):
+        seen.append(config["http_options"])
+        return iter([SimpleNamespace(text="Boil it.\n[[CITED: id1]]")])
+
+    env.models.generate_content_stream = stream
+    svc = main.GeminiService()
+    list(svc.answer_from_context_stream("q?", CARDS, deadline=ai_service.ask_deadline()))
+    assert seen == [{"timeout": ai_service.ASK_CALL_TIMEOUT_MS,
+                     "headers": {"X-Server-Timeout": str(int(ai_service.ASK_DEADLINE_S))}}]
+
+
+class _SlowModels:
+    """Generates the answer in `needs_s` seconds of fake time, or times out
+    first when the call's timeout is shorter."""
+
+    def __init__(self, clock, needs_s):
+        self.clock, self.needs_s, self.calls = clock, needs_s, []
+
+    def generate_content(self, model, contents, config=None):
+        timeout_s = config["http_options"]["timeout"] / 1000
+        self.calls.append((model, timeout_s))
+        if timeout_s < self.needs_s:
+            self.clock.t += timeout_s
+            raise TimeoutError("read timeout")
+        self.clock.t += self.needs_s
+        return SimpleNamespace(text=json.dumps({"answer": "1. Boil.\n2. Serve.", "citedIds": ["id1"]}),
+                               candidates=[SimpleNamespace(finish_reason="STOP")])
+
+
+@pytest.mark.parametrize("needs_s", [25, 45])
+def test_a_long_buffered_answer_is_not_cut_at_twenty_seconds(env, needs_s):
+    models = _SlowModels(env.clock, needs_s)
+    env.models.generate_content = models.generate_content
+    resp = main.ask_brain(_Req(json_body={"uid": "u1", "question": "walk me through all the steps"}))
+
+    assert resp.status == 200
+    assert json.loads(resp.body)["citedIds"] == ["id1"]
+    assert env.refunds == []
+    assert models.calls == [(ai_service.GEMINI_ASK_MODEL, ai_service.ASK_DEADLINE_S)]
+
+
+def test_a_buffered_timeout_is_not_retried_on_the_same_model(env):
+    calls = []
+
+    def generate(model, contents, config=None):
+        calls.append(model)
+        if model == ai_service.GEMINI_ASK_MODEL:
+            env.clock.t += 5  # the connection timed out early
+            raise TimeoutError("connect timeout")
+        return SimpleNamespace(text=json.dumps({"answer": "Boil it.", "citedIds": ["id1"]}),
+                               candidates=[SimpleNamespace(finish_reason="STOP")])
+
+    env.models.generate_content = generate
+    resp = main.ask_brain(_Req(json_body={"uid": "u1", "question": "how do I cook the pasta?"}))
+
+    assert resp.status == 200
+    assert calls == [ai_service.GEMINI_ASK_MODEL, ai_service.GEMINI_FALLBACK_MODEL]
+
+
+def test_a_transient_error_is_still_retried_on_the_same_model(env, monkeypatch):
+    monkeypatch.setattr(ai_service, "_retry_delay", lambda attempt: 1.0)
+    calls = []
+
+    class _Unavailable(Exception):
+        code = 503
+
+    def generate(model, contents, config=None):
+        calls.append(model)
+        if len(calls) == 1:
+            raise _Unavailable("503 UNAVAILABLE")
+        return SimpleNamespace(text=json.dumps({"answer": "Boil it.", "citedIds": ["id1"]}),
+                               candidates=[SimpleNamespace(finish_reason="STOP")])
+
+    env.models.generate_content = generate
+    resp = main.ask_brain(_Req(json_body={"uid": "u1", "question": "how do I cook the pasta?"}))
+    assert resp.status == 200
+    assert calls == [ai_service.GEMINI_ASK_MODEL, ai_service.GEMINI_ASK_MODEL]
+
+
+# ── The real google-genai request: our header is the one sent ──────────────
+
+def _captured_request(monkeypatch, env, call):
+    pytest.importorskip("google.genai._api_client")
+    from google import genai
+
+    svc = ai_service.GeminiService.__new__(ai_service.GeminiService)
+    svc.client = genai.Client(api_key="test-key",
+                              http_options={"timeout": ai_service.GEMINI_CALL_TIMEOUT_MS})
+    svc.model = ai_service.GEMINI_ANALYSIS_MODEL
+    svc._deadline = env.clock.t + 45
+    sent = []
+
+    class _Stop(Exception):
+        pass
+
+    def fake_send(request, stream=False, **kwargs):
+        sent.append((request.headers, request.extensions.get("timeout"), stream))
+        raise _Stop("captured")
+
+    monkeypatch.setattr(svc.client._api_client._httpx_client, "send", fake_send)
+    with pytest.raises(Exception):
+        call(svc)
+    return sent[-1]
+
+
+def test_the_sdk_sends_the_budget_as_the_stream_server_timeout(monkeypatch, env):
+    headers, timeout, stream = _captured_request(monkeypatch, env, lambda svc: list(
+        svc.client.models.generate_content_stream(
+            model="m", contents=["hi"], config=svc._call_config({"temperature": 0.2}, stream=True))))
+    assert stream is True
+    assert headers.get_list("X-Server-Timeout") == ["45"]
+    assert timeout["read"] == ai_service.ASK_CALL_TIMEOUT_MS / 1000
+
+
+def test_the_sdk_sends_the_budget_on_a_buffered_call(monkeypatch, env):
+    headers, timeout, stream = _captured_request(monkeypatch, env, lambda svc: (
+        svc.client.models.generate_content(
+            model="m", contents=["hi"], config=svc._call_config({"temperature": 0.2}))))
+    assert stream is False
+    assert headers.get_list("X-Server-Timeout") == ["45"]
+    assert timeout["read"] == 45.0
