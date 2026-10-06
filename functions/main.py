@@ -2515,8 +2515,12 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         # embedding API down). Track it: if EVERY retrieval path failed and
         # nothing was assembled, the honest response is a retryable error with
         # the ask unit refunded — NOT the canned "your library is empty"
-        # answer, which gaslights a user with hundreds of saves.
+        # answer, which gaslights a user with hundreds of saves. The vector
+        # half is tracked on its own: it is THE retrieval (the keyword half is
+        # a literal scan of the newest cards), so when it failed an empty
+        # result proves nothing about the library (see 1j).
         retrieval_errors = 0
+        vector_failed = False
         try:
             candidates = perform_search_logic(uid, retrieval_query, limit=30)
             # Quality-gate the nearest-neighbour output exactly like the
@@ -2530,6 +2534,7 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         except Exception as e:
             logger.error(f"ask_brain retrieval failed: {e}")
             retrieval_errors += 1
+            vector_failed = True
             cards = []
 
         # 1b. Hybrid retrieval: add lexical keyword matches vector search may
@@ -2709,14 +2714,16 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         # 1j. Retrieval infrastructure failed AND nothing was assembled → this
         #     is an outage, not an empty library. Refund and return a
         #     retryable error instead of "try saving a few links" (which is a
-        #     lie to a user with hundreds of cards). A PARTIAL failure with
-        #     usable cards still answers normally.
-        if not cards and retrieval_errors >= 2:
+        #     lie to a user with hundreds of cards). The VECTOR half failing
+        #     is enough: an embedding outage used to slip through whenever the
+        #     literal keyword scan still ran (and, as usual, found nothing). A
+        #     PARTIAL failure with usable cards still answers normally.
+        if not cards and (vector_failed or retrieval_errors >= 2):
             if charged:
                 refund_quota(*charged)
                 charged = None
             return _error_response(
-                "Machina couldn't search your library right now. Please try again in a minute.",
+                "Machina couldn't search your library just now. Try again in a moment.",
                 503, headers)
 
         # 1k. Nothing retrieved (empty/off-topic library): the reply is the
