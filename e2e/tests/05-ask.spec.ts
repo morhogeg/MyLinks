@@ -12,9 +12,9 @@ const LIBRARY = {
 };
 
 async function ask(page: Page, question: string) {
-    // Phone: bottom tab bar. Desktop: the toolbar's "Ask your brain".
+    // Phone: bottom tab bar. Desktop: the toolbar's "Ask Machina".
     await page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Ask' })
-        .or(page.getByRole('button', { name: 'Ask your brain' })).first().click();
+        .or(page.getByRole('button', { name: 'Ask Machina', exact: true })).first().click();
     const box = page.getByRole('textbox').last();
     await box.fill(question);
     await box.press('Enter');

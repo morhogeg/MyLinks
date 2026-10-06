@@ -4,7 +4,7 @@
 
 
 import { Fragment, useState, useEffect, useRef, useMemo, useCallback, cloneElement, type ReactElement } from 'react';
-import { Link, Collection, WeeklySynthesis, CuratedDigest, DigestCardRef, UserNote } from '@/lib/types';
+import { Link, LinkStatus, Collection, WeeklySynthesis, CuratedDigest, DigestCardRef, UserNote } from '@/lib/types';
 import { getColorStyleByKey, getCategoryColorStyle, assignCategoryColors } from '@/lib/colors';
 import { platformIcon, platformColor, type PlatformKey } from '@/lib/platform';
 import DigestView from './DigestView';
@@ -13,7 +13,7 @@ import Dropdown from './Dropdown';
 import { deleteLink, updateLinkReminder, markLinkReviewed, markTakeawayDone, markTakeawayDismissed, toLink } from '@/lib/storage';
 import { closedTakeaways, isTakeawayDismissed, isTakeawayDone, openTakeaways } from '@/lib/takeaway';
 import { track } from '@/lib/analytics';
-import { collection, onSnapshot, doc, getDoc, updateDoc, arrayUnion, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, arrayUnion, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
@@ -59,7 +59,7 @@ import NotesView from './NotesView';
 import KnowledgeGraph from './KnowledgeGraph';
 import { getNoteGroups, isWrittenNote } from '@/lib/notes';
 import LoadMoreSentinel from './feed/LoadMoreSentinel';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, AlarmClock, CheckCircle2, CheckSquare, CheckCheck, Layers, List, Image as ImageIcon, Share2, Globe, Plus, Pencil, Newspaper, CalendarCheck, Lock, BookOpenCheck, ChevronLeft, BarChart3, StickyNote, Waypoints, Upload } from 'lucide-react';
+import { Search, Inbox, Archive, ArchiveRestore, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, AlarmClock, CheckCircle2, CheckSquare, CheckCheck, Layers, List, Image as ImageIcon, Share2, Globe, Plus, Pencil, Newspaper, CalendarCheck, Lock, BookOpenCheck, ChevronLeft, BarChart3, StickyNote, Waypoints, Upload } from 'lucide-react';
 import { usePullToRefresh } from '@/lib/usePullToRefresh';
 import { useProcessingBanner } from '@/lib/useProcessingBanner';
 import { cardStartMs } from '@/lib/shareProgress';
@@ -90,6 +90,20 @@ import { useScrollLock } from '@/lib/useScrollLock';
 // Stable no-op for card slots that don't wire up an action (pending cards).
 const noop = () => { };
 
+// How many cards a library-wide filtered view adds per load-more: one feed
+// page's worth (useLinks PAGE_SIZE).
+const RENDER_STEP = 150;
+
+// The phone selection bar keeps its 32px buttons; this ::after makes each a
+// 44pt target.
+const SELECTION_HIT = ' relative after:absolute after:-inset-1.5';
+
+// An active-filter chip IS its remove button: the whole pill clears it (the
+// ✕ alone was an 18px target). No taller ::after: wrapped rows sit 6px apart,
+// and a grown chip would take taps off the edge of the one below.
+const FILTER_CHIP = 'group flex items-center ps-2.5 pe-1 py-1 rounded-full bg-card border border-border-subtle text-xs font-semibold shadow-sm cursor-pointer hover:border-accent/40 transition-colors';
+const FILTER_CHIP_X = 'flex items-center justify-center rounded-full p-0.5 text-text-muted group-hover:text-accent group-hover:bg-accent/10 transition-colors';
+
 /**
  * Main feed component displaying saved links
  * Features:
@@ -105,12 +119,15 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     const toast = useToast();
     // Links subscription + pull-refresh (R-3: useLinks). Windowed (report 3.15):
     // loadMore grows the subscription window; hasMore gates the scroll sentinel.
-    const { links, isLoading, handlePullRefresh, loadMore, hasMore } = useLinks(uid, toast);
+    const { links, windowIds, isLoading, handlePullRefresh, loadMore, hasMore } = useLinks(uid, toast);
     // Links saved offline in a session that ended before reconnecting.
     useResumeOfflineSaves(uid);
     // Collections — declared before the filter pipeline so private-collection
     // membership can hide cards from it while the privacy vault is locked.
     const [collections, setCollections] = useState<Collection[]>([]);
+    // True once the collections listener has answered, so "none" can be told
+    // apart from "not loaded yet" (see the open-collection bounce below).
+    const [collectionsLoaded, setCollectionsLoaded] = useState(false);
     // Privacy vault: one app-level PIN protects every collection marked
     // Private. While locked, member cards vanish from the library, search,
     // related cards, Ask context, and suggestions.
@@ -192,6 +209,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         semanticOnlyIds,
         partialIds,
         reminderCount,
+        filtersNeedLibrary,
     // LIVE query in — literal matching is instant per keystroke; the semantic
     // ids arrive debounced and append below the literal tiers.
     } = useFeedFilters(visibleLinks, searchQuery, libraryLinks, privateCollectionIds, semanticIds);
@@ -199,6 +217,31 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // BEFORE the children render, so every chip, dot and graph node reads the
     // same assignment. Sticky per device: a new save never recolors the rest.
     useMemo(() => assignCategoryColors(visibleLinks.map((l) => l.category)), [visibleLinks]);
+    // True while a filtered view waits on the full-library fetch it asked for
+    // (see filtersNeedLibrary): older matches are still on their way.
+    const checkingLibrary = isLoadingLibrary && filtersNeedLibrary && !searchQuery.trim();
+    // A filtered view unions in the whole library, which can be thousands of
+    // cards ("Unread" on a big library); mounting them in one go would freeze
+    // a phone. Such a view renders a feed page's worth at a time and the
+    // load-more sentinel grows it, the way it grows the window. The limit
+    // belongs to one filter selection and starts over when it changes.
+    const capKey = filtersNeedLibrary && !searchQuery.trim()
+        ? [filter, ...[selectedCategory, selectedTags, selectedSources, selectedCollections].map((set) => [...set].sort().join(','))].join('|')
+        : '';
+    const [renderCap, setRenderCap] = useState({ key: '', limit: RENDER_STEP });
+    const renderLimit = renderCap.key === capKey ? renderCap.limit : RENDER_STEP;
+    const shownLinks = useMemo(
+        () => (capKey && filteredLinks.length > renderLimit ? filteredLinks.slice(0, renderLimit) : filteredLinks),
+        [capKey, filteredLinks, renderLimit]
+    );
+    const moreToShow = shownLinks.length < filteredLinks.length;
+    // Once the snapshot has landed, such a view already holds every match:
+    // another window page would add nothing to it.
+    const libraryCoversView = !!capKey && libraryLinks.length > 0 && !isLoadingLibrary;
+    const handleLoadMore = useCallback(() => {
+        if (moreToShow) setRenderCap({ key: capKey, limit: renderLimit + RENDER_STEP });
+        else loadMore();
+    }, [moreToShow, capKey, renderLimit, loadMore]);
     // Where the literal hits end and the meaning-only hits begin. useFeedFilters
     // sorts literal matches first and meaning-only ones last, so the boundary is
     // one index — but ONLY under the default sort, the only one that tiers by
@@ -264,18 +307,38 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     };
     /** The result list cut into segments, each with the divider that opens it
      *  (null for the leading segment when it has none). Off search this is
-     *  one undivided segment (or the Reminders view's time groups). */
+     *  one undivided segment (or the Reminders view's time groups). Cuts
+     *  only exist while searching or in Reminders, which are never capped,
+     *  so slicing the shown list keeps every divider index valid. */
     const resultSegments = useMemo(() => {
         const cuts = [partialSplit, meaningSplit, ...reminderSplits.map((r) => r.idx)].filter((i) => i >= 0).sort((a, b) => a - b);
         const segs: { start: number; links: Link[] }[] = [];
         let prev = 0;
         for (const c of cuts) {
-            if (c > prev) segs.push({ start: prev, links: filteredLinks.slice(prev, c) });
+            if (c > prev) segs.push({ start: prev, links: shownLinks.slice(prev, c) });
             prev = c;
         }
-        segs.push({ start: prev, links: filteredLinks.slice(prev) });
+        segs.push({ start: prev, links: shownLinks.slice(prev) });
         return segs;
-    }, [filteredLinks, partialSplit, meaningSplit, reminderSplits]);
+    }, [shownLinks, partialSplit, meaningSplit, reminderSplits]);
+    const [activeLinkId, setActiveLinkId] = useState<string | null>(null);
+    // Live copies of cards opened from OUTSIDE the loaded feed pages: Ask
+    // citations, a dup-save redirect, a push tap, the reminder strip, My Notes,
+    // collection members, old search results. Written by the one-doc listener
+    // below while such a card is open; keyed by id, consulted by activeLink.
+    const [fetchedCards, setFetchedCards] = useState<Record<string, Link>>({});
+    // The id that listener is attached to, if any. Read only by the local-edit
+    // callback below, never during render.
+    const liveCardIdRef = useRef<string | null>(null);
+    // A card handler's edit landed. The search snapshot is a one-time read, so
+    // it is patched; so is a fetched copy whose listener has closed. The copy
+    // under a live listener is left alone: Firestore already shows the write
+    // there, and an older acknowledged write could briefly undo a newer one.
+    const handleLocalEdit = useCallback((id: string, patch: Partial<Link>) => {
+        patchLink(id, patch);
+        if (id === liveCardIdRef.current) return;
+        setFetchedCards((prev) => (prev[id] ? { ...prev, [id]: { ...prev[id], ...patch } } : prev));
+    }, [patchLink]);
     // Card action handlers that depend only on [uid, toast] (R-3: useLinkActions).
     const {
         handleStatusChange,
@@ -290,76 +353,118 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         handleRetryProcessing,
         handleRemoveFromCollection,
         handleShareCard,
-    } = useLinkActions(uid, toast, patchLink);
-    const [activeLinkId, setActiveLinkId] = useState<string | null>(null);
+    } = useLinkActions(uid, toast, handleLocalEdit);
     // The import sheet, offered from the empty library (the same sheet the
     // first run and Settings open).
     const [importing, setImporting] = useState(false);
-    // Cards fetched directly by id for a deep-link (?linkId) that targets a card
-    // older than the loaded window — reminder push taps and dup-save redirects
-    // point at arbitrary-age links. Keyed by id; consulted by activeLink below.
-    const [fetchedCards, setFetchedCards] = useState<Record<string, Link>>({});
     // Back-stack for related-card navigation: opening a card *from* another card
     // pushes the current one, so closing returns there instead of dismissing all.
     const [linkStack, setLinkStack] = useState<string[]>([]);
     // Resolved against visibleLinks so a locked private card can never be opened
     // (deep link, push tap) — and an open one closes itself when the vault relocks.
-    // A directly-fetched deep-link card (outside the window) is the fallback, and
-    // it goes through the SAME vault gate: while locked it stays hidden if it's
-    // effectively private, so the fetch can never bypass the PIN.
+    // A live fetched copy (outside the window) is the fallback, and it goes
+    // through the SAME vault gate: while locked it stays hidden if it's
+    // effectively private, so the listener can never bypass the PIN.
     const activeLink = useMemo(() => {
         if (!activeLinkId) return null;
         const inWindow = visibleLinks.find(l => l.id === activeLinkId);
         if (inWindow) return inWindow;
-        // Out-of-window cards: a directly-fetched deep-link doc, else the
-        // search library snapshot (how an old search result opens on tap).
-        // Both go through the SAME vault gate as the window.
+        // Out-of-window cards: the live copy from the listener below, else the
+        // search library snapshot while that listener's first answer is on its
+        // way (how an old search result opens on tap with no wait). Both go
+        // through the SAME vault gate as the window.
         const fallback = fetchedCards[activeLinkId] ?? libraryLinks.find(l => l.id === activeLinkId);
         if (!fallback) return null;
         if (vaultLocked && isEffectivelyPrivateCard(fallback)) return null;
         return fallback;
     }, [activeLinkId, visibleLinks, fetchedCards, libraryLinks, vaultLocked, isEffectivelyPrivateCard]);
 
-    // A cited/related card can reference a doc OUTSIDE the loaded feed window —
-    // Ask retrieval spans the whole library — or one that no longer exists.
-    // When activeLinkId can't resolve locally, fetch the doc once and open it;
-    // if it's gone (deleted) or stays blocked (vault-locked private), CLEAR the
-    // id. Leaving it dangling rendered no modal while anyOverlayOpen stayed
-    // true — scroll locked and the back gesture dead until a reload.
+    // A card can be opened that no loaded feed page holds: Ask retrieval and
+    // the digest span the whole library, and a push or dup-save names any
+    // card. A one-time read used to stand in for it, so the open card was a
+    // frozen copy: the star didn't fill, a note or title edit didn't show,
+    // "Machina's read" stayed empty (and each tap paid for another one), and a
+    // screenshot read never arrived. Instead, listen to that ONE doc while it
+    // is open. A card the reminder overlay holds (useLinks) counts as off-page
+    // too: clearing its reminder drops it from `links` mid-view.
+    const liveCardId = activeLinkId && !windowIds.has(activeLinkId) ? activeLinkId : null;
+    // The copy on screen when it opened, so the listener can start from it and
+    // the modal never blinks while the first snapshot is on its way, plus the
+    // id the modal is showing (both synced in an effect, never during render).
+    const openCopy = liveCardId ? visibleLinks.find((l) => l.id === liveCardId) ?? null : null;
+    const openCopyRef = useRef<Link | null>(null);
+    const shownIdRef = useRef<string | null>(null);
+    // A digest card's source URL, for when that card has since been deleted
+    // (set by openDigestCard below, used by the listener's "gone" branch).
+    const digestFallbackRef = useRef<{ id: string; url: string } | null>(null);
     useEffect(() => {
-        if (!activeLinkId || activeLink || !uid) return;
-        if (fetchedCards[activeLinkId]) {
-            // Already fetched but still unresolvable → vault gate — don't dangle.
-            // Say why nothing opened (a push / citation tap otherwise just
-            // lands on the feed with no explanation).
-            setActiveLinkId(null);
-            toast.info('That card is in Private. Unlock Private to open it.');
-            return;
-        }
-        let cancelled = false;
-        (async () => {
-            try {
-                const snap = await getDoc(doc(db, 'users', uid, 'links', activeLinkId));
-                if (cancelled) return;
-                if (!snap.exists()) {
-                    // Deleted since the push / citation / digest was written.
-                    // Same copy as the digest's deleted-card tap.
-                    setActiveLinkId(null);
-                    toast.info('That card is no longer in your library.');
-                    return;
-                }
-                const card = toLink(snap as QueryDocumentSnapshot<DocumentData>);
-                setFetchedCards(prev => ({ ...prev, [activeLinkId]: card }));
-            } catch (e) {
-                reportError(e, 'feed-cited-card-fetch');
-                if (!cancelled) {
-                    setActiveLinkId(null);
-                    toast.error("Couldn't open that card. Please try again.");
-                }
+        openCopyRef.current = openCopy;
+        shownIdRef.current = activeLink?.id ?? null;
+    });
+    useEffect(() => {
+        if (!uid || !liveCardId) return;
+        const id = liveCardId;
+        liveCardIdRef.current = id;
+        const seed = openCopyRef.current;
+        if (seed?.id === id) setFetchedCards((prev) => ({ ...prev, [id]: seed }));
+        const unsubscribe = onSnapshot(doc(db, 'users', uid, 'links', id), (snap) => {
+            if (snap.exists()) {
+                setFetchedCards((prev) => ({ ...prev, [id]: toLink(snap as QueryDocumentSnapshot<DocumentData>) }));
+                if (digestFallbackRef.current?.id === id) digestFallbackRef.current = null;
+                return;
             }
-        })();
-        return () => { cancelled = true; };
-    }, [activeLinkId, activeLink, uid, fetchedCards, toast]);
+            const { fromCache, hasPendingWrites } = snap.metadata;
+            if (fromCache && !hasPendingWrites) {
+                // Not on this device and no server to ask (offline). A copy
+                // already on screen stays until the server settles it; with
+                // nothing to show, say so, as the old one-time read did.
+                if (shownIdRef.current === id) return;
+                setActiveLinkId((cur) => (cur === id ? null : cur));
+                toast.error("Couldn't open that card. Please try again.");
+                return;
+            }
+            // Gone. CLEAR the id: leaving it dangling rendered no modal while
+            // anyOverlayOpen stayed true, so scroll locked and the back gesture
+            // died until a reload. The search snapshot forgets it too.
+            setFetchedCards((prev) => {
+                if (!prev[id]) return prev;
+                const next = { ...prev };
+                delete next[id];
+                return next;
+            });
+            markDeleted([id]);
+            setActiveLinkId((cur) => (cur === id ? null : cur));
+            // Our own delete already closed the card; nothing to explain.
+            if (hasPendingWrites) return;
+            // Deleted since the push / citation / digest was written, or just
+            // now on another device. A digest tap still offers somewhere
+            // useful to land: the source itself, one tap away (opening it
+            // from here, after a network round trip, would be popup-blocked).
+            const fallback = digestFallbackRef.current?.id === id ? digestFallbackRef.current : null;
+            if (fallback) digestFallbackRef.current = null;
+            toast.info('That card is no longer in your library.', fallback
+                ? { label: 'Open original', onClick: () => openExternal(fallback.url) }
+                : undefined);
+        }, (e) => {
+            reportError(e, 'feed-open-card-listener');
+            setActiveLinkId((cur) => (cur === id ? null : cur));
+            toast.error("Couldn't open that card. Please try again.");
+        });
+        return () => {
+            unsubscribe();
+            if (liveCardIdRef.current === id) liveCardIdRef.current = null;
+        };
+    }, [uid, liveCardId, toast, markDeleted]);
+    // Known but unresolvable means the vault gate (a locked private card):
+    // close it rather than dangle, and say why nothing opened (a push or
+    // citation tap otherwise just lands on the feed with no explanation).
+    // Not known yet means the listener is still on its way.
+    useEffect(() => {
+        if (!activeLinkId || activeLink) return;
+        if (!fetchedCards[activeLinkId] && !links.some((l) => l.id === activeLinkId)) return;
+        setActiveLinkId(null);
+        toast.info('That card is in Private. Unlock Private to open it.');
+    }, [activeLinkId, activeLink, fetchedCards, links, toast]);
 
     // Open a card reached from another card's "Related" list — remember where we
     // came from so the back-stack can return there.
@@ -638,17 +743,20 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         };
     }, [toast]);
 
-    // Open a card referenced by a digest: prefer the live card (detail modal);
-    // if it was deleted since the digest was written, fall back to the
-    // denormalized source URL so the tap still lands somewhere useful.
+    // Open a card referenced by a digest. A digest mostly picks OLD cards, past
+    // the loaded pages, so checking the window here sent live cards to their
+    // website instead. The card opens like any other (the one-doc listener
+    // above fetches it); only a card deleted since the digest was written
+    // falls back to its denormalized source URL, offered by the listener's
+    // "gone" branch, so the tap still lands somewhere useful.
     const openDigestCard = (card: DigestCardRef) => {
-        if (links.some((l) => l.id === card.id)) {
-            setActiveLinkId(card.id);
-        } else if (card.url) {
-            openExternal(card.url);
-        } else {
-            toast.info('That card is no longer in your library.');
+        if (!card.id) {
+            if (card.url) openExternal(card.url);
+            else toast.info('That card is no longer in your library.');
+            return;
         }
+        digestFallbackRef.current = card.url ? { id: card.id, url: card.url } : null;
+        setActiveLinkId(card.id);
     };
 
     const dismissSynthesis = () => {
@@ -676,6 +784,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                 id: d.id,
                 ...d.data()
             } as Collection)));
+            setCollectionsLoaded(true);
         }, (error: Error) => {
             reportError(error, 'feed-collections-snapshot');
         });
@@ -684,62 +793,47 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
 
     // 3. Handle deep linking
     //
-    // The effect depends on `links`, which Firestore's onSnapshot mutates on every
-    // background change (favorite, read, scan completes). Without a guard, each
-    // such update re-ran this effect and re-opened the modal the user had just
-    // closed — forever. We consume a given linkId exactly once (ref guard) and
-    // strip it from the URL so a refresh doesn't re-trigger it either.
+    // `?linkId=` (a dup-save redirect, a universal link, NativeShell's
+    // machina:// route) opens that card. Each request is consumed ONCE (ref
+    // guard) and stripped from the URL, so a refresh doesn't re-open a modal
+    // the user just closed. The guard resets once the param is gone: the same
+    // card can be deep-linked again (pasting an already-saved URL a second
+    // time used to open nothing). A sender that re-pushes the same id before
+    // the strip lands can add an `n` nonce to make it a new request.
+    //
+    // Opening goes through activeLinkId like any other card. The one-doc
+    // listener fetches a card outside the window and handles deleted and
+    // private ones, so nothing is in flight here for a re-run to cancel: the
+    // old getDoc was cancelled by ANY change to `links` while it ran, and the
+    // re-run then bailed on the guard, silently dropping older cards.
     const consumedDeepLinkRef = useRef<string | null>(null);
     useEffect(() => {
         const linkId = searchParams.get('linkId');
-        if (!linkId) return;
-        if (consumedDeepLinkRef.current === linkId) return;
-
-        const inList = links.find(l => l.id === linkId);
-        // Still doing the first window load — wait before deciding whether the
-        // card is genuinely outside the window and needs a direct fetch.
-        if (!inList && isLoading) return;
-
-        // Consume once (both the in-window and fetched paths): onSnapshot mutates
-        // `links` constantly, and without this the effect would re-open a modal
-        // the user just closed, or re-fetch on every background change.
-        consumedDeepLinkRef.current = linkId;
-
-        // Drop ?linkId from the URL so closing the modal is final and a manual
-        // refresh won't re-open it. history.replaceState avoids a Next navigation
-        // (and the scroll reset that comes with it).
-        const stripLinkIdFromUrl = () => {
-            if (typeof window === 'undefined') return;
-            const url = new URL(window.location.href);
-            url.searchParams.delete('linkId');
-            window.history.replaceState(window.history.state, '', url.toString());
-        };
-
-        if (inList) {
-            setActiveLinkId(inList.id);
-            stripLinkIdFromUrl();
+        if (!linkId) {
+            consumedDeepLinkRef.current = null;
             return;
         }
-
-        // Outside the loaded window — fetch the doc directly and open it. Reuses
-        // useLinks' toLink mapping so the fetched card is normalized identically.
-        if (!uid) return;
-        let cancelled = false;
-        (async () => {
-            try {
-                const snap = await getDoc(doc(db, 'users', uid, 'links', linkId));
-                if (cancelled) return;
-                if (!snap.exists()) return; // deleted/unknown id — no crash, just no-op
-                const card = toLink(snap as QueryDocumentSnapshot<DocumentData>);
-                setFetchedCards(prev => ({ ...prev, [linkId]: card }));
-                setActiveLinkId(linkId);
-                stripLinkIdFromUrl();
-            } catch (e) {
-                reportError(e, 'feed-deeplink-fetch');
-            }
-        })();
-        return () => { cancelled = true; };
-    }, [searchParams, links, isLoading, uid]);
+        const request = `${linkId}:${searchParams.get('n') ?? ''}`;
+        if (consumedDeepLinkRef.current === request) return;
+        // Still doing the first window load: wait, so a card on the first page
+        // opens from the live feed instead of a listener of its own.
+        if (isLoading) return;
+        consumedDeepLinkRef.current = request;
+        setActiveLinkId(linkId);
+        // Drop the params from the URL so closing the modal is final and a
+        // manual refresh won't re-open it. history.replaceState avoids a Next
+        // navigation (and the scroll reset that comes with it). Pass null, not
+        // history.state: Next treats a call carrying its own state as internal
+        // and leaves useSearchParams on the old URL, so the param never left,
+        // the guard never reset, and a second push of the same URL was a
+        // no-op. With null, Next keeps its state and syncs the params.
+        if (typeof window !== 'undefined') {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('linkId');
+            url.searchParams.delete('n');
+            window.history.replaceState(null, '', url.toString());
+        }
+    }, [searchParams, isLoading]);
 
     // Only the scrollable card layouts drive pull-to-refresh; disable it while a
     // full-screen mode (Ask/Collections) or any overlay/sheet owns the screen so
@@ -838,7 +932,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                 <PushNudge uid={uid} onDone={() => setShowPushNudge(false)} />
             )}
             {dueLinks.length > 0 && (
-                <div className="mb-4 rounded-2xl border border-accent/25 bg-card overflow-hidden shadow-lg shadow-accent/5 animate-in fade-in slide-in-from-top-1 duration-300">
+                <div className="mb-4 rounded-2xl border border-accent/25 bg-card overflow-hidden shadow-lg shadow-accent/5 animate-fade-in">
                     <div className="flex items-center gap-3 px-4 py-3 border-b border-border-subtle">
                         <div className="w-9 h-9 shrink-0 rounded-xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-md shadow-accent/20">
                             <Bell className="w-[18px] h-[18px] text-accent-ink" />
@@ -1008,26 +1102,64 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // with no per-doc side effects to preserve.
     const linkRefs = (ids: string[]) => ids.map((id) => doc(db, 'users', uid!, 'links', id));
 
-    const handleBulkArchive = async () => {
-        if (!uid) return;
-        const ids = Array.from(selectedIds);
+    // Write a status per card, batched as above. A batch is all-or-nothing,
+    // so ONE selected card deleted on another device used to sink its whole
+    // chunk: when a batch fails, fall back to per-card writes and keep the
+    // ones that land. Resolves to the ids written.
+    const writeStatuses = async (changes: Map<string, LinkStatus>): Promise<string[]> => {
+        const ids = Array.from(changes.keys());
         try {
-            await batchedUpdate(linkRefs(ids), (batch, ref) => batch.update(ref, { status: 'archived' }));
-            ids.forEach((id) => patchLink(id, { status: 'archived' }));
-            toast.success(`Archived ${ids.length} link${ids.length === 1 ? '' : 's'}`);
+            await batchedUpdate(linkRefs(ids), (batch, ref) => batch.update(ref, { status: changes.get(ref.id)! }));
+            return ids;
         } catch {
-            toast.error("Couldn't archive some links. Please try again.");
+            const results = await Promise.allSettled(linkRefs(ids).map((ref) => updateDoc(ref, { status: changes.get(ref.id)! })));
+            return ids.filter((_, i) => results[i].status === 'fulfilled');
         }
+    };
+
+    // Archive the selection, or under the Archived filter bring it back. The
+    // toast carries Undo, which puts back the status each card had (a starred
+    // card gets its star back).
+    const handleBulkStatus = async () => {
+        if (!uid) return;
+        const target: LinkStatus = filter === 'archived' ? 'unread' : 'archived';
+        const ids = Array.from(selectedIds);
+        const known = new Map([...libraryLinks, ...links].map((l) => [l.id, l.status]));
+        const previous = new Map(ids.map((id) => {
+            const status = known.get(id);
+            return [id, (status === 'favorite' || status === 'archived' ? status : 'unread') as LinkStatus];
+        }));
         setSelectedIds(new Set());
         setIsSelectionMode(false);
+        const done = await writeStatuses(new Map(ids.map((id) => [id, target])));
+        done.forEach((id) => handleLocalEdit(id, { status: target }));
+        if (done.length === 0) {
+            toast.error(target === 'archived'
+                ? "Couldn't archive those links. Please try again."
+                : "Couldn't unarchive those links. Please try again.");
+            return;
+        }
+        const verb = target === 'archived' ? 'Archived' : 'Unarchived';
+        toast.success(done.length === ids.length
+            ? `${verb} ${done.length} link${done.length === 1 ? '' : 's'}`
+            : `${verb} ${done.length} of ${ids.length} links`, {
+            label: 'Undo',
+            onClick: () => {
+                const restore = new Map(done.map((id) => [id, previous.get(id) ?? 'unread']));
+                void writeStatuses(restore).then((back) => {
+                    back.forEach((id) => handleLocalEdit(id, { status: restore.get(id)! }));
+                    if (back.length < restore.size) toast.error("Couldn't undo that for every link.");
+                });
+            },
+        });
     };
 
     // Selection toolbar extras: select everything the current view shows, tag
     // the selection, or add it to a collection (the same sheet a single card
     // uses, in bulk mode).
-    const allVisibleSelected = filteredLinks.length > 0 && filteredLinks.every((l) => selectedIds.has(l.id));
+    const allVisibleSelected = shownLinks.length > 0 && shownLinks.every((l) => selectedIds.has(l.id));
     const handleSelectAllVisible = () => {
-        setSelectedIds(allVisibleSelected ? new Set() : new Set(filteredLinks.map((l) => l.id)));
+        setSelectedIds(allVisibleSelected ? new Set() : new Set(shownLinks.map((l) => l.id)));
     };
     const handleBulkAddTag = async (tag: string) => {
         if (!uid) return;
@@ -1585,6 +1717,18 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         onLibraryFacetApplied?.();
     }, [libraryFacet, onLibraryFacetApplied, openNotesView, setSelectedCategory, setSelectedTags, setSelectedSources, setSelectedCollections, setFilter]);
 
+    // A filtered view answers from the whole library (useFeedFilters unions
+    // the full snapshot in), so fetch it the moment one is applied on the grid
+    // or list: a status filter, a facet chip, a tapped Insights row (search
+    // asks for itself). Once per selection: a failed fetch re-arms
+    // ensureLibrary, and re-running on that alone would retry in a loop.
+    const libraryAskedRef = useRef('');
+    useEffect(() => {
+        const key = viewMode === 'grid' || viewMode === 'list' ? capKey : '';
+        if (key && key !== libraryAskedRef.current) ensureLibrary();
+        libraryAskedRef.current = key;
+    }, [capKey, viewMode, ensureLibrary]);
+
     // True while the Insights-applied facet is still exactly what the feed
     // shows. The user changing ANYTHING (adding/removing a facet, searching,
     // picking a collection) dissolves the "came from Insights" context and the
@@ -1698,14 +1842,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         if (!uid) return;
         try {
             await updateDoc(doc(db, 'users', uid, 'links', link.id), { isPrivate });
-            patchLink(link.id, { isPrivate });
+            handleLocalEdit(link.id, { isPrivate });
             toast.success(isPrivate
                 ? 'Moved to Private. Find it in the Private view'
                 : 'Removed from Private');
         } catch {
             toast.error("Couldn't update the card. Please try again.");
         }
-    }, [uid, toast, patchLink]);
+    }, [uid, toast, handleLocalEdit]);
     const handleToggleCardPrivate = useCallback((link: Link) => {
         // "Remove from Private" is only reachable inside the unlocked Private
         // view, so no extra gate; hiding a card never needs the vault open.
@@ -1721,11 +1865,11 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         const next = !link.hideThumbnail;
         try {
             await updateDoc(doc(db, 'users', uid, 'links', link.id), { hideThumbnail: next, updatedAt: Date.now() });
-            patchLink(link.id, { hideThumbnail: next });
+            handleLocalEdit(link.id, { hideThumbnail: next });
         } catch {
             toast.error("Couldn't update the card. Please try again.");
         }
-    }, [uid, toast, patchLink]);
+    }, [uid, toast, handleLocalEdit]);
 
     // Status-filter selection, PIN-gated for 'private': entering the Private
     // view demands the PIN while the vault is locked, and LEAVING it relocks
@@ -1798,6 +1942,10 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
 
     const performDeleteCollection = async (col: Collection) => {
         if (!uid) return;
+        // Deleting the collection you're in: step out to the gallery first, the
+        // way performDelete steps back from an open card, so the place never
+        // goes blank under you (on a phone it used to, for the last one).
+        if (openCollectionId === col.id) closeCollectionToGallery();
         try {
             await deleteCollection(uid, col.id, col.shareId);
             setSelectedCollections(prev => {
@@ -1838,7 +1986,13 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // motion + session tallies confirm each action, and stacked success toasts
     // were covering the deck's Undo/Archive/Remind/Keep buttons.
     const swipeArchive = useCallback((link: Link) => handleStatusChange(link.id, 'archived', { silent: true }), [handleStatusChange]);
-    const swipeResetStatus = useCallback((link: Link) => handleStatusChange(link.id, 'unread', { silent: true }), [handleStatusChange]);
+    // Undo of a left swipe. The deck hands back the card as it was when it was
+    // archived, so put THAT status back: archiving a starred card drops the
+    // star (one `status` field), and a hardcoded 'unread' kept it dropped.
+    const swipeResetStatus = useCallback(
+        (link: Link) => handleStatusChange(link.id, link.status === 'favorite' ? 'favorite' : 'unread', { silent: true }),
+        [handleStatusChange],
+    );
     // Right swipe = Keep: the card does NOT move, change status, or get favorited
     // — it only rests from review sessions for a cooldown (reviewQueue
     // REVIEWED_REST_DAYS). `keep` false is the deck's Undo, which clears the stamp.
@@ -2048,9 +2202,11 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     );
 
     // If the open collection is deleted out from under the detail view (e.g. from
-    // another device), fall back to the gallery instead of a blank place.
+    // another device), fall back to the gallery instead of a blank place. Keyed
+    // on the listener having answered, not on there being collections: the
+    // old `length > 0` guard never fired when the LAST one was deleted.
     useEffect(() => {
-        if (viewMode === 'collection' && openCollectionId && collections.length > 0
+        if (viewMode === 'collection' && openCollectionId && collectionsLoaded
             && !collections.some((c) => c.id === openCollectionId)) {
             closeCollectionToGallery();
         }
@@ -2061,7 +2217,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
             closeCollectionToGallery();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [viewMode, openCollectionId, collections, vaultLocked, privateCollectionIds]);
+    }, [viewMode, openCollectionId, collections, collectionsLoaded, vaultLocked, privateCollectionIds]);
 
     // Same bounce for the Private cards view: if the vault relocks while it's
     // showing (app backgrounded), fall back to All so nothing stays exposed.
@@ -2207,10 +2363,13 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         // "Update link" — or hide that it needs one.
         const publishable = publishableMembers(openCollectionMembers);
         const stale = isShareStale(openCol, publishable);
-        // "Ask about this" grounds Ask in exactly the cards the grid shows (so
-        // while locked no hidden card's title rides into the question). Ask
-        // may see vault cards while unlocked, same as its normal context.
-        const canAsk = members.length > 0 && !(openCol.isPrivate && vaultLocked);
+        // "Ask about this" grounds Ask in exactly the cards it can answer from.
+        // The server strips every effectively-private card from Ask's context,
+        // so on a private collection (unlocked or not), or one whose cards are
+        // all private, Ask always came back with nothing: no button there, and
+        // the question's hints only name cards Ask will actually see.
+        const askable = openCol.isPrivate ? [] : members.filter((l) => !isEffectivelyPrivateCard(l));
+        const canAsk = askable.length > 0;
         const colStyle = getColorStyleByKey(openCol.color || openCol.name);
         const nameDir = getDirection(openCol.name);
         return (
@@ -2259,7 +2418,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             "Ask about this" cluster path, seeded from the collection. */}
                         {canAsk && (
                             <button
-                                onClick={() => handleAskCollection(openCol, members)}
+                                onClick={() => handleAskCollection(openCol, askable)}
                                 className={`${ctrlBase} px-3.5 ${ctrlIdle} hover:text-accent hover:border-accent/40`}
                             >
                                 <MessagesSquare className="w-4 h-4" /><span>Ask about this</span>
@@ -2423,7 +2582,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                     <div className="hidden sm:block">
                         <MobileSubheader
                             onBack={closeDigestToList}
-                            backLabel="Back to Today"
+                            backLabel="Back to Revisit"
                             icon={<Newspaper className="w-5 h-5" />}
                             title={digestDetailTitle}
                         />
@@ -2452,26 +2611,26 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                     behaviour is untouched. Selection mode swaps in for the row. */}
                 {isLibraryView && (
                     isSelectionMode ? (
-                        <div className="flex sm:hidden items-center animate-in fade-in slide-in-from-top-1 duration-200">
+                        <div className="flex sm:hidden items-center">
                             {/* Same 40px height as the row it replaces — no layout hop. */}
                             <div className="flex items-center gap-1 h-10 px-1.5 rounded-full bg-accent/10 border border-accent/20 animate-slide-up">
                                 <span className="text-xs font-bold text-accent px-1.5 tabular-nums">{selectedIds.size}</span>
-                                {bulkExtraButtons('h-8 w-8')}
+                                {bulkExtraButtons('h-8 w-8' + SELECTION_HIT)}
                                 <button
-                                    onClick={handleBulkArchive}
+                                    onClick={handleBulkStatus}
                                     disabled={selectedIds.size === 0}
-                                    title="Archive selected"
-                                    aria-label="Archive selected"
-                                    className="h-8 w-8 inline-flex items-center justify-center rounded-full text-accent cursor-pointer hover:bg-accent hover:text-accent-ink transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                    title={filter === 'archived' ? 'Unarchive selected' : 'Archive selected'}
+                                    aria-label={filter === 'archived' ? 'Unarchive selected' : 'Archive selected'}
+                                    className={`h-8 w-8 inline-flex items-center justify-center rounded-full text-accent cursor-pointer hover:bg-accent hover:text-accent-ink transition-colors disabled:opacity-30 disabled:cursor-not-allowed${SELECTION_HIT}`}
                                 >
-                                    <Archive className="w-4 h-4" />
+                                    {filter === 'archived' ? <ArchiveRestore className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
                                 </button>
                                 <button
                                     onClick={() => setConfirmBulkDelete(true)}
                                     disabled={selectedIds.size === 0}
                                     title="Delete selected"
                                     aria-label="Delete selected"
-                                    className="h-8 w-8 inline-flex items-center justify-center rounded-full text-text-secondary cursor-pointer hover:bg-red-500 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                    className={`h-8 w-8 inline-flex items-center justify-center rounded-full text-text-secondary cursor-pointer hover:bg-red-500 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed${SELECTION_HIT}`}
                                 >
                                     <Trash2 className="w-4 h-4" />
                                 </button>
@@ -2482,7 +2641,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                     }}
                                     title="Cancel selection"
                                     aria-label="Cancel selection"
-                                    className="h-8 w-8 inline-flex items-center justify-center rounded-full text-text-secondary cursor-pointer hover:bg-card-hover hover:text-text transition-colors"
+                                    className={`h-8 w-8 inline-flex items-center justify-center rounded-full text-text-secondary cursor-pointer hover:bg-card-hover hover:text-text transition-colors${SELECTION_HIT}`}
                                 >
                                     <X className="w-4 h-4" />
                                 </button>
@@ -2514,7 +2673,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                     <button
                                         onClick={() => setSearchQuery('')}
                                         aria-label="Clear search"
-                                        className="absolute end-2 top-1/2 -translate-y-1/2 p-1 rounded-full text-text-muted hover:text-text hover:bg-fill-strong transition-colors"
+                                        // 24px glyph, 44pt target: it grows toward the field's edge
+                                        // and the gap past it, never over the typed text (pe-9).
+                                        className="absolute end-2 top-1/2 -translate-y-1/2 p-1 rounded-full text-text-muted hover:text-text hover:bg-fill-strong transition-colors after:absolute after:-inset-y-2.5 after:-start-1 after:-end-4"
                                     >
                                         <X className="w-4 h-4" />
                                     </button>
@@ -2578,7 +2739,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                 <button
                                     onClick={() => setSearchQuery('')}
                                     aria-label="Clear search"
-                                    className="absolute end-2 top-1/2 -translate-y-1/2 p-1 rounded-full text-text-muted hover:text-text hover:bg-fill-strong transition-colors cursor-pointer"
+                                    className="absolute end-2 top-1/2 -translate-y-1/2 p-1 rounded-full text-text-muted hover:text-text hover:bg-fill-strong transition-colors cursor-pointer after:absolute after:-inset-y-2.5 after:-start-1 after:-end-4"
                                 >
                                     <X className="w-4 h-4" />
                                 </button>
@@ -2691,12 +2852,13 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                     />
                                 )}
                                 <button
-                                    onClick={handleBulkArchive}
+                                    onClick={handleBulkStatus}
                                     disabled={selectedIds.size === 0}
-                                    title="Archive selected"
+                                    title={filter === 'archived' ? 'Unarchive selected' : 'Archive selected'}
+                                    aria-label={filter === 'archived' ? 'Unarchive selected' : 'Archive selected'}
                                     className="h-7 w-7 inline-flex items-center justify-center rounded-full text-accent cursor-pointer hover:bg-accent hover:text-accent-ink transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                                 >
-                                    <Archive className="w-4 h-4" />
+                                    {filter === 'archived' ? <ArchiveRestore className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
                                 </button>
                                 <button
                                     onClick={() => setConfirmBulkDelete(true)}
@@ -2738,8 +2900,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                 // Blank-slate entrance, same as the mobile tab
                                 // (clears a pending graph hand-off — see selectTab).
                                 onClick={() => { setGraphAsk(null); setGraphRestore(null); setAskOpenChat(null); setAskFromGraph(false); setViewMode('ask'); }}
-                                title="Ask your brain"
-                                aria-label="Ask your brain"
+                                title="Ask Machina"
+                                aria-label="Ask Machina"
                                 className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
                             >
                                 <MessagesSquare className="w-4 h-4" />
@@ -2817,7 +2979,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                 const active = filterButtons.find(b => b.key === filter);
                 if (!active) return null;
                 return (
-                    <div className="flex flex-wrap items-center gap-2 -mx-2 px-2 sm:mx-0 sm:px-0 mb-1 animate-in fade-in slide-in-from-top-1 duration-300">
+                    <div className="flex flex-wrap items-center gap-2 -mx-2 px-2 sm:mx-0 sm:px-0 mb-1 animate-fade-in">
                         <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-accent/5 border border-accent/10">
                             {cloneElement(
                                 active.icon as ReactElement<{ className?: string }>,
@@ -2825,18 +2987,16 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             )}
                             <span className="text-[10px] font-bold text-accent uppercase tracking-wider">Showing:</span>
                         </div>
-                        <div className="group flex items-center gap-1 ps-2.5 pe-1 py-1 rounded-full bg-card border border-border-subtle text-text-secondary text-xs font-semibold shadow-sm">
+                        <button
+                            type="button"
+                            onClick={() => handleFilterSelect('all')}
+                            aria-label={`Clear ${active.label} filter`}
+                            title="Clear filter"
+                            className={`${FILTER_CHIP} gap-1 text-text-secondary`}
+                        >
                             <span>{active.label}</span>
-                            <button
-                                type="button"
-                                onClick={() => handleFilterSelect('all')}
-                                aria-label={`Clear ${active.label} filter`}
-                                title="Clear filter"
-                                className="flex items-center justify-center rounded-full p-0.5 text-text-muted hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
-                            >
-                                <X className="w-3.5 h-3.5" />
-                            </button>
-                        </div>
+                            <span aria-hidden className={FILTER_CHIP_X}><X className="w-3.5 h-3.5" /></span>
+                        </button>
                     </div>
                 );
             })()}
@@ -2844,7 +3004,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
             {/* Back to Insights — shown while the feed is scoped to exactly the
                 facet a tapped Insights row applied (see insightsBackVisible). */}
             {isLibraryView && insightsBackVisible && (
-                <div className="-mx-2 px-2 sm:mx-0 sm:px-0 mb-1 animate-in fade-in slide-in-from-top-1 duration-300">
+                <div className="-mx-2 px-2 sm:mx-0 sm:px-0 mb-1 animate-fade-in">
                     <button
                         onClick={backToInsights}
                         className="inline-flex items-center gap-1 ps-1.5 pe-3 py-1.5 rounded-full bg-card border border-border-subtle text-xs font-semibold text-text-secondary hover:text-text hover:border-accent/40 shadow-sm transition-colors cursor-pointer"
@@ -2862,70 +3022,58 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                 per-row label pills are gone and a single "Clear all" covers the
                 whole bar. Collections keep their own banner below (extra actions). */}
             {isLibraryView && (selectedCategory.size > 0 || selectedTags.size > 0 || sourceChips.length > 0) && (
-                <div className="flex flex-wrap items-center gap-1.5 -mx-2 px-2 sm:mx-0 sm:px-0 mb-1 animate-in fade-in slide-in-from-top-1 duration-300">
+                <div className="flex flex-wrap items-center gap-1.5 -mx-2 px-2 sm:mx-0 sm:px-0 mb-1 animate-fade-in">
                     {Array.from(selectedCategory).map(cat => {
                         const colorStyle = getCategoryColorStyle(cat);
                         return (
-                            <div
+                            <button
                                 key={`cat:${cat}`}
-                                className="group flex items-center gap-1.5 ps-2.5 pe-1 py-1 rounded-full bg-card border border-border-subtle text-text-secondary text-xs font-semibold shadow-sm"
+                                type="button"
+                                onClick={() => setSelectedCategory(prev => { const n = new Set(prev); n.delete(cat); return n; })}
+                                aria-label={`Remove ${cat} filter`}
+                                title="Remove filter"
+                                className={`${FILTER_CHIP} gap-1.5 text-text-secondary`}
                             >
                                 <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: colorStyle.color }} />
                                 <span>{cat}</span>
-                                <button
-                                    type="button"
-                                    onClick={() => setSelectedCategory(prev => { const n = new Set(prev); n.delete(cat); return n; })}
-                                    aria-label={`Remove ${cat} filter`}
-                                    title="Remove filter"
-                                    className="flex items-center justify-center rounded-full p-0.5 text-text-muted hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
-                                >
-                                    <X className="w-3.5 h-3.5" />
-                                </button>
-                            </div>
+                                <span aria-hidden className={FILTER_CHIP_X}><X className="w-3.5 h-3.5" /></span>
+                            </button>
                         );
                     })}
                     {Array.from(selectedTags).map(tag => (
-                        <div
+                        <button
                             key={`tag:${tag}`}
-                            className="group flex items-center gap-1 ps-2.5 pe-1 py-1 rounded-full bg-card border border-border-subtle text-text-secondary text-xs font-semibold shadow-sm"
+                            type="button"
+                            onClick={() => handleToggleTag(tag)}
+                            aria-label={`Remove ${tag.split('/').pop()} filter`}
+                            title="Remove filter"
+                            className={`${FILTER_CHIP} gap-1 text-text-secondary`}
                         >
                             <span className="text-accent/60 font-bold">#</span>
                             <span>{tag.split('/').pop()}</span>
-                            <button
-                                type="button"
-                                onClick={() => handleToggleTag(tag)}
-                                aria-label={`Remove ${tag.split('/').pop()} filter`}
-                                title="Remove filter"
-                                className="flex items-center justify-center rounded-full p-0.5 text-text-muted hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
-                            >
-                                <X className="w-3.5 h-3.5" />
-                            </button>
-                        </div>
+                            <span aria-hidden className={FILTER_CHIP_X}><X className="w-3.5 h-3.5" /></span>
+                        </button>
                     ))}
                     {sourceChips.map(chip => (
-                        <div
+                        <button
                             key={`src:${chip.id}`}
-                            className="group flex items-center gap-1.5 ps-2.5 pe-1 py-1 rounded-full bg-card border border-border-subtle text-text-secondary text-xs font-semibold shadow-sm"
+                            type="button"
+                            onClick={() => handleToggleSourceKeys(chip.keys)}
+                            aria-label={`Remove ${chip.label} filter`}
+                            title="Remove filter"
+                            className={`${FILTER_CHIP} gap-1.5 text-text-secondary`}
                         >
                             <Globe className="w-3 h-3 text-text-muted shrink-0" />
                             <span>{chip.label}</span>
-                            <button
-                                type="button"
-                                onClick={() => handleToggleSourceKeys(chip.keys)}
-                                aria-label={`Remove ${chip.label} filter`}
-                                title="Remove filter"
-                                className="flex items-center justify-center rounded-full p-0.5 text-text-muted hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
-                            >
-                                <X className="w-3.5 h-3.5" />
-                            </button>
-                        </div>
+                            <span aria-hidden className={FILTER_CHIP_X}><X className="w-3.5 h-3.5" /></span>
+                        </button>
                     ))}
                     {selectedCategory.size + selectedTags.size + sourceChips.length > 1 && (
                         <button
                             onClick={() => { setSelectedCategory(new Set()); setSelectedTags(new Set()); setSelectedSources(new Set()); }}
-                            className="text-[10px] font-bold text-text-muted/60 hover:text-accent hover:underline px-2 transition-colors uppercase tracking-tight"
+                            className="h-7 px-2.5 rounded-full text-xs font-semibold text-text-muted hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
                         >
-                            Clear All
+                            Clear all
                         </button>
                     )}
                 </div>
@@ -2933,7 +3081,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
 
             {/* Active Collection — banner shown when the feed is scoped to a collection. */}
             {isLibraryView && selectedCollections.size > 0 && (
-                <div className="flex flex-wrap items-center gap-2 -mx-2 px-2 sm:mx-0 sm:px-0 mb-1 animate-in fade-in slide-in-from-top-1 duration-300">
+                <div className="flex flex-wrap items-center gap-2 -mx-2 px-2 sm:mx-0 sm:px-0 mb-1 animate-fade-in">
                     <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-accent/5 border border-accent/10">
                         <Layers className="w-3 h-3 text-accent" />
                         <span className="text-[10px] font-bold text-accent uppercase tracking-wider">Collection:</span>
@@ -2943,18 +3091,16 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                         if (!col) return null;
                         return (
                             <div key={id} className="flex items-center gap-2">
-                                <div className="group flex items-center gap-1 ps-2.5 pe-1 py-1 rounded-full bg-card border border-border-subtle text-text text-xs font-semibold shadow-sm">
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedCollections(prev => { const n = new Set(prev); n.delete(id); return n; })}
+                                    aria-label={`Remove ${col.name} filter`}
+                                    title="Clear collection filter"
+                                    className={`${FILTER_CHIP} gap-1 text-text`}
+                                >
                                     <span>{col.name}</span>
-                                    <button
-                                        type="button"
-                                        onClick={() => setSelectedCollections(prev => { const n = new Set(prev); n.delete(id); return n; })}
-                                        aria-label={`Remove ${col.name} filter`}
-                                        title="Clear collection filter"
-                                        className="flex items-center justify-center rounded-full p-0.5 text-text-muted hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
-                                    >
-                                        <X className="w-3.5 h-3.5" />
-                                    </button>
-                                </div>
+                                    <span aria-hidden className={FILTER_CHIP_X}><X className="w-3.5 h-3.5" /></span>
+                                </button>
                                 <button
                                     onClick={() => setManageCardsCollection(col)}
                                     title="Add or remove cards in this collection"
@@ -3120,7 +3266,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                         const visibleTags = matchingTags.length === 1 && matchingTags[0].count === filteredLinks.length
                             ? [] : matchingTags;
                         return (matchingSources.length > 0 || visibleTags.length > 0) && (
-                        <div className="mb-5 animate-in fade-in slide-in-from-top-1 duration-200">
+                        <div className="mb-5 animate-fade-in">
                             {matchingSources.length > 0 && (
                                 <>
                                     <div className="flex items-center gap-2 mb-2.5">
@@ -3193,16 +3339,17 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                     })()}
                     {/* Library-fetch status. Matches from the loaded window render
                         immediately; while the one-time full-library fetch is still
-                        in flight, older cards may be missing — show a subtle line
-                        above the grid instead of blocking the results. The empty
-                        state owns the no-results case (spinner there). */}
-                    {(viewMode === 'grid' || viewMode === 'list') && filteredLinks.length > 0 && searchingLibrary && (
+                        in flight (a search, or a filtered view), older cards may
+                        be missing — show a subtle line above the grid instead of
+                        blocking the results. The empty state owns the no-results
+                        case (spinner there). */}
+                    {(viewMode === 'grid' || viewMode === 'list') && filteredLinks.length > 0 && (searchingLibrary || checkingLibrary) && (
                         <div className="flex items-center gap-2 mb-4 text-xs" aria-live="polite">
                             {/* Same sentence as Ask's first drafting beat, so it
                                 gets the same orb — a library search looks like a
                                 library search wherever it happens. */}
                             <CitationMark state="searching" size={20} />
-                            <span className="text-text-muted font-medium">Searching your library…</span>
+                            <span className="text-text-muted font-medium">{searchingLibrary ? 'Searching your library…' : 'Checking your whole library…'}</span>
                         </div>
                     )}
                     {viewMode === 'collection' ? (
@@ -3283,12 +3430,12 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             // end: one quiet line — no icon tile, no heading, no
                             // Clear CTA (the bar's own × already clears). The full
                             // empty state below is for SETTLED states only.
-                            if (searchQuery && (searchingLibrary || searchingMeaning)) {
+                            if ((searchQuery && (searchingLibrary || searchingMeaning)) || checkingLibrary) {
                                 return (
                                     <div className="flex items-center justify-center gap-2 py-24 px-6 animate-fade-in">
                                         <span className="text-accent"><CitationMark state="searching" size={18} /></span>
                                         <span className="text-sm font-medium text-text-muted">
-                                            {searchingLibrary ? 'Searching your library…' : 'Searching by meaning…'}
+                                            {checkingLibrary ? 'Checking your whole library…' : searchingLibrary ? 'Searching your library…' : 'Searching by meaning…'}
                                         </span>
                                     </div>
                                 );
@@ -3406,6 +3553,15 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                     Ask Machina instead
                                 </button>
                             )}
+                            {/* Only the loaded pages were checked (the full-library
+                                fetch failed, or this view never asks for it): older
+                                cards may still match, so this is not a verdict yet.
+                                Reminders is complete without it (useLinks keeps
+                                every pending one live). */}
+                            {hasMore && filter !== 'reminders'
+                                && !((filtersNeedLibrary || searchQuery.trim()) && libraryLinks.length > 0) && (
+                                <LoadMoreSentinel hasMore onLoadMore={loadMore} />
+                            )}
                         </div>
                             );
                         })()
@@ -3452,7 +3608,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                 (meaningSplit) — the rows below it share no word
                                 with the query. -1 while not searching, so the
                                 list is untouched off search. */}
-                            {filteredLinks.flatMap((link, idx) => {
+                            {shownLinks.flatMap((link, idx) => {
                                 // cv-card: off-screen rows skip layout/paint (3.15).
                                 const row = (
                                     <div key={link.id} className="cv-card">
@@ -3480,7 +3636,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                 const divider = dividerAt(idx);
                                 return divider ? [divider, row] : row;
                             })}
-                            <LoadMoreSentinel hasMore={hasMore} onLoadMore={loadMore} />
+                            <LoadMoreSentinel hasMore={moreToShow || (hasMore && !libraryCoversView)} onLoadMore={handleLoadMore} />
                         </div>
                     ) : (
                         <>
@@ -3533,7 +3689,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                 </Fragment>
                             ));
                         })()}
-                        <LoadMoreSentinel hasMore={hasMore} onLoadMore={loadMore} />
+                        <LoadMoreSentinel hasMore={moreToShow || (hasMore && !libraryCoversView)} onLoadMore={handleLoadMore} />
                         </>
                     )}
                 </div>
@@ -3633,12 +3789,12 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
             )}
 
             {/* Digest detail — mobile full-screen place (Task B). Back returns to
-                the Today list. */}
+                the Revisit list. */}
             {viewMode === 'digestDetail' && (
                 <div className="sm:hidden fixed inset-x-0 top-0 z-50 bg-background flex flex-col animate-fade-in transition-[bottom] duration-300 [transition-timing-function:var(--ease-modal)]" style={{ bottom: overlayBottom }}>
                     <MobileSubheader
                         onBack={closeDigestToList}
-                        backLabel="Back to Today"
+                        backLabel="Back to Revisit"
                         icon={<Newspaper className="w-5 h-5" />}
                         title={digestDetailTitle}
                     />

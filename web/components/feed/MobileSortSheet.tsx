@@ -1,6 +1,7 @@
 'use client';
 
 import { X, Check, ArrowUpDown } from 'lucide-react';
+import { useSheetA11y } from './useSheetA11y';
 import { useSheetDrag } from '@/lib/useSheetDrag';
 import type { SortType } from '@/lib/useFeedFilters';
 
@@ -24,29 +25,34 @@ export default function MobileSortSheet({
     sortOptions: { value: string; label: string }[];
 }) {
     const { sheetRef, scrimRef, handleProps } = useSheetDrag({ onClose });
+    const { titleId, closeRef } = useSheetA11y(isOpen, onClose);
     if (!isOpen) return null;
     return (
         <div className="sm:hidden fixed inset-0 z-50 flex flex-col justify-end isolate">
             <div
                 ref={scrimRef}
-                className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
+                className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fade-in"
                 onClick={onClose}
             />
             <div
                 ref={sheetRef}
-                className="relative bg-background rounded-t-3xl border-t border-border-subtle shadow-2xl px-5 pt-3 pb-8 animate-in slide-in-from-bottom duration-300"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby={titleId}
+                className="relative bg-background rounded-t-3xl border-t border-border-subtle shadow-2xl px-5 pt-3 pb-8 animate-slide-up"
             >
                 <div {...handleProps}>
                     <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-text-muted/30" />
                     <div className="flex items-center justify-between mb-4">
-                        <h3 className="flex items-center gap-2 text-base font-bold text-text">
+                        <h3 id={titleId} className="flex items-center gap-2 text-base font-bold text-text">
                             <ArrowUpDown className="w-4 h-4 text-text-muted" />
                             Sort by
                         </h3>
                         <button
+                            ref={closeRef}
                             onClick={onClose}
                             aria-label="Close sort"
-                            className="p-1.5 rounded-full text-text-muted hover:text-text hover:bg-card-hover transition-colors"
+                            className="relative p-1.5 rounded-full text-text-muted hover:text-text hover:bg-card-hover transition-colors after:absolute after:-inset-1.5"
                         >
                             <X className="w-5 h-5" />
                         </button>

@@ -9,6 +9,10 @@ import { reportError } from '@/lib/errorReporter';
 /** One page of the growing feed window (report 3.15). */
 const PAGE_SIZE = 150;
 
+/** Reconnect backoff for a page listener that errored: 1s, 2s, 4s… capped. */
+const RETRY_BASE_MS = 1000;
+const RETRY_MAX_MS = 60_000;
+
 /**
  * Real-time Firestore subscription for the user's links, plus the pull-to-refresh
  * authoritative re-read.
@@ -49,7 +53,15 @@ export function useLinks(uid: string | null | undefined, toast: ReturnType<typeo
     const [refreshedTop, setRefreshedTop] = useState<Link[] | null>(null);
     // Docs the backend has flagged `reminderDue` — see the second subscription.
     const [reminderLinks, setReminderLinks] = useState<Link[]>([]);
+    // Docs with a reminder still scheduled — see the third subscription.
+    const [pendingReminderLinks, setPendingReminderLinks] = useState<Link[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    // Reconnect state for page listeners that errored (see the error callback):
+    // bumping the tick re-runs the page effect, which re-opens every page that
+    // no longer has a listener. Rounds counts consecutive failed rounds.
+    const [retryTick, setRetryTick] = useState(0);
+    const retryRoundsRef = useRef(0);
+    const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // A workspace change unmounts Feed (AuthProvider gates children behind the
     // login screen), so this hook re-initializes at PAGE_SIZE on the next
@@ -76,6 +88,9 @@ export function useLinks(uid: string | null | undefined, toast: ReturnType<typeo
                 : query(linksRef, orderBy('createdAt', 'desc'), startAfter(cursors[i - 1]), limit(PAGE_SIZE));
             const page = i;
             const unsub = onSnapshot(q, (snapshot: QuerySnapshot<DocumentData>) => {
+                // Healthy again only once the SERVER answers: a re-opened
+                // listener replays the cache first, then may fail again.
+                if (!snapshot.metadata.fromCache) retryRoundsRef.current = 0;
                 pageDocsRef.current[page] = snapshot.docs;
                 setPages((prev) => {
                     const next = prev.slice();
@@ -86,19 +101,36 @@ export function useLinks(uid: string | null | undefined, toast: ReturnType<typeo
                 setIsLoading(false);
             }, (error: Error) => {
                 reportError(error, 'useLinks-snapshot');
-                toast.error("Lost connection to your library. Reconnecting…");
                 setIsLoading(false);
+                // Firestore ends a listener after its error callback, so the
+                // page would never update again while the toast promised a
+                // reconnect. Forget this one (the cards already loaded stay on
+                // screen) and re-open it after a capped backoff; pages failing
+                // together share one timer, and one toast per failed streak.
+                if (subs.get(page)?.key === key) subs.delete(page);
+                if (retryTimerRef.current !== null) return;
+                const round = retryRoundsRef.current++;
+                if (round === 0) toast.error("Lost connection to your library. Reconnecting…");
+                retryTimerRef.current = setTimeout(() => {
+                    retryTimerRef.current = null;
+                    setRetryTick((t) => t + 1);
+                }, Math.min(RETRY_MAX_MS, RETRY_BASE_MS * 2 ** round));
             });
             subs.set(i, { key, unsub });
         }
-    }, [uid, cursors, toast]);
+    }, [uid, cursors, toast, retryTick]);
 
-    // Tear every page listener down when the workspace goes away / on unmount.
+    // Tear every page listener (and a pending reconnect) down when the
+    // workspace goes away / on unmount.
     useEffect(() => {
         const subs = subsRef.current;
         return () => {
             subs.forEach((s) => s.unsub());
             subs.clear();
+            if (retryTimerRef.current !== null) {
+                clearTimeout(retryTimerRef.current);
+                retryTimerRef.current = null;
+            }
         };
     }, [uid]);
 
@@ -117,6 +149,12 @@ export function useLinks(uid: string | null | undefined, toast: ReturnType<typeo
         }
         return out;
     }, [pages, refreshedTop]);
+
+    // Ids on a loaded page. A page keeps its cards live; a card held only by
+    // the reminder overlays below can drop out of `links` while it is open
+    // (clearing or cancelling the reminder does exactly that), so Feed
+    // listens to such a card on its own.
+    const windowIds = useMemo(() => new Set(windowLinks.map((l) => l.id)), [windowLinks]);
 
     // More on the server while the LAST page came back full. While a just-
     // requested page is still in flight, keep saying yes (loadMore no-ops).
@@ -143,15 +181,40 @@ export function useLinks(uid: string | null | undefined, toast: ReturnType<typeo
         return () => unsubscribe();
     }, [uid]);
 
-    // Merge the due-reminder docs into the window. Window docs win on id conflict
-    // (they carry the freshest snapshot); reminder docs outside the window are
-    // appended so the reminder strip and deep-links can reach old cards.
+    // Pending-reminder sync. A reminder is set on a card the user wants back,
+    // which is very often an OLD one, so the Reminders filter, its count and
+    // Revisit's later-today list (all derived from `links`) missed every
+    // scheduled reminder past the loaded pages. Same shape as the due listener
+    // above: a single-field equality query (no composite index, no orderBy),
+    // naturally small (only cards with a reminder still scheduled), merged
+    // below.
+    useEffect(() => {
+        if (!uid) return;
+        const linksRef = collection(db, 'users', uid, 'links');
+        const q = query(linksRef, where('reminderStatus', '==', 'pending'));
+        const unsubscribe = onSnapshot(q, (snapshot: QuerySnapshot<DocumentData>) => {
+            setPendingReminderLinks(snapshot.docs.map(toLink));
+        }, (error: Error) => {
+            reportError(error, 'useLinks-pending-reminders');
+        });
+        return () => unsubscribe();
+    }, [uid]);
+
+    // Merge the reminder docs (due, then pending) into the window. Window docs
+    // win on id conflict (they carry the freshest snapshot); reminder docs
+    // outside the window are appended so the reminder strip, the Reminders
+    // view and deep-links can reach old cards.
     const links = useMemo(() => {
-        if (reminderLinks.length === 0) return windowLinks;
+        if (reminderLinks.length === 0 && pendingReminderLinks.length === 0) return windowLinks;
         const seen = new Set(windowLinks.map((l) => l.id));
-        const extra = reminderLinks.filter((l) => !seen.has(l.id));
+        const extra: Link[] = [];
+        for (const l of reminderLinks.concat(pendingReminderLinks)) {
+            if (seen.has(l.id)) continue;
+            seen.add(l.id);
+            extra.push(l);
+        }
         return extra.length ? windowLinks.concat(extra) : windowLinks;
-    }, [windowLinks, reminderLinks]);
+    }, [windowLinks, reminderLinks, pendingReminderLinks]);
 
     // Open the next page after the last card currently loaded. A no-op until
     // the last page has arrived full (the sentinel can fire twice in a row),
@@ -197,5 +260,5 @@ export function useLinks(uid: string | null | undefined, toast: ReturnType<typeo
         }
     };
 
-    return { links, isLoading, handlePullRefresh, loadMore, hasMore };
+    return { links, windowIds, isLoading, handlePullRefresh, loadMore, hasMore };
 }

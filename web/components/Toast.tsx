@@ -50,18 +50,30 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         info: (m, action) => push(m, 'info', action),
     }), [push]);
 
+    // Errors interrupt (an assertive alert region); confirmations wait their
+    // turn (a polite status region). Both regions stay mounted while empty, so
+    // a screen reader is already listening when a toast lands in one.
+    const errors = toasts.filter((t) => t.variant === 'error');
+    const others = toasts.filter((t) => t.variant !== 'error');
+    const region = 'w-full flex flex-col items-center gap-2';
+
     return (
         <ToastContext.Provider value={value}>
             {children}
             <div
-                className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[200] flex flex-col items-center gap-2 w-[calc(100%-2rem)] max-w-sm pointer-events-none"
+                className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[200] flex flex-col items-center w-[calc(100%-2rem)] max-w-sm pointer-events-none"
                 style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-                role="status"
-                aria-live="polite"
             >
-                {toasts.map((t) => (
-                    <Toast key={t.id} item={t} onDismiss={() => remove(t.id)} />
-                ))}
+                <div role="alert" aria-live="assertive" className={region}>
+                    {errors.map((t) => (
+                        <Toast key={t.id} item={t} onDismiss={remove} />
+                    ))}
+                </div>
+                <div role="status" aria-live="polite" className={`${region} ${errors.length && others.length ? 'mt-2' : ''}`}>
+                    {others.map((t) => (
+                        <Toast key={t.id} item={t} onDismiss={remove} />
+                    ))}
+                </div>
             </div>
         </ToastContext.Provider>
     );
@@ -75,38 +87,40 @@ const VARIANTS: Record<ToastVariant, { icon: typeof Info; accent: string; stroke
     info: { icon: Info, accent: 'text-accent' },
 };
 
-function Toast({ item, onDismiss }: { item: ToastItem; onDismiss: () => void }) {
-    // A confirmation is brief: it shouldn't hang around after it's been read.
-    // Errors linger longer. A toast carrying an action ("Undo", "Open") stays
-    // 8 s: it is asking to be tapped, and 4.5 s was too short to reach it
-    // (WCAG 2.2.1). Hovering or focusing a toast pauses it.
+/** After a pause, a toast always gets at least this long to be read again. */
+const RESUME_MIN_MS = 1500;
+
+function Toast({ item, onDismiss }: { item: ToastItem; onDismiss: (id: number) => void }) {
+    // Errors linger a bit longer since they may need action; everything else is
+    // brief — a confirmation shouldn't hang around after it's been read. A toast
+    // carrying an action (Undo, Open) gets the longest beat: it is asking to be
+    // tapped, and 4.5s was too short to read it and reach it.
     const duration = item.action ? 8000 : item.variant === 'error' ? 6000 : 2400;
-    const [paused, setPaused] = useState(false);
-    // Time left, carried across pauses and across re-renders (the provider
-    // hands a fresh onDismiss each render, which re-runs the effect).
-    const remaining = useRef(duration);
+    // Held open while the pointer is on it or focus is in it, so reaching for
+    // Undo (or reading slowly, or tabbing to it) never races the timer.
+    const [hovered, setHovered] = useState(false);
+    const [focused, setFocused] = useState(false);
+    const paused = hovered || focused;
+    const remainingRef = useRef(duration);
 
     useEffect(() => {
         if (paused) return;
         const started = Date.now();
-        const timer = setTimeout(onDismiss, Math.max(0, remaining.current));
+        const timer = setTimeout(() => onDismiss(item.id), remainingRef.current);
         return () => {
             clearTimeout(timer);
-            remaining.current -= Date.now() - started;
+            remainingRef.current = Math.max(RESUME_MIN_MS, remainingRef.current - (Date.now() - started));
         };
-    }, [paused, onDismiss]);
+    }, [paused, item.id, onDismiss]);
 
     const { icon: Icon, accent, strokeWidth } = VARIANTS[item.variant];
 
     return (
         <div
-            // An error interrupts (assertive); everything else waits its turn
-            // in the polite region around the stack.
-            role={item.variant === 'error' ? 'alert' : undefined}
-            onMouseEnter={() => setPaused(true)}
-            onMouseLeave={() => setPaused(false)}
-            onFocus={() => setPaused(true)}
-            onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setPaused(false); }}
+            onPointerEnter={() => setHovered(true)}
+            onPointerLeave={() => setHovered(false)}
+            onFocus={() => setFocused(true)}
+            onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocused(false); }}
             className="pointer-events-auto w-full flex items-start gap-3 bg-card border border-border-strong rounded-xl px-4 py-3 shadow-2xl backdrop-blur-lg animate-slide-up"
         >
             <Icon className={`w-5 h-5 shrink-0 mt-0.5 ${accent}`} strokeWidth={strokeWidth} aria-hidden="true" />
@@ -114,16 +128,18 @@ function Toast({ item, onDismiss }: { item: ToastItem; onDismiss: () => void }) 
             {item.action && (
                 <button
                     type="button"
-                    onClick={() => { item.action?.onClick(); onDismiss(); }}
+                    onClick={() => { item.action?.onClick(); onDismiss(item.id); }}
                     className="shrink-0 -my-0.5 px-2.5 py-1 rounded-lg text-sm font-bold text-accent hover:bg-accent/10 transition-colors"
                 >
                     {item.action.label}
                 </button>
             )}
+            {/* 24px glyph, 44pt target: the ::after reaches the toast's edge and
+                stops short of the action button. */}
             <button
                 type="button"
-                onClick={onDismiss}
-                className="relative p-1 -m-1 rounded-full text-text-muted hover:text-text transition-colors after:absolute after:-inset-2.5 after:content-['']"
+                onClick={() => onDismiss(item.id)}
+                className="relative p-1 -m-1 rounded-full text-text-muted hover:text-text transition-colors after:absolute after:-inset-y-2.5 after:-start-2 after:-end-3"
                 aria-label="Dismiss notification"
             >
                 <X className="w-4 h-4" />

@@ -212,7 +212,7 @@ function Card({
                     {failed ? (
                         <div className="flex-grow space-y-2">
                             <p className="text-sm text-text-secondary">
-                                Your link is safe: the AI analysis didn’t finish. Retry to try again, or open the original.
+                                Your link is safe: Machina couldn’t finish reading it. Tap Retry, or open the original.
                             </p>
                             {/* The backend writes the real failure into `error`
                                 (process_link_background's except / the janitor).
@@ -282,19 +282,17 @@ function Card({
 
     return (
         <>
+        {/* The whole card opens on tap, through ONE real control: the title
+            button below, whose ::after overlay covers the card. An onClick on
+            the <article> gave keyboard users no way in and VoiceOver no
+            "button"; every other control on the card sits above that overlay
+            (z-10 and up), so tap behavior is unchanged. */}
         <article
             style={{ ['--enter-delay' as string]: enterDelay }}
-            className={`group surface-card animate-card-enter bg-card rounded-[20px] border shadow-[var(--shadow-card)] transition-all duration-300 ease-[var(--ease-spring)] cursor-pointer relative flex flex-col items-stretch h-full [@media(hover:hover)]:hover:-translate-y-1 [@media(hover:hover)]:hover:shadow-[var(--shadow-card-hover)] ${isSelected
+            className={`group surface-card animate-card-enter bg-card rounded-[20px] border shadow-[var(--shadow-card)] transition-all duration-300 ease-[var(--ease-spring)] relative flex flex-col items-stretch h-full [@media(hover:hover)]:hover:-translate-y-1 [@media(hover:hover)]:hover:shadow-[var(--shadow-card-hover)] ${isSelected
                 ? 'border-accent bg-accent/5 ring-1 ring-accent'
                 : 'border-border-subtle hover:border-accent/30'
                 } ${link.isRead ? 'opacity-60 grayscale-[0.3]' : ''} ${isEditingCategory ? 'overflow-visible z-50' : 'overflow-hidden'}`}
-            onClick={() => {
-                if (isSelectionMode && onToggleSelection) {
-                    onToggleSelection(link.id);
-                } else {
-                    onOpenDetails(link);
-                }
-            }}
         >
             {/* Video thumbnail header — a short banner (matches the shorter thumb in
                 the open card) rather than a full 16:9 block. YouTube and social video
@@ -350,8 +348,12 @@ function Card({
                 overlays the top of the image on photo cards. z above the
                 thumbnail; pointer-events off until hover so it never steals the
                 image's click-to-open target. Pinned to dir="ltr" so the button
-                order is IDENTICAL on every card regardless of the card's own dir. */}
-            <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 absolute top-2.5 left-1/2 -translate-x-1/2 z-30 pointer-events-none group-hover:pointer-events-auto">
+                order is IDENTICAL on every card regardless of the card's own dir.
+                Shown for keyboard focus too (focus-visible, so a mouse click on
+                a card control doesn't leave it pinned open), and gone entirely
+                on touch screens (the ⋯ menu serves those): invisible, it still
+                put eight unseen buttons per card in VoiceOver's path. */}
+            <div className="opacity-0 group-hover:opacity-100 group-has-[:focus-visible]:opacity-100 transition-opacity duration-200 absolute top-2.5 left-1/2 -translate-x-1/2 z-30 pointer-events-none group-hover:pointer-events-auto group-has-[:focus-visible]:pointer-events-auto [@media(hover:none)]:hidden">
                 <div dir="ltr" className="flex items-center gap-1 bg-card/90 backdrop-blur-md border border-border-strong p-1 rounded-full shadow-xl">
                     {/* Only render as a link for real http(s) URLs — never make a
                         stored javascript:/data: value clickable. */}
@@ -556,6 +558,7 @@ function Card({
                         {/* Private marker — icon only, matching the collection tiles. */}
                         {link.isPrivate && (
                             <span
+                                role="img"
                                 aria-label="Private"
                                 title="Private"
                                 className="flex items-center justify-center w-6 h-6 rounded-full bg-fill-subtle border border-border-strong text-text-muted shrink-0"
@@ -581,7 +584,7 @@ function Card({
                                 }}
                                 aria-label="Remove from favorites"
                                 title="Remove from favorites"
-                                className="flex items-center justify-center w-6 h-6 rounded-full text-yellow-500 shrink-0"
+                                className="relative flex items-center justify-center w-6 h-6 rounded-full text-yellow-500 shrink-0 after:absolute after:-inset-2.5"
                             >
                                 <Star className="w-3.5 h-3.5 fill-yellow-500" />
                             </button>
@@ -590,25 +593,40 @@ function Card({
                     </div>
 
                     {/* Touch-only actions trigger: hover actions are unreachable on a
-                        phone, so coarse-pointer devices get a persistent menu button. */}
+                        phone, so coarse-pointer devices get a persistent menu button.
+                        A 28px glyph circle inside a 44pt hit area (the ::after). */}
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
                             setIsSheetOpen(true);
                         }}
                         aria-label="Actions"
-                        className="hidden [@media(hover:none)]:flex items-center justify-center p-1.5 -me-1 ms-1 rounded-full text-text-muted hover:text-text active:bg-fill-strong z-20 flex-shrink-0"
+                        className="relative hidden [@media(hover:none)]:flex items-center justify-center p-1.5 -me-1 ms-1 rounded-full text-text-muted hover:text-text active:bg-fill-strong z-20 flex-shrink-0 after:absolute after:-inset-2"
                     >
                         <MoreHorizontal className="w-4 h-4" />
                     </button>
                 </div>
 
-                {/* Title - NO LINE CLAMP */}
+                {/* Title - NO LINE CLAMP. Its button is the card's tap target
+                    (the ::after covers the whole card, see the <article>). In
+                    selection mode it is a checkbox, so the selected state is
+                    announced, not only colored. */}
                 <h3
                     dir="auto"
                     className={`font-bold text-base sm:text-lg text-text transition-colors leading-tight ${isRtl ? 'text-right' : ''}`}
                 >
-                    {link.title}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            if (isSelectionMode && onToggleSelection) onToggleSelection(link.id);
+                            else onOpenDetails(link);
+                        }}
+                        role={isSelectionMode ? 'checkbox' : undefined}
+                        aria-checked={isSelectionMode ? isSelected : undefined}
+                        className="block w-full [text-align:inherit] cursor-pointer focus-visible:outline-none after:absolute after:inset-0 after:rounded-[20px] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-accent"
+                    >
+                        {link.title}
+                    </button>
                 </h3>
 
                 {/* Summary - Structured display */}
@@ -655,9 +673,9 @@ function Card({
                                         e.stopPropagation();
                                         onTagClick?.(tag);
                                     }}
-                                    className="inline-flex items-center text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-fill-subtle text-text-muted/60 group-hover:text-accent group-hover:bg-accent/10 hover:!bg-accent/20 hover:!text-accent active:scale-95 transition-all border border-transparent group-hover:border-accent/10 cursor-pointer"
+                                    className="relative z-10 inline-flex items-center text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-fill-subtle text-text-muted/60 group-hover:text-accent group-hover:bg-accent/10 hover:!bg-accent/20 hover:!text-accent active:scale-95 transition-all border border-transparent group-hover:border-accent/10 cursor-pointer after:absolute after:-inset-x-[3px] after:-inset-y-2"
                                 >
-                                    {parents && <span className="opacity-40 font-normal mr-0.5">{parents}/</span>}
+                                    {parents && <span className="opacity-40 font-normal me-0.5">{parents}/</span>}
                                     {leaf}
                                 </button>
                             );
@@ -715,7 +733,7 @@ function Card({
                             ) : link.captureQuality === 'partial'
                                 && link.sourceType !== 'image'
                                 && link.sourceType !== 'note' && (
-                                <span title="Partial capture" aria-label="Partial capture" className="flex items-center">
+                                <span role="img" title="Partial capture" aria-label="Partial capture" className="flex items-center">
                                     <EyeOff className="w-3 h-3" />
                                 </span>
                             )}

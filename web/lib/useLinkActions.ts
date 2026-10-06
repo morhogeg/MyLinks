@@ -160,9 +160,12 @@ export function useLinkActions(
     const handleGenerateSummary = useCallback(async (id: string, text: string) => {
         if (!uid) return null;
         const result = await generateCardSummary(uid, id, text);
-        if (!result) toast.error("Couldn't write a summary. Please try again.");
+        // Stored on the card, so a copy outside the live window must carry it
+        // too, or the next open shows the button again and pays for another.
+        if (result) localEdit(id, result);
+        else toast.error("Couldn't write a summary. Please try again.");
         return result;
-    }, [uid, toast]);
+    }, [uid, toast, localEdit]);
 
     // Retry analysis for a failed capture card (M3). Optimistically flips the card
     // back to `processing` and re-runs analysis in place; on failure it returns to

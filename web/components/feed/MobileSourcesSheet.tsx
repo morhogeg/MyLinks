@@ -4,6 +4,7 @@ import { useState, type Dispatch, type SetStateAction } from 'react';
 import { X, Search, Globe } from 'lucide-react';
 import SourceFacetList from '../SourceFacetList';
 import { sourceMatchesQuery, type SourceFacet } from '@/lib/source';
+import { useSheetA11y } from './useSheetA11y';
 import { useSheetDrag, useIsMobile } from '@/lib/useSheetDrag';
 
 /**
@@ -34,6 +35,7 @@ export default function MobileSourcesSheet({
 }) {
     const isMobile = useIsMobile();
     const { sheetRef, scrimRef, handleProps } = useSheetDrag({ onClose, enabled: isMobile });
+    const { titleId, closeRef } = useSheetA11y(isOpen, onClose);
     const [query, setQuery] = useState('');
     if (!isOpen) return null;
 
@@ -45,17 +47,20 @@ export default function MobileSourcesSheet({
         <div className="fixed inset-0 z-50 flex flex-col justify-end sm:items-center sm:justify-center sm:p-4 isolate">
             <div
                 ref={scrimRef}
-                className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
+                className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fade-in"
                 onClick={onClose}
             />
             <div
                 ref={sheetRef}
-                className="relative bg-background rounded-t-3xl border-t border-border-subtle shadow-2xl px-5 pt-3 pb-8 max-h-[85vh] flex flex-col animate-in slide-in-from-bottom duration-300 sm:rounded-3xl sm:border sm:max-w-md sm:w-full sm:max-h-[70vh] sm:pb-6"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby={titleId}
+                className="relative bg-background rounded-t-3xl border-t border-border-subtle shadow-2xl px-5 pt-3 pb-8 max-h-[85vh] flex flex-col animate-slide-up sm:rounded-3xl sm:border sm:max-w-md sm:w-full sm:max-h-[70vh] sm:pb-6"
             >
                 <div {...handleProps}>
                     <div className="sm:hidden mx-auto mb-3 h-1 w-10 rounded-full bg-text-muted/30" />
                     <div className="flex items-center justify-between mb-4">
-                        <h3 className="flex items-center gap-2 text-base font-bold text-text">
+                        <h3 id={titleId} className="flex items-center gap-2 text-base font-bold text-text">
                             <Globe className="w-4 h-4 text-text-muted" />
                             Sources
                         </h3>
@@ -69,9 +74,10 @@ export default function MobileSourcesSheet({
                                 </button>
                             )}
                             <button
+                                ref={closeRef}
                                 onClick={onClose}
                                 aria-label="Close sources"
-                                className="p-1.5 rounded-full text-text-muted hover:text-text hover:bg-card-hover transition-colors"
+                                className="relative p-1.5 rounded-full text-text-muted hover:text-text hover:bg-card-hover transition-colors after:absolute after:-inset-1.5"
                             >
                                 <X className="w-5 h-5" />
                             </button>
