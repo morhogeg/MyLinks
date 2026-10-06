@@ -339,9 +339,9 @@ function ListCard({
                                 onStatusChange(link.id, 'unread', { from: 'favorite' });
                             }}
                             aria-label="Remove from favorites"
-                            className="shrink-0 w-9 h-11 flex items-center justify-center rounded-lg text-yellow-500 transition-colors"
+                            className="shrink-0 w-9 h-11 flex items-center justify-center rounded-lg text-star transition-colors"
                         >
-                            <Star className="w-4 h-4 fill-yellow-500" />
+                            <Star className="w-4 h-4 fill-star" />
                         </button>
                     )}
 

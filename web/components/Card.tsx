@@ -189,18 +189,18 @@ function Card({
         })();
         return (
             <article
-                className={`surface-card animate-card-enter bg-card rounded-[20px] border shadow-[var(--shadow-card)] relative flex flex-col h-full overflow-hidden ${failed ? 'border-red-500/30' : 'border-border-subtle'
+                className={`surface-card animate-card-enter bg-card rounded-[20px] border shadow-[var(--shadow-card)] relative flex flex-col h-full overflow-hidden ${failed ? 'border-danger/30' : 'border-border-subtle'
                     }`}
                 aria-busy={!failed}
             >
                 <div className="p-4 sm:p-5 flex flex-col h-full space-y-3">
                     <div className="flex items-center gap-2">
                         {failed ? (
-                            <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+                            <AlertTriangle className="w-4 h-4 text-danger shrink-0" />
                         ) : (
                             <CitationMark state="working" size={20} />
                         )}
-                        <span className={`text-[10px] uppercase font-black tracking-widest ${failed ? 'text-red-400' : 'text-accent'}`}>
+                        <span className={`text-[10px] uppercase font-black tracking-widest ${failed ? 'text-danger' : 'text-accent'}`}>
                             {failed ? 'Couldn’t analyze' : queued ? 'Queued' : 'Saving…'}
                         </span>
                     </div>
@@ -268,7 +268,7 @@ function Card({
                                 <button
                                     onClick={(e) => { e.stopPropagation(); onDelete(link.id); }}
                                     aria-label="Delete"
-                                    className="p-1.5 rounded-full text-text-muted hover:text-red-500 transition-all"
+                                    className="p-1.5 rounded-full text-text-muted hover:text-danger transition-all"
                                 >
                                     <Trash2 className="w-3.5 h-3.5" />
                                 </button>
@@ -390,10 +390,10 @@ function Card({
                             onStatusChange(link.id, link.status === 'favorite' ? 'unread' : 'favorite', { from: link.status });
                         }}
                         title={link.status === 'favorite' ? 'Remove from favorites' : 'Add to favorites'}
-                        className={`p-1.5 rounded-full transition-all flex items-center justify-center ${link.status === 'favorite' ? 'text-yellow-500 bg-yellow-500/10' : 'text-text-muted hover:text-accent'
+                        className={`p-1.5 rounded-full transition-all flex items-center justify-center ${link.status === 'favorite' ? 'text-star bg-star/10' : 'text-text-muted hover:text-accent'
                             }`}
                     >
-                        <Star className={`w-3 h-3 ${link.status === 'favorite' ? 'fill-yellow-500' : ''}`} />
+                        <Star className={`w-3 h-3 ${link.status === 'favorite' ? 'fill-star' : ''}`} />
                     </button>
                     <button
                         onClick={(e) => {
@@ -464,7 +464,7 @@ function Card({
                             onDelete(link.id);
                         }}
                         title="Delete"
-                        className="p-1.5 rounded-full text-text-muted hover:text-red-500 transition-all flex items-center justify-center"
+                        className="p-1.5 rounded-full text-text-muted hover:text-danger transition-all flex items-center justify-center"
                     >
                         <Trash2 className="w-3 h-3" />
                     </button>
@@ -584,9 +584,9 @@ function Card({
                                 }}
                                 aria-label="Remove from favorites"
                                 title="Remove from favorites"
-                                className="relative flex items-center justify-center w-6 h-6 rounded-full text-yellow-500 shrink-0 after:absolute after:-inset-2.5"
+                                className="relative flex items-center justify-center w-6 h-6 rounded-full text-star shrink-0 after:absolute after:-inset-2.5"
                             >
-                                <Star className="w-3.5 h-3.5 fill-yellow-500" />
+                                <Star className="w-3.5 h-3.5 fill-star" />
                             </button>
                         )}
                         <SourceByline link={link} />

@@ -2090,8 +2090,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     const statusOptions = [
         { value: 'all', label: 'All', icon: <Inbox className="w-4 h-4 text-text-secondary" /> },
         { value: 'unread', label: 'Unread', icon: <Inbox className="w-4 h-4 text-accent" /> },
-        { value: 'read', label: 'Read', icon: <CheckCircle2 className="w-4 h-4 text-green-500" /> },
-        { value: 'favorite', label: 'Favorites', icon: <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" /> },
+        { value: 'read', label: 'Read', icon: <CheckCircle2 className="w-4 h-4 text-success" /> },
+        { value: 'favorite', label: 'Favorites', icon: <Star className="w-4 h-4 text-star fill-star" /> },
         // Reminders lives here as a Show option (was a separate toolbar button).
         { value: 'reminders', label: reminderCount > 0 ? `Reminders (${reminderCount})` : 'Reminders', icon: <Bell className="w-4 h-4 text-blue-500" /> },
         { value: 'archived', label: 'Archived', icon: <Archive className="w-4 h-4 text-text-secondary" /> },
@@ -2428,7 +2428,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             <span className="shrink-0 whitespace-nowrap text-[13px] sm:text-[14px] font-medium text-text-muted tabular-nums" dir="ltr">· {count} {count === 1 ? 'card' : 'cards'}</span>
                         )}
                         {openCol.isPublic && (
-                            <span className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide ${stale ? 'bg-amber-500/15 text-amber-600' : 'bg-accent/10 text-accent'}`}>
+                            <span className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide ${stale ? 'bg-warning/15 text-warning' : 'bg-accent/10 text-accent'}`}>
                                 <Globe className="w-3 h-3" /> {stale ? 'Update page' : 'Shared'}
                             </span>
                         )}

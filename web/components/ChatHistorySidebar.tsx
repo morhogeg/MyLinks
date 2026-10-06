@@ -186,7 +186,7 @@ function ChatRow({
                         <button
                             role="menuitem"
                             onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onRequestDelete(); }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-text-secondary hover:text-red-400 hover:bg-red-500/10 transition-colors text-start"
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-text-secondary hover:text-danger hover:bg-danger/10 transition-colors text-start"
                         >
                             <Trash2 className="w-4 h-4 shrink-0" />
                             Delete

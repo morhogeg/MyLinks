@@ -260,7 +260,7 @@ export default function ShareCollectionSheet({
                             {/* Live status + the link itself. */}
                             <div className="rounded-xl bg-fill-subtle px-3.5 py-3 space-y-2.5">
                                 <div className="flex items-center gap-2 text-xs font-semibold">
-                                    <span className="flex items-center gap-1.5 text-green-500">
+                                    <span className="flex items-center gap-1.5 text-success">
                                         <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
                                         Public
                                     </span>
@@ -277,7 +277,7 @@ export default function ShareCollectionSheet({
                                         aria-label="Copy link"
                                         className="flex items-center justify-center w-9 h-9 rounded-lg bg-card border border-border-subtle text-text-muted hover:text-accent hover:border-accent/40 transition-colors shrink-0"
                                     >
-                                        {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                                        {copied ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}
                                     </button>
                                 </div>
                             </div>
@@ -285,7 +285,7 @@ export default function ShareCollectionSheet({
                             {/* Drift between the live collection and the frozen snapshot. */}
                             {stale && (
                                 <div className="flex items-start gap-2.5 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3.5 py-3">
-                                    <RefreshCw className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                                    <RefreshCw className="w-4 h-4 text-warning shrink-0 mt-0.5" />
                                     <div className="flex-1 text-[13px] text-text leading-snug">
                                         This collection changed since you published. The public page still shows the old version.
                                     </div>
@@ -319,7 +319,7 @@ export default function ShareCollectionSheet({
                             <button
                                 onClick={doUnpublish}
                                 disabled={busy !== null}
-                                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-40"
+                                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-danger hover:bg-danger/10 transition-colors disabled:opacity-40"
                             >
                                 <Lock className="w-4 h-4" />
                                 {busy === 'unpublish' ? 'Stopping…' : 'Stop sharing'}

@@ -384,7 +384,7 @@ function MenuRow({ icon, label, onClick, danger }: { icon: React.ReactNode; labe
         <button
             role="menuitem"
             onClick={onClick}
-            className={`w-full flex items-center gap-2.5 px-3 py-3 min-h-[44px] text-sm font-medium text-start transition-colors ${danger ? 'text-red-400 hover:bg-red-500/10' : 'text-text hover:bg-fill-subtle'}`}
+            className={`w-full flex items-center gap-2.5 px-3 py-3 min-h-[44px] text-sm font-medium text-start transition-colors ${danger ? 'text-danger hover:bg-danger/10' : 'text-text hover:bg-fill-subtle'}`}
         >
             <span className="shrink-0">{icon}</span>
             {/* flex-1 + text-start keeps a label that wraps to two lines (e.g.

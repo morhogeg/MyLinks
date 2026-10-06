@@ -1585,7 +1585,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                                                 ? 'px-4 py-2.5 rounded-2xl rounded-br-md bg-accent text-accent-ink text-[15px] leading-relaxed'
                                                 : m.error
                                                     // Errors keep a subtle container so they stand out.
-                                                    ? 'px-4 py-3 rounded-2xl rounded-bl-md text-[15px] leading-relaxed bg-red-500/10 border border-red-500/20 text-text whitespace-pre-wrap'
+                                                    ? 'px-4 py-3 rounded-2xl rounded-bl-md text-[15px] leading-relaxed bg-danger/10 border border-danger/20 text-text whitespace-pre-wrap'
                                                     // AI answer: plain text on the page (no bubble), like Gemini.
                                                     : `px-1 ${ANSWER_TEXT_CLS} leading-relaxed text-text`
                                         }
