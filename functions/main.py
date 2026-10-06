@@ -2441,12 +2441,17 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         # "restate" follow-up: the model re-sent the previous answer and the
         # user paid an ask for it. Answer it in one line instead, before the
         # quota meter, retrieval and any model call (search.is_social_turn).
+        # The reply is marked `social` so the client leaves it out of the
+        # recent answers whose citations it sends back as `contextIds`: a
+        # "You're welcome." cites nothing and would only push the answer the
+        # conversation is about out of that window.
         from search import is_social_turn, social_reply
         if is_social_turn(question):
             reply = social_reply(question, history)
             if want_stream:
                 def _social_stream():
                     yield "data: " + json.dumps({"type": "token", "text": reply}) + "\n\n"
+                    yield "data: " + json.dumps({"type": "social"}) + "\n\n"
                     yield "data: " + json.dumps({"type": "sources", "sources": []}) + "\n\n"
                     yield "data: " + json.dumps({"type": "done"}) + "\n\n"
 
@@ -2455,7 +2460,7 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
                                          mimetype="text/event-stream")
             return https_fn.Response(
                 json.dumps({"success": True, "answer": reply, "citedIds": [],
-                            "sources": [], "ungrounded": False}),
+                            "sources": [], "ungrounded": False, "social": True}),
                 status=200, headers=headers, mimetype='application/json')
 
         # Monthly ask quota — meter before the retrieval + paid Gemini answer.

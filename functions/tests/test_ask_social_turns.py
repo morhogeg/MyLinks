@@ -74,8 +74,9 @@ def test_endpoint_answers_thanks_without_retrieval_model_or_charge(endpoint):
     resp = main.ask_brain(_Req(json_body={"uid": "u1", "question": "thanks!", "history": _EN_HISTORY}))
     body = json.loads(resp.body)
     assert resp.status == 200
+    # `social` lets the client keep this reply out of its contextIds window.
     assert body == {"success": True, "answer": "You're welcome.", "citedIds": [],
-                    "sources": [], "ungrounded": False}
+                    "sources": [], "ungrounded": False, "social": True}
 
 
 def test_endpoint_streams_the_hebrew_reply(endpoint):
@@ -83,5 +84,56 @@ def test_endpoint_streams_the_hebrew_reply(endpoint):
                                           "stream": True}))
     events = [json.loads(line[len("data: "):]) for line in "".join(resp.body).split("\n\n") if line]
     assert events == [{"type": "token", "text": "בשמחה."},
+                      {"type": "social"},
                       {"type": "sources", "sources": []},
                       {"type": "done"}]
+
+
+# ── A thank-you is never the subject of a later follow-up (RV-1) ────────────
+# Politeness stopped being a "restate" request (above), which also stopped it
+# being skipped as a follow-up: "How do I make the maple cake?" -> "thanks" ->
+# "in Hebrew" retrieved for "thanks" and told the model the subject was
+# «thanks». A reaction turn carries no topic, so the lookup walks past it.
+
+_CAKE_Q = "How do I make the maple cake?"
+
+
+def _thread(*user_turns, first=_CAKE_Q):
+    history = [{"role": "user", "content": first},
+               {"role": "assistant", "content": "1. Preheat the oven to 180C. 2. Mix."}]
+    for turn in user_turns:
+        history += [{"role": "user", "content": turn},
+                    {"role": "assistant", "content": "You're welcome."}]
+    return history
+
+
+@pytest.mark.parametrize("reaction", [
+    "thanks", "Thank you!", "thanks a lot", "ok please", "sure", "yes", "yes please",
+    "תודה", "תודה רבה", "אוקיי", "👍",
+])
+@pytest.mark.parametrize("followup", ["in Hebrew", "shorter", "בעברית"])
+def test_a_reaction_turn_is_skipped_for_a_restate(reaction, followup):
+    out = resolve_followup(followup, _thread(reaction))
+    assert out == {"query": _CAKE_Q, "subject": _CAKE_Q, "restate": True}
+
+
+def test_a_reaction_turn_is_skipped_for_a_pointer_followup():
+    out = resolve_followup("who published this?", _thread("thanks"))
+    assert out["subject"] == _CAKE_Q
+    assert out["query"] == f"{_CAKE_Q} who published this?"
+
+
+def test_several_reactions_in_a_row_are_all_skipped():
+    out = resolve_followup("בעברית", _thread("thanks", "ok please", "תודה רבה"))
+    assert out["subject"] == _CAKE_Q
+
+
+def test_hebrew_thread_resolves_past_a_hebrew_thank_you():
+    he_q = "איך מכינים את עוגת המייפל?"
+    out = resolve_followup("תקצר", _thread("תודה רבה", first=he_q))
+    assert out["subject"] == he_q and out["restate"] is True
+
+
+def test_a_real_question_after_a_thank_you_is_still_the_subject():
+    out = resolve_followup("in Hebrew", _thread("thanks", first="thanks, and what about the pasta?"))
+    assert out["subject"] == "thanks, and what about the pasta?"

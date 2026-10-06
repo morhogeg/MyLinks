@@ -167,6 +167,16 @@ def test_the_model_is_still_asked_the_raw_question_and_history(seen):
     assert asked["cardIds"] == ["cake"]
 
 
+def test_a_thank_you_turn_is_not_the_followup_subject(seen):
+    # RV-1: "thanks" in between used to become the topic: retrieval ran for
+    # "thanks" and the prompt named «thanks» as the subject.
+    history = _HISTORY + [{"role": "user", "content": "thanks"},
+                          {"role": "assistant", "content": "You're welcome."}]
+    _ask("בעברית", history)
+    assert seen["search"] == [_ASKED]
+    assert seen["asked"][0]["followup"]["subject"] == _ASKED
+
+
 def test_a_normal_question_retrieves_for_itself_unchanged(seen):
     # The safety property, at the endpoint: a question with a topic of its own
     # is routed EXACTLY as before, whether or not a conversation precedes it.

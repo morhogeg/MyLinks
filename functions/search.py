@@ -1275,15 +1275,40 @@ def is_referential_followup(question: str) -> bool:
     return len(keyword_query_tokens(question)) <= _MAX_REFERENTIAL_TOKENS
 
 
+# Yes/no answers to the previous turn. Like politeness they name no subject,
+# so a turn made only of them is never the TOPIC a later follow-up is about.
+_AFFIRMATION_TOKENS = {
+    "yes", "yeah", "yep", "yup", "no", "nope", "nah",
+    "כן", "לא", "בטח", "ברור",
+}
+
+
+def _is_reaction_turn(text: str) -> bool:
+    """True when a user turn only reacts to the answer before it: a thank-you
+    ("thanks", "תודה רבה", "👍"), politeness ("ok please", "sure") or a yes/no.
+    It names no subject, so it can never be what a later "in Hebrew" or
+    "who published this?" is about. Politeness used to be skipped here as a
+    side effect of reading as a restate request; once it stopped being one
+    (AI-4), "thanks" became the subject of the next follow-up. Pure."""
+    if is_social_turn(text):
+        return True
+    words = {w for w in re.split(r"[\W_]+", (text or "").lower(), flags=re.UNICODE) if w}
+    reactions = _POLITENESS_TOKENS | _AFFIRMATION_TOKENS | _SOCIAL_ANCHORS
+    return bool(words & reactions) and words <= (reactions | _SOCIAL_FILLERS)
+
+
 def _last_topical_user_turn(history) -> Optional[str]:
     """The most recent user turn that stated a subject of its own — the thing a
     follow-up is really asking about. Skips turns that are themselves
-    follow-ups, so a chain of them still resolves to the real question."""
+    follow-ups, and turns that only react to an answer ("thanks", "ok",
+    "yes"), so a chain of them still resolves to the real question."""
     for item in reversed(history):
         if not isinstance(item, dict) or item.get("role") != "user":
             continue
         prior = str(item.get("content") or "").strip()
-        if prior and not is_context_free_followup(prior) and not is_referential_followup(prior):
+        if (prior and not _is_reaction_turn(prior)
+                and not is_context_free_followup(prior)
+                and not is_referential_followup(prior)):
             return prior
     return None
 
