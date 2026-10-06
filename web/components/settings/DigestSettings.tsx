@@ -162,11 +162,12 @@ export function ScheduleView({ settings, setSettings }: { settings: Settings; se
                             index={settings.digest_day}
                             onChange={(i) => setSettings((p) => ({ ...p, digest_day: i }))}
                             className="flex-[1.7]"
+                            label="Day"
                         />
                     )}
-                    <Wheel items={HOURS12} index={hourIdx} onChange={(i) => commitTime(i, minuteIdx * MINUTE_STEP, ampmIdx)} className="flex-1" />
-                    <Wheel items={MINUTES} index={minuteIdx} onChange={(i) => commitTime(hourIdx, i * MINUTE_STEP, ampmIdx)} className="flex-1" />
-                    <Wheel items={AMPM} index={ampmIdx} onChange={(i) => commitTime(hourIdx, minuteIdx * MINUTE_STEP, i)} className="flex-1" />
+                    <Wheel items={HOURS12} index={hourIdx} onChange={(i) => commitTime(i, minuteIdx * MINUTE_STEP, ampmIdx)} className="flex-1" label="Hour" />
+                    <Wheel items={MINUTES} index={minuteIdx} onChange={(i) => commitTime(hourIdx, i * MINUTE_STEP, ampmIdx)} className="flex-1" label="Minute" />
+                    <Wheel items={AMPM} index={ampmIdx} onChange={(i) => commitTime(hourIdx, minuteIdx * MINUTE_STEP, i)} className="flex-1" label="AM or PM" />
                 </div>
             </div>
             <Footnote>Your digest arrives at this time.</Footnote>

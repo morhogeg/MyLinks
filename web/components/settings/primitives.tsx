@@ -175,8 +175,17 @@ export function Segmented<T extends string>({ value, options, onChange, iconOnly
 const ITEM_H = 36;
 
 /** iOS-style drum wheel. Scroll-snaps under the centered selection band; commits
-    the settled index a beat after scrolling stops. */
-export function Wheel({ items, index, onChange, className }: { items: string[]; index: number; onChange: (i: number) => void; className?: string }) {
+    the settled index a beat after scrolling stops. For VoiceOver and the
+    keyboard it is a spinbutton: arrow keys (and VoiceOver's swipe up/down,
+    which WebKit sends as arrow keys) step it, and it reads out its value. */
+export function Wheel({ items, index, onChange, className, label }: {
+    items: string[];
+    index: number;
+    onChange: (i: number) => void;
+    className?: string;
+    /** What this wheel sets ("Hour"), for VoiceOver. */
+    label: string;
+}) {
     const ref = useRef<HTMLDivElement>(null);
     const [active, setActive] = useState(index);
     // Detent the finger has last rolled onto — drives the per-tick haptic without
@@ -209,21 +218,46 @@ export function Wheel({ items, index, onChange, className }: { items: string[]; 
         return () => { el.removeEventListener('scroll', onScroll); clearTimeout(t); };
     }, [items.length, index, onChange]);
 
+    // Step by keyboard: scroll the drum to the new row; the scroll handler
+    // above ticks and commits it exactly as a finger would.
+    const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+        const last = items.length - 1;
+        const next =
+            e.key === 'ArrowUp' ? active + 1
+            : e.key === 'ArrowDown' ? active - 1
+            : e.key === 'Home' ? 0
+            : e.key === 'End' ? last
+            : null;
+        if (next === null) return;
+        e.preventDefault();
+        const i = Math.max(0, Math.min(last, next));
+        if (ref.current) ref.current.scrollTop = i * ITEM_H;
+    };
+
     return (
         <div
             ref={ref}
-            className={`h-[180px] overflow-y-scroll snap-y snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [-webkit-overflow-scrolling:touch] [mask-image:linear-gradient(180deg,transparent,#000_26%,#000_74%,transparent)] [-webkit-mask-image:linear-gradient(180deg,transparent,#000_26%,#000_74%,transparent)] ${className || ''}`}
+            role="spinbutton"
+            tabIndex={0}
+            aria-label={label}
+            aria-valuemin={0}
+            aria-valuemax={items.length - 1}
+            aria-valuenow={active}
+            aria-valuetext={items[active]}
+            onKeyDown={onKeyDown}
+            className={`h-[180px] overflow-y-scroll snap-y snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [-webkit-overflow-scrolling:touch] [mask-image:linear-gradient(180deg,transparent,#000_26%,#000_74%,transparent)] [-webkit-mask-image:linear-gradient(180deg,transparent,#000_26%,#000_74%,transparent)] focus-visible:outline-2 focus-visible:outline-accent rounded-[10px] ${className || ''}`}
         >
-            <div className="h-[72px]" />
+            <div className="h-[72px]" aria-hidden="true" />
             {items.map((it, i) => (
                 <div
                     key={i}
+                    aria-hidden="true"
                     className={`h-[36px] snap-center flex items-center justify-center text-[22px] tabular-nums tracking-[-0.01em] transition-colors ${i === active ? 'text-text font-semibold' : 'text-text-muted'}`}
                 >
                     {it}
                 </div>
             ))}
-            <div className="h-[72px]" />
+            <div className="h-[72px]" aria-hidden="true" />
         </div>
     );
 }

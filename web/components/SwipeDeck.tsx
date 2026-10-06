@@ -109,6 +109,9 @@ export default function SwipeDeck({
     const [pos, setPos] = useState(0);
     const [drag, setDrag] = useState({ x: 0, y: 0 });
     const [phase, setPhase] = useState<Phase>('idle');
+    // Reduce Motion: the top card fades out where it is instead of flying
+    // off-screen with a spin (the graph and the header fade already honor it).
+    const [fadeExit, setFadeExit] = useState(false);
     const [lastAction, setLastAction] = useState<{ index: number; kind: ActionKind; link: Link } | null>(null);
     // Mobile-only ⓘ panel explaining the four actions (desktop gets hover tooltips).
     const [helpOpen, setHelpOpen] = useState(false);
@@ -312,6 +315,9 @@ export default function SwipeDeck({
             if (flingSeq.current === seq) finishExitRef.current();
         }, 420);
         setPhase('exiting');
+        const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+        setFadeExit(reduce);
+        if (reduce) return;
         if (dir === 'right') setDrag({ x: window.innerWidth, y: 0 });
         else if (dir === 'left') setDrag({ x: -window.innerWidth, y: 0 });
         else setDrag({ x: 0, y: -window.innerHeight });
@@ -499,6 +505,7 @@ export default function SwipeDeck({
                     const transform = isTop
                         ? `translate(${drag.x}px, ${drag.y}px) rotate(${drag.x * 0.04}deg)`
                         : `translateY(${depth * 12}px) scale(${1 - depth * 0.04})`;
+                    const fading = isTop && phase === 'exiting' && fadeExit;
 
                     return (
                         <div
@@ -510,7 +517,10 @@ export default function SwipeDeck({
                             className={`absolute inset-0 ${isTop ? 'cursor-grab active:cursor-grabbing z-30' : 'z-10'}`}
                             style={{
                                 transform,
-                                transition: phase === 'dragging' && isTop ? 'none' : 'transform 0.3s cubic-bezier(0.22,1,0.36,1)',
+                                opacity: fading ? 0 : 1,
+                                transition: phase === 'dragging' && isTop ? 'none'
+                                    : fading ? 'opacity 0.15s ease-out'
+                                    : 'transform 0.3s cubic-bezier(0.22,1,0.36,1)',
                                 touchAction: 'none',
                                 pointerEvents: isTop ? 'auto' : 'none',
                             }}

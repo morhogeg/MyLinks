@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Lock, X } from 'lucide-react';
 import {
     setPin, attemptUnlock, verifyPin, disablePin, tryBiometricUnlock,
@@ -55,6 +55,7 @@ export default function PinLockModal({
     unlockReason?: string;
 }) {
     const [step, setStep] = useState<Step>(FIRST_STEP[mode]);
+    const subtitleId = useId();
     const [value, setValue] = useState('');
     const [firstPin, setFirstPin] = useState('');
     const [error, setError] = useState<string | null>(null);
@@ -276,7 +277,11 @@ export default function PinLockModal({
                         <Lock className="w-6 h-6 text-accent" />
                     </span>
                     <h3 className="text-base font-bold text-text">{STEP_TITLE[step]}</h3>
-                    <p className="mt-1 text-[13px] text-text-muted leading-snug">{subtitle}</p>
+                    <p id={subtitleId} className="mt-1 text-[13px] text-text-muted leading-snug">{subtitle}</p>
+                    {/* The step change (Choose → Confirm) is read out, not just
+                        redrawn. Only the title is live: the subtitle's wait
+                        countdown would be announced every second. */}
+                    <span className="sr-only" aria-live="polite">{STEP_TITLE[step]}</span>
 
                     {/* The dots — a visual mirror of the hidden input's value. The
                         just-typed digit shows for a beat before masking. */}
@@ -307,13 +312,17 @@ export default function PinLockModal({
                             disabled={busy || waiting}
                             onChange={(e) => handleChange(e.target.value)}
                             aria-label={`${STEP_TITLE[step]}: ${PIN_LENGTH} digits`}
+                            aria-describedby={subtitleId}
                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                         />
                     </div>
 
-                    <p className={`mt-3 text-[12px] font-medium min-h-[1rem] ${error ? 'text-red-400' : 'text-transparent'}`}>
-                        {error ?? ' '}
-                    </p>
+                    {/* The row keeps its height either way; the error itself is
+                        an alert, so "Wrong PIN. 2 tries left." is heard, not only
+                        seen as a cleared field. */}
+                    <div className="mt-3 min-h-[1rem]">
+                        {error && <p role="alert" className="text-[12px] font-medium text-danger">{error}</p>}
+                    </div>
 
                     {step === 'verify' && reauthProvider && (
                         <button

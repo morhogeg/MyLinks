@@ -16,6 +16,11 @@ interface SimpleMarkdownProps {
  * Simple markdown renderer for AI summaries
  * Handles: ## headings, - bullet points, **bold**
  */
+/** Card summaries (compact) follow the reader's iOS Text Size like the detail
+    view does (--reading-scale, lib/useReadingScale.ts): 12px at the default
+    size, up to the same 1.35x cap. */
+const COMPACT_TEXT = 'text-[calc(0.75rem*var(--reading-scale,1))]';
+
 export default function SimpleMarkdown({ content, className = '', isCompact = false, isRtl = false, inline = false }: SimpleMarkdownProps) {
     if (!content) return null;
 
@@ -96,7 +101,7 @@ export default function SimpleMarkdown({ content, className = '', isCompact = fa
             }
 
             elements.push(
-                <h3 key={key++} dir="auto" className={`font-bold text-text uppercase tracking-wide ${isCompact ? 'text-[11px] mt-6 mb-3' : 'text-base mt-8 mb-5 border-b border-border-subtle pb-2'} ${isRtl ? 'text-right' : 'text-left'}`}>
+                <h3 key={key++} dir="auto" className={`font-bold text-text uppercase tracking-wide ${isCompact ? 'text-[calc(11px*var(--reading-scale,1))] mt-6 mb-3' : 'text-base mt-8 mb-5 border-b border-border-subtle pb-2'} ${isRtl ? 'text-right' : 'text-left'}`}>
                     {headingText}
                 </h3>
             );
@@ -153,14 +158,14 @@ export default function SimpleMarkdown({ content, className = '', isCompact = fa
 
             sentences.forEach((sentence, i) => {
                 elements.push(
-                    <p key={`${key++}-${i}`} dir="auto" className={`text-text-secondary ${isCompact ? 'mb-3 text-xs leading-relaxed' : 'mb-5 leading-relaxed'} ${isRtl ? 'text-right' : 'text-left'}`}>
+                    <p key={`${key++}-${i}`} dir="auto" className={`text-text-secondary ${isCompact ? `mb-3 ${COMPACT_TEXT} leading-relaxed` : 'mb-5 leading-relaxed'} ${isRtl ? 'text-right' : 'text-left'}`}>
                         {formatInlineStyles(sentence)}
                     </p>
                 );
             });
         } else {
             elements.push(
-                <p key={key++} dir="auto" className={`text-text-secondary ${isCompact ? 'mb-4 text-xs leading-relaxed' : 'mb-5 leading-relaxed'} ${isRtl ? 'text-right' : 'text-left'}`}>
+                <p key={key++} dir="auto" className={`text-text-secondary ${isCompact ? `mb-4 ${COMPACT_TEXT} leading-relaxed` : 'mb-5 leading-relaxed'} ${isRtl ? 'text-right' : 'text-left'}`}>
                     {formatInlineStyles(trimmed)}
                 </p>
             );

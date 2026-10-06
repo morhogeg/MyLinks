@@ -1554,13 +1554,14 @@ export default function LinkDetailModal({
                                 </span>
                             )}
                             {isReminderActive && nextReminderDate && (
-                                <span
+                                <button
+                                    type="button"
                                     onClick={handleToggleReminder}
                                     className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-accent/10 border border-accent/20 text-accent cursor-pointer hover:brightness-110 active:scale-95 transition-all"
                                 >
-                                    <Bell className="w-3.5 h-3.5" />
+                                    <Bell className="w-3.5 h-3.5" aria-hidden="true" />
                                     {isRtl ? 'תזכורת:' : 'Reminder:'} {nextReminderDate.toLocaleDateString(isRtl ? 'he-IL' : undefined)}
-                                </span>
+                                </button>
                             )}
                         </div>
 
@@ -1579,13 +1580,21 @@ export default function LinkDetailModal({
                                             {parents && <span className="opacity-30 font-normal mr-0.5">{parents}/</span>}
                                             {leaf}
                                         </span>
-                                        <X
-                                            className="w-3 h-3 ml-1 opacity-40 group-hover/tag:opacity-100 hover:text-red-400 cursor-pointer transition-all"
+                                        {/* A real button: the bare 12px icon it replaced was
+                                            not focusable and had no name. Full strength where
+                                            there is no hover (touch), quiet until hover with
+                                            a mouse. */}
+                                        <button
+                                            type="button"
+                                            aria-label={isRtl ? `הסר את התגית ${leaf}` : `Remove tag ${leaf}`}
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 onUpdateTags(link.id, link.tags.filter(t => t !== tag), link.tags);
                                             }}
-                                        />
+                                            className="relative ms-0.5 -me-1 p-1 rounded-md opacity-100 [@media(hover:hover)]:opacity-40 group-hover/tag:opacity-100 focus-visible:opacity-100 hover:text-danger cursor-pointer transition-all after:absolute after:-inset-1.5 after:content-['']"
+                                        >
+                                            <X className="w-3 h-3" aria-hidden="true" />
+                                        </button>
                                     </span>
                                 );
                             })}
@@ -1726,31 +1735,32 @@ export default function LinkDetailModal({
                                         // fused against nothing (owner, 2026-08-22).
                                         const relRtl = getDominantDirection(rel.title, isRtl ? 'rtl' : 'ltr') === 'rtl';
                                         return (
-                                        <div
+                                        <button
+                                            type="button"
                                             key={rel.id}
                                             onClick={() => onOpenOtherLink?.(rel)}
-                                            className="group p-3 rounded-xl bg-card-hover border border-border-subtle shadow-sm hover:border-accent/50 transition-all cursor-pointer"
+                                            className="group block w-full text-start p-3 rounded-xl bg-card-hover border border-border-subtle shadow-sm hover:border-accent/50 transition-all cursor-pointer"
                                         >
-                                            <div className={`flex justify-between items-start gap-3 ${relRtl ? 'flex-row-reverse' : ''}`}>
-                                                <h4
+                                            <span className={`flex justify-between items-start gap-3 ${relRtl ? 'flex-row-reverse' : ''}`}>
+                                                <span
                                                     dir={relRtl ? "rtl" : "ltr"}
-                                                    className={`flex-1 min-w-0 font-medium text-text group-hover:text-accent transition-colors text-sm ${relRtl ? 'text-right' : ''}`}
+                                                    className={`block flex-1 min-w-0 font-medium text-text group-hover:text-accent transition-colors text-sm ${relRtl ? 'text-right' : ''}`}
                                                 >
                                                     {rel.title}
-                                                </h4>
+                                                </span>
                                                 {strong && (
                                                     <span className="shrink-0 text-[10px] bg-accent/20 text-accent px-1.5 py-0.5 rounded font-mono">
                                                         strong
                                                     </span>
                                                 )}
-                                            </div>
-                                            <p
+                                            </span>
+                                            <span
                                                 dir="auto"
-                                                className="text-xs text-text-muted mt-1.5 font-normal italic text-start"
+                                                className="block text-xs text-text-muted mt-1.5 font-normal italic text-start"
                                             >
                                                 {reason}
-                                            </p>
-                                        </div>
+                                            </span>
+                                        </button>
                                         );
                                     })}
                                 </div>
