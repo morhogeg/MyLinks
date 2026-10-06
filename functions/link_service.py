@@ -755,18 +755,42 @@ def storage_key_for(uid: str) -> str:
     if cached:
         return cached
     try:
-        ref = get_db().collection('users').document(uid)
+        db = get_db()
+        ref = db.collection('users').document(uid)
         snap = ref.get()
         key = (snap.to_dict() or {}).get('storageKey') if snap.exists else None
         if not isinstance(key, str) or not key:
-            key = secrets.token_hex(16)
-            ref.set({'storageKey': key}, merge=True)
-            logger.info(f"Minted storage key for user {mask_uid(uid)}")
+            # Minted in a transaction that keeps whatever another worker
+            # stored first: two first-image saves at once (an import of
+            # several posts) used to mint two keys, and the images under the
+            # one that lost were outside every cleanup (launch audit ACCT-7).
+            key = _run_transaction(db, lambda tx: _mint_storage_key(tx, ref))
+            logger.info(f"Storage key ready for user {mask_uid(uid)}")
         _STORAGE_KEY_CACHE[uid] = key
         return key
     except Exception as e:
-        logger.warning(f"Storage key lookup failed for {mask_uid(uid)}; using legacy prefix: {e}")
+        logger.warning(f"Storage key lookup failed for {mask_uid(uid)}; using legacy prefix: {type(e).__name__}")
         return uid
+
+
+def _mint_storage_key(tx, ref) -> str:
+    """Inside a transaction: the stored key if there is one, else a new one."""
+    snap = ref.get(transaction=tx)
+    key = (snap.to_dict() or {}).get('storageKey') if snap.exists else None
+    if isinstance(key, str) and key:
+        return key
+    key = secrets.token_hex(16)
+    tx.set(ref, {'storageKey': key}, merge=True)
+    return key
+
+
+def _run_transaction(db, fn):
+    """Run ``fn(transaction)`` in a Firestore transaction (retried on
+    contention). Tests swap this for a direct call."""
+    @firestore.transactional
+    def _txn(tx):
+        return fn(tx)
+    return _txn(db.transaction())
 
 
 def find_user_by_ingest_token(token: str) -> Optional[str]:
