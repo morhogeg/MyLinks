@@ -10,8 +10,9 @@
  * Reads the masters live/render.mjs writes (out/live/machina-in-motion-
  * landscape.mp4 / -portrait.mp4) and packs each cut for a static host that
  * takes at most 15 MB a file (claude.ai artifacts): H.264 MP4 first, VP9 WebM
- * for browsers without H.264, both 1080p60 at ~1.6 Mb/s (the film is flat
- * paper and type, so this holds up next to the 6 Mb/s master), plus a poster
+ * for browsers without H.264, both 1080p60 at ~1.5 Mb/s, set from the film's
+ * length (the film is flat paper and type, so this holds up next to the
+ * 6 Mb/s master), plus a poster
  * (the ring of saves around the phone) and the page, live/player.html, with the film's
  * chapters (film/edit.js) written in. Encodes are skipped when the output is
  * newer than its master, unless --force.
@@ -33,8 +34,13 @@ const FORCE = process.argv.includes('--force');
 const PAGE_ONLY = process.argv.includes('--page');
 const CUT = process.argv.includes('--cut') ? process.argv[process.argv.indexOf('--cut') + 1] : null;
 const LIMIT = 15e6;
-const VIDEO_KBPS = 1620;
 const POSTER_T = 7.4; // the ring of saves, fully formed around the phone
+
+const S = makeEdit(buildIndex(TAKES).takes.session);
+// each file's video bitrate from the film's length, so it lands under the
+// host's limit with room for the audio and the container (~1.5 Mb/s at 68 s)
+const TARGET = 14.4e6;
+const kbps = (audioKbps) => Math.floor((TARGET * 8) / S.dur / 1000 - audioKbps - 24);
 
 fs.mkdirSync(DIR, { recursive: true });
 const stale = (out, src) => FORCE || !fs.existsSync(out) || fs.statSync(out).mtimeMs < fs.statSync(src).mtimeMs;
@@ -47,13 +53,13 @@ for (const cut of ['landscape', 'portrait'].filter((c) => !CUT || c === CUT)) {
 
   const mp4 = path.join(DIR, `film-${cut}.mp4`);
   if (!PAGE_ONLY && stale(mp4, master)) {
-    const v = ['-c:v', 'libx264', '-preset', 'slower', '-b:v', `${VIDEO_KBPS}k`, '-maxrate', '4000k', '-bufsize', '8000k', '-passlogfile', log];
+    const v = ['-c:v', 'libx264', '-preset', 'slower', '-b:v', `${kbps(128)}k`, '-maxrate', '4000k', '-bufsize', '8000k', '-passlogfile', log];
     ff(['-i', master, ...v, '-pass', '1', '-an', '-f', 'mp4', '/dev/null']);
     ff(['-i', master, ...v, '-pass', '2', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', mp4]);
   }
   const webm = path.join(DIR, `film-${cut}.webm`);
   if (!PAGE_ONLY && stale(webm, master)) {
-    const v = ['-c:v', 'libvpx-vp9', '-b:v', `${VIDEO_KBPS}k`, '-row-mt', '1', '-deadline', 'good', '-g', '120', '-passlogfile', `${log}-vp9`];
+    const v = ['-c:v', 'libvpx-vp9', '-b:v', `${kbps(112)}k`, '-row-mt', '1', '-deadline', 'good', '-g', '120', '-passlogfile', `${log}-vp9`];
     ff(['-i', master, ...v, '-cpu-used', '4', '-pass', '1', '-an', '-f', 'webm', '/dev/null']);
     ff(['-i', master, ...v, '-cpu-used', '2', '-pass', '2', '-c:a', 'libopus', '-b:a', '112k', webm]);
   }
@@ -66,7 +72,6 @@ for (const cut of ['landscape', 'portrait'].filter((c) => !CUT || c === CUT)) {
 }
 
 // the page, with the film's chapters and length written in
-const S = makeEdit(buildIndex(TAKES).takes.session);
 const clock = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
 const list = chaptersOf(S.at)
   .map((ch, i) =>
