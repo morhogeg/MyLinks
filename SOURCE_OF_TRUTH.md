@@ -2571,6 +2571,23 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-06 (evening) — CARD HEADER FROM REVISIT: bell no longer
+  clipped.** Owner screenshot: a card opened from Revisit cut the reminder
+  bell in half. Cause: the header action row scrolls sideways with its
+  scrollbar hidden, and the labelled "‹ Revisit" back control used about two
+  buttons' width, so the row's visible edge landed mid-bell. Fix in
+  `LinkDetailModal.tsx`: only when `backTo` is set (Revisit is the only
+  caller) and only below `sm`, everything after the bell (collection, share,
+  update/stop sharing, image toggle, Delete, Open source) moves into a "⋯"
+  button that opens the existing `CardActionSheet`; the row is then back,
+  read, favorite, reminder, ⋯, close and fits a 375pt phone without
+  scrolling. Regular cards are unchanged (owner: they look fine). Escape
+  closes the sheet before the card. **Verified:** tsc 0, eslint 0 on the
+  file, em-dash gate. **NOT verified:** rendered on a phone or in a browser
+  (widths were worked out from the classes); QA on the next TestFlight
+  build: open a card from Revisit, check the row fits and ⋯ offers Delete
+  and Open source.
+
 - **2026-10-06 (later) — LAUNCH AUDIT SHIPPED: merge `7c82ffa`, build
   1347.** Owner said ship. `claude/launch-audit` merged to `main` with no
   scope line, so the whole functions codebase deployed. Deploy Cloud

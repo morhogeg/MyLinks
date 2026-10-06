@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, StatusChangeHandler, UserNote, CardShareMode } from '@/lib/types';
 import SourceByline from './SourceByline';
-import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, CircleCheck, Check, Network, Play, Youtube, ImageOff, Image as ImageIcon, Layers, Share2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, StickyNote, Waypoints, Upload, RefreshCw, Link2Off } from 'lucide-react';
+import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, CircleCheck, Check, Network, Play, Youtube, ImageOff, Image as ImageIcon, Layers, Share2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, StickyNote, Waypoints, Upload, RefreshCw, Link2Off, MoreHorizontal } from 'lucide-react';
 import SimpleMarkdown from './SimpleMarkdown';
 import PosterImage from './ui/PosterImage';
 import { openExternal } from '@/lib/share';
@@ -25,6 +25,7 @@ import ProBadge from './ui/ProBadge';
 import { requestPaywall } from '@/lib/entitlement';
 import { getActionableTakeaway, isTakeawayDismissed, isTakeawayDone } from '@/lib/takeaway';
 import ScreenshotEnrich from '@/components/ScreenshotEnrich';
+import CardActionSheet from './CardActionSheet';
 import { scrollBehavior } from '@/lib/motion';
 import { relativeTime } from '@/lib/relativeTime';
 
@@ -172,6 +173,9 @@ export default function LinkDetailModal({
     // Multi-screenshot carousel: which slide is in view (drives the counter +
     // dots). The container itself owns the position via scroll-snap.
     const [galleryIndex, setGalleryIndex] = useState(0);
+    // "More" sheet for the header actions that don't fit next to the labelled
+    // "‹ Revisit" back control on a phone (see the header below).
+    const [moreOpen, setMoreOpen] = useState(false);
     const galleryRef = useRef<HTMLDivElement>(null);
     // The carousel element survives navigating card → related card, so put it
     // back on slide 1 when the card changes (the index state resets alongside).
@@ -482,6 +486,8 @@ export default function LinkDetailModal({
         const onKey = (e: KeyboardEvent) => {
             if (e.key !== 'Escape') return;
             e.preventDefault();
+            // The More sheet listens for Escape itself and closes.
+            if (moreOpen) return;
             if (isEditingNote) setIsEditingNote(false);
             else if (isEditingTitle) setIsEditingTitle(false);
             else if (isEditingSummary) setIsEditingSummary(false);
@@ -492,7 +498,7 @@ export default function LinkDetailModal({
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
-    }, [isOpen, isEditingNote, isEditingTitle, isEditingSummary, editingNoteId, isEditingCategory, isAddingTag, onClose]);
+    }, [isOpen, moreOpen, isEditingNote, isEditingTitle, isEditingSummary, editingNoteId, isEditingCategory, isAddingTag, onClose]);
 
     // Server similarities for the Related list (lib/similarity.ts). Held per
     // card id, so a refresh for the same card keeps showing the last answer
@@ -608,6 +614,14 @@ export default function LinkDetailModal({
         </div>
     );
 
+    // Opened from Revisit, the labelled "‹ Revisit" back control takes about
+    // two buttons' width, and on a phone the row then clipped the bell mid-icon
+    // (owner, 2026-10-06). So in that case, below sm, everything after the bell
+    // (collection, share, image, Delete, Open source) moves into a "More" sheet
+    // and the row fits without scrolling. Regular cards keep the full row.
+    const compactHeader = !canGoBack && !!backTo;
+    const wideOnly = compactHeader ? 'hidden sm:flex' : 'flex';
+
     return (
         <>
         <div
@@ -717,14 +731,14 @@ export default function LinkDetailModal({
                         </button>
 
                         {/* Divider between status toggles and the "do something with it" actions. */}
-                        <span className="shrink-0 mx-0.5 h-5 w-px bg-border-subtle" aria-hidden="true" />
+                        <span className={`${compactHeader ? 'hidden sm:block' : ''} shrink-0 mx-0.5 h-5 w-px bg-border-subtle`} aria-hidden="true" />
 
                         {onAddToCollection && (
                             <button
                                 onClick={() => onAddToCollection(link)}
                                 title="Add to collection"
                                 aria-label="Add to collection"
-                                className="shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl flex items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors"
+                                className={`${wideOnly} shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors`}
                             >
                                 <Layers className="w-[18px] h-[18px]" />
                             </button>
@@ -734,7 +748,7 @@ export default function LinkDetailModal({
                                 onClick={() => onShare(link)}
                                 title="Share"
                                 aria-label="Share this card"
-                                className="shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl flex items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors"
+                                className={`${wideOnly} shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors`}
                             >
                                 <Share2 className="w-[18px] h-[18px]" />
                             </button>
@@ -746,7 +760,7 @@ export default function LinkDetailModal({
                                 onClick={() => onShare(link, 'update')}
                                 title="Update public link"
                                 aria-label="Update public link"
-                                className="shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl flex items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors"
+                                className={`${wideOnly} shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors`}
                             >
                                 <RefreshCw className="w-[18px] h-[18px]" />
                             </button>
@@ -756,7 +770,7 @@ export default function LinkDetailModal({
                                 onClick={() => onShare(link, 'stop')}
                                 title="Stop sharing"
                                 aria-label="Stop sharing this card"
-                                className="shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl flex items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors"
+                                className={`${wideOnly} shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors`}
                             >
                                 <Link2Off className="w-[18px] h-[18px]" />
                             </button>
@@ -773,7 +787,7 @@ export default function LinkDetailModal({
                                    for no reason a reader could decode. State now
                                    shows as icon + a brighter glyph, and hover
                                    matches every sibling. */
-                                className={`shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl flex items-center justify-center transition-colors hover:text-accent hover:bg-card-hover ${link.hideThumbnail ? 'text-text' : 'text-text-muted'
+                                className={`${wideOnly} shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl items-center justify-center transition-colors hover:text-accent hover:bg-card-hover ${link.hideThumbnail ? 'text-text' : 'text-text-muted'
                                     }`}
                             >
                                 {link.hideThumbnail ? <ImageIcon className="w-[18px] h-[18px]" /> : <ImageOff className="w-[18px] h-[18px]" />}
@@ -782,9 +796,9 @@ export default function LinkDetailModal({
                     </div>
 
                     {/* Delete + Open source + Close — pinned right so they're NEVER
-                        clipped by the scrolling action row (the reader icon used to
-                        push Delete off-screen on narrow phones). Delete keeps its red
-                        hover so it reads distinctly from the neutral Close. */}
+                        clipped by the action row. Delete keeps its red hover so it
+                        reads distinctly from the neutral Close. In the compact
+                        Revisit header they move into the More sheet (below). */}
                     <button
                         /* One confirm only: the parent (Feed.handleDelete) owns the
                            branded dialog, which stacks above this modal (z-100 > z-50).
@@ -793,7 +807,7 @@ export default function LinkDetailModal({
                         onClick={() => onDelete(link.id)}
                         title="Delete"
                         aria-label="Delete"
-                        className="shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl flex items-center justify-center text-text-muted hover:text-danger hover:bg-danger/10 transition-colors"
+                        className={`${wideOnly} shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl items-center justify-center text-text-muted hover:text-danger hover:bg-danger/10 transition-colors`}
                     >
                         <Trash2 className="w-[18px] h-[18px]" />
                     </button>
@@ -804,10 +818,21 @@ export default function LinkDetailModal({
                             rel="noopener noreferrer"
                             title={link.sourceType === 'image' ? 'View original image' : 'Open source'}
                             aria-label={link.sourceType === 'image' ? 'View original image' : 'Open source'}
-                            className="shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl flex items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors"
+                            className={`${wideOnly} shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors`}
                         >
                             <ExternalLink className="w-[18px] h-[18px]" />
                         </a>
+                    )}
+                    {compactHeader && (
+                    <button
+                        onClick={() => setMoreOpen(true)}
+                        aria-label="More actions"
+                        title="More actions"
+                        aria-haspopup="menu"
+                        className="sm:hidden shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl flex items-center justify-center text-text-muted hover:text-text hover:bg-card-hover transition-colors"
+                    >
+                        <MoreHorizontal className="w-5 h-5" />
+                    </button>
                     )}
                     <button
                         onClick={onClose}
@@ -1764,6 +1789,20 @@ export default function LinkDetailModal({
             </div>
 
         </div>
+        {/* The compact header's "More" sheet. Portals to <body> at z-90, above this modal (z-50); delete still
+            confirms through the parent's dialog (z-100). */}
+        <CardActionSheet
+            link={link}
+            isOpen={compactHeader && moreOpen}
+            onClose={() => setMoreOpen(false)}
+            onStatusChange={onStatusChange}
+            onReadStatusChange={onReadStatusChange}
+            onUpdateReminder={handleToggleReminder}
+            onDelete={onDelete}
+            onAddToCollection={onAddToCollection}
+            onShare={onShare}
+            onToggleThumbnail={onToggleThumbnail}
+        />
         </>
     );
 }
