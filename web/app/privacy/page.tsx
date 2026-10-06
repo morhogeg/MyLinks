@@ -318,6 +318,14 @@ export default function PrivacyPage() {
             checked and restored. Payment itself is handled by Apple; we never see your card
             details.
           </li>
+          <li>
+            <span className="text-text">Public post viewers.</span>{" "}
+            X (Twitter) and Instagram often refuse to show a public post to a server. To read one
+            you saved, Machina&rsquo;s server may request it through a third-party viewer service
+            (fxtwitter, vxtwitter, or an Instagram viewer). They receive the post&rsquo;s address,
+            with any tracking parameters removed, and nothing else: not your account, not your
+            other saves.
+          </li>
         </ul>
         <p className="mt-4 leading-relaxed text-text-secondary">
           Two small Google services also run on your device rather than on our servers: the web app

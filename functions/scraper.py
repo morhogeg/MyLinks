@@ -1161,6 +1161,21 @@ def _scrape_linkedin_url(url: str) -> dict:
                 "truncated": True, "capture_reason": "login_wall"}
 
 
+def _relay_url(url: str, relay_host: str) -> str:
+    """The same post on a third-party viewer service, by PATH only. The query
+    string is the sharer's tracking (`?t=`, `?s=`, `?igsh=`, the kind
+    url_key.py drops), and a relay has no business receiving it; the privacy
+    policy names these services (launch audit CAP-10). A relay that keeps the
+    platform's www prefix (an Instagram bridge) keeps it here too."""
+    parts = urlsplit(url)
+    host = (parts.hostname or "").lower()
+    if relay_host.startswith("api.") or not host.startswith("www."):
+        netloc = relay_host
+    else:
+        netloc = "www." + relay_host
+    return urlunsplit(("https", netloc, parts.path or "/", "", ""))
+
+
 def _scrape_twitter_url(url: str) -> dict:
     """
     Scrape Twitter/X URLs using the fxtwitter.com API.
@@ -1172,7 +1187,7 @@ def _scrape_twitter_url(url: str) -> dict:
 
     try:
         # 1. Try fxtwitter.com API first
-        fx_api_url = url.replace('twitter.com', 'api.fxtwitter.com').replace('x.com', 'api.fxtwitter.com')
+        fx_api_url = _relay_url(url, 'api.fxtwitter.com')
         logger.info(f"Attempting fxtwitter API: {fx_api_url}")
 
         try:
@@ -1197,7 +1212,7 @@ def _scrape_twitter_url(url: str) -> dict:
 
         # 2. Fallback to vxtwitter.com
         logger.info("fxtwitter failed or empty, trying vxtwitter...")
-        vx_api_url = url.replace('twitter.com', 'api.vxtwitter.com').replace('x.com', 'api.vxtwitter.com')
+        vx_api_url = _relay_url(url, 'api.vxtwitter.com')
 
         vx_result = None
         try:
@@ -1814,7 +1829,7 @@ def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
         bridges = ['instagramez.com', 'kkinstagram.com', 'ddinstagram.com']
         for bridge in bridges:
             try:
-                bridge_url = url.replace('instagram.com', bridge)
+                bridge_url = _relay_url(url, bridge)
                 logger.info(f"Trying Instagram bridge: {bridge_url}")
                 headers = {"User-Agent": MOBILE_USER_AGENT}
                 response = safe_get(bridge_url, headers=headers, timeout=5)
@@ -1837,10 +1852,11 @@ def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
                     if "AliExpress" in b_title or "AliExpress" in b_desc or "Open in App" in b_title:
                         continue
 
-                    # Bridges expose the real media as og:image — prefer it when
-                    # the direct scrape didn't yield one (login-walled preview).
-                    if not best_image:
-                        best_image = _extract_og_image(soup)
+                    # The bridge's og:image is NOT used: these are unaffiliated
+                    # sites (one served AliExpress spam, hence the check above),
+                    # and the image would be analyzed into the summary and kept
+                    # as the card's picture (launch audit CAP-10). Their text
+                    # is still a fallback for the caption, nothing more.
 
                     if b_desc and len(b_desc) > len(best_desc):
                         best_desc = b_desc
@@ -1852,8 +1868,10 @@ def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
             except Exception as e:
                 logger.warning(f"Instagram bridge {bridge} failed: {e}")
 
-    # 3. Incorporate original message body
-    if message_body and url in message_body:
+    # 3. Incorporate original message body. share_ingest has usually removed
+    # the URL from it already, so it is not required to be there (with that
+    # check the caption never reached the model; launch audit CAP-16).
+    if message_body:
         caption_guess = message_body.replace(url, '').strip()
         noise = ["Check out this reel!", "Watch this reel by", "Instagram post by", "See this post on Instagram", "Watch this video on Instagram"]
         for n in noise:
@@ -2124,7 +2142,9 @@ def _scrape_facebook_url(url: str, message_body: Optional[str] = None) -> dict:
 
     # Fold in the shared caption from the message body — for recipe/video posts
     # this is often the most complete text (the on-page caption is gated).
-    if message_body and url in message_body:
+    # share_ingest has usually removed the URL from the shared text already
+    # (launch audit CAP-16), so it is not required to be there.
+    if message_body:
         caption_guess = message_body.replace(url, '').strip()
         if caption_guess and len(caption_guess) > 5:
             metadata_lines.append(f"SHARED CAPTION:\n{caption_guess}")
