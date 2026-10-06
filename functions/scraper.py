@@ -360,6 +360,36 @@ FETCH_ERROR_MESSAGES = {
 # 30k characters; 25k leaves room for the shared caption and scaffolding.
 MAX_ARTICLE_CHARS = 25_000
 
+# How much of a fetched page is parsed. BeautifulSoup costs ~80 MB of memory
+# per MB of dense markup, so parsing the full 10 MB response cap ran a 256 MiB
+# function (and even the 1 GiB worker) out of memory, which skips the refund
+# (launch audit CAP-4). The article text kept is 25,000 characters; 2 MB of
+# HTML holds it for any real page.
+MAX_PARSE_BYTES = 2_000_000
+# The page HTML returned with a result is only a fallback for an empty `text`.
+_MAX_RETURNED_HTML = 200_000
+
+
+def _parse_slice(content: bytes) -> bytes:
+    """The first MAX_PARSE_BYTES of `content`, cut on a UTF-8 character
+    boundary: a split multi-byte character makes the strict UTF-8 decode
+    fail, and the charset sniffer would then fall back to windows-1252 and
+    turn a Hebrew page into mojibake."""
+    if len(content) <= MAX_PARSE_BYTES:
+        return content
+    cut = content[:MAX_PARSE_BYTES]
+    # Walk back to the last character's lead byte; drop that character only
+    # if the cut left it incomplete.
+    i, back = len(cut) - 1, 0
+    while i >= 0 and back < 3 and (cut[i] & 0xC0) == 0x80:
+        i, back = i - 1, back + 1
+    if i >= 0:
+        lead = cut[i]
+        need = 2 if lead >> 5 == 0b110 else 3 if lead >> 4 == 0b1110 else 4 if lead >> 3 == 0b11110 else 1
+        if len(cut) - i < need:
+            cut = cut[:i]
+    return cut
+
 # A PDF up to this size is sent to Gemini as a native document part (safe_get's
 # MAX_RESPONSE_BYTES is the same ceiling, so anything bigger never arrives).
 MAX_PDF_BYTES = 10 * 1024 * 1024
@@ -654,7 +684,7 @@ def _scrape_url(url: str, message_body: Optional[str] = None) -> dict:
             if "html" in ctype and content:
                 try:
                     from bs4 import BeautifulSoup
-                    rsoup = BeautifulSoup(content, 'html.parser',
+                    rsoup = BeautifulSoup(_parse_slice(content), 'html.parser',
                                           from_encoding=_header_charset(raw_ctype))
                     og = _og_bits(rsoup)
                     if rsoup.title and rsoup.title.string:
@@ -697,12 +727,14 @@ def _scrape_url(url: str, message_body: Optional[str] = None) -> dict:
         # falls back to ISO-8859-1, which mangles a UTF-8 Hebrew page that
         # declares its charset only in <meta>. BeautifulSoup honours an explicit
         # header charset, then the document's own <meta charset>, then sniffs.
+        content = _parse_slice(content)
         soup = BeautifulSoup(content, 'html.parser', from_encoding=_header_charset(raw_ctype))
         encoding = getattr(soup, "original_encoding", None) or "utf-8"
         try:
             html = content.decode(encoding, errors="replace")
         except LookupError:
             html = content.decode("utf-8", errors="replace")
+        html = html[:_MAX_RETURNED_HTML]
 
         # Extract title
         title = ""
