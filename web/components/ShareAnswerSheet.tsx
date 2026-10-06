@@ -7,7 +7,7 @@ import {
 import { ChatSource, Link } from '@/lib/types';
 import { newShareId } from '@/lib/collections';
 import { publishAnswer, unpublishAnswer, resolveShareableSources, PublicAnswerSource } from '@/lib/answerShare';
-import { shareLink, shareUrlFor, openExternal } from '@/lib/share';
+import { shareLink, shareUrlFor, openExternal, copyToClipboard } from '@/lib/share';
 import { useToast } from '@/components/Toast';
 import { useVisualViewport } from '@/lib/useVisualViewport';
 import { track } from '@/lib/analytics';
@@ -49,6 +49,11 @@ interface ShareAnswerSheetProps {
  * a PIN-locked collection is dropped from the snapshot, and an answer built
  * only from those cards cannot be shared at all. That check runs on open, so
  * the refusal is visible before the user reaches for the button.
+ *
+ * A page that is ALREADY public always keeps its link and Stop sharing, whatever
+ * the check says now: its cards can turn private after it was published, and
+ * hiding the way to take it down then (as the refusal used to) left a public
+ * page naming a now-private card with no way to stop it.
  */
 export default function ShareAnswerSheet({
     uid,
@@ -118,6 +123,11 @@ export default function ShareAnswerSheet({
     const blockedCopy = allowed && allowed.withheldMissing === 0
         ? "This answer is built only from private cards, so it can't be shared."
         : "The cards this answer cited are private or no longer in your library, so it can't be shared.";
+    // The same verdict for a page that is already live: say what changed and
+    // point at the one control that fixes it.
+    const blockedLiveCopy = allowed && allowed.withheldMissing === 0
+        ? 'Every card this answer cites is private now, so it shouldn’t stay public. Stop sharing to take the page down.'
+        : 'The cards this answer cites are private now or no longer in your library, so it shouldn’t stay public. Stop sharing to take the page down.';
 
     const doPublish = async () => {
         if (!uid || busy || !allowed || blocked) return;
@@ -133,7 +143,7 @@ export default function ShareAnswerSheet({
             });
             onShareIdChange(id);
             track('answer_shared', { sources: allowed.shareable.length });
-            toast.success('Your answer is live');
+            toast.success(shareId ? 'Public page updated' : 'Your answer is live');
         } catch {
             toast.error("Couldn't publish this answer. Please try again.");
         } finally {
@@ -147,7 +157,9 @@ export default function ShareAnswerSheet({
         try {
             await unpublishAnswer(uid, shareId);
             onShareIdChange(null);
-            toast.success('Sharing turned off. The public page is gone');
+            // share_page is edge-cached for up to a minute, so "gone" would
+            // overclaim; same wording as the collection sheet.
+            toast.success('Sharing turned off. The link stops working within a minute.');
         } catch {
             toast.error("Couldn't stop sharing. Please try again.");
         } finally {
@@ -157,11 +169,12 @@ export default function ShareAnswerSheet({
 
     const doCopy = async () => {
         if (!url) return;
-        try {
-            await navigator.clipboard.writeText(url);
+        // copyToClipboard falls back to execCommand inside WKWebView, where the
+        // async Clipboard API is often missing or rejects.
+        if (await copyToClipboard(url)) {
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
-        } catch {
+        } else {
             toast.error("Couldn't copy the link.");
         }
     };
@@ -199,10 +212,11 @@ export default function ShareAnswerSheet({
                     <div className="flex items-center gap-3 px-5 pt-3 pb-4 border-b border-border-subtle">
                         <Share2 className="w-5 h-5 text-accent shrink-0" />
                         <h3 className="flex-1 text-lg font-bold text-text truncate">Share answer</h3>
+                        {/* 32px drawn, 44pt to the finger (the ::after). */}
                         <button
                             onClick={onClose}
                             aria-label="Close"
-                            className="p-1.5 rounded-full text-text-muted hover:text-text hover:bg-fill-subtle transition-colors"
+                            className="relative after:absolute after:-inset-1.5 p-1.5 rounded-full text-text-muted hover:text-text hover:bg-fill-subtle transition-colors"
                         >
                             <X className="w-5 h-5" />
                         </button>
@@ -245,14 +259,89 @@ export default function ShareAnswerSheet({
                         )}
                     </div>
 
-                    {checking ? (
+                    {isPublic ? (
+                        <>
+                            <div className="rounded-xl bg-fill-subtle px-3.5 py-3 space-y-2.5">
+                                <div className="flex items-center gap-2 text-xs font-semibold">
+                                    <span className="flex items-center gap-1.5 text-green-500">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                                        Public
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="flex-1 text-[13px] text-text truncate font-mono" dir="ltr">{url}</span>
+                                    <button
+                                        onClick={doCopy}
+                                        aria-label="Copy link"
+                                        className="flex items-center justify-center w-9 h-9 rounded-lg bg-card border border-border-subtle text-text-muted hover:text-accent hover:border-accent/40 transition-colors shrink-0"
+                                    >
+                                        {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* What changed since this page went up. Shown once the
+                                vault check lands; Stop sharing stays below either way. */}
+                            {blocked ? (
+                                <div className="flex items-start gap-2.5 rounded-xl border border-border-subtle bg-fill-subtle px-3.5 py-3">
+                                    <Lock className="w-4 h-4 text-text-muted shrink-0 mt-0.5" />
+                                    <p className="flex-1 text-[13px] text-text leading-snug">{blockedLiveCopy}</p>
+                                </div>
+                            ) : withheldPrivate > 0 && (
+                                <div className="flex items-start gap-2.5 rounded-xl border border-border-subtle bg-fill-subtle px-3.5 py-3">
+                                    <ShieldCheck className="w-4 h-4 text-accent shrink-0 mt-0.5" />
+                                    <p className="flex-1 text-[13px] text-text leading-snug">
+                                        {withheldPrivate === 1
+                                            ? 'A cited card is private now. Update the page so it leaves it out.'
+                                            : `${withheldPrivate} cited cards are private now. Update the page so it leaves them out.`}
+                                    </p>
+                                    <button
+                                        onClick={doPublish}
+                                        disabled={busy !== null}
+                                        className="shrink-0 px-3 h-8 rounded-lg bg-accent text-accent-ink text-xs font-bold hover:bg-accent-hover transition-colors disabled:opacity-40"
+                                    >
+                                        {busy === 'publish' ? 'Updating…' : 'Update page'}
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* No passing on a page that should come down. */}
+                            {!blocked && (
+                            <div className="grid grid-cols-2 gap-3">
+                                <button
+                                    onClick={doShare}
+                                    className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-accent text-accent-ink font-semibold hover:bg-accent-hover transition-colors"
+                                >
+                                    <Share2 className="w-4 h-4" />
+                                    Share link
+                                </button>
+                                <button
+                                    onClick={() => url && openExternal(url)}
+                                    className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-fill-subtle text-text font-semibold hover:bg-fill-strong transition-colors"
+                                >
+                                    <ExternalLink className="w-4 h-4" />
+                                    View page
+                                </button>
+                            </div>
+                            )}
+
+                            <button
+                                onClick={doUnpublish}
+                                disabled={busy !== null}
+                                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-40"
+                            >
+                                <Lock className="w-4 h-4" />
+                                {busy === 'unpublish' ? 'Stopping…' : 'Stop sharing'}
+                            </button>
+                        </>
+                    ) : checking ? (
                         <p className="text-sm text-text-muted text-center py-2">Checking the sources…</p>
                     ) : blocked ? (
                         <div className="flex items-start gap-2.5 rounded-xl border border-border-subtle bg-fill-subtle px-3.5 py-3">
                             <Lock className="w-4 h-4 text-text-muted shrink-0 mt-0.5" />
                             <p className="flex-1 text-[13px] text-text leading-snug">{blockedCopy}</p>
                         </div>
-                    ) : !isPublic ? (
+                    ) : (
                         <>
                             <p className="text-sm text-text-muted leading-relaxed">
                                 Sharing creates a page with the question, this answer, and the sources it
@@ -284,53 +373,6 @@ export default function ShareAnswerSheet({
                             >
                                 <Globe className="w-4 h-4" />
                                 {busy === 'publish' ? 'Creating…' : 'Create share link'}
-                            </button>
-                        </>
-                    ) : (
-                        <>
-                            <div className="rounded-xl bg-fill-subtle px-3.5 py-3 space-y-2.5">
-                                <div className="flex items-center gap-2 text-xs font-semibold">
-                                    <span className="flex items-center gap-1.5 text-green-500">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                                        Public
-                                    </span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <span className="flex-1 text-[13px] text-text truncate font-mono" dir="ltr">{url}</span>
-                                    <button
-                                        onClick={doCopy}
-                                        aria-label="Copy link"
-                                        className="flex items-center justify-center w-9 h-9 rounded-lg bg-card border border-border-subtle text-text-muted hover:text-accent hover:border-accent/40 transition-colors shrink-0"
-                                    >
-                                        {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3">
-                                <button
-                                    onClick={doShare}
-                                    className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-accent text-accent-ink font-semibold hover:bg-accent-hover transition-colors"
-                                >
-                                    <Share2 className="w-4 h-4" />
-                                    Share link
-                                </button>
-                                <button
-                                    onClick={() => url && openExternal(url)}
-                                    className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-fill-subtle text-text font-semibold hover:bg-fill-strong transition-colors"
-                                >
-                                    <ExternalLink className="w-4 h-4" />
-                                    View page
-                                </button>
-                            </div>
-
-                            <button
-                                onClick={doUnpublish}
-                                disabled={busy !== null}
-                                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-40"
-                            >
-                                <Lock className="w-4 h-4" />
-                                {busy === 'unpublish' ? 'Stopping…' : 'Stop sharing'}
                             </button>
                         </>
                     )}
