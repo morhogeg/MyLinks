@@ -4,6 +4,7 @@ import logging
 import re
 import time
 import random
+import unicodedata
 from datetime import datetime, timezone
 from typing import List, Optional
 from pydantic import Field
@@ -221,7 +222,24 @@ def _response_text(response) -> str:
 # These helpers detect that shape so _generate_json can spend a remaining
 # attempt on it instead of persisting the fragment.
 _COMPLETE_TAIL = ('.', '!', '?', '…', ':', ';', ')', ']', '"', "'", '”', '’',
-                  '״', '׳', '*', '`', '~')
+                  '״', '׳', '*', '`', '~',
+                  # Other scripts' sentence ends and closers: CJK full stops
+                  # and marks, Devanagari danda, Arabic/Urdu question mark and
+                  # full stop, guillemets, fullwidth/CJK brackets. A Japanese
+                  # summary ending "。" or an Arabic one ending "؟" is whole.
+                  '。', '！', '？', '।', '॥', '؟', '۔', '»', '›', '）', '」', '』',
+                  '】', '〉', '》')
+# Trailing code points that only modify the character before them (emoji
+# variation selectors, zero-width joiner): look past them at the real last one.
+_TAIL_MODIFIERS = '️︎‍'
+
+
+def _ends_complete(t: str) -> bool:
+    """`t` (already right-stripped, non-empty) ends on terminal punctuation, a
+    closer, or an emoji/symbol (a summary may end on 🎉)."""
+    core = t.rstrip(_TAIL_MODIFIERS) or t
+    last = core[-1]
+    return core.endswith(_COMPLETE_TAIL) or unicodedata.category(last) in ("So", "Sk")
 
 
 def _text_cut_off(text) -> bool:
@@ -229,9 +247,9 @@ def _text_cut_off(text) -> bool:
 
     Two signals, both conservative: an odd number of ``**`` markers (an opened
     bold that never closes), or a final character that is neither punctuation
-    nor a closing marker — the prompt requires every sentence and bullet to end
-    with a period, so trailing off on a bare letter/digit is the truncation
-    signature, not a style choice.
+    (in any script), a closer, nor an emoji — the prompt requires every
+    sentence of the summary to end with a period, so trailing off on a bare
+    letter/digit is the truncation signature there, not a style choice.
     """
     if not isinstance(text, str):
         return False
@@ -240,7 +258,7 @@ def _text_cut_off(text) -> bool:
         return False
     if t.count('**') % 2 == 1:
         return True
-    return not t.endswith(_COMPLETE_TAIL)
+    return not _ends_complete(t)
 
 
 # Analysis list fields checked for a truncated LAST element. Structured output
@@ -274,17 +292,26 @@ def _list_tail_cut_off(items) -> bool:
     return t.endswith(('-', '–', '־', ',', '،', ';'))
 
 
-def _analysis_cut_off(data: dict) -> bool:
+def _analysis_cut_off(data: dict, finish_reason: Optional[str] = None) -> bool:
     """True when an analysis dict looks truncated mid-generation.
 
-    Checks the two prose fields (summary/detailedSummary) with the full
-    truncation heuristic, flags a PRESENT-but-empty summary (the degenerate
-    cousin: valid JSON, no content — a card with a blank summary is junk), and
-    checks the list fields' last element for high-confidence signatures only
-    (see _list_tail_cut_off). Non-analysis schemas (BrainAnswer,
-    WeeklySynthesis) lack every checked field and pass through untouched.
+    The main signal is the model's own: finish_reason MAX_TOKENS means the
+    output was cut. Beyond that, conservative shape checks: the `summary` with
+    the full truncation heuristic (its prompt demands a period on every
+    sentence), the `detailedSummary` for an unclosed bold only (its recipe
+    steps and list items routinely end on a bare word: "5. Serve warm"), a
+    PRESENT-but-empty summary (the degenerate cousin: valid JSON, no content),
+    and the list fields' last element for high-confidence signatures only
+    (see _list_tail_cut_off). Each false positive costs a full extra analysis
+    call. Non-analysis schemas (BrainAnswer, WeeklySynthesis) lack every
+    checked field and pass through untouched unless the model hit MAX_TOKENS.
     """
-    if any(_text_cut_off(data.get(f)) for f in ("summary", "detailedSummary")):
+    if finish_reason == "MAX_TOKENS":
+        return True
+    if _text_cut_off(data.get("summary")):
+        return True
+    detail = data.get("detailedSummary")
+    if isinstance(detail, str) and detail.count('**') % 2 == 1:
         return True
     s = data.get("summary")
     if isinstance(s, str) and not s.strip():
@@ -1096,10 +1123,11 @@ class GeminiService:
 
                 if isinstance(data, dict):
                     # Early-stopped generation: valid JSON whose summary trails
-                    # off mid-word. Spend a remaining attempt on a clean take,
-                    # but NEVER fail the save over it — if retries stay cut off
-                    # (or none remain), the fullest fragment is returned below.
-                    if _analysis_cut_off(data):
+                    # off mid-word (or the model reports MAX_TOKENS). Spend a
+                    # remaining attempt on a clean take, but NEVER fail the
+                    # save over it — if retries stay cut off (or none remain),
+                    # the fullest fragment is returned below.
+                    if _analysis_cut_off(data, _finish_reason_name(response)):
                         if (truncated_best is None
                                 or len(str(data.get("detailedSummary") or ""))
                                 > len(str(truncated_best.get("detailedSummary") or ""))):

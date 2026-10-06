@@ -50,8 +50,14 @@ def test_empty_and_non_string_pass():
 
 
 def test_analysis_checks_both_prose_fields_only():
-    assert _analysis_cut_off({"summary": "Fine.", "detailedSummary": "- מנכ"})
+    # AI-13 (launch audit): the bare-letter test runs on the SUMMARY only.
+    # detailedSummary list items and recipe steps routinely end on a bare word
+    # ("5. Serve warm"), and every false positive bought a full extra analysis
+    # call; there only an unclosed bold (or MAX_TOKENS) counts.
     assert _analysis_cut_off({"summary": "cut mid", "detailedSummary": "Fine."})
+    assert _analysis_cut_off({"summary": "Fine.", "detailedSummary": "- **Senec"})
+    assert not _analysis_cut_off({"summary": "Fine.", "detailedSummary": "- מנכ"})
+    assert not _analysis_cut_off({"summary": "Fine.", "detailedSummary": "## Steps\n1. Mix\n2. Serve warm"})
     assert not _analysis_cut_off({"summary": "Fine.", "detailedSummary": "Also fine."})
     # Non-analysis schemas (no prose fields) are never flagged.
     assert not _analysis_cut_off({"answer": "whatever with no period"})
@@ -89,8 +95,10 @@ def _service_with(texts):
     return svc
 
 
-_CUT = '{"summary": "Fine.", "detailedSummary": "- מנכ"}'
-_CUT_SHORTER = '{"summary": "Fine.", "detailedSummary": "- מ"}'
+# Cut in the SUMMARY (where the bare-letter test runs, see AI-13 above); the
+# fullest fragment is still chosen by detailedSummary length.
+_CUT = '{"summary": "הארגון קיים מפגש עם המנכ", "detailedSummary": "- מנכ"}'
+_CUT_SHORTER = '{"summary": "הארגון קיים מפגש עם המנכ", "detailedSummary": "- מ"}'
 _CLEAN = '{"summary": "Fine.", "detailedSummary": "- הכל תקין."}'
 
 
