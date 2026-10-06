@@ -13,7 +13,7 @@
  * for browsers without H.264, both 1080p60 at ~1.5 Mb/s, set from the film's
  * length (the film is flat paper and type, so this holds up next to the
  * 6 Mb/s master), plus a poster
- * (the ring of saves around the phone) and the page, live/player.html, with the film's
+ * (the ring of saves, "Introducing Machina.") and the page, live/player.html, with the film's
  * chapters (film/edit.js) written in. Encodes are skipped when the output is
  * newer than its master, unless --force.
  */
@@ -34,13 +34,14 @@ const FORCE = process.argv.includes('--force');
 const PAGE_ONLY = process.argv.includes('--page');
 const CUT = process.argv.includes('--cut') ? process.argv[process.argv.indexOf('--cut') + 1] : null;
 const LIMIT = 15e6;
-const POSTER_T = 7.4; // the ring of saves, fully formed around the phone
 
 const S = makeEdit(buildIndex(TAKES).takes.session);
 // each file's video bitrate from the film's length, so it lands under the
 // host's limit with room for the audio and the container (~1.5 Mb/s at 68 s)
 const TARGET = 14.4e6;
 const kbps = (audioKbps) => Math.floor((TARGET * 8) / S.dur / 1000 - audioKbps - 24);
+// the cover: the ring of saves around the phone, "Introducing Machina." under it
+const POSTER_T = S.at.gather - 0.7;
 
 fs.mkdirSync(DIR, { recursive: true });
 const stale = (out, src) => FORCE || !fs.existsSync(out) || fs.statSync(out).mtimeMs < fs.statSync(src).mtimeMs;
