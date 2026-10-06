@@ -1,6 +1,7 @@
 import React from 'react';
 import { Bookmark, MessageCircle, Play, Plus, Star, Heart, Send, Layers } from 'lucide-react';
 import { sans } from '../fonts';
+import { NIGHT } from '../look';
 
 /**
  * The five places things get saved before Machina — Instagram, X, YouTube,
@@ -12,6 +13,10 @@ import { sans } from '../fonts';
  * up unreadable, and one person opens the wrong pile twice. So this file holds
  * three things: the platform vocabulary, a `SaveSurface` per platform (the
  * gesture), and the `Silo` (the pile).
+ *
+ * On the night set (2026-10-05) every surface is the platform in iOS DARK
+ * MODE, and every panel, pile and chip is dark glass (the kit's SaveChip
+ * recipe): a lit hairline on the top edge, a deep shadow under it.
  *
  * Two rules held here:
  *  - Brand hues are the app's own (`web/lib/platform.tsx` PLATFORM_RGB), so the
@@ -29,9 +34,9 @@ export const PLATFORM: Record<
 > = {
   // PLATFORM_RGB from web/lib/platform.tsx, verbatim where the app defines one.
   instagram: { name: 'Instagram', label: 'Saved', rgb: '225, 48, 108' },
-  // X's app silver (191,201,214) is a dark-theme value and vanishes on a white
-  // panel; the light grade uses X's own light-mode black.
-  x: { name: 'X', label: 'Bookmarks', rgb: '15, 20, 25' },
+  // X wears the app's dark-theme silver (PLATFORM_RGB 191,201,214) on the
+  // night set (the light grade wore X's light-mode black, invisible on dark)
+  x: { name: 'X', label: 'Bookmarks', rgb: '191, 201, 214' },
   youtube: { name: 'YouTube', label: 'Watch later', rgb: '255, 0, 0' },
   whatsapp: { name: 'WhatsApp', label: 'Messages to you', rgb: '37, 211, 102' },
   reading: { name: 'Safari', label: 'Open tabs', rgb: '90, 160, 230' },
@@ -59,9 +64,23 @@ export const PlatformGlyph: React.FC<{ k: PlatformKey; size?: number }> = ({ k, 
   return <Bookmark size={size} />;
 };
 
+/** a greeked line: light at low alpha on the dark surfaces */
 const grey = (w: number, h = 7, o = 0.1) => (
-  <div style={{ width: `${w}%`, height: h, borderRadius: 4, background: `rgba(16,20,32,${o})` }} />
+  <div style={{ width: `${w}%`, height: h, borderRadius: 4, background: `rgba(255,255,255,${(o * 0.95).toFixed(3)})` }} />
 );
+
+/** dark glass (the night look's panel, the kit's SaveChip recipe) */
+const GLASS = 'linear-gradient(180deg, #1D1D21 0%, #141417 100%)';
+/** the piles: the same glass a shade up, with a brighter edge, so five small
+ *  panels still read as objects on the night set at a distance */
+const PILE_GLASS = 'linear-gradient(180deg, #25252B 0%, #19191D 100%)';
+const PILE_EDGE = 'rgba(255,255,255,0.12)';
+const GLASS_SHADOW =
+  'inset 0 1px 0 rgba(255,255,255,0.07), 0 1px 2px rgba(0,0,0,0.5), 0 22px 52px -18px rgba(0,0,0,0.85), 0 44px 80px -40px rgba(0,0,0,0.7)';
+/** iOS dark-mode label colours */
+const LABEL = '#F2F2F7';
+const LABEL_2 = '#8E8E93';
+const ICON = 'rgba(235,235,245,0.7)';
 
 /** A faded, title-less thumbnail block — the honest state of a buried save. */
 const thumb = (hue: string, seed: number, w = 44, h = 30) => (
@@ -71,10 +90,10 @@ const thumb = (hue: string, seed: number, w = 44, h = 30) => (
       height: h,
       borderRadius: 6,
       flexShrink: 0,
-      background: `linear-gradient(${120 + (seed % 3) * 40}deg, rgba(${hue},${
-        0.1 + (seed % 3) * 0.03
-      }), rgba(16,20,32,${0.06 + (seed % 4) * 0.015}))`,
-      border: '1px solid rgba(16,24,40,0.06)',
+      background: `linear-gradient(${120 + (seed % 3) * 40}deg, rgba(${hue},${(
+        0.2 + (seed % 3) * 0.05
+      ).toFixed(3)}), rgba(255,255,255,${(0.04 + (seed % 4) * 0.012).toFixed(3)}))`,
+      border: '1px solid rgba(255,255,255,0.06)',
     }}
   />
 );
@@ -109,9 +128,9 @@ const surfaceShell = (k: PlatformKey, children: React.ReactNode) => {
         width: SURFACE_W,
         height: SURFACE_H,
         borderRadius: 22,
-        background: 'linear-gradient(168deg, rgba(255,255,255,0.99), rgba(243,244,248,0.99))',
-        border: '1px solid rgba(16,24,40,0.09)',
-        boxShadow: '0 30px 70px -20px rgba(24,32,48,0.4), inset 0 1px 0 rgba(255,255,255,0.9)',
+        background: GLASS,
+        border: `1px solid ${NIGHT.cardEdge}`,
+        boxShadow: GLASS_SHADOW,
         fontFamily: sans,
         overflow: 'hidden',
       }}
@@ -122,7 +141,7 @@ const surfaceShell = (k: PlatformKey, children: React.ReactNode) => {
           alignItems: 'center',
           gap: 9,
           padding: '15px 18px',
-          borderBottom: '1px solid rgba(16,24,40,0.06)',
+          borderBottom: '1px solid rgba(255,255,255,0.07)',
         }}
       >
         <span style={{ color: ink, display: 'inline-flex', opacity: 0.95 }}>
@@ -130,7 +149,7 @@ const surfaceShell = (k: PlatformKey, children: React.ReactNode) => {
         </span>
         {/* X's mark IS its name — printing both read as "✕ X". */}
         {k !== 'x' && (
-          <span style={{ fontSize: 14.5, fontWeight: 600, color: 'rgba(20,24,34,0.92)' }}>
+          <span style={{ fontSize: 14.5, fontWeight: 600, color: LABEL }}>
             {p.name}
           </span>
         )}
@@ -157,9 +176,9 @@ const ActionButton: React.FC<{
       minWidth: wide ? 92 : 38,
       padding: wide ? '0 14px' : 0,
       borderRadius: 999,
-      background: save > 0.5 ? `rgba(${ink},0.14)` : 'rgba(16,20,32,0.05)',
-      border: `1px solid ${save > 0.5 ? `rgba(${ink},0.5)` : 'rgba(16,24,40,0.1)'}`,
-      color: save > 0.5 ? `rgb(${ink})` : 'rgba(40,44,54,0.8)',
+      background: save > 0.5 ? `rgba(${ink},0.16)` : 'rgba(255,255,255,0.06)',
+      border: `1px solid ${save > 0.5 ? `rgba(${ink},0.55)` : 'rgba(255,255,255,0.12)'}`,
+      color: save > 0.5 ? `rgb(${ink})` : 'rgba(235,235,245,0.78)',
       fontSize: 13,
       fontWeight: 600,
       transform: `scale(${1 + Math.sin(Math.min(1, save) * Math.PI) * 0.12})`,
@@ -186,19 +205,19 @@ export const SaveSurface: React.FC<{ k: PlatformKey; save: number }> = ({ k, sav
             height: 176,
             borderRadius: 12,
             background:
-              'linear-gradient(150deg, rgba(225,48,108,0.14), rgba(244,244,248,0.9) 55%, rgba(230,231,238,0.95))',
-            border: '1px solid rgba(16,24,40,0.07)',
+              'radial-gradient(70% 80% at 24% 18%, rgba(225,48,108,0.34), rgba(225,48,108,0) 70%), radial-gradient(60% 70% at 86% 90%, rgba(120,92,200,0.28), rgba(120,92,200,0) 72%), linear-gradient(150deg, #2a1d2a, #1a1720 60%, #141318)',
+            border: '1px solid rgba(255,255,255,0.07)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             padding: 22,
           }}
         >
-          <span style={{ fontSize: 21, fontWeight: 700, lineHeight: 1.2, letterSpacing: '-0.02em', color: '#1b1c22', textAlign: 'center' }}>
+          <span style={{ fontSize: 21, fontWeight: 700, lineHeight: 1.2, letterSpacing: '-0.02em', color: '#FFFFFF', textAlign: 'center' }}>
             Why you forget most of what you read
           </span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', marginTop: 14, gap: 14, color: 'rgba(40,44,54,0.75)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', marginTop: 14, gap: 14, color: ICON }}>
           <Heart size={20} />
           <MessageCircle size={20} />
           <Send size={19} />
@@ -223,7 +242,7 @@ export const SaveSurface: React.FC<{ k: PlatformKey; save: number }> = ({ k, sav
             borderRadius: 12,
             background:
               'radial-gradient(58% 75% at 22% 32%, rgba(255,186,116,0.4), rgba(255,186,116,0) 62%), radial-gradient(40% 55% at 78% 25%, rgba(120,140,180,0.18), rgba(120,140,180,0) 60%), linear-gradient(168deg, #322b27, #423931 52%, #1a181c)',
-            border: '1px solid rgba(16,24,40,0.07)',
+            border: '1px solid rgba(255,255,255,0.06)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -273,11 +292,11 @@ export const SaveSurface: React.FC<{ k: PlatformKey; save: number }> = ({ k, sav
             15:28
           </span>
         </div>
-        <div style={{ marginTop: 12, fontSize: 15.5, fontWeight: 700, letterSpacing: '-0.02em', color: '#111318', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          How to Use AI to Improve Yourself
+        <div style={{ marginTop: 12, fontSize: 15.5, fontWeight: 700, letterSpacing: '-0.02em', color: LABEL, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          Use the Tools, Keep the Thinking
         </div>
         <div style={{ display: 'flex', alignItems: 'center', marginTop: 10 }}>
-          <span style={{ fontSize: 12, color: '#606068' }}>IAmMarkManson</span>
+          <span style={{ fontSize: 12, color: '#AAAAAA' }}>Unhurried</span>
           <span style={{ marginLeft: 'auto' }}>
             <ActionButton save={save} ink={p.rgb} wide>
               <Plus size={15} strokeWidth={2.6} />
@@ -293,7 +312,7 @@ export const SaveSurface: React.FC<{ k: PlatformKey; save: number }> = ({ k, sav
     return surfaceShell(
       k,
       <>
-        <div style={{ fontSize: 12, color: 'rgba(96,102,116,0.85)', marginBottom: 10 }}>
+        <div style={{ fontSize: 12, color: LABEL_2, marginBottom: 10 }}>
           You (Me)
         </div>
         {on && (
@@ -305,10 +324,10 @@ export const SaveSurface: React.FC<{ k: PlatformKey; save: number }> = ({ k, sav
               padding: '10px 13px',
               borderRadius: 14,
               borderBottomRightRadius: 4,
-              background: 'rgba(37,211,102,0.16)',
-              border: '1px solid rgba(37,211,102,0.32)',
+              background: 'rgba(37,211,102,0.18)',
+              border: '1px solid rgba(37,211,102,0.36)',
               fontSize: 13,
-              color: 'rgba(38,74,52,0.9)',
+              color: 'rgba(214,246,226,0.95)',
             }}
           >
             zillow.com/homes/2-bed-balcony…
@@ -330,13 +349,13 @@ export const SaveSurface: React.FC<{ k: PlatformKey; save: number }> = ({ k, sav
               flex: 1,
               height: 40,
               borderRadius: 999,
-              border: '1px solid rgba(16,24,40,0.12)',
-              background: '#ffffff',
+              border: '1px solid rgba(255,255,255,0.1)',
+              background: '#2C2C2E',
               display: 'flex',
               alignItems: 'center',
               padding: '0 14px',
               fontSize: 12.5,
-              color: on ? 'rgba(96,102,116,0.5)' : 'rgba(38,74,52,0.85)',
+              color: on ? 'rgba(142,142,147,0.7)' : 'rgba(214,246,226,0.9)',
               overflow: 'hidden',
               whiteSpace: 'nowrap',
             }}
@@ -356,11 +375,11 @@ export const SaveSurface: React.FC<{ k: PlatformKey; save: number }> = ({ k, sav
       k,
       <>
         <div style={{ display: 'flex', gap: 11 }}>
-          <div style={{ width: 34, height: 34, borderRadius: 34, background: 'rgba(16,20,32,0.1)', flexShrink: 0 }} />
+          <div style={{ width: 34, height: 34, borderRadius: 34, background: 'rgba(255,255,255,0.12)', flexShrink: 0 }} />
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 7 }}>
-            <div style={{ fontSize: 12, color: 'rgba(96,102,116,0.85)' }}>@futuretense</div>
-            <div style={{ fontSize: 14.5, fontWeight: 600, lineHeight: 1.3, color: '#14161c' }}>
-              What AI actually changes about work, a thread:
+            <div style={{ fontSize: 12, color: LABEL_2 }}>@futuretense</div>
+            <div style={{ fontSize: 14.5, fontWeight: 600, lineHeight: 1.3, color: LABEL }}>
+              What the machines actually change about work, a thread:
             </div>
             {grey(94)}
             {grey(78)}
@@ -375,7 +394,7 @@ export const SaveSurface: React.FC<{ k: PlatformKey; save: number }> = ({ k, sav
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            color: 'rgba(40,44,54,0.65)',
+            color: 'rgba(235,235,245,0.62)',
             padding: '0 8px',
           }}
         >
@@ -399,9 +418,9 @@ export const SaveSurface: React.FC<{ k: PlatformKey; save: number }> = ({ k, sav
   return surfaceShell(
     k,
     <>
-      <div style={{ fontSize: 11, color: 'rgba(96,102,116,0.8)' }}>theatlantic.com</div>
-      <div style={{ marginTop: 10, fontSize: 17, fontWeight: 700, lineHeight: 1.2, letterSpacing: '-0.02em', color: '#111318' }}>
-        The jobs AI actually changes
+      <div style={{ fontSize: 11, color: LABEL_2 }}>theatlantic.com</div>
+      <div style={{ marginTop: 10, fontSize: 17, fontWeight: 700, lineHeight: 1.2, letterSpacing: '-0.02em', color: LABEL }}>
+        The jobs automation actually changes
       </div>
       <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
         {grey(98)}
@@ -418,7 +437,7 @@ export const SaveSurface: React.FC<{ k: PlatformKey; save: number }> = ({ k, sav
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          color: 'rgba(40,44,54,0.7)',
+          color: ICON,
           padding: '0 8px',
         }}
       >
@@ -460,9 +479,9 @@ export const Silo: React.FC<{ k: PlatformKey; grow: number; open?: number; count
         width: SILO_W,
         height: SILO_H,
         borderRadius: 16,
-        background: 'linear-gradient(168deg, rgba(255,255,255,0.99), rgba(243,244,248,0.99))',
-        border: '1px solid rgba(16,24,40,0.09)',
-        boxShadow: '0 20px 50px -16px rgba(24,32,48,0.35), inset 0 1px 0 rgba(255,255,255,0.9)',
+        background: PILE_GLASS,
+        border: `1px solid ${PILE_EDGE}`,
+        boxShadow: GLASS_SHADOW.replace('rgba(255,255,255,0.07)', 'rgba(255,255,255,0.1)'),
         fontFamily: sans,
         overflow: open > 0.02 ? 'visible' : 'hidden',
       }}
@@ -473,14 +492,14 @@ export const Silo: React.FC<{ k: PlatformKey; grow: number; open?: number; count
           alignItems: 'center',
           gap: 7,
           padding: '10px 12px',
-          borderBottom: '1px solid rgba(16,24,40,0.06)',
+          borderBottom: '1px solid rgba(255,255,255,0.07)',
         }}
       >
         <span style={{ color: ink, display: 'inline-flex', opacity: 0.95 }}>
           <PlatformGlyph k={k} size={12} />
         </span>
         {k !== 'x' && (
-          <span style={{ fontSize: 11.5, fontWeight: 600, color: 'rgba(20,24,34,0.92)' }}>
+          <span style={{ fontSize: 11.5, fontWeight: 600, color: LABEL }}>
             {p.name}
           </span>
         )}
@@ -490,8 +509,8 @@ export const Silo: React.FC<{ k: PlatformKey; grow: number; open?: number; count
             fontSize: 10.5,
             fontWeight: 700,
             fontVariantNumeric: 'tabular-nums',
-            color: 'rgba(96,102,116,0.9)',
-            background: 'rgba(16,20,32,0.06)',
+            color: '#AEAEB2',
+            background: 'rgba(255,255,255,0.08)',
             borderRadius: 999,
             padding: '2px 8px',
           }}
@@ -519,9 +538,11 @@ export const Silo: React.FC<{ k: PlatformKey; grow: number; open?: number; count
                 top: 10 + y,
                 height: 36,
                 borderRadius: 8,
-                background: '#ffffff',
-                border: '1px solid rgba(16,24,40,0.08)',
-                boxShadow: '0 3px 10px -4px rgba(24,32,48,0.25)',
+                // a card in the pile: a shade lighter than the silo's glass,
+                // so the stacked edges read in the dark
+                background: 'linear-gradient(180deg, #303037 0%, #26262C 100%)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05), 0 3px 10px -4px rgba(0,0,0,0.75)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8,
@@ -552,9 +573,11 @@ export const FlyChip: React.FC<{ k: PlatformKey }> = ({ k }) => {
         width: 88,
         height: 56,
         borderRadius: 10,
-        background: '#ffffff',
-        border: '1px solid rgba(16,24,40,0.1)',
-        boxShadow: '0 12px 30px -8px rgba(24,32,48,0.45)',
+        // dark glass, lit a little brighter than the piles: it is the save
+        // in flight, the one moving light in the frame
+        background: 'linear-gradient(180deg, #2C2C33 0%, #1F1F25 100%)',
+        border: '1px solid rgba(255,255,255,0.13)',
+        boxShadow: `inset 0 1px 0 rgba(255,255,255,0.09), 0 12px 30px -8px rgba(0,0,0,0.8), 0 0 22px rgba(${NIGHT.glow},0.2)`,
         display: 'flex',
         alignItems: 'center',
         gap: 7,

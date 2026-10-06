@@ -33,9 +33,9 @@ import {
 
 const SOURCES = [
   { Screen: InstagramSource, item: { title: 'Hidden coves of Sardinia', site: 'instagram.com' } },
-  { Screen: YouTubeSource, item: { title: 'How to Use AI to Improve Yourself', site: 'youtube.com' } },
+  { Screen: YouTubeSource, item: { title: 'Use the Tools, Keep the Thinking', site: 'youtube.com' } },
   { Screen: ScreenshotSource, item: { title: 'Screenshot', site: 'Photos' } },
-  { Screen: ArticleScreen, item: { title: 'The jobs AI actually changes', site: 'theatlantic.com' } },
+  { Screen: ArticleScreen, item: { title: 'The jobs automation actually changes', site: 'theatlantic.com' } },
 ];
 // frames where the world behind the sheet swaps: the first source holds while
 // the sheet slides up, then 24 frames (0.8s) per cut. Mirrored in
@@ -137,13 +137,13 @@ export const Capture: React.FC = () => {
                 <div style={{ position: 'absolute', inset: 0, opacity: cutDip }}>
                   <Source />
                 </div>
-                {/* iOS dims the page behind a sheet with dark glass in light
-                    mode too — just far less of it than the dark grade used */}
+                {/* iOS dims the page behind a sheet; in dark mode the dim is
+                    deeper, so the lighter sheet lifts off the page */}
                 <div
                   style={{
                     position: 'absolute',
                     inset: 0,
-                    background: `rgba(10,12,18,${sheet * 0.26})`,
+                    background: `rgba(0,0,0,${(sheet * 0.42).toFixed(3)})`,
                     zIndex: 70,
                   }}
                 />

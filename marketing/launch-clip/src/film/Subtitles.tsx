@@ -2,6 +2,8 @@ import React from 'react';
 import { AbsoluteFill, useCurrentFrame, useVideoConfig } from 'remotion';
 import { SUBTITLES, BAR_FRAMES, FPS } from '../../timeline.mjs';
 import { sans } from '../fonts';
+import { NIGHT, typeGlow } from '../look';
+import { CaptionScrim } from './effects';
 import VO from './vo.json';
 
 /**
@@ -28,6 +30,11 @@ import VO from './vo.json';
  * All motion here lands on WHOLE pixels. Sub-pixel translation forces Chromium
  * to re-rasterize the glyphs every frame, which reads as a shimmer on type this
  * large — one of the two jitters in the Ask beat.
+ *
+ * The night look (2026-10-05, src/look.ts): the lines are white light with
+ * the luminous-type halo (`typeGlow`), the kickers the app's silver, the rule
+ * a silver stroke of light, and a centred line's scrim is the night itself
+ * rising under it (effects `CaptionScrim`). Motion and placements unchanged.
  */
 
 const LEFT_X = 128;
@@ -77,14 +84,25 @@ const Masked: React.FC<{ text: string; local: number; dur: number; k0?: number; 
   </span>
 );
 
-/** the act's kicker: a small letterspaced label */
+/** the act's kicker: a small letterspaced label, in the app's silver */
 const KICKER = (size: number): React.CSSProperties => ({
   fontFamily: sans,
   fontSize: size,
   fontWeight: 700,
   letterSpacing: '0.34em',
   textTransform: 'uppercase',
-  color: 'rgba(75,85,99,0.72)',
+  color: NIGHT.inkSoft,
+});
+
+/** a narrated line: white light (the glow lives on the block, outside the
+ *  masks, so the line's own mask never clips its halo) */
+const LINE = (size: number): React.CSSProperties => ({
+  fontFamily: sans,
+  fontSize: size,
+  fontWeight: 500,
+  lineHeight: 1.14,
+  letterSpacing: '-0.026em',
+  color: NIGHT.ink,
 });
 
 export const Subtitles: React.FC = () => {
@@ -127,19 +145,8 @@ export const Subtitles: React.FC = () => {
               }}
             >
               {kicker(KICKER(17), 'center')}
-              <span style={{ maxWidth: 940 }}>
-                {line(
-                  {
-                    fontFamily: sans,
-                    fontSize: 56,
-                    fontWeight: 500,
-                    lineHeight: 1.14,
-                    letterSpacing: '-0.026em',
-                    color: 'rgba(17,24,39,0.96)',
-                    textShadow: '0 1px 2px rgba(255,255,255,0.6), 0 2px 30px rgba(238,240,244,0.9)',
-                  },
-                  'center',
-                )}
+              <span style={{ maxWidth: 940, filter: typeGlow(0.8) }}>
+                {line(LINE(56), 'center')}
               </span>
             </div>
           );
@@ -160,13 +167,14 @@ export const Subtitles: React.FC = () => {
                 alignItems: 'stretch',
               }}
             >
-              {/* the accent rule grows with the line and leaves with it — the
-                  app's own light-mode accent gradient (ink, not chrome) */}
+              {/* the accent rule grows with the line and leaves with it — a
+                  silver stroke of light, the app's dark-theme accent gradient */}
               <div
                 style={{
                   width: 3,
                   borderRadius: 2,
-                  background: 'linear-gradient(180deg, #34343F, #14141B)',
+                  background: NIGHT.silver,
+                  boxShadow: `0 0 12px rgba(${NIGHT.glow},0.35)`,
                   opacity: 0.85,
                   transform: `scaleY(${(tin * (1 - tout)).toFixed(3)})`,
                   transformOrigin: tout > 0 ? 'center bottom' : 'center top',
@@ -177,18 +185,7 @@ export const Subtitles: React.FC = () => {
                     as a chapter marker above the line, so a viewer can place each
                     beat inside `Capture. Ask. Connect.` without being told. */}
                 {kicker(KICKER(15), 'flex-start')}
-                {line(
-                  {
-                    fontFamily: sans,
-                    fontSize: 46,
-                    fontWeight: 500,
-                    lineHeight: 1.14,
-                    letterSpacing: '-0.026em',
-                    color: 'rgba(17,24,39,0.96)',
-                    textShadow: '0 1px 2px rgba(255,255,255,0.6), 0 2px 30px rgba(238,240,244,0.9)',
-                  },
-                  'flex-start',
-                )}
+                <span style={{ filter: typeGlow(0.8) }}>{line(LINE(46), 'flex-start')}</span>
               </span>
             </div>
           );
@@ -196,15 +193,9 @@ export const Subtitles: React.FC = () => {
 
         return (
           <React.Fragment key={s.text}>
-            {/* a scrim only where a centred line actually needs one — the set
-                tone rising to hold the type, never a dark band on paper */}
-            <AbsoluteFill
-              style={{
-                background:
-                  'linear-gradient(180deg, rgba(238,240,244,0) 64%, rgba(238,240,244,0.5) 84%, rgba(238,240,244,0.85) 100%)',
-                opacity: o,
-              }}
-            />
+            {/* a scrim only where a centred line actually needs one — the
+                night rising to hold the type, never a subtitle box */}
+            <CaptionScrim opacity={o} />
             <div
               style={{
                 position: 'absolute',
@@ -227,21 +218,20 @@ export const Subtitles: React.FC = () => {
                   fontWeight: 600,
                   letterSpacing: '0.3em',
                   textTransform: 'uppercase',
-                  color: 'rgba(55,63,75,0.8)',
+                  color: NIGHT.inkSoft,
                 },
                 'center',
               )}
               {/* vertical: a wider measure so a two-sentence line does not
                   orphan its last word onto a third line (the intro, 2026-09-19) */}
-              <span style={{ maxWidth: vertical ? 1040 : 1300, padding: vertical ? '0 36px' : '0 60px', textAlign: 'center' }}>
+              <span style={{ maxWidth: vertical ? 1040 : 1300, padding: vertical ? '0 36px' : '0 60px', textAlign: 'center', filter: typeGlow(0.8) }}>
                 {line(
                   {
                     fontFamily: sans,
                     fontSize: vertical ? 54 : 44,
                     fontWeight: 500,
                     letterSpacing: '-0.024em',
-                    color: 'rgba(17,24,39,0.96)',
-                    textShadow: '0 1px 2px rgba(255,255,255,0.6), 0 8px 34px rgba(238,240,244,0.9)',
+                    color: NIGHT.ink,
                     textAlign: 'center',
                   },
                   'center',

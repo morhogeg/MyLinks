@@ -2,11 +2,14 @@ import React from 'react';
 import { AbsoluteFill, useCurrentFrame } from 'remotion';
 import { mono } from '../fonts';
 import { prog, ramp, EASE_MODAL, EASE_OUT, EASE_SPRING } from '../film/anim';
+import { NIGHT } from '../look';
 
 /**
- * Cold open — the app launching, in the film's light grade (owner call: the
- * whole film is light, bookends included, so the boot wears the endcard's
- * palette — ink mark on paper — rather than the shipped graphite ground).
+ * Cold open — the app launching, in the app's REAL boot look (the night look,
+ * 2026-10-05): the shipped graphite ground and a white mark of light. Light
+ * is already arriving on frame 0 (a cool pool behind where the mark will
+ * form, and a soft glow gathering at the point), so the film never opens on
+ * a dead black hold.
  *
  * The MOTION is still `BootScreen` from `web/app/page.tsx`, ported
  * frame-for-frame from its CSS keyframes in `globals.css`, down to the delays:
@@ -37,18 +40,30 @@ export const ColdOpen: React.FC = () => {
   const dissolve = 1 - prog(f, EXIT + 6, EXIT + 17);
 
   const MARK_W = 360; // the boot mark is min(30vw, 117px); scaled for a 1080 frame
+  const K = MARK_W / 117; // the shipped glow radii, at the film's mark size
+
+  // the light arriving: up from a visible glow on frame 0, full as the
+  // brackets settle; the point's own glow then takes over
+  const arrive = prog(f, 0, 20, EASE_OUT);
+  const gathering = (0.42 + 0.58 * arrive) * (1 - 0.55 * dot);
 
   return (
     <AbsoluteFill
       style={{
-        // the light boot ground — a white pool on the film's paper set
-        backgroundImage:
-          'radial-gradient(120% 90% at 50% 42%, #FFFFFF, #E9EBF0 72%)',
+        // the shipped BootScreen ground: the prototype's radial graphite
+        backgroundImage: 'radial-gradient(120% 90% at 50% 42%, #131319, #050507 72%)',
         alignItems: 'center',
         justifyContent: 'center',
         opacity: dissolve,
       }}
     >
+      {/* the key light, behind where the mark forms: lit from the first frame */}
+      <AbsoluteFill
+        style={{
+          background: `radial-gradient(40% 48% at 50% 43%, rgba(${NIGHT.key},${(0.13 + 0.09 * arrive).toFixed(3)}) 0%, rgba(${NIGHT.key},${(0.05 + 0.03 * arrive).toFixed(3)}) 46%, rgba(${NIGHT.key},0) 100%)`,
+        }}
+      />
+
       <div
         style={{
           display: 'flex',
@@ -58,24 +73,39 @@ export const ColdOpen: React.FC = () => {
         }}
       >
         <span style={{ position: 'relative', display: 'inline-flex' }}>
-          {/* the halo breathes with LIGHT, never the ink — on paper it is a
-              soft white bloom */}
+          {/* the light gathering at the point before the brackets close on it */}
+          <span
+            style={{
+              position: 'absolute',
+              left: '50%',
+              top: '50%',
+              width: MARK_W * 1.5,
+              height: MARK_W * 1.5,
+              transform: 'translate(-50%, -50%)',
+              borderRadius: '50%',
+              background: `radial-gradient(closest-side, rgba(225,232,255,${(0.24 * gathering).toFixed(3)}) 0%, rgba(${NIGHT.glow},${(0.1 * gathering).toFixed(3)}) 34%, rgba(${NIGHT.glow},0) 100%)`,
+            }}
+          />
+          {/* the halo breathes with LIGHT, never the geometry: the shipped
+              silver halo behind the mark */}
           <span
             style={{
               position: 'absolute',
               inset: '-45%',
               borderRadius: '50%',
               background:
-                'radial-gradient(closest-side, rgba(255,255,255,0.9), rgba(255,255,255,0) 72%)',
-              opacity: Math.max(0, Math.sin(((f - 48) / 126) * Math.PI * 2)) * 0.9,
+                'radial-gradient(closest-side, rgba(174,184,206,0.2), rgba(174,184,206,0) 72%)',
+              opacity: Math.max(0, Math.sin(((f - 48) / 126) * Math.PI * 2)),
             }}
           />
           <span
             style={{
               position: 'relative',
               width: MARK_W,
-              color: '#14141B',
-              filter: `drop-shadow(0 ${glow * 10}px ${glow * 44}px rgba(24,32,48,${glow * 0.3}))`,
+              // text-white, and the shipped boot-glow (0 → 18px of silver at
+              // 0.34), scaled to the film's mark
+              color: '#FFFFFF',
+              filter: `drop-shadow(0 0 ${(glow * 18 * K).toFixed(2)}px rgba(174,184,206,${(glow * 0.34).toFixed(3)}))`,
             }}
           >
             <svg viewBox="288 292 448 416" style={{ width: '100%', height: 'auto' }} fill="currentColor">
@@ -91,14 +121,14 @@ export const ColdOpen: React.FC = () => {
         </span>
 
         {/* MACHINA — the launch setting: letterspaced monospace that breathes
-            open as it fades in (0.30em → 0.46em), in ink. */}
+            open as it fades in (0.30em → 0.46em), in the shipped #E6E6F0. */}
         <span
           style={{
             marginTop: MARK_W * 0.359,
             fontFamily: mono,
             fontSize: MARK_W * 0.145,
             textTransform: 'uppercase',
-            color: '#26262E',
+            color: '#E6E6F0',
             letterSpacing: `${ramp(f, [32, 53], [0.3, 0.46], EASE_OUT)}em`,
             textIndent: '0.46em',
             opacity: word,

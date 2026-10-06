@@ -33,13 +33,13 @@ import { drift, prog, ramp, EASE_IN_OUT, EASE_MODAL, EASE_OUT } from '../film/an
  * Beat C — the loss, ON BAR 3 (the film's only minor chord). One person goes
  * looking for one thing they know they saved — and opens the wrong pile,
  * twice. A fingertip motivates each open; the fan-out reveals only more
- * unreadable cards; the pile drops shut with a thud. Then everything bleaches
- * into the paper, and the wordmark's gather resolves it.
+ * unreadable cards; the pile drops shut with a thud. Then everything sinks
+ * into the dark, and the wordmark's gather resolves it.
  *
  * Everything stays 2D — 3D rotation makes Chromium snapshot-and-scale layers,
- * which was the softness the owner flagged in round 11. Light grade, ink on
- * paper, un-branded surfaces (a failure wearing Machina's chrome would read as
- * the product's).
+ * which was the softness the owner flagged in round 11. The night look: the
+ * platforms in iOS dark mode, the piles dark glass, un-branded surfaces (a
+ * failure wearing Machina's chrome would read as the product's).
  */
 
 // Local tap-contact frames, derived from the shared bar map (scene starts bar 1).
@@ -63,7 +63,7 @@ export const Scatter: React.FC = () => {
   const siloPos = CONSTELLATION.map((p) => ({ x: p.x * vx, y: p.y * vy }));
 
   // ── camera: neutral through the save run, a gentle push onto each wrong
-  // pile during the loss, back out for the bleach. 2D only.
+  // pile during the loss, back out as the piles sink away. 2D only.
   const wA =
     prog(f, LOSS.openA - 6, LOSS.openA + 16, EASE_IN_OUT) *
     (1 - prog(f, LOSS.openB - 8, LOSS.openB + 12, EASE_IN_OUT));
@@ -82,7 +82,9 @@ export const Scatter: React.FC = () => {
 
   return (
     <AbsoluteFill style={{ background: SET_BG, opacity: out }}>
-      <Stage intensity={0.62} backlight={0.25} />
+      {/* the set lit a little brighter than the product beats: the piles are
+          small dark glass, and they must read as things in the dark */}
+      <Stage intensity={0.95} backlight={0.42} />
 
       <AbsoluteFill style={{ alignItems: 'center', justifyContent: 'center' }}>
         <div
@@ -98,7 +100,7 @@ export const Scatter: React.FC = () => {
             const c = CONTACTS[i];
             const land = c + 15;
             // the silo exists faintly from the start, brightens as ITS save lands
-            const alive = 0.45 + 0.55 * prog(f, land - 4, land + 8, EASE_OUT);
+            const alive = 0.62 + 0.38 * prog(f, land - 4, land + 8, EASE_OUT);
             // the pile keeps growing through beat B — items nobody will read
             const grow =
               prog(f, land, land + 30, EASE_IN_OUT) * 0.5 +
@@ -115,7 +117,9 @@ export const Scatter: React.FC = () => {
             // the shut: a small drop the moment the fan collapses
             const shutAt = i === WRONG_A ? LOSS.shutA : i === WRONG_B ? LOSS.shutB : -100;
             const shutThud = Math.max(0, 1 - Math.abs(f - shutAt - 4) / 8) * 0.05;
-            // the light-grade exit: bleach into the paper, staggered
+            // the night exit: each pile SINKS into the dark, staggered:
+            // drains of colour, softens, dims and recedes (it bleached into
+            // the paper on the light grade)
             const gone = prog(f, 318 + ((i * 13) % 5) * 8, 352 + ((i * 13) % 5) * 8, EASE_IN_OUT);
 
             const count = SILO_BASE_COUNT[p.k] + (f >= land ? 1 : 0);
@@ -131,11 +135,11 @@ export const Scatter: React.FC = () => {
                   marginTop: SILO_OFFSET.y,
                   transform: [
                     `translate3d(${siloPos[i].x}px, ${siloPos[i].y + drift(f, 4, 260 + i * 24, i)}px, 0)`,
-                    `scale(${1 + bounce + shutThud + openT * 0.3})`,
+                    `scale(${(1 + bounce + shutThud + openT * 0.3) * (1 - gone * 0.035)})`,
                   ].join(' '),
                   opacity: alive * (1 - gone) * (openT > 0 ? 1 : 1),
                   zIndex: openT > 0 ? 30 : 10 - i,
-                  filter: `blur(${gone * 5}px) saturate(${1 - gone * 0.9}) brightness(${1 + gone * 0.35})`,
+                  filter: gone > 0.001 ? `grayscale(${gone.toFixed(3)}) blur(${(gone * 5).toFixed(2)}px) brightness(${(1 - gone * 0.5).toFixed(3)})` : undefined,
                 }}
               >
                 <Silo k={p.k} grow={grow} open={openT} count={count} />
@@ -226,12 +230,12 @@ export const Scatter: React.FC = () => {
         </div>
       </AbsoluteFill>
 
-      {/* the frame washing toward white as the piles bleach out */}
+      {/* the dark closing in from the edges as the piles sink away */}
       <AbsoluteFill
         style={{
-          background: `radial-gradient(78% 66% at 50% 48%, rgba(238,240,244,0) 42%, rgba(244,246,249,${
+          background: `radial-gradient(78% 66% at 50% 48%, rgba(2,2,3,0) 42%, rgba(2,2,3,${(
             0.2 + prog(f, 315, 370) * 0.55
-          }) 100%)`,
+          ).toFixed(3)}) 100%)`,
           pointerEvents: 'none',
         }}
       />

@@ -2897,6 +2897,25 @@ drafts; `npm run verify` has the final word on bans and fit.
    reel; do not lead with it. The recap **push** is native: device-record it
    if the notification should be in shot.
 
+*All nine films, the NIGHT LOOK (2026-10-05/06; branch `claude/videos-new-look`, NOT on `main`; supersedes the per-branch states below for these videos):*
+the owner asked for an Apple-level re-edit of every video "in a completely
+new style and vibe". The nine branches (film `claude/film-gemini-vo`, reel
+`claude/machina-reel-pilot`, clips `claude/clip-save|find|ask|revisit`, ads
+`claude/ad-card|trip|todo`) are merged into one branch, and every film is
+re-cut on one night set (`marketing/launch-clip/src/look.ts`; README "The
+night look"): near-black stage lit like a product shot, the app captured in
+its own DARK theme with a rim of light and its screen's glow, white and silver
+type (the owner's mask-rise caption motion kept), lost saves sinking into the
+dark, the gather as a burst of light, a luminous lockup. One score engine for
+all nine (`audio/nocturne.mjs`: F minor while saves are lost, D-flat lydian
+once Machina arrives), one narrator (Gemini Sulafat: SAVE and the reel were
+re-voiced from Kokoro), one mix (−14 LUFS, −1 dBTP, a three-band duck), one
+`npm run verify`. REVISIT is laid onto its Gemini read for the first time.
+Deliverables render with `node scripts/render-all.mjs` to `out/final/`
+(gitignored). **Open:** nobody has listened to the new scores (no audio
+device here); the Feed 4:5, Music and Silent editions are not re-rendered;
+owner review of the cuts before anything merges or posts.
+
 *Reels, clips and Meta ads (state on 2026-10-02; none of it is on `main` yet):*
 everything below renders from `marketing/launch-clip/` and shows **the real app**.
 `capture/` builds the shipped `web/` with Firebase swapped for a scripted demo

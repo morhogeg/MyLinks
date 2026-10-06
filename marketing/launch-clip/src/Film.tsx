@@ -1,5 +1,5 @@
 import React from 'react';
-import { AbsoluteFill, Audio, Sequence, staticFile, useCurrentFrame } from 'remotion';
+import { AbsoluteFill, Audio, Sequence, staticFile } from 'remotion';
 import { SCENES, barToFrame } from '../timeline.mjs';
 import { Grain, SET_BG, Vignette } from './film/effects';
 import { Subtitles } from './film/Subtitles';
@@ -46,8 +46,6 @@ export const Film: React.FC<{
   withSubtitles = true,
   audioFile = 'score.wav',
 }) => {
-  const frame = useCurrentFrame();
-
   return (
     <AbsoluteFill style={{ background: SET_BG, fontFamily: sans }}>
       {withAudio && <Audio src={staticFile(audioFile)} />}
@@ -68,21 +66,13 @@ export const Film: React.FC<{
 
       <Vignette strength={0.9} />
       <Grain opacity={0.05} />
-      {/* Captions bring their own per-cue scrim; a film-wide one was invisible
-          on the dark grade but washes the dark cold open on the light grade. */}
+      {/* Captions bring their own per-cue scrim (a film-wide one would dull
+          the product beats for lines that sit beside the device). */}
       {withSubtitles && <Subtitles />}
 
-      {/* the first breath — the light film blooms in from white */}
-      <AbsoluteFill
-        style={{
-          background: '#FFFFFF',
-          opacity: Math.max(
-            frame < 8 ? 1 - frame / 8 : 0,
-            0,
-          ),
-          pointerEvents: 'none',
-        }}
-      />
+      {/* No opening overlay on the night set: the light film bloomed in from
+          white; now the cold open's own light is already arriving on frame 0
+          (ColdOpen.tsx), so the first frame is a picture, never a blank. */}
     </AbsoluteFill>
   );
 };

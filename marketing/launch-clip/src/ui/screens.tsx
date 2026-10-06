@@ -14,6 +14,7 @@ import {
   Tap,
 } from './app';
 import { AnimatedMark, CitationGlyph } from './Brand';
+import { NIGHT } from '../look';
 import {
   ASK_ANSWER,
   ASK_QUESTION,
@@ -113,9 +114,12 @@ export const FeedScreen: React.FC<{
 
 // ───────────────────────────────────────────────────── capture: safari + share
 
-/** The article being read, in a browser — where a save actually starts. */
+/** The article being read, in a browser — where a save actually starts.
+ *  (The four sources wear iOS DARK MODE since the night look, 2026-10-05:
+ *  system greys #1C1C1E / #2C2C2E, label #F2F2F7, secondary #8E8E93, and the
+ *  light status bar.) */
 export const ArticleScreen: React.FC<{ dim?: number }> = ({ dim = 0 }) => (
-  <Screen style={{ background: '#ffffff' }}>
+  <Screen style={{ background: '#121214' }}>
     <StatusBar />
     <div style={{ position: 'absolute', top: 54, left: 0, right: 0, bottom: 0, filter: dim ? `brightness(${1 - dim * 0.25})` : undefined }}>
       {/* browser chrome */}
@@ -126,12 +130,12 @@ export const ArticleScreen: React.FC<{ dim?: number }> = ({ dim = 0 }) => (
           alignItems: 'center',
           justifyContent: 'center',
           gap: 6,
-          borderBottom: '1px solid rgba(0,0,0,0.07)',
-          background: 'rgba(248,248,250,0.95)',
+          borderBottom: '1px solid rgba(255,255,255,0.08)',
+          background: 'rgba(28,28,30,0.95)',
         }}
       >
-        <Lock size={10} color="#8a8a92" />
-        <span style={{ fontSize: 12.5, color: '#3c3c43' }}>{INCOMING.url}</span>
+        <Lock size={10} color="#8E8E93" />
+        <span style={{ fontSize: 12.5, color: 'rgba(235,235,245,0.82)' }}>{INCOMING.url}</span>
       </div>
       <div style={{ padding: '26px 26px 0' }}>
         <div
@@ -140,7 +144,7 @@ export const ArticleScreen: React.FC<{ dim?: number }> = ({ dim = 0 }) => (
             fontWeight: 800,
             letterSpacing: '0.16em',
             textTransform: 'uppercase',
-            color: '#8a8a92',
+            color: '#8E8E93',
           }}
         >
           {INCOMING.site}
@@ -152,12 +156,12 @@ export const ArticleScreen: React.FC<{ dim?: number }> = ({ dim = 0 }) => (
             lineHeight: 1.14,
             fontWeight: 700,
             letterSpacing: '-0.03em',
-            color: '#111318',
+            color: '#F2F2F7',
           }}
         >
           {INCOMING.headline}
         </h1>
-        <p style={{ marginTop: 14, fontSize: 14.5, lineHeight: 1.55, color: '#55555f' }}>
+        <p style={{ marginTop: 14, fontSize: 14.5, lineHeight: 1.55, color: '#AEAEB2' }}>
           {INCOMING.standfirst}
         </p>
         {/* body texture — greeked lines, never lorem gibberish on screen */}
@@ -169,7 +173,7 @@ export const ArticleScreen: React.FC<{ dim?: number }> = ({ dim = 0 }) => (
                 height: 8,
                 width: `${w}%`,
                 borderRadius: 4,
-                background: 'rgba(0,0,0,0.07)',
+                background: 'rgba(255,255,255,0.085)',
               }}
             />
           ))}
@@ -183,18 +187,18 @@ export const ArticleScreen: React.FC<{ dim?: number }> = ({ dim = 0 }) => (
           left: 0,
           right: 0,
           height: 62,
-          background: 'rgba(248,248,250,0.96)',
-          borderTop: '1px solid rgba(0,0,0,0.07)',
+          background: 'rgba(28,28,30,0.96)',
+          borderTop: '1px solid rgba(255,255,255,0.08)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-around',
           padding: '0 26px',
-          color: '#8a8a92',
+          color: '#8E8E93',
         }}
       >
         <ChevronLeft size={20} />
         <ChevronLeft size={20} style={{ transform: 'rotate(180deg)', opacity: 0.35 }} />
-        <Share2 size={19} color="#26262b" />
+        <Share2 size={19} color="#F2F2F7" />
         <Newspaper size={19} />
       </div>
     </div>
@@ -211,7 +215,7 @@ export const ArticleScreen: React.FC<{ dim?: number }> = ({ dim = 0 }) => (
  * without a single word of copy.
  */
 export const InstagramSource: React.FC = () => (
-  <Screen style={{ background: '#ffffff' }}>
+  <Screen style={{ background: '#000000' }}>
     <StatusBar />
     <div style={{ position: 'absolute', top: 54, left: 0, right: 0, bottom: 0 }}>
       <div
@@ -221,20 +225,22 @@ export const InstagramSource: React.FC = () => (
           alignItems: 'center',
           gap: 9,
           padding: '0 16px',
-          borderBottom: '1px solid rgba(0,0,0,0.08)',
+          borderBottom: '1px solid rgba(255,255,255,0.1)',
         }}
       >
         <Instagram size={17} color="rgb(225,48,108)" />
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#111318' }}>@quietplaces</span>
+        <span style={{ fontSize: 13, fontWeight: 600, color: '#F5F5F5' }}>@quietplaces</span>
       </div>
       <div style={{ padding: 14 }}>
         <div
           style={{
             aspectRatio: '1',
             borderRadius: 12,
+            // the post itself: a cove at dusk (sea, a sand edge), with the
+            // carousel's white title, so the picture is lit, not a white tile
             background:
-              'linear-gradient(150deg, rgba(225,48,108,0.12), rgba(244,244,248,0.9) 55%, rgba(230,231,238,0.95))',
-            border: '1px solid rgba(0,0,0,0.07)',
+              'radial-gradient(80% 60% at 72% 26%, rgba(70,186,196,0.5), rgba(70,186,196,0) 70%), radial-gradient(70% 46% at 18% 92%, rgba(222,190,142,0.42), rgba(222,190,142,0) 72%), linear-gradient(160deg, #124656, #0c2d3b 55%, #081b25)',
+            border: '1px solid rgba(255,255,255,0.08)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -247,7 +253,8 @@ export const InstagramSource: React.FC = () => (
               fontWeight: 700,
               lineHeight: 1.18,
               letterSpacing: '-0.03em',
-              color: '#1b1c22',
+              color: '#FFFFFF',
+              textShadow: '0 2px 14px rgba(0,0,0,0.45)',
               textAlign: 'center',
             }}
           >
@@ -262,7 +269,7 @@ export const InstagramSource: React.FC = () => (
                 width: 5,
                 height: 5,
                 borderRadius: 5,
-                background: i === 2 ? 'rgba(27,28,34,0.9)' : 'rgba(0,0,0,0.18)',
+                background: i === 2 ? 'rgba(245,245,245,0.92)' : 'rgba(255,255,255,0.26)',
               }}
             />
           ))}
@@ -273,7 +280,7 @@ export const InstagramSource: React.FC = () => (
 );
 
 export const YouTubeSource: React.FC = () => (
-  <Screen style={{ background: '#ffffff' }}>
+  <Screen style={{ background: '#0F0F0F' }}>
     <StatusBar />
     <div style={{ position: 'absolute', top: 54, left: 0, right: 0, bottom: 0 }}>
       {/* A thumbnail that READS like the real video still (owner note, 13m):
@@ -285,7 +292,7 @@ export const YouTubeSource: React.FC = () => (
           height: 220,
           background:
             'radial-gradient(58% 75% at 22% 32%, rgba(255,186,116,0.4), rgba(255,186,116,0) 62%), radial-gradient(40% 55% at 78% 25%, rgba(120,140,180,0.18), rgba(120,140,180,0) 60%), linear-gradient(168deg, #322b27, #423931 52%, #1a181c)',
-          borderBottom: '1px solid rgba(0,0,0,0.07)',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
         }}
       >
         <div
@@ -334,12 +341,12 @@ export const YouTubeSource: React.FC = () => (
         </span>
       </div>
       <div style={{ padding: '16px 16px 0' }}>
-        <div style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.22, letterSpacing: '-0.02em', color: '#111318' }}>
-          How to Use AI to Improve Yourself
+        <div style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.22, letterSpacing: '-0.02em', color: '#F1F1F1' }}>
+          Use the Tools, Keep the Thinking
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 11 }}>
           <Youtube size={15} color="rgb(255,0,0)" />
-          <span style={{ fontSize: 12.5, color: '#606068' }}>IAmMarkManson · 206K views</span>
+          <span style={{ fontSize: 12.5, color: '#AAAAAA' }}>Unhurried · 206K views</span>
         </div>
       </div>
     </div>
@@ -354,7 +361,8 @@ export const YouTubeSource: React.FC = () => (
  * screenshot is of a chat: that is the honest case (a friend's message, the
  * thing you screenshot because there is nowhere to save it), and it is the
  * `gift` card's origin in the library, so the feed later shows where it went.
- * Photos' own light chrome, nobody's logo.
+ * Photos' own dark-mode chrome, nobody's logo; the screenshot is of a
+ * dark-mode thread, as the phone that took it is in dark mode.
  */
 export const ScreenshotSource: React.FC = () => {
   const bubble = (side: 'them' | 'me', text: string) => (
@@ -364,8 +372,8 @@ export const ScreenshotSource: React.FC = () => {
         maxWidth: '78%',
         padding: '6px 10px',
         borderRadius: 14,
-        background: side === 'me' ? '#2f7ce0' : '#e9e9eb',
-        color: side === 'me' ? '#ffffff' : '#111318',
+        background: side === 'me' ? '#0A84FF' : '#26252A',
+        color: side === 'me' ? '#ffffff' : '#F2F2F7',
         fontSize: 11,
         lineHeight: 1.3,
       }}
@@ -377,7 +385,7 @@ export const ScreenshotSource: React.FC = () => {
   const shotH = 560;
   const shotW = Math.round((shotH * SCREEN_W) / SCREEN_H);
   return (
-    <Screen style={{ background: '#ffffff' }}>
+    <Screen style={{ background: '#000000' }}>
       <StatusBar />
       <div style={{ position: 'absolute', top: 54, left: 0, right: 0, bottom: 0 }}>
         {/* Photos' single-photo bar: back, the date, the day's time */}
@@ -387,13 +395,13 @@ export const ScreenshotSource: React.FC = () => {
             display: 'flex',
             alignItems: 'center',
             padding: '0 12px',
-            color: '#2f7ce0',
+            color: '#0A84FF',
           }}
         >
           <ChevronLeft size={22} strokeWidth={2.2} />
           <div style={{ flex: 1, textAlign: 'center', marginRight: 22 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#111318' }}>Today</div>
-            <div style={{ fontSize: 10.5, color: '#7a7a84' }}>9:41</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#F2F2F7' }}>Today</div>
+            <div style={{ fontSize: 10.5, color: '#8E8E93' }}>9:41</div>
           </div>
         </div>
         {/* the screenshot itself: a messages thread, framed like the photo it is */}
@@ -402,9 +410,9 @@ export const ScreenshotSource: React.FC = () => {
             style={{
               width: shotW,
               height: shotH,
-              background: '#ffffff',
-              border: '1px solid rgba(0,0,0,0.1)',
-              boxShadow: '0 2px 10px rgba(16,24,40,0.08)',
+              background: '#000000',
+              border: '1px solid rgba(255,255,255,0.14)',
+              boxShadow: '0 2px 14px rgba(0,0,0,0.6)',
               overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column',
@@ -417,11 +425,11 @@ export const ScreenshotSource: React.FC = () => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 6,
-                borderBottom: '1px solid rgba(0,0,0,0.08)',
-                background: 'rgba(247,247,249,0.96)',
+                borderBottom: '1px solid rgba(255,255,255,0.08)',
+                background: 'rgba(28,28,30,0.96)',
                 fontSize: 11.5,
                 fontWeight: 600,
-                color: '#111318',
+                color: '#F2F2F7',
               }}
             >
               <div
@@ -429,7 +437,7 @@ export const ScreenshotSource: React.FC = () => {
                   width: 20,
                   height: 20,
                   borderRadius: 20,
-                  background: 'linear-gradient(160deg, #c9ced8, #8e95a3)',
+                  background: 'linear-gradient(160deg, #8e95a3, #5a606c)',
                 }}
               />
               Dana
@@ -442,19 +450,19 @@ export const ScreenshotSource: React.FC = () => {
                   width: '78%',
                   borderRadius: 12,
                   overflow: 'hidden',
-                  border: '1px solid rgba(0,0,0,0.08)',
+                  border: '1px solid rgba(255,255,255,0.08)',
                 }}
               >
                 <div
                   style={{
                     height: 78,
                     background:
-                      'radial-gradient(60% 70% at 30% 35%, rgba(221,196,170,0.9), rgba(221,196,170,0) 70%), linear-gradient(160deg, #e7dfd6, #b9a897)',
+                      'radial-gradient(60% 70% at 30% 35%, rgba(221,196,170,0.78), rgba(221,196,170,0) 70%), linear-gradient(160deg, #8c7c6c, #4a4038)',
                   }}
                 />
-                <div style={{ padding: '6px 8px', background: '#f3f3f5' }}>
-                  <div style={{ fontSize: 10.5, fontWeight: 600, color: '#111318' }}>Ceramic pour-over set</div>
-                  <div style={{ fontSize: 9.5, color: '#7a7a84' }}>studio.smallbatch.co</div>
+                <div style={{ padding: '6px 8px', background: '#2C2C2E' }}>
+                  <div style={{ fontSize: 10.5, fontWeight: 600, color: '#F2F2F7' }}>Ceramic pour-over set</div>
+                  <div style={{ fontSize: 9.5, color: '#8E8E93' }}>studio.smallbatch.co</div>
                 </div>
               </div>
               {bubble('them', 'the ceramic one, not the glass')}
@@ -475,9 +483,9 @@ export const ScreenshotSource: React.FC = () => {
             alignItems: 'flex-start',
             justifyContent: 'space-between',
             padding: '14px 26px 0',
-            color: '#2f7ce0',
-            borderTop: '1px solid rgba(0,0,0,0.06)',
-            background: 'rgba(247,247,249,0.96)',
+            color: '#0A84FF',
+            borderTop: '1px solid rgba(255,255,255,0.08)',
+            background: 'rgba(28,28,30,0.94)',
           }}
         >
           <Share2 size={20} strokeWidth={1.9} />
@@ -522,10 +530,10 @@ export const ShareSheet: React.FC<{
         style={{
           margin: '0 8px',
           borderRadius: 34,
-          background: 'rgba(247,247,249,0.96)',
+          background: 'rgba(30,30,32,0.97)',
           backdropFilter: 'blur(30px)',
-          border: '1px solid rgba(0,0,0,0.06)',
-          boxShadow: '0 -20px 60px rgba(24,32,48,0.28)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          boxShadow: '0 -20px 60px rgba(0,0,0,0.6)',
           padding: '10px 0 26px',
           height: H - 12,
         }}
@@ -535,7 +543,7 @@ export const ShareSheet: React.FC<{
             width: 38,
             height: 5,
             borderRadius: 3,
-            background: 'rgba(0,0,0,0.18)',
+            background: 'rgba(255,255,255,0.28)',
             margin: '0 auto 14px',
           }}
         />
@@ -546,14 +554,14 @@ export const ShareSheet: React.FC<{
               width: 42,
               height: 42,
               borderRadius: 9,
-              background: 'linear-gradient(140deg, #FFFFFF, #E8E8EE)',
-              border: '1px solid rgba(0,0,0,0.08)',
+              background: 'linear-gradient(140deg, #3A3A3C, #2C2C2E)',
+              border: '1px solid rgba(255,255,255,0.1)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: 9,
               fontWeight: 800,
-              color: '#6b6b74',
+              color: '#AEAEB2',
             }}
           >
             {shared.site.slice(0, 1).toUpperCase()}
@@ -561,20 +569,20 @@ export const ShareSheet: React.FC<{
           <div style={{ minWidth: 0 }}>
             {/* The row must name the SOURCE currently behind the sheet — the
                 cross-cut only argues "from anywhere" if the sheet agrees. */}
-            <div style={{ fontSize: 13.5, fontWeight: 600, color: '#111318', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 250 }}>
+            <div style={{ fontSize: 13.5, fontWeight: 600, color: '#F2F2F7', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 250 }}>
               {shared.title}
             </div>
-            <div style={{ fontSize: 11.5, color: '#7a7a84' }}>{shared.site}</div>
+            <div style={{ fontSize: 11.5, color: '#8E8E93' }}>{shared.site}</div>
           </div>
         </div>
-        <div style={{ height: 1, background: 'rgba(0,0,0,0.08)', margin: '0 0 14px' }} />
+        <div style={{ height: 1, background: 'rgba(255,255,255,0.1)', margin: '0 0 14px' }} />
         {/* app row — Machina first */}
         <div style={{ display: 'flex', gap: 20, padding: '0 20px 18px' }}>
           {[
             { name: 'Machina', machina: true },
-            { name: 'Messages', hue: '#2ecc57' },
-            { name: 'Mail', hue: '#2f7ce0' },
-            { name: 'Notes', hue: '#e8c34a' },
+            { name: 'Messages', hue: '#30D158' },
+            { name: 'Mail', hue: '#0A84FF' },
+            { name: 'Notes', hue: '#F2C94C' },
           ].map((a) => (
             <div key={a.name} style={{ width: 62, textAlign: 'center' }}>
               <div
@@ -584,19 +592,19 @@ export const ShareSheet: React.FC<{
                   height: 58,
                   borderRadius: 14,
                   margin: '0 auto 7px',
-                  // The Machina app icon does not theme — it is the dark
-                  // graphite tile in light mode too, which also makes it the
-                  // strongest mark in the row.
+                  // The Machina app icon is the graphite tile; on the dark
+                  // sheet a fine edge of light keeps it separate, and it
+                  // lights up as it is picked.
                   background: a.machina
                     ? 'radial-gradient(circle at 50% 36%, #282833, #16161d 46%, #07070a 100%)'
                     : a.hue,
-                  border: a.machina ? '1px solid rgba(0,0,0,0.25)' : 'none',
+                  border: a.machina ? '1px solid rgba(255,255,255,0.16)' : 'none',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   transform: a.machina ? `scale(${1 + pick * 0.08})` : 'none',
                   boxShadow: a.machina
-                    ? `0 ${4 + pick * 8}px ${10 + pick * 22}px -4px rgba(24,32,48,${0.2 + pick * 0.35})`
+                    ? `0 ${(4 + pick * 8).toFixed(2)}px ${(10 + pick * 22).toFixed(2)}px -4px rgba(0,0,0,${(0.45 + pick * 0.3).toFixed(3)}), 0 0 ${(pick * 26).toFixed(2)}px rgba(${NIGHT.glow},${(pick * 0.5).toFixed(3)})`
                     : 'none',
                 }}
               >
@@ -610,7 +618,7 @@ export const ShareSheet: React.FC<{
               <div
                 style={{
                   fontSize: 10.5,
-                  color: a.machina ? '#111318' : '#6b6b74',
+                  color: a.machina ? '#F5F5F7' : 'rgba(235,235,245,0.62)',
                   fontWeight: a.machina ? 600 : 400,
                 }}
               >
@@ -619,7 +627,7 @@ export const ShareSheet: React.FC<{
             </div>
           ))}
         </div>
-        <div style={{ height: 1, background: 'rgba(0,0,0,0.08)', margin: '0 0 8px' }} />
+        <div style={{ height: 1, background: 'rgba(255,255,255,0.1)', margin: '0 0 8px' }} />
         {[
           { label: 'Copy', icon: '⧉' },
           { label: 'Add to Reading List', icon: '⌾' },
@@ -632,7 +640,7 @@ export const ShareSheet: React.FC<{
               justifyContent: 'space-between',
               padding: '13px 20px',
               fontSize: 14,
-              color: '#26262b',
+              color: '#F2F2F7',
             }}
           >
             {r.label}
@@ -963,7 +971,7 @@ export const AskScreen: React.FC<{
             borderRadius: 22,
             background: T.card,
             border: `1px solid ${T.border}`,
-            boxShadow: '0 8px 24px -10px rgba(24,32,48,0.18)',
+            boxShadow: '0 8px 24px -10px rgba(0,0,0,0.7)',
           }}
         >
           <span style={{ fontSize: 13.5, color: asked ? T.textMuted : T.text, flex: 1, whiteSpace: 'nowrap', overflow: 'hidden' }}>
@@ -1019,7 +1027,7 @@ export const AskScreen: React.FC<{
  * frame because in the film the user has just TAPPED Graph on a cited answer.
  */
 const GRAPH_LEGEND = [
-  { name: 'AI', n: 4 },
+  { name: 'Tech', n: 4 },
   { name: 'Home', n: 4 },
   { name: 'Science', n: 3 },
   { name: 'Philosophy', n: 1 },
@@ -1062,7 +1070,7 @@ export const GraphScreen: React.FC<{
             borderRadius: 999,
             background: T.card,
             border: `1px solid ${T.border}`,
-            boxShadow: '0 1px 2px rgba(16,24,40,0.06)',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.5)',
             fontSize: 12,
             fontWeight: 600,
             color: T.textSecondary,
@@ -1171,8 +1179,10 @@ export const GraphScreen: React.FC<{
                 y1={pa.y}
                 x2={pb.x}
                 y2={pb.y}
-                stroke={T.textMuted}
-                strokeOpacity={0.13 + (i % 5) * 0.055}
+                // the dark theme's muted grey is too deep to read at these
+                // alphas on the dark canvas: the secondary grey, still quiet
+                stroke={T.textSecondary}
+                strokeOpacity={0.15 + (i % 5) * 0.06}
                 strokeWidth={0.7 + (i % 3) * 0.35}
                 strokeDasharray={len}
                 strokeDashoffset={len * (1 - t)}
@@ -1255,7 +1265,7 @@ export const GraphScreen: React.FC<{
           width: 34,
           height: 34,
           borderRadius: 999,
-          background: 'rgba(255,255,255,0.85)',
+          background: 'rgba(18,18,18,0.85)',
           backdropFilter: 'blur(12px)',
           border: `1px solid ${T.borderStrong}`,
           display: 'flex',
@@ -1289,12 +1299,12 @@ export const DigestScreen: React.FC<{ enter?: number; reviewEnter?: number }> = 
           narrative lead, the amber STANDOUT card (doubling as the resurfaced
           save), the italic "Worth sitting with" question, and the Your-notes
           footer. Not an approximation — the same hierarchy, radii and type
-          scale, in the film's light tokens. */}
+          scale, in the film's dark tokens. */}
       <div
         style={{
           borderRadius: 18,
           background: T.card,
-          border: '1px solid rgba(20,20,27,0.22)',
+          border: '1px solid rgba(233,233,242,0.25)',
           boxShadow: T.shadowCard,
           overflow: 'hidden',
           opacity: enter,
@@ -1343,7 +1353,7 @@ export const DigestScreen: React.FC<{ enter?: number; reviewEnter?: number }> = 
             marginTop: 16,
             borderRadius: 16,
             border: `1px solid ${T.border}`,
-            background: T.fillSubtle,
+            background: T.cardHover,
             padding: '13px 15px',
             opacity: reviewEnter,
             transform: `translateY(${(1 - reviewEnter) * 14}px)`,
@@ -1358,10 +1368,10 @@ export const DigestScreen: React.FC<{ enter?: number; reviewEnter?: number }> = 
               fontWeight: 700,
               letterSpacing: '0.14em',
               textTransform: 'uppercase',
-              color: '#D97706',
+              color: '#FBBF24',
             }}
           >
-            <Star size={12} fill="#D97706" strokeWidth={0} />
+            <Star size={12} fill="#FBBF24" strokeWidth={0} />
             Standout
           </div>
           <div style={{ marginTop: 6, fontSize: 14.5, fontWeight: 700, lineHeight: 1.25, color: T.text }}>
@@ -1453,7 +1463,7 @@ export const DigestScreen: React.FC<{ enter?: number; reviewEnter?: number }> = 
 /** Collections — a fast establishing beat, not a feature tour. */
 export const CollectionsScreen: React.FC<{ enter?: number }> = ({ enter = 1 }) => {
   const cols = [
-    { name: 'AI & what it means', n: 12, key: 'indigo' },
+    { name: 'The future of work', n: 12, key: 'indigo' },
     { name: 'Ideas worth keeping', n: 18, key: 'teal' },
     { name: 'The apartment hunt', n: 9, key: 'orange' },
     { name: 'Gift ideas', n: 7, key: 'blue' },

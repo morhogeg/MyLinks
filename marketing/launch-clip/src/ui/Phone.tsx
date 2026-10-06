@@ -1,5 +1,6 @@
 import React from 'react';
 import { T } from '../theme';
+import { NIGHT } from '../look';
 
 /** iPhone logical screen size the app is designed against (iPhone 15/16 class). */
 export const SCREEN_W = 393;
@@ -32,11 +33,16 @@ export const Phone: React.FC<{
         padding: BEZEL,
         background:
           'linear-gradient(147deg, #8e8e96 0%, #3a3a40 18%, #24242a 44%, #4e4e57 62%, #1b1b20 84%, #6a6a73 100%)',
+        // on the night set the body is RIM-LIT: a fine edge of light, a lit
+        // top bevel, the key light spilling round the silhouette so it
+        // separates from the dark, and a deep shadow under it for weight
         boxShadow: [
-          '0 0 0 1px rgba(255,255,255,0.35)',
+          '0 0 0 1px rgba(255,255,255,0.16)',
+          'inset 0 1px 0 rgba(255,255,255,0.32)',
           'inset 0 0 0 1px rgba(0,0,0,0.6)',
-          '0 40px 90px -20px rgba(24,32,48,0.45)',
-          '0 8px 26px rgba(24,32,48,0.25)',
+          `0 0 70px -12px rgba(${NIGHT.key},0.42)`,
+          '0 40px 90px -20px rgba(0,0,0,0.9)',
+          '0 8px 26px rgba(0,0,0,0.6)',
         ].join(', '),
         position: 'relative',
         ...style,
@@ -127,8 +133,9 @@ export const Phone: React.FC<{
 };
 
 /** iOS status bar — the small truth that makes a mock read as a device.
- *  Ink follows the film's theme (`T.text`); pass `light` to force dark ink on
- *  a surface that stays bright regardless of grade. */
+ *  Ink follows the film's theme (`T.text`: light ink, the dark-mode bar);
+ *  pass `light` to force dark ink on a surface that stays bright regardless
+ *  of grade. */
 export const StatusBar: React.FC<{ time?: string; light?: boolean }> = ({
   time = '9:41',
   light = false,
@@ -198,7 +205,8 @@ export const HomeIndicator: React.FC = () => (
       width: 138,
       height: 5,
       borderRadius: 3,
-      background: 'rgba(20,20,27,0.4)',
+      // dark mode's indicator: a light pill
+      background: 'rgba(255,255,255,0.62)',
       zIndex: 58,
     }}
   />

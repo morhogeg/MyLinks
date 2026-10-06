@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { T, categoryColor } from '../theme';
 import { sans } from '../fonts';
+import { NIGHT } from '../look';
 import { CitationGlyph, Wordmark } from './Brand';
 import type { Card } from '../data/library';
 
@@ -57,7 +58,8 @@ export const AppHeader: React.FC<{ title?: string; showSearch?: boolean }> = ({
       left: 0,
       right: 0,
       paddingTop: 54,
-      background: 'rgba(249,250,251,0.88)',
+      // the app's header glass, bg-background/85 (dark tokens)
+      background: 'rgba(5,5,5,0.85)',
       backdropFilter: 'blur(20px)',
       zIndex: 40,
     }}
@@ -86,7 +88,7 @@ export const AppHeader: React.FC<{ title?: string; showSearch?: boolean }> = ({
             width: 27,
             height: 27,
             borderRadius: 27,
-            background: 'linear-gradient(140deg, #ECECF1, #D8D8E0)',
+            background: 'linear-gradient(140deg, #2B2B33, #1A1A20)',
             border: `1px solid ${T.borderStrong}`,
             display: 'flex',
             alignItems: 'center',
@@ -152,7 +154,7 @@ export const TabBar: React.FC<{ active?: 'home' | 'collections' | 'ask' | 'diges
         right: 0,
         bottom: 0,
         paddingBottom: 22,
-        background: 'rgba(249,250,251,0.88)',
+        background: 'rgba(5,5,5,0.85)',
         backdropFilter: 'blur(20px)',
         borderTop: `1px solid ${T.border}`,
         zIndex: 50,
@@ -324,10 +326,12 @@ export const AppCard: React.FC<{
     style={{
       background: T.card,
       borderRadius: 20,
-      border: `1px solid ${highlight > 0 ? `rgba(20,20,27,${0.06 + highlight * 0.28})` : T.border}`,
+      border: `1px solid ${highlight > 0 ? `rgba(236,239,246,${(0.05 + highlight * 0.5).toFixed(3)})` : T.border}`,
+      // the night look's emphasis: a ring of light and a soft halo, never a
+      // recolour of the card (it was an ink ring on the light grade)
       boxShadow:
         highlight > 0
-          ? `${T.shadowCard}, 0 8px ${18 + highlight * 22}px -8px rgba(24,32,48,${0.08 + highlight * 0.22})`
+          ? `${T.shadowCard}, 0 0 ${(10 + highlight * 18).toFixed(1)}px ${(highlight * 2).toFixed(1)}px rgba(${NIGHT.glow},${(highlight * 0.34).toFixed(3)})`
           : T.shadowCard,
       padding: 16,
       display: 'flex',
@@ -383,7 +387,7 @@ export const AppCard: React.FC<{
             fontSize: 12,
             lineHeight: 1.35,
             fontStyle: 'italic',
-            color: 'rgba(107,114,128,0.95)',
+            color: 'rgba(160,160,160,0.92)',
           }}
         >
           <StickyNote size={12} style={{ flexShrink: 0, marginTop: 2, opacity: 0.6 }} />
@@ -417,8 +421,8 @@ export const SearchField: React.FC<{ value: string; caret?: boolean; semantic?: 
       padding: '0 13px',
       borderRadius: 14,
       background: T.card,
-      border: `1px solid ${semantic > 0 ? `rgba(20,20,27,${0.06 + semantic * 0.24})` : T.border}`,
-      boxShadow: semantic > 0 ? `0 6px 26px -8px rgba(24,32,48,${0.3 * semantic})` : undefined,
+      border: `1px solid ${semantic > 0 ? `rgba(236,239,246,${(0.05 + semantic * 0.32).toFixed(3)})` : T.border}`,
+      boxShadow: semantic > 0 ? `0 0 ${(8 + semantic * 18).toFixed(1)}px rgba(${NIGHT.glow},${(0.26 * semantic).toFixed(3)})` : undefined,
     }}
   >
     <Search size={15} color={T.textMuted} />
@@ -463,7 +467,7 @@ export const CitationChip: React.FC<{
         borderRadius: 12,
         background: T.card,
         border: `1px solid ${T.border}`,
-        boxShadow: '0 1px 2px rgba(16,24,40,0.08)',
+        boxShadow: '0 1px 2px rgba(0,0,0,0.5)',
         opacity: enter,
         transform: `translateY(${(1 - enter) * 10}px) scale(${0.96 + enter * 0.04})`,
         maxWidth: '100%',
@@ -478,7 +482,9 @@ export const CitationChip: React.FC<{
           width: 26,
           height: 26,
           borderRadius: 9,
-          background: platform ? `${PLATFORM_INK[kind]}1F` : 'rgba(20,20,27,0.06)',
+          // the platform's hue as a ~0.16 tint (an rgb() string cannot take a
+          // hex alpha suffix, which left these tiles unfilled)
+          background: platform ? PLATFORM_INK[kind].replace('rgb(', 'rgba(').replace(')', ', 0.16)') : 'rgba(255,255,255,0.07)',
           color: platform ? PLATFORM_INK[kind] : T.accent,
           display: 'flex',
           alignItems: 'center',
@@ -526,7 +532,7 @@ export const GraphChip: React.FC<{ opacity?: number; pressed?: number }> = ({
       fontWeight: 600,
       letterSpacing: '0.02em',
       color: T.text,
-      background: `rgba(20,20,27,${0.04 + pressed * 0.08})`,
+      background: `rgba(255,255,255,${(0.05 + pressed * 0.12).toFixed(3)})`,
       border: `1px ${pressed > 0.4 ? 'solid' : 'dashed'} ${T.borderStrong}`,
       borderRadius: 999,
       padding: '4px 9px',
@@ -541,13 +547,20 @@ export const GraphChip: React.FC<{ opacity?: number; pressed?: number }> = ({
 
 /**
  * A fingertip. Rendered inside a `position: relative` parent, centred on it:
- * the pad lands (scales in, darkens), then lifts as a ripple that expands and
- * fades. `t` runs 0–1 over the whole gesture; contact is at ~0.5.
+ * the pad lands (scales in, brightens), then lifts as a ripple that expands
+ * and fades. `t` runs 0–1 over the whole gesture; contact is at ~0.5.
+ *
+ * On the night set the touch is LIGHT (a soft white pad and ring, with a
+ * faint halo); pass `tone="dark"` on a light control, where a light ripple
+ * would vanish.
  */
-export const Tap: React.FC<{ t: number; size?: number }> = ({ t, size = 44 }) => {
+export const Tap: React.FC<{ t: number; size?: number; tone?: 'light' | 'dark' }> = ({ t, size = 44, tone = 'light' }) => {
   if (t <= 0 || t >= 1) return null;
   const down = Math.min(1, t / 0.45); // approach + land
   const up = Math.max(0, (t - 0.5) / 0.5); // lift + ripple
+  const light = tone === 'light';
+  const rgb = light ? '255,255,255' : '20,20,27';
+  const k = light ? 1.15 : 1;
   return (
     <span
       style={{
@@ -559,9 +572,11 @@ export const Tap: React.FC<{ t: number; size?: number }> = ({ t, size = 44 }) =>
         pointerEvents: 'none',
         transform: `translate(-50%, -50%) scale(${0.7 + down * 0.3 + up * 0.9})`,
         borderRadius: '50%',
-        background: `rgba(20,20,27,${0.22 * down * (1 - up)})`,
-        border: `1.5px solid rgba(20,20,27,${0.3 * (1 - up) * down})`,
-        boxShadow: `0 0 0 ${up * 14}px rgba(20,20,27,${0.1 * (1 - up)})`,
+        background: `rgba(${rgb},${(0.22 * k * down * (1 - up)).toFixed(3)})`,
+        border: `1.5px solid rgba(${rgb},${(0.42 * k * (1 - up) * down).toFixed(3)})`,
+        boxShadow: light
+          ? `0 0 0 ${(up * 14).toFixed(2)}px rgba(255,255,255,${(0.1 * (1 - up)).toFixed(3)}), 0 0 ${(12 + up * 10).toFixed(1)}px rgba(${NIGHT.glow},${(0.35 * down * (1 - up)).toFixed(3)})`
+          : `0 0 0 ${(up * 14).toFixed(2)}px rgba(20,20,27,${(0.1 * (1 - up)).toFixed(3)})`,
       }}
     />
   );

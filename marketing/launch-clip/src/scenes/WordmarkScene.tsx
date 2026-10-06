@@ -4,6 +4,7 @@ import { AbsoluteFill, useCurrentFrame } from 'remotion';
 import { SET_BG, Stage } from '../film/effects';
 import { useFraming } from '../film/format';
 import { CONSTELLATION, Silo, SILO_BASE_COUNT, SILO_OFFSET } from '../ui/platforms';
+import { NIGHT, typeGlow } from '../look';
 import { drift, prog, ramp, EASE_IN_OUT, EASE_OUT } from '../film/anim';
 
 /**
@@ -49,9 +50,10 @@ export const WordmarkScene: React.FC = () => {
   // brackets travel from wide-open to closed around the point, and stay
   const spread = (1 - close) * 620 + close * 96;
 
-  // The flash BUILDS as the five converge and spikes on the landing. Written as
+  // The light BUILDS as the five converge and spikes on the landing. Written as
   // a plain decay it sat at full brightness for the whole gather and washed the
-  // incoming panels into one white blob — the opposite of the point.
+  // incoming panels into one blob — the opposite of the point. On the night
+  // set it is a burst of light ON the gather point, never a full-frame flash.
   const flash =
     f < COLLAPSE
       ? Math.pow(gather, 3.4) * 0.5
@@ -59,6 +61,9 @@ export const WordmarkScene: React.FC = () => {
   const float = drift(f, 4, 250);
   const outScale = ramp(f, [60, 120], [1, 1.02], EASE_OUT);
   const out = 1 - prog(f, PUSH + 8, PUSH + 26);
+  // the scatter ends sunk in the dark, so the piles come back up out of it
+  // over the gather's first frames rather than popping in at full
+  const inFade = prog(f, 0, 6, EASE_OUT);
 
   const bracket = (side: -1 | 1) => (
     <div
@@ -71,10 +76,10 @@ export const WordmarkScene: React.FC = () => {
         // stems thicken and it stops being the shipped geometry
         width: 49,
         height: 176,
-        // On the light grade the mark is INK — the accent in light mode is the
-        // dark graphite, so the brackets close in ink around an ink point.
-        color: '#14141B',
-        filter: `drop-shadow(0 ${6 + flash * 6}px ${20 + flash * 26}px rgba(24,32,48,${0.25 + flash * 0.25}))`,
+        // On the night set the mark is LIGHT: white brackets with the
+        // luminous type's halo, brightening with the burst
+        color: NIGHT.ink,
+        filter: `${typeGlow(1.1)} drop-shadow(0 0 ${(8 + flash * 24).toFixed(2)}px rgba(${NIGHT.glow},${(0.18 + flash * 0.42).toFixed(3)}))`,
         opacity: close,
         overflow: 'hidden',
       }}
@@ -91,8 +96,8 @@ export const WordmarkScene: React.FC = () => {
   );
 
   return (
-    <AbsoluteFill style={{ background: SET_BG, opacity: out }}>
-      <Stage intensity={0.62} backlight={0.3 * (1 - gather)} />
+    <AbsoluteFill style={{ background: SET_BG, opacity: out * inFade }}>
+      <Stage intensity={0.62 + 0.33 * (1 - gather)} backlight={0.42 * (1 - gather)} />
 
       {/* the gather — the same constellation, running backwards into a point */}
       {gather < 1 && (
@@ -138,15 +143,23 @@ export const WordmarkScene: React.FC = () => {
         </AbsoluteFill>
       )}
 
-      {/* the collapse flash — pure white light on the light set, so the landing
-          still reads as a spike of energy rather than a hole */}
-      <AbsoluteFill
-        style={{
-          background: `radial-gradient(42% 38% at 50% 50%, rgba(255,255,255,${
-            0.85 * flash * flash
-          }) 0%, rgba(255,255,255,0) 70%)`,
-        }}
-      />
+      {/* the collapse: a burst of light on the gather point (the night
+          look's version of the light grade's white flash), growing a little
+          as it fades so the landing reads as energy released */}
+      {flash > 0.002 && (
+        <AbsoluteFill style={{ alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+          <div
+            style={{
+              width: 1300,
+              height: 1300,
+              flexShrink: 0,
+              borderRadius: '50%',
+              transform: `scale(${(0.82 + 0.3 * prog(f, COLLAPSE, COLLAPSE + 26, EASE_OUT)).toFixed(4)})`,
+              background: `radial-gradient(circle, rgba(225,232,255,${(0.85 * flash * flash).toFixed(4)}) 0%, rgba(160,178,232,${(0.3 * flash * flash).toFixed(4)}) 30%, rgba(160,178,232,0) 65%)`,
+            }}
+          />
+        </AbsoluteFill>
+      )}
 
       <AbsoluteFill style={{ alignItems: 'center', justifyContent: 'center' }}>
         <div
@@ -170,11 +183,11 @@ export const WordmarkScene: React.FC = () => {
               width: 62,
               height: 62,
               borderRadius: 62,
-              // everything the brackets gathered, held as one point of INK
-              background: '#14141B',
-              opacity: gather * 0.96,
+              // everything the brackets gathered, held as one point of LIGHT
+              background: NIGHT.ink,
+              opacity: gather * 0.98,
               filter: 'blur(0.4px)',
-              boxShadow: `0 ${8 + flash * 8}px ${26 + flash * 40}px rgba(24,32,48,${0.3 + flash * 0.3})`,
+              boxShadow: `0 0 ${(16 + flash * 40).toFixed(2)}px ${(2 + flash * 6).toFixed(2)}px rgba(${NIGHT.glow},${(0.5 + flash * 0.35).toFixed(3)})`,
             }}
           />
         </div>

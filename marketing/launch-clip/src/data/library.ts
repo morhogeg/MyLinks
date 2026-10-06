@@ -1,20 +1,26 @@
 /**
  * The library the film shows.
  *
- * Round 13 (owner call): DIVERSE on purpose — an article on memory, an X thread about AI,
+ * Round 13 (owner call): DIVERSE on purpose — an article on memory, an X thread about machines and work,
  * a philosophy video, a travel carousel, an apartment listing, a gift idea, a
  * workout, an article a friend sent. The whole point of the product is that
  * one life produces saves this different, across this many apps, and no single
  * app holds them.
  *
  * Three scenes still need internal coherence, and get it from one THREAD
- * running through the diversity: the AI/what-stays-human trio (the X thread,
- * the philosophy video, the article Maya sent) powers the Ask answer with
+ * running through the diversity: the machines/what-stays-human trio (the X
+ * thread, the philosophy video, the article Maya sent) powers the Ask answer with
  * citations from three different platforms, gives the graph its months-apart
  * pair (the video is 2mo old, the thread 2d), and gives the digest the thing
  * "you keep circling". The search query — "remembering more from books" — shares
  * NOT ONE word with the one card it retrieves ("Why you forget most of what you
  * read"; the recipe it replaced on 2026-09-19 was the owner's "lame example").
+ *
+ * No literal "AI" anywhere on screen (owner, 2026-10-05): the trio's theme is
+ * machines and the work that stays human; the category is Tech (the same
+ * hashed orange the graph always wore). The video's channel is a made-up one,
+ * "Unhurried": its title had to change, and a reworded title must not be put
+ * in a real creator's mouth.
  */
 
 export type Card = {
@@ -47,13 +53,13 @@ export const CARDS: Card[] = [
   },
   {
     id: 'aithread',
-    category: 'AI',
-    title: 'What AI actually changes about work',
+    category: 'Tech',
+    title: 'What the machines actually change about work',
     summary:
       'A thread arguing the models take the typing, not the judgment, and which skills to bet on either way.',
     source: '@futuretense',
     sourceKind: 'x',
-    tags: ['ai', 'work'],
+    tags: ['automation', 'work'],
     readTime: 4,
     age: '2d ago',
   },
@@ -108,23 +114,23 @@ export const CARDS: Card[] = [
   },
   {
     id: 'aiarticle',
-    category: 'AI',
-    title: 'The jobs AI actually changes',
+    category: 'Tech',
+    title: 'The jobs automation actually changes',
     summary:
       'A sober look past the hype at which work shifts first, and why the viral lists keep getting it wrong.',
     source: 'theatlantic.com',
-    tags: ['ai', 'work'],
+    tags: ['automation', 'work'],
     readTime: 9,
     age: '3w ago',
     note: 'Maya sent this. The part about editors is us.',
   },
   {
     id: 'machineminds',
-    category: 'AI',
-    title: 'How to Use AI to Improve Yourself',
+    category: 'Tech',
+    title: 'Use the Tools, Keep the Thinking',
     summary:
-      'Use the tools without outsourcing the thinking: blunt, funny, and specific about what to automate and what to keep yours.',
-    source: 'IAmMarkManson',
+      'Hand off the busywork, not the judgment: blunt, funny, and specific about what to automate and what to keep yours.',
+    source: 'Unhurried',
     sourceKind: 'youtube',
     tags: ['self-improvement', 'watch-again'],
     readTime: 15,
@@ -150,8 +156,8 @@ export const byId = (id: string) => {
 /** The capture scene's incoming article — the one a friend sent. */
 export const INCOMING = {
   site: 'theatlantic.com',
-  url: 'theatlantic.com/tech/jobs-ai-changes',
-  headline: 'The jobs AI actually changes',
+  url: 'theatlantic.com/tech/jobs-automation-changes',
+  headline: 'The jobs automation actually changes',
   standfirst:
     'Past the hype: which work actually shifts first, and why the viral lists keep getting it wrong.',
 };
@@ -170,19 +176,20 @@ export const INCOMING = {
 export const SEARCH_QUERY = 'remembering more from books';
 export const SEARCH_HITS = ['memory'];
 
-/** The Ask exchange — assembled from the AI trio, one card per platform. */
-export const ASK_QUESTION = 'What have I been saving about AI?';
+/** The Ask exchange — assembled from the work trio, one card per platform.
+ *  (Short enough to stay whole in the composer while it is typed.) */
+export const ASK_QUESTION = 'What have I been saving about work?';
 
 export const ASK_ANSWER = [
   'Your saves circle one question: what stays human.',
   '',
-  'The thread you starred argues AI takes the typing and leaves the judgment, the article Maya sent maps which jobs actually shift, and Mark Manson’s video flips it: use the machines to sharpen the human part.',
+  'The thread you starred argues the machines take the typing and leave the judgment, the article Maya sent maps which jobs actually shift, and the video you saved flips it: use the tools to sharpen the human part.',
 ].join('\n');
 
 export const ASK_SOURCES = [
-  { id: 'aithread', label: '@futuretense', kind: 'x' as const, title: 'What AI actually changes about work' },
-  { id: 'machineminds', label: 'IAmMarkManson', kind: 'youtube' as const, title: 'How to Use AI to Improve Yourself' },
-  { id: 'aiarticle', label: 'theatlantic.com', kind: 'link' as const, title: 'The jobs AI actually changes' },
+  { id: 'aithread', label: '@futuretense', kind: 'x' as const, title: 'What the machines actually change about work' },
+  { id: 'machineminds', label: 'Unhurried', kind: 'youtube' as const, title: 'Use the Tools, Keep the Thinking' },
+  { id: 'aiarticle', label: 'theatlantic.com', kind: 'link' as const, title: 'The jobs automation actually changes' },
 ];
 
 /** The graph scene. Positions are hand-set — a force layout that never settles reads as noise. */
@@ -198,10 +205,10 @@ export const GRAPH_NODES: {
 }[] = [
   // The caption's claim lives in cluster 0: the thread saved two days ago and
   // the philosophy video saved two months ago sit on the same island.
-  { id: 'aithread', x: 0.33, y: 0.36, r: 15, cluster: 0, category: 'AI', label: 'AI & work' },
-  { id: 'machineminds', x: 0.47, y: 0.27, r: 13, cluster: 0, category: 'AI', label: 'AI to improve yourself' },
-  { id: 'aiarticle', x: 0.24, y: 0.5, r: 11, cluster: 0, category: 'AI' },
-  { id: 'agents', x: 0.42, y: 0.5, r: 9, cluster: 0, category: 'AI' },
+  { id: 'aithread', x: 0.33, y: 0.36, r: 15, cluster: 0, category: 'Tech', label: 'Machines & work' },
+  { id: 'machineminds', x: 0.47, y: 0.27, r: 13, cluster: 0, category: 'Tech', label: 'Keep the thinking' },
+  { id: 'aiarticle', x: 0.24, y: 0.5, r: 11, cluster: 0, category: 'Tech' },
+  { id: 'agents', x: 0.42, y: 0.5, r: 9, cluster: 0, category: 'Tech' },
   { id: 'ethics', x: 0.35, y: 0.62, r: 8, cluster: 0, category: 'Philosophy' },
   { id: 'apartment', x: 0.7, y: 0.42, r: 12, cluster: 1, category: 'Home', label: 'Balcony two-bed' },
   { id: 'renttips', x: 0.79, y: 0.56, r: 11, cluster: 1, category: 'Home' },
@@ -236,7 +243,7 @@ export const GRAPH_EDGES: [string, string][] = [
 /** Island captions. The app draws these in textSecondary, NOT in a cluster
  *  colour — they are type, not legend. */
 export const CLUSTERS = [
-  { name: 'AI & what stays human', x: 0.35, y: 0.19 },
+  { name: 'Machines & what stays human', x: 0.35, y: 0.19 },
   { name: 'The apartment hunt', x: 0.74, y: 0.24 },
   { name: 'Learning that sticks', x: 0.55, y: 0.93 },
 ];
@@ -248,8 +255,8 @@ export const CLUSTERS = [
 export const SYNTHESIS = {
   title: 'You keep circling one idea',
   meta: 'Jul 21 – 27 · 8 saves',
-  lead: 'The AI thread, Maya’s article, and Mark Manson’s video: three saves, one question. What stays human? You might be ready to write your own take.',
-  standoutTitle: 'How to Use AI to Improve Yourself',
+  lead: 'The thread on machines and work, Maya’s article, and that video from May: three saves, one question. What stays human? You might be ready to write your own take.',
+  standoutTitle: 'Use the Tools, Keep the Thinking',
   standoutReason: 'Saved two months ago, never revisited. It’s the missing half of the argument your newer saves are having.',
   question: 'If the models take the typing, what’s the part of your work only you can do?',
 };

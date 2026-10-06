@@ -1,30 +1,70 @@
-# Machina — launch film
+# Machina — the films
 
-An 80-second launch film, rendered from code. No editor project, no stock music, no
-screen recording: the picture is [Remotion](https://remotion.dev) (React → frames),
-the score is synthesized by a Node script, and both read their timing from one
-shared file.
+Nine films, rendered from code. No editor project, no stock music, no screen
+recording: the picture is [Remotion](https://remotion.dev) (React → frames)
+over captures of the REAL app (`capture/`), the score is synthesized
+(`audio/nocturne.mjs`), the narrator is Gemini TTS (voice Sulafat), and each
+film reads its timing from its own timeline file.
 
-**The film is graded light, bookends included** (owner call) — the product's
-daytime face, white set, ink typography. The cold open runs the shipped
-`BootScreen` MOTION (same keyframes, same delays) in the endcard's ink-on-paper
-palette rather than the app's graphite ground, so the film opens and closes in
-the same light. Act one's loss reads in the same grade: the platform panels
-*bleach out* into the paper rather than sinking into black.
+## The night look (2026-10-05)
 
-The same project builds the **short-form reels** (1080×1920, 15–20s) from a
-shared kit; see [Reels](#reels) and [Motion language](#motion-language) at
-the end. The film's timeline, captions and voice are untouched by them.
+**Every film is shot on one night set** (`src/look.ts`), replacing the light
+"ink on paper" grade. The idea is light, not darkness: the saves are lost in
+the dark, and Machina is where the light comes from.
+
+- **Set**: near black (`#020203`, a hair under the app's `#050505`), lit like
+  a product stage: a soft top light where the type lives, a cool key light
+  behind the product, a violet and a teal pool at the edges for depth, a slow
+  haze; dithered (no banding) and finished with grain and a deep vignette.
+- **Product**: the app is captured in its own **dark theme**
+  (`capture/device.mjs`, `CAPTURE_THEME`), shown as a glass slab with a rim
+  of light (brightest along the top) and its screen's own glow on the set.
+- **Type**: white lines and silver kickers with a soft halo; the
+  owner-approved mask-rise caption motion is unchanged. A video's opening
+  line can be a **poster** (`poster: true`): already set on frame 0.
+- **Story beats**: lost saves *sink into the dark* (grey, dim, recede); the
+  gather is a **burst of light** at the point; the point and the wordmark are
+  white light; emphasis is a ring of light with a halo; taps are light (dark
+  on the dark theme's light buttons: the +, Save, Send).
+- **Close**: the lockup strikes with a burst of light and lands on the
+  tagline, held about two seconds.
+- **Sound**: `audio/nocturne.mjs`, one engine for all nine (see
+  [The score](#the-score)); every mix mastered to −14 LUFS, true peak ≤ −1
+  dBTP, the music stepping back hardest in the speech band under each line.
+
+| Film | Composition (main) | Length | Timeline |
+|---|---|---|---|
+| Launch film | `MachinaLaunchVO` (16:9), `MachinaLaunchVerticalVO` (9:16) | 80.0s | `timeline.mjs` |
+| Highlight reel | `MachinaReel` | 81.6s | `reel-timeline.mjs` |
+| SAVE | `MachinaClipSave` | 62.7s | `clips/save-timeline.mjs` |
+| FIND | `MachinaFind` | 32.5s | `clips/find-timeline.mjs` |
+| ASK | `MachinaAsk` | 34.7s | `clips/ask-timeline.mjs` |
+| REVISIT | `MachinaClipRevisit` | 56.5s | `clips/revisit-timeline.mjs` |
+| Meta ad 1, "What one save becomes" | `MachinaAdCard` (+ Music, Feed 4:5) | 43.7s | `ads/card-timeline.mjs` |
+| Meta ad 2, "The trip" | `MachinaAdTrip` (+ Music, Feed) | 30.7s | `ads/trip-timeline.mjs` |
+| Meta ad 2, "talking to a friend" | `MachinaAdAskTalk` (+ Music, Feed) | 33.9s | `ads/asktalk-timeline.mjs` |
+| Meta ad 3, "Save anything" | `MachinaAdTodo` (+ Music, Feed) | 43.7s | `clips/ad-todo-timeline.mjs` |
 
 ```bash
 cd marketing/launch-clip
-npm install
-npm run score      # → public/score.wav   (synthesize the music + sound design)
-npm run captions   # → out/machina-launch.srt
-npm run verify     # caption-overlap check + per-bar mix analysis (run before rendering)
-npm run render     # → out/machina-launch.mp4
-npm run studio     # interactive editor at localhost:3000
+npm install                                   # (web/ needs `npm ci` too, for the capture)
+node capture/build-app.mjs                    # the real app, built for capture
+node capture/shoot.mjs                        # every take, dark theme → public/reel/app + takes data
+python3 audio/synth-vo.py <script>            # narration from the committed takes (no key, no network)
+node audio/<…>-score.mjs                      # the score (each video's cue sheet)
+node audio/mix-vo.mjs <script>                # score + narrator, mastered (and <ad>-music cuts)
+node scripts/dwell.mjs                        # every caption window against its read
+npm run verify                                # every film's gates
+node scripts/render-all.mjs MachinaReel:machina-reel …   # one bundle, many renders → out/final/
 ```
+
+Scripts: `film`, `reel`, `save`, `find`, `ask`, `revisit`, `adcard`, `adtodo`,
+`trip`, `asktalk`. New narration is voiced on GitHub (push a change to
+`audio/narration-request.json`; `.github/workflows/narration-tts.yml`).
+
+The sections below are the films' history and reference, newest calls
+included; where they describe the light grade (white set, ink type, bleach
+into paper), the night look above supersedes them.
 
 ## Why it is built this way
 
@@ -313,40 +353,52 @@ lengths and its picture is re-timed to them.
 
 ## The score
 
-`audio/score.mjs` — no dependencies, deterministic (seeded LCG, so every render
-is bit-identical). Pad, moving sub bass, a detuned saw **pulse** (the engine), an
-**FM electric piano** for the melody, plus kick, clap, hat, shaker, rim, risers,
-whooshes and impacts — each with its own ADSR and one-pole filter, into a
-dotted-8th delay bus and a Freeverb-style tank (8 damped combs → 4 allpasses,
-23-sample stereo spread), then tanh saturation and film fades.
+**One engine for all nine films: `audio/nocturne.mjs` (2026-10-05).** Each
+film's score script (`audio/score.mjs`, `audio/reel-score.mjs`,
+`audio/clips/*-score.mjs`, `audio/find-score.mjs`, `audio/ads/*-score.mjs`) is
+only its CUE SHEET, through `audio/score-lib.mjs`: which stretches are the
+problem, the turn, the product, its peak and the close, and which of its
+timeline's `HITS` get a tick, a glint, a boom, a whoosh or a riser. Re-time a
+film and its music follows.
 
-**Do not put a plucked string back in.** An earlier cut used Karplus-Strong for
-the rhythmic figure, playing chord-tone-only arpeggios into a long reverb — which
-is, acoustically, a koto, and it got (correctly) described as sounding Chinese.
-Two things had to change together: the instrument, and the note choice. The pulse
-figure walks scale degrees **0-2-3-4-6**, which puts E→F and B→C in the line;
-degrees 0-2-4-5 (C E G A) are still pentatonic no matter what plays them. Progression is
-**C major**, walked C → G → Am → F (I–V–vi–IV) under the whole film, ending
-resolved at home on C. The same four chords walked Am → F → C → G is the same
-harmony and a completely different mood — that ordering is what made an earlier
-cut read as gloomy. Per-bar density brings percussion in for capture, peaks on
-Ask, and drops to a held C pedal for the endcard.
+- **Harmony.** One pitch set, the A-flat major scale, heard from two centres:
+  **F minor** while the saves are lost (`dark`: Fm9 ↔ D♭maj9, a felt-piano
+  sigh, a heartbeat sub, a clock-like hat) and **D-flat lydian** once Machina
+  arrives (`drive`: D♭maj9 · E♭/D♭ · Fm7 · B♭m9; `peak`: G♭maj7♯11 · A♭add9 ·
+  D♭maj9 · E♭/D♭). Same notes, opposite moods: the turn moves where home is,
+  not the key, so it lifts without a lurch. The lydian G natural is the colour
+  of wonder; every film ends resolved on D♭.
+- **Sections.** `dark` · `turn` (a reverse swell into a boom, the light chord,
+  a rising glint) · `drive` (builds in over two bars: harmony and the pulse
+  bass, then the kick and arp, then the full kit) · `calm` (the drive's
+  harmony with no beat, for a read such as the weekly recap) · `peak` ·
+  `end` (the beat stops, a riser lands the strike, the tonic held, the felt
+  motif resolving home) · `still`.
+- **Instruments** (no samples, deterministic): PolyBLEP saw/pulse
+  oscillators, TPT state-variable filters, a 7-voice supersaw pad (HALO), an
+  additive felt piano with inharmonic partials and a hammer thump (FELT), an
+  FM bell (GLINT), a filtered pulse bass (ENGINE) and a sine sub, 16th glass
+  arps (SPARK), a half-time kit (kick on 1 and the & of 2, clap on 3, 16th
+  hats), booms, risers, swells, whooshes and glass ticks. Sends: a modulated
+  8-line FDN reverb (~3.4s) and a ping-pong dotted-8th delay. Master: a kick
+  sidechain on the pads and bass, a stereo-linked glue compressor, a gentle
+  tanh, a DC blocker.
+- **It breathes with the narrator**: melodic notes never start on a spoken
+  word (the spans come from `out/vo/<script>/manifest.json`).
+- **The mix** (`audio/mix-vo.mjs`): under each line the music steps back in
+  three bands, hardest in the speech band (300Hz–4.5kHz); every film is
+  mastered to −14 LUFS, true peak ≤ −1 dBTP (music-only cuts −1.3).
+  `MIX_STEMS=1` writes the ducked music and the voice alone, so the margin can
+  be measured line by line: every narrated line sits 5.6dB+ over the music in
+  the speech band (median about 10dB).
 
-**The score has a split personality, deliberately:** bar 3 — the loss — is the
-ONLY minor chord in the entire film; everything after the turn is I–IV–V
-sunshine (C, F, G), every scene opening on the tonic and closing on V. A
-four-on-the-floor kick plus off-beat open hats carry the product act, the pulse
-doubles to 16ths from the hero scene, a high sparkle pad voice rides over the
-product bars, and a quiet keys lead-in sings over capture/library before the
-full melody enters with Ask.
-
-There is no audio device in the render environment, so the mix is verified
-numerically — `npm run verify` prints per-bar RMS and peak, DC offset and a
-near-clip count, and fails on a clipped master or a bar sitting >3.5dB below its
-neighbours (a hole that size reads as the music stopping). It also asserts no two
-captions ever overlap, which a still review cannot catch.
-
-**Someone still has to listen to it before it ships.**
+The mix levels were set by solo measurement (`DEFAULT_GAINS` in the engine),
+and the balance, loudness, clicks and spectrum were checked numerically and on
+spectrograms. **There is no audio device here: someone still has to listen
+before anything is posted.** (The old C-major scores, and the warning never to
+put a plucked string back in, are in git history: an arpeggio of chord tones
+into a long reverb read as a koto. The new arps walk chord tones plus colour
+tones through a filtered pulse, and none of the figures is pentatonic.)
 
 ## Environment notes (hard-won)
 
@@ -1440,18 +1492,15 @@ few scenes built from these parts; it should not need new motion primitives.
 
 ### Palette and grade
 
-Light only: **ink on paper**. The set is the film's paper (`SET_BG`, a shade
-under the app's `#F9FAFB` so a white screen still separates), lit by
-**`Paper`** (a daylight pool where the type lives, a lift behind the product,
-two slow cool pools, dithered by **`Dither`** so its soft gradients never band
-into rings) and finished by **`Lens`** (the film's grain and a whisper
-of vignette). Colour comes only from the app's own pixels (category pills,
-platform marks) and the app's tokens (`PLATFORM_INK` in `SaveChip`); the
-reel's own type is `INK`/`INK_SOFT`. Emphasis is a lift and an ink ring
-(**`Lift`**), never a recolour. Where the app itself would darken the frame
-(the Add dialog's black scrim), the element is **lifted off its screen**
-(`AppShot` `crop`) instead, so the grade never flips. Never: dark flips,
-neon, glow, glitch, chromatic aberration, colour casts.
+The night set (`src/look.ts`, see [The night look](#the-night-look-2026-10-05)):
+**`Paper`** draws it (the name is the light grade's, kept so every scene
+picked the night set up unchanged), **`BandScrim`** draws the SAME light under
+a mask so the caption band and the set never show a seam, and **`Lens`** adds
+grain and a deep vignette. Colour comes only from the app's own pixels
+(category pills, platform marks) and the set's two edge pools; the films' own
+type is white (`INK`) and silver (`INK_SOFT`). Emphasis is a ring of light
+with a halo (**`Lift`**), never a recolour. Never: a light flip, neon, glitch,
+chromatic aberration, colour casts on the app's pixels.
 
 ### Type
 
@@ -1681,24 +1730,20 @@ app responds and the tick sounds** (the pad touches at 35% of the `Tap`
 gesture). **Nothing sounds on a word the narrator has to land:** a melody note
 or a shimmer goes after the word, not on it (round 13).
 
-### Narrator (`audio/synth-vo.py reel`)
+### Narrator (`audio/synth-vo.py <script>`)
 
-One voice config for everything Machina says (Kokoro `af_heart`, speed 0.95,
-"Machina" spoken "Makeena"). **The captions are the script:** the reel's lines
-are read from `CAPTIONS` in `reel-timeline.mjs` and spoken verbatim, one line
-per caption. The reel introduces Machina with the App Store subtitle and
-closes on the tagline, once, in short lines with air around them. Word timings are measured from the
-per caption. The reel names Machina with the App Store subtitle and closes on
-the tagline (owner call 2026-09-28: every film ends on the tagline, said once)
-in short lines with air around them. Word timings are measured from the
-synthesized audio (`src/reels/data/reel-vo.json`) and drive the kinetic type
-and the lockup's line. The mix ducks the score to 0.55 under the voice
-(the film uses 0.65); that puts the reel's voice at the film's
-voice-over-music balance, which verify measures. The two brand lines (the
-name and the promise) duck it to 0.4 (`duck` on their captions). Verify also
-holds every line at least 3dB over the music in the speech band, and the
-finished mix is mastered to the feeds' −14 LUFS, true peak ≤ −1 dBTP
-(`mix-vo.mjs reel`: a gain, then a look-ahead limiter; `audio/loudness.mjs`).
+One narrator for every film since 2026-10-05: **Gemini TTS, voice Sulafat**
+(the owner's house voice), each film with its own tone and an acting note per
+line (`style`, `pace` on its captions; the film's in `FILM_LINES`). The SAVE
+clip and the highlight reel were the last two on Kokoro; they were re-voiced
+on GitHub (run 29) and re-timed to the read. The reel takes the launch film's
+tone and pace word for word, so the six lines the two share re-use the film's
+own takes. **The captions are the script**: every film but the launch film
+reads its lines from its timeline's `CAPTIONS`, so captions and voice cannot
+disagree. Word timings are measured from the audio and drive the captions;
+`scripts/dwell.mjs` checks every window against the read (the whole line
+inside it, leaving 0.3–1.2s after the voice, ≤4s for an `until` line). Mix and
+master: see [The score](#the-score).
 
 ### Brand bans
 

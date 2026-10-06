@@ -66,12 +66,13 @@ export const light = {
 export type Theme = typeof dark;
 
 /**
- * The film is graded LIGHT (owner call, 2026-07-31) — the product's daytime
- * face, bookends included: the cold open runs the shipped BootScreen MOTION in
- * the endcard's ink-on-paper palette rather than the app's graphite ground
- * (owner call, round 10 — one grade for the whole film).
+ * The film is graded NIGHT (2026-10-05, src/look.ts): the product's own dark
+ * face, bookends included. The cold open runs the shipped BootScreen motion in
+ * its real graphite boot look, and every screen wears the dark tokens above,
+ * which are globals.css :root verbatim. (It was graded light, `T = light`,
+ * from 2026-07-31 until then.)
  */
-export const T = light;
+export const T = dark;
 
 /** `getCategoryColorStyle` from `web/lib/colors.ts`, same hash, same palette. */
 const categoryColorStyles = [

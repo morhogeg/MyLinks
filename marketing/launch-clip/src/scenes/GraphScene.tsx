@@ -5,6 +5,7 @@ import { useFraming } from '../film/format';
 import { FloorGlow, Rig, SET_BG, Stage } from '../film/effects';
 import { drift, prog, ramp, EASE_IN_OUT, EASE_MODAL, EASE_OUT } from '../film/anim';
 import { GraphScreen } from '../ui/screens';
+import { NIGHT } from '../look';
 
 /**
  * The graph — the one beat a competitor cannot copy, so it gets its own scene.
@@ -51,12 +52,13 @@ export const GraphScene: React.FC = () => {
           </Phone>
         </div>
       </Rig>
-      {/* a breath of light from the graph itself */}
+      {/* a breath of light from the graph itself: the key light's colour,
+          screened, gentle enough never to grey the app's blacks */}
       <AbsoluteFill
         style={{
-          background: `radial-gradient(40% 34% at 50% 44%, rgba(255,255,255,${
-            0.22 * prog(f, 10, 90)
-          }) 0%, rgba(255,255,255,0) 72%)`,
+          background: `radial-gradient(40% 34% at ${fr.vertical ? 50 : 67}% 44%, rgba(${NIGHT.glow},${(
+            0.1 * prog(f, 10, 90)
+          ).toFixed(3)}) 0%, rgba(${NIGHT.glow},0) 72%)`,
           mixBlendMode: 'screen',
           pointerEvents: 'none',
         }}
