@@ -658,6 +658,25 @@ def _sanitize_categories(categories) -> list:
     return cleaned
 
 
+def _prompt_vocabulary(uid, client_tags: list, client_categories: list) -> tuple:
+    """The "existing tags / categories" lists for an analysis prompt.
+
+    Built on the server from the caller's own cards whenever the caller is
+    known (link_service.get_user_vocabulary: newest cards, private ones left
+    out). The lists the app sent were read from its newest cards INCLUDING
+    private ones and went into the Gemini prompt unfiltered, so a tag that
+    exists only on a private card reached Google (launch audit PRIV-1). A
+    failed read gives empty lists rather than the client's. The client lists
+    are used only with no uid (REQUIRE_AUTH off, local development)."""
+    if uid:
+        try:
+            return get_user_vocabulary(uid)
+        except Exception as e:
+            logger.warning("Prompt vocabulary read failed (%s); analyzing without it", type(e).__name__)
+            return [], []
+    return client_tags, client_categories
+
+
 # Ingest tokens are `secrets.token_urlsafe(24)` (link_service.ensure_ingest_token):
 # 32 URL-safe base64 characters. Anything else is not one of ours and is
 # refused before it can reach the limiter or Firestore.
@@ -2224,8 +2243,9 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
             ai = GeminiService()
             # Synchronous path: cap Gemini at 2 attempts to stay under the 60s
             # function budget (report 3.6).
-            analysis = ai.analyze_text(note_text, existing_tags=existing_tags,
-                                       existing_categories=existing_categories, attempts=2)
+            note_tags, note_cats = _prompt_vocabulary(note_uid, existing_tags, existing_categories)
+            analysis = ai.analyze_text(note_text, existing_tags=note_tags,
+                                       existing_categories=note_cats, attempts=2)
 
             related_links = []
             if note_uid:
@@ -2306,6 +2326,7 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
         ai = GeminiService()
         content_type = scraped.get("content_type")
         # Synchronous path: 2 Gemini attempts (stay under the 60s budget, report 3.6).
+        existing_tags, existing_categories = _prompt_vocabulary(uid, existing_tags, existing_categories)
         analysis = _analyze_scraped(ai, scraped, existing_tags, attempts=2,
                                     existing_categories=existing_categories, pro=pro)
 
@@ -3321,6 +3342,7 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
         # 2. Analyze with AI
         ai = GeminiService()
         # Synchronous path: 2 Gemini attempts (stay under the 60s budget, report 3.6).
+        existing_tags, existing_categories = _prompt_vocabulary(uid, existing_tags, existing_categories)
         analysis = ai.analyze_image(image_bytes, mime_type, existing_tags=existing_tags,
                                     existing_categories=existing_categories, attempts=2)
 
