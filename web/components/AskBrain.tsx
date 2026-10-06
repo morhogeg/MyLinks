@@ -226,6 +226,9 @@ const HISTORY_TURNS = 6;
 const MAX_QUESTION_CHARS = 2000;
 const QUESTION_TOO_LONG = 'That question is too long. Keep it under 2,000 characters and try again.';
 const GENERIC_ASK_ERROR = 'Something went wrong reaching Machina. Please try again.';
+// Appended to an answer the model stopped before finishing (the stream's
+// "incomplete" error). Markdown italics, under the partial answer.
+const ANSWER_CUT_OFF_NOTE = '_The answer was cut off here. Ask again for the rest._';
 
 /** What a failed ask says in the chat. The backend's user-facing errors are
  *  whole sentences ("Too many requests. Please slow down.", the quota line);
@@ -1241,7 +1244,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                     for (const chunk of chunks) {
                         const line = chunk.split('\n').find(l => l.startsWith('data:'));
                         if (!line) continue;
-                        let evt: { type?: string; text?: string; sources?: ChatSource[]; error?: string };
+                        let evt: { type?: string; text?: string; sources?: ChatSource[]; error?: string; reason?: string };
                         try {
                             evt = JSON.parse(line.slice(line.indexOf(':') + 1).trim());
                         } catch { continue; }
@@ -1272,6 +1275,19 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                             // A reply to a thank-you: kept out of contextIds.
                             accSocial = true;
                             if (!isStale()) patchAt({ social: true });
+                        } else if (evt.type === 'error' && evt.reason === 'incomplete' && accContent.trim()) {
+                            // The answer stopped early, but what arrived is real
+                            // (and, past a short reply, charged): keep it on
+                            // screen with a note instead of swapping it for an
+                            // error the user paid for.
+                            accContent = `${accContent.trimEnd()}\n\n${ANSWER_CUT_OFF_NOTE}`;
+                            if (!isStale()) {
+                                setIsThinking(false);
+                                patchAt({ content: accContent });
+                                setLiveStatus(ANSWER_CUT_OFF_NOTE);
+                            }
+                            reportError(new Error('ask stream incomplete'), 'ask-send-stream');
+                            done = true;
                         } else if (evt.type === 'error') {
                             accError = askErrorCopy(evt.error);
                             if (!isStale()) {
