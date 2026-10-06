@@ -110,7 +110,7 @@ def test_backfill_and_trigger_embed_the_same_characters():
     backfill.embed_text(long_text)               # graph backfill, pipelines
 
     trigger = search.EmbeddingService.__new__(search.EmbeddingService)
-    trigger.client, trigger.model = fake_client, "models/gemini-embedding-001"
+    trigger.client, trigger.model = fake_client, ai_service.EMBEDDING_MODEL
     trigger.generate_embedding(long_text)        # sync_link_embedding
 
     assert search._EMBED_TEXT_MAX_CHARS == ai_service.EMBED_TEXT_MAX_CHARS
