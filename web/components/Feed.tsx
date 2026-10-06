@@ -94,6 +94,16 @@ const noop = () => { };
 // page's worth (useLinks PAGE_SIZE).
 const RENDER_STEP = 150;
 
+// The phone selection bar keeps its 32px buttons; this ::after makes each a
+// 44pt target.
+const SELECTION_HIT = ' relative after:absolute after:-inset-1.5';
+
+// An active-filter chip IS its remove button: the whole pill clears it (the
+// ✕ alone was an 18px target). No taller ::after: wrapped rows sit 6px apart,
+// and a grown chip would take taps off the edge of the one below.
+const FILTER_CHIP = 'group flex items-center ps-2.5 pe-1 py-1 rounded-full bg-card border border-border-subtle text-xs font-semibold shadow-sm cursor-pointer hover:border-accent/40 transition-colors';
+const FILTER_CHIP_X = 'flex items-center justify-center rounded-full p-0.5 text-text-muted group-hover:text-accent group-hover:bg-accent/10 transition-colors';
+
 /**
  * Main feed component displaying saved links
  * Features:
@@ -922,7 +932,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                 <PushNudge uid={uid} onDone={() => setShowPushNudge(false)} />
             )}
             {dueLinks.length > 0 && (
-                <div className="mb-4 rounded-2xl border border-accent/25 bg-card overflow-hidden shadow-lg shadow-accent/5 animate-in fade-in slide-in-from-top-1 duration-300">
+                <div className="mb-4 rounded-2xl border border-accent/25 bg-card overflow-hidden shadow-lg shadow-accent/5 animate-fade-in">
                     <div className="flex items-center gap-3 px-4 py-3 border-b border-border-subtle">
                         <div className="w-9 h-9 shrink-0 rounded-xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-md shadow-accent/20">
                             <Bell className="w-[18px] h-[18px] text-white" />
@@ -2601,17 +2611,17 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                     behaviour is untouched. Selection mode swaps in for the row. */}
                 {isLibraryView && (
                     isSelectionMode ? (
-                        <div className="flex sm:hidden items-center animate-in fade-in slide-in-from-top-1 duration-200">
+                        <div className="flex sm:hidden items-center">
                             {/* Same 40px height as the row it replaces — no layout hop. */}
                             <div className="flex items-center gap-1 h-10 px-1.5 rounded-full bg-accent/10 border border-accent/20 animate-slide-up">
                                 <span className="text-xs font-bold text-accent px-1.5 tabular-nums">{selectedIds.size}</span>
-                                {bulkExtraButtons('h-8 w-8')}
+                                {bulkExtraButtons('h-8 w-8' + SELECTION_HIT)}
                                 <button
                                     onClick={handleBulkStatus}
                                     disabled={selectedIds.size === 0}
                                     title={filter === 'archived' ? 'Unarchive selected' : 'Archive selected'}
                                     aria-label={filter === 'archived' ? 'Unarchive selected' : 'Archive selected'}
-                                    className="h-8 w-8 inline-flex items-center justify-center rounded-full text-accent cursor-pointer hover:bg-accent hover:text-accent-ink transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                    className={`h-8 w-8 inline-flex items-center justify-center rounded-full text-accent cursor-pointer hover:bg-accent hover:text-accent-ink transition-colors disabled:opacity-30 disabled:cursor-not-allowed${SELECTION_HIT}`}
                                 >
                                     {filter === 'archived' ? <ArchiveRestore className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
                                 </button>
@@ -2620,7 +2630,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                     disabled={selectedIds.size === 0}
                                     title="Delete selected"
                                     aria-label="Delete selected"
-                                    className="h-8 w-8 inline-flex items-center justify-center rounded-full text-text-secondary cursor-pointer hover:bg-red-500 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                    className={`h-8 w-8 inline-flex items-center justify-center rounded-full text-text-secondary cursor-pointer hover:bg-red-500 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed${SELECTION_HIT}`}
                                 >
                                     <Trash2 className="w-4 h-4" />
                                 </button>
@@ -2631,7 +2641,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                     }}
                                     title="Cancel selection"
                                     aria-label="Cancel selection"
-                                    className="h-8 w-8 inline-flex items-center justify-center rounded-full text-text-secondary cursor-pointer hover:bg-card-hover hover:text-text transition-colors"
+                                    className={`h-8 w-8 inline-flex items-center justify-center rounded-full text-text-secondary cursor-pointer hover:bg-card-hover hover:text-text transition-colors${SELECTION_HIT}`}
                                 >
                                     <X className="w-4 h-4" />
                                 </button>
@@ -2663,7 +2673,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                     <button
                                         onClick={() => setSearchQuery('')}
                                         aria-label="Clear search"
-                                        className="absolute end-2 top-1/2 -translate-y-1/2 p-1 rounded-full text-text-muted hover:text-text hover:bg-fill-strong transition-colors"
+                                        // 24px glyph, 44pt target: it grows toward the field's edge
+                                        // and the gap past it, never over the typed text (pe-9).
+                                        className="absolute end-2 top-1/2 -translate-y-1/2 p-1 rounded-full text-text-muted hover:text-text hover:bg-fill-strong transition-colors after:absolute after:-inset-y-2.5 after:-start-1 after:-end-4"
                                     >
                                         <X className="w-4 h-4" />
                                     </button>
@@ -2727,7 +2739,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                 <button
                                     onClick={() => setSearchQuery('')}
                                     aria-label="Clear search"
-                                    className="absolute end-2 top-1/2 -translate-y-1/2 p-1 rounded-full text-text-muted hover:text-text hover:bg-fill-strong transition-colors cursor-pointer"
+                                    className="absolute end-2 top-1/2 -translate-y-1/2 p-1 rounded-full text-text-muted hover:text-text hover:bg-fill-strong transition-colors cursor-pointer after:absolute after:-inset-y-2.5 after:-start-1 after:-end-4"
                                 >
                                     <X className="w-4 h-4" />
                                 </button>
@@ -2967,7 +2979,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                 const active = filterButtons.find(b => b.key === filter);
                 if (!active) return null;
                 return (
-                    <div className="flex flex-wrap items-center gap-2 -mx-2 px-2 sm:mx-0 sm:px-0 mb-1 animate-in fade-in slide-in-from-top-1 duration-300">
+                    <div className="flex flex-wrap items-center gap-2 -mx-2 px-2 sm:mx-0 sm:px-0 mb-1 animate-fade-in">
                         <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-accent/5 border border-accent/10">
                             {cloneElement(
                                 active.icon as ReactElement<{ className?: string }>,
@@ -2975,18 +2987,16 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             )}
                             <span className="text-[10px] font-bold text-accent uppercase tracking-wider">Showing:</span>
                         </div>
-                        <div className="group flex items-center gap-1 ps-2.5 pe-1 py-1 rounded-full bg-card border border-border-subtle text-text-secondary text-xs font-semibold shadow-sm">
+                        <button
+                            type="button"
+                            onClick={() => handleFilterSelect('all')}
+                            aria-label={`Clear ${active.label} filter`}
+                            title="Clear filter"
+                            className={`${FILTER_CHIP} gap-1 text-text-secondary`}
+                        >
                             <span>{active.label}</span>
-                            <button
-                                type="button"
-                                onClick={() => handleFilterSelect('all')}
-                                aria-label={`Clear ${active.label} filter`}
-                                title="Clear filter"
-                                className="flex items-center justify-center rounded-full p-0.5 text-text-muted hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
-                            >
-                                <X className="w-3.5 h-3.5" />
-                            </button>
-                        </div>
+                            <span aria-hidden className={FILTER_CHIP_X}><X className="w-3.5 h-3.5" /></span>
+                        </button>
                     </div>
                 );
             })()}
@@ -2994,7 +3004,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
             {/* Back to Insights — shown while the feed is scoped to exactly the
                 facet a tapped Insights row applied (see insightsBackVisible). */}
             {isLibraryView && insightsBackVisible && (
-                <div className="-mx-2 px-2 sm:mx-0 sm:px-0 mb-1 animate-in fade-in slide-in-from-top-1 duration-300">
+                <div className="-mx-2 px-2 sm:mx-0 sm:px-0 mb-1 animate-fade-in">
                     <button
                         onClick={backToInsights}
                         className="inline-flex items-center gap-1 ps-1.5 pe-3 py-1.5 rounded-full bg-card border border-border-subtle text-xs font-semibold text-text-secondary hover:text-text hover:border-accent/40 shadow-sm transition-colors cursor-pointer"
@@ -3012,70 +3022,58 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                 per-row label pills are gone and a single "Clear all" covers the
                 whole bar. Collections keep their own banner below (extra actions). */}
             {isLibraryView && (selectedCategory.size > 0 || selectedTags.size > 0 || sourceChips.length > 0) && (
-                <div className="flex flex-wrap items-center gap-1.5 -mx-2 px-2 sm:mx-0 sm:px-0 mb-1 animate-in fade-in slide-in-from-top-1 duration-300">
+                <div className="flex flex-wrap items-center gap-1.5 -mx-2 px-2 sm:mx-0 sm:px-0 mb-1 animate-fade-in">
                     {Array.from(selectedCategory).map(cat => {
                         const colorStyle = getCategoryColorStyle(cat);
                         return (
-                            <div
+                            <button
                                 key={`cat:${cat}`}
-                                className="group flex items-center gap-1.5 ps-2.5 pe-1 py-1 rounded-full bg-card border border-border-subtle text-text-secondary text-xs font-semibold shadow-sm"
+                                type="button"
+                                onClick={() => setSelectedCategory(prev => { const n = new Set(prev); n.delete(cat); return n; })}
+                                aria-label={`Remove ${cat} filter`}
+                                title="Remove filter"
+                                className={`${FILTER_CHIP} gap-1.5 text-text-secondary`}
                             >
                                 <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: colorStyle.color }} />
                                 <span>{cat}</span>
-                                <button
-                                    type="button"
-                                    onClick={() => setSelectedCategory(prev => { const n = new Set(prev); n.delete(cat); return n; })}
-                                    aria-label={`Remove ${cat} filter`}
-                                    title="Remove filter"
-                                    className="flex items-center justify-center rounded-full p-0.5 text-text-muted hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
-                                >
-                                    <X className="w-3.5 h-3.5" />
-                                </button>
-                            </div>
+                                <span aria-hidden className={FILTER_CHIP_X}><X className="w-3.5 h-3.5" /></span>
+                            </button>
                         );
                     })}
                     {Array.from(selectedTags).map(tag => (
-                        <div
+                        <button
                             key={`tag:${tag}`}
-                            className="group flex items-center gap-1 ps-2.5 pe-1 py-1 rounded-full bg-card border border-border-subtle text-text-secondary text-xs font-semibold shadow-sm"
+                            type="button"
+                            onClick={() => handleToggleTag(tag)}
+                            aria-label={`Remove ${tag.split('/').pop()} filter`}
+                            title="Remove filter"
+                            className={`${FILTER_CHIP} gap-1 text-text-secondary`}
                         >
                             <span className="text-accent/60 font-bold">#</span>
                             <span>{tag.split('/').pop()}</span>
-                            <button
-                                type="button"
-                                onClick={() => handleToggleTag(tag)}
-                                aria-label={`Remove ${tag.split('/').pop()} filter`}
-                                title="Remove filter"
-                                className="flex items-center justify-center rounded-full p-0.5 text-text-muted hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
-                            >
-                                <X className="w-3.5 h-3.5" />
-                            </button>
-                        </div>
+                            <span aria-hidden className={FILTER_CHIP_X}><X className="w-3.5 h-3.5" /></span>
+                        </button>
                     ))}
                     {sourceChips.map(chip => (
-                        <div
+                        <button
                             key={`src:${chip.id}`}
-                            className="group flex items-center gap-1.5 ps-2.5 pe-1 py-1 rounded-full bg-card border border-border-subtle text-text-secondary text-xs font-semibold shadow-sm"
+                            type="button"
+                            onClick={() => handleToggleSourceKeys(chip.keys)}
+                            aria-label={`Remove ${chip.label} filter`}
+                            title="Remove filter"
+                            className={`${FILTER_CHIP} gap-1.5 text-text-secondary`}
                         >
                             <Globe className="w-3 h-3 text-text-muted shrink-0" />
                             <span>{chip.label}</span>
-                            <button
-                                type="button"
-                                onClick={() => handleToggleSourceKeys(chip.keys)}
-                                aria-label={`Remove ${chip.label} filter`}
-                                title="Remove filter"
-                                className="flex items-center justify-center rounded-full p-0.5 text-text-muted hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
-                            >
-                                <X className="w-3.5 h-3.5" />
-                            </button>
-                        </div>
+                            <span aria-hidden className={FILTER_CHIP_X}><X className="w-3.5 h-3.5" /></span>
+                        </button>
                     ))}
                     {selectedCategory.size + selectedTags.size + sourceChips.length > 1 && (
                         <button
                             onClick={() => { setSelectedCategory(new Set()); setSelectedTags(new Set()); setSelectedSources(new Set()); }}
-                            className="text-[10px] font-bold text-text-muted/60 hover:text-accent hover:underline px-2 transition-colors uppercase tracking-tight"
+                            className="h-7 px-2.5 rounded-full text-xs font-semibold text-text-muted hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
                         >
-                            Clear All
+                            Clear all
                         </button>
                     )}
                 </div>
@@ -3083,7 +3081,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
 
             {/* Active Collection — banner shown when the feed is scoped to a collection. */}
             {isLibraryView && selectedCollections.size > 0 && (
-                <div className="flex flex-wrap items-center gap-2 -mx-2 px-2 sm:mx-0 sm:px-0 mb-1 animate-in fade-in slide-in-from-top-1 duration-300">
+                <div className="flex flex-wrap items-center gap-2 -mx-2 px-2 sm:mx-0 sm:px-0 mb-1 animate-fade-in">
                     <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-accent/5 border border-accent/10">
                         <Layers className="w-3 h-3 text-accent" />
                         <span className="text-[10px] font-bold text-accent uppercase tracking-wider">Collection:</span>
@@ -3093,18 +3091,16 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                         if (!col) return null;
                         return (
                             <div key={id} className="flex items-center gap-2">
-                                <div className="group flex items-center gap-1 ps-2.5 pe-1 py-1 rounded-full bg-card border border-border-subtle text-text text-xs font-semibold shadow-sm">
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedCollections(prev => { const n = new Set(prev); n.delete(id); return n; })}
+                                    aria-label={`Remove ${col.name} filter`}
+                                    title="Clear collection filter"
+                                    className={`${FILTER_CHIP} gap-1 text-text`}
+                                >
                                     <span>{col.name}</span>
-                                    <button
-                                        type="button"
-                                        onClick={() => setSelectedCollections(prev => { const n = new Set(prev); n.delete(id); return n; })}
-                                        aria-label={`Remove ${col.name} filter`}
-                                        title="Clear collection filter"
-                                        className="flex items-center justify-center rounded-full p-0.5 text-text-muted hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
-                                    >
-                                        <X className="w-3.5 h-3.5" />
-                                    </button>
-                                </div>
+                                    <span aria-hidden className={FILTER_CHIP_X}><X className="w-3.5 h-3.5" /></span>
+                                </button>
                                 <button
                                     onClick={() => setManageCardsCollection(col)}
                                     title="Add or remove cards in this collection"
@@ -3270,7 +3266,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                         const visibleTags = matchingTags.length === 1 && matchingTags[0].count === filteredLinks.length
                             ? [] : matchingTags;
                         return (matchingSources.length > 0 || visibleTags.length > 0) && (
-                        <div className="mb-5 animate-in fade-in slide-in-from-top-1 duration-200">
+                        <div className="mb-5 animate-fade-in">
                             {matchingSources.length > 0 && (
                                 <>
                                     <div className="flex items-center gap-2 mb-2.5">
