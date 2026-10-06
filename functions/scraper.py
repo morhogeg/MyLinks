@@ -1075,6 +1075,16 @@ def _scrape_linkedin_url(url: str) -> dict:
         # forms redirect to the canonical /posts/<authorSlug>_… URL, which is
         # what the slug fallback can actually read an author from.
         final_url = str(response.url or url)
+        # A deleted post is a dead link, and LinkedIn's bot refusals (HTTP 999,
+        # other 4xx, a redirect to /authwall) are a login wall. Both used to be
+        # read as the post itself: a "ready" card summarizing raw markup
+        # (launch audit CAP-9).
+        status = getattr(response, "status_code", 200) or 200
+        if status in (404, 410):
+            return _fetch_failure("not_found" if status == 404 else "gone", f"HTTP {status}")
+        if 500 <= status < 600:
+            return _fetch_failure("server", f"HTTP {status}")
+        walled = status >= 400 or "/authwall" in (urlparse(final_url).path or "")
 
         from bs4 import BeautifulSoup
         import html as html_lib
@@ -1098,11 +1108,12 @@ def _scrape_linkedin_url(url: str) -> dict:
         p_text = " ".join(t for t in (p.get_text().strip() for p in soup.find_all('p')) if t)
 
         # Longest real candidate wins — ld+json articleBody is the whole post,
-        # og:description a teaser, <p> text usually authwall boilerplate.
-        candidates = [c for c in (ld_body, og_desc, p_text) if c]
+        # og:description a teaser, <p> text usually authwall boilerplate. On a
+        # walled page only the og teaser can be the post.
+        candidates = [c for c in ((og_desc,) if walled else (ld_body, og_desc, p_text)) if c]
         body = max(candidates, key=len)[:8000] if candidates else ""
-        truncated = (bool(body) and body == og_desc
-                     and body.rstrip().endswith(("...", "…")))
+        truncated = walled or (bool(body) and body == og_desc
+                               and body.rstrip().endswith(("...", "…")))
 
         source_name = (ld_author
                        or _extract_linkedin_author(html, final_url)
@@ -1116,12 +1127,20 @@ def _scrape_linkedin_url(url: str) -> dict:
         # them ("Ryan Holiday recommends…") instead of an anonymous post.
         text = f"LINKEDIN POST BY {source_name}:\n\n{body}" if source_name and body else body
 
+        if not body:
+            # Nothing of the post itself: the honest partial card (it offers
+            # "Add screenshots"), never the page's markup as the post.
+            result = _unreadable_result("", reason="login_wall")
+            result["source_name"] = source_name or linkedin_author_from_url(final_url)
+            result["final_url"] = final_url
+            return result
+
         return {
-            "html": html,
+            "html": html[:_MAX_RETURNED_HTML],
             "title": title,
-            "text": text or html[:5000],
+            "text": text,
             "truncated": truncated,
-            "capture_reason": "teaser",
+            "capture_reason": "login_wall" if walled else "teaser",
             "source_name": source_name,
             # Where the redirect landed (a lnkd.in short link's real post URL):
             # feeds finalUrlKey dedupe and the card's `sourcePlatform` stamp.
