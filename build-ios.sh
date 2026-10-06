@@ -34,6 +34,17 @@ API_BASE="${API_BASE:-https://secondbrain-app-94da2.web.app}"
 # domain and rewrites /s and /c to share_page (web/vercel.json).
 SHARE_BASE="${SHARE_BASE:-https://mymachina.app}"
 
+# The sign-in gate. Since the 2026-08-02 cutover the database rules are locked,
+# so an UNGATED bundle opens to nothing with no sign-in screen to recover
+# with (TestFlight builds 1266/1267). Default ON, like CI; only an explicit
+# LEGACY_NO_AUTH=1 (rollback only) builds without it.
+if [ "${LEGACY_NO_AUTH:-}" = "1" ]; then
+    REQUIRE_AUTH=""
+    echo "⚠ LEGACY_NO_AUTH=1: building an UNGATED bundle (rollback only)."
+else
+    REQUIRE_AUTH="true"
+fi
+
 COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
 echo "→ Building iOS bundle from commit ${COMMIT}"
 echo "  (if that's not the latest, Ctrl-C and run: git pull origin main)"
@@ -44,10 +55,14 @@ echo "  (if that's not the latest, Ctrl-C and run: git pull origin main)"
 # scrolls past — the next Archive silently ships the OLD web bundle.
 echo "→ Installing web deps"
 npm install
+# Same as the TestFlight workflow: the auth plugin builds without the Facebook
+# SDK (scripts/strip-facebook-sdk.mjs).
+node scripts/strip-facebook-sdk.mjs
 
 echo "→ Building Next.js static export (API base: $API_BASE)"
 NEXT_PUBLIC_API_BASE="$API_BASE" NEXT_PUBLIC_SHARE_BASE="$SHARE_BASE" \
-    NEXT_PUBLIC_POLICY_BASE="$SHARE_BASE" npm run build
+    NEXT_PUBLIC_POLICY_BASE="$SHARE_BASE" NEXT_PUBLIC_REQUIRE_AUTH="$REQUIRE_AUTH" \
+    NEXT_PUBLIC_COMMIT_SHA="$COMMIT" npm run build
 
 # Guard: the static export must have actually produced the bundle. If it didn't,
 # stop LOUDLY rather than syncing/archiving nothing new.
@@ -64,6 +79,13 @@ npx cap sync ios
 PUB="ios/App/App/public"
 if [ ! -f "$PUB/index.html" ]; then
     echo "✗ cap sync did not populate $PUB — aborting." >&2
+    exit 1
+fi
+# Check the ARTIFACT, not the input (same check as the CI workflow): the
+# bundle's own /build-info.json says what the app will gate on.
+GATED="$(node -e "process.stdout.write(String(require('./$PUB/build-info.json').requireAuth))" 2>/dev/null || echo missing)"
+if [ "${LEGACY_NO_AUTH:-}" != "1" ] && [ "$GATED" != "true" ]; then
+    echo "✗ $PUB/build-info.json reports requireAuth=$GATED. An ungated bundle can't read the locked database — refusing to continue." >&2
     exit 1
 fi
 FILES="$(find "$PUB" -type f | wc -l | tr -d ' ')"

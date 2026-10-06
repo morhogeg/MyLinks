@@ -278,6 +278,9 @@ class _SweepDoc:
     def delete(self):
         self._log.append(f"{self._coll}/{self.id}")
 
+    def set(self, data, merge=False):
+        self._log.append(f"set:{self._coll}/{self.id}:{data.get('ownerUid')}")
+
     def get(self):
         return self
 
@@ -289,6 +292,9 @@ class _SweepColl:
         self._log = log
 
     def where(self, **kw):
+        return self
+
+    def select(self, fields):
         return self
 
     def stream(self):
@@ -344,6 +350,22 @@ class _SweepDb:
             return _Users()
         return _SweepColl(name, self.top.get(name, []), self.log)
 
+    def batch(self):
+        db = self
+
+        class _Batch:
+            def __init__(self):
+                self.refs = []
+
+            def delete(self, ref):
+                self.refs.append(ref)
+
+            def commit(self):
+                db.commits = getattr(db, "commits", 0) + 1
+                for ref in self.refs:
+                    ref.delete()
+        return _Batch()
+
 
 def test_delete_user_data_sweeps_everything(monkeypatch):
     log = []
@@ -359,9 +381,29 @@ def test_delete_user_data_sweeps_everything(monkeypatch):
     for path in ("pending_processing/p1", "task_logs/t1", "entitlements/ws-1",
                  "usage_quotas/ws-1", "synthesis_vault/ws-1__2026-W30",
                  "shared_cards/share-a", "shared_answers/share-b",
-                 "shared_owners/share-a", "shared_owners/share-b",
+                 # Owner rows are retired to an ownerless tombstone, not
+                 # deleted (ACCT-3): the circulated ids stay claimed.
+                 "set:shared_owners/share-a:__deleted__", "set:shared_owners/share-b:__deleted__",
                  "previews/share-a", "previews/share-b", "users/ws-1"):
         assert path in log, path
+
+
+def test_delete_user_data_batches_large_libraries(monkeypatch):
+    """A big library is swept in batched commits (<= 400 deletes each), not
+    one round trip per document, so it fits Hosting's 60s proxy limit."""
+    log = []
+    db = _SweepDb(log)
+    db.subs["links"] = [_SweepDoc("users/ws-1/links", f"c{i}", {}, log) for i in range(901)]
+    monkeypatch.setattr(link_service, "get_db", lambda: db)
+    monkeypatch.setattr(share_service, "_delete_share_previews", lambda sid: None)
+
+    link_service.delete_user_data("ws-1")
+
+    assert sum(1 for p in log if p.startswith("users/ws-1/links/")) == 901
+    # links alone needs 3 commits (400 + 400 + 101); one per other non-empty
+    # subcollection / top-level sweep.
+    assert db.commits < 901
+    assert "users/ws-1" in log
 
 
 def test_subcollection_list_matches_the_rules_file():

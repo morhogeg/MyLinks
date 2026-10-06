@@ -196,7 +196,16 @@ console.log('token fallback');
     p.$('token').value = 'good-token-1234567890';
     p.$('baseUrl').value = 'not a url';
     await p.click('saveTokenBtn');
-    check('a bad server address is refused', p.$('tokenStatus').textContent.startsWith('The server address should look like'));
+    check('a bad server address is refused', p.$('tokenStatus').textContent.startsWith('Leave the server address empty'));
+}
+{
+    // Well-formed but not Machina: the token must never be sent there.
+    const p = await openPopup();
+    await p.click('useTokenBtn');
+    p.$('token').value = 'good-token-1234567890';
+    p.$('baseUrl').value = 'https://evil.example';
+    await p.click('saveTokenBtn');
+    check('a foreign server address is refused', p.$('tokenStatus').textContent.startsWith('Leave the server address empty'));
 }
 
 // ── 3. Connected: opening the popup saves the page ─────────────────────────

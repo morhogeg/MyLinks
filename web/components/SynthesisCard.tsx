@@ -133,7 +133,7 @@ export default function SynthesisCard({
     );
 
     return (
-        <div className="mb-4 rounded-2xl border border-accent/25 bg-card overflow-hidden shadow-lg shadow-accent/5 animate-in fade-in slide-in-from-top-1 duration-300">
+        <div className="mb-4 rounded-2xl border border-accent/25 bg-card overflow-hidden shadow-lg shadow-accent/5 animate-fade-in duration-300">
             {/* Header. In the feed it's the collapse toggle; in the archive it's
                 a static masthead for the piece. */}
             {alwaysOpen ? (
@@ -275,7 +275,7 @@ export default function SynthesisCard({
                                 onClick={() => openCard(standout.id)}
                                 className="mt-8 w-full text-start rounded-2xl border border-border bg-card-hover px-5 py-4 hover:border-accent/40 transition-colors"
                             >
-                                <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-400">
+                                <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-warning">
                                     <Star className="w-3.5 h-3.5" /> Standout
                                 </div>
                                 <div dir="auto" className="mt-1.5 text-[15.5px] font-bold text-text leading-snug">

@@ -109,6 +109,9 @@ export default function SwipeDeck({
     const [pos, setPos] = useState(0);
     const [drag, setDrag] = useState({ x: 0, y: 0 });
     const [phase, setPhase] = useState<Phase>('idle');
+    // Reduce Motion: the top card fades out where it is instead of flying
+    // off-screen with a spin (the graph and the header fade already honor it).
+    const [fadeExit, setFadeExit] = useState(false);
     const [lastAction, setLastAction] = useState<{ index: number; kind: ActionKind; link: Link } | null>(null);
     // Mobile-only ⓘ panel explaining the four actions (desktop gets hover tooltips).
     const [helpOpen, setHelpOpen] = useState(false);
@@ -228,7 +231,6 @@ export default function SwipeDeck({
         // and be dealt by the self-heal effect with pos unchanged — keyed only
         // on pos, the measure never re-ran and the stack rendered collapsed at
         // height 0 (the build-1067 first-tap bug).
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pos, current?.id]);
 
     const settle = () => {
@@ -313,6 +315,9 @@ export default function SwipeDeck({
             if (flingSeq.current === seq) finishExitRef.current();
         }, 420);
         setPhase('exiting');
+        const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+        setFadeExit(reduce);
+        if (reduce) return;
         if (dir === 'right') setDrag({ x: window.innerWidth, y: 0 });
         else if (dir === 'left') setDrag({ x: -window.innerWidth, y: 0 });
         else setDrag({ x: 0, y: -window.innerHeight });
@@ -332,6 +337,17 @@ export default function SwipeDeck({
         const y = e.clientY - start.current.y;
         if (Math.abs(x) > 6 || Math.abs(y) > 6) moved.current = true;
         setDrag({ x, y });
+    };
+
+    // The OS took the gesture (an edge swipe, a call, the page scrolling):
+    // end the drag where it is, never as a swipe. Without this the deck stayed
+    // in 'dragging' with the last offset, and the next plain tap's pointerup
+    // read that stale offset and committed Keep or Archive (REC-19).
+    const onPointerCancel = () => {
+        if (phase !== 'dragging') return;
+        moved.current = false;
+        setPhase('idle');
+        setDrag({ x: 0, y: 0 });
     };
 
     const onPointerUp = () => {
@@ -443,7 +459,7 @@ export default function SwipeDeck({
                             onClick={deal}
                             className={onExit
                                 ? 'inline-flex items-center gap-2 h-10 px-4 rounded-full bg-card border border-border-subtle text-text-secondary hover:text-text hover:bg-card-hover transition-colors cursor-pointer text-sm font-semibold'
-                                : 'inline-flex items-center gap-2 h-10 px-5 rounded-full text-white transition-opacity hover:opacity-90 cursor-pointer text-sm font-semibold'}
+                                : 'inline-flex items-center gap-2 h-10 px-5 rounded-full text-accent-ink transition-opacity hover:opacity-90 cursor-pointer text-sm font-semibold'}
                             style={onExit ? undefined : { backgroundImage: 'var(--accent-gradient)' }}
                         >
                             Review {Math.min(sessionSize, poolCount)} more
@@ -452,7 +468,7 @@ export default function SwipeDeck({
                     {onExit && (
                         <button
                             onClick={onExit}
-                            className="inline-flex items-center gap-2 h-10 px-5 rounded-full text-white transition-opacity hover:opacity-90 cursor-pointer text-sm font-semibold"
+                            className="inline-flex items-center gap-2 h-10 px-5 rounded-full text-accent-ink transition-opacity hover:opacity-90 cursor-pointer text-sm font-semibold"
                             style={{ backgroundImage: 'var(--accent-gradient)' }}
                         >
                             Done
@@ -473,7 +489,10 @@ export default function SwipeDeck({
                     onClick={() => { hapticLight(); setHelpOpen((o) => !o); }}
                     aria-label="What do these buttons do?"
                     aria-expanded={helpOpen}
-                    className={`absolute start-0 h-7 w-7 -ms-1 rounded-full flex items-center justify-center transition-colors cursor-pointer [@media(hover:hover)]:hidden ${helpOpen ? 'text-accent bg-accent/10' : 'text-text-muted'}`}
+                    // 28px drawn, 44pt to the finger (the ::after). z-40: the
+                    // button touches the card stack (z-30) below, and the
+                    // target's lower edge must win over the card's corner.
+                    className={`absolute start-0 z-40 h-7 w-7 -ms-1 after:absolute after:-inset-2 rounded-full flex items-center justify-center transition-colors cursor-pointer [@media(hover:hover)]:hidden ${helpOpen ? 'text-accent bg-accent/10' : 'text-text-muted'}`}
                 >
                     <Info className="w-[18px] h-[18px]" />
                 </button>
@@ -500,6 +519,7 @@ export default function SwipeDeck({
                     const transform = isTop
                         ? `translate(${drag.x}px, ${drag.y}px) rotate(${drag.x * 0.04}deg)`
                         : `translateY(${depth * 12}px) scale(${1 - depth * 0.04})`;
+                    const fading = isTop && phase === 'exiting' && fadeExit;
 
                     return (
                         <div
@@ -507,11 +527,15 @@ export default function SwipeDeck({
                             onPointerDown={isTop ? onPointerDown : undefined}
                             onPointerMove={isTop ? onPointerMove : undefined}
                             onPointerUp={isTop ? onPointerUp : undefined}
+                            onPointerCancel={isTop ? onPointerCancel : undefined}
                             onTransitionEnd={isTop && phase === 'exiting' ? finishExit : undefined}
                             className={`absolute inset-0 ${isTop ? 'cursor-grab active:cursor-grabbing z-30' : 'z-10'}`}
                             style={{
                                 transform,
-                                transition: phase === 'dragging' && isTop ? 'none' : 'transform 0.3s cubic-bezier(0.22,1,0.36,1)',
+                                opacity: fading ? 0 : 1,
+                                transition: phase === 'dragging' && isTop ? 'none'
+                                    : fading ? 'opacity 0.15s ease-out'
+                                    : 'transform 0.3s cubic-bezier(0.22,1,0.36,1)',
                                 touchAction: 'none',
                                 pointerEvents: isTop ? 'auto' : 'none',
                             }}
@@ -538,13 +562,13 @@ export default function SwipeDeck({
                 <DeckAction label="Undo" hint={ACTION_HINTS.undo} onClick={undo} disabled={!lastAction} buttonClassName="text-text-muted hover:text-text">
                     <RotateCcw className="w-5 h-5" />
                 </DeckAction>
-                <DeckAction label="← Archive" hint={ACTION_HINTS.archive} onClick={() => fling('left')} buttonClassName="text-blue-500 hover:bg-blue-500 hover:text-white border-blue-500/30">
+                <DeckAction label="← Archive" hint={ACTION_HINTS.archive} onClick={() => fling('left')} buttonClassName="text-info hover:bg-info hover:text-white border-info/30">
                     <Archive className="w-6 h-6" />
                 </DeckAction>
                 <DeckAction label="↑ Remind" hint={ACTION_HINTS.remind} onClick={() => fling('up')} buttonClassName="text-accent hover:bg-accent hover:text-accent-ink border-accent/30">
                     <Bell className="w-6 h-6" />
                 </DeckAction>
-                <DeckAction label="Keep →" hint={ACTION_HINTS.keep} onClick={() => fling('right')} buttonClassName="text-green-500 hover:bg-green-500 hover:text-white border-green-500/30">
+                <DeckAction label="Keep →" hint={ACTION_HINTS.keep} onClick={() => fling('right')} buttonClassName="text-success hover:bg-success/15 border-success/30">
                     <Check className="w-6 h-6" />
                 </DeckAction>
             </div>
@@ -583,8 +607,8 @@ function DeckAction({ children, onClick, label, hint, disabled, buttonClassName 
  *  explains all four actions at once, right above the buttons they describe. */
 function ActionHelp({ onClose }: { onClose: () => void }) {
     const rows: { icon: React.ReactNode; label: string; hint: string }[] = [
-        { icon: <Check className="w-4 h-4 text-green-500" />, label: 'Keep', hint: ACTION_HINTS.keep },
-        { icon: <Archive className="w-4 h-4 text-blue-500" />, label: 'Archive', hint: ACTION_HINTS.archive },
+        { icon: <Check className="w-4 h-4 text-success" />, label: 'Keep', hint: ACTION_HINTS.keep },
+        { icon: <Archive className="w-4 h-4 text-info" />, label: 'Archive', hint: ACTION_HINTS.archive },
         { icon: <Bell className="w-4 h-4 text-accent" />, label: 'Remind', hint: ACTION_HINTS.remind },
         { icon: <RotateCcw className="w-4 h-4 text-text-muted" />, label: 'Undo', hint: ACTION_HINTS.undo },
     ];
@@ -599,7 +623,8 @@ function ActionHelp({ onClose }: { onClose: () => void }) {
             <button
                 onClick={onClose}
                 aria-label="Close"
-                className="absolute top-2 end-2 h-7 w-7 rounded-full flex items-center justify-center text-text-muted hover:text-text transition-colors cursor-pointer"
+                // 28px drawn, 44pt to the finger (the ::after).
+                className="absolute top-2 end-2 h-7 w-7 after:absolute after:-inset-2 rounded-full flex items-center justify-center text-text-muted hover:text-text transition-colors cursor-pointer"
             >
                 <X className="w-4 h-4" />
             </button>
@@ -678,7 +703,7 @@ const CardFace = memo(function CardFace({ link, onToggleFavorite }: { link: Link
             <div className="flex items-center justify-between gap-2 mb-4">
                 <span
                     className="text-[10px] uppercase font-black tracking-widest px-2 py-1 rounded-lg whitespace-nowrap"
-                    style={{ backgroundColor: colorStyle.backgroundColor, color: colorStyle.color }}
+                    style={{ backgroundColor: colorStyle.backgroundColor, color: colorStyle.ink }}
                 >
                     {link.category}
                 </span>
@@ -701,8 +726,8 @@ const CardFace = memo(function CardFace({ link, onToggleFavorite }: { link: Link
                         aria-pressed={isFavorite}
                         /* -my-2 keeps the 40px tap target from growing the header row. */
                         className={`shrink-0 -my-2 -me-1.5 h-10 w-10 rounded-xl flex items-center justify-center transition-colors ${isFavorite
-                            ? 'bg-yellow-500/10 text-yellow-500'
-                            : 'text-text-muted hover:text-yellow-500 hover:bg-card-hover'
+                            ? 'bg-star/10 text-star'
+                            : 'text-text-muted hover:text-star hover:bg-card-hover'
                             }`}
                     >
                         <Star className={`w-[18px] h-[18px] ${isFavorite ? 'fill-current' : ''}`} />
@@ -725,7 +750,7 @@ const CardFace = memo(function CardFace({ link, onToggleFavorite }: { link: Link
             {link.tags.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-border-subtle">
                     {link.tags.slice(0, 4).map((tag) => (
-                        <span key={tag} className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-fill-subtle text-text-muted/60">
+                        <span key={tag} className="text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-fill-subtle text-text-muted/60">
                             {tag.split('/').pop()}
                         </span>
                     ))}

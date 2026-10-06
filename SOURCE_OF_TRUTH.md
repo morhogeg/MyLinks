@@ -233,6 +233,20 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
+> ## 🚨 OWNER ACTION (2026-10-06): launch audit, branch `claude/launch-audit` (NOT merged, NOT deployed)
+>
+> A full launch audit (207 findings: 11 areas, every high fixed) sits on
+> `claude/launch-audit`. Read `docs/launch-audit/FINAL-REPORT.md` first; each
+> finding with its commit is in `docs/launch-audit/01-findings.md`. To ship:
+> (1) review, then merge via `/ship`: deploy ALL functions (indexes first;
+> new `links.needsEmbedding`), the rules (self-serve workspace create is now
+> Google/Apple-only with the token's own email), Vercel; (2) TestFlight: first
+> compile of the share-extension Swift and the Facebook-SDK strip; (3) the
+> 15-minute device pass in the report §4; (4) App Store Connect: privacy label
+> rows (Purchase History, Device ID) and a Terms of Use link (3.1.2(c));
+> (5) `normalize_created_at` dry run, then `--apply`. The 1346 QA below still
+> applies to what is live today.
+>
 > ## 🚨 OWNER ACTION (2026-10-05): install build **1346** (waiting saves, My notes, first-run fixes, theme follows the device)
 >
 > Merge `adf023b`; backend, rules and web all live (§9 2026-10-05). QA on
@@ -2550,6 +2564,35 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-10-06 — LAUNCH AUDIT, branch `claude/launch-audit` (NOT merged,
+  NOT deployed).** Owner asked for a fix-first, Apple-grade launch audit.
+  Eight read-only area audits plus my own passes found **207 findings (24
+  high)**: 196 fixed, 3 partial, 5 accepted with the reason, 1 owner-only.
+  Three fix branches ran in parallel (account/billing/sharing, AI/search/
+  digests, capture pipeline), each reviewed before merging (the AI branch by
+  a second agent too; its 11 findings were fixed as well). Worst ones: a
+  single malformed card could stop reminders for every user (ACCT-1);
+  account deletion could leave images (ACCT-4) and free a deleted account's
+  share ids for phishing (ACCT-3); private tags and cards reached Gemini
+  (PRIV-1, AUTH-2); the share sheet worked before AI consent (AUTH-1); the
+  janitor deleted running capture jobs and Retry charged without delivering
+  (CAP-1, CAP-2); category chips read at 1.7:1 (A11Y-2). One regression
+  from the audit's own lazy loading (OWN-10: Ask and the graph crashed when
+  opened offline on the web) was caught in the final sweep and fixed. Rules
+  change: self-serve workspace create is Google/Apple-only with the token's
+  own email (E2E now signs in with the emulator's fake Google credential).
+  **Verified:**
+  pytest 1,904 (from 1,360), ruff F and py_compile clean, tsc 0, eslint 0/0
+  on the whole web project, unit 79/79, em-dash gate, static export build;
+  CI E2E green on `88d078a` (the last code commit), Python on `a0e80b2`
+  (the last backend one), rules on `043ae65` (unchanged since).
+  **NOT verified:** any Swift
+  (no toolchain: the next TestFlight build is the first compile), anything
+  on a device, production, live Gemini or RevenueCat. Everything is in
+  `docs/launch-audit/` (00-app-map, 01-findings with every commit,
+  FINAL-REPORT); owner steps in the §4 banner. The temporary CI triggers for
+  this branch were removed in its last commit.
 
 - **2026-10-05 (evening) — BROWSER EXTENSION STORE-READY + MACHINA FOR SAFARI
   PROJECT; B1 CORS SHIPPED.** Branch `claude/app-launch-qa-a29d1f`. Two

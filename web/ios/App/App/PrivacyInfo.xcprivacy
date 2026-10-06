@@ -9,11 +9,14 @@
 	<key>NSPrivacyTrackingDomains</key>
 	<array/>
 
-	<!-- Data the app collects, for the App Privacy label. Sign-in email and the
-	     user's saved links/notes are stored on the app's own Firebase backend
-	     (first-party); neither is used for tracking. -->
+	<!-- Data the app collects. Must match the App Privacy label in App Store
+	     Connect (docs/APP_STORE.md §1, nine types). Everything is stored on the
+	     app's own Firebase backend, linked to the account, never used for
+	     tracking. Product Interaction is the only Analytics purpose: the app
+	     works the same if those first-party events are never written. -->
 	<key>NSPrivacyCollectedDataTypes</key>
 	<array>
+		<!-- Sign-in email (Google / Apple via Firebase Auth). -->
 		<dict>
 			<key>NSPrivacyCollectedDataType</key>
 			<string>NSPrivacyCollectedDataTypeEmailAddress</string>
@@ -26,6 +29,46 @@
 				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
 			</array>
 		</dict>
+		<!-- Display name from the Google / Apple account. -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeName</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<!-- Firebase Auth uid and workspace id that key all user data. -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeUserID</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<!-- Screenshots and images the user hands to the app (share sheet, + Image). -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypePhotosorVideos</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<!-- Saved links and page text, notes, tags, collections, Ask questions and chats. -->
 		<dict>
 			<key>NSPrivacyCollectedDataType</key>
 			<string>NSPrivacyCollectedDataTypeOtherUserContent</string>
@@ -38,9 +81,46 @@
 				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
 			</array>
 		</dict>
-		<!-- FCM/APNs push token: a device identifier stored on the app's own
-		     backend (users/{uid}.fcmTokens) purely to deliver the user's
-		     reminders/digests. Linked to the account, never used for tracking. -->
+		<!-- First-party, content-free events in users/{uid}/analytics_events (web/lib/analytics.ts). -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeProductInteraction</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+			</array>
+		</dict>
+		<!-- Uncaught errors and stacks in users/{uid}/client_errors (web/lib/errorReporter.ts). -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeCrashData</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<!-- Machina Pro subscription state via RevenueCat, keyed to the auth uid. -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypePurchaseHistory</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<!-- FCM/APNs push token (users/{uid}.fcmTokens), only to deliver reminders and digests. -->
 		<dict>
 			<key>NSPrivacyCollectedDataType</key>
 			<string>NSPrivacyCollectedDataTypeDeviceID</string>
@@ -55,10 +135,11 @@
 		</dict>
 	</array>
 
-	<!-- Required-reason API declarations. The app (Capacitor runtime + the
-	     ShareConfig bridge) reads/writes App Group UserDefaults to hand the
-	     Share Extension its ingest endpoint + token. Reason CA92.1: access only
-	     the app's/group's own data, never sent off-device for tracking. -->
+	<!-- Required-reason API declarations. UserDefaults: CA92.1 for the app's
+	     own standard defaults (AppDelegate's install marker, the Capacitor
+	     runtime); 1C8F.1 for the App Group defaults the ShareConfig bridge
+	     shares with the Share Extension (the ingest endpoint). Never sent
+	     off-device for tracking. -->
 	<key>NSPrivacyAccessedAPITypes</key>
 	<array>
 		<dict>
@@ -67,6 +148,7 @@
 			<key>NSPrivacyAccessedAPITypeReasons</key>
 			<array>
 				<string>CA92.1</string>
+				<string>1C8F.1</string>
 			</array>
 		</dict>
 	</array>

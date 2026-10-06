@@ -4,14 +4,13 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, StatusChangeHandler, UserNote, CardShareMode } from '@/lib/types';
 import SourceByline from './SourceByline';
 import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, CircleCheck, Check, Network, Play, Youtube, ImageOff, Image as ImageIcon, Layers, Share2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, StickyNote, Waypoints, Upload, RefreshCw, Link2Off } from 'lucide-react';
-import { getPlatform } from '@/lib/platform';
 import SimpleMarkdown from './SimpleMarkdown';
 import PosterImage from './ui/PosterImage';
 import { openExternal } from '@/lib/share';
 import { getCategoryColorStyle } from '@/lib/colors';
 import CategoryInput from './CategoryInput';
 import TagInput from './TagInput';
-import { hasHebrew, getDominantDirection } from '@/lib/rtl';
+import { hasHebrew, getDominantDirection, contentLang } from '@/lib/rtl';
 import { isPending } from '@/lib/feedUtils';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import { useVisualViewport } from '@/lib/useVisualViewport';
@@ -26,6 +25,8 @@ import ProBadge from './ui/ProBadge';
 import { requestPaywall } from '@/lib/entitlement';
 import { getActionableTakeaway, isTakeawayDismissed, isTakeawayDone } from '@/lib/takeaway';
 import ScreenshotEnrich from '@/components/ScreenshotEnrich';
+import { scrollBehavior } from '@/lib/motion';
+import { relativeTime } from '@/lib/relativeTime';
 
 // Sentinel `editingNoteId` for the composer when adding a brand-new note (as
 // opposed to editing an existing one, keyed by its real id).
@@ -186,7 +187,7 @@ export default function LinkDetailModal({
         if (!el) return;
         const max = Math.max(0, Math.round(el.scrollWidth / Math.max(1, el.clientWidth)) - 1);
         const target = Math.max(0, Math.min(i, max));
-        el.scrollTo({ left: target * el.clientWidth, behavior: 'smooth' });
+        el.scrollTo({ left: target * el.clientWidth, behavior: scrollBehavior() });
     };
     // Reset the broken-image fallback when navigating to a different card. Done
     // as a render-time state adjustment (React discards this pass and re-renders
@@ -281,7 +282,7 @@ export default function LinkDetailModal({
     useEffect(() => {
         if (!scrollToNotes) return;
         const t = setTimeout(() => {
-            notesSectionRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+            notesSectionRef.current?.scrollIntoView({ block: 'start', behavior: scrollBehavior() });
         }, 320);
         return () => clearTimeout(t);
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -293,7 +294,7 @@ export default function LinkDetailModal({
     useEffect(() => {
         if (!scrollToRelated) return;
         const t = setTimeout(() => {
-            relatedSectionRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+            relatedSectionRef.current?.scrollIntoView({ block: 'start', behavior: scrollBehavior() });
         }, 320);
         return () => clearTimeout(t);
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -415,7 +416,7 @@ export default function LinkDetailModal({
     useEffect(() => {
         if (!editingNoteId) return;
         const t = setTimeout(() => {
-            noteEditorRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            noteEditorRef.current?.scrollIntoView({ block: 'center', behavior: scrollBehavior() });
         }, 100);
         return () => clearTimeout(t);
     }, [editingNoteId, vp.height]);
@@ -535,29 +536,12 @@ export default function LinkDetailModal({
         remoteSims && remoteSims.id === link.id ? remoteSims.sims : null,
     );
 
-    // Branded source credit, matching the card: YouTube channel in red, X
-    // author (@handle from the URL) in the X grey, everything else muted.
-    const isYouTube = getPlatform(link.url) === 'youtube' || link.sourceType === 'youtube';
     // The source byline is rendered by the shared <SourceByline> — don't
     // reintroduce per-view platform/author derivation here.
 
-    const getTimeAgo = (timestamp: number | string, now: number): string => {
-        if (!timestamp || !now) return '...';
-        let time = typeof timestamp === 'string' ? new Date(timestamp).getTime() : timestamp;
-        if (isNaN(time) || time <= 0) return isRtl ? 'לאחרונה' : 'recently';
-        // Some ingest paths (Facebook, screenshots) store Unix *seconds*, not ms —
-        // anything below year-2001-in-ms is really a seconds value, so scale it up.
-        if (time < 1e12) time *= 1000;
-
-        const seconds = Math.floor((now - time) / 1000);
-        if (seconds < 60) return isRtl ? 'זה עתה' : 'just now';
-        const minutes = Math.floor(seconds / 60);
-        if (minutes < 60) return isRtl ? `לפני ${minutes} דק׳` : `${minutes}m ago`;
-        const hours = Math.floor(minutes / 60);
-        if (hours < 24) return isRtl ? `לפני ${hours} שע׳` : `${hours}h ago`;
-        const days = Math.floor(hours / 24);
-        return isRtl ? `לפני ${days} ימים` : `${days}d ago`;
-    };
+    // One rule for every surface (lib/relativeTime).
+    const getTimeAgo = (timestamp: number | string, now: number): string =>
+        (!timestamp || !now ? '...' : relativeTime(timestamp, now, isRtl));
 
     const isReminderActive = link.reminderStatus === 'pending';
     const nextReminderDate = link.nextReminderAt ? new Date(link.nextReminderAt) : null;
@@ -615,7 +599,7 @@ export default function LinkDetailModal({
                     <button
                         onPointerDown={() => { noteActionRef.current = 'delete'; }}
                         onClick={() => deleteNote(editingNoteId as string)}
-                        className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-text-muted/70 hover:text-red-400 transition-all ${isRtl ? 'mr-auto' : 'ml-auto'}`}
+                        className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-text-muted/70 hover:text-danger transition-all ${isRtl ? 'mr-auto' : 'ml-auto'}`}
                     >
                         <Trash2 className="w-3.5 h-3.5" /> {isRtl ? 'מחק' : 'Delete'}
                     </button>
@@ -664,7 +648,7 @@ export default function LinkDetailModal({
                                     onClick={goBack}
                                     title="Back to previous card"
                                     aria-label="Back to previous card"
-                                    className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-text-muted hover:text-text hover:bg-card-hover transition-colors"
+                                    className="shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl flex items-center justify-center text-text-muted hover:text-text hover:bg-card-hover transition-colors"
                                 >
                                     <ChevronLeft className="w-5 h-5" />
                                 </button>
@@ -683,7 +667,7 @@ export default function LinkDetailModal({
                                     onClick={onClose}
                                     title={`Back to ${backTo}`}
                                     aria-label={`Back to ${backTo}`}
-                                    className="shrink-0 h-10 ps-1.5 pe-2.5 rounded-xl flex items-center gap-0.5 text-text-muted hover:text-text hover:bg-card-hover transition-colors"
+                                    className="shrink-0 h-10 pointer-coarse:h-11 ps-1.5 pe-2.5 rounded-xl flex items-center gap-0.5 text-text-muted hover:text-text hover:bg-card-hover transition-colors"
                                 >
                                     <ChevronLeft className="w-5 h-5 rtl:rotate-180" />
                                     <span className="text-[13px] font-medium">{backTo}</span>
@@ -695,7 +679,7 @@ export default function LinkDetailModal({
                             onClick={() => onReadStatusChange(link.id, !link.isRead)}
                             title={link.isRead ? 'Mark as unread' : 'Mark as read'}
                             aria-label={link.isRead ? 'Mark as unread' : 'Mark as read'}
-                            className={`shrink-0 h-10 w-10 rounded-xl flex items-center justify-center transition-colors ${link.isRead
+                            className={`shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl flex items-center justify-center transition-colors ${link.isRead
                                 ? 'bg-card-hover text-text'
                                 : 'text-text-muted/50 hover:text-text hover:bg-card-hover'
                                 }`}
@@ -713,9 +697,9 @@ export default function LinkDetailModal({
                             // marker, which has never had a container. The reminder
                             // button below KEEPS its blue chip — a bell has no fill
                             // state, so there the background is the only signal.
-                            className={`shrink-0 h-10 w-10 rounded-xl flex items-center justify-center transition-colors ${link.status === 'favorite'
-                                ? 'text-yellow-500'
-                                : 'text-text-muted hover:text-yellow-500 hover:bg-card-hover'
+                            className={`shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl flex items-center justify-center transition-colors ${link.status === 'favorite'
+                                ? 'text-star'
+                                : 'text-text-muted hover:text-star hover:bg-card-hover'
                                 }`}
                         >
                             <Star className={`w-[18px] h-[18px] ${link.status === 'favorite' ? 'fill-current' : ''}`} />
@@ -724,9 +708,9 @@ export default function LinkDetailModal({
                             onClick={handleToggleReminder}
                             title={isReminderActive ? `Reminder active (next: ${nextReminderDate?.toLocaleDateString()})` : 'Set reminder'}
                             aria-label={isReminderActive ? 'Reminder active' : 'Set reminder'}
-                            className={`shrink-0 h-10 w-10 rounded-xl flex items-center justify-center transition-colors ${isReminderActive
-                                ? 'bg-blue-500/10 text-blue-500'
-                                : 'text-text-muted hover:text-blue-500 hover:bg-card-hover'
+                            className={`shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl flex items-center justify-center transition-colors ${isReminderActive
+                                ? 'bg-info/10 text-info'
+                                : 'text-text-muted hover:text-info hover:bg-card-hover'
                                 }`}
                         >
                             {isReminderActive ? <Bell className="w-[18px] h-[18px]" /> : <BellOff className="w-[18px] h-[18px]" />}
@@ -740,7 +724,7 @@ export default function LinkDetailModal({
                                 onClick={() => onAddToCollection(link)}
                                 title="Add to collection"
                                 aria-label="Add to collection"
-                                className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors"
+                                className="shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl flex items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors"
                             >
                                 <Layers className="w-[18px] h-[18px]" />
                             </button>
@@ -750,7 +734,7 @@ export default function LinkDetailModal({
                                 onClick={() => onShare(link)}
                                 title="Share"
                                 aria-label="Share this card"
-                                className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors"
+                                className="shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl flex items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors"
                             >
                                 <Share2 className="w-[18px] h-[18px]" />
                             </button>
@@ -762,7 +746,7 @@ export default function LinkDetailModal({
                                 onClick={() => onShare(link, 'update')}
                                 title="Update public link"
                                 aria-label="Update public link"
-                                className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors"
+                                className="shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl flex items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors"
                             >
                                 <RefreshCw className="w-[18px] h-[18px]" />
                             </button>
@@ -772,7 +756,7 @@ export default function LinkDetailModal({
                                 onClick={() => onShare(link, 'stop')}
                                 title="Stop sharing"
                                 aria-label="Stop sharing this card"
-                                className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors"
+                                className="shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl flex items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors"
                             >
                                 <Link2Off className="w-[18px] h-[18px]" />
                             </button>
@@ -789,7 +773,7 @@ export default function LinkDetailModal({
                                    for no reason a reader could decode. State now
                                    shows as icon + a brighter glyph, and hover
                                    matches every sibling. */
-                                className={`shrink-0 h-10 w-10 rounded-xl flex items-center justify-center transition-colors hover:text-accent hover:bg-card-hover ${link.hideThumbnail ? 'text-text' : 'text-text-muted'
+                                className={`shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl flex items-center justify-center transition-colors hover:text-accent hover:bg-card-hover ${link.hideThumbnail ? 'text-text' : 'text-text-muted'
                                     }`}
                             >
                                 {link.hideThumbnail ? <ImageIcon className="w-[18px] h-[18px]" /> : <ImageOff className="w-[18px] h-[18px]" />}
@@ -809,7 +793,7 @@ export default function LinkDetailModal({
                         onClick={() => onDelete(link.id)}
                         title="Delete"
                         aria-label="Delete"
-                        className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-text-muted hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                        className="shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl flex items-center justify-center text-text-muted hover:text-danger hover:bg-danger/10 transition-colors"
                     >
                         <Trash2 className="w-[18px] h-[18px]" />
                     </button>
@@ -820,7 +804,7 @@ export default function LinkDetailModal({
                             rel="noopener noreferrer"
                             title={link.sourceType === 'image' ? 'View original image' : 'Open source'}
                             aria-label={link.sourceType === 'image' ? 'View original image' : 'Open source'}
-                            className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors"
+                            className="shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl flex items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors"
                         >
                             <ExternalLink className="w-[18px] h-[18px]" />
                         </a>
@@ -829,7 +813,7 @@ export default function LinkDetailModal({
                         onClick={onClose}
                         aria-label="Close"
                         title="Close"
-                        className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-text-muted hover:text-text hover:bg-card-hover transition-colors"
+                        className="shrink-0 h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11 rounded-xl flex items-center justify-center text-text-muted hover:text-text hover:bg-card-hover transition-colors"
                     >
                         <X className="w-[18px] h-[18px]" />
                     </button>
@@ -894,7 +878,7 @@ export default function LinkDetailModal({
                                             />
                                             <div className="absolute inset-0 bg-black/40 opacity-0 [@media(hover:hover)]:group-hover/img:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
                                                 <span className="text-white text-xs font-bold px-3 py-1.5 bg-black/60 rounded-full backdrop-blur-md border border-white/20">
-                                                    Click to View Original
+                                                    Open the original
                                                 </span>
                                             </div>
                                         </div>
@@ -1068,7 +1052,7 @@ export default function LinkDetailModal({
                                                     className="text-[10px] uppercase font-black tracking-widest px-2.5 py-1.5 rounded-lg inline-block cursor-pointer hover:brightness-110 transition-all flex items-center shadow-lg shadow-black/5"
                                                     style={{
                                                         backgroundColor: colorStyle.backgroundColor,
-                                                        color: colorStyle.color,
+                                                        color: colorStyle.ink,
                                                     }}
                                                     onClick={(e) => {
                                                         e.stopPropagation();
@@ -1083,7 +1067,7 @@ export default function LinkDetailModal({
                                                         setIsEditingCategory(true);
                                                     }}
                                                     aria-label="Edit category"
-                                                    className="opacity-0 group-hover/cat:opacity-100 transition-opacity p-1.5 -ms-1.5 hover:bg-fill-subtle rounded-md"
+                                                    className="opacity-0 group-hover/cat:opacity-100 [@media(hover:none)]:opacity-60 focus-visible:opacity-100 transition-opacity p-1.5 -ms-1.5 hover:bg-fill-subtle rounded-md"
                                                 >
                                                     <Pencil className="w-3.5 h-3.5 text-text-muted/40 hover:text-text-muted" />
                                                 </button>
@@ -1167,6 +1151,7 @@ export default function LinkDetailModal({
                         // one); for a link it edits just the title.
                         <h2
                             dir="auto"
+                            lang={contentLang(link.title)}
                             className={`group/title font-bold text-2xl text-text leading-tight mb-4 ${isRtl ? 'text-right' : ''}`}
                         >
                             {link.title}
@@ -1175,7 +1160,7 @@ export default function LinkDetailModal({
                                     onClick={() => { if (isSingleFieldNote) startEditNoteCard(); else { setTitleDraft(link.title); setIsEditingTitle(true); } }}
                                     aria-label={isSingleFieldNote ? 'Edit note' : 'Edit title'}
                                     title={isSingleFieldNote ? 'Edit note' : 'Edit title'}
-                                    className={`inline-flex items-center justify-center align-middle ms-2 w-7 h-7 rounded-lg text-text-muted hover:text-text hover:bg-fill-subtle focus:opacity-100 transition-colors ${isNote ? '' : 'opacity-0 group-hover/title:opacity-100 transition-opacity'}`}
+                                    className={`inline-flex items-center justify-center relative align-middle ms-2 w-7 h-7 after:absolute after:-inset-2 rounded-lg text-text-muted hover:text-text hover:bg-fill-subtle focus:opacity-100 transition-colors ${isNote ? '' : 'opacity-0 group-hover/title:opacity-100 [@media(hover:none)]:opacity-60 transition-opacity'}`}
                                 >
                                     <Pencil className="w-[18px] h-[18px]" />
                                 </button>
@@ -1183,7 +1168,7 @@ export default function LinkDetailModal({
                         </h2>
                     )}
 
-                    <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <div className="animate-fade-in duration-300">
                         {/* Card ↔ open are ONE thought at two zoom levels: the card
                             summary is the canonical lead, shown (bolded) at the top of
                             the open view, then the deeper Key Points / Conclusions
@@ -1263,7 +1248,7 @@ export default function LinkDetailModal({
                                                                 onClick={startEditSummary}
                                                                 aria-label="Edit summary"
                                                                 title="Edit summary"
-                                                                className={`absolute top-0 inline-flex items-center justify-center w-8 h-8 rounded-lg text-text-muted hover:text-text hover:bg-fill-subtle opacity-0 group-hover/summary:opacity-100 focus:opacity-100 transition-opacity ${isRtl ? 'left-0' : 'right-0'}`}
+                                                                className={`absolute top-0 inline-flex items-center justify-center w-8 h-8 after:absolute after:-inset-1.5 rounded-lg text-text-muted hover:text-text hover:bg-fill-subtle opacity-0 group-hover/summary:opacity-100 [@media(hover:none)]:opacity-60 focus:opacity-100 transition-opacity ${isRtl ? 'left-0' : 'right-0'}`}
                                                             >
                                                                 <Pencil className="w-4 h-4" />
                                                             </button>
@@ -1305,6 +1290,10 @@ export default function LinkDetailModal({
                                             both states so it sees the transition. */}
                                         {(isPartialCapture || (!!link.enrichedAt && link.sourceType !== 'image' && !isNote) || !!link.enrichStatus) && (
                                             <ScreenshotEnrich
+                                                // One instance per card: moving to a related
+                                                // partial card must not carry the picked
+                                                // screenshots (and the "Analyze") across.
+                                                key={link.id}
                                                 link={link}
                                                 uid={uid}
                                                 isRtl={isRtl}
@@ -1419,7 +1408,7 @@ export default function LinkDetailModal({
                                             onClick={() => setSummaryOpen(false)}
                                             aria-label="Collapse Machina's read"
                                             aria-expanded="true"
-                                            className="w-full text-sm font-bold text-text-muted uppercase tracking-wider mb-3 flex items-center gap-2 hover:text-text transition-colors text-left"
+                                            className="w-full text-sm font-bold text-text-muted uppercase tracking-wider mb-3 flex items-center gap-2 hover:text-text transition-colors text-start"
                                         >
                                             <CitationMark state="listening" size={16} className="text-accent shrink-0" />
                                             {/* Always English, always LTR — a product-brand control,
@@ -1460,7 +1449,7 @@ export default function LinkDetailModal({
                                         onClick={toggleSummary}
                                         aria-label="Expand Machina's read"
                                         aria-expanded="false"
-                                        className="w-full text-sm font-bold text-text-muted uppercase tracking-wider flex items-center gap-2 hover:text-text transition-colors text-left"
+                                        className="w-full text-sm font-bold text-text-muted uppercase tracking-wider flex items-center gap-2 hover:text-text transition-colors text-start"
                                     >
                                         <CitationMark state="listening" size={16} className="text-accent shrink-0" />
                                         <span className="flex-1">Machina’s read</span>
@@ -1472,7 +1461,7 @@ export default function LinkDetailModal({
                                         disabled={summaryBusy}
                                         aria-busy={summaryBusy}
                                         aria-expanded="false"
-                                        className="group/read w-full flex items-center gap-3 rounded-2xl border border-border-subtle bg-fill-subtle/60 hover:bg-fill-subtle px-4 py-3.5 transition-colors active:scale-[0.99] disabled:active:scale-100 text-left"
+                                        className="group/read w-full flex items-center gap-3 rounded-2xl border border-border-subtle bg-fill-subtle/60 hover:bg-fill-subtle px-4 py-3.5 transition-colors active:scale-[0.99] disabled:active:scale-100 text-start"
                                     >
                                         <CitationMark
                                             state={summaryBusy ? 'shaping' : 'listening'}
@@ -1558,13 +1547,14 @@ export default function LinkDetailModal({
                                 </span>
                             )}
                             {isReminderActive && nextReminderDate && (
-                                <span
+                                <button
+                                    type="button"
                                     onClick={handleToggleReminder}
                                     className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-accent/10 border border-accent/20 text-accent cursor-pointer hover:brightness-110 active:scale-95 transition-all"
                                 >
-                                    <Bell className="w-3.5 h-3.5" />
+                                    <Bell className="w-3.5 h-3.5" aria-hidden="true" />
                                     {isRtl ? 'תזכורת:' : 'Reminder:'} {nextReminderDate.toLocaleDateString(isRtl ? 'he-IL' : undefined)}
-                                </span>
+                                </button>
                             )}
                         </div>
 
@@ -1580,16 +1570,24 @@ export default function LinkDetailModal({
                                         className="inline-flex items-center gap-1.5 text-xs font-bold text-text-muted/70 hover:text-accent transition-all group/tag bg-fill-subtle hover:bg-fill-strong px-2 py-1 rounded-lg border border-transparent hover:border-accent/10"
                                     >
                                         <span className="flex items-center">
-                                            {parents && <span className="opacity-30 font-normal mr-0.5">{parents}/</span>}
+                                            {parents && <span className="opacity-30 font-normal me-0.5">{parents}/</span>}
                                             {leaf}
                                         </span>
-                                        <X
-                                            className="w-3 h-3 ml-1 opacity-40 group-hover/tag:opacity-100 hover:text-red-400 cursor-pointer transition-all"
+                                        {/* A real button: the bare 12px icon it replaced was
+                                            not focusable and had no name. Full strength where
+                                            there is no hover (touch), quiet until hover with
+                                            a mouse. */}
+                                        <button
+                                            type="button"
+                                            aria-label={isRtl ? `הסר את התגית ${leaf}` : `Remove tag ${leaf}`}
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 onUpdateTags(link.id, link.tags.filter(t => t !== tag), link.tags);
                                             }}
-                                        />
+                                            className="relative ms-0.5 -me-1 p-1 rounded-md opacity-100 [@media(hover:hover)]:opacity-40 group-hover/tag:opacity-100 focus-visible:opacity-100 hover:text-danger cursor-pointer transition-all after:absolute after:-inset-1.5 after:content-['']"
+                                        >
+                                            <X className="w-3 h-3" aria-hidden="true" />
+                                        </button>
                                     </span>
                                 );
                             })}
@@ -1610,7 +1608,7 @@ export default function LinkDetailModal({
                                     className="inline-flex items-center gap-1 text-xs font-bold text-text-muted/50 hover:text-accent transition-all bg-fill-subtle hover:bg-fill-strong px-2 py-1 rounded-lg border border-dashed border-border-strong hover:border-accent/30"
                                 >
                                     <Plus className="w-3 h-3" />
-                                    <span>Add Tag</span>
+                                    <span>Add tag</span>
                                 </button>
                             )}
                         </div>
@@ -1650,7 +1648,7 @@ export default function LinkDetailModal({
                                                         {getTimeAgo(n.updatedAt ?? n.createdAt, now)}
                                                     </span>
                                                 </div>
-                                                <div className={`absolute top-2 flex items-center gap-0.5 opacity-0 group-hover/note:opacity-100 focus-within:opacity-100 transition-opacity ${isRtl ? 'left-2' : 'right-2'}`}>
+                                                <div className={`absolute top-2 flex items-center gap-0.5 opacity-0 group-hover/note:opacity-100 [@media(hover:none)]:opacity-60 focus-within:opacity-100 transition-opacity ${isRtl ? 'left-2' : 'right-2'}`}>
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); startEditNote(n); }}
                                                         aria-label="Edit note"
@@ -1665,7 +1663,7 @@ export default function LinkDetailModal({
                                                         title="Delete note"
                                                         className="p-1.5 hover:bg-fill-subtle rounded-md"
                                                     >
-                                                        <Trash2 className="w-4 h-4 text-text-muted/50 hover:text-red-400" />
+                                                        <Trash2 className="w-4 h-4 text-text-muted/50 hover:text-danger" />
                                                     </button>
                                                 </div>
                                             </div>
@@ -1730,31 +1728,32 @@ export default function LinkDetailModal({
                                         // fused against nothing (owner, 2026-08-22).
                                         const relRtl = getDominantDirection(rel.title, isRtl ? 'rtl' : 'ltr') === 'rtl';
                                         return (
-                                        <div
+                                        <button
+                                            type="button"
                                             key={rel.id}
                                             onClick={() => onOpenOtherLink?.(rel)}
-                                            className="group p-3 rounded-xl bg-card-hover border border-border-subtle shadow-sm hover:border-accent/50 transition-all cursor-pointer"
+                                            className="group block w-full text-start p-3 rounded-xl bg-card-hover border border-border-subtle shadow-sm hover:border-accent/50 transition-all cursor-pointer"
                                         >
-                                            <div className={`flex justify-between items-start gap-3 ${relRtl ? 'flex-row-reverse' : ''}`}>
-                                                <h4
+                                            <span className={`flex justify-between items-start gap-3 ${relRtl ? 'flex-row-reverse' : ''}`}>
+                                                <span
                                                     dir={relRtl ? "rtl" : "ltr"}
-                                                    className={`flex-1 min-w-0 font-medium text-text group-hover:text-accent transition-colors text-sm ${relRtl ? 'text-right' : ''}`}
+                                                    className={`block flex-1 min-w-0 font-medium text-text group-hover:text-accent transition-colors text-sm ${relRtl ? 'text-right' : ''}`}
                                                 >
                                                     {rel.title}
-                                                </h4>
+                                                </span>
                                                 {strong && (
                                                     <span className="shrink-0 text-[10px] bg-accent/20 text-accent px-1.5 py-0.5 rounded font-mono">
                                                         strong
                                                     </span>
                                                 )}
-                                            </div>
-                                            <p
+                                            </span>
+                                            <span
                                                 dir="auto"
-                                                className="text-xs text-text-muted mt-1.5 font-normal italic text-start"
+                                                className="block text-xs text-text-muted mt-1.5 font-normal italic text-start"
                                             >
                                                 {reason}
-                                            </p>
-                                        </div>
+                                            </span>
+                                        </button>
                                         );
                                     })}
                                 </div>

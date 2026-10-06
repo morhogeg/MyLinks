@@ -254,7 +254,184 @@ def _snooze_due_links(link_docs, snooze_to_ms: int) -> None:
         try:
             link_doc.reference.update({'nextReminderAt': int(snooze_to_ms)})
         except Exception as e:
-            logger.error(f"Failed to snooze reminder for link {link_doc.id}: {e}")
+            logger.error(f"Failed to snooze reminder for link {link_doc.id}: {type(e).__name__}")
+
+
+def _str_or(value, default: str) -> str:
+    """`value` if it is a non-blank string, else `default`. Card and settings
+    fields are client-writable with any type, so nothing here can assume one."""
+    return value if isinstance(value, str) and value.strip() else default
+
+
+def _count_or_zero(value) -> int:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return 0
+    return max(0, int(value))
+
+
+def _deliver_user_reminders(uid, user_links, user_data, now_ms, report, send_push, handled) -> None:
+    """Deliver one user's due reminders. Adds each doc it wrote to `handled`,
+    so the caller can snooze the rest if this raises part-way."""
+    if user_data is None:
+        # User doc missing or its fetch failed. Snooze so these due docs stop
+        # sorting to the head of the ASC-ordered limit-500 query and starving
+        # everyone (they'd otherwise be re-fetched untouched every tick).
+        _snooze_due_links(user_links, now_ms + REMINDER_SNOOZE_MS)
+        handled.update(d.id for d in user_links)
+        return
+
+    # `settings` is client-writable (rules allow the key; the type guard
+    # there is new). A non-dict value must not raise here: this loop runs
+    # for EVERY user with a due reminder, and the due query orders by
+    # nextReminderAt, so one account could otherwise sit at the head of
+    # the batch and abort the whole tick for everyone.
+    settings = user_data.get('settings')
+    if not isinstance(settings, dict):
+        settings = {}
+    enabled = settings.get('reminders_enabled', settings.get('remindersEnabled', True))
+
+    if not enabled:
+        # Reminders are OFF. Snooze the due docs (nextReminderAt -> now+1h)
+        # rather than leaving them pending-in-the-past: untouched, they'd stay
+        # at the head of the due query and be re-fetched every 2-min tick,
+        # eventually starving users who CAN be delivered to. A user who
+        # re-enables reminders still sees the reminder within <= 1h.
+        _snooze_due_links(user_links, now_ms + REMINDER_SNOOZE_MS)
+        handled.update(d.id for d in user_links)
+        return
+
+    report["users_with_reminders_enabled"] += 1
+
+    fcm_tokens = user_data.get('fcmTokens') or []
+
+    # Push channel resolution. In-app surfacing (below) is always on; push
+    # is the extra notification channel when the user has it. Users predating
+    # the push rollout (or with a legacy 'whatsapp' entry stored) are migrated
+    # at read time: a missing setting defaults to ['push'], and any stored
+    # 'whatsapp' entry is normalized to 'push' (deduped). New workspaces
+    # default to ["push"] (DEFAULT_USER_SETTINGS in link_service.py). Only
+    # string entries count: a stored `[{}]` used to raise on the dedupe.
+    stored = settings.get('reminders_channel')
+    if not isinstance(stored, list):
+        channels = ['push']
+    else:
+        channels = list(dict.fromkeys(
+            'push' if c == 'whatsapp' else c for c in stored if isinstance(c, str)
+        ))
+    wants_push = 'push' in channels and bool(fcm_tokens)
+
+    # NOTE: we no longer skip users without push. Reminders are surfaced
+    # in-app for everyone (see below); push is an extra channel on top.
+
+    report["reminders_found"] += len(user_links)
+    logger.info(f"Found {len(user_links)} reminders for user {mask_uid(uid)}")
+
+    # PRIVACY: a push lands on a locked phone, so a private card's title
+    # must never be its body (same rule as digest_service's candidate
+    # filter). Loaded once per user, and only when a push will be sent.
+    # Lazy import: `search` pulls in ai_service/genai (house pattern).
+    private_ids = set()
+    is_private_card = lambda _data: False  # noqa: E731
+    if wants_push:
+        try:
+            from search import is_effectively_private, private_collection_ids
+            private_ids = private_collection_ids(uid)
+            is_private_card = lambda data: is_effectively_private(data, private_ids)  # noqa: E731
+        except Exception as e:
+            # Fail CLOSED: without the privacy check every push goes generic.
+            logger.warning(f"Reminder privacy lookup failed for {mask_uid(uid)}: {type(e).__name__}")
+            is_private_card = lambda _data: True  # noqa: E731
+
+    # Deliver at most REMINDER_PER_USER_LIMIT this tick; the rest stay pending
+    # and fire on subsequent ticks (a big backlog can't flood one user with
+    # pushes/writes at once). No starvation: delivered docs advance their
+    # status/nextReminderAt, so the leftovers surface next tick.
+    for link_doc in user_links[:REMINDER_PER_USER_LIMIT]:
+        link_id = link_doc.id
+        link_data = link_doc.to_dict() or {}
+
+        # Defensive: skip any doc whose nextReminderAt isn't a usable number
+        # (should never happen — the '<=' int filter excludes non-numeric
+        # values — but never fire on a value we can't reason about).
+        if not isinstance(link_data.get('nextReminderAt'), (int, float)):
+            continue
+
+        try:
+            # Every field below is client-written with any type: coerce
+            # before use, and work out the next schedule BEFORE the push, so
+            # a bad value can't fail after the push and re-send it every tick.
+            title = _str_or(link_data.get('title'), 'Untitled')
+            # Missing -> 'General' and blank -> no suffix, as before; only a
+            # non-string value is new (treated as blank).
+            category = link_data.get('category', 'General')
+            if not isinstance(category, str):
+                category = ''
+            new_reminder_count = _count_or_zero(link_data.get('reminderCount')) + 1
+            profile = _str_or(link_data.get('reminderProfile'), 'smart')
+            is_he = is_hebrew(title)
+
+            # In-app is the always-available channel: flag the link so the
+            # feed surfaces a "Reminders due" strip even with no push. This
+            # write is the delivery — it can't silently fail the way a dead
+            # push token can, so a reminder is never stuck pending in the past.
+            updates = {'reminderDue': True, 'reminderDueAt': now_ms}
+
+            # One-shots ('once' — tomorrow / next week / custom / numbered
+            # quick-reply) fire exactly once. 'smart' and 'spaced-N' recur up
+            # to 3 times via the spaced-repetition schedule.
+            if should_complete_reminder(profile, new_reminder_count):
+                updates.update({
+                    'reminderStatus': ReminderStatus.COMPLETED.value,
+                    'reminderCount': new_reminder_count,
+                    'nextReminderAt': None,
+                })
+            else:
+                next_reminder = calculate_next_reminder(
+                    new_reminder_count,
+                    profile=profile,
+                    anchor_ms=link_data.get('nextReminderAt'),
+                    tz_name=user_data.get('timezone'),
+                )
+                updates['reminderCount'] = new_reminder_count
+                updates['nextReminderAt'] = int(next_reminder.timestamp() * 1000)
+
+            pushed = False
+            if wants_push:
+                if is_private_card(link_data):
+                    # Generic copy; linkId stays so the tap still opens
+                    # the card (behind the privacy lock).
+                    push_title = "Time to revisit"
+                    push_body = "A private card is waiting for you."
+                else:
+                    push_title = "זמן לחזור אל" if is_he else "Time to revisit"
+                    push_body = title if not category else f"{title} · {category}"
+                push_result = send_push(uid, push_title, push_body, {"linkId": link_id})
+                pushed = bool(push_result.get("sent"))
+
+            if pushed:
+                report["reminders_sent"] += 1
+            else:
+                # No push (user hasn't enabled it, or the token just died) —
+                # the in-app strip is how they'll see it.
+                report["reminders_surfaced"] += 1
+
+            handled.add(link_id)
+            link_doc.reference.update(updates)
+            logger.info(f"Delivered reminder for link {link_id} (push={pushed})")
+        except Exception as e:
+            err_msg = f"Failed to send reminder for link {link_id}: {type(e).__name__}"
+            logger.error(err_msg)
+            report["errors"].append(err_msg)
+            # Off the head of the shared due query for an hour, so a doc that
+            # fails every time can't be retried (or re-pushed) every tick.
+            _snooze_due_links([link_doc], now_ms + REMINDER_SNOOZE_MS)
+            handled.add(link_id)
+
+    overflow = user_links[REMINDER_PER_USER_LIMIT:]
+    if overflow:
+        _snooze_due_links(overflow, now_ms + REMINDER_OVERFLOW_SNOOZE_MS)
+        handled.update(d.id for d in overflow)
+        report["reminders_snoozed"] = report.get("reminders_snoozed", 0) + len(overflow)
 
 
 def _uid_from_link_ref(reference) -> Optional[str]:
@@ -379,161 +556,26 @@ def run_reminder_check() -> dict:
     except Exception as e:
         # Batch fetch failed wholesale — treat every affected user as unloadable
         # so their due docs get snoozed (not left to starve the batch head).
-        err_msg = f"Failed to batch-load users for reminders: {e}"
+        err_msg = f"Failed to batch-load users for reminders: {type(e).__name__}"
         logger.error(err_msg)
         report["errors"].append(err_msg)
         user_data_by_uid = {uid: None for uid in uids}
 
     for uid, user_links in by_uid.items():
-        user_data = user_data_by_uid.get(uid)
-
-        if user_data is None:
-            # User doc missing or its fetch failed. Snooze so these due docs stop
-            # sorting to the head of the ASC-ordered limit-500 query and starving
-            # everyone (they'd otherwise be re-fetched untouched every tick).
-            _snooze_due_links(user_links, now_ms + REMINDER_SNOOZE_MS)
-            continue
-
-        # `settings` is client-writable (rules allow the key; the type guard
-        # there is new). A non-dict value must not raise here: this loop runs
-        # for EVERY user with a due reminder, and the due query orders by
-        # nextReminderAt, so one account could otherwise sit at the head of
-        # the batch and abort the whole tick for everyone.
-        settings = user_data.get('settings')
-        if not isinstance(settings, dict):
-            settings = {}
-        enabled = settings.get('reminders_enabled', settings.get('remindersEnabled', True))
-
-        if not enabled:
-            # Reminders are OFF. Snooze the due docs (nextReminderAt -> now+1h)
-            # rather than leaving them pending-in-the-past: untouched, they'd stay
-            # at the head of the due query and be re-fetched every 2-min tick,
-            # eventually starving users who CAN be delivered to. A user who
-            # re-enables reminders still sees the reminder within <= 1h.
-            _snooze_due_links(user_links, now_ms + REMINDER_SNOOZE_MS)
-            continue
-
-        report["users_with_reminders_enabled"] += 1
-
-        fcm_tokens = user_data.get('fcmTokens') or []
-
-        # Push channel resolution. In-app surfacing (below) is always on; push
-        # is the extra notification channel when the user has it. Users predating
-        # the push rollout (or with a legacy 'whatsapp' entry stored) are migrated
-        # at read time: a missing setting defaults to ['push'], and any stored
-        # 'whatsapp' entry is normalized to 'push' (deduped). New workspaces
-        # default to ["push"] (DEFAULT_USER_SETTINGS in link_service.py).
-        stored = settings.get('reminders_channel')
-        if not isinstance(stored, list):
-            channels = ['push']
-        else:
-            channels = list(dict.fromkeys(
-                'push' if c == 'whatsapp' else c for c in stored
-            ))
-        wants_push = 'push' in channels and bool(fcm_tokens)
-
-        # NOTE: we no longer skip users without push. Reminders are surfaced
-        # in-app for everyone (see below); push is an extra channel on top.
-
-        report["reminders_found"] += len(user_links)
-        logger.info(f"Found {len(user_links)} reminders for user {mask_uid(uid)}")
-
-        # PRIVACY: a push lands on a locked phone, so a private card's title
-        # must never be its body (same rule as digest_service's candidate
-        # filter). Loaded once per user, and only when a push will be sent.
-        # Lazy import: `search` pulls in ai_service/genai (house pattern).
-        private_ids = set()
-        is_private_card = lambda _data: False  # noqa: E731
-        if wants_push:
-            try:
-                from search import is_effectively_private, private_collection_ids
-                private_ids = private_collection_ids(uid)
-                is_private_card = lambda data: is_effectively_private(data, private_ids)  # noqa: E731
-            except Exception as e:
-                # Fail CLOSED: without the privacy check every push goes generic.
-                logger.warning(f"Reminder privacy lookup failed for {mask_uid(uid)}: {e}")
-                is_private_card = lambda _data: True  # noqa: E731
-
-        # Deliver at most REMINDER_PER_USER_LIMIT this tick; the rest stay pending
-        # and fire on subsequent ticks (a big backlog can't flood one user with
-        # pushes/writes at once). No starvation: delivered docs advance their
-        # status/nextReminderAt, so the leftovers surface next tick.
-        for link_doc in user_links[:REMINDER_PER_USER_LIMIT]:
-            link_id = link_doc.id
-            link_data = link_doc.to_dict() or {}
-
-            # Defensive: skip any doc whose nextReminderAt isn't a usable number
-            # (should never happen — the '<=' int filter excludes non-numeric
-            # values — but never fire on a value we can't reason about).
-            if not isinstance(link_data.get('nextReminderAt'), (int, float)):
-                continue
-
-            title = link_data.get('title', 'Untitled')
-            category = link_data.get('category', 'General')
-            reminder_count = link_data.get('reminderCount', 0)
-
-            is_he = is_hebrew(title)
-
-            try:
-                # In-app is the always-available channel: flag the link so the
-                # feed surfaces a "Reminders due" strip even with no push. This
-                # write is the delivery — it can't silently fail the way a dead
-                # push token can, so a reminder is never stuck pending in the past.
-                updates = {'reminderDue': True, 'reminderDueAt': now_ms}
-
-                pushed = False
-                if wants_push:
-                    if is_private_card(link_data):
-                        # Generic copy; linkId stays so the tap still opens
-                        # the card (behind the privacy lock).
-                        push_title = "Time to revisit"
-                        push_body = "A private card is waiting for you."
-                    else:
-                        push_title = "זמן לחזור אל" if is_he else "Time to revisit"
-                        push_body = title if not category else f"{title} · {category}"
-                    push_result = send_push(uid, push_title, push_body, {"linkId": link_id})
-                    pushed = bool(push_result.get("sent"))
-
-                if pushed:
-                    report["reminders_sent"] += 1
-                else:
-                    # No push (user hasn't enabled it, or the token just died) —
-                    # the in-app strip is how they'll see it.
-                    report["reminders_surfaced"] += 1
-
-                new_reminder_count = reminder_count + 1
-                profile = link_data.get('reminderProfile', 'smart')
-
-                # One-shots ('once' — tomorrow / next week / custom / numbered
-                # quick-reply) fire exactly once. 'smart' and 'spaced-N' recur up
-                # to 3 times via the spaced-repetition schedule.
-                if should_complete_reminder(profile, new_reminder_count):
-                    updates.update({
-                        'reminderStatus': ReminderStatus.COMPLETED.value,
-                        'reminderCount': new_reminder_count,
-                        'nextReminderAt': None,
-                    })
-                else:
-                    next_reminder = calculate_next_reminder(
-                        new_reminder_count,
-                        profile=profile,
-                        anchor_ms=link_data.get('nextReminderAt'),
-                        tz_name=user_data.get('timezone'),
-                    )
-                    updates['reminderCount'] = new_reminder_count
-                    updates['nextReminderAt'] = int(next_reminder.timestamp() * 1000)
-
-                link_doc.reference.update(updates)
-                logger.info(f"Delivered reminder for link {link_id} (push={pushed})")
-            except Exception as e:
-                err_msg = f"Failed to send reminder for link {link_id}: {e}"
-                logger.error(err_msg)
-                report["errors"].append(err_msg)
-
-        overflow = user_links[REMINDER_PER_USER_LIMIT:]
-        if overflow:
-            _snooze_due_links(overflow, now_ms + REMINDER_OVERFLOW_SNOOZE_MS)
-            report["reminders_snoozed"] = report.get("reminders_snoozed", 0) + len(overflow)
+        # One user's bad data must never stop everyone else's reminders: the
+        # due query is shared and ordered oldest-first, so a doc that raises
+        # every tick would sit at its head forever (launch audit ACCT-1). Any
+        # failure here snoozes that user's untouched docs and moves on.
+        handled: set = set()
+        try:
+            _deliver_user_reminders(
+                uid, user_links, user_data_by_uid.get(uid), now_ms, report, send_push, handled,
+            )
+        except Exception as e:
+            err_msg = f"Reminder delivery failed for user {mask_uid(uid)}: {type(e).__name__}"
+            logger.error(err_msg)
+            report["errors"].append(err_msg)
+            _snooze_due_links([d for d in user_links if d.id not in handled], now_ms + REMINDER_SNOOZE_MS)
 
     logger.info(f"Reminder execution complete. Report: {report}")
     return report
@@ -620,7 +662,7 @@ def coerce_pending_reminder_times(limit: int = 1000) -> dict:
                 link_doc.reference.update({'nextReminderAt': new_ms})
                 report["converted"] += 1
             except Exception as e:
-                report["errors"].append(f"{link_doc.id}: {e}")
+                report["errors"].append(f"{link_doc.id}: {type(e).__name__}")
 
     if report["unparseable"]:
         logger.warning(

@@ -131,7 +131,7 @@ export default function ScreenshotStrip({
                         className="w-full h-full object-cover pointer-events-none"
                     />
                     {images.length > 1 && (
-                        <span className="absolute bottom-1 start-1 min-w-4 h-4 px-1 rounded-full bg-black/65 text-white text-[9px] font-bold flex items-center justify-center pointer-events-none">
+                        <span className="absolute bottom-1 start-1 min-w-4 h-4 px-1 rounded-full bg-black/65 text-white text-[10px] font-bold flex items-center justify-center pointer-events-none">
                             {i + 1}
                         </span>
                     )}

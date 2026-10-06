@@ -44,10 +44,13 @@ export default function PushNudge({ uid, onDone }: { uid: string; onDone: () => 
                 updateUserSettings(uid, { push_enabled: true, reminders_channel: ['push'] })
                     .catch(() => {});
                 toast.success('Notifications on. Reminders and digests will arrive here.');
+            } else if (result === 'declined') {
+                // The user just tapped Don't Allow in the iOS prompt: respect
+                // it. Opening the Settings app here felt like being argued with.
+                toast.info('Notifications stay off. You can turn them on in Settings anytime.');
             } else if (result === 'permission-denied') {
-                // The OS prompt was declined (now or on a previous run). iOS
-                // shows that dialog once per install, so the only way forward
-                // is the Settings app — take the user there directly.
+                // Declined on an earlier run: iOS won't show its prompt again,
+                // so the Settings app is the only way forward.
                 toast.info('Allow notifications for Machina in Settings.');
                 openNotificationSettings();
             } else if (result === 'registration-failed') {
@@ -64,10 +67,10 @@ export default function PushNudge({ uid, onDone }: { uid: string; onDone: () => 
     };
 
     return (
-        <div className="mb-4 rounded-2xl border border-accent/25 bg-card overflow-hidden shadow-lg shadow-accent/5 animate-in fade-in slide-in-from-top-1 duration-300">
+        <div className="mb-4 rounded-2xl border border-accent/25 bg-card overflow-hidden shadow-lg shadow-accent/5 animate-fade-in duration-300">
             <div className="flex items-center gap-3 px-4 py-3.5">
                 <div className="w-9 h-9 shrink-0 rounded-xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-md shadow-accent/20">
-                    <BellRing className="w-[18px] h-[18px] text-white" />
+                    <BellRing className="w-[18px] h-[18px] text-accent-ink" />
                 </div>
                 <div className="flex-grow min-w-0">
                     <div className="text-[15px] font-bold text-text">Never miss a revisit</div>

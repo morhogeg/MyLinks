@@ -1,13 +1,14 @@
-import { collection, addDoc, setDoc, updateDoc, deleteDoc, deleteField, doc, query, where, limit, orderBy, getDocs, getDoc, serverTimestamp, QueryDocumentSnapshot, DocumentData, arrayUnion, arrayRemove, writeBatch, runTransaction } from 'firebase/firestore';
+import { collection, addDoc, setDoc, updateDoc, deleteDoc, deleteField, doc, query, where, limit, orderBy, getDocs, getDoc, QueryDocumentSnapshot, DocumentData, arrayUnion, arrayRemove, writeBatch, runTransaction } from 'firebase/firestore';
 import { db, appCheckHeaders } from './firebase';
 import { authHeaders } from './auth';
 import { apiUrl, fetchWithTimeout } from './api';
 import { offerUpgradeFor, isWaitingSave, saveWallAsWaiting, type WaitingSave } from './entitlement';
 
-import { AnalyzeResponse, Link, LinkMetadata, LinkStatus, User, UserNote } from './types';
+import { Link, LinkMetadata, LinkStatus, User, UserNote } from './types';
 import { canonicalCategory } from './category';
 import { urlKey } from './urlKey';
 import { getNotes } from './notes';
+import { getTimestampNumber } from './feedUtils';
 
 /**
  * Normalize a Firestore link doc into a safe `Link`.
@@ -31,7 +32,11 @@ export function toLink(doc: QueryDocumentSnapshot<DocumentData>): Link {
         category: typeof data.category === 'string' ? data.category : 'General',
         tags: Array.isArray(data.tags) ? data.tags : [],
         status: data.status ?? 'unread',
-        createdAt: data.createdAt ?? 0,
+        // One shape for every reader: legacy cards hold a Firestore Timestamp
+        // (pre-2026-10-05 notes, Image-tab screenshots, saved answers), an ISO
+        // string or unix seconds. Readers that treat it as ms (getTimeAgo) read
+        // a Timestamp as year ~4000 and printed "just now" forever.
+        createdAt: getTimestampNumber(data.createdAt),
         metadata: {
             originalTitle: md.originalTitle ?? '',
             estimatedReadTime: md.estimatedReadTime ?? 0,
@@ -53,51 +58,6 @@ export async function getLinksFromFirestore(uid: string): Promise<Link[]> {
 }
 
 /**
- * Get the user's unique tags from their most recent links.
- *
- * Bounded to the 300 newest links (report 3.9): reading the ENTIRE links
- * collection on every note/save/retry doesn't scale, and tag vocabulary comes
- * from recent activity anyway. Mirrors the backend `get_user_tags` cap.
- */
-export async function getUserTags(uid: string): Promise<string[]> {
-    const linksRef = collection(db, 'users', uid, 'links');
-    const q = query(linksRef, orderBy('createdAt', 'desc'), limit(300));
-    const snapshot = await getDocs(q);
-
-    const tags = new Set<string>();
-    snapshot.docs.forEach(doc => {
-        const linkTags = doc.data().tags as string[] || [];
-        linkTags.forEach(tag => tags.add(tag));
-    });
-
-    return Array.from(tags).sort();
-}
-
-/**
- * The workspace's existing category vocabulary, for the "reuse a category"
- * half of the analysis prompt (functions SYSTEM_PROMPT rule 6).
- *
- * Categories used to drift because the model was never told which ones already
- * existed — tags got a reuse list, categories got nothing, so a household
- * economics article could land in "Business" while similar cards sat under
- * "Society". Same window as getUserTags (the 300 most recent cards) so the two
- * lists cost one read each and describe the same slice of the library.
- */
-export async function getUserCategories(uid: string): Promise<string[]> {
-    const linksRef = collection(db, 'users', uid, 'links');
-    const q = query(linksRef, orderBy('createdAt', 'desc'), limit(300));
-    const snapshot = await getDocs(q);
-
-    const categories = new Set<string>();
-    snapshot.docs.forEach(doc => {
-        const c = doc.data().category;
-        if (typeof c === 'string' && c.trim()) categories.add(c.trim());
-    });
-
-    return Array.from(categories).sort();
-}
-
-/**
  * Return the id of an existing saved link for this URL, or null.
  *
  * Mirrors the backend dedup (functions/link_service.py `link_exists_for_url`):
@@ -111,16 +71,30 @@ export async function getUserCategories(uid: string): Promise<string[]> {
  * Callers MUST treat a thrown error as "unknown" and fall through to saving —
  * a failed dedup probe (e.g. offline) must never block a capture.
  */
-export async function findLinkIdByUrl(uid: string, url: string): Promise<string | null> {
+export async function findLinkIdByUrl(
+    uid: string,
+    url: string,
+    opts: { excludeId?: string } = {},
+): Promise<string | null> {
     if (!url) return null;
     const linksRef = collection(db, 'users', uid, 'links');
     const key = urlKey(url);
     const probes: [string, string][] = key
         ? [['urlKey', key], ['finalUrlKey', key], ['url', url]]
         : [['url', url]];
-    for (const [field, value] of probes) {
-        const snapshot = await getDocs(query(linksRef, where(field, '==', value), limit(1)));
-        if (!snapshot.empty) return snapshot.docs[0].id;
+    // In parallel, priority kept in the order above: three sequential round
+    // trips held the Save button for seconds on a slow connection.
+    const snapshots = await Promise.all(probes.map(([field, value]) =>
+        getDocs(query(linksRef, where(field, '==', value), limit(opts.excludeId ? 3 : 1)))));
+    for (const snapshot of snapshots) {
+        for (const d of snapshot.docs) {
+            // `excludeId`: the caller's own placeholder (an offline save checking
+            // for an earlier copy). Another offline save still waiting is not
+            // an earlier copy either: it hasn't been read yet.
+            if (d.id === opts.excludeId) continue;
+            if (opts.excludeId && d.data().pendingEnqueue === true) continue;
+            return d.id;
+        }
     }
     return null;
 }
@@ -147,20 +121,13 @@ function placeholderTitle(url: string): string {
  * then enqueues the URL (via /api/share, passing this card's id as `cardId`) into
  * the SAME background pipeline, which flips THIS card to ready/failed when
  * analysis lands. A slow scrape can therefore never trip a request timeout or
- * lose the capture. Returns the new card id.
- */
-export async function createProcessingPlaceholder(uid: string, url: string): Promise<string> {
-    const { id, written } = startProcessingPlaceholder(uid, url);
-    await written;
-    return id;
-}
-
-/**
- * The same placeholder, without waiting for the server. The id is minted
- * client-side, so the caller has it at once; `written` resolves when the
- * server acknowledges the write. OFFLINE that ack only comes on reconnect
- * (Firestore queues the write and the card shows in the feed from its local
- * cache right away), so the offline save path must not await it.
+ * lose the capture.
+ *
+ * The id is minted client-side, so the caller has it at once; `written`
+ * resolves when the server acknowledges the write. OFFLINE that ack only comes
+ * on reconnect (Firestore queues the write and the card shows in the feed from
+ * its local cache right away), so the capture form waits on it only briefly
+ * (AddLinkForm PLACEHOLDER_ACK_MS) and otherwise finishes as an offline save.
  */
 export function startProcessingPlaceholder(
     uid: string,
@@ -199,17 +166,17 @@ export function startProcessingPlaceholder(
 }
 
 /**
- * Placeholder card for a MULTI-IMAGE capture (2+ screenshots → one card). Same
- * durable pattern as createProcessingPlaceholder: the card exists in the feed
- * the instant capture starts, and process_link_background flips this same doc
- * to ready/failed via the cardId passed through /api/share.
+ * Placeholder card for an IMAGE capture (one screenshot, or several that become
+ * one card). Same durable pattern as startProcessingPlaceholder: the card exists
+ * in the feed the instant capture starts, and process_link_background flips this
+ * same doc to ready/failed via the cardId passed through /api/share.
  */
 export async function createImagePlaceholder(uid: string, count: number): Promise<string> {
     const linksRef = collection(db, 'users', uid, 'links');
     const now = Date.now();
     const ref = await addDoc(linksRef, {
         url: '',
-        title: `Reading ${count} screenshots…`,
+        title: count === 1 ? 'Reading your screenshot…' : `Reading ${count} screenshots…`,
         summary: '',
         tags: [],
         category: '',
@@ -274,11 +241,11 @@ export async function saveLink(uid: string, linkData: Partial<Link>): Promise<vo
 
     await addDoc(linksRef, {
         ...cleanData,
-        // serverTimestamp() so ordering is consistent across devices/clocks and
-        // survives offline replay. Feed's getTimestampNumber already tolerates a
-        // Firestore Timestamp (via toMillis), so sorting stays correct; the
-        // pending-write value simply reads as 0 until the server resolves it.
-        createdAt: serverTimestamp(),
+        // Epoch ms, like every other writer (the share trigger, the processing
+        // placeholder). NOT serverTimestamp(): Firestore orders by type before
+        // value, so a Timestamp sorts above every numeric createdAt and the card
+        // sat at the top of the feed's newest-first pages forever.
+        createdAt: Date.now(),
         status: 'unread',
         isRead: false
     });
@@ -301,7 +268,7 @@ export async function saveLink(uid: string, linkData: Partial<Link>): Promise<vo
  *
  * A short one-liner IS its own title, so the body stays empty to avoid a card
  * that prints the same sentence twice. A longer/multi-line note gets a truncated
- * first-line title with the full text as the body. Shared by `createNoteCard`
+ * first-line title with the full text as the body. Shared by `startNoteCard`
  * and `updateNoteText` so a note reads identically whether it was just captured
  * or later edited.
  */
@@ -315,9 +282,16 @@ export function splitNoteText(text: string): { title: string; summary: string; f
     return { title, summary, firstLine, words };
 }
 
-export async function createNoteCard(uid: string, text: string): Promise<string> {
+/**
+ * A note card, without waiting for the server: the id is minted client-side
+ * and `written` resolves on the server's acknowledgement. Offline that only
+ * comes on reconnect (Firestore queues the write and the feed shows the note
+ * from its local cache at once), so the capture form must not await it.
+ */
+export function startNoteCard(uid: string, text: string): { id: string; written: Promise<void> } {
     const { title, summary, firstLine, words } = splitNoteText(text);
-    const ref = await addDoc(collection(db, 'users', uid, 'links'), {
+    const ref = doc(collection(db, 'users', uid, 'links'));
+    const written = setDoc(ref, {
         url: '',
         title,
         summary,
@@ -327,12 +301,12 @@ export async function createNoteCard(uid: string, text: string): Promise<string>
         isRead: false,
         sourceType: 'note',
         sourceName: 'Note',
-        createdAt: serverTimestamp(),
+        createdAt: Date.now(), // epoch ms: see saveLink
         // Let the sync_link_embedding trigger vectorize it → searchable + askable.
         needsEmbedding: true,
         metadata: { originalTitle: firstLine, estimatedReadTime: Math.max(1, Math.round(words / 200)) },
     });
-    return ref.id;
+    return { id: ref.id, written };
 }
 
 /**
@@ -340,7 +314,7 @@ export async function createNoteCard(uid: string, text: string): Promise<string>
  *
  * A note IS a single piece of the user's writing, so the detail view edits it in
  * a single field — not a separate "title" and "body". We re-derive title/summary
- * with the SAME split `createNoteCard` uses (so the card reads identically to a
+ * with the SAME split `startNoteCard` uses (so the card reads identically to a
  * fresh capture), refresh the read-time estimate, and flip `needsEmbedding` so
  * search/Ask pick up the new words. One atomic write.
  */
@@ -357,7 +331,7 @@ export async function updateNoteText(uid: string, id: string, text: string): Pro
 }
 
 /**
- * Best-effort AI *organization* for a note card created by `createNoteCard`.
+ * Best-effort AI *organization* for a note card created by `startNoteCard`.
  *
  * The note's BODY is the user's own words and is never touched. The TITLE
  * depends on the note's shape (owner call, 2026-08-26 — this also matches the
@@ -383,17 +357,15 @@ export async function updateNoteText(uid: string, id: string, text: string): Pro
 export async function enrichNoteCard(uid: string, cardId: string, text: string,
     opts: { titleOnly?: boolean } = {}): Promise<void> {
     try {
-        let existingTags: string[] = [];
-        let existingCategories: string[] = [];
-        if (!opts.titleOnly) {
-            try { existingTags = await getUserTags(uid); } catch { /* optional */ }
-            try { existingCategories = await getUserCategories(uid); } catch { /* optional */ }
-        }
-
+        // The tag and category lists the prompt reuses are built on the
+        // server, from this account's cards with private ones left out. The
+        // app used to read its 300 newest cards twice per note to send them,
+        // private cards included (launch audit WEB-21, PRIV-1). A heading-only
+        // refresh doesn't file the note, so it asks the server to skip them.
         const response = await fetchWithTimeout(apiUrl('/api/analyze'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()), ...(await authHeaders()) },
-            body: JSON.stringify({ text: text.trim(), existingTags, existingCategories, uid }),
+            body: JSON.stringify({ text: text.trim(), uid, ...(opts.titleOnly ? { skipVocabulary: true } : {}) }),
         });
         if (!response.ok) {
             // Past the monthly allowance the note stays exactly as saved (a
@@ -504,32 +476,19 @@ export async function generateCardSummary(
 }
 
 /**
- * Retry analysis for a `failed` capture card (M3).
+ * Retry analysis for a `failed` capture card (M3), on the SAME card.
  *
- * Re-runs the same synchronous analysis the Add-Link form uses, then updates the
- * SAME card doc in place: `processing` while it runs, `unread` (ready) on
- * success, or back to `failed` (with the error) if it fails again. Reusing the
- * existing analyze pipeline means no new backend/rules and the card keeps its id
- * — nothing is ever dropped or duplicated.
- */
-/** The model's tags first, then the import's folder / export tags not already
- *  there (case-insensitive), capped like the backend's `_merge_import_tags`. */
-export function mergeImportedTags(modelTags: string[], imported?: string[]): string[] {
-    const out: string[] = [];
-    const seen = new Set<string>();
-    for (const raw of [...modelTags, ...(imported ?? []).slice(0, 8)]) {
-        if (typeof raw !== 'string') continue;
-        const tag = raw.trim().slice(0, 60);
-        const key = tag.toLowerCase();
-        if (!tag || seen.has(key)) continue;
-        seen.add(key);
-        out.push(tag);
-        if (out.length >= 12) break;
-    }
-    return out;
-}
-
-/**
+ * The card goes back through the durable background pipeline every capture
+ * uses: POST /api/share naming this card (`cardId`), and the worker writes the
+ * result onto it in place (`processing` while it runs, then ready or `failed`
+ * again), keeping the user's own fields and an imported card's folder tags. An
+ * IMAGE card re-sends its stored images (`imageUrls`); any other card its URL.
+ *
+ * Never the synchronous /api/analyze: every caller cut that request off at 60
+ * seconds while the function ran on, so a video, a PDF or a slow page failed
+ * again on every Retry, the server kept the unit and threw the result away,
+ * and each Retry cost another save.
+ *
  * Returns `{ waiting }` when the retry crossed the monthly allowance: the card
  * is then kept as `waiting` (read next month or on upgrade) rather than failed
  * again, and the caller announces it (lib/entitlement announceWaitingSave).
@@ -541,137 +500,44 @@ export async function retryFailedLink(uid: string, link: Link): Promise<{ waitin
     // original createdAt) if this attempt dies before completing.
     await updateDoc(linkRef, { status: 'processing', error: null, processingStartedAt: Date.now() });
 
-    // IMAGE card (one screenshot or several): its images are already in
-    // Storage, so retry re-enqueues them through /api/share (imageUrls path)
-    // into the same background pipeline, targeting this same card via cardId,
-    // and the worker writes it back as an image card. The synchronous
-    // /api/analyze below is the WEB-page path: it would scrape the Storage
-    // URL as a page and overwrite the card's sourceType to 'web'.
-    if (link.sourceType === 'image') {
-        const imageUrls = (link.imageUrls?.length ? link.imageUrls : [link.url]).filter(Boolean);
-        try {
-            if (!imageUrls.length) throw new Error('This image is no longer available. Please add it again.');
-            const response = await fetchWithTimeout(apiUrl('/api/share'), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()), ...(await authHeaders()) },
-                body: JSON.stringify({ imageUrls, cardId: link.id, uid }),
-            }, 30_000);
-            const text = await response.text();
-            let data: { success?: boolean; error?: string };
-            try { data = JSON.parse(text); } catch { data = {}; }
-            // Past the allowance the server keeps the card waiting itself.
-            if (response.ok && isWaitingSave(data)) return { waiting: data };
-            const wall = saveWallAsWaiting(response.status, data);
-            if (wall) {
-                await markLinkWaiting(uid, link.id);
-                return { waiting: wall };
-            }
-            if (!response.ok || !data.success) {
-                if (response.status === 429) offerUpgradeFor(data);
-                throw new Error(data?.error || 'Could not restart analysis. Please try again.');
-            }
-            // Queued — the background worker flips this card to ready/failed.
-            return {};
-        } catch (err) {
-            try {
-                await updateDoc(linkRef, {
-                    status: 'failed',
-                    error: err instanceof Error ? err.message.slice(0, 300) : 'Retry failed',
-                    failedAt: Date.now(),
-                });
-            } catch {
-                // Best-effort — the janitor ages out a stuck `processing` card.
-            }
-            throw err;
-        }
-    }
-
     try {
-        let existingTags: string[] = [];
-        let existingCategories: string[] = [];
-        try {
-            existingTags = await getUserTags(uid);
-        } catch {
-            // Tag context is a non-critical optimization.
+        let body: Record<string, unknown>;
+        if (link.sourceType === 'image') {
+            // Its images are already in Storage (the server only accepts the
+            // caller's own); the worker writes it back as an image card.
+            const imageUrls = (link.imageUrls?.length ? link.imageUrls : [link.url]).filter(Boolean);
+            if (!imageUrls.length) throw new Error('This image is no longer available. Please add it again.');
+            body = { imageUrls, cardId: link.id, uid };
+        } else {
+            if (!link.url) throw new Error('This link is no longer available. Please add it again.');
+            body = { url: link.url, cardId: link.id, uid };
         }
-        try {
-            existingCategories = await getUserCategories(uid);
-        } catch {
-            // Category context is likewise best-effort.
-        }
-
-        const response = await fetchWithTimeout(apiUrl('/api/analyze'), {
+        const response = await fetchWithTimeout(apiUrl('/api/share'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()), ...(await authHeaders()) },
-            body: JSON.stringify({ url: link.url, existingTags, existingCategories, uid }),
-        }, 60_000);
+            body: JSON.stringify(body),
+        }, 30_000);
         const text = await response.text();
-        let data: AnalyzeResponse;
-        try {
-            data = JSON.parse(text) as AnalyzeResponse;
-        } catch {
-            throw new Error('The analysis service returned an unexpected response.');
-        }
-        // /api/analyze cannot know the card, so the save wall still answers
-        // 429 here: keep the card waiting instead of failing it again.
+        let data: { success?: boolean; error?: string };
+        try { data = JSON.parse(text); } catch { data = {}; }
+        // Past the allowance the server keeps the card waiting itself.
+        if (response.ok && isWaitingSave(data)) return { waiting: data };
         const wall = saveWallAsWaiting(response.status, data);
         if (wall) {
             await markLinkWaiting(uid, link.id);
             return { waiting: wall };
         }
-        if (!response.ok || !data.success || !data.link) {
+        // 409: the card is no longer waiting for a read (an earlier job
+        // finished it meanwhile). Nothing to retry, and nothing to mark failed.
+        if (response.status === 409) return {};
+        if (!response.ok || !data.success) {
             if (response.status === 429) offerUpgradeFor(data);
-            throw new Error(data?.error || 'Analysis failed. Please try again.');
+            throw new Error(data?.error || 'Could not restart analysis. Please try again.');
         }
-
-        const l = data.link;
-        const key = urlKey(l.url);
-        await updateDoc(linkRef, {
-            url: l.url,
-            // Dedupe key (lib/urlKey.ts); also backfills a legacy card on retry.
-            ...(key ? { urlKey: key } : {}),
-            title: l.title,
-            summary: l.summary,
-            detailedSummary: l.detailedSummary ?? null,
-            // An imported card keeps its folder / export tags through a retry,
-            // exactly as the background worker keeps them on first analysis.
-            tags: mergeImportedTags(l.tags ?? [], link.importedTags),
-            category: canonicalCategory(l.category ?? '') || 'General',
-            language: l.language ?? 'en',
-            metadata: {
-                originalTitle: l.metadata?.originalTitle ?? '',
-                estimatedReadTime: l.metadata?.estimatedReadTime ?? 0,
-                actionableTakeaway: l.metadata?.actionableTakeaway ?? null,
-            },
-            sourceType: l.sourceType || 'web',
-            sourceName: l.sourceName ?? null,
-            // Capture honesty (PM-1C). Written on EVERY retry, null included: a
-            // retry that finally reads the page in full has to clear the flag,
-            // or the card would keep apologizing for a read that now succeeded.
-            captureQuality: l.captureQuality ?? null,
-            captureReason: l.captureReason ?? null,
-            // Scrape extras (main.py _scrape_extras), set-or-cleared like the
-            // flags above: where a redirect landed (dedupe of the expanded
-            // URL) and whether only the article's first part was analyzed.
-            finalUrlKey: l.finalUrlKey || deleteField(),
-            contentTruncated: l.contentTruncated ? true : deleteField(),
-            // Intentionally NOT writing embedding_vector here. The API no longer
-            // returns it, and a client write would store it as a plain array
-            // (invisible to vector search). The `sync_link_embedding` Firestore
-            // trigger re-embeds this card server-side on this very update.
-            concepts: l.concepts ?? [],
-            relatedLinks: l.relatedLinks ?? [],
-            status: 'unread',
-            isRead: false,
-            error: null,
-            failedAt: null,
-            processingStartedAt: null,
-            // Preserve the original createdAt — a successful retry should update
-            // the card in place, not teleport it to the top of the feed.
-        });
+        // Queued: the background worker flips this card to ready/failed.
         return {};
     } catch (err) {
-        // Re-mark as failed so it stays a visible, retryable card — never lost.
+        // Re-mark as failed so it stays a visible, retryable card, never lost.
         // Guard this write in its own try: if it also fails (e.g. offline), we
         // must not swallow the original error or leave the throw un-reached.
         try {
@@ -681,8 +547,8 @@ export async function retryFailedLink(uid: string, link: Link): Promise<{ waitin
                 failedAt: Date.now(),
             });
         } catch {
-            // Best-effort: the card stays in `processing`, but the caller still
-            // learns the retry failed via the re-throw below.
+            // Best-effort: the janitor ages out a card stuck in `processing`,
+            // and the caller still learns the retry failed via the re-throw.
         }
         throw err;
     }

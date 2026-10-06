@@ -89,7 +89,7 @@ export default function WaitingCard({ link, onDelete }: { link: Link; onDelete: 
                     <button
                         onClick={(e) => { e.stopPropagation(); onDelete(link.id); }}
                         aria-label="Delete"
-                        className="ms-auto p-1.5 rounded-full text-text-muted hover:text-red-500 transition-all shrink-0"
+                        className="ms-auto p-1.5 rounded-full text-text-muted hover:text-danger transition-all shrink-0"
                     >
                         <Trash2 className="w-3.5 h-3.5" />
                     </button>

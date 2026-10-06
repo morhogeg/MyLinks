@@ -204,12 +204,14 @@ def test_legacy_synthesis_mode_still_routes_to_the_synthesis_path(monkeypatch):
     # start getting a curated digest instead of their recap.
     routed = {}
 
-    def fake_synthesis(uid, user_data, links, force=False):
+    def fake_synthesis(uid, user_data, links, force=False, week_id=None, push_hold=None):
         routed["uid"] = uid
+        routed["links"] = links
         return {"uid": uid, "sent": True, "channels": ["in_app"], "card_count": 3,
                 "skipped": None, "mode": "synthesis"}
 
-    monkeypatch.setattr(ds, "fetch_candidate_links", lambda uid: _recent_cards())
+    monkeypatch.setattr(ds, "fetch_candidate_links",
+                        lambda uid: pytest.fail("candidates read before the synthesis dedupe"))
     monkeypatch.setattr(ds, "build_and_send_synthesis", fake_synthesis)
     # Pro gate would come after this branch; make it explicit that it isn't hit.
     monkeypatch.setattr(ds, "is_pro", lambda uid: False)
@@ -217,6 +219,8 @@ def test_legacy_synthesis_mode_still_routes_to_the_synthesis_path(monkeypatch):
     res = ds.build_and_send_digest("u1", {"settings": {"digest_mode": "synthesis"}}, force=True)
 
     assert routed["uid"] == "u1"
+    # The synthesis reads its own candidates, after its per-week dedupe check.
+    assert routed["links"] is None
     assert res["mode"] == "synthesis"
     assert res["skipped"] is None
 

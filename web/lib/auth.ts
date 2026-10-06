@@ -48,14 +48,20 @@ export type AuthProviderId = 'google' | 'apple';
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
-/** Popup error codes that mean "fall back to a full-page redirect". */
+/** Popup error codes that mean "fall back to a full-page redirect". A popup
+    the user CLOSED is not one of them: that is a cancel, and answering it by
+    navigating the whole page to Google or Apple was the wrong reply. */
 function popupUnsupported(code: string): boolean {
     return (
         code === 'auth/popup-blocked' ||
-        code === 'auth/popup-closed-by-user' ||
-        code === 'auth/cancelled-popup-request' ||
         code === 'auth/operation-not-supported-in-this-environment'
     );
+}
+
+/** The user dismissed the sign-in popup or the Apple/Google sheet. Not an
+    error: the screen should simply be ready again. */
+export class SignInCancelledError extends Error {
+    constructor() { super('Sign-in cancelled'); this.name = 'SignInCancelledError'; }
 }
 
 /** Thrown when the popup was blocked AND the redirect fallback cannot work
@@ -233,6 +239,8 @@ export async function signIn(provider: AuthProviderId): Promise<void> {
         if (errCode(err) === 'auth/account-exists-with-different-credential') {
             throw new DifferentProviderError(await existingProviderFor(err, provider));
         }
+        // Same cancel detection as provider linking (isCancel, below).
+        if (isCancel(err)) throw new SignInCancelledError();
         throw err;
     }
     // A deliberate sign-in just completed via the popup or native credential
@@ -281,32 +289,79 @@ export async function completeRedirectSignIn(): Promise<User | null> {
  * the page is reloaded straight after. That lands on the LoginScreen, which is
  * where both callers were headed anyway.
  */
-export async function signOutUser(): Promise<void> {
-    if (isNativeApp()) {
-        // The Share Extension's credential lives in the App Group, outside
-        // everything else this function purges — drop it first so the share
-        // sheet cannot keep posting into the departing account's library.
-        try {
-            const { clearNativeShareConfig, clearNativeWebsiteData } = await import('@/lib/shareConfig');
-            await clearNativeShareConfig();
-            // The WebView's own HTTP cache holds every screenshot and thumbnail
-            // the feed showed; JS cannot reach it, the native side can.
-            await clearNativeWebsiteData();
-        } catch {
-            // Never let the bridge block a sign-out.
-        }
-        try {
-            const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
-            await FirebaseAuthentication.signOut();
-        } catch {
-            // Plugin missing/failed — still sign out of the JS SDK below.
-        }
-    }
-    await signOut(auth);
+/** True once a sign-out (ours or an external one) has started purging. */
+let signingOut = false;
 
+/** Whether this tab is already signing out (so AuthProvider can tell a
+ *  deliberate sign-out from one Firebase performed on its own). */
+export function isSigningOut(): boolean {
+    return signingOut;
+}
+
+/** Native-only credentials and caches that live outside the WebView's storage. */
+async function dropNativeSession(): Promise<void> {
+    if (!isNativeApp()) return;
+    // The Share Extension's credential lives in the App Group, outside
+    // everything else this function purges — drop it first so the share
+    // sheet cannot keep posting into the departing account's library.
+    try {
+        const { clearNativeShareConfig, clearNativeWebsiteData } = await import('@/lib/shareConfig');
+        await clearNativeShareConfig();
+        // The WebView's own HTTP cache holds every screenshot and thumbnail
+        // the feed showed; JS cannot reach it, the native side can.
+        await clearNativeWebsiteData();
+    } catch {
+        // Never let the bridge block a sign-out.
+    }
+    try {
+        // A data export left in Caches (the app was killed with the share
+        // sheet open) is the whole library in one file.
+        const { deleteNativeExportFiles } = await import('@/lib/exportFiles');
+        await deleteNativeExportFiles();
+    } catch {
+        // Never block a sign-out on it.
+    }
+    try {
+        // RevenueCat is keyed to the auth uid; leave it anonymous so the next
+        // account on this device starts clean.
+        const { logOutPurchases } = await import('@/lib/purchases');
+        await logOutPurchases();
+    } catch {
+        // Not configured on this build: nothing to undo.
+    }
+    try {
+        const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
+        await FirebaseAuthentication.signOut();
+    } catch {
+        // Plugin missing/failed — still sign out of the JS SDK below.
+    }
+}
+
+async function purgeAndReload(): Promise<void> {
     const { purgeLocalUserData } = await import('@/lib/localData');
     await purgeLocalUserData();
     if (typeof window !== 'undefined') window.location.reload();
+}
+
+export async function signOutUser(): Promise<void> {
+    signingOut = true;
+    await dropNativeSession();
+    await signOut(auth);
+    await purgeAndReload();
+}
+
+/**
+ * Firebase signed this device out on its own: the account was deleted or
+ * disabled on another device, or its sessions were revoked. Nothing the user
+ * tapped ran signOutUser, so without this the library stayed in IndexedDB, the
+ * share sheet kept the departed account's token, and the next person to sign in
+ * inherited its local state. Same purge as a deliberate sign-out.
+ */
+export async function purgeAfterExternalSignOut(): Promise<void> {
+    if (signingOut) return;
+    signingOut = true;
+    await dropNativeSession();
+    await purgeAndReload();
 }
 
 /** Subscribe to auth state; returns the unsubscribe function. */
@@ -557,11 +612,15 @@ export async function deleteAccount(): Promise<void> {
     await revokeAppleIfLinked();
     if (isNativeApp()) {
         const { apiUrl, fetchWithTimeout } = await import('@/lib/api');
+        // 75s: longer than Hosting's 60s proxy limit, so the server's answer
+        // (success or a real error) always arrives before the app gives up.
+        // At the old 30s default a large library was reported as "Could not
+        // delete" while the server went on to finish the deletion.
         const res = await fetchWithTimeout(apiUrl('/api/delete-account'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
             body: '{}',
-        });
+        }, 75_000);
         if (!res.ok) throw new Error(`delete-account HTTP ${res.status}`);
     } else {
         const { httpsCallable } = await import('firebase/functions');

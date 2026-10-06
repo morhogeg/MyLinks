@@ -84,17 +84,29 @@ def test_the_scheme_guard_exists_and_is_anchored():
 # — used to leave the full library readable on the device.
 
 
+def _ts_function_body(src: str, signature: str) -> str:
+    """Text of one top-level TS function: from its signature to the next
+    top-level declaration."""
+    rest = src.split(signature, 1)[1]
+    return re.split(r"\n(?:export )?(?:async )?function |\n/\*\*", rest, maxsplit=1)[0]
+
+
 def test_sign_out_purges_the_local_firestore_cache():
     src = (WEB / "lib" / "auth.ts").read_text(encoding="utf-8")
-    body = src.split("export async function signOutUser")[1]
-    assert "purgeLocalUserData" in body, (
-        "signOutUser() must purge the local Firestore cache — it is the single "
-        "choke point shared by the sign-out and delete-account flows."
+    purge = _ts_function_body(src, "async function purgeAndReload")
+    assert "purgeLocalUserData" in purge, (
+        "The sign-out purge must clear the local Firestore cache — it is the "
+        "single choke point shared by the sign-out and delete-account flows."
     )
-    assert "location.reload" in body, (
+    assert "location.reload" in purge, (
         "terminate() makes the Firestore instance permanently unusable, so the "
         "page must reload after the purge."
     )
+    # Both ways of being signed out run it: the Sign out button (and account
+    # deletion, which ends in signOutUser), and Firebase signing the device out
+    # on its own (account deleted/disabled elsewhere, sessions revoked).
+    for fn in ("export async function signOutUser", "export async function purgeAfterExternalSignOut"):
+        assert "purgeAndReload()" in _ts_function_body(src, fn), fn
 
 
 def test_purge_clears_indexeddb_and_storage():

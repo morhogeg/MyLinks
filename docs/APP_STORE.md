@@ -17,9 +17,14 @@ Top-level answers:
   shared with data brokers):** → **NO.** There are no ads, no analytics SDKs,
   no data sale. Never check "used for tracking" on any item below.
 
-Declare exactly these **7 data types** (across 5 categories — Connect counts
-the types, not the categories, so "7 data types" on the summary screen is the
-correct total). For every one: **Used for Tracking = No** and **Linked to
+Declare exactly these **9 data types** (across 7 categories — Connect counts
+the types, not the categories, so "9 data types" on the summary screen is the
+correct total). ⚠️ **OWNER, 2026-10-06:** the label published 2026-08-26 has
+the first 7 rows only. Add **Purchases → Purchase History** (Machina Pro
+shipped 2026-09-02: RevenueCat receives the purchase receipts, keyed to the
+Firebase auth uid) and **Identifiers → Device ID** (the FCM/APNs push token
+stored on the user doc) in App Store Connect before submitting. The app's
+`PrivacyInfo.xcprivacy` already declares all 9 (launch audit, 2026-10-06). For every one: **Used for Tracking = No** and **Linked to
 user = Yes**. Purpose is **App Functionality** for all of them EXCEPT Product
 Interaction, which is **Analytics** — see the two rows flagged below.
 
@@ -32,6 +37,8 @@ Interaction, which is **Analytics** — see the two rows flagged below.
 | **User Content → Other User-Generated Content** | Yes | Yes | Saved URLs, extracted page text, notes/tags/collections, and Ask Machina questions + chat history. Sent server-side to Google Gemini for analysis. |
 | **Usage Data → Product Interaction** | **Yes** | Yes | ⚠️ CORRECTED 2026-08-26 (was wrongly "No"). `web/lib/analytics.ts` writes first-party, content-free events (app opened, save/ask/export happened) to `users/{uid}/analytics_events`. **Purpose = Analytics**, NOT App Functionality — the app behaves identically if every write fails, so it enables no user-facing feature. |
 | **Diagnostics → Crash Data** | **Yes** | Yes | ⚠️ CORRECTED 2026-08-26 (was wrongly "No"). `web/lib/errorReporter.ts` writes uncaught error messages + stack traces to `users/{uid}/client_errors` (and `/api/client-error` when no workspace resolves). Purpose = App Functionality — Apple lists "diagnosing bugs and troubleshooting" under it. |
+| **Purchases → Purchase History** | **Yes** | Yes | ⚠️ ADDED 2026-10-06 (owner: add in Connect). Machina Pro is an auto-renewable subscription; RevenueCat (`web/lib/purchases.ts`, app user id = Firebase auth uid) and `entitlements/{uid}` hold its state. Purpose = App Functionality. |
+| **Identifiers → Device ID** | **Yes** | Yes | ⚠️ ADDED 2026-10-06 (owner: add in Connect). The FCM/APNs push token (`users/{uid}.fcmTokens`), used only to deliver reminders and digests. Purpose = App Functionality. |
 | **Usage Data — all other subtypes** / **Diagnostics — performance, other** | No | — | Not collected. |
 | **Location / Contacts / Health / Financial / Browsing history / Search history** | **No** | — | Never requested or collected. (In-app search queries stay in the session; Ask questions are declared under User Content above.) |
 
@@ -52,10 +59,15 @@ Notes for edge cases:
   extension; there is no phone-based capture path.)
 - "Linked to user" is **Yes** for everything collected — all data lives in the
   user's own workspace keyed by their UID.
-- The two `PrivacyInfo.xcprivacy` manifests (App + ShareExt, UserDefaults
-  `CA92.1`) must be in Copy Bundle Resources (§4 task 7) — the label above and
-  the manifests must not contradict each other (they don't: manifests declare
-  no tracking domains).
+- The two `PrivacyInfo.xcprivacy` manifests must be in Copy Bundle Resources
+  (§4 task 7), and the label above and the manifests must not contradict each
+  other. As of 2026-10-06 the App manifest declares the same 9 types as this
+  table, the ShareExt manifest declares the two it sends (Other User Content,
+  Photos or Videos), neither declares tracking or tracking domains, and the
+  required-reason entries are UserDefaults `CA92.1` + `1C8F.1` (App Group) and,
+  for the extension, FileTimestamp `C617.1` (its own temp files). (Until then
+  the App manifest declared only Email, Other User Content and Device ID, so
+  this sentence used to be false.)
 
 ## 2. Metadata (App Store Connect → App Information / version page)
 
@@ -315,9 +327,16 @@ browser, and no user-to-user interaction). Result: **4+**.
 > • To test capture, use the share sheet: open any page in Safari → Share →
 > Machina → the card appears in the feed within ~15 seconds.
 >
-> • Account deletion is available in-app: Settings → Delete account.
+> • Account deletion is available in-app: Settings → the account row at the
+> top (your name or email) → Delete account.
 >
-> • No purchases, no ads, no tracking."
+> • In-app purchase: Machina Pro, an auto-renewable subscription (monthly or
+> annual). Every new account gets a 14-day Pro trial on our server (not a
+> StoreKit free trial), so the free-plan limits won't appear during review.
+> To see the purchase sheet: Settings → Plan. Restore Purchases, the renewal
+> terms and the Terms / Privacy links are on the same sheet.
+>
+> • No ads, no tracking."
 
 (Keep the AI-consent sentence in sync with §4 task 6 — the consent screen must
 actually be in the submitted build.)
@@ -484,6 +503,14 @@ build configs, so no iPad screenshots are needed.
       that has never signed into that account.
 - [ ] Enter metadata per §2 (all copy is final and owner-approved — pure
       transcription into Connect).
+- [ ] **Terms of Use link for the subscription** (Guideline 3.1.2(c), added
+      by the launch audit 2026-10-06). An app with an auto-renewable
+      subscription must link its Terms of Use (EULA) in the metadata, not
+      only in the app: either end the Description with
+      `Terms of Use: https://mymachina.app/terms`, or set that page as the
+      custom License Agreement (App Information → License Agreement). The
+      in-app paywall already shows price per period, the renewal line,
+      Restore, and Terms / Privacy links.
 - [ ] Take the 6 screenshots per §4.
 - [x] `TARGETED_DEVICE_FAMILY = 1` (iPhone-only) — already set in all build configs.
 - [ ] Verify the AI-consent screen (§4 task 6) is in the submitted build before

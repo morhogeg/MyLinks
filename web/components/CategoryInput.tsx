@@ -70,9 +70,10 @@ export default function CategoryInput({
             <input
                 ref={inputRef}
                 type="text"
+                aria-label="Category"
                 className={`uppercase font-black tracking-widest px-2 py-0.5 rounded-lg outline-none focus:ring-1 focus:ring-accent/50 bg-fill-strong ${className}`}
                 style={{
-                    color: colorStyle.color,
+                    color: colorStyle.ink,
                     minWidth: '80px'
                 }}
                 value={value}
@@ -98,7 +99,7 @@ export default function CategoryInput({
 
             {isOpen && (value.trim() !== '' || filteredCategories.length > 0) && (
                 <div
-                    className="absolute top-full start-0 mt-1 w-48 bg-card border border-border-strong rounded-lg shadow-xl z-50 overflow-hidden flex flex-col py-1 animate-in fade-in zoom-in-95 duration-200 max-h-60 overflow-y-auto"
+                    className="absolute top-full start-0 mt-1 w-48 bg-card border border-border-strong rounded-lg shadow-xl z-50 overflow-hidden flex flex-col py-1 animate-pop-in duration-200 max-h-60 overflow-y-auto"
                     onClick={(e) => e.stopPropagation()}
                 >
                     {filteredCategories.map(category => (
@@ -109,7 +110,7 @@ export default function CategoryInput({
                         >
                             <span
                                 className="font-bold uppercase tracking-wider"
-                                style={{ color: getCategoryColorStyle(category).color }}
+                                style={{ color: getCategoryColorStyle(category).ink }}
                             >
                                 {category}
                             </span>
@@ -129,7 +130,7 @@ export default function CategoryInput({
 
                     {filteredCategories.length === 0 && !isNew && (
                         <div className="px-3 py-2 text-xs text-text-muted italic">
-                            Type to create...
+                            Type to create…
                         </div>
                     )}
                 </div>

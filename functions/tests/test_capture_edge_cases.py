@@ -459,7 +459,8 @@ def test_success_never_resurrects_a_card_deleted_mid_processing(monkeypatch):
     _drive_worker(monkeypatch, queue={"uid": "u1", "url": "https://example.com/a", "cardId": "c1"})
     states = iter([True, False])
     card_ref = MagicMock()
-    card_ref.get.side_effect = lambda **k: types.SimpleNamespace(exists=next(states), to_dict=dict)
+    card_ref.get.side_effect = lambda **k: types.SimpleNamespace(
+        exists=next(states), to_dict=lambda: {"status": "processing"})
     user_doc = MagicMock()
     user_doc.collection.return_value.document.return_value = card_ref
     db = MagicMock()

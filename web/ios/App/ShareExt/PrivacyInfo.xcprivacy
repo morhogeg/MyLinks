@@ -9,15 +9,41 @@
 	<key>NSPrivacyTrackingDomains</key>
 	<array/>
 
-	<!-- The extension itself does not collect data for the privacy label beyond
-	     what the app already declares; it forwards the shared item to the app's
-	     own backend. -->
+	<!-- What the extension sends to the app's own backend: the shared link,
+	     text or images. Same types (and answers) the app declares. -->
 	<key>NSPrivacyCollectedDataTypes</key>
-	<array/>
+	<array>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeOtherUserContent</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypePhotosorVideos</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+	</array>
 
-	<!-- Reads the ingest endpoint + token from App Group UserDefaults (written
-	     by the main app) to authenticate the upload. Reason CA92.1: app/group's
-	     own data, not used for tracking. -->
+	<!-- UserDefaults: the extension reads only the App Group suite the app
+	     writes (the ingest endpoint, capture hints): reason 1C8F.1.
+	     File timestamps: sweepStaleShareTempFiles reads the modification date
+	     of its OWN temp files to delete day-old ones: reason C617.1 (files in
+	     the app container). Neither is used for tracking. -->
 	<key>NSPrivacyAccessedAPITypes</key>
 	<array>
 		<dict>
@@ -25,7 +51,15 @@
 			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
 			<key>NSPrivacyAccessedAPITypeReasons</key>
 			<array>
-				<string>CA92.1</string>
+				<string>1C8F.1</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>C617.1</string>
 			</array>
 		</dict>
 	</array>

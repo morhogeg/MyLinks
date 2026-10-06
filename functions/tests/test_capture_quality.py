@@ -110,9 +110,11 @@ def test_pdf_the_model_could_not_read_reports_the_pdf_reason(monkeypatch):
     analysis = main._analyze_scraped(_AI(), result, [])
     assert result["capture_reason"] == "pdf"
     assert main._capture_quality(result) == {"captureQuality": "partial", "captureReason": "pdf"}
-    # The fallback prompt still carries the source URL, and the placeholder
-    # the GROUNDING rule keys on.
-    assert "SOURCE URL: https://example.com/download?id=42" in analysis["_text"]
+    # The fallback prompt still carries the source address (never its query
+    # string: privacy policy section 4), and the placeholder the GROUNDING
+    # rule keys on.
+    assert "SOURCE URL: https://example.com/download\n" in analysis["_text"]
+    assert "id=42" not in analysis["_text"]
     assert "[no text content available]" in analysis["_text"]
 
 

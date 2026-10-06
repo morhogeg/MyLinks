@@ -30,11 +30,25 @@ const has = (obj, path) => path.split(".").reduce((o, k) => (o && o[k] !== undef
 
 // ── Settings ────────────────────────────────────────────────────────────────
 
+// An unpacked (development) install may point the server field at a local
+// stub; a store install never can. management.getSelf needs no permission;
+// where it doesn't exist (Safari), the answer is the strict one.
+async function isDevInstall() {
+  try {
+    const self = api.management && api.management.getSelf ? await api.management.getSelf() : null;
+    return Boolean(self && self.installType === "development");
+  } catch (_) {
+    return false;
+  }
+}
+
 async function getSettings() {
   const { token = "", baseUrl = "" } = await api.storage.local.get(["token", "baseUrl"]);
+  const custom = (baseUrl || "").trim().replace(/\/+$/, "");
   return {
     token: S.cleanToken(token),
-    baseUrl: (baseUrl || "").trim().replace(/\/+$/, "") || S.API_ORIGIN,
+    // A stored address outside the allowlist is ignored, never trusted.
+    baseUrl: custom && S.isAllowedApiBase(custom, await isDevInstall()) ? custom : S.API_ORIGIN,
   };
 }
 
@@ -387,6 +401,18 @@ async function handleWeb(msg) {
       tokenTag: token ? await S.tokenTag(token) : null,
     };
   }
+  if (msg.type === "web-disconnect") {
+    // The web app signed out. Forget the token only when it is THAT
+    // account's (same one-way tag), so signing out of one account on a
+    // shared computer never disconnects someone else's extension.
+    const { token: stored } = await getSettings();
+    if (!stored) return { ok: true, connected: false };
+    if (!msg.tokenTag || (await S.tokenTag(stored)) !== msg.tokenTag) {
+      return { ok: false, reason: "other-account" };
+    }
+    await api.storage.local.remove(["token", "connectedAt", "account", "baseUrl"]);
+    return { ok: true, connected: false };
+  }
   const token = S.cleanToken(msg.token);
   if (!S.looksLikeToken(token)) return { ok: false, reason: "bad-token" };
   const check = await checkToken(token);
@@ -398,7 +424,7 @@ async function handleWeb(msg) {
 
 api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   const type = msg && msg.type;
-  if (type === "web-ping" || type === "web-connect") {
+  if (type === "web-ping" || type === "web-connect" || type === "web-disconnect") {
     if (!fromWebApp(sender)) {
       sendResponse({ ok: false, reason: "untrusted" });
       return false;
@@ -423,7 +449,7 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
   if (type === "disconnect") {
-    api.storage.local.remove(["token", "connectedAt", "account"]).then(() => sendResponse({ ok: true }));
+    api.storage.local.remove(["token", "connectedAt", "account", "baseUrl"]).then(() => sendResponse({ ok: true }));
     return true;
   }
   return false;

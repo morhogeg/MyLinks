@@ -43,6 +43,13 @@ export default function LoginScreen({
             // redirect path the browser navigates away before this resolves.
         } catch (err) {
             const name = (err as Error)?.name;
+            // Dismissing the Apple/Google sheet or the popup is a choice, not a
+            // failure: just be ready again.
+            if (name === 'SignInCancelledError') {
+                setBusy(null);
+                return;
+            }
+            const code = (err as { code?: string })?.code;
             setError(
                 name === 'PopupBlockedError'
                     ? 'Your browser blocked the sign-in window. Allow pop-ups for this site, then try again.'
@@ -51,7 +58,9 @@ export default function LoginScreen({
                     // button the user originally signed up with.
                     : name === 'DifferentProviderError'
                         ? (err as Error).message
-                        : 'Sign-in failed. Please try again.',
+                        : code === 'auth/user-disabled'
+                            ? 'This account has been turned off. Write to support@mymachina.app for help.'
+                            : 'Sign-in failed. Please try again.',
             );
             setBusy(null);
         }
@@ -131,7 +140,7 @@ export default function LoginScreen({
                             <button
                                 onClick={() => handleSignIn('apple')}
                                 disabled={busy !== null}
-                                className="mt-5 w-full inline-flex items-center justify-center gap-2.5 rounded-full bg-black text-white px-5 py-3 text-sm font-semibold shadow-sm ring-1 ring-white/10 hover:bg-gray-900 disabled:opacity-60 transition-colors"
+                                className="mt-5 w-full inline-flex items-center justify-center gap-2.5 rounded-full bg-apple-button text-apple-button-ink px-5 py-3 text-sm font-semibold shadow-sm ring-1 ring-black/5 hover:opacity-90 disabled:opacity-60 transition-opacity"
                             >
                                 <AppleGlyph />
                                 {busy === 'apple' ? 'Signing in…' : 'Continue with Apple'}
@@ -145,7 +154,7 @@ export default function LoginScreen({
                             <GoogleGlyph />
                             {busy === 'google' ? 'Signing in…' : 'Continue with Google'}
                         </button>
-                        {error && <p className="mt-3 text-[13px] text-red-500">{error}</p>}
+                        {error && <p role="alert" className="mt-3 text-[13px] text-danger">{error}</p>}
                     </>
                 )}
             </div>

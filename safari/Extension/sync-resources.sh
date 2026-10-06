@@ -28,6 +28,10 @@ mkdir -p "${DEST}"
   --exclude 'node_modules' \
   --exclude 'package.json' \
   --exclude 'package-lock.json' \
+  --exclude 'store/' \
+  --exclude 'scripts/' \
+  --exclude 'icons-src/' \
+  --exclude 'dist/' \
   "${SRC}/" "${DEST}/"
 
 # The one Safari-only difference: the toolbar glyph (see
@@ -45,6 +49,23 @@ try:
         m = json.load(f)
 except Exception as e:  # noqa: BLE001
     print(f"error: extension/manifest.json is not valid JSON: {e}")
+    sys.exit(1)
+
+# Store build, same rules as extension/scripts/package.mjs for Chrome: no
+# development `key`, and only https origins. The shared manifest also matches
+# http://localhost and 127.0.0.1 so the connect flow can be tested against a
+# local web app; shipped, a local page the user allowed in Safari could hand
+# the extension another account's token.
+m.pop("key", None)
+for cs in m.get("content_scripts") or []:
+    cs["matches"] = [x for x in cs.get("matches") or [] if x.startswith("https://")]
+    if not cs["matches"]:
+        print("error: a content script has no https origin left")
+        sys.exit(1)
+if "host_permissions" in m:
+    m["host_permissions"] = [x for x in m["host_permissions"] if x.startswith("https://")]
+if "localhost" in json.dumps(m) or "127.0.0.1" in json.dumps(m):
+    print("error: the Safari manifest still mentions a local origin")
     sys.exit(1)
 
 # Safari overlay: monochrome toolbar icon (Safari tints it like its own

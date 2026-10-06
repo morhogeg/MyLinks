@@ -41,6 +41,14 @@ class FakeQuery:
     def limit(self, n):
         return FakeQuery(self._docs[:n])
 
+    # The vocabulary scan projects and orders (newest first); order is not
+    # under test here, so these keep the docs as given.
+    def select(self, fields):
+        return self
+
+    def order_by(self, field, direction=None):
+        return self
+
     def get(self):
         return list(self._docs)
 

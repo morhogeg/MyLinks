@@ -3,14 +3,13 @@ import json
 import os
 from typing import List, Dict, Optional
 from firebase_admin import firestore
-# DistanceMeasure is NOT re-exported by firebase_admin.firestore on the pinned
-# firebase-admin (6.9.0) — referencing firestore.DistanceMeasure raised
-# AttributeError on EVERY find_related_links call in prod (See-also candidates
-# silently empty since at least 2026-07-27). Import it from the real module,
-# exactly as search.py does.
-from google.cloud.firestore_v1.base_vector_query import DistanceMeasure
+# NOTE: DistanceMeasure is NOT re-exported by firebase_admin.firestore on the
+# pinned firebase-admin (6.9.0); referencing firestore.DistanceMeasure raised
+# AttributeError on every find_related_links call in prod (2026-07-27). If a
+# vector query comes back here, import it from
+# google.cloud.firestore_v1.base_vector_query, as vector_store.py does.
 from google.cloud.firestore_v1.vector import Vector
-from ai_service import GeminiService, GEMINI_ANALYSIS_MODEL, embedding_needs_repair
+from ai_service import GeminiService, GEMINI_ANALYSIS_MODEL, VERIFIER_MAX_OUTPUT_TOKENS
 import vector_store
 from vector_store import card_payload, mirror_vector_write, stored_vector, vector_needs_repair
 from log_safe import mask_uid
@@ -82,6 +81,19 @@ class GraphService:
                 logger.info(f"Distance gate dropped {len(candidates) - len(near)}/{len(candidates)} candidates")
             candidates = near
 
+            # PRIVACY: an effectively-private card (its own flag, or a
+            # private/PIN collection) must never reach the verifier's Gemini
+            # prompt below, nor become a relatedLink of an open card, whose
+            # Related list would then show its title. A failed collection
+            # lookup fails closed (every collection member is dropped).
+            from search import PrivacyGate  # lazy: search registers Functions at import
+            public = PrivacyGate(uid, db=self.db).strip(
+                [dict(data, id=doc_id) for doc_id, data in candidates])
+            public_ids = {c["id"] for c in public}
+            if len(public_ids) < len(candidates):
+                logger.info(f"Privacy gate dropped {len(candidates) - len(public_ids)} candidate(s)")
+            candidates = [(doc_id, data) for doc_id, data in candidates if doc_id in public_ids]
+
             if not candidates:
                 logger.info("No vector candidates within relatedness distance")
                 return []
@@ -147,17 +159,20 @@ class GraphService:
 
         Pure repair: idempotent and safe to re-run. Returns per-user counts.
         """
+        from search import build_embedding_text, EMBED_TEXT_VERSION  # lazy: see find_related_links
         links_ref = self.db.collection('users').document(uid).collection('links')
         docs = list(links_ref.stream())
 
         # Pass 1 — backfill missing embeddings (reused as query vectors below).
+        # Same recipe and version stamp as every other embed site (see
+        # backfill_batch): a title+summary vector is a different, thinner one.
         embeddings: Dict[str, List[float]] = {}
         embedded = 0
         for doc in docs:
             d = doc.to_dict() or {}
             if not (d.get('needsEmbedding') or vector_needs_repair(doc.reference, d, self.db)):
                 continue
-            text = f"{d.get('title', '')}\n{d.get('summary', '')}".strip()
+            text = build_embedding_text(d)
             if not text:
                 continue
             try:
@@ -169,6 +184,7 @@ class GraphService:
                 continue
             try:
                 update = {'embedding_vector': Vector(emb),
+                          'embeddingVersion': EMBED_TEXT_VERSION,
                           'needsEmbedding': firestore.DELETE_FIELD}
                 doc.reference.update(card_payload(update, self.db))
                 mirror_vector_write(doc.reference, update, db=self.db)
@@ -236,12 +252,14 @@ class GraphService:
         `nextCursor` (last id seen), and `done` (True when the page was short,
         i.e. the collection is exhausted). Idempotent — safe to re-run.
         """
+        from search import build_embedding_text, EMBED_TEXT_VERSION  # lazy: see find_related_links
         links_ref = self.db.collection('users').document(uid).collection('links')
         q = links_ref.order_by('__name__')
-        if cursor:
-            snap = links_ref.document(cursor).get()
-            if snap.exists:
-                q = q.start_after(snap)
+        if isinstance(cursor, str) and cursor and '/' not in cursor:
+            # Resume after the checkpoint's id as a POSITION. A snapshot cursor
+            # needs the card to exist: when the checkpoint card had been
+            # deleted, the phase silently restarted from the first card.
+            q = q.start_after({'__name__': cursor})
         docs = list(q.limit(limit).stream())
 
         embedded = updated = skipped = failed = 0
@@ -253,14 +271,22 @@ class GraphService:
                 # Repair anything unsearchable: missing, list-typed (schema
                 # drift), degenerate/poisoned, or explicitly flagged — not just
                 # "field absent" (which missed drift/poison and left cards dead).
+                # Embedded with the SAME recipe (build_embedding_text: detail,
+                # notes, takeaway, concepts…) and version stamp as the trigger
+                # and the pipeline. It used to embed title + summary only and
+                # stamp nothing, so every card this phase touched sat in vector
+                # space as a thinner card and looked out of date to
+                # backfill_embeddings.
                 needs = d.get('needsEmbedding') or vector_needs_repair(doc.reference, d, self.db)
-                if not needs or not text:
+                embed_text = build_embedding_text(d)
+                if not needs or not embed_text:
                     skipped += 1
                     continue
                 try:
-                    emb = self.ai.embed_text(text)
+                    emb = self.ai.embed_text(embed_text)
                     if emb:
                         update = {'embedding_vector': Vector(emb),
+                                  'embeddingVersion': EMBED_TEXT_VERSION,
                                   'needsEmbedding': firestore.DELETE_FIELD}
                         doc.reference.update(card_payload(update, self.db))
                         mirror_vector_write(doc.reference, update, db=self.db)
@@ -408,7 +434,9 @@ OUTPUT FORMAT — a JSON list, [] when nothing genuinely relates:
             response = self.ai.client.models.generate_content(
                 model=GEMINI_ANALYSIS_MODEL,  # Single source of truth (see ai_service)
                 contents=prompt,
-                config={'response_mime_type': 'application/json'}
+                # A cut reply does not parse and yields no relations.
+                config={'response_mime_type': 'application/json',
+                        'max_output_tokens': VERIFIER_MAX_OUTPUT_TOKENS}
             )
             
             return json.loads(response.text)

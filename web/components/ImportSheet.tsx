@@ -405,7 +405,7 @@ export default function ImportSheet({
                             )}
 
                             {note && (
-                                <p role="status" className="mt-3 text-center text-[13px] text-amber-500 leading-snug">{note}</p>
+                                <p role="status" className="mt-3 text-center text-[13px] text-warning leading-snug">{note}</p>
                             )}
 
                             <Button

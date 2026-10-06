@@ -96,6 +96,12 @@ function subscribe(cb: () => void): () => void {
 const getSnapshot = () => snapshot;
 const getServerSnapshot = () => SERVER_SNAPSHOT;
 
+/** The current lock state outside React (an event handler that has just
+ *  awaited loadPrivacyLock). Components use usePrivacyLock. */
+export function getPrivacyLockState(): PrivacyLockState {
+    return snapshot;
+}
+
 /** Read users/{uid}.privacyLock once per uid; safe to call repeatedly. */
 export async function loadPrivacyLock(uid: string): Promise<void> {
     if (loadedForUid === uid && snapshot.hasPin !== null) return;

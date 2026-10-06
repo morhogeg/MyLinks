@@ -107,3 +107,37 @@ def test_rejects_unresolvable_host(monkeypatch):
     monkeypatch.setattr(socket, "getaddrinfo", _boom)
     with pytest.raises(UnsafeURLError):
         validate_public_url("https://does-not-resolve.invalid/")
+
+
+# ── International domain names (launch audit CAP-12) ────────────────────────
+
+@pytest.mark.parametrize("url,dialled", [
+    ("https://bücher.de/katalog", "xn--bcher-kva.de"),
+    ("https://דוגמה.ישראל/", "xn--6dbbec0c.xn--4dbrk0ce"),
+    ("https://例え.jp/", "xn--r8jz45g.jp"),
+    ("https://BÜCHER.de/", "xn--bcher-kva.de"),
+])
+def test_international_domains_are_allowed_and_resolved_as_dialled(monkeypatch, url, dialled):
+    seen = []
+
+    def _getaddrinfo(host, *a, **k):
+        seen.append(host)
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 0))]
+
+    monkeypatch.setattr(socket, "getaddrinfo", _getaddrinfo)
+    validate_public_url(url)
+    assert seen == [dialled]  # the punycode name the HTTP client connects to
+
+
+def test_a_name_the_two_idna_standards_encode_differently_is_still_refused(monkeypatch):
+    # IDNA 2003 maps ß to "ss", IDNA 2008 keeps it: resolving one name and
+    # connecting to another must never happen.
+    monkeypatch.setattr(socket, "getaddrinfo", _fake_resolution("93.184.216.34"))
+    with pytest.raises(UnsafeURLError):
+        validate_public_url("https://faß.de/")
+
+
+def test_an_international_name_resolving_privately_is_still_blocked(monkeypatch):
+    monkeypatch.setattr(socket, "getaddrinfo", _fake_resolution("10.0.0.5"))
+    with pytest.raises(UnsafeURLError):
+        validate_public_url("https://bücher.de/")

@@ -157,7 +157,13 @@ export default function SuggestionPreviewSheet({
                                 role="button"
                                 tabIndex={0}
                                 onClick={() => onOpenCard(link.id)}
-                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenCard(link.id); } }}
+                                // Only keys aimed at the row itself: Enter on the
+                                // Remove button inside used to bubble up here and
+                                // open the card instead of removing it.
+                                onKeyDown={(e) => {
+                                    if (e.target !== e.currentTarget) return;
+                                    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenCard(link.id); }
+                                }}
                                 aria-label={`Open ${link.title}`}
                                 className="group flex items-center gap-3 px-5 py-2.5 cursor-pointer transition-colors hover:bg-fill-subtle active:bg-fill-strong"
                             >

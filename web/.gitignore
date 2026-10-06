@@ -39,3 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Written by `next dev` (16.3.6+) whenever it detects an AI coding agent.
+# Tool-generated, not project docs: the project's rules live in /CLAUDE.md.
+/AGENTS.md
+/CLAUDE.md

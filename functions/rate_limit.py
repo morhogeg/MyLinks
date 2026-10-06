@@ -11,6 +11,7 @@ path), so there's nothing to add to firestore.rules.
 """
 
 import time
+from datetime import datetime, timezone
 import logging
 
 from google.cloud import firestore
@@ -20,6 +21,8 @@ from db import get_db
 logger = logging.getLogger(__name__)
 
 _COLLECTION = "rate_limits"
+# A row is kept this long past the end of its window before it may be pruned.
+_EXPIRE_SLACK_S = 3600
 
 
 class RateLimitBackendError(Exception):
@@ -74,7 +77,13 @@ def check_rate_limit(key: str, limit: int, window_seconds: int,
                 count = 0
 
             count += 1
-            txn.set(doc_ref, {"window_start": window_start, "count": count})
+            txn.set(doc_ref, {
+                "window_start": window_start, "count": count,
+                # The doc id names a user or an IP, so the row must not
+                # outlive its window by long: the janitor deletes rows past
+                # `expireAt` (TTL-policy compatible, like task_logs).
+                "expireAt": datetime.fromtimestamp(window_start + window_seconds + _EXPIRE_SLACK_S, tz=timezone.utc),
+            })
             return count <= limit
 
         return _txn(db.transaction())

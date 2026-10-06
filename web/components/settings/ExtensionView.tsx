@@ -338,7 +338,7 @@ export function ExtensionView({
             <SectionHeader>How to save</SectionHeader>
             <ul className="rounded-[14px] border border-border-subtle bg-card px-[14px] py-3 space-y-2 text-[14.5px] text-text-secondary leading-snug">
                 <li>Click the Machina icon in the toolbar, or press <Mono>Ctrl+Shift+S</Mono> (<Mono>Command+Shift+S</Mono> on a Mac).</li>
-                <li>Right click a link to save the link, or select text and right click to save it with the page.</li>
+                <li>Right-click a link to save the link, or select text and right-click to save it with the page.</li>
                 <li>Each save lands in your library, and Machina reads it in the background.</li>
             </ul>
             <Footnote>Pin Machina to the toolbar so the icon is always one click away.</Footnote>

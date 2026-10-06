@@ -1,5 +1,6 @@
 import { X, Tag as TagIcon } from 'lucide-react';
 import TagExplorer from '../TagExplorer';
+import { useSheetA11y } from './useSheetA11y';
 
 /**
  * Mobile Tag Explorer drawer (tablet ≥sm, <lg). Extracted verbatim from Feed
@@ -26,23 +27,30 @@ export default function MobileTagExplorerDrawer({
     onRenameTag?: (from: string, to: string) => Promise<void>;
     onDeleteTag?: (tag: string) => Promise<void>;
 }) {
+    const { titleId, closeRef } = useSheetA11y(isOpen, onClose);
     if (!isOpen) return null;
     return (
         <div className="lg:hidden fixed inset-0 z-50 flex justify-end isolate">
             <div
-                className="absolute inset-0 bg-background/80 backdrop-blur-sm"
+                className="absolute inset-0 bg-background/80 backdrop-blur-sm animate-fade-in"
                 onClick={onClose}
             />
-            <div className="relative w-full sm:w-80 h-[100dvh] bg-card border-l border-border-strong flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
+            <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby={titleId}
+                className="relative w-full sm:w-80 h-[100dvh] bg-card border-l border-border-strong flex flex-col shadow-2xl animate-ios-push"
+            >
                 <div className="flex-none p-4 border-b border-border-strong flex justify-between items-center bg-card/50 backdrop-blur-xl z-10 safe-pt">
-                    <h2 className="text-base font-bold flex items-center gap-2">
+                    <h2 id={titleId} className="text-base font-bold flex items-center gap-2">
                         <TagIcon className="w-4 h-4 text-accent" />
-                        Filter Tags
+                        Filter tags
                     </h2>
                     <button
+                        ref={closeRef}
                         onClick={onClose}
                         aria-label="Close"
-                        className="p-2 hover:bg-fill-subtle rounded-full touch-manipulation"
+                        className="relative p-2 hover:bg-fill-subtle rounded-full touch-manipulation after:absolute after:-inset-1"
                     >
                         <X className="w-5 h-5" />
                     </button>

@@ -20,6 +20,7 @@
  */
 
 import { isNativeApp } from './api';
+import { reportError } from './errorReporter';
 
 // Identifiers agreed with the owner (SOURCE_OF_TRUTH §4 item 26). Nothing
 // else may invent different ones.
@@ -161,11 +162,39 @@ function isCancelled(e: unknown): boolean {
         || /cancel/i.test(typeof err.message === 'string' ? err.message : '');
 }
 
-function messageOf(e: unknown): string {
-    const m = e && typeof e === 'object' && typeof (e as { message?: unknown }).message === 'string'
-        ? (e as { message: string }).message
-        : '';
-    return m || 'The purchase could not be completed. Please try again.';
+// RevenueCat error codes (PURCHASES_ERROR_CODE) with a plain answer. The SDK's
+// own messages are written for developers ("There is an issue with your
+// configuration"), so they never reach the screen; an unmapped code gets the
+// generic line and goes to reportError with the SDK text, so a real store
+// problem is still visible to us.
+const OFFLINE = 'Couldn’t reach the App Store. Check your connection and try again.';
+const OTHER_ACCOUNT = 'This Apple ID’s subscription belongs to a different Machina account. Sign in with that account to use it.';
+const PLAIN_ERROR: Record<string, string> = {
+    '2': 'The App Store had a problem with this purchase. Please try again.',
+    '3': 'This device isn’t allowed to make purchases. Check Screen Time in Settings.',
+    '5': 'This plan can’t be bought right now. Please try again later.',
+    '6': 'This Apple ID already has Machina Pro. Tap Restore purchases.',
+    '7': OTHER_ACCOUNT,
+    '10': OFFLINE,
+    '13': OTHER_ACCOUNT,
+    '15': 'A purchase is already in progress. Give it a moment.',
+    '20': 'Your purchase is waiting for approval. Pro turns on once it’s approved.',
+    '32': 'The App Store took too long to answer. Please try again.',
+    '35': OFFLINE,
+};
+
+function messageOf(e: unknown, action: 'purchase' | 'restore'): string {
+    const err = (e && typeof e === 'object' ? e : {}) as { code?: unknown; message?: unknown };
+    const code = err.code === undefined ? '' : String(err.code);
+    const plain = PLAIN_ERROR[code];
+    if (plain) return plain;
+    reportError(
+        new Error(`${action} failed (code ${code || 'none'}): ${typeof err.message === 'string' ? err.message : String(e)}`),
+        'purchases',
+    );
+    return action === 'restore'
+        ? 'Purchases could not be restored. Please try again.'
+        : 'The purchase could not be completed. Please try again.';
 }
 
 /** Buy one of the packages from getOfferings(). Never throws. */
@@ -182,7 +211,7 @@ export async function purchase(pkg: ProPackage): Promise<PurchaseOutcome> {
         return { ok: true, pro };
     } catch (e) {
         if (isCancelled(e)) return { ok: false, cancelled: true };
-        return { ok: false, cancelled: false, message: messageOf(e) };
+        return { ok: false, cancelled: false, message: messageOf(e, 'purchase') };
     }
 }
 
@@ -198,7 +227,7 @@ export async function restore(): Promise<PurchaseOutcome> {
         return { ok: true, pro };
     } catch (e) {
         if (isCancelled(e)) return { ok: false, cancelled: true };
-        return { ok: false, cancelled: false, message: messageOf(e) };
+        return { ok: false, cancelled: false, message: messageOf(e, 'restore') };
     }
 }
 

@@ -24,9 +24,10 @@ const SIZE: Record<ButtonSize, string> = {
     md: 'h-9 px-3 text-sm gap-1.5',
 };
 
+// Drawn at 32/36px; the ::after reaches the 44pt touch target around it.
 const ICON_SIZE: Record<ButtonSize, string> = {
-    sm: 'h-8 w-8',
-    md: 'h-9 w-9',
+    sm: 'h-8 w-8 relative after:absolute after:-inset-1.5',
+    md: 'h-9 w-9 relative after:absolute after:-inset-1',
 };
 
 const RADIUS: Record<ButtonRadius, string> = {
@@ -44,7 +45,7 @@ const VARIANT: Record<ButtonVariant, string> = {
     ghost:
         'text-text-secondary hover:text-text hover:bg-card-hover',
     danger:
-        'bg-card border border-border-subtle text-red-400 hover:bg-red-500/10 hover:border-red-500/40',
+        'bg-card border border-border-subtle text-danger hover:bg-danger/10 hover:border-danger/40',
 };
 
 const BASE =

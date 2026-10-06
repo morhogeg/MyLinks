@@ -19,7 +19,7 @@ import {
 
 export function MainView({
     authUid, accountEmail, displayName, photoURL, providerLabel, providerName, settings, theme, setTheme,
-    togglePush, sendTestNotification, pushBusy, pushNote, aiConsentAt,
+    togglePush, sendTestNotification, pushBusy, pushNote, pushOnHere, aiConsentAt,
     privacyLockOn, onChangePin, onDisablePin,
     onReplayTour, go,
 }: {
@@ -37,6 +37,8 @@ export function MainView({
     sendTestNotification: () => void;
     pushBusy: boolean;
     pushNote: string | null;
+    /** Push is on for the account AND this iPhone can receive it. */
+    pushOnHere: boolean;
     aiConsentAt: number | null;
     /** True when the private-collections PIN is set (null while loading). */
     privacyLockOn: boolean | null;
@@ -122,6 +124,7 @@ export function MainView({
                 <RowShell>
                     <RowText title="Theme" />
                     <Segmented
+                        label="Theme"
                         value={theme}
                         onChange={(v) => setTheme(v as typeof theme)}
                         iconOnly
@@ -155,11 +158,24 @@ export function MainView({
 
             <SectionHeader>Notifications</SectionHeader>
             <List>
-                <RowShell tile={<Bell className="w-[17px] h-[17px]" />}>
-                    <RowText title="Push notifications" />
-                    <Toggle on={settings.push_enabled} onChange={togglePush} />
-                </RowShell>
-                {settings.push_enabled && isNativeApp() && (
+                {isNativeApp() ? (
+                    <RowShell tile={<Bell className="w-[17px] h-[17px]" />}>
+                        <RowText
+                            title="Push notifications"
+                            sub={settings.push_enabled && !pushOnHere ? 'Off on this iPhone. Turn on to get reminders here.' : undefined}
+                        />
+                        <Toggle on={pushOnHere} onChange={togglePush} />
+                    </RowShell>
+                ) : (
+                    // The web can't register a device, and switching it off here
+                    // turned push off for the account, iPhone included, with no
+                    // way back from the web. Show the state; the iPhone owns it.
+                    <RowShell tile={<Bell className="w-[17px] h-[17px]" />}>
+                        <RowText title="Push notifications" sub="Managed in the Machina app on iPhone" />
+                        <span className="text-[15px] text-text-muted pe-1">{settings.push_enabled ? 'On' : 'Off'}</span>
+                    </RowShell>
+                )}
+                {pushOnHere && isNativeApp() && (
                     <NavRow
                         tile={<BellRing className="w-[17px] h-[17px]" />}
                         title="Send a test notification"
@@ -169,7 +185,7 @@ export function MainView({
                 )}
                 <NavRow tile={<Clock className="w-[17px] h-[17px]" />} title="Reminders & Digest" value={remindersOrDigest ? 'On' : 'Off'} onClick={() => go('resurfacing')} />
             </List>
-            {pushNote && <p className="text-[12px] text-amber-500 leading-snug px-2 pt-1.5">{pushNote}</p>}
+            {pushNote && <p className="text-[12px] text-warning leading-snug px-2 pt-1.5">{pushNote}</p>}
 
             {/* Private collections — only once a PIN exists (it's created the
                 first time a collection is marked Private, in the edit sheet). */}
@@ -191,7 +207,7 @@ export function MainView({
                 <StopCardLinks />
             </List>
             <Footnote>
-                <b className="text-text-secondary font-semibold">Powered by Google Gemini.</b> Saved content and your questions are sent to Gemini for summaries and answers, on the paid tier, where Google&apos;s terms state your content is never used to train Google&apos;s models. Private cards are never sent. The Privacy Policy lists exactly what each feature sends.
+                <b className="text-text-secondary font-semibold">Powered by Google Gemini.</b> Saved content and your questions are sent to Gemini for summaries and answers, on the paid tier, where Google&apos;s terms state your content is never used to train Google&apos;s models. Private cards are kept out of Ask, search, and digests. The Privacy Policy lists exactly what each feature sends.
                 {aiConsentAt !== null && ` You agreed on ${new Date(aiConsentAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}.`}
             </Footnote>
 

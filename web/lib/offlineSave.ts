@@ -17,12 +17,12 @@
  */
 
 import { useEffect } from 'react';
-import { collection, getDocs, limit, query, waitForPendingWrites, where } from 'firebase/firestore';
+import { collection, deleteDoc, deleteField, doc, getDocs, limit, query, updateDoc, waitForPendingWrites, where } from 'firebase/firestore';
 import { appCheckHeaders, db } from '@/lib/firebase';
 import { authHeaders } from '@/lib/auth';
 import { apiUrl, fetchWithTimeout } from '@/lib/api';
 import { announceWaitingSave, isWaitingSave, offerUpgradeFor, saveWallAsWaiting } from '@/lib/entitlement';
-import { markLinkFailed, markLinkWaiting } from '@/lib/storage';
+import { findLinkIdByUrl, markLinkFailed, markLinkWaiting } from '@/lib/storage';
 
 // Cards this tab is already enqueueing (the form's listener and the resume
 // hook can both see the same card).
@@ -38,6 +38,20 @@ export async function enqueueOfflineSave(uid: string, url: string, cardId: strin
     inFlight.add(cardId);
     try {
         await written;
+        // The offline save skipped the "you already saved this" check (it
+        // needs the server), and the server doesn't dedupe a save that names
+        // its card. Check now: an earlier copy of this link makes the offline
+        // card a duplicate, removed before it is queued and charged.
+        let earlier: string | null = null;
+        try {
+            earlier = await findLinkIdByUrl(uid, url, { excludeId: cardId });
+        } catch {
+            // Unknown: enqueue as before rather than drop a save.
+        }
+        if (earlier) {
+            await deleteDoc(doc(db, 'users', uid, 'links', cardId));
+            return;
+        }
         const response = await fetchWithTimeout(apiUrl('/api/share'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()), ...(await authHeaders()) },
@@ -71,6 +85,22 @@ export async function enqueueOfflineSave(uid: string, url: string, cardId: strin
     } finally {
         inFlight.delete(cardId);
     }
+}
+
+/**
+ * A save made while the device reports itself online but the server isn't
+ * answering (Wi-Fi without internet, a captive portal): the placeholder sits
+ * in Firestore's queue like an offline save. Turn it into one: flag it for
+ * enqueue (so the launch/reconnect hook below also picks it up if this
+ * session ends first) and hand it to the pipeline once both writes land.
+ */
+export function queueStalledSave(uid: string, url: string, cardId: string, written: Promise<void>): void {
+    const flagged = updateDoc(doc(db, 'users', uid, 'links', cardId), {
+        pendingEnqueue: true,
+        queuedAt: Date.now(),
+        processingStartedAt: deleteField(),
+    });
+    void enqueueOfflineSave(uid, url, cardId, Promise.all([written, flagged]));
 }
 
 /** Enqueue every offline-saved card of `uid` still waiting, now and on each

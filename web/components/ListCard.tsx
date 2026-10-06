@@ -3,7 +3,7 @@
 import { memo, useRef, useState } from 'react';
 import { Link, StatusChangeHandler, CardShareMode } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
-import { getDirection } from '@/lib/rtl';
+import { getDirection, contentLang } from '@/lib/rtl';
 import { linkPlatform, platformIcon, platformColor, PLATFORM_LABELS, xHandle, prettyHost } from '@/lib/platform';
 import { hapticLight, hapticMedium } from '@/lib/haptics';
 import { Star, Check, Trash2, StickyNote, Lock, MoreHorizontal, EyeOff } from 'lucide-react';
@@ -185,9 +185,12 @@ function ListCard({
                    (start-0), metadata line, and star all use logical
                    properties/flex order, so dir alone flips them to the
                    correct side for Hebrew cards. The swipe overlays live on
-                   the LTR wrapper, so gesture direction stays physical. */
+                   the LTR wrapper, so gesture direction stays physical.
+                   The row opens through the headline's button, whose ::after
+                   covers the row (a click on the <article> was unreachable
+                   from a keyboard and never announced as a button); the
+                   chrome cluster sits above it. */
                 dir={isRtl ? 'rtl' : 'ltr'}
-                onClick={handleClick}
                 onTouchStart={onTouchStart}
                 onTouchMove={onTouchMove}
                 onTouchEnd={onTouchEnd}
@@ -198,7 +201,7 @@ function ListCard({
                     transitionTimingFunction: 'var(--ease-spring)',
                     touchAction: 'pan-y',
                 }}
-                className={`relative z-10 flex items-start gap-3 ps-3.5 pe-3 py-3 cursor-pointer ${isSelected ? 'bg-accent/5' : 'bg-card'}`}
+                className={`relative z-10 flex items-start gap-3 ps-3.5 pe-3 py-3 ${isSelected ? 'bg-accent/5' : 'bg-card'}`}
             >
                 {/* Category colour cue on the leading edge for quick scanning —
                     widened to 6px so the category reads at a glance (M-P3). */}
@@ -220,8 +223,20 @@ function ListCard({
                 {/* Headline + metadata. The title owns the full content width —
                     only the star (and the checkbox in selection mode) sit beside it. */}
                 <div className="flex-1 min-w-0 ps-1">
-                    <h3 className={`line-clamp-3 font-semibold text-[15px] leading-snug text-text ${isRtl ? 'font-hebrew' : ''}`}>
-                        {link.title}
+                    <h3 lang={contentLang(link.title)} className={`font-semibold text-[15px] leading-snug text-text ${isRtl ? 'font-hebrew' : ''}`}>
+                        {/* A checkbox in selection mode, so the selected state
+                            is announced, not only colored. The clamp lives on
+                            the inner span: a button renders as one inline
+                            block, which a clamp on the heading can't cut. */}
+                        <button
+                            type="button"
+                            onClick={handleClick}
+                            role={isSelectionMode ? 'checkbox' : undefined}
+                            aria-checked={isSelectionMode ? isSelected : undefined}
+                            className="block w-full [text-align:inherit] cursor-pointer focus-visible:outline-none after:absolute after:inset-0 after:rounded-2xl focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-accent"
+                        >
+                            <span className="line-clamp-3">{link.title}</span>
+                        </button>
                     </h3>
                     {/* Metadata stays LTR internally (brand icon + latin
                         handle/host + category name) but hugs the title's edge
@@ -229,7 +244,7 @@ function ListCard({
                     <div className={`mt-1 flex items-center gap-1.5 min-w-0 text-[11px] text-text-muted ${isRtl ? 'justify-end' : ''}`} dir="ltr">
                         {/* Private marker — icon only, matching the grid cards. */}
                         {link.isPrivate && (
-                            <span className="shrink-0 inline-flex items-center" title="Private" aria-label="Private">
+                            <span role="img" className="shrink-0 inline-flex items-center" title="Private" aria-label="Private">
                                 <Lock className="w-3 h-3" />
                             </span>
                         )}
@@ -244,7 +259,7 @@ function ListCard({
                         ) : link.captureQuality === 'partial'
                             && link.sourceType !== 'image'
                             && link.sourceType !== 'note' && (
-                            <span className="shrink-0 inline-flex items-center" title="Partial capture" aria-label="Partial capture">
+                            <span role="img" className="shrink-0 inline-flex items-center" title="Partial capture" aria-label="Partial capture">
                                 <EyeOff className="w-3 h-3" />
                             </span>
                         )}
@@ -257,8 +272,8 @@ function ListCard({
                         {/* Category chip — secondary labeling next to the source;
                             the colour bar on the row edge is the primary cue (M-P3). */}
                         <span
-                            className="shrink-0 max-w-[120px] px-1.5 py-px rounded-full text-[9px] leading-4 font-bold uppercase tracking-wider truncate"
-                            style={{ backgroundColor: colorStyle.backgroundColor, color: colorStyle.color }}
+                            className="shrink-0 max-w-[120px] px-1.5 py-px rounded-full text-[10px] leading-4 font-bold uppercase tracking-wider truncate"
+                            style={{ backgroundColor: colorStyle.backgroundColor, color: colorStyle.ink }}
                             title={link.category}
                         >
                             {link.category}
@@ -305,7 +320,7 @@ function ListCard({
                 <div
                     dir="ltr"
                     style={{ order: isRtl ? -1 : 1 }}
-                    className="shrink-0 -mt-1.5 -mr-1 flex items-start"
+                    className="relative z-10 shrink-0 -mt-1.5 -mr-1 flex items-start"
                 >
                     {/* Favourite: shown only when the card IS one. An empty star on
                         every row spent 36px of title width to advertise an action
@@ -324,9 +339,9 @@ function ListCard({
                                 onStatusChange(link.id, 'unread', { from: 'favorite' });
                             }}
                             aria-label="Remove from favorites"
-                            className="shrink-0 w-9 h-11 flex items-center justify-center rounded-lg text-yellow-500 transition-colors"
+                            className="shrink-0 w-9 h-11 flex items-center justify-center rounded-lg text-star transition-colors"
                         >
-                            <Star className="w-4 h-4 fill-yellow-500" />
+                            <Star className="w-4 h-4 fill-star" />
                         </button>
                     )}
 

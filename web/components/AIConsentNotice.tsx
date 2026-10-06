@@ -21,7 +21,13 @@ import { isNativeApp } from '@/lib/api';
  * (components/onboarding/FlowScreen.tsx), so sign-in leads into one continuous
  * flow instead of three screens that each look like a different app.
  */
-export default function AIConsentNotice({ onAccept }: { onAccept: () => void }) {
+export default function AIConsentNotice({ onAccept, onSignOut }: {
+    onAccept: () => void;
+    /** The way out for someone who won't agree (or signed in with the wrong
+     *  account): without it this screen was a dead end, and Settings, the
+     *  only place to delete the account, sits behind it. */
+    onSignOut?: () => void;
+}) {
     const privacyHref = policyUrl('/privacy');
     return (
         <FlowScreen
@@ -57,6 +63,15 @@ export default function AIConsentNotice({ onAccept }: { onAccept: () => void }) 
                         </a>
                         .
                     </p>
+                    {onSignOut && (
+                        <button
+                            type="button"
+                            onClick={onSignOut}
+                            className="mt-2 mx-auto block min-h-[44px] px-4 text-[13px] text-text-secondary hover:text-text transition-colors"
+                        >
+                            Not now, sign out
+                        </button>
+                    )}
                 </>
             }
         >

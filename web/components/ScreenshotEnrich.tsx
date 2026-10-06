@@ -8,6 +8,7 @@ import { addScreenshotsToCard, enrichScreenshots, enrichStep, MAX_CARD_SCREENSHO
 import { hapticSuccess } from '@/lib/haptics';
 import { useToast } from '@/components/Toast';
 import ScreenshotStrip, { toPickedImages, type PickedImage } from '@/components/ScreenshotStrip';
+import { reportError } from '@/lib/errorReporter';
 
 /**
  * COMPLETE A CARD FROM THE USER'S OWN SCREENSHOTS — the whole flow, in the
@@ -147,7 +148,12 @@ export default function ScreenshotEnrich({
             setQueued(true);
             setPicks([]);
         } catch (err) {
-            toast.error(err instanceof Error ? err.message : t('Could not send the screenshots.', 'לא הצלחנו לשלוח את צילומי המסך.'));
+            // The server's own refusals are sentences ("This card can't take a
+            // screenshot."); a network or browser error ("Load failed") is not,
+            // and goes to the reporter instead of the screen.
+            const msg = err instanceof Error ? err.message.trim() : '';
+            if (!/[.!?]$/.test(msg)) reportError(err, 'screenshot-enrich');
+            toast.error(/[.!?]$/.test(msg) && !(err instanceof TypeError) ? msg : t('Could not send the screenshots. Please try again.', 'לא הצלחנו לשלוח את צילומי המסך. נסו שוב.'));
         } finally {
             setSending(false);
         }

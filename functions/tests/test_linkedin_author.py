@@ -276,3 +276,45 @@ def test_linkedin_scrape_reports_where_it_landed(monkeypatch):
     r = scraper._scrape_linkedin_url("https://lnkd.in/e5zrAbaM")
     assert r["final_url"] == "https://www.linkedin.com/posts/someone_x-activity-1-a"
     assert main._scrape_extras("lnkd.in/e5zrabam", r)["sourcePlatform"] == "linkedin"
+
+
+# ── Dead posts and login walls (launch audit CAP-9) ─────────────────────────
+
+class _WallResp:
+    def __init__(self, status, text, url="https://www.linkedin.com/posts/jane-doe_topic-activity-1-a"):
+        self.status_code, self.text, self.url = status, text, url
+
+
+_AUTHWALL_HTML = ("<html><head><script>window.location='/authwall?trk=x'</script>"
+                  "<title>LinkedIn</title></head><body><p>Join LinkedIn to see this.</p></body></html>")
+
+
+@pytest.mark.parametrize("status,kind", [(404, "not_found"), (410, "gone"), (503, "server")])
+def test_a_dead_linkedin_post_is_a_fetch_failure(monkeypatch, status, kind):
+    monkeypatch.setattr(scraper, "safe_get", lambda *a, **k: _WallResp(status, _AUTHWALL_HTML))
+    r = scraper._scrape_linkedin_url("https://www.linkedin.com/posts/jane-doe_topic-activity-1-a")
+    assert r["fetch_error"] == kind
+
+
+@pytest.mark.parametrize("resp", [
+    _WallResp(999, _AUTHWALL_HTML),
+    _WallResp(200, _AUTHWALL_HTML, url="https://www.linkedin.com/authwall?trk=x&sessionRedirect=y"),
+])
+def test_a_login_wall_is_an_honest_partial_card_never_markup(monkeypatch, resp):
+    monkeypatch.setattr(scraper, "safe_get", lambda *a, **k: resp)
+    r = scraper._scrape_linkedin_url("https://www.linkedin.com/posts/jane-doe_topic-activity-1-a")
+    assert r.get("fetch_error") is None
+    assert r["truncated"] is True and r["capture_reason"] == "login_wall"
+    assert "<html" not in r["text"] and "Join LinkedIn" not in r["text"]
+    assert r["text"] == "[no text content available]"
+    assert r["final_url"] == resp.url
+
+
+def test_a_walled_page_with_an_og_teaser_keeps_the_teaser(monkeypatch):
+    html = ('<html><head><meta property="og:description" content="Five lessons from ten years '
+            'of building teams, and why the first hire matters most..."></head>'
+            '<body><p>Join LinkedIn to see this.</p></body></html>')
+    monkeypatch.setattr(scraper, "safe_get", lambda *a, **k: _WallResp(999, html))
+    r = scraper._scrape_linkedin_url("https://www.linkedin.com/posts/jane-doe_topic-activity-1-a")
+    assert "Five lessons" in r["text"] and "Join LinkedIn" not in r["text"]
+    assert r["truncated"] is True and r["capture_reason"] == "login_wall"

@@ -52,6 +52,11 @@ def test_empty_and_non_string_pass():
 def test_analysis_checks_both_prose_fields_only():
     assert _analysis_cut_off({"summary": "Fine.", "detailedSummary": "- מנכ"})
     assert _analysis_cut_off({"summary": "cut mid", "detailedSummary": "Fine."})
+    assert _analysis_cut_off({"summary": "Fine.", "detailedSummary": "- **Senec"})
+    # AI-13: recipe steps and list items end on a bare word by style ("2. Serve
+    # warm") and must not buy an extra analysis call. RV-4: the one-word cut
+    # above (the incident) is flagged again.
+    assert not _analysis_cut_off({"summary": "Fine.", "detailedSummary": "## Steps\n1. Mix\n2. Serve warm"})
     assert not _analysis_cut_off({"summary": "Fine.", "detailedSummary": "Also fine."})
     # Non-analysis schemas (no prose fields) are never flagged.
     assert not _analysis_cut_off({"answer": "whatever with no period"})

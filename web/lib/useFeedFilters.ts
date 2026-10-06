@@ -43,14 +43,15 @@ function showsArchived(filter: FilterType, searching: boolean): boolean {
  * extracted verbatim from Feed (R-3). Owns filter/category/tags/collections/
  * sources/sort selection; consumes the live links plus the LIVE search query
  * (matching is instant, per keystroke) + the full-library snapshot so search
- * reaches cards older than the loaded window, producing `filteredLinks` and
- * every facet.
+ * and filtered views reach cards older than the loaded window, producing
+ * `filteredLinks` and every facet.
  */
 export function useFeedFilters(
     links: Link[],
     /** The LIVE query (not debounced): matching reacts per keystroke. */
     searchQuery: string,
-    /** Full-library snapshot (useSearchLibrary) — empty until search is first used. */
+    /** Full-library snapshot (useSearchLibrary) — empty until search or a
+     *  filtered view (see filtersNeedLibrary) first needs it. */
     searchLibrary: Link[],
     /** Ids of collections marked Private — their members INHERIT privacy (see below). */
     privateCollectionIds: Set<string>,
@@ -112,21 +113,33 @@ export function useFeedFilters(
     // Query words for the LIVE query, tokenized ONCE per keystroke (not per card).
     const queryTokens = useMemo(() => tokenizeSearch(searchQuery), [searchQuery]);
 
-    // Base set for the filter pipeline. While searching, UNION the full-library
-    // snapshot (useSearchLibrary) into the loaded window so a match OLDER than
-    // the window still renders — the window alone can't reach old cards. The
-    // unioned docs are deduped by id (window docs win — they're the live
-    // snapshot) and run through the SAME pending/privacy predicate as the
-    // window, then flow through every facet/status filter below, so e.g.
-    // archived filtering stays consistent.
+    // A FILTERED view (a status filter or any facet) asks about the whole
+    // library, not the loaded window: "Favorites", "Archived" or an Insights
+    // tap on "Recipes 12" read empty when those cards sat past the first page.
+    // Feed fetches the full-library snapshot for these views (ensureLibrary)
+    // and it is unioned in below exactly as search does. Reminders is the one
+    // exception: useLinks already keeps every pending reminder live, and a
+    // stale snapshot could only add ones that have since fired or been
+    // cancelled.
+    const filtersNeedLibrary = filter !== 'reminders' && (filter !== 'all'
+        || selectedCategory.size > 0 || selectedTags.size > 0
+        || selectedSources.size > 0 || selectedCollections.size > 0);
+
+    // Base set for the filter pipeline. While searching, or in a filtered view,
+    // UNION the full-library snapshot (useSearchLibrary) into the loaded window
+    // so a card OLDER than the window still renders — the window alone can't
+    // reach old cards. The unioned docs are deduped by id (window docs win —
+    // they're the live snapshot) and run through the SAME pending/privacy
+    // predicate as the window, then flow through every facet/status filter
+    // below, so e.g. archived filtering stays consistent.
     const searchBase = useMemo(() => {
         const base = filter === 'private' ? privateCards : contentLinks;
-        if (queryTokens.length === 0 || searchLibrary.length === 0) return base;
+        if ((queryTokens.length === 0 && !filtersNeedLibrary) || searchLibrary.length === 0) return base;
         const gate = filter === 'private' ? isPrivateCard : isContentCard;
         const seen = new Set(base.map((l) => l.id));
         const extra = searchLibrary.filter((r) => !seen.has(r.id) && gate(r));
         return extra.length ? base.concat(extra) : base;
-    }, [filter, privateCards, contentLinks, queryTokens, searchLibrary, isPrivateCard, isContentCard]);
+    }, [filter, privateCards, contentLinks, queryTokens, filtersNeedLibrary, searchLibrary, isPrivateCard, isContentCard]);
 
     // The matches for the live query: id → whether the TITLE covered every
     // query word (those rank above summary matches). Recomputed per keystroke;
@@ -447,5 +460,6 @@ export function useFeedFilters(
         semanticOnlyIds,
         partialIds,
         reminderCount,
+        filtersNeedLibrary,
     };
 }

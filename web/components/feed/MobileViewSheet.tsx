@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { X, Check, LayoutGrid, StickyNote } from 'lucide-react';
+import { useSheetA11y } from './useSheetA11y';
 import { useSheetDrag } from '@/lib/useSheetDrag';
 
 /**
@@ -30,6 +31,7 @@ export default function MobileViewSheet({
     onOpenNotes: () => void;
 }) {
     const { sheetRef, scrimRef, handleProps } = useSheetDrag({ onClose });
+    const { titleId, closeRef } = useSheetA11y(isOpen, onClose);
     if (!isOpen) return null;
 
     const row = 'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[15px] text-start transition-colors cursor-pointer';
@@ -38,24 +40,28 @@ export default function MobileViewSheet({
         <div className="sm:hidden fixed inset-0 z-50 flex flex-col justify-end isolate">
             <div
                 ref={scrimRef}
-                className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
+                className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fade-in"
                 onClick={onClose}
             />
             <div
                 ref={sheetRef}
-                className="relative bg-background rounded-t-3xl border-t border-border-subtle shadow-2xl px-5 pt-3 pb-8 animate-in slide-in-from-bottom duration-300"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby={titleId}
+                className="relative bg-background rounded-t-3xl border-t border-border-subtle shadow-2xl px-5 pt-3 pb-8 animate-slide-up"
             >
                 <div {...handleProps}>
                     <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-text-muted/30" />
                     <div className="flex items-center justify-between mb-4">
-                        <h3 className="flex items-center gap-2 text-base font-bold text-text">
+                        <h3 id={titleId} className="flex items-center gap-2 text-base font-bold text-text">
                             <LayoutGrid className="w-4 h-4 text-text-muted" />
                             View
                         </h3>
                         <button
+                            ref={closeRef}
                             onClick={onClose}
                             aria-label="Close view options"
-                            className="p-1.5 rounded-full text-text-muted hover:text-text hover:bg-card-hover transition-colors"
+                            className="relative p-1.5 rounded-full text-text-muted hover:text-text hover:bg-card-hover transition-colors after:absolute after:-inset-1.5"
                         >
                             <X className="w-5 h-5" />
                         </button>

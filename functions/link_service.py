@@ -216,6 +216,30 @@ def create_workspace(auth_uid: str, email: Optional[str] = None) -> str:
     return auth_uid
 
 
+# Firestore caps a batched write at 500 operations; stay under it.
+_DELETE_BATCH = 400
+
+
+def _delete_all(db, query) -> int:
+    """Delete every document `query` returns, reading only document names and
+    committing 400 deletes per batch. One round trip per batch instead of one
+    per document: a large library is thousands of docs (cards, their vectors,
+    analytics events), and the per-document sweep could outrun the 60-second
+    limit Firebase Hosting puts on the app's /api/delete-account call."""
+    deleted = 0
+    batch, pending = db.batch(), 0
+    for snap in query.select(["__name__"]).stream():
+        batch.delete(snap.reference)
+        pending += 1
+        deleted += 1
+        if pending >= _DELETE_BATCH:
+            batch.commit()
+            batch, pending = db.batch(), 0
+    if pending:
+        batch.commit()
+    return deleted
+
+
 def delete_user_data(uid: str) -> int:
     """Hard-delete a user's Firestore workspace: the links/chats/collections
     subcollections and the top-level user doc. Returns the number of documents
@@ -229,26 +253,52 @@ def delete_user_data(uid: str) -> int:
     # the still-present user doc and run a per-card share/blob cleanup that
     # this sweep already owns (card_cleanup skips while this flag is set).
     # update(), not set(): a workspace doc that is already gone stays gone.
+    # `deletingAt` bounds the flag (card_cleanup honours it for
+    # DELETING_FLAG_TTL_MS only): a sweep that dies part-way used to leave
+    # `deleting` set for good, and every card the user deleted afterwards
+    # kept its public page and its images (launch audit ACCT-6).
     try:
-        user_ref.update({'deleting': True})
+        user_ref.update({'deleting': True, 'deletingAt': _now_ms()})
     except Exception as e:
-        logger.info(f"Could not flag workspace as deleting (continuing): {e}")
+        logger.info(f"Could not flag workspace as deleting (continuing): {type(e).__name__}")
+    try:
+        deleted += _sweep_workspace(db, uid, user_ref)
+    except Exception:
+        # The account stays (the caller keeps the Auth user so a retry can
+        # finish): give its card cleanup back.
+        try:
+            user_ref.update({'deleting': firestore.DELETE_FIELD, 'deletingAt': firestore.DELETE_FIELD})
+        except Exception:
+            pass
+        raise
+    user_ref.delete()
+    deleted += 1
+    logger.info(f"Deleted {deleted} docs for user workspace")
+    return deleted
+
+
+# How long card_cleanup trusts a workspace's `deleting` flag. A real sweep
+# finishes well inside it; an older flag is a sweep that died.
+DELETING_FLAG_TTL_MS = 10 * 60 * 1000
+
+
+def _now_ms() -> int:
+    return int(datetime.now(timezone.utc).timestamp() * 1000)
+
+
+def _sweep_workspace(db, uid: str, user_ref) -> int:
+    """Everything delete_user_data removes before the user doc itself."""
+    deleted = 0
     # Subcollections survive the parent user doc's deletion and must each be
     # swept explicitly: the M12 weekly recaps, the user's margin notes on
     # them, in-app digests, self-hosted analytics and crash reports.
     for sub in USER_SUBCOLLECTIONS:
-        for doc in user_ref.collection(sub).stream():
-            doc.reference.delete()
-            deleted += 1
+        deleted += _delete_all(db, user_ref.collection(sub))
     # Any queued processing rows for this user.
-    for doc in db.collection('pending_processing').where(filter=FieldFilter('uid', '==', uid)).stream():
-        doc.reference.delete()
-        deleted += 1
+    deleted += _delete_all(db, db.collection('pending_processing').where(filter=FieldFilter('uid', '==', uid)))
     # Background-processing heartbeats for this user. The uid is stored nested
     # under `data.uid` (see log_to_firestore in main.py), so query on that path.
-    for doc in db.collection('task_logs').where(filter=FieldFilter('data.uid', '==', uid)).stream():
-        doc.reference.delete()
-        deleted += 1
+    deleted += _delete_all(db, db.collection('task_logs').where(filter=FieldFilter('data.uid', '==', uid)))
     # Per-workspace server-side state keyed by uid: the plan grant, the monthly
     # quota counters, and the vaulted full syntheses (synthesis_vault rows carry
     # a `uid` field — see entitlement.stash_synthesis).
@@ -257,18 +307,41 @@ def delete_user_data(uid: str) -> int:
         if ref.get().exists:
             ref.delete()
             deleted += 1
-    for doc in db.collection('synthesis_vault').where(filter=FieldFilter('uid', '==', uid)).stream():
-        doc.reference.delete()
-        deleted += 1
+    deleted += _delete_all(db, db.collection('synthesis_vault').where(filter=FieldFilter('uid', '==', uid)))
     # Every public share this workspace published: the world-readable snapshot,
     # its owner mapping, and the generated link-preview image. Without this a
     # deleted account's /s, /c and /a pages stayed live forever with nobody
     # able to unpublish them.
     deleted += delete_shares_for_owner(uid)
-    user_ref.delete()
-    deleted += 1
-    logger.info(f"Deleted {deleted} docs for user workspace")
+    # The waiting-saves release plan lists (uid, cardId) pairs for a few hours
+    # (deferred_capture.release_next_slice); this account's leave with it.
+    deleted += _drop_release_slice_entries(db, uid)
     return deleted
+
+
+def _drop_release_slice_entries(db, uid: str) -> int:
+    """Remove `uid`'s entries from the waiting-saves release slices. Returns
+    how many were removed. Best-effort: the release already skips cards that
+    no longer exist, so this only keeps the uid out of a short-lived queue."""
+    removed = 0
+    try:
+        for snap in db.collection('waiting_release_slices').stream():
+            entries = (snap.to_dict() or {}).get('entries') or []
+            keep = [e for e in entries if not (isinstance(e, dict) and e.get('uid') == uid)]
+            if len(keep) == len(entries):
+                continue
+            try:
+                if keep:
+                    snap.reference.update({'entries': keep})
+                else:
+                    snap.reference.delete()
+                removed += len(entries) - len(keep)
+            except Exception as e:
+                # The slice was released meanwhile: nothing left to clean.
+                logger.info(f"Release slice changed during account deletion: {type(e).__name__}")
+    except Exception as e:
+        logger.warning(f"Release slice sweep failed (continuing): {type(e).__name__}")
+    return removed
 
 
 # Every client-facing subcollection under users/{uid}. Keep in step with
@@ -292,10 +365,27 @@ _SHARE_TYPE_COLLECTIONS = {
 }
 
 
+_LEGACY_SHARE_TYPES = {"shared_cards": "card", "shared_collections": "collection"}
+
+# Owner of a share id whose account was deleted. Matches no account.
+DELETED_SHARE_OWNER = "__deleted__"
+
+
+def _retire_owner_row(ref, share_type) -> None:
+    """Overwrite a deleted account's `shared_owners` row with an ownerless
+    tombstone. Deleting the row freed the id: a circulated /s, /c or /a link
+    keeps naming it, so any other account could publish its own page under
+    it and every old copy of the link would show that page (launch audit
+    ACCT-3; unpublish keeps a tombstone for the same reason). The new row
+    holds no uid, so nothing of the deleted account remains in it."""
+    ref.set({"ownerUid": DELETED_SHARE_OWNER, "type": share_type, "unpublishedAt": _now_ms()})
+
+
 def delete_shares_for_owner(uid: str) -> int:
-    """Delete every public share owned by `uid` (snapshot + owner map +
-    previews). Returns the number of docs deleted; best-effort per share so
-    one failure never blocks the rest of the account deletion."""
+    """Delete every public share owned by `uid` (snapshot + previews) and
+    retire its owner row (see _retire_owner_row). Returns the number of docs
+    removed; best-effort per share so one failure never blocks the rest of
+    the account deletion."""
     db = get_db()
     deleted = 0
     owners = db.collection('shared_owners').where(filter=FieldFilter('ownerUid', '==', uid)).stream()
@@ -314,7 +404,7 @@ def delete_shares_for_owner(uid: str) -> int:
             else:
                 db.collection(public_coll).document(share_id).delete()
                 deleted += 1
-            owner_doc.reference.delete()
+            _retire_owner_row(owner_doc.reference, share_type)
             deleted += 1
             try:
                 from share_service import _delete_share_previews
@@ -335,10 +425,9 @@ def delete_shares_for_owner(uid: str) -> int:
                 try:
                     doc.reference.delete()
                     deleted += 1
-                    owner_ref = db.collection('shared_owners').document(doc.id)
-                    if owner_ref.get().exists:
-                        owner_ref.delete()
-                        deleted += 1
+                    _retire_owner_row(db.collection('shared_owners').document(doc.id),
+                                      _LEGACY_SHARE_TYPES[coll])
+                    deleted += 1
                     try:
                         from share_service import _delete_share_previews
                         _delete_share_previews(doc.id)
@@ -536,9 +625,7 @@ def get_user_tags(uid: str) -> list:
     # digest_service's lazy ai_service/push_service imports).
     from search import is_effectively_private, private_collection_ids
 
-    db = get_db()
-    links_ref = db.collection('users').document(uid).collection('links')
-    docs = links_ref.get()
+    docs = _vocabulary_docs(uid)
 
     private_ids = private_collection_ids(uid)
     counts = {}
@@ -560,6 +647,25 @@ def get_user_tags(uid: str) -> list:
     return [tag for tag, _ in ranked[:MAX_PROMPT_TAGS]]
 
 
+# The prompt's tag and category vocabulary comes from the user's most recent
+# cards, not the whole library. Reading every card on every save cost one read
+# per card per capture (an import of k links into a library of N was ~k*N
+# reads), each full document still carrying its embedding (launch audit
+# CAP-11). Recent cards carry the vocabulary worth reusing; usage ranking and
+# the prompt caps were already discarding the long tail.
+VOCAB_SCAN_LIMIT = 500
+# Everything the vocabulary scan and is_effectively_private read.
+_VOCAB_FIELDS = ['tags', 'category', 'isPrivate', 'collectionIds']
+
+
+def _vocabulary_docs(uid: str):
+    links_ref = get_db().collection('users').document(uid).collection('links')
+    return (links_ref.select(_VOCAB_FIELDS)
+            .order_by('createdAt', direction=firestore.Query.DESCENDING)
+            .limit(VOCAB_SCAN_LIMIT)
+            .get())
+
+
 def get_user_vocabulary(uid: str) -> tuple:
     """The user's tag AND category vocabulary, from ONE pass over their cards.
 
@@ -579,9 +685,7 @@ def get_user_vocabulary(uid: str) -> tuple:
     """
     from search import is_effectively_private, private_collection_ids
 
-    db = get_db()
-    links_ref = db.collection('users').document(uid).collection('links')
-    docs = links_ref.get()
+    docs = _vocabulary_docs(uid)
 
     private_ids = private_collection_ids(uid)
     tag_counts = {}
@@ -679,18 +783,42 @@ def storage_key_for(uid: str) -> str:
     if cached:
         return cached
     try:
-        ref = get_db().collection('users').document(uid)
+        db = get_db()
+        ref = db.collection('users').document(uid)
         snap = ref.get()
         key = (snap.to_dict() or {}).get('storageKey') if snap.exists else None
         if not isinstance(key, str) or not key:
-            key = secrets.token_hex(16)
-            ref.set({'storageKey': key}, merge=True)
-            logger.info(f"Minted storage key for user {mask_uid(uid)}")
+            # Minted in a transaction that keeps whatever another worker
+            # stored first: two first-image saves at once (an import of
+            # several posts) used to mint two keys, and the images under the
+            # one that lost were outside every cleanup (launch audit ACCT-7).
+            key = _run_transaction(db, lambda tx: _mint_storage_key(tx, ref))
+            logger.info(f"Storage key ready for user {mask_uid(uid)}")
         _STORAGE_KEY_CACHE[uid] = key
         return key
     except Exception as e:
-        logger.warning(f"Storage key lookup failed for {mask_uid(uid)}; using legacy prefix: {e}")
+        logger.warning(f"Storage key lookup failed for {mask_uid(uid)}; using legacy prefix: {type(e).__name__}")
         return uid
+
+
+def _mint_storage_key(tx, ref) -> str:
+    """Inside a transaction: the stored key if there is one, else a new one."""
+    snap = ref.get(transaction=tx)
+    key = (snap.to_dict() or {}).get('storageKey') if snap.exists else None
+    if isinstance(key, str) and key:
+        return key
+    key = secrets.token_hex(16)
+    tx.set(ref, {'storageKey': key}, merge=True)
+    return key
+
+
+def _run_transaction(db, fn):
+    """Run ``fn(transaction)`` in a Firestore transaction (retried on
+    contention). Tests swap this for a direct call."""
+    @firestore.transactional
+    def _txn(tx):
+        return fn(tx)
+    return _txn(db.transaction())
 
 
 def find_user_by_ingest_token(token: str) -> Optional[str]:

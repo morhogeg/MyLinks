@@ -1,7 +1,7 @@
 import { test, expect, type Page, type Route } from '@playwright/test';
 import {
-    adminList, adminUpdate, collectPageErrors, FREE_ENTITLEMENT, openAsNewUser, openAsReturningUser,
-    readyCard, type ApiCall, type TestUser,
+    adminList, adminUpdate, collectPageErrors, FREE_ENTITLEMENT, openAccountSettings, openAsNewUser,
+    openAsReturningUser, readyCard, type ApiCall, type TestUser,
 } from '../helpers';
 
 // Capture is the product's front door. The placeholder card is written by the
@@ -228,6 +228,29 @@ test('offline save: card shows at once, reaches the pipeline when back online', 
     await expect.poll(() => calls.some((c) => c.path === '/api/share'), { timeout: 30_000 }).toBe(true);
     const card = await onlyCard(user);
     expect((calls.find((c) => c.path === '/api/share')!.body as { cardId: string }).cardId).toBe(card.id);
+});
+
+test('sign-out with an offline save still queued asks first; nothing is lost', async ({ page, context }) => {
+    // Sign-out deletes the local Firestore cache, and the offline write queue
+    // with it. It used to do that silently (launch audit AUTH-6).
+    const { user } = await openAsNewUser(page);
+    await context.setOffline(true);
+    await saveLink(page, 'https://example.com/read-on-the-plane');
+    await expect(page.getByText(/Saved offline/)).toBeVisible();
+
+    await openAccountSettings(page, user.email);
+    await page.getByRole('button', { name: 'Sign out' }).click();
+    const warning = page.getByRole('alertdialog', { name: /Some changes haven.t synced/ });
+    await expect(warning).toBeVisible();
+    await warning.getByRole('button', { name: 'Stay signed in' }).click();
+    await expect(warning).toHaveCount(0);
+
+    // Back online the queued card reaches the server; then sign-out goes
+    // straight through with no warning.
+    await context.setOffline(false);
+    await onlyCard(user);
+    await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: 'Sign out' }).click()]);
+    await expect(page.getByRole('button', { name: 'Get started' }).first()).toBeVisible();
 });
 
 // ── Fixed bugs (found by this suite, 2026-10-04; SOURCE_OF_TRUTH §4 11b) ──

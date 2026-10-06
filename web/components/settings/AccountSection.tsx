@@ -43,14 +43,16 @@ const PROVIDER_LABEL: Record<AuthProviderId, string> = { apple: 'Apple', google:
  *    above the fold made the screen feel like a warning page.
  */
 export function AccountView({
-    accountEmail, displayName, photoURL, providerLabel, signOut, onClose, onDelete, deleteError,
+    accountEmail, displayName, photoURL, providerLabel, signOut, signingOut, onDelete, deleteError,
 }: {
     accountEmail: string | null;
     displayName: string | null;
     photoURL: string | null;
     providerLabel: string;
+    /** Closes Settings and signs out, or asks first (SettingsModal). */
     signOut: () => void;
-    onClose: () => void;
+    /** The unsynced-changes check before sign-out is running. */
+    signingOut: boolean;
     onDelete: () => void;
     deleteError: string | null;
 }) {
@@ -130,12 +132,12 @@ export function AccountView({
             <Footnote>
                 Link both to open this same library with either button.
             </Footnote>
-            {linkNote && <p role="status" className="mt-1.5 text-[12px] text-red-500 px-2">{linkNote}</p>}
+            {linkNote && <p role="status" className="mt-1.5 text-[12px] text-danger px-2">{linkNote}</p>}
 
             <div className="mt-7" />
             <List>
-                <RowShell tile={<LogOut className="w-[16px] h-[16px]" />} onClick={() => { onClose(); signOut(); }}>
-                    <RowText title="Sign out" />
+                <RowShell tile={<LogOut className="w-[16px] h-[16px]" />} onClick={signingOut ? undefined : signOut}>
+                    <RowText title={signingOut ? 'Signing out…' : 'Sign out'} />
                 </RowShell>
             </List>
 
@@ -147,7 +149,7 @@ export function AccountView({
                 <List>
                     <RowShell
                         tile={<Trash2 className="w-[16px] h-[16px]" />}
-                        tileClass="bg-red-500/12 text-red-500"
+                        tileClass="bg-danger/12 text-danger"
                         onClick={onDelete}
                     >
                         <RowText title="Delete account" />
@@ -158,7 +160,7 @@ export function AccountView({
                 Permanently deletes your account and all saved links, collections, and chats.
                 This can&apos;t be undone.
             </Footnote>
-            {deleteError && <p className="mt-1.5 text-[12px] text-red-500 px-2">{deleteError}</p>}
+            {deleteError && <p role="alert" className="mt-1.5 text-[12px] text-danger px-2">{deleteError}</p>}
         </>
     );
 }

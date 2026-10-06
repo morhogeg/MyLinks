@@ -444,6 +444,9 @@ export default function OnboardingTour({
                 e.preventDefault();
                 finish();
             } else if (e.key === 'ArrowRight' || e.key === 'Enter') {
+                // Enter on a focused control is that control's: on "Back" or
+                // "Skip" it used to also advance the tour (A11Y-14).
+                if (e.key === 'Enter' && (e.target as HTMLElement | null)?.closest?.('button, a, input, textarea, select')) return;
                 e.preventDefault();
                 next();
             } else if (e.key === 'ArrowLeft') {

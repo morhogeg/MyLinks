@@ -61,7 +61,7 @@ export default function PrivacyPage() {
       <h1 className="mt-6 text-3xl font-semibold tracking-tight text-text">
         Privacy Policy
       </h1>
-      <p className="mt-2 text-sm text-text-muted">Last updated: October 5, 2026</p>
+      <p className="mt-2 text-sm text-text-muted">Last updated: October 6, 2026</p>
 
       <p className="mt-6 leading-relaxed text-text-secondary">
         Machina (&ldquo;we&rdquo;) is a personal knowledge base: you save
@@ -158,6 +158,12 @@ export default function PrivacyPage() {
             reminders and digests at sensible local times.
           </li>
           <li>
+            <span className="text-text">Notification token.</span>{" "}
+            If you turn on notifications on your iPhone, the push token Apple and Firebase issue
+            for this app on that device, used only to deliver your reminders and digests. It is
+            removed when you sign out or delete your account.
+          </li>
+          <li>
             <span className="text-text">Product usage and diagnostics.</span>{" "}
             To understand which features are used and to catch crashes, Machina records a small
             number of first-party, content-free events: that the app was opened, that a save, ask,
@@ -205,8 +211,10 @@ export default function PrivacyPage() {
           <li>
             <span className="text-text">Saving a link.</span>{" "}
             The text of the page we fetched, up to 30,000 characters, and your list of existing tags
-            so the new card can reuse them. The link&rsquo;s full address is not sent, only the
-            site&rsquo;s name.
+            so the new card can reuse them. Usually only the site&rsquo;s name goes with it. When the
+            page can&rsquo;t be read in full (a login wall, a post that only shows a preview), its
+            address goes too, so the card can still be named, but never the part after a
+            &ldquo;?&rdquo; or &ldquo;#&rdquo;, where links carry sign-in and tracking codes.
           </li>
           <li>
             <span className="text-text">Saving a post with photos, or a screenshot.</span>{" "}
@@ -224,7 +232,9 @@ export default function PrivacyPage() {
           <li>
             <span className="text-text">Search.</span>{" "}
             A card&rsquo;s summary text, converted into the numeric vector that makes semantic
-            search and related-card links work.
+            search and related-card links work. When you search, the words you typed, and the
+            titles, the start of the summaries, and the tags of up to 20 matching cards, so they
+            can be ranked by meaning. Private cards are never among them.
           </li>
           <li>
             <span className="text-text">Asking a question.</span>{" "}
@@ -308,6 +318,14 @@ export default function PrivacyPage() {
             checked and restored. Payment itself is handled by Apple; we never see your card
             details.
           </li>
+          <li>
+            <span className="text-text">Public post viewers.</span>{" "}
+            X (Twitter) and Instagram often refuse to show a public post to a server. To read one
+            you saved, Machina&rsquo;s server may request it through a third-party viewer service
+            (fxtwitter, vxtwitter, or an Instagram viewer). They receive the post&rsquo;s address,
+            with any tracking parameters removed, and nothing else: not your account, not your
+            other saves.
+          </li>
         </ul>
         <p className="mt-4 leading-relaxed text-text-secondary">
           Two small Google services also run on your device rather than on our servers: the web app
@@ -353,6 +371,14 @@ export default function PrivacyPage() {
           permanently removes your workspace (saved items, chats, and collections) along with your
           uploaded images and your sign-in record. You can also email us and we will delete the
           account for you. Deletion is not reversible, so export first if you want a copy.
+        </p>
+        <p className="mt-4 leading-relaxed text-text-secondary">
+          Two small records outlive an account, and neither holds your content. So that deleting
+          and re-creating an account does not restart the free trial, we keep a one-way hash of
+          your email address with the date your first account was created; it cannot be turned
+          back into your address and is used for nothing else. Abuse-prevention counters (how
+          many requests an account or network address made in the last hour or day) expire on
+          their own within a day.
         </p>
       </Section>
 

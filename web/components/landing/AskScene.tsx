@@ -62,6 +62,7 @@ export default function AskScene() {
 
         // Motion reduced: the answer is simply there.
         if (prefersReducedMotion()) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- each in-view entry restarts the scripted demo
             setSent(true);
             setThinking(false);
             setShown(words.length);

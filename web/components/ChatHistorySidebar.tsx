@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
     Pencil,
     Trash2,
@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { ChatSession } from '@/lib/types';
 import SidebarIcon from './ui/SidebarIcon';
+import { relativeTime } from '@/lib/relativeTime';
 
 interface ChatHistorySidebarProps {
     chats: ChatSession[];
@@ -32,21 +33,12 @@ interface ChatHistorySidebarProps {
     onClose?: () => void;
 }
 
-/** "2h ago", "Yesterday", "Apr 3" — compact relative time for the chat list. */
-function relativeTime(ts: number): string {
+/** The chat list's time: the shared rule (lib/relativeTime), capitalized
+    because it stands on its own line ("Just now", "Yesterday", "Apr 3"). */
+function chatTime(ts: number): string {
     if (!ts) return '';
-    const diff = Date.now() - ts;
-    const min = Math.floor(diff / 60000);
-    if (min < 1) return 'Just now';
-    if (min < 60) return `${min}m ago`;
-    const hr = Math.floor(min / 60);
-    if (hr < 24) return `${hr}h ago`;
-    const day = Math.floor(hr / 24);
-    if (day === 1) return 'Yesterday';
-    if (day < 7) return `${day}d ago`;
-    const d = new Date(ts);
-    const sameYear = d.getFullYear() === new Date().getFullYear();
-    return d.toLocaleDateString(undefined, sameYear ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' });
+    const t = relativeTime(ts, Date.now());
+    return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
 /** A single conversation row with select + inline rename + delete. */
@@ -104,6 +96,7 @@ function ChatRow({
             <div className="flex items-center gap-1 px-2 py-1.5 rounded-xl bg-card-hover border border-accent/40">
                 <input
                     autoFocus
+                    aria-label="Chat name"
                     value={draft}
                     onChange={e => setDraft(e.target.value)}
                     onFocus={e => e.target.select()}
@@ -147,7 +140,7 @@ function ChatRow({
                         {chat.title}
                     </span>
                 </span>
-                <span className="text-[11px] text-text-muted">{relativeTime(chat.updatedAt)}</span>
+                <span className="text-[11px] text-text-muted">{chatTime(chat.updatedAt)}</span>
             </button>
             {/* Row actions. A single calm "more" affordance, laid out as a real flex
                 sibling (not an overlay) so the title always truncates with room to
@@ -185,7 +178,7 @@ function ChatRow({
                         <button
                             role="menuitem"
                             onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onRequestDelete(); }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-text-secondary hover:text-red-400 hover:bg-red-500/10 transition-colors text-start"
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-text-secondary hover:text-danger hover:bg-danger/10 transition-colors text-start"
                         >
                             <Trash2 className="w-4 h-4 shrink-0" />
                             Delete
@@ -294,10 +287,24 @@ export default function ChatHistorySidebar(props: ChatHistorySidebarProps) {
     const onClose = props.onClose;
     useEffect(() => {
         if (!mobileOpen) return;
-        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose?.(); };
+        // An Escape already handled inside (the rename field cancels its edit
+        // with preventDefault) is not also a request to close the drawer.
+        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !e.defaultPrevented) onClose?.(); };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
     }, [mobileOpen, onClose]);
+
+    // The open drawer is a modal dialog: focus moves into it (VoiceOver and
+    // keyboard users otherwise stay on the chat behind the scrim) and goes
+    // back to whatever opened it when it closes.
+    const drawerRef = useRef<HTMLDivElement>(null);
+    const titleId = useId();
+    useEffect(() => {
+        if (!mobileOpen) return;
+        const opener = document.activeElement as HTMLElement | null;
+        drawerRef.current?.focus({ preventScroll: true });
+        return () => { opener?.focus?.({ preventScroll: true }); };
+    }, [mobileOpen]);
 
     // History search (both variants). Only offered once the list is long
     // enough that scanning it stops being trivial.
@@ -364,9 +371,16 @@ export default function ChatHistorySidebar(props: ChatHistorySidebarProps) {
     return (
         <div className="fixed inset-0 z-[60] flex animate-fade-in">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative w-[82%] max-w-xs h-full bg-card border-e border-border-strong shadow-2xl flex flex-col safe-pt safe-pb animate-slide-in-left">
+            <div
+                ref={drawerRef}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby={titleId}
+                tabIndex={-1}
+                className="relative w-[82%] max-w-xs h-full bg-card border-e border-border-strong shadow-2xl flex flex-col safe-pt safe-pb animate-slide-in-left focus:outline-none"
+            >
                 <div className="shrink-0 flex items-center justify-between px-4 h-12 border-b border-border-subtle">
-                    <span className="font-semibold text-text">Chat history</span>
+                    <span id={titleId} className="font-semibold text-text">Chat history</span>
                     <button
                         onClick={onClose}
                         aria-label="Close history"

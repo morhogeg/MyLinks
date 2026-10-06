@@ -89,7 +89,7 @@ function Menu({
                 role="menu"
                 aria-label={ariaLabel}
                 style={{ position: 'fixed', left, width: WIDTH, ...vertical }}
-                className="z-[91] rounded-xl bg-card border border-border-strong shadow-2xl overflow-hidden py-1 animate-in fade-in zoom-in-95 duration-150"
+                className="z-[91] rounded-xl bg-card border border-border-strong shadow-2xl overflow-hidden py-1 animate-pop-in duration-150"
                 onClick={(e) => e.stopPropagation()}
             >
                 {items.map((item) => (
@@ -97,7 +97,7 @@ function Menu({
                         key={item.label}
                         role="menuitem"
                         onClick={(e) => { e.stopPropagation(); item.onClick(); onClose(); }}
-                        className={`w-full flex items-center gap-2.5 px-3 py-3 min-h-[44px] text-sm font-medium transition-colors ${item.danger ? 'text-red-400 hover:bg-red-500/10' : 'text-text hover:bg-fill-subtle'}`}
+                        className={`w-full flex items-center gap-2.5 px-3 py-3 min-h-[44px] text-sm font-medium transition-colors ${item.danger ? 'text-danger hover:bg-danger/10' : 'text-text hover:bg-fill-subtle'}`}
                     >
                         <span className="shrink-0">{item.icon}</span>
                         {item.label}

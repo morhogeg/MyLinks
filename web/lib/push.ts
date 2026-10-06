@@ -205,9 +205,31 @@ export async function refreshPushRegistration(): Promise<void> {
  */
 export type PushRegisterResult =
     | 'registered'
+    // The OS prompt was shown just now and the user tapped Don't Allow. A
+    // choice, not a fault: never answer it by opening the Settings app.
+    | 'declined'
+    // Denied on an EARLIER run: iOS will not show the prompt again, so only
+    // the Settings app can change it.
     | 'permission-denied'
     | 'registration-failed'
     | 'unavailable';
+
+/** This device's notification permission. 'prompt' = never asked on this
+ *  install (a new phone or a reinstall resets it). */
+export type DevicePushPermission = 'granted' | 'denied' | 'prompt' | 'unavailable';
+
+export async function getDevicePushPermission(): Promise<DevicePushPermission> {
+    if (!isNativeApp()) return 'unavailable';
+    try {
+        const { FirebaseMessaging } = await import('@capacitor-firebase/messaging');
+        const { receive } = await FirebaseMessaging.checkPermissions();
+        if (receive === 'granted') return 'granted';
+        if (receive === 'denied') return 'denied';
+        return 'prompt';
+    } catch {
+        return 'unavailable';
+    }
+}
 
 /**
  * Request notification permission (MUST be called from a user gesture — iOS
@@ -218,8 +240,13 @@ export async function registerPush(): Promise<PushRegisterResult> {
     if (!isNativeApp()) return 'unavailable';
     try {
         const { FirebaseMessaging } = await import('@capacitor-firebase/messaging');
-        const { receive } = await FirebaseMessaging.requestPermissions();
-        if (receive !== 'granted') return 'permission-denied';
+        // Ask iOS only when it can still show its prompt. Checking first is what
+        // tells a Don't Allow tapped just now ('declined') from one made on an
+        // earlier run ('permission-denied', fixable only in Settings).
+        const { receive: before } = await FirebaseMessaging.checkPermissions();
+        if (before === 'denied') return 'permission-denied';
+        const { receive } = before === 'granted' ? { receive: before } : await FirebaseMessaging.requestPermissions();
+        if (receive !== 'granted') return 'declined';
         // FCM's getToken depends on the APNs token, which arrives ASYNC after
         // the permission grant — the very first call right after "Allow" can
         // throw ("no APNS token yet"). Retry briefly instead of failing at the
@@ -312,14 +339,20 @@ export async function sendTestPush(): Promise<TestPushResult> {
 export async function unregisterPush(): Promise<void> {
     if (!isNativeApp()) return;
     let token: string | null = null;
+    let messaging: typeof import('@capacitor-firebase/messaging').FirebaseMessaging | null = null;
     try {
         const { FirebaseMessaging } = await import('@capacitor-firebase/messaging');
+        messaging = FirebaseMessaging;
         token = (await FirebaseMessaging.getToken()).token || null;
     } catch {
         token = null;
     }
     token = token || recallToken();
-    if (!token) return;
-    await postToken('/api/unregister-device-token', token);
+    if (token) await postToken('/api/unregister-device-token', token);
+    // Invalidate the token at FCM as well. If the unregister call failed
+    // (offline, session already gone), the server kept sending this account's
+    // reminders, card titles included, to the device after sign-out. A deleted
+    // token fails its next send and is pruned; registering again mints a new one.
+    try { await messaging?.deleteToken(); } catch { /* best effort */ }
     try { localStorage.removeItem(LAST_TOKEN_KEY); } catch { /* best effort */ }
 }

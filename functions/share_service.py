@@ -666,7 +666,6 @@ def _render_shared_card(card: dict, share_url: str, og_preview: Optional[dict] =
     title = card.get("title") or "Shared card"
     summary = card.get("summary") or ""
     detailed = card.get("detailedSummary") or ""
-    source = card.get("sourceName") or card.get("category") or ""
     image = _share_card_image(card)
     original = card.get("url") or ""
     tags = card.get("tags") or []
@@ -1213,6 +1212,83 @@ def _link_ref(db, uid: str, link_id: str):
     return db.collection("users").document(uid).collection("links").document(link_id)
 
 
+# ── A private card never has a live public page ─────────────────────────────
+# A card is effectively private when it carries its own `isPrivate` flag or
+# sits in a private collection (search.is_effectively_private). It must not
+# be published, and a page published before it went private must stop
+# rendering even when the client's "Stop sharing" never landed. Both checks
+# FAIL CLOSED: a read that errors counts as private.
+
+PRIVATE_CARD_SHARE_ERROR = ("This card is private, so it can't have a public link. "
+                            "Remove it from Private to share it.")
+PRIVATE_COLLECTION_SHARE_ERROR = ("This collection is private, so it can't have a public page. "
+                                  "Remove it from Private to share it.")
+
+# The only card fields the privacy check reads (keeps the embedding vector
+# out of every /s render).
+_CARD_PRIVACY_FIELDS = ["isPrivate", "collectionIds"]
+
+
+def _private_collection_ids_strict(db, uid: str) -> set:
+    """Ids of `uid`'s private collections. Unlike search.private_collection_ids
+    (an empty set on a read error, which is fine for ranking), this raises: a
+    public page must never be served, or written, on a guess."""
+    from google.cloud.firestore_v1.base_query import FieldFilter as _FF
+    docs = (db.collection("users").document(uid).collection("collections")
+            .where(filter=_FF("isPrivate", "==", True)).stream())
+    return {d.id for d in docs}
+
+
+def _card_is_private(db, uid: str, card: dict) -> bool:
+    """search.is_effectively_private for one stored card of `uid`. Reads the
+    private collections only when the card belongs to a collection; raises
+    when they cannot be read (callers treat that as private)."""
+    from search import is_effectively_private  # lazy: search loads the AI client
+    ids = card.get("collectionIds")
+    needs_collections = not card.get("isPrivate") and isinstance(ids, list) and len(ids) > 0
+    private_ids = _private_collection_ids_strict(db, uid) if needs_collections else set()
+    return is_effectively_private(card, private_ids)
+
+
+def shared_card_withdrawn(db, share_id: str, snapshot: dict) -> bool:
+    """True when the card behind a public /s snapshot is now private, deleted
+    or stopped, so share_page serves the not-found page instead.
+
+    The owner row names the card (`cardId`, recorded by publish); a row
+    written before that falls back to the card that remembers this shareId.
+    A share published before cards remembered their shareId can't be tied to
+    a card either way and renders as before. Fails CLOSED: any read error
+    withdraws the page."""
+    try:
+        row_snap = db.collection("shared_owners").document(share_id).get()
+        row = (row_snap.to_dict() or {}) if row_snap.exists else {}
+        if row.get("unpublishedAt"):
+            return True              # stopped; the snapshot should not exist
+        owner = row.get("ownerUid") or snapshot.get("ownerUid")  # legacy: on the public doc
+        if not isinstance(owner, str) or not owner:
+            return False
+        links = db.collection("users").document(owner).collection("links")
+        card_id = row.get("cardId")
+        if isinstance(card_id, str) and card_id:
+            card_snap = links.document(card_id).get(field_paths=_CARD_PRIVACY_FIELDS)
+            if not card_snap.exists:
+                return True          # the card was deleted
+            card = card_snap.to_dict() or {}
+        else:
+            from google.cloud.firestore_v1.base_query import FieldFilter as _FF
+            hits = list(links.where(filter=_FF("shareId", "==", share_id))
+                        .select(_CARD_PRIVACY_FIELDS).limit(1).get())
+            if not hits:
+                return False         # predates the card pointer: nothing to check
+            card = hits[0].to_dict() or {}
+        return _card_is_private(db, owner, card)
+    except Exception as e:
+        # Type only: a Firestore error can quote a document path, and the
+        # owner's path segment is a phone number for the legacy workspace.
+        logger.warning(f"share page withdrawn: card privacy check failed ({type(e).__name__})")
+        return True
+
+
 def _publish_share_logic(uid: str, share_type: str, share_id: str, payload: dict,
                          collection=None, card=None, update_only: bool = False) -> dict:
     """Write a public share snapshot for `uid` WITHOUT `ownerUid`, plus the
@@ -1260,6 +1336,30 @@ def _publish_share_logic(uid: str, share_type: str, share_id: str, payload: dict
         if not live:
             raise LookupError("This public link was stopped. Share it again to make a new one.")
 
+    # Read the owner's own doc behind the share BEFORE anything is built,
+    # uploaded or written: it must exist, and it must not be private. A
+    # private card (own flag, or a private collection's member) or a private
+    # collection never gets a public page; a failed privacy read raises and
+    # publishes nothing.
+    col_ref = link_ref = None
+    if collection_id is not None:
+        col_ref = _collection_ref(db, uid, collection_id)
+        col_snap = col_ref.get()
+        if not col_snap.exists:
+            raise LookupError("Collection not found")
+        if (col_snap.to_dict() or {}).get("isPrivate"):
+            raise PermissionError(PRIVATE_COLLECTION_SHARE_ERROR)
+    if card_id is not None:
+        link_ref = _link_ref(db, uid, card_id)
+        link_snap = link_ref.get()
+        if not link_snap.exists:
+            raise LookupError("Card not found")
+        link_data = link_snap.to_dict() or {}
+        if update_only and link_data.get("shareId") != share_id:
+            raise LookupError("This public link was stopped. Share it again to make a new one.")
+        if _card_is_private(db, uid, link_data):
+            raise PermissionError(PRIVATE_CARD_SHARE_ERROR)
+
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     # An answer snapshot is rebuilt from an allowlist rather than filtered, so a
     # field the client invents (a card id, a thumbnail) can never reach the
@@ -1290,28 +1390,23 @@ def _publish_share_logic(uid: str, share_type: str, share_id: str, payload: dict
     # refuses when an owner is recorded).
     batch = db.batch()
     batch.set(db.collection(public_coll).document(share_id), doc)
-    batch.set(db.collection("shared_owners").document(share_id), {
-        "ownerUid": uid, "type": share_type, "publishedAt": now_ms,
-    })
-    if collection_id is not None:
-        col_ref = _collection_ref(db, uid, collection_id)
-        if not col_ref.get().exists:
-            raise LookupError("Collection not found")
+    owner_row = {"ownerUid": uid, "type": share_type, "publishedAt": now_ms}
+    if card_id is not None:
+        # Which card this page shows, so share_page can withdraw it the moment
+        # the card turns private or is deleted (shared_card_withdrawn). The
+        # row is functions-only: the card id never reaches the public doc.
+        owner_row["cardId"] = card_id
+    batch.set(db.collection("shared_owners").document(share_id), owner_row)
+    if col_ref is not None:
         flags = {"shareId": share_id, "isPublic": True, "publishedAt": now_ms, "updatedAt": now_ms}
         if signature:
             flags["publishedSignature"] = signature
         batch.set(col_ref, flags, merge=True)
-    if card_id is not None:
+    if link_ref is not None:
         # The card remembers its public page (same batch, same reason as the
         # collection flags): re-sharing reuses the id, "Stop sharing" can find
         # it, and the card-delete trigger can take it down. `updatedAt` is
         # deliberately NOT touched — it means "the owner edited this card".
-        link_ref = _link_ref(db, uid, card_id)
-        link_snap = link_ref.get()
-        if not link_snap.exists:
-            raise LookupError("Card not found")
-        if update_only and (link_snap.to_dict() or {}).get("shareId") != share_id:
-            raise LookupError("This public link was stopped. Share it again to make a new one.")
         batch.set(link_ref, {"shareId": share_id, "sharePublishedAt": now_ms}, merge=True)
     batch.commit()
     return {"shareId": share_id}

@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
+import { pbkdf2Sync } from 'node:crypto';
 import {
-    adminGet, collectPageErrors, createAuthUser, hideDevChrome, installBackend, openAccountSettings,
+    adminGet, adminUpdate, collectPageErrors, createAuthUser, hideDevChrome, installBackend, openAccountSettings,
     openAsReturningUser, readyCard, seedCard, seedReturningUser, signIn,
 } from '../helpers';
 
@@ -87,4 +88,30 @@ test('export my data downloads a file with the library in it', async ({ page }) 
         expect(bytes.toString('utf8')).toContain('Worth keeping forever');
     }
     void user;
+});
+
+test('with the privacy lock on, export asks for the PIN before it hands over private cards', async ({ page }) => {
+    const { user } = await openAsReturningUser(page, {
+        a: readyCard({ title: 'Ordinary article' }),
+        p: readyCard({ title: 'Vault: passport scan notes', isPrivate: true }),
+    });
+    // The PIN 1234 in lib/privacyLock.ts's format (PBKDF2-SHA256, 32 bytes).
+    const salt = '00112233445566778899aabbccddeeff';
+    const pinHash = pbkdf2Sync('1234', Buffer.from(salt, 'hex'), 100_000, 32, 'sha256').toString('hex');
+    await adminUpdate(`users/${user.uid}`, { privacyLock: { pinHash, salt, iterations: 100_000, updatedAt: Date.now() } });
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'Add to Machina' })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Settings' }).click();
+    await page.getByRole('button', { name: /^Export my data/ }).click();
+    const pin = page.getByRole('dialog', { name: 'Enter your PIN' });
+    await expect(pin).toContainText('Your export includes your private collections.');
+
+    const [download] = await Promise.all([
+        page.waitForEvent('download', { timeout: 20_000 }),
+        pin.getByLabel(/^Enter your PIN: 4 digits$/).fill('1234'),
+    ]);
+    const fs = await import('node:fs');
+    const text = fs.readFileSync((await download.path())!).toString('utf8');
+    expect(text).toContain('Vault: passport scan notes');
 });

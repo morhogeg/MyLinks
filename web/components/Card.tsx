@@ -15,9 +15,10 @@ import { getCategoryColorStyle } from '@/lib/colors';
 import CategoryInput from './CategoryInput';
 import CardActionSheet from './CardActionSheet';
 import WaitingCard from './WaitingCard';
-import { hasHebrew } from '@/lib/rtl';
+import { hasHebrew, contentLang } from '@/lib/rtl';
 import { isHttpUrl } from '@/lib/url';
 import { getNotes } from '@/lib/notes';
+import { relativeTime } from '@/lib/relativeTime';
 
 interface CardProps {
     link: Link;
@@ -121,26 +122,9 @@ function Card({
     // is one shared component now — see SourceByline. Do NOT reintroduce a
     // per-card copy here; that's what caused the design to drift across views.
 
-    // Format relative time (e.g., "2h ago")
-    const getTimeAgo = (timestamp: number | string, now: number): string => {
-        if (!timestamp || !now) return '...';
-
-        // Handle ISO string or number
-        let time = typeof timestamp === 'string' ? new Date(timestamp).getTime() : timestamp;
-        if (isNaN(time) || time <= 0) return isRtl ? 'לאחרונה' : 'recently';
-        // Some ingest paths (Facebook, screenshots) store Unix *seconds*, not ms —
-        // anything below year-2001-in-ms is really a seconds value, so scale it up.
-        if (time < 1e12) time *= 1000;
-
-        const seconds = Math.floor((now - time) / 1000);
-        if (seconds < 60) return isRtl ? 'זה עתה' : 'just now';
-        const minutes = Math.floor(seconds / 60);
-        if (minutes < 60) return isRtl ? `לפני ${minutes} דק׳` : `${minutes}m ago`;
-        const hours = Math.floor(minutes / 60);
-        if (hours < 24) return isRtl ? `לפני ${hours} שע׳` : `${hours}h ago`;
-        const days = Math.floor(hours / 24);
-        return isRtl ? `לפני ${days} ימים` : `${days}d ago`;
-    };
+    // One rule for every surface (lib/relativeTime).
+    const getTimeAgo = (timestamp: number | string, now: number): string =>
+        (!timestamp || !now ? '...' : relativeTime(timestamp, now, isRtl));
 
     // M3 — async-capture lifecycle. A card queued via the share sheet is written
     // as `processing` and flips to `failed` if analysis errors. Render
@@ -189,18 +173,18 @@ function Card({
         })();
         return (
             <article
-                className={`surface-card animate-card-enter bg-card rounded-[20px] border shadow-[var(--shadow-card)] relative flex flex-col h-full overflow-hidden ${failed ? 'border-red-500/30' : 'border-border-subtle'
+                className={`surface-card animate-card-enter bg-card rounded-[20px] border shadow-[var(--shadow-card)] relative flex flex-col h-full overflow-hidden ${failed ? 'border-danger/30' : 'border-border-subtle'
                     }`}
                 aria-busy={!failed}
             >
                 <div className="p-4 sm:p-5 flex flex-col h-full space-y-3">
                     <div className="flex items-center gap-2">
                         {failed ? (
-                            <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+                            <AlertTriangle className="w-4 h-4 text-danger shrink-0" />
                         ) : (
                             <CitationMark state="working" size={20} />
                         )}
-                        <span className={`text-[10px] uppercase font-black tracking-widest ${failed ? 'text-red-400' : 'text-accent'}`}>
+                        <span className={`text-[10px] uppercase font-black tracking-widest ${failed ? 'text-danger' : 'text-accent'}`}>
                             {failed ? 'Couldn’t analyze' : queued ? 'Queued' : 'Saving…'}
                         </span>
                     </div>
@@ -212,7 +196,7 @@ function Card({
                     {failed ? (
                         <div className="flex-grow space-y-2">
                             <p className="text-sm text-text-secondary">
-                                Your link is safe: the AI analysis didn’t finish. Retry to try again, or open the original.
+                                Your link is safe: Machina couldn’t finish reading it. Tap Retry, or open the original.
                             </p>
                             {/* The backend writes the real failure into `error`
                                 (process_link_background's except / the janitor).
@@ -268,7 +252,7 @@ function Card({
                                 <button
                                     onClick={(e) => { e.stopPropagation(); onDelete(link.id); }}
                                     aria-label="Delete"
-                                    className="p-1.5 rounded-full text-text-muted hover:text-red-500 transition-all"
+                                    className="p-1.5 rounded-full text-text-muted hover:text-danger transition-all"
                                 >
                                     <Trash2 className="w-3.5 h-3.5" />
                                 </button>
@@ -282,19 +266,17 @@ function Card({
 
     return (
         <>
+        {/* The whole card opens on tap, through ONE real control: the title
+            button below, whose ::after overlay covers the card. An onClick on
+            the <article> gave keyboard users no way in and VoiceOver no
+            "button"; every other control on the card sits above that overlay
+            (z-10 and up), so tap behavior is unchanged. */}
         <article
             style={{ ['--enter-delay' as string]: enterDelay }}
-            className={`group surface-card animate-card-enter bg-card rounded-[20px] border shadow-[var(--shadow-card)] transition-all duration-300 ease-[var(--ease-spring)] cursor-pointer relative flex flex-col items-stretch h-full [@media(hover:hover)]:hover:-translate-y-1 [@media(hover:hover)]:hover:shadow-[var(--shadow-card-hover)] ${isSelected
+            className={`group surface-card animate-card-enter bg-card rounded-[20px] border shadow-[var(--shadow-card)] transition-all duration-300 ease-[var(--ease-spring)] relative flex flex-col items-stretch h-full [@media(hover:hover)]:hover:-translate-y-1 [@media(hover:hover)]:hover:shadow-[var(--shadow-card-hover)] ${isSelected
                 ? 'border-accent bg-accent/5 ring-1 ring-accent'
                 : 'border-border-subtle hover:border-accent/30'
                 } ${link.isRead ? 'opacity-60 grayscale-[0.3]' : ''} ${isEditingCategory ? 'overflow-visible z-50' : 'overflow-hidden'}`}
-            onClick={() => {
-                if (isSelectionMode && onToggleSelection) {
-                    onToggleSelection(link.id);
-                } else {
-                    onOpenDetails(link);
-                }
-            }}
         >
             {/* Video thumbnail header — a short banner (matches the shorter thumb in
                 the open card) rather than a full 16:9 block. YouTube and social video
@@ -350,8 +332,12 @@ function Card({
                 overlays the top of the image on photo cards. z above the
                 thumbnail; pointer-events off until hover so it never steals the
                 image's click-to-open target. Pinned to dir="ltr" so the button
-                order is IDENTICAL on every card regardless of the card's own dir. */}
-            <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 absolute top-2.5 left-1/2 -translate-x-1/2 z-30 pointer-events-none group-hover:pointer-events-auto">
+                order is IDENTICAL on every card regardless of the card's own dir.
+                Shown for keyboard focus too (focus-visible, so a mouse click on
+                a card control doesn't leave it pinned open), and gone entirely
+                on touch screens (the ⋯ menu serves those): invisible, it still
+                put eight unseen buttons per card in VoiceOver's path. */}
+            <div className="opacity-0 group-hover:opacity-100 group-has-[:focus-visible]:opacity-100 transition-opacity duration-200 absolute top-2.5 left-1/2 -translate-x-1/2 z-30 pointer-events-none group-hover:pointer-events-auto group-has-[:focus-visible]:pointer-events-auto [@media(hover:none)]:hidden">
                 <div dir="ltr" className="flex items-center gap-1 bg-card/90 backdrop-blur-md border border-border-strong p-1 rounded-full shadow-xl">
                     {/* Only render as a link for real http(s) URLs — never make a
                         stored javascript:/data: value clickable. */}
@@ -388,10 +374,10 @@ function Card({
                             onStatusChange(link.id, link.status === 'favorite' ? 'unread' : 'favorite', { from: link.status });
                         }}
                         title={link.status === 'favorite' ? 'Remove from favorites' : 'Add to favorites'}
-                        className={`p-1.5 rounded-full transition-all flex items-center justify-center ${link.status === 'favorite' ? 'text-yellow-500 bg-yellow-500/10' : 'text-text-muted hover:text-accent'
+                        className={`p-1.5 rounded-full transition-all flex items-center justify-center ${link.status === 'favorite' ? 'text-star bg-star/10' : 'text-text-muted hover:text-accent'
                             }`}
                     >
-                        <Star className={`w-3 h-3 ${link.status === 'favorite' ? 'fill-yellow-500' : ''}`} />
+                        <Star className={`w-3 h-3 ${link.status === 'favorite' ? 'fill-star' : ''}`} />
                     </button>
                     <button
                         onClick={(e) => {
@@ -462,7 +448,7 @@ function Card({
                             onDelete(link.id);
                         }}
                         title="Delete"
-                        className="p-1.5 rounded-full text-text-muted hover:text-red-500 transition-all flex items-center justify-center"
+                        className="p-1.5 rounded-full text-text-muted hover:text-danger transition-all flex items-center justify-center"
                     >
                         <Trash2 className="w-3 h-3" />
                     </button>
@@ -506,7 +492,7 @@ function Card({
                                                     className="text-[10px] uppercase font-black tracking-widest px-2 py-1 rounded-lg inline-block cursor-pointer hover:brightness-110 transition-all group/chip whitespace-nowrap"
                                                     style={{
                                                         backgroundColor: colorStyle.backgroundColor,
-                                                        color: colorStyle.color,
+                                                        color: colorStyle.ink,
                                                     }}
                                                     onClick={(e) => {
                                                         e.stopPropagation();
@@ -548,7 +534,7 @@ function Card({
                         {isMeaningMatch && (
                             <span
                                 title="Found by meaning, not by matching words"
-                                className="shrink-0 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-accent/12 text-accent"
+                                className="shrink-0 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-accent/12 text-accent"
                             >
                                 Meaning
                             </span>
@@ -556,6 +542,7 @@ function Card({
                         {/* Private marker — icon only, matching the collection tiles. */}
                         {link.isPrivate && (
                             <span
+                                role="img"
                                 aria-label="Private"
                                 title="Private"
                                 className="flex items-center justify-center w-6 h-6 rounded-full bg-fill-subtle border border-border-strong text-text-muted shrink-0"
@@ -581,34 +568,50 @@ function Card({
                                 }}
                                 aria-label="Remove from favorites"
                                 title="Remove from favorites"
-                                className="flex items-center justify-center w-6 h-6 rounded-full text-yellow-500 shrink-0"
+                                className="relative flex items-center justify-center w-6 h-6 rounded-full text-star shrink-0 after:absolute after:-inset-2.5"
                             >
-                                <Star className="w-3.5 h-3.5 fill-yellow-500" />
+                                <Star className="w-3.5 h-3.5 fill-star" />
                             </button>
                         )}
                         <SourceByline link={link} />
                     </div>
 
                     {/* Touch-only actions trigger: hover actions are unreachable on a
-                        phone, so coarse-pointer devices get a persistent menu button. */}
+                        phone, so coarse-pointer devices get a persistent menu button.
+                        A 28px glyph circle inside a 44pt hit area (the ::after). */}
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
                             setIsSheetOpen(true);
                         }}
                         aria-label="Actions"
-                        className="hidden [@media(hover:none)]:flex items-center justify-center p-1.5 -me-1 ms-1 rounded-full text-text-muted hover:text-text active:bg-fill-strong z-20 flex-shrink-0"
+                        className="relative hidden [@media(hover:none)]:flex items-center justify-center p-1.5 -me-1 ms-1 rounded-full text-text-muted hover:text-text active:bg-fill-strong z-20 flex-shrink-0 after:absolute after:-inset-2"
                     >
                         <MoreHorizontal className="w-4 h-4" />
                     </button>
                 </div>
 
-                {/* Title - NO LINE CLAMP */}
+                {/* Title - NO LINE CLAMP. Its button is the card's tap target
+                    (the ::after covers the whole card, see the <article>). In
+                    selection mode it is a checkbox, so the selected state is
+                    announced, not only colored. */}
                 <h3
                     dir="auto"
+                    lang={contentLang(link.title)}
                     className={`font-bold text-base sm:text-lg text-text transition-colors leading-tight ${isRtl ? 'text-right' : ''}`}
                 >
-                    {link.title}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            if (isSelectionMode && onToggleSelection) onToggleSelection(link.id);
+                            else onOpenDetails(link);
+                        }}
+                        role={isSelectionMode ? 'checkbox' : undefined}
+                        aria-checked={isSelectionMode ? isSelected : undefined}
+                        className="block w-full [text-align:inherit] cursor-pointer focus-visible:outline-none after:absolute after:inset-0 after:rounded-[20px] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-accent"
+                    >
+                        {link.title}
+                    </button>
                 </h3>
 
                 {/* Summary - Structured display */}
@@ -655,9 +658,9 @@ function Card({
                                         e.stopPropagation();
                                         onTagClick?.(tag);
                                     }}
-                                    className="inline-flex items-center text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-fill-subtle text-text-muted/60 group-hover:text-accent group-hover:bg-accent/10 hover:!bg-accent/20 hover:!text-accent active:scale-95 transition-all border border-transparent group-hover:border-accent/10 cursor-pointer"
+                                    className="relative z-10 inline-flex items-center text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-fill-subtle text-text-muted/60 group-hover:text-accent group-hover:bg-accent/10 hover:!bg-accent/20 hover:!text-accent active:scale-95 transition-all border border-transparent group-hover:border-accent/10 cursor-pointer after:absolute after:-inset-x-[3px] after:-inset-y-2"
                                 >
-                                    {parents && <span className="opacity-40 font-normal mr-0.5">{parents}/</span>}
+                                    {parents && <span className="opacity-40 font-normal me-0.5">{parents}/</span>}
                                     {leaf}
                                 </button>
                             );
@@ -715,7 +718,7 @@ function Card({
                             ) : link.captureQuality === 'partial'
                                 && link.sourceType !== 'image'
                                 && link.sourceType !== 'note' && (
-                                <span title="Partial capture" aria-label="Partial capture" className="flex items-center">
+                                <span role="img" title="Partial capture" aria-label="Partial capture" className="flex items-center">
                                     <EyeOff className="w-3 h-3" />
                                 </span>
                             )}

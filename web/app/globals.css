@@ -7,7 +7,9 @@
   --card-hover: #1a1a1a;
   --text: #E5E5E5;
   --text-secondary: #A0A0A0;
-  --text-muted: #666666;
+  /* #858585: 5.5 / 5.1 / 4.7:1 on background / card / card-hover (WCAG AA).
+     #666666 was 3.0-3.6:1. */
+  --text-muted: #858585;
   --foreground: #E5E5E5;
   --border: rgba(255, 255, 255, 0.05);
   /* Lumen (dark): --accent is no longer a hue — it is the neutral EMPHASIS
@@ -64,6 +66,35 @@
      overrides to the darker secondary so the labels read vividly, not washed
      out (theme is class-based via .light, so this can't be a Tailwind dark:). */
   --tabbar-inactive: var(--text-muted);
+  /* Sign in with Apple: Apple's HIG asks for the white button on a dark
+     ground and the black one on a light ground. Brand-mandated, not ours. */
+  --apple-button: #FFFFFF;
+  --apple-button-ink: #000000;
+  /* Status colors (danger / warning / success / the favorite star). One token
+     each, so light mode can darken them: Tailwind's red-400, amber-500,
+     green-500 and yellow-500 read at 2-3:1 on the light ground. Light values
+     are red-600, amber-700, green-700 (text, 4.5:1+) and amber-600 for the
+     star (an icon, 3:1+). Brand marks (YouTube red) keep their own color. */
+  --danger: #F87171;
+  --warning: #F59E0B;
+  --success: #22C55E;
+  --star: #EAB308;
+  /* Archive / reminder blue. Light uses blue-600: blue-500 text on the light
+     ground is 3.7:1, under the 4.5:1 text bar. */
+  --info: #3B82F6;
+  /* Category chip text (lib/colors.ts `ink`), one per palette slot. Dark
+     keeps each hue's -500 except slate, blue, red, pink and indigo (-400),
+     which read under 4.5:1 on their tint. Light uses -700/-800. */
+  --cat-ink-purple: rgb(148 163 184);
+  --cat-ink-blue: rgb(96 165 250);
+  --cat-ink-green: rgb(34 197 94);
+  --cat-ink-yellow: rgb(234 179 8);
+  --cat-ink-red: rgb(248 113 113);
+  --cat-ink-pink: rgb(244 114 182);
+  --cat-ink-indigo: rgb(129 140 248);
+  --cat-ink-teal: rgb(20 184 166);
+  --cat-ink-orange: rgb(249 115 22);
+  --cat-ink-cyan: rgb(6 182 212);
   /* Shared spring-ish easing for lifts/entrances. */
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   /* The one modal-entrance curve (M-P2): Apple's no-overshoot push/present easing.
@@ -78,7 +109,9 @@
   --card-hover: #F3F4F6;
   --text: #111827;
   --text-secondary: #4B5563;
-  --text-muted: #9CA3AF;
+  /* #68707C: 4.8 / 5.0 / 4.6:1 on background / card / card-hover (WCAG AA).
+     #9CA3AF was 2.3-2.5:1. */
+  --text-muted: #68707C;
   --foreground: #111827;
   --border: rgba(0, 0, 0, 0.05);
   /* Monolith (light): graphite emphasis on the porcelain ground. */
@@ -116,6 +149,23 @@
   --accent-ring: rgba(90, 88, 80, 0.22); /* identity --glow (light) */
   /* Light mode: darker, vivid inactive tabs (see the :root note). */
   --tabbar-inactive: var(--text-secondary);
+  --apple-button: #000000;
+  --apple-button-ink: #FFFFFF;
+  --danger: #DC2626;
+  --warning: #B45309;
+  --success: #15803D;
+  --star: #D97706;
+  --info: #2563EB;
+  --cat-ink-purple: rgb(51 65 85);
+  --cat-ink-blue: rgb(29 78 216);
+  --cat-ink-green: rgb(22 101 52);
+  --cat-ink-yellow: rgb(133 77 14);
+  --cat-ink-red: rgb(185 28 28);
+  --cat-ink-pink: rgb(190 24 93);
+  --cat-ink-indigo: rgb(67 56 202);
+  --cat-ink-teal: rgb(15 118 110);
+  --cat-ink-orange: rgb(154 52 18);
+  --cat-ink-cyan: rgb(21 94 117);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-modal: cubic-bezier(0.32, 0.72, 0, 1);
 }
@@ -138,6 +188,13 @@
   --color-accent-hover: var(--accent-hover);
   --color-tile: var(--tile);
   --color-tile-ink: var(--tile-ink);
+  --color-apple-button: var(--apple-button);
+  --color-apple-button-ink: var(--apple-button-ink);
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+  --color-success: var(--success);
+  --color-star: var(--star);
+  --color-info: var(--info);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -279,6 +336,26 @@ html {
 
 .animate-fade-in {
   animation: fade-in 0.2s ease-out;
+}
+
+/* Menus and popovers (Dropdown, OverflowMenu, tag and category pickers):
+   a quick fade with a slight grow from the trigger. Replaces the tw-animate
+   classes (animate-in zoom-in-95 ...) they used to carry, which compile to
+   nothing because that plugin was never installed. */
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-pop-in {
+  animation: pop-in 0.14s var(--ease-modal, ease-out);
 }
 
 .animate-slide-in-left {
@@ -688,6 +765,7 @@ a {
   .animate-boot-bkt-r,
   .animate-boot-dot,
   .animate-boot-glow,
+  .animate-pop-in,
   .animate-fade-in {
     animation-duration: 0.01ms !important;
     animation-delay: 0ms !important;

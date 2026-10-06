@@ -10,6 +10,7 @@ import { trackReminderSet } from '@/lib/analytics';
 import { useToast } from '@/components/Toast';
 import { useSheetDrag, useIsMobile } from '@/lib/useSheetDrag';
 import { hapticSelection, hapticSuccess, hapticWarning } from '@/lib/haptics';
+import { reportError } from '@/lib/errorReporter';
 
 interface ReminderModalProps {
     uid: string;
@@ -230,7 +231,10 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
             toast.success(`Reminder set for ${fmtDayTime(new Date(fireAt))}`);
             finish();
         } catch (error) {
-            toast.error(`Couldn't set the reminder: ${error instanceof Error ? error.message : 'please try again.'}`);
+            // A Firestore error ("Missing or insufficient permissions") is for
+            // the reporter, not the screen.
+            reportError(error, 'reminder-set');
+            toast.error("Couldn't set the reminder. Please try again.");
             setSaving(false);
         }
     };
@@ -244,7 +248,8 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
             toast.success('Reminder turned off');
             finish();
         } catch (error) {
-            toast.error(`Couldn't update the reminder: ${error instanceof Error ? error.message : 'please try again.'}`);
+            reportError(error, 'reminder-off');
+            toast.error("Couldn't update the reminder. Please try again.");
             setSaving(false);
         }
     };
@@ -395,7 +400,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                                 label="Pick date & time"
                             />
                             {selected === 'custom' && (
-                                <div className="px-1.5 pb-4 space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                                <div className="px-1.5 pb-4 space-y-2 animate-fade-in duration-200">
                                     <div className="grid grid-cols-2 gap-2">
                                         <input
                                             type="date"
@@ -416,7 +421,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                                             className="w-full bg-fill-subtle border border-border-subtle rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25 [&::-webkit-calendar-picker-indicator]:opacity-60"
                                         />
                                     </div>
-                                    <p aria-live="polite" className={`text-[12.5px] leading-snug px-0.5 ${customInPast ? 'text-red-400' : 'text-text-muted'}`}>
+                                    <p aria-live="polite" className={`text-[12.5px] leading-snug px-0.5 ${customInPast ? 'text-danger' : 'text-text-muted'}`}>
                                         {customTs === null
                                             ? 'Pick a date to continue.'
                                             : customInPast
@@ -432,7 +437,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                             <button
                                 onClick={handleTurnOff}
                                 disabled={saving}
-                                className="w-full flex items-center gap-3 px-1.5 py-3.5 min-h-[52px] text-left text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="w-full flex items-center gap-3 px-1.5 py-3.5 min-h-[52px] text-left text-danger transition-colors hover:bg-danger/10 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <span className="w-6 shrink-0 flex items-center justify-center">
                                     <BellOff className="w-5 h-5" />

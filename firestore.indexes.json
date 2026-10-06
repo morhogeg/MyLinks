@@ -43,6 +43,34 @@
             ]
         },
         {
+            "collectionGroup": "links",
+            "queryScope": "COLLECTION_GROUP",
+            "fields": [
+                {
+                    "fieldPath": "status",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "processingStartedAt",
+                    "order": "ASCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "links",
+            "queryScope": "COLLECTION_GROUP",
+            "fields": [
+                {
+                    "fieldPath": "status",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "queuedAt",
+                    "order": "ASCENDING"
+                }
+            ]
+        },
+        {
             "collectionGroup": "entitlements",
             "queryScope": "COLLECTION",
             "fields": [
@@ -107,6 +135,36 @@
         {
             "collectionGroup": "links",
             "fieldPath": "noteEnrichPending",
+            "indexes": [
+                { "order": "ASCENDING", "queryScope": "COLLECTION" },
+                { "order": "DESCENDING", "queryScope": "COLLECTION" },
+                { "arrayConfig": "CONTAINS", "queryScope": "COLLECTION" },
+                { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }
+            ]
+        },
+        {
+            "collectionGroup": "links",
+            "fieldPath": "enrichStatus",
+            "indexes": [
+                { "order": "ASCENDING", "queryScope": "COLLECTION" },
+                { "order": "DESCENDING", "queryScope": "COLLECTION" },
+                { "arrayConfig": "CONTAINS", "queryScope": "COLLECTION" },
+                { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }
+            ]
+        },
+        {
+            "collectionGroup": "client_errors",
+            "fieldPath": "createdAt",
+            "indexes": [
+                { "order": "ASCENDING", "queryScope": "COLLECTION" },
+                { "order": "DESCENDING", "queryScope": "COLLECTION" },
+                { "arrayConfig": "CONTAINS", "queryScope": "COLLECTION" },
+                { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }
+            ]
+        },
+        {
+            "collectionGroup": "links",
+            "fieldPath": "needsEmbedding",
             "indexes": [
                 { "order": "ASCENDING", "queryScope": "COLLECTION" },
                 { "order": "DESCENDING", "queryScope": "COLLECTION" },

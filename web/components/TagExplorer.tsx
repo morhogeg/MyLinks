@@ -150,7 +150,7 @@ export default function TagExplorer({
                         <button
                             disabled={working}
                             onClick={() => confirmDelete ? void runManage(() => onDeleteTag(node.fullName)) : setConfirmDelete(true)}
-                            className="px-2.5 py-1 rounded-lg text-[12px] font-semibold text-red-500 hover:bg-red-500/10 disabled:opacity-40"
+                            className="px-2.5 py-1 rounded-lg text-[12px] font-semibold text-danger hover:bg-danger/10 disabled:opacity-40"
                         >
                             {confirmDelete ? `Remove from ${cards}?` : 'Delete'}
                         </button>
@@ -291,7 +291,7 @@ export default function TagExplorer({
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Filter tags..."
+                    placeholder="Filter tags…"
                     className="w-full bg-fill-subtle border border-border-subtle rounded-xl pl-8 pr-3 py-1.5 text-xs text-text placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent/30 transition-all"
                 />
             </div>

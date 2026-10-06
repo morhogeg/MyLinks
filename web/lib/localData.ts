@@ -25,7 +25,7 @@
  * so nothing may touch `db` again in this document's lifetime.
  */
 
-import { terminate, clearIndexedDbPersistence } from 'firebase/firestore';
+import { terminate, clearIndexedDbPersistence, waitForPendingWrites } from 'firebase/firestore';
 import { db } from './firebase';
 
 /**
@@ -56,6 +56,28 @@ function purgeLocalStorage(): void {
         sessionStorage.clear();
     } catch {
         // Same.
+    }
+}
+
+/**
+ * True when this device holds Firestore writes the server hasn't acknowledged
+ * within `ms`: in practice, edits made offline. The purge below deletes the
+ * write queue with the cache, so a sign-out asks first instead of losing them
+ * silently. Resolves at once when nothing is pending, online or not.
+ */
+export async function hasUnsyncedWrites(ms = 2000): Promise<boolean> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+        return await Promise.race([
+            waitForPendingWrites(db).then(() => false),
+            new Promise<boolean>((resolve) => { timer = setTimeout(() => resolve(true), ms); }),
+        ]);
+    } catch {
+        // Rejects only when the signed-in user changes mid-wait: nothing of
+        // this user's is left to protect.
+        return false;
+    } finally {
+        clearTimeout(timer);
     }
 }
 

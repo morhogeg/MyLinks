@@ -234,6 +234,16 @@ function sendMessage(msg) {
   });
 }
 
+// Same rule as the service worker: only an unpacked install may use a local server.
+async function isDevInstall() {
+  try {
+    const self = api.management && api.management.getSelf ? await api.management.getSelf() : null;
+    return Boolean(self && self.installType === "development");
+  } catch (_) {
+    return false;
+  }
+}
+
 async function saveToken() {
   const token = S.cleanToken($("token").value);
   if (!token) {
@@ -246,8 +256,8 @@ async function saveToken() {
     return;
   }
   const baseUrl = $("baseUrl").value.trim().replace(/\/+$/, "");
-  if (baseUrl && !/^https?:\/\/[^/\s]+$/i.test(baseUrl)) {
-    setTokenStatus("The server address should look like https://example.com", "err");
+  if (baseUrl && !S.isAllowedApiBase(baseUrl, await isDevInstall())) {
+    setTokenStatus("Leave the server address empty, or use a Machina address.", "err");
     return;
   }
   await api.storage.local.set({ baseUrl });

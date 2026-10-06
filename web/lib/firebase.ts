@@ -75,7 +75,12 @@ export const functions = getFunctions(app);
 import { initializeAppCheck, ReCaptchaV3Provider, getToken, type AppCheck } from "firebase/app-check";
 
 let appCheck: AppCheck | null = null;
-if (typeof window !== 'undefined') {
+// Browser only, as documented (SOURCE_OF_TRUTH §4 task 5): NOT inside the iOS
+// app. reCAPTCHA can't attest the WKWebView's capacitor:// origin, so with the
+// key baked into a native build every /api call would await a token fetch that
+// fails (and the reCAPTCHA badge could show). Native needs its own provider
+// (App Attest) before APPCHECK_ENFORCE can ever be turned on.
+if (typeof window !== 'undefined' && window.location.protocol !== 'capacitor:') {
     const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
     if (siteKey) {
         appCheck = initializeAppCheck(app, {
@@ -119,13 +124,16 @@ if (typeof window !== 'undefined'
     // AUTH_PHASE_1: Connect Auth emulator
     connectAuthEmulator(auth, "http://localhost:9099");
     // E2E sign-in hook (e2e/): the app only offers Google/Apple popups, which a
-    // headless browser can't complete, so the suite signs in with an emulator
-    // email account through this. Lives inside the emulator branch, so it can
-    // only ever reach the local Auth emulator — never exists on a real origin.
-    import('firebase/auth').then(({ signInWithEmailAndPassword }) => {
+    // headless browser can't complete, so the suite signs in through this with
+    // the Auth emulator's fake Google credential (an unsigned JSON ID token,
+    // which only the emulator accepts). It is a real google.com sign-in to the
+    // rules: the locked create rule lets only Google/Apple accounts mint a
+    // workspace, exactly as in production. Lives inside the emulator branch, so
+    // it can only ever reach the local Auth emulator, never a real origin.
+    import('firebase/auth').then(({ GoogleAuthProvider, signInWithCredential }) => {
         (window as unknown as { __machinaE2E?: unknown }).__machinaE2E = {
-            signIn: (email: string, password: string) =>
-                signInWithEmailAndPassword(auth, email, password).then((c) => c.user.uid),
+            signIn: (googleIdToken: string) =>
+                signInWithCredential(auth, GoogleAuthProvider.credential(googleIdToken)).then((c) => c.user.uid),
         };
     });
 }

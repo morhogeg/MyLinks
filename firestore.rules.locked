@@ -136,10 +136,21 @@ service cloud.firestore {
       // The doc may carry only the birth fields, and `createdAt` must be
       // "now" (±5 min of the server clock) so a fresh account cannot
       // backdate itself into the founders' Pro grant.
+      // Only a Google or Apple sign-in may create one: the providers the app
+      // offers, and the same allowlist claim_workspace applies server-side
+      // (a provider enabled in the console by mistake, e.g. anonymous or
+      // email/password, must not mint a workspace through this door either).
+      // `email`, when present, must be the account's own address from the
+      // token: it is what the deleted-account trial clock was keyed on, so
+      // naming someone else's inherited THEIR createdAt (entitlement.py now
+      // reads the address from Auth instead, and this keeps the doc honest).
       allow create: if isSignedIn()
         && request.auth.uid == uid
+        && request.auth.token.firebase.sign_in_provider in ['google.com', 'apple.com']
         && request.resource.data.authUids == [request.auth.uid]
         && request.resource.data.keys().hasOnly(['authUids', 'createdAt', 'onboarded', 'email'])
+        && (!('email' in request.resource.data)
+            || request.resource.data.email == request.auth.token.get('email', null))
         && request.resource.data.createdAt is number
         && request.resource.data.createdAt >= request.time.toMillis() - 300000
         && request.resource.data.createdAt <= request.time.toMillis() + 300000;

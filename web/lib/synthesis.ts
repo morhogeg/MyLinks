@@ -11,6 +11,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { WeeklySynthesis, UserNote } from './types';
+import { isoWeekLabel } from './weekLabel';
 
 /**
  * Read access to the weekly "What you learned" syntheses (M12).
@@ -38,6 +39,10 @@ function toSynthesis(d: QueryDocumentSnapshot<DocumentData>): WeeklySynthesis {
         cards: (data.cards as WeeklySynthesis['cards']) || [],
         cardCount: data.cardCount || 0,
         createdAt: data.createdAt || 0,
+        // Free plan: the backend writes a LOCKED shape (title + teaser, the full
+        // body in the functions-only vault; digest_service.locked_synthesis_doc).
+        // Dropping these flags rendered a blank recap with no Unlock button.
+        ...(data.locked === true ? { locked: true, teaser: typeof data.teaser === 'string' ? data.teaser : '' } : {}),
     };
 }
 
@@ -114,19 +119,10 @@ export async function saveSynthesisNotes(uid: string, weekId: string, notes: Use
  * next. Falls back to the createdAt date if the id isn't a parseable week.
  */
 export function synthesisWeekLabel(s: WeeklySynthesis): string {
-    const m = /^(\d{4})-W(\d{2})$/.exec(s.weekId);
-    const day = (d: Date) => d.toLocaleDateString(undefined, { day: 'numeric' });
-    const dayMonth = (d: Date) => d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
-    if (m) {
-        // ISO-8601: week 1 is the week containing 4 January; weeks start Monday.
-        const jan4 = new Date(Date.UTC(Number(m[1]), 0, 4));
-        const isoDow = jan4.getUTCDay() || 7; // Sunday(0) → 7
-        const week1Mon = jan4.getTime() - (isoDow - 1) * 86_400_000;
-        const start = new Date(week1Mon + (Number(m[2]) - 1) * 7 * 86_400_000);
-        const end = new Date(start.getTime() + 6 * 86_400_000);
-        return start.getMonth() === end.getMonth()
-            ? `${day(start)}–${dayMonth(end)}`
-            : `${dayMonth(start)} – ${dayMonth(end)}`;
-    }
-    return s.createdAt ? dayMonth(new Date(s.createdAt)) : '';
+    const week = isoWeekLabel(s.weekId);
+    if (week) return week;
+    // No week id: the write time, a real instant, so local time is right.
+    return s.createdAt
+        ? new Date(s.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
+        : '';
 }

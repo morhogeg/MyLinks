@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { User } from '@/lib/types';
 import { X, RefreshCw, ChevronLeft } from 'lucide-react';
 import { readLocalAiConsent } from '@/lib/aiConsent';
 import { useTheme } from './ThemeProvider';
 import { useAuth } from './AuthProvider';
 import { deleteAccount } from '@/lib/auth';
+import { hasUnsyncedWrites } from '@/lib/localData';
 import { isNativeApp } from '@/lib/api';
 import { openExternal } from '@/lib/share';
 import { useEntitlement } from './EntitlementProvider';
@@ -27,6 +28,7 @@ import {
 import { useScrollLock } from '@/lib/useScrollLock';
 import { usePrivacyLock } from '@/lib/privacyLock';
 import PinLockModal from './PinLockModal';
+import { scrollBehavior } from '@/lib/motion';
 
 interface SettingsModalProps {
     uid: string;
@@ -127,7 +129,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
     const {
         settings, setSettings, loadError,
         savePreferences, loadSettings,
-        togglePush, sendTestNotification, pushBusy, pushNote,
+        togglePush, sendTestNotification, pushBusy, pushNote, pushOnHere,
     } = useUserSettings(uid);
 
     // Navigation stack; the last entry is the visible screen.
@@ -175,7 +177,14 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
     const [deleting, setDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState<string | null>(null);
 
+    // Set synchronously, before the first await: ConfirmDialog calls onClose
+    // right after onConfirm, while `deleting` in this render is still false.
+    // Reading state there closed the dialog at once, so "Deleting…" never
+    // showed and a second tap started a second deletion.
+    const deletingRef = useRef(false);
     const handleDeleteAccount = async () => {
+        if (deletingRef.current) return;
+        deletingRef.current = true;
         setDeleting(true);
         setDeleteError(null);
         try {
@@ -185,13 +194,34 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
             setShowDeleteConfirm(false);
             onClose();
         } catch (e) {
+            deletingRef.current = false;
             setDeleting(false);
+            setShowDeleteConfirm(false);
             setDeleteError(
                 (e as Error)?.name === 'AppleConfirmCancelled'
                     ? 'Account not deleted. Confirming with Apple is the last step. Try again when ready.'
                     : 'Could not delete your account. Please try again.',
             );
         }
+    };
+
+    // Sign-out deletes this device's Firestore cache (lib/localData.ts) and
+    // with it any edit the server hasn't acknowledged yet, typically one made
+    // offline. Check first (instant when nothing is pending) and ask before
+    // losing anything.
+    const [checkingSignOut, setCheckingSignOut] = useState(false);
+    const [unsyncedWarning, setUnsyncedWarning] = useState(false);
+    const requestSignOut = async () => {
+        if (checkingSignOut) return;
+        setCheckingSignOut(true);
+        const unsynced = await hasUnsyncedWrites();
+        setCheckingSignOut(false);
+        if (unsynced) {
+            setUnsyncedWarning(true);
+            return;
+        }
+        onClose();
+        void signOut();
     };
 
     // An App Store subscription belongs to the Apple ID, not to this account:
@@ -210,20 +240,19 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
         setStack(['main']);
         setTimeout(() => {
             document.getElementById('settings-data-export')
-                ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                ?.scrollIntoView({ behavior: scrollBehavior(), block: 'center' });
         }, 60);
     };
 
     // AI-consent timestamp for the "Privacy & AI" section.
-    const [aiConsentAt, setAiConsentAt] = useState<number | null>(null);
+    // Read fresh each time the sheet opens (Settings only mounts client-side,
+    // after sign-in, so localStorage is available here).
+    const aiConsentAt = useMemo(() => (isOpen ? readLocalAiConsent(uid) : null), [isOpen, uid]);
 
     // Private-collections PIN management (change / turn off). The PIN is first
     // created from the collection edit sheet; here it can only be maintained.
     const { hasPin } = usePrivacyLock(uid);
     const [pinModal, setPinModal] = useState<null | 'change' | 'disable'>(null);
-    useEffect(() => {
-        if (isOpen) setAiConsentAt(readLocalAiConsent());
-    }, [isOpen]);
 
     // On phones Settings is a real full-screen page (slides in, fills the screen,
     // clears the notch); on desktop it stays a centered modal.
@@ -278,7 +307,10 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
     useEffect(() => {
         if (isOpen && uid) {
             // Deep-link: open straight to the digest screen (main → Reminders &
-            // Digest) so Back still walks out one level at a time.
+            // Digest) so Back still walks out one level at a time. Reset on
+            // open on purpose: a key remount would drop the sheet's open/close
+            // transition.
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- reset the nav stack each time the sheet opens
             setStack(initialSection === 'digest' ? ['main', 'resurfacing']
                 : initialSection === 'stats' ? ['main', 'stats']
                     : initialSection === 'extension' || initialSection === 'extension-connect' ? ['main', 'extension'] : ['main']);
@@ -318,10 +350,13 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                     {showBack ? (
                         <button
                             onClick={leaveSubscreen}
-                            className="inline-flex items-center gap-0.5 -ml-1.5 pr-2 py-1 rounded-2xl text-[16px] font-medium text-accent hover:opacity-80 transition-opacity cursor-pointer"
-                            aria-label="Back"
+                            className="inline-flex items-center gap-0.5 -ms-1.5 pe-2 py-1 rounded-2xl text-[16px] font-medium text-accent hover:opacity-80 transition-opacity cursor-pointer"
+                            // The name carries the visible word ("Back to
+                            // Settings"), so Voice Control's "tap Settings"
+                            // finds it; a bare "Back" hid that label.
+                            aria-label={backLabel.length > 12 ? 'Back' : `Back to ${backLabel}`}
                         >
-                            <ChevronLeft className="w-[22px] h-[22px]" strokeWidth={2.4} />
+                            <ChevronLeft className="w-[22px] h-[22px] rtl:rotate-180" strokeWidth={2.4} aria-hidden="true" />
                             <span className="truncate max-w-[9rem]">{backLabel.length > 12 ? 'Back' : backLabel}</span>
                         </button>
                     ) : (
@@ -332,7 +367,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                     {!showBack && (
                         <button
                             onClick={closeSettings}
-                            className="h-8 w-8 flex items-center justify-center text-text-muted hover:text-text transition-colors cursor-pointer"
+                            className="relative h-8 w-8 after:absolute after:-inset-1.5 flex items-center justify-center text-text-muted hover:text-text transition-colors cursor-pointer"
                             aria-label="Close settings"
                         >
                             <X className="w-[17px] h-[17px]" strokeWidth={2.3} />
@@ -358,6 +393,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                                 sendTestNotification={sendTestNotification}
                                 pushBusy={pushBusy}
                                 pushNote={pushNote}
+                                pushOnHere={pushOnHere}
                                 aiConsentAt={aiConsentAt}
                                 privacyLockOn={hasPin}
                                 onChangePin={() => setPinModal('change')}
@@ -373,8 +409,8 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                                 displayName={displayName}
                                 photoURL={photoURL}
                                 providerLabel={providerLabel}
-                                signOut={signOut}
-                                onClose={onClose}
+                                signOut={() => { void requestSignOut(); }}
+                                signingOut={checkingSignOut}
                                 onDelete={() => { setDeleteError(null); setShowDeleteConfirm(true); }}
                                 deleteError={deleteError}
                             />
@@ -451,7 +487,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                             {loadError && (
                                 <button
                                     onClick={() => loadSettings()}
-                                    className="mr-auto inline-flex items-center gap-1.5 text-sm text-red-400 hover:text-red-300 transition-colors cursor-pointer"
+                                    className="mr-auto inline-flex items-center gap-1.5 text-sm text-danger hover:opacity-80 transition-opacity cursor-pointer"
                                 >
                                     <RefreshCw className="w-4 h-4" />
                                     Couldn&apos;t load settings. Retry
@@ -472,8 +508,9 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
 
             <ConfirmDialog
                 isOpen={showDeleteConfirm}
-                onClose={() => { if (!deleting) setShowDeleteConfirm(false); }}
+                onClose={() => { if (!deletingRef.current) setShowDeleteConfirm(false); }}
                 onConfirm={handleDeleteAccount}
+                busy={deleting}
                 title="Delete account?"
                 message="This permanently deletes your account and all saved links, collections, and chats. This action cannot be undone."
                 extra={
@@ -501,6 +538,17 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                 }
                 confirmLabel={deleting ? 'Deleting…' : 'Delete account'}
                 cancelLabel="Cancel"
+                variant="danger"
+            />
+
+            <ConfirmDialog
+                isOpen={unsyncedWarning}
+                onClose={() => setUnsyncedWarning(false)}
+                onConfirm={() => { onClose(); void signOut(); }}
+                title="Some changes haven’t synced"
+                message="Your latest edits are only on this device, usually because it’s offline. Signing out now deletes them. Reconnect and wait a moment to keep them."
+                confirmLabel="Sign out anyway"
+                cancelLabel="Stay signed in"
                 variant="danger"
             />
 

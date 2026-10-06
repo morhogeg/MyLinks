@@ -116,7 +116,13 @@ export default function CollectionsGallery({
                         tabIndex={0}
                         aria-label={`Open collection ${c.name}`}
                         onClick={() => { hapticLight(); onOpen(c.id); }}
-                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(c.id); } }}
+                        // Only keys aimed at the tile itself: Enter on the ⋯
+                        // button inside bubbled up here, opened the collection
+                        // and (preventDefault) swallowed the button's own click.
+                        onKeyDown={(e) => {
+                            if (e.target !== e.currentTarget) return;
+                            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(c.id); }
+                        }}
                         className={`group relative rounded-[20px] border border-border-subtle bg-card shadow-[var(--shadow-card)] cursor-pointer transition-all [@media(hover:hover)]:hover:shadow-[var(--shadow-card-hover)] hover:border-accent/30 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${open ? 'z-20' : ''}`}
                     >
                         {/* Cover — a mosaic of member thumbnails, or (when a collection
@@ -155,7 +161,7 @@ export default function CollectionsGallery({
                             )}
                             {/* Public badge. */}
                             {c.isPublic && !c.isPrivate && (
-                                <span className="absolute top-2 start-2 flex items-center gap-1 px-1.5 py-0.5 rounded-full backdrop-blur-sm bg-black/55 text-[9px] font-bold uppercase tracking-wide text-white">
+                                <span className="absolute top-2 start-2 flex items-center gap-1 px-1.5 py-0.5 rounded-full backdrop-blur-sm bg-black/55 text-[10px] font-bold uppercase tracking-wide text-white">
                                     <Globe className="w-2.5 h-2.5" /> Shared
                                 </span>
                             )}
@@ -224,7 +230,7 @@ export default function CollectionsGallery({
                             </span>
                         )}
                         {s.thumbnails.length > 0 && <div className="absolute inset-0 bg-gradient-to-t from-card/90 to-transparent" />}
-                        <span className="absolute top-2 start-2 flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-accent/85 text-[9px] font-bold uppercase tracking-wide text-accent-ink">
+                        <span className="absolute top-2 start-2 flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-accent/85 text-[10px] font-bold uppercase tracking-wide text-accent-ink">
                             <CitationGlyph className="w-2.5 h-2.5" /> Suggested
                         </span>
                         {onDismissSuggestion && (
@@ -354,7 +360,7 @@ function CollectionMenu({
             <div
                 role="menu"
                 style={{ position: 'fixed', left, width: WIDTH, ...vertical }}
-                className="z-[91] rounded-xl bg-card border border-border-strong shadow-2xl overflow-hidden py-1 animate-in fade-in zoom-in-95 duration-150"
+                className="z-[91] rounded-xl bg-card border border-border-strong shadow-2xl overflow-hidden py-1 animate-pop-in duration-150"
                 onClick={(e) => e.stopPropagation()}
             >
                 <MenuRow icon={<LayoutGrid className="w-4 h-4" />} label="Manage cards" onClick={onManageCards} />
@@ -378,7 +384,7 @@ function MenuRow({ icon, label, onClick, danger }: { icon: React.ReactNode; labe
         <button
             role="menuitem"
             onClick={onClick}
-            className={`w-full flex items-center gap-2.5 px-3 py-3 min-h-[44px] text-sm font-medium text-start transition-colors ${danger ? 'text-red-400 hover:bg-red-500/10' : 'text-text hover:bg-fill-subtle'}`}
+            className={`w-full flex items-center gap-2.5 px-3 py-3 min-h-[44px] text-sm font-medium text-start transition-colors ${danger ? 'text-danger hover:bg-danger/10' : 'text-text hover:bg-fill-subtle'}`}
         >
             <span className="shrink-0">{icon}</span>
             {/* flex-1 + text-start keeps a label that wraps to two lines (e.g.

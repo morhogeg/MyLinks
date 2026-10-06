@@ -81,7 +81,7 @@ export default function DigestCard({
                     aria-expanded={expanded}
                 >
                     <div className="w-9 h-9 shrink-0 rounded-xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-md shadow-accent/20">
-                        <Newspaper className="w-[18px] h-[18px] text-white" />
+                        <Newspaper className="w-[18px] h-[18px] text-accent-ink" />
                     </div>
                     <div className="flex-grow min-w-0">
                         <div className="text-[11px] font-semibold uppercase tracking-wider text-accent">{kindLabel}</div>
@@ -137,7 +137,7 @@ export default function DigestCard({
                                     <span className="ml-auto inline-flex items-center gap-3">
                                         <button
                                             onClick={() => onDelete(digest.id)}
-                                            className="text-[12px] font-semibold text-red-500 hover:text-red-400 transition-colors cursor-pointer"
+                                            className="text-[12px] font-semibold text-danger hover:opacity-80 transition-opacity cursor-pointer"
                                         >
                                             Delete digest
                                         </button>
@@ -151,7 +151,7 @@ export default function DigestCard({
                                 ) : (
                                     <button
                                         onClick={() => setConfirmDelete(true)}
-                                        className="ml-auto inline-flex items-center gap-1.5 text-[12px] font-semibold text-text-muted hover:text-red-500 transition-colors cursor-pointer"
+                                        className="ml-auto inline-flex items-center gap-1.5 text-[12px] font-semibold text-text-muted hover:text-danger transition-colors cursor-pointer"
                                     >
                                         <Trash2 className="w-3.5 h-3.5" /> Delete
                                     </button>
@@ -197,8 +197,8 @@ export function ResurfacedCardRow({ card, onOpen, trailing }: {
                     <SourceByline link={{ url: card.url ?? undefined, sourceName: card.sourceName ?? undefined }} />
                     {card.category && (
                         <span
-                            className="shrink-0 max-w-[120px] px-1.5 py-px rounded-full text-[9px] leading-4 font-bold uppercase tracking-wider truncate"
-                            style={{ backgroundColor: colorStyle.backgroundColor, color: colorStyle.color }}
+                            className="shrink-0 max-w-[120px] px-1.5 py-px rounded-full text-[10px] leading-4 font-bold uppercase tracking-wider truncate"
+                            style={{ backgroundColor: colorStyle.backgroundColor, color: colorStyle.ink }}
                             title={card.category}
                         >
                             {card.category}

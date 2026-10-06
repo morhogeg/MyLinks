@@ -82,11 +82,14 @@ def test_digest_scan_survives_a_non_map_settings_value(monkeypatch):
                     "lastDigestSentAt": None, "fcmTokens": ["t"]}),
     ]
     monkeypatch.setattr(ds, "get_db", lambda: DigestFakeDB(docs, recorder))
-    monkeypatch.setattr(ds, "is_due", lambda settings, tz, last: bool(settings.get("digest_enabled")))
-    monkeypatch.setattr(ds, "is_synthesis_due", lambda settings, tz: False)
+    period = datetime.now(timezone.utc)
+    monkeypatch.setattr(ds, "digest_due_at",
+                        lambda settings, tz, last, last_run=None: period if settings.get("digest_enabled") else None)
+    monkeypatch.setattr(ds, "synthesis_due_at", lambda *a, **k: None)
     sent = []
     monkeypatch.setattr(ds, "build_and_send_digest",
-                        lambda uid, user_data, force=False: sent.append(uid) or {"sent": True, "card_count": 1})
+                        lambda uid, user_data, force=False, period=None, push_hold=None:
+                        sent.append(uid) or {"sent": True, "card_count": 1})
 
     report = ds.run_digest_check()
 
@@ -160,6 +163,15 @@ def test_user_vocabulary_caps_each_item(monkeypatch):
         def get(self):
             return [_Doc({"tags": ["a" * 300, "b"], "category": "c" * 300}),
                     _Doc({"tags": ["b"], "category": "Fine"})]
+
+        def select(self, fields):
+            return self
+
+        def order_by(self, field, direction=None):
+            return self
+
+        def limit(self, n):
+            return self
 
     class _Db:
         def collection(self, *_):
@@ -606,8 +618,14 @@ def test_storage_key_is_minted_once_and_fails_soft(monkeypatch):
 
     class _Ref:
         def __init__(self, d): self._d = d
-        def get(self): return _Snap(self._d)
+        def get(self, transaction=None): return _Snap(self._d)
         def set(self, data, merge=False): writes.append(data)
+
+    class _Tx:
+        def set(self, ref, data, merge=False): ref.set(data, merge=merge)
+
+    # The mint runs in a transaction (ACCT-7); run it directly here.
+    monkeypatch.setattr(link_service, "_run_transaction", lambda db, fn: fn(_Tx()))
 
     class _Db:
         def __init__(self, d): self._d = d
@@ -754,7 +772,79 @@ def test_delete_account_writes_the_tombstone(monkeypatch):
     assert written[-1] == ("doc@example.com", 42)
 
 
+def test_delete_account_retry_after_auth_user_is_gone_succeeds(monkeypatch):
+    """An earlier attempt can finish server-side after the app stopped waiting:
+    the workspace is gone and the auth user too. The retry must report success,
+    not a 500 on UserNotFoundError forever."""
+    class UserNotFoundError(Exception):
+        pass
+
+    def delete_user(uid):
+        raise UserNotFoundError(uid)
+
+    monkeypatch.setattr(main, "find_data_uid_by_auth_uid", lambda uid: None)
+    monkeypatch.setattr(main, "admin_auth", types.SimpleNamespace(
+        delete_user=delete_user, UserNotFoundError=UserNotFoundError))
+    assert main._delete_account_logic("auth-1", "a@example.com") == {"success": True}
+
+
+def test_delete_account_other_auth_failures_still_fail(monkeypatch):
+    class UserNotFoundError(Exception):
+        pass
+
+    def delete_user(uid):
+        raise RuntimeError("auth backend down")
+
+    monkeypatch.setattr(main, "find_data_uid_by_auth_uid", lambda uid: None)
+    monkeypatch.setattr(main, "admin_auth", types.SimpleNamespace(
+        delete_user=delete_user, UserNotFoundError=UserNotFoundError))
+    import pytest
+    with pytest.raises(main._DeleteAccountError):
+        main._delete_account_logic("auth-1", "a@example.com")
+
+
 def test_deleted_accounts_is_functions_only():
     rules = open(main.__file__.replace("functions/main.py", "firestore.rules.locked")).read()
     block = rules[rules.index("match /deleted_accounts/{docId}"):]
     assert "allow read, write: if false;" in block[:200]
+
+
+
+def test_concurrent_first_saves_share_one_storage_key(monkeypatch):
+    """Two workers minting at once must end with ONE key (ACCT-7): the second
+    transaction re-reads and keeps what the first stored."""
+    store = {}
+
+    class _Snap:
+        def __init__(self, d): self._d = d; self.exists = d is not None
+        def to_dict(self): return self._d
+
+    class _Ref:
+        def get(self, transaction=None): return _Snap(dict(store) if store else None)
+        def set(self, data, merge=False): store.update(data)
+
+    class _Db:
+        def collection(self, *_): return self
+        def document(self, *_): return _Ref()
+
+    class _Tx:
+        def set(self, ref, data, merge=False): ref.set(data, merge=merge)
+
+    monkeypatch.setattr(link_service, "get_db", lambda: _Db())
+    real_run = lambda db, fn: fn(_Tx())  # noqa: E731
+    calls = []
+
+    def racing_run(db, fn):
+        # Worker B's whole mint lands between worker A's outside read and
+        # A's transaction.
+        if not calls:
+            calls.append("A")
+            link_service._STORAGE_KEY_CACHE.clear()
+            other = link_service._mint_storage_key(_Tx(), _Ref())
+            calls.append(("B", other))
+        return real_run(db, fn)
+
+    monkeypatch.setattr(link_service, "_run_transaction", racing_run)
+    link_service._STORAGE_KEY_CACHE.clear()
+    key_a = link_service.storage_key_for("ws-race")
+    assert calls[1][1] == key_a == store["storageKey"]

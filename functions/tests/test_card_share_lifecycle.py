@@ -361,7 +361,7 @@ def test_ask_with_no_retrieved_cards_refunds_the_ask(monkeypatch):
     monkeypatch.setattr(main, "meter_quota", lambda *a, **k: {"ok": True, "remaining": 1, "used": 1, "limit": 2, "plan": "free"})
     monkeypatch.setattr(main, "perform_search_logic", lambda *a, **k: [])
     monkeypatch.setattr(main, "rerank_candidates", lambda q, c, top_k=10: list(c))
-    monkeypatch.setattr(main, "keyword_scan_cards", lambda *a, **k: [])
+    monkeypatch.setattr(main, "keyword_scan_full", lambda *a, **k: [])
     monkeypatch.setattr(main, "apply_distance_threshold", lambda r, **k: r)
     monkeypatch.setattr(main, "private_collection_ids", lambda uid: set())
     refunds = []
@@ -404,10 +404,15 @@ def test_update_public_link_never_revives_a_share_stopped_elsewhere(env):
 
 # ── Account deletion: the per-card trigger stands down ──────────────────────
 
+def _now_ms():
+    from datetime import datetime, timezone
+    return int(datetime.now(timezone.utc).timestamp() * 1000)
+
+
 def test_delete_trigger_stands_down_while_the_account_is_being_deleted(env):
     shot = "screenshots/u1/a.jpg"
     db, bucket = env({
-        "users/u1": {"deleting": True},
+        "users/u1": {"deleting": True, "deletingAt": _now_ms()},
         f"shared_cards/{SHARE}": {"card": {}},
         f"shared_owners/{SHARE}": {"ownerUid": "u1", "type": "card"},
     }, objects={shot})
@@ -426,5 +431,73 @@ def test_account_deletion_flags_the_workspace_before_deleting_cards(monkeypatch)
     link_service.delete_user_data("u1")
     user_ref = db.collection.return_value.document.return_value
     names = [c[0] for c in user_ref.mock_calls]
-    assert names[0] == "update" and user_ref.mock_calls[0].args == ({"deleting": True},)
+    assert names[0] == "update"
+    flag = user_ref.mock_calls[0].args[0]
+    assert flag["deleting"] is True and isinstance(flag["deletingAt"], int)
     assert names.index("update") < names.index("collection")
+
+
+@pytest.mark.parametrize("flag", [
+    {"deleting": True},                                    # pre-fix flag, no time
+    {"deleting": True, "deletingAt": 1},                   # a sweep that died long ago
+])
+def test_a_stale_deleting_flag_no_longer_disables_card_cleanup(env, flag):
+    """A deletion that died part-way left `deleting` set for good, and every
+    card deleted afterwards kept its public page and images (ACCT-6)."""
+    shot = "screenshots/u1/a.jpg"
+    db, bucket = env({
+        "users/u1": flag,
+        f"shared_cards/{SHARE}": {"card": {}},
+        f"shared_owners/{SHARE}": {"ownerUid": "u1", "type": "card"},
+    }, objects={shot})
+    report = card_cleanup.cleanup_deleted_card_logic("u1", "gone", {"shareId": SHARE, "url": _dl(shot)})
+    assert report.get("skipped") is None
+    assert f"shared_cards/{SHARE}" not in db.docs
+    assert shot not in bucket.objects
+
+
+def test_a_failed_account_sweep_clears_its_flag(monkeypatch):
+    from unittest.mock import MagicMock
+    import link_service
+    db = MagicMock()
+    monkeypatch.setattr(link_service, "get_db", lambda: db)
+
+    def boom(uid):
+        raise RuntimeError("DEADLINE_EXCEEDED")
+    monkeypatch.setattr(link_service, "delete_shares_for_owner", boom)
+    with pytest.raises(RuntimeError):
+        link_service.delete_user_data("u1")
+    user_ref = db.collection.return_value.document.return_value
+    updates = [c.args[0] for c in user_ref.mock_calls if c[0] == "update"]
+    assert updates[0]["deleting"] is True
+    from google.cloud import firestore
+    assert updates[-1] == {"deleting": firestore.DELETE_FIELD, "deletingAt": firestore.DELETE_FIELD}
+    # The clearing update is the last thing done to the user doc: it is
+    # never deleted after a failed sweep. (On this MagicMock every
+    # collection().document() is the same object, so earlier calls mix in.)
+    assert [c[0] for c in user_ref.mock_calls][-1] == "update"
+
+
+# ── Account deletion keeps circulated share ids claimed (ACCT-3) ────────────
+
+def test_a_deleted_accounts_share_id_cannot_be_claimed_by_another_account(env, monkeypatch):
+    import link_service
+    db, _ = env({
+        "users/victim": {},
+        f"shared_owners/{SHARE}": {"ownerUid": "victim", "type": "card", "publishedAt": 1},
+        f"shared_cards/{SHARE}": {"card": {"title": "Real card"}, "shareId": SHARE},
+    })
+    monkeypatch.setattr(link_service, "get_db", lambda: db)
+    monkeypatch.setattr(share_service, "_delete_share_previews", lambda sid: None)
+    link_service.delete_shares_for_owner("victim")
+
+    assert f"shared_cards/{SHARE}" not in db.docs
+    row = db.docs[f"shared_owners/{SHARE}"]
+    # Ownerless tombstone: nothing of the deleted account is left in it.
+    assert row["ownerUid"] == link_service.DELETED_SHARE_OWNER
+    assert "victim" not in str(row) and row["unpublishedAt"] > 0
+    with pytest.raises(PermissionError):
+        share_service._publish_share_logic(
+            "attacker", "card", SHARE,
+            {"card": {"title": "Your account needs verification", "url": "https://evil.example/login"}})
+    assert f"shared_cards/{SHARE}" not in db.docs

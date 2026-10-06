@@ -77,11 +77,21 @@ def validate_public_url(url: str) -> None:
         dialled = (_u3_parse_url(url).host or "").strip("[]").lower()
     except Exception:
         dialled = None
-    if dialled is not None and dialled != host.lower():
+    # Compare in ASCII (punycode). urlparse keeps a non-ASCII host as typed
+    # while urllib3 encodes it, so every international domain (bücher.de,
+    # דוגמה.ישראל) used to "differ" and was refused (launch audit CAP-12).
+    # Python's codec is IDNA 2003 and urllib3's is IDNA 2008, so a name the
+    # two standards encode differently (faß.de) still differs and is still
+    # refused, which is the point: never validate one host and dial another.
+    try:
+        host_ascii = host.encode("idna").decode("ascii").lower()
+    except UnicodeError as e:
+        raise UnsafeURLError("URL host is not a valid domain name") from e
+    if dialled is not None and dialled != host_ascii:
         raise UnsafeURLError("URL host is ambiguous between parsers")
 
     try:
-        addrinfos = socket.getaddrinfo(host, None)
+        addrinfos = socket.getaddrinfo(host_ascii, None)
     except socket.gaierror as e:
         raise UnsafeURLError(f"Could not resolve host: {host}") from e
 
@@ -349,6 +359,38 @@ FETCH_ERROR_MESSAGES = {
 # Largest article body handed to the model. ai_service caps its prompt input at
 # 30k characters; 25k leaves room for the shared caption and scaffolding.
 MAX_ARTICLE_CHARS = 25_000
+# Longest page title kept (see scrape_url).
+MAX_TITLE_CHARS = 300
+
+# How much of a fetched page is parsed. BeautifulSoup costs ~80 MB of memory
+# per MB of dense markup, so parsing the full 10 MB response cap ran a 256 MiB
+# function (and even the 1 GiB worker) out of memory, which skips the refund
+# (launch audit CAP-4). The article text kept is 25,000 characters; 2 MB of
+# HTML holds it for any real page.
+MAX_PARSE_BYTES = 2_000_000
+# The page HTML returned with a result is only a fallback for an empty `text`.
+_MAX_RETURNED_HTML = 200_000
+
+
+def _parse_slice(content: bytes) -> bytes:
+    """The first MAX_PARSE_BYTES of `content`, cut on a UTF-8 character
+    boundary: a split multi-byte character makes the strict UTF-8 decode
+    fail, and the charset sniffer would then fall back to windows-1252 and
+    turn a Hebrew page into mojibake."""
+    if len(content) <= MAX_PARSE_BYTES:
+        return content
+    cut = content[:MAX_PARSE_BYTES]
+    # Walk back to the last character's lead byte; drop that character only
+    # if the cut left it incomplete.
+    i, back = len(cut) - 1, 0
+    while i >= 0 and back < 3 and (cut[i] & 0xC0) == 0x80:
+        i, back = i - 1, back + 1
+    if i >= 0:
+        lead = cut[i]
+        need = 2 if lead >> 5 == 0b110 else 3 if lead >> 4 == 0b1110 else 4 if lead >> 3 == 0b11110 else 1
+        if len(cut) - i < need:
+            cut = cut[:i]
+    return cut
 
 # A PDF up to this size is sent to Gemini as a native document part (safe_get's
 # MAX_RESPONSE_BYTES is the same ceiling, so anything bigger never arrives).
@@ -553,6 +595,11 @@ def scrape_url(url: str, message_body: Optional[str] = None) -> dict:
     if not isinstance(result, dict):
         return result
     result.setdefault("source_url", url)
+    # A page's <title> is unbounded and flows into the queue doc, the card and
+    # `originalTitle`; one over ~1 MiB broke Firestore's document limit and
+    # left the card processing forever (launch audit CAP-20).
+    if isinstance(result.get("title"), str) and len(result["title"]) > MAX_TITLE_CHARS:
+        result["title"] = result["title"][:MAX_TITLE_CHARS].rstrip()
     # A platform scraper (X, Instagram, LinkedIn…) or an unexpected parse error
     # that came back with NOTHING used to reach the model as an empty prompt
     # and produce a confident junk "ready" card. Make it the honest partial
@@ -644,7 +691,7 @@ def _scrape_url(url: str, message_body: Optional[str] = None) -> dict:
             if "html" in ctype and content:
                 try:
                     from bs4 import BeautifulSoup
-                    rsoup = BeautifulSoup(content, 'html.parser',
+                    rsoup = BeautifulSoup(_parse_slice(content), 'html.parser',
                                           from_encoding=_header_charset(raw_ctype))
                     og = _og_bits(rsoup)
                     if rsoup.title and rsoup.title.string:
@@ -687,12 +734,14 @@ def _scrape_url(url: str, message_body: Optional[str] = None) -> dict:
         # falls back to ISO-8859-1, which mangles a UTF-8 Hebrew page that
         # declares its charset only in <meta>. BeautifulSoup honours an explicit
         # header charset, then the document's own <meta charset>, then sniffs.
+        content = _parse_slice(content)
         soup = BeautifulSoup(content, 'html.parser', from_encoding=_header_charset(raw_ctype))
         encoding = getattr(soup, "original_encoding", None) or "utf-8"
         try:
             html = content.decode(encoding, errors="replace")
         except LookupError:
             html = content.decode("utf-8", errors="replace")
+        html = html[:_MAX_RETURNED_HTML]
 
         # Extract title
         title = ""
@@ -824,7 +873,7 @@ def linkedin_author_from_url(url: str) -> Optional[str]:
     `linkedinAuthor` in web/lib/platform.tsx.
     """
     try:
-        from urllib.parse import urlparse, urlsplit, urlunsplit, parse_qsl, urlencode
+        from urllib.parse import urlparse
         parsed = urlparse(url)
         host = parsed.hostname or ''
         if host.startswith('www.'):
@@ -1033,6 +1082,16 @@ def _scrape_linkedin_url(url: str) -> dict:
         # forms redirect to the canonical /posts/<authorSlug>_… URL, which is
         # what the slug fallback can actually read an author from.
         final_url = str(response.url or url)
+        # A deleted post is a dead link, and LinkedIn's bot refusals (HTTP 999,
+        # other 4xx, a redirect to /authwall) are a login wall. Both used to be
+        # read as the post itself: a "ready" card summarizing raw markup
+        # (launch audit CAP-9).
+        status = getattr(response, "status_code", 200) or 200
+        if status in (404, 410):
+            return _fetch_failure("not_found" if status == 404 else "gone", f"HTTP {status}")
+        if 500 <= status < 600:
+            return _fetch_failure("server", f"HTTP {status}")
+        walled = status >= 400 or "/authwall" in (urlparse(final_url).path or "")
 
         from bs4 import BeautifulSoup
         import html as html_lib
@@ -1056,11 +1115,12 @@ def _scrape_linkedin_url(url: str) -> dict:
         p_text = " ".join(t for t in (p.get_text().strip() for p in soup.find_all('p')) if t)
 
         # Longest real candidate wins — ld+json articleBody is the whole post,
-        # og:description a teaser, <p> text usually authwall boilerplate.
-        candidates = [c for c in (ld_body, og_desc, p_text) if c]
+        # og:description a teaser, <p> text usually authwall boilerplate. On a
+        # walled page only the og teaser can be the post.
+        candidates = [c for c in ((og_desc,) if walled else (ld_body, og_desc, p_text)) if c]
         body = max(candidates, key=len)[:8000] if candidates else ""
-        truncated = (bool(body) and body == og_desc
-                     and body.rstrip().endswith(("...", "…")))
+        truncated = walled or (bool(body) and body == og_desc
+                               and body.rstrip().endswith(("...", "…")))
 
         source_name = (ld_author
                        or _extract_linkedin_author(html, final_url)
@@ -1074,12 +1134,20 @@ def _scrape_linkedin_url(url: str) -> dict:
         # them ("Ryan Holiday recommends…") instead of an anonymous post.
         text = f"LINKEDIN POST BY {source_name}:\n\n{body}" if source_name and body else body
 
+        if not body:
+            # Nothing of the post itself: the honest partial card (it offers
+            # "Add screenshots"), never the page's markup as the post.
+            result = _unreadable_result("", reason="login_wall")
+            result["source_name"] = source_name or linkedin_author_from_url(final_url)
+            result["final_url"] = final_url
+            return result
+
         return {
-            "html": html,
+            "html": html[:_MAX_RETURNED_HTML],
             "title": title,
-            "text": text or html[:5000],
+            "text": text,
             "truncated": truncated,
-            "capture_reason": "teaser",
+            "capture_reason": "login_wall" if walled else "teaser",
             "source_name": source_name,
             # Where the redirect landed (a lnkd.in short link's real post URL):
             # feeds finalUrlKey dedupe and the card's `sourcePlatform` stamp.
@@ -1100,6 +1168,21 @@ def _scrape_linkedin_url(url: str) -> dict:
                 "truncated": True, "capture_reason": "login_wall"}
 
 
+def _relay_url(url: str, relay_host: str) -> str:
+    """The same post on a third-party viewer service, by PATH only. The query
+    string is the sharer's tracking (`?t=`, `?s=`, `?igsh=`, the kind
+    url_key.py drops), and a relay has no business receiving it; the privacy
+    policy names these services (launch audit CAP-10). A relay that keeps the
+    platform's www prefix (an Instagram bridge) keeps it here too."""
+    parts = urlsplit(url)
+    host = (parts.hostname or "").lower()
+    if relay_host.startswith("api.") or not host.startswith("www."):
+        netloc = relay_host
+    else:
+        netloc = "www." + relay_host
+    return urlunsplit(("https", netloc, parts.path or "/", "", ""))
+
+
 def _scrape_twitter_url(url: str) -> dict:
     """
     Scrape Twitter/X URLs using the fxtwitter.com API.
@@ -1111,7 +1194,7 @@ def _scrape_twitter_url(url: str) -> dict:
 
     try:
         # 1. Try fxtwitter.com API first
-        fx_api_url = url.replace('twitter.com', 'api.fxtwitter.com').replace('x.com', 'api.fxtwitter.com')
+        fx_api_url = _relay_url(url, 'api.fxtwitter.com')
         logger.info(f"Attempting fxtwitter API: {fx_api_url}")
 
         try:
@@ -1136,7 +1219,7 @@ def _scrape_twitter_url(url: str) -> dict:
 
         # 2. Fallback to vxtwitter.com
         logger.info("fxtwitter failed or empty, trying vxtwitter...")
-        vx_api_url = url.replace('twitter.com', 'api.vxtwitter.com').replace('x.com', 'api.vxtwitter.com')
+        vx_api_url = _relay_url(url, 'api.vxtwitter.com')
 
         vx_result = None
         try:
@@ -1753,7 +1836,7 @@ def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
         bridges = ['instagramez.com', 'kkinstagram.com', 'ddinstagram.com']
         for bridge in bridges:
             try:
-                bridge_url = url.replace('instagram.com', bridge)
+                bridge_url = _relay_url(url, bridge)
                 logger.info(f"Trying Instagram bridge: {bridge_url}")
                 headers = {"User-Agent": MOBILE_USER_AGENT}
                 response = safe_get(bridge_url, headers=headers, timeout=5)
@@ -1776,10 +1859,11 @@ def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
                     if "AliExpress" in b_title or "AliExpress" in b_desc or "Open in App" in b_title:
                         continue
 
-                    # Bridges expose the real media as og:image — prefer it when
-                    # the direct scrape didn't yield one (login-walled preview).
-                    if not best_image:
-                        best_image = _extract_og_image(soup)
+                    # The bridge's og:image is NOT used: these are unaffiliated
+                    # sites (one served AliExpress spam, hence the check above),
+                    # and the image would be analyzed into the summary and kept
+                    # as the card's picture (launch audit CAP-10). Their text
+                    # is still a fallback for the caption, nothing more.
 
                     if b_desc and len(b_desc) > len(best_desc):
                         best_desc = b_desc
@@ -1791,8 +1875,10 @@ def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
             except Exception as e:
                 logger.warning(f"Instagram bridge {bridge} failed: {e}")
 
-    # 3. Incorporate original message body
-    if message_body and url in message_body:
+    # 3. Incorporate original message body. share_ingest has usually removed
+    # the URL from it already, so it is not required to be there (with that
+    # check the caption never reached the model; launch audit CAP-16).
+    if message_body:
         caption_guess = message_body.replace(url, '').strip()
         noise = ["Check out this reel!", "Watch this reel by", "Instagram post by", "See this post on Instagram", "Watch this video on Instagram"]
         for n in noise:
@@ -2063,7 +2149,9 @@ def _scrape_facebook_url(url: str, message_body: Optional[str] = None) -> dict:
 
     # Fold in the shared caption from the message body — for recipe/video posts
     # this is often the most complete text (the on-page caption is gated).
-    if message_body and url in message_body:
+    # share_ingest has usually removed the URL from the shared text already
+    # (launch audit CAP-16), so it is not required to be there.
+    if message_body:
         caption_guess = message_body.replace(url, '').strip()
         if caption_guess and len(caption_guess) > 5:
             metadata_lines.append(f"SHARED CAPTION:\n{caption_guess}")

@@ -8,7 +8,7 @@ import { track } from '@/lib/analytics';
 import { LargeTitle, SectionHeader, Footnote, List, RowShell, RowText, Chevron } from './primitives';
 
 /**
- * Settings → Insights: a birds-eye view of the library, computed entirely
+ * Settings → Insights: a bird's-eye view of the library, computed entirely
  * on-device (see lib/stats.ts). Magnitude marks (tiles, weekly chart, sources)
  * stay single-hue accent — there, length carries the meaning. Category bars and
  * tag pills wear the app-wide identity colors (`getCategoryColorStyle`), so a
@@ -170,7 +170,7 @@ function CountPills({ items, onOpen, colored }: { items: { name: string; count: 
             {items.map((t) => {
                 const colorStyle = colored ? getCategoryColorStyle(t.name) : null;
                 const style = colorStyle
-                    ? { backgroundColor: colorStyle.backgroundColor, borderColor: colorStyle.borderColor, color: colorStyle.color }
+                    ? { backgroundColor: colorStyle.backgroundColor, borderColor: colorStyle.borderColor, color: colorStyle.ink }
                     : undefined;
                 const toneCls = colorStyle ? '' : 'bg-card border-border-subtle text-text-secondary';
                 return onOpen ? (
@@ -237,6 +237,7 @@ export function StatsView({ uid, onOpenFacet, restoreScroll }: {
 
     useEffect(() => {
         let cancelled = false;
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- clear the last load's error as a new load starts
         setFailed(false);
         loadStats(uid)
             .then((s) => {
@@ -270,7 +271,7 @@ export function StatsView({ uid, onOpenFacet, restoreScroll }: {
                 <LargeTitle>Insights</LargeTitle>
                 <button
                     onClick={() => setAttempt((a) => a + 1)}
-                    className="mt-2 inline-flex items-center gap-1.5 text-sm text-red-400 hover:text-red-300 transition-colors cursor-pointer"
+                    className="mt-2 inline-flex items-center gap-1.5 text-sm text-danger hover:opacity-80 transition-opacity cursor-pointer"
                 >
                     <RefreshCw className="w-4 h-4" />
                     Couldn&apos;t load your stats. Retry
@@ -297,7 +298,7 @@ export function StatsView({ uid, onOpenFacet, restoreScroll }: {
                         <BarChart3 className="w-6 h-6" />
                     </span>
                     <p className="text-[14px] text-text-muted leading-snug max-w-[240px]">
-                        Nothing to chart yet. Save a few links and this becomes your library&apos;s birds-eye view.
+                        Nothing to chart yet. Save a few links and this becomes your library&apos;s bird&apos;s-eye view.
                     </p>
                 </div>
             </>

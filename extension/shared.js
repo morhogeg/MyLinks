@@ -30,6 +30,32 @@
 
   const SAVE_TIMEOUT_MS = 20000;
 
+  // Where saves, and so the token, may be sent. The Advanced "server" field
+  // exists to test against a local stub; without a list, an address someone
+  // was talked into pasting would receive the token with every save.
+  const API_HOSTS = [
+    "secondbrain-app-94da2.web.app",
+    "secondbrain-app-94da2.firebaseapp.com",
+    "mymachina.app",
+    "www.mymachina.app",
+  ];
+
+  // An https Machina host with no port or path, or, only in a development
+  // (unpacked) install, a local server on any port.
+  function isAllowedApiBase(value, devInstall) {
+    let u;
+    try {
+      u = new URL(value);
+    } catch (_) {
+      return false;
+    }
+    if (u.pathname !== "/" || u.search || u.hash || u.username || u.password) return false;
+    const host = u.hostname.toLowerCase();
+    if (u.protocol === "https:" && u.port === "" && API_HOSTS.includes(host)) return true;
+    return Boolean(devInstall) && (u.protocol === "http:" || u.protocol === "https:")
+      && (host === "localhost" || host === "127.0.0.1");
+  }
+
   function cleanToken(value) {
     return typeof value === "string" ? value.trim() : "";
   }
@@ -247,6 +273,7 @@
     LIBRARY_URL,
     SAVE_TIMEOUT_MS,
     CONNECT_HOSTS,
+    isAllowedApiBase,
     cleanToken,
     looksLikeToken,
     classifyUrl,

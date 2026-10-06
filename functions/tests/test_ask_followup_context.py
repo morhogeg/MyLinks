@@ -100,7 +100,7 @@ def seen(monkeypatch):
 
     monkeypatch.setattr(main, "perform_search_logic", fake_search)
     monkeypatch.setattr(main, "rerank_candidates", fake_rerank)
-    monkeypatch.setattr(main, "keyword_scan_cards", fake_keyword)
+    monkeypatch.setattr(main, "keyword_scan_full", fake_keyword)
     monkeypatch.setattr(main, "apply_distance_threshold", lambda r, **k: r)
     monkeypatch.setattr(main, "private_collection_ids", lambda uid: set())
 
@@ -165,6 +165,27 @@ def test_the_model_is_still_asked_the_raw_question_and_history(seen):
     assert asked["question"] == "בעברית"
     assert asked["history"] == _HISTORY
     assert asked["cardIds"] == ["cake"]
+
+
+def test_a_thank_you_turn_is_not_the_followup_subject(seen):
+    # RV-1: "thanks" in between used to become the topic: retrieval ran for
+    # "thanks" and the prompt named «thanks» as the subject.
+    history = _HISTORY + [{"role": "user", "content": "thanks"},
+                          {"role": "assistant", "content": "You're welcome."}]
+    _ask("בעברית", history)
+    assert seen["search"] == [_ASKED]
+    assert seen["asked"][0]["followup"]["subject"] == _ASKED
+
+
+def test_an_ok_that_accepts_an_offer_reaches_the_model(seen):
+    # RV-8: "Want the full steps?" -> "ok" is an answer to the offer, not a
+    # thank-you; the canned "You're welcome." used to swallow it.
+    history = [{"role": "user", "content": _ASKED},
+               {"role": "assistant", "content": "It is a moist cake. Want the full steps?"}]
+    resp = _ask("ok", history, context_ids=["cake"])
+    assert resp.status == 200
+    assert seen["asked"][0]["question"] == "ok"
+    assert seen["asked"][0]["history"] == history
 
 
 def test_a_normal_question_retrieves_for_itself_unchanged(seen):

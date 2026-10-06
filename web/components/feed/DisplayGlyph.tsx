@@ -37,7 +37,7 @@ export default function DisplayGlyph({
             // light), so tinting with it is invisible next to text-secondary.
             // The badge is what actually carries the state — the tint just
             // stops the glyph reading as muted while filters are on.
-            className={`relative h-10 w-10 flex items-center justify-center transition-colors ${active
+            className={`relative h-11 w-11 flex items-center justify-center transition-colors ${active
                 ? 'text-text'
                 : 'text-text-secondary hover:text-text active:text-text'}`}
         >
@@ -50,7 +50,7 @@ export default function DisplayGlyph({
                     // Pinned to the button's corner, inside its padding, so it
                     // clips the glyph only at the very edge the way an iOS badge
                     // does — at top-1/right-1 it sat squarely on the sliders.
-                    className="absolute top-0 right-0 min-w-[14px] h-[14px] px-1 rounded-full bg-accent text-accent-ink text-[9px] font-bold leading-[14px] text-center"
+                    className="absolute top-0 right-0 min-w-[14px] h-[14px] px-1 rounded-full bg-accent text-accent-ink text-[10px] font-bold leading-[14px] text-center"
                 >
                     {activeFilterCount > 9 ? '9+' : activeFilterCount}
                 </span>

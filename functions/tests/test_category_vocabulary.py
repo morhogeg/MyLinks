@@ -36,6 +36,16 @@ def _install_cards(monkeypatch, cards, private_ids=None):
         def get(self):
             return [_Doc(c) for c in cards]
 
+        # Projection, order and limit of the vocabulary scan (not under test).
+        def select(self, fields):
+            return self
+
+        def order_by(self, field, direction=None):
+            return self
+
+        def limit(self, n):
+            return self
+
     class _DB:
         def collection(self, _):
             return self
@@ -196,3 +206,44 @@ def test_language_enforcement_behaviour_is_unchanged():
             "tags": ["פסטה", "recipes", "מטבח איטלקי"]}
     out = GeminiService._enforce_tag_language(data)
     assert out["tags"] == ["פסטה", "מטבח איטלקי"]
+
+
+def test_the_scan_reads_recent_cards_projected_not_the_whole_library(monkeypatch):
+    """Every save read the whole library, full documents with their embedding
+    vectors (launch audit CAP-11): now the newest VOCAB_SCAN_LIMIT cards, with
+    only the fields the vocabulary and the privacy check read."""
+    calls = []
+
+    class _Links:
+        def select(self, fields):
+            calls.append(("select", tuple(fields)))
+            return self
+
+        def order_by(self, field, direction=None):
+            calls.append(("order_by", field, str(direction)))
+            return self
+
+        def limit(self, n):
+            calls.append(("limit", n))
+            return self
+
+        def get(self):
+            calls.append(("get",))
+            return [_Doc({"tags": ["ai"], "category": "Tech", "collectionIds": ["vault"]}),
+                    _Doc({"tags": ["secret"], "category": "Health", "collectionIds": ["vault"], "isPrivate": False})]
+
+    class _DB:
+        def collection(self, name):
+            return _Links() if name == "links" else self
+
+        def document(self, _):
+            return self
+
+    monkeypatch.setattr(link_service, "get_db", lambda: _DB())
+    import search
+    monkeypatch.setattr(search, "private_collection_ids", lambda uid: set())
+    tags, cats = link_service.get_user_vocabulary("u")
+    assert ("select", ("tags", "category", "isPrivate", "collectionIds")) in calls
+    assert any(c[0] == "order_by" and c[1] == "createdAt" and "DESC" in c[2].upper() for c in calls)
+    assert ("limit", link_service.VOCAB_SCAN_LIMIT) in calls
+    assert tags and cats

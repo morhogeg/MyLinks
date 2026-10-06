@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { Collection } from '@/lib/types';
 import { X, Check, Layers, Lock } from 'lucide-react';
 import { COLOR_KEYS, getColorStyleByKey } from '@/lib/colors';
 import { createCollection, updateCollection, unpublishCollection } from '@/lib/collections';
 import { usePrivacyLock } from '@/lib/privacyLock';
 import PinLockModal from './PinLockModal';
+import { Toggle } from './settings/primitives';
 import { useToast } from '@/components/Toast';
 import { useVisualViewport } from '@/lib/useVisualViewport';
 import { useScrollLock } from '@/lib/useScrollLock';
@@ -25,6 +26,9 @@ interface CollectionFormModalProps {
     onClose: () => void;
     /** Fired with the (new or existing) collection id after a successful save. */
     onSaved?: (id: string) => void;
+    /** Fired after an edit turned an existing collection private, so the
+        parent can take its members' own public card links down. */
+    onMadePrivate?: (collection: Collection) => void;
 }
 
 /**
@@ -38,6 +42,7 @@ export default function CollectionFormModal({
     isOpen,
     onClose,
     onSaved,
+    onMadePrivate,
 }: CollectionFormModalProps) {
     const toast = useToast();
     const isEdit = !!collection;
@@ -53,6 +58,12 @@ export default function CollectionFormModal({
     // instead of being hidden behind it while typing the name. No-op on desktop
     // (visualViewport == full window there).
     const vp = useVisualViewport();
+    // Each visible label is tied to its control (htmlFor / aria-labelledby),
+    // so VoiceOver reads "Name, text field" rather than an unnamed field.
+    const fieldId = useId();
+    const nameId = `${fieldId}-name`;
+    const descriptionId = `${fieldId}-description`;
+    const colorLabelId = `${fieldId}-color`;
 
     // Reset the form fields when the sheet opens (or the target collection
     // changes while open). Done as a render-time state adjustment rather than in
@@ -113,6 +124,7 @@ export default function CollectionFormModal({
                 });
                 toast.success('Collection updated');
                 onSaved?.(collection.id);
+                if (isPrivate && !collection.isPrivate) onMadePrivate?.({ ...collection, name: trimmed, isPrivate: true });
             } else {
                 const id = await createCollection(uid, {
                     name: trimmed,
@@ -171,10 +183,11 @@ export default function CollectionFormModal({
 
                 <div className="p-5 space-y-4">
                     <div>
-                        <label className="block text-[11px] font-bold uppercase tracking-wider text-text-muted mb-1.5">
+                        <label htmlFor={nameId} className="block text-[11px] font-bold uppercase tracking-wider text-text-muted mb-1.5">
                             Name
                         </label>
                         <input
+                            id={nameId}
                             autoFocus
                             value={name}
                             onChange={(e) => setName(e.target.value)}
@@ -185,10 +198,11 @@ export default function CollectionFormModal({
                     </div>
 
                     <div>
-                        <label className="block text-[11px] font-bold uppercase tracking-wider text-text-muted mb-1.5">
+                        <label htmlFor={descriptionId} className="block text-[11px] font-bold uppercase tracking-wider text-text-muted mb-1.5">
                             Description <span className="font-medium normal-case text-text-muted/60">(optional)</span>
                         </label>
                         <textarea
+                            id={descriptionId}
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
                             placeholder="What's this collection about?"
@@ -200,10 +214,12 @@ export default function CollectionFormModal({
                     <div>
                         {/* New collections already open with a random color (see the
                             reset block above), so no separate shuffle control. */}
-                        <label className="block text-[11px] font-bold uppercase tracking-wider text-text-muted mb-2">
+                        {/* A group of swatch buttons, not one input: the heading
+                            names the group instead of being a dangling <label>. */}
+                        <p id={colorLabelId} className="block text-[11px] font-bold uppercase tracking-wider text-text-muted mb-2">
                             Color <span className="font-medium normal-case text-text-muted/60">(optional)</span>
-                        </label>
-                        <div className="flex flex-wrap gap-2">
+                        </p>
+                        <div role="group" aria-labelledby={colorLabelId} className="flex flex-wrap gap-2">
                             {COLOR_KEYS.map((key) => {
                                 const style = getColorStyleByKey(key);
                                 const active = color === key;
@@ -239,21 +255,18 @@ export default function CollectionFormModal({
                                         : ''}
                                 </p>
                             </div>
-                            <button
-                                type="button"
-                                role="switch"
-                                aria-checked={isPrivate}
-                                aria-label="Private collection"
-                                onClick={() => {
+                            {/* The app's one switch (iOS size, RTL-aware), not a
+                                smaller hand-drawn copy (launch audit DS-6). */}
+                            <Toggle
+                                on={isPrivate}
+                                label="Private collection"
+                                onChange={() => {
                                     if (isPrivate) { setIsPrivate(false); return; }
                                     // First private collection ever → set up the vault PIN.
                                     if (hasPin) setIsPrivate(true);
                                     else setPinSetupOpen(true);
                                 }}
-                                className={`relative w-11 h-[26px] rounded-full transition-colors shrink-0 ${isPrivate ? 'bg-accent' : 'bg-fill-strong'}`}
-                            >
-                                <span className={`absolute top-[3px] w-5 h-5 rounded-full bg-white shadow transition-all ${isPrivate ? 'start-[21px]' : 'start-[3px]'}`} />
-                            </button>
+                            />
                         </div>
                     </div>
                 </div>
