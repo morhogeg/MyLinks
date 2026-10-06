@@ -3014,7 +3014,11 @@ exact-match, capped.
   (`audio/mix-vo.mjs`); and Remotion's masters are full-range BT.601
   (`yuvj420p`), which a range-blind player crushes in exactly the shadows
   this look lives in, so the posting copies are converted to BT.709 video
-  range (Remotion's own `colorSpace: 'bt709'` mislabels JPEG frames). **Not verified:**
+  range (Remotion's own `colorSpace: 'bt709'` mislabels JPEG frames). The
+  five films over 45s (film ×2, reel, SAVE, REVISIT) are posted as 10-bit
+  HEVC: under the 28.8 MiB cap their H.264 ran 2.6-3.9 Mbps and banded the
+  lockup's floor glow, 10-bit at the same size did not (H.264 copies in
+  `out/final/share/h264/` for X and LinkedIn). **Not verified:**
   nobody has LISTENED (no audio device: the scores are measured, not heard);
   the Feed 4:5, Music-only and Silent editions are not re-rendered; motion
   between sampled frames. **Gotchas:** the session's disk allowance fills

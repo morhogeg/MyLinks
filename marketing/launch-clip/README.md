@@ -37,7 +37,10 @@ the dark, and Machina is where the light comes from.
   renders. Remotion's masters are full-range BT.601 (`yuvj420p`); a player
   or upload pipeline that ignores the range tag crushes the bottom ~16
   levels to black, which is where this look lives. The posting copy is
-  converted to BT.709 video range, tagged, under 28.8 MiB.
+  converted to BT.709 video range, tagged, under 28.8 MiB: H.264 for the
+  films under ~45s; `CODEC=hevc10` (10-bit HEVC) for the longer five,
+  whose H.264 at that size bands the dark glows (H.264 copies alongside
+  for X and LinkedIn).
 
 | Film | Composition (main) | Length | Timeline |
 |---|---|---|---|
@@ -63,7 +66,8 @@ node audio/mix-vo.mjs <script>                # score + narrator, mastered (and 
 node scripts/dwell.mjs                        # every caption window against its read
 npm run verify                                # every film's gates
 node scripts/render-all.mjs MachinaReel:machina-reel …   # one bundle, many renders → out/final/
-scripts/posting-copies.sh machina-reel …      # BT.709 video-range copies to post → out/final/share/
+scripts/posting-copies.sh machina-find …      # BT.709 video-range copies to post → out/final/share/
+CODEC=hevc10 scripts/posting-copies.sh machina-reel …   # the films over ~45s, as 10-bit HEVC
 ```
 
 Scripts: `film`, `reel`, `save`, `find`, `ask`, `revisit`, `adcard`, `adtodo`,
