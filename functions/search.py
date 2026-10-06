@@ -1877,21 +1877,44 @@ def perform_hybrid_search(uid: str, query_text: str, limit: int = 20,
     return ranked
 
 
+def clamp_search_limit(raw, default: int = 10, cap: int = 50) -> int:
+    """A client-supplied result count as an int in [1, cap]; anything
+    unusable (a string, a dict, NaN, Infinity) is `default`."""
+    try:
+        limit = int(raw)
+    except (TypeError, ValueError, OverflowError):
+        limit = default
+    return max(1, min(limit, cap))
+
+
 @https_fn.on_call(max_instances=10)
 def search_links(req: https_fn.CallableRequest) -> Any:
     """
     Callable Function: Perform semantic search.
     Input: { query: string, limit?: number }
+
+    DEPRECATED: web and native both call the HTTP twin (search_links_http),
+    but this stays deployed (removing it takes a deploy-time delete), so it is
+    held to the twin's guards: App Check under APPCHECK_ENFORCE, a string
+    query within MAX_QUESTION_LENGTH, a clamped limit, and the private strip
+    (inside perform_hybrid_search, before its judge sees a candidate).
     """
     uid = None
     try:
         # Prefer the verified caller; fall back to the client uid only while
         # REQUIRE_AUTH is off (staged rollout).
         from link_service import find_data_uid_by_auth_uid
-        from main import REQUIRE_AUTH
+        from main import REQUIRE_AUTH, APPCHECK_ENFORCE, MAX_QUESTION_LENGTH
+        logger.info("search_links callable called (deprecated; clients use search_links_http)")
+        # The callable transport verifies an App Check token itself and sets
+        # req.app only when it is valid; enforce it like _require_app_check.
+        if APPCHECK_ENFORCE and getattr(req, "app", None) is None:
+            raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+                                      message="App Check verification failed")
+        data = req.data if isinstance(req.data, dict) else {}
         uid = find_data_uid_by_auth_uid(req.auth.uid) if req.auth else None
-        if not uid and not REQUIRE_AUTH and req.data:
-            uid = req.data.get("uid") or req.data.get("test_uid")
+        if not uid and not REQUIRE_AUTH and data:
+            uid = data.get("uid") or data.get("test_uid")
         if not uid:
             raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.UNAUTHENTICATED, message="User must be authenticated")
 
@@ -1901,13 +1924,14 @@ def search_links(req: https_fn.CallableRequest) -> Any:
         from main import _callable_rate_limited
         _callable_rate_limited("search-uid", uid)
 
-        query_text = req.data.get("query")
-        limit = req.data.get("limit", 10)
-
-        if not query_text:
+        query_text = data.get("query")
+        if not isinstance(query_text, str) or not query_text.strip():
             raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT, message="Query text is required")
+        query_text = query_text.strip()
+        if len(query_text) > MAX_QUESTION_LENGTH:
+            raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT, message="Query is too long")
 
-        links = perform_hybrid_search(uid, query_text, limit)
+        links = perform_hybrid_search(uid, query_text, clamp_search_limit(data.get("limit", 10)))
         return {"links": links}
 
     except https_fn.HttpsError:

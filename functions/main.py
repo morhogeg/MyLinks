@@ -2975,7 +2975,8 @@ def search_links_http(req: https_fn.Request) -> https_fn.Response:
             if rl:
                 return rl
 
-        query_text = (data.get('query') or '').strip()
+        query_text = data.get('query')
+        query_text = query_text.strip() if isinstance(query_text, str) else ''
         if not query_text:
             return _error_response("query is required", 400, headers)
         if len(query_text) > MAX_QUESTION_LENGTH:
@@ -2983,7 +2984,7 @@ def search_links_http(req: https_fn.Request) -> https_fn.Response:
 
         try:
             limit = int(data.get('limit', 10))
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             limit = 10
         limit = max(1, min(limit, 50))
 
