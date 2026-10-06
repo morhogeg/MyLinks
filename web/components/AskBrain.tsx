@@ -199,6 +199,10 @@ function SaveAnswerButton({ saved, busy, onSave, onOpen }: {
  *  server clamps the total again (MAX_CONTEXT_IDS). */
 const RECENT_ANSWERS_FOR_CONTEXT = 2;
 
+/** Turns of history sent with a question: exactly what ask_brain reads
+ *  (MAX_HISTORY_ITEMS in functions/main.py). Keep the two in step. */
+const HISTORY_TURNS = 6;
+
 export type AskOrigin =
     | 'free'      // typed question → genuine library search
     | 'card'      // a chip about one specific card we suggested
@@ -244,18 +248,26 @@ const THINKING_STAGES: Record<AskOrigin, ThinkingStage[]> = {
     ],
 };
 
+/** The beat after the drafting one, for a wait that runs well past the usual
+ *  few seconds (a cold backend; the app's buffered answer, which shows nothing
+ *  until the whole reply exists). Without it, "Writing your answer…" sat
+ *  unchanged for up to a minute and read as a hang. Same for every origin. */
+const SLOW_STAGE: ThinkingStage = { phrase: 'Taking longer than usual…', orb: 'shaping' };
+const SLOW_AFTER_MS = 20_000;
+
 /** Staged "what Machina is doing" status shown while waiting for the answer —
  *  honest theater (mirrors the real pipeline) that makes the wait legible
  *  instead of three anonymous dots. Remounts per ask. `OrbStatus` owns the
  *  swap, so the orb and the phrase change as one gesture. */
 function ThinkingIndicator({ origin }: { origin: AskOrigin }) {
-    const stages = THINKING_STAGES[origin];
+    const stages = [...THINKING_STAGES[origin], SLOW_STAGE];
     const [stage, setStage] = useState(0);
 
     useEffect(() => {
         const t1 = setTimeout(() => setStage(1), 1600);
         const t2 = setTimeout(() => setStage(2), 4200);
-        return () => { clearTimeout(t1); clearTimeout(t2); };
+        const t3 = setTimeout(() => setStage(3), SLOW_AFTER_MS);
+        return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
     }, []);
 
     return (
@@ -358,6 +370,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
     // True while an SSE answer is still writing (isThinking covers only the
     // pre-first-token wait). Together they gate the Stop affordance.
     const [isStreaming, setIsStreaming] = useState(false);
+    const busy = isThinking || isStreaming;
     const scrollRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -907,7 +920,11 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
         generatedOverride?: boolean,
     ) => {
         const question = text.trim();
-        if (!question || isThinking || !uid) return;
+        // Busy covers the WHOLE answer, not just the wait for its first token:
+        // checking isThinking alone let Enter mid-stream cancel the answer and
+        // send again, saving the cut-off half as if it were complete. Stop is
+        // the way to end an answer early.
+        if (!question || busy || !uid) return;
         setAskOrigin(origin);
 
         // Start a fresh stream generation — aborts any prior in-flight stream and
@@ -925,9 +942,13 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
         // them apart (retry passes the original message's flag through).
         const generated = generatedOverride ?? origin !== 'free';
 
-        // History = the conversation so far (before this turn), trimmed server-side.
+        // History = the turns before this one, cut to what the server reads.
+        // ask_brain keeps only the last MAX_HISTORY_ITEMS turns
+        // (functions/main.py _sanitize_history); sending the whole conversation
+        // every turn grew the body until a long chat hit the route's 256KB cap
+        // and failed on every ask from then on ("Body too large").
         const baseMsgs = base ?? messages;
-        const history = baseMsgs.map(m => ({
+        const history = baseMsgs.slice(-HISTORY_TURNS).map(m => ({
             role: m.role,
             content: m.content,
             ...(m.generated ? { generated: true } : {}),
@@ -1028,8 +1049,12 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
         const wantStream = !isNativeApp();
 
         try {
-            // 30s bounds connection setup only; for the streaming path fetch()
-            // resolves on headers, so a long token stream is not cut off.
+            // For the stream, fetch() resolves on the headers, so 30s bounds
+            // connection setup only and a long token stream is not cut off. The
+            // buffered (app) answer has no headers until the WHOLE reply exists,
+            // so its wait gets the server's full budget (Hosting allows 60s)
+            // plus slack: at 30s the app said "Couldn't reach Machina" while
+            // the server finished the answer and charged the ask.
             const res = await fetchWithTimeout(apiUrl('/api/chat'), {
                 method: 'POST',
                 headers: {
@@ -1045,9 +1070,11 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                     ...(contextIds.length ? { contextIds } : {}),
                 }),
                 signal: controller.signal,
-            }, 30_000);
+            }, wantStream ? 30_000 : 65_000);
 
-            if (isCancelled()) return; // torn down while the request was in flight
+            // Torn down while the request was in flight: release the response
+            // instead of leaving its body unread on an open connection.
+            if (isCancelled()) { res.body?.cancel().catch(() => {}); return; }
 
             const contentType = res.headers.get('content-type') || '';
             if (contentType.includes('text/event-stream') && res.body) {
@@ -1081,6 +1108,12 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                     });
 
                 const reader = res.body.getReader();
+                // Stop or a newer send aborts `controller`, but fetchWithTimeout
+                // stops watching it once the headers land — so cancel the body
+                // here. A read parked waiting for the next token then ends at
+                // once instead of holding the connection (and the server's
+                // work) open until the next chunk happens to arrive.
+                controller.signal.addEventListener('abort', () => { reader.cancel().catch(() => {}); }, { once: true });
                 const decoder = new TextDecoder();
                 let buffer = '';
                 let firstToken = true;
@@ -1141,6 +1174,9 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                         } else if (evt.type === 'done') {
                             done = true;
                             trackFirstAsk();
+                            // The ask was metered: keep the free plan's "N of 20
+                            // left" line current, as the buffered path does.
+                            if (!isPro) void refreshEntitlement();
                             if (!isStale()) hapticLight();
                         }
                     }
@@ -1239,8 +1275,6 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
             send(input);
         }
     };
-
-    const busy = isThinking || isStreaming;
 
     // Stop an in-flight answer. Whatever already streamed in stays (the
     // debounced auto-save keeps it); the pre-token wait just cancels cleanly.
@@ -1656,6 +1690,10 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                         <button
                             dir="auto"
                             onClick={() => {
+                                // send() refuses while an answer is still
+                                // coming; keep the offer up rather than
+                                // dismissing it with nothing sent.
+                                if (busy) return;
                                 trackAskSuggestionUsed('fresh');
                                 // Full title in the sent bubble (owner rule: no truncation).
                                 send(`What's the gist of "${iso(fullTitle(freshCard.title) ?? freshCard.title)}"?`, undefined, 'card',
