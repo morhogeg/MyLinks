@@ -61,7 +61,7 @@ export default function PrivacyPage() {
       <h1 className="mt-6 text-3xl font-semibold tracking-tight text-text">
         Privacy Policy
       </h1>
-      <p className="mt-2 text-sm text-text-muted">Last updated: October 5, 2026</p>
+      <p className="mt-2 text-sm text-text-muted">Last updated: October 6, 2026</p>
 
       <p className="mt-6 leading-relaxed text-text-secondary">
         Machina (&ldquo;we&rdquo;) is a personal knowledge base: you save
@@ -158,6 +158,12 @@ export default function PrivacyPage() {
             reminders and digests at sensible local times.
           </li>
           <li>
+            <span className="text-text">Notification token.</span>{" "}
+            If you turn on notifications on your iPhone, the push token Apple and Firebase issue
+            for this app on that device, used only to deliver your reminders and digests. It is
+            removed when you sign out or delete your account.
+          </li>
+          <li>
             <span className="text-text">Product usage and diagnostics.</span>{" "}
             To understand which features are used and to catch crashes, Machina records a small
             number of first-party, content-free events: that the app was opened, that a save, ask,
@@ -205,8 +211,10 @@ export default function PrivacyPage() {
           <li>
             <span className="text-text">Saving a link.</span>{" "}
             The text of the page we fetched, up to 30,000 characters, and your list of existing tags
-            so the new card can reuse them. The link&rsquo;s full address is not sent, only the
-            site&rsquo;s name.
+            so the new card can reuse them. Usually only the site&rsquo;s name goes with it. When the
+            page can&rsquo;t be read in full (a login wall, a post that only shows a preview), its
+            address goes too, so the card can still be named, but never the part after a
+            &ldquo;?&rdquo; or &ldquo;#&rdquo;, where links carry sign-in and tracking codes.
           </li>
           <li>
             <span className="text-text">Saving a post with photos, or a screenshot.</span>{" "}
@@ -224,7 +232,9 @@ export default function PrivacyPage() {
           <li>
             <span className="text-text">Search.</span>{" "}
             A card&rsquo;s summary text, converted into the numeric vector that makes semantic
-            search and related-card links work.
+            search and related-card links work. When you search, the words you typed, and the
+            titles, the start of the summaries, and the tags of up to 20 matching cards, so they
+            can be ranked by meaning. Private cards are never among them.
           </li>
           <li>
             <span className="text-text">Asking a question.</span>{" "}

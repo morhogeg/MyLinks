@@ -1129,6 +1129,23 @@ def _video_ingest_allowed(uid: str, plan: str = None) -> bool:
 _NO_TEXT_PLACEHOLDER = "[no text content available]"
 
 
+def _url_for_prompt(url) -> str:
+    """A saved address as the model may see it: scheme, host and path only.
+    The query string and fragment are dropped: they carry share tokens,
+    session ids and tracking, and the privacy policy (section 4) promises only
+    the page's address, never those, is sent."""
+    if not isinstance(url, str) or not url.strip():
+        return ""
+    try:
+        from urllib.parse import urlsplit, urlunsplit
+        parts = urlsplit(url.strip())
+        if not parts.scheme or not parts.netloc:
+            return ""
+        return urlunsplit((parts.scheme, parts.netloc, parts.path, "", ""))[:500]
+    except ValueError:
+        return ""
+
+
 def _prompt_content(scraped: dict) -> str:
     """The text handed to the model for a scraped page.
 
@@ -1144,7 +1161,7 @@ def _prompt_content(scraped: dict) -> str:
     if not (thin or scraped.get("truncated")):
         return text
     header = []
-    src = scraped.get("source_url") or scraped.get("final_url")
+    src = _url_for_prompt(scraped.get("source_url") or scraped.get("final_url"))
     if src:
         header.append(f"SOURCE URL: {src}")
     title = (scraped.get("title") or "").strip()
@@ -5464,7 +5481,7 @@ def _enrich_context_text(card: dict) -> str:
     source URL and the partial read it produced. The screenshots are the
     authoritative content (image_is_primary); this is context, so the analysis
     keeps the post's identity and language rather than starting from nothing."""
-    parts = [f"SOURCE URL: {card.get('url') or ''}"]
+    parts = [f"SOURCE URL: {_url_for_prompt(card.get('url'))}"]
     if card.get("sourceName"):
         parts.append(f"POSTED BY: {card['sourceName']}")
     if card.get("enrichedAt"):
@@ -6630,8 +6647,33 @@ def run_processing_janitor() -> dict:
         logger.error(f"client_error_reports prune failed: {e}")
         report["errors"].append(f"client_error_reports: {e}")
 
+    # users/{uid}/client_errors pruning: the privacy policy (section 9)
+    # promises diagnostic error records are discarded after 14 days, and these
+    # per-workspace reports (web/lib/errorReporter.ts) had no sweep at all.
+    # `createdAt` is a serverTimestamp; the COLLECTION_GROUP index for it is a
+    # fieldOverride in firestore.indexes.json (a default single-field index is
+    # COLLECTION-scoped only, the trap that once broke this janitor).
+    report["client_errors_pruned"] = 0
+    try:
+        ce_refs = [
+            doc.reference
+            for doc in db.collection_group("client_errors").where(
+                filter=FieldFilter("createdAt", "<=", cutoff_dt)
+            ).limit(200).stream()
+        ]
+        if ce_refs:
+            batch = db.batch()
+            for ref in ce_refs:
+                batch.delete(ref)
+            batch.commit()
+            report["client_errors_pruned"] = len(ce_refs)
+    except Exception as e:
+        logger.error(f"client_errors prune failed: {e}")
+        report["errors"].append(f"client_errors: {e}")
+
     if (report["failed_out"] or report["queue_pruned"] or report["logs_pruned"]
-            or report["server_errors_pruned"] or report["client_error_reports_pruned"]):
+            or report["server_errors_pruned"] or report["client_error_reports_pruned"]
+            or report["client_errors_pruned"]):
         logger.info(f"Processing janitor: {report}")
     return report
 
