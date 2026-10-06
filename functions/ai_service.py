@@ -6,6 +6,7 @@ import time
 import random
 from datetime import datetime, timezone
 from typing import List, Optional
+from pydantic import Field
 from google import genai
 from google.cloud.firestore_v1.vector import Vector
 from models import AIAnalysis, BrainAnswer, WeeklySynthesis, ScreenshotPlatform, TagSuggestion
@@ -695,10 +696,27 @@ _STRUCTURE_REMINDER = (
     "short answer stays one plain paragraph."
 )
 
+# The honest "your saves don't cover that" answer has nothing to cite, which
+# used to look exactly like an answer that failed to cite: it got the strict
+# re-ask (a second paid call), the ungrounded caution banner, and kept the ask
+# unit. The model now says which one it is: `answered: false` in the JSON
+# shape, `[[CITED: none]]` on the streamed marker.
+_NO_ANSWER_RULE = (
+    ' Set "answered" to false (with an empty citedIds) only when the saved '
+    "sources do not contain the answer and your answer says so; otherwise true."
+)
+
+
+class AskAnswer(BrainAnswer):
+    """BrainAnswer plus the model's own no-answer declaration (see
+    _NO_ANSWER_RULE). Absent means answered."""
+    answered: bool = Field(True, description="False only when the saved sources do not answer the question and the answer says so")
+
+
 _CITED_JSON_SUFFIX = (
-    'Return ONLY a JSON object: {"answer": string, "citedIds": string[]} '
+    'Return ONLY a JSON object: {"answer": string, "citedIds": string[], "answered": boolean} '
     "where citedIds are the ids (without brackets) of the sources you relied on."
-    + _STRUCTURE_REMINDER
+    + _NO_ANSWER_RULE + _STRUCTURE_REMINDER
 )
 
 # Stricter variant used for the single re-ask when the first answer came back
@@ -710,8 +728,8 @@ _CITED_JSON_STRICT_SUFFIX = (
     "ids (shown in square brackets above, without the brackets) of the saved "
     "sources your answer actually relies on. If — and only if — the saved sources "
     "genuinely contain nothing that answers the question, say that plainly in the "
-    "answer text and return an empty citedIds. Never invent an id. "
-    'Return ONLY a JSON object: {"answer": string, "citedIds": string[]}.'
+    "answer text, return an empty citedIds and set answered to false. Never invent an id. "
+    'Return ONLY a JSON object: {"answer": string, "citedIds": string[], "answered": boolean}.'
     + _STRUCTURE_REMINDER
 )
 
@@ -728,9 +746,23 @@ _CITED_JSON_PARAPHRASE_SUFFIX = (
     "— summarize and rephrase them, quoting at most short phrases. Still cover the "
     "substance the user asked for (the key ingredients, the gist of each step), "
     "just paraphrased. Cite the ids you relied on. "
-    'Return ONLY a JSON object: {"answer": string, "citedIds": string[]}.'
-    + _STRUCTURE_REMINDER
+    'Return ONLY a JSON object: {"answer": string, "citedIds": string[], "answered": boolean}.'
+    + _NO_ANSWER_RULE + _STRUCTURE_REMINDER
 )
+
+
+def _declares_no_answer(data) -> bool:
+    """The model said the saved sources don't answer the question (answered:
+    false, as a bool or the string a plain-mode reply may carry). Pure."""
+    v = data.get("answered") if isinstance(data, dict) else None
+    return v is False or (isinstance(v, str) and v.strip().lower() == "false")
+
+
+def _marker_says_no_answer(full_text: str) -> bool:
+    """The streamed answer closed with `[[CITED: none]]`: the stream twin of
+    answered:false. Only when "none" is ALL the markers named. Pure."""
+    ids = _parse_cited_marker(full_text)
+    return bool(ids) and all(i.lower() == "none" for i in ids)
 
 
 def _strip_inline_ids(answer: str, cards: list) -> str:
@@ -1702,7 +1734,7 @@ Return JSON: {"platform": one of "x","instagram","threads","tiktok","youtube","l
         constants at the top of this module. Raises AnalysisError only when
         BOTH models fail.
         """
-        cfg = {"response_schema": BrainAnswer, "safety_settings": _ASK_SAFETY_SETTINGS}
+        cfg = {"response_schema": AskAnswer, "safety_settings": _ASK_SAFETY_SETTINGS}
         try:
             return self._generate_json([prompt], what, config_extra=cfg,
                                        model=GEMINI_ASK_MODEL, attempts=attempts)
@@ -1746,7 +1778,10 @@ Return JSON: {"platform": one of "x","instagram","threads","tiktok","youtube","l
         still cites nothing, we do NOT fail the request — we return the answer
         with ``ungrounded=True`` and empty citedIds so the client can downgrade
         honestly instead of presenting an unverifiable answer as grounded. The
-        empty-library case is NOT ungrounded (there was nothing to cite).
+        empty-library case is NOT ungrounded (there was nothing to cite), and
+        neither is an answer the model DECLARED a no-answer (`answered: false`,
+        "your saves don't cover that"): that returns at once with
+        ``noAnswer=True``, which the caller refunds.
         """
         if not self.client:
             raise AnalysisError("Gemini API key is not configured (GEMINI_API_KEY).")
@@ -1859,6 +1894,12 @@ Return JSON: {"platform": one of "x","instagram","threads","tiktok","youtube","l
         if cited:
             return {"answer": answer, "citedIds": cited, "ungrounded": False,
                     "droppedCardIds": dropped_ids, "filteredCards": filtered_cards}
+        # The model says the saves don't cover the question. That answer is
+        # honest, not ungrounded: re-asking for citations would only buy the
+        # same answer twice, and the caller refunds it (`noAnswer`).
+        if _declares_no_answer(data):
+            return {"answer": answer, "citedIds": [], "ungrounded": False, "noAnswer": True,
+                    "droppedCardIds": dropped_ids, "filteredCards": filtered_cards}
 
         # No valid citation on the first pass. Re-ask ONCE with a stricter prompt
         # that demands the model name the ids it relied on. A transient failure
@@ -1874,6 +1915,10 @@ Return JSON: {"platform": one of "x","instagram","threads","tiktok","youtube","l
             if retry_cited:
                 return {"answer": retry_answer, "citedIds": retry_cited, "ungrounded": False,
                         "droppedCardIds": dropped_ids, "filteredCards": filtered_cards}
+            if _declares_no_answer(retry):
+                return {"answer": retry_answer, "citedIds": [], "ungrounded": False,
+                        "noAnswer": True, "droppedCardIds": dropped_ids,
+                        "filteredCards": filtered_cards}
         except AnalysisError as e:
             logger.warning(f"ask citation retry failed: {e}")
 
@@ -1893,10 +1938,12 @@ Return JSON: {"platform": one of "x","instagram","threads","tiktok","youtube","l
         Yields ("token", text) tuples as the answer streams in, then a final
         ("citedIds", [str]) tuple with the ids the model used, and — when the
         answer ended up with NO valid citation — a trailing ("ungrounded", True)
-        tuple. When the model stopped before finishing an answer that already
-        reached the user (finish_reason MAX_TOKENS, SAFETY, …) the tokens are
-        followed by ("incomplete", <finish_reason>) and nothing else. Reuses the
-        same grounding/system instructions as `answer_from_context` so answer
+        tuple — or, when the model declared the saves don't cover the question
+        (`[[CITED: none]]`), a trailing ("noAnswer", True) instead, which the
+        caller refunds. When the model stopped before finishing an answer that
+        already reached the user (finish_reason MAX_TOKENS, SAFETY, …) the tokens
+        are followed by ("incomplete", <finish_reason>) and nothing else. Reuses
+        the same grounding/system instructions as `answer_from_context` so answer
         quality and Hebrew handling are preserved.
 
         Because schema-constrained JSON cannot be streamed token-by-token, the
@@ -1935,7 +1982,9 @@ Return JSON: {"platform": one of "x","instagram","threads","tiktok","youtube","l
             "the answer, output a citation marker listing the ids (without "
             "brackets) of the sources you relied on, in exactly this format:\n"
             "[[CITED: id1, id2]]\n"
-            "Output the marker exactly once, as the very last line, and nothing after it."
+            "Output the marker exactly once, as the very last line, and nothing after it. "
+            "If the saved sources do not contain the answer and your answer says so, "
+            "write the marker as [[CITED: none]]."
             + _STRUCTURE_REMINDER
         )
         verbatim_prompt = base_prompt + marker_instruction
@@ -2186,6 +2235,13 @@ Return JSON: {"platform": one of "x","instagram","threads","tiktok","youtube","l
         # attributing the answer to cards the model may never have used.
         cited = _valid_cited_ids(_parse_cited_marker(full_text), cards)
         yield ("citedIds", cited)
+
+        # `[[CITED: none]]`: the model said the saves don't cover the question.
+        # An honest answer, not an ungrounded one: no caution banner, and the
+        # caller refunds the ask (the stream twin of answered:false).
+        if not cited and _marker_says_no_answer(full_text):
+            yield ("noAnswer", True)
+            return
 
         # No valid citation → the answer can't be proven grounded in the saves.
         # We can't re-ask (tokens already streamed), so flag it for the UI. cards

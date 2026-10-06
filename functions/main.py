@@ -2785,6 +2785,15 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
             by_id = {c.get("id"): c for c in cards}
 
             def _event_stream():
+                # At most one refund per request, whichever path gives the
+                # ask back (a no-answer, a cut-off answer, a failure).
+                refunded = []
+
+                def _refund_once():
+                    if charged and not refunded:
+                        refunded.append(True)
+                        refund_quota(*charged)
+
                 try:
                     for kind, payload in ai.answer_from_context_stream(
                             question, slim, history, excluded_titles=excluded_titles,
@@ -2811,6 +2820,10 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
                             yield "data: " + json.dumps(
                                 {"type": "ungrounded"}
                             ) + "\n\n"
+                        elif kind == "noAnswer":
+                            # The model said the saves don't cover the
+                            # question: an honest answer, not charged.
+                            _refund_once()
                         elif kind == "incomplete":
                             # The model stopped before finishing an answer
                             # that is already on screen (finish_reason in
@@ -2821,8 +2834,7 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
                                 "ask_brain (stream)",
                                 AnalysisError(f"answer stream incomplete (finish_reason={payload})"),
                                 uid=uid)
-                            if charged:
-                                refund_quota(*charged)
+                            _refund_once()
                             yield "data: " + json.dumps({
                                 "type": "error", "reason": "incomplete",
                                 "error": "Machina's answer was cut off. Please ask again.",
@@ -2836,8 +2848,7 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
                     # durably, and refund the ask unit this request charged.
                     logger.error("ask_brain stream error: %s", stream_exc, exc_info=True)
                     _record_server_error("ask_brain (stream)", stream_exc, uid=uid)
-                    if charged:
-                        refund_quota(*charged)
+                    _refund_once()
                     msg = (
                         "Machina couldn't generate an answer right now. Please try again in a minute."
                         if isinstance(stream_exc, AnalysisError)
@@ -2861,6 +2872,11 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
                                         excluded_titles=excluded_titles,
                                         answer_language=answer_language,
                                         followup=followup)
+        # The model said the saves don't cover the question ("answered":
+        # false): an honest answer, not an ungrounded one, and not charged.
+        if result.get("noAnswer") and charged:
+            refund_quota(*charged)
+            charged = None
 
         # If the answer only succeeded after filter-probe isolation excluded or
         # partially filtered card(s) (Gemini's prompt filter rejects their text
