@@ -11,6 +11,7 @@ import {
     addLinksToCollection,
     removeLinksFromCollection,
     createCollection,
+    unpublishCard,
 } from '@/lib/collections';
 import { rankCollectionsForLink } from '@/lib/collectionSuggest';
 import { useToast } from '@/components/Toast';
@@ -137,12 +138,31 @@ export default function AddToCollectionSheet({
             } else {
                 if (isBulk) await addLinksToCollection(uid, bulkIds, c.id);
                 else await addLinkToCollection(uid, link.id, c.id);
-                // Joining a private collection makes the card private everywhere
-                // (library, search, suggestions), so say so at the moment it happens.
                 const added = isBulk ? `Added ${cardWord} to ${c.name}` : `Added to ${c.name}`;
-                toast.success(privateCollectionIds?.has(c.id)
-                    ? `${added}. ${isBulk ? 'They are' : 'This card is'} now private.`
-                    : added);
+                if (!privateCollectionIds?.has(c.id)) {
+                    toast.success(added);
+                    return;
+                }
+                // Joining a private collection makes the card private everywhere
+                // (library, search, suggestions), so say so at the moment it
+                // happens. A card with its own public /s page must not keep it:
+                // the page would go on showing a private card's title and
+                // summary to anyone with the link. Take those pages down now.
+                const shared = (isBulk ? bulk ?? [] : [link]).filter((l) => l.shareId);
+                const results = await Promise.allSettled(shared.map((l) => unpublishCard(uid, l)));
+                const failed = results.filter((r) => r.status === 'rejected').length;
+                const nowPrivate = isBulk ? 'They are now private' : 'This card is now private';
+                if (failed > 0) {
+                    toast.error(isBulk
+                        ? `${added}. ${nowPrivate}, but ${failed === 1 ? '1 public card link' : `${failed} public card links`} couldn't be stopped. Stop sharing from each card's menu.`
+                        : `${added}. ${nowPrivate}, but its public link couldn't be stopped. Stop sharing from the card's menu.`);
+                } else if (shared.length > 0) {
+                    toast.success(isBulk
+                        ? `${added}. ${nowPrivate}, and ${shared.length === 1 ? '1 public card link stops' : `${shared.length} public card links stop`} working within a minute.`
+                        : `${added}. ${nowPrivate}, and its public link stops working within a minute.`);
+                } else {
+                    toast.success(`${added}. ${nowPrivate}.`);
+                }
             }
         } catch {
             toast.error("Couldn't update the collection. Please try again.");
