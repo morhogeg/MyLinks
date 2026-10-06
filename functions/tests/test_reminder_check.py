@@ -501,3 +501,120 @@ def test_private_card_reminder_push_never_carries_its_title(monkeypatch, past_ms
     assert by_link["public"][2] == "Sourdough guide · Food"
     for lid in ("own", "inherited", "public"):
         assert store["users"]["dana"]["links"][lid]["reminderDue"] is True
+
+
+# ── One user's bad data never stops anyone else's reminders (ACCT-1) ──────
+#
+# Card fields and `settings` are client-writable with any type. The due query
+# is shared and oldest-first, so a doc that raised every tick used to sit at
+# its head and halt reminders for every user.
+
+
+def _victim(past_ms):
+    return {"settings": {}, "fcmTokens": ["tok-v"], "links": {
+        "v1": {"reminderStatus": "pending", "nextReminderAt": past_ms + 1,
+               "title": "Victim card", "reminderProfile": "once", "reminderCount": 0}}}
+
+
+def test_null_title_card_does_not_halt_other_users(monkeypatch, past_ms, push_calls):
+    store = {"users": {
+        "attacker": {"settings": {}, "fcmTokens": [], "links": {
+            "evil": {"reminderStatus": "pending", "nextReminderAt": past_ms,
+                     "title": None, "category": {"x": 1},
+                     "reminderProfile": "once", "reminderCount": 0}}},
+        "victim": _victim(past_ms),
+    }}
+    _install_db(monkeypatch, store)
+
+    report = rs.run_reminder_check()
+
+    assert [c[0] for c in push_calls] == ["victim"]
+    assert store["users"]["victim"]["links"]["v1"]["reminderStatus"] == "completed"
+    # The odd card is delivered too, with safe fallbacks, not left at the head.
+    evil = store["users"]["attacker"]["links"]["evil"]
+    assert evil["reminderStatus"] == "completed"
+    assert report["errors"] == []
+
+
+def test_non_string_channel_entry_does_not_halt_other_users(monkeypatch, past_ms, push_calls):
+    store = {"users": {
+        "attacker": {"settings": {"reminders_channel": [{}, ["x"], "push"]}, "fcmTokens": ["tok-a"],
+                     "links": {"a1": {"reminderStatus": "pending", "nextReminderAt": past_ms,
+                                      "title": "Mine", "reminderProfile": "once", "reminderCount": 0}}},
+        "victim": _victim(past_ms),
+    }}
+    _install_db(monkeypatch, store)
+
+    rs.run_reminder_check()
+
+    assert sorted(c[0] for c in push_calls) == ["attacker", "victim"]
+    assert store["users"]["victim"]["links"]["v1"]["reminderStatus"] == "completed"
+
+
+def test_bad_profile_and_count_are_coerced_not_re_pushed(monkeypatch, past_ms, push_calls):
+    # A null profile used to raise AFTER the push, leaving the doc due: the
+    # same push went out again every 2 minutes.
+    store = {"users": {"erin": {"settings": {}, "fcmTokens": ["tok-e"], "links": {
+        "e1": {"reminderStatus": "pending", "nextReminderAt": past_ms,
+               "title": "Card", "reminderProfile": None, "reminderCount": "two"}}}}}
+    _install_db(monkeypatch, store)
+
+    rs.run_reminder_check()
+    rs.run_reminder_check()
+
+    assert len(push_calls) == 1
+    e1 = store["users"]["erin"]["links"]["e1"]
+    # Treated as a fresh 'smart' reminder: count 1, rescheduled into the future.
+    assert e1["reminderCount"] == 1
+    assert e1["reminderStatus"] == "pending"
+    assert e1["nextReminderAt"] > past_ms + 3_600_000
+
+
+def test_failing_user_is_snoozed_and_others_still_delivered(monkeypatch, past_ms, push_calls):
+    store = {"users": {
+        "flaky": {"settings": {}, "fcmTokens": ["tok-f"], "links": {
+            "f1": {"reminderStatus": "pending", "nextReminderAt": past_ms,
+                   "title": "Flaky", "reminderProfile": "once", "reminderCount": 0}}},
+        "victim": _victim(past_ms),
+    }}
+    _install_db(monkeypatch, store)
+    import search
+
+    def boom(uid):
+        if uid == "flaky":
+            raise RuntimeError("users/+972500000000 not found")
+        return set()
+    monkeypatch.setattr(search, "private_collection_ids", boom)
+    real = rs._deliver_user_reminders
+
+    def explode_for_flaky(uid, *args, **kwargs):
+        if uid == "flaky":
+            raise RuntimeError("users/+972500000000 boom")
+        return real(uid, *args, **kwargs)
+    monkeypatch.setattr(rs, "_deliver_user_reminders", explode_for_flaky)
+
+    report = rs.run_reminder_check()
+
+    assert [c[0] for c in push_calls] == ["victim"]
+    f1 = store["users"]["flaky"]["links"]["f1"]
+    assert f1["reminderStatus"] == "pending"
+    assert f1["nextReminderAt"] > past_ms + rs.REMINDER_SNOOZE_MS - 120_000
+    # The error is recorded without the raw message (it can carry a phone uid).
+    assert report["errors"] and all("+972" not in e for e in report["errors"])
+
+
+def test_per_link_failure_snoozes_that_doc(monkeypatch, past_ms, push_calls):
+    store = {"users": {"gil": {"settings": {}, "fcmTokens": ["tok-g"], "links": {
+        "g1": {"reminderStatus": "pending", "nextReminderAt": past_ms,
+               "title": "Card", "reminderProfile": "smart", "reminderCount": 0}}}}}
+    _install_db(monkeypatch, store)
+    monkeypatch.setattr(rs, "calculate_next_reminder", lambda *a, **k: (_ for _ in ()).throw(ValueError("x")))
+
+    report = rs.run_reminder_check()
+
+    # The schedule is worked out before the push, so nothing was sent.
+    assert push_calls == []
+    g1 = store["users"]["gil"]["links"]["g1"]
+    assert g1["reminderCount"] == 0
+    assert g1["nextReminderAt"] > past_ms + rs.REMINDER_SNOOZE_MS - 120_000
+    assert len(report["errors"]) == 1
