@@ -9,6 +9,10 @@ import { reportError } from '@/lib/errorReporter';
 /** One page of the growing feed window (report 3.15). */
 const PAGE_SIZE = 150;
 
+/** Reconnect backoff for a page listener that errored: 1s, 2s, 4s… capped. */
+const RETRY_BASE_MS = 1000;
+const RETRY_MAX_MS = 60_000;
+
 /**
  * Real-time Firestore subscription for the user's links, plus the pull-to-refresh
  * authoritative re-read.
@@ -52,6 +56,12 @@ export function useLinks(uid: string | null | undefined, toast: ReturnType<typeo
     // Docs with a reminder still scheduled — see the third subscription.
     const [pendingReminderLinks, setPendingReminderLinks] = useState<Link[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    // Reconnect state for page listeners that errored (see the error callback):
+    // bumping the tick re-runs the page effect, which re-opens every page that
+    // no longer has a listener. Rounds counts consecutive failed rounds.
+    const [retryTick, setRetryTick] = useState(0);
+    const retryRoundsRef = useRef(0);
+    const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // A workspace change unmounts Feed (AuthProvider gates children behind the
     // login screen), so this hook re-initializes at PAGE_SIZE on the next
@@ -78,6 +88,9 @@ export function useLinks(uid: string | null | undefined, toast: ReturnType<typeo
                 : query(linksRef, orderBy('createdAt', 'desc'), startAfter(cursors[i - 1]), limit(PAGE_SIZE));
             const page = i;
             const unsub = onSnapshot(q, (snapshot: QuerySnapshot<DocumentData>) => {
+                // Healthy again only once the SERVER answers: a re-opened
+                // listener replays the cache first, then may fail again.
+                if (!snapshot.metadata.fromCache) retryRoundsRef.current = 0;
                 pageDocsRef.current[page] = snapshot.docs;
                 setPages((prev) => {
                     const next = prev.slice();
@@ -88,19 +101,36 @@ export function useLinks(uid: string | null | undefined, toast: ReturnType<typeo
                 setIsLoading(false);
             }, (error: Error) => {
                 reportError(error, 'useLinks-snapshot');
-                toast.error("Lost connection to your library. Reconnecting…");
                 setIsLoading(false);
+                // Firestore ends a listener after its error callback, so the
+                // page would never update again while the toast promised a
+                // reconnect. Forget this one (the cards already loaded stay on
+                // screen) and re-open it after a capped backoff; pages failing
+                // together share one timer, and one toast per failed streak.
+                if (subs.get(page)?.key === key) subs.delete(page);
+                if (retryTimerRef.current !== null) return;
+                const round = retryRoundsRef.current++;
+                if (round === 0) toast.error("Lost connection to your library. Reconnecting…");
+                retryTimerRef.current = setTimeout(() => {
+                    retryTimerRef.current = null;
+                    setRetryTick((t) => t + 1);
+                }, Math.min(RETRY_MAX_MS, RETRY_BASE_MS * 2 ** round));
             });
             subs.set(i, { key, unsub });
         }
-    }, [uid, cursors, toast]);
+    }, [uid, cursors, toast, retryTick]);
 
-    // Tear every page listener down when the workspace goes away / on unmount.
+    // Tear every page listener (and a pending reconnect) down when the
+    // workspace goes away / on unmount.
     useEffect(() => {
         const subs = subsRef.current;
         return () => {
             subs.forEach((s) => s.unsub());
             subs.clear();
+            if (retryTimerRef.current !== null) {
+                clearTimeout(retryTimerRef.current);
+                retryTimerRef.current = null;
+            }
         };
     }, [uid]);
 
