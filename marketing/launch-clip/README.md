@@ -801,7 +801,7 @@ Enforced by `npm run verify` where a machine can check:
 
 **Machina in Motion**: a 65-second film of the real app, in one continuous
 take, that runs as a web page (a 3D stage the visitor's browser draws) and
-renders frame-exact to MP4 from the same page. Built 2026-10-05 on the reel
+renders frame-exact to MP4 from the same page. Built 2026-10-06 on the reel
 kit's capture; branch `claude/live-film`, not merged.
 
 ```bash

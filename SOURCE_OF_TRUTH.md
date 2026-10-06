@@ -2817,7 +2817,7 @@ exact-match, capped.
   `capture/shims/store.ts` gains `captureApi.nextId` (the saved card keeps its
   library id, so its connections, citation and graph node hold).
   **Verified:** `npm run live:verify` (1,135 app frames, 368 distinct strings,
-  17 caption lines: no "AI", "second brain", em dash, recipe content or
+  18 caption lines: no "AI", "second brain", em dash, recipe content or
   "library"; the Ask thinking line is held over, as in the reel); web tsc 0,
   and `web/` + `functions/` are identical to `main`; the live page plays in
   headless Chromium with the video as its clock and seeks (with byte ranges);

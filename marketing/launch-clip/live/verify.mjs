@@ -43,6 +43,10 @@ const filmText = [...script.matchAll(/captions\.add\(\{[^}]*?\}\);/gs)].flatMap(
   for (const k of m[0].matchAll(/(?:text|kicker):\s*'((?:[^'\\]|\\.)*)'/g)) out.push(k[1].replace(/\\n/g, ' '));
   return out;
 });
+// lines kept in a variable (a caption that differs per format)
+for (const m of script.matchAll(/const \w+Line = ([^;]+);/g)) {
+  for (const k of m[1].matchAll(/'((?:[^'\\]|\\.)*)'/g)) if (k[1].includes(' ')) filmText.push(k[1].replace(/\\n/g, ' '));
+}
 
 const RULES = [
   { name: '"AI" as a word', re: /\bAI\b/, where: 'both' },

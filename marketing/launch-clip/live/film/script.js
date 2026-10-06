@@ -308,7 +308,10 @@ export function buildFilm({ stage, index, captions, overlay, format, video }) {
   captions.add({ t0: A.landed + 0.3, t1: A.close - 0.05, text: 'Each save becomes a card,\nwith the key points\npulled out.', place: C.side });
   captions.add({ t0: A.findHome + 0.05, t1: A.findDone + 0.25, kicker: 'Find', text: 'Find it in\nyour own words.', place: C.side });
   captions.add({ t0: A.askOpen + 0.05, t1: A.sent + 0.1, kicker: 'Ask', text: 'Ask anything.', place: C.side });
-  captions.add({ t0: A.stream + 0.2, t1: A.graph - 0.1, text: 'Every answer comes\nstraight from your saves.', place: C.side });
+  // (16:9 sets it narrow: the slab moves left for the sources and a long
+  // second line ran into it)
+  const answerLine = F.name === 'portrait' ? 'Every answer comes\nstraight from your saves.' : 'Every answer\ncomes straight\nfrom your saves.';
+  captions.add({ t0: A.stream + 0.2, t1: A.graph - 0.1, text: answerLine, place: C.side });
   captions.add({ t0: A.graph + 0.25, t1: A.revisit - 0.1, kicker: 'Connect', text: 'Related saves\nfind each other,\nall on their own.', place: C.side });
   captions.add({ t0: A.revisit + 0.15, t1: A.expand + 0.05, kicker: 'Revisit', text: 'When a save calls for action,\nMachina turns it into a to-do.', place: C.side });
   captions.add({ t0: A.expand + 0.25, t1: A.end + 1.2, text: 'Every week, Machina\nbrings back what’s\nworth remembering.', place: C.side });
