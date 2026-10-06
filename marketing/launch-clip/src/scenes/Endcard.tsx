@@ -25,8 +25,10 @@ import { NIGHT, typeGlow } from '../look';
  * The point lands on local frame STRIKE (17), where the score's boom sits; the
  * mark's timing is unchanged from the light grade, only its light is new.
  *
- * Word timing comes from the closing voice line (bar 30.1, 75.25s = local
- * 82.5): the name at +0.06s, "Everything" at +1.05s (src/film/vo.json). The
+ * Word timing comes from the closing voice line (bar 29.7, 74.25s = local
+ * 52.5; it was bar 30.1 until 2026-10-06, which left the tagline only 1.1s
+ * after the voice): the name at +0.06s, "Everything" at +1.05s
+ * (src/film/vo.json). The
  * statement rises out of its mask 3 frames before its first word, the film's
  * caption motion. No price, no urgency, no "download now", and nothing about
  * learning (Machina is not a learning app): the film ends on the one line,
@@ -36,8 +38,8 @@ import { NIGHT, typeGlow } from '../look';
 /** the frame the point lands (u = 1 of the strike), the score's boom */
 const STRIKE = 17;
 /** the closing voice line, in local frames: "Machina." / "Everything …" */
-const SAY_NAME = 84;
-const SAY_LINE = 114;
+const SAY_NAME = 54;
+const SAY_LINE = 84;
 const LEAD = 3;
 
 export const Endcard: React.FC = () => {

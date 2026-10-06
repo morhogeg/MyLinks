@@ -119,7 +119,9 @@ FILM_LINES = [
     # the closing statement = the endcard's one line, the TAGLINE (owner,
     # 2026-10-04: the film ends on it; 2026-09-17: the voice says what the
     # screen shows)
-    {"bar": 30.1, "bars": 1.6, "text": f"{SAY_NAME}. Everything you save, finally useful.",
+    # (night look, 2026-10-06: 0.4 bar sooner, 1.2s after the mark strikes, so
+    # the tagline holds ~2.1s after the voice instead of 1.1s; same take)
+    {"bar": 29.7, "bars": 1.6, "text": f"{SAY_NAME}. Everything you save, finally useful.",
      "style": "A confident, warm sign-off, unhurried; the tagline sincere, landing softly."},
 ]
 

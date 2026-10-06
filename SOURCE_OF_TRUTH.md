@@ -1851,8 +1851,15 @@ The multi-user auth work described below **was** fully written but not live:
       any Branding edit can trigger a quick re-review — verification just
       passed, so expect at worst a short re-check, and don't bundle other
       branding changes into the same save.
-    - **25c. [ ] The launch film is NOT on the landing page, and is still
-      D-3-blocked from going on it.** The 2026-08-06 (round 4) rebuild replaced
+    - **25c. [ ] The launch film is NOT on the landing page. Its D-3 blocker
+      is CLEARED on `claude/videos-new-look` (2026-10-06, not on `main`):** the
+      film's demo content no longer shows the literal "AI" (the trio is now
+      about machines and the work that stays human; the Ask question is "What
+      have I been saving about work?"; category Tech; the video save is a
+      made-up channel, "Unhurried", so no real person is put under a title
+      they never used). What remains: merge the branch, then the owner's call
+      on putting the night-look film on the landing page. History below.
+      ~~D-3-blocked from going on it.~~ The 2026-08-06 (round 4) rebuild replaced
       the video plan with the scroll-driven `GatherScene` — act one rebuilt in
       the DOM, which needs no CDN, no `media-src` widening and no owner upload,
       and which the reader scrubs with their own scroll. The `media-src
@@ -2966,6 +2973,42 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-05/06 — ALL NINE FILMS RE-CUT IN A NEW LOOK ("the night look").
+  Branch `claude/videos-new-look`, NOT merged, NOT posted.** Owner, via
+  /onboard: re-edit every current video to an Apple product-film standard,
+  then "make it breathtaking and in a completely new style and vibe".
+  **What changed, for every film:** (1) the nine branches (film, reel, SAVE,
+  FIND, ASK, REVISIT, ad card, ad trip + its talk edition, ad todo) merged
+  into one; the shared files rebuilt by hand (`capture/shoot.mjs` from every
+  branch's takes, `audio/synth-vo.py` unified and checked byte-identical on ad
+  3 and the film, `audio/mix-vo.mjs` one table: the merge had dropped the
+  save/adcard entries, `audio/verify.mjs` from each branch's newest sections);
+  (2) the light grade replaced by one night set (`src/look.ts`): near black,
+  lit like a product stage, the app captured in its DARK theme with a rim of
+  light and its screen's glow, white/silver type (the mask-rise motion kept),
+  lost saves sink into the dark, the gather is a burst of light, a luminous
+  lockup; (3) a new score engine for all nine (`audio/nocturne.mjs`: F minor
+  while saves are lost → D-flat lydian once Machina arrives; each film's
+  score script is now its cue sheet, read from its HITS); (4) one narrator:
+  SAVE and the reel moved from Kokoro to Gemini Sulafat (narration run 29, 21
+  lines; the reel's six lines shared with the film re-use the film's takes);
+  (5) re-timing to the reads (`scripts/dwell.mjs`): reel 5 windows, SAVE 3,
+  REVISIT laid onto its Gemini read for the first time (+32 frames, the
+  lockup holds 2.2s); the film's closing line 0.4 bar sooner (tagline held
+  2.1s, was 1.1s); (6) frame 0 is a poster in every film (`poster` on the
+  opening caption; lit, nearly sharp saves); (7) the film's on-screen "AI" is
+  gone (§4 25c). **Also:** the capture's to-do tick is a real checkbox in
+  today's app (selector by title); `scripts/render-all.mjs` renders many
+  compositions from one bundle (Remotion 4: `outputLocation`, not `output`).
+  **Verified:** `npm run verify` exit 0 (every film's gates), tsc 0, every
+  mix −14 LUFS / −1.25 dBTP with each narrated line 5.6dB+ over the music in
+  the speech band; contact sheets of every film looked at. **Not verified:**
+  nobody has LISTENED (no audio device: the scores are measured, not heard);
+  the Feed 4:5, Music-only and Silent editions are not re-rendered; motion
+  between sampled frames. **Gotchas:** the session's disk allowance fills
+  with Remotion bundles in /tmp (each ~0.7GB): a script must delete only its
+  own bundle (deleting all of them killed a running render). Deliverables
+  render to `out/final/` (gitignored).
 - **2026-10-05 (evening) — BROWSER EXTENSION STORE-READY + MACHINA FOR SAFARI
   PROJECT; B1 CORS SHIPPED.** Branch `claude/app-launch-qa-a29d1f`. Two
   parallel sessions, merged + verified centrally: Chrome (`7254510` ..

@@ -47,3 +47,5 @@ for (let r = 0; r < rows; r++) {
 graph += rows > 1 ? `;${rowsOut.join('')}vstack=${rows}[out]` : `;[r0]copy[out]`;
 execFileSync('ffmpeg', ['-v', 'error', '-y', ...inputs, '-filter_complex', graph, '-map', '[out]', out]);
 console.log(`wrote ${out} (${files.length} frames)`);
+// its own bundle only: another render may be reading from a bundle next to it
+fs.rmSync(serveUrl, { recursive: true, force: true });
