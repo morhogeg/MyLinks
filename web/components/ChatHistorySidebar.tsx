@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { ChatSession } from '@/lib/types';
 import SidebarIcon from './ui/SidebarIcon';
+import { relativeTime } from '@/lib/relativeTime';
 
 interface ChatHistorySidebarProps {
     chats: ChatSession[];
@@ -32,21 +33,12 @@ interface ChatHistorySidebarProps {
     onClose?: () => void;
 }
 
-/** "2h ago", "Yesterday", "Apr 3" — compact relative time for the chat list. */
-function relativeTime(ts: number): string {
+/** The chat list's time: the shared rule (lib/relativeTime), capitalized
+    because it stands on its own line ("Just now", "Yesterday", "Apr 3"). */
+function chatTime(ts: number): string {
     if (!ts) return '';
-    const diff = Date.now() - ts;
-    const min = Math.floor(diff / 60000);
-    if (min < 1) return 'Just now';
-    if (min < 60) return `${min}m ago`;
-    const hr = Math.floor(min / 60);
-    if (hr < 24) return `${hr}h ago`;
-    const day = Math.floor(hr / 24);
-    if (day === 1) return 'Yesterday';
-    if (day < 7) return `${day}d ago`;
-    const d = new Date(ts);
-    const sameYear = d.getFullYear() === new Date().getFullYear();
-    return d.toLocaleDateString(undefined, sameYear ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' });
+    const t = relativeTime(ts, Date.now());
+    return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
 /** A single conversation row with select + inline rename + delete. */
@@ -148,7 +140,7 @@ function ChatRow({
                         {chat.title}
                     </span>
                 </span>
-                <span className="text-[11px] text-text-muted">{relativeTime(chat.updatedAt)}</span>
+                <span className="text-[11px] text-text-muted">{chatTime(chat.updatedAt)}</span>
             </button>
             {/* Row actions. A single calm "more" affordance, laid out as a real flex
                 sibling (not an overlay) so the title always truncates with room to

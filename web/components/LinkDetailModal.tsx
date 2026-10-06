@@ -26,6 +26,7 @@ import { requestPaywall } from '@/lib/entitlement';
 import { getActionableTakeaway, isTakeawayDismissed, isTakeawayDone } from '@/lib/takeaway';
 import ScreenshotEnrich from '@/components/ScreenshotEnrich';
 import { scrollBehavior } from '@/lib/motion';
+import { relativeTime } from '@/lib/relativeTime';
 
 // Sentinel `editingNoteId` for the composer when adding a brand-new note (as
 // opposed to editing an existing one, keyed by its real id).
@@ -538,23 +539,9 @@ export default function LinkDetailModal({
     // The source byline is rendered by the shared <SourceByline> — don't
     // reintroduce per-view platform/author derivation here.
 
-    const getTimeAgo = (timestamp: number | string, now: number): string => {
-        if (!timestamp || !now) return '...';
-        let time = typeof timestamp === 'string' ? new Date(timestamp).getTime() : timestamp;
-        if (isNaN(time) || time <= 0) return isRtl ? 'לאחרונה' : 'recently';
-        // Some ingest paths (Facebook, screenshots) store Unix *seconds*, not ms —
-        // anything below year-2001-in-ms is really a seconds value, so scale it up.
-        if (time < 1e12) time *= 1000;
-
-        const seconds = Math.floor((now - time) / 1000);
-        if (seconds < 60) return isRtl ? 'זה עתה' : 'just now';
-        const minutes = Math.floor(seconds / 60);
-        if (minutes < 60) return isRtl ? `לפני ${minutes} דק׳` : `${minutes}m ago`;
-        const hours = Math.floor(minutes / 60);
-        if (hours < 24) return isRtl ? `לפני ${hours} שע׳` : `${hours}h ago`;
-        const days = Math.floor(hours / 24);
-        return isRtl ? `לפני ${days} ימים` : `${days}d ago`;
-    };
+    // One rule for every surface (lib/relativeTime).
+    const getTimeAgo = (timestamp: number | string, now: number): string =>
+        (!timestamp || !now ? '...' : relativeTime(timestamp, now, isRtl));
 
     const isReminderActive = link.reminderStatus === 'pending';
     const nextReminderDate = link.nextReminderAt ? new Date(link.nextReminderAt) : null;

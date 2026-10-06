@@ -9,6 +9,7 @@ import { getTimestampNumber } from '@/lib/feedUtils';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { useNow } from '@/lib/useNow';
 import SourceByline from './SourceByline';
+import { relativeTime } from '@/lib/relativeTime';
 
 /**
  * My Notes — everything the user wrote themselves, one entry per card, newest
@@ -30,22 +31,6 @@ import SourceByline from './SourceByline';
  * notes on cards older than the loaded feed still appear).
  */
 
-/** Compact relative date, matching the card surfaces; falls to an absolute
-    date past ~30 days so old notes stay meaningful. */
-function timeAgo(ms: number, now: number, rtl: boolean): string {
-    if (!ms || ms <= 0) return rtl ? 'לאחרונה' : 'recently';
-    const seconds = Math.floor((now - ms) / 1000);
-    if (seconds < 60) return rtl ? 'זה עתה' : 'just now';
-    const minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return rtl ? `לפני ${minutes} דק׳` : `${minutes}m ago`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return rtl ? `לפני ${hours} שע׳` : `${hours}h ago`;
-    const days = Math.floor(hours / 24);
-    if (days <= 30) return rtl ? `לפני ${days} ימים` : `${days}d ago`;
-    return new Date(ms).toLocaleDateString(rtl ? 'he-IL' : undefined, {
-        month: 'short', day: 'numeric', year: 'numeric',
-    });
-}
 
 export default function NotesView({
     groups,
@@ -117,7 +102,7 @@ export default function NotesView({
                             {n.text}
                         </p>
                         <span className="mt-1.5 block text-[11px] font-medium text-text-muted/60">
-                            {timeAgo(n.updatedAt ?? n.createdAt, now, noteRtl)}
+                            {relativeTime(n.updatedAt ?? n.createdAt, now, noteRtl)}
                         </span>
                     </div>
                 );
@@ -240,7 +225,7 @@ export default function NotesView({
                                         <div className="mt-2 flex items-center gap-1.5 min-w-0 text-[11px] text-text-muted">
                                             <SourceByline link={link} />
                                             <span aria-hidden className="text-text-muted/60">·</span>
-                                            <span className="shrink-0 font-medium text-text-muted/80">{timeAgo(writtenAt, now, bodyRtl)}</span>
+                                            <span className="shrink-0 font-medium text-text-muted/80">{relativeTime(writtenAt, now, bodyRtl)}</span>
                                             <ChevronRight className="ms-auto w-4 h-4 shrink-0 text-text-muted/60 rtl:rotate-180" />
                                         </div>
                                     </div>

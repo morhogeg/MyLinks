@@ -18,6 +18,7 @@ import WaitingCard from './WaitingCard';
 import { hasHebrew, contentLang } from '@/lib/rtl';
 import { isHttpUrl } from '@/lib/url';
 import { getNotes } from '@/lib/notes';
+import { relativeTime } from '@/lib/relativeTime';
 
 interface CardProps {
     link: Link;
@@ -121,26 +122,9 @@ function Card({
     // is one shared component now — see SourceByline. Do NOT reintroduce a
     // per-card copy here; that's what caused the design to drift across views.
 
-    // Format relative time (e.g., "2h ago")
-    const getTimeAgo = (timestamp: number | string, now: number): string => {
-        if (!timestamp || !now) return '...';
-
-        // Handle ISO string or number
-        let time = typeof timestamp === 'string' ? new Date(timestamp).getTime() : timestamp;
-        if (isNaN(time) || time <= 0) return isRtl ? 'לאחרונה' : 'recently';
-        // Some ingest paths (Facebook, screenshots) store Unix *seconds*, not ms —
-        // anything below year-2001-in-ms is really a seconds value, so scale it up.
-        if (time < 1e12) time *= 1000;
-
-        const seconds = Math.floor((now - time) / 1000);
-        if (seconds < 60) return isRtl ? 'זה עתה' : 'just now';
-        const minutes = Math.floor(seconds / 60);
-        if (minutes < 60) return isRtl ? `לפני ${minutes} דק׳` : `${minutes}m ago`;
-        const hours = Math.floor(minutes / 60);
-        if (hours < 24) return isRtl ? `לפני ${hours} שע׳` : `${hours}h ago`;
-        const days = Math.floor(hours / 24);
-        return isRtl ? `לפני ${days} ימים` : `${days}d ago`;
-    };
+    // One rule for every surface (lib/relativeTime).
+    const getTimeAgo = (timestamp: number | string, now: number): string =>
+        (!timestamp || !now ? '...' : relativeTime(timestamp, now, isRtl));
 
     // M3 — async-capture lifecycle. A card queued via the share sheet is written
     // as `processing` and flips to `failed` if analysis errors. Render
