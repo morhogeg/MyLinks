@@ -1080,10 +1080,20 @@ _META_FOLLOWUP_TOKENS = {
     "bullet", "points", "list", "steps",
     "קצר", "בקצרה", "תקצר", "ארוך", "הרחב", "הרחיב", "פרט", "בפירוט",
     "סכם", "סיכום", "תמצת", "נקודות", "רשימה", "פשוט",
-    # Continuation / politeness ("go on", "again", "please", "thanks")
-    "explain", "continue", "again", "repeat", "more", "less", "please",
-    "thanks", "thank", "ok", "okay", "sure", "yeah", "yep",
-    "הסבר", "תסביר", "המשך", "תמשיך", "שוב", "בבקשה", "תודה", "אוקיי", "יותר",
+    # Continuation ("go on", "again")
+    "explain", "continue", "again", "repeat", "more", "less",
+    "הסבר", "תסביר", "המשך", "תמשיך", "שוב", "יותר",
+}
+
+# Politeness is NEUTRAL: it neither names a topic nor asks for anything. It
+# used to sit in the meta vocabulary above, so a bare "thanks" (or "ok",
+# "תודה") read as a context-free follow-up, i.e. a RESTATE request: the model
+# re-sent the previous answer and the user paid an ask for it. Now these words
+# are ignored when classifying a turn: "shorter please" is still a restate,
+# "thanks" alone is not (ask_brain answers it as a social turn).
+_POLITENESS_TOKENS = {
+    "please", "thanks", "thank", "ok", "okay", "sure", "yeah", "yep",
+    "בבקשה", "תודה", "אוקיי",
 }
 
 
@@ -1091,11 +1101,71 @@ def is_context_free_followup(question: str) -> bool:
     """True when the question carries no topic of its own — every content token
     is meta (a language, a length, a "go on"), or there are no content tokens
     at all ("why?", "and?"). Such text can only be understood against the turn
-    before it, so retrieving for it is retrieving for noise. Pure."""
+    before it, so retrieving for it is retrieving for noise. Politeness alone
+    ("thanks", "ok please") asks for nothing and is NOT one. Pure."""
+    words = {w for w in re.split(r"[\W_]+", (question or "").lower(), flags=re.UNICODE) if w}
+    if words and words <= _POLITENESS_TOKENS:
+        return False  # "ok" is too short to be a token at all, so check the words
     tokens = keyword_query_tokens(question)
     if not tokens:
         return True
-    return tokens <= _META_FOLLOWUP_TOKENS
+    content = tokens - _POLITENESS_TOKENS
+    if not content:
+        return False
+    return content <= _META_FOLLOWUP_TOKENS
+
+
+# ── Social turns: "thanks", "ok", "תודה" ────────────────────────────────────
+# A message that only thanks or acknowledges is not a question. ask_brain
+# answers it in one line, before retrieval, with no model call and no charge.
+# CLOSED vocabulary on purpose: every word must be a social word, at least one
+# must be an anchor (a thank-you or an acknowledgement, not just filler), a
+# question mark disqualifies, and so does length. Bare affirmations ("yes",
+# "sure") are deliberately NOT social: they may be accepting an offer the
+# previous answer made, which the model must see.
+_SOCIAL_ANCHORS = {
+    "thanks", "thank", "thx", "ty", "tysm", "cheers", "appreciate", "appreciated",
+    "ok", "okay", "okey", "kk", "alright", "noted", "understood", "gotcha", "got",
+    "great", "cool", "nice", "perfect", "awesome", "amazing", "excellent",
+    "wonderful", "brilliant", "fantastic", "good", "sweet", "neat", "wow",
+    "helpful", "helps", "helped",
+    "תודה", "ותודה", "תודות", "אוקיי", "אוקי", "בסדר", "מעולה", "סבבה", "יופי",
+    "אחלה", "מגניב", "הבנתי", "מצוין", "נהדר", "מושלם", "נפלא", "וואו", "תותח",
+    "קיבלתי", "סגור", "אלוף", "אלופה", "טוב",
+}
+_SOCIAL_FILLERS = {
+    "you", "so", "much", "a", "lot", "very", "really", "it", "that", "this",
+    "all", "for", "the", "help", "lol", "haha",
+    "רבה", "לך", "לכם", "ממש", "מאוד", "על", "זה", "הרבה", "העזרה",
+}
+_SOCIAL_EMOJI = set("👍🙏❤🙂😊👌💪🔥🤩😍✨🎉🙌💯")
+_SOCIAL_MAX_CHARS = 60
+_SOCIAL_MAX_WORDS = 6
+
+
+def is_social_turn(question: str) -> bool:
+    """True when the whole message only thanks or acknowledges ("thanks!",
+    "ok, got it", "תודה רבה", "👍"). Pure."""
+    text = (question or "").strip()
+    if not text or len(text) > _SOCIAL_MAX_CHARS or "?" in text or "؟" in text:
+        return False
+    words = [w for w in re.split(r"[\W_]+", text.lower(), flags=re.UNICODE) if w]
+    if not words:
+        return any(ch in _SOCIAL_EMOJI for ch in text)
+    if len(words) > _SOCIAL_MAX_WORDS:
+        return False
+    return (any(w in _SOCIAL_ANCHORS for w in words)
+            and all(w in _SOCIAL_ANCHORS or w in _SOCIAL_FILLERS for w in words))
+
+
+def social_reply(question: str, history=None) -> str:
+    """The one-line answer to a social turn, in the user's language: Hebrew
+    when they wrote Hebrew (or sent only emoji in a Hebrew conversation)."""
+    text = question or ""
+    hebrew = bool(_HEBREW_RE.search(text))
+    if not hebrew and not any(ch.isalpha() for ch in text):
+        hebrew = conversation_language(history) == "Hebrew"
+    return "בשמחה." if hebrew else "You're welcome."
 
 
 # The OTHER kind of follow-up that can't be retrieved for on its own: one that

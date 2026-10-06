@@ -2432,6 +2432,27 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         if len(question) > MAX_QUESTION_LENGTH:
             return _error_response("question is too long", 400, headers)
 
+        # A thank-you or an "ok" is not a question. It used to read as a
+        # "restate" follow-up: the model re-sent the previous answer and the
+        # user paid an ask for it. Answer it in one line instead, before the
+        # quota meter, retrieval and any model call (search.is_social_turn).
+        from search import is_social_turn, social_reply
+        if is_social_turn(question):
+            reply = social_reply(question, history)
+            if want_stream:
+                def _social_stream():
+                    yield "data: " + json.dumps({"type": "token", "text": reply}) + "\n\n"
+                    yield "data: " + json.dumps({"type": "sources", "sources": []}) + "\n\n"
+                    yield "data: " + json.dumps({"type": "done"}) + "\n\n"
+
+                return https_fn.Response(_social_stream(), status=200,
+                                         headers={**headers, "Cache-Control": "no-cache"},
+                                         mimetype="text/event-stream")
+            return https_fn.Response(
+                json.dumps({"success": True, "answer": reply, "citedIds": [],
+                            "sources": [], "ungrounded": False}),
+                status=200, headers=headers, mimetype='application/json')
+
         # Monthly ask quota — meter before the retrieval + paid Gemini answer.
         q = _quota_blocked(uid, "asks", headers)
         if q:
