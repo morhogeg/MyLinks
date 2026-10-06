@@ -1024,7 +1024,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
                     || provider.hasItemConformingToTypeIdentifier(kPlainText) {
             let id = provider.hasItemConformingToTypeIdentifier(kPlainText) ? kPlainText : kText
             provider.loadItem(forTypeIdentifier: id, options: nil) { [weak self] item, _ in
-                if let s = item as? String {
+                if let s = Self.sharedText(from: item) {
                     DispatchQueue.main.async { self?.presentSharedString(s) }
                     self?.upload(payload: ["text": s])
                 } else {
@@ -1034,6 +1034,15 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         } else {
             showResult("Unsupported content", success: false)
         }
+    }
+
+    /// Shared text arrives as a String, attributed text or UTF-8 bytes,
+    /// depending on the host app; all three are the same words to us.
+    private static func sharedText(from item: NSSecureCoding?) -> String? {
+        if let s = item as? String { return s }
+        if let a = item as? NSAttributedString { return a.string }
+        if let d = item as? Data { return String(data: d, encoding: .utf8) }
+        return nil
     }
 
     /// Show the native scan animation, with the shared image behind the sweep.
@@ -1293,7 +1302,13 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
             if let small = downsampledJPEG(from: raw) { return (small, "image/jpeg", UIImage(data: small)) }
             return (raw, "image/jpeg", UIImage(data: raw))
         }
-        if let url = item as? URL, let raw = try? Data(contentsOf: url) {
+        if let url = item as? URL {
+            // Straight from the file first: ImageIO reads only what the
+            // thumbnail needs, so a 75 MB ProRAW original never sits in memory
+            // whole. The bytes path below is the old behaviour, kept as the
+            // fallback.
+            if let small = downsampledJPEG(at: url) { return (small, "image/jpeg", UIImage(data: small)) }
+            guard let raw = try? Data(contentsOf: url) else { return nil }
             if let small = downsampledJPEG(from: raw) { return (small, "image/jpeg", UIImage(data: small)) }
             return (raw, Self.mime(for: url), UIImage(data: raw))
         }
@@ -1309,6 +1324,17 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     private func downsampledJPEG(from data: Data, maxPixel: CGFloat = 2048, quality: CGFloat = 0.8) -> Data? {
         let srcOptions = [kCGImageSourceShouldCache: false] as CFDictionary
         guard let src = CGImageSourceCreateWithData(data as CFData, srcOptions) else { return nil }
+        return thumbnailJPEG(from: src, maxPixel: maxPixel, quality: quality)
+    }
+
+    /// The same thumbnail, read from a file URL without loading the file.
+    private func downsampledJPEG(at url: URL, maxPixel: CGFloat = 2048, quality: CGFloat = 0.8) -> Data? {
+        let srcOptions = [kCGImageSourceShouldCache: false] as CFDictionary
+        guard let src = CGImageSourceCreateWithURL(url as CFURL, srcOptions) else { return nil }
+        return thumbnailJPEG(from: src, maxPixel: maxPixel, quality: quality)
+    }
+
+    private func thumbnailJPEG(from src: CGImageSource, maxPixel: CGFloat, quality: CGFloat) -> Data? {
         let thumbOptions: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceThumbnailMaxPixelSize: maxPixel,
