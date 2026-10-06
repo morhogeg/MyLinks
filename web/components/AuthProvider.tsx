@@ -17,7 +17,7 @@ import { setAnalyticsUid, flushSignIn, trackAppOpen, track } from '@/lib/analyti
 import { installErrorReporter, reportError, flushBufferedReports, reportViaHttp } from '@/lib/errorReporter';
 import {
     initPushListeners, refreshPushRegistration, unregisterPush,
-    readLocalPushPrompt, writeLocalPushPrompt,
+    readLocalPushPrompt, writeLocalPushPrompt, getDevicePushPermission,
 } from '@/lib/push';
 import { reconcileTourSeen } from '@/lib/tourSeen';
 import LoginScreen from '@/components/LoginScreen';
@@ -68,6 +68,14 @@ const AuthContext = createContext<AuthContextType>({
 
 export function useAuth() {
     return useContext(AuthContext);
+}
+
+/** Resolve when `p` settles or after `ms`, whichever comes first; never rejects. */
+function settleWithin(p: Promise<unknown>, ms: number): Promise<void> {
+    return new Promise((resolve) => {
+        const t = setTimeout(resolve, ms);
+        p.then(() => { clearTimeout(t); resolve(); }, () => { clearTimeout(t); resolve(); });
+    });
 }
 
 /** The share-sheet sync held back until the AI notice is accepted. */
@@ -242,10 +250,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // (deep-links, foreground toasts, token rotation) and silently re-register
     // the device token when permission was already granted. Never prompts.
     const attachPush = useCallback(
-        (docId: string, data: Record<string, unknown> | undefined) => {
+        async (docId: string, data: Record<string, unknown> | undefined) => {
             const docTs = typeof data?.pushPromptedAt === 'number' ? data.pushPromptedAt : null;
             if (docTs) {
-                writeLocalPushPrompt(docTs);
+                // The account was asked before (another phone, an earlier
+                // install), but iOS resets the permission per install: if this
+                // device has never been asked and the account wants push, leave
+                // the local record unset so the feed offers the nudge here. A
+                // deliberate "off" stays respected.
+                const settings = (data?.settings ?? {}) as { push_enabled?: unknown };
+                const wantsPush = settings.push_enabled === true;
+                const neverAskedHere = wantsPush && isNativeApp()
+                    && (await getDevicePushPermission()) === 'prompt';
+                if (!neverAskedHere) writeLocalPushPrompt(docTs);
             } else {
                 const localTs = readLocalPushPrompt();
                 if (localTs !== null) {
@@ -322,7 +339,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 setUid(userDoc.id);
                 const consented = reconcileAiConsent(userDoc.id, userDoc.data());
                 attachUserDoc(userDoc.id, userDoc.data(), consented);
-                attachPush(userDoc.id, userDoc.data());
+                await settleWithin(attachPush(userDoc.id, userDoc.data()), 1500);
                 reconcileTourSeen(userDoc.id, userDoc.data(), false);
             } catch (err) {
                 console.error('Failed to look up user:', err);
@@ -385,7 +402,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     setUid(dataDoc.id);
                     const consented = reconcileAiConsent(dataDoc.id, dataDoc.data);
                     attachUserDoc(dataDoc.id, dataDoc.data, consented);
-                    attachPush(dataDoc.id, dataDoc.data);
+                    // Before setLoading(false): the feed reads the nudge record
+                    // once, on mount. Bounded so a stuck bridge never holds the app.
+                    await settleWithin(attachPush(dataDoc.id, dataDoc.data), 1500);
+                    if (cancelled) return;
                     // First run for a fresh workspace: the backend returns
                     // `created` on creation and stamps `onboarded: false` on
                     // the doc (covers a reload before dismissal).

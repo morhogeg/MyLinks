@@ -127,7 +127,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
     const {
         settings, setSettings, loadError,
         savePreferences, loadSettings,
-        togglePush, sendTestNotification, pushBusy, pushNote,
+        togglePush, sendTestNotification, pushBusy, pushNote, pushOnHere,
     } = useUserSettings(uid);
 
     // Navigation stack; the last entry is the visible screen.
@@ -369,6 +369,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                                 sendTestNotification={sendTestNotification}
                                 pushBusy={pushBusy}
                                 pushNote={pushNote}
+                                pushOnHere={pushOnHere}
                                 aiConsentAt={aiConsentAt}
                                 privacyLockOn={hasPin}
                                 onChangePin={() => setPinModal('change')}

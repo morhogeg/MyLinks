@@ -44,10 +44,13 @@ export default function PushNudge({ uid, onDone }: { uid: string; onDone: () => 
                 updateUserSettings(uid, { push_enabled: true, reminders_channel: ['push'] })
                     .catch(() => {});
                 toast.success('Notifications on. Reminders and digests will arrive here.');
+            } else if (result === 'declined') {
+                // The user just tapped Don't Allow in the iOS prompt: respect
+                // it. Opening the Settings app here felt like being argued with.
+                toast.info('Notifications stay off. You can turn them on in Settings anytime.');
             } else if (result === 'permission-denied') {
-                // The OS prompt was declined (now or on a previous run). iOS
-                // shows that dialog once per install, so the only way forward
-                // is the Settings app — take the user there directly.
+                // Declined on an earlier run: iOS won't show its prompt again,
+                // so the Settings app is the only way forward.
                 toast.info('Allow notifications for Machina in Settings.');
                 openNotificationSettings();
             } else if (result === 'registration-failed') {

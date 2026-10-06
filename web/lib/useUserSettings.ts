@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { User, DigestChannel, DigestMode, ReminderChannel } from '@/lib/types';
 import { updateUserSettings, getUserSettings } from '@/lib/storage';
-import { registerPush, openNotificationSettings, sendTestPush, unregisterPush } from '@/lib/push';
+import { registerPush, openNotificationSettings, sendTestPush, unregisterPush, getDevicePushPermission, type DevicePushPermission } from '@/lib/push';
+import { isNativeApp } from '@/lib/api';
+import { reportError } from '@/lib/errorReporter';
 import { useToast } from '@/components/Toast';
 
 // Mirrors DEFAULT_USER_SETTINGS in functions/link_service.py — keep in sync.
@@ -190,9 +192,26 @@ export function useUserSettings(uid: string) {
     const [pushBusy, setPushBusy] = useState(false);
     const [pushNote, setPushNote] = useState<string | null>(null);
 
+    // `push_enabled` is per ACCOUNT, notification permission per DEVICE. On a
+    // new phone or after a reinstall the account says on while this phone has
+    // never been asked and holds no token, so the switch showed ON and nothing
+    // ever arrived. The switch shows what THIS iPhone will actually receive;
+    // re-read when the app returns from the Settings app.
+    const [devicePush, setDevicePush] = useState<DevicePushPermission>('unavailable');
+    useEffect(() => {
+        if (!isNativeApp()) return;
+        let alive = true;
+        const read = () => { void getDevicePushPermission().then((p) => { if (alive) setDevicePush(p); }); };
+        read();
+        const onVisible = () => { if (document.visibilityState === 'visible') read(); };
+        document.addEventListener('visibilitychange', onVisible);
+        return () => { alive = false; document.removeEventListener('visibilitychange', onVisible); };
+    }, []);
+    const pushOnHere = settings.push_enabled && (!isNativeApp() || devicePush === 'granted');
+
     const togglePush = async () => {
         if (pushBusy) return;
-        if (settings.push_enabled) {
+        if (pushOnHere) {
             void unregisterPush();
             setPushNote(null);
             setSettings((p) => ({
@@ -207,9 +226,14 @@ export function useUserSettings(uid: string) {
         setPushNote(null);
         try {
             const result = await registerPush();
+            if (result !== 'unavailable') void getDevicePushPermission().then(setDevicePush);
             // Two distinct failures, two distinct fixes — naming the wrong one
             // sends the user to iOS Settings for a backend fault (or vice versa)
             // and the trail dead-ends.
+            if (result === 'declined') {
+                setPushNote('Notifications stay off for now. To turn them on later, allow them for Machina in iOS Settings.');
+                return;
+            }
             if (result === 'permission-denied') {
                 setPushNote('Notifications are turned off for Machina. Allow them in iOS Settings, then flip this on again.');
                 // The OS prompt only shows once per install, so take the user
@@ -243,7 +267,7 @@ export function useUserSettings(uid: string) {
         try {
             const reg = await registerPush();
             if (reg === 'unavailable') return;
-            if (reg === 'permission-denied') {
+            if (reg === 'permission-denied' || reg === 'declined') {
                 setPushNote('Notifications are turned off for Machina in iOS Settings. Allow them there first.');
                 return;
             }
@@ -252,26 +276,23 @@ export function useUserSettings(uid: string) {
                 return;
             }
             const test = await sendTestPush();
+            // User-facing copy stays plain; the exact failure (FCM/APNs error
+            // names, which link broke) goes to error reporting for us to read.
             if (!test.ok) {
-                setPushNote(`Machina could not be reached to send the test (${test.error ?? 'unknown error'}).`);
+                setPushNote('Couldn’t reach Machina to send the test. Check your connection and try again.');
+                reportError(new Error(`test push: ${test.error ?? 'unknown error'}`), 'push-test-unreachable');
             } else if (test.skipped === 'no_tokens' || !test.tokens) {
-                setPushNote('The backend has no registered device for this account. Registration is not reaching the server.');
+                setPushNote('This iPhone isn’t registered for notifications yet. Turn the switch off and on again.');
+                reportError(new Error('test push: no registered device'), 'push-test-no-tokens');
             } else if ((test.sent ?? 0) > 0) {
-                setPushNote(`Test sent to ${test.tokens} device${test.tokens === 1 ? '' : 's'}. It should appear on your lock screen now. If nothing arrives, the block is between Apple and this phone (Focus mode, notification style, or the APNs setup).`);
+                setPushNote('Test sent. It should appear on your lock screen in a moment. If it doesn’t, check Focus and the notification settings for Machina.');
             } else {
+                setPushNote('The test notification couldn’t be delivered. Try again later.');
                 // The token was registered FRESH seconds ago (registerPush above),
-                // so an all-failed send is never staleness — it's FCM/APNs
-                // rejecting the send. Name the error and its actual fix.
-                const err = test.errors?.[0];
-                if (err === 'ThirdPartyAuthError' || err === 'InvalidCredentialError') {
-                    setPushNote(`Apple rejected the send (${err}): the APNs key in Firebase → Cloud Messaging doesn't match this app. That's a Firebase-console fix, not a phone setting.`);
-                } else if (err === 'SenderIdMismatchError') {
-                    setPushNote(`The send was refused (${err}): this build's Firebase config doesn't match the project sending the push.`);
-                } else if (err === 'UnregisteredError') {
-                    setPushNote(`Apple says this device's token is not valid for this app (${err}). Usually a mismatch between the build and the push environment.`);
-                } else {
-                    setPushNote(`The send failed for the freshly registered token${err ? ` (${err})` : ''}. This is on the sending side, not this phone.`);
-                }
+                // so an all-failed send is never staleness: FCM/APNs refused it
+                // (ThirdPartyAuthError = the APNs key; SenderIdMismatchError =
+                // the build's Firebase config; UnregisteredError = environment).
+                reportError(new Error(`test push failed: ${test.errors?.[0] ?? 'unknown'}`), 'push-test-send-failed');
             }
         } finally {
             setPushBusy(false);
@@ -288,5 +309,6 @@ export function useUserSettings(uid: string) {
         sendTestNotification,
         pushBusy,
         pushNote,
+        pushOnHere,
     };
 }
