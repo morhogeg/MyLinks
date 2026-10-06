@@ -43,6 +43,13 @@ export default function LoginScreen({
             // redirect path the browser navigates away before this resolves.
         } catch (err) {
             const name = (err as Error)?.name;
+            // Dismissing the Apple/Google sheet or the popup is a choice, not a
+            // failure: just be ready again.
+            if (name === 'SignInCancelledError') {
+                setBusy(null);
+                return;
+            }
+            const code = (err as { code?: string })?.code;
             setError(
                 name === 'PopupBlockedError'
                     ? 'Your browser blocked the sign-in window. Allow pop-ups for this site, then try again.'
@@ -51,7 +58,9 @@ export default function LoginScreen({
                     // button the user originally signed up with.
                     : name === 'DifferentProviderError'
                         ? (err as Error).message
-                        : 'Sign-in failed. Please try again.',
+                        : code === 'auth/user-disabled'
+                            ? 'This account has been turned off. Write to support@mymachina.app for help.'
+                            : 'Sign-in failed. Please try again.',
             );
             setBusy(null);
         }

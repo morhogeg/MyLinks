@@ -48,14 +48,20 @@ export type AuthProviderId = 'google' | 'apple';
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
-/** Popup error codes that mean "fall back to a full-page redirect". */
+/** Popup error codes that mean "fall back to a full-page redirect". A popup
+    the user CLOSED is not one of them: that is a cancel, and answering it by
+    navigating the whole page to Google or Apple was the wrong reply. */
 function popupUnsupported(code: string): boolean {
     return (
         code === 'auth/popup-blocked' ||
-        code === 'auth/popup-closed-by-user' ||
-        code === 'auth/cancelled-popup-request' ||
         code === 'auth/operation-not-supported-in-this-environment'
     );
+}
+
+/** The user dismissed the sign-in popup or the Apple/Google sheet. Not an
+    error: the screen should simply be ready again. */
+export class SignInCancelledError extends Error {
+    constructor() { super('Sign-in cancelled'); this.name = 'SignInCancelledError'; }
 }
 
 /** Thrown when the popup was blocked AND the redirect fallback cannot work
@@ -233,6 +239,8 @@ export async function signIn(provider: AuthProviderId): Promise<void> {
         if (errCode(err) === 'auth/account-exists-with-different-credential') {
             throw new DifferentProviderError(await existingProviderFor(err, provider));
         }
+        // Same cancel detection as provider linking (isCancel, below).
+        if (isCancel(err)) throw new SignInCancelledError();
         throw err;
     }
     // A deliberate sign-in just completed via the popup or native credential

@@ -532,7 +532,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!loading && aiConsented === false) {
         return (
             <AuthContext.Provider value={value}>
-                <AIConsentNotice onAccept={acceptAiConsent} />
+                <AIConsentNotice onAccept={acceptAiConsent} onSignOut={signOut} />
             </AuthContext.Provider>
         );
     }
