@@ -962,16 +962,25 @@ def _require_app_check(req, headers: dict = None) -> bool:
         return not APPCHECK_ENFORCE
 
 
+# Chinese, Japanese and Korean text has no spaces between words: counted as
+# "words" a 12,000-character Japanese article was one word, a 1-minute read
+# (launch audit CAP-17). These scripts are counted by character instead.
+_CJK_CHAR_RE = re.compile(r'[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uf900-\ufaff]')
+_CJK_CHARS_PER_MINUTE = 500
+
+
 def _estimate_read_time(text: str, words_per_minute: int = 200) -> int:
     """Estimate read time in minutes from word count.
 
     Counts words rather than characters so the estimate holds for non-Latin
     scripts (e.g. Hebrew), where the old `len(text) // 1500` heuristic was off.
+    CJK characters are counted one by one at _CJK_CHARS_PER_MINUTE.
     """
     if not text:
         return 1
-    words = len(text.split())
-    return max(1, round(words / words_per_minute))
+    cjk = len(_CJK_CHAR_RE.findall(text))
+    words = len(_CJK_CHAR_RE.sub(' ', text).split()) if cjk else len(text.split())
+    return max(1, round(words / words_per_minute + cjk / _CJK_CHARS_PER_MINUTE))
 
 
 # NOTE: `_append_capture_note` was removed 2026-07-27 at the owner's request.

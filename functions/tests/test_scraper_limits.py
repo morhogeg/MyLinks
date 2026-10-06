@@ -84,3 +84,27 @@ def test_a_hebrew_page_cut_mid_character_still_reads_as_hebrew(monkeypatch):
     result = scraper.scrape_url("https://example.co.il/post")
     assert "זהו משפט אמיתי" in result["text"]
     assert "×" not in result["text"]             # windows-1252 mojibake marker
+
+
+# ── Page titles are bounded (CAP-20) ─────────────────────────────────────────
+
+def test_a_huge_page_title_is_capped(monkeypatch):
+    pytest.importorskip("bs4")
+    title = "T" * 50_000
+    body = "<p>" + ("A real sentence with plenty of words in it. " * 40) + "</p>"
+    page = f"<html><head><title>{title}</title></head><body>{body}</body></html>".encode()
+    monkeypatch.setattr(scraper, "safe_get", lambda *a, **k: _FakeResponse(page))
+    result = scraper.scrape_url("https://example.com/long-title")
+    assert len(result["title"]) == scraper.MAX_TITLE_CHARS
+
+
+# ── Read time for scripts without spaces (CAP-17) ────────────────────────────
+
+def test_read_time_counts_cjk_by_character():
+    import main
+    assert main._estimate_read_time("日本語の記事です。" * 1500) >= 20      # ~13.5k characters
+    assert main._estimate_read_time("한국어 기사입니다. " * 1000) >= 10
+    # Latin and Hebrew keep the word count.
+    assert main._estimate_read_time("word " * 2000) == 10
+    assert main._estimate_read_time("מילה " * 2000) == 10
+    assert main._estimate_read_time("") == 1

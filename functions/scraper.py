@@ -359,6 +359,8 @@ FETCH_ERROR_MESSAGES = {
 # Largest article body handed to the model. ai_service caps its prompt input at
 # 30k characters; 25k leaves room for the shared caption and scaffolding.
 MAX_ARTICLE_CHARS = 25_000
+# Longest page title kept (see scrape_url).
+MAX_TITLE_CHARS = 300
 
 # How much of a fetched page is parsed. BeautifulSoup costs ~80 MB of memory
 # per MB of dense markup, so parsing the full 10 MB response cap ran a 256 MiB
@@ -593,6 +595,11 @@ def scrape_url(url: str, message_body: Optional[str] = None) -> dict:
     if not isinstance(result, dict):
         return result
     result.setdefault("source_url", url)
+    # A page's <title> is unbounded and flows into the queue doc, the card and
+    # `originalTitle`; one over ~1 MiB broke Firestore's document limit and
+    # left the card processing forever (launch audit CAP-20).
+    if isinstance(result.get("title"), str) and len(result["title"]) > MAX_TITLE_CHARS:
+        result["title"] = result["title"][:MAX_TITLE_CHARS].rstrip()
     # A platform scraper (X, Instagram, LinkedIn…) or an unexpected parse error
     # that came back with NOTHING used to reach the model as an empty prompt
     # and produce a confident junk "ready" card. Make it the honest partial
