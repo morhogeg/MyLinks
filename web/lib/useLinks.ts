@@ -118,6 +118,12 @@ export function useLinks(uid: string | null | undefined, toast: ReturnType<typeo
         return out;
     }, [pages, refreshedTop]);
 
+    // Ids on a loaded page. A page keeps its cards live; a card held only by
+    // the reminder overlay below can drop out of `links` while it is open
+    // (clearing the reminder does exactly that), so Feed listens to such a
+    // card on its own.
+    const windowIds = useMemo(() => new Set(windowLinks.map((l) => l.id)), [windowLinks]);
+
     // More on the server while the LAST page came back full. While a just-
     // requested page is still in flight, keep saying yes (loadMore no-ops).
     const lastPage = pages[cursors.length];
@@ -197,5 +203,5 @@ export function useLinks(uid: string | null | undefined, toast: ReturnType<typeo
         }
     };
 
-    return { links, isLoading, handlePullRefresh, loadMore, hasMore };
+    return { links, windowIds, isLoading, handlePullRefresh, loadMore, hasMore };
 }

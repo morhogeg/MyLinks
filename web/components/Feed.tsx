@@ -105,7 +105,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     const toast = useToast();
     // Links subscription + pull-refresh (R-3: useLinks). Windowed (report 3.15):
     // loadMore grows the subscription window; hasMore gates the scroll sentinel.
-    const { links, isLoading, handlePullRefresh, loadMore, hasMore } = useLinks(uid, toast);
+    const { links, windowIds, isLoading, handlePullRefresh, loadMore, hasMore } = useLinks(uid, toast);
     // Links saved offline in a session that ended before reconnecting.
     useResumeOfflineSaves(uid);
     // Collections — declared before the filter pipeline so private-collection
@@ -276,6 +276,24 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         segs.push({ start: prev, links: filteredLinks.slice(prev) });
         return segs;
     }, [filteredLinks, partialSplit, meaningSplit, reminderSplits]);
+    const [activeLinkId, setActiveLinkId] = useState<string | null>(null);
+    // Live copies of cards opened from OUTSIDE the loaded feed pages: Ask
+    // citations, a dup-save redirect, a push tap, the reminder strip, My Notes,
+    // collection members, old search results. Written by the one-doc listener
+    // below while such a card is open; keyed by id, consulted by activeLink.
+    const [fetchedCards, setFetchedCards] = useState<Record<string, Link>>({});
+    // The id that listener is attached to, if any. Read only by the local-edit
+    // callback below, never during render.
+    const liveCardIdRef = useRef<string | null>(null);
+    // A card handler's edit landed. The search snapshot is a one-time read, so
+    // it is patched; so is a fetched copy whose listener has closed. The copy
+    // under a live listener is left alone: Firestore already shows the write
+    // there, and an older acknowledged write could briefly undo a newer one.
+    const handleLocalEdit = useCallback((id: string, patch: Partial<Link>) => {
+        patchLink(id, patch);
+        if (id === liveCardIdRef.current) return;
+        setFetchedCards((prev) => (prev[id] ? { ...prev, [id]: { ...prev[id], ...patch } } : prev));
+    }, [patchLink]);
     // Card action handlers that depend only on [uid, toast] (R-3: useLinkActions).
     const {
         handleStatusChange,
@@ -290,76 +308,108 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         handleRetryProcessing,
         handleRemoveFromCollection,
         handleShareCard,
-    } = useLinkActions(uid, toast, patchLink);
-    const [activeLinkId, setActiveLinkId] = useState<string | null>(null);
+    } = useLinkActions(uid, toast, handleLocalEdit);
     // The import sheet, offered from the empty library (the same sheet the
     // first run and Settings open).
     const [importing, setImporting] = useState(false);
-    // Cards fetched directly by id for a deep-link (?linkId) that targets a card
-    // older than the loaded window — reminder push taps and dup-save redirects
-    // point at arbitrary-age links. Keyed by id; consulted by activeLink below.
-    const [fetchedCards, setFetchedCards] = useState<Record<string, Link>>({});
     // Back-stack for related-card navigation: opening a card *from* another card
     // pushes the current one, so closing returns there instead of dismissing all.
     const [linkStack, setLinkStack] = useState<string[]>([]);
     // Resolved against visibleLinks so a locked private card can never be opened
     // (deep link, push tap) — and an open one closes itself when the vault relocks.
-    // A directly-fetched deep-link card (outside the window) is the fallback, and
-    // it goes through the SAME vault gate: while locked it stays hidden if it's
-    // effectively private, so the fetch can never bypass the PIN.
+    // A live fetched copy (outside the window) is the fallback, and it goes
+    // through the SAME vault gate: while locked it stays hidden if it's
+    // effectively private, so the listener can never bypass the PIN.
     const activeLink = useMemo(() => {
         if (!activeLinkId) return null;
         const inWindow = visibleLinks.find(l => l.id === activeLinkId);
         if (inWindow) return inWindow;
-        // Out-of-window cards: a directly-fetched deep-link doc, else the
-        // search library snapshot (how an old search result opens on tap).
-        // Both go through the SAME vault gate as the window.
+        // Out-of-window cards: the live copy from the listener below, else the
+        // search library snapshot while that listener's first answer is on its
+        // way (how an old search result opens on tap with no wait). Both go
+        // through the SAME vault gate as the window.
         const fallback = fetchedCards[activeLinkId] ?? libraryLinks.find(l => l.id === activeLinkId);
         if (!fallback) return null;
         if (vaultLocked && isEffectivelyPrivateCard(fallback)) return null;
         return fallback;
     }, [activeLinkId, visibleLinks, fetchedCards, libraryLinks, vaultLocked, isEffectivelyPrivateCard]);
 
-    // A cited/related card can reference a doc OUTSIDE the loaded feed window —
-    // Ask retrieval spans the whole library — or one that no longer exists.
-    // When activeLinkId can't resolve locally, fetch the doc once and open it;
-    // if it's gone (deleted) or stays blocked (vault-locked private), CLEAR the
-    // id. Leaving it dangling rendered no modal while anyOverlayOpen stayed
-    // true — scroll locked and the back gesture dead until a reload.
+    // A card can be opened that no loaded feed page holds: Ask retrieval and
+    // the digest span the whole library, and a push or dup-save names any
+    // card. A one-time read used to stand in for it, so the open card was a
+    // frozen copy: the star didn't fill, a note or title edit didn't show,
+    // "Machina's read" stayed empty (and each tap paid for another one), and a
+    // screenshot read never arrived. Instead, listen to that ONE doc while it
+    // is open. A card the reminder overlay holds (useLinks) counts as off-page
+    // too: clearing its reminder drops it from `links` mid-view.
+    const liveCardId = activeLinkId && !windowIds.has(activeLinkId) ? activeLinkId : null;
+    // The copy on screen when it opened, so the listener can start from it and
+    // the modal never blinks while the first snapshot is on its way, plus the
+    // id the modal is showing (both synced in an effect, never during render).
+    const openCopy = liveCardId ? visibleLinks.find((l) => l.id === liveCardId) ?? null : null;
+    const openCopyRef = useRef<Link | null>(null);
+    const shownIdRef = useRef<string | null>(null);
     useEffect(() => {
-        if (!activeLinkId || activeLink || !uid) return;
-        if (fetchedCards[activeLinkId]) {
-            // Already fetched but still unresolvable → vault gate — don't dangle.
-            // Say why nothing opened (a push / citation tap otherwise just
-            // lands on the feed with no explanation).
-            setActiveLinkId(null);
-            toast.info('That card is in Private. Unlock Private to open it.');
-            return;
-        }
-        let cancelled = false;
-        (async () => {
-            try {
-                const snap = await getDoc(doc(db, 'users', uid, 'links', activeLinkId));
-                if (cancelled) return;
-                if (!snap.exists()) {
-                    // Deleted since the push / citation / digest was written.
-                    // Same copy as the digest's deleted-card tap.
-                    setActiveLinkId(null);
-                    toast.info('That card is no longer in your library.');
-                    return;
-                }
-                const card = toLink(snap as QueryDocumentSnapshot<DocumentData>);
-                setFetchedCards(prev => ({ ...prev, [activeLinkId]: card }));
-            } catch (e) {
-                reportError(e, 'feed-cited-card-fetch');
-                if (!cancelled) {
-                    setActiveLinkId(null);
-                    toast.error("Couldn't open that card. Please try again.");
-                }
+        openCopyRef.current = openCopy;
+        shownIdRef.current = activeLink?.id ?? null;
+    });
+    useEffect(() => {
+        if (!uid || !liveCardId) return;
+        const id = liveCardId;
+        liveCardIdRef.current = id;
+        const seed = openCopyRef.current;
+        if (seed?.id === id) setFetchedCards((prev) => ({ ...prev, [id]: seed }));
+        const unsubscribe = onSnapshot(doc(db, 'users', uid, 'links', id), (snap) => {
+            if (snap.exists()) {
+                setFetchedCards((prev) => ({ ...prev, [id]: toLink(snap as QueryDocumentSnapshot<DocumentData>) }));
+                return;
             }
-        })();
-        return () => { cancelled = true; };
-    }, [activeLinkId, activeLink, uid, fetchedCards, toast]);
+            const { fromCache, hasPendingWrites } = snap.metadata;
+            if (fromCache && !hasPendingWrites) {
+                // Not on this device and no server to ask (offline). A copy
+                // already on screen stays until the server settles it; with
+                // nothing to show, say so, as the old one-time read did.
+                if (shownIdRef.current === id) return;
+                setActiveLinkId((cur) => (cur === id ? null : cur));
+                toast.error("Couldn't open that card. Please try again.");
+                return;
+            }
+            // Gone. CLEAR the id: leaving it dangling rendered no modal while
+            // anyOverlayOpen stayed true, so scroll locked and the back gesture
+            // died until a reload. The search snapshot forgets it too.
+            setFetchedCards((prev) => {
+                if (!prev[id]) return prev;
+                const next = { ...prev };
+                delete next[id];
+                return next;
+            });
+            markDeleted([id]);
+            setActiveLinkId((cur) => (cur === id ? null : cur));
+            // Our own delete already closed the card; nothing to explain.
+            if (hasPendingWrites) return;
+            // Deleted since the push / citation / digest was written, or just
+            // now on another device. Same copy as the digest's deleted-card tap.
+            toast.info('That card is no longer in your library.');
+        }, (e) => {
+            reportError(e, 'feed-open-card-listener');
+            setActiveLinkId((cur) => (cur === id ? null : cur));
+            toast.error("Couldn't open that card. Please try again.");
+        });
+        return () => {
+            unsubscribe();
+            if (liveCardIdRef.current === id) liveCardIdRef.current = null;
+        };
+    }, [uid, liveCardId, toast, markDeleted]);
+    // Known but unresolvable means the vault gate (a locked private card):
+    // close it rather than dangle, and say why nothing opened (a push or
+    // citation tap otherwise just lands on the feed with no explanation).
+    // Not known yet means the listener is still on its way.
+    useEffect(() => {
+        if (!activeLinkId || activeLink) return;
+        if (!fetchedCards[activeLinkId] && !links.some((l) => l.id === activeLinkId)) return;
+        setActiveLinkId(null);
+        toast.info('That card is in Private. Unlock Private to open it.');
+    }, [activeLinkId, activeLink, fetchedCards, links, toast]);
 
     // Open a card reached from another card's "Related" list — remember where we
     // came from so the back-stack can return there.
@@ -1698,14 +1748,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         if (!uid) return;
         try {
             await updateDoc(doc(db, 'users', uid, 'links', link.id), { isPrivate });
-            patchLink(link.id, { isPrivate });
+            handleLocalEdit(link.id, { isPrivate });
             toast.success(isPrivate
                 ? 'Moved to Private. Find it in the Private view'
                 : 'Removed from Private');
         } catch {
             toast.error("Couldn't update the card. Please try again.");
         }
-    }, [uid, toast, patchLink]);
+    }, [uid, toast, handleLocalEdit]);
     const handleToggleCardPrivate = useCallback((link: Link) => {
         // "Remove from Private" is only reachable inside the unlocked Private
         // view, so no extra gate; hiding a card never needs the vault open.
@@ -1721,11 +1771,11 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         const next = !link.hideThumbnail;
         try {
             await updateDoc(doc(db, 'users', uid, 'links', link.id), { hideThumbnail: next, updatedAt: Date.now() });
-            patchLink(link.id, { hideThumbnail: next });
+            handleLocalEdit(link.id, { hideThumbnail: next });
         } catch {
             toast.error("Couldn't update the card. Please try again.");
         }
-    }, [uid, toast, patchLink]);
+    }, [uid, toast, handleLocalEdit]);
 
     // Status-filter selection, PIN-gated for 'private': entering the Private
     // view demands the PIN while the vault is locked, and LEAVING it relocks
