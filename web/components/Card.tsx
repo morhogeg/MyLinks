@@ -212,7 +212,7 @@ function Card({
                     {failed ? (
                         <div className="flex-grow space-y-2">
                             <p className="text-sm text-text-secondary">
-                                Your link is safe: the AI analysis didn’t finish. Retry to try again, or open the original.
+                                Your link is safe: Machina couldn’t finish reading it. Tap Retry, or open the original.
                             </p>
                             {/* The backend writes the real failure into `error`
                                 (process_link_background's except / the janitor).

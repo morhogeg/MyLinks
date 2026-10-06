@@ -2572,7 +2572,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                     <div className="hidden sm:block">
                         <MobileSubheader
                             onBack={closeDigestToList}
-                            backLabel="Back to Today"
+                            backLabel="Back to Revisit"
                             icon={<Newspaper className="w-5 h-5" />}
                             title={digestDetailTitle}
                         />
@@ -2888,8 +2888,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                 // Blank-slate entrance, same as the mobile tab
                                 // (clears a pending graph hand-off — see selectTab).
                                 onClick={() => { setGraphAsk(null); setGraphRestore(null); setAskOpenChat(null); setAskFromGraph(false); setViewMode('ask'); }}
-                                title="Ask your brain"
-                                aria-label="Ask your brain"
+                                title="Ask Machina"
+                                aria-label="Ask Machina"
                                 className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
                             >
                                 <MessagesSquare className="w-4 h-4" />
@@ -3793,12 +3793,12 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
             )}
 
             {/* Digest detail — mobile full-screen place (Task B). Back returns to
-                the Today list. */}
+                the Revisit list. */}
             {viewMode === 'digestDetail' && (
                 <div className="sm:hidden fixed inset-x-0 top-0 z-50 bg-background flex flex-col animate-fade-in transition-[bottom] duration-300 [transition-timing-function:var(--ease-modal)]" style={{ bottom: overlayBottom }}>
                     <MobileSubheader
                         onBack={closeDigestToList}
-                        backLabel="Back to Today"
+                        backLabel="Back to Revisit"
                         icon={<Newspaper className="w-5 h-5" />}
                         title={digestDetailTitle}
                     />
