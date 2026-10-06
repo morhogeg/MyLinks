@@ -1002,8 +1002,12 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
         const wantStream = !isNativeApp();
 
         try {
-            // 30s bounds connection setup only; for the streaming path fetch()
-            // resolves on headers, so a long token stream is not cut off.
+            // For the stream, 30s bounds connection setup only: fetch()
+            // resolves on headers, so a long token stream is not cut off. A
+            // buffered answer (native) sends its headers only once the whole
+            // answer is ready, so its wait must outlast the server's Ask
+            // budget (50s, inside Hosting's 60s); at 30s a long answer the
+            // server went on to deliver showed as "Couldn't reach Machina".
             const res = await fetchWithTimeout(apiUrl('/api/chat'), {
                 method: 'POST',
                 headers: {
@@ -1019,7 +1023,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                     ...(contextIds.length ? { contextIds } : {}),
                 }),
                 signal: controller.signal,
-            }, 30_000);
+            }, wantStream ? 30_000 : 60_000);
 
             if (isCancelled()) return; // torn down while the request was in flight
 
