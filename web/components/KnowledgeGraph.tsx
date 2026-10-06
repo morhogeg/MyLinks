@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowUpRight, ChevronLeft, FileText, LocateFixed, MessagesSquare, Waypoints, X } from 'lucide-react';
 import { AskHints, Link } from '@/lib/types';
-import { buildGraphModel, edgeReason, GraphModel, GraphNode, BuildSignal } from '@/lib/graph';
+import { buildGraphModel, edgeReason, GraphModel, GraphNode, BuildSignal, graphStructureKey, graphSafeLink } from '@/lib/graph';
 import { fetchPoolSims } from '@/lib/similarity';
 import { tick, ALPHA_MIN } from '@/lib/graphPhysics';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { getDominantDirection } from '@/lib/rtl';
 import { hapticLight } from '@/lib/haptics';
+import { reportError } from '@/lib/errorReporter';
 
 /**
  * The Graph view — the library as a living constellation. Every card the
@@ -149,6 +150,10 @@ export default function KnowledgeGraph({
 
     const [model, setModel] = useState<GraphModel | null>(null);
     const [building, setBuilding] = useState(true);
+    // A build that threw. It used to leave "Mapping your knowledge…" up for
+    // good; now the view says so and offers a retry (bumps buildNonce).
+    const [buildError, setBuildError] = useState(false);
+    const [buildNonce, setBuildNonce] = useState(0);
     const [selected, setSelected] = useState<number | null>(null);
     // A tapped island caption (or its chip above the canvas) spotlights that
     // cluster and opens its panel.
@@ -177,6 +182,10 @@ export default function KnowledgeGraph({
     const alphaRef = useRef(1);
     const autoFitRef = useRef(true);
     const drawPendingRef = useRef(true);
+    // Repaint request. The rAF loop parks itself when nothing is moving (see
+    // the loop), so anything that changes the picture calls this rather than
+    // only setting drawPendingRef: it also restarts a parked loop.
+    const redrawRef = useRef<() => void>(() => { drawPendingRef.current = true; });
     const hoverRef = useRef<number | null>(null);
     const paletteRef = useRef<Palette | null>(null);
     const selectedRef = useRef<number | null>(null);
@@ -192,12 +201,21 @@ export default function KnowledgeGraph({
     const captionRectsRef = useRef<{ x1: number; y1: number; x2: number; y2: number; cluster: number }[]>([]);
     const openRef = useRef(onOpenCard);
     const restoreRef = useRef<GraphRestoreFocus | null>(restoreFocus ?? null);
-    restoreRef.current = restoreFocus ?? restoreRef.current;
     const onRestoreConsumedRef = useRef(onRestoreConsumed);
-    onRestoreConsumedRef.current = onRestoreConsumed;
-    selectedRef.current = selected;
-    clusterFocusRef.current = clusterFocus;
-    openRef.current = onOpenCard;
+    // The pointer handlers and the rAF loop live outside React's render cycle,
+    // so they read the model through a ref that tracks the latest build.
+    const modelRef = useRef<GraphModel | null>(model);
+    // Mirror the latest props/state into those refs after every render. In an
+    // effect, not during render (react-hooks/refs), and declared before every
+    // other effect so each of them, in the same commit, reads current values.
+    useEffect(() => {
+        restoreRef.current = restoreFocus ?? restoreRef.current;
+        onRestoreConsumedRef.current = onRestoreConsumed;
+        selectedRef.current = selected;
+        clusterFocusRef.current = clusterFocus;
+        openRef.current = onOpenCard;
+        modelRef.current = model;
+    });
 
     // Every selection (canvas tap or panel row) starts a follow; deselect ends it.
     useEffect(() => {
@@ -241,19 +259,55 @@ export default function KnowledgeGraph({
     useEffect(() => {
         citedRef.current = cited && cited.idx.size ? cited.idx : null;
         citedFitRef.current = cited && cited.idx.size ? [...cited.idx] : null;
-        drawPendingRef.current = true;
+        redrawRef.current();
     }, [cited]);
     useEffect(() => {
         clusterFitRef.current = clusterFocus;
         if (clusterFocus !== null) autoFitRef.current = false;
+        // A save in flight belongs to the cluster it started on: a new focus
+        // starts with a fresh Save button.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setSavingCluster(false);
-        drawPendingRef.current = true;
+        redrawRef.current();
     }, [clusterFocus]);
 
     // ── Build the model (chunked; cancelled when the pool changes) ───────────
+    // Rebuilt only when the map's INPUTS change (graphStructureKey), not on
+    // every new `links` array: a card marked read 1.5s after it was opened
+    // used to rebuild the whole map under the user, back to "Mapping your
+    // knowledge…" with the selection, layout and pan/zoom thrown away.
+    const structureKey = useMemo(() => graphStructureKey(links), [links]);
+    const linksRef = useRef(links);
+    // The key the model on screen was built from.
+    const builtKeyRef = useRef<string | null>(null);
+    useEffect(() => {
+        linksRef.current = links;
+        // Same structure, newer card objects (read state, a note, an edited
+        // reason): point the live model at them, so the panels and captions
+        // show current data. The node copies carry their positions and
+        // velocities over, and the order (what `selected` indexes) is
+        // unchanged, so the layout, selection and camera stay where they are.
+        const m = modelRef.current;
+        if (!m || builtKeyRef.current !== structureKey) return;
+        const byId = new Map(links.map((l) => [l.id, l]));
+        const stale = (n: GraphNode) => {
+            const fresh = byId.get(n.id);
+            return !!fresh && fresh !== n.link;
+        };
+        if (!m.nodes.some(stale)) return;
+        setModel({ ...m, nodes: m.nodes.map((n) => (stale(n) ? { ...n, link: graphSafeLink(byId.get(n.id)!) } : n)) });
+    }, [links, structureKey]);
+
     useEffect(() => {
         const signal: BuildSignal = { cancelled: false };
+        const key = structureKey;
+        const pool = linksRef.current;
+        // The build's own status resets synchronously, in the same pass that
+        // captures the focused card's id below before clearing the selection;
+        // deriving these during render would clear the selection first.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setBuilding(true);
+        setBuildError(false);
         // The focused card's ID, captured BEFORE the index-based selection is
         // cleared. Node indices don't survive a rebuild, but card ids do — so a
         // rebuild re-resolves the same card instead of dumping you back to the
@@ -270,10 +324,11 @@ export default function KnowledgeGraph({
             ...(restoreRef.current?.citedIds ?? []),
             restoreRef.current?.selectedId, keepId, pendingFocusIdRef.current,
         ].filter((x): x is string => !!x);
-        buildGraphModel(links, signal, pins, uid
+        buildGraphModel(pool, signal, pins, uid
             ? { poolSims: (ids, concepts) => fetchPoolSims(uid, ids, concepts) }
             : undefined).then((m) => {
             if (signal.cancelled || !m) return;
+            builtKeyRef.current = key;
             alphaRef.current = 1;
             autoFitRef.current = true;
             if (reducedMotionRef.current) {
@@ -282,7 +337,7 @@ export default function KnowledgeGraph({
             }
             setModel(m);
             setBuilding(false);
-            drawPendingRef.current = true;
+            redrawRef.current();
             // Coming back from an Ask this graph launched: re-open the focus
             // that launched it, so Ask reads as a detour, not an exit.
             const restore = restoreRef.current;
@@ -316,7 +371,7 @@ export default function KnowledgeGraph({
                     // Asked for by name and not on the map. Name it back to the
                     // user; the pending id stays set so the post-fetch rebuild
                     // gets one more chance to resolve it.
-                    unmapped = links.find((l) => l.id === focusId)?.title || 'That card';
+                    unmapped = pool.find((l) => l.id === focusId)?.title || 'That card';
                 }
                 // A `keepId` that no longer resolves (card deleted, or filtered
                 // out of the pool) still falls through to the full-graph fit.
@@ -330,16 +385,23 @@ export default function KnowledgeGraph({
                 }
                 onRestoreConsumedRef.current?.();
             }
+        }).catch((e) => {
+            if (signal.cancelled) return;
+            reportError(e, 'graph-build');
+            builtKeyRef.current = null;
+            setModel(null);
+            setBuilding(false);
+            setBuildError(true);
         });
         return () => {
             signal.cancelled = true;
         };
-    }, [links, uid]);
+    }, [structureKey, uid, buildNonce]);
 
     // ── Theme + reduced motion ───────────────────────────────────────────────
     useEffect(() => {
         paletteRef.current = readPalette();
-        drawPendingRef.current = true;
+        redrawRef.current();
     }, [themeNonce]);
     useEffect(() => {
         const observer = new MutationObserver(() => setThemeNonce((n) => n + 1));
@@ -366,7 +428,7 @@ export default function KnowledgeGraph({
             canvas.height = Math.round(height * dpr);
             canvas.style.width = `${width}px`;
             canvas.style.height = `${height}px`;
-            drawPendingRef.current = true;
+            redrawRef.current();
         };
         resize();
         const ro = new ResizeObserver(resize);
@@ -376,28 +438,31 @@ export default function KnowledgeGraph({
 
     // Selection changes re-light the canvas and give the sim a nudge redraw.
     useEffect(() => {
-        drawPendingRef.current = true;
+        redrawRef.current();
     }, [selected, model]);
 
     // ── The rAF loop: physics + draw ─────────────────────────────────────────
+    // Runs only while something moves: the simulation is still cooling, or
+    // the camera is still easing toward its framing. It used to repaint every
+    // frame forever (60-120fps) whenever a framing mode was on, which is
+    // most of the time, so an idle graph kept the GPU and battery busy. Idle,
+    // it parks; redrawRef wakes it for the next change.
     useEffect(() => {
         if (!model) return;
         let raf = 0;
         const loop = () => {
-            raf = requestAnimationFrame(loop);
+            raf = 0;
             const canvas = canvasRef.current;
+            // Not laid out yet: the canvas resize's redraw restarts the loop.
             if (!canvas || !canvas.width) return;
             const simActive = alphaRef.current > ALPHA_MIN;
             if (simActive) tick(model, alphaRef);
+            let moving = false;
             if (autoFitRef.current) {
                 const target = fitCamera(model, canvas);
                 if (target) {
-                    const cam = camRef.current;
                     const ease = reducedMotionRef.current ? 1 : 0.08;
-                    cam.k += (target.k - cam.k) * ease;
-                    cam.x += (target.x - cam.x) * ease;
-                    cam.y += (target.y - cam.y) * ease;
-                    drawPendingRef.current = true;
+                    moving = glide(camRef.current, target.k, () => target.x, () => target.y, ease);
                 }
             } else if (clusterFitRef.current !== null && model.clusters[clusterFitRef.current]) {
                 // Frame the focused cluster with padding.
@@ -424,12 +489,10 @@ export default function KnowledgeGraph({
                 const bw = Math.max(80, maxX - minX);
                 const bh = Math.max(80, maxY - minY);
                 const tk = Math.min(1.3, Math.max(0.2, Math.min((freeW - pad * 2) / bw, (freeH - pad * 2) / bh)));
-                const cam = camRef.current;
                 const ease = reducedMotionRef.current ? 1 : 0.1;
-                cam.k += (tk - cam.k) * ease;
-                cam.x += (freeW / 2 - ((minX + maxX) / 2) * cam.k - cam.x) * ease;
-                cam.y += (freeH / 2 - ((minY + maxY) / 2) * cam.k - cam.y) * ease;
-                drawPendingRef.current = true;
+                moving = glide(camRef.current, tk,
+                    (k) => freeW / 2 - ((minX + maxX) / 2) * k,
+                    (k) => freeH / 2 - ((minY + maxY) / 2) * k, ease);
             } else if (followRef.current !== null && model.nodes[followRef.current]) {
                 // Frame the whole EGO NETWORK — the card and everything it
                 // connects to — inside the area the panel leaves free (right
@@ -458,12 +521,10 @@ export default function KnowledgeGraph({
                 const bw = Math.max(60, maxX - minX);
                 const bh = Math.max(60, maxY - minY);
                 const tk = Math.min(1.25, Math.max(0.4, Math.min((freeW - pad * 2) / bw, (freeH - pad * 2) / bh)));
-                const cam = camRef.current;
                 const ease = reducedMotionRef.current ? 1 : 0.11;
-                cam.k += (tk - cam.k) * ease;
-                cam.x += (freeW / 2 - ((minX + maxX) / 2) * cam.k - cam.x) * ease;
-                cam.y += (freeH / 2 - ((minY + maxY) / 2) * cam.k - cam.y) * ease;
-                drawPendingRef.current = true;
+                moving = glide(camRef.current, tk,
+                    (k) => freeW / 2 - ((minX + maxX) / 2) * k,
+                    (k) => freeH / 2 - ((minY + maxY) / 2) * k, ease);
             } else if (citedFitRef.current?.length) {
                 // Frame every card the answer cited, however many clusters they
                 // span — a set that straddles three islands SHOULD zoom out far
@@ -500,15 +561,13 @@ export default function KnowledgeGraph({
                     const bw = Math.max(80, maxX - minX);
                     const bh = Math.max(80, maxY - minY);
                     const tk = Math.min(1.3, Math.max(0.12, Math.min((freeW - pad * 2) / bw, (freeH - pad * 2) / bh)));
-                    const cam = camRef.current;
                     const ease = reducedMotionRef.current ? 1 : 0.1;
-                    cam.k += (tk - cam.k) * ease;
-                    cam.x += (freeW / 2 - ((minX + maxX) / 2) * cam.k - cam.x) * ease;
-                    cam.y += (freeH / 2 - ((minY + maxY) / 2) * cam.k - cam.y) * ease;
-                    drawPendingRef.current = true;
+                    moving = glide(camRef.current, tk,
+                        (k) => freeW / 2 - ((minX + maxX) / 2) * k,
+                        (k) => freeH / 2 - ((minY + maxY) / 2) * k, ease);
                 }
             }
-            if (simActive || drawPendingRef.current) {
+            if (simActive || moving || drawPendingRef.current) {
                 drawPendingRef.current = false;
                 captionRectsRef.current = draw(canvas, model, camRef.current, paletteRef.current ?? readPalette(), {
                     selected: selectedRef.current,
@@ -517,9 +576,16 @@ export default function KnowledgeGraph({
                     cited: citedRef.current,
                 });
             }
+            if (simActive || moving) raf = requestAnimationFrame(loop);
         };
+        const wake = () => { if (!raf) raf = requestAnimationFrame(loop); };
+        redrawRef.current = () => { drawPendingRef.current = true; wake(); };
         raf = requestAnimationFrame(loop);
-        return () => cancelAnimationFrame(raf);
+        return () => {
+            cancelAnimationFrame(raf);
+            raf = 0;
+            redrawRef.current = () => { drawPendingRef.current = true; };
+        };
     }, [model]);
 
     // ── Pointer interaction ──────────────────────────────────────────────────
@@ -605,7 +671,7 @@ export default function KnowledgeGraph({
                 const hit = hitTest(p);
                 if (hit !== hoverRef.current) {
                     hoverRef.current = hit >= 0 ? hit : null;
-                    drawPendingRef.current = true;
+                    redrawRef.current();
                 }
                 const overCaption = hit < 0 && captionRectsRef.current.some(
                     (r) => p.x >= r.x1 && p.x <= r.x2 && p.y >= r.y1 && p.y <= r.y2,
@@ -629,7 +695,7 @@ export default function KnowledgeGraph({
                     cam.k = k;
                 }
                 pinchDist = dist;
-                drawPendingRef.current = true;
+                redrawRef.current();
                 return;
             }
             moved += Math.hypot(p.x - last.x, p.y - last.y);
@@ -640,22 +706,25 @@ export default function KnowledgeGraph({
                 n.fx = w.x;
                 n.fy = w.y;
                 alphaRef.current = Math.max(alphaRef.current, 0.3);
-                drawPendingRef.current = true;
+                redrawRef.current();
             } else if (mode === 'pan') {
                 cam.x += p.x - prev.x;
                 cam.y += p.y - prev.y;
                 canvas.style.cursor = 'grabbing';
-                drawPendingRef.current = true;
+                redrawRef.current();
             }
         };
 
         const onPointerUp = (e: PointerEvent) => {
+            // A cancelled pointer (the OS took the gesture: an edge swipe, a
+            // call) ends the drag but is never a tap, so it selects nothing.
+            const cancelled = e.type === 'pointercancel';
             pointers.delete(e.pointerId);
             if (mode === 'node' && dragNode >= 0 && modelRef.current) {
                 const n = modelRef.current.nodes[dragNode];
                 n.fx = null;
                 n.fy = null;
-                if (moved < TAP_SLOP) {
+                if (moved < TAP_SLOP && !cancelled) {
                     hapticLight();
                     if (selectedRef.current === dragNode) {
                         // Second tap on the focused card opens it — the panel's
@@ -667,7 +736,7 @@ export default function KnowledgeGraph({
                     }
                 }
                 dragNode = -1;
-            } else if (mode === 'pan' && moved < TAP_SLOP) {
+            } else if (mode === 'pan' && moved < TAP_SLOP && !cancelled) {
                 // Empty-space tap: an island caption spotlights its cluster;
                 // anywhere else clears every focus.
                 const p2 = last;
@@ -708,11 +777,12 @@ export default function KnowledgeGraph({
             cam.x = p.x - ((p.x - cam.x) / cam.k) * k;
             cam.y = p.y - ((p.y - cam.y) / cam.k) * k;
             cam.k = k;
-            drawPendingRef.current = true;
+            redrawRef.current();
         };
 
         const onDoubleClick = () => {
             autoFitRef.current = true;
+            redrawRef.current();
         };
 
         canvas.addEventListener('pointerdown', onPointerDown);
@@ -730,14 +800,6 @@ export default function KnowledgeGraph({
             canvas.removeEventListener('dblclick', onDoubleClick);
         };
     }, []);
-
-    // The pointer handlers live outside React's render cycle, so they read the
-    // model through a ref that tracks the latest build.
-    const modelRef = useRef<GraphModel | null>(null);
-    // Latest-ref pattern, like the handler refs above: written in render, read
-    // only by the canvas event handlers (never during render).
-    // eslint-disable-next-line react-hooks/immutability
-    modelRef.current = model;
 
     // ── Selection panel data ─────────────────────────────────────────────────
     const selection = useMemo(() => {
@@ -908,6 +970,7 @@ export default function KnowledgeGraph({
 
     const refit = useCallback(() => {
         autoFitRef.current = true;
+        redrawRef.current();
     }, []);
 
     const selectNeighbor = useCallback((index: number) => {
@@ -915,8 +978,8 @@ export default function KnowledgeGraph({
         setSelected(index);
     }, []);
 
-    const showEmpty = !building && !loading && model && model.nodes.length < 2;
-    const showLoading = loading || building;
+    const showEmpty = !buildError && !building && !loading && model && model.nodes.length < 2;
+    const showLoading = !buildError && (loading || building);
 
     return (
         <div className="space-y-3 animate-fade-in">
@@ -1106,6 +1169,23 @@ export default function KnowledgeGraph({
                     >
                         <LocateFixed className="w-4 h-4" />
                     </button>
+                )}
+
+                {/* The build threw: say so instead of "Mapping…" forever. */}
+                {buildError && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-8 text-center">
+                        <Waypoints className="w-9 h-9 text-text-muted" />
+                        <p className="text-[15px] font-semibold text-text">Couldn&apos;t draw your graph</p>
+                        <p className="text-[13px] text-text-secondary max-w-[300px] leading-relaxed">
+                            Something went wrong while mapping your cards.
+                        </p>
+                        <button
+                            onClick={() => setBuildNonce((n) => n + 1)}
+                            className="mt-1 h-9 px-4 inline-flex items-center justify-center rounded-full bg-card border border-border-strong text-[13px] font-bold text-text hover:bg-card-hover active:scale-[0.98] transition-all cursor-pointer"
+                        >
+                            Try again
+                        </button>
+                    </div>
                 )}
 
                 {/* Mapping / loading state */}
@@ -1353,6 +1433,29 @@ function fitCamera(model: GraphModel, canvas: HTMLCanvasElement): Camera | null 
         x: width / 2 - ((minX + maxX) / 2) * k,
         y: height / 2 - ((minY + maxY) / 2) * k,
     };
+}
+
+/**
+ * One easing step of the camera toward a framing: zoom `tk`, with the x/y
+ * that frame the target at a given zoom (the framed point stays put while the
+ * zoom eases, exactly as before). Returns whether the camera moved; within a
+ * fraction of a pixel of the target it lands exactly on it, paints that last
+ * frame, and from then on reports false so the loop can park.
+ */
+function glide(cam: Camera, tk: number, xAt: (k: number) => number, yAt: (k: number) => number, ease: number): boolean {
+    const tx = xAt(tk);
+    const ty = yAt(tk);
+    if (Math.abs(tk - cam.k) < 1e-4 && Math.abs(tx - cam.x) < 0.1 && Math.abs(ty - cam.y) < 0.1) {
+        if (cam.k === tk && cam.x === tx && cam.y === ty) return false;
+        cam.k = tk;
+        cam.x = tx;
+        cam.y = ty;
+        return true;
+    }
+    cam.k += (tk - cam.k) * ease;
+    cam.x += (xAt(cam.k) - cam.x) * ease;
+    cam.y += (yAt(cam.k) - cam.y) * ease;
+    return true;
 }
 
 // ── Drawing ──────────────────────────────────────────────────────────────────

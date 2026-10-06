@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
     Pencil,
     Trash2,
@@ -104,6 +104,7 @@ function ChatRow({
             <div className="flex items-center gap-1 px-2 py-1.5 rounded-xl bg-card-hover border border-accent/40">
                 <input
                     autoFocus
+                    aria-label="Chat name"
                     value={draft}
                     onChange={e => setDraft(e.target.value)}
                     onFocus={e => e.target.select()}
@@ -294,10 +295,24 @@ export default function ChatHistorySidebar(props: ChatHistorySidebarProps) {
     const onClose = props.onClose;
     useEffect(() => {
         if (!mobileOpen) return;
-        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose?.(); };
+        // An Escape already handled inside (the rename field cancels its edit
+        // with preventDefault) is not also a request to close the drawer.
+        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !e.defaultPrevented) onClose?.(); };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
     }, [mobileOpen, onClose]);
+
+    // The open drawer is a modal dialog: focus moves into it (VoiceOver and
+    // keyboard users otherwise stay on the chat behind the scrim) and goes
+    // back to whatever opened it when it closes.
+    const drawerRef = useRef<HTMLDivElement>(null);
+    const titleId = useId();
+    useEffect(() => {
+        if (!mobileOpen) return;
+        const opener = document.activeElement as HTMLElement | null;
+        drawerRef.current?.focus({ preventScroll: true });
+        return () => { opener?.focus?.({ preventScroll: true }); };
+    }, [mobileOpen]);
 
     // History search (both variants). Only offered once the list is long
     // enough that scanning it stops being trivial.
@@ -364,9 +379,16 @@ export default function ChatHistorySidebar(props: ChatHistorySidebarProps) {
     return (
         <div className="fixed inset-0 z-[60] flex animate-fade-in">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative w-[82%] max-w-xs h-full bg-card border-e border-border-strong shadow-2xl flex flex-col safe-pt safe-pb animate-slide-in-left">
+            <div
+                ref={drawerRef}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby={titleId}
+                tabIndex={-1}
+                className="relative w-[82%] max-w-xs h-full bg-card border-e border-border-strong shadow-2xl flex flex-col safe-pt safe-pb animate-slide-in-left focus:outline-none"
+            >
                 <div className="shrink-0 flex items-center justify-between px-4 h-12 border-b border-border-subtle">
-                    <span className="font-semibold text-text">Chat history</span>
+                    <span id={titleId} className="font-semibold text-text">Chat history</span>
                     <button
                         onClick={onClose}
                         aria-label="Close history"

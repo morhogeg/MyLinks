@@ -59,6 +59,8 @@ export default function ManageCollectionCardsSheet({
     );
     const [pending, setPending] = useState<Set<string>>(seedMembers);
     const [original, setOriginal] = useState<Set<string>>(seedMembers);
+    // Cards the user has ticked or unticked in this sheet.
+    const [touched, setTouched] = useState<Set<string>>(() => new Set());
 
     // Re-seed + clear search if the SAME mounted instance is reopened (rare — it's
     // usually remounted per open, where the initializer above already seeded).
@@ -70,7 +72,28 @@ export default function ManageCollectionCardsSheet({
             const members = seedMembers();
             setPending(members);
             setOriginal(members);
+            setTouched(new Set());
         }
+    }
+
+    // Members that arrive AFTER mount. The sheet opens before the collection's
+    // complete member query (Feed's useCollectionLinks) lands, so members
+    // outside the loaded feed used to show unticked: they could not be
+    // removed, and ticking one toasted "Added 1 card". Fold each newcomer into
+    // BOTH sets, so it starts ticked and the diff stays honest, unless the user
+    // has already ticked or unticked that card here. Same render-time
+    // adjustment as the reopen above; it settles once the ids are in.
+    const late = isOpen
+        ? links.filter((l) => (l.collectionIds ?? []).includes(collection.id) && !original.has(l.id) && !touched.has(l.id))
+        : [];
+    if (late.length > 0) {
+        const withLate = (prev: Set<string>) => {
+            const next = new Set(prev);
+            for (const l of late) next.add(l.id);
+            return next;
+        };
+        setOriginal(withLate);
+        setPending(withLate);
     }
 
     // Apply the staged diff (fire-and-forget; the feed's onSnapshot reflects it)
@@ -129,6 +152,7 @@ export default function ManageCollectionCardsSheet({
 
     const toggle = (l: Link) => {
         hapticSelection();
+        setTouched((prev) => (prev.has(l.id) ? prev : new Set(prev).add(l.id)));
         setPending((prev) => {
             const next = new Set(prev);
             if (next.has(l.id)) next.delete(l.id);
