@@ -618,3 +618,16 @@ def test_per_link_failure_snoozes_that_doc(monkeypatch, past_ms, push_calls):
     assert g1["reminderCount"] == 0
     assert g1["nextReminderAt"] > past_ms + rs.REMINDER_SNOOZE_MS - 120_000
     assert len(report["errors"]) == 1
+
+
+def test_push_body_category_suffix_is_unchanged(monkeypatch, past_ms, push_calls):
+    store = {"users": {"ivy": {"settings": {}, "fcmTokens": ["tok-i"], "links": {
+        "missing": {"reminderStatus": "pending", "nextReminderAt": past_ms,
+                    "title": "No category", "reminderProfile": "once", "reminderCount": 0},
+        "blank": {"reminderStatus": "pending", "nextReminderAt": past_ms, "category": "",
+                  "title": "Blank category", "reminderProfile": "once", "reminderCount": 0},
+    }}}}
+    _install_db(monkeypatch, store)
+    rs.run_reminder_check()
+    bodies = {c[3]["linkId"]: c[2] for c in push_calls}
+    assert bodies == {"missing": "No category · General", "blank": "Blank category"}

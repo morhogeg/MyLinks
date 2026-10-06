@@ -361,7 +361,11 @@ def _deliver_user_reminders(uid, user_links, user_data, now_ms, report, send_pus
             # before use, and work out the next schedule BEFORE the push, so
             # a bad value can't fail after the push and re-send it every tick.
             title = _str_or(link_data.get('title'), 'Untitled')
-            category = _str_or(link_data.get('category'), '')
+            # Missing -> 'General' and blank -> no suffix, as before; only a
+            # non-string value is new (treated as blank).
+            category = link_data.get('category', 'General')
+            if not isinstance(category, str):
+                category = ''
             new_reminder_count = _count_or_zero(link_data.get('reminderCount')) + 1
             profile = _str_or(link_data.get('reminderProfile'), 'smart')
             is_he = is_hebrew(title)
