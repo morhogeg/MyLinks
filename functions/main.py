@@ -5390,11 +5390,20 @@ def share_page(req: https_fn.Request) -> https_fn.Response:
 # Background Processing
 # ─────────────────────────────────────────────
 
-def log_to_firestore(task_id: str, message: str, level: str = "INFO", data: dict = None):
-    """Log a heartbeat to Firestore for visibility."""
+def log_to_firestore(task_id: str, message: str, level: str = "INFO", data: dict = None,
+                     uid: str = None):
+    """Log a heartbeat to Firestore for visibility.
+
+    Pass the workspace `uid`: it is stored as `data.uid`, the field account
+    deletion sweeps `task_logs` by (link_service._sweep_workspace). These rows
+    carry URLs and titles, so a row without it outlived a deleted account for
+    up to the 14-day prune."""
     try:
         db = get_db()
         now = datetime.now(timezone.utc)
+        payload = dict(data or {})
+        if uid:
+            payload["uid"] = uid
         log_entry = {
             "taskId": task_id,
             "message": message,
@@ -5405,7 +5414,7 @@ def log_to_firestore(task_id: str, message: str, level: str = "INFO", data: dict
             # Timestamp fields, not the ISO `timestamp` string). The janitor prune
             # also matches on it (expireAt <= now) — see run_processing_janitor.
             "expireAt": now + timedelta(days=14),
-            "data": data or {}
+            "data": payload,
         }
         db.collection('task_logs').add(log_entry)
         logger.info(f"[{task_id}] {message}")
@@ -5565,7 +5574,7 @@ def _enrich_card_with_images(ref, task_id: str, uid: str, card_ref, data: dict) 
     from scraper import safe_get
 
     card_id = card_ref.id
-    log_to_firestore(task_id, "Screenshot enrich started", data={"uid": uid, "cardId": card_id})
+    log_to_firestore(task_id, "Screenshot enrich started", data={"cardId": card_id}, uid=uid)
     try:
         ref.update({"status": "processing", "startedAt": datetime.now(timezone.utc).isoformat()})
         snap = card_ref.get()
@@ -5643,7 +5652,7 @@ def _enrich_card_with_images(ref, task_id: str, uid: str, card_ref, data: dict) 
             update["needsEmbedding"] = True
         card_ref.update(card_payload(update, get_db()))
         mirror_vector_write(card_ref, update, db=get_db())
-        log_to_firestore(task_id, "Screenshot enrich complete", data={"cardId": card_id})
+        log_to_firestore(task_id, "Screenshot enrich complete", data={"cardId": card_id}, uid=uid)
         ref.delete()
     except Exception as e:
         logger.error(f"Screenshot enrich failed for {_mask_uid(uid)}/{card_id}: {e}", exc_info=True)
@@ -5967,7 +5976,8 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
     mime_type = _safe_image_mime(data.get("mimeType"))
     original_body = data.get("body")
 
-    log_to_firestore(task_id, "Background processing started", data={"url": url, "uid": uid, "isImage": is_image})
+    log_to_firestore(task_id, "Background processing started", data={"url": url, "isImage": is_image},
+                     uid=uid)
 
     # The URL we were handed before any reassignment (the image path rewrites `url`
     # to the stored Storage URL below). Kept so a FAILED card records the original.
@@ -6077,7 +6087,7 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         # is our own Storage object, which the image branch below downloads
         # itself; scraping it only cost a second download.
         if not is_image:
-            log_to_firestore(task_id, f"Scraping content for: {url}")
+            log_to_firestore(task_id, f"Scraping content for: {url}", uid=uid)
             ref.update({"status": "scraping"})
             _write_stage(card_ref, "scraping")
             # A released waiting card reads the page as it was when it was
@@ -6104,7 +6114,7 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
                 raise _FetchFailed(scraped.get("fetch_error_message") or "Couldn't open this link.")
 
         # 2. Analyze with AI
-        log_to_firestore(task_id, "Starting AI analysis", data={"scrapedTitle": scraped.get("title")})
+        log_to_firestore(task_id, "Starting AI analysis", data={"scrapedTitle": scraped.get("title")}, uid=uid)
         ref.update({"status": "analyzing", "scrapedTitle": scraped.get("title", "")})
 
         db = get_db()
@@ -6128,7 +6138,7 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
                 # order). Fetch each back — through the same SSRF guard, per URL
                 # — and analyze the whole set as one document.
                 image_urls = queued_image_urls[:MAX_CARD_IMAGES]
-                log_to_firestore(task_id, f"Downloading {len(image_urls)} images")
+                log_to_firestore(task_id, f"Downloading {len(image_urls)} images", uid=uid)
                 ref.update({"status": "downloading_image"})
                 image_parts = []
                 for img_url in image_urls:
@@ -6138,25 +6148,25 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
                     image_parts.append((img_response.content, part_mime))
 
                 url = image_urls[0]
-                log_to_firestore(task_id, f"Starting AI analysis of {len(image_parts)} images")
+                log_to_firestore(task_id, f"Starting AI analysis of {len(image_parts)} images", uid=uid)
                 ref.update({"status": "analyzing_image", "storageUrl": url})
                 analysis = ai.analyze_images(image_parts, existing_tags=existing_tags,
                                              existing_categories=existing_categories)
                 screenshot_parts = image_parts
             else:
-                log_to_firestore(task_id, f"Downloading image bytes from: {url}")
+                log_to_firestore(task_id, f"Downloading image bytes from: {url}", uid=uid)
                 ref.update({"status": "downloading_image"})
                 img_response = safe_get(url, timeout=30)
                 img_response.raise_for_status()
                 image_bytes = img_response.content
 
                 # Upload to Firebase Storage
-                log_to_firestore(task_id, "Uploading image to Firebase Storage")
+                log_to_firestore(task_id, "Uploading image to Firebase Storage", uid=uid)
                 public_url = _store_image(f"screenshots/{storage_key_for(uid)}/{task_id}.jpg", image_bytes, mime_type)
 
                 url = public_url
 
-                log_to_firestore(task_id, "Starting AI image analysis")
+                log_to_firestore(task_id, "Starting AI image analysis", uid=uid)
                 ref.update({"status": "analyzing_image", "storageUrl": public_url})
                 analysis = ai.analyze_image(image_bytes, mime_type, existing_tags=existing_tags,
                                             existing_categories=existing_categories)
@@ -6194,7 +6204,7 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
 
         # 4. Build link document
         final_title = analysis.get("title", scraped.get("title", "Untitled"))
-        log_to_firestore(task_id, "Saving processed link to brain", data={"finalTitle": final_title})
+        log_to_firestore(task_id, "Saving processed link to brain", data={"finalTitle": final_title}, uid=uid)
         ref.update({"status": "saving"})
 
         # Determine source type
