@@ -706,12 +706,15 @@ def judge_relevance(query_text: str, candidates: List[dict], *,
     # ai_service), and the candidate list carries the user's Hebrew cards on
     # EVERY query — without this the judge silently blanks and search falls
     # back to the distance-gate wall, which is exactly the bug being fixed.
-    from ai_service import GEMINI_ANALYSIS_MODEL, _ASK_SAFETY_SETTINGS
+    from ai_service import GEMINI_ANALYSIS_MODEL, _ASK_SAFETY_SETTINGS, JUDGE_MAX_OUTPUT_TOKENS
     result = client.models.generate_content(
         model=GEMINI_ANALYSIS_MODEL,
         contents=build_judge_prompt(query_text, candidates),
         config={"temperature": 0, "response_mime_type": "application/json",
-                "safety_settings": _ASK_SAFETY_SETTINGS},
+                "safety_settings": _ASK_SAFETY_SETTINGS,
+                # A verdict for 20 candidates is under 1k tokens; a reply cut
+                # by the cap does not parse and falls back to the gates.
+                "max_output_tokens": JUDGE_MAX_OUTPUT_TOKENS},
     )
     text = getattr(result, "text", None)
     if not text:

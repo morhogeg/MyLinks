@@ -10,7 +10,8 @@ from firebase_admin import firestore
 # exactly as search.py does.
 from google.cloud.firestore_v1.base_vector_query import DistanceMeasure
 from google.cloud.firestore_v1.vector import Vector
-from ai_service import GeminiService, GEMINI_ANALYSIS_MODEL, embedding_needs_repair
+from ai_service import (GeminiService, GEMINI_ANALYSIS_MODEL, VERIFIER_MAX_OUTPUT_TOKENS,
+                        embedding_needs_repair)
 import vector_store
 from vector_store import card_payload, mirror_vector_write, stored_vector, vector_needs_repair
 from log_safe import mask_uid
@@ -421,7 +422,9 @@ OUTPUT FORMAT — a JSON list, [] when nothing genuinely relates:
             response = self.ai.client.models.generate_content(
                 model=GEMINI_ANALYSIS_MODEL,  # Single source of truth (see ai_service)
                 contents=prompt,
-                config={'response_mime_type': 'application/json'}
+                # A cut reply does not parse and yields no relations.
+                config={'response_mime_type': 'application/json',
+                        'max_output_tokens': VERIFIER_MAX_OUTPUT_TOKENS}
             )
             
             return json.loads(response.text)

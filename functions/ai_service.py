@@ -100,6 +100,28 @@ def ask_deadline(budget_s: float = None) -> float:
     """The monotonic deadline `budget_s` (default ASK_DEADLINE_S) from now."""
     return time.monotonic() + (ASK_DEADLINE_S if budget_s is None else budget_s)
 
+# Output ceilings (max_output_tokens) per surface. No generation call set one,
+# so a degenerate generation (a repetition loop) could run to the model's own
+# maximum (65k tokens) on any of them. Each cap sits far above what its prompt
+# legitimately produces: an analysis is ~1-3k tokens even for a long recipe or
+# a 30-item list, an Ask answer reproducing 40 recipe steps ~6k, a synthesis
+# ~2k, the judge's verdict for 20 candidates under 1k. The headroom is
+# deliberate: on a thinking-capable model, thinking tokens count against this
+# cap too. Hitting it is handled (MAX_TOKENS marks an analysis truncated,
+# fails a JSON reply that never closed, ends a stream as incomplete).
+ANALYSIS_MAX_OUTPUT_TOKENS = 16384
+ASK_MAX_OUTPUT_TOKENS = 16384
+SYNTHESIS_MAX_OUTPUT_TOKENS = 16384
+JUDGE_MAX_OUTPUT_TOKENS = 8192
+VERIFIER_MAX_OUTPUT_TOKENS = 8192
+SMALL_JSON_MAX_OUTPUT_TOKENS = 4096  # tag follow-up, screenshot platform
+
+# Weekly synthesis input: the newest this-many cards of the week, each summary
+# cut to this many characters. A heavy week (hundreds of saves) otherwise sent
+# every one of them, in full, on one call.
+SYNTHESIS_MAX_CARDS = 80
+SYNTHESIS_SUMMARY_CHARS = 600
+
 # Safety thresholds for the ASK (RAG) calls only. Ask answers questions about
 # the user's OWN saved content, so the configurable harm categories are set to
 # BLOCK_NONE — Gemini's safety filter false-positives on innocuous non-English
@@ -1083,6 +1105,9 @@ class GeminiService:
             # keeps the output stable run-to-run and cuts the variance that makes
             # a model occasionally flip a claim's direction or invent filler.
             "temperature": 0.2,
+            # Every caller of this helper gets a ceiling; surfaces with a
+            # different shape (Ask, synthesis, small JSON) override it.
+            "max_output_tokens": ANALYSIS_MAX_OUTPUT_TOKENS,
         }
         if config_extra:
             config.update(config_extra)
@@ -1111,7 +1136,15 @@ class GeminiService:
                         f"Empty response from Gemini ({_gen_failure_reason(response)})",
                         prompt_blocked=_prompt_blocked(response))
 
-                data = json.loads(text)
+                try:
+                    data = json.loads(text)
+                except ValueError:
+                    # Output ran into max_output_tokens before the JSON closed:
+                    # say so (a retry under the same cap would be cut again).
+                    if _finish_reason_name(response) == "MAX_TOKENS":
+                        raise AnalysisError(
+                            f"Gemini {what} hit max_output_tokens before its JSON closed")
+                    raise
                 # Defensive unwrapping kept as a safety net.
                 if isinstance(data, str):
                     try:
@@ -1282,7 +1315,8 @@ Return JSON: {{"tags": [...]}}"""
         try:
             extra = self._generate_json(
                 [prompt], "tag follow-up", attempts=1,
-                config_extra={"response_schema": TagSuggestion})
+                config_extra={"response_schema": TagSuggestion,
+                              "max_output_tokens": SMALL_JSON_MAX_OUTPUT_TOKENS})
         except Exception as e:
             logger.warning(f"Tag follow-up failed (non-fatal): {e}")
             return data
@@ -1625,7 +1659,8 @@ Return JSON: {"platform": one of "x","instagram","threads","tiktok","youtube","l
             data = self._generate_json(
                 contents, "screenshot platform", attempts=1,
                 config_extra={"response_schema": ScreenshotPlatform,
-                              "media_resolution": "MEDIA_RESOLUTION_LOW"})
+                              "media_resolution": "MEDIA_RESOLUTION_LOW",
+                              "max_output_tokens": SMALL_JSON_MAX_OUTPUT_TOKENS})
             platform = str((data or {}).get("platform") or "").strip().lower()
             logger.info(f"Screenshot platform follow-up: {platform or 'none'} ({(data or {}).get('evidence')})")
             return platform
@@ -1781,7 +1816,8 @@ Return JSON: {"platform": one of "x","instagram","threads","tiktok","youtube","l
         if not self.client:
             raise AnalysisError("Gemini API key is not configured (GEMINI_API_KEY).")
         config = self._call_config({"temperature": 0.2,
-                                    "safety_settings": _ASK_SAFETY_SETTINGS})
+                                    "safety_settings": _ASK_SAFETY_SETTINGS,
+                                    "max_output_tokens": ASK_MAX_OUTPUT_TOKENS})
         try:
             resp = self.client.models.generate_content(
                 model=GEMINI_ANALYSIS_MODEL,
@@ -1795,6 +1831,10 @@ Return JSON: {"platform": one of "x","instagram","threads","tiktok","youtube","l
             raise EmptyGenerationError(
                 f"Empty response from Gemini in plain mode ({_gen_failure_reason(resp)})",
                 prompt_blocked=_prompt_blocked(resp))
+        if _finish_reason_name(resp) == "MAX_TOKENS":
+            # A half answer (often a half-written JSON object) must not be
+            # passed off as the answer: let the caller's next stage try.
+            raise AnalysisError("AI answer (plain mode) hit max_output_tokens")
         cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", text,
                          flags=re.MULTILINE).strip()
         m = re.search(r"\{.*\}", cleaned, re.DOTALL)
@@ -1819,7 +1859,8 @@ Return JSON: {"platform": one of "x","instagram","threads","tiktok","youtube","l
         constants at the top of this module. Raises AnalysisError only when
         BOTH models fail.
         """
-        cfg = {"response_schema": AskAnswer, "safety_settings": _ASK_SAFETY_SETTINGS}
+        cfg = {"response_schema": AskAnswer, "safety_settings": _ASK_SAFETY_SETTINGS,
+               "max_output_tokens": ASK_MAX_OUTPUT_TOKENS}
         try:
             return self._generate_json([prompt], what, config_extra=cfg,
                                        model=GEMINI_ASK_MODEL, attempts=attempts)
@@ -2223,7 +2264,8 @@ Return JSON: {"platform": one of "x","instagram","threads","tiktok","youtube","l
             # timeout, or raises AskDeadlineExceeded out of the generator when
             # no time is left to start this rung.
             call_config = self._call_config({"temperature": 0.2,
-                                             "safety_settings": _ASK_SAFETY_SETTINGS})
+                                             "safety_settings": _ASK_SAFETY_SETTINGS,
+                                             "max_output_tokens": ASK_MAX_OUTPUT_TOKENS})
             try:
                 stream = self.client.models.generate_content_stream(
                     model=attempt_model,
@@ -2393,24 +2435,35 @@ Return JSON: {"platform": one of "x","instagram","threads","tiktok","youtube","l
             raise AnalysisError("Gemini API key is not configured (GEMINI_API_KEY).")
         if not cards:
             raise AnalysisError("No cards to synthesize")
+        # Bounded input: the week's newest SYNTHESIS_MAX_CARDS (the caller
+        # passes them newest first), each cut to a digest. Themes and the
+        # standout can only reference these.
+        total = len(cards)
+        cards = cards[:SYNTHESIS_MAX_CARDS]
+        saved_label = (f"{len(cards)} most recent of the {total} things" if total > len(cards)
+                       else f"{len(cards)} things")
+
+        def _words(val, n: int = 10) -> str:
+            items = val if isinstance(val, (list, tuple)) else []
+            return ", ".join(str(x)[:60] for x in items[:n] if isinstance(x, str) and x.strip())
 
         def _card_block(c: dict) -> str:
-            concepts = ", ".join(c.get("concepts") or [])
-            tags = ", ".join(c.get("tags") or [])
-            meta = f"category: {c.get('category', 'General')}"
+            concepts = _words(c.get("concepts"))
+            tags = _words(c.get("tags"))
+            meta = f"category: {str(c.get('category') or 'General')[:60]}"
             if concepts:
                 meta += f"; concepts: {concepts}"
             if tags:
                 meta += f"; tags: {tags}"
             return (
-                f"[{c.get('id')}] {c.get('title', 'Untitled')} ({meta})\n"
-                f"{(c.get('summary') or '').strip()}"
+                f"[{c.get('id')}] {str(c.get('title') or 'Untitled')[:200]} ({meta})\n"
+                f"{str(c.get('summary') or '').strip()[:SYNTHESIS_SUMMARY_CHARS]}"
             )
 
         sources_text = "\n\n".join(_card_block(c) for c in cards)
         valid_ids = {c.get("id") for c in cards if c.get("id")}
 
-        prompt = f"""You are Machina, the user's personal knowledge companion. Below are the {len(cards)} things this person saved this week: their reading, in their own library. Write them a short, warm "What you learned this week" recap.
+        prompt = f"""You are Machina, the user's personal knowledge companion. Below are the {saved_label} this person saved this week: their reading, in their own library. Write them a short, warm "What you learned this week" recap.
 
 This is the highlight of their week with the app, so it must read like a thoughtful debrief from a smart friend who actually read everything, NOT a list of links or a bullet dump. Find the real throughline.
 
@@ -2438,7 +2491,8 @@ Return ONLY a JSON object matching the schema (title, narrative, themes[title,in
             # Unlike the extraction paths, this surface is deliberately a warm,
             # narrative debrief — hold it ABOVE the 0.2 extraction default so the
             # prose doesn't go flat, while staying grounded by the prompt's rules.
-            config_extra={"response_schema": WeeklySynthesis, "temperature": 0.6},
+            config_extra={"response_schema": WeeklySynthesis, "temperature": 0.6,
+                          "max_output_tokens": SYNTHESIS_MAX_OUTPUT_TOKENS},
         )
 
         # Guard against hallucinated ids — keep only ones we actually supplied.
