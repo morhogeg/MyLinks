@@ -30,7 +30,14 @@ the dark, and Machina is where the light comes from.
   tagline, held about two seconds.
 - **Sound**: `audio/nocturne.mjs`, one engine for all nine (see
   [The score](#the-score)); every mix mastered to −14 LUFS, true peak ≤ −1
-  dBTP, the music stepping back hardest in the speech band under each line.
+  dBTP in the rendered mp4 (the wav at −1.75: the AAC encode raises
+  inter-sample peaks by up to ~0.6 dB), the music stepping back hardest in
+  the speech band under each line.
+- **Delivery**: post the copies from `scripts/posting-copies.sh`, not the raw
+  renders. Remotion's masters are full-range BT.601 (`yuvj420p`); a player
+  or upload pipeline that ignores the range tag crushes the bottom ~16
+  levels to black, which is where this look lives. The posting copy is
+  converted to BT.709 video range, tagged, under 28.8 MiB.
 
 | Film | Composition (main) | Length | Timeline |
 |---|---|---|---|
@@ -56,6 +63,7 @@ node audio/mix-vo.mjs <script>                # score + narrator, mastered (and 
 node scripts/dwell.mjs                        # every caption window against its read
 npm run verify                                # every film's gates
 node scripts/render-all.mjs MachinaReel:machina-reel …   # one bundle, many renders → out/final/
+scripts/posting-copies.sh machina-reel …      # BT.709 video-range copies to post → out/final/share/
 ```
 
 Scripts: `film`, `reel`, `save`, `find`, `ask`, `revisit`, `adcard`, `adtodo`,

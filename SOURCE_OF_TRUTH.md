@@ -3001,8 +3001,20 @@ exact-match, capped.
   today's app (selector by title); `scripts/render-all.mjs` renders many
   compositions from one bundle (Remotion 4: `outputLocation`, not `output`).
   **Verified:** `npm run verify` exit 0 (every film's gates), tsc 0, every
-  mix −14 LUFS / −1.25 dBTP with each narrated line 5.6dB+ over the music in
-  the speech band; contact sheets of every film looked at. **Not verified:**
+  mix −14 LUFS / −1.75 dBTP (wav) with each narrated line 5.6dB+ over the
+  music in the speech band; contact sheets of every film looked at.
+  **Rendered (2026-10-06):** all eleven main editions (film 16:9 + 9:16,
+  reel, SAVE, FIND, ASK, REVISIT, the four ads) with
+  `scripts/render-all.mjs` → `out/final/` (CRF 17 masters), then
+  `scripts/posting-copies.sh` → `out/final/share/` (what to post); every
+  file probed (length as its timeline, −14.0 LUFS, −1.2 to −1.8 dBTP in the
+  mp4) and frames sampled from each. Two delivery fixes found on the
+  finished files: the AAC encode raised the trip-talk ad's peaks from −1.25
+  (wav) to −0.7 dBTP, so the mix master now limits 0.7 dB under the spec
+  (`audio/mix-vo.mjs`); and Remotion's masters are full-range BT.601
+  (`yuvj420p`), which a range-blind player crushes in exactly the shadows
+  this look lives in, so the posting copies are converted to BT.709 video
+  range (Remotion's own `colorSpace: 'bt709'` mislabels JPEG frames). **Not verified:**
   nobody has LISTENED (no audio device: the scores are measured, not heard);
   the Feed 4:5, Music-only and Silent editions are not re-rendered; motion
   between sampled frames. **Gotchas:** the session's disk allowance fills
