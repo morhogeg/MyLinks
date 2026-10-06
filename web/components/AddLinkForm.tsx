@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, FormEvent } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Link, Plus, X, Upload, Loader2, Image as ImageIcon, StickyNote } from 'lucide-react';
 import { doc, onSnapshot } from 'firebase/firestore';
-import { saveLink, getUserTags, findLinkIdByUrl, createProcessingPlaceholder, startProcessingPlaceholder, createImagePlaceholder, markLinkFailed, markLinkWaiting, createNoteCard, enrichNoteCard } from '@/lib/storage';
+import { saveLink, getUserTags, findLinkIdByUrl, startProcessingPlaceholder, createImagePlaceholder, markLinkFailed, markLinkWaiting, startNoteCard, enrichNoteCard } from '@/lib/storage';
 import { appCheckHeaders, db } from '@/lib/firebase';
 import { authHeaders } from '@/lib/auth';
 import { progressFor } from '@/lib/shareProgress';
@@ -23,7 +23,8 @@ import VideoScanProgress from '@/components/VideoScanProgress';
 import LinkScanProgress from '@/components/LinkScanProgress';
 import ImportSheet from '@/components/ImportSheet';
 import ScreenshotStrip, { toPickedImages, type PickedImage } from '@/components/ScreenshotStrip';
-import { enqueueOfflineSave } from '@/lib/offlineSave';
+import { enqueueOfflineSave, queueStalledSave } from '@/lib/offlineSave';
+import { reportError } from '@/lib/errorReporter';
 
 interface AddLinkFormProps {
     onLinkAdded: () => void;
@@ -105,6 +106,44 @@ type SaveFailReason = 'timeout' | 'network' | 'analyze_failed' | 'save_failed';
 
 const saveError = (message: string, category: SaveFailReason): Error =>
     Object.assign(new Error(message), { category });
+
+// What a failed save says. Firestore and browser errors ("FirebaseError:
+// Missing or insufficient permissions", "Load failed") go to the error
+// reporter, never to the screen.
+const SAVE_COPY = {
+    link: 'Couldn’t save that link. Please try again.',
+    note: 'Couldn’t save your note. Please try again.',
+    image: 'Couldn’t save your screenshot. Please try again.',
+    images: 'Couldn’t save your screenshots. Please try again.',
+    network: 'Couldn’t reach Machina. Check your connection and try again.',
+    notReady: 'Machina is still signing you in. Try again in a moment.',
+    unexpected: 'Couldn’t save that. Please try again.',
+} as const;
+
+/** How long the "you already saved this" probe may hold a save. It fails
+    open: past this the save goes ahead. */
+const DEDUPE_PROBE_MS = 3000;
+/** How long a link placeholder may wait for the server before the save is
+    treated as offline (the device says online, the server isn't answering). */
+const PLACEHOLDER_ACK_MS = 8000;
+/** A rejected note write comes back fast; past this the write is queued. */
+const NOTE_ACK_MS = 1500;
+
+type Settled<T> = { status: 'ok'; value: T } | { status: 'error'; error: unknown } | { status: 'pending' };
+
+/** `p`'s outcome if it settles within `ms`, else 'pending'. Never rejects. */
+async function settleWithin<T>(p: Promise<T>, ms: number): Promise<Settled<T>> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const pending = new Promise<Settled<T>>((resolve) => { timer = setTimeout(() => resolve({ status: 'pending' }), ms); });
+    try {
+        return await Promise.race([
+            p.then((value): Settled<T> => ({ status: 'ok', value }), (error: unknown): Settled<T> => ({ status: 'error', error })),
+            pending,
+        ]);
+    } finally {
+        clearTimeout(timer);
+    }
+}
 
 const fetchWithTimeout = async (input: string, init: RequestInit) => {
     const controller = new AbortController();
@@ -478,9 +517,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
         window.addEventListener('online', run);
     };
 
-    const handleSubmit = async (e: FormEvent) => {
-        e.preventDefault();
-
+    const submit = async () => {
         const formattedUrl = formatUrl(url);
 
         // Text with no link in it: don't invent "https://<the text>". Offer to
@@ -496,7 +533,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
         }
 
         if (!uid) {
-            setError('User not ready yet. Please wait a moment and try again.');
+            setError(SAVE_COPY.notReady);
             return;
         }
 
@@ -517,9 +554,9 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                 placeholder = startProcessingPlaceholder(uid, formattedUrl, { offline: true });
             } catch (writeErr) {
                 trackSaveFailed('save_failed');
-                const message = `Could not save to Machina: ${writeErr instanceof Error ? writeErr.message : String(writeErr)}`;
-                setError(message);
-                toast.error(message);
+                reportError(writeErr, 'capture.link.offline');
+                setError(SAVE_COPY.link);
+                toast.error(SAVE_COPY.link);
                 return;
             }
             enqueueWhenOnline(uid, formattedUrl, placeholder.id, placeholder.written);
@@ -535,13 +572,21 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
         }
 
         if (activeTab === 'link') {
+            // Busy from the first tap: the probe and the placeholder below are
+            // network round trips, and the Save button must say so.
+            setIsLoading(true);
+            setError(null);
             try {
-                const existingId = await findLinkIdByUrl(uid, formattedUrl);
+                // Capped and parallel (lib/storage.ts): a slow connection used
+                // to hold the button for three sequential round trips.
+                const probe = await settleWithin(findLinkIdByUrl(uid, formattedUrl), DEDUPE_PROBE_MS);
+                const existingId = probe.status === 'ok' ? probe.value : null;
                 if (existingId) {
                     trackSaveFailed('duplicate');
                     toast.info("You already saved this. Opening it now.");
                     setUrl('');
                     setError(null);
+                    setIsLoading(false);
                     setIsExpanded(false);
                     // Deep-link to the existing card; Feed consumes ?linkId and
                     // opens it (see Feed.tsx's searchParams effect).
@@ -561,8 +606,6 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
             // the moment the placeholder is written. (Note & Image stay
             // synchronous below — see the report: images upload inline bytes the
             // trigger path doesn't handle, and a note is near-instant.)
-            setIsLoading(true);
-            setError(null);
             setProgress(0);
             lastLinkPct.current = 0;
 
@@ -570,19 +613,36 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
             // processingStartedAt (a hair later at most; the monotonic guard keeps
             // the correction from stepping the % backwards).
             const startedAt = Date.now();
-            let cardId: string;
-            try {
-                cardId = await createProcessingPlaceholder(uid, formattedUrl);
-            } catch (writeErr) {
+            const placeholder = startProcessingPlaceholder(uid, formattedUrl);
+            const ack = await settleWithin(placeholder.written, PLACEHOLDER_ACK_MS);
+            if (ack.status === 'error') {
                 // The placeholder write IS the capture — if it fails, nothing was
                 // saved. Keep the URL in the field so retry is one tap.
                 trackSaveFailed('save_failed');
-                const message = `Could not save to Machina: ${writeErr instanceof Error ? writeErr.message : String(writeErr)}`;
-                setError(message);
-                toast.error(message);
+                reportError(ack.error, 'capture.link.placeholder');
+                setError(SAVE_COPY.link);
+                toast.error(SAVE_COPY.link);
                 setIsLoading(false);
                 return;
             }
+            if (ack.status === 'pending') {
+                // The device says online but the server isn't answering (Wi-Fi
+                // without internet, a captive portal). Firestore keeps the card
+                // queued, and it shows in the feed already: finish it as an
+                // offline save instead of a stepper stuck at 0% forever.
+                queueStalledSave(uid, formattedUrl, placeholder.id, placeholder.written);
+                trackSaveSucceeded('web_form');
+                trackFirstSave();
+                onLinkAdded();
+                hapticSuccess();
+                toast.info('Saved. Your connection is slow, so Machina will read it in the background.');
+                setUrl('');
+                setError(null);
+                setIsExpanded(false);
+                setIsLoading(false);
+                return;
+            }
+            const cardId = placeholder.id;
 
             // PLAIN links only: enter the processing phase NOW — the dialog stays
             // open and the stepper subscribes to this card doc (see the onSnapshot
@@ -696,33 +756,47 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
             setProgress(0);
 
             const text = note.trim();
-            let cardId: string;
-            try {
-                cardId = await createNoteCard(uid, text);
-            } catch (writeErr) {
+            // Not awaited to the server: offline (or on a connection that isn't
+            // answering) the acknowledgement only comes on reconnect, and the
+            // form used to spin on "Reading your note…" until then. A rejected
+            // write comes back fast, so a short wait still catches it.
+            const { id: cardId, written } = startNoteCard(uid, text);
+            const ack = await settleWithin(written, NOTE_ACK_MS);
+            if (ack.status === 'error') {
                 trackSaveFailed('save_failed');
-                const message = `Couldn't save your note: ${writeErr instanceof Error ? writeErr.message : String(writeErr)}`;
-                setError(message);
-                toast.error(message);
+                reportError(ack.error, 'capture.note');
+                setError(SAVE_COPY.note);
+                toast.error(SAVE_COPY.note);
                 setIsLoading(false);
                 return;
             }
+            if (ack.status === 'pending') {
+                written.catch((err) => {
+                    reportError(err, 'capture.note.late');
+                    toast.error(SAVE_COPY.note);
+                });
+            }
 
-            // Saved durably. Record and close immediately — the feed streams the
-            // note card in via onSnapshot, exactly like any other capture.
+            // Saved (queued, if offline). Record and close immediately — the
+            // feed streams the note card in via onSnapshot, exactly like any
+            // other capture.
             trackSaveSucceeded('note');
             trackFirstSave();
             setProgress(100);
             hapticSuccess();
-            toast.success('Note saved');
+            toast.success(ack.status === 'pending' && typeof navigator !== 'undefined' && navigator.onLine === false
+                ? 'Note saved. It syncs when you’re back online.'
+                : 'Note saved');
             setNote('');
             setIsExpanded(false);
             setIsLoading(false);
             onLinkAdded();
 
             // Background AI enrichment (title/tags/category). Fire-and-forget: the
-            // note already stands on its own with the user's text if this never lands.
-            void enrichNoteCard(uid, cardId, text);
+            // note already stands on its own with the user's text if this never
+            // lands. Chained to the write, so a note saved offline is enriched
+            // on reconnect instead of failing at once and never again.
+            void written.then(() => enrichNoteCard(uid, cardId, text), () => {});
             return;
         }
 
@@ -760,7 +834,8 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                 try {
                     cardId = await createImagePlaceholder(uid, images.length);
                 } catch (writeErr) {
-                    throw saveError(`Could not save to Machina: ${writeErr instanceof Error ? writeErr.message : String(writeErr)}`, 'save_failed');
+                    reportError(writeErr, 'capture.images.placeholder');
+                    throw saveError(SAVE_COPY.images, 'save_failed');
                 }
 
                 let waiting: WaitingSave | null = null;
@@ -785,7 +860,8 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                         // Best-effort; the processing janitor ages it out otherwise.
                     }
                     if (err instanceof Error && 'category' in err) throw err;
-                    throw saveError(err instanceof Error ? err.message : `Network error: ${String(err)}`, 'network');
+                    reportError(err, 'capture.images.enqueue');
+                    throw saveError(SAVE_COPY.network, 'network');
                 }
 
                 if (waiting) {
@@ -835,7 +911,8 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                     // Preserve a categorized error (e.g. the timeout) as-is; only a
                     // genuine transport failure gets wrapped as 'network'.
                     if (netErr instanceof Error && 'category' in netErr) throw netErr;
-                    throw saveError(netErr instanceof Error ? netErr.message : `Network error: ${String(netErr)}`, 'network');
+                    reportError(netErr, 'capture.image.network');
+                    throw saveError(SAVE_COPY.network, 'network');
                 }
                 data = await readBody(response);
                 // Past the monthly allowance the server stored the image and
@@ -876,7 +953,8 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                     relatedLinks: data.link.relatedLinks,
                 });
             } catch (saveErr) {
-                throw saveError(`Could not save to Machina: ${saveErr instanceof Error ? saveErr.message : String(saveErr)}`, 'save_failed');
+                reportError(saveErr, 'capture.image.save');
+                throw saveError(SAVE_COPY.image, 'save_failed');
             }
 
             // The capture landed and is persisted — record it (image tab only;
@@ -896,17 +974,34 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
             toast.success('Saved to Machina');
             onLinkAdded();
         } catch (err) {
-            const message = err instanceof Error ? err.message : `Unknown error: ${String(err)}`;
             // Record a SHORT, FIXED failure category (never raw error text). An
-            // uncategorized error is an unexpected code path → 'analyze_failed'.
-            const category = (err instanceof Error && 'category' in err
-                ? (err as { category?: SaveFailReason }).category
-                : undefined) ?? 'analyze_failed';
+            // uncategorized error is an unexpected code path → 'analyze_failed',
+            // and its text (a canvas or browser error) is for the reporter, not
+            // the screen; a categorized one already carries plain copy.
+            const categorized = err instanceof Error && 'category' in err;
+            const category = (categorized ? (err as { category?: SaveFailReason }).category : undefined) ?? 'analyze_failed';
+            if (!categorized) reportError(err, 'capture.unexpected');
+            const message = categorized ? (err as Error).message : SAVE_COPY.unexpected;
             trackSaveFailed(category);
             setError(message);
             toast.error(message);
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    // One submit at a time. The link path awaits the dedupe probe and the
+    // placeholder write, so a second tap (or Enter) during them used to pass
+    // every guard and save the link twice, charging two saves (WEB-4).
+    const submitting = useRef(false);
+    const handleSubmit = async (e: FormEvent) => {
+        e.preventDefault();
+        if (submitting.current) return;
+        submitting.current = true;
+        try {
+            await submit();
+        } finally {
+            submitting.current = false;
         }
     };
 

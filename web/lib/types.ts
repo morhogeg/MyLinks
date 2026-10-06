@@ -120,7 +120,7 @@ export interface Link {
   imageUrls?: string[];
   createdAt: number | string; // Handle both Unix timestamp and ISO string
   // When the current processing attempt began (epoch ms). Stamped on the
-  // placeholder card by the backend (share path) and createProcessingPlaceholder
+  // placeholder card by the backend (share path) and startProcessingPlaceholder
   // (web path); a retry re-stamps it while preserving createdAt. It's the shared
   // wall clock the capture-progress loaders ramp from (see lib/shareProgress.ts),
   // so the in-app ramp resumes where the Share Extension left off instead of

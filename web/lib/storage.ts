@@ -116,16 +116,30 @@ export async function getUserCategories(uid: string): Promise<string[]> {
  * Callers MUST treat a thrown error as "unknown" and fall through to saving —
  * a failed dedup probe (e.g. offline) must never block a capture.
  */
-export async function findLinkIdByUrl(uid: string, url: string): Promise<string | null> {
+export async function findLinkIdByUrl(
+    uid: string,
+    url: string,
+    opts: { excludeId?: string } = {},
+): Promise<string | null> {
     if (!url) return null;
     const linksRef = collection(db, 'users', uid, 'links');
     const key = urlKey(url);
     const probes: [string, string][] = key
         ? [['urlKey', key], ['finalUrlKey', key], ['url', url]]
         : [['url', url]];
-    for (const [field, value] of probes) {
-        const snapshot = await getDocs(query(linksRef, where(field, '==', value), limit(1)));
-        if (!snapshot.empty) return snapshot.docs[0].id;
+    // In parallel, priority kept in the order above: three sequential round
+    // trips held the Save button for seconds on a slow connection.
+    const snapshots = await Promise.all(probes.map(([field, value]) =>
+        getDocs(query(linksRef, where(field, '==', value), limit(opts.excludeId ? 3 : 1)))));
+    for (const snapshot of snapshots) {
+        for (const d of snapshot.docs) {
+            // `excludeId`: the caller's own placeholder (an offline save checking
+            // for an earlier copy). Another offline save still waiting is not
+            // an earlier copy either: it hasn't been read yet.
+            if (d.id === opts.excludeId) continue;
+            if (opts.excludeId && d.data().pendingEnqueue === true) continue;
+            return d.id;
+        }
     }
     return null;
 }
@@ -152,20 +166,13 @@ function placeholderTitle(url: string): string {
  * then enqueues the URL (via /api/share, passing this card's id as `cardId`) into
  * the SAME background pipeline, which flips THIS card to ready/failed when
  * analysis lands. A slow scrape can therefore never trip a request timeout or
- * lose the capture. Returns the new card id.
- */
-export async function createProcessingPlaceholder(uid: string, url: string): Promise<string> {
-    const { id, written } = startProcessingPlaceholder(uid, url);
-    await written;
-    return id;
-}
-
-/**
- * The same placeholder, without waiting for the server. The id is minted
- * client-side, so the caller has it at once; `written` resolves when the
- * server acknowledges the write. OFFLINE that ack only comes on reconnect
- * (Firestore queues the write and the card shows in the feed from its local
- * cache right away), so the offline save path must not await it.
+ * lose the capture.
+ *
+ * The id is minted client-side, so the caller has it at once; `written`
+ * resolves when the server acknowledges the write. OFFLINE that ack only comes
+ * on reconnect (Firestore queues the write and the card shows in the feed from
+ * its local cache right away), so the capture form waits on it only briefly
+ * (AddLinkForm PLACEHOLDER_ACK_MS) and otherwise finishes as an offline save.
  */
 export function startProcessingPlaceholder(
     uid: string,
@@ -205,7 +212,7 @@ export function startProcessingPlaceholder(
 
 /**
  * Placeholder card for a MULTI-IMAGE capture (2+ screenshots → one card). Same
- * durable pattern as createProcessingPlaceholder: the card exists in the feed
+ * durable pattern as startProcessingPlaceholder: the card exists in the feed
  * the instant capture starts, and process_link_background flips this same doc
  * to ready/failed via the cardId passed through /api/share.
  */
@@ -306,7 +313,7 @@ export async function saveLink(uid: string, linkData: Partial<Link>): Promise<vo
  *
  * A short one-liner IS its own title, so the body stays empty to avoid a card
  * that prints the same sentence twice. A longer/multi-line note gets a truncated
- * first-line title with the full text as the body. Shared by `createNoteCard`
+ * first-line title with the full text as the body. Shared by `startNoteCard`
  * and `updateNoteText` so a note reads identically whether it was just captured
  * or later edited.
  */
@@ -320,9 +327,16 @@ export function splitNoteText(text: string): { title: string; summary: string; f
     return { title, summary, firstLine, words };
 }
 
-export async function createNoteCard(uid: string, text: string): Promise<string> {
+/**
+ * A note card, without waiting for the server: the id is minted client-side
+ * and `written` resolves on the server's acknowledgement. Offline that only
+ * comes on reconnect (Firestore queues the write and the feed shows the note
+ * from its local cache at once), so the capture form must not await it.
+ */
+export function startNoteCard(uid: string, text: string): { id: string; written: Promise<void> } {
     const { title, summary, firstLine, words } = splitNoteText(text);
-    const ref = await addDoc(collection(db, 'users', uid, 'links'), {
+    const ref = doc(collection(db, 'users', uid, 'links'));
+    const written = setDoc(ref, {
         url: '',
         title,
         summary,
@@ -337,7 +351,7 @@ export async function createNoteCard(uid: string, text: string): Promise<string>
         needsEmbedding: true,
         metadata: { originalTitle: firstLine, estimatedReadTime: Math.max(1, Math.round(words / 200)) },
     });
-    return ref.id;
+    return { id: ref.id, written };
 }
 
 /**
@@ -345,7 +359,7 @@ export async function createNoteCard(uid: string, text: string): Promise<string>
  *
  * A note IS a single piece of the user's writing, so the detail view edits it in
  * a single field — not a separate "title" and "body". We re-derive title/summary
- * with the SAME split `createNoteCard` uses (so the card reads identically to a
+ * with the SAME split `startNoteCard` uses (so the card reads identically to a
  * fresh capture), refresh the read-time estimate, and flip `needsEmbedding` so
  * search/Ask pick up the new words. One atomic write.
  */
@@ -362,7 +376,7 @@ export async function updateNoteText(uid: string, id: string, text: string): Pro
 }
 
 /**
- * Best-effort AI *organization* for a note card created by `createNoteCard`.
+ * Best-effort AI *organization* for a note card created by `startNoteCard`.
  *
  * The note's BODY is the user's own words and is never touched. The TITLE
  * depends on the note's shape (owner call, 2026-08-26 — this also matches the
