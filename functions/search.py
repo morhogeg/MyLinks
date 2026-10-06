@@ -1914,29 +1914,61 @@ def _flag_failed_embed(doc_ref, data: dict, db) -> None:
 # (one bookkeeping field), which re-fires sync_link_embedding, so the one
 # embed site does the work under its own rate limits and retry. Bounded per
 # tick, and a card is re-requested at most once an hour.
-# Needs the `needsEmbedding` field enabled at COLLECTION_GROUP scope (a
-# fieldOverride in firestore.indexes.json); until then the query fails and
-# the sweep logs it and does nothing.
+# The query needs `needsEmbedding` indexed at COLLECTION_GROUP scope (the
+# fieldOverride in firestore.indexes.json); without it the query fails and
+# the sweep logs it once per instance and does nothing.
+# The scan pages through the flagged cards in document-path order and keeps
+# its place between ticks (scheduler_state/embedRepair), wrapping to the
+# start once it reaches the end. A fixed limit(EMBED_REPAIR_SCAN) from the
+# start saw the SAME cards every tick: a front of unanalyzed or backed-off
+# cards starved every flagged card behind it.
 EMBED_REPAIR_BATCH = 10
 EMBED_REPAIR_SCAN = 50
 EMBED_REPAIR_BACKOFF_MS = 60 * 60 * 1000
 _REPAIR_STAMP = "embedRepairRequestedAt"
 _repair_query_warned = False
+# Server-only bookkeeping for scheduled sweeps (no client rule allows it).
+SCHEDULER_STATE_COLLECTION = "scheduler_state"
+_REPAIR_STATE_DOC = "embedRepair"
+
+
+def _repair_cursor(state_ref) -> Optional[str]:
+    """The card path the previous tick stopped at, or None (start from the
+    top). A missing, unreadable or malformed value is None. Never raises."""
+    try:
+        snap = state_ref.get()
+        path = (snap.to_dict() or {}).get("cursor") if snap.exists else None
+    except Exception as e:
+        logger.warning(f"Embedding repair cursor unreadable ({type(e).__name__}); scanning from the top")
+        return None
+    parts = path.split("/") if isinstance(path, str) else []
+    if len(parts) >= 4 and len(parts) % 2 == 0 and parts[-2] == "links" and all(parts):
+        return path
+    return None
 
 
 def repair_flagged_embeddings(db=None) -> dict:
-    """Re-fire the embed trigger for up to EMBED_REPAIR_BATCH flagged cards.
-    Never raises (it rides the janitor's tick)."""
+    """Re-fire the embed trigger for up to EMBED_REPAIR_BATCH flagged cards,
+    continuing where the previous tick's scan stopped. Never raises (it rides
+    the janitor's tick)."""
     global _repair_query_warned
     report = {"scanned": 0, "requested": 0, "cleared": 0, "errors": 0}
     try:
         db = db or get_db()
         now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
-        flagged = (db.collection_group("links")
-                   .where(filter=FieldFilter("needsEmbedding", "==", True))
-                   .limit(EMBED_REPAIR_SCAN).stream())
-        for doc in flagged:
+        state_ref = db.collection(SCHEDULER_STATE_COLLECTION).document(_REPAIR_STATE_DOC)
+        cursor = _repair_cursor(state_ref)
+        query = (db.collection_group("links")
+                 .where(filter=FieldFilter("needsEmbedding", "==", True))
+                 .order_by("__name__"))
+        if cursor:
+            # A position, not a snapshot: valid even if that card is gone.
+            query = query.start_after({"__name__": db.document(cursor)})
+        last_path = None
+        batch_full = False
+        for doc in query.limit(EMBED_REPAIR_SCAN).stream():
             report["scanned"] += 1
+            last_path = doc.reference.path
             try:
                 d = doc.to_dict() or {}
                 if d.get("status") in UNANALYZED_STATUSES:
@@ -1956,7 +1988,16 @@ def repair_flagged_embeddings(db=None) -> dict:
                 report["errors"] += 1
                 logger.warning(f"Embedding repair skipped one card ({type(e).__name__})")
             if report["requested"] >= EMBED_REPAIR_BATCH:
+                batch_full = True
                 break
+        # Continue after the last card examined; a short page that ran to
+        # its end means the scan reached the last flagged card: wrap.
+        next_cursor = last_path if (batch_full or report["scanned"] >= EMBED_REPAIR_SCAN) else None
+        if next_cursor != cursor:
+            try:
+                state_ref.set({"cursor": next_cursor, "at": now_ms})
+            except Exception as e:
+                logger.warning(f"Embedding repair cursor not saved ({type(e).__name__})")
     except Exception as e:
         report["errors"] += 1
         if not _repair_query_warned:
