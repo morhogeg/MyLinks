@@ -11,6 +11,7 @@ import { useSheetDrag, useIsMobile } from '@/lib/useSheetDrag';
 import { policyUrl, openExternal } from '@/lib/share';
 import { hapticLight, hapticSuccess, hapticWarning } from '@/lib/haptics';
 import { track } from '@/lib/analytics';
+import { reportError } from '@/lib/errorReporter';
 import { syncEntitlement, type PaywallReason } from '@/lib/entitlement';
 import {
     ProPackage, ProPeriod, getOfferings, purchase, restore, purchasesAvailability, annualSavingsPercent,
@@ -23,9 +24,11 @@ import {
  * button, a Restore link, and the Terms + Privacy links Apple requires on any
  * subscription screen alongside price and duration.
  *
- * Prices are never hardcoded: they come from RevenueCat's `default` offering.
- * The literal fallback labels below appear ONLY when the offering fails to
- * load, so the screen still names the price and period it is about to bill.
+ * Prices are never hardcoded: they come from RevenueCat's `default` offering,
+ * already localized by StoreKit. When the offering fails to load the rows say
+ * the price is unavailable and Continue stays disabled: nothing can be bought
+ * without the store's own price on screen, and a fixed US price would be wrong
+ * in every other storefront.
  *
  * On the web there is nothing to buy (purchases are native-only); the sheet
  * says so and keeps the legal links. Nothing here throws: every purchase call
@@ -33,7 +36,6 @@ import {
  * still refreshes the plan and closes.
  */
 
-const FALLBACK_PRICE: Record<ProPeriod, string> = { annual: '$49.99', monthly: '$7.99' };
 const PERIOD_LABEL: Record<ProPeriod, { name: string; per: string }> = {
     annual: { name: 'Yearly', per: 'per year' },
     monthly: { name: 'Monthly', per: 'per month' },
@@ -77,6 +79,8 @@ export default function Paywall({
     const [period, setPeriod] = useState<ProPeriod>('annual');
     const [busy, setBusy] = useState<'purchase' | 'restore' | null>(null);
     const [note, setNote] = useState<string | null>(null);
+    // Bumped by "Try again" when the offering failed to load.
+    const [offeringsAttempt, setOfferingsAttempt] = useState(0);
 
     useScrollLock(isOpen);
     const isMobile = useIsMobile();
@@ -90,8 +94,8 @@ export default function Paywall({
     }, [isOpen, onClose, busy]);
 
     // Offerings load on every open: prices can change, and a first open right
-    // after sign-in may race the SDK configure (an empty result then shows the
-    // fallback labels, which the next open corrects).
+    // after sign-in may race the SDK configure (an empty result then offers
+    // Try again, which re-runs this).
     useEffect(() => {
         if (!isOpen) return;
         setNote(null);
@@ -103,7 +107,7 @@ export default function Paywall({
         return () => { cancelled = true; };
         // availability is derived from constants; re-running on it would loop.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isOpen]);
+    }, [isOpen, offeringsAttempt]);
 
     const annual = packages?.find((p) => p.period === 'annual');
     const monthly = packages?.find((p) => p.period === 'monthly');
@@ -111,20 +115,21 @@ export default function Paywall({
     const selected = period === 'annual' ? annual : monthly;
     const offeringsFailed = packages !== null && packages.length === 0 && availability.available;
 
-    const priceOf = (p: ProPeriod) => (p === 'annual' ? annual : monthly)?.priceString
-        ?? (offeringsFailed || !availability.available ? FALLBACK_PRICE[p] : null);
+    const priceOf = (p: ProPeriod) => (p === 'annual' ? annual : monthly)?.priceString ?? null;
 
     const finish = useCallback(async (kind: 'purchase' | 'restore', pro: boolean) => {
         // The server is the source of truth: re-read the subscription from
         // RevenueCat and rewrite the entitlement. A sync failure (the secret
         // not configured yet, a blip) must not swallow a paid purchase: refresh
-        // anyway and tell the user what happened.
+        // anyway and tell the user in plain words. The server's own text
+        // ("REVENUECAT_SECRET_KEY missing", "HTTP 503") is for us, not them;
+        // the RevenueCat webhook still lands the entitlement on its own.
         let synced = true;
         try {
             await syncEntitlement();
         } catch (e) {
             synced = false;
-            setNote(e instanceof Error ? e.message : 'Could not confirm your subscription yet.');
+            reportError(e, `paywall.${kind}.sync`);
         }
         await onPurchased();
         track(kind === 'purchase' ? 'paywall_purchase' : 'paywall_restore', { ok: pro, kind: period });
@@ -133,6 +138,9 @@ export default function Paywall({
             onClose();
         } else if (pro) {
             hapticSuccess();
+            setNote(kind === 'restore'
+                ? 'Your purchase was found. Pro turns on in a moment.'
+                : 'Your purchase went through. Pro turns on in a moment.');
         } else if (kind === 'restore') {
             setNote('No Machina Pro purchase was found for this Apple ID.');
         } else {
@@ -270,9 +278,17 @@ export default function Paywall({
                             </div>
 
                             {offeringsFailed && (
-                                <p className="mt-2 text-[12px] text-text-muted leading-snug">
-                                    Prices could not be loaded from the App Store. Pull down to close and try again.
-                                </p>
+                                <div className="mt-2 flex items-center justify-between gap-3">
+                                    <p role="status" className="text-[12px] text-text-muted leading-snug">
+                                        Prices could not be loaded from the App Store.
+                                    </p>
+                                    <button
+                                        onClick={() => { hapticLight(); setOfferingsAttempt((n) => n + 1); }}
+                                        className="shrink-0 min-h-[44px] px-2 -me-2 text-[13px] font-semibold text-accent cursor-pointer"
+                                    >
+                                        Try again
+                                    </button>
+                                </div>
                             )}
 
                             <Button
@@ -285,8 +301,10 @@ export default function Paywall({
                                 {busy === 'purchase' ? 'Opening the App Store…' : 'Continue'}
                             </Button>
                             <p className="mt-2 text-center text-[12px] text-text-muted leading-snug">
-                                {priceOf(period) ? `${priceOf(period)} ${PERIOD_LABEL[period].per}, ` : ''}
-                                billed to your Apple ID. Renews automatically until cancelled in Settings.
+                                {priceOf(period)
+                                    ? `${priceOf(period)} ${PERIOD_LABEL[period].per}, billed to your Apple ID.`
+                                    : 'Billed to your Apple ID.'}
+                                {' '}Renews automatically until cancelled in Settings.
                             </p>
                         </>
                     ) : availability.reason === 'web' ? (
@@ -369,11 +387,13 @@ function PlanRow({
             <span className="text-end shrink-0">
                 {loading ? (
                     <span className="block h-4 w-14 rounded bg-fill-strong animate-pulse" />
-                ) : (
+                ) : price ? (
                     <>
-                        <span className="block text-[15px] font-bold text-text tabular-nums">{price ?? '...'}</span>
+                        <span className="block text-[15px] font-bold text-text tabular-nums">{price}</span>
                         <span className="block text-[11px] text-text-muted">{label.per}</span>
                     </>
+                ) : (
+                    <span className="block text-[12px] text-text-muted">Price unavailable</span>
                 )}
             </span>
         </button>
