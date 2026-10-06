@@ -77,11 +77,21 @@ def validate_public_url(url: str) -> None:
         dialled = (_u3_parse_url(url).host or "").strip("[]").lower()
     except Exception:
         dialled = None
-    if dialled is not None and dialled != host.lower():
+    # Compare in ASCII (punycode). urlparse keeps a non-ASCII host as typed
+    # while urllib3 encodes it, so every international domain (bücher.de,
+    # דוגמה.ישראל) used to "differ" and was refused (launch audit CAP-12).
+    # Python's codec is IDNA 2003 and urllib3's is IDNA 2008, so a name the
+    # two standards encode differently (faß.de) still differs and is still
+    # refused, which is the point: never validate one host and dial another.
+    try:
+        host_ascii = host.encode("idna").decode("ascii").lower()
+    except UnicodeError as e:
+        raise UnsafeURLError("URL host is not a valid domain name") from e
+    if dialled is not None and dialled != host_ascii:
         raise UnsafeURLError("URL host is ambiguous between parsers")
 
     try:
-        addrinfos = socket.getaddrinfo(host, None)
+        addrinfos = socket.getaddrinfo(host_ascii, None)
     except socket.gaierror as e:
         raise UnsafeURLError(f"Could not resolve host: {host}") from e
 
