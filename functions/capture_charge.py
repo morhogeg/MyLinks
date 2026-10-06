@@ -34,14 +34,34 @@ Consequence worth knowing: if the janitor times a card out and refunds it, and
 the worker later runs anyway (the job was only slow), the worker still finishes
 the card, but there is no token left to spend or refund, so that save is free.
 A user is never charged twice and never refunded twice.
+
+**One run per job.** Firestore triggers are delivered at least once, so the
+same job can reach the worker twice, even concurrently. ``start_job`` is the
+worker's first write and it CLAIMS the job: only a job that still exists and is
+still ``queued`` can be started, and starting it marks it ``processing`` in the
+same transaction that writes the card. A second delivery finds it started (or
+gone, once the first run finished) and does nothing: no card, no Gemini call,
+no refund.
 """
 
+from datetime import datetime, timezone
 from typing import Callable, Optional
 
 from google.cloud import firestore
 
 CHARGE_FIELD = "charge"
 _KINDS = ("saves", "imports")
+
+# A queue doc's `status` while it waits for a worker (every enqueue path writes
+# it), and the one ``start_job`` moves it to.
+QUEUED = "queued"
+STARTED_STATUS = "processing"
+
+# ``start_job`` outcomes.
+STARTED = "started"            # this run owns the job; the card is written
+DUPLICATE = "duplicate"        # gone or already started: another run owns it
+CARD_GONE = "card_gone"        # the existing card was deleted while it waited
+CARD_SETTLED = "card_settled"  # the existing card is not waiting for this job
 
 
 def token(kind: str) -> dict:
@@ -87,31 +107,51 @@ def claim(db, ref) -> Optional[str]:
     return run_transaction(db, _body)
 
 
-def move_to_card(db, job_ref, card_ref, card_fields: dict, *, create: bool = False,
-                 job_fields: Optional[dict] = None) -> bool:
-    """Start a job on its card: write ``card_fields`` to the card (``create``
-    sets a fresh placeholder; otherwise the existing card is updated) and move
-    the job's token onto it, atomically. Returns False, writing nothing, when
-    the existing card is gone (the user deleted it while it was queued); the
-    token then stays on the job for the caller to ``claim``."""
+def job_claimable(job: Optional[dict]) -> bool:
+    """True while a queue doc is still waiting for its first run. A doc with no
+    `status` at all predates the field and counts as waiting; ``start_job``
+    stamps one, so even such a doc can be started only once."""
+    return job is not None and job.get("status", QUEUED) == QUEUED
+
+
+def start_job(db, job_ref, card_ref, card_fields: Optional[dict], *, create: bool = False,
+              job_fields: Optional[dict] = None, accepts: Optional[Callable[[dict], bool]] = None,
+              move_token: bool = True) -> str:
+    """Claim a queued job for this run and start its card, atomically.
+
+    In one transaction: the job must still exist and be ``queued`` (and, for
+    ``create``, must not name a card yet), else DUPLICATE and nothing is
+    written. An existing card must still exist (else CARD_GONE) and pass
+    ``accepts`` (else CARD_SETTLED); in both cases nothing is written and the
+    token stays on the job for the caller to refund with ``claim``. On STARTED
+    the job is marked ``processing`` with ``startedAt`` (plus ``job_fields``),
+    ``card_fields`` are written to the card (``create`` sets a fresh card,
+    otherwise the card is updated) and, with ``move_token``, the job's token
+    moves onto the card."""
     def _body(tx):
         job = _snap_dict(job_ref.get(transaction=tx))
-        if not create and _snap_dict(card_ref.get(transaction=tx)) is None:
-            return False
-        kind = charge_kind(job)
-        fields = dict(card_fields)
-        if kind:
-            fields[CHARGE_FIELD] = token(kind)
-        if create:
-            tx.set(card_ref, fields)
-        else:
-            tx.update(card_ref, fields)
-        jf = dict(job_fields or {})
-        if kind:
-            jf[CHARGE_FIELD] = firestore.DELETE_FIELD
-        if jf and job is not None:
-            tx.update(job_ref, jf)
-        return True
+        if not job_claimable(job) or (create and job.get("cardId")):
+            return DUPLICATE
+        if not create and card_ref is not None:
+            card = _snap_dict(card_ref.get(transaction=tx))
+            if card is None:
+                return CARD_GONE
+            if accepts is not None and not accepts(card):
+                return CARD_SETTLED
+        kind = charge_kind(job) if move_token else None
+        jf = {"status": STARTED_STATUS, "startedAt": datetime.now(timezone.utc).isoformat()}
+        jf.update(job_fields or {})
+        if card_ref is not None and card_fields is not None:
+            fields = dict(card_fields)
+            if kind:
+                fields[CHARGE_FIELD] = token(kind)
+                jf[CHARGE_FIELD] = firestore.DELETE_FIELD
+            if create:
+                tx.set(card_ref, fields)
+            else:
+                tx.update(card_ref, fields)
+        tx.update(job_ref, jf)
+        return STARTED
     return run_transaction(db, _body)
 
 

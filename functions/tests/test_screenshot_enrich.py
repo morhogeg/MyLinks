@@ -80,7 +80,7 @@ class _Ref:
         self.updates = []
         self.deleted = False
 
-    def get(self):
+    def get(self, transaction=None):
         return _Snap(self.doc)
 
     def update(self, fields):

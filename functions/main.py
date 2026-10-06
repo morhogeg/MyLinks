@@ -5475,6 +5475,22 @@ def _card_accepts_screenshots(card) -> bool:
     return bool(card.get("url"))
 
 
+def _card_awaits_job(card: dict) -> bool:
+    """May a queued capture job start on this EXISTING card?
+
+    Only while the card is still waiting for its analysis: a processing
+    placeholder (or a failed card the client flipped back for Retry), a failed
+    card, or a waiting one. A card that is already finished (a Retry or an
+    earlier job completed it) must not be overwritten by a late job, nor
+    re-analyzed at a second Gemini bill. Nor may a card that already holds a
+    charge token: a started, unfinished job is on it right now (two Retries
+    in quick succession), and the second job would only pay for the same read
+    twice."""
+    return (card.get("status") in (LinkStatus.PROCESSING.value, LinkStatus.FAILED.value,
+                                   LinkStatus.WAITING.value)
+            and capture_charge.charge_kind(card) is None)
+
+
 def _card_enrich_screenshots(card) -> list:
     """The screenshots an earlier "Add screenshots" already put on this web
     card (``enrichedAt`` + ``imageUrls``), in order. Empty for a card never
@@ -5587,9 +5603,28 @@ def _enrich_card_with_images(ref, task_id: str, uid: str, card_ref, data: dict) 
     from scraper import safe_get
 
     card_id = card_ref.id
+    # One run per job (capture_charge.start_job): a second delivery of this
+    # trigger, or one that arrives after the first run finished and removed
+    # the job, does nothing. It used to read the screenshots again, then hit
+    # the deleted job doc, refund a second time and stamp `failed` on the
+    # card the first run had just completed.
+    try:
+        outcome = capture_charge.start_job(get_db(), ref, card_ref, None,
+                                           accepts=_card_accepts_screenshots, move_token=False)
+    except Exception as claim_err:
+        logger.warning(f"Could not claim the enrich job: {claim_err}")
+        outcome = capture_charge.STARTED
+        _job_progress(ref, {"status": capture_charge.STARTED_STATUS,
+                            "startedAt": datetime.now(timezone.utc).isoformat()})
+    if outcome == capture_charge.DUPLICATE:
+        logger.info("Enrich job already started or finished by another run; skipping")
+        return
     log_to_firestore(task_id, "Screenshot enrich started", data={"cardId": card_id}, uid=uid)
     try:
-        ref.update({"status": "processing", "startedAt": datetime.now(timezone.utc).isoformat()})
+        if outcome == capture_charge.CARD_SETTLED:
+            # The card stopped being a settled web card while the job waited
+            # (it is being re-captured, say): nothing to read the post into.
+            raise ValueError("Card no longer takes screenshots")
         snap = card_ref.get()
         card = snap.to_dict() if snap.exists else None
         if not card:
@@ -5819,6 +5854,15 @@ def _enrich_pending_note(ref, uid: str, data: dict) -> None:
     prune) does no paid work and puts the note back to pending."""
     db = get_db()
     card_id = data.get("cardId")
+    # One run per job (capture_charge.start_job). A second delivery used to
+    # find the token gone and put the ORGANIZED note back to pending, so the
+    # next release charged and enriched it again.
+    try:
+        if capture_charge.start_job(db, ref, None, None) == capture_charge.DUPLICATE:
+            logger.info("Note job already started or finished by another run; skipping")
+            return
+    except Exception as claim_err:
+        logger.warning(f"Could not claim the note job: {claim_err}")
     try:
         kind = capture_charge.claim(db, ref)
         if not uid or not _valid_card_id(card_id):
@@ -5893,6 +5937,13 @@ def _snapshot_capture(ref, uid: str, data: dict) -> None:
     card_id = data.get("cardId")
     url = data.get("url")
     db = get_db()
+    # One run per job (capture_charge.start_job): a second delivery would only
+    # scrape the page again.
+    try:
+        if capture_charge.start_job(db, ref, None, None) == capture_charge.DUPLICATE:
+            return
+    except Exception as claim_err:
+        logger.warning(f"Could not claim the snapshot job: {claim_err}")
     try:
         if not card_id or not isinstance(url, str):
             return
@@ -5989,9 +6040,6 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
     mime_type = _safe_image_mime(data.get("mimeType"))
     original_body = data.get("body")
 
-    log_to_firestore(task_id, "Background processing started", data={"url": url, "isImage": is_image},
-                     uid=uid)
-
     # The URL we were handed before any reassignment (the image path rewrites `url`
     # to the stored Storage URL below). Kept so a FAILED card records the original.
     original_url = url
@@ -6024,14 +6072,17 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             data,
         )
         return
-    # Refund bookkeeping: the job's charge token moves onto the card when work
-    # starts, and only whoever removes it refunds (capture_charge docstring).
+    # One run per job, and refund bookkeeping: the claim below is this run's
+    # first write. In ONE transaction it checks the job is still queued (a
+    # trigger can be delivered twice, even concurrently), marks it started,
+    # writes the card's processing state and moves the job's charge token onto
+    # the card; only whoever later removes the token refunds (capture_charge).
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     if existing_card_id:
         card_ref = get_db().collection('users').document(uid).collection('links').document(existing_card_id)
         card_id = existing_card_id
         # Start the card's processing clock now that work is actually
-        # beginning, and move the charge token onto the card in the same
-        # transaction. The janitor ages a `processing` card out after 15
+        # beginning. The janitor ages a `processing` card out after 15
         # minutes, measured from this field, and a bulk import (POST
         # /api/import) queues far more jobs than max_instances can run at
         # once: an imported card is written with only `queuedAt` and gets this
@@ -6039,21 +6090,31 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         # the janitor may have timed out a card whose job was merely slow to
         # start; work is running again, so the card shows it.
         try:
-            started = capture_charge.move_to_card(get_db(), ref, card_ref, {
+            outcome = capture_charge.start_job(get_db(), ref, card_ref, {
                 "status": LinkStatus.PROCESSING.value,
-                "processingStartedAt": int(datetime.now(timezone.utc).timestamp() * 1000),
-            })
+                "processingStartedAt": now_ms,
+            }, accepts=_card_awaits_job)
         except Exception as stamp_err:
-            # A read error counts as "present" (only a confirmed-missing card
-            # drops a job); the token stays on the job and the failure path
-            # claims it from there.
+            # A read error counts as "started" (only a confirmed answer drops
+            # a job); the token stays on the job and the failure path claims
+            # it from there.
             logger.warning(f"Could not start the card: {stamp_err}")
-            started = True
-        if not started:
-            # The user deleted the card while it waited in the queue: drop the
-            # job. Running it would re-create the card they just removed.
-            # Refunded (from the job's own token): no paid work ran.
-            logger.info("Card deleted before processing; dropping the job")
+            outcome = capture_charge.STARTED
+            _job_progress(ref, {"status": capture_charge.STARTED_STATUS,
+                                "startedAt": datetime.now(timezone.utc).isoformat()})
+        if outcome == capture_charge.DUPLICATE:
+            # Another delivery of this trigger owns the job (or already
+            # finished and removed it): nothing to do, nothing to refund.
+            logger.info("Job already started or finished by another run; skipping")
+            return
+        if outcome != capture_charge.STARTED:
+            # CARD_GONE: the user deleted the card while it waited in the
+            # queue; running would re-create the card they just removed.
+            # CARD_SETTLED: the card no longer waits for this job (a Retry or
+            # another job already finished it, or another job is on it now);
+            # running would overwrite it. Either way no paid work runs, so the
+            # job's own token is refunded, and the job is dropped.
+            logger.info(f"Dropping the job before any work ({outcome})")
             _refund_job(uid, ref)
             try:
                 ref.delete()
@@ -6064,7 +6125,7 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         card_ref = get_db().collection('users').document(uid).collection('links').document()
         card_id = card_ref.id
         try:
-            capture_charge.move_to_card(get_db(), ref, card_ref, {
+            outcome = capture_charge.start_job(get_db(), ref, card_ref, {
                 "url": original_url,
                 "title": _capture_placeholder_title(original_url, is_image),
                 "summary": "",
@@ -6072,10 +6133,10 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
                 "category": "",
                 "status": LinkStatus.PROCESSING.value,
                 "sourceType": "image" if is_image else "web",
-                "createdAt": int(datetime.now(timezone.utc).timestamp() * 1000),
+                "createdAt": now_ms,
                 # When processing began — the janitor uses this (not createdAt,
                 # which a retry preserves) to age out cards stuck in `processing`.
-                "processingStartedAt": int(datetime.now(timezone.utc).timestamp() * 1000),
+                "processingStartedAt": now_ms,
                 "metadata": {"originalTitle": "", "estimatedReadTime": 0},
                 **({"urlKey": url_key(original_url)} if not is_image and url_key(original_url) else {}),
             }, create=True, job_fields={"cardId": card_id})
@@ -6084,18 +6145,24 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             # "create the real card at the end" behaviour so a save is never lost.
             logger.error(f"Failed to write processing placeholder card: {placeholder_err}", exc_info=True)
             card_ref = None
+            outcome = capture_charge.STARTED
+            _job_progress(ref, {"status": capture_charge.STARTED_STATUS,
+                                "startedAt": datetime.now(timezone.utc).isoformat()})
+        if outcome == capture_charge.DUPLICATE:
+            # A second delivery of the same share: the first run already made
+            # (or is making) its card. A second card, and a second Gemini
+            # bill, is exactly what the claim exists to prevent.
+            logger.info("Job already started or finished by another run; skipping")
+            return
 
+    log_to_firestore(task_id, "Background processing started", data={"url": url, "isImage": is_image},
+                     uid=uid)
     analysis = {}
     scraped = {"html": "", "title": "", "text": ""}
     # Assumed Pro until the video path reads the plan; only YouTube cares.
     pro = True
 
     try:
-        # Mark the queue doc as in-flight. Kept inside the try so that if this
-        # write throws, the failure hits the except below and the visible card
-        # is marked FAILED — rather than the capture being lost silently.
-        ref.update({"status": "processing", "startedAt": datetime.now(timezone.utc).isoformat()})
-
         # 1. Scrape content (only once). Image jobs are NOT scraped: their `url`
         # is our own Storage object, which the image branch below downloads
         # itself; scraping it only cost a second download.

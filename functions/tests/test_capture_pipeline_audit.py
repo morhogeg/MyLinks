@@ -14,7 +14,11 @@ import pytest
 
 import main
 import tests.test_capture_charge as tcc
-from tests.test_capture_charge import FakeDB, _Ref, _iso, env  # noqa: F401  (env is a fixture)
+from tests.test_capture_charge import FakeDB, _Ref, _iso
+
+# The shared stateful-Firestore harness (a fixture), bound by assignment so
+# the tests' `env` parameters don't read as redefinitions of an import.
+env = tcc.env
 
 FUNCTIONS = Path(__file__).resolve().parent.parent
 REAL_LOG = main.log_to_firestore
@@ -109,4 +113,176 @@ def test_a_job_doc_removed_mid_run_does_not_fail_the_capture(env, monkeypatch):
     monkeypatch.setattr(tcc.scraper, "scrape_url", scrape_then_lose_the_job)
     env.run_worker()
     assert db.docs["users/u1/links/c1"]["status"] == "unread"
+    assert env.refunds == []
+
+
+# ── CAP-3: one run per job (triggers are delivered at least once) ────────────
+
+def _count_analyses(monkeypatch):
+    calls = []
+
+    def analyze(ai, scraped, tags, **kw):
+        calls.append(1)
+        return {"title": "Read", "summary": "S", "concepts": [], "tags": ["ai"], "category": "Tech"}
+    monkeypatch.setattr(main, "_analyze_scraped", analyze)
+    return calls
+
+
+def _deliver(db, path, data):
+    ref = _Ref(db, path)
+    snap = types.SimpleNamespace(to_dict=lambda: dict(data), reference=ref, id=ref.id)
+    main.process_link_background.__wrapped__(types.SimpleNamespace(data=snap))
+
+
+def _cards(db):
+    return {k: v for k, v in db.docs.items() if k.startswith("users/u1/links/")}
+
+
+def test_a_share_job_delivered_twice_makes_one_card_and_one_analysis(env, monkeypatch):
+    db = env.make({tcc.JOB: tcc._job(cardId=None, source="share", charge={"kind": "saves"})})
+    db.docs[tcc.JOB].pop("cardId")
+    event = dict(db.docs[tcc.JOB])  # the trigger's payload: the doc as created
+    calls = _count_analyses(monkeypatch)
+    _deliver(db, tcc.JOB, event)
+    _deliver(db, tcc.JOB, event)
+    cards = _cards(db)
+    assert len(cards) == 1 and next(iter(cards.values()))["status"] == "unread"
+    assert len(calls) == 1 and env.refunds == []
+
+
+def test_overlapping_deliveries_run_the_job_once(env, monkeypatch):
+    db = env.make({tcc.JOB: tcc._job(cardId=None, source="share", charge={"kind": "saves"})})
+    db.docs[tcc.JOB].pop("cardId")
+    event = dict(db.docs[tcc.JOB])
+    calls = _count_analyses(monkeypatch)
+    nested = []
+
+    def scrape_while_a_duplicate_arrives(url, body=None):
+        if not nested:
+            nested.append(1)
+            _deliver(db, tcc.JOB, event)  # the second delivery, mid-run
+        return {"html": "", "title": "Scraped", "text": "body text " * 20}
+    monkeypatch.setattr(tcc.scraper, "scrape_url", scrape_while_a_duplicate_arrives)
+    _deliver(db, tcc.JOB, event)
+    assert len(_cards(db)) == 1 and len(calls) == 1
+
+
+def test_redelivery_after_success_leaves_the_web_card_ready(env, monkeypatch):
+    db = env.make({"users/u1/links/c1": {"status": "processing", "processingStartedAt": tcc.NOW_MS,
+                                         "url": "https://example.com/a", "createdAt": 111},
+                   tcc.JOB: tcc._job(charge={"kind": "saves"})})
+    event = dict(db.docs[tcc.JOB])
+    calls = _count_analyses(monkeypatch)
+    _deliver(db, tcc.JOB, event)
+    _deliver(db, tcc.JOB, event)
+    card = db.docs["users/u1/links/c1"]
+    assert card["status"] == "unread" and card["title"] == "Read" and "error" not in card
+    assert len(calls) == 1 and env.refunds == []
+
+
+@pytest.mark.parametrize("token_on_job", [False, True])
+def test_a_late_job_never_overwrites_a_card_the_users_retry_finished(env, token_on_job):
+    """The janitor times out a card whose job was slow to start, the user's
+    Retry completes it, THEN the original job runs and hits a transient error."""
+    old = tcc.NOW_MS - 20 * 60 * 1000
+    job = tcc._job(createdAt=_iso(20))
+    if token_on_job:
+        job["charge"] = {"kind": "saves"}
+    db = env.make({"users/u1/links/c1": {"url": "https://example.com/a", "status": "processing",
+                                         "createdAt": old, "processingStartedAt": old,
+                                         "charge": {"kind": "saves"}},
+                   tcc.JOB: job}, scraped=tcc.scraper._fetch_failure("timeout"))
+    env.janitor()
+    assert db.docs["users/u1/links/c1"]["status"] == "failed"
+    # The user's Retry lands first and finishes the card.
+    db.docs["users/u1/links/c1"].update({"status": "unread", "title": "Great article",
+                                         "summary": "Real summary"})
+    db.docs["users/u1/links/c1"].pop("error")
+    env.refunds.clear()
+    env.run_worker()
+    card = db.docs["users/u1/links/c1"]
+    assert card["status"] == "unread" and card["title"] == "Great article"
+    assert card["summary"] == "Real summary" and "error" not in card
+    # The late job did no paid work: a token it still carried is given back.
+    assert env.refunds == (["saves"] if token_on_job else [])
+    assert tcc.JOB not in db.docs
+
+
+def test_a_second_job_for_a_card_another_job_is_running_is_refused(env, monkeypatch):
+    db = env.make({"users/u1/links/c1": {"status": "processing", "processingStartedAt": tcc.NOW_MS,
+                                         "charge": {"kind": "saves"}},
+                   tcc.JOB: tcc._job(charge={"kind": "saves"})})
+    calls = _count_analyses(monkeypatch)
+    env.run_worker()
+    assert calls == [] and env.refunds == ["saves"]
+    assert db.docs["users/u1/links/c1"]["charge"] == {"kind": "saves"}  # the running job's
+    assert tcc.JOB not in db.docs
+
+
+# Screenshot enrich and released-note jobs get the same claim.
+
+class _Img:
+    content = b"\x89PNGfake"
+    headers = {"Content-Type": "image/png"}
+
+    def raise_for_status(self):
+        return None
+
+
+def _enrich_world(env, monkeypatch, *, fail=False):
+    db = env.make({"users/u1/links/c1": {"status": "unread", "url": "https://facebook.com/p/1",
+                                         "sourceType": "web", "title": "Partial", "summary": "teaser",
+                                         "captureQuality": "partial", "enrichStatus": "processing"},
+                   "pending_processing/e1": {"uid": "u1", "url": "https://s/a.png", "imageUrls": ["https://s/a.png"],
+                                             "isImage": True, "enrich": True, "cardId": "c1",
+                                             "status": "queued", "createdAt": _iso(),
+                                             "charge": {"kind": "saves"}}})
+    monkeypatch.setattr(tcc.scraper, "safe_get", lambda url, **k: _Img())
+    monkeypatch.setattr(main, "mirror_vector_write", lambda *a, **k: None)
+    monkeypatch.setattr(main, "card_payload", lambda fields, db=None: fields)
+
+    def read(*a, **k):
+        if fail:
+            raise main.AnalysisError("vision down")
+        return {"title": "Full post", "summary": "Whole post", "tags": ["x"], "category": "Tech",
+                "concepts": []}
+    monkeypatch.setattr(main, "GeminiService", lambda: types.SimpleNamespace(
+        embed_text=lambda t: None, analyze_text_with_images=read))
+    return db
+
+
+def test_a_redelivered_enrich_job_never_fails_the_card_it_completed(env, monkeypatch):
+    db = _enrich_world(env, monkeypatch)
+    event = dict(db.docs["pending_processing/e1"])
+    _deliver(db, "pending_processing/e1", event)
+    _deliver(db, "pending_processing/e1", event)
+    card = db.docs["users/u1/links/c1"]
+    assert card["title"] == "Full post" and "enrichStatus" not in card and "enrichError" not in card
+    assert env.refunds == []
+
+
+def test_a_redelivered_failed_enrich_job_refunds_once(env, monkeypatch):
+    db = _enrich_world(env, monkeypatch, fail=True)
+    event = dict(db.docs["pending_processing/e1"])
+    _deliver(db, "pending_processing/e1", event)
+    _deliver(db, "pending_processing/e1", event)
+    assert env.refunds == ["saves"]
+    assert db.docs["users/u1/links/c1"]["enrichStatus"] == "failed"
+
+
+def test_a_redelivered_note_job_does_not_put_the_organized_note_back(env, monkeypatch):
+    db = env.make({"users/u1/links/n1": {"status": "unread", "sourceType": "note", "captureType": "text",
+                                         "title": "my words", "summary": "my words about a thing",
+                                         "noteEnrichQueuedAt": 1},
+                   "pending_processing/n1": {"uid": "u1", "cardId": "n1", "noteEnrich": True,
+                                             "source": "deferred", "status": "queued",
+                                             "createdAt": _iso(), "charge": {"kind": "saves"}}})
+    monkeypatch.setattr(main, "GeminiService", lambda: types.SimpleNamespace(
+        analyze_text=lambda *a, **k: {"title": "Organized", "summary": "S", "tags": ["t"],
+                                      "category": "Tech", "concepts": []}))
+    event = dict(db.docs["pending_processing/n1"])
+    _deliver(db, "pending_processing/n1", event)
+    _deliver(db, "pending_processing/n1", event)
+    note = db.docs["users/u1/links/n1"]
+    assert note["title"] == "Organized" and "noteEnrichPending" not in note
     assert env.refunds == []
