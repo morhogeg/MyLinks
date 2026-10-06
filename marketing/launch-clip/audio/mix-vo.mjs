@@ -13,7 +13,8 @@
  * so the voice owns the words while the score keeps its weight and its
  * shimmer. 120ms ramps. A caption's own `duck` (the brand lines) goes deeper.
  * Every video is mastered for the feeds: −14 LUFS integrated, true peak
- * ≤ −1 dBTP (−1.3 for a music-only cut, whose AAC encode runs hotter).
+ * ≤ −1 dBTP in the rendered mp4 (−1.3 for a music-only cut, whose AAC encode
+ * runs hotter); the wav sits 0.7 dB under that, room for the encode.
  *
  * (run AFTER the score and synth-vo.py for the same script)
  */
@@ -170,7 +171,7 @@ let g = peak > 0.98 ? 0.98 / peak : 1;
 const MASTER = script.master;
 if (MASTER) {
   let gain = 10 ** ((MASTER.lufs - lufs(L, R, SR)) / 20);
-  let ceiling = 10 ** ((MASTER.truePeak - 0.3) / 20);
+  let ceiling = 10 ** ((MASTER.truePeak - 0.8) / 20);
   let out = null;
   for (let pass = 0; pass < 6; pass++) {
     const l = L.map((v) => v * gain);
@@ -179,9 +180,10 @@ if (MASTER) {
     const I = lufs(l, r, SR);
     const tp = truePeak(l, r);
     out = { l, r, I, tp };
-    // (0.2 dB under the spec: meters and the render's AAC encode disagree by
-    // about that much on inter-sample peaks)
-    const tpMax = MASTER.truePeak - 0.2;
+    // (0.7 dB under the spec, room for the render's AAC encode: it raised
+    // the inter-sample peaks of the trip-talk ad's mix by 0.55 dB, −1.25 in
+    // the wav to −0.7 dBTP in the mp4, 2026-10-06; 0.2 was not enough)
+    const tpMax = MASTER.truePeak - 0.7;
     if (Math.abs(I - MASTER.lufs) < 0.05 && tp <= tpMax) break;
     gain *= 10 ** ((MASTER.lufs - I) / 20);
     if (tp > tpMax) ceiling *= 10 ** ((tpMax - tp - 0.05) / 20);
