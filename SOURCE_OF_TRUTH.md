@@ -2583,6 +2583,7 @@ exact-match, capped.
   "Edit text" on a TEXT card (the body is the user's own words, nothing else
   edits it) and the pencil on the user's own My notes. All in
   `LinkDetailModal.tsx`. **Verified:** tsc 0, eslint 0, em-dash gate.
+  **Shipped** as merge `a5d0c89`, TestFlight run #349 → **build 1349** green.
 
 - **2026-10-06 (evening) — CARD HEADER FROM REVISIT: bell no longer
   clipped.** Owner screenshot: a card opened from Revisit cut the reminder
