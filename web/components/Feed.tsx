@@ -349,6 +349,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     const openCopy = liveCardId ? visibleLinks.find((l) => l.id === liveCardId) ?? null : null;
     const openCopyRef = useRef<Link | null>(null);
     const shownIdRef = useRef<string | null>(null);
+    // A digest card's source URL, for when that card has since been deleted
+    // (set by openDigestCard below, used by the listener's "gone" branch).
+    const digestFallbackRef = useRef<{ id: string; url: string } | null>(null);
     useEffect(() => {
         openCopyRef.current = openCopy;
         shownIdRef.current = activeLink?.id ?? null;
@@ -362,6 +365,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         const unsubscribe = onSnapshot(doc(db, 'users', uid, 'links', id), (snap) => {
             if (snap.exists()) {
                 setFetchedCards((prev) => ({ ...prev, [id]: toLink(snap as QueryDocumentSnapshot<DocumentData>) }));
+                if (digestFallbackRef.current?.id === id) digestFallbackRef.current = null;
                 return;
             }
             const { fromCache, hasPendingWrites } = snap.metadata;
@@ -388,8 +392,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
             // Our own delete already closed the card; nothing to explain.
             if (hasPendingWrites) return;
             // Deleted since the push / citation / digest was written, or just
-            // now on another device. Same copy as the digest's deleted-card tap.
-            toast.info('That card is no longer in your library.');
+            // now on another device. A digest tap still offers somewhere
+            // useful to land: the source itself, one tap away (opening it
+            // from here, after a network round trip, would be popup-blocked).
+            const fallback = digestFallbackRef.current?.id === id ? digestFallbackRef.current : null;
+            if (fallback) digestFallbackRef.current = null;
+            toast.info('That card is no longer in your library.', fallback
+                ? { label: 'Open original', onClick: () => openExternal(fallback.url) }
+                : undefined);
         }, (e) => {
             reportError(e, 'feed-open-card-listener');
             setActiveLinkId((cur) => (cur === id ? null : cur));
@@ -688,17 +698,20 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         };
     }, [toast]);
 
-    // Open a card referenced by a digest: prefer the live card (detail modal);
-    // if it was deleted since the digest was written, fall back to the
-    // denormalized source URL so the tap still lands somewhere useful.
+    // Open a card referenced by a digest. A digest mostly picks OLD cards, past
+    // the loaded pages, so checking the window here sent live cards to their
+    // website instead. The card opens like any other (the one-doc listener
+    // above fetches it); only a card deleted since the digest was written
+    // falls back to its denormalized source URL, offered by the listener's
+    // "gone" branch, so the tap still lands somewhere useful.
     const openDigestCard = (card: DigestCardRef) => {
-        if (links.some((l) => l.id === card.id)) {
-            setActiveLinkId(card.id);
-        } else if (card.url) {
-            openExternal(card.url);
-        } else {
-            toast.info('That card is no longer in your library.');
+        if (!card.id) {
+            if (card.url) openExternal(card.url);
+            else toast.info('That card is no longer in your library.');
+            return;
         }
+        digestFallbackRef.current = card.url ? { id: card.id, url: card.url } : null;
+        setActiveLinkId(card.id);
     };
 
     const dismissSynthesis = () => {
