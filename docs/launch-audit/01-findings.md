@@ -32,7 +32,8 @@ Severity is the auditor's, re-rated where the code showed otherwise.
 | OWN-6 | info | pip-audit on `functions/requirements.txt` | clean |
 | OWN-7 | low | Extension keyboard test raced a tab's URL at creation | fixed `519f131` |
 | OWN-8 | low | `next dev` 16.3.8 writes `web/AGENTS.md` + `web/CLAUDE.md` in agent sessions | fixed `4e71370` (gitignored) |
-| OWN-9 | medium | First load shipped 1,986 KB of JS (595 KB gzip), including react-markdown and the whole graph | partial `dea79c9`: Ask and the graph load on first use (1,752 KB / 523 KB gzip, react-markdown out of the first load). The rest is Firebase (~370 KB) and the feed itself; further splitting has small returns for its risk |
+| OWN-9 | medium | First load shipped 1,986 KB of JS (595 KB gzip), including react-markdown and the whole graph | partial `dea79c9`, `88d078a`: Ask and the graph load on first use (1,752 KB / 524 KB gzip, react-markdown out of the first load). The rest is Firebase (~370 KB) and the feed itself; further splitting has small returns for its risk |
+| OWN-10 | medium (web) | Caused by OWN-9, found in the final sweep: on the web, opening Ask or the graph offline replaced the page with the error screen, and the view kept crashing even back online until a full reload (next/dynamic remembers a failed load). The background prefetch also threw an unhandled ChunkLoadError offline. Not iOS: the app ships the code in its bundle | fixed `88d078a` (retry state that loads by itself on reconnect, Reload when a load fails online; the crash reproduced and the fix checked against a production build) |
 
 ## Web: library and capture (WEB)
 
@@ -56,9 +57,9 @@ Severity is the auditor's, re-rated where the code showed otherwise.
 | WEB-16 | low | Signing out lost offline saves and edits without a word | fixed `7232cda` (asks first) |
 | WEB-17 | low | A link saved offline that already existed became a duplicate | fixed `6c0db61` |
 | WEB-18 | low | One malformed character entity failed a whole bookmarks import | fixed `c214bff` |
-| WEB-19 | low | Single-image saves showed raw browser errors and could lose the capture when backgrounded | fixed: errors `6c0db61`; durability with CAP-2 (below) |
+| WEB-19 | low | Single-image saves showed raw browser errors and could lose the capture when backgrounded | fixed `6c0db61` (errors), `06c8ab2` (one image now takes the durable queue too) |
 | WEB-20 | low | Bulk archive had no Undo and no bulk unarchive | fixed `f52f88f` |
-| WEB-21 | low (cost) | Each note save read up to 600 documents for the prompt's vocabulary | see PRIV-1: the server builds the vocabulary now; the app's own reads go with the capture merge |
+| WEB-21 | low (cost) | Each note save read up to 600 documents for the prompt's vocabulary | fixed `cdc41b6` (the server builds it, see PRIV-1; a note edit skips it) |
 
 ## Web: sign-in, settings, consent, billing (AUTH)
 
@@ -198,7 +199,7 @@ Severity is the auditor's, re-rated where the code showed otherwise.
 | ACCT-5 | medium | Making a card private didn't take down its public pages | fixed `4744c35`, `7df9e6c`; collection and answer snapshots carry no card ids, so a card made private stays on a public collection page until it is updated (the toast says so) |
 | ACCT-6 | low | A failed deletion left `deleting: True` set for good, disabling card cleanup | fixed `2c2021e` (`deletingAt`, trusted for 10 minutes; cleared on failure) |
 | ACCT-7 | low | Storage keys could be minted twice by concurrent workers, leaving images outside every cleanup | fixed `2861544` (transactional mint) |
-| ACCT-8 | low | Deletion left data behind: RevenueCat customer, other linked logins, rate-limit rows (ids name a phone number or IP), task_logs rows without a uid, and the email hash undisclosed | fixed `44ce394` (RevenueCat best-effort, linked logins, `expireAt` on rate-limit rows), `5a3cecf` (policy names the email hash and counters); rate-limit pruning and task_logs uid: see below |
+| ACCT-8 | low | Deletion left data behind: RevenueCat customer, other linked logins, rate-limit rows (ids name a phone number or IP), task_logs rows without a uid, and the email hash undisclosed | fixed `44ce394` (RevenueCat best-effort, linked logins, `expireAt` on rate-limit rows), `5a3cecf` (policy names the email hash and counters); `a0e80b2` (janitor prunes rate-limit rows within a day), `7277768` (worker task_logs carry the uid) |
 | ACCT-9 | low | Masked phone uids in logs could be reversed by brute force | fixed `44ce394` (keyed HMAC); per-doc error logs carry the exception type only (`ae23ee0`) |
 | ACCT-10 | low | Account deletion doesn't require a recent sign-in | accepted for launch: Apple accounts already re-authenticate (token revocation); adding a Google re-sign-in step on iOS can't be device-tested here, and a broken deletion is an App Store rejection. Post-launch, with a device |
 | ACCT-11 | low | The RevenueCat webhook ignored events that change access (extended, refund reversed, temporary grant) | fixed `29f5e00` |
@@ -238,7 +239,7 @@ The AI fixes were made on a separate branch, reviewed by a second agent
 | GRAPH-PRIV | medium | "See also" sent private candidates to the Gemini verifier | fixed `812e6ee` |
 | RV-1 | high | A "thanks" turn became the subject of the next follow-up (regression from AI-4) | fixed `3be3059` |
 | RV-2 | medium-high | The 20 s per-call timeout cut long answers (every long iOS answer) | fixed `8c0a098` (buffered calls get the budget; streams send their own server timeout) |
-| RV-3 | medium | "No answer" and cut-off refunds could be triggered on purpose (unmetered model calls) | fixed `d7ba245` (refund only short no-answers and early cut-offs) |
+| RV-3 | medium | "No answer" and cut-off refunds could be triggered on purpose (unmetered model calls) | fixed `d7ba245` (refund only short no-answers and early cut-offs); a long cut-off, now charged, keeps its text on screen `4bd1e68` |
 | RV-4 | medium | AI-13 brought back the cut-off Hebrew card it was meant to keep fixed | fixed `e201c6c` |
 | RV-5 | medium | The AI-7 repair sweep had no index and could stall on the same 50 cards | fixed `5123455` (index; paged with a saved cursor) |
 | RV-6 | medium | Hebrew recency/exclusion detection fired on ordinary questions ("the first week with a newborn") | fixed `51eefd5` |
@@ -253,27 +254,26 @@ The AI fixes were made on a separate branch, reviewed by a second agent
 
 | ID | Sev | Finding | Status |
 |---|---|---|---|
-| CAP-1 | high | The janitor deleted queue jobs that were still running (aged from queueing, not from start): the card failed and Retry charged again | CAPFIX-1 |
-| CAP-2 | high | Retry and the web Image tab charged up front and kept the unit when the app gave up at 60 s (videos, PDFs, slow pages) | CAPFIX-2 |
-| CAP-3 | medium | The worker wasn't idempotent: a redelivered job made a second card, a late job overwrote a good Retry, a redelivered enrich refunded twice | CAPFIX-3 |
+| CAP-1 | high | The janitor deleted queue jobs that were still running (aged from queueing, not from start): the card failed and Retry charged again | fixed `1667a5c` |
+| CAP-2 | high | Retry and the web Image tab charged up front and kept the unit when the app gave up at 60 s (videos, PDFs, slow pages) | fixed `06c8ab2` (Retry and the Image tab go through the durable queue; the server checks the named card first) |
+| CAP-3 | medium | The worker wasn't idempotent: a redelivered job made a second card, a late job overwrote a good Retry, a redelivered enrich refunded twice | fixed `f7494e2` (each job claimed once, in the transaction that starts its card) |
 | CAP-4 | medium | Large pages ran the scraper out of memory (~80 MB per MB of dense HTML parsed), and a killed instance skips the refund | fixed `9017d1c` (2 MB parse cap, cut on a UTF-8 boundary) |
 | CAP-5 | medium | `set_global_options` gives every function gen-1 CPU shares and concurrency 1 | accepted for launch: a cost decision, and concurrency above 1 needs a thread-safety pass first (FINAL-REPORT §4) |
-| CAP-6 | medium | Backlog releases and imports share the 10 worker slots with live saves | CAPFIX-6 |
-| CAP-7 | medium | An exception after the card was written turned a finished capture into FAILED, with no refund | CAPFIX-7 |
-| CAP-8 | medium | Shared screenshots were stored twice; deleting the card left the original | CAPFIX-8 |
+| CAP-6 | medium | Backlog releases and imports share the 10 worker slots with live saves | partial `d2476a7`: the daily release drains 50 per janitor tick; imports still share the worker queue (a second queue and worker is a bigger change than launch needs) |
+| CAP-7 | medium | An exception after the card was written turned a finished capture into FAILED, with no refund | fixed `4cc3fdf` |
+| CAP-8 | medium | Shared screenshots were stored twice; deleting the card left the original | fixed `f8f1def` |
 | CAP-9 | medium | LinkedIn login walls, 999 and 404 pages became "ready" cards built from raw markup | fixed `924ae91` |
 | CAP-10 | medium | Saved X and Instagram URLs, with the sharer's tracking tokens, went to unaffiliated relays whose images were trusted; the privacy policy didn't name them | fixed `a0e6e66` (path only, no relay images, policy names them) |
 | CAP-11 | medium | Every capture read the user's entire library for the prompt's vocabulary | fixed `ae5909c` (newest 500, projected) |
 | CAP-12 | medium | The SSRF guard refused every international domain name | fixed `066d4b6` |
-| CAP-13 | low | Healthy queued cards could fill the janitor's 200-card window and hide a stuck one | CAPFIX-13 |
-| CAP-14 | low | "Add screenshots" never timed out and had no at-most-once refund | CAPFIX-14 |
-| CAP-15 | low | Retry on a trial burned the 3-per-hour video budget on links that aren't videos | CAPFIX-15 |
+| CAP-13 | low | Healthy queued cards could fill the janitor's 200-card window and hide a stuck one | fixed `d2b93fb` (by age; two new composite indexes, old scan while they build) |
+| CAP-14 | low | "Add screenshots" never timed out and had no at-most-once refund | fixed `e86d679` |
+| CAP-15 | low | Retry on a trial burned the 3-per-hour video budget on links that aren't videos | fixed `45a9035` |
 | CAP-16 | low | The text shared with an Instagram or Facebook link never reached the model | fixed `a0e6e66` |
-| CAP-17 | low | URL extraction kept CJK and Hebrew punctuation; CJK read time was always 1 minute | read time fixed `c0c9012`; URL extraction CAPFIX-17 |
-| CAP-18 | low | A link without `https://` in the share `url` field was rejected | CAPFIX-18 |
-| CAP-19 | low | The screenshot-enrich path stored model output without the usual length caps | CAPFIX-19 |
-| CAP-20 | low | Page titles and share URLs had no size limit (a huge title broke the card) | titles fixed `c0c9012`; share URL length CAPFIX-20 |
-| CAP-21 | low | Shared text over 30,000 characters was silently cut | CAPFIX-21 |
+| CAP-17 | low | URL extraction kept CJK and Hebrew punctuation; CJK read time was always 1 minute | read time fixed `c0c9012`; URL extraction `c6ca6b6`, `2ea1d17` (server and web form) |
+| CAP-18 | low | A link without `https://` in the share `url` field was rejected | fixed `c6ca6b6` |
+| CAP-19 | low | The screenshot-enrich path stored model output without the usual length caps | fixed `204f79c` |
+| CAP-20 | low | Page titles and share URLs had no size limit (a huge title broke the card) | titles fixed `c0c9012`; share URL length `c6ca6b6` |
+| CAP-21 | low | Shared text over 30,000 characters was silently cut | fixed `c6ca6b6` (stored up to 200,000 characters; analysis reads the first 30,000) |
 | CAP-22 | low (plausible) | A Gemini RECITATION block made a capture permanently unsaveable | fixed `dc8019f` (one retry in the model's own words; not testable against live Gemini here) |
 
-<!-- BACKEND -->

@@ -7,17 +7,18 @@ status and its commit are in `01-findings.md`; the product map is in
 ## 1. Verdict: ready with caveats
 
 The code is in launch shape. Every high-severity finding is fixed in this
-branch, each fix is covered by a test that fails on the old code or by a
-measured render, and the full suites pass. What stands between this branch
-and the App Store is work that can't be done from this machine:
+branch. Backend fixes come with tests that fail on the old code; UI fixes
+were type-checked and linted, and the visual ones rendered and measured; the
+full suites pass locally and in CI. What stands between this branch and the
+App Store is work that can't be done from this machine:
 
 1. **Ship it.** Merge to `main` through `/ship`: Vercel, the Cloud Functions
    (all of them, indexes first), the Firestore rules, and a TestFlight build.
    None of this is deployed.
 2. **Compile and smoke-test the iOS changes.** There is no Swift toolchain
-   here, so the share extension edits, the Facebook-SDK strip and the
-   Info.plist changes have never been compiled. The next TestFlight build is
-   their first compile; then a 15-minute device pass (section 4).
+   here, so the share-extension edits have never been compiled, and the
+   Facebook-SDK strip and the plist and asset changes never built. The next
+   TestFlight build is their first; then a 15-minute device pass (section 4).
 3. **App Store Connect**: the privacy label rows and the Terms of Use link
    (section 4).
 
@@ -26,9 +27,12 @@ device, against production Firebase, or against live Gemini.
 
 ## 2. What was fixed, by severity
 
-About 205 findings across 11 audit areas; full table with commits in
-`01-findings.md`. Counts are in section 3. Below, every high, then the
-mediums grouped by what they protect.
+207 findings across 11 audit areas: 24 high, 84 medium, 10 low-medium,
+87 low, 2 informational. **196 fixed** (3 of them also need an owner step:
+WEB-3, IOS-2, IOS-3), 3 partial (OWN-9, IOS-5, CAP-6), 5 accepted with the
+reason stated, 1 owner-only (IOS-19), 2 clean checks. Every finding with
+its commit is in `01-findings.md`. Below: every high, then the mediums
+grouped by what they protect.
 
 ### High (all fixed)
 
@@ -53,7 +57,10 @@ mediums grouped by what they protect.
   only saw the loaded window (WEB-2); free users never saw the locked weekly
   recap (REC-1); a shared answer couldn't be unpublished once its sources
   went private (REC-2); digest ticks dropped users past 60 s (AI-2).
-CAPHIGH
+- **Capture charging and loss**: the janitor deleted queue jobs while they
+  ran, failing the card and charging Retry again (CAP-1); Retry and the web
+  Image tab charged up front and kept the charge when the app gave up at
+  60 s (CAP-2). Both now go through the durable queue.
 - **Unreadable or untappable UI**: muted text at 2.3-3.6:1 (A11Y-1),
   category chips down to 1.7:1 (A11Y-2), white labels on the porcelain
   gradient (DS-1), a red debug border under every heading (DS-2), Ask silent
@@ -79,7 +86,11 @@ CAPHIGH
   international domains were refused (CAP-12); the capture form froze
   (WEB-5); Retry threw away video data (WEB-7); 6+ screenshots hid the share
   extension (IOS-4); the share sheet could hang on a dim screen (IOS-7).
-CAPMED
+- **Capture queue**: a redelivered job made a duplicate card or overwrote a
+  good Retry (CAP-3); a failure after the card was written failed it with no
+  refund (CAP-7); screenshots were stored twice and outlived their card
+  (CAP-8); the daily backlog release could hold up live saves for hours
+  (CAP-6, partial: it now drains in slices).
 - **Ask and recall**: budgets that didn't line up (AI-3, RV-2, REC-7), honest
   "not in your saves" answers charged (AI-5) and refunds that could be
   farmed (RV-3), an embedding outage shown as an empty library (AI-6), lost
@@ -100,16 +111,21 @@ CAPMED
   label update is an owner step), the Facebook SDK in every build (IOS-3;
   first compile pending), unpinned native dependencies (IOS-5; partial),
   the local build script with the sign-in gate off (IOS-6).
+- **A regression from this audit, caught in the final sweep** (OWN-10): the
+  lazy loading added for OWN-9 made Ask or the graph crash to the error
+  screen when opened offline on the web, and stay broken until a full
+  reload. It now shows a retry state and loads on reconnect. iOS was never
+  affected (the app ships that code in its bundle).
 
-### Low
+### Low and low-medium
 
-About 90 lows, all fixed or explained in the log: copy, RTL details,
-locale formats, tooling, cost trims and robustness gaps.
+97 of them, all fixed or explained in the log: copy, RTL details, locale
+formats, tooling, cost trims and robustness gaps.
 
 ## 3. What was verified, and how
 
 **Ran, and passed (verified)**
-- Backend: `pytest` BACKEND_COUNT passed (1,360 at the start of the audit);
+- Backend: `pytest` 1,904 passed (1,360 at the start of the audit);
   `python -m py_compile *.py`; `ruff --select F` clean on every production
   module. Each backend fix comes with tests, and the new tests were run
   against the previous code to confirm they fail there (a few pin behaviour
@@ -117,20 +133,26 @@ locale formats, tooling, cost trims and robustness gaps.
   way.
 - Web: `tsc --noEmit` 0 errors; `eslint . --max-warnings=0` clean on the
   whole project; unit tests 79/79 (`lib` + build scripts); the em-dash gate
-  (now parser-based) clean on 195 files; the production static export builds.
+  (now parser-based) clean on 196 files; the production static export builds.
 - CI on GitHub (Playwright journeys against the Firebase emulators, which
-  can't be downloaded here): E2E journeys, Firestore rules tests and the
-  Python suite green on CI_SHA. The E2E run covers the new Google-emulator
-  sign-in the stricter create rule required.
+  can't be downloaded here): E2E journeys (67 passed, 4 skipped; extension
+  journeys 13 passed) and the Python suite green on `a0e80b2`, the last
+  backend commit; Firestore rules tests green on `043ae65` (rules unchanged
+  since). E2E on `88d078a`, the final web fix, was still running when this
+  was written. The E2E run covers the new Google-emulator sign-in the
+  stricter create rule required.
 - Browser extension: unit checks locally; its Chromium journeys in CI.
 - Renders in Chromium (temporary harness pages, deleted after): touch
   targets on a phone vs desktop (44pt only on touch), category chip
   contrast measured on rendered chips in both themes (4.99-8.93:1), the
   offline pill (no longer swallows taps), digest wheels by keyboard, toast
   timing, reduced-motion deck, Apple button in both themes, paywall states,
-  theme color, week labels west of UTC, Hebrew `lang` on cards.
+  theme color, week labels west of UTC, Hebrew `lang` on cards, and the
+  lazy-loaded Ask and graph on a production build (the old loader's offline
+  crash reproduced; the new one recovers offline, after a failed load and
+  after a failed prefetch).
 - Measured: first-load JavaScript 1,986 KB / 595 KB gzip before,
-  1,755 KB / 525 KB after (production build, home page).
+  1,752 KB / 524 KB after (production build, home page).
 
 **Not verified (couldn't be run here)**
 - Any Swift: no toolchain. The share-extension changes compile for the first
@@ -151,7 +173,9 @@ Each line: what, and why it can't be done here.
 - Merge `claude/launch-audit` to `main` via `/ship`. Vercel deploys on push.
   Functions deploy automatically on `functions/**` changes; this branch
   changes most of them, so deploy all (no `Deploy-Functions:` scope line),
-  and indexes go first (new: `links.needsEmbedding`). The Firestore rules
+  and indexes go first (new: two `links` composite indexes for the janitor,
+  `links.enrichStatus` and `links.needsEmbedding` overrides; the janitor
+  falls back to its old scan while they build). The Firestore rules
   changed (Google/Apple-only self-serve workspace create), so the rules
   deploy runs too. Not done: deploying is the owner's call, and nothing here
   may push to `main`.
@@ -161,10 +185,12 @@ Each line: what, and why it can't be done here.
   in this environment.
 - Device pass on that build, about 15 minutes: share 6+ screenshots
   (extension shows; "first 5 of N"); share with VoiceOver on (result is
-  spoken); cancel Apple and Google sign-in (no red error); Settings →
-  notifications, tap Don't Allow (no jump to Settings); make a shared card
-  Private, then open its link (not found); delete a test account with
-  images (it finishes; images gone). None of this can run without a device.
+  spoken); save one screenshot from the + sheet and Retry a failed card
+  (both now run in the background and finish on their own); cancel Apple and
+  Google sign-in (no red error); Settings → notifications, tap Don't Allow
+  (no jump to Settings); make a shared card Private, then open its link (not
+  found); delete a test account with images (it finishes; images gone). None
+  of this can run without a device.
 
 **Production data and consoles (owner)**
 - `normalize_created_at`: dry run, then `--apply` (WEB-3). It rewrites
