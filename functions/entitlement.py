@@ -356,6 +356,27 @@ def _mark_trial_settled(uid: str) -> None:
     _TRIAL_SETTLED.add(uid)
 
 
+def _run_transaction(db, fn):
+    """Run ``fn(transaction)`` in a Firestore transaction (retried on
+    contention, so ``fn`` reads and writes only through the transaction).
+    Tests swap this for a direct call."""
+    from google.cloud import firestore  # lazy: the hot paths here never need it
+
+    @firestore.transactional
+    def _txn(tx):
+        return fn(tx)
+    return _txn(db.transaction())
+
+
+def _trial_clock_unstarted(doc: Optional[dict]) -> bool:
+    """True only for a reverse trial whose 14-day clock has not started. A
+    founder, a subscriber, and a doc written before the anchor rule shipped
+    (which already carries trialEndsAt) are all settled forever."""
+    doc = doc or {}
+    return (doc.get("source") == "trial"
+            and not doc.get("trialAnchorAt") and not doc.get("trialEndsAt"))
+
+
 def count_cards(uid: str, cap: int) -> int:
     """How many cards `uid` has, counted only up to `cap`.
 
@@ -386,11 +407,8 @@ def maybe_start_trial(uid: str) -> bool:
     if not uid or uid in _TRIAL_SETTLED:
         return False
     try:
-        doc = get_entitlement(uid)
-        # Only an unstarted reverse trial has a clock to start. A founder, a
-        # subscriber, and a doc written before this rule shipped (which already
-        # carries trialEndsAt) are all settled forever.
-        if doc.get("source") != "trial" or doc.get("trialAnchorAt") or doc.get("trialEndsAt"):
+        # Only an unstarted reverse trial has a clock to start.
+        if not _trial_clock_unstarted(get_entitlement(uid)):
             _mark_trial_settled(uid)
             return False
         if count_cards(uid, TRIAL_ANCHOR_CARDS) < TRIAL_ANCHOR_CARDS:
@@ -401,18 +419,36 @@ def maybe_start_trial(uid: str) -> bool:
         # this needs the user doc (one read, once per workspace, ever).
         created = _user_created_at(uid) or now
         ends = trial_ends_from_anchor(created, now)
-        get_db().collection(_COLLECTION).document(uid).set({
-            "trialAnchorAt": now,
-            "trialEndsAt": ends,
-            "proUntil": ends,
-            "plan": PLAN_PRO,
-            "source": "trial",
-            "updatedAt": now,
-        }, merge=True)
+        db = get_db()
+        ref = db.collection(_COLLECTION).document(uid)
+
+        def _start(tx) -> bool:
+            # Re-read inside the transaction and write only if the clock is
+            # STILL unstarted. The read above is a snapshot: a purchase synced
+            # from RevenueCat (or another instance anchoring this workspace)
+            # can land before this write, and a plain merge would overwrite
+            # it, cutting an annual subscriber back to the trial's end date.
+            snap = ref.get(transaction=tx)
+            if not _trial_clock_unstarted(snap.to_dict() if snap.exists else None):
+                return False
+            tx.set(ref, {
+                "trialAnchorAt": now,
+                "trialEndsAt": ends,
+                "proUntil": ends,
+                "plan": PLAN_PRO,
+                "source": "trial",
+                "updatedAt": now,
+            }, merge=True)
+            return True
+
+        started = _run_transaction(db, _start)
+        # Either way the workspace is settled: the clock started here, or
+        # something else (a purchase, another instance) settled it first.
         _mark_trial_settled(uid)
-        logger.info("Trial clock started for %s at %d cards, ends %s",
-                    mask_uid(uid), TRIAL_ANCHOR_CARDS, ends)
-        return True
+        if started:
+            logger.info("Trial clock started for %s at %d cards, ends %s",
+                        mask_uid(uid), TRIAL_ANCHOR_CARDS, ends)
+        return started
     except Exception as e:
         logger.warning("Trial anchor check failed (ignored) for %s: %s", mask_uid(uid), e)
         return False

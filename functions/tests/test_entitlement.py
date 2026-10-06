@@ -230,6 +230,9 @@ class _AnchorDB:
         self.created_at = created_at
         self.writes = []
         self.card_reads = 0
+        # Runs while the cards are being counted: a write that lands between
+        # maybe_start_trial's first read and its own write.
+        self.on_count = None
 
     # users/{uid}/links -> a query that only ever reports its length
     class _Links:
@@ -246,6 +249,8 @@ class _AnchorDB:
 
         def get(self):
             self.outer.card_reads += 1
+            if self.outer.on_count:
+                self.outer.on_count()
             return [object()] * min(self.outer.card_count, self.cap or self.outer.card_count)
 
     class _UserRef:
@@ -268,7 +273,7 @@ class _AnchorDB:
         def __init__(self, outer):
             self.outer = outer
 
-        def get(self):
+        def get(self, transaction=None):
             data = self.outer.ent_doc
 
             class _S:
@@ -294,6 +299,13 @@ class _AnchorDB:
         return _Col()
 
 
+class _DirectTx:
+    """The anchor write runs in a transaction; offline, run it directly."""
+
+    def set(self, ref, data, merge=False):
+        ref.set(data, merge=merge)
+
+
 def _anchor_env(monkeypatch, cards, ent_doc=None, created_offset=3 * DAY):
     launch = _ms(ent.PRO_LAUNCH_AT)
     created = launch + created_offset
@@ -302,6 +314,7 @@ def _anchor_env(monkeypatch, cards, ent_doc=None, created_offset=3 * DAY):
                    "trialEndsAt": None, "trialAnchorAt": None}
     db = _AnchorDB(ent_doc, cards, created)
     monkeypatch.setattr(ent, "get_db", lambda: db)
+    monkeypatch.setattr(ent, "_run_transaction", lambda _db, fn: fn(_DirectTx()), raising=False)
     ent._TRIAL_SETTLED.clear()
     return db, created
 
@@ -373,6 +386,47 @@ def test_grandfathered_trial_without_an_anchor_is_left_alone(monkeypatch):
     db, _ = _anchor_env(monkeypatch, cards=50, ent_doc=legacy)
     assert ent.maybe_start_trial("u1") is False
     assert db.writes == []
+
+
+def test_a_purchase_synced_mid_anchor_is_never_overwritten(monkeypatch):
+    """The anchor used to read the doc, count the cards, then plain-merge
+    {source: trial, proUntil: trial end}. A RevenueCat sync landing in between
+    was overwritten: an annual subscriber cut back to the trial's end date.
+    The write now re-checks inside a transaction."""
+    db, created = _anchor_env(monkeypatch, cards=10)
+    monkeypatch.setattr(ent, "_now_ms", lambda: created + 5 * DAY)
+    annual = created + 370 * DAY
+
+    def purchase_lands():
+        db.ent_doc = {**db.ent_doc, "plan": "pro", "source": "revenuecat",
+                      "proUntil": annual, "productId": "machina_pro_annual"}
+
+    db.on_count = purchase_lands
+    assert ent.maybe_start_trial("u1") is False
+    assert db.writes == []
+    assert db.ent_doc["source"] == "revenuecat"
+    assert db.ent_doc["proUntil"] == annual
+    assert db.ent_doc.get("trialAnchorAt") is None
+    # Settled: a subscriber has no trial clock to watch.
+    assert "u1" in ent._TRIAL_SETTLED
+
+
+def test_an_anchor_written_meanwhile_is_not_moved(monkeypatch):
+    """Two card writes on two instances: the second must not move the clock
+    the first one started."""
+    db, created = _anchor_env(monkeypatch, cards=11)
+    first = created + 2 * DAY
+    monkeypatch.setattr(ent, "_now_ms", lambda: first + 60_000)
+
+    def other_instance_anchors():
+        db.ent_doc = {**db.ent_doc, "trialAnchorAt": first,
+                      "trialEndsAt": first + 14 * DAY, "proUntil": first + 14 * DAY}
+
+    db.on_count = other_instance_anchors
+    assert ent.maybe_start_trial("u1") is False
+    assert db.writes == []
+    assert db.ent_doc["trialAnchorAt"] == first
+    assert db.ent_doc["proUntil"] == first + 14 * DAY
 
 
 def test_anchor_failure_is_swallowed(monkeypatch):
