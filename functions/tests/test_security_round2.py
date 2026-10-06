@@ -754,6 +754,37 @@ def test_delete_account_writes_the_tombstone(monkeypatch):
     assert written[-1] == ("doc@example.com", 42)
 
 
+def test_delete_account_retry_after_auth_user_is_gone_succeeds(monkeypatch):
+    """An earlier attempt can finish server-side after the app stopped waiting:
+    the workspace is gone and the auth user too. The retry must report success,
+    not a 500 on UserNotFoundError forever."""
+    class UserNotFoundError(Exception):
+        pass
+
+    def delete_user(uid):
+        raise UserNotFoundError(uid)
+
+    monkeypatch.setattr(main, "find_data_uid_by_auth_uid", lambda uid: None)
+    monkeypatch.setattr(main, "admin_auth", types.SimpleNamespace(
+        delete_user=delete_user, UserNotFoundError=UserNotFoundError))
+    assert main._delete_account_logic("auth-1", "a@example.com") == {"success": True}
+
+
+def test_delete_account_other_auth_failures_still_fail(monkeypatch):
+    class UserNotFoundError(Exception):
+        pass
+
+    def delete_user(uid):
+        raise RuntimeError("auth backend down")
+
+    monkeypatch.setattr(main, "find_data_uid_by_auth_uid", lambda uid: None)
+    monkeypatch.setattr(main, "admin_auth", types.SimpleNamespace(
+        delete_user=delete_user, UserNotFoundError=UserNotFoundError))
+    import pytest
+    with pytest.raises(main._DeleteAccountError):
+        main._delete_account_logic("auth-1", "a@example.com")
+
+
 def test_deleted_accounts_is_functions_only():
     rules = open(main.__file__.replace("functions/main.py", "firestore.rules.locked")).read()
     block = rules[rules.index("match /deleted_accounts/{docId}"):]

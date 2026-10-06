@@ -596,11 +596,15 @@ export async function deleteAccount(): Promise<void> {
     await revokeAppleIfLinked();
     if (isNativeApp()) {
         const { apiUrl, fetchWithTimeout } = await import('@/lib/api');
+        // 75s: longer than Hosting's 60s proxy limit, so the server's answer
+        // (success or a real error) always arrives before the app gives up.
+        // At the old 30s default a large library was reported as "Could not
+        // delete" while the server went on to finish the deletion.
         const res = await fetchWithTimeout(apiUrl('/api/delete-account'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
             body: '{}',
-        });
+        }, 75_000);
         if (!res.ok) throw new Error(`delete-account HTTP ${res.status}`);
     } else {
         const { httpsCallable } = await import('firebase/functions');

@@ -175,7 +175,14 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
     const [deleting, setDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState<string | null>(null);
 
+    // Set synchronously, before the first await: ConfirmDialog calls onClose
+    // right after onConfirm, while `deleting` in this render is still false.
+    // Reading state there closed the dialog at once, so "Deleting…" never
+    // showed and a second tap started a second deletion.
+    const deletingRef = useRef(false);
     const handleDeleteAccount = async () => {
+        if (deletingRef.current) return;
+        deletingRef.current = true;
         setDeleting(true);
         setDeleteError(null);
         try {
@@ -185,7 +192,9 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
             setShowDeleteConfirm(false);
             onClose();
         } catch (e) {
+            deletingRef.current = false;
             setDeleting(false);
+            setShowDeleteConfirm(false);
             setDeleteError(
                 (e as Error)?.name === 'AppleConfirmCancelled'
                     ? 'Account not deleted. Confirming with Apple is the last step. Try again when ready.'
@@ -474,8 +483,9 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
 
             <ConfirmDialog
                 isOpen={showDeleteConfirm}
-                onClose={() => { if (!deleting) setShowDeleteConfirm(false); }}
+                onClose={() => { if (!deletingRef.current) setShowDeleteConfirm(false); }}
                 onConfirm={handleDeleteAccount}
+                busy={deleting}
                 title="Delete account?"
                 message="This permanently deletes your account and all saved links, collections, and chats. This action cannot be undone."
                 extra={

@@ -216,6 +216,30 @@ def create_workspace(auth_uid: str, email: Optional[str] = None) -> str:
     return auth_uid
 
 
+# Firestore caps a batched write at 500 operations; stay under it.
+_DELETE_BATCH = 400
+
+
+def _delete_all(db, query) -> int:
+    """Delete every document `query` returns, reading only document names and
+    committing 400 deletes per batch. One round trip per batch instead of one
+    per document: a large library is thousands of docs (cards, their vectors,
+    analytics events), and the per-document sweep could outrun the 60-second
+    limit Firebase Hosting puts on the app's /api/delete-account call."""
+    deleted = 0
+    batch, pending = db.batch(), 0
+    for snap in query.select(["__name__"]).stream():
+        batch.delete(snap.reference)
+        pending += 1
+        deleted += 1
+        if pending >= _DELETE_BATCH:
+            batch.commit()
+            batch, pending = db.batch(), 0
+    if pending:
+        batch.commit()
+    return deleted
+
+
 def delete_user_data(uid: str) -> int:
     """Hard-delete a user's Firestore workspace: the links/chats/collections
     subcollections and the top-level user doc. Returns the number of documents
@@ -237,18 +261,12 @@ def delete_user_data(uid: str) -> int:
     # swept explicitly: the M12 weekly recaps, the user's margin notes on
     # them, in-app digests, self-hosted analytics and crash reports.
     for sub in USER_SUBCOLLECTIONS:
-        for doc in user_ref.collection(sub).stream():
-            doc.reference.delete()
-            deleted += 1
+        deleted += _delete_all(db, user_ref.collection(sub))
     # Any queued processing rows for this user.
-    for doc in db.collection('pending_processing').where(filter=FieldFilter('uid', '==', uid)).stream():
-        doc.reference.delete()
-        deleted += 1
+    deleted += _delete_all(db, db.collection('pending_processing').where(filter=FieldFilter('uid', '==', uid)))
     # Background-processing heartbeats for this user. The uid is stored nested
     # under `data.uid` (see log_to_firestore in main.py), so query on that path.
-    for doc in db.collection('task_logs').where(filter=FieldFilter('data.uid', '==', uid)).stream():
-        doc.reference.delete()
-        deleted += 1
+    deleted += _delete_all(db, db.collection('task_logs').where(filter=FieldFilter('data.uid', '==', uid)))
     # Per-workspace server-side state keyed by uid: the plan grant, the monthly
     # quota counters, and the vaulted full syntheses (synthesis_vault rows carry
     # a `uid` field — see entitlement.stash_synthesis).
@@ -257,9 +275,7 @@ def delete_user_data(uid: str) -> int:
         if ref.get().exists:
             ref.delete()
             deleted += 1
-    for doc in db.collection('synthesis_vault').where(filter=FieldFilter('uid', '==', uid)).stream():
-        doc.reference.delete()
-        deleted += 1
+    deleted += _delete_all(db, db.collection('synthesis_vault').where(filter=FieldFilter('uid', '==', uid)))
     # Every public share this workspace published: the world-readable snapshot,
     # its owner mapping, and the generated link-preview image. Without this a
     # deleted account's /s, /c and /a pages stayed live forever with nobody

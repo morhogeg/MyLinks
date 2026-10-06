@@ -4582,6 +4582,12 @@ def _delete_account_logic(auth_uid: str, email: str = None) -> dict:
     # Delete the Firebase Auth user last so the login can't be reused.
     try:
         admin_auth.delete_user(auth_uid)
+    except admin_auth.UserNotFoundError:
+        # Already gone: an earlier attempt finished server-side after the app
+        # stopped waiting for it. The data sweep above is idempotent, so this
+        # retry has now completed the deletion; failing here would make every
+        # retry fail forever.
+        pass
     except Exception as e:
         logger.error("Failed to delete auth user: %s", e)
         raise _DeleteAccountError("Failed to delete account")
@@ -4589,7 +4595,10 @@ def _delete_account_logic(auth_uid: str, email: str = None) -> dict:
     return {"success": True}
 
 
-@https_fn.on_call()
+# 300s: a large workspace's sweep (Firestore batches + Storage blobs) must not
+# be cut off at the 60s default. The native path still goes through Hosting's
+# 60s proxy, which the batched sweep fits inside.
+@https_fn.on_call(timeout_sec=300)
 def delete_account(req: https_fn.CallableRequest) -> dict:
     """Permanently delete the signed-in user's account and all their data.
 
@@ -4617,7 +4626,7 @@ def delete_account(req: https_fn.CallableRequest) -> dict:
         )
 
 
-@https_fn.on_request()
+@https_fn.on_request(timeout_sec=300)
 def delete_account_http(req: https_fn.Request) -> https_fn.Response:
     """HTTP twin of the `delete_account` callable, for the native iOS shell.
 
