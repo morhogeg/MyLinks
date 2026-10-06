@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import {
     collection, query, getDocs, limit, where, doc, getDoc, setDoc, updateDoc, arrayUnion,
 } from 'firebase/firestore';
@@ -9,9 +9,9 @@ import { db, functions, auth } from '@/lib/firebase';
 import { isNativeApp, REQUIRE_AUTH, apiUrl, fetchWithTimeout } from '@/lib/api';
 import {
     onAuthChange, completeRedirectSignIn, signIn, signOutUser, authHeaders,
-    PROFILE_UPDATED_EVENT,
+    PROFILE_UPDATED_EVENT, isSigningOut, purgeAfterExternalSignOut,
 } from '@/lib/auth';
-import { syncShareConfigToNative } from '@/lib/shareConfig';
+import { syncShareConfigToNative, clearNativeShareConfig } from '@/lib/shareConfig';
 import { readLocalAiConsent, writeLocalAiConsent } from '@/lib/aiConsent';
 import { setAnalyticsUid, flushSignIn, trackAppOpen, track } from '@/lib/analytics';
 import { installErrorReporter, reportError, flushBufferedReports, reportViaHttp } from '@/lib/errorReporter';
@@ -70,15 +70,30 @@ export function useAuth() {
     return useContext(AuthContext);
 }
 
+/** The share-sheet sync held back until the AI notice is accepted. */
+let pendingShareSync: { docId: string; docToken?: string } | null = null;
+
 /**
  * Best-effort, fire-and-forget side effects once the data doc is known: hand the
  * iOS Share Extension its endpoint/token, and persist the browser timezone.
+ *
+ * The share sheet gets its token only once THIS account has accepted the AI
+ * notice (App Review 5.1.2). Before that, a user who signed in and left the
+ * notice unanswered could share a page from Safari and have it analyzed by
+ * Gemini without ever consenting. Until then the extension holds no token
+ * (any left by an earlier build is cleared) and asks the user to open Machina.
  */
-function attachUserDoc(docId: string, data: Record<string, unknown> | undefined) {
+function attachUserDoc(docId: string, data: Record<string, unknown> | undefined, consented: boolean) {
     // Pass the doc's ingestToken so the bridge needs NO backend call at all
     // (the callable is only a fallback for a token-less first launch).
     const docToken = typeof data?.ingestToken === 'string' ? data.ingestToken : undefined;
-    syncShareConfigToNative(docId, docToken);
+    if (consented) {
+        pendingShareSync = null;
+        syncShareConfigToNative(docId, docToken);
+    } else {
+        pendingShareSync = { docId, docToken };
+        void clearNativeShareConfig();
+    }
     syncTimezone(docId, typeof data?.timezone === 'string' ? data.timezone : null);
 }
 
@@ -138,16 +153,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [needsOnboarding, setNeedsOnboarding] = useState(false);
     // Bumped by "Try again" on the restricted screen to re-run resolution.
     const [retryNonce, setRetryNonce] = useState(0);
-    // AI-consent gate (App Review 5.1.1/5.1.2): null until the local record is
-    // read on mount (keeps SSR/first paint consistent), then true/false. Both
-    // signals count — localStorage `ai-consent-v1` OR `aiConsentAt` on the
-    // user doc (checked when the doc resolves, so a reinstall doesn't re-ask).
+    // AI-consent gate (App Review 5.1.1/5.1.2): null until the workspace
+    // resolves, then true/false for THAT account. Either record counts:
+    // `aiConsentAt` on the user doc (survives reinstalls and devices), or this
+    // device's per-workspace cache (lib/aiConsent).
     const [aiConsented, setAiConsented] = useState<boolean | null>(null);
+    // The auth uid this tab last resolved, to tell "signed out from
+    // elsewhere" (deleted or disabled account, revoked sessions) from the
+    // signed-out state the app simply started in.
+    const lastAuthUidRef = useRef<string | null>(null);
 
     const native = typeof window !== 'undefined' && isNativeApp();
 
     useEffect(() => {
-        setAiConsented(readLocalAiConsent() !== null);
         // Install the global JS error handlers once, as early as possible.
         installErrorReporter();
     }, []);
@@ -194,21 +212,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, []);
 
     // Reconcile the two consent records once the data doc is known: a doc
-    // timestamp wins (cache it locally); otherwise mirror a local acceptance
-    // up to the doc so it survives reinstalls.
+    // timestamp wins (cache it locally); otherwise mirror this workspace's
+    // local acceptance up to the doc (a failed write at accept time) so it
+    // survives reinstalls. Returns whether this account has consented.
     const reconcileAiConsent = useCallback(
-        (docId: string, data: Record<string, unknown> | undefined) => {
+        (docId: string, data: Record<string, unknown> | undefined): boolean => {
             const docTs = typeof data?.aiConsentAt === 'number' ? data.aiConsentAt : null;
             if (docTs) {
                 setAiConsented(true);
-                writeLocalAiConsent(docTs);
-                return;
+                writeLocalAiConsent(docId, docTs);
+                return true;
             }
-            const localTs = readLocalAiConsent();
+            const localTs = readLocalAiConsent(docId);
             if (localTs !== null) {
+                setAiConsented(true);
                 updateDoc(doc(db, 'users', docId), { aiConsentAt: localTs })
                     .catch((e) => reportError(e, 'auth-ai-consent-reconcile'));
+                return true;
             }
+            setAiConsented(false);
+            return false;
         },
         [],
     );
@@ -237,15 +260,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         [],
     );
 
-    // Explicit acceptance from the notice: persist locally + on the user doc.
+    // Explicit acceptance from the notice: persist locally + on the user doc,
+    // then hand the share sheet the token it was held back from.
     const acceptAiConsent = useCallback(() => {
         const now = Date.now();
         setAiConsented(true);
-        writeLocalAiConsent(now);
         track('consent_accepted');
         if (uid) {
+            writeLocalAiConsent(uid, now);
             updateDoc(doc(db, 'users', uid), { aiConsentAt: now })
                 .catch((e) => reportError(e, 'auth-ai-consent-accept'));
+        }
+        if (pendingShareSync) {
+            const { docId, docToken } = pendingShareSync;
+            pendingShareSync = null;
+            syncShareConfigToNative(docId, docToken);
         }
     }, [uid]);
 
@@ -291,8 +320,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 const userDoc = snapshot.docs[0];
                 setRestricted(false);
                 setUid(userDoc.id);
-                attachUserDoc(userDoc.id, userDoc.data());
-                reconcileAiConsent(userDoc.id, userDoc.data());
+                const consented = reconcileAiConsent(userDoc.id, userDoc.data());
+                attachUserDoc(userDoc.id, userDoc.data(), consented);
                 attachPush(userDoc.id, userDoc.data());
                 reconcileTourSeen(userDoc.id, userDoc.data(), false);
             } catch (err) {
@@ -322,6 +351,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const unsub = onAuthChange(async (user) => {
             if (cancelled) return;
             if (!user) {
+                const hadUser = lastAuthUidRef.current !== null;
+                lastAuthUidRef.current = null;
+                if (hadUser && !isSigningOut()) {
+                    // Signed out by Firebase, not by us: run the same purge as
+                    // the Sign out button (it reloads into the signed-out page).
+                    void purgeAfterExternalSignOut();
+                    return;
+                }
+                setAiConsented(null);
                 setUid(null);
                 setAuthUid(null);
                 setEmail(null);
@@ -332,6 +370,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 return;
             }
 
+            lastAuthUidRef.current = user.uid;
             setAuthUid(user.uid);
             setEmail(user.email);
             setDisplayName(user.displayName);
@@ -344,8 +383,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     setRestricted(false);
                     setRestrictedDetail(null);
                     setUid(dataDoc.id);
-                    attachUserDoc(dataDoc.id, dataDoc.data);
-                    reconcileAiConsent(dataDoc.id, dataDoc.data);
+                    const consented = reconcileAiConsent(dataDoc.id, dataDoc.data);
+                    attachUserDoc(dataDoc.id, dataDoc.data, consented);
                     attachPush(dataDoc.id, dataDoc.data);
                     // First run for a fresh workspace: the backend returns
                     // `created` on creation and stamps `onboarded: false` on

@@ -281,32 +281,71 @@ export async function completeRedirectSignIn(): Promise<User | null> {
  * the page is reloaded straight after. That lands on the LoginScreen, which is
  * where both callers were headed anyway.
  */
-export async function signOutUser(): Promise<void> {
-    if (isNativeApp()) {
-        // The Share Extension's credential lives in the App Group, outside
-        // everything else this function purges — drop it first so the share
-        // sheet cannot keep posting into the departing account's library.
-        try {
-            const { clearNativeShareConfig, clearNativeWebsiteData } = await import('@/lib/shareConfig');
-            await clearNativeShareConfig();
-            // The WebView's own HTTP cache holds every screenshot and thumbnail
-            // the feed showed; JS cannot reach it, the native side can.
-            await clearNativeWebsiteData();
-        } catch {
-            // Never let the bridge block a sign-out.
-        }
-        try {
-            const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
-            await FirebaseAuthentication.signOut();
-        } catch {
-            // Plugin missing/failed — still sign out of the JS SDK below.
-        }
-    }
-    await signOut(auth);
+/** True once a sign-out (ours or an external one) has started purging. */
+let signingOut = false;
 
+/** Whether this tab is already signing out (so AuthProvider can tell a
+ *  deliberate sign-out from one Firebase performed on its own). */
+export function isSigningOut(): boolean {
+    return signingOut;
+}
+
+/** Native-only credentials and caches that live outside the WebView's storage. */
+async function dropNativeSession(): Promise<void> {
+    if (!isNativeApp()) return;
+    // The Share Extension's credential lives in the App Group, outside
+    // everything else this function purges — drop it first so the share
+    // sheet cannot keep posting into the departing account's library.
+    try {
+        const { clearNativeShareConfig, clearNativeWebsiteData } = await import('@/lib/shareConfig');
+        await clearNativeShareConfig();
+        // The WebView's own HTTP cache holds every screenshot and thumbnail
+        // the feed showed; JS cannot reach it, the native side can.
+        await clearNativeWebsiteData();
+    } catch {
+        // Never let the bridge block a sign-out.
+    }
+    try {
+        // RevenueCat is keyed to the auth uid; leave it anonymous so the next
+        // account on this device starts clean.
+        const { logOutPurchases } = await import('@/lib/purchases');
+        await logOutPurchases();
+    } catch {
+        // Not configured on this build: nothing to undo.
+    }
+    try {
+        const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
+        await FirebaseAuthentication.signOut();
+    } catch {
+        // Plugin missing/failed — still sign out of the JS SDK below.
+    }
+}
+
+async function purgeAndReload(): Promise<void> {
     const { purgeLocalUserData } = await import('@/lib/localData');
     await purgeLocalUserData();
     if (typeof window !== 'undefined') window.location.reload();
+}
+
+export async function signOutUser(): Promise<void> {
+    signingOut = true;
+    await dropNativeSession();
+    await signOut(auth);
+    await purgeAndReload();
+}
+
+/**
+ * Firebase signed this device out on its own: the account was deleted or
+ * disabled on another device, or its sessions were revoked. Nothing the user
+ * tapped ran signOutUser, so without this the library stayed in IndexedDB, the
+ * share sheet kept the departed account's token, and the next person to sign in
+ * inherited its local state. Same purge as a deliberate sign-out.
+ */
+export async function purgeAfterExternalSignOut(): Promise<void> {
+    if (signingOut) return;
+    signingOut = true;
+    await dropNativeSession();
+    await purgeAndReload();
 }
 
 /** Subscribe to auth state; returns the unsubscribe function. */

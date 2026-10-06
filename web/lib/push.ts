@@ -312,14 +312,20 @@ export async function sendTestPush(): Promise<TestPushResult> {
 export async function unregisterPush(): Promise<void> {
     if (!isNativeApp()) return;
     let token: string | null = null;
+    let messaging: typeof import('@capacitor-firebase/messaging').FirebaseMessaging | null = null;
     try {
         const { FirebaseMessaging } = await import('@capacitor-firebase/messaging');
+        messaging = FirebaseMessaging;
         token = (await FirebaseMessaging.getToken()).token || null;
     } catch {
         token = null;
     }
     token = token || recallToken();
-    if (!token) return;
-    await postToken('/api/unregister-device-token', token);
+    if (token) await postToken('/api/unregister-device-token', token);
+    // Invalidate the token at FCM as well. If the unregister call failed
+    // (offline, session already gone), the server kept sending this account's
+    // reminders, card titles included, to the device after sign-out. A deleted
+    // token fails its next send and is pruned; registering again mints a new one.
+    try { await messaging?.deleteToken(); } catch { /* best effort */ }
     try { localStorage.removeItem(LAST_TOKEN_KEY); } catch { /* best effort */ }
 }

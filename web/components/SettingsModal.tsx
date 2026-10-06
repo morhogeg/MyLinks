@@ -217,7 +217,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
     // AI-consent timestamp for the "Privacy & AI" section.
     // Read fresh each time the sheet opens (Settings only mounts client-side,
     // after sign-in, so localStorage is available here).
-    const aiConsentAt = useMemo(() => (isOpen ? readLocalAiConsent() : null), [isOpen]);
+    const aiConsentAt = useMemo(() => (isOpen ? readLocalAiConsent(uid) : null), [isOpen, uid]);
 
     // Private-collections PIN management (change / turn off). The PIN is first
     // created from the collection edit sheet; here it can only be maintained.
