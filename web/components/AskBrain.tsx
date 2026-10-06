@@ -408,6 +408,13 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
     // Gate persistence until the initial load/migration has run, so the first
     // (empty) render doesn't create a stray chat.
     const hydratedRef = useRef(false);
+    // Question saves asked for BEFORE that: an ask handed over from the graph,
+    // a collection or a dead-end search is sent from the mount effect, ahead of
+    // the first chats snapshot. Skipping its save (the old behaviour) meant
+    // leaving early lost the question and its already-charged answer, which had
+    // no doc to land in. They run when the chats load, or on unmount if the
+    // user leaves first.
+    const pendingSavesRef = useRef<(() => void)[]>([]);
 
     // Stream lifecycle guard. Every send() captures the current generation; the
     // reader loop re-checks it before each setMessages, so a stale stream can't
@@ -444,8 +451,17 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
     // mid-stream that must DETACH, not drop: the in-flight answer keeps running
     // and persists to its chat doc via commitDetached, exactly like switching
     // chats. Without this, the streamed answer was silently discarded and the
-    // chat reopened as an unanswered question.
-    useEffect(() => () => { detachStreamRef.current(); }, []);
+    // chat reopened as an unanswered question. A question whose save was still
+    // waiting for the chats to load is saved now, so that answer has a doc.
+    useEffect(() => {
+        const pending = pendingSavesRef;
+        return () => {
+            detachStreamRef.current();
+            const queued = pending.current;
+            pending.current = [];
+            queued.forEach((save) => save());
+        };
+    }, []);
 
     // Living suggested prompts, built from the actual library (newest save,
     // this week's activity, shared concepts, top categories, a dusty card) and
@@ -637,6 +653,10 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
     useEffect(() => {
         if (!uid || !chatsLoaded || hydratedRef.current) return;
         hydratedRef.current = true;
+        // Questions asked before this point (see pendingSavesRef) save now.
+        const queued = pendingSavesRef.current;
+        pendingSavesRef.current = [];
+        queued.forEach((save) => save());
         const legacyKey = `askbrain:chat:${uid}`;
         let legacy: ChatMessage[] | null = null;
         try {
@@ -682,15 +702,17 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
         return task;
     }, [uid]);
 
-    // Debounced auto-save as the conversation grows.
+    // Debounced auto-save as the conversation grows, and once more when the
+    // chats first load: an answer that landed before they did would otherwise
+    // wait for the next message to be saved.
     useEffect(() => {
-        if (!uid || !hydratedRef.current || messages.length === 0) return;
+        if (!uid || !chatsLoaded || !hydratedRef.current || messages.length === 0) return;
         if (saveTimer.current) clearTimeout(saveTimer.current);
         const snapshot = messages;
         const convo = convoRef.current;
         saveTimer.current = setTimeout(() => persistConversation(snapshot, convo), 600);
         return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
-    }, [messages, uid, persistConversation]);
+    }, [messages, uid, chatsLoaded, persistConversation]);
 
     // ── Keeping and sharing an answer ─────────────────────────────────────────
     // An answer used to be the one thing you could not keep: copy the text or
@@ -986,10 +1008,15 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
         // stream's commit could still pass the ownership check and overwrite
         // the screen, erasing this just-sent question.
         if (convo.id) chatOwnerGenRef.current.set(convo.id, gen);
-        const chatIdReady: Promise<string | null> = hydratedRef.current
-            ? persistConversation(withUser, convo)
-            : Promise.resolve(null);
-        chatIdReady.then(id => { if (id) chatOwnerGenRef.current.set(id, gen); });
+        const saveQuestion = () => {
+            // Ownership hangs off the persist task itself, so it is recorded
+            // before anything chained after it (a backgrounded completion) runs.
+            persistConversation(withUser, convo).then(id => { if (id) chatOwnerGenRef.current.set(id, gen); });
+        };
+        // Before the first chats snapshot (an ask handed over at mount), the
+        // save waits for it instead of being skipped (see pendingSavesRef).
+        if (hydratedRef.current) saveQuestion();
+        else pendingSavesRef.current.push(saveQuestion);
 
         // Mirror of the on-screen assistant bubble, so a detached stream can
         // persist the finished exchange even though it can't touch React state.
