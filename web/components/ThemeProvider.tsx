@@ -84,6 +84,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         return () => mq.removeEventListener('change', apply);
     }, [theme]);
 
+    // Browser chrome follows the chosen theme, not just the OS: layout.tsx
+    // ships one theme-color per OS appearance, so a light-theme reader on a
+    // dark-mode computer got a black tab bar over a white page. Both tags get
+    // the live `--background`, so whichever one the browser picks is right.
+    useEffect(() => {
+        const bg = getComputedStyle(document.documentElement).getPropertyValue('--background').trim();
+        if (!bg) return;
+        document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute('content', bg));
+    }, [resolvedTheme]);
+
     // Native status bar text follows the resolved theme: light text on the
     // dark theme, dark text on the light one. Without this iOS picks by the
     // system appearance, so a light-theme app on a dark-mode phone drew white

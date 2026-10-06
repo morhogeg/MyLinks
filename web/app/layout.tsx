@@ -52,7 +52,14 @@ export const viewport: Viewport = {
   // No maximumScale / userScalable:false: blocking pinch-zoom fails WCAG 1.4.4
   // for low-vision readers. The focus-zoom those were guarding against is
   // handled by the 16px input/textarea/select rule in globals.css.
-  themeColor: "#050505",
+  // Browser chrome (Android Chrome, desktop Safari's tab bar) before the app
+  // runs: the OS appearance picks one. Same hex as `--background` in
+  // globals.css (metadata can't read a CSS variable). After hydration
+  // ThemeProvider rewrites both to the theme the user actually chose.
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#F9FAFB" },
+    { media: "(prefers-color-scheme: dark)", color: "#050505" },
+  ],
   viewportFit: "cover",
 };
 
