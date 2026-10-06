@@ -525,14 +525,17 @@ def collect_notes_text(data: dict) -> str:
     """
     data = data or {}
     parts = []
-    legacy = (data.get("userNote") or "").strip()
-    if legacy:
-        parts.append(legacy)
-    for n in (data.get("userNotes") or []):
-        if isinstance(n, dict):
-            t = (n.get("text") or "").strip()
-            if t:
-                parts.append(t)
+    # Client-written shapes: anything but a string note (a number, a null, a
+    # map) is skipped, never raised on — this feeds the keyword scan, where
+    # one bad card used to abort lexical search for the whole library.
+    legacy = data.get("userNote")
+    if isinstance(legacy, str) and legacy.strip():
+        parts.append(legacy.strip())
+    notes = data.get("userNotes")
+    for n in (notes if isinstance(notes, list) else []):
+        t = n.get("text") if isinstance(n, dict) else None
+        if isinstance(t, str) and t.strip():
+            parts.append(t.strip())
     return "\n".join(parts)
 
 

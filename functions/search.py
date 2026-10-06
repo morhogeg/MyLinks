@@ -97,17 +97,19 @@ def build_embedding_text(data: dict) -> str:
     unit-tested offline.
     """
     data = data or {}
-    title = (data.get("title") or "").strip()
-    summary = (data.get("summary") or "").strip()
-    detailed = (data.get("detailedSummary") or "").strip()
+    # Every field is coerced (see _text_items): one malformed client-written
+    # value must cost the card a field, not its embedding.
+    title = _scalar_text(data.get("title")).strip()
+    summary = _scalar_text(data.get("summary")).strip()
+    detailed = _scalar_text(data.get("detailedSummary")).strip()
     # The user's own annotations — high-signal, their words, not the model's.
     # Merges the legacy `userNote` string + the multi-note `userNotes` array.
     note = collect_notes_text(data).strip()
-    tags = ", ".join(t for t in (data.get("tags") or []) if t)
-    concepts = ", ".join(c for c in (data.get("concepts") or []) if c)
-    meta = data.get("metadata") or {}
-    takeaway = (meta.get("actionableTakeaway") or "").strip()
-    highlights = [str(h) for h in (data.get("videoHighlights") or []) if h]
+    tags = ", ".join(_text_items(data.get("tags")))
+    concepts = ", ".join(_text_items(data.get("concepts")))
+    meta = data.get("metadata") if isinstance(data.get("metadata"), dict) else {}
+    takeaway = _scalar_text(meta.get("actionableTakeaway")).strip()
+    highlights = _text_items(data.get("videoHighlights"))
 
     parts = []
     if title:
@@ -167,16 +169,31 @@ def keyword_query_tokens(question: str) -> set:
     return tokens
 
 
+def _text_items(val) -> List[str]:
+    """The non-empty string items of a stored list field; [] for any other
+    shape. Card docs are client-written: one None tag, a numeric concept or a
+    string where a list belongs used to raise inside the haystack join and
+    take keyword search down for every query in that library."""
+    if not isinstance(val, (list, tuple)):
+        return []
+    return [x for x in val if isinstance(x, str) and x]
+
+
+def _scalar_text(val) -> str:
+    """A stored scalar field as text ("" for a missing/None value)."""
+    return "" if val is None else str(val)
+
+
 def _card_haystack(data: dict) -> str:
-    return " ".join(str(x) for x in [
-        data.get("title", ""), data.get("summary", ""),
-        " ".join(data.get("tags", []) or []),
+    return " ".join([
+        _scalar_text(data.get("title")), _scalar_text(data.get("summary")),
+        " ".join(_text_items(data.get("tags"))),
         # Concepts too: an Ask chip can anchor on a concept ("what else did I
         # save on Resilience?") that appears ONLY in the concepts array — with
         # concepts absent from the haystack the lexical fallback and rerank
         # boost were blind to exactly the label the chip promised to find.
-        " ".join(data.get("concepts", []) or []),
-        data.get("sourceName", ""), data.get("category", ""),
+        " ".join(_text_items(data.get("concepts"))),
+        _scalar_text(data.get("sourceName")), _scalar_text(data.get("category")),
         # The user's own notes are searchable too — a literal word they wrote
         # should surface the card in keyword fallback and rerank. Covers both the
         # legacy string and the multi-note array.
@@ -798,16 +815,21 @@ def keyword_scan_cards(uid: str, query_text: str, exclude_ids: set = None,
     for doc in query.stream():
         if doc.id in exclude_ids:
             continue
-        data = doc.to_dict() or {}
-        # Mid-flight/failed captures have no settled content to ground an
-        # answer in (matches recent_cards/category_cards) — and the anchor
-        # rescue PINS its results to the front, so a failed placeholder must
-        # never qualify.
-        if data.get("status") in UNANALYZED_STATUSES:
-            continue
-        score = keyword_match_score(data, tokens)
-        if score > 0:
-            scored.append((score, normalize_card_for_search(data, doc.id)))
+        try:
+            data = doc.to_dict() or {}
+            # Mid-flight/failed captures have no settled content to ground an
+            # answer in (matches recent_cards/category_cards) — and the anchor
+            # rescue PINS its results to the front, so a failed placeholder must
+            # never qualify.
+            if data.get("status") in UNANALYZED_STATUSES:
+                continue
+            score = keyword_match_score(data, tokens)
+            if score > 0:
+                scored.append((score, normalize_card_for_search(data, doc.id)))
+        except Exception as e:
+            # One malformed card costs only itself: an error here used to
+            # abort the scan, i.e. lexical search for every query.
+            logger.warning(f"Keyword scan skipped one malformed card ({type(e).__name__})")
 
     scored.sort(key=lambda s: s[0], reverse=True)
     return [d for _, d in scored[:limit]]
