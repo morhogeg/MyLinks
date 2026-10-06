@@ -1178,37 +1178,44 @@ def is_context_free_followup(question: str) -> bool:
     return content <= _META_FOLLOWUP_TOKENS
 
 
-# ── Social turns: "thanks", "ok", "תודה" ────────────────────────────────────
-# A message that only thanks or acknowledges is not a question. ask_brain
-# answers it in one line, before retrieval, with no model call and no charge.
-# CLOSED vocabulary on purpose: every word must be a social word, at least one
-# must be an anchor (a thank-you or an acknowledgement, not just filler), a
-# question mark disqualifies, and so does length. Bare affirmations ("yes",
-# "sure") are deliberately NOT social: they may be accepting an offer the
-# previous answer made, which the model must see.
+# ── Social turns: "thanks", "תודה" ──────────────────────────────────────────
+# A message that only thanks is not a question. ask_brain answers it in one
+# line, before retrieval, with no model call and no charge. CLOSED vocabulary
+# on purpose: every word must be a social word, at least one must be a
+# thank-you (not just filler), a question mark disqualifies, and so does
+# length. Acknowledgements ("ok", "great", "perfect", "סבבה") and affirmations
+# ("yes", "sure") are deliberately NOT enough on their own: they may be
+# accepting an offer the previous answer made ("Want the full steps?" ->
+# "ok"), which the model must see. Next to a thank-you they are filler
+# ("ok, thanks", "great, thanks!").
 _SOCIAL_ANCHORS = {
-    "thanks", "thank", "thx", "ty", "tysm", "cheers", "appreciate", "appreciated",
+    "thanks", "thank", "thx", "thanx", "tnx", "ty", "tysm", "cheers",
+    "appreciate", "appreciated",
+    "תודה", "ותודה", "תודות", "תנקס",
+}
+# Acknowledgements: filler next to a thank-you, never a social turn alone.
+_ACK_TOKENS = {
     "ok", "okay", "okey", "kk", "alright", "noted", "understood", "gotcha", "got",
     "great", "cool", "nice", "perfect", "awesome", "amazing", "excellent",
     "wonderful", "brilliant", "fantastic", "good", "sweet", "neat", "wow",
     "helpful", "helps", "helped",
-    "תודה", "ותודה", "תודות", "אוקיי", "אוקי", "בסדר", "מעולה", "סבבה", "יופי",
-    "אחלה", "מגניב", "הבנתי", "מצוין", "נהדר", "מושלם", "נפלא", "וואו", "תותח",
-    "קיבלתי", "סגור", "אלוף", "אלופה", "טוב",
+    "אוקיי", "אוקי", "בסדר", "מעולה", "סבבה", "יופי", "אחלה", "מגניב", "הבנתי",
+    "מצוין", "נהדר", "מושלם", "נפלא", "וואו", "תותח", "קיבלתי", "סגור", "אלוף",
+    "אלופה", "טוב",
 }
 _SOCIAL_FILLERS = {
     "you", "so", "much", "a", "lot", "very", "really", "it", "that", "this",
     "all", "for", "the", "help", "lol", "haha",
     "רבה", "לך", "לכם", "ממש", "מאוד", "על", "זה", "הרבה", "העזרה",
-}
+} | _ACK_TOKENS
 _SOCIAL_EMOJI = set("👍🙏❤🙂😊👌💪🔥🤩😍✨🎉🙌💯")
 _SOCIAL_MAX_CHARS = 60
 _SOCIAL_MAX_WORDS = 6
 
 
 def is_social_turn(question: str) -> bool:
-    """True when the whole message only thanks or acknowledges ("thanks!",
-    "ok, got it", "תודה רבה", "👍"). Pure."""
+    """True when the whole message only thanks ("thanks!", "ok, thanks",
+    "תודה רבה", "👍"). Pure."""
     text = (question or "").strip()
     if not text or len(text) > _SOCIAL_MAX_CHARS or "?" in text or "؟" in text:
         return False
@@ -1285,15 +1292,16 @@ _AFFIRMATION_TOKENS = {
 
 def _is_reaction_turn(text: str) -> bool:
     """True when a user turn only reacts to the answer before it: a thank-you
-    ("thanks", "תודה רבה", "👍"), politeness ("ok please", "sure") or a yes/no.
-    It names no subject, so it can never be what a later "in Hebrew" or
-    "who published this?" is about. Politeness used to be skipped here as a
-    side effect of reading as a restate request; once it stopped being one
-    (AI-4), "thanks" became the subject of the next follow-up. Pure."""
+    ("thanks", "תודה רבה", "👍"), an acknowledgement ("great", "got it"),
+    politeness ("ok please", "sure") or a yes/no. It names no subject, so it
+    can never be what a later "in Hebrew" or "who published this?" is about.
+    Politeness used to be skipped here as a side effect of reading as a
+    restate request; once it stopped being one (AI-4), "thanks" became the
+    subject of the next follow-up. Pure."""
     if is_social_turn(text):
         return True
     words = {w for w in re.split(r"[\W_]+", (text or "").lower(), flags=re.UNICODE) if w}
-    reactions = _POLITENESS_TOKENS | _AFFIRMATION_TOKENS | _SOCIAL_ANCHORS
+    reactions = _POLITENESS_TOKENS | _AFFIRMATION_TOKENS | _SOCIAL_ANCHORS | _ACK_TOKENS
     return bool(words & reactions) and words <= (reactions | _SOCIAL_FILLERS)
 
 

@@ -22,9 +22,10 @@ _HE_HISTORY = [{"role": "user", "content": "איך מכינים את עוגת ה
 
 
 @pytest.mark.parametrize("text", [
-    "thanks", "Thank you!", "thanks a lot", "thank you so much", "ok", "Okay, thanks.",
-    "great, thanks!", "got it", "that helps a lot", "perfect", "👍", "🙏🙏",
-    "תודה", "תודה רבה!", "אוקיי", "סבבה, תודה", "מעולה", "תודה רבה לך",
+    "thanks", "Thank you!", "thanks a lot", "thank you so much", "Okay, thanks.",
+    "great, thanks!", "thanks, that helps a lot", "perfect, thank you", "appreciate it",
+    "👍", "🙏🙏",
+    "תודה", "תודה רבה!", "סבבה, תודה", "תודה רבה לך", "מעולה, תודה",
 ])
 def test_social_turns(text):
     assert is_social_turn(text) is True
@@ -34,6 +35,11 @@ def test_social_turns(text):
     "thanks, what about the pasta?", "ok so how do I make it", "is it good",
     "Thanks?", "yes", "sure", "yes please", "great recipe ideas", "", "   ",
     "thanks " * 20, "תודה, ומה עם הפסטה?", "מה שמרתי השבוע", "?",
+    # RV-8: an acknowledgement alone may ACCEPT an offer the answer made
+    # ("Want the full steps?" -> "ok"), so the model must see it.
+    "ok", "okay", "great", "perfect", "cool", "got it", "that helps a lot",
+    "yes thanks", "sure, thanks",
+    "אוקיי", "מעולה", "סבבה", "בסדר", "כן", "בטח",
 ])
 def test_not_social_turns(text):
     assert is_social_turn(text) is False
@@ -109,7 +115,8 @@ def _thread(*user_turns, first=_CAKE_Q):
 
 @pytest.mark.parametrize("reaction", [
     "thanks", "Thank you!", "thanks a lot", "ok please", "sure", "yes", "yes please",
-    "תודה", "תודה רבה", "אוקיי", "👍",
+    "ok", "great", "perfect", "got it", "cool, thanks",
+    "תודה", "תודה רבה", "אוקיי", "מעולה", "סבבה", "👍",
 ])
 @pytest.mark.parametrize("followup", ["in Hebrew", "shorter", "בעברית"])
 def test_a_reaction_turn_is_skipped_for_a_restate(reaction, followup):

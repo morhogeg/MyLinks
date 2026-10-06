@@ -177,6 +177,17 @@ def test_a_thank_you_turn_is_not_the_followup_subject(seen):
     assert seen["asked"][0]["followup"]["subject"] == _ASKED
 
 
+def test_an_ok_that_accepts_an_offer_reaches_the_model(seen):
+    # RV-8: "Want the full steps?" -> "ok" is an answer to the offer, not a
+    # thank-you; the canned "You're welcome." used to swallow it.
+    history = [{"role": "user", "content": _ASKED},
+               {"role": "assistant", "content": "It is a moist cake. Want the full steps?"}]
+    resp = _ask("ok", history, context_ids=["cake"])
+    assert resp.status == 200
+    assert seen["asked"][0]["question"] == "ok"
+    assert seen["asked"][0]["history"] == history
+
+
 def test_a_normal_question_retrieves_for_itself_unchanged(seen):
     # The safety property, at the endpoint: a question with a topic of its own
     # is routed EXACTLY as before, whether or not a conversation precedes it.

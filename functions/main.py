@@ -2437,10 +2437,11 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         if len(question) > MAX_QUESTION_LENGTH:
             return _error_response("question is too long", 400, headers)
 
-        # A thank-you or an "ok" is not a question. It used to read as a
-        # "restate" follow-up: the model re-sent the previous answer and the
-        # user paid an ask for it. Answer it in one line instead, before the
-        # quota meter, retrieval and any model call (search.is_social_turn).
+        # A thank-you is not a question. It used to read as a "restate"
+        # follow-up: the model re-sent the previous answer and the user paid
+        # an ask for it. Answer it in one line instead, before the quota
+        # meter, retrieval and any model call (search.is_social_turn). A bare
+        # "ok" or "great" still reaches the model: it may accept an offer.
         # The reply is marked `social` so the client leaves it out of the
         # recent answers whose citations it sends back as `contextIds`: a
         # "You're welcome." cites nothing and would only push the answer the
