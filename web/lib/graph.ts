@@ -128,6 +128,39 @@ function idHash(id: string): number {
     return h >>> 0;
 }
 
+/** The string entries of a stored list field; anything else (a null concept
+ *  the model emitted, a number, a non-array) is dropped. */
+const strings = (v: unknown): string[] =>
+    Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+const isStringList = (v: unknown) => Array.isArray(v) && v.every((x) => typeof x === 'string');
+
+/**
+ * A card as the graph may safely read it. Card fields are whatever Firestore
+ * holds: one null concept made `c.toLowerCase()` throw mid-build, and the view
+ * sat on "Mapping your knowledge…" for good. The text fields the build and the
+ * panels read are normalized here, once; a well-formed card (nearly all of
+ * them) is returned as the SAME object, so nothing downstream sees a copy.
+ */
+export function graphSafeLink(l: Link): Link {
+    const ok = (l.concepts === undefined || isStringList(l.concepts))
+        && isStringList(l.tags)
+        && typeof l.title === 'string'
+        && typeof l.category === 'string'
+        && (l.relatedLinks === undefined || (Array.isArray(l.relatedLinks)
+            && l.relatedLinks.every((r) => !!r && typeof r.id === 'string')));
+    if (ok) return l;
+    return {
+        ...l,
+        title: typeof l.title === 'string' ? l.title : '',
+        category: typeof l.category === 'string' ? l.category : '',
+        tags: strings(l.tags),
+        concepts: strings(l.concepts),
+        relatedLinks: Array.isArray(l.relatedLinks)
+            ? l.relatedLinks.filter((r) => !!r && typeof r.id === 'string')
+            : undefined,
+    };
+}
+
 export function nodeRadius(degree: number): number {
     return Math.min(16, 5 + 3 * Math.sqrt(degree));
 }
@@ -157,8 +190,10 @@ export async function buildGraphModel(
     pinIds?: Iterable<string>,
     options?: BuildOptions,
 ): Promise<GraphModel | null> {
-    // Only settled cards participate — in-flight/failed captures have no analysis.
-    const settled = links.filter((l) => !isPending(l));
+    // Only settled cards participate — in-flight/failed captures have no
+    // analysis. Each is read through graphSafeLink, so a malformed field can
+    // no longer throw out of the build.
+    const settled = links.filter((l) => !isPending(l)).map(graphSafeLink);
     // Node cap (MAX_GRAPH_CARDS): keep pinned cards, then the connected ones,
     // newest first.
     const pinned = new Set(pinIds ?? []);
