@@ -4998,7 +4998,9 @@ def revenuecat_webhook(req: https_fn.Request) -> https_fn.Response:
         logger.warning("revenuecat_webhook called but REVENUECAT_WEBHOOK_AUTH is unset")
         return _error_response("Webhook not configured", 503)
     provided = (req.headers.get("Authorization") or "").strip()
-    if not hmac.compare_digest(provided, expected):
+    # Bytes, not str: compare_digest raises TypeError on a non-ASCII str, which
+    # turned a junk header into a 500 instead of this 401. Still constant-time.
+    if not hmac.compare_digest(provided.encode("utf-8"), expected.encode("utf-8")):
         logger.warning("revenuecat_webhook: bad Authorization header")
         return _error_response("Unauthorized", 401)
     if not rc_configured():
