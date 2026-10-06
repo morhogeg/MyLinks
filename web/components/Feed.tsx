@@ -13,7 +13,7 @@ import Dropdown from './Dropdown';
 import { deleteLink, updateLinkReminder, markLinkReviewed, markTakeawayDone, markTakeawayDismissed, toLink } from '@/lib/storage';
 import { closedTakeaways, isTakeawayDismissed, isTakeawayDone, openTakeaways } from '@/lib/takeaway';
 import { track } from '@/lib/analytics';
-import { collection, onSnapshot, doc, getDoc, updateDoc, arrayUnion, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, arrayUnion, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
@@ -747,62 +747,47 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
 
     // 3. Handle deep linking
     //
-    // The effect depends on `links`, which Firestore's onSnapshot mutates on every
-    // background change (favorite, read, scan completes). Without a guard, each
-    // such update re-ran this effect and re-opened the modal the user had just
-    // closed — forever. We consume a given linkId exactly once (ref guard) and
-    // strip it from the URL so a refresh doesn't re-trigger it either.
+    // `?linkId=` (a dup-save redirect, a universal link, NativeShell's
+    // machina:// route) opens that card. Each request is consumed ONCE (ref
+    // guard) and stripped from the URL, so a refresh doesn't re-open a modal
+    // the user just closed. The guard resets once the param is gone: the same
+    // card can be deep-linked again (pasting an already-saved URL a second
+    // time used to open nothing). A sender that re-pushes the same id before
+    // the strip lands can add an `n` nonce to make it a new request.
+    //
+    // Opening goes through activeLinkId like any other card. The one-doc
+    // listener fetches a card outside the window and handles deleted and
+    // private ones, so nothing is in flight here for a re-run to cancel: the
+    // old getDoc was cancelled by ANY change to `links` while it ran, and the
+    // re-run then bailed on the guard, silently dropping older cards.
     const consumedDeepLinkRef = useRef<string | null>(null);
     useEffect(() => {
         const linkId = searchParams.get('linkId');
-        if (!linkId) return;
-        if (consumedDeepLinkRef.current === linkId) return;
-
-        const inList = links.find(l => l.id === linkId);
-        // Still doing the first window load — wait before deciding whether the
-        // card is genuinely outside the window and needs a direct fetch.
-        if (!inList && isLoading) return;
-
-        // Consume once (both the in-window and fetched paths): onSnapshot mutates
-        // `links` constantly, and without this the effect would re-open a modal
-        // the user just closed, or re-fetch on every background change.
-        consumedDeepLinkRef.current = linkId;
-
-        // Drop ?linkId from the URL so closing the modal is final and a manual
-        // refresh won't re-open it. history.replaceState avoids a Next navigation
-        // (and the scroll reset that comes with it).
-        const stripLinkIdFromUrl = () => {
-            if (typeof window === 'undefined') return;
-            const url = new URL(window.location.href);
-            url.searchParams.delete('linkId');
-            window.history.replaceState(window.history.state, '', url.toString());
-        };
-
-        if (inList) {
-            setActiveLinkId(inList.id);
-            stripLinkIdFromUrl();
+        if (!linkId) {
+            consumedDeepLinkRef.current = null;
             return;
         }
-
-        // Outside the loaded window — fetch the doc directly and open it. Reuses
-        // useLinks' toLink mapping so the fetched card is normalized identically.
-        if (!uid) return;
-        let cancelled = false;
-        (async () => {
-            try {
-                const snap = await getDoc(doc(db, 'users', uid, 'links', linkId));
-                if (cancelled) return;
-                if (!snap.exists()) return; // deleted/unknown id — no crash, just no-op
-                const card = toLink(snap as QueryDocumentSnapshot<DocumentData>);
-                setFetchedCards(prev => ({ ...prev, [linkId]: card }));
-                setActiveLinkId(linkId);
-                stripLinkIdFromUrl();
-            } catch (e) {
-                reportError(e, 'feed-deeplink-fetch');
-            }
-        })();
-        return () => { cancelled = true; };
-    }, [searchParams, links, isLoading, uid]);
+        const request = `${linkId}:${searchParams.get('n') ?? ''}`;
+        if (consumedDeepLinkRef.current === request) return;
+        // Still doing the first window load: wait, so a card on the first page
+        // opens from the live feed instead of a listener of its own.
+        if (isLoading) return;
+        consumedDeepLinkRef.current = request;
+        setActiveLinkId(linkId);
+        // Drop the params from the URL so closing the modal is final and a
+        // manual refresh won't re-open it. history.replaceState avoids a Next
+        // navigation (and the scroll reset that comes with it). Pass null, not
+        // history.state: Next treats a call carrying its own state as internal
+        // and leaves useSearchParams on the old URL, so the param never left,
+        // the guard never reset, and a second push of the same URL was a
+        // no-op. With null, Next keeps its state and syncs the params.
+        if (typeof window !== 'undefined') {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('linkId');
+            url.searchParams.delete('n');
+            window.history.replaceState(null, '', url.toString());
+        }
+    }, [searchParams, isLoading]);
 
     // Only the scrollable card layouts drive pull-to-refresh; disable it while a
     // full-screen mode (Ask/Collections) or any overlay/sheet owns the screen so
