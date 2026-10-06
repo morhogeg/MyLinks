@@ -2353,10 +2353,13 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         // "Update link" — or hide that it needs one.
         const publishable = publishableMembers(openCollectionMembers);
         const stale = isShareStale(openCol, publishable);
-        // "Ask about this" grounds Ask in exactly the cards the grid shows (so
-        // while locked no hidden card's title rides into the question). Ask
-        // may see vault cards while unlocked, same as its normal context.
-        const canAsk = members.length > 0 && !(openCol.isPrivate && vaultLocked);
+        // "Ask about this" grounds Ask in exactly the cards it can answer from.
+        // The server strips every effectively-private card from Ask's context,
+        // so on a private collection (unlocked or not), or one whose cards are
+        // all private, Ask always came back with nothing: no button there, and
+        // the question's hints only name cards Ask will actually see.
+        const askable = openCol.isPrivate ? [] : members.filter((l) => !isEffectivelyPrivateCard(l));
+        const canAsk = askable.length > 0;
         const colStyle = getColorStyleByKey(openCol.color || openCol.name);
         const nameDir = getDirection(openCol.name);
         return (
@@ -2405,7 +2408,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             "Ask about this" cluster path, seeded from the collection. */}
                         {canAsk && (
                             <button
-                                onClick={() => handleAskCollection(openCol, members)}
+                                onClick={() => handleAskCollection(openCol, askable)}
                                 className={`${ctrlBase} px-3.5 ${ctrlIdle} hover:text-accent hover:border-accent/40`}
                             >
                                 <MessagesSquare className="w-4 h-4" /><span>Ask about this</span>
