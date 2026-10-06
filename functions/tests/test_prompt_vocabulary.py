@@ -39,3 +39,13 @@ def test_every_synchronous_analysis_uses_it():
                       (image_src, "ai.analyze_image(image_bytes")):
         at = src.index(call)
         assert "_prompt_vocabulary(" in src[max(0, at - 400):at], call
+
+
+def test_a_heading_only_note_refresh_skips_the_vocabulary_read():
+    """The app's note EDIT only takes the new heading, so it sends
+    skipVocabulary and the server reads no cards for it (WEB-21)."""
+    src = inspect.getsource(main.analyze_link)
+    at = src.index("ai.analyze_text(note_text")
+    window = src[max(0, at - 600):at]
+    assert "data.get('skipVocabulary') is True" in window
+    assert "note_tags, note_cats = [], []" in window

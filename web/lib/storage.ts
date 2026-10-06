@@ -58,51 +58,6 @@ export async function getLinksFromFirestore(uid: string): Promise<Link[]> {
 }
 
 /**
- * Get the user's unique tags from their most recent links.
- *
- * Bounded to the 300 newest links (report 3.9): reading the ENTIRE links
- * collection on every note/save/retry doesn't scale, and tag vocabulary comes
- * from recent activity anyway. Mirrors the backend `get_user_tags` cap.
- */
-export async function getUserTags(uid: string): Promise<string[]> {
-    const linksRef = collection(db, 'users', uid, 'links');
-    const q = query(linksRef, orderBy('createdAt', 'desc'), limit(300));
-    const snapshot = await getDocs(q);
-
-    const tags = new Set<string>();
-    snapshot.docs.forEach(doc => {
-        const linkTags = doc.data().tags as string[] || [];
-        linkTags.forEach(tag => tags.add(tag));
-    });
-
-    return Array.from(tags).sort();
-}
-
-/**
- * The workspace's existing category vocabulary, for the "reuse a category"
- * half of the analysis prompt (functions SYSTEM_PROMPT rule 6).
- *
- * Categories used to drift because the model was never told which ones already
- * existed — tags got a reuse list, categories got nothing, so a household
- * economics article could land in "Business" while similar cards sat under
- * "Society". Same window as getUserTags (the 300 most recent cards) so the two
- * lists cost one read each and describe the same slice of the library.
- */
-export async function getUserCategories(uid: string): Promise<string[]> {
-    const linksRef = collection(db, 'users', uid, 'links');
-    const q = query(linksRef, orderBy('createdAt', 'desc'), limit(300));
-    const snapshot = await getDocs(q);
-
-    const categories = new Set<string>();
-    snapshot.docs.forEach(doc => {
-        const c = doc.data().category;
-        if (typeof c === 'string' && c.trim()) categories.add(c.trim());
-    });
-
-    return Array.from(categories).sort();
-}
-
-/**
  * Return the id of an existing saved link for this URL, or null.
  *
  * Mirrors the backend dedup (functions/link_service.py `link_exists_for_url`):
@@ -402,17 +357,15 @@ export async function updateNoteText(uid: string, id: string, text: string): Pro
 export async function enrichNoteCard(uid: string, cardId: string, text: string,
     opts: { titleOnly?: boolean } = {}): Promise<void> {
     try {
-        let existingTags: string[] = [];
-        let existingCategories: string[] = [];
-        if (!opts.titleOnly) {
-            try { existingTags = await getUserTags(uid); } catch { /* optional */ }
-            try { existingCategories = await getUserCategories(uid); } catch { /* optional */ }
-        }
-
+        // The tag and category lists the prompt reuses are built on the
+        // server, from this account's cards with private ones left out. The
+        // app used to read its 300 newest cards twice per note to send them,
+        // private cards included (launch audit WEB-21, PRIV-1). A heading-only
+        // refresh doesn't file the note, so it asks the server to skip them.
         const response = await fetchWithTimeout(apiUrl('/api/analyze'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()), ...(await authHeaders()) },
-            body: JSON.stringify({ text: text.trim(), existingTags, existingCategories, uid }),
+            body: JSON.stringify({ text: text.trim(), uid, ...(opts.titleOnly ? { skipVocabulary: true } : {}) }),
         });
         if (!response.ok) {
             // Past the monthly allowance the note stays exactly as saved (a

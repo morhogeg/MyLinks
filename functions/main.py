@@ -2245,7 +2245,12 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
             ai = GeminiService()
             # Synchronous path: cap Gemini at 2 attempts to stay under the 60s
             # function budget (report 3.6).
-            note_tags, note_cats = _prompt_vocabulary(note_uid, existing_tags, existing_categories)
+            # A heading-only refresh (the app's note edit) files nothing, so it
+            # skips the vocabulary read.
+            if data.get('skipVocabulary') is True:
+                note_tags, note_cats = [], []
+            else:
+                note_tags, note_cats = _prompt_vocabulary(note_uid, existing_tags, existing_categories)
             analysis = ai.analyze_text(note_text, existing_tags=note_tags,
                                        existing_categories=note_cats, attempts=2)
 
@@ -2330,8 +2335,8 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
         # for a reverse-trial workspace it SPENDS one of its few videos per
         # hour, so checking it before the scrape used the budget up on articles.
         pro = _video_ingest_allowed(uid, plan) if content_type == "youtube" else True
-        # Synchronous path: 2 Gemini attempts (stay under the 60s budget, report 3.6).
         existing_tags, existing_categories = _prompt_vocabulary(uid, existing_tags, existing_categories)
+        # Synchronous path: 2 Gemini attempts (stay under the 60s budget, report 3.6).
         analysis = _analyze_scraped(ai, scraped, existing_tags, attempts=2,
                                     existing_categories=existing_categories, pro=pro)
 
