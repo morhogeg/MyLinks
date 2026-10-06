@@ -6,8 +6,7 @@ name: Firestore rules tests
 # run, so the runner needs Node (for the test suite + firebase CLI) and a JDK.
 on:
   push:
-    # TEMP (launch audit): run on the audit branch too; revert before merge.
-    branches: [main, claude/launch-audit]
+    branches: [main]
     paths:
       - "firestore.rules*"
       - "firestore-rules-test/**"

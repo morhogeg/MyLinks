@@ -8,8 +8,7 @@ name: E2E user journeys
 # throws, a client write the rules silently reject.
 on:
   push:
-    # TEMP (launch audit): run on the audit branch too; revert before merge.
-    branches: [main, claude/launch-audit]
+    branches: [main]
     paths:
       - "web/**"
       - "!web/ios/**"
