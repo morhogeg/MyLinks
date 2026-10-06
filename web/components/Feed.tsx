@@ -55,7 +55,7 @@ import CollectionFormModal from './CollectionFormModal';
 import ManageCollectionCardsSheet from './ManageCollectionCardsSheet';
 import MobileSubheader from './MobileSubheader';
 import NotesView from './NotesView';
-import dynamic from 'next/dynamic';
+import { lazyView } from './feed/lazyView';
 import { getNoteGroups, isWrittenNote } from '@/lib/notes';
 import LoadMoreSentinel from './feed/LoadMoreSentinel';
 import { Search, Inbox, Archive, ArchiveRestore, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, AlarmClock, CheckCircle2, CheckSquare, CheckCheck, Layers, List, Image as ImageIcon, Share2, Globe, Plus, Pencil, Newspaper, CalendarCheck, Lock, BookOpenCheck, ChevronLeft, BarChart3, StickyNote, Waypoints, Upload } from 'lucide-react';
@@ -91,12 +91,8 @@ import { scrollBehavior } from '@/lib/motion';
 // biggest views, and many sessions never open them: they load on first use
 // instead of with the app (launch audit OWN-9). FeedContent prefetches both
 // once the library is up, so the first tap rarely waits.
-const AskBrain = dynamic(() => import('./AskBrain'), { ssr: false, loading: () => <LazyViewPlaceholder /> });
-const KnowledgeGraph = dynamic(() => import('./KnowledgeGraph'), { ssr: false, loading: () => <LazyViewPlaceholder /> });
-
-function LazyViewPlaceholder() {
-    return <div className="min-h-[60vh]" aria-busy="true" />;
-}
+const AskBrain = lazyView(() => import('./AskBrain'));
+const KnowledgeGraph = lazyView(() => import('./KnowledgeGraph'));
 
 // Stable no-op for card slots that don't wire up an action (pending cards).
 const noop = () => { };
@@ -132,10 +128,17 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // loadMore grows the subscription window; hasMore gates the scroll sentinel.
     const { links, windowIds, isLoading, handlePullRefresh, loadMore, hasMore } = useLinks(uid, toast);
     // Fetch the Ask and graph code once the library is on screen (see the
-    // dynamic imports above), so opening either rarely waits for it.
+    // lazy views above), so opening either rarely waits for it. Only while
+    // online, and a failed prefetch is dropped: offline it was an unhandled
+    // ChunkLoadError (seen in the offline-save journey), and opening the view
+    // later simply loads it then.
     useEffect(() => {
         if (isLoading) return;
-        const t = window.setTimeout(() => { void import('./AskBrain'); void import('./KnowledgeGraph'); }, 1500);
+        const t = window.setTimeout(() => {
+            if (navigator.onLine === false) return;
+            AskBrain.preload().catch(() => undefined);
+            KnowledgeGraph.preload().catch(() => undefined);
+        }, 1500);
         return () => window.clearTimeout(t);
     }, [isLoading]);
     // Links saved offline in a session that ended before reconnecting.
