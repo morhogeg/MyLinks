@@ -31,6 +31,9 @@ def _drive_url_pipeline(monkeypatch, *, stage_update_raises=False):
     stages = []
 
     card_ref = MagicMock()
+    # The client's processing placeholder: the worker only starts a job on a
+    # card that is still waiting for one (capture_charge.start_job).
+    card_ref.get.return_value = types.SimpleNamespace(exists=True, to_dict=lambda: {"status": "processing"})
 
     def _card_update(payload):
         if stage_update_raises:

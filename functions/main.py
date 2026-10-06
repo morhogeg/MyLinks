@@ -2181,7 +2181,9 @@ def debug_status(req: https_fn.Request) -> https_fn.Response:
         return _server_error(exc=e, message="Debug failed")
 
 
-@https_fn.on_request(max_instances=10, timeout_sec=120)
+# 1 GiB: parsing a large page (or a PDF) can pass the 256 MiB default, and Cloud
+# Run's CPU share scales with memory, which shortens every analysis.
+@https_fn.on_request(max_instances=10, timeout_sec=120, memory=1024)
 def analyze_link(req: https_fn.Request) -> https_fn.Response:
     """
     HTTP endpoint for analyzing URLs immediately (Synchronous).
@@ -2297,7 +2299,6 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
             charged = (uid, "saves")
         else:
             plan = "free"
-        pro = _video_ingest_allowed(uid, plan)
 
         logger.info(f"Analyzing URL synchronously: {url}")
 
@@ -2325,6 +2326,10 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
         # 2. Analyze with AI (YouTube → native video ingestion w/ fallback)
         ai = GeminiService()
         content_type = scraped.get("content_type")
+        # The plan's video gate, read only for a video (as the worker does):
+        # for a reverse-trial workspace it SPENDS one of its few videos per
+        # hour, so checking it before the scrape used the budget up on articles.
+        pro = _video_ingest_allowed(uid, plan) if content_type == "youtube" else True
         # Synchronous path: 2 Gemini attempts (stay under the 60s budget, report 3.6).
         existing_tags, existing_categories = _prompt_vocabulary(uid, existing_tags, existing_categories)
         analysis = _analyze_scraped(ai, scraped, existing_tags, attempts=2,
@@ -3225,7 +3230,7 @@ def _similarity_http(req, headers: dict) -> https_fn.Response:
         return _server_error(headers, e, "Similarity failed")
 
 
-@https_fn.on_request(max_instances=10, timeout_sec=120)
+@https_fn.on_request(max_instances=10, timeout_sec=120, memory=1024)  # see analyze_link
 def analyze_image(req: https_fn.Request) -> https_fn.Response:
     """HTTP endpoint for analyzing Images immediately (Synchronous)."""
     if req.method == 'OPTIONS':
@@ -3394,10 +3399,38 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
 # Share Ingestion (iOS Share Extension / browser extension)
 # ─────────────────────────────────────────────
 
-_URL_IN_TEXT_RE = re.compile(r'https?://[^\s<>"]+', re.I)
+# CJK punctuation (U+3000-303F: 。、「」 and the ideographic space) and the
+# full/halfwidth forms (U+FF00-FFEF: ，．（）) end a URL: Chinese and Japanese
+# text puts no space after a link, so "…/article。谢谢" used to save the whole
+# run as the URL (a 404, a FAILED card). web/components/AddLinkForm.tsx
+# formatUrl mirrors both rules.
+_URL_IN_TEXT_RE = re.compile(r'https?://[^\s<>"\u3000-\u303f\uff00-\uffef]+', re.I)
 # Punctuation that ends a sentence around a URL, never the URL itself:
-# "read this (https://a.com/x)." must save https://a.com/x.
-_URL_TRAILING_PUNCT = ').,;:!?"\'”’»]>'
+# "read this (https://a.com/x)." must save https://a.com/x. Includes the
+# ellipsis and the Hebrew gershayim/geresh (״ ׳) Hebrew text puts after one.
+_URL_TRAILING_PUNCT = ').,;:!?"\'”’»]>…\u05f4\u05f3'
+# A shared `url` value with no scheme: a host with a dot in it, an optional
+# port and path, no spaces ("www.nytimes.com/2026/…", "example.com/a"). The
+# iOS Share Extension sends `{"url": s}` when the URL item arrives as such a
+# string; it is saved as https://… instead of failing "No URL or text found".
+_BARE_HOST_URL_RE = re.compile(r'(?:[\w-]+\.)+[^\W\d_]{2,}(?::\d{1,5})?(?:[/?#]\S*)?')
+# Shared TEXT (no URL) is the user's own words and becomes the card's body
+# verbatim, so it is kept whole up to this many characters: even at 4 bytes
+# per character in UTF-8 that is ~800 KB, safely under Firestore's 1 MiB
+# document limit with the card's other fields. Only the first MAX_NOTE_LENGTH
+# characters go to analysis.
+MAX_SHARED_TEXT_LENGTH = 200_000
+
+
+def _with_scheme(value):
+    """A bare host/path `url` value gets https:// in front (see
+    _BARE_HOST_URL_RE); anything else is returned unchanged."""
+    if not isinstance(value, str):
+        return value
+    v = value.strip()
+    if v and "://" not in v and _BARE_HOST_URL_RE.fullmatch(v):
+        return f"https://{v}"
+    return value
 
 
 def _trim_url(raw: str) -> str:
@@ -3488,6 +3521,30 @@ def _pending_url_doc(uid: str, url: str, *, card_id: Optional[str] = None,
     if card_id:
         doc["cardId"] = card_id
     return doc
+
+
+# Statuses a card may be in when a capture names it by `cardId`: the processing
+# placeholder the web client writes first (or a failed card it flipped back to
+# processing for Retry), or a failed card. Anything else is a finished card a
+# new job must not overwrite or pay to read again.
+_CAPTURE_TARGET_STATUSES = (LinkStatus.PROCESSING.value, LinkStatus.FAILED.value)
+
+
+def _capture_target_error(uid: str, card_id, headers: dict):
+    """None when `card_id` names one of the CALLER's own cards that is waiting
+    for its analysis; otherwise the error response, before anything is
+    stored or charged: 400 for a malformed id, 404 for a card that is not in
+    the caller's workspace (another user's card simply isn't there), 409 for
+    one already finished (a client that gets 409 leaves the card alone)."""
+    if not _valid_card_id(card_id):
+        return _error_response("Invalid card", 400, headers)
+    snap = get_db().collection('users').document(uid).collection('links').document(card_id).get()
+    card = (snap.to_dict() or {}) if snap.exists else None
+    if card is None:
+        return _error_response("Card not found", 404, headers)
+    if card.get("status") not in _CAPTURE_TARGET_STATUSES:
+        return _error_response("This card is already saved.", 409, headers)
+    return None
 
 
 def _claim_offline_enqueue(uid: str, card_id) -> Optional[bool]:
@@ -3701,6 +3758,13 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                 q = _quota_blocked(uid, "saves", headers)
                 if q:
                     return q
+            elif data.get('cardId'):
+                # The web capture's own placeholder: it must be the caller's
+                # and still waiting, checked before anything is stored or
+                # charged (a missing one used to leave the stored set behind).
+                bad = _capture_target_error(uid, data.get('cardId'), headers)
+                if bad:
+                    return bad
             # Past the monthly save wall, the set is still stored and kept as a
             # `waiting` card; only its analysis waits (deferred_capture).
             over = None
@@ -3755,8 +3819,12 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                 # screenshot…" the moment the request returns; the worker
                 # clears it on either outcome.
                 all_urls = enrich_prior_urls + stored_urls
+                # `enrichJobId` names the job that owns this read: the janitor
+                # finds it there to refund a read that never finished, and a
+                # superseded job never marks a newer read failed.
                 enrich_ref.update({"enrichStatus": "processing", "enrichStartedAt": now_ms,
                                    "enrichStage": "queued", "enrichCount": len(all_urls),
+                                   "enrichJobId": process_ref.id,
                                    "enrichError": gc_firestore.DELETE_FIELD})
                 process_ref.set({
                     "uid": uid,
@@ -3771,7 +3839,12 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                     "createdAt": datetime.now(timezone.utc).isoformat(),
                     "status": "queued",
                     "attempts": 0,
+                    # The unit metered above, refundable at most once
+                    # (capture_charge): by the worker's failure path or the
+                    # janitor's timeout, whichever claims it first.
+                    capture_charge.CHARGE_FIELD: capture_charge.token("saves"),
                 })
+                charged = None  # the token owns the unit now
                 logger.info(f"Share ingest queued {len(stored_urls)}-screenshot enrich for {_mask_uid(uid)}")
                 return https_fn.Response(
                     json.dumps({"success": True, "queued": True, "id": process_ref.id,
@@ -3820,6 +3893,10 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
             for u in image_urls_in:
                 if not isinstance(u, str) or len(u) > MAX_URL_LENGTH or not u.startswith(allowed_prefixes):
                     return _error_response("Invalid image URL", 400, headers)
+            if data.get('cardId'):
+                bad = _capture_target_error(uid, data.get('cardId'), headers)
+                if bad:
+                    return bad
             q = _quota_blocked(uid, "saves", headers)
             if q:
                 # A Retry past the monthly wall: the images are already ours,
@@ -3939,7 +4016,10 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
             )
 
         url, shared_rest, extra_urls = _split_shared_text(
-            data.get('url'), data.get('text'), data.get('shared'))
+            _with_scheme(data.get('url')), data.get('text'), data.get('shared'))
+        if url and len(url) > MAX_URL_LENGTH:
+            # The same ceiling analyze_link, analyze_image and the import hold.
+            return _error_response("URL is too long", 400, headers)
         if not url:
             # NOTE PATH — shared plain text with no URL is a first-class note card,
             # not an error. The card is written FIRST, with the text exactly as
@@ -3965,7 +4045,11 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                     return q
             else:
                 charged = (uid, "saves")
-            note_text = note_text[:MAX_NOTE_LENGTH]
+            # Kept whole (up to MAX_SHARED_TEXT_LENGTH): it was cut at 30,000
+            # characters while the response said `saved: true`. Only the
+            # analysis below reads the first MAX_NOTE_LENGTH.
+            text_cut = len(note_text) > MAX_SHARED_TEXT_LENGTH
+            note_text = note_text[:MAX_SHARED_TEXT_LENGTH]
             card_ref = get_db().collection('users').document(uid).collection('links').document()
             # verbatim: shared text is kept as the user sent it (see
             # _note_link_data). A fresh note has no vector yet — flag it so
@@ -3977,18 +4061,20 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
             card_ref.set(link_data)
             charged = None  # the card exists; _enrich_shared_note owns the unit now
             logger.info(f"Share ingest saved note for {_mask_uid(uid)}")
+            # Said, never silent: a text past the ceiling was kept only up to it.
+            cut = {"truncated": True} if text_cut else {}
             if over is not None:
                 return https_fn.Response(
                     json.dumps({"success": True, "saved": True, "id": card_ref.id, "note": True,
                                 "enriched": False, "kind": "saves",
                                 "upgrade": over["upgrade"], "used": over["used"],
-                                "limit": over["limit"]}),
+                                "limit": over["limit"], **cut}),
                     status=200, headers=headers, mimetype='application/json'
                 )
-            enriched = _enrich_shared_note(uid, card_ref, note_text)
+            enriched = _enrich_shared_note(uid, card_ref, note_text[:MAX_NOTE_LENGTH])
             return https_fn.Response(
                 json.dumps({"success": True, "saved": True, "id": card_ref.id, "note": True,
-                            "enriched": enriched}),
+                            "enriched": enriched, **cut}),
                 status=200, headers=headers, mimetype='application/json'
             )
 
@@ -4019,6 +4105,17 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                 json.dumps({"success": True, "duplicate": True, "url": url}),
                 status=200, headers=headers, mimetype='application/json'
             )
+
+        # A card named by `cardId` (the durable web capture's placeholder, or a
+        # failed card's Retry, web/lib/storage.ts retryFailedLink) must be the
+        # caller's own and still waiting for its analysis. The worker then
+        # finalizes that card in place, keeping its user-owned fields and its
+        # import tags, through the same durable queue as every capture, so a
+        # slow page no longer races the 60-second request limit.
+        if card_id and not data.get('offlineEnqueue'):
+            bad = _capture_target_error(uid, card_id, headers)
+            if bad:
+                return bad
 
         # A link saved OFFLINE (web/lib/offlineSave.ts): the card carries
         # `pendingEnqueue`, and more than one path (the form's reconnect
@@ -5633,11 +5730,20 @@ def share_page(req: https_fn.Request) -> https_fn.Response:
 # Background Processing
 # ─────────────────────────────────────────────
 
-def log_to_firestore(task_id: str, message: str, level: str = "INFO", data: dict = None):
-    """Log a heartbeat to Firestore for visibility."""
+def log_to_firestore(task_id: str, message: str, level: str = "INFO", data: dict = None,
+                     uid: str = None):
+    """Log a heartbeat to Firestore for visibility.
+
+    Pass the workspace `uid`: it is stored as `data.uid`, the field account
+    deletion sweeps `task_logs` by (link_service._sweep_workspace). These rows
+    carry URLs and titles, so a row without it outlived a deleted account for
+    up to the 14-day prune."""
     try:
         db = get_db()
         now = datetime.now(timezone.utc)
+        payload = dict(data or {})
+        if uid:
+            payload["uid"] = uid
         log_entry = {
             "taskId": task_id,
             "message": message,
@@ -5648,7 +5754,7 @@ def log_to_firestore(task_id: str, message: str, level: str = "INFO", data: dict
             # Timestamp fields, not the ISO `timestamp` string). The janitor prune
             # also matches on it (expireAt <= now) — see run_processing_janitor.
             "expireAt": now + timedelta(days=14),
-            "data": data or {}
+            "data": payload,
         }
         db.collection('task_logs').add(log_entry)
         logger.info(f"[{task_id}] {message}")
@@ -5707,6 +5813,22 @@ def _card_accepts_screenshots(card) -> bool:
     if card.get("captureType") in ("text", "answer"):
         return False
     return bool(card.get("url"))
+
+
+def _card_awaits_job(card: dict) -> bool:
+    """May a queued capture job start on this EXISTING card?
+
+    Only while the card is still waiting for its analysis: a processing
+    placeholder (or a failed card the client flipped back for Retry), a failed
+    card, or a waiting one. A card that is already finished (a Retry or an
+    earlier job completed it) must not be overwritten by a late job, nor
+    re-analyzed at a second Gemini bill. Nor may a card that already holds a
+    charge token: a started, unfinished job is on it right now (two Retries
+    in quick succession), and the second job would only pay for the same read
+    twice."""
+    return (card.get("status") in (LinkStatus.PROCESSING.value, LinkStatus.FAILED.value,
+                                   LinkStatus.WAITING.value)
+            and capture_charge.charge_kind(card) is None)
 
 
 def _card_enrich_screenshots(card) -> list:
@@ -5773,6 +5895,19 @@ def _merge_tags(existing, fresh) -> list:
     return out[:12]
 
 
+def _job_progress(ref, fields: dict) -> None:
+    """Best-effort breadcrumb on the queue doc (its `status`, for operators).
+
+    Never fails a capture: the user sees the CARD, not the job, and the job
+    doc may be gone mid-run (an operator cleared the queue, or a prune). A
+    `404 No document to update` here used to turn a healthy capture into a
+    FAILED card, keep its Gemini spend, and make the user pay again on Retry."""
+    try:
+        ref.update(fields)
+    except Exception as e:
+        logger.warning(f"Queue breadcrumb {fields.get('status')!r} not recorded: {type(e).__name__}: {e}")
+
+
 def _enrich_stage(card_ref, stage: str) -> None:
     """Tell the open card which step the screenshot read is on ("reading" →
     "analyzing" → "connecting"), so its progress is anchored to real work and
@@ -5794,6 +5929,11 @@ def _enrich_error_message(e: Exception) -> str:
     return "Something went wrong reading the screenshots. Please try again."
 
 
+# A screenshot read's title: the same ceiling an imported or snapshotted page
+# title gets (MAX_IMPORT_TITLE_LENGTH, _snapshot_capture).
+_MAX_ENRICH_TITLE_LENGTH = 300
+
+
 def _enrich_card_with_images(ref, task_id: str, uid: str, card_ref, data: dict) -> None:
     """Complete a partial card with the user's screenshots of the post.
 
@@ -5808,9 +5948,29 @@ def _enrich_card_with_images(ref, task_id: str, uid: str, card_ref, data: dict) 
     from scraper import safe_get
 
     card_id = card_ref.id
-    log_to_firestore(task_id, "Screenshot enrich started", data={"uid": uid, "cardId": card_id})
+    # One run per job (capture_charge.start_job): a second delivery of this
+    # trigger, or one that arrives after the first run finished and removed
+    # the job, does nothing. It used to read the screenshots again, then hit
+    # the deleted job doc, refund a second time and stamp `failed` on the
+    # card the first run had just completed.
     try:
-        ref.update({"status": "processing", "startedAt": datetime.now(timezone.utc).isoformat()})
+        outcome = capture_charge.start_job(get_db(), ref, card_ref, None,
+                                           accepts=_card_accepts_screenshots, move_token=False)
+    except Exception as claim_err:
+        logger.warning(f"Could not claim the enrich job: {claim_err}")
+        outcome = capture_charge.STARTED
+        _job_progress(ref, {"status": capture_charge.STARTED_STATUS,
+                            "startedAt": datetime.now(timezone.utc).isoformat()})
+    if outcome == capture_charge.DUPLICATE:
+        logger.info("Enrich job already started or finished by another run; skipping")
+        return
+    log_to_firestore(task_id, "Screenshot enrich started", data={"cardId": card_id}, uid=uid)
+    written = False
+    try:
+        if outcome == capture_charge.CARD_SETTLED:
+            # The card stopped being a settled web card while the job waited
+            # (it is being re-captured, say): nothing to read the post into.
+            raise ValueError("Card no longer takes screenshots")
         snap = card_ref.get()
         card = snap.to_dict() if snap.exists else None
         if not card:
@@ -5820,7 +5980,7 @@ def _enrich_card_with_images(ref, task_id: str, uid: str, card_ref, data: dict) 
         if not image_urls:
             raise ValueError("No screenshots to read")
 
-        ref.update({"status": "downloading_image"})
+        _job_progress(ref, {"status": "downloading_image"})
         _enrich_stage(card_ref, "reading")
         image_parts = []
         for img_url in image_urls:
@@ -5830,7 +5990,7 @@ def _enrich_card_with_images(ref, task_id: str, uid: str, card_ref, data: dict) 
 
         existing_tags, existing_categories = get_user_vocabulary(uid)
         ai = GeminiService()
-        ref.update({"status": "analyzing_image"})
+        _job_progress(ref, {"status": "analyzing_image"})
         _enrich_stage(card_ref, "analyzing")
         analysis = ai.analyze_text_with_images(
             _enrich_context_text(card), image_parts,
@@ -5856,15 +6016,22 @@ def _enrich_card_with_images(ref, task_id: str, uid: str, card_ref, data: dict) 
         )
 
         now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+        # The model's fields are clamped exactly as _build_link_data clamps a
+        # new card's: the screenshots are user-supplied images a hostile post
+        # can steer, and tags/category/concepts feed every later prompt for
+        # this workspace (get_user_vocabulary).
         update = {
-            "title": (analysis.get("title") or "").strip() or card.get("title") or "Untitled",
+            "title": _clip(analysis.get("title"), _MAX_ENRICH_TITLE_LENGTH) or card.get("title") or "Untitled",
             "summary": analysis.get("summary"),
             "detailedSummary": analysis.get("detailedSummary") or card.get("detailedSummary") or "",
-            "tags": _merge_tags(card.get("tags"), analysis.get("tags")),
-            "concepts": analysis.get("concepts") or card.get("concepts") or [],
-            "category": canonical_category(analysis.get("category", "")) or card.get("category") or "General",
-            "language": analysis.get("language") or card.get("language") or "en",
-            "metadata.actionableTakeaway": analysis.get("actionableTakeaway"),
+            "tags": _merge_tags(card.get("tags"),
+                                _clip_list(analysis.get("tags"), MAX_CARD_TAGS, MAX_TAG_LENGTH)),
+            "concepts": (_clip_list(analysis.get("concepts"), MAX_CARD_CONCEPTS, MAX_TAG_LENGTH)
+                         or card.get("concepts") or []),
+            "category": (canonical_category(_clip(analysis.get("category", ""), MAX_CATEGORY_LENGTH))
+                         or card.get("category") or "General"),
+            "language": _clip(analysis.get("language"), 16) or card.get("language") or "en",
+            "metadata.actionableTakeaway": _clip_or_none(analysis.get("actionableTakeaway"), MAX_TAKEAWAY_LENGTH),
             "metadata.estimatedReadTime": max(
                 int((card.get("metadata") or {}).get("estimatedReadTime") or 0),
                 _estimate_read_time(" ".join(str(analysis.get(k) or "") for k in ("summary", "detailedSummary")))),
@@ -5875,6 +6042,7 @@ def _enrich_card_with_images(ref, task_id: str, uid: str, card_ref, data: dict) 
             "enrichStatus": gc_firestore.DELETE_FIELD,
             "enrichStage": gc_firestore.DELETE_FIELD,
             "enrichError": gc_firestore.DELETE_FIELD,
+            "enrichJobId": gc_firestore.DELETE_FIELD,
             "enrichedAt": now_ms,
             "enrichCount": len(image_urls),
         }
@@ -5885,22 +6053,67 @@ def _enrich_card_with_images(ref, task_id: str, uid: str, card_ref, data: dict) 
         else:
             update["needsEmbedding"] = True
         card_ref.update(card_payload(update, get_db()))
-        mirror_vector_write(card_ref, update, db=get_db())
-        log_to_firestore(task_id, "Screenshot enrich complete", data={"cardId": card_id})
+        written = True
+        # The read is saved; nothing after this may turn it into a failure.
+        # The charge bought it: take the token off the job (no refund), so a
+        # job doc left behind can never be refunded by the queue prune.
+        _spend_job_charge(ref)
+        _mirror_vector_or_flag(card_ref, update, get_db())
+        log_to_firestore(task_id, "Screenshot enrich complete", data={"cardId": card_id}, uid=uid)
         ref.delete()
     except Exception as e:
+        if written:
+            logger.error(f"Post-save step failed; the completed card is kept: {e}", exc_info=True)
+            try:
+                ref.delete()
+            except Exception:
+                pass
+            return
         logger.error(f"Screenshot enrich failed for {_mask_uid(uid)}/{card_id}: {e}", exc_info=True)
-        # share_ingest metered the enrich as a save; it produced nothing.
-        refund_quota(uid, "saves")
+        # share_ingest metered the enrich as a save; it produced nothing. At
+        # most once: the refund claims the job's charge token, which the
+        # janitor's timeout refund would claim too.
+        _refund_job(uid, ref)
         try:
-            card_ref.update({"enrichStatus": "failed", "enrichError": _enrich_error_message(e),
-                             "enrichStage": gc_firestore.DELETE_FIELD})
+            _fail_enrich(card_ref, _enrich_error_message(e), job_id=ref.id)
         except Exception as write_err:
             logger.error(f"Could not record enrich failure: {write_err}")
         try:
             ref.delete()
         except Exception:
             pass
+
+
+# What a screenshot read that never finished says (the janitor's timeout).
+_ENRICH_TIMEOUT_MESSAGE = "Reading the screenshots took too long. Please try again."
+
+
+def _fail_enrich(card_ref, message: str, *, job_id: Optional[str] = None,
+                 older_than_ms: Optional[int] = None) -> bool:
+    """Mark a card's screenshot read failed, in a transaction, but only while
+    that read is still in flight (`enrichStatus: 'processing'`) and, for a
+    worker (`job_id`), still ITS read: a newer "Add screenshots" names another
+    job in `enrichJobId`, and a read that already finished has no
+    `enrichStatus`, and neither is ever overwritten. The janitor passes
+    `older_than_ms` so the age is re-checked inside the transaction. Returns
+    True when the card was marked."""
+    def _body(tx):
+        snap = card_ref.get(transaction=tx)
+        card = (snap.to_dict() or {}) if getattr(snap, "exists", False) else None
+        if card is None or card.get("enrichStatus") != "processing":
+            return False
+        owner = card.get("enrichJobId")
+        if job_id and owner and owner != job_id:
+            return False
+        if older_than_ms is not None:
+            asked = _to_ms(card.get("enrichStartedAt"))
+            if asked is not None and asked > older_than_ms:
+                return False
+        tx.update(card_ref, {"enrichStatus": "failed", "enrichError": message,
+                             "enrichStage": gc_firestore.DELETE_FIELD,
+                             "enrichJobId": gc_firestore.DELETE_FIELD})
+        return True
+    return capture_charge.run_transaction(get_db(), _body)
 
 
 class _FetchFailed(Exception):
@@ -5934,7 +6147,14 @@ def _merge_card_write(new: dict, current: dict) -> dict:
     for key in _USER_OWNED_CARD_FIELDS:
         if key in current:
             out[key] = current[key]
-    out["tags"] = _merge_tags(current.get("tags"), new.get("tags"))[:MAX_CARD_TAGS]
+    fresh_tags = new.get("tags")
+    if new.get("status") != LinkStatus.FAILED.value and current.get("importedTags"):
+        # An imported card's folder / export tags become real tags when its
+        # analysis lands. The import's own job carries them, but a Retry's
+        # job does not: the card does. Same rule as the first run
+        # (_merge_import_tags): the model's tags lead, the user's filing follows.
+        fresh_tags = _merge_import_tags(fresh_tags, current.get("importedTags"))
+    out["tags"] = _merge_tags(current.get("tags"), fresh_tags)[:MAX_CARD_TAGS]
     notes = [n for n in (current.get("userNotes") or []) if isinstance(n, dict)]
     have = {(n.get("text") or "").strip() for n in notes}
     for n in new.get("userNotes") or []:
@@ -5951,6 +6171,33 @@ def _write_capture_card(card_ref, data: dict) -> tuple:
     the charge token, all in one transaction. Returns ``(written,
     removed_charge_kind)``."""
     return capture_charge.finalize_card(get_db(), card_ref, lambda cur: _merge_card_write(data, cur))
+
+
+def _mirror_vector_or_flag(card_ref, fields: dict, db, *, replace: bool = False) -> None:
+    """Mirror a just-written card's vector to its sibling doc (vector_store).
+
+    The mirror raises by design once the sibling is the only copy (phase 3).
+    The card is already saved by then, so a failure must not fail the
+    capture: flag the card `needsEmbedding` instead, and sync_link_embedding
+    writes the vector (card and sibling) again."""
+    try:
+        mirror_vector_write(card_ref, fields, replace=replace, db=db)
+    except Exception as e:
+        logger.error(f"Vector mirror failed; card flagged for re-embedding: {type(e).__name__}: {e}")
+        try:
+            card_ref.update({"needsEmbedding": True})
+        except Exception as flag_err:
+            logger.error(f"Could not flag the card for re-embedding: {flag_err}")
+
+
+def _spend_job_charge(job_ref) -> None:
+    """A job whose paid work LANDED while its token stayed on the job (the
+    screenshot enrich): take the token off without refunding it, so a job doc
+    that outlives the run is never refunded by the queue prune."""
+    try:
+        capture_charge.claim(get_db(), job_ref)
+    except Exception as e:
+        logger.warning(f"Could not spend the job's charge: {e}")
 
 
 def _refund_job(uid: str, job_ref) -> None:
@@ -6040,6 +6287,15 @@ def _enrich_pending_note(ref, uid: str, data: dict) -> None:
     prune) does no paid work and puts the note back to pending."""
     db = get_db()
     card_id = data.get("cardId")
+    # One run per job (capture_charge.start_job). A second delivery used to
+    # find the token gone and put the ORGANIZED note back to pending, so the
+    # next release charged and enriched it again.
+    try:
+        if capture_charge.start_job(db, ref, None, None) == capture_charge.DUPLICATE:
+            logger.info("Note job already started or finished by another run; skipping")
+            return
+    except Exception as claim_err:
+        logger.warning(f"Could not claim the note job: {claim_err}")
     try:
         kind = capture_charge.claim(db, ref)
         if not uid or not _valid_card_id(card_id):
@@ -6089,6 +6345,62 @@ def _owned_blob_deleter(uid: str):
     return _delete
 
 
+def _owned_blob_path(uid: str, url) -> Optional[str]:
+    """The Storage object path of `url` when it is one of `uid`'s own
+    screenshots or post covers in this project's bucket, else None. Never
+    raises: when the bucket can't be read the blob counts as not ours."""
+    if not uid or not isinstance(url, str) or not url:
+        return None
+    try:
+        from card_cleanup import blob_path_for
+        return blob_path_for(url, storage.bucket().name, {uid, storage_key_for(uid)})
+    except Exception as e:
+        logger.warning(f"Storage ownership check failed: {type(e).__name__}: {e}")
+        return None
+
+
+def _job_image_urls(data: dict) -> list:
+    """The image URLs an image job carries: its ordered set, else its one url."""
+    urls = list(data.get("imageUrls") or []) if isinstance(data.get("imageUrls"), list) else []
+    return [u for u in urls + [data.get("url")] if isinstance(u, str) and u]
+
+
+def _drop_capture_blobs(uid: str, urls=None, *, card: Optional[dict] = None) -> int:
+    """Delete the Storage blobs a capture stored for a card the user deleted
+    before its result landed (`urls`, or every Storage URL on `card`). The
+    card cleanup that ran on delete could not see them. card_cleanup's rules
+    hold: only `uid`'s own blobs (the deleter refuses any other path), and
+    never one another card still shows (a failed check keeps the blob).
+    Best-effort; returns how many were deleted."""
+    if card is not None:
+        from card_cleanup import card_blob_urls
+        urls = card_blob_urls(card)
+    urls = [u for u in dict.fromkeys(urls or []) if isinstance(u, str) and u]
+    if not uid or not urls:
+        return 0
+    try:
+        from card_cleanup import _url_still_referenced
+        deleter = _owned_blob_deleter(uid)
+        links_ref = get_db().collection('users').document(uid).collection('links')
+    except Exception as e:
+        logger.warning(f"Capture blob cleanup unavailable: {type(e).__name__}: {e}")
+        return 0
+    deleted = 0
+    for u in urls:
+        if not _owned_blob_path(uid, u):
+            continue
+        try:
+            if _url_still_referenced(links_ref, u):
+                continue
+            deleter(u)
+            deleted += 1
+        except Exception as e:
+            # Already gone (the card cleanup got there first) is fine.
+            if "404" not in str(e) and "NotFound" not in type(e).__name__:
+                logger.warning(f"Capture blob cleanup failed: {type(e).__name__}: {e}")
+    return deleted
+
+
 def _drop_snapshot(uid: str, card_id) -> None:
     """Delete a card's capture snapshot (doc + copied post images) once the
     card has been analyzed. Best-effort."""
@@ -6114,6 +6426,13 @@ def _snapshot_capture(ref, uid: str, data: dict) -> None:
     card_id = data.get("cardId")
     url = data.get("url")
     db = get_db()
+    # One run per job (capture_charge.start_job): a second delivery would only
+    # scrape the page again.
+    try:
+        if capture_charge.start_job(db, ref, None, None) == capture_charge.DUPLICATE:
+            return
+    except Exception as claim_err:
+        logger.warning(f"Could not claim the snapshot job: {claim_err}")
     try:
         if not card_id or not isinstance(url, str):
             return
@@ -6210,8 +6529,6 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
     mime_type = _safe_image_mime(data.get("mimeType"))
     original_body = data.get("body")
 
-    log_to_firestore(task_id, "Background processing started", data={"url": url, "uid": uid, "isImage": is_image})
-
     # The URL we were handed before any reassignment (the image path rewrites `url`
     # to the stored Storage URL below). Kept so a FAILED card records the original.
     original_url = url
@@ -6244,14 +6561,17 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             data,
         )
         return
-    # Refund bookkeeping: the job's charge token moves onto the card when work
-    # starts, and only whoever removes it refunds (capture_charge docstring).
+    # One run per job, and refund bookkeeping: the claim below is this run's
+    # first write. In ONE transaction it checks the job is still queued (a
+    # trigger can be delivered twice, even concurrently), marks it started,
+    # writes the card's processing state and moves the job's charge token onto
+    # the card; only whoever later removes the token refunds (capture_charge).
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     if existing_card_id:
         card_ref = get_db().collection('users').document(uid).collection('links').document(existing_card_id)
         card_id = existing_card_id
         # Start the card's processing clock now that work is actually
-        # beginning, and move the charge token onto the card in the same
-        # transaction. The janitor ages a `processing` card out after 15
+        # beginning. The janitor ages a `processing` card out after 15
         # minutes, measured from this field, and a bulk import (POST
         # /api/import) queues far more jobs than max_instances can run at
         # once: an imported card is written with only `queuedAt` and gets this
@@ -6259,22 +6579,37 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         # the janitor may have timed out a card whose job was merely slow to
         # start; work is running again, so the card shows it.
         try:
-            started = capture_charge.move_to_card(get_db(), ref, card_ref, {
+            outcome = capture_charge.start_job(get_db(), ref, card_ref, {
                 "status": LinkStatus.PROCESSING.value,
-                "processingStartedAt": int(datetime.now(timezone.utc).timestamp() * 1000),
-            })
+                "processingStartedAt": now_ms,
+            }, accepts=_card_awaits_job)
         except Exception as stamp_err:
-            # A read error counts as "present" (only a confirmed-missing card
-            # drops a job); the token stays on the job and the failure path
-            # claims it from there.
+            # A read error counts as "started" (only a confirmed answer drops
+            # a job); the token stays on the job and the failure path claims
+            # it from there.
             logger.warning(f"Could not start the card: {stamp_err}")
-            started = True
-        if not started:
-            # The user deleted the card while it waited in the queue: drop the
-            # job. Running it would re-create the card they just removed.
-            # Refunded (from the job's own token): no paid work ran.
-            logger.info("Card deleted before processing; dropping the job")
+            outcome = capture_charge.STARTED
+            _job_progress(ref, {"status": capture_charge.STARTED_STATUS,
+                                "startedAt": datetime.now(timezone.utc).isoformat()})
+        if outcome == capture_charge.DUPLICATE:
+            # Another delivery of this trigger owns the job (or already
+            # finished and removed it): nothing to do, nothing to refund.
+            logger.info("Job already started or finished by another run; skipping")
+            return
+        if outcome != capture_charge.STARTED:
+            # CARD_GONE: the user deleted the card while it waited in the
+            # queue; running would re-create the card they just removed.
+            # CARD_SETTLED: the card no longer waits for this job (a Retry or
+            # another job already finished it, or another job is on it now);
+            # running would overwrite it. Either way no paid work runs, so the
+            # job's own token is refunded, and the job is dropped.
+            logger.info(f"Dropping the job before any work ({outcome})")
             _refund_job(uid, ref)
+            if outcome == capture_charge.CARD_GONE and is_image:
+                # The screenshots share_ingest stored for a placeholder the
+                # user deleted (an image placeholder has no url, so the card
+                # cleanup could not see them).
+                _drop_capture_blobs(uid, _job_image_urls(data))
             try:
                 ref.delete()
             except Exception:
@@ -6284,7 +6619,7 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         card_ref = get_db().collection('users').document(uid).collection('links').document()
         card_id = card_ref.id
         try:
-            capture_charge.move_to_card(get_db(), ref, card_ref, {
+            outcome = capture_charge.start_job(get_db(), ref, card_ref, {
                 "url": original_url,
                 "title": _capture_placeholder_title(original_url, is_image),
                 "summary": "",
@@ -6292,10 +6627,10 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
                 "category": "",
                 "status": LinkStatus.PROCESSING.value,
                 "sourceType": "image" if is_image else "web",
-                "createdAt": int(datetime.now(timezone.utc).timestamp() * 1000),
+                "createdAt": now_ms,
                 # When processing began — the janitor uses this (not createdAt,
                 # which a retry preserves) to age out cards stuck in `processing`.
-                "processingStartedAt": int(datetime.now(timezone.utc).timestamp() * 1000),
+                "processingStartedAt": now_ms,
                 "metadata": {"originalTitle": "", "estimatedReadTime": 0},
                 **({"urlKey": url_key(original_url)} if not is_image and url_key(original_url) else {}),
             }, create=True, job_fields={"cardId": card_id})
@@ -6304,24 +6639,33 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             # "create the real card at the end" behaviour so a save is never lost.
             logger.error(f"Failed to write processing placeholder card: {placeholder_err}", exc_info=True)
             card_ref = None
+            outcome = capture_charge.STARTED
+            _job_progress(ref, {"status": capture_charge.STARTED_STATUS,
+                                "startedAt": datetime.now(timezone.utc).isoformat()})
+        if outcome == capture_charge.DUPLICATE:
+            # A second delivery of the same share: the first run already made
+            # (or is making) its card. A second card, and a second Gemini
+            # bill, is exactly what the claim exists to prevent.
+            logger.info("Job already started or finished by another run; skipping")
+            return
 
+    log_to_firestore(task_id, "Background processing started", data={"url": url, "isImage": is_image},
+                     uid=uid)
     analysis = {}
     scraped = {"html": "", "title": "", "text": ""}
     # Assumed Pro until the video path reads the plan; only YouTube cares.
     pro = True
+    # Set the moment the analyzed card is written: from then on a failure is
+    # bookkeeping, never a reason to mark the capture FAILED.
+    card_written = False
 
     try:
-        # Mark the queue doc as in-flight. Kept inside the try so that if this
-        # write throws, the failure hits the except below and the visible card
-        # is marked FAILED — rather than the capture being lost silently.
-        ref.update({"status": "processing", "startedAt": datetime.now(timezone.utc).isoformat()})
-
         # 1. Scrape content (only once). Image jobs are NOT scraped: their `url`
         # is our own Storage object, which the image branch below downloads
         # itself; scraping it only cost a second download.
         if not is_image:
-            log_to_firestore(task_id, f"Scraping content for: {url}")
-            ref.update({"status": "scraping"})
+            log_to_firestore(task_id, f"Scraping content for: {url}", uid=uid)
+            _job_progress(ref, {"status": "scraping"})
             _write_stage(card_ref, "scraping")
             # A released waiting card reads the page as it was when it was
             # SAVED (deferred_capture): the post may since have been deleted
@@ -6347,8 +6691,8 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
                 raise _FetchFailed(scraped.get("fetch_error_message") or "Couldn't open this link.")
 
         # 2. Analyze with AI
-        log_to_firestore(task_id, "Starting AI analysis", data={"scrapedTitle": scraped.get("title")})
-        ref.update({"status": "analyzing", "scrapedTitle": scraped.get("title", "")})
+        log_to_firestore(task_id, "Starting AI analysis", data={"scrapedTitle": scraped.get("title")}, uid=uid)
+        _job_progress(ref, {"status": "analyzing", "scrapedTitle": scraped.get("title", "")})
 
         db = get_db()
         existing_tags, existing_categories = get_user_vocabulary(uid)
@@ -6371,8 +6715,8 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
                 # order). Fetch each back — through the same SSRF guard, per URL
                 # — and analyze the whole set as one document.
                 image_urls = queued_image_urls[:MAX_CARD_IMAGES]
-                log_to_firestore(task_id, f"Downloading {len(image_urls)} images")
-                ref.update({"status": "downloading_image"})
+                log_to_firestore(task_id, f"Downloading {len(image_urls)} images", uid=uid)
+                _job_progress(ref, {"status": "downloading_image"})
                 image_parts = []
                 for img_url in image_urls:
                     img_response = safe_get(img_url, timeout=30)
@@ -6381,26 +6725,34 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
                     image_parts.append((img_response.content, part_mime))
 
                 url = image_urls[0]
-                log_to_firestore(task_id, f"Starting AI analysis of {len(image_parts)} images")
-                ref.update({"status": "analyzing_image", "storageUrl": url})
+                log_to_firestore(task_id, f"Starting AI analysis of {len(image_parts)} images", uid=uid)
+                _job_progress(ref, {"status": "analyzing_image", "storageUrl": url})
                 analysis = ai.analyze_images(image_parts, existing_tags=existing_tags,
                                              existing_categories=existing_categories)
                 screenshot_parts = image_parts
             else:
-                log_to_firestore(task_id, f"Downloading image bytes from: {url}")
-                ref.update({"status": "downloading_image"})
+                log_to_firestore(task_id, f"Downloading image bytes from: {url}", uid=uid)
+                _job_progress(ref, {"status": "downloading_image"})
                 img_response = safe_get(url, timeout=30)
                 img_response.raise_for_status()
                 image_bytes = img_response.content
 
-                # Upload to Firebase Storage
-                log_to_firestore(task_id, "Uploading image to Firebase Storage")
-                public_url = _store_image(f"screenshots/{storage_key_for(uid)}/{task_id}.jpg", image_bytes, mime_type)
+                if _owned_blob_path(uid, url):
+                    # Already the user's own blob (share_ingest stored it, or
+                    # it is a Retry or a released waiting card): the card keeps
+                    # pointing at it, so deleting the card deletes it. It used
+                    # to be copied to `{task_id}.jpg` and the card pointed only
+                    # at the copy, so the original outlived the card forever.
+                    public_url = url
+                else:
+                    log_to_firestore(task_id, "Uploading image to Firebase Storage", uid=uid)
+                    public_url = _store_image(f"screenshots/{storage_key_for(uid)}/{task_id}.jpg",
+                                              image_bytes, mime_type)
 
                 url = public_url
 
-                log_to_firestore(task_id, "Starting AI image analysis")
-                ref.update({"status": "analyzing_image", "storageUrl": public_url})
+                log_to_firestore(task_id, "Starting AI image analysis", uid=uid)
+                _job_progress(ref, {"status": "analyzing_image", "storageUrl": public_url})
                 analysis = ai.analyze_image(image_bytes, mime_type, existing_tags=existing_tags,
                                             existing_categories=existing_categories)
                 screenshot_parts = [(image_bytes, mime_type)]
@@ -6437,8 +6789,8 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
 
         # 4. Build link document
         final_title = analysis.get("title", scraped.get("title", "Untitled"))
-        log_to_firestore(task_id, "Saving processed link to brain", data={"finalTitle": final_title})
-        ref.update({"status": "saving"})
+        log_to_firestore(task_id, "Saving processed link to brain", data={"finalTitle": final_title}, uid=uid)
+        _job_progress(ref, {"status": "saving"})
 
         # Determine source type
         is_youtube = scraped.get("content_type") == "youtube"
@@ -6543,18 +6895,29 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             # charge token spent — see _write_capture_card.
             if not _write_capture_card(card_ref, card_payload(link_data, db))[0]:
                 # Deleted mid-processing: the user doesn't want it. Drop the
-                # result rather than resurrect the card.
+                # result rather than resurrect the card, and the blobs this
+                # capture stored with it (the screenshot, a post cover): the
+                # card cleanup that ran on delete never saw them.
                 logger.info("Card deleted during processing; result dropped")
+                _drop_capture_blobs(uid, card=link_data)
                 ref.delete()
                 return
+            card_written = True
             link_id = card_id
-            mirror_vector_write(card_ref, link_data, replace=True, db=db)
+            saved_ref = card_ref
         else:
             link_id = save_link_to_firestore(uid, card_payload(link_data, db))
-            mirror_vector_write(
-                db.collection('users').document(uid).collection('links').document(link_id),
-                link_data, replace=True, db=db)
-        db.collection('users').document(uid).update({'lastSavedLinkId': link_id})
+            card_written = True
+            saved_ref = db.collection('users').document(uid).collection('links').document(link_id)
+
+        # The card is SAVED. Everything below is bookkeeping, and none of it
+        # may turn the finished capture into a FAILED card: that overwrote a
+        # ready card and refunded nothing (its token was already spent).
+        _mirror_vector_or_flag(saved_ref, link_data, db, replace=True)
+        try:
+            db.collection('users').document(uid).update({'lastSavedLinkId': link_id})
+        except Exception as stamp_err:
+            logger.warning(f"lastSavedLinkId not recorded (card kept): {type(stamp_err).__name__}: {stamp_err}")
 
         # 6. Check for reminder intent. Own guard: the card is already saved,
         # and a bad parse (a hostile share note) must not flip it to FAILED.
@@ -6566,11 +6929,22 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         logger.info(f"Processing complete for {data.get('source', 'unknown')} item")
 
         # Successful cleanup
-        ref.delete()
         if data.get("source") == "deferred":
             _drop_snapshot(uid, existing_card_id)
+        ref.delete()
 
     except Exception as e:
+        if card_written:
+            # A step AFTER the successful card write failed (cleanup, most
+            # likely the queue doc delete). The capture itself is done: keep
+            # the card exactly as written, no refund (the charge bought it),
+            # and just try to clear the job.
+            logger.error(f"Post-save step failed; the saved card is kept: {e}", exc_info=True)
+            try:
+                ref.delete()
+            except Exception:
+                pass
+            return
         logger.error(f"Background processing error: {e}", exc_info=True)
 
         # M3 — never drop a capture. Mark the visible card as a retryable FAILED
@@ -6677,6 +7051,124 @@ def _to_ms(value) -> Optional[int]:
     return None
 
 
+def _iso_ms(value) -> Optional[int]:
+    """`_to_ms` for queue-doc stamps, which are ISO-8601 strings
+    (`createdAt`, `startedAt`); None for anything unparseable."""
+    if isinstance(value, str):
+        try:
+            dt = datetime.fromisoformat(value)
+        except ValueError:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return int(dt.timestamp() * 1000)
+    return _to_ms(value)
+
+
+_JANITOR_BATCH = 200
+
+
+def _stuck_processing_cards(db, cutoff: int, queued_cutoff: int, report: dict) -> list:
+    """The `processing` cards old enough to be dead, found by AGE.
+
+    Two collection-group queries, one per clock: `processingStartedAt` older
+    than the timeout (work started and never finished) and `queuedAt` older
+    than the queue window (a job never picked up). Each is ordered by its
+    clock, so the OLDEST come first and each tick works the backlog down. The
+    old `status == processing` scan read the first 200 in document-path order
+    and filtered by age afterwards, so 200 healthy queued import cards in one
+    workspace hid another user's card killed 40 minutes earlier.
+
+    Needs the (status, processingStartedAt) and (status, queuedAt)
+    COLLECTION_GROUP composite indexes in firestore.indexes.json (a default
+    index is COLLECTION-scoped only: the janitor 400'd every 5 minutes on
+    that once, until 2026-07-28). Until they are built the old scan runs, so
+    a fresh deploy never stops the sweep. Every writer of a processing card
+    stamps one of the two clocks; the per-card checks in the caller still
+    decide."""
+    found = {}
+    try:
+        for field, bound in (("processingStartedAt", cutoff), ("queuedAt", queued_cutoff)):
+            query = (db.collection_group("links")
+                     .where(filter=FieldFilter("status", "==", LinkStatus.PROCESSING.value))
+                     .where(filter=FieldFilter(field, "<", bound))
+                     .limit(_JANITOR_BATCH))
+            for doc in query.stream():
+                found.setdefault(getattr(doc.reference, "path", None) or doc.id, doc)
+        return list(found.values())
+    except Exception as e:
+        logger.warning(f"Janitor age query failed, using the status scan: {e}")
+        report["errors"].append(f"age query: {e}")
+    try:
+        return list(db.collection_group("links").where(
+            filter=FieldFilter("status", "==", LinkStatus.PROCESSING.value)
+        ).limit(_JANITOR_BATCH).stream())
+    except Exception as e:
+        logger.error(f"Janitor query failed: {e}")
+        report["errors"].append(str(e))
+        return []
+
+
+def _enrich_job_alive(job_ref, cutoff: int, queued_cutoff: int) -> bool:
+    """Is the job behind a screenshot read still legitimately pending? Queued
+    and inside the queue window (waiting for a worker, not stuck), or started
+    less than the timeout ago (running now). Gone, or older than that: dead."""
+    snap = job_ref.get()
+    job = (snap.to_dict() or {}) if getattr(snap, "exists", False) else None
+    if job is None:
+        return False
+    if job.get("status") == "queued":
+        created = _iso_ms(job.get("createdAt"))
+        return created is not None and created >= queued_cutoff
+    started = _iso_ms(job.get("startedAt"))
+    if started is None:
+        started = _iso_ms(job.get("createdAt"))
+    return started is not None and started >= cutoff
+
+
+def _sweep_stuck_enrich(db, cutoff: int, queued_cutoff: int, report: dict) -> int:
+    """Fail screenshot reads stuck at `enrichStatus: 'processing'` past the
+    timeout (measured from `enrichStartedAt`, stamped when the screenshots
+    were sent), unless their job is still legitimately pending, and give the
+    unit back once: the refund claims the job's charge token (capture_charge),
+    so it never repeats the worker's own failure refund or the queue prune's.
+    A read with no job named (sent before `enrichJobId` existed) carries no
+    token and is only marked. Needs the `enrichStatus` COLLECTION_GROUP
+    index (firestore.indexes.json). Returns how many reads were failed."""
+    failed_out = 0
+    try:
+        docs = list(db.collection_group("links").where(
+            filter=FieldFilter("enrichStatus", "==", "processing")
+        ).limit(_JANITOR_BATCH).stream())
+    except Exception as e:
+        logger.error(f"Janitor enrich query failed: {e}")
+        report["errors"].append(f"enrich: {e}")
+        return 0
+    for doc in docs:
+        d = doc.to_dict() or {}
+        if d.get("enrichStatus") != "processing":
+            continue
+        asked = _to_ms(d.get("enrichStartedAt"))
+        if asked is not None and asked > cutoff:
+            continue
+        try:
+            owner = doc.reference.parent.parent.id
+            job_id = d.get("enrichJobId")
+            job_ref = db.collection("pending_processing").document(job_id) if _valid_card_id(job_id) else None
+            if job_ref is not None and _enrich_job_alive(job_ref, cutoff, queued_cutoff):
+                continue
+            if not _fail_enrich(doc.reference, _ENRICH_TIMEOUT_MESSAGE, older_than_ms=cutoff):
+                continue
+        except Exception as e:
+            logger.error(f"Janitor failed to time out enrich {doc.id}: {e}")
+            report["errors"].append(f"enrich {doc.id}: {e}")
+            continue
+        failed_out += 1
+        if job_ref is not None and isinstance(owner, str) and owner:
+            _refund_job(owner, job_ref)
+    return failed_out
+
+
 def run_processing_janitor() -> dict:
     """Flip cards stuck in `processing` past the timeout to a retryable FAILED.
 
@@ -6688,31 +7180,18 @@ def run_processing_janitor() -> dict:
 
     Only `processing` cards are ever matched: a `waiting` card (a save kept
     past the monthly wall, deferred_capture) has no clock to run out and is
-    never aged, failed or refunded here. Uses a collection-group query so it
-    doesn't scan every user. NOTE: the
-    default single-field indexes cover COLLECTION scope only — this query needs
-    the `status` field enabled at COLLECTION_GROUP scope, declared as a
-    fieldOverride in firestore.indexes.json (it 400'd in prod without it,
-    every 5 minutes, until 2026-07-28). Age is measured from
-    `processingStartedAt` when present (a retry preserves the old `createdAt`),
-    falling back to `createdAt`.
+    never aged, failed or refunded here. The cards are found BY AGE
+    (_stuck_processing_cards). Age is measured from `processingStartedAt`
+    when present (a retry preserves the old `createdAt`), falling back to
+    `createdAt`.
     """
     db = get_db()
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     cutoff = now_ms - _PROCESSING_TIMEOUT_MS
+    queued_cutoff = now_ms - _QUEUED_TIMEOUT_MS
     report = {"scanned": 0, "failed_out": 0, "errors": []}
 
-    try:
-        stuck = db.collection_group("links").where(
-            filter=FieldFilter("status", "==", LinkStatus.PROCESSING.value)
-        ).limit(200).stream()
-    except Exception as e:
-        logger.error(f"Janitor query failed: {e}")
-        report["errors"].append(str(e))
-        return report
-
-    queued_cutoff = now_ms - _QUEUED_TIMEOUT_MS
-    for doc in stuck:
+    for doc in _stuck_processing_cards(db, cutoff, queued_cutoff, report):
         report["scanned"] += 1
         d = doc.to_dict() or {}
         started = _to_ms(d.get("processingStartedAt"))
@@ -6762,6 +7241,13 @@ def run_processing_janitor() -> dict:
             if isinstance(owner, str) and owner:
                 refund_quota(owner, refund_kind)
 
+    # Screenshot reads ("Add screenshots") that never finished. A hard-killed
+    # enrich run never reached its failure path, so the card said "Reading
+    # your screenshot" forever and its unit was never given back. Runs before
+    # the queue prune so the job is still there to tell a read that is merely
+    # waiting for a worker from a dead one.
+    report["enrich_failed_out"] = _sweep_stuck_enrich(db, cutoff, queued_cutoff, report)
+
     # Stale pending_processing queue docs. A hard-killed job (timeout/OOM) never
     # reaches the trigger's cleanup `ref.delete()`, so its queue doc lives
     # forever — and `pending_exists_for_url` then reports every future save of
@@ -6774,17 +7260,30 @@ def run_processing_janitor() -> dict:
     report["queue_pruned"] = 0
     try:
         cutoff_iso = datetime.fromtimestamp(cutoff / 1000, tz=timezone.utc).isoformat()
-        queued_cutoff_iso = datetime.fromtimestamp(
-            (now_ms - _QUEUED_TIMEOUT_MS) / 1000, tz=timezone.utc).isoformat()
         stale_jobs = db.collection("pending_processing").where(
             filter=FieldFilter("createdAt", "<", cutoff_iso)
         ).limit(200).stream()
         for doc in stale_jobs:
             job = doc.to_dict() or {}
-            # Never started, and still inside the longer queue window: it is
-            # waiting for capacity, not dead. Leave it alone.
-            if job.get("status") == "queued" and str(job.get("createdAt") or "") >= queued_cutoff_iso:
-                continue
+            if job.get("status") == "queued":
+                # Never started, and still inside the longer queue window: it
+                # is waiting for capacity, not dead. Leave it alone.
+                created = _iso_ms(job.get("createdAt"))
+                if created is not None and created >= queued_cutoff:
+                    continue
+            else:
+                # STARTED: its age counts from when a worker picked it up
+                # (`startedAt`), not from when it was enqueued. A job can wait
+                # far longer than the timeout for a worker (a 200-link import,
+                # the waiting-saves release, retry backoff); pruning on
+                # `createdAt` deleted such a job WHILE it ran, so its next
+                # write 404'd and a healthy capture turned FAILED. Only a doc
+                # with no start stamp falls back to `createdAt`.
+                started_job = _iso_ms(job.get("startedAt"))
+                if started_job is None:
+                    started_job = _iso_ms(job.get("createdAt"))
+                if started_job is not None and started_job >= cutoff:
+                    continue
             # A job still holding its charge token never handed it to a card
             # (abandoned in the queue, or its placeholder write failed), so no
             # card refund can cover it: refund it here, once.
@@ -6914,32 +7413,37 @@ def run_processing_janitor() -> dict:
         logger.error(f"client_errors prune failed: {e}")
         report["errors"].append(f"client_errors: {e}")
 
-    if (report["failed_out"] or report["queue_pruned"] or report["logs_pruned"]
+    if (report["failed_out"] or report["enrich_failed_out"] or report["queue_pruned"] or report["logs_pruned"]
             or report["server_errors_pruned"] or report["client_error_reports_pruned"]
             or report["client_errors_pruned"]):
         logger.info(f"Processing janitor: {report}")
     return report
 
 
-@scheduler_fn.on_schedule(schedule="every 5 minutes", max_instances=1)
+@scheduler_fn.on_schedule(schedule="every 5 minutes", max_instances=1, timeout_sec=300)
 def sweep_stuck_processing(event: scheduler_fn.ScheduledEvent) -> None:
     """Every 5 min: age out captures stuck in `processing` (see run_processing_janitor).
 
-    Also carries the one-shot category-case backfill. It rides an existing tick
-    rather than getting its own schedule because it runs once and then costs a
-    single marker read forever after; a dedicated job would be permanent
-    infrastructure for a one-time fix. It never raises, so the janitor's real
-    work is unaffected either way.
+    Also releases the next slice of the day's waiting-saves plan
+    (deferred_capture.release_next_slice): the daily run puts only the first
+    slice on the queue, so the backlog never takes every worker instance from
+    live saves. And it carries the one-shot category-case backfill, which
+    rides an existing tick rather than getting its own schedule because it
+    runs once and then costs a single marker read forever after; a dedicated
+    job would be permanent infrastructure for a one-time fix. Neither raises,
+    so the janitor's real work is unaffected either way.
     """
     run_processing_janitor()
+    deferred_capture.release_next_slice()
     run_category_migration()
     repair_flagged_embeddings()  # cards left needsEmbedding after a failed embed (search.py)
 
 
 # Waiting saves (deferred_capture): every workspace's waiting cards are
-# enqueued oldest first within the month's remaining allowance. Daily, just
-# after the UTC month rolls over on the 1st (quota month keys are UTC); on any
-# other day a workspace at its cap has no room, so the run costs one query.
+# planned oldest first within the month's remaining allowance, and queued a
+# slice at a time (the first here, the rest by sweep_stuck_processing). Daily,
+# just after the UTC month rolls over on the 1st (quota month keys are UTC); on
+# any other day a workspace at its cap has no room, so the run costs one query.
 @scheduler_fn.on_schedule(schedule="15 0 * * *", max_instances=1, timeout_sec=540, memory=512)
 def release_waiting_saves(event: scheduler_fn.ScheduledEvent) -> None:
     """Daily 00:15 UTC: analyze waiting saves that now fit the allowance."""

@@ -4,7 +4,7 @@ import { authHeaders } from './auth';
 import { apiUrl, fetchWithTimeout } from './api';
 import { offerUpgradeFor, isWaitingSave, saveWallAsWaiting, type WaitingSave } from './entitlement';
 
-import { AnalyzeResponse, Link, LinkMetadata, LinkStatus, User, UserNote } from './types';
+import { Link, LinkMetadata, LinkStatus, User, UserNote } from './types';
 import { canonicalCategory } from './category';
 import { urlKey } from './urlKey';
 import { getNotes } from './notes';
@@ -211,17 +211,17 @@ export function startProcessingPlaceholder(
 }
 
 /**
- * Placeholder card for a MULTI-IMAGE capture (2+ screenshots → one card). Same
- * durable pattern as startProcessingPlaceholder: the card exists in the feed
- * the instant capture starts, and process_link_background flips this same doc
- * to ready/failed via the cardId passed through /api/share.
+ * Placeholder card for an IMAGE capture (one screenshot, or several that become
+ * one card). Same durable pattern as startProcessingPlaceholder: the card exists
+ * in the feed the instant capture starts, and process_link_background flips this
+ * same doc to ready/failed via the cardId passed through /api/share.
  */
 export async function createImagePlaceholder(uid: string, count: number): Promise<string> {
     const linksRef = collection(db, 'users', uid, 'links');
     const now = Date.now();
     const ref = await addDoc(linksRef, {
         url: '',
-        title: `Reading ${count} screenshots…`,
+        title: count === 1 ? 'Reading your screenshot…' : `Reading ${count} screenshots…`,
         summary: '',
         tags: [],
         category: '',
@@ -523,32 +523,19 @@ export async function generateCardSummary(
 }
 
 /**
- * Retry analysis for a `failed` capture card (M3).
+ * Retry analysis for a `failed` capture card (M3), on the SAME card.
  *
- * Re-runs the same synchronous analysis the Add-Link form uses, then updates the
- * SAME card doc in place: `processing` while it runs, `unread` (ready) on
- * success, or back to `failed` (with the error) if it fails again. Reusing the
- * existing analyze pipeline means no new backend/rules and the card keeps its id
- * — nothing is ever dropped or duplicated.
- */
-/** The model's tags first, then the import's folder / export tags not already
- *  there (case-insensitive), capped like the backend's `_merge_import_tags`. */
-export function mergeImportedTags(modelTags: string[], imported?: string[]): string[] {
-    const out: string[] = [];
-    const seen = new Set<string>();
-    for (const raw of [...modelTags, ...(imported ?? []).slice(0, 8)]) {
-        if (typeof raw !== 'string') continue;
-        const tag = raw.trim().slice(0, 60);
-        const key = tag.toLowerCase();
-        if (!tag || seen.has(key)) continue;
-        seen.add(key);
-        out.push(tag);
-        if (out.length >= 12) break;
-    }
-    return out;
-}
-
-/**
+ * The card goes back through the durable background pipeline every capture
+ * uses: POST /api/share naming this card (`cardId`), and the worker writes the
+ * result onto it in place (`processing` while it runs, then ready or `failed`
+ * again), keeping the user's own fields and an imported card's folder tags. An
+ * IMAGE card re-sends its stored images (`imageUrls`); any other card its URL.
+ *
+ * Never the synchronous /api/analyze: every caller cut that request off at 60
+ * seconds while the function ran on, so a video, a PDF or a slow page failed
+ * again on every Retry, the server kept the unit and threw the result away,
+ * and each Retry cost another save.
+ *
  * Returns `{ waiting }` when the retry crossed the monthly allowance: the card
  * is then kept as `waiting` (read next month or on upgrade) rather than failed
  * again, and the caller announces it (lib/entitlement announceWaitingSave).
@@ -560,145 +547,44 @@ export async function retryFailedLink(uid: string, link: Link): Promise<{ waitin
     // original createdAt) if this attempt dies before completing.
     await updateDoc(linkRef, { status: 'processing', error: null, processingStartedAt: Date.now() });
 
-    // IMAGE card (one screenshot or several): its images are already in
-    // Storage, so retry re-enqueues them through /api/share (imageUrls path)
-    // into the same background pipeline, targeting this same card via cardId,
-    // and the worker writes it back as an image card. The synchronous
-    // /api/analyze below is the WEB-page path: it would scrape the Storage
-    // URL as a page and overwrite the card's sourceType to 'web'.
-    if (link.sourceType === 'image') {
-        const imageUrls = (link.imageUrls?.length ? link.imageUrls : [link.url]).filter(Boolean);
-        try {
-            if (!imageUrls.length) throw new Error('This image is no longer available. Please add it again.');
-            const response = await fetchWithTimeout(apiUrl('/api/share'), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()), ...(await authHeaders()) },
-                body: JSON.stringify({ imageUrls, cardId: link.id, uid }),
-            }, 30_000);
-            const text = await response.text();
-            let data: { success?: boolean; error?: string };
-            try { data = JSON.parse(text); } catch { data = {}; }
-            // Past the allowance the server keeps the card waiting itself.
-            if (response.ok && isWaitingSave(data)) return { waiting: data };
-            const wall = saveWallAsWaiting(response.status, data);
-            if (wall) {
-                await markLinkWaiting(uid, link.id);
-                return { waiting: wall };
-            }
-            if (!response.ok || !data.success) {
-                if (response.status === 429) offerUpgradeFor(data);
-                throw new Error(data?.error || 'Could not restart analysis. Please try again.');
-            }
-            // Queued — the background worker flips this card to ready/failed.
-            return {};
-        } catch (err) {
-            try {
-                await updateDoc(linkRef, {
-                    status: 'failed',
-                    error: err instanceof Error ? err.message.slice(0, 300) : 'Retry failed',
-                    failedAt: Date.now(),
-                });
-            } catch {
-                // Best-effort — the janitor ages out a stuck `processing` card.
-            }
-            throw err;
-        }
-    }
-
     try {
-        let existingTags: string[] = [];
-        let existingCategories: string[] = [];
-        try {
-            existingTags = await getUserTags(uid);
-        } catch {
-            // Tag context is a non-critical optimization.
+        let body: Record<string, unknown>;
+        if (link.sourceType === 'image') {
+            // Its images are already in Storage (the server only accepts the
+            // caller's own); the worker writes it back as an image card.
+            const imageUrls = (link.imageUrls?.length ? link.imageUrls : [link.url]).filter(Boolean);
+            if (!imageUrls.length) throw new Error('This image is no longer available. Please add it again.');
+            body = { imageUrls, cardId: link.id, uid };
+        } else {
+            if (!link.url) throw new Error('This link is no longer available. Please add it again.');
+            body = { url: link.url, cardId: link.id, uid };
         }
-        try {
-            existingCategories = await getUserCategories(uid);
-        } catch {
-            // Category context is likewise best-effort.
-        }
-
-        const response = await fetchWithTimeout(apiUrl('/api/analyze'), {
+        const response = await fetchWithTimeout(apiUrl('/api/share'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()), ...(await authHeaders()) },
-            body: JSON.stringify({ url: link.url, existingTags, existingCategories, uid }),
-        }, 60_000);
+            body: JSON.stringify(body),
+        }, 30_000);
         const text = await response.text();
-        let data: AnalyzeResponse;
-        try {
-            data = JSON.parse(text) as AnalyzeResponse;
-        } catch {
-            throw new Error('The analysis service returned an unexpected response.');
-        }
-        // /api/analyze cannot know the card, so the save wall still answers
-        // 429 here: keep the card waiting instead of failing it again.
+        let data: { success?: boolean; error?: string };
+        try { data = JSON.parse(text); } catch { data = {}; }
+        // Past the allowance the server keeps the card waiting itself.
+        if (response.ok && isWaitingSave(data)) return { waiting: data };
         const wall = saveWallAsWaiting(response.status, data);
         if (wall) {
             await markLinkWaiting(uid, link.id);
             return { waiting: wall };
         }
-        if (!response.ok || !data.success || !data.link) {
+        // 409: the card is no longer waiting for a read (an earlier job
+        // finished it meanwhile). Nothing to retry, and nothing to mark failed.
+        if (response.status === 409) return {};
+        if (!response.ok || !data.success) {
             if (response.status === 429) offerUpgradeFor(data);
-            throw new Error(data?.error || 'Analysis failed. Please try again.');
+            throw new Error(data?.error || 'Could not restart analysis. Please try again.');
         }
-
-        const l = data.link;
-        const key = urlKey(l.url);
-        await updateDoc(linkRef, {
-            url: l.url,
-            // Dedupe key (lib/urlKey.ts); also backfills a legacy card on retry.
-            ...(key ? { urlKey: key } : {}),
-            title: l.title,
-            summary: l.summary,
-            detailedSummary: l.detailedSummary ?? null,
-            // An imported card keeps its folder / export tags through a retry,
-            // exactly as the background worker keeps them on first analysis.
-            tags: mergeImportedTags(l.tags ?? [], link.importedTags),
-            category: canonicalCategory(l.category ?? '') || 'General',
-            language: l.language ?? 'en',
-            // The whole map the server built: a retried YouTube card keeps its
-            // videoId, thumbnail, channel, duration and key moments, and an
-            // X/Instagram card its cover. Writing three fields here replaced
-            // the map and dropped all of that (launch audit WEB-7).
-            metadata: {
-                ...(l.metadata ?? {}),
-                originalTitle: l.metadata?.originalTitle ?? '',
-                estimatedReadTime: l.metadata?.estimatedReadTime ?? 0,
-                actionableTakeaway: l.metadata?.actionableTakeaway ?? null,
-            },
-            // The free plan's "Pro feature" line for a video; cleared when a
-            // retry no longer warrants it.
-            proFeature: l.proFeature ?? deleteField(),
-            sourceType: l.sourceType || 'web',
-            sourceName: l.sourceName ?? null,
-            // Capture honesty (PM-1C). Written on EVERY retry, null included: a
-            // retry that finally reads the page in full has to clear the flag,
-            // or the card would keep apologizing for a read that now succeeded.
-            captureQuality: l.captureQuality ?? null,
-            captureReason: l.captureReason ?? null,
-            // Scrape extras (main.py _scrape_extras), set-or-cleared like the
-            // flags above: where a redirect landed (dedupe of the expanded
-            // URL) and whether only the article's first part was analyzed.
-            finalUrlKey: l.finalUrlKey || deleteField(),
-            contentTruncated: l.contentTruncated ? true : deleteField(),
-            // Intentionally NOT writing embedding_vector here. The API no longer
-            // returns it, and a client write would store it as a plain array
-            // (invisible to vector search). The `sync_link_embedding` Firestore
-            // trigger re-embeds this card server-side on this very update.
-            concepts: l.concepts ?? [],
-            relatedLinks: l.relatedLinks ?? [],
-            status: 'unread',
-            isRead: false,
-            error: null,
-            failedAt: null,
-            processingStartedAt: null,
-            // Preserve the original createdAt — a successful retry should update
-            // the card in place, not teleport it to the top of the feed.
-        });
+        // Queued: the background worker flips this card to ready/failed.
         return {};
     } catch (err) {
-        // Re-mark as failed so it stays a visible, retryable card — never lost.
+        // Re-mark as failed so it stays a visible, retryable card, never lost.
         // Guard this write in its own try: if it also fails (e.g. offline), we
         // must not swallow the original error or leave the throw un-reached.
         try {
@@ -708,8 +594,8 @@ export async function retryFailedLink(uid: string, link: Link): Promise<{ waitin
                 failedAt: Date.now(),
             });
         } catch {
-            // Best-effort: the card stays in `processing`, but the caller still
-            // learns the retry failed via the re-throw below.
+            // Best-effort: the janitor ages out a card stuck in `processing`,
+            // and the caller still learns the retry failed via the re-throw.
         }
         throw err;
     }
