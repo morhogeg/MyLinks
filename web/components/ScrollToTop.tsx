@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ArrowUp } from 'lucide-react';
+import { scrollBehavior } from '@/lib/motion';
 
 /**
  * A subtle "back to top" button that fades in once the Home feed has scrolled
@@ -25,7 +26,7 @@ export default function ScrollToTop({ enabled = true }: { enabled?: boolean }) {
 
     return (
         <button
-            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            onClick={() => window.scrollTo({ top: 0, behavior: scrollBehavior() })}
             aria-label="Back to top"
             title="Back to top"
             className="flex fixed bottom-20 sm:bottom-24 right-4 sm:right-6 z-40 w-9 h-9 rounded-full bg-card/70 backdrop-blur border border-border-subtle/60 text-text-muted items-center justify-center hover:text-text hover:bg-card/90 shadow-sm transition-colors animate-fade-in duration-200 cursor-pointer"

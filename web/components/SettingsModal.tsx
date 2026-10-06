@@ -28,6 +28,7 @@ import {
 import { useScrollLock } from '@/lib/useScrollLock';
 import { usePrivacyLock } from '@/lib/privacyLock';
 import PinLockModal from './PinLockModal';
+import { scrollBehavior } from '@/lib/motion';
 
 interface SettingsModalProps {
     uid: string;
@@ -239,7 +240,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
         setStack(['main']);
         setTimeout(() => {
             document.getElementById('settings-data-export')
-                ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                ?.scrollIntoView({ behavior: scrollBehavior(), block: 'center' });
         }, 60);
     };
 

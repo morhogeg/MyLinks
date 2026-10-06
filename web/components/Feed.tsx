@@ -86,6 +86,7 @@ import { tagMatches } from '@/lib/tags';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { useScrollLock } from '@/lib/useScrollLock';
+import { scrollBehavior } from '@/lib/motion';
 
 // Stable no-op for card slots that don't wire up an action (pending cards).
 const noop = () => { };
@@ -2167,7 +2168,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     }, [headerCommand]);
 
     const selectTab = (tab: BottomTab) => {
-        if (tab === activeTab && tab === 'home') { window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+        if (tab === activeTab && tab === 'home') { window.scrollTo({ top: 0, behavior: scrollBehavior() }); return; }
         if (tab === 'home') {
             // Home is the whole library. An open collection scoped the feed to
             // itself (openCollection sets selectedCollections); drop that scope

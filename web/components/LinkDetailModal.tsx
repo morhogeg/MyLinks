@@ -25,6 +25,7 @@ import ProBadge from './ui/ProBadge';
 import { requestPaywall } from '@/lib/entitlement';
 import { getActionableTakeaway, isTakeawayDismissed, isTakeawayDone } from '@/lib/takeaway';
 import ScreenshotEnrich from '@/components/ScreenshotEnrich';
+import { scrollBehavior } from '@/lib/motion';
 
 // Sentinel `editingNoteId` for the composer when adding a brand-new note (as
 // opposed to editing an existing one, keyed by its real id).
@@ -185,7 +186,7 @@ export default function LinkDetailModal({
         if (!el) return;
         const max = Math.max(0, Math.round(el.scrollWidth / Math.max(1, el.clientWidth)) - 1);
         const target = Math.max(0, Math.min(i, max));
-        el.scrollTo({ left: target * el.clientWidth, behavior: 'smooth' });
+        el.scrollTo({ left: target * el.clientWidth, behavior: scrollBehavior() });
     };
     // Reset the broken-image fallback when navigating to a different card. Done
     // as a render-time state adjustment (React discards this pass and re-renders
@@ -280,7 +281,7 @@ export default function LinkDetailModal({
     useEffect(() => {
         if (!scrollToNotes) return;
         const t = setTimeout(() => {
-            notesSectionRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+            notesSectionRef.current?.scrollIntoView({ block: 'start', behavior: scrollBehavior() });
         }, 320);
         return () => clearTimeout(t);
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -292,7 +293,7 @@ export default function LinkDetailModal({
     useEffect(() => {
         if (!scrollToRelated) return;
         const t = setTimeout(() => {
-            relatedSectionRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+            relatedSectionRef.current?.scrollIntoView({ block: 'start', behavior: scrollBehavior() });
         }, 320);
         return () => clearTimeout(t);
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -414,7 +415,7 @@ export default function LinkDetailModal({
     useEffect(() => {
         if (!editingNoteId) return;
         const t = setTimeout(() => {
-            noteEditorRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            noteEditorRef.current?.scrollIntoView({ block: 'center', behavior: scrollBehavior() });
         }, 100);
         return () => clearTimeout(t);
     }, [editingNoteId, vp.height]);
