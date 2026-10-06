@@ -70,18 +70,19 @@ const NAMED_ENTITIES: Record<string, string> = {
     amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', '#39': "'",
 };
 
+/** A numeric entity's character, or the entity as written when it names no
+    Unicode code point: String.fromCodePoint throws past 0x10FFFF, and one
+    such title used to fail the whole import. */
+function fromEntityCode(code: number, whole: string): string {
+    return Number.isFinite(code) && code > 0 && code <= 0x10FFFF ? String.fromCodePoint(code) : whole;
+}
+
 /** Decode the handful of entities an exporter actually writes. */
 function decodeEntities(text: string): string {
     return text.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (whole, body: string) => {
         const key = body.toLowerCase();
-        if (key.startsWith('#x')) {
-            const code = parseInt(body.slice(2), 16);
-            return Number.isFinite(code) && code > 0 ? String.fromCodePoint(code) : whole;
-        }
-        if (key.startsWith('#')) {
-            const code = parseInt(body.slice(1), 10);
-            return Number.isFinite(code) && code > 0 ? String.fromCodePoint(code) : whole;
-        }
+        if (key.startsWith('#x')) return fromEntityCode(parseInt(body.slice(2), 16), whole);
+        if (key.startsWith('#')) return fromEntityCode(parseInt(body.slice(1), 10), whole);
         return NAMED_ENTITIES[key] ?? whole;
     });
 }

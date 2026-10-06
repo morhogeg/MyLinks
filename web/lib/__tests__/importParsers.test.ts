@@ -123,6 +123,19 @@ test('bookmarks parsing survives junk instead of throwing', () => {
  * Pocket CSV
  * ------------------------------------------------------------------ */
 
+test('an out-of-range character entity stays as written; the import goes on', () => {
+    // String.fromCodePoint throws past 0x10FFFF: one such title used to fail
+    // the whole file with "That file could not be read" (launch audit WEB-18).
+    const html = '<DL><p>'
+        + '<DT><A HREF="https://example.com/a">Broken &#99999999; and &#x110000; title</A>'
+        + '<DT><A HREF="https://example.com/b">Caf&#233; &#x1F600; &amp; more</A>'
+        + '</DL>';
+    const r = parseNetscapeBookmarks(html);
+    assert.equal(r.links.length, 2);
+    assert.equal(r.links[0].title, 'Broken &#99999999; and &#x110000; title');
+    assert.equal(r.links[1].title, 'Caf\u00e9 \u{1F600} & more');
+});
+
 test('csv rows: quoted commas, doubled quotes, trailing newline', () => {
     const rows = parseCsvRows('a,"b,c",d\n"say ""hi""",e,f\n');
     assert.deepEqual(rows, [['a', 'b,c', 'd'], ['say "hi"', 'e', 'f']]);
