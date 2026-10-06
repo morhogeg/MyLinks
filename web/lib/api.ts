@@ -34,6 +34,12 @@ export function apiUrl(path: string): string {
  * *headers* arrive, so the timeout here only bounds connection setup — the
  * (legitimately long) body stream that follows is not cut off. Callers reading
  * a single JSON body get the same protection for free.
+ *
+ * The caller's own `init.signal` still cancels the request: it is mirrored onto
+ * the timeout's controller until the headers arrive. (It used to be replaced
+ * outright, so Ask's Stop and a superseding send never aborted anything.) The
+ * mirror is removed once fetch() settles; a caller that streams the body must
+ * cancel the body itself when it tears down.
  */
 export async function fetchWithTimeout(
     input: string,
@@ -42,10 +48,15 @@ export async function fetchWithTimeout(
 ): Promise<Response> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const callerSignal = init.signal;
+    const onCallerAbort = () => controller.abort(callerSignal?.reason);
+    if (callerSignal?.aborted) onCallerAbort();
+    else callerSignal?.addEventListener('abort', onCallerAbort, { once: true });
     try {
         return await fetch(input, { ...init, signal: controller.signal });
     } finally {
         clearTimeout(timer);
+        callerSignal?.removeEventListener('abort', onCallerAbort);
     }
 }
 
