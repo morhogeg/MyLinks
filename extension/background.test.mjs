@@ -480,6 +480,15 @@ console.log('connect.js (content script)');
     check('does nothing inside a frame', posted.length === 0);
 }
 
+console.log('server address allowlist');
+check('Machina hosts are allowed', S.isAllowedApiBase('https://mymachina.app', false) && S.isAllowedApiBase('https://secondbrain-app-94da2.web.app', false));
+check('any other host is refused', !S.isAllowedApiBase('https://evil.example', false) && !S.isAllowedApiBase('https://mymachina.app.evil.example', false));
+check('http, ports, paths and credentials are refused', !S.isAllowedApiBase('http://mymachina.app', false)
+    && !S.isAllowedApiBase('https://mymachina.app:8443', false) && !S.isAllowedApiBase('https://mymachina.app/x', false)
+    && !S.isAllowedApiBase('https://u:p@mymachina.app', false));
+check('a local server only in a development install', !S.isAllowedApiBase('http://127.0.0.1:5123', false)
+    && S.isAllowedApiBase('http://127.0.0.1:5123', true) && S.isAllowedApiBase('http://localhost:3000', true));
+
 console.log('manifest');
 check('permissions are exactly the documented five', JSON.stringify([...MANIFEST.permissions].sort()) === JSON.stringify(['activeTab', 'contextMenus', 'notifications', 'scripting', 'storage']));
 check('no host permissions at all (share_ingest admits extension origins)', !MANIFEST.host_permissions && !MANIFEST.optional_host_permissions);

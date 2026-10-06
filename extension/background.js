@@ -30,11 +30,25 @@ const has = (obj, path) => path.split(".").reduce((o, k) => (o && o[k] !== undef
 
 // ── Settings ────────────────────────────────────────────────────────────────
 
+// An unpacked (development) install may point the server field at a local
+// stub; a store install never can. management.getSelf needs no permission;
+// where it doesn't exist (Safari), the answer is the strict one.
+async function isDevInstall() {
+  try {
+    const self = api.management && api.management.getSelf ? await api.management.getSelf() : null;
+    return Boolean(self && self.installType === "development");
+  } catch (_) {
+    return false;
+  }
+}
+
 async function getSettings() {
   const { token = "", baseUrl = "" } = await api.storage.local.get(["token", "baseUrl"]);
+  const custom = (baseUrl || "").trim().replace(/\/+$/, "");
   return {
     token: S.cleanToken(token),
-    baseUrl: (baseUrl || "").trim().replace(/\/+$/, "") || S.API_ORIGIN,
+    // A stored address outside the allowlist is ignored, never trusted.
+    baseUrl: custom && S.isAllowedApiBase(custom, await isDevInstall()) ? custom : S.API_ORIGIN,
   };
 }
 
@@ -423,7 +437,7 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
   if (type === "disconnect") {
-    api.storage.local.remove(["token", "connectedAt", "account"]).then(() => sendResponse({ ok: true }));
+    api.storage.local.remove(["token", "connectedAt", "account", "baseUrl"]).then(() => sendResponse({ ok: true }));
     return true;
   }
   return false;
