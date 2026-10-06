@@ -197,6 +197,10 @@ jobs:
         run: |
           echo "NEXT_PUBLIC_REQUIRE_AUTH='${NEXT_PUBLIC_REQUIRE_AUTH}' (empty = ungated rollback build)"
           npm ci
+          # Apple + Google sign-in only: build the auth plugin without the
+          # Facebook SDK it links by default (scripts/strip-facebook-sdk.mjs
+          # says why; it fails the build if the plugin's manifest changes).
+          node scripts/strip-facebook-sdk.mjs
           npm run build
           npx cap sync ios
           test -f ios/App/App/public/index.html || { echo "::error::web bundle not synced"; exit 1; }

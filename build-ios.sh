@@ -55,6 +55,9 @@ echo "  (if that's not the latest, Ctrl-C and run: git pull origin main)"
 # scrolls past — the next Archive silently ships the OLD web bundle.
 echo "→ Installing web deps"
 npm install
+# Same as the TestFlight workflow: the auth plugin builds without the Facebook
+# SDK (scripts/strip-facebook-sdk.mjs).
+node scripts/strip-facebook-sdk.mjs
 
 echo "→ Building Next.js static export (API base: $API_BASE)"
 NEXT_PUBLIC_API_BASE="$API_BASE" NEXT_PUBLIC_SHARE_BASE="$SHARE_BASE" \

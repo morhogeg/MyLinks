@@ -14,7 +14,8 @@
     "test:tags": "node --test --experimental-strip-types lib/__tests__/tags.test.ts",
     "test:related": "node --test --experimental-strip-types lib/__tests__/related.test.ts",
     "test:platform": "node --test --experimental-strip-types lib/__tests__/platform.test.ts",
-    "test:colors": "node --test --experimental-strip-types lib/__tests__/colors.test.ts"
+    "test:colors": "node --test --experimental-strip-types lib/__tests__/colors.test.ts",
+    "test:unit": "node --test --experimental-strip-types lib/__tests__/*.test.ts && node --test scripts/*.test.mjs"
   },
   "dependencies": {
     "@capacitor-firebase/authentication": "^8.3.0",

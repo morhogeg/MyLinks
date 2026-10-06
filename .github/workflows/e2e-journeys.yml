@@ -60,6 +60,10 @@ jobs:
         working-directory: web
         run: npm ci
 
+      - name: Web unit tests (lib + build scripts)
+        working-directory: web
+        run: npm run test:unit
+
       - name: Install e2e dependencies + Chromium
         working-directory: e2e
         run: |
