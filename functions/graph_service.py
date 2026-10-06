@@ -257,10 +257,11 @@ class GraphService:
         from search import build_embedding_text, EMBED_TEXT_VERSION  # lazy: see find_related_links
         links_ref = self.db.collection('users').document(uid).collection('links')
         q = links_ref.order_by('__name__')
-        if cursor:
-            snap = links_ref.document(cursor).get()
-            if snap.exists:
-                q = q.start_after(snap)
+        if isinstance(cursor, str) and cursor and '/' not in cursor:
+            # Resume after the checkpoint's id as a POSITION. A snapshot cursor
+            # needs the card to exist: when the checkpoint card had been
+            # deleted, the phase silently restarted from the first card.
+            q = q.start_after({'__name__': cursor})
         docs = list(q.limit(limit).stream())
 
         embedded = updated = skipped = failed = 0
