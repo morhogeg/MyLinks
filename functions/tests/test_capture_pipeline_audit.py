@@ -340,3 +340,137 @@ def test_a_failed_vector_mirror_never_fails_a_completed_screenshot_read(env, mon
     card = db.docs["users/u1/links/c1"]
     assert card["title"] == "Full post" and "enrichStatus" not in card
     assert card["needsEmbedding"] is True and env.refunds == []
+
+
+# ── CAP-8: one stored copy per screenshot, removed with its card ─────────────
+
+BUCKET = "bkt"
+
+
+class _Blob:
+    def __init__(self, bucket, path):
+        self.bucket, self.path = bucket, path
+
+    def delete(self):
+        if self.bucket.blobs.pop(self.path, None) is None:
+            raise LookupError("404 No such object")
+
+
+class _Bucket:
+    name = BUCKET
+
+    def __init__(self):
+        self.blobs = {}
+
+    def blob(self, path):
+        return _Blob(self, path)
+
+
+def _storage_url(path):
+    from urllib.parse import quote
+    return f"https://firebasestorage.googleapis.com/v0/b/{BUCKET}/o/{quote(path, safe='')}?alt=media&token=t"
+
+
+def _share_stubs(monkeypatch, charges=None):
+    monkeypatch.setattr(main, "_rate_limited", lambda *a, **k: None)
+    monkeypatch.setattr(main, "_require_app_check", lambda *a, **k: True)
+    monkeypatch.setattr(main, "_authed_uid", lambda *a, **k: ("u1", None))
+    monkeypatch.setattr(main, "_quota_blocked",
+                        lambda uid, kind, *a, **k: charges.append(kind) if charges is not None else None)
+    monkeypatch.setattr(main, "link_exists_for_url", lambda uid, url: False)
+    monkeypatch.setattr(main, "pending_exists_for_url", lambda uid, url: False)
+
+
+@pytest.fixture
+def storage_world(env, monkeypatch):
+    """The env harness plus a fake bucket that every Storage path writes to
+    and reads from: share_ingest's store, the worker's download, the card
+    cleanup's delete."""
+    import firebase_admin.storage as fb_storage
+    from urllib.parse import unquote
+    bucket = _Bucket()
+    stores = []
+
+    def store(path, data, mime):
+        stores.append(path)
+        bucket.blobs[path] = data
+        return _storage_url(path)
+
+    def safe_get(url, **k):
+        path = unquote(url.split("/o/")[1].split("?")[0])
+        return types.SimpleNamespace(content=bucket.blobs[path], headers={"Content-Type": "image/jpeg"},
+                                     raise_for_status=lambda: None)
+
+    def make(docs):
+        db = env.make({**docs, "users/u1": {"storageKey": "KEY"}})
+        monkeypatch.setattr(main, "_store_image", store)
+        monkeypatch.setattr(main, "storage", types.SimpleNamespace(bucket=lambda *a, **k: bucket))
+        monkeypatch.setattr(fb_storage, "bucket", lambda *a, **k: bucket, raising=False)
+        monkeypatch.setattr(main, "storage_key_for", lambda uid: "KEY")
+        monkeypatch.setattr(tcc._Query, "get", lambda self, *a, **k: list(self.stream()), raising=False)
+        monkeypatch.setattr(tcc.scraper, "safe_get", safe_get)
+        monkeypatch.setattr(main, "GeminiService", lambda: types.SimpleNamespace(
+            embed_text=lambda t: None,
+            analyze_image=lambda b, m, **k: {"title": "Shot", "summary": "S", "tags": ["a"],
+                                             "category": "Tech", "concepts": []}))
+        _share_stubs(monkeypatch)
+        return db
+
+    return types.SimpleNamespace(make=make, bucket=bucket, stores=stores, env=env)
+
+
+def _run_job_of(db, body):
+    _deliver(db, f"pending_processing/{body['id']}", dict(db.docs[f"pending_processing/{body['id']}"]))
+
+
+@pytest.mark.parametrize("shape", ["image", "images"])
+def test_a_shared_screenshot_is_stored_once_and_leaves_with_its_card(storage_world, shape, monkeypatch):
+    import base64
+    import card_cleanup
+    from tests.test_capture_edge_cases import _Req, _json
+    db = storage_world.make({})
+    b64 = base64.b64encode(b"\xff\xd8\xff" + b"x" * 64).decode()
+    payload = ({"image": b64, "mimeType": "image/jpeg"} if shape == "image"
+               else {"images": [{"data": b64, "mimeType": "image/jpeg"}]})
+    body = _json(main.share_ingest(_Req(payload)))
+    _run_job_of(db, body)
+    assert len(storage_world.stores) == 1  # share_ingest's copy, reused by the worker
+    (card_path, card), = _cards(db).items()
+    assert card["status"] == "unread" and card["url"] == _storage_url(storage_world.stores[0])
+
+    db.docs.pop(card_path)  # the user deletes the card
+    monkeypatch.setattr(card_cleanup, "get_db", main.get_db)  # the same fake db
+    report = card_cleanup.cleanup_deleted_card_logic("u1", card_path.rsplit("/", 1)[1], card)
+    assert report["deleted_blobs"] == 1 and storage_world.bucket.blobs == {}
+
+
+def test_a_card_deleted_mid_run_takes_its_stored_screenshot_with_it(storage_world, monkeypatch):
+    path = "screenshots/KEY/abc.jpg"
+    db = storage_world.make({
+        "users/u1/links/c1": {"status": "processing", "processingStartedAt": tcc.NOW_MS, "url": "",
+                              "sourceType": "image"},
+        tcc.JOB: tcc._job(url=_storage_url(path), isImage=True, imageUrls=[_storage_url(path)],
+                          charge={"kind": "saves"})})
+    storage_world.bucket.blobs[path] = b"\xff\xd8\xffimg"
+    real_vocab = main.get_user_vocabulary
+
+    def delete_card_then_continue(uid):
+        db.docs.pop("users/u1/links/c1", None)  # deleted while it was being read
+        return real_vocab(uid)
+    monkeypatch.setattr(main, "get_user_vocabulary", delete_card_then_continue)
+    storage_world.env.run_worker()
+    assert "users/u1/links/c1" not in db.docs and storage_world.bucket.blobs == {}
+
+
+def test_a_placeholder_deleted_while_queued_takes_its_screenshots_with_it(storage_world):
+    paths = ["screenshots/KEY/a.jpg", "screenshots/KEY/b.jpg"]
+    storage_world.make({tcc.JOB: tcc._job(url=_storage_url(paths[0]), isImage=True,
+                                               imageUrls=[_storage_url(p) for p in paths],
+                                               charge={"kind": "saves"}),
+                             # Another card that shows the second image keeps it.
+                             "users/u1/links/other": {"status": "unread", "url": _storage_url(paths[1])}})
+    for p in paths:
+        storage_world.bucket.blobs[p] = b"img"
+    storage_world.env.run_worker()
+    assert list(storage_world.bucket.blobs) == [paths[1]]
+    assert storage_world.env.refunds == ["saves"]

@@ -5939,6 +5939,62 @@ def _owned_blob_deleter(uid: str):
     return _delete
 
 
+def _owned_blob_path(uid: str, url) -> Optional[str]:
+    """The Storage object path of `url` when it is one of `uid`'s own
+    screenshots or post covers in this project's bucket, else None. Never
+    raises: when the bucket can't be read the blob counts as not ours."""
+    if not uid or not isinstance(url, str) or not url:
+        return None
+    try:
+        from card_cleanup import blob_path_for
+        return blob_path_for(url, storage.bucket().name, {uid, storage_key_for(uid)})
+    except Exception as e:
+        logger.warning(f"Storage ownership check failed: {type(e).__name__}: {e}")
+        return None
+
+
+def _job_image_urls(data: dict) -> list:
+    """The image URLs an image job carries: its ordered set, else its one url."""
+    urls = list(data.get("imageUrls") or []) if isinstance(data.get("imageUrls"), list) else []
+    return [u for u in urls + [data.get("url")] if isinstance(u, str) and u]
+
+
+def _drop_capture_blobs(uid: str, urls=None, *, card: Optional[dict] = None) -> int:
+    """Delete the Storage blobs a capture stored for a card the user deleted
+    before its result landed (`urls`, or every Storage URL on `card`). The
+    card cleanup that ran on delete could not see them. card_cleanup's rules
+    hold: only `uid`'s own blobs (the deleter refuses any other path), and
+    never one another card still shows (a failed check keeps the blob).
+    Best-effort; returns how many were deleted."""
+    if card is not None:
+        from card_cleanup import card_blob_urls
+        urls = card_blob_urls(card)
+    urls = [u for u in dict.fromkeys(urls or []) if isinstance(u, str) and u]
+    if not uid or not urls:
+        return 0
+    try:
+        from card_cleanup import _url_still_referenced
+        deleter = _owned_blob_deleter(uid)
+        links_ref = get_db().collection('users').document(uid).collection('links')
+    except Exception as e:
+        logger.warning(f"Capture blob cleanup unavailable: {type(e).__name__}: {e}")
+        return 0
+    deleted = 0
+    for u in urls:
+        if not _owned_blob_path(uid, u):
+            continue
+        try:
+            if _url_still_referenced(links_ref, u):
+                continue
+            deleter(u)
+            deleted += 1
+        except Exception as e:
+            # Already gone (the card cleanup got there first) is fine.
+            if "404" not in str(e) and "NotFound" not in type(e).__name__:
+                logger.warning(f"Capture blob cleanup failed: {type(e).__name__}: {e}")
+    return deleted
+
+
 def _drop_snapshot(uid: str, card_id) -> None:
     """Delete a card's capture snapshot (doc + copied post images) once the
     card has been analyzed. Best-effort."""
@@ -6143,6 +6199,11 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             # job's own token is refunded, and the job is dropped.
             logger.info(f"Dropping the job before any work ({outcome})")
             _refund_job(uid, ref)
+            if outcome == capture_charge.CARD_GONE and is_image:
+                # The screenshots share_ingest stored for a placeholder the
+                # user deleted (an image placeholder has no url, so the card
+                # cleanup could not see them).
+                _drop_capture_blobs(uid, _job_image_urls(data))
             try:
                 ref.delete()
             except Exception:
@@ -6270,9 +6331,17 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
                 img_response.raise_for_status()
                 image_bytes = img_response.content
 
-                # Upload to Firebase Storage
-                log_to_firestore(task_id, "Uploading image to Firebase Storage", uid=uid)
-                public_url = _store_image(f"screenshots/{storage_key_for(uid)}/{task_id}.jpg", image_bytes, mime_type)
+                if _owned_blob_path(uid, url):
+                    # Already the user's own blob (share_ingest stored it, or
+                    # it is a Retry or a released waiting card): the card keeps
+                    # pointing at it, so deleting the card deletes it. It used
+                    # to be copied to `{task_id}.jpg` and the card pointed only
+                    # at the copy, so the original outlived the card forever.
+                    public_url = url
+                else:
+                    log_to_firestore(task_id, "Uploading image to Firebase Storage", uid=uid)
+                    public_url = _store_image(f"screenshots/{storage_key_for(uid)}/{task_id}.jpg",
+                                              image_bytes, mime_type)
 
                 url = public_url
 
@@ -6420,8 +6489,11 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             # charge token spent — see _write_capture_card.
             if not _write_capture_card(card_ref, card_payload(link_data, db))[0]:
                 # Deleted mid-processing: the user doesn't want it. Drop the
-                # result rather than resurrect the card.
+                # result rather than resurrect the card, and the blobs this
+                # capture stored with it (the screenshot, a post cover): the
+                # card cleanup that ran on delete never saw them.
                 logger.info("Card deleted during processing; result dropped")
+                _drop_capture_blobs(uid, card=link_data)
                 ref.delete()
                 return
             card_written = True
