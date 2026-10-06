@@ -14,16 +14,10 @@ import { useToast } from '@/components/Toast';
 import { getActionableTakeaway } from '@/lib/takeaway';
 import { getNotes } from '@/lib/notes';
 import type { Link } from '@/lib/types';
-import { registerPlugin } from '@capacitor/core';
+import { Filesystem, deleteNativeExportFiles, EXPORT_FILE_NAMES } from '@/lib/exportFiles';
+import { loadPrivacyLock, getPrivacyLockState } from '@/lib/privacyLock';
+import PinLockModal from '@/components/PinLockModal';
 import { List, RowShell, RowText } from './primitives';
-
-/** The two @capacitor/filesystem calls the native export uses. Registered by
- *  name (the plugin's JS layer is exactly this registerPlugin call), so the
- *  web bundle carries no filesystem code and the web build never needs it. */
-interface FilesystemPlugin {
-    writeFile(opts: { path: string; data: string; directory: 'CACHE'; encoding: 'utf8' }): Promise<{ uri: string }>;
-}
-const Filesystem = registerPlugin<FilesystemPlugin>('Filesystem');
 
 /**
  * Settings → Export my data.
@@ -45,7 +39,11 @@ const Filesystem = registerPlugin<FilesystemPlugin>('Filesystem');
  * Web downloads via a Blob object URL. The native iOS app writes both files
  * to the app's cache directory (@capacitor/filesystem) and opens the share
  * sheet with them (@capacitor/share `files`), so "Save to Files", AirDrop or
- * Mail all work.
+ * Mail all work. The files are deleted when the sheet closes (lib/exportFiles).
+ *
+ * With the privacy lock on, the export asks for the PIN first: the lock keeps
+ * private collections away from a borrowed phone, and an export would hand
+ * them over in one file.
  */
 
 const PAGE_SIZE = 500;
@@ -184,21 +182,25 @@ function buildMarkdown(
 }
 
 /** Native iOS: write the files to the cache directory and hand them to the
- *  share sheet. A dismissed sheet is not an error. */
+ *  share sheet. A dismissed sheet is not an error. The share call resolves
+ *  when the sheet's activity completes (Files, AirDrop and Mail have taken
+ *  their copy by then), so the files are deleted straight after. */
 async function shareFilesNative(files: { name: string; content: string }[]): Promise<boolean> {
-    const uris: string[] = [];
-    for (const f of files) {
-        const { uri } = await Filesystem.writeFile({ path: f.name, data: f.content, directory: 'CACHE', encoding: 'utf8' });
-        uris.push(uri);
-    }
-    const { Share } = await import('@capacitor/share');
     try {
+        const uris: string[] = [];
+        for (const f of files) {
+            const { uri } = await Filesystem.writeFile({ path: f.name, data: f.content, directory: 'CACHE', encoding: 'utf8' });
+            uris.push(uri);
+        }
+        const { Share } = await import('@capacitor/share');
         await Share.share({ title: 'Machina export', files: uris });
         return true;
     } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         if (/cancel/i.test(msg)) return false;
         throw e;
+    } finally {
+        await deleteNativeExportFiles();
     }
 }
 
@@ -220,9 +222,27 @@ export default function DataExport() {
     const { uid } = useAuth();
     const toast = useToast();
     const [busy, setBusy] = useState(false);
+    const [askPin, setAskPin] = useState(false);
     const native = isNativeApp();
 
     const handleExport = async () => {
+        if (!uid || busy) return;
+        // Same PIN that opens private collections (see the header). A config
+        // that can't be read fails closed, as everywhere else the lock is used.
+        await loadPrivacyLock(uid);
+        const lock = getPrivacyLockState();
+        if (lock.hasPin === null) {
+            toast.error('Export failed. Please try again.');
+            return;
+        }
+        if (lock.hasPin && !lock.unlocked) {
+            setAskPin(true);
+            return;
+        }
+        await runExport();
+    };
+
+    const runExport = async () => {
         if (!uid || busy) return;
         setBusy(true);
         try {
@@ -245,15 +265,16 @@ export default function DataExport() {
 
             const markdown = buildMarkdown(links, collections);
 
+            const [jsonName, mdName] = EXPORT_FILE_NAMES;
             if (native) {
                 const shared = await shareFilesNative([
-                    { name: 'machina-export.json', content: json },
-                    { name: 'machina-export.md', content: markdown },
+                    { name: jsonName, content: json },
+                    { name: mdName, content: markdown },
                 ]);
                 if (!shared) return;
             } else {
-                downloadBlob(json, 'machina-export.json', 'application/json');
-                downloadBlob(markdown, 'machina-export.md', 'text/markdown');
+                downloadBlob(json, jsonName, 'application/json');
+                downloadBlob(markdown, mdName, 'text/markdown');
             }
 
             track('export_used', { count: links.length });
@@ -266,18 +287,30 @@ export default function DataExport() {
     };
 
     return (
-        <List>
-            <RowShell
-                tile={<Download className="w-[16px] h-[16px]" />}
-                onClick={busy ? undefined : handleExport}
-            >
-                <RowText
-                    title={busy ? 'Preparing your export…' : 'Export my data'}
-                    sub={native
-                        ? 'Save or send all your cards, notes, collections and Ask chats as JSON + Markdown.'
-                        : 'Download all your cards, notes, collections and Ask chats as JSON + Markdown.'}
+        <>
+            <List>
+                <RowShell
+                    tile={<Download className="w-[16px] h-[16px]" />}
+                    onClick={busy ? undefined : handleExport}
+                >
+                    <RowText
+                        title={busy ? 'Preparing your export…' : 'Export my data'}
+                        sub={native
+                            ? 'Save or send all your cards, notes, collections and Ask chats as JSON + Markdown.'
+                            : 'Download all your cards, notes, collections and Ask chats as JSON + Markdown.'}
+                    />
+                </RowShell>
+            </List>
+            {askPin && uid && (
+                <PinLockModal
+                    uid={uid}
+                    mode="unlock"
+                    isOpen
+                    unlockReason="Your export includes your private collections."
+                    onSuccess={() => { void runExport(); }}
+                    onClose={() => setAskPin(false)}
                 />
-            </RowShell>
-        </List>
+            )}
+        </>
     );
 }

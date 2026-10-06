@@ -43,6 +43,7 @@ export default function PinLockModal({
     isOpen,
     onClose,
     onSuccess,
+    unlockReason,
 }: {
     uid: string;
     mode: Mode;
@@ -50,6 +51,8 @@ export default function PinLockModal({
     onClose: () => void;
     /** Fired after the flow completes (vault unlocked / PIN saved / PIN removed). */
     onSuccess?: () => void;
+    /** Why the vault is being unlocked, when it isn't opening a collection. */
+    unlockReason?: string;
 }) {
     const [step, setStep] = useState<Step>(FIRST_STEP[mode]);
     const [value, setValue] = useState('');
@@ -237,7 +240,7 @@ export default function PinLockModal({
         : mode === 'change' && step === 'verify' ? 'Enter your current PIN first.'
         : step === 'create' ? 'This one PIN protects all your private collections.'
         : step === 'confirm' ? 'Enter the same PIN once more.'
-        : 'This collection is private.';
+        : unlockReason ?? 'This collection is private.';
 
     return (
         <div

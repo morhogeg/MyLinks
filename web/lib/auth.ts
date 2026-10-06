@@ -314,6 +314,14 @@ async function dropNativeSession(): Promise<void> {
         // Never let the bridge block a sign-out.
     }
     try {
+        // A data export left in Caches (the app was killed with the share
+        // sheet open) is the whole library in one file.
+        const { deleteNativeExportFiles } = await import('@/lib/exportFiles');
+        await deleteNativeExportFiles();
+    } catch {
+        // Never block a sign-out on it.
+    }
+    try {
         // RevenueCat is keyed to the auth uid; leave it anonymous so the next
         // account on this device starts clean.
         const { logOutPurchases } = await import('@/lib/purchases');
