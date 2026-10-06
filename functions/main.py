@@ -2265,7 +2265,6 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
             charged = (uid, "saves")
         else:
             plan = "free"
-        pro = _video_ingest_allowed(uid, plan)
 
         logger.info(f"Analyzing URL synchronously: {url}")
 
@@ -2293,6 +2292,10 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
         # 2. Analyze with AI (YouTube → native video ingestion w/ fallback)
         ai = GeminiService()
         content_type = scraped.get("content_type")
+        # The plan's video gate, read only for a video (as the worker does):
+        # for a reverse-trial workspace it SPENDS one of its few videos per
+        # hour, so checking it before the scrape used the budget up on articles.
+        pro = _video_ingest_allowed(uid, plan) if content_type == "youtube" else True
         # Synchronous path: 2 Gemini attempts (stay under the 60s budget, report 3.6).
         analysis = _analyze_scraped(ai, scraped, existing_tags, attempts=2,
                                     existing_categories=existing_categories, pro=pro)

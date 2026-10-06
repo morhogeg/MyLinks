@@ -639,6 +639,51 @@ def test_a_screenshot_read_is_clamped_like_any_new_card(env, monkeypatch):
     assert len(card["metadata"]["actionableTakeaway"]) == main.MAX_TAKEAWAY_LENGTH
 
 
+# ── CAP-15: a trial's video budget is spent on videos only ───────────────────
+
+def test_analyze_link_reads_the_video_budget_only_for_a_video(monkeypatch):
+    from tests.test_capture_edge_cases import _Req, _json
+    _share_stubs(monkeypatch)
+    monkeypatch.setattr(main, "plan_for", lambda uid: "pro")
+    monkeypatch.setattr(main, "entitlement_source", lambda uid: "trial")
+    spent = []
+
+    def rate_limit(key, limit, window, fail_open=False):
+        if key.startswith("video-trial-uid"):
+            spent.append(key)
+            return len(spent) <= 3
+        return True
+    monkeypatch.setattr(main, "check_rate_limit", rate_limit)
+    monkeypatch.setattr(main, "refund_quota", lambda *a, **k: None)
+    monkeypatch.setattr(main, "get_db", lambda: None)
+    monkeypatch.setattr(main, "GraphService", lambda d: types.SimpleNamespace(find_related_links=lambda **k: []))
+    watched = []
+
+    class AI:
+        def analyze_text(self, *a, **k):
+            return {"title": "T", "summary": "S", "tags": [], "category": "Tech", "concepts": []}
+
+        def analyze_youtube(self, *a, **k):
+            watched.append(1)
+            return {"title": "V", "summary": "S", "tags": [], "category": "Tech", "concepts": []}
+
+        def embed_text(self, t):
+            return None
+    monkeypatch.setattr(main, "GeminiService", AI)
+
+    def scrape(url, body=None):
+        if "youtube" in url:
+            return {"html": "x", "text": "YOUTUBE VIDEO", "title": "V", "content_type": "youtube",
+                    "youtube_metadata": {"video_id": "abcdefghijk", "length_seconds": 600,
+                                         "watch_url": "https://www.youtube.com/watch?v=abcdefghijk"}}
+        return {"html": "", "title": "A", "text": "article body " * 20}
+    monkeypatch.setattr(tcc.scraper, "scrape_url", scrape)
+    for u in ["https://a.com/1", "https://b.com/2", "https://c.com/3",
+              "https://www.youtube.com/watch?v=abcdefghijk"]:
+        assert _json(main.analyze_link(_Req({"url": u})))["success"]
+    assert len(spent) == 1 and watched == [1]
+
+
 def test_the_enrich_sweep_has_a_collection_group_index():
     import json
     overrides = json.loads((FUNCTIONS.parent / "firestore.indexes.json").read_text())["fieldOverrides"]
