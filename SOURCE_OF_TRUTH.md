@@ -2546,7 +2546,7 @@ native iOS share sheet, so that beat is a brand graphic.
 - **Four feature clips** sit on their own branches, each awaiting owner review:
   SAVE `claude/clip-save`, FIND `claude/clip-find`, ASK `claude/clip-ask`,
   REVISIT `claude/clip-revisit`.
-- **The live film, "Machina in Motion"** (66s, narrated, 16:9 + 9:16) is on branch `claude/live-film` (built 2026-10-06 on
+- **The live film, "Machina in Motion"** (68s, narrated, 16:9 + 9:16) is on branch `claude/live-film` (built 2026-10-06 on
   the reel kit + today's `main`), awaiting owner review. One continuous take
   of the real app (boot → save → find → ask → graph → Revisit), composed in a
   3D set with an orbit camera, lifts, a ring of the account's saves and the
@@ -2851,7 +2851,24 @@ exact-match, capped.
   score's tempo follows the edit). **Verified:** every line fits its caption;
   every line sits ≥ 4.7 dB over the music in the speech band (the reel's bar is
   3 dB); `live:verify` green. **NOT verified:** nobody has listened to the
-  narrated mix.
+  narrated mix. **Then (owner): "Narration is missing in the first few
+  seconds, we had it before" and "some cards in the rotating carousel are
+  jittery".** The reel's opening lines are back over the boot and the ring
+  ("You save things everywhere." / "An article here. A video there. A thread
+  somewhere else." / "Saved, and rarely seen again." / "Introducing Machina."),
+  still without the subtitle line; the ring orbits 2.2 s longer under them
+  and its spiral, the band's entry and "Save anything" hang off a new
+  `gather` anchor (film now 68.4s); 16:9 frames the boot smaller and higher
+  so the lines clear the phone. The jitter was aliasing, measured: each ring
+  card was drawn from the 3× capture shrunk about 5× by the GPU, so an
+  in-focus card's glyphs dropped in and out frame to frame. Ring cards are
+  now mip pyramids of canvases (never shrunk more than 2×); the same frames
+  rendered after the fix hold their text. (Ruled out on the way, by
+  pixel-identical A/B renders: the blur's 0.25 px steps, CPU load during the
+  render, will-change.) **Verified:** every line fits; every line ≥ 4.1 dB
+  over the music in the speech band; `live:verify` green. **NOT verified:**
+  nobody has listened; the phone's own screen is still drawn from the 3×
+  capture (mild softness while small, not seen to shimmer).
 
 - **2026-10-05 (evening) — BROWSER EXTENSION STORE-READY + MACHINA FOR SAFARI
   PROJECT; B1 CORS SHIPPED.** Branch `claude/app-launch-qa-a29d1f`. Two

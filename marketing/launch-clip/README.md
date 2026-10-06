@@ -799,7 +799,7 @@ Enforced by `npm run verify` where a machine can check:
 
 # The live film (`live/`)
 
-**Machina in Motion**: a 66-second narrated film of the real app, in one
+**Machina in Motion**: a 68-second narrated film of the real app, in one
 continuous take, that runs as a web page (a 3D stage the visitor's browser
 draws) and renders frame-exact to MP4 from the same page. Built 2026-10-06 on the reel
 kit's capture; branch `claude/live-film`, not merged.
@@ -872,10 +872,17 @@ addition), so its connections, the Ask citation and its graph node all hold.
   (the app's own black scrim would otherwise darken the frame), stays live
   while it works, then folds down into the slot where the new card appears.
 - **The words** (`film/words.js`) are the reel's owner-approved lines, and
-  the narrator speaks them. The film opens on the app and the ring of saves
-  with no words (owner, 2026-10-06: the subtitle line is not needed at the
-  start) and ends on the tagline. In 9:16 a band of the same paper fades any
-  screen that rises under them (the reel's BandScrim).
+  the narrator speaks them. The film opens on the reel's opening (the
+  problem, then the name) over the boot and the ring of saves, without the
+  subtitle line (owner, 2026-10-06: "not needed"), and ends on the tagline.
+  In 9:16 a band of the same paper fades any screen that rises under them
+  (the reel's BandScrim).
+- **The ring's cards are mipmapped.** Each is a small pyramid of canvases
+  (1071 px, the 3× capture, down to 67 px), and each frame lays the card out
+  at the level nearest its size on screen, blending into the next: the GPU
+  never shrinks a card's texture more than 2×. Drawn straight from the
+  capture, a card on screen at a fifth of its texture broke its text up
+  differently every frame, and the ring shimmered (owner: "jittery").
 
 ## Live and rendered, one page
 
@@ -907,8 +914,8 @@ The house narrator, the same voice as the launch film and the reel (Kokoro
 setup in "The voice-over" above). **The captions are the script:**
 `audio/synth-vo.py live` reads `voiceOf` in `film/words.js`, one line per
 caption, starting 0.1 s after the caption starts arriving, and fails if a
-line would still be speaking when its caption leaves (the Revisit beat holds
-3.4 s for that reason). `audio/mix-vo.mjs live` lays the lines over the
+line would still be speaking when its caption leaves (the home hold is 8.8 s
+and the Revisit beat 3.4 s for that reason). `audio/mix-vo.mjs live` lays the lines over the
 score: the score sits 6 dB down (it is mastered on its own), ducks to 0.65
 under each line, to 0.4 under the Ask answer (the score is fullest there)
 and the tagline (the brand line, as in the reel), then the mix is mastered to
