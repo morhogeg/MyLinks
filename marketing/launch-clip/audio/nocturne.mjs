@@ -15,6 +15,8 @@
  *   drive  D♭maj9 · E♭/D♭ · Fm7 · B♭m9 (I · II · iii · vi), a filtered pulse
  *          bass, 16th glass arps, a half-time kick and a backbeat on 3
  *   peak   the same, wider: G♭maj7♯11 · A♭add9 · D♭maj9 · E♭/D♭, octave arps
+ *   calm   the drive's harmony with no beat: pads, air and the felt figure,
+ *          for a beat the viewer has to read (a recap, a summary)
  *   end    the beat stops a beat early; a riser lands the strike: boom, the
  *          tonic held, a rising glint, the felt motif resolving home
  *
@@ -707,8 +709,8 @@ export function createScore({ seconds, bpm, seed = 0x51ce7, gains = {} }) {
 /**
  * Render a cue sheet.
  *
- *   sections: [{ from, kind }]   frames; kind ∈ dark | turn | drive | peak | end
- *                                 | still (pad only, no beat). Sorted; each runs
+ *   sections: [{ from, kind }]   frames; kind ∈ dark | turn | drive | calm | peak
+ *                                 | end | still (pad only, no beat). Sorted; each runs
  *                                 to the next one's `from` (the last to `total`).
  *   hits: {
  *     ticks:   [frame]           a finger lands (glass tick)
@@ -716,6 +718,8 @@ export function createScore({ seconds, bpm, seed = 0x51ce7, gains = {} }) {
  *     booms:   [frame]           an impact (the mark's strike, a big reveal)
  *     glints:  [frame]           light catching (a lift, a chip, a phase)
  *     risers:  [frame]           a riser ends ON this frame
+ *     softBooms:[frame]           a lighter impact (a cut, a small reveal)
+ *     typing:  [frame]            keystrokes (very quiet ticks)
  *   }
  *   voice:   [[startSec, endSec]] spoken spans: melodic notes avoid starting in them
  *   fadeOut: seconds of fade at the very end (default 1.2)
@@ -760,23 +764,25 @@ export function renderCues({ fps, bpm, total, sections, hits = {}, voice = [], f
       // a drive section builds in: bar 0 harmony and engine, bar 1 adds the
       // kick and arp, full kit from bar 2 (a peak arrives full)
       const build = kind === 'drive' ? Math.min(2, bi) : 2;
-      const loop = kind === 'end' ? null : LOOPS[kind === 'still' ? 'dark' : kind] ?? LOOPS.drive;
+      // (calm walks the drive's loop, still the dark one)
+      const lk = kind === 'still' ? 'dark' : kind === 'calm' ? 'drive' : kind;
+      const loop = kind === 'end' ? null : LOOPS[lk] ?? LOOPS.drive;
       let name;
       if (kind === 'end') name = 'Dbmaj9';
       else {
-        name = loop[loopIdx[kind === 'still' ? 'dark' : kind] % loop.length];
-        if (!b.partial) loopIdx[kind === 'still' ? 'dark' : kind]++;
+        name = loop[loopIdx[lk] % loop.length];
+        if (!b.partial) loopIdx[lk]++;
       }
       const c = CHORDS[name];
       const dur = b.len;
       // ── harmony (every kind)
-      const padLevel = { dark: 0.022, still: 0.026, drive: 0.04, peak: 0.046, end: 0.05 }[kind] ?? 0.04;
-      const bright = { dark: 0.3, still: 0.35, drive: 0.6, peak: 0.85, end: 0.7 }[kind] ?? 0.55;
+      const padLevel = { dark: 0.022, still: 0.026, calm: 0.034, drive: 0.04, peak: 0.046, end: 0.05 }[kind] ?? 0.04;
+      const bright = { dark: 0.3, still: 0.35, calm: 0.5, drive: 0.6, peak: 0.85, end: 0.7 }[kind] ?? 0.55;
       c.pad.forEach((m, k) =>
         S.halo(b.t, dur, m, { level: padLevel, bright, attack: kind === 'dark' ? 1.6 : 0.5, release: kind === 'end' ? 6 : 2.2, pan: (k - 1.5) / 3 }),
       );
       S.subBass(b.t, dur, c.bass, { level: kind === 'dark' ? 0.06 : 0.1 });
-      if (kind === 'peak' || kind === 'end' || kind === 'drive') S.air(b.t, dur, c.pad[3] + 24, { level: kind === 'drive' ? 0.006 : 0.008, pan: 0.2 });
+      if (kind === 'peak' || kind === 'end' || kind === 'drive' || kind === 'calm') S.air(b.t, dur, c.pad[3] + 24, { level: kind === 'drive' ? 0.006 : 0.008, pan: 0.2 });
 
       if (kind === 'dark' || kind === 'still') {
         // the heartbeat on 1 (dark only), the felt sigh over two bars
@@ -789,6 +795,17 @@ export function renderCues({ fps, bpm, total, sections, hits = {}, voice = [], f
         }
         // a thin hat ticking like a clock, only in dark
         if (kind === 'dark') for (let q = 0; q < 4; q++) if (b.t + q * beat < b.t + dur) S.hat(b.t + q * beat + beat * 0.5, { level: 0.012, pan: 0.4 });
+        continue;
+      }
+
+      if (kind === 'calm') {
+        // no beat: the figure on the felt piano, between the words
+        const phrase = MOTIF.drive[Math.floor(b.t / bar) % 2];
+        for (const [bt, m] of phrase) {
+          const t = b.t + bt * beat;
+          if (t >= b.t + dur - 0.05 || speaking(t)) continue;
+          S.felt(t, m, { level: 0.05, pan: (m - 72) / 18, bright: 0.5, len: 3 });
+        }
         continue;
       }
 
@@ -848,6 +865,8 @@ export function renderCues({ fps, bpm, total, sections, hits = {}, voice = [], f
   for (const f of hits.ticks ?? []) S.tick(sec(f), { level: 0.045, pan: 0.1 });
   for (const f of hits.whooshes ?? []) S.whoosh(sec(f), { level: 0.055 });
   for (const f of hits.booms ?? []) S.boom(sec(f), { level: 0.5 });
+  for (const f of hits.softBooms ?? []) S.boom(sec(f), { level: 0.26, len: 2.2 });
+  for (const f of hits.typing ?? []) S.tick(sec(f), { level: 0.016, pan: -0.15 });
   for (const f of hits.glints ?? []) S.glint(sec(f), 84, { level: 0.018, pan: 0.3 });
   for (const f of hits.risers ?? []) {
     S.riser(sec(f), Math.min(2.4, bar * 0.75), { level: 0.06 });

@@ -1,252 +1,40 @@
 /**
- * The highlight reel's score: the film's instruments (audio/synth.mjs), its
- * own arrangement on the reel's clock (reel-timeline.mjs, 112.5 BPM, 16
- * frames a beat).
- *
- * The arrangement follows the cut, not a loop: the hook floats on a held IV
- * with no drums until the saves collapse into one point; the mark lands on
- * beat 3 of bar 0 and the harmony resolves home on bar 1; the drums come in
- * on the downbeat the real app appears (bar 2) and run hot through the hero
- * (Ask); they drop out for the lockup so the mark strikes into air.
- *
- * Sound design sits on the same frames the picture uses (HITS): a tap is a
- * tick, a phase of the save pipeline is a rising tick, a card landing is a
- * sub, a citation is a bell, a fling is a whoosh, typing is 16th-note clicks.
- *
+ * The highlight reel's score (the night look, audio/nocturne.mjs):
  *   node audio/reel-score.mjs   →   public/reel-score.wav
+ *   node audio/mix-vo.mjs reel  →   public/reel-score-vo.wav (+ the narrator)
+ *
+ * Cue sheet, in OUTPUT frames (the timeline's HITS are source frames: real()).
+ * Lost in the dark until the saves collapse; the light comes on as the point
+ * lands and holds through the name; the product drives from the share beat,
+ * peaks on Ask and the graph, breathes for Revisit, and lands on the lockup.
  */
+import * as T from '../reel-timeline.mjs';
+import { writeScore } from './score-lib.mjs';
 
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import fs from 'node:fs';
-import { BAR, BAR_FRAMES, BEAT, BAR_CHORDS, CAPTIONS, FPS, HITS, RISERS, TOTAL_FRAMES, TOTAL_SEC, MODES, SHARE_BEAT, SHARE_STARTS, TODO_LEN, holdStart, real, srcOf } from '../reel-timeline.mjs';
-import { createSynth } from './synth.mjs';
+const r = (f) => Math.round(T.real(f));
+const H = T.HITS;
+const shareBeat = T.holdStart('share');
 
-// Round 5: the round-1 score, on the reel's steady clock (K = 2, 112.5 BPM:
-// every source 8th is an output beat). Everything is
-// written against SOURCE frames (the round-1 cut) and placed where that
-// moment now falls in the output (real()); the groove runs at 90 BPM, so a
-// round-1 bar is two bars here.
-
-// The reel ends on its last frame: no tail past the end, the fade finishes in it.
-const S = createSynth({ seconds: TOTAL_SEC, beat: BEAT });
-const { pad, sub, pulse, keys, bell, kick, hat, rim, shaker, clap, riser, whoosh, impact, tick, shimmer } = S;
-
-const f = (src) => real(src) / FPS; // SOURCE frame → seconds in the output
-const b = (bar) => bar * BAR; // OUTPUT bar → seconds
-const at = (bar, beats) => b(bar) + beats * BEAT;
-
-// The film's four chords, same voicings.
-const CHORDS = {
-  Fmaj7: { bass: 41, upper: [57, 60, 64, 69] },
-  Cmaj7: { bass: 48, upper: [59, 64, 67, 71] },
-  G6: { bass: 43, upper: [59, 62, 64, 69] },
-};
-
-const BARS = Math.ceil(TOTAL_FRAMES / BAR_FRAMES); // output bars
-/** the round-1 bar (64 source frames) an output bar falls in */
-const srcBar = (bar) => Math.min(BAR_CHORDS.length - 1, Math.floor(srcOf(bar * BAR_FRAMES + 1) / 64));
-
-/** How much of the band is playing, per ROUND-1 bar. */
-const DENSITY = [0.3, 0.52, 0.86, 0.92, 0.97, 1.0, 0.96, 0.92, 0.5, 0.45];
-const DRUMS = [f(128), f(512)]; // the app appears … the lockup breathes
-
-for (let bar = 0; bar < BARS; bar++) {
-  const sb = srcBar(bar);
-  const ch = CHORDS[BAR_CHORDS[sb]];
-  const d = DENSITY[sb];
-  const t0 = b(bar);
-  const len = Math.min(BAR, TOTAL_SEC - t0);
-  const drums = t0 >= DRUMS[0] - 0.01 && t0 < DRUMS[1] - 0.01;
-
-  // ── pad: the hook is voiced high and open (air before the product)
-  const padLevel = 0.1 + 0.08 * d;
-  const lift = sb < 1 ? 12 : 0;
-  ch.upper.forEach((m, i) => {
-    const panPos = ((i / (ch.upper.length - 1)) * 2 - 1) * 0.55;
-    pad(t0, len, m + lift, padLevel * (i === 0 ? 1 : 0.85), panPos);
-  });
-  pad(t0, len, ch.bass + 12, padLevel * 0.6, 0);
-  if (drums) pad(t0, len, ch.upper[3] + 12, padLevel * 0.34, bar % 2 ? 0.35 : -0.35);
-
-  // ── bass: a moving line once the band is in
-  if (sb >= 1) sub(t0, ch.bass, 0.34 + 0.26 * d, d >= 0.7 ? 0.55 : 1.6);
-  if (d >= 0.7) {
-    sub(at(bar, 1.5), ch.bass + 7, 0.2 + 0.1 * d, 0.36);
-    sub(at(bar, 2.5), ch.bass + 12, 0.18 + 0.1 * d, 0.34);
-    sub(at(bar, 3.5), ch.bass + 7, 0.15, 0.3);
-  }
-
-  // ── drums: four on the floor, backbeat claps, 16th hats, off-beat opens
-  if (drums) {
-    for (let k = 0; k < 4; k++) kick(at(bar, k), (k % 2 ? 0.34 : 0.42) + 0.2 * d);
-    clap(at(bar, 1), 0.17 + 0.05 * d);
-    clap(at(bar, 3), 0.17 + 0.05 * d);
-    rim(at(bar, 2.75), 0.08 + 0.04 * d);
-    for (let k = 0; k < 16; k++) {
-      const accent = k % 4 === 0 ? 0.9 : k % 2 ? 1 : 0.55;
-      hat(at(bar, k / 4), 0.034 * accent * d, k % 2 ? 0.22 : -0.18);
-      shaker(at(bar, k / 4), 0.02 * d, k % 2 ? 0.34 : -0.3);
-    }
-    for (let k = 0; k < 4; k++) hat(at(bar, k + 0.5), 0.03 * d, 0.1, true);
-  }
-
-  // ── the pulse figure: the film's scale walk (degrees 0-2-3-4-6)
-  if (sb >= 1 && t0 < f(512)) {
-    const SCALE = [0, 2, 4, 5, 7, 9, 11];
-    const shape = [0, 2, 3, 4, 6, 4, 3, 2];
-    const onsets = drums ? [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5] : [0, 0.75, 1.5, 2, 2.75, 3.5];
-    onsets.forEach((on, k) => {
-      if (at(bar, on) >= TOTAL_SEC) return;
-      const step = shape[(k + bar) % shape.length];
-      const m = ch.upper[0] + SCALE[step % 7] + Math.floor(step / 7) * 12 + (on >= 2.5 ? 12 : 0);
-      pulse(at(bar, on), m, (drums ? 0.1 : 0.12) * (0.62 + 0.38 * d), ((k % 4) / 3) * 1.1 - 0.55, drums ? 0.3 : 0.4);
-    });
-  }
-}
-
-// ── the lockup: one held voicing under the end, a single breath
-for (const m of [48, 64, 67, 72]) pad(f(512), TOTAL_SEC - f(512) - 0.2, m, 0.08, m === 64 ? -0.4 : 0.35);
-
-// ── melody (FM keys): a lead-in over Save/Find, the tune over the hero, home
-// on C for the lockup. Stepwise, with E→F and B→C in the line.
-const MELODY = [
-  [2, 0, 67], [2, 2, 69], [3, 0, 71], [3, 2.5, 72], // lead-in (quiet)
-  [4, 0, 64], [4, 1.5, 65], [4, 3, 67], // Ask: E F G
-  [5, 0, 72], [5, 1.5, 71], [5, 2, 72], [5, 3, 74], // the chips: C B C D
-  [6, 0, 71], [6, 2, 67], [7, 0, 69], [7, 2, 71], // connect → revisit: B G A B
-  // home: C as the mark draws, E (softer) in the breath after its name, and
-  // the G AFTER the last word (round 13: it landed on "find.", the one word
-  // the reel has to land, and masked the whole closing line)
-  // (2026-09-28: the closing line is now the longer tagline; the G moved
-  // half a beat later so it still lands after "useful.")
-  [8, 1, 72], [8, 2.5, 76, 0.12], [9, 1, 79],
-];
-for (const [bar, bt, m, level] of MELODY) {
-  const lead = bar < 4;
-  keys(f(bar * 64 + bt * 16), m, level ?? (lead ? 0.11 : bar >= 8 ? 0.19 : 0.16), bar % 2 ? 0.2 : -0.2, bar >= 8 ? 2.8 : 2);
-}
-
-// ── risers, each ENDING on the reveal it leads into
-for (const [from, to] of RISERS) riser(f(from), f(to) - f(from), 0.09);
-
-// ── sound design, on the picture's frames
-const H = HITS;
-
-// the problem (output frames): a bell as each named save lifts on its word,
-// and a soft fall as they all bleach on "rarely seen again"
-{
-  const VO = JSON.parse(fs.readFileSync(new URL('../src/reels/data/reel-vo.json', import.meta.url), 'utf8'));
-  const named = CAPTIONS[1];
-  const t = VO.find((v) => v.frame === named.at);
-  [[1, 84], [4, 88], [7, 91]].forEach(([w, m], i) => bell(named.at / FPS + t.words[w], m, 0.05, [-0.35, 0.35, 0][i], 1.6));
-  whoosh(CAPTIONS[2].at / FPS + 0.2, 1.2, 0.05, 0);
-  // the name: a soft shimmer as the wordmark's wipe completes, just after
-  // "Machina" is said (round 13: on the word itself it masked the name)
-  const name = CAPTIONS.find((c) => c.place === 'mark');
-  const nt = VO.find((v) => v.frame === name.at);
-  shimmer(name.at / FPS + nt.words[1] + 0.4, [79, 84, 88, 91], 0.035);
-}
-
-// the hook: saves appearing as scattered glints, the rush, the point, the snap
-[4, 8, 12, 16, 20, 24, 28].forEach((fr, i) => bell(f(fr), [84, 88, 91, 86, 89, 93, 95][i], 0.028, i % 2 ? 0.45 : -0.45, 1.2));
-whoosh(f(H.collapse) - 0.3, 0.55, 0.1, -0.35);
-whoosh(f(H.collapse) - 0.25, 0.5, 0.1, 0.35);
-impact(f(H.dotLands), 0.36);
-sub(f(H.dotLands), 36, 0.3, 0.6);
-tick(f(H.bracketsClose), 0.11, 0.85);
-sub(f(H.bracketsClose), 43, 0.18, 0.25);
-shimmer(f(H.markLocked), [72, 79, 84, 88], 0.05);
-whoosh(f(H.toApp) - 0.1, 0.5, 0.08, 0);
-// the mark holds on its own now (no tagline over it): a held, lifting chord
-// under it so the music does not drop out
-[60, 64, 67, 71].forEach((m, i) => pad(f(H.markLocked) - 0.2, f(H.toApp) - f(H.markLocked) + 0.4, m, 0.13, (i / 3) * 1.1 - 0.55));
-sub(f(H.markLocked), 36, 0.22, 1.2);
-
-// save: tap, the dialog, the five phases climbing, saved, the card landing
-tick(f(H.plusTap), 0.1, 1.1);
-whoosh(f(H.dialog) - 0.08, 0.35, 0.05, 0.2);
-H.phases.forEach((fr, i) => {
-  tick(f(fr), 0.075, 1.0 + i * 0.12);
-  bell(f(fr), [72, 76, 79, 83, 84][i], 0.035, i % 2 ? 0.3 : -0.3, 0.9);
+writeScore({
+  script: 'reel',
+  fps: T.FPS,
+  bpm: T.BPM,
+  total: T.TOTAL_FRAMES,
+  out: 'reel-score.wav',
+  sections: [
+    { from: 0, kind: 'dark' },
+    { from: r(H.collapse), kind: 'turn' },
+    { from: shareBeat, kind: 'drive' },
+    { from: r(H.askTap), kind: 'peak' },
+    { from: r(H.revisitTap), kind: 'drive' },
+    { from: r(H.lockup), kind: 'end' },
+  ],
+  hits: {
+    booms: [r(H.dotLands), r(H.markStrike)],
+    softBooms: [r(H.toApp), r(H.graph)],
+    risers: T.RISERS.map(([, end]) => r(end)),
+    ticks: [H.plusTap, H.saveTap, H.searchTap, H.askTap, H.send, H.graphTap, H.revisitTap, H.recapTap].map(r),
+    glints: [...H.phases, ...H.chips, H.cardLands, H.found, H.standout].map(r),
+    whooshes: [r(H.toApp) - 8, r(H.graphTap) + 6, r(H.lockup) - 10],
+  },
 });
-shimmer(f(H.saved), [84, 88, 91], 0.045);
-sub(f(H.cardLands), 43, 0.3, 0.32);
-tick(f(H.cardLands), 0.09, 0.9);
-
-// the share hold: three shares from three apps, each pulled into the mark
-// (output frames: SHARE_STARTS + SHARE_BEAT, scenes/ShareBeat.tsx)
-{
-  const S0 = holdStart('share') / FPS;
-  SHARE_STARTS.forEach((t0, i) => {
-    tick(S0 + (t0 + SHARE_BEAT.tap) / FPS, 0.09, 1.15 + i * 0.1);
-    whoosh(S0 + (t0 + SHARE_BEAT.pull - 2) / FPS, 0.45, 0.07, [0.4, -0.4, 0.4][i]);
-    bell(S0 + (t0 + SHARE_BEAT.land) / FPS, [84, 88, 91][i], 0.055, 0, 1.6);
-    sub(S0 + (t0 + SHARE_BEAT.land) / FPS, 43, 0.16, 0.25);
-  });
-}
-
-// the modes hold: Link, Image, Note tapped on beats, then the link pasted
-// then Save tapped (output frames: MODES, scenes/SaveModes.tsx)
-{
-  const M0 = holdStart('modes') / FPS;
-  MODES.taps.forEach((u, i) => {
-    tick(M0 + u / FPS, 0.09, 1.1 + i * 0.1);
-    bell(M0 + u / FPS, [79, 83, 86][i], 0.035, [-0.3, 0.3, 0][i], 1.1);
-  });
-  tick(M0 + MODES.paste / FPS, 0.06, 1.4);
-  tick(M0 + MODES.save / FPS, 0.1, 1.2);
-}
-
-// the insert: the new card, tapped open, its Key Points arriving (output
-// frames: scenes/CardDetail.tsx taps at +20 and lands the Key Points at +130)
-const I0 = holdStart('card') / FPS;
-tick(I0 + 20 / FPS, 0.09, 1.2);
-whoosh(I0 + 22 / FPS, 0.35, 0.05, -0.15);
-shimmer(I0 + 130 / FPS, [79, 84, 88], 0.035);
-
-// find: the tap, typing on 16ths, the one card
-tick(f(H.searchTap), 0.09, 1.25);
-for (let fr = H.typeFrom; fr < H.found; fr += 4) tick(f(fr), 0.035, 1.6 + ((fr / 4) % 3) * 0.08);
-sub(f(H.found), 48, 0.3, 0.34);
-shimmer(f(H.found), [76, 83, 88], 0.045);
-
-// ask: tap, typing, send, the stream, three citations
-tick(f(H.askTap), 0.1, 1.15);
-for (let fr = H.askTypeFrom; fr < H.send; fr += 4) tick(f(fr), 0.035, 1.6 + ((fr / 4) % 3) * 0.08);
-tick(f(H.send), 0.11, 1.3);
-whoosh(f(H.send), 0.4, 0.06, 0.25);
-shimmer(f(H.answerFrom), [79, 84], 0.03);
-H.chips.forEach((fr, i) => {
-  sub(f(fr), [48, 52, 55][i], 0.22, 0.26);
-  bell(f(fr), [84, 88, 91][i], 0.06, [-0.35, 0, 0.35][i], 1.6);
-});
-tick(f(H.graphTap), 0.1, 1.2);
-whoosh(f(H.graphTap) + 0.03, 0.5, 0.07, -0.2);
-
-// connect: the graph arrives
-impact(f(H.graph), 0.24);
-shimmer(f(H.graph) + 0.05, [72, 76, 79, 84], 0.045);
-
-// recall: the tab opens on "Do this" (its first row lifts), then this week's
-// recap is tapped open and its standout lifts (output frames, scenes/Recall.tsx:
-// row at +40, recap tap at TODO_LEN + 16, standout at TODO_LEN + 208)
-{
-  const R0 = holdStart('recall') / FPS;
-  tick(R0, 0.09, 1.15);
-  bell(R0 + 40 / FPS, 84, 0.04, -0.2, 1.4);
-  tick(R0 + (TODO_LEN + 16) / FPS, 0.09, 1.3);
-  shimmer(R0 + (TODO_LEN + 20) / FPS, [72, 76, 79], 0.035);
-  bell(R0 + (TODO_LEN + 208) / FPS, 88, 0.05, 0.2, 1.8);
-  sub(R0 + (TODO_LEN + 208) / FPS, 48, 0.2, 0.3);
-}
-
-// the lockup: the last card leaves, the mark strikes into air
-whoosh(f(H.lockup) - 0.1, 0.7, 0.09, 0);
-impact(f(H.markStrike), 0.34);
-shimmer(f(H.markStrike) + 0.08, [79, 84, 88, 91], 0.055);
-
-S.master({ fadeInSec: 0.25, fadeOutSec: 1.1 });
-
-const here = path.dirname(fileURLToPath(import.meta.url));
-S.writeWav(path.join(here, '..', 'public', 'reel-score.wav'));

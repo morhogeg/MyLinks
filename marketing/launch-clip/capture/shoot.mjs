@@ -1100,7 +1100,9 @@ const takes = {
     // (clip round 3) the V60 step, ticked off: the app's own "Marked as done"
     // (the row leaves the list, the step stays on its card)
     await t.freeze();
-    await visible(page.locator('div[class*="ps-1.5"]', { hasText: 'Tomorrow morning' }).getByRole('button', { name: 'Mark as done' })).click();
+    // (the app's tick is a real checkbox since 36d987ec, named for its task;
+    // its title is still "Mark as done")
+    await visible(page.locator('div[class*="ps-1.5"]', { hasText: 'Tomorrow morning' }).locator('button[title="Mark as done"]')).click();
     t.mark('tick');
     await t.roll(40, { rects: RECAP, step: 1000 / 60 });
     await t.thaw();
