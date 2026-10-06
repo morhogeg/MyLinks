@@ -115,6 +115,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // Collections — declared before the filter pipeline so private-collection
     // membership can hide cards from it while the privacy vault is locked.
     const [collections, setCollections] = useState<Collection[]>([]);
+    // True once the collections listener has answered, so "none" can be told
+    // apart from "not loaded yet" (see the open-collection bounce below).
+    const [collectionsLoaded, setCollectionsLoaded] = useState(false);
     // Privacy vault: one app-level PIN protects every collection marked
     // Private. While locked, member cards vanish from the library, search,
     // related cards, Ask context, and suggestions.
@@ -771,6 +774,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                 id: d.id,
                 ...d.data()
             } as Collection)));
+            setCollectionsLoaded(true);
         }, (error: Error) => {
             reportError(error, 'feed-collections-snapshot');
         });
@@ -1890,6 +1894,10 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
 
     const performDeleteCollection = async (col: Collection) => {
         if (!uid) return;
+        // Deleting the collection you're in: step out to the gallery first, the
+        // way performDelete steps back from an open card, so the place never
+        // goes blank under you (on a phone it used to, for the last one).
+        if (openCollectionId === col.id) closeCollectionToGallery();
         try {
             await deleteCollection(uid, col.id, col.shareId);
             setSelectedCollections(prev => {
@@ -2146,9 +2154,11 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     );
 
     // If the open collection is deleted out from under the detail view (e.g. from
-    // another device), fall back to the gallery instead of a blank place.
+    // another device), fall back to the gallery instead of a blank place. Keyed
+    // on the listener having answered, not on there being collections: the
+    // old `length > 0` guard never fired when the LAST one was deleted.
     useEffect(() => {
-        if (viewMode === 'collection' && openCollectionId && collections.length > 0
+        if (viewMode === 'collection' && openCollectionId && collectionsLoaded
             && !collections.some((c) => c.id === openCollectionId)) {
             closeCollectionToGallery();
         }
@@ -2159,7 +2169,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
             closeCollectionToGallery();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [viewMode, openCollectionId, collections, vaultLocked, privateCollectionIds]);
+    }, [viewMode, openCollectionId, collections, collectionsLoaded, vaultLocked, privateCollectionIds]);
 
     // Same bounce for the Private cards view: if the vault relocks while it's
     // showing (app backgrounded), fall back to All so nothing stays exposed.
