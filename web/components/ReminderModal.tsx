@@ -10,6 +10,7 @@ import { trackReminderSet } from '@/lib/analytics';
 import { useToast } from '@/components/Toast';
 import { useSheetDrag, useIsMobile } from '@/lib/useSheetDrag';
 import { hapticSelection, hapticSuccess, hapticWarning } from '@/lib/haptics';
+import { reportError } from '@/lib/errorReporter';
 
 interface ReminderModalProps {
     uid: string;
@@ -230,7 +231,10 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
             toast.success(`Reminder set for ${fmtDayTime(new Date(fireAt))}`);
             finish();
         } catch (error) {
-            toast.error(`Couldn't set the reminder: ${error instanceof Error ? error.message : 'please try again.'}`);
+            // A Firestore error ("Missing or insufficient permissions") is for
+            // the reporter, not the screen.
+            reportError(error, 'reminder-set');
+            toast.error("Couldn't set the reminder. Please try again.");
             setSaving(false);
         }
     };
@@ -244,7 +248,8 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
             toast.success('Reminder turned off');
             finish();
         } catch (error) {
-            toast.error(`Couldn't update the reminder: ${error instanceof Error ? error.message : 'please try again.'}`);
+            reportError(error, 'reminder-off');
+            toast.error("Couldn't update the reminder. Please try again.");
             setSaving(false);
         }
     };

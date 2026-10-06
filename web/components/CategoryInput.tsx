@@ -70,6 +70,7 @@ export default function CategoryInput({
             <input
                 ref={inputRef}
                 type="text"
+                aria-label="Category"
                 className={`uppercase font-black tracking-widest px-2 py-0.5 rounded-lg outline-none focus:ring-1 focus:ring-accent/50 bg-fill-strong ${className}`}
                 style={{
                     color: colorStyle.color,

@@ -1408,7 +1408,7 @@ export default function LinkDetailModal({
                                             onClick={() => setSummaryOpen(false)}
                                             aria-label="Collapse Machina's read"
                                             aria-expanded="true"
-                                            className="w-full text-sm font-bold text-text-muted uppercase tracking-wider mb-3 flex items-center gap-2 hover:text-text transition-colors text-left"
+                                            className="w-full text-sm font-bold text-text-muted uppercase tracking-wider mb-3 flex items-center gap-2 hover:text-text transition-colors text-start"
                                         >
                                             <CitationMark state="listening" size={16} className="text-accent shrink-0" />
                                             {/* Always English, always LTR — a product-brand control,
@@ -1449,7 +1449,7 @@ export default function LinkDetailModal({
                                         onClick={toggleSummary}
                                         aria-label="Expand Machina's read"
                                         aria-expanded="false"
-                                        className="w-full text-sm font-bold text-text-muted uppercase tracking-wider flex items-center gap-2 hover:text-text transition-colors text-left"
+                                        className="w-full text-sm font-bold text-text-muted uppercase tracking-wider flex items-center gap-2 hover:text-text transition-colors text-start"
                                     >
                                         <CitationMark state="listening" size={16} className="text-accent shrink-0" />
                                         <span className="flex-1">Machina’s read</span>
@@ -1461,7 +1461,7 @@ export default function LinkDetailModal({
                                         disabled={summaryBusy}
                                         aria-busy={summaryBusy}
                                         aria-expanded="false"
-                                        className="group/read w-full flex items-center gap-3 rounded-2xl border border-border-subtle bg-fill-subtle/60 hover:bg-fill-subtle px-4 py-3.5 transition-colors active:scale-[0.99] disabled:active:scale-100 text-left"
+                                        className="group/read w-full flex items-center gap-3 rounded-2xl border border-border-subtle bg-fill-subtle/60 hover:bg-fill-subtle px-4 py-3.5 transition-colors active:scale-[0.99] disabled:active:scale-100 text-start"
                                     >
                                         <CitationMark
                                             state={summaryBusy ? 'shaping' : 'listening'}
@@ -1570,7 +1570,7 @@ export default function LinkDetailModal({
                                         className="inline-flex items-center gap-1.5 text-xs font-bold text-text-muted/70 hover:text-accent transition-all group/tag bg-fill-subtle hover:bg-fill-strong px-2 py-1 rounded-lg border border-transparent hover:border-accent/10"
                                     >
                                         <span className="flex items-center">
-                                            {parents && <span className="opacity-30 font-normal mr-0.5">{parents}/</span>}
+                                            {parents && <span className="opacity-30 font-normal me-0.5">{parents}/</span>}
                                             {leaf}
                                         </span>
                                         {/* A real button: the bare 12px icon it replaced was

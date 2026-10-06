@@ -180,7 +180,7 @@ export default function TagInput({
                         onClick={() => handleSelectTag(suggestion)}
                         onMouseEnter={() => setSelectedIndex(index)}
                         disabled={isSelected}
-                        className={`w-full text-left flex items-center justify-between rounded-lg transition-colors ${rowClass}
+                        className={`w-full text-start flex items-center justify-between rounded-lg transition-colors ${rowClass}
                             ${index === selectedIndex ? 'bg-accent text-accent-ink' : ''}
                             ${isSelected
                                 ? 'bg-accent/10 text-accent font-semibold cursor-default opacity-80'
@@ -196,7 +196,7 @@ export default function TagInput({
                 <button
                     onClick={() => handleSelectTag(value.trim())}
                     onMouseEnter={() => setSelectedIndex(suggestions.length)}
-                    className={`w-full text-left flex items-center gap-2 rounded-lg transition-colors ${rowClass} ${selectedIndex === suggestions.length ? 'bg-accent/20 text-accent' : 'text-accent hover:bg-accent/10'}`}
+                    className={`w-full text-start flex items-center gap-2 rounded-lg transition-colors ${rowClass} ${selectedIndex === suggestions.length ? 'bg-accent/20 text-accent' : 'text-accent hover:bg-accent/10'}`}
                 >
                     <Plus className="w-4 h-4 shrink-0" />
                     <span className="font-semibold truncate">Create &quot;{value.trim()}&quot;</span>
