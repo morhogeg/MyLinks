@@ -59,11 +59,13 @@ const chipAt = (k: number, f: number) => {
   const b = prog(f, O.bleach, O.bleach + 30, EASE_MODAL) * (1 - prog(f, O.gather[0] - 8, O.gather[1] - 4, EASE_IN_OUT));
   return {
     x: POINT.x + (c.x - POINT.x) * push * (1 - g),
-    y: POINT.y + ((c.y - POINT.y) * push + (1 - arrive) * 26 * c.s) * (1 - g),
+    // (night look: lit and nearly sharp on frame 0, the poster; the focus
+    // pull is the last 3px)
+    y: POINT.y + ((c.y - POINT.y) * push + (1 - arrive) * 12 * c.s) * (1 - g),
     s: c.s * push * mix(0.95, 1, arrive) * mix(1, 0.06, Math.pow(g, 0.7)),
     r: c.r * (1 - g) + g * (k % 2 ? 16 : -16),
-    o: mix(0.5, 1, arrive) * (1 - Math.pow(g, 5)) * (1 - 0.72 * b),
-    blur: (1 - arrive) * 8 + c.blur * (1 - g) + g * 2 + 3 * b,
+    o: mix(0.84, 1, arrive) * (1 - Math.pow(g, 5)) * (1 - 0.72 * b),
+    blur: (1 - arrive) * 3 + c.blur * (1 - g) + g * 2 + 3 * b,
     grey: b,
     g,
   };

@@ -150,7 +150,7 @@ const PACE = 'Natural and easy, about 155 words a minute, unhurried between sent
 export const CAPTIONS = [
   // the hook: the problem, over each app's own save list (owner, 2026-09-30:
   // the opening must say it plainly, saves scattered across apps, lost)
-  { at: 16, to: 158, text: 'Your saves are scattered across\ncountless apps, and impossible to find.', style: "Knowing and a little rueful, naming a frustration everyone shares; let 'impossible to find' land.", pace: PACE, sizes: [54, 54] },
+  { at: 16, to: 158, poster: true, text: 'Your saves are scattered across\ncountless apps, and impossible to find.', style: "Knowing and a little rueful, naming a frustration everyone shares; let 'impossible to find' land.", pace: PACE, sizes: [54, 54] },
   // the name, and the first thing it does
   { at: 176, to: 318, kicker: 'Any app', text: 'Machina saves from any app.\nNo copying, no pasting.', style: "The turn: warm and assured, a small proud smile on the name; 'No copying, no pasting' light and easy.", pace: PACE, until: 'the fifth share lands in the mark' },
   // the source tour (owner, 2026-09-29: show what each kind of save becomes)

@@ -112,7 +112,8 @@ export const searchKeys: Key[] = [
   // Home, tilted back a breath and soft, settling as the feed starts to
   // scroll (the tilt's last frame, when the slab re-rasters as 2D, lands on
   // the scroll's first: the rule "a tilt ends on a change")
-  { f: 0, cx: 196.5, cy: 330, z: 2.0, fx: 540, fy: 1180, rx: 7 },
+  // (night look: frame 0 is a legible poster, the tilt a small settle)
+  { f: 0, cx: 196.5, cy: 330, z: 2.0, fx: 540, fy: 1180, rx: 4 },
   { f: S.scroll, cy: 320, z: 2.1, rx: 0, ease: EASE_MODAL },
   { f: S.scrollBack + BACK, cy: 316, z: 2.14, ease: linear },
   // down onto the field as Machina is named, arriving with the tap
@@ -189,7 +190,7 @@ export const Search: React.FC<{ f: number }> = ({ f }) => {
         cam={cam}
         motion={motion}
         focus={rack > 0.01 ? { y0: field[1] - 8, y1: bandTo + 8, blur: 0 } : undefined}
-        blur={Math.max(open * 4, rack * 12)}
+        blur={Math.max(open * 1.5, rack * 12)}
       >
         {/* each pad lands (t 0.35) on the frame the app responds and the tick sounds */}
         <Tap x={tapField.x} y={tapField.y} t={prog(f, S.fieldTap - 10, S.fieldTap + 18, linear)} />

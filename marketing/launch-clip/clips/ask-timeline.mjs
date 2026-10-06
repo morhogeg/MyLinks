@@ -98,7 +98,7 @@ export const CAPTIONS = [
   // round 2: frame the knowledge Ask reaches, not the search; no chapter word)
   // (`tight`, owner 2026-09-29: the voice paused 0.22s after "knowledge"
   // on its own; synth-vo.py closes pauses inside the line)
-  { at: beat(1), to: beat(7) + 10, hook: true, tight: true, text: 'Your saves hold more knowledge\nthan you remember.',
+  { at: beat(1), to: beat(7) + 10, hook: true, poster: true, tight: true, text: 'Your saves hold more knowledge\nthan you remember.',
     style: 'Intriguing, a gentle hook, slightly lowered as if sharing a secret.', pace: PACE,
     // (the "secret" read came back ~3.5dB under the other lines, with its
     // peaks already at 0.8: the music steps further back instead)

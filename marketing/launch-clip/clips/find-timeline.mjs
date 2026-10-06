@@ -106,7 +106,7 @@ const PACE = 'Crisp and efficient, about 160 words a minute; the opening questio
 // leaves 0.47 to 0.6s after its last word; the picture carries on alone
 export const CAPTIONS = [
   // the hook: the problem, over the feed scrolling past
-  { at: 16, to: 125, text: 'You saved it.\nBut what was it called?', duck: 0.45, style: 'Wry and relatable; the question genuinely searching, tip-of-the-tongue frustration.', pace: PACE },
+  { at: 16, to: 125, poster: true, text: 'You saved it.\nBut what was it called?', duck: 0.45, style: 'Wry and relatable; the question genuinely searching, tip-of-the-tongue frustration.', pace: PACE },
   // the name, as the camera goes to the search field
   { at: 128, to: 208, text: 'Machina finds it\nin your own words.', kicker: 'Your own words', duck: 0.4, style: 'Calm relief, reassuring, a small smile.', pace: PACE },
   { at: 304, to: 395, text: 'Only half remember it?\nYou still get what’s close.', kicker: 'Close matches', style: 'Understanding, then easy reassurance.', pace: PACE },

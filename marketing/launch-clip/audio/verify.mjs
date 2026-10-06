@@ -49,7 +49,6 @@ import { lufs, powerDb, speechBand, truePeak } from './loudness.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 let failed = false;
-
 // ── 0. em dashes (the app-wide ban, mirrored)
 {
   const hits = [];
@@ -125,38 +124,53 @@ let failed = false;
   if (!failed) console.log(`✓ ${SUBTITLES.length} captions, no overlaps, last ends bar ${prevEnd.toFixed(2)}`);
 }
 
-// ── 1b. the brand lines (owner call 2026-09-28): the film ENDS on the tagline,
-// exactly as written, once; the endcard shows it and the closing voice line
-// says it word for word, nothing else; the introduction carries "Never lose
-// another great find", which appears nowhere at the end
+// ── 1b. caption motion (2026-10-04): each caption rises in 3 frames BEFORE
+// the narrator's first word (src/film/vo.json) and rolls out on its end
+// (src/film/Subtitles.tsx), so the bar-level check above is not enough: the
+// early arrival must not land on the previous caption's way out. Two captions
+// on screen at once is the one thing the track must never do.
 {
-  const TAGLINE = 'Everything you save, finally useful.';
-  const SUBTITLE = 'Never lose another great find';
+  const vo = JSON.parse(fs.readFileSync(path.join(here, '..', 'src', 'film', 'vo.json'), 'utf8'));
+  const BAR_FRAMES = Math.round(BAR * 30);
+  const cues = [...SUBTITLES]
+    .sort((a, b) => a.bar - b.bar)
+    .map((s) => {
+      const first = vo.find((v) => v.bar === s.bar)?.words[0];
+      return { s, first, from: Math.round(s.bar * BAR_FRAMES + (first ?? 0) * 30) - 3, to: Math.round((s.bar + s.bars) * BAR_FRAMES) };
+    });
   const bad = [];
-  const endcard = fs.readFileSync(path.join(here, '..', 'src', 'scenes', 'Endcard.tsx'), 'utf8');
-  const jsx = endcard.slice(endcard.indexOf('return ('));
-  const vo = fs.readFileSync(path.join(here, 'synth-vo.py'), 'utf8');
-  const film = vo.slice(vo.indexOf('FILM_LINES = ['), vo.indexOf('def film_script'));
-  const spoken = [...film.matchAll(/^\s*\(([\d.]+), [\d.]+, f?"([^"]+)"/gm)].map((m) => ({ bar: Number(m[1]), text: m[2] }));
-  const last = spoken[spoken.length - 1];
-  const count = (hay, needle) => hay.split(needle).length - 1;
-  if (count(jsx, TAGLINE) !== 1) bad.push(`the endcard shows the tagline ${count(jsx, TAGLINE)} times (want once, exactly "${TAGLINE}")`);
-  if (/textTransform:\s*'uppercase'/.test(jsx.slice(jsx.indexOf(TAGLINE) - 600, jsx.indexOf(TAGLINE)))) bad.push('the endcard tagline is set in caps (it is kept exactly as written)');
-  if (jsx.includes(SUBTITLE)) bad.push(`the endcard still shows "${SUBTITLE}"`);
-  if (!last || last.text !== TAGLINE) bad.push(`the closing voice line is "${last?.text}", not the endcard's "${TAGLINE}" word for word`);
-  const inCaptions = SUBTITLES.filter((c) => c.text.replace(/\n/g, ' ').includes(TAGLINE));
-  if (inCaptions.length) bad.push(`the tagline also appears in a caption (bar ${inCaptions.map((c) => c.bar).join(', ')}): once per film, at the end`);
-  if (spoken.slice(0, -1).some((l) => l.text.includes(TAGLINE))) bad.push('the tagline is spoken before the close');
-  const intro = SUBTITLES.find((c) => c.kicker === 'Introducing');
-  if (!intro || !intro.text.includes(SUBTITLE)) bad.push(`the introduction does not carry "${SUBTITLE}"`);
-  const introVo = spoken.find((l) => intro && l.bar === intro.bar);
-  if (intro && (!introVo || !introVo.text.endsWith(intro.text.split('\n').slice(-1)[0]))) bad.push(`the introduction's voice line does not say its caption ("${introVo?.text}")`);
+  for (const c of cues) if (c.first === undefined) bad.push(`"${c.s.text}" has no voiced line at bar ${c.s.bar} (re-run audio/synth-vo.py film)`);
+  for (let i = 1; i < cues.length; i++) {
+    if (cues[i].from <= cues[i - 1].to) bad.push(`"${cues[i].s.text}" rises at frame ${cues[i].from}, before "${cues[i - 1].s.text}" is gone (${cues[i - 1].to})`);
+  }
   if (bad.length) {
-    console.error('✗ film brand lines:');
+    console.error('✗ caption motion:');
     for (const b of bad) console.error('    ' + b);
     failed = true;
   } else {
-    console.log(`✓ the film ends on the tagline, once, screen and voice word for word; the introduction says "${SUBTITLE}."`);
+    const gap = Math.min(...cues.slice(1).map((c, i) => c.from - cues[i].to));
+    console.log(`✓ caption motion: never two at once (tightest hand-over ${gap} frames)`);
+  }
+}
+
+// ── 1c. the tagline closes the film (owner, 2026-10-04): it is the endcard's
+// line and the closing voice line, and no caption says it before then
+{
+  const bad = [];
+  const tagline = /everything you save, finally useful/i;
+  const endcard = fs.readFileSync(path.join(here, '..', 'src', 'scenes', 'Endcard.tsx'), 'utf8');
+  if (!tagline.test(endcard)) bad.push('the endcard does not carry the tagline');
+  for (const c of SUBTITLES) if (tagline.test(c.text)) bad.push(`the tagline appears before the end: "${c.text}"`);
+  const vo = JSON.parse(fs.readFileSync(path.join(here, '..', 'src', 'film', 'vo.json'), 'utf8'));
+  const last = vo[vo.length - 1];
+  if (!tagline.test(last?.text ?? '')) bad.push(`the closing voice line is not the tagline: "${last?.text}"`);
+  for (const v of vo.slice(0, -1)) if (tagline.test(v.text)) bad.push(`the voice says the tagline before the end: "${v.text}"`);
+  if (bad.length) {
+    console.error('✗ tagline:');
+    for (const b of bad) console.error('    ' + b);
+    failed = true;
+  } else {
+    console.log('✓ the tagline closes the film (endcard + last line), and only there');
   }
 }
 
@@ -217,6 +231,7 @@ let failed = false;
   }
 }
 
+console.log(failed ? '\nFAILED' : '\nOK');
 
 // ───────────────────────────────────────────────────────────────── THE REEL
 console.log('\n── reel');
@@ -291,22 +306,11 @@ console.log('\n── reel');
   } else {
     console.log('  (no out/vo/reel/manifest.json: VO fit not re-checked; run synth-vo.py reel)');
   }
-  // the line the reel shares with the film: its endcard's, the tagline (2026-09-28)
+  // the line the reel shares with the film: its endcard line, the tagline
   const film = read('src/scenes/Endcard.tsx');
   const close = caps.find((c) => c.place === 'lockup');
-  const closeLine = close?.text.split('\n').slice(-1)[0].replace(/\.$/, '');
-  if (!close || !film.includes(closeLine)) bad.push('the reel lockup line is not the film endcard line (the tagline)');
-  // (2026-09-28, owner) every launch film ENDS on the tagline, once, word for
-  // word; the film's endcard carries it, and no earlier line repeats it
-  {
-    const TAGLINE = 'Everything you save, finally useful.';
-    if (!film.includes(TAGLINE)) bad.push(`the film endcard does not carry the tagline "${TAGLINE}"`);
-    if (!close || !close.text.endsWith(TAGLINE)) bad.push('the reel does not end on the tagline');
-    for (const c of caps) if (c !== close && /finally useful/i.test(`${c.text} ${c.say ?? ''}`)) bad.push(`the tagline appears before the end: "${c.text}"`);
-    for (const c of SUBTITLES) if (/finally useful/i.test(c.text)) bad.push(`the film repeats the tagline before its endcard: "${c.text}"`);
-    const filmVo = read('audio/synth-vo.py');
-    if (!filmVo.includes(`f"{SAY_NAME}. ${TAGLINE}"`)) bad.push('the film\'s closing voice line is not the tagline');
-  }
+  const closeLine = close?.text.split('\n').slice(1).join(' ');
+  if (!close || !film.includes(closeLine)) bad.push('the reel lockup line is not the film endcard line');
 
   // ── 4. banned strings, everywhere a viewer can read one
   for (const c of L.CARDS) {
@@ -470,10 +474,228 @@ console.log('\n── reel');
   }
 }
 
-// ── the REVISIT feature clip: its own gates (audio/clips/revisit-verify.mjs)
-if (!(await import('./clips/revisit-verify.mjs')).ok) failed = true;
-// ── Meta ad 3 (TODO): its own gates (audio/ads/todo-verify.mjs)
-if (!(await import('./ads/todo-verify.mjs')).ok) failed = true;
+// ─────────────────────────────────────────────────────── THE FIND CLIP
+// (clips/find-timeline.mjs, src/reels/clips/find/, the take clips/find/search):
+// the reel's gates on the clip's own files, plus what the clip claims about
+// the search, checked against the demo data and the frames it shows: the
+// own-words query shares no word with its card and finds it alone; the
+// close-match query is answered under "Close matches" with its one card; the
+// source is offered (never over "No matches" in the frames used) and one tap
+// shows only saves from it.
+console.log('\n── find clip');
+{
+  const F = await import('../clips/find-timeline.mjs');
+  const L = await import('../capture/library.mjs');
+  const root = path.join(here, '..');
+  const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
+  const bad = [];
+  const BANNED = [
+    [/—/, 'em dash'],
+    [/\bAI\b/, 'literal "AI"'],
+    [/second brain/i, '"second brain"'],
+    [/librar(y|ies)/i, '"library"'],
+  ];
+  const scan = (where, text) => {
+    for (const [re, what] of BANNED) if (re.test(text)) bad.push(`${what} in ${where}: ${JSON.stringify(text).slice(0, 110)}`);
+  };
+
+  // captions and the chapter word: no overlaps, lines on the beat, in the clip
+  const caps = [...F.CAPTIONS].sort((a, b) => a.at - b.at);
+  caps.forEach((c, i) => {
+    scan(`caption ${i + 1}`, c.text);
+    if (c.say) scan(`caption ${i + 1} (spoken)`, c.say);
+    if (c.to <= c.at) bad.push(`caption "${c.text}" ends before it starts`);
+    if (i && c.at < caps[i - 1].to) bad.push(`caption overlap: "${c.text}" / "${caps[i - 1].text}"`);
+    if (c.to > F.TOTAL_FRAMES) bad.push(`caption "${c.text}" runs past the clip`);
+    if (c.at % F.BEAT_FRAMES) bad.push(`caption "${c.text}" starts at ${c.at}, not on a beat`);
+  });
+  const kick = [...F.KICKERS].sort((a, b) => a.at - b.at);
+  kick.forEach((k, i) => {
+    scan(`kicker ${k.text}`, k.text);
+    if (i && k.at < kick[i - 1].to) bad.push(`kicker overlap at ${k.at}`);
+    if (!caps.some((c) => !c.place && c.to === k.to && c.at >= k.at)) bad.push(`kicker ${k.text} (${k.at}–${k.to}) does not leave with a line`);
+  });
+  // the grid: every tap, landing and cut on a beat (typing and the delete run
+  // between beats; the only things allowed to)
+  for (const k of ['fieldTap', 'type1', 'found1', 'back1', 'type2', 'found2', 'back2', 'type3', 'chipTap', 'cardTap', 'throwOut', 'lockup', 'markStrike']) {
+    if (F.HITS[k] % F.BEAT_FRAMES) bad.push(`HITS.${k} = ${F.HITS[k]} is not on a beat`);
+  }
+  // the narrator mirrors the captions, and every line fits and leaves in time
+  const SAY_NAME = /SAY_NAME = "([^"]+)"/.exec(read('audio/synth-vo.py'))[1];
+  const spoken = (t) => t.split(/\s+/).join(' ').replaceAll('Machina', SAY_NAME);
+  const timing = JSON.parse(read('src/reels/clips/find/find-vo.json'));
+  caps.forEach((c) => {
+    const t = timing.find((x) => x.frame === c.at);
+    if (!t) return bad.push(`no narrator timing for "${c.text}": run synth-vo.py find`);
+    if (t.text !== spoken(c.say ?? c.text)) bad.push(`narrator ≠ caption at ${c.at}: said "${t.text}"`);
+    if (t.words.length !== (c.say ?? c.text).split(/\s+/).filter(Boolean).length) bad.push(`caption at ${c.at}: words ≠ timings`);
+  });
+  const manifest = path.join(root, 'out', 'vo', 'find', 'manifest.json');
+  if (fs.existsSync(manifest)) {
+    for (const line of JSON.parse(fs.readFileSync(manifest, 'utf8'))) {
+      const c = caps.find((x) => x.at === line.frame);
+      if (!c) continue;
+      const window = (c.to - c.at) / F.FPS;
+      if (line.spoken > window + 1e-6) bad.push(`VO "${line.text}" speaks ${line.spoken}s in a ${window.toFixed(2)}s caption`);
+      if (c.place === 'lockup') continue;
+      const dwell = window - line.spoken;
+      if (dwell < 0.3) bad.push(`caption "${c.text}" leaves ${dwell.toFixed(2)}s after its voice (min 0.3s)`);
+      if (dwell > (c.until ? 4 : 1.2)) bad.push(`caption "${c.text}" lingers ${dwell.toFixed(2)}s after its voice`);
+    }
+  } else {
+    console.log('  (no out/vo/find/manifest.json: VO fit not re-checked; run synth-vo.py find)');
+  }
+  const close = caps.find((c) => c.place === 'lockup');
+  if (!close || !read('src/scenes/Endcard.tsx').includes(close.text.split('\n').slice(1).join(' '))) {
+    bad.push('the clip lockup line is not the film endcard line');
+  }
+
+  // the searches, element by element
+  const takes = JSON.parse(read('src/reels/clips/find/takes.json'));
+  const T = takes['clips/find/search'];
+  const Q = L.SEARCH.clip;
+  const words = (s) => (s.toLowerCase().match(/[\p{L}\p{N}']+/gu) ?? []).map((w) => w.replace(/'s$/, '').replace(/'/g, ''));
+  const onFrame = (i) => T.frames[i].t.map((k) => T.texts[k]);
+  const titles = L.CARDS.map((c) => c.title);
+  const shownTitles = (i) => titles.filter((x) => onFrame(i).includes(x));
+  for (const q of [Q.words, Q.close, Q.source]) scan('search query', q.query);
+  // 1. your own words
+  {
+    const card = L.CARDS.find((c) => c.id === Q.words.hits[0]);
+    const cardWords = new Set(words([card.title, card.summary, card.tags.join(' '), card.category, card.sourceName, card.note ?? ''].join(' ')));
+    const shared = words(Q.words.query).filter((w) => cardWords.has(w));
+    if (shared.length) bad.push(`"${Q.words.query}" shares ${shared.join(', ')} with "${card.title}"`);
+    if (!onFrame(T.marks.result1 - 1).includes(Q.words.query)) bad.push(`the take never shows "${Q.words.query}" typed whole`);
+    for (let i = T.marks.result1 + 1; i < T.marks.clear1; i++) {
+      const shown = shownTitles(i);
+      if (shown.length !== 1 || shown[0] !== card.title) bad.push(`"${Q.words.query}" frame ${i} shows ${JSON.stringify(shown)}`);
+    }
+  }
+  // 2. close matches
+  {
+    const card = L.CARDS.find((c) => c.id === Q.close.card);
+    for (let i = T.marks.result2; i < T.marks.clear2; i++) {
+      const shown = shownTitles(i);
+      if (!onFrame(i).includes('Close matches') || shown.length !== 1 || shown[0] !== card.title) bad.push(`"${Q.close.query}" frame ${i}: not "${card.title}" alone under Close matches`);
+    }
+  }
+  // 3. the source: offered (never over "No matches" in the frames the clip
+  // plays: the scene holds at most OFFERED = 10 frames of the roll), then only its saves
+  {
+    for (let i = T.marks.sources; i <= T.marks.sources + 10; i++) {
+      if (!onFrame(i).includes(Q.source.source)) bad.push(`frame ${i} does not offer ${Q.source.source}`);
+      if (onFrame(i).includes('No matches')) bad.push(`frame ${i} shows "No matches" under the source (the clip plays it)`);
+    }
+    const last = T.marks.detail - 1;
+    const shown = L.CARDS.filter((c) => onFrame(last).includes(c.title));
+    const other = shown.filter((c) => c.sourceName !== Q.source.source && c.sourceType !== Q.source.source.toLowerCase());
+    if (!shown.length || other.length) bad.push(`after the ${Q.source.source} tap the feed shows ${JSON.stringify(other.map((c) => c.title))}`);
+  }
+  // the hook's scroll is eased, and shown at the nearest captured step with
+  // the chrome in frame (the camera cannot take up the rounding): its steps
+  // must stay fine, or the slow ends alternate a hop and a hold (measured)
+  {
+    let worst = 0;
+    for (let i = T.marks.scroll + 1; i < T.marks.top; i++) {
+      const a = T.frames[i - 1].r.firstCard;
+      const b = T.frames[i].r.firstCard;
+      if (a && b) worst = Math.max(worst, Math.abs(b[1] - a[1]));
+    }
+    if (worst > 6) bad.push(`the hook's scroll was captured in ${worst}pt steps (max 6: coarser steps judder at the ease's slow ends)`);
+  }
+  // the app's own text on every frame of the take (the clip uses all of it)
+  T.frames.forEach((fr, i) => fr.t.forEach((k) => scan(`the app on the find take, frame ${i}`, T.texts[k])));
+
+  if (bad.length) {
+    console.error('✗ find clip:');
+    for (const b of bad) console.error('    ' + b);
+    failed = true;
+  } else {
+    console.log(`✓ ${caps.length} captions + ${kick.length} kickers, no overlaps, each on a beat; narrator mirrors every caption; each leaves in time`);
+    console.log('✓ taps, landings and cuts on the beat');
+    console.log(`✓ own words: no shared word, one card; close matches: one card under the label; the source offered, then only its saves; no banned string in captions or ${T.count} captured frames`);
+  }
+
+  // the score and the mix: no clipping or holes, the voice clear of the music
+  // in the speech band, mastered like the reel
+  const wav = (p) => {
+    const b = fs.readFileSync(path.join(root, p));
+    const n = (b.length - 44) / 4;
+    const L2 = new Float64Array(n);
+    const R2 = new Float64Array(n);
+    for (let i = 0; i < n; i++) {
+      L2[i] = b.readInt16LE(44 + i * 4) / 32768;
+      R2[i] = b.readInt16LE(46 + i * 4) / 32768;
+    }
+    return { SR: b.readUInt32LE(24), n, L: L2, R: R2 };
+  };
+  const scorePath = 'public/clips/find/score.wav';
+  const mixPath = 'public/clips/find/score-vo.wav';
+  if (!fs.existsSync(path.join(root, scorePath)) || !fs.existsSync(path.join(root, mixPath))) {
+    console.error('✗ the find score or mix is missing: run `node audio/find-score.mjs && node audio/mix-vo.mjs find`');
+    failed = true;
+  } else {
+    const score = wav(scorePath);
+    const mix = wav(mixPath);
+    let clipped = 0;
+    for (let i = 0; i < score.n; i++) if (Math.abs(score.L[i]) > 0.995 || Math.abs(score.R[i]) > 0.995) clipped++;
+    const rows = [];
+    for (let k = 0; k * F.BAR * score.SR < score.n; k++) {
+      const s0 = Math.floor(k * F.BAR * score.SR);
+      const e = Math.min(score.n, Math.floor((k + 1) * F.BAR * score.SR));
+      let sum = 0;
+      for (let i = s0; i < e; i++) sum += ((score.L[i] + score.R[i]) / 2) ** 2;
+      rows.push(10 * Math.log10(sum / (e - s0) || 1e-18));
+    }
+    console.log(`  find bars (dB): ${rows.map((x) => x.toFixed(1)).join('  ')}`);
+    if (clipped) {
+      console.error(`✗ the find score clips (${clipped} samples)`);
+      failed = true;
+    }
+    for (let i = 1; i < rows.length - 2; i++) {
+      const dip = Math.min(rows[i - 1], rows[i + 1]) - rows[i];
+      if (dip > 3.5) {
+        console.error(`✗ find bar ${i} sits ${dip.toFixed(1)}dB below its neighbours`);
+        failed = true;
+      }
+    }
+    // each line: the mix minus the ducked bed is the voice (mix-vo.mjs writes
+    // the gain the master applied), measured where speech is heard
+    const master = path.join(root, 'out', 'vo', 'find', 'mix.json');
+    const gain = fs.existsSync(master) ? JSON.parse(fs.readFileSync(master, 'utf8')).gain : 1;
+    if (fs.existsSync(manifest)) {
+      const clear = JSON.parse(fs.readFileSync(manifest, 'utf8')).map((line) => {
+        const duck = caps.find((c) => c.at === line.frame)?.duck ?? 0.55;
+        const s0 = Math.round(line.start * mix.SR);
+        const e = Math.min(mix.n, s0 + Math.round(line.spoken * mix.SR));
+        const voice = new Float64Array(e - s0);
+        const music = new Float64Array(e - s0);
+        for (let i = s0; i < e; i++) {
+          const m = (mix.L[i] + mix.R[i]) / 2 / gain;
+          const b = ((score.L[i] + score.R[i]) / 2) * duck;
+          voice[i - s0] = m - b;
+          music[i - s0] = b;
+        }
+        return { text: line.text, all: powerDb(voice) - powerDb(music), db: powerDb(speechBand(voice, mix.SR)) - powerDb(speechBand(music, mix.SR)) };
+      });
+      for (const c of clear) console.log(`  "${c.text.slice(0, 34)}…": ${c.db.toFixed(1)}dB over the music in the speech band (${c.all.toFixed(1)}dB full band)`);
+      const masked = clear.filter((c) => c.db < 3);
+      if (masked.length) {
+        for (const c of masked) console.error(`✗ the music masks "${c.text}": ${c.db.toFixed(1)}dB (min 3dB)`);
+        failed = true;
+      } else {
+        console.log('✓ every find line sits 3dB or more over the music where speech is heard');
+      }
+    }
+    const I = lufs(mix.L, mix.R, mix.SR);
+    const tp = truePeak(mix.L, mix.R);
+    const ok = Math.abs(I + 14) <= 0.5 && tp <= -1;
+    (ok ? console.log : console.error)(`${ok ? '✓' : '✗'} the find mix: ${I.toFixed(1)} LUFS integrated, ${tp.toFixed(2)} dBTP (spec −14 ±0.5 LUFS, ≤ −1 dBTP)`);
+    if (!ok) failed = true;
+  }
+}
+
+console.log(failed ? '\nFAILED' : '\nOK');
 // ─────────────────────────────────────────────────────── THE SAVE CLIP
 // clips/save-timeline.mjs, src/reels/clips/save: the reel's gates, held to
 // the clip's own clock, plus the ones a clip adds (at most three lines and
@@ -507,12 +729,6 @@ console.log('\n── clip: save');
     if (i && c.at < caps[i - 1].to) bad.push(`caption overlap: "${c.text}" / "${caps[i - 1].text}"`);
     if (c.to > C.TOTAL_FRAMES) bad.push(`caption "${c.text}" runs past the clip`);
     if (c.at % (C.BEAT_FRAMES / 2)) bad.push(`caption "${c.text}" starts at ${c.at}, not on an 8th`);
-  });
-  // (2026-10-04) the caption motion: a line rises 3 frames (HEAD_LEAD,
-  // kit/Type.tsx) before its `at`, so the line before it must be gone by then
-  caps.forEach((c, i) => {
-    const prev = caps[i - 1];
-    if (prev && !c.place && !prev.place && c.at - 3 < prev.to) bad.push(`"${c.text.split('\n')[0]}" rises at ${c.at - 3} while "${prev.text.split('\n')[0]}" runs to ${prev.to}: two captions at once`);
   });
   const lines = caps.filter((c) => !c.place);
   const close = caps.find((c) => c.place === 'lockup');
@@ -747,7 +963,271 @@ console.log('\n── clip: save');
 }
 
 // Meta ad 1, "What one save becomes" (its gates live with it)
+// ─────────────────────────────────────────────────────── THE ASK CLIP
+// The feature clip (clips/ask-timeline.mjs, src/reels/clips/ask/, capture
+// take `askfull`) under the reel's gates, on its own clock: captions and
+// kickers, the narrator mirroring them and fitting them, the dwell rule, the
+// closing tagline, banned strings on screen and in the voice, the score, the
+// voice over the music, the delivery loudness. Plus what a clip written
+// straight in output frames needs: every picture event on the grid (cuts and
+// taps on beats, the rest on 8ths), every line starting on a beat, at most
+// three lines before the close, and the app's thinking line on NO frame of
+// its take (the clip never has to skip a range).
+console.log('\n── clip: ask');
+{
+  const C = await import('../clips/ask-timeline.mjs');
+  const LIB = await import('../capture/library.mjs');
+  const root = path.join(here, '..');
+  const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
+  const bad = [];
+  const BANNED = [
+    [/—/, 'em dash'],
+    [/\bAI\b/, 'literal "AI"'],
+    [/second brain/i, '"second brain"'],
+    [/librar(y|ies)/i, '"library"'],
+  ];
+  const scan = (where, text) => {
+    for (const [re, what] of BANNED) if (re.test(text)) bad.push(`${what} in ${where}: ${JSON.stringify(text).slice(0, 110)}`);
+  };
+
+  // captions and kickers
+  const caps = [...C.CAPTIONS].sort((a, b) => a.at - b.at);
+  caps.forEach((c, i) => {
+    scan(`caption ${i + 1}`, c.text);
+    if (c.say) scan(`caption ${i + 1} (spoken)`, c.say);
+    if (c.to <= c.at) bad.push(`caption "${c.text}" ends before it starts`);
+    if (i && c.at < caps[i - 1].to) bad.push(`caption overlap: "${c.text}" starts at ${c.at}, "${caps[i - 1].text}" runs to ${caps[i - 1].to}`);
+    if (c.to > C.TOTAL_FRAMES) bad.push(`caption "${c.text}" runs past the clip (${c.to} > ${C.TOTAL_FRAMES})`);
+    if (c.at % C.BEAT_FRAMES) bad.push(`caption "${c.text}" starts at ${c.at}, not on a beat`);
+  });
+  // (2026-10-04) the caption motion: a line rises 3 frames (HEAD_LEAD,
+  // kit/Type.tsx) before its `at`, so the line before it must be gone by then
+  caps.forEach((c, i) => {
+    const prev = caps[i - 1];
+    if (prev && !c.place && !prev.place && c.at - 3 < prev.to) bad.push(`"${c.text.split('\n')[0]}" rises at ${c.at - 3} while "${prev.text.split('\n')[0]}" runs to ${prev.to}: two captions at once`);
+  });
+  const lines = caps.filter((c) => !c.place);
+  // it stands on its own: the product is named before the close
+  if (!lines.some((c) => /\bMachina\b/.test(c.say ?? c.text))) bad.push('no line before the close names Machina');
+  // it opens on the problem (a hook line, before any chapter word)
+  if (!caps[0]?.hook) bad.push('the clip does not open on its hook line');
+  const kick = [...C.KICKERS].sort((a, b) => a.at - b.at);
+  kick.forEach((k, i) => {
+    if (i && k.at < kick[i - 1].to) bad.push(`kicker overlap: ${k.text} / ${kick[i - 1].text}`);
+    if (!lines.some((c) => !c.hook && c.to === k.to && c.at >= k.at)) bad.push(`kicker ${k.text} (${k.at}–${k.to}) does not leave with a line`);
+    scan(`kicker ${k.text}`, k.text);
+  });
+  if (kick.some((k) => k.at < caps[0].to)) bad.push('a chapter word sits on the hook');
+
+  // the grid: cuts and taps on beats, every other picture event on an 8th
+  const ON_BEAT = ['open', 'appMark', 'typeFrom', 'send', 'citeTap', 'summary', 'closeTap', 'followTap', 'scroll2', 'graphTap', 'lockup', 'markStrike'];
+  for (const [k, v] of Object.entries(C.HITS)) {
+    for (const fr of [v].flat()) {
+      const step = ON_BEAT.includes(k) || k === 'chips' ? C.BEAT_FRAMES : C.BEAT_FRAMES / 2;
+      if (fr % step) bad.push(`hit ${k} at ${fr} is not on ${step === C.BEAT_FRAMES ? 'a beat' : 'an 8th'}`);
+    }
+  }
+
+  // the narrator mirrors the captions, fits them, and obeys the dwell rule
+  const SAY_NAME = /SAY_NAME = "([^"]+)"/.exec(read('audio/synth-vo.py'))[1];
+  const spoken = (t) => t.split(/\s+/).join(' ').replaceAll('Machina', SAY_NAME);
+  const timing = JSON.parse(read('src/reels/clips/ask/vo.json'));
+  caps.forEach((c) => {
+    const t = timing.find((x) => x.frame === c.at);
+    if (!t) return bad.push(`no narrator timing for caption at ${c.at} ("${c.text}"): run synth-vo.py ask`);
+    if (t.text !== spoken(c.say ?? c.text)) bad.push(`narrator ≠ caption at ${c.at}: said "${t.text}", scripted "${c.say ?? c.text}"`);
+    const words = (c.say ?? c.text).split(/\s+/).filter(Boolean).length;
+    if (t.words.length !== words) bad.push(`caption at ${c.at} has ${words} words but ${t.words.length} timings`);
+  });
+  const manifestPath = path.join(root, 'out', 'vo', 'ask', 'manifest.json');
+  const manifest = fs.existsSync(manifestPath) ? JSON.parse(fs.readFileSync(manifestPath, 'utf8')) : null;
+  if (manifest) {
+    for (const line of manifest) {
+      const c = caps.find((x) => x.at === line.frame);
+      if (!c) continue;
+      const window = (c.to - c.at) / C.FPS;
+      if (line.spoken > window + 1e-6) bad.push(`VO "${line.text}" speaks ${line.spoken}s in a ${window.toFixed(2)}s caption`);
+      if (c.place === 'lockup') continue;
+      const dwell = window - line.spoken;
+      const max = c.until ? 4 : 1.2;
+      if (dwell < 0.3) bad.push(`caption "${c.text}" leaves ${dwell.toFixed(2)}s after its voice (min 0.3s)`);
+      if (dwell > max) bad.push(`caption "${c.text}" lingers ${dwell.toFixed(2)}s after its voice (max ${max}s)`);
+    }
+  } else {
+    console.log('  (no out/vo/ask/manifest.json: VO fit not re-checked; run synth-vo.py ask)');
+  }
+  const close = caps.find((c) => c.place === 'lockup');
+  // the close is the tagline, exactly, and said nowhere earlier; the App
+  // Store subtitle is never said (owner 2026-09-28: every launch film ends on
+  // the tagline)
+  const closeLine = close?.text.split('\n').slice(1).join(' ');
+  if (closeLine !== 'Everything you save, finally useful.') bad.push(`the clip does not end on the tagline: "${closeLine}"`);
+  for (const c of caps) if (c !== close && /finally useful/i.test(`${c.text} ${c.say ?? ''}`)) bad.push(`the tagline appears before the end: "${c.text}"`);
+  if (caps.some((c) => /great find/i.test(`${c.text} ${c.say ?? ''}`))) bad.push('the clip says the App Store subtitle');
+  // the end card holds (finishing pass: it held 1.3s; the owner's rule for
+  // the reel is ~2s): at least 1.6s from the last spoken word to the end
+  const closeVo = manifest?.find((l) => l.frame === close?.at);
+  if (closeVo && C.TOTAL_FRAMES / C.FPS - (closeVo.start + closeVo.spoken) < 1.6)
+    bad.push(`the end card holds ${(C.TOTAL_FRAMES / C.FPS - (closeVo.start + closeVo.spoken)).toFixed(2)}s after its last word (min 1.6s)`);
+
+  // banned strings on every frame of the take, and the thinking line nowhere
+  scan('Ask question', LIB.ASK.question);
+  scan('Ask answer', LIB.ASK.answer);
+  scan('Ask follow-up answer', LIB.ASK_MORE.answer);
+  const takes = JSON.parse(read('src/reels/data/takes.json'));
+  const t = takes[C.TAKE];
+  if (!t) bad.push(`no capture take "${C.TAKE}": run \`npm run reel:capture\``);
+  else {
+    t.frames.forEach((fr, i) =>
+      fr.t.forEach((k) => {
+        scan(`the app on ${C.TAKE} frame ${i}`, t.texts[k]);
+        if (/Searching your/i.test(t.texts[k])) bad.push(`the app's thinking line is on ${C.TAKE} frame ${i}`);
+      }),
+    );
+    // each captured run fits the window the clip plays it in (at K frames each)
+    const runs = [
+      ['typing', 'stream', C.HITS.send - C.HITS.typeFrom],
+      ['stream', 'sources', C.HITS.sources - C.HITS.send],
+      ['stream2', 'sources2', C.HITS.scroll2 - C.HITS.followTap],
+    ];
+    for (const [a, b2, window] of runs) {
+      const n = t.marks[b2] - t.marks[a];
+      if (n * C.K > window) bad.push(`the ${a} run (${n} frames × ${C.K}) overruns its ${window}-frame window`);
+    }
+  }
+
+  if (bad.length) {
+    console.error('✗ ask clip:');
+    for (const b of bad) console.error('    ' + b);
+    failed = true;
+  } else {
+    console.log(`✓ ${caps.length} captions + ${kick.length} kickers, no overlaps, lines on beats, opens on its hook, names Machina; narrator mirrors, fits and leaves on time`);
+    console.log('✓ every cut and tap on a beat, every other picture event on an 8th');
+    console.log(`✓ no em dash / "AI" / "second brain" / "library", and no thinking line, on any of the ${t.count} frames of ${C.TAKE}`);
+  }
+
+  // the score, the voice over it, the delivery
+  const P = (f) => path.join(root, f);
+  const wavOf = (f) => {
+    const b = fs.readFileSync(P(f));
+    const SR = b.readUInt32LE(24);
+    const n = (b.length - 44) / 4;
+    const L = new Float64Array(n);
+    const Rr = new Float64Array(n);
+    for (let i = 0; i < n; i++) {
+      L[i] = b.readInt16LE(44 + i * 4) / 32768;
+      Rr[i] = b.readInt16LE(46 + i * 4) / 32768;
+    }
+    return { SR, n, L, R: Rr };
+  };
+  if (!fs.existsSync(P('public/ask-score.wav')) || !fs.existsSync(P('public/ask-score-vo.wav'))) {
+    console.error('✗ public/ask-score.wav or ask-score-vo.wav missing: run `node audio/clips/ask-score.mjs && node audio/mix-vo.mjs ask`');
+    failed = true;
+  } else {
+    const bed = wavOf('public/ask-score.wav');
+    const mix = wavOf('public/ask-score-vo.wav');
+    let clipped = 0;
+    for (let i = 0; i < bed.n; i++) if (Math.abs(bed.L[i]) > 0.995 || Math.abs(bed.R[i]) > 0.995) clipped++;
+    const rows = [];
+    for (let k = 0; k * C.BAR * bed.SR < bed.n; k++) {
+      const s0 = Math.floor(k * C.BAR * bed.SR);
+      const e = Math.min(bed.n, Math.floor((k + 1) * C.BAR * bed.SR));
+      let sum = 0;
+      for (let i = s0; i < e; i++) sum += ((bed.L[i] + bed.R[i]) / 2) ** 2;
+      rows.push(20 * Math.log10(Math.sqrt(sum / (e - s0)) || 1e-9));
+    }
+    console.log(`  ask bars (dB): ${rows.map((x) => x.toFixed(1)).join('  ')}`);
+    if (clipped) {
+      console.error(`✗ the ask score clips (${clipped} samples)`);
+      failed = true;
+    }
+    for (let i = 1; i < rows.length - 2; i++) {
+      const dip = Math.min(rows[i - 1], rows[i + 1]) - rows[i];
+      if (dip > 3.5) {
+        console.error(`✗ ask bar ${i} sits ${dip.toFixed(1)}dB below its neighbours`);
+        failed = true;
+      }
+    }
+    // the voice: the mix (un-mastered) minus the ducked bed, per line
+    const mixInfo = path.join(root, 'out', 'vo', 'ask', 'mix.json');
+    const gain = fs.existsSync(mixInfo) ? JSON.parse(fs.readFileSync(mixInfo, 'utf8')).gain : 1;
+    const duckOf = Object.fromEntries(C.CAPTIONS.filter((c) => c.duck).map((c) => [c.at, c.duck]));
+    const perLine = (manifest ?? []).map((line) => {
+      const s0 = Math.round(line.start * mix.SR);
+      const e = s0 + Math.round(line.spoken * mix.SR);
+      const duck = duckOf[line.frame] ?? 0.55;
+      const voice = new Float64Array(e - s0);
+      const music = new Float64Array(e - s0);
+      for (let i = s0; i < e; i++) {
+        const m = (mix.L[i] + mix.R[i]) / 2 / gain;
+        const c = ((bed.L[i] + bed.R[i]) / 2) * duck;
+        voice[i - s0] = m - c;
+        music[i - s0] = c;
+      }
+      return {
+        text: line.text,
+        ratio: powerDb(voice) - powerDb(music),
+        speech: powerDb(speechBand(voice, mix.SR)) - powerDb(speechBand(music, mix.SR)),
+      };
+    });
+    if (perLine.length) {
+      const median = (xs) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
+      // the film's balance, the one mix the owner has listened to
+      let filmBal = null;
+      if (['public/score-vo.wav', 'public/score.wav', 'out/vo/manifest.json'].every((f) => fs.existsSync(P(f)))) {
+        const fmix = fs.readFileSync(P('public/score-vo.wav'));
+        const fbed = fs.readFileSync(P('public/score.wav'));
+        const FSR = fmix.readUInt32LE(24);
+        const mid = (buf, i) => (buf.readInt16LE(44 + i * 4) + buf.readInt16LE(46 + i * 4)) / 65536;
+        filmBal = median(
+          JSON.parse(fs.readFileSync(P('out/vo/manifest.json'), 'utf8')).map((line) => {
+            const s0 = Math.round(line.bar * 2.5 * FSR);
+            const e = s0 + Math.round((line.spoken ?? line.sec) * FSR);
+            const voice = new Float64Array(e - s0);
+            const music = new Float64Array(e - s0);
+            for (let i = s0; i < e; i++) {
+              voice[i - s0] = mid(fmix, i) - mid(fbed, i) * 0.65;
+              music[i - s0] = mid(fbed, i) * 0.65;
+            }
+            return powerDb(voice) - powerDb(music);
+          }),
+        );
+      }
+      const bal = median(perLine.map((x) => x.ratio));
+      console.log(`  voice over music, median line: ${filmBal === null ? '' : `film ${filmBal.toFixed(1)}dB · `}ask ${bal.toFixed(1)}dB`);
+      if (filmBal !== null && bal < filmBal - 3) {
+        console.error("✗ the ask clip's voice sits >3dB lower in its mix than the film's does");
+        failed = true;
+      }
+      const worst = perLine.reduce((a, b) => (b.speech < a.speech ? b : a));
+      console.log(`  voice over music in the speech band: min ${worst.speech.toFixed(1)}dB ("${worst.text.slice(0, 32)}…"), median ${median(perLine.map((x) => x.speech)).toFixed(1)}dB`);
+      const masked = perLine.filter((x) => x.speech < 3);
+      if (masked.length) {
+        for (const x of masked) console.error(`✗ the music masks "${x.text}": ${x.speech.toFixed(1)}dB over it in the speech band (min 3dB)`);
+        failed = true;
+      } else {
+        console.log('✓ every ask line sits 3dB or more over the music where speech is heard');
+      }
+    }
+    const I = lufs(mix.L, mix.R, mix.SR);
+    const tp = truePeak(mix.L, mix.R);
+    const okLoud = Math.abs(I + 14) <= 0.5 && tp <= -1;
+    (okLoud ? console.log : console.error)(`${okLoud ? '✓' : '✗'} the ask mix: ${I.toFixed(1)} LUFS integrated, ${tp.toFixed(2)} dBTP (spec −14 ±0.5 LUFS, ≤ −1 dBTP)`);
+    if (!okLoud) failed = true;
+  }
+}
+
+
+// ─────────────────────────────────────────────── THE REVISIT CLIP
+if (!(await import('./clips/revisit-verify.mjs')).ok) failed = true;
+// ─────────────────────────────────────────────── META AD 1
 if (await (await import('./ads/card-verify.mjs')).default()) failed = true;
+// ─────────────────────────────────────────────── META AD 2, the trip
+if (!(await (await import('./ads/trip-verify.mjs')).default())) failed = true;
+// ─────────────────────────────── META AD 2, "talking to a friend" edition
+if (!(await (await import('./ads/asktalk-verify.mjs')).default())) failed = true;
+// ─────────────────────────────────────────────── META AD 3
+if (!(await import('./ads/todo-verify.mjs')).ok) failed = true;
 
 console.log(failed ? '\nFAILED' : '\nOK');
 process.exit(failed ? 1 : 0);

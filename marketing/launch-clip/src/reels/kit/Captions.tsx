@@ -19,7 +19,7 @@ import { KineticLine, Kicker } from './Type';
  *
  * Kickers sit in the same band, one label above the line.
  */
-export type ReelCaption = { at: number; to: number; text: string; say?: string; place?: 'top' | 'hook' | 'lockup' | 'mark'; sizes?: number[] };
+export type ReelCaption = { at: number; to: number; text: string; say?: string; place?: 'top' | 'hook' | 'lockup' | 'mark'; sizes?: number[]; poster?: boolean };
 export type ReelKicker = { at: number; to: number; text: string };
 export type WordTiming = { frame: number | null; words: number[] }[];
 
@@ -92,6 +92,7 @@ export const Captions: React.FC<{
               from={c.at}
               to={c.to}
               starts={starts}
+              poster={c.poster}
               size={56}
               sizes={c.sizes ?? (c.place === 'hook' ? [96, 52] : undefined)}
               weight={c.place === 'hook' ? 580 : 600}

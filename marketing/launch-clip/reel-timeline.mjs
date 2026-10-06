@@ -246,7 +246,7 @@ const PACE = 'Measured and cinematic, about 145 words a minute; room to breathe 
 export const CAPTIONS = [
   // the problem, as the launch film opens: the saves hang where they were
   // kept while the narrator names it
-  { at: 16, to: 88, text: 'You save things everywhere.', style: TONE + 'Soft, intimate opener, a knowing half-smile, as if noticing something true about the listener.', pace: PACE },
+  { at: 16, to: 88, poster: true, text: 'You save things everywhere.', style: TONE + 'Soft, intimate opener, a knowing half-smile, as if noticing something true about the listener.', pace: PACE },
   { at: 96, to: 218, text: 'An article here. A recipe there.\nA video somewhere else.', style: TONE + 'Light, observational list, each item a small glance in a different direction; even rhythm.', pace: PACE },
   { at: 224, to: 314, text: 'Saved, and rarely seen again.', style: TONE + 'Quiet and a little wistful, landing softly; the low point.', pace: PACE },
   // the answer: the saves collapse into the point, the brackets snap, and

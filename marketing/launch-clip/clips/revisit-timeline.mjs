@@ -164,7 +164,7 @@ const PACE = 'Unhurried and warm, about 145 words a minute; let sentences breath
 
 export const CAPTIONS = [
   // THE OPENING: the habit, then the problem (no chapter word: `open`)
-  { at: 16, to: 90, open: true, text: 'You save things\nto come back to later.', style: 'Warm and knowing, gentle.', pace: PACE },
+  { at: 16, to: 90, open: true, poster: true, text: 'You save things\nto come back to later.', style: 'Warm and knowing, gentle.', pace: PACE },
   { at: 96, to: 180, open: true, text: 'But most of them,\nyou never open again.', style: 'Softly honest, a touch wistful, no guilt.', pace: PACE },
   // the turn: the saves gather into the point as the name is said
   { at: 192, to: 266, open: true, text: 'Machina brings them\nback to you.', style: 'The turn: kind and uplifting, a smile.', pace: PACE },

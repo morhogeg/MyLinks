@@ -9,7 +9,7 @@
  * One mix for every video, like one voice (audio/synth-vo.py) and one score
  * engine (audio/nocturne.mjs). Under each spoken line the music steps back
  * in THREE bands (night look, 2026-10-05): the speech band (300Hz–4.5kHz)
- * ducks to `duck` × 0.8, the lows and the air only to 1 − (1 − duck) × 0.55,
+ * ducks to 1 − (1 − duck) × 1.35, the lows and the air only to 1 − (1 − duck) × 0.55,
  * so the voice owns the words while the score keeps its weight and its
  * shimmer. 120ms ramps. A caption's own `duck` (the brand lines) goes deeper.
  * Every video is mastered for the feeds: −14 LUFS integrated, true peak
@@ -142,7 +142,7 @@ const STEMS = process.env.MIX_STEMS ? { music: new Float32Array(N), voice: new F
 let peak = 0;
 for (let i = 0; i < N; i++) {
   const d = duck[i];
-  const dMid = 1 - (1 - d) * 1.2 > 0 ? Math.max(0.05, 1 - (1 - d) * 1.2) : 0.05;
+  const dMid = Math.max(0.05, 1 - (1 - d) * 1.35);
   const dEdge = 1 - (1 - d) * 0.55;
   const ll = lowL(L[i]);
   const rl = lowR(R[i]);

@@ -78,7 +78,9 @@ const chipAt = (k: number, f: number, out: number) => {
   const c = CHIPS[k];
   const t0 = 1 + k * 2; // they arrive on a rolling cascade
   // (round 13: they come INTO FOCUS rather than out of nothing, so the very
-  // first frame, the one a feed shows before it plays, is already the scatter)
+  // first frame, the one a feed shows before it plays, is already the scatter;
+  // night look: frame 0 is already lit and nearly sharp, a poster, and the
+  // focus pull is the last 3px, not 8)
   const arrive = prog(f, t0, t0 + 12, EASE_MODAL);
   // the hang: a slow push-in (near ones faster: parallax) and a drift apart
   const hang = prog(f, 0, HITS.collapse, (t) => t);
@@ -92,7 +94,7 @@ const chipAt = (k: number, f: number, out: number) => {
     return acc + prog(out, w - 2, w + 6, EASE_SPRING) * (1 - prog(out, w + 34, w + 50, EASE_MODAL));
   }, 0);
   const ox = (c.x - C.x) * push * (1 - 0.35 * e);
-  const oy = (c.y - C.y) * push + (1 - arrive) * 28 * depth;
+  const oy = (c.y - C.y) * push + (1 - arrive) * 12 * depth;
   // the gather
   const g = prog(f, HITS.collapse - 8, HITS.dotLands, EASE_GATHER);
   // "rarely seen again": bleached into the paper, back to ink as it is gathered
@@ -104,8 +106,8 @@ const chipAt = (k: number, f: number, out: number) => {
     y: C.y + oy * (1 - g),
     s: c.s * push * (1 + 0.14 * e) * mix(0.95, 1, arrive) * mix(1, 0.06, Math.pow(g, 0.7)),
     r: c.r * (1 - g) * (1 - 0.5 * e) + g * (k % 2 ? 16 : -16),
-    o: mix(0.5, 1, arrive) * (1 - Math.pow(g, 5)) * (1 - 0.72 * b),
-    blur: (1 - arrive) * 8 + c.blur * (1 - g) * (1 - e) + g * 2 + 3 * b,
+    o: mix(0.84, 1, arrive) * (1 - Math.pow(g, 5)) * (1 - 0.72 * b),
+    blur: (1 - arrive) * 3 + c.blur * (1 - g) * (1 - e) + g * 2 + 3 * b,
     grey: b,
     e,
     g,

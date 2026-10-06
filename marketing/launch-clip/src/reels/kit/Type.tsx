@@ -55,14 +55,17 @@ export const KineticLine: React.FC<{
   weight?: number;
   font?: string;
   tracking?: string;
-}> = ({ text, frame, from, to, starts, size = 64, sizes, width = 940, align = 'center', color = INK, weight = 600, font = sans, tracking = '-0.028em' }) => {
+  /** already set on frame 0 (a video's opening line: the frame a feed shows
+   *  before it plays is the poster); it still leaves in its own motion */
+  poster?: boolean;
+}> = ({ text, frame, from, to, starts, size = 64, sizes, width = 940, align = 'center', color = INK, weight = 600, font = sans, tracking = '-0.028em', poster = false }) => {
   // (2026-10-04, owner: the word-by-word blur reveal read "dated and laggy";
   // the full captions stay, in the Headline motion) each LINE rises out of
   // its own mask in one decisive move (HEAD_IN frames, ease-out quint, no
   // blur), HEAD_LEAD frames before its first word is said, and rolls up out
   // of the same mask in the HEAD_OUT frames before `to`. Same props as ever.
   const first = starts?.[0] ?? 0;
-  if (frame < from + Math.min(0, first) - HEAD_LEAD - 1 || frame > to + 1) return null;
+  if ((!poster && frame < from + Math.min(0, first) - HEAD_LEAD - 1) || frame > to + 1) return null;
   const local = frame - from;
   const lines = text.split('\n').map((l) => l.split(' ').filter(Boolean));
   const outStart = to - from - HEAD_OUT;
@@ -73,7 +76,7 @@ export const KineticLine: React.FC<{
         const firstWord = w + 1;
         w += words.length;
         const lineStart = starts?.[firstWord] ?? li * HEAD_STAGGER;
-        const tin = OUT_QUINT(Math.min(1, Math.max(0, (local - lineStart + HEAD_LEAD) / HEAD_IN)));
+        const tin = poster ? 1 : OUT_QUINT(Math.min(1, Math.max(0, (local - lineStart + HEAD_LEAD) / HEAD_IN)));
         const tout = IN_CUBIC(Math.min(1, Math.max(0, (local - outStart - li) / HEAD_OUT)));
         const y = (1 - tin) * 108 - tout * 108;
         return (
