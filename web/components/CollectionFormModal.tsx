@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { Collection } from '@/lib/types';
 import { X, Check, Layers, Lock } from 'lucide-react';
 import { COLOR_KEYS, getColorStyleByKey } from '@/lib/colors';
@@ -53,6 +53,12 @@ export default function CollectionFormModal({
     // instead of being hidden behind it while typing the name. No-op on desktop
     // (visualViewport == full window there).
     const vp = useVisualViewport();
+    // Each visible label is tied to its control (htmlFor / aria-labelledby),
+    // so VoiceOver reads "Name, text field" rather than an unnamed field.
+    const fieldId = useId();
+    const nameId = `${fieldId}-name`;
+    const descriptionId = `${fieldId}-description`;
+    const colorLabelId = `${fieldId}-color`;
 
     // Reset the form fields when the sheet opens (or the target collection
     // changes while open). Done as a render-time state adjustment rather than in
@@ -171,10 +177,11 @@ export default function CollectionFormModal({
 
                 <div className="p-5 space-y-4">
                     <div>
-                        <label className="block text-[11px] font-bold uppercase tracking-wider text-text-muted mb-1.5">
+                        <label htmlFor={nameId} className="block text-[11px] font-bold uppercase tracking-wider text-text-muted mb-1.5">
                             Name
                         </label>
                         <input
+                            id={nameId}
                             autoFocus
                             value={name}
                             onChange={(e) => setName(e.target.value)}
@@ -185,10 +192,11 @@ export default function CollectionFormModal({
                     </div>
 
                     <div>
-                        <label className="block text-[11px] font-bold uppercase tracking-wider text-text-muted mb-1.5">
+                        <label htmlFor={descriptionId} className="block text-[11px] font-bold uppercase tracking-wider text-text-muted mb-1.5">
                             Description <span className="font-medium normal-case text-text-muted/60">(optional)</span>
                         </label>
                         <textarea
+                            id={descriptionId}
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
                             placeholder="What's this collection about?"
@@ -200,10 +208,12 @@ export default function CollectionFormModal({
                     <div>
                         {/* New collections already open with a random color (see the
                             reset block above), so no separate shuffle control. */}
-                        <label className="block text-[11px] font-bold uppercase tracking-wider text-text-muted mb-2">
+                        {/* A group of swatch buttons, not one input: the heading
+                            names the group instead of being a dangling <label>. */}
+                        <p id={colorLabelId} className="block text-[11px] font-bold uppercase tracking-wider text-text-muted mb-2">
                             Color <span className="font-medium normal-case text-text-muted/60">(optional)</span>
-                        </label>
-                        <div className="flex flex-wrap gap-2">
+                        </p>
+                        <div role="group" aria-labelledby={colorLabelId} className="flex flex-wrap gap-2">
                             {COLOR_KEYS.map((key) => {
                                 const style = getColorStyleByKey(key);
                                 const active = color === key;
