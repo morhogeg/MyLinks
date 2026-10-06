@@ -910,6 +910,17 @@ _CITED_JSON_PARAPHRASE_SUFFIX = (
 )
 
 
+# The card-analysis twin of _CITED_JSON_PARAPHRASE_SUFFIX: same fields, but
+# in the model's own words, for the one retry after an output-side block.
+_ANALYSIS_PARAPHRASE_SUFFIX = (
+    "\n\nIMPORTANT: write every field in YOUR OWN WORDS. Do not copy long "
+    "passages, full ingredient lists or complete step-by-step blocks verbatim "
+    "from the content; summarize them, quoting at most short phrases. Keep the "
+    "substance (the key ingredients, the gist of each step) and the same JSON "
+    "shape."
+)
+
+
 def _declares_no_answer(data) -> bool:
     """The model said the saved sources don't answer the question (answered:
     false, as a bool or the string a plain-mode reply may carry). Pure."""
@@ -1506,8 +1517,21 @@ Return JSON: {{"tags": [...]}}"""
         cats_context = self._categories_context(existing_categories)
 
         prompt = f"{SYSTEM_PROMPT}{tags_context}{cats_context}\n\nContent to analyze:\n{clean_text}"
-        return self._enforce_tag_language(
-            self._generate_json([prompt], "text analysis", attempts=attempts))
+        try:
+            data = self._generate_json([prompt], "text analysis", attempts=attempts)
+        except EmptyGenerationError as e:
+            # An OUTPUT-side block (RECITATION: the rules ask for complete
+            # recipe steps, which on some pages means reproducing them
+            # verbatim) comes back the same on every Retry, so the page could
+            # never be saved (launch audit CAP-22). One more call asks for the
+            # same card in the model's own words. An INPUT-side block can't be
+            # helped by rewording the instruction, so it raises as before.
+            if e.prompt_blocked:
+                raise
+            logger.warning("text analysis empty (%s); retrying in own words", e)
+            data = self._generate_json([prompt + _ANALYSIS_PARAPHRASE_SUFFIX],
+                                       "text analysis (paraphrase retry)", attempts=1)
+        return self._enforce_tag_language(data)
 
     def analyze_text_with_images(self, text: str, images: list, existing_tags: list = None,
                                  content_type: str = None, image_is_primary: bool = False,
