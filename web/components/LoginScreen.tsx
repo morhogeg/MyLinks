@@ -140,7 +140,7 @@ export default function LoginScreen({
                             <button
                                 onClick={() => handleSignIn('apple')}
                                 disabled={busy !== null}
-                                className="mt-5 w-full inline-flex items-center justify-center gap-2.5 rounded-full bg-black text-white px-5 py-3 text-sm font-semibold shadow-sm ring-1 ring-white/10 hover:bg-gray-900 disabled:opacity-60 transition-colors"
+                                className="mt-5 w-full inline-flex items-center justify-center gap-2.5 rounded-full bg-apple-button text-apple-button-ink px-5 py-3 text-sm font-semibold shadow-sm ring-1 ring-black/5 hover:opacity-90 disabled:opacity-60 transition-opacity"
                             >
                                 <AppleGlyph />
                                 {busy === 'apple' ? 'Signing in…' : 'Continue with Apple'}
