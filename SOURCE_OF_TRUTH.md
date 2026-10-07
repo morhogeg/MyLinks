@@ -2571,6 +2571,24 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-07 (late morning) — REVISIT REMINDERS: DONE TOAST + SWIPES.**
+  Owner QA on 1352. (1) Done (the check button, or a left swipe) now shows
+  "Reminder done" with **Undo**; Undo writes back the exact reminder fields
+  taken before the change (`reminderSnapshot` / `restoreLinkReminder` in
+  `lib/storage.ts`), so a Smart review gets its repeats back. (2) Swipes on
+  each reminder row (`SwipeableReminder` in `DigestView.tsx`, same feel as
+  the Do this swipe): **left = Done**, **right = Snooze**, to tomorrow 9:00 AM,
+  or one day past a reminder already set later than that (`snoozeTarget`,
+  new `lib/reminderTime.ts`, which also now holds `whenLabel` and
+  `isReminderDue`). The reveal names the target ("Snooze to Tomorrow, 9:00
+  AM"); the toast says it with Undo. Snooze keeps the profile and repeat
+  count (`snoozeLinkReminder`). A right drag starting within 36px of the
+  screen edge is left to the back gesture. Also fixed the byline's missing
+  space in "·1:00 PM". **Verified:** tsc 0, eslint 0, em-dash gate, unit
+  tests (new `reminderTime.test.ts`, 4/4; suite 77/77). **NOT verified:**
+  the swipe on a device (no touch here), the Firestore write of the restore
+  path against the live rules (same fields `updateLinkReminder` writes).
+
 - **2026-10-07 (morning) — REVISIT REMINDERS: EVERY ACTIVE REMINDER, MORE
   ROOM.** Owner QA on 1351. (1) The Reminders section now lists every card
   with an active reminder (was: due now + later today): due ones first,

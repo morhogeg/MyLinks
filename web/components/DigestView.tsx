@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
-import { CalendarCheck, ChevronRight, ChevronDown, Bell, Check, CheckCircle2, CircleSlash, GalleryHorizontalEnd } from 'lucide-react';
+import { CalendarCheck, ChevronRight, ChevronDown, Bell, BellRing, Check, CheckCircle2, CircleSlash, GalleryHorizontalEnd } from 'lucide-react';
 import { CitationGlyph } from '@/components/ui/Wordmark';
 import type { CuratedDigest, WeeklySynthesis, DigestCardRef, UserNote, Link } from '@/lib/types';
 import { track } from '@/lib/analytics';
@@ -10,6 +10,7 @@ import { digestDisplayTitle, digestKindLabel } from '@/lib/digest';
 import { synthesisWeekLabel } from '@/lib/synthesis';
 import { cardThumbnailUrl } from '@/lib/cardThumbnail';
 import { getActionableTakeaway, isTakeawayDone } from '@/lib/takeaway';
+import { isReminderDue, whenLabel, snoozeTarget } from '@/lib/reminderTime';
 import { getDirection } from '@/lib/rtl';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { hapticLight } from '@/lib/haptics';
@@ -59,31 +60,7 @@ function weekSectionLabel(weekId: string, now: Date): string | null {
     return null;
 }
 
-/** "4:30 PM" in the reader's locale — the eyebrow on a reminder that lands
- *  later today. */
-const timeLabel = (ms: number) => new Date(ms).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-
-/** When an upcoming reminder fires, as short as the day allows: "1:00 PM"
- *  today, "Tomorrow, 9:00 AM", "Fri, 9:00 AM" this week, then "Oct 14, 9:00 AM"
- *  (with the year once it is not this one). */
-function whenLabel(ms: number, now: Date): string {
-    const d = new Date(ms);
-    const time = timeLabel(ms);
-    const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
-    const days = Math.round((startOf(d) - startOf(now)) / 86_400_000);
-    if (days <= 0) return time;
-    if (days === 1) return `Tomorrow, ${time}`;
-    if (days < 7) return `${d.toLocaleDateString(undefined, { weekday: 'short' })}, ${time}`;
-    const date = d.toLocaleDateString(undefined, d.getFullYear() === now.getFullYear()
-        ? { month: 'short', day: 'numeric' }
-        : { month: 'short', day: 'numeric', year: 'numeric' });
-    return `${date}, ${time}`;
-}
-
-/** A pending reminder is DUE once it has fired (the sweep sets reminderDue, the
- *  in-app delivery that works with or without push) or once its scheduled moment
- *  has passed and the next sweep simply hasn't run yet. */
-const isDueNow = (l: Link, now: number) => l.reminderDue === true || (l.nextReminderAt ?? 0) <= now;
+const isDueNow = isReminderDue;
 
 /** A live card, flattened into the shape the shared resurfaced-card row reads. */
 const toCardRef = (l: Link): DigestCardRef => ({
@@ -129,6 +106,8 @@ interface Props {
     /** Mark the reminder handled: clears the due flag and stops a still-pending
      *  reminder from firing again. */
     onCompleteReminder?: (link: Link) => void;
+    /** Move the reminder later (lib/reminderTime snoozeTarget): a right swipe. */
+    onSnoozeReminder?: (link: Link) => void;
     /** The newest digest, whose cards the review row deals (the same cards the
      *  push counted). */
     reviewDigest?: CuratedDigest | null;
@@ -166,7 +145,7 @@ interface Props {
 export default function DigestView({
     digests, syntheses, synthesisNotes, onSaveSynthesisNotes, onOpenCard, onOpenSynthesisCard,
     onOpenDigestSettings, onDeleteDigest, onOpenDigest,
-    reminderCards = [], onOpenReminderCard, onEditReminder, onCompleteReminder,
+    reminderCards = [], onOpenReminderCard, onEditReminder, onCompleteReminder, onSnoozeReminder,
     reviewDigest = null, reviewLeft = 0, onStartReview,
     takeawayCards = [], onOpenTakeawayCard, onCompleteTakeaway, onDismissTakeaway,
     closedTakeawayCards = [], onReopenTakeaway,
@@ -323,15 +302,20 @@ export default function DigestView({
                         onToggle={() => toggle(DUE_KEY)}
                     />
                     {isOpen(DUE_KEY) && reminders.map((l) => (
-                        <ResurfacedCardRow
+                        <SwipeableReminder
                             key={l.id}
+                            onDone={onCompleteReminder ? () => onCompleteReminder(l) : undefined}
+                            onSnooze={onSnoozeReminder ? () => onSnoozeReminder(l) : undefined}
+                            snoozeLabel={whenLabel(snoozeTarget(l, now), now)}
+                        >
+                        <ResurfacedCardRow
                             card={toCardRef(l)}
                             onOpen={() => onOpenReminderCard?.(l)}
                             note={isDueNow(l, nowMs) ? (
                                 <span className="shrink-0 font-semibold text-accent">· Now</span>
                             ) : l.nextReminderAt ? (
-                                <span className="shrink-0 font-semibold tabular-nums whitespace-nowrap">· 
-                                    {whenLabel(l.nextReminderAt, now)}
+                                <span className="shrink-0 font-semibold tabular-nums whitespace-nowrap">
+                                    {`· ${whenLabel(l.nextReminderAt, now)}`}
                                 </span>
                             ) : null}
                             trailing={
@@ -359,6 +343,7 @@ export default function DigestView({
                                 </>
                             }
                         />
+                        </SwipeableReminder>
                     ))}
                 </div>
             )}
@@ -616,6 +601,152 @@ const SWIPE_HINT_KEY = 'machina.takeawaySwipeLearned';
 const CHECK_HOLD_MS = 650;
 /** The fold itself: the row's height eases to zero. */
 const COLLAPSE_MS = 280;
+
+/** How far a reminder row must travel, as a share of its width, to act. */
+const REMINDER_SWIPE_FRACTION = 0.3;
+/** A rightward drag starting this close to the screen's left edge belongs to
+ *  the app's edge swipe back (lib/useEdgeSwipeBack, 28px), never to a row. */
+const EDGE_GUARD_PX = 36;
+
+/**
+ * A Revisit reminder row you can swipe (owner, 2026-10-07):
+ * - left: Done, the same as the check button (Feed's toast carries Undo);
+ * - right: Snooze, to tomorrow 9:00 AM or a day after a later reminder (the
+ *   reveal names where it lands; Feed's toast carries Undo too).
+ * Past the threshold the row slides off and the write runs; the live list then
+ * drops or re-sorts it. Short of it, the row springs back. A vertical drag is
+ * the page scroll and is left alone, as is anything starting at the screen's
+ * left edge (the back gesture). The buttons on the row stay for taps, mouse
+ * and screen readers, so the swipe is a shortcut, never the only way.
+ */
+function SwipeableReminder({ onDone, onSnooze, snoozeLabel, children }: {
+    onDone?: () => void;
+    onSnooze?: () => void;
+    snoozeLabel: string;
+    children: ReactNode;
+}) {
+    const [dx, setDx] = useState(0);
+    const [dragging, setDragging] = useState(false);
+    const [armed, setArmed] = useState(false);
+    const rowRef = useRef<HTMLDivElement>(null);
+    const drag = useRef<{ id: number; x: number; y: number; axis: 'h' | 'v' | null; armed: boolean } | null>(null);
+    const suppressClick = useRef(false);
+    const timer = useRef<number | null>(null);
+    // A write still owed by a row that slid off; flushed if the row unmounts
+    // first (leaving the screen mid-slide never drops it).
+    const pending = useRef<(() => void) | null>(null);
+
+    useEffect(() => () => {
+        if (timer.current) window.clearTimeout(timer.current);
+        const owed = pending.current;
+        pending.current = null;
+        owed?.();
+    }, []);
+
+    if (!onDone && !onSnooze) return <>{children}</>;
+
+    const onPointerDown = (e: React.PointerEvent) => {
+        if (!e.isPrimary || e.button !== 0 || pending.current) return;
+        drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, axis: null, armed: false };
+    };
+    const onPointerMove = (e: React.PointerEvent) => {
+        const d = drag.current;
+        if (!d || d.id !== e.pointerId) return;
+        const mx = e.clientX - d.x;
+        const my = e.clientY - d.y;
+        if (d.axis === null) {
+            if (Math.abs(mx) < 8 && Math.abs(my) < 8) return;
+            const horizontal = Math.abs(mx) > Math.abs(my);
+            const ours = horizontal && (mx < 0 ? !!onDone : (!!onSnooze && d.x > EDGE_GUARD_PX));
+            d.axis = ours ? 'h' : 'v';
+            if (d.axis === 'h') {
+                rowRef.current?.setPointerCapture(e.pointerId);
+                setDragging(true);
+            }
+        }
+        if (d.axis !== 'h') return;
+        // Only a direction that has an action moves the row.
+        const next = Math.max(onDone ? -Infinity : 0, Math.min(onSnooze ? Infinity : 0, mx));
+        setDx(next);
+        const width = rowRef.current?.offsetWidth ?? 1;
+        const isArmed = Math.abs(next) > width * REMINDER_SWIPE_FRACTION;
+        if (isArmed !== d.armed) {
+            d.armed = isArmed;
+            setArmed(isArmed);
+            if (isArmed) hapticLight();
+        }
+    };
+    const onPointerEnd = (e: React.PointerEvent) => {
+        const d = drag.current;
+        if (!d || d.id !== e.pointerId) return;
+        drag.current = null;
+        if (d.axis !== 'h') return;
+        suppressClick.current = true;
+        setDragging(false);
+        setArmed(false);
+        const write = dx < 0 ? onDone : onSnooze;
+        if (d.armed && e.type === 'pointerup' && write) {
+            const width = rowRef.current?.offsetWidth ?? 400;
+            setDx(dx < 0 ? -width : width);
+            pending.current = write;
+            timer.current = window.setTimeout(() => {
+                pending.current = null;
+                write();
+                // Still here a moment later (a failed write, or a snooze that
+                // kept its place in the list): come back.
+                timer.current = window.setTimeout(() => setDx(0), 900);
+            }, 200);
+        } else {
+            setDx(0);
+        }
+    };
+
+    return (
+        <div className="relative rounded-2xl overflow-hidden">
+            {/* What the swipe reveals, under the row. Left = Done (accent),
+                right = Snooze (neutral), each naming what it will do. */}
+            {dx < 0 && (
+                <div
+                    aria-hidden="true"
+                    className={`absolute inset-0 flex items-center justify-end gap-1.5 pe-5 text-[13px] font-semibold transition-colors ${armed ? 'bg-accent text-accent-ink' : 'bg-accent/15 text-accent'}`}
+                >
+                    <CheckCircle2 className="w-4 h-4" />
+                    Done
+                </div>
+            )}
+            {dx > 0 && (
+                <div
+                    aria-hidden="true"
+                    className={`absolute inset-0 flex items-center justify-start gap-1.5 ps-5 text-[13px] font-semibold transition-colors ${armed ? 'bg-fill-strong text-text' : 'bg-fill-subtle text-text-muted'}`}
+                >
+                    <BellRing className="w-4 h-4" />
+                    {`Snooze to ${snoozeLabel}`}
+                </div>
+            )}
+            <div
+                ref={rowRef}
+                onPointerDown={onPointerDown}
+                onPointerMove={onPointerMove}
+                onPointerUp={onPointerEnd}
+                onPointerCancel={onPointerEnd}
+                onClickCapture={(e) => {
+                    if (suppressClick.current) {
+                        suppressClick.current = false;
+                        e.preventDefault();
+                        e.stopPropagation();
+                    }
+                }}
+                className="relative touch-pan-y select-none"
+                style={{
+                    transform: dx ? `translateX(${dx}px)` : undefined,
+                    transition: dragging ? 'none' : 'transform 220ms var(--ease-modal)',
+                }}
+            >
+                {children}
+            </div>
+        </div>
+    );
+}
 
 /**
  * One task in Revisit's "Do this" list, Reminders-style.
