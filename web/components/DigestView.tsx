@@ -310,6 +310,9 @@ export default function DigestView({
                         <ResurfacedCardRow
                             key={l.id}
                             card={toCardRef(l)}
+                            // Say what to do, like the Do this rows below; a card
+                            // without an action keeps its summary.
+                            task={getActionableTakeaway(l) || undefined}
                             onOpen={() => onOpenReminderCard?.(l)}
                             trailing={
                                 <>
