@@ -93,8 +93,9 @@ END_OF_MONTH_DAYS = 3
 # next run.
 RELEASE_BATCH = 200
 # The daily sweep does not put its whole plan on the queue at once: it shares
-# process_link_background's 10 instances with every live save, and a 3,000-card
-# release was ~2.5 hours of worker time during which share-sheet saves sat
+# process_link_background's instances with every live save (10 when this was
+# measured; 50 since 2026-10-07), and a 3,000-card release was ~2.5 hours of
+# worker time during which share-sheet saves sat
 # invisible behind it and web placeholders were failed by the janitor. The
 # plan (which cards, decided once a day) is written as slices of this many
 # cards; the daily run releases the first, the 5-minute janitor tick one more
