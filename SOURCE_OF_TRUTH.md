@@ -2571,6 +2571,24 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-07 (afternoon) — CAPACITY FOR A LAUNCH SPIKE + OWNER LAUNCH
+  GUIDE.** Owner asked whether 5,000 downloads tomorrow would hold. Answer:
+  not yet, for owner reasons (no App Store release, the Gemini spend cap at
+  ₪50 binds at ~70 users and must be sized ~₪4,000 for 5,000, payments not
+  set up), plus one code limit, fixed here: `max_instances` 10 → **50** on
+  `analyze_link`, `analyze_image`, `share_ingest`, `ask_brain` and
+  `process_link_background` (concurrency stays 1, CAP-5; cost follows use
+  only, no `min_instances`). At ~10 s a card, 10 instances were ~3,600
+  captures/hour; 50 is ~18,000. Not changed: `search_links_http` (10) and
+  the global default (20). Assumed, NOT verified: Gemini Tier 1 per-minute
+  limits are above ~50 concurrent captures. **Verified:** py_compile, pytest
+  1,904 passed. **Deploy:** `Deploy-Functions:` scoped to the five.
+  **Owner guide:** a step-by-step checklist doc (spend cap sizing, device
+  check, payments, App Store listing and submit, housekeeping, launch week)
+  lives outside the repo as a Claude doc:
+  https://claude.ai/code/artifact/775ccd24-7fb2-4d1d-8a06-b608d787df72 . Its
+  steps mirror §4 items 5, 5b, 9, 26 and the launch-audit owner list.
+
 - **2026-10-07 (midday) — REMINDER DONE BUTTON LOOKED ALREADY DONE.** Owner
   QA on 1353: the reminder row's Done control was a `CheckCircle2` (a check
   in a circle), which read as "already done" on an open reminder. Now

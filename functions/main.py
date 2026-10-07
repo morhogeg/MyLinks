@@ -2181,9 +2181,14 @@ def debug_status(req: https_fn.Request) -> https_fn.Response:
         return _server_error(exc=e, message="Debug failed")
 
 
+# max_instances=50 (was 10, 2026-10-07): each instance serves one request at
+# a time (concurrency 1, CAP-5), so this is how many saves or asks run at
+# once. 10 was about one capture a second; 50 absorbs a launch spike. Cost
+# only follows real use (no min_instances); the per-uid rate limits and the
+# monthly quotas still bound each workspace.
 # 1 GiB: parsing a large page (or a PDF) can pass the 256 MiB default, and Cloud
 # Run's CPU share scales with memory, which shortens every analysis.
-@https_fn.on_request(max_instances=10, timeout_sec=120, memory=1024)
+@https_fn.on_request(max_instances=50, timeout_sec=120, memory=1024)
 def analyze_link(req: https_fn.Request) -> https_fn.Response:
     """
     HTTP endpoint for analyzing URLs immediately (Synchronous).
@@ -2420,7 +2425,7 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
         return _server_error(headers, e)
 
 
-@https_fn.on_request(max_instances=10, timeout_sec=120)
+@https_fn.on_request(max_instances=50, timeout_sec=120)  # see analyze_link
 def ask_brain(req: https_fn.Request) -> https_fn.Response:
     """HTTP endpoint: conversational RAG over the user's saved links.
 
@@ -3235,7 +3240,7 @@ def _similarity_http(req, headers: dict) -> https_fn.Response:
         return _server_error(headers, e, "Similarity failed")
 
 
-@https_fn.on_request(max_instances=10, timeout_sec=120, memory=1024)  # see analyze_link
+@https_fn.on_request(max_instances=50, timeout_sec=120, memory=1024)  # see analyze_link
 def analyze_image(req: https_fn.Request) -> https_fn.Response:
     """HTTP endpoint for analyzing Images immediately (Synchronous)."""
     if req.method == 'OPTIONS':
@@ -3612,7 +3617,7 @@ def _defer_url_capture(uid: str, url: str, card_id, over: dict, headers: dict, *
     return _waiting_response(uid, card_ref.id, over, headers, **extra)
 
 
-@https_fn.on_request(max_instances=10)
+@https_fn.on_request(max_instances=50)  # see analyze_link
 def share_ingest(req: https_fn.Request) -> https_fn.Response:
     """
     HTTP endpoint for the iOS Share Extension (and any share-sheet client).
@@ -6514,7 +6519,8 @@ def _snapshot_capture(ref, uid: str, data: dict) -> None:
     # the placeholder stranded at `processing` with no error anywhere
     # (2026-08-26 demo-account stall).
     timeout_sec=540,
-    max_instances=10,
+    # 50 captures at once (was 10, 2026-10-07; see analyze_link).
+    max_instances=50,
 )
 def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnapshot]) -> None:
     """
