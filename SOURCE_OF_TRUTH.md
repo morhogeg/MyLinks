@@ -2588,6 +2588,7 @@ exact-match, capped.
   tests (new `reminderTime.test.ts`, 4/4; suite 77/77). **NOT verified:**
   the swipe on a device (no touch here), the Firestore write of the restore
   path against the live rules (same fields `updateLinkReminder` writes).
+  **Shipped** as merge `3a78c7e`, TestFlight run #353 → **build 1353** green.
 
 - **2026-10-07 (morning) — REVISIT REMINDERS: EVERY ACTIVE REMINDER, MORE
   ROOM.** Owner QA on 1351. (1) The Reminders section now lists every card
