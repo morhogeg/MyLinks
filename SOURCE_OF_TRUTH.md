@@ -2582,7 +2582,8 @@ exact-match, capped.
   captures/hour; 50 is ~18,000. Not changed: `search_links_http` (10) and
   the global default (20). Assumed, NOT verified: Gemini Tier 1 per-minute
   limits are above ~50 concurrent captures. **Verified:** py_compile, pytest
-  1,904 passed. **Deploy:** `Deploy-Functions:` scoped to the five.
+  1,904 passed. **Deploy:** `Deploy-Functions:` scoped to the five; merge
+  `a9bee4e`, deploy-functions #125 (`37693132266`) **green**.
   **Owner guide:** a step-by-step checklist doc (spend cap sizing, device
   check, payments, App Store listing and submit, housekeeping, launch week)
   lives outside the repo as a Claude doc:
