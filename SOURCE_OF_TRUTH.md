@@ -2571,6 +2571,20 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-07 (morning) — REVISIT REMINDERS: EVERY ACTIVE REMINDER, MORE
+  ROOM.** Owner QA on 1351. (1) The Reminders section now lists every card
+  with an active reminder (was: due now + later today): due ones first,
+  then by when they fire. Feed's `reminderCards` already held them all;
+  `DigestView` stopped filtering. When it fires moved from the trailing
+  controls into the byline (`· Now` in accent, `· 1:00 PM`, `· Tomorrow,
+  9:00 AM`, `· Fri, …`, `· Oct 14, …`; `whenLabel`). (2) Less truncation:
+  `ResurfacedCardRow`'s trailing variant puts the bell + done controls
+  beside the title only; the summary runs the full row width and clamps at
+  3 lines (was 2, beside the controls). Digest lists (no trailing) are
+  unchanged. A long reminder list pushes Do this down; the section header
+  collapses it. **Verified:** tsc 0, eslint 0, em-dash gate; a phone-width
+  mock of the new row. **NOT verified:** in the app.
+
 - **2026-10-07 (later) — REVISIT: "DUE NOW" RENAMED "REMINDERS"; ACTION
   TEXT UNDONE.** Owner was confused why a card with a reminder sat in
   Revisit, read as an action-items screen. Revisit holds both on purpose:
