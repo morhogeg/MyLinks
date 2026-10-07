@@ -2577,7 +2577,8 @@ exact-match, capped.
   `ReminderDoneButton` in `DigestView.tsx`: an empty circle like the Do this
   rows; a tap fills it with the check, holds `CHECK_HOLD_MS` (650 ms), then
   completes (toast with Undo as before). **Verified:** tsc 0, eslint 0,
-  em-dash gate. **NOT verified:** on device.
+  em-dash gate. **NOT verified:** on device. **Shipped** as merge `0567a67`,
+  TestFlight run #354 → **build 1354** green.
 
 - **2026-10-07 (late morning) — REVISIT REMINDERS: DONE TOAST + SWIPES.**
   Owner QA on 1352. (1) Done (the check button, or a left swipe) now shows
