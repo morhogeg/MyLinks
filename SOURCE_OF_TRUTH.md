@@ -2571,6 +2571,16 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-07 — REVISIT "DUE NOW" SAYS WHAT TO DO.** Owner QA on 1349:
+  a due reminder row showed the card's summary snippet while the "Do this"
+  rows below say the action. `ResurfacedCardRow` (`DigestCard.tsx`) takes an
+  optional `task`; Revisit's Due now passes `getActionableTakeaway(l)`, shown
+  in full in the Do this text style (14.5px medium). A card with no action
+  keeps its summary. Layout unchanged (time, bell, done). The digest lists
+  and onboarding use the same row without `task`, so they are unchanged.
+  A card with an open action now shows it in both Due now and Do this.
+  **Verified:** tsc 0, eslint 0, em-dash gate. **NOT verified:** on device.
+
 - **2026-10-06 (night) — CARD HEADER ROUND 2 (owner QA on 1348).** (1)
   The Revisit header bunched the icons left with a hole before ⋯; on a
   phone the action group now dissolves into the row (`display: contents`)
