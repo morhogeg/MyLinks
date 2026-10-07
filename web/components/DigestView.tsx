@@ -63,6 +63,23 @@ function weekSectionLabel(weekId: string, now: Date): string | null {
  *  later today. */
 const timeLabel = (ms: number) => new Date(ms).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 
+/** When an upcoming reminder fires, as short as the day allows: "1:00 PM"
+ *  today, "Tomorrow, 9:00 AM", "Fri, 9:00 AM" this week, then "Oct 14, 9:00 AM"
+ *  (with the year once it is not this one). */
+function whenLabel(ms: number, now: Date): string {
+    const d = new Date(ms);
+    const time = timeLabel(ms);
+    const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+    const days = Math.round((startOf(d) - startOf(now)) / 86_400_000);
+    if (days <= 0) return time;
+    if (days === 1) return `Tomorrow, ${time}`;
+    if (days < 7) return `${d.toLocaleDateString(undefined, { weekday: 'short' })}, ${time}`;
+    const date = d.toLocaleDateString(undefined, d.getFullYear() === now.getFullYear()
+        ? { month: 'short', day: 'numeric' }
+        : { month: 'short', day: 'numeric', year: 'numeric' });
+    return `${date}, ${time}`;
+}
+
 /** A pending reminder is DUE once it has fired (the sweep sets reminderDue, the
  *  in-app delivery that works with or without push) or once its scheduled moment
  *  has passed and the next sweep simply hasn't run yet. */
@@ -101,7 +118,7 @@ interface Props {
     onOpenDigest?: (id: string) => void;
     /** Cards carrying a reminder that still wants attention — already fired, or
      *  pending with a moment attached. Sorted by that moment, soonest first;
-     *  this view keeps the ones due now plus the ones landing later today. */
+     *  this view lists every one: the due ones first, then the upcoming. */
     reminderCards?: Link[];
     /** Open a due card. */
     onOpenReminderCard?: (link: Link) => void;
@@ -207,12 +224,11 @@ export default function DigestView({
     // opened, so "now" is the moment the user looked.
     const now = new Date();
     const nowMs = now.getTime();
-    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime();
+    // Every active reminder (owner, 2026-10-07: not just today's), the due ones
+    // first, then the rest in the order they fire.
     const dueNow = reminderCards.filter((l) => isDueNow(l, nowMs));
-    const dueLaterToday = reminderCards.filter(
-        (l) => !isDueNow(l, nowMs) && (l.nextReminderAt ?? Infinity) < endOfToday,
-    );
-    const dueToday = [...dueNow, ...dueLaterToday];
+    const upcoming = reminderCards.filter((l) => !isDueNow(l, nowMs));
+    const reminders = [...dueNow, ...upcoming];
 
     // The newest synthesis is PROMOTED out of the archive into "This week" when
     // it's recent enough to be about the week you're in. Older ones stay in the
@@ -226,7 +242,7 @@ export default function DigestView({
     const showReview = !!reviewDigest && reviewLeft > 0 && !!onStartReview;
     const reviewWhen = reviewDigest ? digestDisplayTitle(reviewDigest, { relative: true }) : '';
 
-    const isEmpty = digests.length === 0 && syntheses.length === 0 && dueToday.length === 0
+    const isEmpty = digests.length === 0 && syntheses.length === 0 && reminders.length === 0
         && !hasTakeaways && !showReview;
     if (isEmpty) {
         return (
@@ -274,7 +290,7 @@ export default function DigestView({
         : null;
     const activeDigest = digests.find((d) => d.id === activeId) ?? null;
 
-    const todayTop = (dueToday.length > 0 || hasTakeaways || thisWeek || showReview) ? (
+    const todayTop = (reminders.length > 0 || hasTakeaways || thisWeek || showReview) ? (
         <div className="flex flex-col gap-4">
             {/* First: it's the one thing here with an end. */}
             {showReview && (
@@ -298,26 +314,28 @@ export default function DigestView({
                     <ChevronRight className="w-4 h-4 text-text-muted shrink-0 rtl:rotate-180" />
                 </button>
             )}
-            {dueToday.length > 0 && (
+            {reminders.length > 0 && (
                 <div className="flex flex-col gap-1.5">
                     <SectionHeader
                         label="Reminders"
-                        count={dueToday.length}
+                        count={reminders.length}
                         open={isOpen(DUE_KEY)}
                         onToggle={() => toggle(DUE_KEY)}
                     />
-                    {isOpen(DUE_KEY) && dueToday.map((l) => (
+                    {isOpen(DUE_KEY) && reminders.map((l) => (
                         <ResurfacedCardRow
                             key={l.id}
                             card={toCardRef(l)}
                             onOpen={() => onOpenReminderCard?.(l)}
+                            note={isDueNow(l, nowMs) ? (
+                                <span className="shrink-0 font-semibold text-accent">· Now</span>
+                            ) : l.nextReminderAt ? (
+                                <span className="shrink-0 font-semibold tabular-nums whitespace-nowrap">· 
+                                    {whenLabel(l.nextReminderAt, now)}
+                                </span>
+                            ) : null}
                             trailing={
                                 <>
-                                    {!isDueNow(l, nowMs) && l.nextReminderAt && (
-                                        <span dir="ltr" className="px-1 text-[11px] font-semibold text-text-muted tabular-nums">
-                                            {timeLabel(l.nextReminderAt)}
-                                        </span>
-                                    )}
                                     {onEditReminder && (
                                         <button
                                             onClick={() => onEditReminder(l)}

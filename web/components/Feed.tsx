@@ -1288,9 +1288,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // ── Today tab ────────────────────────────────────────────────────────────
     // Every card whose reminder still wants attention: one that has already
     // fired and not been acted on (`reminderDue` — the in-app delivery that
-    // works with or without push) plus any still-pending one. DigestView keeps
-    // the ones due now and the ones landing later today; the rest wait for their
-    // day. Derived from visibleLinks so a locked private card can never surface
+    // works with or without push) plus any still-pending one. Revisit lists
+    // them all, the due ones first, then by when they fire. Derived from visibleLinks so a locked private card can never surface
     // here, exactly like the home feed's due strip.
     const reminderCards = useMemo(
         () => visibleLinks

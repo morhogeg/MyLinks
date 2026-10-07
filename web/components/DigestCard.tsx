@@ -174,54 +174,56 @@ export default function DigestCard({
  * alignment AND the thumbnail to the correct side; the metadata line stays LTR
  * internally (brand icon + latin handle) but hugs the title's edge on RTL cards.
  */
-export function ResurfacedCardRow({ card, onOpen, trailing }: {
+export function ResurfacedCardRow({ card, onOpen, trailing, note }: {
     card: DigestCardRef;
     onOpen: () => void;
-    /** Controls pinned to the end of the row (Today hangs the reminder actions
-     *  here). Rendered OUTSIDE the tappable area so a tap on them never opens
-     *  the card. */
+    /** Controls pinned to the end of the row (Revisit hangs the reminder
+     *  actions here). Rendered OUTSIDE the tappable area so a tap on them never
+     *  opens the card. They sit beside the title only, so the summary below
+     *  runs the full width of the row. */
     trailing?: ReactNode;
+    /** Extra text at the end of the byline (Revisit: when the reminder is). */
+    note?: ReactNode;
 }) {
     const isRtl = getDirection(card.title) === 'rtl';
     const colorStyle = getCategoryColorStyle(card.category || 'General');
-    const body = (
+    const head = (
         <>
-            <div className="min-w-0 flex-1">
-                <div className={`text-sm font-semibold leading-snug text-text group-hover:text-accent transition-colors ${isRtl ? 'font-hebrew' : ''}`}>
-                    {card.title}
-                </div>
-                {/* Same byline language as the home cards: SourceByline (X logo +
-                    @handle, YouTube channel, plain publisher…) + the category
-                    chip, exactly like ListCard's meta row. */}
-                <div className={`mt-1 flex items-center gap-1.5 min-w-0 text-[11px] text-text-muted ${isRtl ? 'justify-end' : ''}`} dir="ltr">
-                    <SourceByline link={{ url: card.url ?? undefined, sourceName: card.sourceName ?? undefined }} />
-                    {card.category && (
-                        <span
-                            className="shrink-0 max-w-[120px] px-1.5 py-px rounded-full text-[10px] leading-4 font-bold uppercase tracking-wider truncate"
-                            style={{ backgroundColor: colorStyle.backgroundColor, color: colorStyle.ink }}
-                            title={card.category}
-                        >
-                            {card.category}
-                        </span>
-                    )}
-                </div>
-                {card.summary && (
-                    <SimpleMarkdown
-                        inline
-                        content={card.summary}
-                        className="mt-1 text-[13px] leading-relaxed text-text-secondary line-clamp-2"
-                    />
-                )}
+            <div className={`text-sm font-semibold leading-snug text-text group-hover:text-accent transition-colors ${isRtl ? 'font-hebrew' : ''}`}>
+                {card.title}
             </div>
-            {card.thumbnailUrl && (
-                <img
-                    src={card.thumbnailUrl}
-                    alt=""
-                    loading="lazy"
-                    className="w-14 h-14 mt-0.5 rounded-xl object-cover shrink-0 bg-fill-subtle"
-                />
-            )}
+            {/* Same byline language as the home cards: SourceByline (X logo +
+                @handle, YouTube channel, plain publisher…) + the category
+                chip, exactly like ListCard's meta row. */}
+            <div className={`mt-1 flex items-center gap-1.5 min-w-0 text-[11px] text-text-muted ${isRtl ? 'justify-end' : ''}`} dir="ltr">
+                <SourceByline link={{ url: card.url ?? undefined, sourceName: card.sourceName ?? undefined }} />
+                {card.category && (
+                    <span
+                        className="shrink-0 max-w-[120px] px-1.5 py-px rounded-full text-[10px] leading-4 font-bold uppercase tracking-wider truncate"
+                        style={{ backgroundColor: colorStyle.backgroundColor, color: colorStyle.ink }}
+                        title={card.category}
+                    >
+                        {card.category}
+                    </span>
+                )}
+                {note}
+            </div>
         </>
+    );
+    const summary = (lines: string) => card.summary && (
+        <SimpleMarkdown
+            inline
+            content={card.summary}
+            className={`mt-1 text-[13px] leading-relaxed text-text-secondary ${lines}`}
+        />
+    );
+    const thumb = card.thumbnailUrl && (
+        <img
+            src={card.thumbnailUrl}
+            alt=""
+            loading="lazy"
+            className="w-14 h-14 mt-0.5 rounded-xl object-cover shrink-0 bg-fill-subtle"
+        />
     );
 
     if (!trailing) {
@@ -231,22 +233,42 @@ export function ResurfacedCardRow({ card, onOpen, trailing }: {
                 onClick={onOpen}
                 className="group w-full flex items-start gap-3 rounded-2xl border border-border-subtle bg-card px-3.5 py-3 text-start cursor-pointer transition-all hover:bg-card-hover hover:border-text-muted/40 active:scale-[0.99]"
             >
-                {body}
+                <div className="min-w-0 flex-1">
+                    {head}
+                    {summary('line-clamp-2')}
+                </div>
+                {thumb}
             </button>
         );
     }
     // With trailing controls the row can't be one <button> (nested buttons are
-    // invalid), so the tappable area is its own button and the controls sit
-    // beside it inside the same bordered shell.
+    // invalid). The title + byline is the tappable button, with the controls
+    // beside it; the summary (and image) sit underneath across the whole row
+    // and open the card too, so a reminder row truncates far less (owner,
+    // 2026-10-07). The second target is hidden from assistive tech: the first
+    // already names the card.
     return (
         <div
             dir={isRtl ? 'rtl' : 'ltr'}
-            className="group flex items-start gap-1 rounded-2xl border border-border-subtle bg-card ps-3.5 pe-2 py-3 transition-all hover:bg-card-hover hover:border-text-muted/40"
+            className="group rounded-2xl border border-border-subtle bg-card ps-3.5 pe-2 py-3 transition-all hover:bg-card-hover hover:border-text-muted/40"
         >
-            <button onClick={onOpen} className="min-w-0 flex-1 flex items-start gap-3 text-start cursor-pointer">
-                {body}
-            </button>
-            <span className="flex items-center gap-0.5 shrink-0">{trailing}</span>
+            <div className="flex items-start gap-1">
+                <button onClick={onOpen} className="min-w-0 flex-1 text-start cursor-pointer">
+                    {head}
+                </button>
+                <span className="flex items-center gap-0.5 shrink-0 -mt-1.5">{trailing}</span>
+            </div>
+            {(card.summary || thumb) && (
+                <button
+                    onClick={onOpen}
+                    tabIndex={-1}
+                    aria-hidden
+                    className="w-full flex items-start gap-3 pe-1.5 text-start cursor-pointer"
+                >
+                    <div className="min-w-0 flex-1">{summary('line-clamp-3')}</div>
+                    {thumb}
+                </button>
+            )}
         </div>
     );
 }
