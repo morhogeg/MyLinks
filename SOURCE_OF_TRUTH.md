@@ -2580,6 +2580,7 @@ exact-match, capped.
   and onboarding use the same row without `task`, so they are unchanged.
   A card with an open action now shows it in both Due now and Do this.
   **Verified:** tsc 0, eslint 0, em-dash gate. **NOT verified:** on device.
+  **Shipped** as merge `7d25593`, TestFlight run #350 → **build 1350** green.
 
 - **2026-10-06 (night) — CARD HEADER ROUND 2 (owner QA on 1348).** (1)
   The Revisit header bunched the icons left with a hole before ⋯; on a
