@@ -331,14 +331,10 @@ export default function DigestView({
                                         </button>
                                     )}
                                     {onCompleteReminder && (
-                                        <button
-                                            onClick={() => onCompleteReminder(l)}
-                                            aria-label={`Mark the reminder for “${l.title}” as done`}
-                                            title="Mark as done"
-                                            className="w-9 h-9 shrink-0 flex items-center justify-center rounded-lg text-text-muted hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
-                                        >
-                                            <CheckCircle2 className="w-4 h-4" />
-                                        </button>
+                                        <ReminderDoneButton
+                                            title={l.title}
+                                            onDone={() => onCompleteReminder(l)}
+                                        />
                                     )}
                                 </>
                             }
@@ -601,6 +597,47 @@ const SWIPE_HINT_KEY = 'machina.takeawaySwipeLearned';
 const CHECK_HOLD_MS = 650;
 /** The fold itself: the row's height eases to zero. */
 const COLLAPSE_MS = 280;
+
+/**
+ * A reminder row's Done control: an EMPTY circle, like the Do this rows. It
+ * used to be a check-in-a-circle icon, which read as already done while the
+ * reminder was still open (owner QA on 1353). A tap fills it with the check,
+ * holds a beat so the tick is seen, then completes (Feed's toast has Undo).
+ */
+function ReminderDoneButton({ title, onDone }: { title: string; onDone: () => void }) {
+    const [checked, setChecked] = useState(false);
+    const timer = useRef<number | null>(null);
+    useEffect(() => () => { if (timer.current) window.clearTimeout(timer.current); }, []);
+    const tick = () => {
+        if (checked) return;
+        hapticLight();
+        setChecked(true);
+        timer.current = window.setTimeout(() => {
+            onDone();
+            // Still here (a failed write): clear the tick.
+            timer.current = window.setTimeout(() => setChecked(false), 1500);
+        }, CHECK_HOLD_MS);
+    };
+    return (
+        <button
+            onClick={tick}
+            role="checkbox"
+            aria-checked={checked}
+            aria-label={`Mark the reminder for “${title}” as done`}
+            title="Mark as done"
+            className="w-9 h-9 shrink-0 flex items-center justify-center rounded-lg cursor-pointer"
+        >
+            <span
+                className={`w-[20px] h-[20px] rounded-full flex items-center justify-center border-[1.5px] transition-all duration-200 ${checked
+                    ? 'bg-accent border-accent'
+                    : 'border-text-muted/60 [@media(hover:hover)]:hover:border-accent active:scale-90'}`}
+                style={{ transitionTimingFunction: 'var(--ease-spring)' }}
+            >
+                {checked && <Check className="w-3 h-3 text-accent-ink animate-scale-up" strokeWidth={3} />}
+            </span>
+        </button>
+    );
+}
 
 /** How far a reminder row must travel, as a share of its width, to act. */
 const REMINDER_SWIPE_FRACTION = 0.3;
