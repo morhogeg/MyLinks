@@ -301,7 +301,7 @@ export default function DigestView({
             {dueToday.length > 0 && (
                 <div className="flex flex-col gap-1.5">
                     <SectionHeader
-                        label="Due now"
+                        label="Reminders"
                         count={dueToday.length}
                         open={isOpen(DUE_KEY)}
                         onToggle={() => toggle(DUE_KEY)}
@@ -310,9 +310,6 @@ export default function DigestView({
                         <ResurfacedCardRow
                             key={l.id}
                             card={toCardRef(l)}
-                            // Say what to do, like the Do this rows below; a card
-                            // without an action keeps its summary.
-                            task={getActionableTakeaway(l) || undefined}
                             onOpen={() => onOpenReminderCard?.(l)}
                             trailing={
                                 <>

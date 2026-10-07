@@ -2571,7 +2571,18 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-10-07 — REVISIT "DUE NOW" SAYS WHAT TO DO.** Owner QA on 1349:
+- **2026-10-07 (later) — REVISIT: "DUE NOW" RENAMED "REMINDERS"; ACTION
+  TEXT UNDONE.** Owner was confused why a card with a reminder sat in
+  Revisit, read as an action-items screen. Revisit holds both on purpose:
+  reminders due today (top) and Do this action items. The section is now
+  titled **Reminders** (also in the onboarding tour's Revisit miniature;
+  the open/closed storage key stays `due-now`), and the 1350 change below
+  is reverted: a reminder row shows the card's summary again, not the
+  action. Owner confirmed: a card with both a reminder and an action
+  appears in both sections, by design. **Verified:** tsc 0, eslint 0,
+  em-dash gate.
+
+- **2026-10-07 — REVISIT "DUE NOW" SAYS WHAT TO DO (reverted, entry above).** Owner QA on 1349:
   a due reminder row showed the card's summary snippet while the "Do this"
   rows below say the action. `ResurfacedCardRow` (`DigestCard.tsx`) takes an
   optional `task`; Revisit's Due now passes `getActionableTakeaway(l)`, shown

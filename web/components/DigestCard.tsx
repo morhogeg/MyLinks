@@ -174,11 +174,8 @@ export default function DigestCard({
  * alignment AND the thumbnail to the correct side; the metadata line stays LTR
  * internally (brand icon + latin handle) but hugs the title's edge on RTL cards.
  */
-export function ResurfacedCardRow({ card, task, onOpen, trailing }: {
+export function ResurfacedCardRow({ card, onOpen, trailing }: {
     card: DigestCardRef;
-    /** The card's "Do this" action. When set it replaces the summary line and
-     *  reads like Revisit's Do this rows: the thing to go do, in full. */
-    task?: string;
     onOpen: () => void;
     /** Controls pinned to the end of the row (Today hangs the reminder actions
      *  here). Rendered OUTSIDE the tappable area so a tap on them never opens
@@ -208,11 +205,7 @@ export function ResurfacedCardRow({ card, task, onOpen, trailing }: {
                         </span>
                     )}
                 </div>
-                {task ? (
-                    <p dir="auto" className="mt-1.5 text-[14.5px] leading-snug font-medium text-text text-start">
-                        {task}
-                    </p>
-                ) : card.summary && (
+                {card.summary && (
                     <SimpleMarkdown
                         inline
                         content={card.summary}

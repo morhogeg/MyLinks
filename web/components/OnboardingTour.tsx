@@ -295,7 +295,7 @@ function AskMock() {
 }
 
 /** A miniature of the REAL Revisit tab (DigestView.tsx): its three sections in
-    their own vocabulary. "Due now" holds a ResurfacedCardRow with the reminder
+    their own vocabulary. "Reminders" holds a ResurfacedCardRow with the reminder
     bell, "Do this" holds a TakeawayRow (the blank circle, the task, the card
     under it), and "Weekly synthesis" holds the SynthesisCard masthead. The old
     mock here was an invented digest ("3 threads came together") that matched
@@ -312,7 +312,7 @@ function RevisitMock() {
                 <p className="text-[12px] font-bold text-text">Revisit</p>
             </div>
             <div className="flex flex-col gap-1.5">
-                {section('Due now')}
+                {section('Reminders')}
                 <div className="flex items-center gap-2 rounded-xl bg-fill-subtle px-2.5 py-2">
                     <div className="min-w-0 flex-1">
                         <p className="text-[11px] font-semibold text-text truncate">The science of deep focus</p>
