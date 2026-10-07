@@ -2580,7 +2580,8 @@ exact-match, capped.
   is reverted: a reminder row shows the card's summary again, not the
   action. Owner confirmed: a card with both a reminder and an action
   appears in both sections, by design. **Verified:** tsc 0, eslint 0,
-  em-dash gate.
+  em-dash gate. **Shipped** as merge `946bfe3`, TestFlight run #351 →
+  **build 1351** green.
 
 - **2026-10-07 — REVISIT "DUE NOW" SAYS WHAT TO DO (reverted, entry above).** Owner QA on 1349:
   a due reminder row showed the card's summary snippet while the "Do this"
