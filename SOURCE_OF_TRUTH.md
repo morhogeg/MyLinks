@@ -2571,6 +2571,14 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-07 (midday) — REMINDER DONE BUTTON LOOKED ALREADY DONE.** Owner
+  QA on 1353: the reminder row's Done control was a `CheckCircle2` (a check
+  in a circle), which read as "already done" on an open reminder. Now
+  `ReminderDoneButton` in `DigestView.tsx`: an empty circle like the Do this
+  rows; a tap fills it with the check, holds `CHECK_HOLD_MS` (650 ms), then
+  completes (toast with Undo as before). **Verified:** tsc 0, eslint 0,
+  em-dash gate. **NOT verified:** on device.
+
 - **2026-10-07 (late morning) — REVISIT REMINDERS: DONE TOAST + SWIPES.**
   Owner QA on 1352. (1) Done (the check button, or a left swipe) now shows
   "Reminder done" with **Undo**; Undo writes back the exact reminder fields
