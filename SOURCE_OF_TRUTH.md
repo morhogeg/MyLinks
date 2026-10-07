@@ -2583,7 +2583,8 @@ exact-match, capped.
   3 lines (was 2, beside the controls). Digest lists (no trailing) are
   unchanged. A long reminder list pushes Do this down; the section header
   collapses it. **Verified:** tsc 0, eslint 0, em-dash gate; a phone-width
-  mock of the new row. **NOT verified:** in the app.
+  mock of the new row. **NOT verified:** in the app. **Shipped** as merge
+  `b62e414`, TestFlight run #352 → **build 1352** green.
 
 - **2026-10-07 (later) — REVISIT: "DUE NOW" RENAMED "REMINDERS"; ACTION
   TEXT UNDONE.** Owner was confused why a card with a reminder sat in
