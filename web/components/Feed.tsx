@@ -10,7 +10,8 @@ import { platformIcon, platformColor, type PlatformKey } from '@/lib/platform';
 import DigestView from './DigestView';
 import DigestCard from './DigestCard';
 import Dropdown from './Dropdown';
-import { deleteLink, updateLinkReminder, markLinkReviewed, markTakeawayDone, markTakeawayDismissed, toLink } from '@/lib/storage';
+import { deleteLink, updateLinkReminder, markLinkReviewed, markTakeawayDone, markTakeawayDismissed, toLink, reminderSnapshot, restoreLinkReminder, snoozeLinkReminder } from '@/lib/storage';
+import { snoozeTarget, whenLabel } from '@/lib/reminderTime';
 import { closedTakeaways, isTakeawayDismissed, isTakeawayDone, openTakeaways } from '@/lib/takeaway';
 import { track } from '@/lib/analytics';
 import { collection, onSnapshot, doc, updateDoc, arrayUnion, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
@@ -48,7 +49,7 @@ import AddToCollectionSheet from './AddToCollectionSheet';
 import CollectionsGallery from './CollectionsGallery';
 import SuggestionPreviewSheet from './SuggestionPreviewSheet';
 import OverflowMenu from './OverflowMenu';
-import { hapticLight } from '@/lib/haptics';
+import { hapticLight, hapticSuccess } from '@/lib/haptics';
 import ImportSheet from './ImportSheet';
 import { getDirection } from '@/lib/rtl';
 import CollectionFormModal from './CollectionFormModal';
@@ -1397,6 +1398,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // uses, so a card marked done here looks done everywhere.
     const completeReminder = useCallback(async (link: Link) => {
         if (!uid) return;
+        // Taken before the write so Undo puts back exactly what was there.
+        const before = reminderSnapshot(link);
         if (link.reminderStatus === 'pending') {
             try {
                 await updateLinkReminder(uid, link.id, false);
@@ -1406,7 +1409,40 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
             }
         }
         if (link.reminderDue) void clearReminderDue(link.id);
+        hapticSuccess();
+        toast.success('Reminder done', {
+            label: 'Undo',
+            onClick: () => {
+                restoreLinkReminder(uid, link.id, before).catch(() => {
+                    toast.error("Couldn't undo that. Please try again.");
+                });
+            },
+        });
     }, [uid, toast, clearReminderDue]);
+
+    // Revisit's right swipe: move the reminder to tomorrow 9:00 (or a day after
+    // a later one; lib/reminderTime snoozeTarget), with Undo.
+    const snoozeReminder = useCallback(async (link: Link) => {
+        if (!uid) return;
+        const before = reminderSnapshot(link);
+        const now = new Date();
+        const at = snoozeTarget(link, now);
+        try {
+            await snoozeLinkReminder(uid, link.id, at);
+        } catch {
+            toast.error("Couldn't snooze that reminder. Please try again.");
+            return;
+        }
+        hapticSuccess();
+        toast.success(`Snoozed to ${whenLabel(at, now)}`, {
+            label: 'Undo',
+            onClick: () => {
+                restoreLinkReminder(uid, link.id, before).catch(() => {
+                    toast.error("Couldn't undo that. Please try again.");
+                });
+            },
+        });
+    }, [uid, toast]);
 
     // Open the deck on one digest's cards. Done returns to `returnTo`.
     const startDigestReview = useCallback((digest: CuratedDigest, returnTo: 'grid' | 'digest') => {
@@ -2396,6 +2432,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
             onOpenReminderCard={(l) => { openLinkDetails(l); if (l.reminderDue) void clearReminderDue(l.id); }}
             onEditReminder={handleOpenReminderModal}
             onCompleteReminder={(l) => { void completeReminder(l); }}
+            onSnoozeReminder={(l) => { void snoozeReminder(l); }}
             reviewDigest={latestDigest}
             reviewLeft={latestDigestLeft}
             onStartReview={latestDigest ? () => startDigestReview(latestDigest, 'digest') : undefined}

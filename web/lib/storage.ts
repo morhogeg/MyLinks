@@ -772,6 +772,45 @@ export async function updateLinkReminder(
 }
 
 
+/** A card's reminder fields exactly as they stand, so a change from Revisit
+ *  (Done, Snooze) can be undone by writing them back. */
+export interface ReminderSnapshot {
+    reminderStatus: Link['reminderStatus'] | null;
+    nextReminderAt: number | null;
+    reminderCount: number;
+    reminderProfile: string | null;
+    reminderDue: boolean;
+    reminderDueAt: number | null;
+}
+
+export function reminderSnapshot(link: Link): ReminderSnapshot {
+    return {
+        reminderStatus: link.reminderStatus ?? null,
+        nextReminderAt: link.nextReminderAt ?? null,
+        reminderCount: link.reminderCount ?? 0,
+        reminderProfile: link.reminderProfile ?? null,
+        reminderDue: link.reminderDue === true,
+        reminderDueAt: link.reminderDueAt ?? null,
+    };
+}
+
+/** Put a card's reminder back the way a snapshot recorded it (Undo). */
+export async function restoreLinkReminder(uid: string, id: string, snap: ReminderSnapshot): Promise<void> {
+    await updateDoc(doc(db, 'users', uid, 'links', id), { ...snap });
+}
+
+/** Move a reminder to a later moment, keeping its profile and repeat count
+ *  (a snoozed Smart review is still a Smart review). Clears a fired "due"
+ *  flag, the same as re-setting a reminder does. */
+export async function snoozeLinkReminder(uid: string, id: string, at: number): Promise<void> {
+    await updateDoc(doc(db, 'users', uid, 'links', id), {
+        reminderStatus: 'pending',
+        nextReminderAt: at,
+        reminderDue: false,
+        reminderDueAt: null,
+    });
+}
+
 /**
  * Get user settings from Firestore
  */
