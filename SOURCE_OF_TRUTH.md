@@ -2574,6 +2574,15 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-10 (later) — Launch screen mark REMOVED (owner: "pointless").** The
+  launch screen is now deliberately empty: only the adaptive `LaunchBackground`
+  color (light #F9FAFB / dark #050505). iOS requires a launch storyboard, so
+  it can't be deleted outright. `SplashMark.imageset` was deleted;
+  `MainViewController` keeps the matching web-view color, so there is still no
+  flash. Verified: ibtool + actool clean, simulator build, burst screenshots in
+  light + dark (plain background, then the app). Ships as the next TestFlight
+  build (see the entry above this one once recorded).
+
 - **2026-10-10 — iOS LAUNCH SCREEN ADAPTS TO LIGHT/DARK (no dark flash).**
   Branch `claude/app-launch-qa-a29d1f`, commit `e83d8513`. Owner OK'd the fix
   "if that's best practice". Cause: the launch screen was a full-screen dark
