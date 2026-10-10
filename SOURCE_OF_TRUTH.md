@@ -2592,6 +2592,8 @@ exact-match, capped.
   the popup path triggers the same onAuthStateChanged). **Related, not
   changed:** `BootScreen` is always dark, so light-mode users still see a dark
   cold-start screen; making it follow the theme is a separate small change.
+  **SHIPPED as merge `b79823eb`:** Vercel green, e2e-journeys #41 green,
+  TestFlight run #357 → **build 1357** green.
 
 - **2026-10-10 (later) — Launch screen mark REMOVED (owner: "pointless").** The
   launch screen is now deliberately empty: only the adaptive `LaunchBackground`
