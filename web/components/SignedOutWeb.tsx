@@ -50,11 +50,15 @@ const LandingPage = dynamic(() => import('@/components/LandingPage'), {
 export default function SignedOutWeb({
     onSignIn,
     showApple,
+    resuming = null,
 }: {
     onSignIn: (provider: 'google' | 'apple') => Promise<void>;
     showApple: boolean;
+    /** Returning from a redirect sign-in with this provider: open on the
+        sign-in screen with its button already in "Signing in…". */
+    resuming?: null | 'google' | 'apple';
 }) {
-    const [signingIn, setSigningIn] = useState(false);
+    const [signingIn, setSigningIn] = useState(resuming !== null);
 
     if (signingIn) {
         // The back affordance is OVERLAID here rather than added to
@@ -72,7 +76,7 @@ export default function SignedOutWeb({
                     <ArrowLeft className="h-4 w-4" aria-hidden />
                     Back
                 </button>
-                <LoginScreen onSignIn={onSignIn} showApple={showApple} />
+                <LoginScreen onSignIn={onSignIn} showApple={showApple} initialBusy={resuming} />
             </div>
         );
     }

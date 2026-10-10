@@ -17,6 +17,7 @@ export default function LoginScreen({
     detail,
     email,
     showApple = true,
+    initialBusy = null,
 }: {
     onSignIn: (provider: 'google' | 'apple') => Promise<void>;
     onSignOut?: () => void;
@@ -30,8 +31,10 @@ export default function LoginScreen({
     /** Show "Continue with Apple". Hidden pre-cutover when the Apple provider
         may not be configured yet. */
     showApple?: boolean;
+    /** Start in "Signing in…" (returning from a redirect sign-in). */
+    initialBusy?: null | 'google' | 'apple';
 }) {
-    const [busy, setBusy] = useState<null | 'google' | 'apple'>(null);
+    const [busy, setBusy] = useState<null | 'google' | 'apple'>(initialBusy);
     const [error, setError] = useState<string | null>(null);
 
     const handleSignIn = async (provider: 'google' | 'apple') => {

@@ -8,7 +8,7 @@ import { httpsCallable } from 'firebase/functions';
 import { db, functions, auth } from '@/lib/firebase';
 import { isNativeApp, REQUIRE_AUTH, apiUrl, fetchWithTimeout } from '@/lib/api';
 import {
-    onAuthChange, completeRedirectSignIn, signIn, signOutUser, authHeaders,
+    onAuthChange, completeRedirectSignIn, pendingRedirectSignIn, signIn, signOutUser, authHeaders,
     PROFILE_UPDATED_EVENT, isSigningOut, purgeAfterExternalSignOut,
 } from '@/lib/auth';
 import { syncShareConfigToNative, clearNativeShareConfig } from '@/lib/shareConfig';
@@ -179,6 +179,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // "Signing in…" on the button until the app takes over. Cold boots with a
     // persisted session never showed the sign-in screen and keep the boot screen.
     const [signInHandoff, setSignInHandoff] = useState(false);
+    // Same idea for the web REDIRECT fallback (pop-up blocked): the tab comes
+    // back from Google/Apple as a fresh load, and auth reports "signed out"
+    // before getRedirectResult() finishes. While this is set (the provider the
+    // tab left with), the sign-in screen holds in "Signing in…" instead of the
+    // landing page. Cleared when the redirect turns out empty.
+    const [redirectReturn, setRedirectReturn] = useState<null | 'google' | 'apple'>(null);
     const signedOutVisibleRef = useRef(false);
     // The auth uid this tab last resolved, to tell "signed out from
     // elsewhere" (deleted or disabled account, revoked sessions) from the
@@ -393,7 +399,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         // Finish a redirect-based sign-in if one is pending (web only; no-op
         // under Capacitor and on a normal load).
-        completeRedirectSignIn().catch(() => {});
+        const resuming = pendingRedirectSignIn();
+        if (resuming) setRedirectReturn(resuming);
+        completeRedirectSignIn()
+            .then((u) => { if (!u && !cancelled) setRedirectReturn(null); })
+            .catch(() => { if (!cancelled) setRedirectReturn(null); });
+        // Never strand the user on "Signing in…": if the redirect result hasn't
+        // produced a user in time (it can hang on a bad network), fall back to
+        // the signed-out screen so they can simply try again.
+        const redirectGiveUp = resuming
+            ? setTimeout(() => {
+                if (!cancelled && !auth.currentUser) setRedirectReturn(null);
+            }, REDIRECT_RETURN_TIMEOUT_MS)
+            : undefined;
 
         const unsub = onAuthChange(async (user) => {
             if (cancelled) return;
@@ -466,7 +484,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
         });
 
-        return () => { cancelled = true; unsub(); };
+        return () => { cancelled = true; unsub(); clearTimeout(redirectGiveUp); };
         // retryNonce re-runs resolution (onAuthChange re-fires with the
         // current user on resubscribe) after a failed workspace setup. The
         // helpers are re-created every render; listing them would resubscribe
@@ -504,13 +522,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // During loading we render children so the page shows its own spinner (and
     // SSR/first paint stay consistent — loading starts true).
     const gated = REQUIRE_AUTH || !native;
-    if (loading && signInHandoff && gated) {
+    const holdSignIn = gated && !restricted
+        && ((loading && signInHandoff) || (redirectReturn !== null && !uid));
+    if (holdSignIn) {
         // Same element type at the same position as the signed-out branch
         // below, so React keeps SignedOutWeb (and LoginScreen's busy state)
         // mounted instead of remounting it. See signInHandoff above.
         return (
             <AuthContext.Provider value={value}>
-                <SignedOutWeb onSignIn={signIn} showApple={!native || REQUIRE_AUTH} />
+                <SignedOutWeb
+                    // A redirect return is its own screen: when it ends without
+                    // a user (empty result or timeout) the key change remounts a
+                    // fresh, usable landing instead of keeping a stuck "Signing
+                    // in…". The in-session hand-off keeps one key, so its
+                    // LoginScreen state survives (the whole point of it).
+                    key={redirectReturn ? 'redirect-return' : 'signed-out'}
+                    onSignIn={signIn}
+                    showApple={!native || REQUIRE_AUTH}
+                    resuming={redirectReturn}
+                />
             </AuthContext.Provider>
         );
     }
@@ -560,7 +590,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // as the expression so a future flag change keeps working.
             return (
                 <AuthContext.Provider value={value}>
-                    <SignedOutWeb onSignIn={signIn} showApple={!native || REQUIRE_AUTH} />
+                    <SignedOutWeb
+                    // A redirect return is its own screen: when it ends without
+                    // a user (empty result or timeout) the key change remounts a
+                    // fresh, usable landing instead of keeping a stuck "Signing
+                    // in…". The in-session hand-off keeps one key, so its
+                    // LoginScreen state survives (the whole point of it).
+                    key={redirectReturn ? 'redirect-return' : 'signed-out'}
+                    onSignIn={signIn}
+                    showApple={!native || REQUIRE_AUTH}
+                    resuming={redirectReturn}
+                />
                 </AuthContext.Provider>
             );
         }
@@ -602,6 +642,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         </AuthContext.Provider>
     );
 }
+
+/** How long a redirect return may hold "Signing in…" before giving up. */
+const REDIRECT_RETURN_TIMEOUT_MS = 12_000;
 
 /** Shape returned by both the claim callable and its HTTP twin. */
 type ClaimResult = { uid: string | null; created?: boolean };
