@@ -86,6 +86,27 @@ function redirectCanWork(): boolean {
     return host === authDomain || host.endsWith(`.${authDomain}`);
 }
 
+/**
+ * Set just before a redirect sign-in leaves the page, read when it comes back.
+ * Without it the return trip renders "signed out" first: `auth` is initialized
+ * without a redirect resolver (see the top of this file), so
+ * onAuthStateChanged reports null before getRedirectResult() has finished, and
+ * the landing page showed again before the app (owner, 2026-10-10).
+ * sessionStorage: per tab, gone when the tab closes, like the redirect itself.
+ */
+const REDIRECT_SIGN_IN_KEY = 'machina:redirectSignIn';
+
+/** The provider of a redirect sign-in this tab is returning from, if any. */
+export function pendingRedirectSignIn(): AuthProviderId | null {
+    if (typeof window === 'undefined' || isNativeApp()) return null;
+    try {
+        const v = sessionStorage.getItem(REDIRECT_SIGN_IN_KEY);
+        return v === 'google' || v === 'apple' ? v : null;
+    } catch {
+        return null;
+    }
+}
+
 async function popupWithFallback(
     provider: GoogleAuthProvider | OAuthProvider,
 ): Promise<void> {
@@ -95,6 +116,10 @@ async function popupWithFallback(
         const code = (err as { code?: string })?.code ?? '';
         if (!popupUnsupported(code)) throw err;
         if (redirectCanWork()) {
+            try {
+                sessionStorage.setItem(REDIRECT_SIGN_IN_KEY,
+                    provider.providerId === 'apple.com' ? 'apple' : 'google');
+            } catch { /* storage blocked: the return trip just shows the landing first */ }
             await signInWithRedirect(auth, provider, browserPopupRedirectResolver);
             return;
         }
@@ -272,6 +297,8 @@ export async function completeRedirectSignIn(): Promise<User | null> {
         return result?.user ?? null;
     } catch {
         return null;
+    } finally {
+        try { sessionStorage.removeItem(REDIRECT_SIGN_IN_KEY); } catch { /* ignore */ }
     }
 }
 

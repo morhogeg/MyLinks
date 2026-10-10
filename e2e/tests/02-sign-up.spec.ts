@@ -123,3 +123,40 @@ test('a cold start with a saved session still shows the boot screen, then the ap
     await expect(page.getByText('Starting Machina')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Add to Machina' })).toBeVisible();
 });
+
+// Web REDIRECT fallback (pop-up blocked: phones, in-app browsers). The tab comes
+// back from Google as a fresh load and auth reports "signed out" before the
+// redirect result lands, which used to show the landing page again first. The
+// marker lib/auth.ts sets before leaving is simulated here.
+async function returnFromRedirect(page: import('@playwright/test').Page) {
+    await page.addInitScript(() => {
+        try { sessionStorage.setItem('machina:redirectSignIn', 'google'); } catch { /* */ }
+        const w = window as unknown as { __seen: Set<string> };
+        w.__seen = new Set();
+        const look = () => {
+            const t = document.body?.innerText ?? '';
+            if (t.includes('finally useful') && t.includes('Get started')) w.__seen.add('landing');
+            if (t.includes('Signing in')) w.__seen.add('signing-in');
+        };
+        new MutationObserver(look).observe(document, { childList: true, subtree: true, characterData: true });
+    });
+}
+
+test('returning from a redirect holds "Signing in…" first; an empty redirect ends on a usable landing', async ({ page }) => {
+    // What a REAL return from Google does next (the redirect result carries
+    // the user, the hold runs straight into the app) can't be produced
+    // without a live Google round trip. The emulator answers "no redirect
+    // happened" within ~0.5 s, which exercises the other branch: the hold
+    // must come first, then give way to a working landing, never a stuck
+    // spinner.
+    await returnFromRedirect(page);
+    await hideDevChrome(page);
+    await installBackend(page, null);
+    await page.goto('/');
+    await expect(page.getByRole('button', { name: 'Get started' }).first()).toBeVisible();
+    const seen = await page.evaluate(() => [...(window as unknown as { __seen: Set<string> }).__seen]);
+    expect(seen[0], 'first screen after the redirect return').toBe('signing-in');
+    // The landing is usable: Get started opens a fresh sign-in screen.
+    await page.getByRole('button', { name: 'Get started' }).first().click();
+    await expect(page.getByRole('button', { name: /Continue with Google/ })).toBeEnabled();
+});
