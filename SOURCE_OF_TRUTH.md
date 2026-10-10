@@ -1353,7 +1353,10 @@ The multi-user auth work described below **was** fully written but not live:
     upload, TestFlight for Mac, screenshots, review notes). Needs B1 live
     (shipped with this merge). Not verified: Safari runtime, signing for the
     store. iOS Safari extension: plan in `safari/README.md`, deferred to
-    post-launch (touches the fragile iOS signing pipeline).
+    post-launch (touches the fragile iOS signing pipeline). **Owner decisions
+    2026-10-10:** name "Machina for Safari" (fallback "Machina: Save from
+    Safari" only if taken); iOS Safari extension deferred; App Review notes
+    may carry the demo account's ingest token (reset it after approval).
 
 ### 🟡 P2 — security/cost hardening & honest product surface
 
@@ -2570,6 +2573,23 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-10-10 — iOS LAUNCH SCREEN ADAPTS TO LIGHT/DARK (no dark flash).**
+  Branch `claude/app-launch-qa-a29d1f`, commit `e83d8513`. Owner OK'd the fix
+  "if that's best practice". Cause: the launch screen was a full-screen dark
+  bitmap (`Splash`, 11 MB) and the web view a fixed `#050505`, so light-mode
+  phones (the default Auto theme since 1ca855d) flashed dark at cold start.
+  Now, per Apple's guidance: adaptive `LaunchBackground` colorset (light
+  #F9FAFB / dark #050505) + a centered 122pt `SplashMark` cut from the old
+  splash; `MainViewController.viewDidLoad` gives the web view the same color
+  after Capacitor's fixed config one (`capacitor.config.ts` comment updated).
+  **Verified:** actool + ibtool compile clean, local simulator build (with
+  gitignored inputs borrowed from ~/MyLinks and a dummy
+  GoogleService-Info.plist, none committed), burst screenshots on iPhone 17 Pro
+  light + dark: no flash. **Note:** iOS caches launch screens; a device may
+  show the old dark one until the app is reinstalled or the phone restarts.
+  Also recorded: owner decisions on Safari (§4 26c) and the privacy policy
+  text (approved as written). Ships with TestFlight (see next entry).
 
 - **2026-10-07 (afternoon) — CAPACITY FOR A LAUNCH SPIKE + OWNER LAUNCH
   GUIDE.** Owner asked whether 5,000 downloads tomorrow would hold. Answer:
