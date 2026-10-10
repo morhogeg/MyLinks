@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import {
     adminGet, collectPageErrors, createAuthUser, expectNoHorizontalOverflow, hideDevChrome,
-    installBackend, openAccountSettings, openAsNewUser, signIn,
+    installBackend, openAccountSettings, openAsNewUser, readyCard, seedCard, seedReturningUser, signIn,
 } from '../helpers';
 
 // The first five minutes of a brand-new account. Every write here goes through
@@ -82,4 +82,44 @@ test('sign out returns to the landing page and stays signed out on reload', asyn
     await page.goto('/');
     await expect(page.getByRole('button', { name: 'Get started' }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: 'Add to Machina' })).toHaveCount(0);
+});
+
+// Owner report 2026-10-10: signing in from the landing page flashed the
+// cold-launch boot screen (the landing's big glowing mark, always dark), which
+// read as "sent back to the home page" before the app appeared. The sign-in
+// screen must hold until the app takes over; the boot screen is cold-start only.
+test('signing in from the landing page goes straight to the app (no boot screen in between) @desktop', async ({ page }) => {
+    const user = await createAuthUser('handoff');
+    await seedReturningUser(user);
+    await seedCard(user, 'a', readyCard({ title: 'Already in my library' }));
+    await page.addInitScript(() => { try { localStorage.setItem('machina_onboarding_v1', '1'); } catch { /* */ } });
+    await hideDevChrome(page);
+    await installBackend(page, user, { claim: 'down' });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Get started' }).first().click();
+    await expect(page.getByRole('button', { name: /Continue with Google/ })).toBeVisible();
+
+    // Record every screen the page passes through from here on.
+    await page.evaluate(() => {
+        const w = window as unknown as { __seen: Set<string> };
+        w.__seen = new Set();
+        const look = () => {
+            const t = document.body.innerText;
+            if (t.includes('Starting Machina')) w.__seen.add('boot');
+            if (t.includes('finally useful') && t.includes('Get started')) w.__seen.add('landing');
+        };
+        new MutationObserver(look).observe(document.body, { childList: true, subtree: true, characterData: true });
+    });
+    await signIn(page, user);
+    await expect(page.getByRole('heading', { name: 'Already in my library' })).toBeVisible();
+    const seen = await page.evaluate(() => [...(window as unknown as { __seen: Set<string> }).__seen]);
+    expect(seen, 'screens shown between sign-in and the app').toEqual([]);
+});
+
+test('a cold start with a saved session still shows the boot screen, then the app', async ({ page }) => {
+    const { user } = await openAsNewUser(page);
+    await expect.poll(async () => (await adminGet(`users/${user.uid}`))?.onboarded).toBe(true);
+    await page.reload();
+    await expect(page.getByText('Starting Machina')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Add to Machina' })).toBeVisible();
 });

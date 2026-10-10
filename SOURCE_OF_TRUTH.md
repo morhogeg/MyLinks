@@ -2574,6 +2574,25 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-10 — SIGN-IN NO LONGER FLASHES "THE HOME PAGE" BEFORE THE APP.**
+  Owner report: start on the web home page, sign in, and it showed the same
+  screen as before sign-in, then signed in ("a lack of reliability").
+  **Cause (reproduced with an E2E timeline, 400ms Firestore latency):** on an
+  in-session sign-in, AuthProvider set `loading` while resolving the
+  workspace, and app/page.tsx re-showed the cold-launch `BootScreen`, the
+  landing's big glowing mark on a hardcoded dark ground, for 1-2 s. It reads
+  as being bounced to the start (and flips a light-mode user to dark).
+  **Fix:** `signInHandoff` in AuthProvider: when a user arrives from the
+  visible signed-out screen, the same `SignedOutWeb` element stays mounted
+  (React preserves LoginScreen's "Signing in…") until loading ends; cold
+  starts with a saved session keep the boot screen. **Verified:** new E2E in
+  `02-sign-up.spec.ts` (MutationObserver: no boot/landing between sign-in and
+  the app) fails on the old code and passes now; full suite 70 passed. **Not
+  verified:** a real Google/Apple popup (tests sign in via the emulator hook;
+  the popup path triggers the same onAuthStateChanged). **Related, not
+  changed:** `BootScreen` is always dark, so light-mode users still see a dark
+  cold-start screen; making it follow the theme is a separate small change.
+
 - **2026-10-10 (later) — Launch screen mark REMOVED (owner: "pointless").** The
   launch screen is now deliberately empty: only the adaptive `LaunchBackground`
   color (light #F9FAFB / dark #050505). iOS requires a launch storyboard, so
