@@ -2574,6 +2574,28 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-10 (later) — SIGN-IN, PART 2: THE WEB REDIRECT RETURN.** Owner,
+  after b79823eb: "was it pushed? it looks the same". It was (Vercel + build
+  1357 green). **Second cause found:** production's `authDomain` is
+  `mymachina.app` (read from the live bundle), the same site as the page, so
+  `redirectCanWork()` is true and a blocked/unsupported pop-up (phones,
+  in-app browsers) falls back to `signInWithRedirect`. On the return load,
+  `onAuthStateChanged` reports null before `getRedirectResult()` finishes
+  (auth has no redirect resolver at init), so the REAL landing showed, then
+  the app: exactly the symptom, and b79823eb didn't cover it. **Fix:**
+  `lib/auth.ts` sets sessionStorage `machina:redirectSignIn` before
+  redirecting; AuthProvider `redirectReturn` holds SignedOutWeb in sign-in mode
+  ("Signing in…", `LoginScreen.initialBusy`, `SignedOutWeb.resuming`) until a
+  user arrives, the redirect turns out empty, or 12 s
+  (`REDIRECT_RETURN_TIMEOUT_MS`). Separate React key for the redirect-return
+  screen so giving up remounts a usable landing (my first version left a stuck
+  spinner; caught by the test). **Verified:** E2E redirect test fails on the
+  old code, passes now; full suite 71 passed. **Not verified:** a live Google
+  redirect round trip (the emulator answers "no redirect" in ~0.5 s, so only
+  the hold-then-empty branch is testable), and which path the owner actually
+  hit (device/browser not known). Web only (native never redirects): Vercel,
+  no TestFlight.
+
 - **2026-10-10 — SIGN-IN NO LONGER FLASHES "THE HOME PAGE" BEFORE THE APP.**
   Owner report: start on the web home page, sign in, and it showed the same
   screen as before sign-in, then signed in ("a lack of reliability").
