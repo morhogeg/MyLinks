@@ -2589,7 +2589,13 @@ exact-match, capped.
   light + dark: no flash. **Note:** iOS caches launch screens; a device may
   show the old dark one until the app is reinstalled or the phone restarts.
   Also recorded: owner decisions on Safari (§4 26c) and the privacy policy
-  text (approved as written). Ships with TestFlight (see next entry).
+  text (approved as written). **SHIPPED as merge `acf7f272`:** TestFlight
+  run #355 → **build 1355** built + uploaded green (first CI compile of the
+  launch screen + MainViewController change); e2e-journeys #40 green.
+  Build 1355 also carries the rewritten Settings → Browser extension screen
+  (89be304). Owner QA: on a light-mode phone, cold-launch → light launch
+  screen with the mark, no dark flash (reinstall once if iOS shows the cached
+  old screen); dark-mode phone unchanged.
 
 - **2026-10-07 (afternoon) — CAPACITY FOR A LAUNCH SPIKE + OWNER LAUNCH
   GUIDE.** Owner asked whether 5,000 downloads tomorrow would hold. Answer:
