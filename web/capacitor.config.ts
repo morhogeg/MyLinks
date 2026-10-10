@@ -6,10 +6,11 @@ const config: CapacitorConfig = {
   // Next.js static export lands here (see next.config.ts: output "export").
   webDir: 'out',
   ios: {
-    // The WKWebView's own background, shown before the first paint and behind
-    // overscroll. Unset it is white, which flashed between the launch screen
-    // and the (default dark) app. Mirrors the dark `--background` token in
-    // app/globals.css (:root) — config can't read CSS, so keep the two in sync.
+    // The WKWebView's background before the first paint. Config only takes one
+    // fixed color, so MainViewController.viewDidLoad replaces it with the
+    // adaptive LaunchBackground asset (light #F9FAFB / dark #050505, the
+    // `--background` tokens in app/globals.css). This value only covers the
+    // instant before that runs; keep it equal to the dark token.
     backgroundColor: '#050505',
   },
   plugins: {

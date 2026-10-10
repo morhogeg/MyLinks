@@ -11,4 +11,17 @@ class MainViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
         bridge?.registerPluginInstance(ShareConfigPlugin())
     }
+
+    /// What shows before the page's first paint and behind overscroll. The
+    /// capacitor.config `backgroundColor` is a single fixed color (dark), which
+    /// flashed dark on a light-mode phone; this is the adaptive LaunchBackground
+    /// asset (the app's light/dark `--background` tokens), so the launch screen,
+    /// the web view and the first paint all match the phone's appearance.
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        guard let launch = UIColor(named: "LaunchBackground") else { return }
+        view.backgroundColor = launch
+        webView?.backgroundColor = launch
+        webView?.scrollView.backgroundColor = launch
+    }
 }
