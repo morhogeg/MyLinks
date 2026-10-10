@@ -170,12 +170,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // `aiConsentAt` on the user doc (survives reinstalls and devices), or this
     // device's per-workspace cache (lib/aiConsent).
     const [aiConsented, setAiConsented] = useState<boolean | null>(null);
+    // In-session sign-in hand-off. When the user signs in FROM the visible
+    // sign-in screen, resolving the workspace takes a second or more (a cold
+    // claim can take far longer). Showing the cold-launch boot screen in that
+    // gap (the landing's big glowing mark, always dark) read as being thrown
+    // back to the start before the app appeared (owner, 2026-10-10). Instead
+    // the same SignedOutWeb element stays mounted, so its LoginScreen keeps
+    // "Signing in…" on the button until the app takes over. Cold boots with a
+    // persisted session never showed the sign-in screen and keep the boot screen.
+    const [signInHandoff, setSignInHandoff] = useState(false);
+    const signedOutVisibleRef = useRef(false);
     // The auth uid this tab last resolved, to tell "signed out from
     // elsewhere" (deleted or disabled account, revoked sessions) from the
     // signed-out state the app simply started in.
     const lastAuthUidRef = useRef<string | null>(null);
 
     const native = typeof window !== 'undefined' && isNativeApp();
+
+    // Whether the signed-out screen (landing / sign-in) is what's on screen
+    // right now, read by the auth listener when a user arrives. A ref, set
+    // after commit, so the listener sees the last PAINTED state, not a render
+    // that never landed.
+    useEffect(() => {
+        signedOutVisibleRef.current =
+            !loading && !restricted && (REQUIRE_AUTH || !native) && !authUid;
+    }, [loading, restricted, native, authUid]);
 
     useEffect(() => {
         // Install the global JS error handlers once, as early as possible.
@@ -399,6 +418,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
 
             lastAuthUidRef.current = user.uid;
+            setSignInHandoff(signedOutVisibleRef.current);
             setAuthUid(user.uid);
             setEmail(user.email);
             setDisplayName(user.displayName);
@@ -439,7 +459,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     setUid(null);
                 }
             } finally {
-                if (!cancelled) setLoading(false);
+                if (!cancelled) {
+                    setLoading(false);
+                    setSignInHandoff(false);
+                }
             }
         });
 
@@ -481,6 +504,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // During loading we render children so the page shows its own spinner (and
     // SSR/first paint stay consistent — loading starts true).
     const gated = REQUIRE_AUTH || !native;
+    if (loading && signInHandoff && gated) {
+        // Same element type at the same position as the signed-out branch
+        // below, so React keeps SignedOutWeb (and LoginScreen's busy state)
+        // mounted instead of remounting it. See signInHandoff above.
+        return (
+            <AuthContext.Provider value={value}>
+                <SignedOutWeb onSignIn={signIn} showApple={!native || REQUIRE_AUTH} />
+            </AuthContext.Provider>
+        );
+    }
     if (!loading) {
         // A failed workspace resolution ALWAYS surfaces — deliberately checked
         // before the gate, and outside it. In legacy native mode there is no
