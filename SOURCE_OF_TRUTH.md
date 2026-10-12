@@ -787,6 +787,18 @@ The multi-user auth work described below **was** fully written but not live:
 >   2026-08-04 on also ships **`/build-info.json`** (`requireAuth`, `buildNumber`,
 >   `commit`), so a build can be identified without guessing.
 
+> ## ✅ LAUNCH CHECKLIST (2026-10-12) — the owner's live tracker
+>
+> **https://claude.ai/artifact/WBWKnkeZQyHtzuLBbKR6py** — every remaining launch
+> step (78, 19 marked Gate) in ten areas, each with a step-by-step guide and a
+> checkbox the owner ticks. Ticks and notes are stored in the artifact's
+> database, collection `progress` (one doc per step id: `done`, `doneAt`,
+> `note`); read it with `ArtifactData` `list` before reporting launch status.
+> It supersedes the 2026-10-07 owner guide doc (`775ccd24…`) and mirrors §4
+> items 5, 5b, 9, 11, 12a, 19, 21, 26, 26b/c, the 2026-10-06 audit owner list,
+> docs/APP_STORE.md §5 and CAMPAIGN.md §2/§6/§8. When a §4 item closes, tick
+> its step there too (set the doc), and vice versa.
+
 > **LAUNCH GATE (compiled 2026-08-02, "what is actually left before iOS
 > launch?").** Pointers only — the detail stays in the numbered tasks, so nothing
 > below is duplicated and nothing can drift. **Almost none of it is code.**
@@ -2573,6 +2585,21 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-10-12 — LAUNCH CHECKLIST ARTIFACT.** Owner asked for one launch
+  checklist across every area with a clickable step-by-step guide per step and
+  checkboxes future sessions can read. Built as an interactive artifact with a
+  `db` store: https://claude.ai/artifact/WBWKnkeZQyHtzuLBbKR6py (pointer box
+  at the top of §4's launch gate; read rule in `CLAUDE.md`). 78 steps, 19 gates,
+  content drawn from §4/§7/§8, docs/APP_STORE.md, CAMPAIGN.md and both store
+  LISTING files; steps tagged "General" (EU DSA trader status, 2FA, review
+  replies) are standard Apple/platform requirements not in the repo docs.
+  Pre-filled as done (store docs written by Claude, notes say so): auth
+  cutover, launch capacity, base privacy label, legal pages, trademark,
+  Gemini paid project, @machinaapp. **Verified 2026-10-12:** remote branches
+  `trigger/ask-debug` and `trigger/pipeline-debug` still exist (§4 12a open);
+  no `/press` page; the landing page has no App Store link yet. **Not
+  verified:** whether `support@mymachina.app` delivers mail.
 
 - **2026-10-10 (later) — SIGN-IN, PART 2: THE WEB REDIRECT RETURN.** Owner,
   after b79823eb: "was it pushed? it looks the same". It was (Vercel + build

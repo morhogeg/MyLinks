@@ -7,6 +7,16 @@ ranked backlog (§4), ship checklist (§5), and App Store / cost / marketing pla
 
 Rules:
 - When learning the codebase or picking work, start from `SOURCE_OF_TRUTH.md` §4.
+- **Launch checklist (owner ticks it, you read it):**
+  https://claude.ai/artifact/WBWKnkeZQyHtzuLBbKR6py — 78 steps across backend,
+  security, iOS, payments, App Store, web, legal, marketing, launch week and
+  after launch. Before answering "what's left to launch" or picking launch work,
+  read its `progress` collection with the `ArtifactData` tool (`action: "list"`,
+  `collection: "progress"`, page through `next_cursor`). One doc per step id;
+  `done: true` means done, `note` holds what the owner set or saw. Step titles
+  and guides are in the page source (`Artifact` `action: "read"`). When a
+  session finishes a step itself, set that step's doc (`done`, `doneAt`, a
+  `note`) rather than editing the page.
 - When a change needs documenting, update `SOURCE_OF_TRUTH.md` (check boxes in
   §4, add a §9 session-log entry). Do **not** create new HANDOFF/TASKS/spec/audit
   docs — the old ones were consolidated into it and deleted.
