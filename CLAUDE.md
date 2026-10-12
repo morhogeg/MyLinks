@@ -14,9 +14,12 @@ Rules:
   read its `progress` collection with the `ArtifactData` tool (`action: "list"`,
   `collection: "progress"`, page through `next_cursor`). One doc per step id;
   `done: true` means done, `note` holds what the owner set or saw. Step titles
-  and guides are in the page source (`Artifact` `action: "read"`). When a
-  session finishes a step itself, set that step's doc (`done`, `doneAt`, a
-  `note`) rather than editing the page.
+  and guides are in the page source (`Artifact` `action: "read"`). The owner's
+  questions about a step, and the in-page answers, are in collection `threads`
+  (doc id = step id, `messages: [{role, text, sub, at}]`, `sub` = the 0-based
+  sub-step asked about); read a step's thread before discussing that step.
+  When a session finishes a step itself, set that step's doc (`done`, `doneAt`,
+  a `note`) rather than editing the page.
 - When a change needs documenting, update `SOURCE_OF_TRUTH.md` (check boxes in
   §4, add a §9 session-log entry). Do **not** create new HANDOFF/TASKS/spec/audit
   docs — the old ones were consolidated into it and deleted.

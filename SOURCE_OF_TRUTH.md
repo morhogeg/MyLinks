@@ -794,6 +794,9 @@ The multi-user auth work described below **was** fully written but not live:
 > checkbox the owner ticks. Ticks and notes are stored in the artifact's
 > database, collection `progress` (one doc per step id: `done`, `doneAt`,
 > `note`); read it with `ArtifactData` `list` before reporting launch status.
+> Each step also has a **Discuss** box (ask about the step or any numbered
+> line; Claude answers in the page with the step, notes and checklist as
+> context); threads are saved in collection `threads`, one doc per step id.
 > It supersedes the 2026-10-07 owner guide doc (`775ccd24…`) and mirrors §4
 > items 5, 5b, 9, 11, 12a, 19, 21, 26, 26b/c, the 2026-10-06 audit owner list,
 > docs/APP_STORE.md §5 and CAMPAIGN.md §2/§6/§8. When a §4 item closes, tick
