@@ -318,12 +318,31 @@ def is_owner_workspace(uid: str) -> bool:
     return False
 
 
+# Stamped on an entitlement doc once the owner check has run for it, so the
+# check (one user-doc read plus a Firebase Auth lookup per linked account)
+# happens at most once per workspace, ever.
+OWNER_CHECKED = "ownerChecked"
+
+
+def _check_existing_for_owner(uid: str, ref, data: dict) -> dict:
+    """A doc written before the owner grant existed (a trial, a free plan):
+    if this workspace is the owner's, move it onto the owner grant; either way
+    stamp it so this never runs again for it."""
+    if is_owner_workspace(uid):
+        doc = {**owner_grant(), OWNER_CHECKED: True, "updatedAt": _now_ms()}
+        logger.info("Owner grant applied to existing entitlement for %s", mask_uid(uid))
+    else:
+        doc = {OWNER_CHECKED: True}
+    ref.set(doc, merge=True)
+    return {**data, **doc}
+
+
 def _replace_founder_doc(uid: str, ref, data: dict) -> dict:
     """A doc written while the founders' year existed: recompute it under the
     current rule (owner, or the reverse trial from createdAt) and store that.
     Runs at most once per such workspace."""
     grant = grant_for(_user_created_at(uid), owner=is_owner_workspace(uid))
-    doc = {**grant, "updatedAt": _now_ms()}
+    doc = {**grant, OWNER_CHECKED: True, "updatedAt": _now_ms()}
     ref.set(doc, merge=True)
     logger.info("Founder entitlement replaced for %s: %s", mask_uid(uid), doc["source"])
     return {**data, **doc}
@@ -344,6 +363,9 @@ def get_entitlement(uid: str, user_created_at_ms: Optional[int] = None) -> dict:
             data = snap.to_dict() or {}
             if data.get("source") == "founder":
                 return _replace_founder_doc(uid, ref, data)
+            if (not data.get(OWNER_CHECKED) and data.get("source") not in ("owner", "revenuecat")
+                    and _owner_email()):
+                data = _check_existing_for_owner(uid, ref, data)
             data.setdefault("plan", PLAN_FREE)
             return data
         created = (user_created_at_ms if user_created_at_ms is not None
@@ -352,6 +374,7 @@ def get_entitlement(uid: str, user_created_at_ms: Optional[int] = None) -> dict:
         # (maybe_start_trial), not here.
         doc = dict(grant_for(created, owner=is_owner_workspace(uid)))
         doc.update({
+            OWNER_CHECKED: True,
             "rcAppUserId": None,
             "productId": None,
             "nudgedAt": None,

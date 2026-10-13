@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { X, Check, Plus, MessagesSquare, Newspaper, Youtube } from 'lucide-react';
+import { X, Check, Plus, MessagesSquare, Newspaper, Youtube, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { CitationGlyph } from '@/components/ui/Wordmark';
 import ProBadge from '@/components/ui/ProBadge';
@@ -49,23 +49,31 @@ const HEADLINE: Record<PaywallReason, string> = {
     synthesis: 'Read the whole weekly recap',
     digest: 'Curated digests come with Pro',
     youtube: 'YouTube key moments come with Pro',
-    settings: 'Machina, without limits',
-    manual: 'Machina, without limits',
+    settings: 'Machina Pro',
+    manual: 'Machina Pro',
 };
 
-// What Pro adds, each with the free plan's number so nothing is implied. Each
-// icon is the one the app itself uses for that feature: + is the add button,
-// MessagesSquare the Ask tab, the citation glyph the weekly recap card
-// ("This week in Machina"), Newspaper the digest card, Youtube the video scan.
-// What both plans share is one footnote under the list, not a row: a paywall
-// row reads as something you're buying.
-const FEATURES: { icon: React.ReactNode; title: string; free: string }[] = [
-    { icon: <Plus className="w-4 h-4" />, title: 'Unlimited saves, each one read and filed', free: 'Free: 50 a month' },
-    { icon: <MessagesSquare className="w-4 h-4" />, title: 'Unlimited questions in Ask Machina', free: 'Free: 20 a month' },
-    { icon: <CitationGlyph className="w-3.5 h-auto" />, title: 'The full weekly recap', free: 'Free: title and first line' },
-    { icon: <Newspaper className="w-4 h-4" />, title: 'Curated digests on your schedule', free: 'Pro only' },
-    { icon: <Youtube className="w-4 h-4" />, title: 'YouTube videos watched for you, with key moments', free: 'Pro only' },
+// Free vs Pro, one row per difference, read as a table: the free column says
+// exactly what you keep, the Pro column what you get. Icons are the app's own
+// for each feature (+ the add button, MessagesSquare the Ask tab, the citation
+// glyph the weekly recap card, Newspaper the digest card, Youtube the video
+// scan, Layers the Collections tab). The last row is what both plans share,
+// so free never reads as a trap.
+type Cell = string | boolean;
+const COMPARISON: { icon: React.ReactNode; label: string; free: Cell; pro: Cell }[] = [
+    { icon: <Plus className="w-4 h-4" />, label: 'Saves', free: '50/month', pro: 'Unlimited' },
+    { icon: <MessagesSquare className="w-4 h-4" />, label: 'Ask Machina', free: '20/month', pro: 'Unlimited' },
+    { icon: <CitationGlyph className="w-3.5 h-auto" />, label: 'Weekly recap', free: 'Preview', pro: 'Full' },
+    { icon: <Newspaper className="w-4 h-4" />, label: 'Curated digests', free: false, pro: true },
+    { icon: <Youtube className="w-4 h-4" />, label: 'YouTube key moments', free: false, pro: true },
+    { icon: <Layers className="w-4 h-4" />, label: 'Search & collections', free: true, pro: true },
 ];
+
+function CellValue({ value, pro }: { value: Cell; pro: boolean }) {
+    if (value === true) return <Check className={`w-4 h-4 ${pro ? 'text-text' : 'text-text-muted'}`} strokeWidth={2.5} aria-label="Included" />;
+    if (value === false) return <span className="text-text-muted" aria-label="Not included">–</span>;
+    return <span className={pro ? 'font-semibold text-text' : 'text-text-muted'}>{value}</span>;
+}
 
 export default function Paywall({
     isOpen,
@@ -194,7 +202,7 @@ export default function Paywall({
             : 'Your saves are kept. Machina reads them next month, or right away with Pro.')
         : null;
     const trialLine = isTrial && !trialStarted
-        ? `Your free trial starts once you have saved ${trialAnchorCards} things.`
+        ? `Pro is free for 14 days, starting from your ${trialAnchorCards}th save.`
         : isTrial && daysLeft !== null
             ? (daysLeft === 0 ? 'Your free trial ends today.' : `Your free trial has ${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} left.`)
             : null;
@@ -202,6 +210,10 @@ export default function Paywall({
     // is nothing to buy, so the plan picker gives way to a status line.
     const proActive = isPro && !isTrial;
     const perMonth = annualPerMonth(annual);
+
+    const legalLine = priceOf(period)
+        ? `${priceOf(period)} ${PERIOD_LABEL[period].per}. Renews automatically; cancel anytime in Settings.`
+        : 'Renews automatically; cancel anytime in Settings.';
 
     return (
         <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center animate-fade-in">
@@ -218,67 +230,68 @@ export default function Paywall({
                     <div className="sm:hidden flex justify-center pt-3 pb-1">
                         <div className="h-1.5 w-10 rounded-full bg-fill-strong" />
                     </div>
-                    <div className="flex items-start gap-3 px-5 pt-2 pb-3">
-                        <div className="flex-1 min-w-0 pt-1">
-                            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-accent">
-                                <CitationGlyph className="w-3 h-auto" />
-                                Machina Pro
-                            </div>
-                            <h2 className="mt-1.5 text-[21px] font-bold text-text leading-tight tracking-[-0.01em]">
+                    <div className="flex items-start gap-3 px-6 pt-3 pb-1">
+                        <div className="flex-1 min-w-0">
+                            <h2 className="text-[26px] font-bold text-text leading-tight tracking-[-0.02em]">
                                 {HEADLINE[reason]}
                             </h2>
-                            {waitingLine && (
-                                <p className="mt-1 text-[13px] text-text-secondary leading-snug">{waitingLine}</p>
-                            )}
-                            {trialLine && (
-                                <p className="mt-1 text-[13px] text-text-secondary leading-snug">{trialLine}</p>
+                            {(waitingLine || trialLine) && (
+                                <p className="mt-1.5 text-[14px] text-text-secondary leading-snug">{waitingLine ?? trialLine}</p>
                             )}
                         </div>
                         <button
                             onClick={onClose}
                             disabled={busy !== null}
                             aria-label="Close"
-                            className="p-3 -me-3 -mt-1 rounded-full text-text-muted [@media(hover:hover)]:hover:text-text [@media(hover:hover)]:hover:bg-fill-subtle active:opacity-60 transition-colors disabled:opacity-40"
+                            className="w-11 h-11 -me-3 -mt-1.5 shrink-0 flex items-center justify-center rounded-full text-text-muted [@media(hover:hover)]:hover:text-text [@media(hover:hover)]:hover:bg-fill-subtle active:opacity-60 transition-colors disabled:opacity-40"
                         >
-                            <X className="w-5 h-5" />
+                            <span className="w-7 h-7 rounded-full bg-fill-subtle flex items-center justify-center">
+                                <X className="w-4 h-4" strokeWidth={2.5} />
+                            </span>
                         </button>
                     </div>
                 </div>
 
-                {/* The feature list scrolls; the plans and the button below it
-                    never do, so the one action on this sheet is always on
-                    screen, even on the smallest phone. */}
-                <div className="flex-1 min-h-0 overflow-y-auto px-5 pb-3">
-                    <ul className="rounded-2xl bg-card-hover border border-border-subtle divide-y divide-border-subtle overflow-hidden">
-                        {FEATURES.map((f) => (
-                            <li key={f.title} className="flex items-center gap-3 px-3.5 py-2.5">
-                                <span className="w-7 h-7 shrink-0 rounded-lg bg-accent/12 text-accent flex items-center justify-center ring-1 ring-accent/20">
-                                    {f.icon}
-                                </span>
-                                <span className="min-w-0">
-                                    <span className="block text-[14px] font-semibold text-text leading-snug">{f.title}</span>
-                                    <span className="block text-[12px] text-text-muted mt-0.5">{f.free}</span>
-                                </span>
-                            </li>
-                        ))}
-                    </ul>
-                    <p className="mt-2.5 px-1 text-[12px] text-text-muted leading-snug">
-                        Search, collections, share pages and reminders are free for everyone.
-                    </p>
+                <div className="flex-1 min-h-0 overflow-y-auto px-6 pt-4 pb-2">
+                    <table className="w-full text-[14px] leading-tight border-collapse">
+                        <thead>
+                            <tr className="text-[12px] font-semibold">
+                                <th scope="col" className="sr-only">Feature</th>
+                                <th scope="col" className="w-[72px] pb-2 text-center font-semibold text-text-muted">Free</th>
+                                <th scope="col" className="w-[76px] pb-2 text-center">
+                                    <span className="inline-flex items-center"><ProBadge /></span>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {COMPARISON.map((row) => (
+                                <tr key={row.label} className="border-t border-border-subtle">
+                                    <th scope="row" className="py-3 pe-2 text-start font-medium text-text">
+                                        <span className="flex items-center gap-2.5">
+                                            <span className="w-5 shrink-0 flex justify-center text-text-secondary">{row.icon}</span>
+                                            {row.label}
+                                        </span>
+                                    </th>
+                                    <td className="py-3 text-center text-[13px]"><span className="inline-flex justify-center"><CellValue value={row.free} pro={false} /></span></td>
+                                    <td className="py-3 text-center text-[13px]"><span className="inline-flex justify-center"><CellValue value={row.pro} pro /></span></td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
 
-                <div className="shrink-0 border-t border-border-subtle px-5 pt-3">
+                <div className="shrink-0 px-6 pt-3">
                     {proActive ? (
-                        <div className="rounded-xl border border-border-subtle bg-card-hover px-4 py-3.5 text-center">
-                            <div className="flex items-center justify-center gap-2 text-[14px] font-semibold text-text">
-                                <ProBadge /> {source === 'owner' ? 'Machina Pro is on for this account' : 'Machina Pro is active'}
-                            </div>
+                        <div className="rounded-2xl bg-card-hover px-4 py-4 text-center">
+                            <p className="text-[15px] font-semibold text-text">
+                                {source === 'owner' ? 'Machina Pro is on for this account' : 'Machina Pro is active'}
+                            </p>
                             {source === 'revenuecat' && (
                                 <button
                                     onClick={() => openExternal(isNativeApp()
                                         ? 'itms-apps://apps.apple.com/account/subscriptions'
                                         : 'https://apps.apple.com/account/subscriptions')}
-                                    className="mt-1 min-h-[44px] px-2 text-[13px] font-semibold text-accent active:opacity-60 cursor-pointer"
+                                    className="mt-1 min-h-[44px] px-2 text-[14px] font-semibold text-accent active:opacity-60 cursor-pointer"
                                 >
                                     Manage subscription
                                 </button>
@@ -286,17 +299,17 @@ export default function Paywall({
                         </div>
                     ) : availability.available ? (
                         <>
-                            <div className="flex flex-col gap-2">
-                                <PlanRow
+                            <div className="grid grid-cols-2 gap-2.5">
+                                <PlanTile
                                     period="annual"
                                     price={priceOf('annual')}
-                                    detail={perMonth ? `${perMonth} a month` : null}
+                                    detail={perMonth ? `${perMonth}/month` : null}
                                     selected={period === 'annual'}
                                     chip={savings ? `Save ${savings}%` : null}
                                     loading={packages === null}
                                     onSelect={() => { hapticLight(); setPeriod('annual'); }}
                                 />
-                                <PlanRow
+                                <PlanTile
                                     period="monthly"
                                     price={priceOf('monthly')}
                                     detail={null}
@@ -308,13 +321,13 @@ export default function Paywall({
                             </div>
 
                             {offeringsFailed && (
-                                <div className="mt-1 flex items-center justify-between gap-3">
-                                    <p role="status" className="text-[12px] text-text-muted leading-snug">
-                                        Prices could not be loaded from the App Store.
+                                <div className="mt-1 flex items-center justify-center gap-1">
+                                    <p role="status" className="text-[12.5px] text-text-muted leading-snug">
+                                        Couldn’t load prices.
                                     </p>
                                     <button
                                         onClick={() => { hapticLight(); setOfferingsAttempt((n) => n + 1); }}
-                                        className="shrink-0 min-h-[44px] px-2 -me-2 text-[13px] font-semibold text-accent active:opacity-60 cursor-pointer"
+                                        className="min-h-[44px] px-1.5 text-[12.5px] font-semibold text-accent active:opacity-60 cursor-pointer"
                                     >
                                         Try again
                                     </button>
@@ -326,29 +339,22 @@ export default function Paywall({
                                 radius="full"
                                 onClick={buy}
                                 disabled={!canBuy}
-                                className="mt-3 w-full h-12 text-[16px]"
+                                className={`${offeringsFailed ? 'mt-1' : 'mt-4'} w-full h-[52px] text-[17px] font-semibold`}
                             >
-                                {busy === 'purchase' ? 'Opening the App Store…' : 'Continue'}
+                                {busy === 'purchase' ? 'Opening the App Store…' : 'Subscribe'}
                             </Button>
-                            <p className="mt-2 text-center text-[11.5px] text-text-muted leading-snug">
-                                {priceOf(period)
-                                    ? `${priceOf(period)} ${PERIOD_LABEL[period].per}, billed to your Apple ID.`
-                                    : 'Billed to your Apple ID.'}
-                                {' '}Renews automatically until cancelled in Settings.
-                            </p>
+                            <p className="mt-2.5 text-center text-[12px] text-text-muted leading-snug">{legalLine}</p>
                         </>
                     ) : availability.reason === 'web' ? (
-                        <div className="rounded-xl border border-border-subtle bg-card-hover px-4 py-3.5 text-center">
-                            <div className="flex items-center justify-center gap-2 text-[14px] font-semibold text-text">
-                                <ProBadge /> Subscribe in the Machina app on iPhone
-                            </div>
-                            <p className="mt-1 text-[12.5px] text-text-muted leading-snug">
-                                Your plan applies everywhere you sign in with this same account, including here.
+                        <div className="rounded-2xl bg-card-hover px-4 py-4 text-center">
+                            <p className="text-[15px] font-semibold text-text">Subscribe in the Machina app on iPhone</p>
+                            <p className="mt-1 text-[13px] text-text-muted leading-snug">
+                                Your plan applies everywhere you sign in with this account, including here.
                             </p>
                         </div>
                     ) : (
-                        <div className="rounded-xl border border-border-subtle bg-card-hover px-4 py-3.5 text-center">
-                            <p className="text-[13.5px] text-text-secondary leading-snug">
+                        <div className="rounded-2xl bg-card-hover px-4 py-4 text-center">
+                            <p className="text-[14px] text-text-secondary leading-snug">
                                 Subscriptions aren’t available in this build yet.
                             </p>
                         </div>
@@ -358,20 +364,24 @@ export default function Paywall({
                         <p role="status" className="mt-2 text-center text-[13px] text-warning leading-snug">{note}</p>
                     )}
 
-                    <div className="mt-1 mb-1 flex items-center justify-center gap-1 text-[12.5px] text-text-muted">
+                    <div className="mt-0.5 mb-1 flex items-center justify-center text-[12px] text-text-muted">
                         {availability.available && !proActive && (
-                            <button
-                                onClick={doRestore}
-                                disabled={busy !== null}
-                                className="min-h-[44px] px-2.5 underline underline-offset-2 [@media(hover:hover)]:hover:text-text active:opacity-60 transition-colors disabled:opacity-50 cursor-pointer"
-                            >
-                                {busy === 'restore' ? 'Restoring…' : 'Restore purchases'}
-                            </button>
+                            <>
+                                <button
+                                    onClick={doRestore}
+                                    disabled={busy !== null}
+                                    className="min-h-[44px] px-2 [@media(hover:hover)]:hover:text-text active:opacity-60 transition-colors disabled:opacity-50 cursor-pointer"
+                                >
+                                    {busy === 'restore' ? 'Restoring…' : 'Restore Purchases'}
+                                </button>
+                                <span aria-hidden className="text-border-strong">·</span>
+                            </>
                         )}
-                        <button onClick={() => openExternal(policyUrl('/terms'))} className="min-h-[44px] px-2.5 underline underline-offset-2 [@media(hover:hover)]:hover:text-text active:opacity-60 transition-colors cursor-pointer">
+                        <button onClick={() => openExternal(policyUrl('/terms'))} className="min-h-[44px] px-2 [@media(hover:hover)]:hover:text-text active:opacity-60 transition-colors cursor-pointer">
                             Terms
                         </button>
-                        <button onClick={() => openExternal(policyUrl('/privacy'))} className="min-h-[44px] px-2.5 underline underline-offset-2 [@media(hover:hover)]:hover:text-text active:opacity-60 transition-colors cursor-pointer">
+                        <span aria-hidden className="text-border-strong">·</span>
+                        <button onClick={() => openExternal(policyUrl('/privacy'))} className="min-h-[44px] px-2 [@media(hover:hover)]:hover:text-text active:opacity-60 transition-colors cursor-pointer">
                             Privacy
                         </button>
                     </div>
@@ -381,12 +391,12 @@ export default function Paywall({
     );
 }
 
-export function PlanRow({
+export function PlanTile({
     period, price, detail, selected, chip, loading, onSelect,
 }: {
     period: ProPeriod;
     price: string | null;
-    /** One quiet line under the name (the annual plan's per-month cost), or null. */
+    /** Added after the billing period under the price (the annual plan's per-month cost), or null. */
     detail: string | null;
     selected: boolean;
     chip: string | null;
@@ -398,34 +408,32 @@ export function PlanRow({
         <button
             onClick={onSelect}
             aria-pressed={selected}
-            className={`w-full min-h-[56px] flex items-center gap-3 rounded-2xl border px-4 py-2.5 text-start transition-[colors,transform] duration-150 active:scale-[0.99] cursor-pointer ${selected ? 'border-accent/60 bg-accent/8' : 'border-border-strong bg-card [@media(hover:hover)]:hover:bg-card-hover'}`}
+            className={`relative min-h-[96px] flex flex-col items-start justify-center rounded-2xl px-4 py-3 text-start transition-[colors,transform,box-shadow] duration-150 active:scale-[0.98] cursor-pointer ${selected ? 'bg-accent/8 ring-2 ring-accent' : 'bg-card ring-1 ring-border-strong [@media(hover:hover)]:hover:bg-card-hover'}`}
         >
-            <span className={`w-5 h-5 shrink-0 rounded-full border flex items-center justify-center ${selected ? 'border-accent bg-accent text-accent-ink' : 'border-border-strong'}`}>
-                {selected && <Check className="w-3 h-3" strokeWidth={3} />}
-            </span>
-            <span className="flex-1 min-w-0">
-                <span className="flex items-center gap-2">
-                    <span className="text-[15px] font-semibold text-text">{label.name}</span>
-                    {chip && (
-                        <span className="rounded-full bg-accent/12 text-accent text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 ring-1 ring-accent/20">
-                            {chip}
-                        </span>
-                    )}
+            {chip && (
+                <span className="absolute -top-2.5 start-3 rounded-full bg-accent text-accent-ink text-[10.5px] font-bold px-2 py-0.5">
+                    {chip}
                 </span>
-                {detail && <span className="block text-[12px] text-text-muted mt-0.5 tabular-nums">{detail}</span>}
-            </span>
-            <span className="text-end shrink-0">
-                {loading ? (
-                    <span className="block h-4 w-14 rounded bg-fill-strong animate-pulse" />
-                ) : price ? (
-                    <>
-                        <span className="block text-[15px] font-bold text-text tabular-nums">{price}</span>
-                        <span className="block text-[11px] text-text-muted">{label.per}</span>
-                    </>
-                ) : (
-                    <span className="block text-[12px] text-text-muted">Price unavailable</span>
-                )}
-            </span>
+            )}
+            <span className="text-[13px] font-semibold text-text-secondary">{label.name}</span>
+            {loading ? (
+                <>
+                    <span className="mt-1.5 block h-5 w-20 rounded bg-fill-strong animate-pulse" />
+                    <span className="mt-1.5 block h-3 w-14 rounded bg-fill-subtle animate-pulse" />
+                </>
+            ) : price ? (
+                <>
+                    <span className="mt-0.5 text-[20px] font-bold text-text tabular-nums leading-tight">{price}</span>
+                    <span className="mt-0.5 text-[12px] text-text-muted tabular-nums">{detail ? `${label.per} · ${detail}` : label.per}</span>
+                </>
+            ) : (
+                <span className="mt-1 text-[13px] text-text-muted">Price unavailable</span>
+            )}
+            {selected && (
+                <span className="absolute top-3 end-3 w-5 h-5 rounded-full bg-accent text-accent-ink flex items-center justify-center">
+                    <Check className="w-3 h-3" strokeWidth={3} />
+                </span>
+            )}
         </button>
     );
 }

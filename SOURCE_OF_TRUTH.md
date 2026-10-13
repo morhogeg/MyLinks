@@ -2593,6 +2593,27 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-13 (night) — PAYWALL ROUND 2 ("messy and confusing, make it Apple
+  grade") + OWNER CHECK FOR EXISTING DOCS.** Round 1 on device (build 1362)
+  still read as busy: an eyebrow, a title, a status line, five boxed feature
+  rows each with a "Free: …" subline, a footnote, two stacked plan cards and a
+  grey button. Round 2 replaces the feature cards with a **Free vs Pro
+  comparison table** (Saves 50/month vs Unlimited, Ask 20/month vs Unlimited,
+  Weekly recap Preview vs Full, digests and YouTube key moments – vs ✓, Search
+  & collections ✓ ✓), one large title ("Machina Pro" from Settings; the reason
+  headline elsewhere), no eyebrow, **side-by-side plan tiles** (period, big
+  price, "per year · $4.16/month", "Save N%" badge on the yearly edge, ring +
+  check when selected), button "Subscribe", one legal line, and "Restore
+  Purchases · Terms · Privacy". Trial copy: "Pro is free for 14 days, starting
+  from your 10th save." Owner/subscriber status card unchanged. Render-verified
+  390px light + dark (free, trial, save wall, owner, subscriber, plan tiles
+  incl. ₪ prices) and 375×667. **Backend:** the owner's phone showed the
+  10-save trial line on 1362, meaning an existing `source: 'trial'` doc was
+  never owner-checked (round 1 only checked new docs and founder docs).
+  `get_entitlement` now checks any stored non-owner, non-RevenueCat doc once
+  (when OWNER_EMAIL is set) and stamps `ownerChecked: true`; the owner's doc
+  moves to the owner grant on its next read. New docs and founder migrations
+  stamp it at write. pytest 1915 passed, tsc + eslint clean.
 - **2026-10-13 (evening) — PAYWALL POLISH ROUND 1 (owner: "make all needed
   fixes, not just mine").** Device screenshot (build ~1359) showed "Machina Pro"
   twice, icons that didn't match the app, and the Continue button below the
