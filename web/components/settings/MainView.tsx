@@ -79,6 +79,8 @@ export function MainView({
                 ? 'Apple couldn’t charge your payment method. Update it in Manage subscription to keep Pro.'
                 : subscribed && ent.willRenew === false
                     ? `Renewal is off, so Pro stays on until ${endsOn ?? 'the end of this period'} and then stops. Turn it back on in Manage subscription.`
+                    : ent.isPro && ent.source === 'owner'
+                        ? 'Pro is on for this account, with no end date.'
                     : subscribed
                         ? 'Billed by Apple. Change your plan or cancel anytime in Manage subscription; Pro stays on until the end of the period you paid for.'
                         : !ent.isPro && ent.quotas.saves.limit > 0

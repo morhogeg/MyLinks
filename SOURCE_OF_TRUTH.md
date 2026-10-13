@@ -2593,6 +2593,19 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-13 (closing) — PLAN SHEET FOR PEOPLE WHO ALREADY HAVE PRO.** Owner
+  confirmed their account shows "Machina Pro is on for this account" (owner
+  grant works on device, build 1364) and asked whether it should say "renews
+  on / active until". Decision: someone with Pro sees status first, then what's
+  included, like Apple's own plan screens. `Paywall.tsx` for owner/subscriber:
+  subtitle under the title ("On for this account, with no end date. Nothing to
+  renew." / "Yearly plan · Renews Aug 9, 2027." / "Renewal is off. Pro stays on
+  until …" / payment-issue warning), the Free-vs-Pro table becomes "Included in
+  your plan" (Pro values only), and subscribers get one "Manage in the App
+  Store" button (primary when Apple couldn't charge) with "Change your plan or
+  cancel there." Settings owner note: "Pro is on for this account, with no end
+  date." Render-verified light + dark (owner, renewing, renewal off, payment
+  issue). tsc + eslint + em-dash clean.
 - **2026-10-13 (late night) — PRO/FREE MADE AIRTIGHT + SIGN-OUT FIX (owner:
   "comprehensive overview of all aspects and UX related to the pro and free
   plan, apple grade and airtight").** An inventory of every plan surface found
