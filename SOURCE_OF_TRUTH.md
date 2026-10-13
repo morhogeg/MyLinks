@@ -1290,20 +1290,22 @@ The multi-user auth work described below **was** fully written but not live:
     in `firebase.json`; deploy-hosting.yml fires on that path) and the
     functions deploy carries the new composite index. **OWNER CHECKLIST (the
     parts no session can do):**
-    - [ ] RevenueCat: create the project + iOS app (bundle
+    - [x] (2026-10-13) RevenueCat: create the project + iOS app (bundle
       `com.morhogeg.machina`); copy the **public iOS SDK key** and a **v1
       REST secret key**; set the webhook URL to the deployed
       `revenuecat_webhook` function URL with an Authorization header value
       of your choosing (any long random string).
-    - [ ] App Store Connect: sign the **Paid Apps agreement**; create
+    - [ ] App Store Connect (2026-10-13: Paid Apps agreement ACTIVE, bank + W-9
+      active; Small Business Program applied 2026-10-04, approval email not yet
+      received; subscription products not confirmed): sign the **Paid Apps agreement**; create
       subscription group **`Machina Pro`** with products
       `com.morhogeg.machina.pro.monthly` ($7.99) and
       `com.morhogeg.machina.pro.annual` ($49.99). Do **NOT** configure an
       introductory free trial in Connect: the 14-day trial is server-side.
       Enroll in the **Small Business Program** (15% commission).
-    - [ ] RevenueCat: attach both products to entitlement **`pro`** and
+    - [x] (2026-10-13) RevenueCat: attach both products to entitlement **`pro`** and
       offering **`default`** (packages `$rc_annual`, `$rc_monthly`).
-    - [ ] GitHub secrets: `NEXT_PUBLIC_REVENUECAT_IOS_KEY` (public key, baked
+    - [x] (2026-10-13) GitHub secrets: `NEXT_PUBLIC_REVENUECAT_IOS_KEY` (public key, baked
       into TestFlight builds), `REVENUECAT_SECRET_KEY` (REST secret, written
       to `functions/.env` by deploy-functions), `REVENUECAT_WEBHOOK_AUTH`
       (the Authorization value from the first step).
@@ -2589,6 +2591,24 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-13 — REVENUECAT CONSOLE SETUP + REDEPLOY (owner-driven, item 26).**
+  Owner set up RevenueCat with session guidance: project `Machina`, App Store app
+  (`com.morhogeg.machina`, In-App Purchase `.p8` uploaded), products
+  `com.morhogeg.machina.pro.monthly` / `.annual` added by hand (no App Store
+  Connect API key, so RevenueCat shows "Could not check"; harmless), entitlement
+  **`pro`** (a first attempt named `machina_pro` was replaced: the code checks
+  exactly `pro`), offering `default` with `$rc_monthly` / `$rc_annual`, each
+  carrying the wizard's Test Store product plus the App Store product. Webhook
+  points at `revenuecat_webhook`; the Authorization value lives in the
+  `REVENUECAT_WEBHOOK_AUTH` secret. All three GitHub secrets set. Redeployed:
+  deploy-functions #126 (unscoped, via `.deploy-ping`) green, canary OK; iOS →
+  TestFlight #358 = **build 1358** green, the first build with the public key.
+  Webhook URL per deploy log: `https://revenuecat-webhook-yw4q7lycxa-uc.a.run.app`.
+  RevenueCat pricing re-checked: free under $2,500 MTR, then 1% of all MTR
+  (gross, before Apple's cut). NOT verified: webhook "Send test event" 2xx,
+  that the secret key is V1, the subscriptions existing in App Store Connect,
+  and any sandbox purchase. Still open: ASC subscriptions, SBP approval, sandbox
+  test on 1358+, submitting the products with the binary.
 - **2026-10-12 — LAUNCH CHECKLIST ARTIFACT.** Owner asked for one launch
   checklist across every area with a clickable step-by-step guide per step and
   checkboxes future sessions can read. Built as an interactive artifact with a
