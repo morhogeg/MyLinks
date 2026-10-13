@@ -2593,6 +2593,17 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-13 (final) — LAST PRO/FREE GAPS (owner: "ship whatever fixes and
+  improvements you can").** (1) A free user whose trial or subscription ran
+  out is told so on the plan sheet ("Your Pro trial ended on Oct 10. You're on
+  the free plan, and everything you saved is still here." / "Your Pro
+  subscription ended on …"), read from the stored `source` + date on a free
+  plan. (2) The import sheet shows the free lifetime allowance before the wall
+  ("480 of 500 imported links left on the free plan"). (3) Settings → Plan
+  render-verified for the first time (free with usage note, trial "Pro trial ·
+  9 days left" + end date, subscriber "Renews Aug 9, 2027" + Manage
+  subscription, owner) in light + dark; plan sheet ended-states too. tsc +
+  eslint + em-dash clean.
 - **2026-10-13 (closing) — PLAN SHEET FOR PEOPLE WHO ALREADY HAVE PRO.** Owner
   confirmed their account shows "Machina Pro is on for this account" (owner
   grant works on device, build 1364) and asked whether it should say "renews
