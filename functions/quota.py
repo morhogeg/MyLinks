@@ -50,8 +50,9 @@ _KEEP_MONTHS = 2
 _QUOTA_KINDS = {
     "saves": {
         "env": {"free": ("FREE_SAVE_QUOTA", "MONTHLY_SAVE_QUOTA"), "pro": ("PRO_SAVE_QUOTA",)},
-        # 150 -> 100 with the Pro launch: 100 is the free tier's published cap.
-        "default": {"free": 100, "pro": 1000},
+        # 150 -> 100 with the Pro launch; 100 -> 50 (2026-10-13, owner: 100 was
+        # too generous). 50 is the free tier's published cap.
+        "default": {"free": 50, "pro": 1000},
         "message": {
             "free": "You've used all {limit} free saves this month. Upgrade to Machina Pro for unlimited saves, or wait for the 1st.",
             "pro": "Monthly save limit reached. Resets on the 1st.",

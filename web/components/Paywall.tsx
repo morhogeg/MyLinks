@@ -53,7 +53,7 @@ const HEADLINE: Record<PaywallReason, string> = {
 };
 
 const FEATURES: { icon: React.ReactNode; title: string; free: string }[] = [
-    { icon: <InfinityIcon className="w-4 h-4" />, title: 'Unlimited saves, each one read and filed', free: 'Free: 100 a month' },
+    { icon: <InfinityIcon className="w-4 h-4" />, title: 'Unlimited saves, each one read and filed', free: 'Free: 50 a month' },
     { icon: <MessageCircle className="w-4 h-4" />, title: 'Unlimited questions in Ask Machina', free: 'Free: 20 a month' },
     { icon: <BookOpen className="w-4 h-4" />, title: 'The full weekly synthesis', free: 'Free: title and first line' },
     { icon: <Newspaper className="w-4 h-4" />, title: 'Curated digests on your schedule', free: 'Pro only' },

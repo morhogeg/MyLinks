@@ -466,7 +466,7 @@ finding dissolves.
   three Instagram/Facebook ad videos showing the real app. Reviewing the
   campaign against the code found posts promising what the app doesn't do:
   - "a citation on every line" (Ask lists its sources under the answer);
-  - "capture stays free" (the free plan caps saves at 100 a month);
+  - "capture stays free" (the free plan caps saves at 50 a month);
   - Pro features beside the word "Free".
 
   The fix was to make the copy follow the code, not the other way round, and
