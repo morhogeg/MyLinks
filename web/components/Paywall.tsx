@@ -214,6 +214,18 @@ export default function Paywall({
     const trialLeft = isTrial && endsAt !== null ? calendarDaysUntil(endsAt) : null;
     const trialFraction = trialLeft !== null ? Math.max(0.04, Math.min(1, trialLeft / 14)) : 0;
     const endsOn = planDate(endsAt);
+    // Someone who already has Pro sees where they stand first ("Yearly plan ·
+    // Renews Oct 13, 2027", or that it never ends), then what's included. A
+    // Free-vs-Pro comparison is for deciding, not for owning.
+    const statusLine = !proActive ? null
+        : source === 'owner' ? 'On for this account, with no end date. Nothing to renew.'
+            : billingIssue ? 'Apple couldn’t charge your payment method. Update it to keep Pro.'
+                : [
+                    subPeriod ? `${PERIOD_LABEL[subPeriod].name} plan` : null,
+                    willRenew === false
+                        ? `Renewal is off. Pro stays on until ${endsOn ?? 'the end of this period'}.`
+                        : endsOn ? `Renews ${endsOn}.` : null,
+                ].filter(Boolean).join(' · ');
 
     // Apple bills the moment someone subscribes, trial or not (the 14 days are
     // Machina's, not the App Store's), so a trial user is told so up front.
@@ -251,6 +263,9 @@ export default function Paywall({
                             {waitingLine && (
                                 <p className="mt-1.5 text-[14px] text-text-secondary leading-snug">{waitingLine}</p>
                             )}
+                            {statusLine && (
+                                <p className={`mt-1.5 text-[14px] leading-snug ${billingIssue && source === 'revenuecat' ? 'text-warning' : 'text-text-secondary'}`}>{statusLine}</p>
+                            )}
                         </div>
                         <button
                             onClick={onClose}
@@ -283,15 +298,19 @@ export default function Paywall({
                         </div>
                     )}
                     <table className="w-full text-[14px] leading-tight border-collapse">
-                        <thead>
-                            <tr className="text-[12px] font-semibold">
-                                <th scope="col" className="sr-only">Feature</th>
-                                <th scope="col" className="w-[72px] pb-2 text-center font-semibold text-text-muted">Free</th>
-                                <th scope="col" className="w-[76px] pb-2 text-center">
-                                    <span className="inline-flex items-center"><ProBadge /></span>
-                                </th>
-                            </tr>
-                        </thead>
+                        {proActive ? (
+                            <caption className="pb-2 text-start text-[12px] font-semibold text-text-muted">Included in your plan</caption>
+                        ) : (
+                            <thead>
+                                <tr className="text-[12px] font-semibold">
+                                    <th scope="col" className="sr-only">Feature</th>
+                                    <th scope="col" className="w-[72px] pb-2 text-center font-semibold text-text-muted">Free</th>
+                                    <th scope="col" className="w-[76px] pb-2 text-center">
+                                        <span className="inline-flex items-center"><ProBadge /></span>
+                                    </th>
+                                </tr>
+                            </thead>
+                        )}
                         <tbody>
                             {rows.map((row) => (
                                 <tr key={row.label} className="border-t border-border-subtle">
@@ -301,8 +320,10 @@ export default function Paywall({
                                             {row.label}
                                         </span>
                                     </th>
-                                    <td className="py-3 text-center text-[13px]"><span className="inline-flex justify-center"><CellValue value={row.free} pro={false} /></span></td>
-                                    <td className="py-3 text-center text-[13px]"><span className="inline-flex justify-center"><CellValue value={row.pro} pro /></span></td>
+                                    {!proActive && (
+                                        <td className="py-3 text-center text-[13px]"><span className="inline-flex justify-center"><CellValue value={row.free} pro={false} /></span></td>
+                                    )}
+                                    <td className={`py-3 text-[13px] ${proActive ? 'text-end' : 'text-center'}`}><span className={`inline-flex ${proActive ? 'justify-end' : 'justify-center'}`}><CellValue value={row.pro} pro /></span></td>
                                 </tr>
                             ))}
                         </tbody>
@@ -311,34 +332,20 @@ export default function Paywall({
 
                 <div className="shrink-0 px-6 pt-3">
                     {proActive && source === 'revenuecat' ? (
-                        <div className="rounded-2xl bg-card-hover px-4 py-4">
-                            <p className="text-[15px] font-semibold text-text">
-                                Machina Pro{subPeriod ? ` · ${PERIOD_LABEL[subPeriod].name}` : ''}
-                            </p>
-                            <p className={`mt-1 text-[13px] leading-snug ${billingIssue ? 'text-warning' : 'text-text-secondary'}`}>
-                                {billingIssue
-                                    ? 'Apple couldn’t charge your payment method. Update it to keep Pro.'
-                                    : willRenew === false
-                                        ? `Renewal is off. Pro stays on until ${endsOn ?? 'the end of this period'}.`
-                                        : endsOn ? `Renews ${endsOn}.` : 'Active.'}
-                            </p>
+                        <>
                             <Button
-                                variant="secondary"
+                                variant={billingIssue ? 'primary' : 'secondary'}
                                 radius="full"
                                 onClick={manageSubscription}
-                                className="mt-3 w-full h-11 text-[15px] font-semibold"
+                                className="w-full h-12 text-[16px] font-semibold"
                             >
                                 Manage in the App Store
                             </Button>
-                            <p className="mt-2 text-[12px] text-text-muted leading-snug">
+                            <p className="mt-2.5 text-center text-[12px] text-text-muted leading-snug">
                                 Change your plan or cancel there. Pro stays on until the end of the period you paid for.
                             </p>
-                        </div>
-                    ) : proActive ? (
-                        <div className="rounded-2xl bg-card-hover px-4 py-4 text-center">
-                            <p className="text-[15px] font-semibold text-text">Machina Pro is on for this account</p>
-                        </div>
-                    ) : availability.available ? (
+                        </>
+                    ) : proActive ? null : availability.available ? (
                         <>
                             <div className="grid grid-cols-2 gap-2.5">
                                 <PlanTile
