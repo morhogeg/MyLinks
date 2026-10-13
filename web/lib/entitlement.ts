@@ -19,7 +19,7 @@ import { apiUrl, fetchWithTimeout } from './api';
 import { authHeaders } from './auth';
 
 export type Plan = 'free' | 'pro';
-export type EntitlementSource = 'trial' | 'founder' | 'revenuecat' | null;
+export type EntitlementSource = 'trial' | 'owner' | 'revenuecat' | null;
 
 export interface QuotaMeter {
     used: number;
@@ -97,7 +97,7 @@ export function parseEntitlement(raw: unknown): Entitlement {
     const source = r.source;
     return {
         plan: r.plan === 'pro' ? 'pro' : 'free',
-        source: source === 'trial' || source === 'founder' || source === 'revenuecat' ? source : null,
+        source: source === 'trial' || source === 'owner' || source === 'revenuecat' ? source : null,
         proUntil: numOrNull(r.proUntil),
         trialEndsAt: numOrNull(r.trialEndsAt),
         trialAnchorAt: numOrNull(r.trialAnchorAt),

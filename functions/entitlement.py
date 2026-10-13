@@ -5,8 +5,9 @@ Source of truth is the functions-only top-level collection
 exactly like ``usage_quotas``). One doc per workspace::
 
     plan          'free' | 'pro'        the granted plan (see effective_plan)
-    source        'trial'|'founder'|'revenuecat'
-    proUntil      ms                    plan is honoured only while now < proUntil
+    source        'trial'|'owner'|'revenuecat'
+    proUntil      ms | None             plan is honoured only while now < proUntil
+                                        (None = no expiry: the owner, a lifetime)
     trialEndsAt   ms | None              when the trial ends; None until it starts
     trialAnchorAt ms | None              when the 10th card landed (the clock start)
     rcAppUserId   str | None             RevenueCat app user id (= Firebase Auth uid)
@@ -16,11 +17,11 @@ exactly like ``usage_quotas``). One doc per workspace::
 
 Where the grant comes from, in order:
 
-1. **Founders** (every workspace created before ``PRO_LAUNCH_AT``): 365 days of
-   Pro, so the owner and the TestFlight testers never hit a wall the day this
-   ships. A legacy doc with no ``createdAt`` at all predates the feature by
-   definition and is a founder too.
-2. **Reverse trial** (every workspace created on/after launch): 14 days of Pro
+1. **Owner**: the workspace whose linked sign-in account carries the verified
+   ``OWNER_EMAIL`` is Pro with no expiry. Nobody else gets a standing grant:
+   the pre-launch founders' year was removed on 2026-10-13 (owner's call), and
+   any stored ``source: 'founder'`` doc is recomputed on its next read.
+2. **Reverse trial** (every other workspace): 14 days of Pro
    whose clock starts when the library reaches ``TRIAL_ANCHOR_CARDS`` cards, not
    at sign-up. A trial spent on an empty library teaches nothing, so the 14 days
    begin the moment the 10th card is written (``maybe_start_trial``, called from
@@ -63,12 +64,11 @@ logger = logging.getLogger(__name__)
 _COLLECTION = "entitlements"
 _VAULT_COLLECTION = "synthesis_vault"
 
-# The day Pro shipped. Workspaces created before this get the founders grant.
-# ISO date, UTC midnight. Set to the day the feature branch was pushed.
+# The day Pro shipped. ISO date, UTC midnight. Kept for reference and tests:
+# since 2026-10-13 nothing is granted for being created before it.
 PRO_LAUNCH_AT = "2026-09-02"
 
 TRIAL_DAYS = 14
-FOUNDER_DAYS = 365
 
 # How many cards a library needs before the 14-day trial clock starts.
 TRIAL_ANCHOR_CARDS = 10
@@ -91,10 +91,6 @@ _DAY_MS = 24 * 60 * 60 * 1000
 
 def _now_ms() -> int:
     return int(datetime.now(timezone.utc).timestamp() * 1000)
-
-
-def _launch_ms() -> int:
-    return int(datetime.fromisoformat(PRO_LAUNCH_AT).replace(tzinfo=timezone.utc).timestamp() * 1000)
 
 
 def _to_ms(value) -> Optional[int]:
@@ -146,15 +142,29 @@ def trial_ends_from_anchor(created_ms: int, anchor_ms: int) -> int:
                created_ms + TRIAL_CEILING_DAYS * _DAY_MS)
 
 
+def owner_grant() -> dict:
+    """The owner's standing grant: Pro, no expiry. Pure."""
+    return {
+        "plan": PLAN_PRO,
+        "source": "owner",
+        "proUntil": None,
+        "trialEndsAt": None,
+        "trialAnchorAt": None,
+    }
+
+
 def grant_for(user_created_at_ms: Optional[int],
               trial_anchor_at_ms: Optional[int] = None,
-              trial_ends_at_ms: Optional[int] = None) -> dict:
+              trial_ends_at_ms: Optional[int] = None,
+              owner: bool = False) -> dict:
     """The server-side grant a workspace is owed, given its creation date and
     (for a trial) where its clock stands.
 
-    Founders (created before launch, or with no createdAt at all) get 365 days
-    from launch day and ignore both trial arguments. Everyone else is on the
-    reverse trial:
+    The owner gets ``owner_grant()`` and ignores everything else. A workspace
+    with no createdAt at all gets nothing (the free plan): there is no date to
+    measure a trial from. Everyone else is on the reverse trial, measured from
+    their own createdAt, so a workspace created long ago finds its trial
+    ceiling already passed and reads as free:
 
     - ``trial_anchor_at_ms`` set: the 10th card has landed, so the trial ends at
       ``min(anchor + 14d, createdAt + 60d)``.
@@ -165,13 +175,14 @@ def grant_for(user_created_at_ms: Optional[int],
 
     Pure: no I/O, so the rule is unit-testable.
     """
-    launch = _launch_ms()
+    if owner:
+        return owner_grant()
     created = _to_ms(user_created_at_ms)
-    if created is None or created < launch:
+    if created is None:
         return {
-            "plan": PLAN_PRO,
-            "source": "founder",
-            "proUntil": launch + FOUNDER_DAYS * _DAY_MS,
+            "plan": PLAN_FREE,
+            "source": None,
+            "proUntil": None,
             "trialEndsAt": None,
             "trialAnchorAt": None,
         }
@@ -240,8 +251,8 @@ def _created_at_for_new_grant(uid: str) -> Optional[int]:
     The email the lookup keys on comes from the Firebase Auth account linked
     to the workspace, never from the doc. The client fallback writes the doc
     itself, so its `email` was whatever the client chose: naming a deleted
-    account's address inherited THAT account's createdAt (a founder's year of
-    Pro, or a creation-date oracle), and leaving it out reset the clock."""
+    account's address inherited THAT account's createdAt (a creation-date
+    oracle), and leaving it out reset the clock."""
     ref = get_db().collection("users").document(uid)
     snap = ref.get()
     if not snap.exists:
@@ -279,8 +290,47 @@ def _created_at_for_new_grant(uid: str) -> Optional[int]:
     return created
 
 
+def _owner_email() -> str:
+    return (os.environ.get("OWNER_EMAIL") or "").strip().lower()
+
+
+def is_owner_workspace(uid: str) -> bool:
+    """True when a sign-in account linked to workspace `uid` has OWNER_EMAIL as
+    its provider-verified email. The email comes from Firebase Auth, never from
+    the workspace doc (which a client-side fallback could have written). Fails
+    CLOSED: unset OWNER_EMAIL, a missing doc or any Auth error means False."""
+    owner = _owner_email()
+    if not uid or not owner:
+        return False
+    try:
+        snap = get_db().collection("users").document(uid).get()
+        data = (snap.to_dict() or {}) if snap.exists else {}
+        linked = data.get("authUids")
+        candidates = [a for a in linked if isinstance(a, str) and a] if isinstance(linked, list) else []
+        if uid not in candidates:
+            candidates.append(uid)
+        for auth_uid in candidates:
+            email = _verified_account_email(auth_uid)
+            if email and email.strip().lower() == owner:
+                return True
+    except Exception as e:
+        logger.warning("Owner check failed for %s (treating as not owner): %s", mask_uid(uid), e)
+    return False
+
+
+def _replace_founder_doc(uid: str, ref, data: dict) -> dict:
+    """A doc written while the founders' year existed: recompute it under the
+    current rule (owner, or the reverse trial from createdAt) and store that.
+    Runs at most once per such workspace."""
+    grant = grant_for(_user_created_at(uid), owner=is_owner_workspace(uid))
+    doc = {**grant, "updatedAt": _now_ms()}
+    ref.set(doc, merge=True)
+    logger.info("Founder entitlement replaced for %s: %s", mask_uid(uid), doc["source"])
+    return {**data, **doc}
+
+
 def get_entitlement(uid: str, user_created_at_ms: Optional[int] = None) -> dict:
-    """The entitlement doc for `uid`, lazily creating the founder/trial grant.
+    """The entitlement doc for `uid`, lazily creating the owner/trial grant.
 
     `user_created_at_ms` saves a user-doc read when the caller already has it;
     otherwise it is fetched. Returns the free shape (never raises) on any error.
@@ -292,13 +342,15 @@ def get_entitlement(uid: str, user_created_at_ms: Optional[int] = None) -> dict:
         snap = ref.get()
         if snap.exists:
             data = snap.to_dict() or {}
+            if data.get("source") == "founder":
+                return _replace_founder_doc(uid, ref, data)
             data.setdefault("plan", PLAN_FREE)
             return data
         created = (user_created_at_ms if user_created_at_ms is not None
                    else _created_at_for_new_grant(uid))
         # A brand-new trial has no anchor yet: the clock starts at the 10th card
         # (maybe_start_trial), not here.
-        doc = dict(grant_for(created))
+        doc = dict(grant_for(created, owner=is_owner_workspace(uid)))
         doc.update({
             "rcAppUserId": None,
             "productId": None,
@@ -332,16 +384,16 @@ def is_pro(uid: str) -> bool:
     return plan_for(uid) == PLAN_PRO
 
 
-# Sources that represent a real commitment (money, or the founders' grant).
+# Sources that represent a real commitment (money, or the owner's own account).
 # A reverse trial is also "pro" for feature gates, but it is free to obtain
 # (create an account, delete it, create another), so the two costliest paid
 # surfaces — native video ingestion and the 10,000-link import ceiling — key
 # on the SOURCE, not just the plan.
-_COMMITTED_SOURCES = frozenset({"revenuecat", "founder"})
+_COMMITTED_SOURCES = frozenset({"revenuecat", "owner"})
 
 
 def entitlement_source(uid: str) -> Optional[str]:
-    """'trial' | 'founder' | 'revenuecat' | None for a workspace (never raises)."""
+    """'trial' | 'owner' | 'revenuecat' | None for a workspace (never raises)."""
     doc = get_entitlement(uid)
     if effective_plan(doc) != PLAN_PRO:
         return None
@@ -350,7 +402,7 @@ def entitlement_source(uid: str) -> Optional[str]:
 
 
 def is_committed_pro(uid: str) -> bool:
-    """Pro through a subscription or the founders' grant — never a trial."""
+    """Pro through a subscription or the owner grant — never a trial."""
     return entitlement_source(uid) in _COMMITTED_SOURCES
 
 
@@ -365,7 +417,7 @@ def plan_for_imports(uid: str) -> str:
 # ── Trial clock ───────────────────────────────────────────────────────────────
 #
 # Per-instance memo of workspaces whose trial clock needs no further attention
-# (already anchored, grandfathered, founder, or subscribed). Cloud Functions
+# (already anchored, grandfathered, owner, free, or subscribed). Cloud Functions
 # instances are reused across invocations, so this turns the common case (every
 # card write after the tenth) into zero Firestore reads. It is a cache of a
 # ONE-WAY transition: a uid only ever moves from "watch" to "settled", so a cold
@@ -394,8 +446,8 @@ def _run_transaction(db, fn):
 
 
 def _trial_clock_unstarted(doc: Optional[dict]) -> bool:
-    """True only for a reverse trial whose 14-day clock has not started. A
-    founder, a subscriber, and a doc written before the anchor rule shipped
+    """True only for a reverse trial whose 14-day clock has not started. The
+    owner, a subscriber, and a doc written before the anchor rule shipped
     (which already carries trialEndsAt) are all settled forever."""
     doc = doc or {}
     return (doc.get("source") == "trial"
@@ -595,7 +647,7 @@ def sync_from_revenuecat(uid: str, app_user_id: str) -> dict:
     """Re-read the subscriber from RevenueCat and rewrite the entitlement doc.
 
     Active `pro` entitlement → plan pro, source revenuecat, proUntil = expiry.
-    Not active → fall back to whatever server-side grant (trial/founder) is
+    Not active → fall back to whatever server-side grant (owner/trial) is
     still running, else free. Restores any vaulted synthesis when the result is
     pro. Raises RevenueCatError when RevenueCat can't be reached; the caller
     decides how to answer (503 for the client, 502 for the webhook).
@@ -606,7 +658,12 @@ def sync_from_revenuecat(uid: str, app_user_id: str) -> dict:
 
     ref = get_db().collection(_COLLECTION).document(uid)
     existing = get_entitlement(uid)
-    if state["active"]:
+    if is_owner_workspace(uid):
+        # The owner stays on the owner grant whatever RevenueCat says, so a
+        # test purchase that lapses (sandbox subscriptions expire in minutes)
+        # can never leave the owner's own account on the free plan.
+        doc = {**owner_grant(), "productId": state["productId"] if state["active"] else None}
+    elif state["active"]:
         doc = {
             "plan": PLAN_PRO,
             "source": "revenuecat",
@@ -617,11 +674,11 @@ def sync_from_revenuecat(uid: str, app_user_id: str) -> dict:
         }
     else:
         # Subscription lapsed (or never existed): the free-standing grant, if
-        # any, is still theirs. Recompute from createdAt so a lapsed founder
-        # keeps the founders year. The trial clock is carried through, never
-        # recomputed: a subscriber who lapses does not get a fresh 14 days.
+        # any, is still theirs (the owner stays Pro). The trial clock is
+        # carried through, never recomputed: a subscriber who lapses does not
+        # get a fresh 14 days.
         grant = grant_for(_user_created_at(uid), existing.get("trialAnchorAt"),
-                          existing.get("trialEndsAt"))
+                          existing.get("trialEndsAt"), owner=is_owner_workspace(uid))
         if effective_plan(grant, now) == PLAN_PRO:
             doc = {**grant, "productId": None}
         else:

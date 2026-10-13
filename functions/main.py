@@ -468,7 +468,7 @@ _RATE_LIMITS = {
     "share-config-rotate": (5, 3600, False),
     # Native YouTube video ingestion on a TRIAL workspace. Trials are free to
     # mint, and a 3-hour video costs real money to watch, so a trial gets a
-    # few per hour (the honest metadata-only card past that); paid and founder
+    # few per hour (the honest metadata-only card past that); paid and owner
     # workspaces are not limited here. Fail closed: the cheap answer wins.
     "video-trial-uid": (3, 3600, False),
 }
@@ -1137,7 +1137,7 @@ def _fetch_post_images(image_urls: list) -> list:
 def _video_ingest_allowed(uid: str, plan: str = None) -> bool:
     """May this save WATCH a YouTube video (native ingestion, ~$0.09/hour)?
 
-    Paid and founder workspaces: yes. A reverse-trial workspace: yes, but a few
+    Paid and owner workspaces: yes. A reverse-trial workspace: yes, but a few
     per hour (`video-trial-uid`, fail closed) — trials are free to mint and
     the import path can enqueue thousands of links. Free: no (the honest
     metadata-only card, stamped `proFeature: 'youtube'`)."""
@@ -5213,7 +5213,7 @@ def _entitlement_caller(req, headers):
 @https_fn.on_request()
 def entitlement_http(req: https_fn.Request) -> https_fn.Response:
     """GET /api/entitlement: the caller's plan, grant dates, and this month's
-    quota usage. Lazily creates the founder/trial grant on first call."""
+    quota usage. Lazily creates the owner/trial grant on first call."""
     if req.method == 'OPTIONS':
         return _cors_preflight(req)
     headers = _cors_headers(req)
@@ -7507,7 +7507,7 @@ def force_release_waiting_saves(req: https_fn.Request) -> https_fn.Response:
                                   timeout_sec=300)
 def release_waiting_on_upgrade(event: firestore_fn.Event[firestore_fn.Change[firestore_fn.DocumentSnapshot]]) -> None:
     """Going Pro reads the waiting saves. Every grant path writes the
-    entitlement doc (RevenueCat sync and webhook, founder and trial grants,
+    entitlement doc (RevenueCat sync and webhook, owner and trial grants,
     a hand edit), so this one trigger is the upgrade hook for all of them. The
     cards go onto the normal throttled queue; see deferred_capture."""
     uid = (event.params or {}).get("uid")

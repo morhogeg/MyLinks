@@ -533,7 +533,7 @@ def release_waiting(uid: str, plan: str, *, limit: int = RELEASE_BATCH, cards=No
 def release_on_entitlement_write(uid: str, after: Optional[dict]) -> Optional[dict]:
     """The upgrade hook: called on every write to ``entitlements/{uid}``
     (main.release_waiting_on_upgrade). Every way a workspace becomes Pro writes
-    that doc (the RevenueCat sync and webhook, the founder and trial grants, an
+    that doc (the RevenueCat sync and webhook, the owner and trial grants, an
     owner's hand edit), so one trigger covers them all. Releases only while the
     doc's EFFECTIVE plan is Pro; for a Pro workspace with nothing waiting this
     costs one empty query. Returns the release report, or None when not Pro."""

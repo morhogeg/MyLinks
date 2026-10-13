@@ -58,11 +58,9 @@ export function MainView({
             ? 'trial'
             : ent.isTrial
             ? `trial, ${ent.daysLeft ?? 0} ${ent.daysLeft === 1 ? 'day' : 'days'} left`
-            : ent.isPro && ent.source === 'founder'
-                ? 'founding member'
-                : ent.isPro
-                    ? 'active'
-                    : undefined;
+            : ent.isPro
+                ? 'active'
+                : undefined;
     const proTitle = ent.loaded && !ent.isPro ? 'Upgrade to Pro' : 'Machina Pro';
     const manageSubscription = () => openExternal(isNativeApp()
         ? 'itms-apps://apps.apple.com/account/subscriptions'

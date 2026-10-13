@@ -90,9 +90,9 @@ export default function TermsPage() {
         renews automatically at the same price unless you cancel at least 24 hours before the end of
         the current period. You can manage or cancel it at any time in your Apple ID subscription
         settings; cancelling stops future renewals and keeps Pro active until the period you already
-        paid for ends. Refunds are handled by Apple under its own policies. A free trial or a
-        founders&rsquo; grant, where offered, ends on the date shown in Settings and does not
-        convert to a paid plan unless you subscribe. Subscription status is checked through
+        paid for ends. Refunds are handled by Apple under its own policies. A free trial, where
+        offered, ends on the date shown in Settings and does not convert to a paid plan unless
+        you subscribe. Subscription status is checked through
         RevenueCat, described in the Privacy Policy.
       </p>
 

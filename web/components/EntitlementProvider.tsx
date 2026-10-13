@@ -32,7 +32,7 @@ interface EntitlementContextType {
     source: Entitlement['source'];
     proUntil: number | null;
     trialEndsAt: number | null;
-    /** Whole days left on the current grant (trial / founder / subscription), or null. */
+    /** Whole days left on the current grant (trial / subscription), or null. */
     daysLeft: number | null;
     /** True while a reverse trial is what makes the plan Pro. */
     isTrial: boolean;
