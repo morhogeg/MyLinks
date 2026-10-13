@@ -34,8 +34,8 @@
   an answer used as cards under the answer, and a tap opens that card
   (`AskBrain.tsx`, `onOpenLink`). The posts now say exactly that.
 - **"Capture stays free"** (old T23). The free plan has refused the 101st save of
-  the month since 2026-09-02 (`functions/quota.py`, free 100 / Pro 1000). The
-  post now states the real plan: a 14-day Pro trial, then 100 saves and 20
+  the month since 2026-09-02 (`functions/quota.py`, free 50 since 2026-10-13 / Pro 1000). The
+  post now states the real plan: a 14-day Pro trial, then 50 saves and 20
   questions a month.
 - **Pro features next to "Free".** The Sunday recap is a locked teaser on free,
   and the Daily Brew and YouTube key moments are Pro-only (`digest_service.py`,
@@ -183,7 +183,7 @@ gets shown; a fresh one gets throttled.
 4. **Product Hunt is scheduled** for the same Tuesday, 12:01 AM Pacific.
 5. **Every launch-week attachment is rendered** and in a folder (§7), along with
    the Day 1 to 8 copy, scheduled.
-6. **You've decided the pricing line.** T24 says "100 saves and 20 questions a
+6. **You've decided the pricing line.** T24 says "50 saves and 20 questions a
    month" on free because that's what `functions/quota.py` enforces. But
    `SOURCE_OF_TRUTH.md` §7.1 also says "Capture is never gated". The code and
    the principle disagree, and the copy follows the code. If you change the cap,
@@ -618,7 +618,7 @@ Trust Machina, 2/3: free to start.
 
 Pro is free for your first 14 days, and the clock only starts once you've saved ten things. Nothing to cancel.
 
-After that, the free plan keeps 100 saves and 20 questions a month. Pro is unlimited.
+After that, the free plan keeps 50 saves and 20 questions a month. Pro is unlimited.
 ```
 
 - **Attach:** the welcome screen line ("Pro is free for your first 14 days…").
@@ -1066,7 +1066,7 @@ Every product claim in these posts, and where it was verified on 2026-10-02 (`ma
 | This week in Machina on Sunday: themes, a standout, an open question; locked teaser on free | `SynthesisCard.tsx`, `functions/digest_service.py` (`is_pro`) |
 | The Daily Brew: a daily deck; keep, remind, archive; Pro-only | `SwipeDeck.tsx` (`ActionKind`), `digest_service.py` |
 | Reminders that repeat, spaced out | `functions/reminder_service.py`, §9 2026-09-25 |
-| 14-day Pro trial, starting at the 10th save, nothing to cancel; free plan 100 saves + 20 questions a month | `functions/entitlement.py` (`TRIAL_DAYS`, `TRIAL_ANCHOR_CARDS`), `functions/quota.py`, `web/components/Onboarding.tsx` |
+| 14-day Pro trial, starting at the 10th save, nothing to cancel; free plan 50 saves + 20 questions a month | `functions/entitlement.py` (`TRIAL_DAYS`, `TRIAL_ANCHOR_CARDS`), `functions/quota.py`, `web/components/Onboarding.tsx` |
 | No ads, no tracking, nothing sold; Gemini paid tier keeps content out of training; export; in-app deletion | `docs/APP_STORE.md` §1 (App Privacy label), `AIConsentNotice.tsx`, `DataExport.tsx`, `delete_account` |
 | Web app at mymachina.app holds the same library | `docs/BRANDING.md` D-8, Vercel |
 | Hebrew cards render right to left, with search and Ask in Hebrew | RTL work, builds 1290 to 1313; `empty_library_answer` (Hebrew) |

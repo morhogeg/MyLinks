@@ -223,7 +223,7 @@ def test_limit_for_defaults(monkeypatch):
     _clear_quota_env(monkeypatch)
     # Machina Pro (2026-09-02): the free tier's published caps, and the Pro
     # abuse ceilings. `_limit_for` without a plan is the FREE limit.
-    assert quota._limit_for("saves") == 100
+    assert quota._limit_for("saves") == 50
     assert quota._limit_for("asks") == 20
     assert quota._limit_for("saves", "pro") == 1000
     assert quota._limit_for("asks", "pro") == 1000

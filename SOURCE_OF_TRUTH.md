@@ -1270,7 +1270,7 @@ The multi-user auth work described below **was** fully written but not live:
     graceful-degradation state (founder grants + trials, paywall says
     "not available in this build").** One
     plan, "Machina Pro" (monthly $7.99 / annual $49.99, prices live in App
-    Store Connect + RevenueCat, never in code). Free: 100 saves + 20 asks a
+    Store Connect + RevenueCat, never in code). Free: 50 saves (100 until 2026-10-13) + 20 asks a
     month, locked synthesis teaser, no curated digests, metadata-only YouTube
     cards. Pro: unlimited (abuse ceiling 1000), full synthesis, digests, video
     ingestion. **No founders grant (removed 2026-10-13, owner's call):** the
@@ -1322,7 +1322,7 @@ The multi-user auth work described below **was** fully written but not live:
     deploy-functions writes them into `functions/.env`, and cut a TestFlight
     build so the public key is baked in.
 26a. **[x] DECIDED 2026-10-05 (owner): capture is never gated; the cap moved
-    onto the analysis.** Past 100 free saves (or Pro's 1000 ceiling) a save is
+    onto the analysis.** Past the free allowance (50 since 2026-10-13; or Pro's 1000 ceiling) a save is
     kept as `status: 'waiting'` with a server-only page snapshot
     (`users/{uid}/capture_snapshots/{cardId}`, scrape only, no Gemini), and read
     on upgrade (Firestore trigger `release_waiting_on_upgrade` on
@@ -2346,7 +2346,7 @@ with no expiry; pre-launch testers are measured like everyone else.
 
 | Surface | Free | Pro |
 |---|---|---|
-| Capture from anywhere + analysis on save (summary, tags, connections) | 100 saves/month | Unlimited (abuse ceiling 1000) |
+| Capture from anywhere + analysis on save (summary, tags, connections) | 50 saves/month (100 until 2026-10-13) | Unlimited (abuse ceiling 1000) |
 | Meaning search, collections, share pages, reminders, multi-screenshot | Yes | Yes |
 | Ask Machina | 20 questions/month | Unlimited (abuse ceiling 1000) |
 | Weekly synthesis | Locked teaser (title + first line) | Full |
@@ -2593,6 +2593,12 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-13 (later still) — FREE SAVES 100 → 50 A MONTH (owner).**
+  `quota.py` free default 50 (no env override is set in prod), paywall row
+  "Free: 50 a month", campaign T24 and docs updated. Existing free users
+  between 50 and 100 saves this month have their next saves kept as
+  `waiting` (capture is never gated; deferred_capture reads them next month
+  or on upgrade). Verified: pytest, tsc. Asks stay 20, imports 500.
 - **2026-10-13 (later) — FOUNDERS GRANT REMOVED; OWNER GRANT INSTEAD.** Owner
   saw "You have Pro as a founding member" on the paywall and asked for no
   founders grant at all, only their own account kept unlimited. `entitlement.py`:

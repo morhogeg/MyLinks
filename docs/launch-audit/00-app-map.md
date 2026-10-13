@@ -79,7 +79,7 @@ SDK, `lib/auth.ts`); `delete_account(_http)` wipes the workspace; sign-out
 purges local caches and the native share token.
 
 **Billing:** `entitlements/{uid}` (functions-only) is the source of truth;
-14-day server-side reverse trial; free = 100 saves + 20 asks/month
+14-day server-side reverse trial; free = 50 saves + 20 asks/month
 (`quota.py`); RevenueCat webhook + `/api/entitlement/sync`.
 
 ## Data model (Firestore)
