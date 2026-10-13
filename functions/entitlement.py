@@ -21,17 +21,15 @@ Where the grant comes from, in order:
    ``OWNER_EMAIL`` is Pro with no expiry. Nobody else gets a standing grant:
    the pre-launch founders' year was removed on 2026-10-13 (owner's call), and
    any stored ``source: 'founder'`` doc is recomputed on its next read.
-2. **Reverse trial** (every other workspace): 14 days of Pro
-   whose clock starts when the library reaches ``TRIAL_ANCHOR_CARDS`` cards, not
-   at sign-up. A trial spent on an empty library teaches nothing, so the 14 days
-   begin the moment the 10th card is written (``maybe_start_trial``, called from
-   the links trigger) and ``trialAnchorAt`` records that moment. Until then the
-   plan resolves as trial-Pro, bounded by a hard ceiling so a dormant account
-   cannot sit on Pro forever: ``trialEndsAt = min(anchor + 14d, createdAt +
-   60d)``, and before the anchor exists ``proUntil`` is the ceiling alone. The
-   anchor is stored, never recomputed from "now", so deleting and reinstalling
-   the app cannot restart the clock. Entitlement docs written before this rule
-   shipped already carry a ``trialEndsAt`` and are left exactly as they are.
+2. **Reverse trial** (every other workspace): 14 days of Pro from the day the
+   workspace was created (owner's call, 2026-10-13: a countdown people can see
+   from day one beats a clock that starts at an invisible 10th save). The end
+   date is stored at creation and never recomputed from "now", and createdAt
+   survives delete-and-recreate (``_created_at_for_new_grant``), so neither a
+   reinstall nor a new account restarts it. Docs written under the old
+   10th-save rule whose clock never started get their 14 days from their next
+   read, never past the Pro they were already granted
+   (``_start_unstarted_trial``).
 3. **RevenueCat** (a real App Store subscription): ``sync_from_revenuecat``
    reads the subscriber from RevenueCat's REST API and writes ``proUntil`` from
    the ``pro`` entitlement's expiry. The client calls it after a purchase or a
@@ -70,7 +68,8 @@ PRO_LAUNCH_AT = "2026-09-02"
 
 TRIAL_DAYS = 14
 
-# How many cards a library needs before the 14-day trial clock starts.
+# The old rule's trigger (the 14 days used to start at the 10th card). Kept
+# only because older app builds still read `trialAnchorCards`.
 TRIAL_ANCHOR_CARDS = 10
 # Hard ceiling from workspace creation, so an account that never reaches ten
 # cards still stops being Pro. Without it "the clock starts at 10 saves" would
@@ -186,16 +185,19 @@ def grant_for(user_created_at_ms: Optional[int],
             "trialEndsAt": None,
             "trialAnchorAt": None,
         }
-    ceiling = created + TRIAL_CEILING_DAYS * _DAY_MS
     anchor = _to_ms(trial_anchor_at_ms)
     if anchor is not None:
         trial_ends = trial_ends_from_anchor(created, anchor)
     else:
         trial_ends = _to_ms(trial_ends_at_ms)
+    if trial_ends is None:
+        # The rule since 2026-10-13: the 14 days run from creation.
+        anchor = created
+        trial_ends = trial_ends_from_anchor(created, created)
     return {
         "plan": PLAN_PRO,
         "source": "trial",
-        "proUntil": trial_ends if trial_ends is not None else ceiling,
+        "proUntil": trial_ends,
         "trialEndsAt": trial_ends,
         "trialAnchorAt": anchor,
     }
@@ -337,6 +339,26 @@ def _check_existing_for_owner(uid: str, ref, data: dict) -> dict:
     return {**data, **doc}
 
 
+def _start_unstarted_trial(uid: str, ref, data: dict) -> dict:
+    """A trial doc from the old 10th-save rule whose clock never started: start
+    its 14 days now, but never past the Pro it already held (its 60-day
+    ceiling), so this grants nothing an account didn't already have. One that
+    already lapsed is only marked, so it stays on the free plan."""
+    now = _now_ms()
+    held = _to_ms(data.get("proUntil"))
+    if held is not None and held > now:
+        ends = min(now + TRIAL_DAYS * _DAY_MS, held)
+        doc = {"trialAnchorAt": now, "trialEndsAt": ends, "proUntil": ends, "updatedAt": now}
+    else:
+        # Lapsed (or a malformed doc with no date at all, which would otherwise
+        # read as Pro forever): end it where it stands, today at the latest.
+        ends = held if held is not None else now
+        doc = {"trialEndsAt": ends, "proUntil": ends, "updatedAt": now}
+    ref.set(doc, merge=True)
+    logger.info("Unstarted trial clock started for %s", mask_uid(uid))
+    return {**data, **doc}
+
+
 def _replace_founder_doc(uid: str, ref, data: dict) -> dict:
     """A doc written while the founders' year existed: recompute it under the
     current rule (owner, or the reverse trial from createdAt) and store that.
@@ -366,12 +388,13 @@ def get_entitlement(uid: str, user_created_at_ms: Optional[int] = None) -> dict:
             if (not data.get(OWNER_CHECKED) and data.get("source") not in ("owner", "revenuecat")
                     and _owner_email()):
                 data = _check_existing_for_owner(uid, ref, data)
+            if _trial_clock_unstarted(data):
+                data = _start_unstarted_trial(uid, ref, data)
             data.setdefault("plan", PLAN_FREE)
             return data
         created = (user_created_at_ms if user_created_at_ms is not None
                    else _created_at_for_new_grant(uid))
-        # A brand-new trial has no anchor yet: the clock starts at the 10th card
-        # (maybe_start_trial), not here.
+        # A brand-new trial's 14 days are fixed here, from createdAt.
         doc = dict(grant_for(created, owner=is_owner_workspace(uid)))
         doc.update({
             OWNER_CHECKED: True,
@@ -439,22 +462,9 @@ def plan_for_imports(uid: str) -> str:
 
 # ── Trial clock ───────────────────────────────────────────────────────────────
 #
-# Per-instance memo of workspaces whose trial clock needs no further attention
-# (already anchored, grandfathered, owner, free, or subscribed). Cloud Functions
-# instances are reused across invocations, so this turns the common case (every
-# card write after the tenth) into zero Firestore reads. It is a cache of a
-# ONE-WAY transition: a uid only ever moves from "watch" to "settled", so a cold
-# instance re-reading the doc reaches the same answer. Bounded so a busy
-# instance cannot grow it without limit.
-_TRIAL_SETTLED: set = set()
-_TRIAL_SETTLED_MAX = 2000
-
-
-def _mark_trial_settled(uid: str) -> None:
-    if len(_TRIAL_SETTLED) >= _TRIAL_SETTLED_MAX:
-        _TRIAL_SETTLED.clear()
-    _TRIAL_SETTLED.add(uid)
-
+# Since 2026-10-13 a trial's 14 days are fixed when its doc is created
+# (grant_for). The only clock left to start is an old doc from the 10th-save
+# rule, which _start_unstarted_trial handles on its next read.
 
 def _run_transaction(db, fn):
     """Run ``fn(transaction)`` in a Firestore transaction (retried on
@@ -469,89 +479,11 @@ def _run_transaction(db, fn):
 
 
 def _trial_clock_unstarted(doc: Optional[dict]) -> bool:
-    """True only for a reverse trial whose 14-day clock has not started. The
-    owner, a subscriber, and a doc written before the anchor rule shipped
-    (which already carries trialEndsAt) are all settled forever."""
+    """True only for a trial doc from the old 10th-save rule whose 14-day clock
+    never started. Every doc written since carries trialEndsAt."""
     doc = doc or {}
     return (doc.get("source") == "trial"
             and not doc.get("trialAnchorAt") and not doc.get("trialEndsAt"))
-
-
-def count_cards(uid: str, cap: int) -> int:
-    """How many cards `uid` has, counted only up to `cap`.
-
-    Projected to one small field and limited, so this is at most `cap` cheap
-    document reads and never pages a library of thousands.
-    """
-    query = (
-        get_db()
-        .collection("users").document(uid).collection("links")
-        .select(["createdAt"])
-        .limit(cap)
-    )
-    return len(list(query.get()))
-
-
-def maybe_start_trial(uid: str) -> bool:
-    """Start the 14-day trial clock if this workspace just reached ten cards.
-
-    Called from the links trigger on every card CREATE, which is the cheapest
-    correct place: it is the one choke point every capture path passes through
-    (share sheet, web add, note, import), and it needs no scheduler. Almost
-    every call costs nothing at all thanks to the settled memo above; the ones
-    that do work read one entitlement doc and, at most, ten card ids.
-
-    Returns True only on the write that actually starts the clock. Never raises:
-    a failure here means the trial simply starts on a later save.
-    """
-    if not uid or uid in _TRIAL_SETTLED:
-        return False
-    try:
-        # Only an unstarted reverse trial has a clock to start.
-        if not _trial_clock_unstarted(get_entitlement(uid)):
-            _mark_trial_settled(uid)
-            return False
-        if count_cards(uid, TRIAL_ANCHOR_CARDS) < TRIAL_ANCHOR_CARDS:
-            return False
-
-        now = _now_ms()
-        # The ceiling is measured from the workspace's own creation date, so
-        # this needs the user doc (one read, once per workspace, ever).
-        created = _user_created_at(uid) or now
-        ends = trial_ends_from_anchor(created, now)
-        db = get_db()
-        ref = db.collection(_COLLECTION).document(uid)
-
-        def _start(tx) -> bool:
-            # Re-read inside the transaction and write only if the clock is
-            # STILL unstarted. The read above is a snapshot: a purchase synced
-            # from RevenueCat (or another instance anchoring this workspace)
-            # can land before this write, and a plain merge would overwrite
-            # it, cutting an annual subscriber back to the trial's end date.
-            snap = ref.get(transaction=tx)
-            if not _trial_clock_unstarted(snap.to_dict() if snap.exists else None):
-                return False
-            tx.set(ref, {
-                "trialAnchorAt": now,
-                "trialEndsAt": ends,
-                "proUntil": ends,
-                "plan": PLAN_PRO,
-                "source": "trial",
-                "updatedAt": now,
-            }, merge=True)
-            return True
-
-        started = _run_transaction(db, _start)
-        # Either way the workspace is settled: the clock started here, or
-        # something else (a purchase, another instance) settled it first.
-        _mark_trial_settled(uid)
-        if started:
-            logger.info("Trial clock started for %s at %d cards, ends %s",
-                        mask_uid(uid), TRIAL_ANCHOR_CARDS, ends)
-        return started
-    except Exception as e:
-        logger.warning("Trial anchor check failed (ignored) for %s: %s", mask_uid(uid), e)
-        return False
 
 
 def entitlement_summary(uid: str) -> dict:
@@ -574,6 +506,13 @@ def entitlement_summary(uid: str) -> dict:
         "trialEndsAt": _to_ms(doc.get("trialEndsAt")),
         "trialAnchorAt": _to_ms(doc.get("trialAnchorAt")),
         "trialAnchorCards": TRIAL_ANCHOR_CARDS,
+        # A subscription's plan and whether Apple will charge again, so the
+        # app can say "Renews Nov 13" or "Ends Nov 13" instead of guessing.
+        "productId": doc.get("productId"),
+        "willRenew": doc.get("willRenew"),
+        "billingIssue": bool(doc.get("billingIssue")),
+        # The free plan's numbers, so no client hardcodes them.
+        "freeLimits": {k: quota_limit(k, "free") for k in ("saves", "asks", "imports")},
         "quotas": {
             "saves": {"used": used.get("saves", 0), "limit": quota_limit("saves", plan)},
             "asks": {"used": used.get("asks", 0), "limit": quota_limit("asks", plan)},
@@ -641,11 +580,22 @@ def pro_from_subscriber(subscriber: dict, now_ms: Optional[int] = None) -> dict:
     """
     ent = ((subscriber or {}).get("entitlements") or {}).get(RC_ENTITLEMENT_ID) or {}
     if not ent:
-        return {"active": False, "proUntil": None, "productId": None}
+        return {"active": False, "proUntil": None, "productId": None,
+                "willRenew": None, "billingIssue": False}
     until = _to_ms(ent.get("expires_date"))
     product = ent.get("product_identifier")
     active = until is None or until > (now_ms or _now_ms())
-    return {"active": active, "proUntil": until, "productId": product}
+    # The product's own subscription record says whether Apple will charge
+    # again: a cancellation sets unsubscribe_detected_at, a failed charge
+    # billing_issues_detected_at. Unknown (no record) stays None.
+    sub = ((subscriber or {}).get("subscriptions") or {}).get(product) if product else None
+    will_renew = None
+    billing_issue = False
+    if isinstance(sub, dict):
+        will_renew = until is not None and not sub.get("unsubscribe_detected_at")
+        billing_issue = bool(sub.get("billing_issues_detected_at"))
+    return {"active": active, "proUntil": until, "productId": product,
+            "willRenew": will_renew, "billingIssue": billing_issue}
 
 
 def resolve_workspace_for_app_user(app_user_id: str, aliases=None) -> Optional[str]:
@@ -685,7 +635,8 @@ def sync_from_revenuecat(uid: str, app_user_id: str) -> dict:
         # The owner stays on the owner grant whatever RevenueCat says, so a
         # test purchase that lapses (sandbox subscriptions expire in minutes)
         # can never leave the owner's own account on the free plan.
-        doc = {**owner_grant(), "productId": state["productId"] if state["active"] else None}
+        doc = {**owner_grant(), "productId": state["productId"] if state["active"] else None,
+               "willRenew": None, "billingIssue": False}
     elif state["active"]:
         doc = {
             "plan": PLAN_PRO,
@@ -694,6 +645,8 @@ def sync_from_revenuecat(uid: str, app_user_id: str) -> dict:
             "trialEndsAt": existing.get("trialEndsAt"),
             "trialAnchorAt": existing.get("trialAnchorAt"),
             "productId": state["productId"],
+            "willRenew": state["willRenew"],
+            "billingIssue": state["billingIssue"],
         }
     else:
         # Subscription lapsed (or never existed): the free-standing grant, if
@@ -703,7 +656,7 @@ def sync_from_revenuecat(uid: str, app_user_id: str) -> dict:
         grant = grant_for(_user_created_at(uid), existing.get("trialAnchorAt"),
                           existing.get("trialEndsAt"), owner=is_owner_workspace(uid))
         if effective_plan(grant, now) == PLAN_PRO:
-            doc = {**grant, "productId": None}
+            doc = {**grant, "productId": None, "willRenew": None, "billingIssue": False}
         else:
             doc = {
                 "plan": PLAN_FREE,
@@ -712,6 +665,8 @@ def sync_from_revenuecat(uid: str, app_user_id: str) -> dict:
                 "trialEndsAt": grant.get("trialEndsAt"),
                 "trialAnchorAt": grant.get("trialAnchorAt"),
                 "productId": None,
+                "willRenew": None,
+                "billingIssue": False,
             }
     doc.update({"rcAppUserId": app_user_id, "updatedAt": now})
     ref.set(doc, merge=True)
@@ -867,10 +822,12 @@ def trial_nudge_copy(ends_ms: int, saves: int, asks: int, tz_name: Optional[str]
     """(title, body) for the trial-ending push. No em dashes (build tripwire)."""
     when = _weekday_phrase(ends_ms, tz_name, now_ms or _now_ms())
     title = f"Your Pro trial ends {when}"
-    things = "thing" if saves == 1 else "things"
-    questions = "question" if asks == 1 else "questions"
-    body = (f"You saved {saves} {things} and asked {asks} {questions}. "
-            "Keep unlimited saves, Ask, and your weekly synthesis with Machina Pro.")
+    # The counts used to be this month's metered usage, which read as the
+    # library size and was wrong for anyone past their first month. The body
+    # now says what changes and that nothing is lost.
+    del saves, asks
+    body = ("After that you keep everything you saved on the free plan. "
+            "Keep unlimited saves, Ask and your weekly synthesis with Machina Pro.")
     return title, body
 
 
@@ -886,10 +843,8 @@ def run_trial_nudges() -> dict:
     the device had a push token, so nobody is retried every hour; only a push
     that raises releases it for the next sweep.
 
-    A trial whose clock has not started yet has a null trialEndsAt, which a
-    range filter excludes by definition: nobody is warned about an end date
-    they do not have. They become candidates the moment the tenth card anchors
-    the clock (maybe_start_trial writes the date this query looks at).
+    Every trial carries its end date from creation, so every trial is a
+    candidate once; an old 10th-save doc gets its date on its next read.
     """
     from google.cloud.firestore_v1.base_query import FieldFilter
     from push_service import send_push

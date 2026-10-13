@@ -248,8 +248,8 @@ def test_client_fallback_workspace_inherits_the_deleted_accounts_trial_clock(mon
     monkeypatch.setattr(ent, "_verified_account_email", lambda auth_uid: "again@example.com")
 
     doc = ent.get_entitlement("u1")
-    # The grant's ceiling is measured from the ORIGINAL first sign-up.
-    assert doc["proUntil"] == first + ent.TRIAL_CEILING_DAYS * DAY
+    # The trial is measured from the ORIGINAL first sign-up.
+    assert doc["proUntil"] == first + ent.TRIAL_DAYS * DAY
     user = db.store["users"]["u1"]
     assert user["createdAt"] == first
     assert user[ent.TRIAL_CLOCK_CHECKED] is True
@@ -264,7 +264,7 @@ def test_server_created_workspace_skips_the_lookup(monkeypatch):
     )
     monkeypatch.setattr(ent, "get_db", lambda: db)
     doc = ent.get_entitlement("u1")
-    assert doc["proUntil"] == created + ent.TRIAL_CEILING_DAYS * DAY
+    assert doc["proUntil"] == created + ent.TRIAL_DAYS * DAY
     assert db.tomb_reads == 0
 
 

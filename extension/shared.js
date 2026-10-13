@@ -153,7 +153,7 @@
       if (body.waiting === true) {
         const upgrade = body.upgrade === true;
         const detail = serverText(body, "message") ||
-          (upgrade ? "Saved. Machina will read it on the 1st, or now with Pro." : "Saved. Machina will read it on the 1st.");
+          (upgrade ? "Saved. Machina will read it next month, or now with Pro." : "Saved. Machina will read it next month.");
         return out("waiting", "Saved for later", detail, upgrade ? "upgrade" : "open");
       }
       if (body.duplicate === true) {

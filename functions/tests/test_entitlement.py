@@ -21,7 +21,7 @@ def test_a_pre_launch_workspace_gets_no_founders_year():
     created = launch - 30 * DAY
     g = ent.grant_for(created)
     assert g["source"] == "trial"
-    assert g["proUntil"] == created + ent.TRIAL_CEILING_DAYS * DAY
+    assert g["proUntil"] == created + ent.TRIAL_DAYS * DAY
     assert ent.effective_plan(g, now_ms=launch + 40 * DAY) == "free"
 
 
@@ -39,19 +39,17 @@ def test_the_owner_is_pro_with_no_expiry():
     assert ent.effective_plan(g, now_ms=launch + 10_000 * DAY) == "pro"
 
 
-def test_trial_without_an_anchor_has_not_started_its_clock():
-    """Under 10 cards: still Pro, but with no end date and only the ceiling."""
+def test_a_new_trial_runs_fourteen_days_from_creation():
+    """Since 2026-10-13 the countdown starts at sign-up and is visible from day one."""
     launch = _ms(ent.PRO_LAUNCH_AT)
     created = launch + 3 * DAY
     g = ent.grant_for(created)
     assert g["source"] == "trial"
-    assert g["trialEndsAt"] is None
-    assert g["trialAnchorAt"] is None
-    assert g["proUntil"] == created + ent.TRIAL_CEILING_DAYS * DAY
-    # The 14 days have not begun, so day 20 is still Pro...
-    assert ent.effective_plan(g, now_ms=created + 20 * DAY) == "pro"
-    # ...but the ceiling still ends it, so a dormant account is not Pro forever.
-    assert ent.effective_plan(g, now_ms=created + 61 * DAY) == "free"
+    assert g["trialAnchorAt"] == created
+    assert g["trialEndsAt"] == created + 14 * DAY
+    assert g["proUntil"] == g["trialEndsAt"]
+    assert ent.effective_plan(g, now_ms=created + 13 * DAY) == "pro"
+    assert ent.effective_plan(g, now_ms=created + 15 * DAY) == "free"
 
 
 def test_trial_anchored_at_ten_cards_runs_fourteen_days_from_the_anchor():
@@ -145,13 +143,13 @@ def test_trial_nudge_copy_is_plain_and_dash_free():
     now = _ms("2026-09-10")  # a Thursday
     title, body = ent.trial_nudge_copy(now + 3 * DAY, 12, 1, "UTC", now)
     assert title == "Your Pro trial ends Sunday"
-    assert body.startswith("You saved 12 things and asked 1 question.")
+    # No usage counts: this month's metered saves read as the library size.
+    assert "12" not in body and "free plan" in body
     assert "—" not in title + body
     title, _ = ent.trial_nudge_copy(now + DAY, 1, 0, "UTC", now)
     assert title == "Your Pro trial ends tomorrow"
     title, body = ent.trial_nudge_copy(now + 3600 * 1000, 1, 2, "UTC", now)
     assert title == "Your Pro trial ends today"
-    assert "1 thing " in body and "2 questions" in body
 
 
 def test_resolve_workspace_skips_anonymous_ids_and_uses_aliases(monkeypatch):
@@ -219,235 +217,14 @@ def test_get_entitlement_lazily_creates_the_grant(monkeypatch):
     monkeypatch.setattr(ent, "get_db", lambda: DB())
     doc = ent.get_entitlement("u1")
     assert doc["source"] == "trial"
-    # A fresh trial has no clock yet: it starts at the 10th card.
-    assert doc["trialEndsAt"] is None
-    assert doc["trialAnchorAt"] is None
-    assert doc["proUntil"] == launch + (2 + ent.TRIAL_CEILING_DAYS) * DAY
+    # A fresh trial's 14 days run from createdAt.
+    assert doc["trialAnchorAt"] == launch + 2 * DAY
+    assert doc["trialEndsAt"] == launch + (2 + ent.TRIAL_DAYS) * DAY
+    assert doc["proUntil"] == doc["trialEndsAt"]
     assert doc["nudgedAt"] is None
     assert "u1" in created
     # Second call reads the stored doc rather than recreating it.
     assert ent.get_entitlement("u1")["proUntil"] == doc["proUntil"]
-
-
-# ── maybe_start_trial: the clock starts at the 10th card ─────────────────────
-
-class _AnchorDB:
-    """Fake Firestore with a users doc, an entitlements doc, and N link docs."""
-
-    def __init__(self, ent_doc, card_count, created_at):
-        self.ent_doc = ent_doc
-        self.card_count = card_count
-        self.created_at = created_at
-        self.writes = []
-        self.card_reads = 0
-        # Runs while the cards are being counted: a write that lands between
-        # maybe_start_trial's first read and its own write.
-        self.on_count = None
-
-    # users/{uid}/links -> a query that only ever reports its length
-    class _Links:
-        def __init__(self, outer):
-            self.outer = outer
-            self.cap = None
-
-        def select(self, _fields):
-            return self
-
-        def limit(self, n):
-            self.cap = n
-            return self
-
-        def get(self):
-            self.outer.card_reads += 1
-            if self.outer.on_count:
-                self.outer.on_count()
-            return [object()] * min(self.outer.card_count, self.cap or self.outer.card_count)
-
-    class _UserRef:
-        def __init__(self, outer):
-            self.outer = outer
-
-        def get(self):
-            class _S:
-                exists = True
-
-                def to_dict(_self):
-                    return {"createdAt": self.outer.created_at}
-            return _S()
-
-        def collection(self, name):
-            assert name == "links"
-            return _AnchorDB._Links(self.outer)
-
-    class _EntRef:
-        def __init__(self, outer):
-            self.outer = outer
-
-        def get(self, transaction=None):
-            data = self.outer.ent_doc
-
-            class _S:
-                exists = data is not None
-
-                def to_dict(_self):
-                    return dict(data) if data is not None else None
-            return _S()
-
-        def create(self, doc):
-            self.outer.ent_doc = dict(doc)
-
-        def set(self, doc, merge=False):
-            self.outer.writes.append(dict(doc))
-            self.outer.ent_doc = {**(self.outer.ent_doc or {}), **doc} if merge else dict(doc)
-
-    def collection(self, name):
-        outer = self
-
-        class _Col:
-            def document(self, _id):
-                return _AnchorDB._UserRef(outer) if name == "users" else _AnchorDB._EntRef(outer)
-        return _Col()
-
-
-class _DirectTx:
-    """The anchor write runs in a transaction; offline, run it directly."""
-
-    def set(self, ref, data, merge=False):
-        ref.set(data, merge=merge)
-
-
-def _anchor_env(monkeypatch, cards, ent_doc=None, created_offset=3 * DAY):
-    launch = _ms(ent.PRO_LAUNCH_AT)
-    created = launch + created_offset
-    if ent_doc is None:
-        ent_doc = {"plan": "pro", "source": "trial", "proUntil": created + 60 * DAY,
-                   "trialEndsAt": None, "trialAnchorAt": None}
-    db = _AnchorDB(ent_doc, cards, created)
-    monkeypatch.setattr(ent, "get_db", lambda: db)
-    monkeypatch.setattr(ent, "_run_transaction", lambda _db, fn: fn(_DirectTx()), raising=False)
-    ent._TRIAL_SETTLED.clear()
-    return db, created
-
-
-def test_trial_clock_does_not_start_below_ten_cards(monkeypatch):
-    db, _created = _anchor_env(monkeypatch, cards=9)
-    assert ent.maybe_start_trial("u1") is False
-    assert db.writes == []
-    # Still unsettled: the next card must check again.
-    assert "u1" not in ent._TRIAL_SETTLED
-
-
-def test_trial_clock_starts_on_exactly_ten_cards(monkeypatch):
-    db, created = _anchor_env(monkeypatch, cards=10)
-    now = _ms("2026-09-20")
-    monkeypatch.setattr(ent, "_now_ms", lambda: now)
-
-    assert ent.maybe_start_trial("u1") is True
-    written = db.writes[0]
-    assert written["trialAnchorAt"] == now
-    assert written["trialEndsAt"] == min(now + 14 * DAY, created + 60 * DAY)
-    assert written["proUntil"] == written["trialEndsAt"]
-    assert written["plan"] == "pro" and written["source"] == "trial"
-    # Settled, so the eleventh card costs no Firestore read at all.
-    assert "u1" in ent._TRIAL_SETTLED
-    reads_before = db.card_reads
-    assert ent.maybe_start_trial("u1") is False
-    assert db.card_reads == reads_before
-
-
-def test_a_late_anchor_is_capped_by_the_sixty_day_ceiling(monkeypatch):
-    launch = _ms(ent.PRO_LAUNCH_AT)
-    db, created = _anchor_env(monkeypatch, cards=12)
-    now = created + 55 * DAY
-    monkeypatch.setattr(ent, "_now_ms", lambda: now)
-    assert launch < created < now
-
-    assert ent.maybe_start_trial("u1") is True
-    assert db.writes[0]["trialEndsAt"] == created + ent.TRIAL_CEILING_DAYS * DAY
-
-
-def test_the_owner_and_subscribers_are_never_anchored(monkeypatch):
-    for doc in (
-        {"plan": "pro", "source": "owner", "proUntil": None, "trialEndsAt": None},
-        {"plan": "pro", "source": "revenuecat", "proUntil": 1, "trialEndsAt": None},
-    ):
-        db, _ = _anchor_env(monkeypatch, cards=50, ent_doc=doc)
-        assert ent.maybe_start_trial("u1") is False
-        assert db.writes == []
-        assert db.card_reads == 0          # short-circuits before counting
-        assert "u1" in ent._TRIAL_SETTLED
-
-
-def test_an_already_started_trial_is_left_alone(monkeypatch):
-    launch = _ms(ent.PRO_LAUNCH_AT)
-    already = {"plan": "pro", "source": "trial", "proUntil": launch + 20 * DAY,
-               "trialEndsAt": launch + 20 * DAY, "trialAnchorAt": launch + 6 * DAY}
-    db, _ = _anchor_env(monkeypatch, cards=50, ent_doc=already)
-    assert ent.maybe_start_trial("u1") is False
-    assert db.writes == []
-
-
-def test_grandfathered_trial_without_an_anchor_is_left_alone(monkeypatch):
-    """A doc written before this rule shipped has trialEndsAt but no anchor.
-    Re-anchoring it would silently extend a trial that is already running."""
-    launch = _ms(ent.PRO_LAUNCH_AT)
-    legacy = {"plan": "pro", "source": "trial", "proUntil": launch + 17 * DAY,
-              "trialEndsAt": launch + 17 * DAY}
-    db, _ = _anchor_env(monkeypatch, cards=50, ent_doc=legacy)
-    assert ent.maybe_start_trial("u1") is False
-    assert db.writes == []
-
-
-def test_a_purchase_synced_mid_anchor_is_never_overwritten(monkeypatch):
-    """The anchor used to read the doc, count the cards, then plain-merge
-    {source: trial, proUntil: trial end}. A RevenueCat sync landing in between
-    was overwritten: an annual subscriber cut back to the trial's end date.
-    The write now re-checks inside a transaction."""
-    db, created = _anchor_env(monkeypatch, cards=10)
-    monkeypatch.setattr(ent, "_now_ms", lambda: created + 5 * DAY)
-    annual = created + 370 * DAY
-
-    def purchase_lands():
-        db.ent_doc = {**db.ent_doc, "plan": "pro", "source": "revenuecat",
-                      "proUntil": annual, "productId": "machina_pro_annual"}
-
-    db.on_count = purchase_lands
-    assert ent.maybe_start_trial("u1") is False
-    assert db.writes == []
-    assert db.ent_doc["source"] == "revenuecat"
-    assert db.ent_doc["proUntil"] == annual
-    assert db.ent_doc.get("trialAnchorAt") is None
-    # Settled: a subscriber has no trial clock to watch.
-    assert "u1" in ent._TRIAL_SETTLED
-
-
-def test_an_anchor_written_meanwhile_is_not_moved(monkeypatch):
-    """Two card writes on two instances: the second must not move the clock
-    the first one started."""
-    db, created = _anchor_env(monkeypatch, cards=11)
-    first = created + 2 * DAY
-    monkeypatch.setattr(ent, "_now_ms", lambda: first + 60_000)
-
-    def other_instance_anchors():
-        db.ent_doc = {**db.ent_doc, "trialAnchorAt": first,
-                      "trialEndsAt": first + 14 * DAY, "proUntil": first + 14 * DAY}
-
-    db.on_count = other_instance_anchors
-    assert ent.maybe_start_trial("u1") is False
-    assert db.writes == []
-    assert db.ent_doc["trialAnchorAt"] == first
-    assert db.ent_doc["proUntil"] == first + 14 * DAY
-
-
-def test_anchor_failure_is_swallowed(monkeypatch):
-    class Boom:
-        def collection(self, _n):
-            raise RuntimeError("firestore down")
-
-    monkeypatch.setattr(ent, "get_db", lambda: Boom())
-    ent._TRIAL_SETTLED.clear()
-    # get_entitlement fails open to free, so there is no trial to anchor.
-    assert ent.maybe_start_trial("u1") is False
 
 
 def test_entitlement_summary_adds_the_trial_and_import_fields(monkeypatch):
@@ -470,6 +247,10 @@ def test_entitlement_summary_adds_the_trial_and_import_fields(monkeypatch):
     assert summary["quotas"]["imports"]["used"] == 40
     assert summary["quotas"]["saves"]["used"] == 2
     assert summary["waiting"] == 0
+    assert summary["freeLimits"] == {"saves": quota.quota_limit("saves", "free"),
+                                     "asks": quota.quota_limit("asks", "free"),
+                                     "imports": quota.quota_limit("imports", "free")}
+    assert summary["willRenew"] is None and summary["billingIssue"] is False
 
 
 # ── Owner grant and the founders' migration (2026-10-13) ─────────────────────
@@ -631,7 +412,80 @@ def test_no_owner_check_without_owner_email(monkeypatch):
     launch = _ms(ent.PRO_LAUNCH_AT)
     db = _owner_env(monkeypatch, {
         "users/u9": {"authUids": ["z1"], "createdAt": launch + 20 * DAY},
-        "entitlements/u9": {"plan": "pro", "source": "trial", "proUntil": launch + 80 * DAY},
+        "entitlements/u9": {"plan": "pro", "source": "trial", "proUntil": launch + 34 * DAY,
+                            "trialEndsAt": launch + 34 * DAY},
     }, {"z1": "me@example.com"}, owner_email=None)
     assert ent.get_entitlement("u9")["source"] == "trial"
     assert db.sets == []
+
+
+# ── The old 10th-save clock, retired 2026-10-13 ──────────────────────────────
+
+def test_an_unstarted_old_trial_starts_its_fourteen_days_on_read(monkeypatch):
+    launch = _ms(ent.PRO_LAUNCH_AT)
+    now = launch + 30 * DAY
+    monkeypatch.setattr(ent, "_now_ms", lambda: now)
+    db = _owner_env(monkeypatch, {
+        "users/u5": {"authUids": ["b5"], "createdAt": launch + 20 * DAY},
+        "entitlements/u5": {"plan": "pro", "source": "trial", "proUntil": launch + 80 * DAY,
+                            "trialEndsAt": None, "trialAnchorAt": None, ent.OWNER_CHECKED: True},
+    }, {})
+    doc = ent.get_entitlement("u5")
+    assert doc["trialAnchorAt"] == now
+    assert doc["trialEndsAt"] == now + 14 * DAY == doc["proUntil"]
+    assert db.docs["entitlements/u5"]["trialEndsAt"] == now + 14 * DAY
+
+
+def test_starting_an_old_trial_never_extends_the_pro_it_already_had(monkeypatch):
+    launch = _ms(ent.PRO_LAUNCH_AT)
+    now = launch + 70 * DAY
+    monkeypatch.setattr(ent, "_now_ms", lambda: now)
+    _owner_env(monkeypatch, {
+        "entitlements/u6": {"plan": "pro", "source": "trial", "proUntil": now + 3 * DAY,
+                            "trialEndsAt": None, "trialAnchorAt": None, ent.OWNER_CHECKED: True},
+    }, {})
+    assert ent.get_entitlement("u6")["trialEndsAt"] == now + 3 * DAY
+
+
+def test_a_lapsed_unstarted_trial_stays_free(monkeypatch):
+    launch = _ms(ent.PRO_LAUNCH_AT)
+    now = launch + 90 * DAY
+    monkeypatch.setattr(ent, "_now_ms", lambda: now)
+    _owner_env(monkeypatch, {
+        "entitlements/u7": {"plan": "pro", "source": "trial", "proUntil": launch + 60 * DAY,
+                            "trialEndsAt": None, "trialAnchorAt": None, ent.OWNER_CHECKED: True},
+    }, {})
+    doc = ent.get_entitlement("u7")
+    assert doc["trialEndsAt"] == launch + 60 * DAY
+    assert ent.effective_plan(doc, now) == "free"
+
+
+def test_pro_from_subscriber_reads_renewal_and_billing_state():
+    sub = {
+        "entitlements": {"pro": {"expires_date": "2099-01-01T00:00:00Z",
+                                 "product_identifier": "com.morhogeg.machina.pro.annual"}},
+        "subscriptions": {"com.morhogeg.machina.pro.annual": {"unsubscribe_detected_at": None,
+                                                              "billing_issues_detected_at": None}},
+    }
+    state = ent.pro_from_subscriber(sub)
+    assert state["willRenew"] is True and state["billingIssue"] is False
+    sub["subscriptions"]["com.morhogeg.machina.pro.annual"]["unsubscribe_detected_at"] = "2026-10-01T00:00:00Z"
+    sub["subscriptions"]["com.morhogeg.machina.pro.annual"]["billing_issues_detected_at"] = "2026-10-02T00:00:00Z"
+    state = ent.pro_from_subscriber(sub)
+    assert state["willRenew"] is False and state["billingIssue"] is True
+    del sub["subscriptions"]
+    assert ent.pro_from_subscriber(sub)["willRenew"] is None
+
+
+def test_a_dateless_trial_doc_is_ended_not_left_as_pro_forever(monkeypatch):
+    now = _ms(ent.PRO_LAUNCH_AT) + 50 * DAY
+    monkeypatch.setattr(ent, "_now_ms", lambda: now)
+    db = _owner_env(monkeypatch, {
+        "entitlements/u8": {"plan": "pro", "source": "trial", "proUntil": None,
+                            "trialEndsAt": None, "trialAnchorAt": None, ent.OWNER_CHECKED: True},
+    }, {})
+    doc = ent.get_entitlement("u8")
+    assert doc["proUntil"] == now and ent.effective_plan(doc, now + 1) == "free"
+    writes = len(db.sets)
+    ent.get_entitlement("u8")
+    assert len(db.sets) == writes

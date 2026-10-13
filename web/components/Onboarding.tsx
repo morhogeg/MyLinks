@@ -47,7 +47,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
     const [showHow, setShowHow] = useState(false);
     const [importing, setImporting] = useState(false);
     // One line, only for a reverse trial (never for the owner or subscribers).
-    const { isTrial, trialStarted, trialAnchorCards } = useEntitlement();
+    const { isTrial } = useEntitlement();
     // This screen only ever shows for a library that was just created. The
     // commonest way to land here by mistake: an existing user who signed up
     // with Apple and today tapped Google (or the reverse) — Firebase then has
@@ -94,9 +94,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
                         )}
                         {isTrial && (
                             <p className={`${showHow || authUid ? 'mt-3' : ''} text-[12px] text-text-muted text-center leading-relaxed`}>
-                                {trialStarted
-                                    ? 'Pro is free for your first 14 days. Nothing to cancel.'
-                                    : `Pro is free for your first 14 days. The clock starts once you’ve saved ${trialAnchorCards} things.`}
+                                Pro is free for your first 14 days. Nothing to cancel.
                             </p>
                         )}
                     </>

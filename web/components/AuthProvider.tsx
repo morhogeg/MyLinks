@@ -327,17 +327,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const signOut = useCallback(async () => {
         // Remove this device's push token BEFORE signing out — the unregister
         // endpoint verifies the caller's ID token, which is gone afterwards.
-        try {
-            await unregisterPush();
-        } catch {
-            // Dead tokens are also pruned server-side on the next send.
-        }
+        // Bounded: the plugin's getToken can wait forever when this device
+        // never registered for push. Dead tokens are also pruned server-side
+        // on the next send.
+        await settleWithin(unregisterPush(), 4000);
         // Web: a browser extension connected to this account would keep
         // saving into it after sign-out (a shared computer). Disconnect it;
         // one connected to a different account is left alone.
         if (!isNativeApp() && currentIngestToken) {
             const { disconnectExtensionFor } = await import('@/lib/extension');
-            await disconnectExtensionFor(currentIngestToken);
+            await settleWithin(disconnectExtensionFor(currentIngestToken), 3000);
         }
         await signOutUser();
         setUid(null);

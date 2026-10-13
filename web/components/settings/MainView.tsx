@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { RotateCcw } from 'lucide-react';
 import { Bell, BellRing, Sun, Moon, Monitor, Clock, Compass, Lock, BarChart3, Heart, Crown, Puzzle, Upload } from 'lucide-react';
 import { policyUrl, openExternal } from '@/lib/share';
 import { isNativeApp } from '@/lib/api';
@@ -11,6 +12,11 @@ import { accountTitle, isPrivateRelay } from './AccountSection';
 import StopCardLinks from './StopCardLinks';
 import ImportSheet from '@/components/ImportSheet';
 import { useEntitlement } from '@/components/EntitlementProvider';
+import { useToast } from '@/components/Toast';
+import { planDate, endsPhrase, daysLeftLabel, syncEntitlement } from '@/lib/entitlement';
+import { restore, purchasesAvailability } from '@/lib/purchases';
+import { hapticLight, hapticSuccess } from '@/lib/haptics';
+import { reportError } from '@/lib/errorReporter';
 import type { Settings, View } from './types';
 import {
     SectionHeader, Footnote, List, RowShell, RowText, Chevron,
@@ -48,23 +54,61 @@ export function MainView({
     go: (v: View) => void;
 }) {
     const remindersOrDigest = settings.reminders_enabled || settings.digest_enabled;
-    // Machina Pro row: one line of truth about the plan, and the way to change it.
+    // Plan section: one row that says exactly where the account stands (and
+    // opens the plan sheet), the Apple-side actions next to it, and one
+    // footnote with the date or the numbers that matter for this state.
     const ent = useEntitlement();
-    // A trial whose 14 days have not started yet has no countdown to show: the
-    // clock begins at the tenth card, so "0 days left" would be a lie.
-    const proValue = !ent.loaded
-        ? undefined
-        : ent.isTrial && !ent.trialStarted
-            ? 'trial'
-            : ent.isTrial
-            ? `trial, ${ent.daysLeft ?? 0} ${ent.daysLeft === 1 ? 'day' : 'days'} left`
-            : ent.isPro
-                ? 'active'
-                : undefined;
-    const proTitle = ent.loaded && !ent.isPro ? 'Upgrade to Pro' : 'Machina Pro';
+    const toast = useToast();
+    const subscribed = ent.isPro && ent.source === 'revenuecat';
+    const lastingPro = ent.isPro && !ent.isTrial;
+    const endsOn = planDate(ent.endsAt);
+    const proTitle = !ent.loaded ? 'Machina Pro'
+        : ent.isTrial ? 'Pro trial'
+            : ent.isPro ? 'Machina Pro' : 'Upgrade to Pro';
+    const proValue = !ent.loaded ? undefined
+        : ent.isTrial
+            ? (ent.endsAt !== null ? daysLeftLabel(ent.endsAt) : undefined)
+            : subscribed && ent.billingIssue ? 'Payment issue'
+                : subscribed && ent.willRenew === false && endsOn ? `Ends ${endsOn}`
+                    : subscribed && endsOn ? `Renews ${endsOn}`
+                        : ent.isPro ? 'Active' : 'Free';
+    const planNote = !ent.loaded ? null
+        : ent.isTrial && ent.endsAt !== null
+            ? `Your trial ends ${endsPhrase(ent.endsAt)}. After that you keep the free plan and everything you saved. Nothing to cancel.`
+            : subscribed && ent.billingIssue
+                ? 'Apple couldn’t charge your payment method. Update it in Manage subscription to keep Pro.'
+                : subscribed && ent.willRenew === false
+                    ? `Renewal is off, so Pro stays on until ${endsOn ?? 'the end of this period'} and then stops. Turn it back on in Manage subscription.`
+                    : subscribed
+                        ? 'Billed by Apple. Change your plan or cancel anytime in Manage subscription; Pro stays on until the end of the period you paid for.'
+                        : !ent.isPro && ent.quotas.saves.limit > 0
+                            ? `This month: ${ent.quotas.saves.used} of ${ent.quotas.saves.limit} saves and ${ent.quotas.asks.used} of ${ent.quotas.asks.limit} questions. Resets on the 1st.`
+                            : null;
     const manageSubscription = () => openExternal(isNativeApp()
         ? 'itms-apps://apps.apple.com/account/subscriptions'
         : 'https://apps.apple.com/account/subscriptions');
+    // Restore lives here as well as on the plan sheet: someone who reinstalled
+    // or changed phones looks for it in Settings first.
+    const [restoring, setRestoring] = useState(false);
+    const canRestore = purchasesAvailability().available && !lastingPro;
+    const doRestore = async () => {
+        if (restoring) return;
+        hapticLight();
+        setRestoring(true);
+        try {
+            const r = await restore();
+            if (r.ok) {
+                try { await syncEntitlement(); } catch (e) { reportError(e, 'settings.restore.sync'); }
+                await ent.refresh();
+                if (r.pro) { hapticSuccess(); toast.success('Machina Pro restored.'); }
+                else toast.info('No Machina Pro purchase was found for this Apple ID.');
+            } else if (!r.cancelled) {
+                toast.error(r.message);
+            }
+        } finally {
+            setRestoring(false);
+        }
+    };
     // The same sheet the first run opens, reachable for good from Settings.
     const [importing, setImporting] = useState(false);
     return (
@@ -107,13 +151,16 @@ export function MainView({
                             value={proValue}
                             onClick={() => ent.openPaywall('settings')}
                         />
-                        {ent.isPro && ent.source === 'revenuecat' && (
+                        {subscribed && (
                             <ExternalRow title="Manage subscription" onClick={manageSubscription} />
                         )}
+                        {canRestore && (
+                            <RowShell tile={<RotateCcw className="w-[16px] h-[16px]" />} onClick={restoring ? undefined : doRestore}>
+                                <RowText title={restoring ? 'Restoring…' : 'Restore Purchases'} />
+                            </RowShell>
+                        )}
                     </List>
-                    {ent.loaded && !ent.isPro && (
-                        <Footnote>Unlimited saves and questions, the full weekly synthesis, curated digests, and video transcripts.</Footnote>
-                    )}
+                    {planNote && <Footnote>{planNote}</Footnote>}
                 </>
             )}
 

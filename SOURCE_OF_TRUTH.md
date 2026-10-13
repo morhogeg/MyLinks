@@ -2593,6 +2593,51 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-13 (late night) — PRO/FREE MADE AIRTIGHT + SIGN-OUT FIX (owner:
+  "comprehensive overview of all aspects and UX related to the pro and free
+  plan, apple grade and airtight").** An inventory of every plan surface found
+  these gaps, now closed. **Trial rule (owner's call, replaces the 10th-save
+  anchor):** 14 days from workspace creation, fixed in `grant_for` at creation
+  (`trialAnchorAt = createdAt`); createdAt still inherits across
+  delete-and-recreate, so it can't be restarted. Old docs whose clock never
+  started get 14 days from their next read, capped at the Pro they already held
+  (`_start_unstarted_trial`; lapsed ones are only marked). `maybe_start_trial`
+  and its links-trigger call were removed (dead under the new rule).
+  **Countdown:** paywall trial card ("Pro trial · 9 days left", a bar that
+  empties, "Ends on Oct 22. Then you keep the free plan and everything you
+  saved. Nothing to cancel."), Settings row "Pro trial · 9 days left" with the
+  end date in the footnote; all counts use calendar days (`daysLeftLabel`,
+  `endsPhrase`) so "1 day left" never sits next to "Ends today". Trial CTA "Keep
+  Pro"; its billing line says billing starts today (the 14 days are Machina's,
+  Apple bills at purchase). **Subscription management:** RevenueCat sync now
+  stores `willRenew` (from `unsubscribe_detected_at`) and `billingIssue`; the
+  summary returns them plus `productId` and `freeLimits`. Subscriber card on
+  the sheet: "Machina Pro · Yearly", "Renews Oct 13, 2027" / "Renewal is off.
+  Pro stays on until …" / payment-issue warning, a "Manage in the App Store"
+  button and "Change your plan or cancel there". Settings: row value "Renews
+  Oct 13" / "Ends …" / "Payment issue" / "Free" / "Active", Manage
+  subscription, and a new **Restore Purchases** row (native, non-Pro). Free
+  footnote shows this month's usage ("12 of 50 saves and 3 of 20 questions").
+  Cancellation is only ever via the App Store, and every billing line now
+  says so ("Cancel anytime in your App Store subscriptions"). **No hardcoded
+  limits:** the comparison table reads `freeLimits` from the server. **One
+  name:** "Weekly synthesis" everywhere (the app uses it in five places; round
+  2's "weekly recap" reverted). Extension fallback "on the 1st" → "next
+  month". Trial-nudge body no longer quotes this month's metered counts as if
+  they were the library. Onboarding: "Pro is free for your first 14 days.
+  Nothing to cancel." **Sign-out (owner: "tapping sign out does nothing"):**
+  every step is now time-bounded (`bounded` in `lib/auth.ts`: share config,
+  export files, RevenueCat logOut, native Firebase sign-out, JS sign-out,
+  cache purge; `unregisterPush` and the extension disconnect in
+  AuthProvider), and Settings stays open reading "Signing out…" until the
+  reload instead of closing first. Likely cause: RevenueCat `logOut` began
+  running with build 1358 (first build with the key) and could stall; not
+  confirmed on device. **Question answered:** "Search & collections" stays
+  the last table row on purpose (the one row both plans share, read after
+  what Pro adds). Verified: pytest 1909, tsc, eslint, em-dash check,
+  extension tests; paywall render-verified light + dark (trial, last day,
+  subscriber renewing / off / payment issue, free, 375×667). Not verified:
+  Settings plan section rendering, sign-out on device, real StoreKit prices.
 - **2026-10-13 (night) — PAYWALL ROUND 2 ("messy and confusing, make it Apple
   grade") + OWNER CHECK FOR EXISTING DOCS.** Round 1 on device (build 1362)
   still read as busy: an eyebrow, a title, a status line, five boxed feature
