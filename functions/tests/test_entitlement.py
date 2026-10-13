@@ -596,3 +596,42 @@ def test_revenuecat_sync_never_moves_the_owner_off_the_owner_grant(monkeypatch):
         doc = ent.sync_from_revenuecat("+972", "a1")
         assert doc["source"] == "owner" and doc["proUntil"] is None
         assert ent.effective_plan(db.docs["entitlements/+972"]) == "pro"
+
+
+def test_an_existing_trial_doc_on_the_owner_account_moves_to_the_owner_grant(monkeypatch):
+    """The owner's phone can be signed into a workspace whose trial doc predates
+    the owner grant; its first read checks it once and promotes it."""
+    launch = _ms(ent.PRO_LAUNCH_AT)
+    db = _owner_env(monkeypatch, {
+        "users/a1": {"authUids": ["a1"], "createdAt": launch + 20 * DAY},
+        "entitlements/a1": {"plan": "pro", "source": "trial", "proUntil": launch + 80 * DAY,
+                            "trialEndsAt": None, "trialAnchorAt": None},
+    }, {"a1": "me@example.com"})
+    doc = ent.get_entitlement("a1")
+    assert doc["source"] == "owner" and doc["proUntil"] is None
+    assert db.docs["entitlements/a1"][ent.OWNER_CHECKED] is True
+
+
+def test_the_owner_check_runs_once_per_existing_doc(monkeypatch):
+    launch = _ms(ent.PRO_LAUNCH_AT)
+    calls = []
+    db = _owner_env(monkeypatch, {
+        "users/u9": {"authUids": ["z1"], "createdAt": launch + 20 * DAY},
+        "entitlements/u9": {"plan": "pro", "source": "trial", "proUntil": launch + 80 * DAY},
+    }, {"z1": "someone@else.com"})
+    real = ent.is_owner_workspace
+    monkeypatch.setattr(ent, "is_owner_workspace", lambda uid: calls.append(uid) or real(uid))
+    assert ent.get_entitlement("u9")["source"] == "trial"
+    ent.get_entitlement("u9")
+    assert calls == ["u9"]
+    assert db.docs["entitlements/u9"][ent.OWNER_CHECKED] is True
+
+
+def test_no_owner_check_without_owner_email(monkeypatch):
+    launch = _ms(ent.PRO_LAUNCH_AT)
+    db = _owner_env(monkeypatch, {
+        "users/u9": {"authUids": ["z1"], "createdAt": launch + 20 * DAY},
+        "entitlements/u9": {"plan": "pro", "source": "trial", "proUntil": launch + 80 * DAY},
+    }, {"z1": "me@example.com"}, owner_email=None)
+    assert ent.get_entitlement("u9")["source"] == "trial"
+    assert db.sets == []
