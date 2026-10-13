@@ -31,16 +31,22 @@ export interface Entitlement {
     plan: Plan;
     source: EntitlementSource;
     proUntil: number | null;
-    /** When the trial ends. Null on a trial whose clock has not started yet. */
+    /** When the trial ends: 14 days from sign-up (since 2026-10-13). */
     trialEndsAt: number | null;
-    /**
-     * When the library reached `trialAnchorCards` cards and the 14 days began.
-     * Null means the trial is granted but not yet running: the user is Pro, and
-     * the countdown has not started.
-     */
+    /** When the trial's 14 days began. Null only on an old doc not read since. */
     trialAnchorAt: number | null;
-    /** How many cards start the trial clock (the server owns the number). */
-    trialAnchorCards: number;
+    /** App Store product of a subscription (…pro.annual / …pro.monthly), or null. */
+    productId: string | null;
+    /**
+     * Whether Apple will charge again at `proUntil`. False once the user
+     * cancelled (Pro still runs to the end of the paid period); null when
+     * unknown or not a subscription.
+     */
+    willRenew: boolean | null;
+    /** Apple could not charge the payment method (grace period / retry). */
+    billingIssue: boolean;
+    /** The free plan's numbers, from the server, so no screen hardcodes them. */
+    freeLimits: { saves: number; asks: number; imports: number };
     quotas: { saves: QuotaMeter; asks: QuotaMeter; imports: QuotaMeter };
     /**
      * Saves kept past the monthly allowance and not read yet (`status:
@@ -68,7 +74,11 @@ const FREE_ENTITLEMENT: Entitlement = {
     proUntil: null,
     trialEndsAt: null,
     trialAnchorAt: null,
-    trialAnchorCards: 10,
+    productId: null,
+    willRenew: null,
+    billingIssue: false,
+    // Fallbacks for a server that predates the field (functions/quota.py).
+    freeLimits: { saves: 50, asks: 20, imports: 500 },
     quotas: {
         saves: { used: 0, limit: 0 },
         asks: { used: 0, limit: 0 },
@@ -101,9 +111,14 @@ export function parseEntitlement(raw: unknown): Entitlement {
         proUntil: numOrNull(r.proUntil),
         trialEndsAt: numOrNull(r.trialEndsAt),
         trialAnchorAt: numOrNull(r.trialAnchorAt),
-        // A server that predates the anchor rule sends no number; the copy that
-        // reads it says "10 things", so that is the fallback.
-        trialAnchorCards: numOrNull(r.trialAnchorCards) ?? FREE_ENTITLEMENT.trialAnchorCards,
+        productId: typeof r.productId === 'string' && r.productId ? r.productId : null,
+        willRenew: typeof r.willRenew === 'boolean' ? r.willRenew : null,
+        billingIssue: r.billingIssue === true,
+        freeLimits: (() => {
+            const f = (r.freeLimits && typeof r.freeLimits === 'object' ? r.freeLimits : {}) as Record<string, unknown>;
+            const d = FREE_ENTITLEMENT.freeLimits;
+            return { saves: numOrNull(f.saves) ?? d.saves, asks: numOrNull(f.asks) ?? d.asks, imports: numOrNull(f.imports) ?? d.imports };
+        })(),
         quotas: { saves: meter('saves'), asks: meter('asks'), imports: meter('imports') },
         waiting: num(r.waiting),
     };
@@ -202,6 +217,43 @@ export function announceWaitingSave(data: WaitingSave): string | null {
         return null;
     }
     return typeof data.message === 'string' && data.message ? data.message : waitingSaveMessage(false);
+}
+
+/**
+ * A plan date the way Apple writes them: "Oct 27", with the year only when it
+ * isn't this year ("Oct 13, 2027"). Null when there is no date.
+ */
+export function planDate(ts: number | null, now = Date.now()): string | null {
+    if (ts === null) return null;
+    const d = new Date(ts);
+    const sameYear = d.getFullYear() === new Date(now).getFullYear();
+    return d.toLocaleDateString(undefined, sameYear
+        ? { month: 'short', day: 'numeric' }
+        : { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+/**
+ * When something ends, as a person would say it: "today", "tomorrow", or
+ * "on Oct 27". Calendar days in the viewer's time zone, not 24-hour blocks,
+ * so a trial ending at 9am tomorrow never reads as "today".
+ */
+export function endsPhrase(ts: number, now = Date.now()): string {
+    const diff = calendarDaysUntil(ts, now);
+    if (diff <= 0) return 'today';
+    if (diff === 1) return 'tomorrow';
+    return `on ${planDate(ts, now)}`;
+}
+
+/** Calendar days from today to `ts` in the viewer's time zone (0 = today). */
+export function calendarDaysUntil(ts: number, now = Date.now()): number {
+    const day = (t: number) => { const d = new Date(t); return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); };
+    return Math.max(0, Math.round((day(ts) - day(now)) / 86_400_000));
+}
+
+/** "Last day", "1 day left", "9 days left": a countdown that agrees with endsPhrase. */
+export function daysLeftLabel(ts: number, now = Date.now()): string {
+    const n = calendarDaysUntil(ts, now);
+    return n === 0 ? 'Last day' : `${n} ${n === 1 ? 'day' : 'days'} left`;
 }
 
 /** Whole days until `ts`, floored at 0; null when there is no date. */

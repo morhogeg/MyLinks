@@ -36,14 +36,16 @@ interface EntitlementContextType {
     daysLeft: number | null;
     /** True while a reverse trial is what makes the plan Pro. */
     isTrial: boolean;
-    /**
-     * True once the trial's 14 days are actually running. A brand-new workspace
-     * is on the trial from day one, but the clock only starts at the tenth card,
-     * so an unstarted trial has no end date and no days left to show.
-     */
-    trialStarted: boolean;
-    /** How many cards start that clock (the server owns the number). */
-    trialAnchorCards: number;
+    /** When the current grant ends (trial end, subscription period end), or null (no end). */
+    endsAt: number | null;
+    /** The subscription's billing period, read from its App Store product. */
+    period: 'annual' | 'monthly' | null;
+    /** Whether Apple will charge again at `endsAt` (subscriptions only; null when unknown). */
+    willRenew: boolean | null;
+    /** Apple could not charge the payment method. */
+    billingIssue: boolean;
+    /** The free plan's monthly saves / asks and lifetime imports. */
+    freeLimits: Entitlement['freeLimits'];
     quotas: Entitlement['quotas'];
     /** Saves kept past the monthly allowance, not read yet (the paywall says so). */
     waiting: number;
@@ -52,6 +54,9 @@ interface EntitlementContextType {
     refresh: () => Promise<void>;
     openPaywall: (reason?: PaywallReason) => void;
 }
+
+// Shown only until the first fetch answers (the server owns the real numbers).
+const DEFAULT_FREE_LIMITS: Entitlement['freeLimits'] = { saves: 50, asks: 20, imports: 500 };
 
 const UNMETERED: Entitlement['quotas'] = {
     saves: { used: 0, limit: 0 },
@@ -67,8 +72,11 @@ const EntitlementContext = createContext<EntitlementContextType>({
     trialEndsAt: null,
     daysLeft: null,
     isTrial: false,
-    trialStarted: false,
-    trialAnchorCards: 10,
+    endsAt: null,
+    period: null,
+    willRenew: null,
+    billingIssue: false,
+    freeLimits: DEFAULT_FREE_LIMITS,
     quotas: UNMETERED,
     waiting: 0,
     loaded: false,
@@ -180,13 +188,12 @@ export function EntitlementProvider({ children }: { children: ReactNode }) {
         const isPro = plan === 'pro';
         const source = live?.source ?? null;
         const isTrial = isPro && source === 'trial';
-        // An unstarted trial holds Pro until a far-off ceiling. Reporting THAT
-        // as "days left" would advertise a 60-day trial, so a trial with no
-        // anchor has no countdown at all until the tenth card starts it.
-        const trialStarted = !isTrial || live?.trialAnchorAt != null;
         const until = !isPro ? null
-            : isTrial ? (trialStarted ? live?.trialEndsAt ?? null : null)
+            : isTrial ? live?.trialEndsAt ?? live?.proUntil ?? null
                 : live?.proUntil ?? null;
+        const productId = live?.productId ?? '';
+        const period = /annual|yearly/.test(productId) ? 'annual' as const
+            : /monthly/.test(productId) ? 'monthly' as const : null;
         return {
             plan,
             isPro,
@@ -195,8 +202,11 @@ export function EntitlementProvider({ children }: { children: ReactNode }) {
             trialEndsAt: live?.trialEndsAt ?? null,
             daysLeft: daysUntil(until),
             isTrial,
-            trialStarted,
-            trialAnchorCards: live?.trialAnchorCards ?? 10,
+            endsAt: until,
+            period,
+            willRenew: live?.willRenew ?? null,
+            billingIssue: live?.billingIssue ?? false,
+            freeLimits: live?.freeLimits ?? DEFAULT_FREE_LIMITS,
             quotas: live?.quotas ?? UNMETERED,
             waiting: live?.waiting ?? 0,
             loaded: live !== null,

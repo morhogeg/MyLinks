@@ -340,10 +340,8 @@ class _EvSnap:
 
 def _run_trigger(monkeypatch, db, after, before):
     import search
-    import entitlement
     monkeypatch.setattr(search, "get_db", lambda: db)
     monkeypatch.setattr(search, "check_rate_limit", lambda *a, **k: True)
-    monkeypatch.setattr(entitlement, "maybe_start_trial", lambda uid: None)
 
     class FakeES:
         def generate_embedding(self, text):

@@ -73,7 +73,7 @@ check('a server message replaces the stock line', d({ ok: true, status: 200, bod
 const w = d({ ok: true, status: 200, body: { success: true, saved: true, queued: false, waiting: true, upgrade: true, message: 'Saved. Machina will read it on the 1st, or now with Pro.' } });
 check('waiting -> saved for later + upgrade', w.state === 'waiting' && w.title === 'Saved for later' && w.action === 'upgrade' && w.detail.startsWith('Saved. Machina will read it'));
 check('waiting on Pro -> no upgrade action', d({ ok: true, status: 200, body: { success: true, waiting: true, upgrade: false } }).action === 'open');
-check('waiting with no message still explains', /on the 1st/.test(d({ ok: true, status: 200, body: { success: true, waiting: true, upgrade: false } }).detail));
+check('waiting with no message still explains', /next month/.test(d({ ok: true, status: 200, body: { success: true, waiting: true, upgrade: false } }).detail));
 check('duplicate', d({ ok: true, status: 200, body: { success: true, duplicate: true } }).state === 'duplicate');
 check('200 with no JSON is NOT called saved', d({ ok: true, status: 200, body: null }).state === 'unknown');
 check('200 {success:false} is NOT called saved', d({ ok: true, status: 200, body: { success: false } }).state === 'unknown');

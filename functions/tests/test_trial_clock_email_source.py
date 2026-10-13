@@ -106,7 +106,7 @@ def test_a_foreign_email_on_the_doc_cannot_claim_a_founders_clock(monkeypatch, a
     doc = ent.get_entitlement("attacker")
 
     assert doc["source"] == "trial"
-    assert doc["proUntil"] == created + ent.TRIAL_CEILING_DAYS * DAY
+    assert doc["proUntil"] == created + ent.TRIAL_DAYS * DAY
     user = db.store["users"]["attacker"]
     assert user["createdAt"] == created          # nothing inherited, nothing learned
     assert user[ent.TRIAL_CLOCK_CHECKED] is True
@@ -123,7 +123,7 @@ def test_leaving_the_email_out_no_longer_resets_the_clock(monkeypatch, auth_acco
 
     doc = ent.get_entitlement("again")
 
-    assert doc["proUntil"] == first + ent.TRIAL_CEILING_DAYS * DAY
+    assert doc["proUntil"] == first + ent.TRIAL_DAYS * DAY
     assert db.store["users"]["again"]["createdAt"] == first
 
 

@@ -13,7 +13,7 @@ import { isNativeApp } from '@/lib/api';
 import { hapticLight, hapticSuccess, hapticWarning } from '@/lib/haptics';
 import { track } from '@/lib/analytics';
 import { reportError } from '@/lib/errorReporter';
-import { syncEntitlement, type PaywallReason } from '@/lib/entitlement';
+import { syncEntitlement, planDate, endsPhrase, daysLeftLabel, calendarDaysUntil, type PaywallReason } from '@/lib/entitlement';
 import {
     ProPackage, ProPeriod, getOfferings, purchase, restore, purchasesAvailability, annualSavingsPercent, annualPerMonth,
 } from '@/lib/purchases';
@@ -46,7 +46,7 @@ const HEADLINE: Record<PaywallReason, string> = {
     saves: 'You’ve used this month’s free saves',
     asks: 'You’ve used this month’s free questions',
     imports: 'You’ve imported everything the free plan includes',
-    synthesis: 'Read the whole weekly recap',
+    synthesis: 'Read the whole weekly synthesis',
     digest: 'Curated digests come with Pro',
     youtube: 'YouTube key moments come with Pro',
     settings: 'Machina Pro',
@@ -56,14 +56,15 @@ const HEADLINE: Record<PaywallReason, string> = {
 // Free vs Pro, one row per difference, read as a table: the free column says
 // exactly what you keep, the Pro column what you get. Icons are the app's own
 // for each feature (+ the add button, MessagesSquare the Ask tab, the citation
-// glyph the weekly recap card, Newspaper the digest card, Youtube the video
+// glyph the weekly synthesis card, Newspaper the digest card, Youtube the video
 // scan, Layers the Collections tab). The last row is what both plans share,
 // so free never reads as a trap.
 type Cell = string | boolean;
-const COMPARISON: { icon: React.ReactNode; label: string; free: Cell; pro: Cell }[] = [
-    { icon: <Plus className="w-4 h-4" />, label: 'Saves', free: '50/month', pro: 'Unlimited' },
-    { icon: <MessagesSquare className="w-4 h-4" />, label: 'Ask Machina', free: '20/month', pro: 'Unlimited' },
-    { icon: <CitationGlyph className="w-3.5 h-auto" />, label: 'Weekly recap', free: 'Preview', pro: 'Full' },
+// The free numbers come from the server (functions/quota.py), never from here.
+const comparison = (free: { saves: number; asks: number }): { icon: React.ReactNode; label: string; free: Cell; pro: Cell }[] => [
+    { icon: <Plus className="w-4 h-4" />, label: 'Saves', free: `${free.saves}/month`, pro: 'Unlimited' },
+    { icon: <MessagesSquare className="w-4 h-4" />, label: 'Ask Machina', free: `${free.asks}/month`, pro: 'Unlimited' },
+    { icon: <CitationGlyph className="w-3.5 h-auto" />, label: 'Weekly synthesis', free: 'Preview', pro: 'Full' },
     { icon: <Newspaper className="w-4 h-4" />, label: 'Curated digests', free: false, pro: true },
     { icon: <Youtube className="w-4 h-4" />, label: 'YouTube key moments', free: false, pro: true },
     { icon: <Layers className="w-4 h-4" />, label: 'Search & collections', free: true, pro: true },
@@ -87,7 +88,9 @@ export default function Paywall({
     /** Re-fetch the entitlement after a purchase or restore. */
     onPurchased: () => Promise<void>;
 }) {
-    const { isTrial, trialStarted, trialAnchorCards, daysLeft, isPro, source, waiting } = useEntitlement();
+    const {
+        isTrial, isPro, source, waiting, endsAt, period: subPeriod, willRenew, billingIssue, freeLimits,
+    } = useEntitlement();
     const availability = purchasesAvailability();
     const [packages, setPackages] = useState<ProPackage[] | null>(null);
     const [period, setPeriod] = useState<ProPeriod>('annual');
@@ -201,19 +204,29 @@ export default function Paywall({
             ? `${waiting} ${waiting === 1 ? 'save is' : 'saves are'} waiting to be read. Machina reads them next month, or right away with Pro.`
             : 'Your saves are kept. Machina reads them next month, or right away with Pro.')
         : null;
-    const trialLine = isTrial && !trialStarted
-        ? `Pro is free for 14 days, starting from your ${trialAnchorCards}th save.`
-        : isTrial && daysLeft !== null
-            ? (daysLeft === 0 ? 'Your free trial ends today.' : `Your free trial has ${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} left.`)
-            : null;
     // Already Pro for good (a subscription, or the owner's own account): there
-    // is nothing to buy, so the plan picker gives way to a status line.
+    // is nothing to buy, so the plan picker gives way to a status card.
     const proActive = isPro && !isTrial;
     const perMonth = annualPerMonth(annual);
+    const rows = comparison(freeLimits);
+    // The trial counts down from sign-up: days left, a bar that empties, and
+    // the date it ends, so nobody is surprised on day 15.
+    const trialLeft = isTrial && endsAt !== null ? calendarDaysUntil(endsAt) : null;
+    const trialFraction = trialLeft !== null ? Math.max(0.04, Math.min(1, trialLeft / 14)) : 0;
+    const endsOn = planDate(endsAt);
 
-    const legalLine = priceOf(period)
-        ? `${priceOf(period)} ${PERIOD_LABEL[period].per}. Renews automatically; cancel anytime in Settings.`
-        : 'Renews automatically; cancel anytime in Settings.';
+    // Apple bills the moment someone subscribes, trial or not (the 14 days are
+    // Machina's, not the App Store's), so a trial user is told so up front.
+    // Cancelling happens in the App Store, never in the app, so that is where
+    // the sheet says to go.
+    const price = priceOf(period);
+    const legalLine = [
+        price ? `${isTrial ? 'Billing starts today: ' : ''}${price} ${PERIOD_LABEL[period].per}.` : null,
+        'Renews automatically. Cancel anytime in your App Store subscriptions.',
+    ].filter(Boolean).join(' ');
+    const manageSubscription = () => openExternal(isNativeApp()
+        ? 'itms-apps://apps.apple.com/account/subscriptions'
+        : 'https://apps.apple.com/account/subscriptions');
 
     return (
         <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center animate-fade-in">
@@ -235,8 +248,8 @@ export default function Paywall({
                             <h2 className="text-[26px] font-bold text-text leading-tight tracking-[-0.02em]">
                                 {HEADLINE[reason]}
                             </h2>
-                            {(waitingLine || trialLine) && (
-                                <p className="mt-1.5 text-[14px] text-text-secondary leading-snug">{waitingLine ?? trialLine}</p>
+                            {waitingLine && (
+                                <p className="mt-1.5 text-[14px] text-text-secondary leading-snug">{waitingLine}</p>
                             )}
                         </div>
                         <button
@@ -252,7 +265,23 @@ export default function Paywall({
                     </div>
                 </div>
 
-                <div className="flex-1 min-h-0 overflow-y-auto px-6 pt-4 pb-2">
+                <div className="flex-1 min-h-0 overflow-y-auto px-6 pt-4 pb-4 [mask-image:linear-gradient(to_bottom,black_calc(100%-20px),transparent)]">
+                    {trialLeft !== null && (
+                        <div className="mb-4 rounded-2xl bg-card-hover px-4 py-3.5">
+                            <div className="flex items-baseline justify-between gap-3">
+                                <span className="text-[15px] font-semibold text-text">Pro trial</span>
+                                <span className="text-[15px] font-semibold text-text tabular-nums">
+                                    {daysLeftLabel(endsAt as number)}
+                                </span>
+                            </div>
+                            <div className="mt-2.5 h-1.5 rounded-full bg-fill-strong overflow-hidden" aria-hidden>
+                                <div className="h-full rounded-full bg-accent" style={{ width: `${trialFraction * 100}%` }} />
+                            </div>
+                            <p className="mt-2.5 text-[12.5px] text-text-muted leading-snug">
+                                Ends {endsPhrase(endsAt as number)}. Then you keep the free plan and everything you saved. Nothing to cancel.
+                            </p>
+                        </div>
+                    )}
                     <table className="w-full text-[14px] leading-tight border-collapse">
                         <thead>
                             <tr className="text-[12px] font-semibold">
@@ -264,7 +293,7 @@ export default function Paywall({
                             </tr>
                         </thead>
                         <tbody>
-                            {COMPARISON.map((row) => (
+                            {rows.map((row) => (
                                 <tr key={row.label} className="border-t border-border-subtle">
                                     <th scope="row" className="py-3 pe-2 text-start font-medium text-text">
                                         <span className="flex items-center gap-2.5">
@@ -281,21 +310,33 @@ export default function Paywall({
                 </div>
 
                 <div className="shrink-0 px-6 pt-3">
-                    {proActive ? (
-                        <div className="rounded-2xl bg-card-hover px-4 py-4 text-center">
+                    {proActive && source === 'revenuecat' ? (
+                        <div className="rounded-2xl bg-card-hover px-4 py-4">
                             <p className="text-[15px] font-semibold text-text">
-                                {source === 'owner' ? 'Machina Pro is on for this account' : 'Machina Pro is active'}
+                                Machina Pro{subPeriod ? ` · ${PERIOD_LABEL[subPeriod].name}` : ''}
                             </p>
-                            {source === 'revenuecat' && (
-                                <button
-                                    onClick={() => openExternal(isNativeApp()
-                                        ? 'itms-apps://apps.apple.com/account/subscriptions'
-                                        : 'https://apps.apple.com/account/subscriptions')}
-                                    className="mt-1 min-h-[44px] px-2 text-[14px] font-semibold text-accent active:opacity-60 cursor-pointer"
-                                >
-                                    Manage subscription
-                                </button>
-                            )}
+                            <p className={`mt-1 text-[13px] leading-snug ${billingIssue ? 'text-warning' : 'text-text-secondary'}`}>
+                                {billingIssue
+                                    ? 'Apple couldn’t charge your payment method. Update it to keep Pro.'
+                                    : willRenew === false
+                                        ? `Renewal is off. Pro stays on until ${endsOn ?? 'the end of this period'}.`
+                                        : endsOn ? `Renews ${endsOn}.` : 'Active.'}
+                            </p>
+                            <Button
+                                variant="secondary"
+                                radius="full"
+                                onClick={manageSubscription}
+                                className="mt-3 w-full h-11 text-[15px] font-semibold"
+                            >
+                                Manage in the App Store
+                            </Button>
+                            <p className="mt-2 text-[12px] text-text-muted leading-snug">
+                                Change your plan or cancel there. Pro stays on until the end of the period you paid for.
+                            </p>
+                        </div>
+                    ) : proActive ? (
+                        <div className="rounded-2xl bg-card-hover px-4 py-4 text-center">
+                            <p className="text-[15px] font-semibold text-text">Machina Pro is on for this account</p>
                         </div>
                     ) : availability.available ? (
                         <>
@@ -341,7 +382,7 @@ export default function Paywall({
                                 disabled={!canBuy}
                                 className={`${offeringsFailed ? 'mt-1' : 'mt-4'} w-full h-[52px] text-[17px] font-semibold`}
                             >
-                                {busy === 'purchase' ? 'Opening the App Store…' : 'Subscribe'}
+                                {busy === 'purchase' ? 'Opening the App Store…' : isTrial ? 'Keep Pro' : 'Subscribe'}
                             </Button>
                             <p className="mt-2.5 text-center text-[12px] text-text-muted leading-snug">{legalLine}</p>
                         </>

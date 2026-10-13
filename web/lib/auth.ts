@@ -326,54 +326,69 @@ export function isSigningOut(): boolean {
 }
 
 /** Native-only credentials and caches that live outside the WebView's storage. */
+/**
+ * Wait for one sign-out step, but never longer than `ms`. Every step below is
+ * a native plugin call or a network round trip that can stall (StoreKit busy,
+ * no network, a plugin that never answers), and a stalled step used to leave
+ * the user tapping "Sign out" with nothing happening. A step that runs out of
+ * time is skipped exactly like one that failed.
+ */
+function bounded(step: () => Promise<unknown>, ms = 3000): Promise<void> {
+    return new Promise((resolve) => {
+        const t = setTimeout(resolve, ms);
+        let p: Promise<unknown>;
+        try { p = step(); } catch { clearTimeout(t); resolve(); return; }
+        p.then(() => { clearTimeout(t); resolve(); }, () => { clearTimeout(t); resolve(); });
+    });
+}
+
 async function dropNativeSession(): Promise<void> {
     if (!isNativeApp()) return;
     // The Share Extension's credential lives in the App Group, outside
     // everything else this function purges — drop it first so the share
     // sheet cannot keep posting into the departing account's library.
-    try {
+    // Each step is bounded (see `bounded`): a failure or a stall skips it.
+    await bounded(async () => {
         const { clearNativeShareConfig, clearNativeWebsiteData } = await import('@/lib/shareConfig');
         await clearNativeShareConfig();
         // The WebView's own HTTP cache holds every screenshot and thumbnail
         // the feed showed; JS cannot reach it, the native side can.
         await clearNativeWebsiteData();
-    } catch {
-        // Never let the bridge block a sign-out.
-    }
-    try {
-        // A data export left in Caches (the app was killed with the share
-        // sheet open) is the whole library in one file.
+    });
+    // A data export left in Caches (the app was killed with the share sheet
+    // open) is the whole library in one file.
+    await bounded(async () => {
         const { deleteNativeExportFiles } = await import('@/lib/exportFiles');
         await deleteNativeExportFiles();
-    } catch {
-        // Never block a sign-out on it.
-    }
-    try {
-        // RevenueCat is keyed to the auth uid; leave it anonymous so the next
-        // account on this device starts clean.
+    });
+    // RevenueCat is keyed to the auth uid; leave it anonymous so the next
+    // account on this device starts clean. Not configured on a build without
+    // the key: nothing to undo.
+    await bounded(async () => {
         const { logOutPurchases } = await import('@/lib/purchases');
         await logOutPurchases();
-    } catch {
-        // Not configured on this build: nothing to undo.
-    }
-    try {
+    });
+    // Plugin missing/failed: the JS SDK sign-out below still runs.
+    await bounded(async () => {
         const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
         await FirebaseAuthentication.signOut();
-    } catch {
-        // Plugin missing/failed — still sign out of the JS SDK below.
-    }
+    });
 }
 
 async function purgeAndReload(): Promise<void> {
-    const { purgeLocalUserData } = await import('@/lib/localData');
-    await purgeLocalUserData();
+    // Generous bound: deleting the cache is the privacy-critical step, but a
+    // purge that never returns must not keep a signed-out user on screen.
+    await bounded(async () => {
+        const { purgeLocalUserData } = await import('@/lib/localData');
+        await purgeLocalUserData();
+    }, 8000);
     if (typeof window !== 'undefined') window.location.reload();
 }
 
 export async function signOutUser(): Promise<void> {
     signingOut = true;
     await dropNativeSession();
-    await signOut(auth);
+    await bounded(() => signOut(auth), 5000);
     await purgeAndReload();
 }
 

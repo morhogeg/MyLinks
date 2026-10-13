@@ -154,31 +154,8 @@ class _Deleted:
         return None
 
 
-def _anchor_calls(monkeypatch):
-    seen = []
+def test_the_links_trigger_no_longer_touches_the_trial_clock(monkeypatch):
+    """The 10th-save clock was retired on 2026-10-13: a trial's end date is fixed
+    at sign-up, so a card write has nothing to start."""
     import entitlement
-    monkeypatch.setattr(entitlement, "maybe_start_trial", lambda uid: seen.append(uid))
-    return seen
-
-
-def test_a_created_card_checks_the_trial_clock(monkeypatch):
-    _instrument(monkeypatch, {"embed-uid": True, "embed-global": True})
-    seen = _anchor_calls(monkeypatch)
-    _handler(_event(_EMBEDDABLE, before=_Deleted()))
-    assert seen == ["uid-1"]
-
-
-def test_a_processing_placeholder_still_checks_the_trial_clock(monkeypatch):
-    """An import writes ten `processing` cards; the embedding path returns early
-    on those, so the check must run before it does."""
-    _instrument(monkeypatch, {"embed-uid": True, "embed-global": True})
-    seen = _anchor_calls(monkeypatch)
-    _handler(_event({"status": "processing", "title": ""}, before=_Deleted()))
-    assert seen == ["uid-1"]
-
-
-def test_an_updated_card_does_not_recheck_the_trial_clock(monkeypatch):
-    _instrument(monkeypatch, {"embed-uid": True, "embed-global": True})
-    seen = _anchor_calls(monkeypatch)
-    _handler(_event(_EMBEDDABLE))          # before exists -> an update
-    assert seen == []
+    assert not hasattr(entitlement, "maybe_start_trial")

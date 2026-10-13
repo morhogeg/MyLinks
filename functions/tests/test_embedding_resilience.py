@@ -28,10 +28,8 @@ def _fresh_flags():
 
 
 def _trigger(monkeypatch, db, card, embed):
-    import entitlement
     monkeypatch.setattr(search, "get_db", lambda: db)
     monkeypatch.setattr(search, "check_rate_limit", lambda *a, **k: True)
-    monkeypatch.setattr(entitlement, "maybe_start_trial", lambda uid: None)
     updates = []
     real_update = type(db.collection("x").document("y")).update
 

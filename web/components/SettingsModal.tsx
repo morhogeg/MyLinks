@@ -211,16 +211,18 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
     // losing anything.
     const [checkingSignOut, setCheckingSignOut] = useState(false);
     const [unsyncedWarning, setUnsyncedWarning] = useState(false);
+    // Settings stays open with the row reading "Signing out…" until the
+    // sign-out reloads the app: closing first left a phone that looked
+    // signed in while the native steps ran.
     const requestSignOut = async () => {
         if (checkingSignOut) return;
         setCheckingSignOut(true);
         const unsynced = await hasUnsyncedWrites();
-        setCheckingSignOut(false);
         if (unsynced) {
+            setCheckingSignOut(false);
             setUnsyncedWarning(true);
             return;
         }
-        onClose();
         void signOut();
     };
 
@@ -544,7 +546,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
             <ConfirmDialog
                 isOpen={unsyncedWarning}
                 onClose={() => setUnsyncedWarning(false)}
-                onConfirm={() => { onClose(); void signOut(); }}
+                onConfirm={() => { setUnsyncedWarning(false); setCheckingSignOut(true); void signOut(); }}
                 title="Some changes haven’t synced"
                 message="Your latest edits are only on this device, usually because it’s offline. Signing out now deletes them. Reconnect and wait a moment to keep them."
                 confirmLabel="Sign out anyway"
