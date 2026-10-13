@@ -11,7 +11,8 @@ import { track } from '@/lib/analytics';
 import { apiUrl, fetchWithTimeout } from '@/lib/api';
 import { appCheckHeaders } from '@/lib/firebase';
 import { authHeaders } from '@/lib/auth';
-import { offerUpgradeFor } from '@/lib/entitlement';
+import { offerUpgradeFor, meterLabel } from '@/lib/entitlement';
+import { useEntitlement } from '@/components/EntitlementProvider';
 import { findLinkIdByUrl } from '@/lib/storage';
 import { parseImportFile, type ImportedLink, type ImportFormat } from '@/lib/importParsers';
 
@@ -89,6 +90,10 @@ export default function ImportSheet({
 
     const busy = scanning || progress !== null;
     useScrollLock(isOpen);
+    // The free plan's lifetime import allowance, shown before the wall rather
+    // than only when an import runs into it ("480 of 500 imported links left").
+    const ent = useEntitlement();
+    const importAllowance = ent.loaded && !ent.isPro ? meterLabel('imports', ent.quotas.imports) : null;
     const isMobile = useIsMobile();
     const { sheetRef, scrimRef, handleProps } = useSheetDrag({ onClose, enabled: isMobile && !busy });
 
@@ -421,6 +426,7 @@ export default function ImportSheet({
                             </Button>
                             <p className="mt-2 text-center text-[12px] text-text-muted leading-snug">
                                 Imported links do not count against your monthly saves.
+                                {importAllowance && <> {importAllowance} on the free plan.</>}
                             </p>
                         </>
                     )}

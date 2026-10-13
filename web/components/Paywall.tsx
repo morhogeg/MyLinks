@@ -90,6 +90,7 @@ export default function Paywall({
 }) {
     const {
         isTrial, isPro, source, waiting, endsAt, period: subPeriod, willRenew, billingIssue, freeLimits,
+        trialEndsAt, proUntil, loaded,
     } = useEntitlement();
     const availability = purchasesAvailability();
     const [packages, setPackages] = useState<ProPackage[] | null>(null);
@@ -204,6 +205,15 @@ export default function Paywall({
             ? `${waiting} ${waiting === 1 ? 'save is' : 'saves are'} waiting to be read. Machina reads them next month, or right away with Pro.`
             : 'Your saves are kept. Machina reads them next month, or right away with Pro.')
         : null;
+    // Someone whose trial or subscription has run out is told when, and that
+    // nothing they saved went with it, so the sheet reads as "here's where you
+    // are" and not as a wall that appeared from nowhere.
+    const endedLine = !loaded || isPro ? null
+        : source === 'trial' && trialEndsAt !== null
+            ? `Your Pro trial ended on ${planDate(trialEndsAt)}. You’re on the free plan, and everything you saved is still here.`
+            : source === 'revenuecat' && proUntil !== null
+                ? `Your Pro subscription ended on ${planDate(proUntil)}. Everything you saved is still here.`
+                : null;
     // Already Pro for good (a subscription, or the owner's own account): there
     // is nothing to buy, so the plan picker gives way to a status card.
     const proActive = isPro && !isTrial;
@@ -260,8 +270,8 @@ export default function Paywall({
                             <h2 className="text-[26px] font-bold text-text leading-tight tracking-[-0.02em]">
                                 {HEADLINE[reason]}
                             </h2>
-                            {waitingLine && (
-                                <p className="mt-1.5 text-[14px] text-text-secondary leading-snug">{waitingLine}</p>
+                            {(waitingLine || endedLine) && (
+                                <p className="mt-1.5 text-[14px] text-text-secondary leading-snug">{waitingLine ?? endedLine}</p>
                             )}
                             {statusLine && (
                                 <p className={`mt-1.5 text-[14px] leading-snug ${billingIssue && source === 'revenuecat' ? 'text-warning' : 'text-text-secondary'}`}>{statusLine}</p>
