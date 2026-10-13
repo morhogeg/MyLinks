@@ -2605,8 +2605,8 @@ exact-match, capped.
   TestFlight #358 = **build 1358** green, the first build with the public key.
   Webhook URL per deploy log: `https://revenuecat-webhook-yw4q7lycxa-uc.a.run.app`.
   RevenueCat pricing re-checked: free under $2,500 MTR, then 1% of all MTR
-  (gross, before Apple's cut). NOT verified: webhook "Send test event" 2xx,
-  that the secret key is V1, the subscriptions existing in App Store Connect,
+  (gross, before Apple's cut). Verified: webhook "Send test event" → 200
+  (auth + secrets live). NOT verified: that the secret key is V1, the subscriptions existing in App Store Connect,
   and any sandbox purchase. Still open: ASC subscriptions, SBP approval, sandbox
   test on 1358+, submitting the products with the binary.
 - **2026-10-12 — LAUNCH CHECKLIST ARTIFACT.** Owner asked for one launch
