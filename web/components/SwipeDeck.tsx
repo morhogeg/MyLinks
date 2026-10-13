@@ -5,7 +5,7 @@ import { Link } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
 import SourceByline from './SourceByline';
 import SimpleMarkdown from './SimpleMarkdown';
-import { hasHebrew } from '@/lib/rtl';
+import { isRtlContent } from '@/lib/rtl';
 import { hapticLight } from '@/lib/haptics';
 import { Check, Archive, Bell, RotateCcw, Info, X, Star } from 'lucide-react';
 import { CitationGlyph } from '@/components/ui/Wordmark';
@@ -678,7 +678,7 @@ function HintBadge({ label, color, icon, opacity, pos }: { label: string; color:
  *  the memo all three stacked faces would re-run SimpleMarkdown parsing at
  *  pointer-event rate — only the wrapper's transform changes per frame. */
 const CardFace = memo(function CardFace({ link, onToggleFavorite }: { link: Link; onToggleFavorite: (link: Link) => void }) {
-    const isRtl = link.language === 'he' || hasHebrew(link.title) || hasHebrew(link.summary);
+    const isRtl = isRtlContent(link.language, link.title, link.summary);
     const colorStyle = getCategoryColorStyle(link.category);
     const isFavorite = link.status === 'favorite';
 

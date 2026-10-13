@@ -2593,6 +2593,25 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-13 — ARABIC-SCRIPT CARDS READ RIGHT-TO-LEFT (owner, ahead of the
+  App Store country list).** Language audit: card analysis and Ask already
+  follow any language (prompt rules), but card LAYOUT keyed RTL off Hebrew
+  letters only, so Arabic/Persian/Urdu cards rendered left-aligned. Now
+  `lib/rtl.ts` splits two questions: `isRtlContent` (layout: Hebrew + Arabic
+  script, or an RTL `language` code) and `isHebrewContent` (the Hebrew
+  microcopy: "דק׳ קריאה", time-ago, "לעשות", related reasons, the "Key Points"
+  heading translation). An Arabic card reads RTL with the app's English labels
+  laid out LTR; Hebrew is unchanged. `contentLang` returns "ar" for VoiceOver.
+  Touched: `Card`, `SwipeDeck`, `LinkDetailModal`, `KnowledgeGraph`,
+  `SimpleMarkdown`; `getDirection` callers (ListCard, DigestCard, notes,
+  collections) pick up Arabic automatically. Render-verified 390px light+dark
+  (Arabic + Hebrew fixtures, throwaway harness deleted); `tsc` + eslint clean.
+  App UI language stays English (owner decision). **Known remaining language
+  gaps (not fixed):** weekly recap is Hebrew-or-English only
+  (`ai_service.py` recap prompt); the tag-language backstop only separates
+  Hebrew from the rest, so a French card can reuse English tags; tapped Ask
+  chips in a Latin-script non-English chat can come back in English
+  (`search.conversation_language` can't tell Latin languages apart).
 - **2026-10-13 (final) — LAST PRO/FREE GAPS (owner: "ship whatever fixes and
   improvements you can").** (1) A free user whose trial or subscription ran
   out is told so on the plan sheet ("Your Pro trial ended on Oct 10. You're on

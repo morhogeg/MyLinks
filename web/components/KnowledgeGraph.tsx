@@ -7,7 +7,7 @@ import { buildGraphModel, edgeReason, GraphModel, GraphNode, BuildSignal, graphS
 import { fetchPoolSims } from '@/lib/similarity';
 import { tick, ALPHA_MIN } from '@/lib/graphPhysics';
 import { getCategoryColorStyle } from '@/lib/colors';
-import { getDominantDirection } from '@/lib/rtl';
+import { getDominantDirection, hasHebrew } from '@/lib/rtl';
 import { hapticLight } from '@/lib/haptics';
 import { reportError } from '@/lib/errorReporter';
 
@@ -805,7 +805,8 @@ export default function KnowledgeGraph({
     const selection = useMemo(() => {
         if (!model || selected === null || !model.nodes[selected]) return null;
         const node = model.nodes[selected];
-        const isRtl = getDominantDirection(node.link.title) === 'rtl';
+        // The reasons are Hebrew or English; an Arabic title gets English ones.
+        const isHe = getDominantDirection(node.link.title) === 'rtl' && hasHebrew(node.link.title);
         const neighbors = model.adjacency[selected]
             .map((ei) => {
                 const e = model.edges[ei];
@@ -816,7 +817,7 @@ export default function KnowledgeGraph({
                     category: other.category,
                     weight: e.weight,
                     strong: e.strong,
-                    reason: edgeReason(node.link, other.link, isRtl),
+                    reason: edgeReason(node.link, other.link, isHe),
                 };
             })
             .sort((a, b) => b.weight - a.weight);
