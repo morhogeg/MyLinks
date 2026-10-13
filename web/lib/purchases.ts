@@ -126,11 +126,20 @@ function periodOf(pkg: { identifier: string; packageType?: string }): ProPeriod 
  * prices. Empty when unavailable, unconfigured, or the offering has not been
  * set up yet; the paywall then shows fallback labels without prices.
  */
+// StoreKit can sit on a products request for a long time when the App Store
+// has nothing to return (a product not yet live in Connect, a flaky network).
+// Past this, the paywall stops shimmering and offers "Try again" instead.
+const OFFERINGS_TIMEOUT_MS = 12_000;
+
 export async function getOfferings(): Promise<ProPackage[]> {
     const p = await plugin();
     if (!p || configuredFor === null) return [];
     try {
-        const offerings = await p.getOfferings();
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const timeout = new Promise<never>((_, reject) => {
+            timer = setTimeout(() => reject(new Error('offerings timeout')), OFFERINGS_TIMEOUT_MS);
+        });
+        const offerings = await Promise.race([p.getOfferings(), timeout]).finally(() => clearTimeout(timer));
         const offering = offerings.all?.[RC_OFFERING_ID] ?? offerings.current;
         if (!offering) return [];
         const out: ProPackage[] = [];
@@ -228,6 +237,20 @@ export async function restore(): Promise<PurchaseOutcome> {
     } catch (e) {
         if (isCancelled(e)) return { ok: false, cancelled: true };
         return { ok: false, cancelled: false, message: messageOf(e, 'restore') };
+    }
+}
+
+/**
+ * "$4.17 a month": what the annual plan costs per month, in the store's own
+ * currency. Null when the price isn't real or the currency can't be formatted.
+ */
+export function annualPerMonth(annual: ProPackage | undefined): string | null {
+    if (!annual || !(annual.price > 0)) return null;
+    try {
+        return new Intl.NumberFormat(undefined, { style: 'currency', currency: annual.currencyCode })
+            .format(Math.floor((annual.price / 12) * 100) / 100);
+    } catch {
+        return null;
     }
 }
 
