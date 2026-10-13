@@ -1020,7 +1020,7 @@ export default function LinkDetailModal({
                                 >
                                     <ProBadge />
                                     <span className="flex-1 min-w-0 text-[13px] text-text-secondary leading-snug">
-                                        Video transcripts are a Pro feature. This card was filed from the video’s title and description.
+                                        YouTube key moments are a Pro feature. This card was filed from the video’s title and description.
                                     </span>
                                     <ChevronRight className="w-4 h-4 shrink-0 text-text-muted" />
                                 </button>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { X, Check, Plus, MessagesSquare, Newspaper, Youtube, Layers } from 'lucide-react';
+import { X, Check, Plus, MessagesSquare, Newspaper, Youtube } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { CitationGlyph } from '@/components/ui/Wordmark';
 import ProBadge from '@/components/ui/ProBadge';
@@ -9,12 +9,13 @@ import { useEntitlement } from '@/components/EntitlementProvider';
 import { useScrollLock } from '@/lib/useScrollLock';
 import { useSheetDrag, useIsMobile } from '@/lib/useSheetDrag';
 import { policyUrl, openExternal } from '@/lib/share';
+import { isNativeApp } from '@/lib/api';
 import { hapticLight, hapticSuccess, hapticWarning } from '@/lib/haptics';
 import { track } from '@/lib/analytics';
 import { reportError } from '@/lib/errorReporter';
 import { syncEntitlement, type PaywallReason } from '@/lib/entitlement';
 import {
-    ProPackage, ProPeriod, getOfferings, purchase, restore, purchasesAvailability, annualSavingsPercent,
+    ProPackage, ProPeriod, getOfferings, purchase, restore, purchasesAvailability, annualSavingsPercent, annualPerMonth,
 } from '@/lib/purchases';
 
 /**
@@ -45,23 +46,25 @@ const HEADLINE: Record<PaywallReason, string> = {
     saves: 'You’ve used this month’s free saves',
     asks: 'You’ve used this month’s free questions',
     imports: 'You’ve imported everything the free plan includes',
-    synthesis: 'Read the whole synthesis',
+    synthesis: 'Read the whole weekly recap',
     digest: 'Curated digests come with Pro',
-    youtube: 'Video transcripts come with Pro',
+    youtube: 'YouTube key moments come with Pro',
     settings: 'Machina, without limits',
     manual: 'Machina, without limits',
 };
 
-// Each icon is the one the app itself uses for that feature: + is the add
-// button, MessagesSquare the Ask tab, the citation glyph the synthesis card,
-// Newspaper the digest card, Youtube the video scan, Layers the Collections tab.
+// What Pro adds, each with the free plan's number so nothing is implied. Each
+// icon is the one the app itself uses for that feature: + is the add button,
+// MessagesSquare the Ask tab, the citation glyph the weekly recap card
+// ("This week in Machina"), Newspaper the digest card, Youtube the video scan.
+// What both plans share is one footnote under the list, not a row: a paywall
+// row reads as something you're buying.
 const FEATURES: { icon: React.ReactNode; title: string; free: string }[] = [
     { icon: <Plus className="w-4 h-4" />, title: 'Unlimited saves, each one read and filed', free: 'Free: 50 a month' },
     { icon: <MessagesSquare className="w-4 h-4" />, title: 'Unlimited questions in Ask Machina', free: 'Free: 20 a month' },
-    { icon: <CitationGlyph className="w-3.5 h-auto" />, title: 'The full weekly synthesis', free: 'Free: title and first line' },
+    { icon: <CitationGlyph className="w-3.5 h-auto" />, title: 'The full weekly recap', free: 'Free: title and first line' },
     { icon: <Newspaper className="w-4 h-4" />, title: 'Curated digests on your schedule', free: 'Pro only' },
     { icon: <Youtube className="w-4 h-4" />, title: 'YouTube videos watched for you, with key moments', free: 'Pro only' },
-    { icon: <Layers className="w-4 h-4" />, title: 'Meaning search, collections, share pages, reminders', free: 'Included in both' },
 ];
 
 export default function Paywall({
@@ -193,10 +196,12 @@ export default function Paywall({
     const trialLine = isTrial && !trialStarted
         ? `Your free trial starts once you have saved ${trialAnchorCards} things.`
         : isTrial && daysLeft !== null
-        ? (daysLeft === 0 ? 'Your free trial ends today.' : `Your free trial has ${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} left.`)
-        : isPro && source === 'revenuecat'
-            ? 'Machina Pro is active on this account.'
+            ? (daysLeft === 0 ? 'Your free trial ends today.' : `Your free trial has ${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} left.`)
             : null;
+    // Already Pro for good (a subscription, or the owner's own account): there
+    // is nothing to buy, so the plan picker gives way to a status line.
+    const proActive = isPro && !isTrial;
+    const perMonth = annualPerMonth(annual);
 
     return (
         <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center animate-fade-in">
@@ -213,8 +218,8 @@ export default function Paywall({
                     <div className="sm:hidden flex justify-center pt-3 pb-1">
                         <div className="h-1.5 w-10 rounded-full bg-fill-strong" />
                     </div>
-                    <div className="flex items-start gap-3 px-5 pt-3 pb-3">
-                        <div className="flex-1 min-w-0">
+                    <div className="flex items-start gap-3 px-5 pt-2 pb-3">
+                        <div className="flex-1 min-w-0 pt-1">
                             <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-accent">
                                 <CitationGlyph className="w-3 h-auto" />
                                 Machina Pro
@@ -233,20 +238,21 @@ export default function Paywall({
                             onClick={onClose}
                             disabled={busy !== null}
                             aria-label="Close"
-                            className="p-2 -me-2 -mt-1 rounded-full text-text-muted hover:text-text hover:bg-fill-subtle transition-colors disabled:opacity-40"
+                            className="p-3 -me-3 -mt-1 rounded-full text-text-muted [@media(hover:hover)]:hover:text-text [@media(hover:hover)]:hover:bg-fill-subtle active:opacity-60 transition-colors disabled:opacity-40"
                         >
                             <X className="w-5 h-5" />
                         </button>
                     </div>
                 </div>
 
-                <div className="overflow-y-auto px-5 pb-4">
-                    {/* Feature list: what Pro adds, with the free tier's number
-                        on each row so nothing is implied. */}
-                    <ul className="flex flex-col gap-2">
+                {/* The feature list scrolls; the plans and the button below it
+                    never do, so the one action on this sheet is always on
+                    screen, even on the smallest phone. */}
+                <div className="flex-1 min-h-0 overflow-y-auto px-5 pb-3">
+                    <ul className="rounded-2xl bg-card-hover border border-border-subtle divide-y divide-border-subtle overflow-hidden">
                         {FEATURES.map((f) => (
-                            <li key={f.title} className="flex items-start gap-3 rounded-xl bg-card-hover px-3.5 py-2.5">
-                                <span className="mt-0.5 w-7 h-7 shrink-0 rounded-lg bg-accent/12 text-accent flex items-center justify-center ring-1 ring-accent/20">
+                            <li key={f.title} className="flex items-center gap-3 px-3.5 py-2.5">
+                                <span className="w-7 h-7 shrink-0 rounded-lg bg-accent/12 text-accent flex items-center justify-center ring-1 ring-accent/20">
                                     {f.icon}
                                 </span>
                                 <span className="min-w-0">
@@ -256,13 +262,35 @@ export default function Paywall({
                             </li>
                         ))}
                     </ul>
+                    <p className="mt-2.5 px-1 text-[12px] text-text-muted leading-snug">
+                        Search, collections, share pages and reminders are free for everyone.
+                    </p>
+                </div>
 
-                    {availability.available ? (
+                <div className="shrink-0 border-t border-border-subtle px-5 pt-3">
+                    {proActive ? (
+                        <div className="rounded-xl border border-border-subtle bg-card-hover px-4 py-3.5 text-center">
+                            <div className="flex items-center justify-center gap-2 text-[14px] font-semibold text-text">
+                                <ProBadge /> {source === 'owner' ? 'Machina Pro is on for this account' : 'Machina Pro is active'}
+                            </div>
+                            {source === 'revenuecat' && (
+                                <button
+                                    onClick={() => openExternal(isNativeApp()
+                                        ? 'itms-apps://apps.apple.com/account/subscriptions'
+                                        : 'https://apps.apple.com/account/subscriptions')}
+                                    className="mt-1 min-h-[44px] px-2 text-[13px] font-semibold text-accent active:opacity-60 cursor-pointer"
+                                >
+                                    Manage subscription
+                                </button>
+                            )}
+                        </div>
+                    ) : availability.available ? (
                         <>
-                            <div className="mt-4 flex flex-col gap-2">
+                            <div className="flex flex-col gap-2">
                                 <PlanRow
                                     period="annual"
                                     price={priceOf('annual')}
+                                    detail={perMonth ? `${perMonth} a month` : null}
                                     selected={period === 'annual'}
                                     chip={savings ? `Save ${savings}%` : null}
                                     loading={packages === null}
@@ -271,6 +299,7 @@ export default function Paywall({
                                 <PlanRow
                                     period="monthly"
                                     price={priceOf('monthly')}
+                                    detail={null}
                                     selected={period === 'monthly'}
                                     chip={null}
                                     loading={packages === null}
@@ -279,13 +308,13 @@ export default function Paywall({
                             </div>
 
                             {offeringsFailed && (
-                                <div className="mt-2 flex items-center justify-between gap-3">
+                                <div className="mt-1 flex items-center justify-between gap-3">
                                     <p role="status" className="text-[12px] text-text-muted leading-snug">
                                         Prices could not be loaded from the App Store.
                                     </p>
                                     <button
                                         onClick={() => { hapticLight(); setOfferingsAttempt((n) => n + 1); }}
-                                        className="shrink-0 min-h-[44px] px-2 -me-2 text-[13px] font-semibold text-accent cursor-pointer"
+                                        className="shrink-0 min-h-[44px] px-2 -me-2 text-[13px] font-semibold text-accent active:opacity-60 cursor-pointer"
                                     >
                                         Try again
                                     </button>
@@ -297,11 +326,11 @@ export default function Paywall({
                                 radius="full"
                                 onClick={buy}
                                 disabled={!canBuy}
-                                className="mt-4 w-full h-11 text-[15px]"
+                                className="mt-3 w-full h-12 text-[16px]"
                             >
                                 {busy === 'purchase' ? 'Opening the App Store…' : 'Continue'}
                             </Button>
-                            <p className="mt-2 text-center text-[12px] text-text-muted leading-snug">
+                            <p className="mt-2 text-center text-[11.5px] text-text-muted leading-snug">
                                 {priceOf(period)
                                     ? `${priceOf(period)} ${PERIOD_LABEL[period].per}, billed to your Apple ID.`
                                     : 'Billed to your Apple ID.'}
@@ -309,7 +338,7 @@ export default function Paywall({
                             </p>
                         </>
                     ) : availability.reason === 'web' ? (
-                        <div className="mt-4 rounded-xl border border-border-subtle bg-card-hover px-4 py-3.5 text-center">
+                        <div className="rounded-xl border border-border-subtle bg-card-hover px-4 py-3.5 text-center">
                             <div className="flex items-center justify-center gap-2 text-[14px] font-semibold text-text">
                                 <ProBadge /> Subscribe in the Machina app on iPhone
                             </div>
@@ -318,7 +347,7 @@ export default function Paywall({
                             </p>
                         </div>
                     ) : (
-                        <div className="mt-4 rounded-xl border border-border-subtle bg-card-hover px-4 py-3.5 text-center">
+                        <div className="rounded-xl border border-border-subtle bg-card-hover px-4 py-3.5 text-center">
                             <p className="text-[13.5px] text-text-secondary leading-snug">
                                 Subscriptions aren’t available in this build yet.
                             </p>
@@ -326,23 +355,23 @@ export default function Paywall({
                     )}
 
                     {note && (
-                        <p role="status" className="mt-3 text-center text-[13px] text-warning leading-snug">{note}</p>
+                        <p role="status" className="mt-2 text-center text-[13px] text-warning leading-snug">{note}</p>
                     )}
 
-                    <div className="mt-4 flex items-center justify-center gap-4 text-[12.5px] text-text-muted">
-                        {availability.available && (
+                    <div className="mt-1 mb-1 flex items-center justify-center gap-1 text-[12.5px] text-text-muted">
+                        {availability.available && !proActive && (
                             <button
                                 onClick={doRestore}
                                 disabled={busy !== null}
-                                className="underline underline-offset-2 hover:text-text transition-colors disabled:opacity-50 cursor-pointer"
+                                className="min-h-[44px] px-2.5 underline underline-offset-2 [@media(hover:hover)]:hover:text-text active:opacity-60 transition-colors disabled:opacity-50 cursor-pointer"
                             >
                                 {busy === 'restore' ? 'Restoring…' : 'Restore purchases'}
                             </button>
                         )}
-                        <button onClick={() => openExternal(policyUrl('/terms'))} className="underline underline-offset-2 hover:text-text transition-colors cursor-pointer">
+                        <button onClick={() => openExternal(policyUrl('/terms'))} className="min-h-[44px] px-2.5 underline underline-offset-2 [@media(hover:hover)]:hover:text-text active:opacity-60 transition-colors cursor-pointer">
                             Terms
                         </button>
-                        <button onClick={() => openExternal(policyUrl('/privacy'))} className="underline underline-offset-2 hover:text-text transition-colors cursor-pointer">
+                        <button onClick={() => openExternal(policyUrl('/privacy'))} className="min-h-[44px] px-2.5 underline underline-offset-2 [@media(hover:hover)]:hover:text-text active:opacity-60 transition-colors cursor-pointer">
                             Privacy
                         </button>
                     </div>
@@ -352,11 +381,13 @@ export default function Paywall({
     );
 }
 
-function PlanRow({
-    period, price, selected, chip, loading, onSelect,
+export function PlanRow({
+    period, price, detail, selected, chip, loading, onSelect,
 }: {
     period: ProPeriod;
     price: string | null;
+    /** One quiet line under the name (the annual plan's per-month cost), or null. */
+    detail: string | null;
     selected: boolean;
     chip: string | null;
     loading: boolean;
@@ -367,7 +398,7 @@ function PlanRow({
         <button
             onClick={onSelect}
             aria-pressed={selected}
-            className={`w-full flex items-center gap-3 rounded-2xl border px-4 py-3 text-start transition-colors cursor-pointer ${selected ? 'border-accent/60 bg-accent/8' : 'border-border-subtle bg-card hover:bg-card-hover'}`}
+            className={`w-full min-h-[56px] flex items-center gap-3 rounded-2xl border px-4 py-2.5 text-start transition-[colors,transform] duration-150 active:scale-[0.99] cursor-pointer ${selected ? 'border-accent/60 bg-accent/8' : 'border-border-strong bg-card [@media(hover:hover)]:hover:bg-card-hover'}`}
         >
             <span className={`w-5 h-5 shrink-0 rounded-full border flex items-center justify-center ${selected ? 'border-accent bg-accent text-accent-ink' : 'border-border-strong'}`}>
                 {selected && <Check className="w-3 h-3" strokeWidth={3} />}
@@ -381,9 +412,7 @@ function PlanRow({
                         </span>
                     )}
                 </span>
-                <span className="block text-[12px] text-text-muted mt-0.5">
-                    {period === 'annual' ? 'Best value. One payment a year.' : 'Flexible. Cancel any month.'}
-                </span>
+                {detail && <span className="block text-[12px] text-text-muted mt-0.5 tabular-nums">{detail}</span>}
             </span>
             <span className="text-end shrink-0">
                 {loading ? (

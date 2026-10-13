@@ -2593,6 +2593,32 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-13 (evening) — PAYWALL POLISH ROUND 1 (owner: "make all needed
+  fixes, not just mine").** Device screenshot (build ~1359) showed "Machina Pro"
+  twice, icons that didn't match the app, and the Continue button below the
+  fold behind six tall feature cards. `Paywall.tsx`: (1) settings/manual
+  headline "Machina, without limits" (eyebrow keeps the brand); (2) feature
+  icons are the app's own: + (add button), MessagesSquare (Ask tab), the
+  citation glyph (the weekly recap card), Newspaper, Youtube; (3) layout: the
+  feature list is one inset-grouped list that scrolls, and the plans + Continue
+  + Apple's billing line + links sit in a pinned footer, so the action is
+  always on screen (verified at 375×667); (4) "Included in both" stopped being a
+  row (a paywall row reads as something you buy) and became one footnote;
+  (5) jargon: "weekly synthesis" → "weekly recap" (the card itself says "This
+  week in Machina"), "Video transcripts" → "YouTube key moments" (also in
+  `LinkDetailModal`); (6) annual plan shows its per-month cost from the store's
+  price (`annualPerMonth`), monthly loses its filler line; (7) someone already
+  Pro for good (owner / subscriber) gets a status card instead of a plan picker
+  (subscriber: "Manage subscription"); (8) touch: 44px close, Restore, Terms,
+  Privacy, Try again; press states; hover guarded behind `(hover:hover)`;
+  unselected plan border `border-border-strong` (was invisible in dark);
+  (9) `getOfferings` times out after 12s so a StoreKit request that never
+  answers shows "Prices could not be loaded / Try again" instead of shimmering
+  forever. Render-verified in a throwaway harness at 390px light + dark (free,
+  save-wall with waiting saves, trial, owner, subscriber, plan rows with
+  prices) and 375×667; harness deleted. tsc + eslint clean. Not verified on
+  device: real StoreKit prices (the App Store Connect products still need
+  price/localization/screenshot).
 - **2026-10-13 (later still) — FREE SAVES 100 → 50 A MONTH (owner).**
   `quota.py` free default 50 (no env override is set in prod), paywall row
   "Free: 50 a month", campaign T24 and docs updated. Existing free users
