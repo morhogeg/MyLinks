@@ -550,7 +550,7 @@ def test_video_trial_bucket_fails_closed():
 
 def test_plan_for_imports_is_free_for_a_trial(monkeypatch):
     import entitlement as ent
-    for source, expected in (("trial", "free"), ("revenuecat", "pro"), ("founder", "pro"), (None, "free")):
+    for source, expected in (("trial", "free"), ("revenuecat", "pro"), ("owner", "pro"), ("founder", "free"), (None, "free")):
         monkeypatch.setattr(ent, "entitlement_source", lambda uid, s=source: s)
         assert ent.plan_for_imports("u") == expected, source
 

@@ -191,11 +191,9 @@ export default function Paywall({
         ? `Your free trial starts once you have saved ${trialAnchorCards} things.`
         : isTrial && daysLeft !== null
         ? (daysLeft === 0 ? 'Your free trial ends today.' : `Your free trial has ${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} left.`)
-        : isPro && source === 'founder'
-            ? 'You have Pro as a founding member. Subscribing keeps it after that ends.'
-            : isPro && source === 'revenuecat'
-                ? 'Machina Pro is active on this account.'
-                : null;
+        : isPro && source === 'revenuecat'
+            ? 'Machina Pro is active on this account.'
+            : null;
 
     return (
         <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center animate-fade-in">

@@ -1273,8 +1273,9 @@ The multi-user auth work described below **was** fully written but not live:
     Store Connect + RevenueCat, never in code). Free: 100 saves + 20 asks a
     month, locked synthesis teaser, no curated digests, metadata-only YouTube
     cards. Pro: unlimited (abuse ceiling 1000), full synthesis, digests, video
-    ingestion. Every pre-launch workspace gets a 365-day founders grant; every
-    new workspace gets Pro free for 14 days (server-side reverse trial from
+    ingestion. **No founders grant (removed 2026-10-13, owner's call):** the
+    owner's workspace (verified `OWNER_EMAIL` on a linked sign-in account) is Pro
+    with no expiry (`source: 'owner'`); every other workspace gets Pro free for 14 days (server-side reverse trial from
     `createdAt`, no card, no StoreKit). Source of truth is functions-only
     `entitlements/{uid}` (`functions/entitlement.py`); capture is never gated
     (a free 429 carries `upgrade: true` and the client opens the paywall).
@@ -2338,9 +2339,10 @@ free. A hard paywall at install would show a price before the library has
 anything in it; the magic only appears after a few saves and the first Sunday
 synthesis, and 14 days guarantees two syntheses land during the trial. Capture
 is **never** gated — a save that bounces off a paywall destroys the "I can trust
-this caught it" promise the whole product stands on. Workspaces that existed
+this caught it" promise the whole product stands on. ~~Workspaces that existed
 before the feature shipped (owner + TestFlight friends) get a 365-day founders
-grant so nobody who helped test hits a wall.
+grant.~~ Removed 2026-10-13 (owner): only the owner's own workspace keeps Pro,
+with no expiry; pre-launch testers are measured like everyone else.
 
 | Surface | Free | Pro |
 |---|---|---|
@@ -2591,6 +2593,25 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-13 (later) — FOUNDERS GRANT REMOVED; OWNER GRANT INSTEAD.** Owner
+  saw "You have Pro as a founding member" on the paywall and asked for no
+  founders grant at all, only their own account kept unlimited. `entitlement.py`:
+  `grant_for(..., owner=True)` → `owner_grant()` (plan pro, `source: 'owner'`,
+  `proUntil: None`); `is_owner_workspace(uid)` matches OWNER_EMAIL against the
+  provider-verified email of any linked Auth account (never the doc's own
+  `email`; fails closed when unset). A stored `source: 'founder'` doc is
+  recomputed on its next read (`_replace_founder_doc`): owner → owner grant,
+  anyone else → the trial rule from their own `createdAt`, whose 60-day ceiling
+  has long passed, so **pre-launch testers (and possibly the App Review demo
+  account `machinareviewer@gmail.com`) are now on the free tier**. No createdAt
+  → free. `sync_from_revenuecat` pins the owner to the owner grant whatever
+  RevenueCat says (a lapsed sandbox test purchase can never drop the owner to
+  free), so **test purchases must be made on a non-owner account**.
+  `_COMMITTED_SOURCES` = revenuecat + owner. Web: `EntitlementSource` gains
+  'owner', loses 'founder'; paywall founder line and Settings "founding member"
+  removed (owner shows "active"); Terms drop the founders' grant clause.
+  Pro's 1000/month abuse ceiling still applies to the owner. Verified: pytest
+  1912 passed, `tsc --noEmit` clean, py_compile clean. Not verified on device.
 - **2026-10-13 — REVENUECAT CONSOLE SETUP + REDEPLOY (owner-driven, item 26).**
   Owner set up RevenueCat with session guidance: project `Machina`, App Store app
   (`com.morhogeg.machina`, In-App Purchase `.p8` uploaded), products

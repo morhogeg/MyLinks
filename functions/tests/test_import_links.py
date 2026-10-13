@@ -132,7 +132,7 @@ def _stub(monkeypatch, db, *, existing=(), plan="free", meter=None):
     monkeypatch.setattr(main, "link_exists_for_url", lambda uid, url: url in existing)
     monkeypatch.setattr(main, "pending_exists_for_url", lambda uid, url: False)
     monkeypatch.setattr(main, "plan_for", lambda uid: plan)
-    # Imports key on the COMMITTED plan (paid / founder), never a trial.
+    # Imports key on the COMMITTED plan (paid / owner), never a trial.
     monkeypatch.setattr(main, "plan_for_imports", lambda uid: plan)
     charges = []
 

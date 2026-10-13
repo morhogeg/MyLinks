@@ -46,7 +46,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
     const native = isNativeApp();
     const [showHow, setShowHow] = useState(false);
     const [importing, setImporting] = useState(false);
-    // One line, only for a reverse trial (never for founders or subscribers).
+    // One line, only for a reverse trial (never for the owner or subscribers).
     const { isTrial, trialStarted, trialAnchorCards } = useEntitlement();
     // This screen only ever shows for a library that was just created. The
     // commonest way to land here by mistake: an existing user who signed up

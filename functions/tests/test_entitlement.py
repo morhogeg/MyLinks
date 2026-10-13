@@ -14,17 +14,29 @@ def _ms(iso):
     return int(datetime.fromisoformat(iso).replace(tzinfo=timezone.utc).timestamp() * 1000)
 
 
-def test_founder_grant_for_pre_launch_workspace():
+def test_a_pre_launch_workspace_gets_no_founders_year():
+    """The founders' year is gone (2026-10-13): an old workspace is measured
+    like anyone else, so its trial ceiling has long passed and it reads free."""
     launch = _ms(ent.PRO_LAUNCH_AT)
-    g = ent.grant_for(launch - 30 * DAY)
-    assert g["plan"] == "pro" and g["source"] == "founder"
-    assert g["proUntil"] == launch + 365 * DAY
-    assert g["trialEndsAt"] is None
+    created = launch - 30 * DAY
+    g = ent.grant_for(created)
+    assert g["source"] == "trial"
+    assert g["proUntil"] == created + ent.TRIAL_CEILING_DAYS * DAY
+    assert ent.effective_plan(g, now_ms=launch + 40 * DAY) == "free"
 
 
-def test_missing_created_at_is_a_founder():
+def test_missing_created_at_is_free():
     g = ent.grant_for(None)
-    assert g["source"] == "founder"
+    assert g["plan"] == "free" and g["source"] is None
+    assert ent.effective_plan(g) == "free"
+
+
+def test_the_owner_is_pro_with_no_expiry():
+    launch = _ms(ent.PRO_LAUNCH_AT)
+    g = ent.grant_for(launch - 300 * DAY, launch, launch + DAY, owner=True)
+    assert g == ent.owner_grant()
+    assert g["source"] == "owner" and g["proUntil"] is None
+    assert ent.effective_plan(g, now_ms=launch + 10_000 * DAY) == "pro"
 
 
 def test_trial_without_an_anchor_has_not_started_its_clock():
@@ -78,12 +90,10 @@ def test_a_pre_anchor_trial_doc_keeps_its_existing_end_date():
     assert ent.effective_plan(g, now_ms=created + 21 * DAY) == "free"
 
 
-def test_founders_ignore_the_trial_clock_entirely():
-    launch = _ms(ent.PRO_LAUNCH_AT)
-    g = ent.grant_for(launch - DAY, launch + 5 * DAY, launch + 9 * DAY)
-    assert g["source"] == "founder"
-    assert g["proUntil"] == launch + 365 * DAY
-    assert g["trialEndsAt"] is None and g["trialAnchorAt"] is None
+def test_owner_counts_as_committed_pro(monkeypatch):
+    monkeypatch.setattr(ent, "get_entitlement", lambda uid: ent.owner_grant())
+    assert ent.is_committed_pro("me") is True
+    assert ent.plan_for_imports("me") == "pro"
 
 
 def test_created_at_in_seconds_or_iso_is_normalised():
@@ -356,9 +366,9 @@ def test_a_late_anchor_is_capped_by_the_sixty_day_ceiling(monkeypatch):
     assert db.writes[0]["trialEndsAt"] == created + ent.TRIAL_CEILING_DAYS * DAY
 
 
-def test_founders_and_subscribers_are_never_anchored(monkeypatch):
+def test_the_owner_and_subscribers_are_never_anchored(monkeypatch):
     for doc in (
-        {"plan": "pro", "source": "founder", "proUntil": 1, "trialEndsAt": None},
+        {"plan": "pro", "source": "owner", "proUntil": None, "trialEndsAt": None},
         {"plan": "pro", "source": "revenuecat", "proUntil": 1, "trialEndsAt": None},
     ):
         db, _ = _anchor_env(monkeypatch, cards=50, ent_doc=doc)
@@ -460,3 +470,129 @@ def test_entitlement_summary_adds_the_trial_and_import_fields(monkeypatch):
     assert summary["quotas"]["imports"]["used"] == 40
     assert summary["quotas"]["saves"]["used"] == 2
     assert summary["waiting"] == 0
+
+
+# ── Owner grant and the founders' migration (2026-10-13) ─────────────────────
+
+class _MemDB:
+    """Just enough Firestore: collection/document get, create, set(merge)."""
+
+    def __init__(self, docs):
+        self.docs = {k: dict(v) for k, v in docs.items()}   # "col/id" -> data
+        self.sets = []
+
+    def collection(self, name):
+        db = self
+
+        class _Snap:
+            def __init__(self, data):
+                self._d, self.exists = data, data is not None
+
+            def to_dict(self):
+                return dict(self._d) if self._d is not None else None
+
+        class _Ref:
+            def __init__(self, doc_id):
+                self.key = f"{name}/{doc_id}"
+
+            def get(self, transaction=None):
+                return _Snap(db.docs.get(self.key))
+
+            def create(self, doc):
+                db.docs[self.key] = dict(doc)
+
+            def set(self, doc, merge=False):
+                db.sets.append((self.key, dict(doc)))
+                base = db.docs.get(self.key, {}) if merge else {}
+                db.docs[self.key] = {**base, **doc}
+
+        class _Col:
+            def document(self, doc_id):
+                return _Ref(doc_id)
+
+        return _Col()
+
+
+def _owner_env(monkeypatch, docs, emails, owner_email="me@example.com"):
+    db = _MemDB(docs)
+    monkeypatch.setattr(ent, "get_db", lambda: db)
+    monkeypatch.setattr(ent, "_verified_account_email", lambda auth_uid: emails.get(auth_uid))
+    if owner_email is None:
+        monkeypatch.delenv("OWNER_EMAIL", raising=False)
+    else:
+        monkeypatch.setenv("OWNER_EMAIL", owner_email)
+    return db
+
+
+def test_owner_is_matched_through_a_linked_account_email(monkeypatch):
+    _owner_env(monkeypatch, {"users/+972": {"authUids": ["a1", "a2"]}},
+               {"a1": "relay@privaterelay.appleid.com", "a2": "Me@Example.com"})
+    assert ent.is_owner_workspace("+972") is True
+
+
+def test_owner_check_ignores_the_email_written_on_the_doc(monkeypatch):
+    _owner_env(monkeypatch, {"users/u1": {"authUids": ["a1"], "email": "me@example.com"}},
+               {"a1": "someone@else.com"})
+    assert ent.is_owner_workspace("u1") is False
+
+
+def test_owner_check_fails_closed_without_owner_email(monkeypatch):
+    _owner_env(monkeypatch, {"users/u1": {"authUids": ["a1"]}}, {"a1": "me@example.com"},
+               owner_email=None)
+    assert ent.is_owner_workspace("u1") is False
+
+
+def test_a_stored_founder_doc_becomes_the_owner_grant_for_the_owner(monkeypatch):
+    launch = _ms(ent.PRO_LAUNCH_AT)
+    db = _owner_env(monkeypatch, {
+        "users/+972": {"authUids": ["a1"], "createdAt": launch - 200 * DAY},
+        "entitlements/+972": {"plan": "pro", "source": "founder",
+                              "proUntil": launch + 365 * DAY, "trialEndsAt": None},
+    }, {"a1": "me@example.com"})
+    doc = ent.get_entitlement("+972")
+    assert doc["source"] == "owner" and doc["proUntil"] is None
+    assert db.docs["entitlements/+972"]["source"] == "owner"
+    assert ent.effective_plan(doc) == "pro"
+
+
+def test_a_stored_founder_doc_drops_to_free_for_anyone_else(monkeypatch):
+    launch = _ms(ent.PRO_LAUNCH_AT)
+    db = _owner_env(monkeypatch, {
+        "users/u2": {"authUids": ["b1"], "createdAt": launch - 100 * DAY},
+        "entitlements/u2": {"plan": "pro", "source": "founder",
+                            "proUntil": launch + 365 * DAY, "trialEndsAt": None},
+    }, {"b1": "tester@example.com"})
+    doc = ent.get_entitlement("u2")
+    assert doc["source"] == "trial"
+    assert ent.effective_plan(doc) == "free"
+    assert db.docs["entitlements/u2"]["source"] == "trial"
+    # Recomputed once: the next read is a plain read, no further write.
+    writes = len(db.sets)
+    ent.get_entitlement("u2")
+    assert len(db.sets) == writes
+
+
+def test_a_new_owner_workspace_is_created_on_the_owner_grant(monkeypatch):
+    launch = _ms(ent.PRO_LAUNCH_AT)
+    _owner_env(monkeypatch, {"users/u3": {"authUids": ["c1"], "createdAt": launch + 30 * DAY,
+                                          ent.TRIAL_CLOCK_CHECKED: True}},
+               {"c1": "me@example.com"})
+    doc = ent.get_entitlement("u3")
+    assert doc["source"] == "owner" and doc["proUntil"] is None
+
+
+def test_revenuecat_sync_never_moves_the_owner_off_the_owner_grant(monkeypatch):
+    launch = _ms(ent.PRO_LAUNCH_AT)
+    db = _owner_env(monkeypatch, {
+        "users/+972": {"authUids": ["a1"], "createdAt": launch - 200 * DAY},
+        "entitlements/+972": dict(ent.owner_grant()),
+    }, {"a1": "me@example.com"})
+    monkeypatch.setattr(ent, "restore_vaulted_syntheses", lambda uid: 0)
+    active = {"entitlements": {"pro": {"expires_date": "2099-01-01T00:00:00Z",
+                                       "product_identifier": "com.morhogeg.machina.pro.monthly"}}}
+    lapsed = {"entitlements": {"pro": {"expires_date": "2020-01-01T00:00:00Z"}}}
+    for subscriber in (active, lapsed):
+        monkeypatch.setattr(ent, "fetch_subscriber", lambda app_user_id, s=subscriber: s)
+        doc = ent.sync_from_revenuecat("+972", "a1")
+        assert doc["source"] == "owner" and doc["proUntil"] is None
+        assert ent.effective_plan(db.docs["entitlements/+972"]) == "pro"
