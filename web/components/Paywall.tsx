@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { X, Check, Infinity as InfinityIcon, MessageCircle, BookOpen, Newspaper, Youtube, Layers } from 'lucide-react';
+import { X, Check, Plus, MessagesSquare, Newspaper, Youtube, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { CitationGlyph } from '@/components/ui/Wordmark';
 import ProBadge from '@/components/ui/ProBadge';
@@ -48,14 +48,17 @@ const HEADLINE: Record<PaywallReason, string> = {
     synthesis: 'Read the whole synthesis',
     digest: 'Curated digests come with Pro',
     youtube: 'Video transcripts come with Pro',
-    settings: 'Machina Pro',
-    manual: 'Machina Pro',
+    settings: 'Machina, without limits',
+    manual: 'Machina, without limits',
 };
 
+// Each icon is the one the app itself uses for that feature: + is the add
+// button, MessagesSquare the Ask tab, the citation glyph the synthesis card,
+// Newspaper the digest card, Youtube the video scan, Layers the Collections tab.
 const FEATURES: { icon: React.ReactNode; title: string; free: string }[] = [
-    { icon: <InfinityIcon className="w-4 h-4" />, title: 'Unlimited saves, each one read and filed', free: 'Free: 50 a month' },
-    { icon: <MessageCircle className="w-4 h-4" />, title: 'Unlimited questions in Ask Machina', free: 'Free: 20 a month' },
-    { icon: <BookOpen className="w-4 h-4" />, title: 'The full weekly synthesis', free: 'Free: title and first line' },
+    { icon: <Plus className="w-4 h-4" />, title: 'Unlimited saves, each one read and filed', free: 'Free: 50 a month' },
+    { icon: <MessagesSquare className="w-4 h-4" />, title: 'Unlimited questions in Ask Machina', free: 'Free: 20 a month' },
+    { icon: <CitationGlyph className="w-3.5 h-auto" />, title: 'The full weekly synthesis', free: 'Free: title and first line' },
     { icon: <Newspaper className="w-4 h-4" />, title: 'Curated digests on your schedule', free: 'Pro only' },
     { icon: <Youtube className="w-4 h-4" />, title: 'YouTube videos watched for you, with key moments', free: 'Pro only' },
     { icon: <Layers className="w-4 h-4" />, title: 'Meaning search, collections, share pages, reminders', free: 'Included in both' },
