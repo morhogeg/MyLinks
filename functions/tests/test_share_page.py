@@ -545,3 +545,39 @@ class TestOpenInMachina:
         monkeypatch.setenv("APP_STORE_ID", '1"><script>')
         html = _render_shared_card(_card(), f"https://x/s?id={self.SHARE_ID}")
         assert "apple-itunes-app" not in html
+
+
+class TestAppStoreHandoff:
+    """Once APP_STORE_ID is set, the primary button carries the App Store URL
+    and the page ships the iOS swap script; without it, neither appears."""
+
+    SHARE_ID = "b" * 32
+
+    def test_no_store_handoff_without_app_store_id(self, monkeypatch):
+        monkeypatch.delenv("APP_STORE_ID", raising=False)
+        html = _render_shared_card(_card(), f"https://x/s?id={self.SHARE_ID}")
+        assert 'id="mx-open"' in html
+        assert "data-store" not in html
+        assert "<script" not in html
+
+    def test_store_handoff_with_app_store_id(self, monkeypatch):
+        monkeypatch.setenv("APP_STORE_ID", "1234567890")
+        html = _render_shared_card(_card(), f"https://x/s?id={self.SHARE_ID}")
+        assert 'data-store="https://apps.apple.com/app/id1234567890"' in html
+        assert "Get the Machina app" in html
+        # The web path stays the default href for non-iOS visitors.
+        assert f'?shared={self.SHARE_ID}&amp;type=card"' in html
+
+    def test_answer_page_pitch_and_handoff(self, monkeypatch):
+        import share_service
+        monkeypatch.setenv("APP_STORE_ID", "1234567890")
+        html = share_service._render_shared_answer(
+            {"question": "What did I save on sleep?", "answer": "Two cards.", "sources": []},
+            f"https://x/a?id={self.SHARE_ID}")
+        assert "Save your own links and ask them anything." in html
+        assert 'data-store="https://apps.apple.com/app/id1234567890"' in html
+
+    def test_non_numeric_app_store_id_adds_no_handoff(self, monkeypatch):
+        monkeypatch.setenv("APP_STORE_ID", "abc")
+        html = _render_shared_card(_card(), f"https://x/s?id={self.SHARE_ID}")
+        assert "data-store" not in html and "<script" not in html

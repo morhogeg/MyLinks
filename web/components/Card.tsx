@@ -15,7 +15,7 @@ import { getCategoryColorStyle } from '@/lib/colors';
 import CategoryInput from './CategoryInput';
 import CardActionSheet from './CardActionSheet';
 import WaitingCard from './WaitingCard';
-import { hasHebrew, contentLang } from '@/lib/rtl';
+import { isRtlContent, isHebrewContent, contentLang } from '@/lib/rtl';
 import { isHttpUrl } from '@/lib/url';
 import { getNotes } from '@/lib/notes';
 import { relativeTime } from '@/lib/relativeTime';
@@ -88,7 +88,9 @@ function Card({
     onOpenInGraph,
     isMeaningMatch = false,
 }: CardProps) {
-    const isRtl = link.language === 'he' || hasHebrew(link.title) || hasHebrew(link.summary);
+    // Layout follows any RTL script; the Hebrew labels follow Hebrew only.
+    const isRtl = isRtlContent(link.language, link.title, link.summary);
+    const isHe = isHebrewContent(link.language, link.title, link.summary);
     const [isEditingCategory, setIsEditingCategory] = useState(false);
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     // One shared app-wide minute clock (see lib/useNow) instead of a per-card
@@ -124,7 +126,7 @@ function Card({
 
     // One rule for every surface (lib/relativeTime).
     const getTimeAgo = (timestamp: number | string, now: number): string =>
-        (!timestamp || !now ? '...' : relativeTime(timestamp, now, isRtl));
+        (!timestamp || !now ? '...' : relativeTime(timestamp, now, isHe));
 
     // M3 — async-capture lifecycle. A card queued via the share sheet is written
     // as `processing` and flips to `failed` if analysis errors. Render
@@ -507,7 +509,7 @@ function Card({
                                                     e.stopPropagation();
                                                     setIsEditingCategory(true);
                                                 }}
-                                                aria-label={isRtl ? 'עריכת קטגוריה' : 'Edit category'}
+                                                aria-label={isHe ? 'עריכת קטגוריה' : 'Edit category'}
                                                 className="opacity-0 group-hover/cat:opacity-100 focus-visible:opacity-100 transition-opacity p-1 -ms-1 hover:bg-fill-subtle rounded-md flex-shrink-0"
                                             >
                                                 <Pencil className="w-3 h-3 text-text-muted/40 hover:text-text-muted" />
@@ -700,7 +702,7 @@ function Card({
                         <div className="flex items-center gap-3 text-text-muted/60 text-[11px] font-medium">
                             <span className="flex items-center gap-1">
                                 <Clock className="w-3 h-3" />
-                                {link.metadata.estimatedReadTime}{isRtl ? ' דק׳' : 'm'}
+                                {link.metadata.estimatedReadTime}{isHe ? ' דק׳' : 'm'}
                             </span>
                             {now > 0 && <span>{getTimeAgo(link.createdAt, now)}</span>}
                             {/* Partial capture (PM-1C): a marker, not a message.
@@ -713,7 +715,7 @@ function Card({
                                    after the open card is closed. */
                                 <span role="status" className="flex items-center gap-1 text-accent">
                                     <CitationMark state="working" size={14} />
-                                    {isRtl ? 'מתעדכן' : 'Updating'}
+                                    {isHe ? 'מתעדכן' : 'Updating'}
                                 </span>
                             ) : link.captureQuality === 'partial'
                                 && link.sourceType !== 'image'

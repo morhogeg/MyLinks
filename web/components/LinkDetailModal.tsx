@@ -10,7 +10,7 @@ import { openExternal } from '@/lib/share';
 import { getCategoryColorStyle } from '@/lib/colors';
 import CategoryInput from './CategoryInput';
 import TagInput from './TagInput';
-import { hasHebrew, getDominantDirection, contentLang } from '@/lib/rtl';
+import { isRtlContent, isHebrewContent, getDominantDirection, contentLang } from '@/lib/rtl';
 import { isPending } from '@/lib/feedUtils';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import { useVisualViewport } from '@/lib/useVisualViewport';
@@ -523,7 +523,11 @@ export default function LinkDetailModal({
 
     if (!isOpen) return null;
 
-    const isRtl = link.language === 'he' || hasHebrew(link.title) || hasHebrew(link.summary) || (link.detailedSummary ? hasHebrew(link.detailedSummary) : false);
+    // Layout follows any RTL script (Hebrew, Arabic, Persian…); the Hebrew
+    // labels, header-row order and related-card reasons follow Hebrew only, so
+    // an Arabic card reads RTL with the app's English labels laid out LTR.
+    const isRtl = isRtlContent(link.language, link.title, link.summary, link.detailedSummary);
+    const isHe = isHebrewContent(link.language, link.title, link.summary, link.detailedSummary);
 
     // Partial capture (PM-1C): the backend flagged this card's page as only
     // partly read. The sourceType check is belt and braces — the flag is only
@@ -538,7 +542,7 @@ export default function LinkDetailModal({
     // concept matches (see lib/related.ts). Computed here, below the isOpen
     // guard, so the closed modal costs nothing.
     const relatedCards = getRelatedCards(
-        link, allLinks, isRtl, excludeRelatedIds,
+        link, allLinks, isHe, excludeRelatedIds,
         remoteSims && remoteSims.id === link.id ? remoteSims.sims : null,
     );
 
@@ -547,7 +551,7 @@ export default function LinkDetailModal({
 
     // One rule for every surface (lib/relativeTime).
     const getTimeAgo = (timestamp: number | string, now: number): string =>
-        (!timestamp || !now ? '...' : relativeTime(timestamp, now, isRtl));
+        (!timestamp || !now ? '...' : relativeTime(timestamp, now, isHe));
 
     const isReminderActive = link.reminderStatus === 'pending';
     const nextReminderDate = link.nextReminderAt ? new Date(link.nextReminderAt) : null;
@@ -580,7 +584,7 @@ export default function LinkDetailModal({
                 }}
                 rows={3}
                 dir="auto"
-                placeholder={isRtl ? 'מה דעתך על זה?' : 'Add your take…'}
+                placeholder={isHe ? 'מה דעתך על זה?' : 'Add your take…'}
                 aria-label="Edit your note"
                 className={`w-full min-h-[6.5rem] max-h-[45vh] overflow-y-auto text-base text-text bg-background border border-accent/40 rounded-xl px-3.5 py-3 focus:outline-none focus:ring-2 focus:ring-accent/50 resize-none placeholder:text-text-muted/50 leading-relaxed ${isRtl ? 'text-right' : ''}`}
             />
@@ -590,14 +594,14 @@ export default function LinkDetailModal({
                     onClick={saveNote}
                     className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-accent text-accent-ink text-xs font-bold hover:bg-accent-hover active:scale-95 transition-all"
                 >
-                    <Check className="w-3.5 h-3.5" /> {isRtl ? 'שמור הערה' : 'Save note'}
+                    <Check className="w-3.5 h-3.5" /> {isHe ? 'שמור הערה' : 'Save note'}
                 </button>
                 <button
                     onPointerDown={() => { noteActionRef.current = 'cancel'; }}
                     onClick={cancelNote}
                     className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-fill-subtle text-text-muted text-xs font-bold hover:text-text hover:bg-fill-strong transition-all"
                 >
-                    {isRtl ? 'ביטול' : 'Cancel'}
+                    {isHe ? 'ביטול' : 'Cancel'}
                 </button>
                 {/* Delete only when editing an existing note; a brand-new note is
                     discarded by Cancel, not deleted. */}
@@ -605,9 +609,9 @@ export default function LinkDetailModal({
                     <button
                         onPointerDown={() => { noteActionRef.current = 'delete'; }}
                         onClick={() => deleteNote(editingNoteId as string)}
-                        className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-text-muted/70 hover:text-danger transition-all ${isRtl ? 'mr-auto' : 'ml-auto'}`}
+                        className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-text-muted/70 hover:text-danger transition-all ${isHe ? 'mr-auto' : 'ml-auto'}`}
                     >
-                        <Trash2 className="w-3.5 h-3.5" /> {isRtl ? 'מחק' : 'Delete'}
+                        <Trash2 className="w-3.5 h-3.5" /> {isHe ? 'מחק' : 'Delete'}
                     </button>
                 )}
             </div>
@@ -1350,16 +1354,16 @@ export default function LinkDetailModal({
                             // list. Done wins if both are set.
                             const dismissed = !done && isTakeawayDismissed(link);
                             const label = done
-                                ? (isRtl ? 'בוצע' : 'Done')
+                                ? (isHe ? 'בוצע' : 'Done')
                                 : dismissed
-                                    ? (isRtl ? 'לא בשבילי' : 'Not for me')
-                                    : (isRtl ? 'לעשות' : 'Do this');
-                            const labelClass = `flex items-center gap-2 mb-2 text-sm font-bold text-text-muted ${isRtl ? '' : 'uppercase tracking-wider'}`;
+                                    ? (isHe ? 'לא בשבילי' : 'Not for me')
+                                    : (isHe ? 'לעשות' : 'Do this');
+                            const labelClass = `flex items-center gap-2 mb-2 text-sm font-bold text-text-muted ${isHe ? '' : 'uppercase tracking-wider'}`;
                             const icon = done
                                 ? <CircleCheck className="w-4 h-4 shrink-0 text-accent" />
                                 : <Circle className={`w-4 h-4 shrink-0 ${dismissed ? 'text-text-muted' : 'text-accent'}`} />;
                             return (
-                                <div className="mb-6" dir={isRtl ? 'rtl' : 'ltr'}>
+                                <div className="mb-6" dir={isHe ? 'rtl' : 'ltr'}>
                                     {/* Same label treatment as Machina's read below, so
                                         the two read as sibling sections rather than two
                                         unrelated inventions. Hebrew skips the uppercase
@@ -1393,7 +1397,7 @@ export default function LinkDetailModal({
                                             <span>{label}</span>
                                         </div>
                                     )}
-                                    <p className={`reading-prose leading-relaxed ${isRtl ? 'text-right' : 'text-left'} ${done ? 'text-text-muted line-through decoration-text-muted/60' : dismissed ? 'text-text-muted' : 'text-text-secondary'}`}>
+                                    <p dir={isRtl ? 'rtl' : 'ltr'} className={`reading-prose leading-relaxed ${isRtl ? 'text-right' : 'text-left'} ${done ? 'text-text-muted line-through decoration-text-muted/60' : dismissed ? 'text-text-muted' : 'text-text-secondary'}`}>
                                         {takeaway}
                                     </p>
                                 </div>
@@ -1508,9 +1512,9 @@ export default function LinkDetailModal({
                             if (basedOn.length === 0) return null;
                             return (
                                 <div className="mb-8">
-                                    <h3 className={`text-sm font-bold text-text-muted uppercase tracking-wider mb-3 flex items-center gap-2 ${isRtl ? 'flex-row-reverse' : ''}`}>
+                                    <h3 className={`text-sm font-bold text-text-muted uppercase tracking-wider mb-3 flex items-center gap-2 ${isHe ? 'flex-row-reverse' : ''}`}>
                                         <CitationMark state="listening" size={16} className="text-accent shrink-0" />
-                                        {isRtl ? 'מבוסס על' : 'Based on'}
+                                        {isHe ? 'מבוסס על' : 'Based on'}
                                     </h3>
                                     <div className="flex flex-wrap gap-2">
                                         {basedOn.map((src) => (
@@ -1536,7 +1540,7 @@ export default function LinkDetailModal({
                         <div className="flex flex-wrap items-center gap-4 text-sm text-text-muted mb-8">
                             <span className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-fill-subtle border border-border-subtle">
                                 <Clock className="w-3.5 h-3.5" />
-                                {link.metadata.estimatedReadTime} {isRtl ? 'דק׳ קריאה' : 'min read'}
+                                {link.metadata.estimatedReadTime} {isHe ? 'דק׳ קריאה' : 'min read'}
                             </span>
                             <span className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-fill-subtle border border-border-subtle">
                                 <Tag className="w-3.5 h-3.5 text-accent" />
@@ -1550,9 +1554,9 @@ export default function LinkDetailModal({
                                 <span className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-fill-subtle border border-border-subtle">
                                     <Upload className="w-3.5 h-3.5" />
                                     {link.importedFromAt
-                                        ? (isRtl ? 'יובא, נשמר במקור ' : 'Imported, first saved ')
-                                            + new Date(link.importedFromAt).toLocaleDateString(isRtl ? 'he-IL' : undefined, { month: 'short', year: 'numeric' })
-                                        : (isRtl ? 'יובא' : 'Imported')}
+                                        ? (isHe ? 'יובא, נשמר במקור ' : 'Imported, first saved ')
+                                            + new Date(link.importedFromAt).toLocaleDateString(isHe ? 'he-IL' : undefined, { month: 'short', year: 'numeric' })
+                                        : (isHe ? 'יובא' : 'Imported')}
                                 </span>
                             )}
                             {isReminderActive && nextReminderDate && (
@@ -1562,7 +1566,7 @@ export default function LinkDetailModal({
                                     className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-accent/10 border border-accent/20 text-accent cursor-pointer hover:brightness-110 active:scale-95 transition-all"
                                 >
                                     <Bell className="w-3.5 h-3.5" aria-hidden="true" />
-                                    {isRtl ? 'תזכורת:' : 'Reminder:'} {nextReminderDate.toLocaleDateString(isRtl ? 'he-IL' : undefined)}
+                                    {isHe ? 'תזכורת:' : 'Reminder:'} {nextReminderDate.toLocaleDateString(isHe ? 'he-IL' : undefined)}
                                 </button>
                             )}
                         </div>
@@ -1588,7 +1592,7 @@ export default function LinkDetailModal({
                                             a mouse. */}
                                         <button
                                             type="button"
-                                            aria-label={isRtl ? `הסר את התגית ${leaf}` : `Remove tag ${leaf}`}
+                                            aria-label={isHe ? `הסר את התגית ${leaf}` : `Remove tag ${leaf}`}
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 onUpdateTags(link.id, link.tags.filter(t => t !== tag), link.tags);
@@ -1631,9 +1635,9 @@ export default function LinkDetailModal({
                             calm — a notes list, not a chat. */}
                         {onUpdateNotes && (
                             <div ref={notesSectionRef} className="mb-8 border-t border-border-subtle pt-6 scroll-mt-4">
-                                <h3 className={`text-sm font-bold text-text-muted uppercase tracking-wider mb-3 flex items-center gap-2 ${isRtl ? 'flex-row-reverse' : ''}`}>
+                                <h3 className={`text-sm font-bold text-text-muted uppercase tracking-wider mb-3 flex items-center gap-2 ${isHe ? 'flex-row-reverse' : ''}`}>
                                     <StickyNote className="w-4 h-4 text-accent" />
-                                    {isRtl ? (notes.length > 1 ? 'ההערות שלי' : 'ההערה שלי') : (notes.length > 1 ? 'My notes' : 'My note')}
+                                    {isHe ? (notes.length > 1 ? 'ההערות שלי' : 'ההערה שלי') : (notes.length > 1 ? 'My notes' : 'My note')}
                                 </h3>
 
                                 <div className="space-y-2.5">
@@ -1685,11 +1689,11 @@ export default function LinkDetailModal({
                                 {!isNewNote && (
                                     <button
                                         onClick={startAddNote}
-                                        className={`mt-2.5 w-full flex items-center gap-2 px-4 py-3 rounded-xl border border-dashed border-border-strong text-text-muted/70 hover:text-accent hover:border-accent/40 hover:bg-accent/[0.04] active:scale-[0.99] transition-all ${isRtl ? 'flex-row-reverse' : ''}`}
+                                        className={`mt-2.5 w-full flex items-center gap-2 px-4 py-3 rounded-xl border border-dashed border-border-strong text-text-muted/70 hover:text-accent hover:border-accent/40 hover:bg-accent/[0.04] active:scale-[0.99] transition-all ${isHe ? 'flex-row-reverse' : ''}`}
                                     >
                                         <Plus className="w-4 h-4 shrink-0" />
                                         <span className="text-sm font-semibold">
-                                            {notes.length ? (isRtl ? 'הוסף הערה' : 'Add note') : (isRtl ? 'הוסף הערה' : 'Add a note')}
+                                            {notes.length ? (isHe ? 'הוסף הערה' : 'Add note') : (isHe ? 'הוסף הערה' : 'Add a note')}
                                         </span>
                                     </button>
                                 )}
@@ -1702,10 +1706,10 @@ export default function LinkDetailModal({
                             navigates. */}
                         {relatedCards.length > 0 && (
                             <div ref={relatedSectionRef} className="mb-8 border-t border-border-subtle pt-6 scroll-mt-4">
-                                <div className={`mb-4 flex items-center justify-between gap-3 ${isRtl ? 'flex-row-reverse' : ''}`}>
-                                    <h3 className={`text-sm font-bold text-text-muted uppercase tracking-wider flex items-center gap-2 ${isRtl ? 'flex-row-reverse' : ''}`}>
+                                <div className={`mb-4 flex items-center justify-between gap-3 ${isHe ? 'flex-row-reverse' : ''}`}>
+                                    <h3 className={`text-sm font-bold text-text-muted uppercase tracking-wider flex items-center gap-2 ${isHe ? 'flex-row-reverse' : ''}`}>
                                         <Network className="w-4 h-4" />
-                                        {isRtl ? 'כרטיסים קשורים' : 'Related cards'}
+                                        {isHe ? 'כרטיסים קשורים' : 'Related cards'}
                                     </h3>
                                     {/* The list above is this card's connections as a
                                         list; this opens the same ties as a map, with
@@ -1713,12 +1717,12 @@ export default function LinkDetailModal({
                                     {onOpenInGraph && (
                                         <button
                                             onClick={() => onOpenInGraph(link)}
-                                            title={isRtl ? 'הצג בגרף' : 'See this card in the graph'}
-                                            aria-label={isRtl ? 'הצג בגרף' : 'See this card in the graph'}
-                                            className={`shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-card-hover border border-border-subtle text-[12px] font-semibold text-text-secondary hover:text-text hover:border-accent/40 transition-colors cursor-pointer ${isRtl ? 'flex-row-reverse' : ''}`}
+                                            title={isHe ? 'הצג בגרף' : 'See this card in the graph'}
+                                            aria-label={isHe ? 'הצג בגרף' : 'See this card in the graph'}
+                                            className={`shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-card-hover border border-border-subtle text-[12px] font-semibold text-text-secondary hover:text-text hover:border-accent/40 transition-colors cursor-pointer ${isHe ? 'flex-row-reverse' : ''}`}
                                         >
                                             <Waypoints className="w-3.5 h-3.5 shrink-0 text-accent" />
-                                            <span>{isRtl ? 'הצג בגרף' : 'See in graph'}</span>
+                                            <span>{isHe ? 'הצג בגרף' : 'See in graph'}</span>
                                         </button>
                                     )}
                                 </div>

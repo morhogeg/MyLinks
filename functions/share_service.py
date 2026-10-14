@@ -78,6 +78,37 @@ def _open_in_app_href(share_url: str) -> str:
     return f"{WEB_URL}/?{urlencode({'shared': share_id, 'type': kind})}"
 
 
+def _app_store_id() -> str:
+    """APP_STORE_ID when it is set and digits-only, else "". Read per call so
+    the App Store hand-off switches on the moment the env var is configured."""
+    app_id = (os.environ.get("APP_STORE_ID") or "").strip()
+    return app_id if app_id.isdigit() else ""
+
+
+def _open_in_machina_button(share_url: str) -> str:
+    """The share page's primary button.
+
+    Everywhere it links to the web app (`_open_in_app_href`). Once the app is
+    listed (APP_STORE_ID set) it also carries the App Store URL, and the inline
+    script in `_share_html_shell` points it there on iPhone/iPad: a tap on a
+    same-domain link can never open the installed app, and the App Store page
+    shows "Open" to people who already have Machina and "Get" to everyone else.
+    Done in the browser, not by User-Agent here, because share pages are
+    CDN-cached and one cached copy serves every device."""
+    app_id = _app_store_id()
+    store = f' data-store="https://apps.apple.com/app/id{app_id}"' if app_id else ""
+    return (f'<a class="btn btn-primary" id="mx-open" href="{_esc(_open_in_app_href(share_url))}"'
+            f'{store}>Open in Machina</a>')
+
+
+# Swaps the primary button to the App Store on iOS (iPadOS reports a Mac UA,
+# hence the touch check). Only emitted when APP_STORE_ID is set.
+_APP_STORE_SWAP_JS = """<script>(function(){var a=document.getElementById('mx-open');
+if(!a||!a.getAttribute('data-store'))return;var u=navigator.userAgent||'';
+if(/iPhone|iPad|iPod/.test(u)||(/Macintosh/.test(u)&&navigator.maxTouchPoints>1)){
+a.href=a.getAttribute('data-store');a.textContent='Get the Machina app';}})();</script>"""
+
+
 def _app_banner_meta(url: str) -> str:
     """Safari's Smart App Banner, emitted only when APP_STORE_ID is set.
 
@@ -85,8 +116,8 @@ def _app_banner_meta(url: str) -> str:
     is configured, and digits-only because the value lands in a meta tag. The
     `app-argument` is handed to the installed app's openURL handler
     (web/components/NativeShell.tsx)."""
-    app_id = (os.environ.get("APP_STORE_ID") or "").strip()
-    if not app_id.isdigit():
+    app_id = _app_store_id()
+    if not app_id:
         return ""
     return (f'\n<meta name="apple-itunes-app" '
             f'content="app-id={app_id}, app-argument={_esc(url)}">')
@@ -620,6 +651,7 @@ def _share_html_shell(*, title: str, description: str, image: str, url: str, bod
   .mosaic.n4 {{ grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; }}
   .mosaic img {{ width:100%; height:100%; object-fit:cover; display:block; }}
   .col-meta {{ color:#71717a; font-size:14px; margin:0 0 4px; }}
+  .pitch {{ color:#A1A1AA; font-size:15px; margin:8px 0 0; }}
   .col-item {{ display:flex; gap:14px; padding:18px 0; border-top:1px solid #1c1c1f; }}
   .col-item .thumb {{ width:56px; height:56px; border-radius:10px; object-fit:cover;
                      flex-shrink:0; background:#161618; }}
@@ -646,7 +678,7 @@ def _share_html_shell(*, title: str, description: str, image: str, url: str, bod
     <div class="brand"><img src="{_esc(WEB_URL)}/icon-192.png" alt="Machina"><span>Machina</span></div>
     {body}
     <div class="foot">Saved on <a href="{_esc(WEB_URL)}">Machina</a> — Everything you save, finally useful.</div>
-  </div>
+  </div>{_APP_STORE_SWAP_JS if _app_store_id() else ""}
 </body>
 </html>"""
 
@@ -697,7 +729,7 @@ def _render_shared_card(card: dict, share_url: str, og_preview: Optional[dict] =
       {detail_html}
       {tags_html}
       <div class="actions">
-        <a class="btn btn-primary" href="{_esc(_open_in_app_href(share_url))}">Open in Machina</a>
+        {_open_in_machina_button(share_url)}
         {original_btn}
       </div>
     </div>"""
@@ -881,7 +913,7 @@ def _render_shared_collection(data: dict, share_url: str) -> str:
       {desc_html}
       {mosaic}
       {items}{overflow}
-      <div class="actions"><a class="btn btn-primary" href="{_esc(_open_in_app_href(share_url))}">Open in Machina</a></div>
+      <div class="actions">{_open_in_machina_button(share_url)}</div>
     </div>"""
     og_desc = _md_to_plain(description) or f"A curated collection of {count} card{'s' if count != 1 else ''} on Machina — summaries, sources, and links."
     og_image, og_w, og_h, og_type = _og_image_meta(data.get("ogPreview"), image)
@@ -942,8 +974,9 @@ def _render_shared_answer(data: dict, share_url: str) -> str:
       {notice_html}
       {sources_html}
       <p class="col-meta" style="margin-top:28px">{_esc(credit)}</p>
+      <p class="pitch">Save your own links and ask them anything.</p>
       <div class="actions">
-        <a class="btn btn-primary" href="{_esc(_open_in_app_href(share_url))}">Open in Machina</a>
+        {_open_in_machina_button(share_url)}
       </div>
     </div>"""
 

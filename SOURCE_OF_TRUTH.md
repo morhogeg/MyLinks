@@ -1122,6 +1122,15 @@ The multi-user auth work described below **was** fully written but not live:
 
 ### 🟠 P1 — App Store submission requirements (see §6 for the full readiness review)
 
+27. **[ ] Set `APP_STORE_ID` on release day (owner, 5 min).** Copy the
+    numeric Apple ID from App Store Connect → App Information and set it in
+    the functions env, then redeploy `share_page`. It switches on BOTH the
+    Smart App Banner and (shipped 2026-10-14) the share-page button's App
+    Store hand-off on iPhone/iPad. Set it only once the app is live: before
+    release the App Store page says the app isn't available. Later, post
+    launch: Associated Domains entitlement + an in-app screen for a shared
+    answer, so the link itself opens the app.
+
 6. **[x] AI-consent disclosure (Guideline 5.1.1/5.1.2 as updated Nov 2025).**
    Apps sending personal data to third-party AI must name the provider and get
    explicit consent. Machina sends saved URLs/images/questions to **Google
@@ -2593,6 +2602,39 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-14 — SHARE PAGES BECOME AN APP DOWNLOAD FUNNEL (owner, from a
+  WhatsApp-shared Ask answer whose "Open in Machina" landed on the signed-out
+  homepage).** Cause: the button links to `mymachina.app/?shared=…`, a
+  same-domain tap that can never fire a universal link (and the
+  `applinks:` entitlement was never added), the web app ignores `?shared=`,
+  and `APP_STORE_ID` is unset so no Smart App Banner. Fix
+  (`share_service._open_in_machina_button`): once `APP_STORE_ID` is set the
+  button carries the App Store URL and an inline script (`_APP_STORE_SWAP_JS`,
+  client-side because share pages are CDN-cached for 60s) relabels it "Get
+  the Machina app" on iPhone/iPad; the App Store page shows "Open" to existing
+  users. Desktop/Android keep "Open in Machina" → web root (landing page when
+  signed out). Answer page gains "Save your own links and ask them anything."
+  **Inert until the owner sets `APP_STORE_ID`** (§4 task 27). 1913 functions
+  tests pass; iPhone vs desktop button verified in headless Chromium.
+- **2026-10-13 — ARABIC-SCRIPT CARDS READ RIGHT-TO-LEFT (owner, ahead of the
+  App Store country list).** Language audit: card analysis and Ask already
+  follow any language (prompt rules), but card LAYOUT keyed RTL off Hebrew
+  letters only, so Arabic/Persian/Urdu cards rendered left-aligned. Now
+  `lib/rtl.ts` splits two questions: `isRtlContent` (layout: Hebrew + Arabic
+  script, or an RTL `language` code) and `isHebrewContent` (the Hebrew
+  microcopy: "דק׳ קריאה", time-ago, "לעשות", related reasons, the "Key Points"
+  heading translation). An Arabic card reads RTL with the app's English labels
+  laid out LTR; Hebrew is unchanged. `contentLang` returns "ar" for VoiceOver.
+  Touched: `Card`, `SwipeDeck`, `LinkDetailModal`, `KnowledgeGraph`,
+  `SimpleMarkdown`; `getDirection` callers (ListCard, DigestCard, notes,
+  collections) pick up Arabic automatically. Render-verified 390px light+dark
+  (Arabic + Hebrew fixtures, throwaway harness deleted); `tsc` + eslint clean.
+  App UI language stays English (owner decision). **Known remaining language
+  gaps (not fixed):** weekly recap is Hebrew-or-English only
+  (`ai_service.py` recap prompt); the tag-language backstop only separates
+  Hebrew from the rest, so a French card can reuse English tags; tapped Ask
+  chips in a Latin-script non-English chat can come back in English
+  (`search.conversation_language` can't tell Latin languages apart).
 - **2026-10-13 (final) — LAST PRO/FREE GAPS (owner: "ship whatever fixes and
   improvements you can").** (1) A free user whose trial or subscription ran
   out is told so on the plan sheet ("Your Pro trial ended on Oct 10. You're on

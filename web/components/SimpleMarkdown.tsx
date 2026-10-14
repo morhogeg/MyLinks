@@ -1,6 +1,6 @@
 'use client';
 
-import { contentLang } from '@/lib/rtl';
+import { contentLang, hasHebrew } from '@/lib/rtl';
 import React from 'react';
 
 interface SimpleMarkdownProps {
@@ -94,8 +94,8 @@ export default function SimpleMarkdown({ content, className = '', isCompact = fa
             flushList();
             let headingText = trimmed.slice(3);
 
-            // Translate headers if RTL
-            if (isRtl) {
+            // Translate headers on Hebrew content (not other RTL scripts)
+            if (isRtl && hasHebrew(content)) {
                 const upperHeading = headingText.toUpperCase();
                 if (upperHeading === 'KEY POINTS') headingText = 'נקודות עיקריות';
                 else if (upperHeading === 'CONCLUSIONS' || upperHeading === 'CONCLUSION') headingText = 'מסקנות';
