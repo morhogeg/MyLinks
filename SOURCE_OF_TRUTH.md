@@ -2678,7 +2678,8 @@ exact-match, capped.
   card and pill labels identical every second for 12s, including across a
   simulated backend re-stamp of `processingStartedAt` (held at 37%, no step
   back); light + dark at 375px; no console errors. `tsc`, eslint, 84 unit
-  tests clean. **Not verified on device.**
+  tests clean. **Not verified on device.** **SHIPPED** as merge `8de7bb4`:
+  Vercel (auto), TestFlight run #370 = **build 1370**.
 - **2026-10-14 — IN-APP PHOTO PICKER CAPPED AT 5 (owner, from the
   `ios-pass` launch-checklist step).** The + button's Image tab and the
   partial card's "Add screenshots" now open a native picker
