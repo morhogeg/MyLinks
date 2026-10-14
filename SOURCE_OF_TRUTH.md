@@ -2616,6 +2616,11 @@ exact-match, capped.
   signed out). Answer page gains "Save your own links and ask them anything."
   **Inert until the owner sets `APP_STORE_ID`** (§4 task 27). 1913 functions
   tests pass; iPhone vs desktop button verified in headless Chromium.
+  **SHIPPED** together with the Arabic RTL entry below as merge `ae33681`:
+  Vercel (auto), Deploy Cloud Functions run #131 (`share_page` only),
+  TestFlight run #367 = **build 1367** (RTL fix). Owner QA on 1367: open an
+  Arabic-language card (title/summary/Key Points right-aligned, labels stay
+  English); Hebrew cards unchanged.
 - **2026-10-13 — ARABIC-SCRIPT CARDS READ RIGHT-TO-LEFT (owner, ahead of the
   App Store country list).** Language audit: card analysis and Ask already
   follow any language (prompt rules), but card LAYOUT keyed RTL off Hebrew
