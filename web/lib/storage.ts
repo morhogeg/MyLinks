@@ -171,12 +171,13 @@ export function startProcessingPlaceholder(
  * in the feed the instant capture starts, and process_link_background flips this
  * same doc to ready/failed via the cardId passed through /api/share.
  */
-export async function createImagePlaceholder(uid: string, count: number): Promise<string> {
+export async function createImagePlaceholder(uid: string, count: number, startedAt?: number): Promise<string> {
     const linksRef = collection(db, 'users', uid, 'links');
     const now = Date.now();
     const ref = await addDoc(linksRef, {
         url: '',
-        title: count === 1 ? 'Reading your screenshot…' : `Reading ${count} screenshots…`,
+        // WHAT is being read; the card's status line narrates the work.
+        title: count === 1 ? 'Screenshot' : `${count} screenshots`,
         summary: '',
         tags: [],
         category: '',
@@ -184,7 +185,10 @@ export async function createImagePlaceholder(uid: string, count: number): Promis
         sourceType: 'image',
         isRead: false,
         createdAt: now,
-        processingStartedAt: now,
+        // The save's start (before compression), so the card's ramp continues
+        // the + sheet's instead of restarting. The backend re-stamps this when
+        // its job starts; cardProgress holds the % across that.
+        processingStartedAt: startedAt ?? now,
         metadata: { originalTitle: '', estimatedReadTime: 0 },
     });
     return ref.id;

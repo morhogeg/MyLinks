@@ -2,9 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2 } from 'lucide-react';
-import type { OrbState } from '@/components/ui/CitationMark';
 import OrbStatus from '@/components/ui/OrbStatus';
-import { imageScanLabel, imageScanOrb, linkScanLabel, linkScanOrb, textScanLabel, LINK_SCAN_STEPS, TEXT_SCAN_STEPS, LINK_SCAN_ORBS } from '@/lib/scanPhases';
+import { capturePhase, type CaptureKind } from '@/lib/scanPhases';
 
 export interface AnalyzingState {
     active: boolean;
@@ -12,57 +11,11 @@ export interface AnalyzingState {
     progress: number;
     /** What's being analyzed, for the label. 'text' is a shared paragraph with
         no URL — it must never be narrated as a link being fetched. */
-    kind: 'link' | 'image' | 'video' | 'text';
+    kind: CaptureKind;
     /** For a LINK capture, the backend `processingStage`'s step (0..4) when
         present — pins the label to the real milestone instead of deriving it from
         the % (which the time-ramp can push ahead). Absent → derive from progress. */
     stageStep?: number;
-}
-
-/**
- * Phase label that advances with progress, mirroring the in-panel scan views
- * (LinkScanProgress / ImageScanProgress / VideoScanProgress) so the banner reads
- * as genuinely working through stages, not a static "Analyzing".
- */
-/** Ellipsize a phase label — except the terminal 'Done!' beat, which must never
-    render as "Done!…" on a still-ACTIVE banner (owner-reported, build 1294). An
-    active banner at the ramp ceiling is still working, so say so; the real
-    finish is the `done` frame's "Saved to Machina". */
-function working(label: string): string {
-    return (label === 'Done!' ? 'Wrapping up' : label) + '…';
-}
-
-function phaseStatus(
-    kind: AnalyzingState['kind'],
-    pct: number,
-    stageStep?: number,
-): { label: string; orb: OrbState } {
-    // Image capture: shared source (IMAGE_SCAN_STEPS) — the same beats the
-    // in-dialog ImageScanProgress and the iOS share sheet narrate, so the
-    // banner can never drift into a third wording again.
-    if (kind === 'image') {
-        return { label: working(imageScanLabel(pct)), orb: imageScanOrb(pct) };
-    }
-    if (kind === 'video') {
-        if (pct >= 92) return { label: 'Organizing & tagging…', orb: 'solving' };
-        if (pct >= 72) return { label: 'Writing the summary…', orb: 'shaping' };
-        if (pct >= 40) return { label: 'Understanding the video…', orb: 'solving' };
-        return { label: 'Watching the video…', orb: 'searching' };
-    }
-    // Shared text: the same beats and the same orbs as a link, with copy that
-    // doesn't claim to be fetching anything (shared source: TEXT_SCAN_STEPS).
-    if (kind === 'text') {
-        if (stageStep != null && TEXT_SCAN_STEPS[stageStep]) {
-            return { label: working(TEXT_SCAN_STEPS[stageStep]), orb: LINK_SCAN_ORBS[stageStep] };
-        }
-        return { label: working(textScanLabel(pct)), orb: linkScanOrb(pct) };
-    }
-    // link / web article — mirror the in-dialog stepper exactly (shared source).
-    // Pin to the backend stage when reported; else derive the phase from the %.
-    if (stageStep != null && LINK_SCAN_STEPS[stageStep]) {
-        return { label: working(LINK_SCAN_STEPS[stageStep]), orb: LINK_SCAN_ORBS[stageStep] };
-    }
-    return { label: working(linkScanLabel(pct)), orb: linkScanOrb(pct) };
 }
 
 /**
@@ -128,7 +81,7 @@ export default function AnalyzingBanner({ state }: { state: AnalyzingState | nul
     pct = done ? 100 : Math.max(pct, maxPct.current);
     maxPct.current = pct;
 
-    const phase = phaseStatus(shown.kind, pct, shown.stageStep);
+    const phase = capturePhase(shown.kind, pct, shown.stageStep);
 
     return (
         <div

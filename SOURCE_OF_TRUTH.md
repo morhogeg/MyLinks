@@ -2089,6 +2089,20 @@ G3b. **[x] In-app photo picker stops at 5 — SHIPPED 2026-10-14 (merge `2b3f378
     backstop. **The share sheet is unchanged** (Photos owns that selection;
     it still says "Saving the first 5 of N"; owner decision).
 
+G3c. **[x] A processing card narrates the same phase as the pill — SHIPPED
+    2026-10-14 (owner device QA on build 1368).** The processing card's status
+    line was a fixed "Saving…" (right after the + sheet's "Saved" toast) under
+    a pill reading "Organizing & tagging… 88%", with a title "Reading your
+    screenshot…" as a third wording. Now `Card.tsx` `ProcessingStatus` shows
+    the live phase from `lib/cardProgress.ts` `cardCaptureProgress` (one
+    per-card ramp + per-card high-water mark, also used by
+    `useProcessingBanner`) and `scanPhases.capturePhase` (moved out of
+    `AnalyzingBanner`). The + sheet's image ramp now runs the shared curve
+    from the save's start, and `createImagePlaceholder` stamps that start as
+    `processingStartedAt`, so sheet → pill → card continue one ramp. Image
+    placeholders are titled "Screenshot" / "N screenshots" (the server's
+    "Analyzing image…" displays as "Screenshot").
+
 18c. **[ ] Native share-extension indicator: per-phase states.** Web maps every
     capture phase to its own motion (`LINK_SCAN_ORBS` in `web/lib/scanPhases.ts` —
     fetch=`working`, read=`searching`, write=`shaping`, connect=`searching`,
@@ -2653,6 +2667,18 @@ exact-match, capped.
   **SHIPPED** as merge `c6b8535`: Vercel (auto), Deploy Cloud Functions #132
   green (`entitlement_http`, `entitlement_sync_http`), TestFlight run #369 =
   **build 1369**.
+- **2026-10-14 (later) — PROCESSING CARD AND PILL SAY THE SAME THING (owner
+  QA on build 1368).** Screenshot save showed "Saved" toast → card "SAVING…" /
+  "Reading your screenshot…" → pill "Organizing & tagging… 88%". Fixed (§4
+  G3c): the card's status line narrates the pill's phase from the same
+  per-card computation (`lib/cardProgress.ts`), the + sheet's image ramp
+  rides the shared curve from the save's start (placeholder anchored to it),
+  placeholder title "Screenshot". **Verified** in a throwaway harness (real
+  `Card` + real `AnalyzingBanner` fed by `useProcessingBanner`, deleted):
+  card and pill labels identical every second for 12s, including across a
+  simulated backend re-stamp of `processingStartedAt` (held at 37%, no step
+  back); light + dark at 375px; no console errors. `tsc`, eslint, 84 unit
+  tests clean. **Not verified on device.**
 - **2026-10-14 — IN-APP PHOTO PICKER CAPPED AT 5 (owner, from the
   `ios-pass` launch-checklist step).** The + button's Image tab and the
   partial card's "Add screenshots" now open a native picker

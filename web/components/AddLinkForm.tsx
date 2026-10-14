@@ -202,6 +202,11 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
     }, [openSignal]);
     const [progress, setProgress] = useState(0);
     const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+    // When the current image save started (epoch ms). The in-sheet ramp, the
+    // placeholder card's processingStartedAt, the pill and the card's status
+    // line all run the shared curve (lib/shareProgress) from THIS one clock, so
+    // they narrate the same phase from the first second.
+    const imageStartRef = useRef(0);
 
     // DURABLE PLAIN-LINK DIALOG (Task 1). After /api/share acks, the dialog no
     // longer closes: it enters a processing phase, subscribing to the placeholder
@@ -271,14 +276,22 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
 
     useEffect(() => {
         // The plain-link path drives its own ramp from the card doc (see below),
-        // so it's excluded here — image / video / note keep this simulated ease.
+        // so it's excluded here; image rides the shared curve, video / note keep
+        // this simulated ease.
         const animated = isLoading && (activeTab === 'image' || isVideo || isNote);
-        if (animated) {
+        if (animated && activeTab === 'image') {
+            // Image: the shared curve from the save's start, not a private
+            // ease. A private, faster ramp read "Reading text" in the sheet, then
+            // the card and pill picked up the shared curve lower down
+            // (owner-reported 2026-10-14).
+            const tick = () => setProgress(progressFor(Date.now() - (imageStartRef.current || Date.now())));
+            tick();
+            progressTimer.current = setInterval(tick, 250);
+        } else if (animated) {
             setProgress((p) => (p < 8 ? 8 : p));
             // Smaller factor = slower climb. Tuned so video reaches ~97% over a
-            // minute, images fill in a few seconds, and a normal page lands in
-            // between (a handful of seconds, slower on a cold start).
-            const factor = isVideo ? 0.012 : activeTab === 'image' ? 0.04 : 0.03;
+            // minute and a note lands in a handful of seconds.
+            const factor = isVideo ? 0.012 : 0.03;
             progressTimer.current = setInterval(() => {
                 setProgress((p) => {
                     const CAP = 99;
@@ -807,6 +820,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
             return;
         }
 
+        imageStartRef.current = Date.now();
         setIsLoading(true);
         setError(null);
         setProgress(0);
@@ -828,11 +842,9 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                 const compressed = await compressImage(im.file);
                 payload.push({ data: compressed.base64, mimeType: compressed.mimeType });
             }
-            setProgress((p) => Math.max(p, 45));
-
             let cardId: string;
             try {
-                cardId = await createImagePlaceholder(uid, images.length);
+                cardId = await createImagePlaceholder(uid, images.length, imageStartRef.current);
             } catch (writeErr) {
                 reportError(writeErr, `${errorTag}.placeholder`);
                 throw saveError(single ? SAVE_COPY.image : SAVE_COPY.images, 'save_failed');

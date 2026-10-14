@@ -3,9 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from './types';
 import type { AnalyzingState } from '@/components/AnalyzingBanner';
-import { progressFor, CEILING, toMs, cardStartMs } from './shareProgress';
-import { stageProgress } from './scanPhases';
-import { lastShareHandoff } from './shareConfig';
+import { toMs, cardStartMs } from './shareProgress';
+import { cardCaptureProgress, forgetCardProgress } from './cardProgress';
 import { claimCardCapture, finishCardCapture, isCardCaptureFinished } from './captureLifecycle';
 
 /**
@@ -103,7 +102,10 @@ export function useProcessingBanner(links: Link[], suppressId?: string | null): 
             stillLive.set(l.id, start);
         }
         for (const [id, start] of liveCards.current) {
-            if (!stillLive.has(id)) finishCardCapture(id, start);
+            if (!stillLive.has(id)) {
+                finishCardCapture(id, start);
+                forgetCardProgress(id);
+            }
         }
         liveCards.current = stillLive;
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -156,44 +158,11 @@ export function useProcessingBanner(links: Link[], suppressId?: string | null): 
         ((toMs(a.createdAt) ?? 0) >= (toMs(b.createdAt) ?? 0) ? a : b),
     );
     const clock = now || Date.now();
-    // Prefer the shared start clock stamped on the card (processingStartedAt, then
-    // createdAt); only fall back to first-seen when a card carries neither.
-    const cardStartMs =
-        toMs(newest.processingStartedAt) ??
-        toMs(newest.createdAt) ??
-        firstSeen.current.get(newest.id) ??
-        clock;
-    // CONTINUITY ACROSS PROCESSES: the extension anchors its HUD at capture
-    // start, but the card's processingStartedAt is stamped when the server
-    // receives the upload — seconds LATER. Anchoring here at the card's stamp
-    // made the in-app banner restart near 0 after the extension showed a high
-    // number (owner-reported, 2026-07-13). If a Share-Extension hand-off from
-    // the same capture era exists, anchor at the EARLIER of the two clocks and
-    // never display less than the % the extension already showed (capped at the
-    // curve ceiling so a legacy "100" hint can't fake completion).
-    const handoff = lastShareHandoff();
-    const matching = handoff && Math.abs(handoff.startMs - cardStartMs) < 10 * 60_000 ? handoff : null;
-    const startMs = matching ? Math.min(cardStartMs, matching.startMs) : cardStartMs;
-    const handoffFloor = matching?.pct !== undefined ? Math.min(matching.pct, CEILING) : 0;
-    const elapsed = Math.max(0, clock - startMs);
-    // Honor the backend's per-stage milestone: floor the % to the reported stage
-    // and pin the phase step to it (shared mapping — scanPhases.stageProgress), so
-    // the banner never runs ahead of the real work. Absent on a pre-deploy
-    // backend, in which case the time ramp / label carry as before.
-    const { step: stageStep, floor: stageFloor } = stageProgress(newest.processingStage);
+    // Same per-card computation the card's own status line uses (cardProgress),
+    // so the pill and the card always narrate the same phase.
+    const cur = cardCaptureProgress(newest, clock, firstSeen.current.get(newest.id));
     // Non-decreasing: clamp to the highest % shown so far this capture.
-    const progress = Math.max(progressFor(elapsed), handoffFloor, stageFloor, lastPct.current);
+    const progress = Math.max(cur.progress, lastPct.current);
     lastPct.current = progress;
-
-    const kind: AnalyzingState['kind'] =
-        newest.sourceType === 'image' ? 'image' : newest.sourceType === 'youtube' ? 'video' : 'link';
-
-    // The stage step labels the LINK phase precisely; other kinds keep their own
-    // pct-derived phrasing, so only forward it when a stage is actually present.
-    return {
-        active: true,
-        progress,
-        kind,
-        stageStep: kind === 'link' && newest.processingStage ? stageStep : undefined,
-    };
+    return { active: true, progress, kind: cur.kind, stageStep: cur.stageStep };
 }

@@ -182,3 +182,55 @@ export function textScanLabel(progress: number): string {
     if (progress >= 100) return 'Done!';
     return TEXT_SCAN_STEPS[linkScanStepIndex(progress)];
 }
+
+/** Ellipsize a phase label — except the terminal 'Done!' beat, which must never
+    render as "Done!…" on a still-ACTIVE banner (owner-reported, build 1294). An
+    active banner at the ramp ceiling is still working, so say so; the real
+    finish is the `done` frame's "Saved to Machina". */
+function working(label: string): string {
+    return (label === 'Done!' ? 'Wrapping up' : label) + '…';
+}
+
+/** What a capture is: a link/page, a screenshot, a video, or shared text. */
+export type CaptureKind = 'link' | 'image' | 'video' | 'text';
+
+/**
+ * The live phase label + orb for a capture at a 0–100 progress value. The ONE
+ * narration every in-flight surface reads: the AnalyzingBanner pill AND the
+ * processing card's status line (Card.tsx) call this with the same inputs, so
+ * the card can never say one thing while the bar says another (owner-reported
+ * 2026-10-14: the card read a fixed "Saving…" under a pill reading
+ * "Organizing & tagging… 88%").
+ */
+export function capturePhase(
+    kind: CaptureKind,
+    pct: number,
+    stageStep?: number,
+): { label: string; orb: OrbState } {
+    // Image capture: shared source (IMAGE_SCAN_STEPS) — the same beats the
+    // in-dialog ImageScanProgress and the iOS share sheet narrate, so the
+    // banner can never drift into a third wording again.
+    if (kind === 'image') {
+        return { label: working(imageScanLabel(pct)), orb: imageScanOrb(pct) };
+    }
+    if (kind === 'video') {
+        if (pct >= 92) return { label: 'Organizing & tagging…', orb: 'solving' };
+        if (pct >= 72) return { label: 'Writing the summary…', orb: 'shaping' };
+        if (pct >= 40) return { label: 'Understanding the video…', orb: 'solving' };
+        return { label: 'Watching the video…', orb: 'searching' };
+    }
+    // Shared text: the same beats and the same orbs as a link, with copy that
+    // doesn't claim to be fetching anything (shared source: TEXT_SCAN_STEPS).
+    if (kind === 'text') {
+        if (stageStep != null && TEXT_SCAN_STEPS[stageStep]) {
+            return { label: working(TEXT_SCAN_STEPS[stageStep]), orb: LINK_SCAN_ORBS[stageStep] };
+        }
+        return { label: working(textScanLabel(pct)), orb: linkScanOrb(pct) };
+    }
+    // link / web article — mirror the in-dialog stepper exactly (shared source).
+    // Pin to the backend stage when reported; else derive the phase from the %.
+    if (stageStep != null && LINK_SCAN_STEPS[stageStep]) {
+        return { label: working(LINK_SCAN_STEPS[stageStep]), orb: LINK_SCAN_ORBS[stageStep] };
+    }
+    return { label: working(linkScanLabel(pct)), orb: linkScanOrb(pct) };
+}
