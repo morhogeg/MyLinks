@@ -1,6 +1,6 @@
 /**
- * contentLang: Hebrew content is marked lang="he" so VoiceOver reads it with
- * a Hebrew voice (R-1). Run with
+ * contentLang: Hebrew content is marked lang="he" and Arabic-script content
+ * lang="ar" so VoiceOver reads it with the matching voice (R-1). Run with
  * `node --test --experimental-strip-types lib/__tests__/rtl.test.ts`.
  */
 import { test } from 'node:test';
@@ -21,6 +21,12 @@ test('English, mixed English-led and empty text get no lang', () => {
     assert.equal(contentLang(undefined), undefined);
 });
 
-test('Arabic is RTL but not Hebrew, so it is not marked "he"', () => {
-    assert.equal(contentLang('مرحبا بالعالم'), undefined);
+test('Arabic-script text is "ar", never "he"', () => {
+    assert.equal(contentLang('مرحبا بالعالم'), 'ar');
+    // Persian shares the Arabic script, so it gets the Arabic voice too.
+    assert.equal(contentLang('سلام دنیا'), 'ar');
+});
+
+test('English-led text with an Arabic phrase gets no lang', () => {
+    assert.equal(contentLang('A note about "مرحبا" in English'), undefined);
 });

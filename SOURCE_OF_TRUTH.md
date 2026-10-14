@@ -2619,6 +2619,19 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-14 — E2E CI GREEN AGAIN (stale Arabic test).** "E2E user
+  journeys" had failed on every `main` push since merge `ae33681` (runs
+  38523343865, 38576401976, 38577631394; last green `e54bbe76`) at "Web unit
+  tests (lib + build scripts)": `rtl.test.ts` still expected
+  `contentLang('مرحبا بالعالم')` to be `undefined`, but the 2026-10-13 Arabic
+  change made it return `"ar"` on purpose (VoiceOver voice). The code is
+  right, so the test changed: Arabic and Persian return `"ar"`, and an
+  English-led line with an Arabic phrase gets no lang. Verified locally:
+  `npm run test:unit` 78/78 lib + 6/6 scripts. Test-only, no app change, no
+  TestFlight. Local gotcha: in a worktree with no `web/node_modules`,
+  `scripts/check-em-dash.test.mjs` fails with "Cannot find package
+  'typescript'"; that's the missing install, not a real failure (CI installs
+  deps).
 - **2026-10-14 — TRIAL ACCOUNTS SEE THEIR IMPORT ALLOWANCE (owner, testing
   checklist step `ios-plan` "Settings → Import: a free account sees how many
   imported links it has left" on build 1367 with a trial account).** The
