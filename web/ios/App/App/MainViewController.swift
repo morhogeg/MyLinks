@@ -4,12 +4,15 @@ import Capacitor
 /// Bridge view controller whose only job is to register app-embedded custom
 /// plugins. Capacitor 8 with SPM does NOT auto-discover plugins compiled into
 /// the app target (only plugins shipped as Swift packages), so ShareConfigPlugin
-/// must be registered explicitly here — otherwise `registerPlugin('ShareConfig')`
-/// on the JS side resolves to a no-op and the share token never reaches the App
-/// Group (the Share Extension then shows "Open Machina and sign in first").
+/// and PhotoPickerPlugin must be registered explicitly here — otherwise
+/// `registerPlugin('ShareConfig')` on the JS side resolves to a no-op and the
+/// share token never reaches the App Group (the Share Extension then shows
+/// "Open Machina and sign in first"), and the + button falls back to WebKit's
+/// uncapped photo picker.
 class MainViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
         bridge?.registerPluginInstance(ShareConfigPlugin())
+        bridge?.registerPluginInstance(PhotoPickerPlugin())
     }
 
     /// What shows before the page's first paint and behind overscroll. The

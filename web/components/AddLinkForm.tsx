@@ -25,6 +25,7 @@ import ImportSheet from '@/components/ImportSheet';
 import ScreenshotStrip, { toPickedImages, type PickedImage } from '@/components/ScreenshotStrip';
 import { enqueueOfflineSave, queueStalledSave } from '@/lib/offlineSave';
 import { reportError } from '@/lib/errorReporter';
+import { openCappedPicker } from '@/lib/photoPicker';
 
 interface AddLinkFormProps {
     onLinkAdded: () => void;
@@ -433,15 +434,16 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
         imagesRef.current.forEach((im) => URL.revokeObjectURL(im.preview));
     }, []);
 
-    const addImageFiles = (files: FileList | null) => {
-        if (!files || files.length === 0) return;
-        // Read the FileList NOW, synchronously: the input's onChange resets
-        // `value` right after this call, and a FileList is LIVE (WebKit
-        // empties it on reset) — so a setImages updater, which React runs
-        // after the handler returns, would see zero files. Same reason the
-        // toast and object-URL creation stay OUT of the updater: it must be
-        // pure (StrictMode runs it twice).
-        const incoming = Array.from(files);
+    // `incoming` is a plain array: the input's onChange copies its FileList
+    // synchronously, because the handler resets `value` right after and a
+    // FileList is LIVE (WebKit empties it on reset), so a setImages updater,
+    // which React runs after the handler returns, would see zero files. Same
+    // reason the toast and object-URL creation stay OUT of the updater: it must
+    // be pure (StrictMode runs it twice).
+    const addImageFiles = (incoming: File[]) => {
+        if (incoming.length === 0) return;
+        // The iOS picker is capped at the room left, so this trim only bites
+        // on desktop web, where a file picker can't be capped.
         const room = Math.max(0, MAX_IMAGES - imagesRef.current.length);
         if (incoming.length > room) {
             toast.info(`Up to ${MAX_IMAGES} images per card. Kept the first ${room}.`);
@@ -1090,8 +1092,18 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                                         type="file"
                                         accept="image/*"
                                         multiple
+                                        // In the iOS app: the native picker, capped at
+                                        // the room left, instead of WebKit's uncapped one.
+                                        onClick={(e) => openCappedPicker(
+                                            e,
+                                            MAX_IMAGES - imagesRef.current.length,
+                                            (files, failed) => {
+                                                if (failed > 0) toast.error(failed === 1 ? "Couldn't read 1 photo." : `Couldn't read ${failed} photos.`);
+                                                addImageFiles(files);
+                                            },
+                                        )}
                                         onChange={(e) => {
-                                            addImageFiles(e.target.files);
+                                            addImageFiles(Array.from(e.target.files ?? []));
                                             // Reset so re-picking the same file fires onChange again.
                                             e.target.value = '';
                                         }}
