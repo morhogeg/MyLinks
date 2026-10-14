@@ -3,9 +3,8 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { User, DigestChannel, DigestMode, ReminderChannel } from '@/lib/types';
 import { updateUserSettings, getUserSettings } from '@/lib/storage';
-import { registerPush, openNotificationSettings, sendTestPush, unregisterPush, getDevicePushPermission, type DevicePushPermission } from '@/lib/push';
+import { registerPush, openNotificationSettings, unregisterPush, getDevicePushPermission, type DevicePushPermission } from '@/lib/push';
 import { isNativeApp } from '@/lib/api';
-import { reportError } from '@/lib/errorReporter';
 import { useToast } from '@/components/Toast';
 
 // Mirrors DEFAULT_USER_SETTINGS in functions/link_service.py — keep in sync.
@@ -257,48 +256,6 @@ export function useUserSettings(uid: string) {
         }
     };
 
-    // Diagnostic: re-register this device's token, then have the backend send a
-    // real push through FCM/APNs. The note names the exact link that failed —
-    // the one chain with two silent failure modes gets a loud self-test.
-    const sendTestNotification = async () => {
-        if (pushBusy) return;
-        setPushBusy(true);
-        setPushNote(null);
-        try {
-            const reg = await registerPush();
-            if (reg === 'unavailable') return;
-            if (reg === 'permission-denied' || reg === 'declined') {
-                setPushNote('Notifications are turned off for Machina in iOS Settings. Allow them there first.');
-                return;
-            }
-            if (reg === 'registration-failed') {
-                setPushNote('Could not register this device with Machina: the token upload failed. Check your connection and try again.');
-                return;
-            }
-            const test = await sendTestPush();
-            // User-facing copy stays plain; the exact failure (FCM/APNs error
-            // names, which link broke) goes to error reporting for us to read.
-            if (!test.ok) {
-                setPushNote('Couldn’t reach Machina to send the test. Check your connection and try again.');
-                reportError(new Error(`test push: ${test.error ?? 'unknown error'}`), 'push-test-unreachable');
-            } else if (test.skipped === 'no_tokens' || !test.tokens) {
-                setPushNote('This iPhone isn’t registered for notifications yet. Turn the switch off and on again.');
-                reportError(new Error('test push: no registered device'), 'push-test-no-tokens');
-            } else if ((test.sent ?? 0) > 0) {
-                setPushNote('Test sent. It should appear on your lock screen in a moment. If it doesn’t, check Focus and the notification settings for Machina.');
-            } else {
-                setPushNote('The test notification couldn’t be delivered. Try again later.');
-                // The token was registered FRESH seconds ago (registerPush above),
-                // so an all-failed send is never staleness: FCM/APNs refused it
-                // (ThirdPartyAuthError = the APNs key; SenderIdMismatchError =
-                // the build's Firebase config; UnregisteredError = environment).
-                reportError(new Error(`test push failed: ${test.errors?.[0] ?? 'unknown'}`), 'push-test-send-failed');
-            }
-        } finally {
-            setPushBusy(false);
-        }
-    };
-
     return {
         settings,
         setSettings,
@@ -306,7 +263,6 @@ export function useUserSettings(uid: string) {
         savePreferences,
         loadSettings,
         togglePush,
-        sendTestNotification,
         pushBusy,
         pushNote,
         pushOnHere,
