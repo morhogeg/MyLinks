@@ -2072,7 +2072,7 @@ G3. **[x] iOS share extension: multi-screenshot cards — SHIPPED 2026-09-16 (me
     (`firstProvider()`), so sharing 3 screenshots made 1 card and silently
     dropped 2, against the "never lies about saving" promise.
 
-G3b. **[x] In-app photo picker stops at 5 — SHIPPED 2026-10-14 (owner, from
+G3b. **[x] In-app photo picker stops at 5 — SHIPPED 2026-10-14 (merge `2b3f378`, build 1368; owner, from
     the `ios-pass` device pass).** The + button's Image tab and "Add
     screenshots" on a partial card used a plain `<input type="file"
     multiple>`, which in WKWebView opens the iOS picker with NO limit (HTML
@@ -2633,8 +2633,10 @@ exact-match, capped.
   JPEGs, a 720px screenshot not upscaled, swipe-down and cancel resolve
   empty, the picker reopens after. `tsc` + eslint clean; Xcode simulator build
   clean. **Not verified:** the real AddLinkForm/ScreenshotEnrich screens
-  on device (needs sign-in) — launch checklist `ios-pass` gained a
-  sub-step for it. Share sheet unchanged by owner decision.
+  on device (needs sign-in) — launch checklist `ios-pass` gained sub-step 3
+  for it (checklist version 4). Share sheet unchanged by owner decision.
+  **SHIPPED** as merge `2b3f378`: Vercel (auto), TestFlight run #368 =
+  **build 1368**. No functions change.
 - **2026-10-14 — SHARE PAGES BECOME AN APP DOWNLOAD FUNNEL (owner, from a
   WhatsApp-shared Ask answer whose "Open in Machina" landed on the signed-out
   homepage).** Cause: the button links to `mymachina.app/?shared=…`, a
