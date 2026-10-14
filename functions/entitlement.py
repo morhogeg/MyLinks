@@ -457,7 +457,12 @@ def plan_for_imports(uid: str) -> str:
     allowance: the Pro ceiling (10,000) is an abuse ceiling for paying users,
     and a disposable trial account with 10,000 imports of 3-hour videos was
     the cheapest way to spend the Gemini budget."""
-    return PLAN_PRO if is_committed_pro(uid) else PLAN_FREE
+    return _import_plan_for(entitlement_source(uid))
+
+
+def _import_plan_for(source: Optional[str]) -> str:
+    """`plan_for_imports` from an already-known source (None unless Pro is on)."""
+    return PLAN_PRO if source in _COMMITTED_SOURCES else PLAN_FREE
 
 
 # ── Trial clock ───────────────────────────────────────────────────────────────
@@ -492,6 +497,9 @@ def entitlement_summary(uid: str) -> dict:
 
     doc = get_entitlement(uid)
     plan = effective_plan(doc)
+    # The import meter reports the allowance import_links_http enforces: a
+    # trial is Pro for saves and asks but gets the free 500 imports.
+    import_plan = _import_plan_for(doc.get("source") if plan == PLAN_PRO else None)
     used = quota_usage(uid)
     # Additive only: `trialAnchorAt`, `trialAnchorCards` and the `imports` meter
     # are new fields on an otherwise unchanged shape, so an older client that
@@ -516,7 +524,7 @@ def entitlement_summary(uid: str) -> dict:
         "quotas": {
             "saves": {"used": used.get("saves", 0), "limit": quota_limit("saves", plan)},
             "asks": {"used": used.get("asks", 0), "limit": quota_limit("asks", plan)},
-            "imports": {"used": used.get("imports", 0), "limit": quota_limit("imports", plan)},
+            "imports": {"used": used.get("imports", 0), "limit": quota_limit("imports", import_plan)},
         },
         "waiting": _count_waiting(uid),
     }

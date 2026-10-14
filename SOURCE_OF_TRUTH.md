@@ -2619,6 +2619,24 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-14 — TRIAL ACCOUNTS SEE THEIR IMPORT ALLOWANCE (owner, testing
+  checklist step `ios-plan` "Settings → Import: a free account sees how many
+  imported links it has left" on build 1367 with a trial account).** The
+  import of a 10-link test file worked, but the sheet showed no count. Cause:
+  a trial is Pro in the app (`isPro`), so `ImportSheet.tsx` hid the line,
+  while `import_links_http` caps a trial at the FREE 500 lifetime imports
+  (`plan_for_imports`), and `entitlement_summary` reported the trial's import
+  limit as Pro's 10,000. Fix: `entitlement_summary` reports the import limit
+  `import_links_http` enforces (`_import_plan_for`: Pro only for owner /
+  RevenueCat), the sheet shows the count for free AND trial, the sheet
+  re-reads the entitlement after every import (was foreground-only, so it kept
+  saying 500 after importing), and the copy is "Imports don't use your monthly
+  saves. 490 of 500 imported links left." (sheet + Settings footnote; the old
+  "do not count against your monthly saves" read as unlimited). Limits for
+  reference: free 50 saves/mo + 500 imports lifetime; trial 1,000/mo + 500;
+  Pro 1,000/mo (abuse ceiling) + 10,000. Verified: pytest entitlement +
+  security_round2 + import_links (114), tsc, eslint. Not render-verified (the
+  line needs a signed-in trial account); owner re-checks on the next build.
 - **2026-10-14 — IN-APP PHOTO PICKER CAPPED AT 5 (owner, from the
   `ios-pass` launch-checklist step).** The + button's Image tab and the
   partial card's "Add screenshots" now open a native picker

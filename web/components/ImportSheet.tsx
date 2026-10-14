@@ -90,10 +90,13 @@ export default function ImportSheet({
 
     const busy = scanning || progress !== null;
     useScrollLock(isOpen);
-    // The free plan's lifetime import allowance, shown before the wall rather
-    // than only when an import runs into it ("480 of 500 imported links left").
+    // The lifetime import allowance, shown before the wall rather than only
+    // when an import runs into it ("480 of 500 imported links left"). A trial
+    // is Pro for saves but gets the free 500 imports, so it sees this too.
     const ent = useEntitlement();
-    const importAllowance = ent.loaded && !ent.isPro ? meterLabel('imports', ent.quotas.imports) : null;
+    const importAllowance = ent.loaded && (!ent.isPro || ent.isTrial)
+        ? meterLabel('imports', ent.quotas.imports)
+        : null;
     const isMobile = useIsMobile();
     const { sheetRef, scrimRef, handleProps } = useSheetDrag({ onClose, enabled: isMobile && !busy });
 
@@ -234,6 +237,9 @@ export default function ImportSheet({
             hapticWarning();
         } finally {
             setProgress(null);
+            // The server charged the allowance; re-read it so the next open
+            // says 490, not 500.
+            void ent.refresh();
         }
         if (queued > 0) {
             hapticSuccess();
@@ -425,8 +431,8 @@ export default function ImportSheet({
                                     : 'Import'}
                             </Button>
                             <p className="mt-2 text-center text-[12px] text-text-muted leading-snug">
-                                Imported links do not count against your monthly saves.
-                                {importAllowance && <> {importAllowance} on the free plan.</>}
+                                Imports don&apos;t use your monthly saves.
+                                {importAllowance && <> {importAllowance}.</>}
                             </p>
                         </>
                     )}

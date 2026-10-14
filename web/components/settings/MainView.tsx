@@ -266,7 +266,7 @@ export function MainView({
                     onClick={() => setImporting(true)}
                 />
             </List>
-            <Footnote>Bring links over from your browser&apos;s bookmarks, a Pocket export, or a list you paste. Imported links do not count against your monthly saves.</Footnote>
+            <Footnote>Bring links over from your browser&apos;s bookmarks, a Pocket export, or a list you paste. Imports don&apos;t use your monthly saves.</Footnote>
             <div id="settings-data-export" className="pt-3.5">
                 <DataExport />
             </div>
