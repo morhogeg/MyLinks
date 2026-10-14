@@ -4,7 +4,7 @@
 
 import { Link, StatusChangeHandler, CardShareMode } from '@/lib/types';
 import { Archive, Star, Clock, Trash2, Bell, Pencil, Circle, Check, MoreHorizontal, ExternalLink, Layers, Share2, RotateCcw, AlertTriangle, StickyNote, Lock, ImageOff, Image as ImageIcon, Images, EyeOff } from 'lucide-react';
-import { useState, memo } from 'react';
+import { useState, useEffect, memo } from 'react';
 import SourceByline from './SourceByline';
 import { cardThumbnailUrl } from '@/lib/cardThumbnail';
 import CitationMark from './ui/CitationMark';
@@ -19,6 +19,8 @@ import { isRtlContent, isHebrewContent, contentLang } from '@/lib/rtl';
 import { isHttpUrl } from '@/lib/url';
 import { getNotes } from '@/lib/notes';
 import { relativeTime } from '@/lib/relativeTime';
+import { cardCaptureProgress, captureKindOf } from '@/lib/cardProgress';
+import { capturePhase } from '@/lib/scanPhases';
 
 interface CardProps {
     link: Link;
@@ -58,6 +60,51 @@ interface CardProps {
      *  query. Renders the small "Meaning" chip in the chrome row so a result
      *  that shares no word with what was typed explains itself. */
     isMeaningMatch?: boolean;
+}
+
+/**
+ * The live status line on a `processing` card: the same phase the app-level pill
+ * shows for this capture ("Scanning image…", "Reading text…"), read from the
+ * same per-card progress (lib/cardProgress) and the same labels
+ * (scanPhases.capturePhase). It used to be a fixed "Saving…", which read wrong
+ * right after the + sheet's "Saved" toast and under a pill that said something
+ * else (owner-reported 2026-10-14). Ticks once a second, only while mounted.
+ */
+function ProcessingStatus({ link }: { link: Link }) {
+    const [clock, setClock] = useState(0);
+    useEffect(() => {
+        const read = () => setClock(Date.now());
+        read();
+        const iv = setInterval(read, 1000);
+        return () => clearInterval(iv);
+    }, []);
+    // Before the first tick (one frame) show the ramp's starting beat.
+    const cur = clock ? cardCaptureProgress(link, clock) : { progress: 0, kind: captureKindOf(link), stageStep: undefined };
+    // Rounded like the pill's displayed %, so the phase thresholds flip together.
+    const phase = capturePhase(cur.kind, Math.round(cur.progress), cur.stageStep);
+    return (
+        <>
+            <CitationMark state={phase.orb} size={20} />
+            <span className="text-[10px] uppercase font-black tracking-widest text-accent">
+                {phase.label}
+            </span>
+        </>
+    );
+}
+
+/** The placeholder titles capture paths write onto a `processing` card. They
+ *  describe the work, which the status line now narrates live, so the card
+ *  shows WHAT is being read instead: "Screenshot" / "3 screenshots" / the host.
+ *  ("Analyzing image…" is the server's share-sheet placeholder,
+ *  main.py _capture_placeholder_title; the "Reading …" ones are older web
+ *  placeholders still in flight.) */
+function processingTitle(link: Link, host: string): string {
+    const t = (link.title || '').trim();
+    const many = /^Reading (\d+) screenshots…$/.exec(t);
+    if (many) return `${many[1]} screenshots`;
+    if (t === 'Reading your screenshot…' || t === 'Analyzing image…') return 'Screenshot';
+    if (!t || t === 'Analyzing link…') return host;
+    return t;
 }
 
 /**
@@ -182,17 +229,22 @@ function Card({
                 <div className="p-4 sm:p-5 flex flex-col h-full space-y-3">
                     <div className="flex items-center gap-2">
                         {failed ? (
-                            <AlertTriangle className="w-4 h-4 text-danger shrink-0" />
+                            <>
+                                <AlertTriangle className="w-4 h-4 text-danger shrink-0" />
+                                <span className="text-[10px] uppercase font-black tracking-widest text-danger">Couldn’t analyze</span>
+                            </>
+                        ) : queued ? (
+                            <>
+                                <CitationMark state="working" size={20} />
+                                <span className="text-[10px] uppercase font-black tracking-widest text-accent">Queued</span>
+                            </>
                         ) : (
-                            <CitationMark state="working" size={20} />
+                            <ProcessingStatus link={link} />
                         )}
-                        <span className={`text-[10px] uppercase font-black tracking-widest ${failed ? 'text-danger' : 'text-accent'}`}>
-                            {failed ? 'Couldn’t analyze' : queued ? 'Queued' : 'Saving…'}
-                        </span>
                     </div>
 
                     <h3 dir="auto" className="font-bold text-base text-text leading-tight line-clamp-2">
-                        {link.title || host}
+                        {processingTitle(link, host)}
                     </h3>
 
                     {failed ? (
