@@ -245,12 +245,27 @@ def test_entitlement_summary_adds_the_trial_and_import_fields(monkeypatch):
     assert summary["trialAnchorAt"] is None
     assert summary["trialAnchorCards"] == ent.TRIAL_ANCHOR_CARDS
     assert summary["quotas"]["imports"]["used"] == 40
+    # A trial's import meter is the free allowance import_links_http enforces.
+    assert summary["quotas"]["imports"]["limit"] == quota.quota_limit("imports", "free")
     assert summary["quotas"]["saves"]["used"] == 2
     assert summary["waiting"] == 0
     assert summary["freeLimits"] == {"saves": quota.quota_limit("saves", "free"),
                                      "asks": quota.quota_limit("asks", "free"),
                                      "imports": quota.quota_limit("imports", "free")}
     assert summary["willRenew"] is None and summary["billingIssue"] is False
+
+
+def test_entitlement_summary_import_meter_is_pro_only_when_committed(monkeypatch):
+    import quota
+    monkeypatch.setattr(quota, "quota_usage", lambda uid: {})
+    monkeypatch.setattr(ent, "_count_waiting", lambda uid: 0)
+    monkeypatch.setattr(ent, "get_entitlement", lambda uid: ent.owner_grant())
+    assert ent.entitlement_summary("me")["quotas"]["imports"]["limit"] == quota.quota_limit("imports", "pro")
+    # A lapsed subscription is free for imports too.
+    launch = _ms(ent.PRO_LAUNCH_AT)
+    monkeypatch.setattr(ent, "get_entitlement",
+                        lambda uid: {"plan": "pro", "source": "revenuecat", "proUntil": launch})
+    assert ent.entitlement_summary("u")["quotas"]["imports"]["limit"] == quota.quota_limit("imports", "free")
 
 
 # ── Owner grant and the founders' migration (2026-10-13) ─────────────────────
