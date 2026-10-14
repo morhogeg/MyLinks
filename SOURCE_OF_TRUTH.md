@@ -2637,6 +2637,9 @@ exact-match, capped.
   Pro 1,000/mo (abuse ceiling) + 10,000. Verified: pytest entitlement +
   security_round2 + import_links (114), tsc, eslint. Not render-verified (the
   line needs a signed-in trial account); owner re-checks on the next build.
+  **SHIPPED** as merge `c6b8535`: Vercel (auto), Deploy Cloud Functions #132
+  green (`entitlement_http`, `entitlement_sync_http`), TestFlight run #369 =
+  **build 1369**.
 - **2026-10-14 — IN-APP PHOTO PICKER CAPPED AT 5 (owner, from the
   `ios-pass` launch-checklist step).** The + button's Image tab and the
   partial card's "Add screenshots" now open a native picker
