@@ -2072,6 +2072,23 @@ G3. **[x] iOS share extension: multi-screenshot cards — SHIPPED 2026-09-16 (me
     (`firstProvider()`), so sharing 3 screenshots made 1 card and silently
     dropped 2, against the "never lies about saving" promise.
 
+G3b. **[x] In-app photo picker stops at 5 — SHIPPED 2026-10-14 (owner, from
+    the `ios-pass` device pass).** The + button's Image tab and "Add
+    screenshots" on a partial card used a plain `<input type="file"
+    multiple>`, which in WKWebView opens the iOS picker with NO limit (HTML
+    can't set one), so a user could tick 8 and we then kept the first 5 with
+    a toast. Now `PhotoPickerPlugin.swift` (registered in
+    `MainViewController`) opens `PHPickerViewController` with
+    `selectionLimit` = the room left (5 minus tiles already in the strip, or
+    minus screenshots already on the card), `.ordered` selection (numbered
+    badges = card order), no photo permission prompt. Picks are downsampled
+    natively (ImageIO thumbnail, 2048px JPEG) to temp
+    files that JS reads via `convertFileSrc` (`web/lib/photoPicker.ts`
+    `openCappedPicker`, wired as the input's `onClick` + `preventDefault`).
+    Desktop web keeps the input and the "Kept the first N" toast as the
+    backstop. **The share sheet is unchanged** (Photos owns that selection;
+    it still says "Saving the first 5 of N"; owner decision).
+
 18c. **[ ] Native share-extension indicator: per-phase states.** Web maps every
     capture phase to its own motion (`LINK_SCAN_ORBS` in `web/lib/scanPhases.ts` —
     fetch=`working`, read=`searching`, write=`shaping`, connect=`searching`,
@@ -2602,6 +2619,22 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-14 — IN-APP PHOTO PICKER CAPPED AT 5 (owner, from the
+  `ios-pass` launch-checklist step).** The + button's Image tab and the
+  partial card's "Add screenshots" now open a native picker
+  (`PhotoPickerPlugin.swift` → `PHPickerViewController`, `selectionLimit` =
+  room left, ordered) instead of WebKit's uncapped one, so iOS itself greys
+  out photo 6 (§4 G3b). JS side: `web/lib/photoPicker.ts`
+  (`openCappedPicker` on the file input's onClick; desktop web unchanged).
+  **Verified on the iOS 26.1 simulator** with a throwaway harness page (not
+  committed) driving the real plugin through the same label → input →
+  preventDefault path: "Select up to 3/5 photos" header, the extra tap
+  refused, files returned in tap order, 6016×6016 HEICs → 2048px ~400KB
+  JPEGs, a 720px screenshot not upscaled, swipe-down and cancel resolve
+  empty, the picker reopens after. `tsc` + eslint clean; Xcode simulator build
+  clean. **Not verified:** the real AddLinkForm/ScreenshotEnrich screens
+  on device (needs sign-in) — launch checklist `ios-pass` gained a
+  sub-step for it. Share sheet unchanged by owner decision.
 - **2026-10-14 — SHARE PAGES BECOME AN APP DOWNLOAD FUNNEL (owner, from a
   WhatsApp-shared Ask answer whose "Open in Machina" landed on the signed-out
   homepage).** Cause: the button links to `mymachina.app/?shared=…`, a

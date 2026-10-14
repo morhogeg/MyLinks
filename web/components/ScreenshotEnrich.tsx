@@ -9,6 +9,7 @@ import { hapticSuccess } from '@/lib/haptics';
 import { useToast } from '@/components/Toast';
 import ScreenshotStrip, { toPickedImages, type PickedImage } from '@/components/ScreenshotStrip';
 import { reportError } from '@/lib/errorReporter';
+import { openCappedPicker } from '@/lib/photoPicker';
 
 /**
  * COMPLETE A CARD FROM THE USER'S OWN SCREENSHOTS — the whole flow, in the
@@ -168,6 +169,16 @@ export default function ScreenshotEnrich({
             multiple
             hidden
             aria-label={t('Choose screenshots', 'בחירת צילומי מסך')}
+            // In the iOS app: the native picker, capped at the room left on
+            // the card, instead of WebKit's uncapped one.
+            onClick={(e) => openCappedPicker(e, room - picksRef.current.length, (files, failed) => {
+                if (failed > 0) {
+                    toast.error(failed === 1
+                        ? t("Couldn't read 1 photo.", 'לא הצלחנו לקרוא תמונה אחת.')
+                        : t(`Couldn't read ${failed} photos.`, `לא הצלחנו לקרוא ${failed} תמונות.`));
+                }
+                addFiles(files);
+            })}
             onChange={(e) => {
                 addFiles(Array.from(e.target.files ?? []));
                 // Reset so re-picking the same file fires onChange again.
