@@ -2681,7 +2681,8 @@ exact-match, capped.
   motion kept, phase text `sr-only`); image and video-link saves no longer
   toast "Saved…" while still processing (§4 G3c follow-up). Harness-verified
   (light, 375px): card shows mark + "Screenshot", its hidden label equals the
-  pill's. `tsc` + eslint clean. Not verified on device.
+  pill's. `tsc` + eslint clean. Not verified on device. **SHIPPED** as merge
+  `c485ab8`: Vercel (auto), TestFlight run #371 = **build 1371**.
 - **2026-10-14 (later) — PROCESSING CARD AND PILL SAY THE SAME THING (owner
   QA on build 1368).** Screenshot save showed "Saved" toast → card "SAVING…" /
   "Reading your screenshot…" → pill "Organizing & tagging… 88%". Fixed (§4
