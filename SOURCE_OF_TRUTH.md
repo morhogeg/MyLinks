@@ -2689,7 +2689,8 @@ exact-match, capped.
   `TestPushResult`, the `MainView`/`SettingsModal` props. The Push
   notifications toggle and its failure notes are unchanged. Backend
   `send_test_push_http` + its hosting rewrite left in place, now unused
-  (§4 P3 G-1). `tsc` + eslint clean.
+  (§4 P3 G-1). `tsc` + eslint clean. **SHIPPED** as merge `369a102`: Vercel
+  (auto), TestFlight run #372 = **build 1372**.
 - **2026-10-14 (evening) — CARD SHOWS THE MARK, PILL DOES THE TALKING (owner
   QA on build 1370).** Owner: drop the mid-process "Saved" toast, and why say
   the phase twice? Card status row is now the animated mark only (phase
