@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { RotateCcw } from 'lucide-react';
-import { Bell, BellRing, Sun, Moon, Monitor, Clock, Compass, Lock, BarChart3, Heart, Crown, Puzzle, Upload } from 'lucide-react';
+import { Bell, Sun, Moon, Monitor, Clock, Compass, Lock, BarChart3, Heart, Crown, Puzzle, Upload } from 'lucide-react';
 import { policyUrl, openExternal } from '@/lib/share';
 import { isNativeApp } from '@/lib/api';
 import { browserKind, chromeWebStoreUrl, macAppStoreUrl } from '@/lib/extension';
@@ -25,7 +25,7 @@ import {
 
 export function MainView({
     authUid, accountEmail, displayName, photoURL, providerLabel, providerName, settings, theme, setTheme,
-    togglePush, sendTestNotification, pushBusy, pushNote, pushOnHere, aiConsentAt,
+    togglePush, pushNote, pushOnHere, aiConsentAt,
     privacyLockOn, onChangePin, onDisablePin,
     onReplayTour, go,
 }: {
@@ -40,8 +40,6 @@ export function MainView({
     theme: 'light' | 'dark' | 'system';
     setTheme: (t: 'light' | 'dark' | 'system') => void;
     togglePush: () => void;
-    sendTestNotification: () => void;
-    pushBusy: boolean;
     pushNote: string | null;
     /** Push is on for the account AND this iPhone can receive it. */
     pushOnHere: boolean;
@@ -221,14 +219,6 @@ export function MainView({
                         <RowText title="Push notifications" sub="Managed in the Machina app on iPhone" />
                         <span className="text-[15px] text-text-muted pe-1">{settings.push_enabled ? 'On' : 'Off'}</span>
                     </RowShell>
-                )}
-                {pushOnHere && isNativeApp() && (
-                    <NavRow
-                        tile={<BellRing className="w-[17px] h-[17px]" />}
-                        title="Send a test notification"
-                        value={pushBusy ? 'Sending…' : undefined}
-                        onClick={sendTestNotification}
-                    />
                 )}
                 <NavRow tile={<Clock className="w-[17px] h-[17px]" />} title="Reminders & Digest" value={remindersOrDigest ? 'On' : 'Off'} onClick={() => go('resurfacing')} />
             </List>

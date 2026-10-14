@@ -292,46 +292,6 @@ export async function openNotificationSettings(): Promise<boolean> {
     }
 }
 
-/** Outcome of a test push, relayed from the backend's send_push summary. */
-export interface TestPushResult {
-    ok: boolean;
-    /** Device tokens on the workspace when the send ran. */
-    tokens?: number;
-    sent?: number;
-    failed?: number;
-    /** Backend's reason when nothing was attempted (e.g. 'no_tokens'). */
-    skipped?: string | null;
-    /** FCM error names for the first few failed sends (never tokens). */
-    errors?: string[];
-    /** Transport-level failure reaching the endpoint at all. */
-    error?: string;
-}
-
-/**
- * Ask the backend to send this workspace a real push RIGHT NOW, exercising
- * the whole chain (stored token → FCM → APNs → this device). Diagnostic:
- * the result names the failing link instead of leaving silence.
- */
-export async function sendTestPush(): Promise<TestPushResult> {
-    try {
-        const res = await fetchWithTimeout(apiUrl('/api/send-test-push'), {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                ...(await authHeaders()),
-                ...(await appCheckHeaders()),
-            },
-            body: '{}',
-        });
-        if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
-        const body = await res.json();
-        return { ok: true, ...body };
-    } catch (e) {
-        console.warn('Test push failed:', e);
-        return { ok: false, error: 'network' };
-    }
-}
-
 /**
  * Remove this device's token from the workspace (sign-out / toggle off).
  * Must run while still signed in — the endpoint verifies the bearer token.

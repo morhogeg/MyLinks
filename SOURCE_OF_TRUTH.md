@@ -1995,6 +1995,14 @@ The multi-user auth work described below **was** fully written but not live:
 
 ### 🟢 P3 — product roadmap (post-launch)
 
+G-1. **[ ] Retire the unused test-push endpoint.** The Settings → "Send a
+    test notification" row was removed 2026-10-14 (owner); nothing calls
+    `send_test_push_http` any more. Delete the function in
+    `functions/main.py`, its `/api/send-test-push` rewrite in `firebase.json`
+    (that one needs `./deploy-hosting.sh`), and deploy with
+    `Deploy-Functions: send_test_push_http` (a deploy of "all" prunes it).
+    Harmless until then: bearer-authed and rate-limited.
+
 G0. **[x] Launch film built** *(2026-07-29 — `marketing/launch-clip/`, 67s
     1920×1080 + `.srt`; details and the reuse caveats in §8 "Launch film".
     **Re-cut 2026-07-30** around `docs/BRANDING.md`-adjacent story work: act one
@@ -2675,6 +2683,13 @@ exact-match, capped.
   **SHIPPED** as merge `c6b8535`: Vercel (auto), Deploy Cloud Functions #132
   green (`entitlement_http`, `entitlement_sync_http`), TestFlight run #369 =
   **build 1369**.
+- **2026-10-14 (night) — "SEND A TEST NOTIFICATION" REMOVED FROM SETTINGS
+  (owner).** The row (native, push on) is gone, with its client plumbing:
+  `useUserSettings.sendTestNotification`, `push.ts sendTestPush` /
+  `TestPushResult`, the `MainView`/`SettingsModal` props. The Push
+  notifications toggle and its failure notes are unchanged. Backend
+  `send_test_push_http` + its hosting rewrite left in place, now unused
+  (§4 P3 G-1). `tsc` + eslint clean.
 - **2026-10-14 (evening) — CARD SHOWS THE MARK, PILL DOES THE TALKING (owner
   QA on build 1370).** Owner: drop the mid-process "Saved" toast, and why say
   the phase twice? Card status row is now the animated mark only (phase
