@@ -63,12 +63,14 @@ interface CardProps {
 }
 
 /**
- * The live status line on a `processing` card: the same phase the app-level pill
- * shows for this capture ("Scanning image…", "Reading text…"), read from the
- * same per-card progress (lib/cardProgress) and the same labels
- * (scanPhases.capturePhase). It used to be a fixed "Saving…", which read wrong
- * right after the + sheet's "Saved" toast and under a pill that said something
- * else (owner-reported 2026-10-14). Ticks once a second, only while mounted.
+ * The status mark on a `processing` card: the animated Machina mark alone,
+ * moving with the capture's current phase (same per-card progress as the pill,
+ * lib/cardProgress, and the same verb→motion table, scanPhases.capturePhase).
+ * The pill is the ONE place that narrates the phase in words, with its %; the
+ * card saying the same words beside it was duplication (owner, 2026-10-14). It
+ * used to read a fixed "Saving…", which contradicted the pill. The phase stays
+ * as a screen-reader label so VoiceOver still hears it. Ticks once a second,
+ * only while mounted.
  */
 function ProcessingStatus({ link }: { link: Link }) {
     const [clock, setClock] = useState(0);
@@ -85,9 +87,7 @@ function ProcessingStatus({ link }: { link: Link }) {
     return (
         <>
             <CitationMark state={phase.orb} size={20} />
-            <span className="text-[10px] uppercase font-black tracking-widest text-accent">
-                {phase.label}
-            </span>
+            <span className="sr-only">{phase.label}</span>
         </>
     );
 }

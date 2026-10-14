@@ -749,11 +749,11 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                 // so the honest surface is the pill: it ramps from that card's
                 // own clock and flips to "Saved to Machina" when the card
                 // actually resolves. Leaving `progress` where the ramp reached
-                // hands over mid-flight instead of finishing early. The SAVE
-                // itself is worth confirming — hence the buzz and a toast that
-                // says exactly what happened: captured now, analysing still.
+                // hands over mid-flight instead of finishing early. The buzz
+                // confirms the capture; no toast: a "Saved" popping up while the
+                // pill and card still read as working is noise mid-process
+                // (owner, 2026-10-14). The pill's "Saved to Machina" is the finish.
                 hapticSuccess();
-                toast.success('Saved. Analyzing in the background.');
                 setUrl('');
                 setIsExpanded(false);
                 setIsLoading(false);
@@ -892,10 +892,9 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
             trackFirstSave();
             clearImages();
             setIsExpanded(false);
+            // No toast: the pill and the card carry the read from here, and a
+            // "Saved" popping up mid-process read as noise (owner, 2026-10-14).
             hapticSuccess();
-            toast.success(single
-                ? 'Saved. Reading your screenshot in the background.'
-                : 'Saved. Reading your screenshots in the background.');
             onLinkAdded();
         } catch (err) {
             // Record a SHORT, FIXED failure category (never raw error text). An

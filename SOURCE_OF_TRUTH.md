@@ -2102,6 +2102,14 @@ G3c. **[x] A processing card narrates the same phase as the pill — SHIPPED
     `processingStartedAt`, so sheet → pill → card continue one ramp. Image
     placeholders are titled "Screenshot" / "N screenshots" (the server's
     "Analyzing image…" displays as "Screenshot").
+    **Follow-up same day (owner QA on 1370):** the card no longer repeats the
+    pill's words. Its status row is the animated mark alone (motion still
+    follows the phase; the phase is an `sr-only` label for VoiceOver); the
+    pill is the one place that narrates, with its %. "Queued" and "Couldn't
+    analyze" keep their text. The mid-process "Saved. Reading your
+    screenshot in the background." toast (and the video link's "Saved.
+    Analyzing in the background.") are gone; the success haptic stays, and
+    the pill's "Saved to Machina" is the finish.
 
 18c. **[ ] Native share-extension indicator: per-phase states.** Web maps every
     capture phase to its own motion (`LINK_SCAN_ORBS` in `web/lib/scanPhases.ts` —
@@ -2667,6 +2675,13 @@ exact-match, capped.
   **SHIPPED** as merge `c6b8535`: Vercel (auto), Deploy Cloud Functions #132
   green (`entitlement_http`, `entitlement_sync_http`), TestFlight run #369 =
   **build 1369**.
+- **2026-10-14 (evening) — CARD SHOWS THE MARK, PILL DOES THE TALKING (owner
+  QA on build 1370).** Owner: drop the mid-process "Saved" toast, and why say
+  the phase twice? Card status row is now the animated mark only (phase
+  motion kept, phase text `sr-only`); image and video-link saves no longer
+  toast "Saved…" while still processing (§4 G3c follow-up). Harness-verified
+  (light, 375px): card shows mark + "Screenshot", its hidden label equals the
+  pill's. `tsc` + eslint clean. Not verified on device.
 - **2026-10-14 (later) — PROCESSING CARD AND PILL SAY THE SAME THING (owner
   QA on build 1368).** Screenshot save showed "Saved" toast → card "SAVING…" /
   "Reading your screenshot…" → pill "Organizing & tagging… 88%". Fixed (§4
