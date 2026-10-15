@@ -2668,7 +2668,9 @@ exact-match, capped.
   the curated digest, which still uses the unordered slice. +2 tests
   (`test_ai_payload_privacy.py`, incl. a 600-card regression); full suite
   1916 pass. The missed week is not recovered (owner: no need). First
-  proof is the Sun Oct 18 synthesis.
+  proof is the Sun Oct 18 synthesis. **SHIPPED** as merge `bdf3e3e`: Deploy
+  Cloud Functions #133 green (`send_digests`, `force_send_digests`,
+  `send_digest_now`). Backend only: no Vercel or TestFlight change.
 - **2026-10-14 — E2E CI GREEN AGAIN (stale Arabic test).** "E2E user
   journeys" had failed on every `main` push since merge `ae33681` (runs
   38523343865, 38576401976, 38577631394; last green `e54bbe76`) at "Web unit
