@@ -15,6 +15,8 @@ Ask has stripped effectively-private cards out of its prompt since it shipped
 Offline: the Firestore reads are faked at each module's ``get_db`` boundary.
 """
 
+from datetime import datetime, timedelta, timezone
+
 import digest_service as ds
 import link_service as ls
 import search
@@ -53,7 +55,16 @@ class FakeQuery:
         return list(self._docs)
 
     def where(self, filter):
-        field, value = filter.field_path, filter.value
+        field, op, value = filter.field_path, filter.op_string, filter.value
+        if op == ">=":
+            # Firestore's rule: a range filter only matches values of its own
+            # type (a number bound never matches a Timestamp or a string).
+            def hit(v):
+                if isinstance(value, datetime):
+                    return isinstance(v, datetime) and v >= value
+                return (isinstance(v, (int, float)) and not isinstance(v, bool)
+                        and v >= value)
+            return FakeQuery([d for d in self._docs if hit(d.to_dict().get(field))])
         return FakeQuery([d for d in self._docs if d.to_dict().get(field) == value])
 
     def stream(self):
@@ -133,6 +144,43 @@ def test_archived_exclusion_still_holds(monkeypatch):
 def test_embedding_vector_is_still_dropped(monkeypatch):
     _install(monkeypatch, ds, [_link("a", title="A", embedding_vector=[0.1] * 8)])
     assert "embedding_vector" not in ds.fetch_candidate_links("u1")[0]
+
+
+def test_recent_read_applies_the_same_filters(monkeypatch):
+    """The synthesis's own read (fetch_recent_links) shares the privacy,
+    archived and embedding rules with fetch_candidate_links."""
+    now = _now_ms()
+    _install(
+        monkeypatch, ds,
+        links=[
+            _link("public", title="Public", createdAt=now, embedding_vector=[0.1]),
+            _link("secret", title="Secret", createdAt=now, isPrivate=True),
+            _link("inherited", title="Inherited", createdAt=now, collectionIds=["vault"]),
+            _link("gone", title="Gone", createdAt=now, status="archived"),
+        ],
+        collections=[FakeDoc("vault", {"isPrivate": True})],
+    )
+    got = ds.fetch_recent_links("u1")
+    assert [l["id"] for l in got] == ["public"]
+    assert "embedding_vector" not in got[0]
+
+
+def test_recent_read_finds_the_week_past_the_first_500_cards(monkeypatch):
+    """2026-10-11: the week's saves sat past the arbitrary first 500 cards the
+    synthesis used to read, so it skipped the week as not_enough_cards."""
+    now = _now_ms()
+    old = [_link(f"a{i:04d}", title="Old", createdAt=now - 30 * 86_400_000)
+           for i in range(600)]
+    week = [
+        _link("z1", title="Ms", createdAt=now - 86_400_000),
+        _link("z2", title="Stamp", createdAt=datetime.now(timezone.utc) - timedelta(days=2)),
+        _link("z3", title="Ms too", createdAt=now - 3 * 86_400_000),
+        _link("z4", title="Legacy string", createdAt="2026-01-01T00:00:00+00:00"),
+    ]
+    _install(monkeypatch, ds, old + week)
+    assert not ds.synthesis_window_cards(ds.fetch_candidate_links("u1"))  # the bug
+    ids = [l["id"] for l in ds.synthesis_window_cards(ds.fetch_recent_links("u1"))]
+    assert ids == ["z1", "z2", "z3"]
 
 
 # ── synthesis_window_cards: the Gemini-bound half ─────────────────────────

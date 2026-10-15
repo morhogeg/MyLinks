@@ -1756,7 +1756,10 @@ The multi-user auth work described below **was** fully written but not live:
     **unordered `limit(500)`** — past ~500 saves curation sees an arbitrary slice;
     a clean `order_by("createdAt")` is unsafe because `createdAt` is stored mixed
     `number|string`, so the real fix is a normalized numeric sort field
-    (backfill/migration), deferred until it bites.
+    (backfill/migration), deferred until it bites. **It bit the weekly synthesis
+    (2026-10-15):** the synthesis now reads its own 7-day window
+    (`fetch_recent_links`, a `createdAt >=` range query per stored type);
+    the curated digest still reads the unordered slice.
 19d. **[x] Launch-readiness cutover-independent hardening — SHIPPED + MERGED
     2026-07-22 (commit `772ac51`, merged to `main`).** From the App Store
     launch-readiness audit: SSRF `is_global` tightening (+13 tests,
@@ -2649,6 +2652,23 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-15 — WEEKLY SYNTHESIS SKIPPED OCT 5–11 (owner: "why did it
+  stop?").** The Revisit list's newest synthesis was Sep 28–Oct 4; nothing
+  was written for the week due Sun Oct 11. The scheduler was healthy
+  (Pipeline Health green Oct 10–12) and no synthesis code changed that week.
+  Most likely cause (not verified: no prod access in the session to read the
+  owner's card count or `synthesisRun` stamp): the synthesis took its 7-day
+  window out of `fetch_candidate_links`, an **unordered `limit(500)`** (§4
+  19c deferred b). Past 500 saves, most of a week's saves were never read, a
+  light week fell under `SYNTHESIS_MIN_CARDS` (3), and `not_enough_cards`
+  settled the week with no retry and no trace in the app. Fix:
+  `fetch_recent_links` queries `createdAt >= cutoff` twice (epoch ms, and a
+  Timestamp for notes/screenshots/Ask answers older app builds still write),
+  sharing the archived/unanalyzed/private filter (`_keep_candidates`) with
+  the curated digest, which still uses the unordered slice. +2 tests
+  (`test_ai_payload_privacy.py`, incl. a 600-card regression); full suite
+  1916 pass. The missed week is not recovered (owner: no need). First
+  proof is the Sun Oct 18 synthesis.
 - **2026-10-14 — E2E CI GREEN AGAIN (stale Arabic test).** "E2E user
   journeys" had failed on every `main` push since merge `ae33681` (runs
   38523343865, 38576401976, 38577631394; last green `e54bbe76`) at "Web unit

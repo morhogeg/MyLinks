@@ -31,6 +31,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional, List
 
 from google.cloud import firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 from db import get_db, SCHEDULER_STATE_COLLECTION
 from entitlement import is_pro
@@ -158,28 +159,57 @@ def fetch_candidate_links(uid: str) -> List[dict]:
 
     KNOWN LIMIT: the fetch is bounded by CANDIDATE_LIMIT but NOT ordered, so a
     user past that many saves gets an arbitrary (doc-id-ordered) slice — which
-    can thin out rediscover/synthesis quality. A server-side order_by("createdAt")
-    is unsafe here: createdAt is stored mixed number|string across docs (see
+    can thin out the curated digest. A server-side order_by("createdAt") is
+    unsafe here: createdAt is stored mixed number|string across docs (see
     web/lib/types.ts), and Firestore sorts across types, so it would corrupt the
     order. A correct fix needs a normalized numeric sort field (a backfill/
-    migration) — tracked in SOURCE_OF_TRUTH §4, deferred until it actually bites.
+    migration) — tracked in SOURCE_OF_TRUTH §4. The weekly synthesis no longer
+    reads through here (fetch_recent_links): it is the path this bit.
 
     PRIVACY (2026-07-27): effectively-private cards (own `isPrivate` flag or
-    membership in a private collection) are dropped here, at the single point
-    both consumers read from. It matters more on this path than anywhere else:
-    the digest renders card titles into an in-app surface, and the SYNTHESIS
-    mode sends every card in the window to Gemini and then puts the model's
-    generated title into a PUSH NOTIFICATION — i.e. a private card's subject
-    on a locked phone. Ask has enforced the same rule since it shipped
+    membership in a private collection) are dropped (_keep_candidates), the
+    single filter both readers share. It matters more on this path than
+    anywhere else: the digest renders card titles into an in-app surface, and
+    the SYNTHESIS sends every card in the window to Gemini and then puts the
+    model's generated title into a PUSH NOTIFICATION — i.e. a private card's
+    subject on a locked phone. Ask has enforced the same rule since it shipped
     (`search.strip_private_cards`); these two surfaces never got it.
     """
+    links_ref = get_db().collection("users").document(uid).collection("links")
+    return _keep_candidates(uid, links_ref.limit(CANDIDATE_LIMIT).get())
+
+
+def fetch_recent_links(uid: str, days: int = SYNTHESIS_WINDOW_DAYS) -> List[dict]:
+    """The user's cards saved in the last `days`, filtered like
+    fetch_candidate_links — the weekly synthesis's read.
+
+    It used to take the synthesis window out of fetch_candidate_links' 500
+    arbitrary cards, so past 500 saves most of a week's saves were never read:
+    a light week fell under SYNTHESIS_MIN_CARDS and was skipped as
+    `not_enough_cards`, which settles the week silently (2026-10-11).
+
+    A range filter only matches values of its own type, so this runs one query
+    per type a recent `createdAt` can have: epoch ms (every writer today) and a
+    Firestore Timestamp (notes, Image-tab screenshots and saved Ask answers
+    until 2026-10-05, which an older app build can still write). ISO strings
+    and Unix seconds only exist on legacy cards, never inside a week.
+    """
+    links_ref = get_db().collection("users").document(uid).collection("links")
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    docs = {}
+    for bound in (int(cutoff.timestamp() * 1000), cutoff):
+        query = links_ref.where(filter=FieldFilter("createdAt", ">=", bound))
+        for doc in query.limit(CANDIDATE_LIMIT).get():
+            docs[doc.id] = doc
+    return _keep_candidates(uid, docs.values())
+
+
+def _keep_candidates(uid: str, docs) -> List[dict]:
+    """The docs a digest or synthesis may use, as plain dicts with `id`: no
+    archived, unanalyzed or effectively-private cards, no embedding vector."""
     # Lazy import: `search` pulls in ai_service/genai, which the scheduler
     # path has no other reason to load (house pattern in this module).
     from search import is_effectively_private, private_collection_ids
-
-    db = get_db()
-    links_ref = db.collection("users").document(uid).collection("links")
-    docs = links_ref.limit(CANDIDATE_LIMIT).get()
 
     private_ids = private_collection_ids(uid)
     links = []
@@ -283,7 +313,7 @@ def synthesis_window_cards(links: List[dict]) -> List[dict]:
     incident), and this window is fed straight to `synthesize_week`. Ask has
     filtered it since that incident; the weekly call could still be poisoned by
     the same one card, losing the whole synthesis. Privacy filtering happens
-    upstream in fetch_candidate_links, which both consumers share.
+    upstream in _keep_candidates, which both readers share.
     """
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     cutoff = now_ms - SYNTHESIS_WINDOW_DAYS * 86_400_000
@@ -439,9 +469,9 @@ def build_and_send_synthesis(uid: str, user_data: dict, links: Optional[List[dic
     additionally sends a push notification when the user has the push channel on.
     Returns a result dict shaped like build_and_send_digest's.
 
-    `links` None defers the candidate read (up to CANDIDATE_LIMIT documents)
-    until after the per-week dedupe check, so a week already delivered costs
-    one read. `week_id` pins the ISO week the scheduled period belongs to
+    `links` None defers the candidate read (fetch_recent_links) until after
+    the per-week dedupe check, so a week already delivered costs one read.
+    `week_id` pins the ISO week the scheduled period belongs to
     (run_digest_check derives it from the period's target, so a retry later
     in the catch-up window lands on the same doc); default: the current week.
     `push_hold` (run_digest_check, see push_hold_reason) delivers in-app only.
@@ -477,7 +507,7 @@ def build_and_send_synthesis(uid: str, user_data: dict, links: Optional[List[dic
             logger.warning(f"Synthesis dedupe check failed for {mask_uid(uid)}: {e}")
 
     if links is None:
-        links = fetch_candidate_links(uid)
+        links = fetch_recent_links(uid)
     cards = synthesis_window_cards(links)
     if len(cards) < SYNTHESIS_MIN_CARDS and not force:
         result["skipped"] = "not_enough_cards"

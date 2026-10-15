@@ -186,7 +186,7 @@ def test_free_workspace_never_reads_candidates(monkeypatch):
 def test_a_delivered_week_costs_one_read_not_five_hundred(monkeypatch):
     from tests.test_digest_delivery import RecordingDB
     monkeypatch.setattr(ds, "get_db", lambda: RecordingDB(synth_exists=True))
-    monkeypatch.setattr(ds, "fetch_candidate_links",
+    monkeypatch.setattr(ds, "fetch_recent_links",
                         lambda uid: pytest.fail("read candidates for a delivered week"))
     res = ds.build_and_send_synthesis("u1", {"settings": {}}, None, force=False, week_id="2026-W40")
     assert res["skipped"] == "already_sent_this_week"
