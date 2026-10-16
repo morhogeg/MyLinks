@@ -2671,6 +2671,8 @@ exact-match, capped.
   returned no products; 11 = bad key). Remaining suspects: StoreKit returning
   nothing pre-review (one forum report says add the group to the review draft
   before the products), or the wrong key in `NEXT_PUBLIC_REVENUECAT_IOS_KEY`.
+  **SHIPPED** as merge `fa03bdc`: Vercel (auto), TestFlight run #373 =
+  **build 1373** (green).
 - **2026-10-15 — WEEKLY SYNTHESIS SKIPPED OCT 5–11 (owner: "why did it
   stop?").** The Revisit list's newest synthesis was Sep 28–Oct 4; nothing
   was written for the week due Sun Oct 11. The scheduler was healthy
