@@ -2652,6 +2652,27 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-16 (later) — PAYWALL PRICES: ROOT CAUSE FOUND AND FIXED (our
+  bug, not Apple or RevenueCat).** The owner's trial workspace
+  (`cJSmZgLy…`) had ~25 `client_errors` since build 1358 (2026-10-13), all
+  `"Purchases.then()" is not implemented on ios` (unhandledrejection).
+  `lib/purchases.ts` cached `import(...).then((m) => m.Purchases)`:
+  resolving a promise WITH a Capacitor plugin proxy makes the promise read
+  `.then`, which the proxy turns into a native call that rejects, and the
+  promise never settles. So `configurePurchases`, `getOfferings`,
+  `purchase`, `restore` and `logOutPurchases` all hung at their first line:
+  the SDK was never configured, the tiles shimmered forever (the 12s
+  timeout only wrapped `getOfferings` itself), and none of the new
+  `offerings:` reports could fire. This is also the likely root cause of the
+  2026-10-13 "sign out does nothing" (`logOutPurchases` hung; `bounded`
+  masked it). Fix: cache the module, read `.Purchases` into a local `const`
+  at each call site, never return or resolve the proxy (comment at
+  `modulePromise`). Reproduced the hang and the exact message with a mock
+  proxy in Node; the new pattern resolves. tsc + eslint clean. **Not verified
+  on device:** that real prices now load; if they don't, the `offerings:`
+  reports from the previous entry will now fire and name the next problem.
+  **Rule for new code:** never `return` a Capacitor plugin object from an
+  async function or `.then`; destructure it from the awaited module.
 - **2026-10-16 — PAYWALL PRICES NEVER LOAD: ERROR NOW LOGGED (owner: "why
   don't I see the prices still?").** Owner's device (paywall, trial) showed
   the plan tiles shimmering with no prices. Ruled out from owner screenshots:

@@ -56,9 +56,17 @@ export type PurchaseOutcome =
     | { ok: false; cancelled: true }
     | { ok: false; cancelled: false; message: string };
 
-type PurchasesPlugin = typeof import('@revenuecat/purchases-capacitor').Purchases;
+type PurchasesModule = typeof import('@revenuecat/purchases-capacitor');
+type PurchasesPlugin = PurchasesModule['Purchases'];
 
-let pluginPromise: Promise<PurchasesPlugin | null> | null = null;
+// Holds the MODULE, never the `Purchases` object itself. That object is a
+// Capacitor plugin proxy: every property read, `.then` included, becomes a
+// native call. Resolving a promise with it (or returning it from an async
+// function) makes the promise ask for `.then`, which rejects with
+// '"Purchases.then()" is not implemented on ios' and leaves the promise
+// pending forever: configure never ran and the paywall shimmered for good
+// (builds 1358–1373). So the proxy only ever lives in a local `const`.
+let modulePromise: Promise<PurchasesModule | null> | null = null;
 let configuredFor: string | null = null;
 
 /** Why purchases can't run here, or `{available: true}`. Synchronous, cheap. */
@@ -68,14 +76,12 @@ export function purchasesAvailability(): PurchasesAvailability {
     return { available: true };
 }
 
-async function plugin(): Promise<PurchasesPlugin | null> {
-    if (!purchasesAvailability().available) return null;
-    if (!pluginPromise) {
-        pluginPromise = import('@revenuecat/purchases-capacitor')
-            .then((m) => m.Purchases)
-            .catch(() => null);
+function loadModule(): Promise<PurchasesModule | null> {
+    if (!purchasesAvailability().available) return Promise.resolve(null);
+    if (!modulePromise) {
+        modulePromise = import('@revenuecat/purchases-capacitor').catch(() => null);
     }
-    return pluginPromise;
+    return modulePromise;
 }
 
 /**
@@ -84,7 +90,7 @@ async function plugin(): Promise<PurchasesPlugin | null> {
  * logIn so a device shared between accounts never mixes receipts.
  */
 export async function configurePurchases(authUid: string): Promise<void> {
-    const p = await plugin();
+    const p = (await loadModule())?.Purchases;
     if (!p || !authUid) return;
     try {
         if (configuredFor === null) {
@@ -105,7 +111,7 @@ export async function configurePurchases(authUid: string): Promise<void> {
 
 /** Forget the account on sign-out (RevenueCat falls back to an anonymous id). */
 export async function logOutPurchases(): Promise<void> {
-    const p = await plugin();
+    const p = (await loadModule())?.Purchases;
     if (!p || configuredFor === null) return;
     try {
         await p.logOut();
@@ -149,7 +155,7 @@ function reportOfferings(what: string, e?: unknown): void {
 }
 
 export async function getOfferings(): Promise<ProPackage[]> {
-    const p = await plugin();
+    const p = (await loadModule())?.Purchases;
     if (!p) {
         reportOfferings('plugin failed to load');
         return [];
@@ -240,7 +246,7 @@ function messageOf(e: unknown, action: 'purchase' | 'restore'): string {
 
 /** Buy one of the packages from getOfferings(). Never throws. */
 export async function purchase(pkg: ProPackage): Promise<PurchaseOutcome> {
-    const p = await plugin();
+    const p = (await loadModule())?.Purchases;
     if (!p || configuredFor === null) {
         return { ok: false, cancelled: false, message: 'Purchases are not available right now.' };
     }
@@ -258,7 +264,7 @@ export async function purchase(pkg: ProPackage): Promise<PurchaseOutcome> {
 
 /** Restore purchases made with this Apple ID. Never throws. */
 export async function restore(): Promise<PurchaseOutcome> {
-    const p = await plugin();
+    const p = (await loadModule())?.Purchases;
     if (!p || configuredFor === null) {
         return { ok: false, cancelled: false, message: 'Purchases are not available right now.' };
     }
