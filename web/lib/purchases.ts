@@ -286,7 +286,10 @@ export function annualPerMonth(annual: ProPackage | undefined): string | null {
     if (!annual || !(annual.price > 0)) return null;
     try {
         return new Intl.NumberFormat(undefined, { style: 'currency', currency: annual.currencyCode })
-            .format(Math.floor((annual.price / 12) * 100) / 100);
+            // Intl rounds to the currency's own digits ($4.1658 → $4.17,
+            // ¥ has none). Never floor: a per-month figure below the real one
+            // understates the price, which App Review rejects.
+            .format(annual.price / 12);
     } catch {
         return null;
     }

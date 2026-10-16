@@ -2652,6 +2652,18 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-16 (evening) — PRICES CONFIRMED ON DEVICE; PER-MONTH ROUNDING
+  FIXED; PURCHASE TEST WRITTEN UP (owner).** Owner's screenshot on build 1374
+  showed real StoreKit prices ($49.99 / $7.99, Save 48%), so the 1374 fix is
+  verified on device. `annualPerMonth` floored ($49.99/12 → $4.16); it now
+  lets `Intl.NumberFormat` round to the currency's digits ($4.17, ₪15.83,
+  ¥650), since understating a price is an App Review risk. tsc + eslint clean.
+  Launch checklist: `pay-prices` rewritten (cause, $4.17) and ticked;
+  `pay-sandbox` rewritten as a 10-step test (restore with nothing bought,
+  buy Monthly on a trial test account, app + server checks, reinstall,
+  cancel via Manage subscription, "Ends …" afterwards). Restore Purchases is
+  hidden in Settings once subscribed (`canRestore` = `!lastingPro`), so the
+  restore check runs before buying.
 - **2026-10-16 (later) — PAYWALL PRICES: ROOT CAUSE FOUND AND FIXED (our
   bug, not Apple or RevenueCat).** The owner's trial workspace
   (`cJSmZgLy…`) had ~25 `client_errors` since build 1358 (2026-10-13), all
