@@ -2652,6 +2652,25 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-16 — PAYWALL PRICES NEVER LOAD: ERROR NOW LOGGED (owner: "why
+  don't I see the prices still?").** Owner's device (paywall, trial) showed
+  the plan tiles shimmering with no prices. Ruled out from owner screenshots:
+  App Store Connect (group `Machina Pro` localized; Monthly + Annual both
+  "Prepare for Submission", i.e. metadata complete; Paid Apps agreement
+  active) and RevenueCat (offering `default`: `$rc_monthly` →
+  `com.morhogeg.machina.pro.monthly`, `$rc_annual` → `.pro.annual`, plus the
+  harmless auto-created Test Store products). Tiles render, so a key is baked
+  in. Cause still unknown: `getOfferings` swallowed every failure. Now
+  `lib/purchases.ts` reports each empty path to `users/{uid}/client_errors`
+  (source `purchases`): plugin load, SDK not configured, configure failure,
+  missing `default` offering, no annual/monthly package, and the SDK error
+  with code + message + underlying message, each tagged with the key's 5-char
+  prefix (`appl_` App Store vs `test_` Test Store). tsc + eslint clean. **Next
+  session:** after the owner opens the paywall on the new build, read the
+  owner's `client_errors` for `offerings:` and fix from the code (23 = Apple
+  returned no products; 11 = bad key). Remaining suspects: StoreKit returning
+  nothing pre-review (one forum report says add the group to the review draft
+  before the products), or the wrong key in `NEXT_PUBLIC_REVENUECAT_IOS_KEY`.
 - **2026-10-15 — WEEKLY SYNTHESIS SKIPPED OCT 5–11 (owner: "why did it
   stop?").** The Revisit list's newest synthesis was Sep 28–Oct 4; nothing
   was written for the week due Sun Oct 11. The scheduler was healthy

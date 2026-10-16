@@ -96,9 +96,10 @@ export async function configurePurchases(authUid: string): Promise<void> {
             await p.logIn({ appUserID: authUid });
             configuredFor = authUid;
         }
-    } catch {
+    } catch (e) {
         // A failed configure only means the paywall reports "unavailable";
         // the entitlement itself still comes from the server.
+        reportOfferings('configure failed', e);
     }
 }
 
@@ -131,9 +132,32 @@ function periodOf(pkg: { identifier: string; packageType?: string }): ProPeriod 
 // Past this, the paywall stops shimmering and offers "Try again" instead.
 const OFFERINGS_TIMEOUT_MS = 12_000;
 
+// Every way the price load comes back empty, with the SDK's own code and
+// text, so a paywall stuck on "Couldn't load prices" says why in
+// client_errors. The key prefix (appl_ = App Store, test_ = Test Store) is
+// public and tells a wrong key apart from an App Store problem.
+function reportOfferings(what: string, e?: unknown): void {
+    const err = (e && typeof e === 'object' ? e : {}) as {
+        code?: unknown; message?: unknown; underlyingErrorMessage?: unknown;
+    };
+    const parts = [`offerings: ${what}`, `key ${IOS_KEY.slice(0, 5) || 'none'}`];
+    if (err.code !== undefined) parts.push(`code ${String(err.code)}`);
+    if (typeof err.message === 'string') parts.push(err.message);
+    else if (e !== undefined && typeof e !== 'object') parts.push(String(e));
+    if (typeof err.underlyingErrorMessage === 'string') parts.push(err.underlyingErrorMessage);
+    reportError(new Error(parts.join(' | ')), 'purchases');
+}
+
 export async function getOfferings(): Promise<ProPackage[]> {
     const p = await plugin();
-    if (!p || configuredFor === null) return [];
+    if (!p) {
+        reportOfferings('plugin failed to load');
+        return [];
+    }
+    if (configuredFor === null) {
+        reportOfferings('SDK not configured yet');
+        return [];
+    }
     try {
         let timer: ReturnType<typeof setTimeout> | undefined;
         const timeout = new Promise<never>((_, reject) => {
@@ -141,7 +165,10 @@ export async function getOfferings(): Promise<ProPackage[]> {
         });
         const offerings = await Promise.race([p.getOfferings(), timeout]).finally(() => clearTimeout(timer));
         const offering = offerings.all?.[RC_OFFERING_ID] ?? offerings.current;
-        if (!offering) return [];
+        if (!offering) {
+            reportOfferings(`no '${RC_OFFERING_ID}' offering (have: ${Object.keys(offerings.all ?? {}).join(', ') || 'none'})`);
+            return [];
+        }
         const out: ProPackage[] = [];
         for (const pkg of offering.availablePackages) {
             const period = periodOf(pkg);
@@ -155,9 +182,14 @@ export async function getOfferings(): Promise<ProPackage[]> {
                 raw: pkg,
             });
         }
+        if (out.length === 0) {
+            const ids = offering.availablePackages.map((pkg) => pkg.identifier).join(', ') || 'none';
+            reportOfferings(`'${offering.identifier}' has no annual/monthly package (packages: ${ids})`);
+        }
         // Annual first: it is the preselected, recommended option.
         return out.sort((a, b) => (a.period === 'annual' ? -1 : 1) - (b.period === 'annual' ? -1 : 1));
-    } catch {
+    } catch (e) {
+        reportOfferings('getOfferings failed', e);
         return [];
     }
 }
