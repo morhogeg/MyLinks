@@ -160,6 +160,19 @@ export async function syncEntitlement(): Promise<Entitlement> {
     return parseEntitlement(data);
 }
 
+/**
+ * Wake the sync function while Apple's purchase sheet is up. Nothing calls it
+ * until someone buys, so it is nearly always cold, and the cold start used to
+ * land after the purchase. A bare GET is a CORS simple request (no preflight)
+ * and the function answers 405 before any auth or RevenueCat call.
+ * Fire-and-forget: never throws, the answer is ignored.
+ */
+export function warmEntitlementSync(): void {
+    try {
+        fetch(apiUrl('/api/entitlement/sync'), { method: 'GET', mode: 'no-cors' }).catch(() => {});
+    } catch { /* no fetch: nothing to warm */ }
+}
+
 /** True when a parsed error body is a free-plan quota wall. */
 export function isUpgradeHint(data: unknown): data is UpgradeHint {
     if (!data || typeof data !== 'object') return false;

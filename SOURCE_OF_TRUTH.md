@@ -2652,6 +2652,30 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-16 (night) — PURCHASE FEELS INSTANT; THE MARK NARRATES THE WAIT
+  (owner: "after I tapped OK on purchase successful nothing happens for a few
+  seconds").** Cause (from the code, not timed on device): after Apple's
+  alert, `Paywall.tsx` waited on `syncEntitlement` (a Cloud Function nobody
+  calls until a purchase, so nearly always cold, then a RevenueCat REST read)
+  AND a second `fetchEntitlement` before closing, while the faded button
+  still said "Opening the App Store…". Now: tapping Subscribe fires
+  `warmEntitlementSync()` (a bare GET, answered 405 before auth, which
+  starts the cold start while Apple's sheet is up); the button stays full
+  strength and shows the animated `CitationMark` via `OrbStatus` per stage
+  (Opening the App Store… → Confirming your purchase… after 1.5s → Turning
+  on Pro… only when Apple's answer lacks Pro → "You're on Pro", locked
+  mark); when Apple's answer says Pro is active the plan flips to Pro
+  optimistically (`EntitlementProvider.apply`), the sheet closes after a
+  0.7s "You're on Pro" beat, and the sync runs behind it and replaces the
+  optimistic plan with the server's answer (no second fetch). A failed sync
+  keeps the optimistic plan; the webhook lands it and the next foreground
+  refresh reconciles. Any fetch that started before a direct write drops its
+  result (`writes` counter), so a stale read can't put the trial back.
+  Restore is unchanged except it uses the sync's answer too. The grid icon
+  and "UNRATED" in Apple's purchase sheet are Apple's sandbox/pre-release
+  look; the app can't change that sheet (expected to show the real icon
+  once live; not verified). tsc + eslint clean. **Not verified on device.**
+
 - **2026-10-16 (evening) — PRICES CONFIRMED ON DEVICE; PER-MONTH ROUNDING
   FIXED; PURCHASE TEST WRITTEN UP (owner).** Owner's screenshot on build 1374
   showed real StoreKit prices ($49.99 / $7.99, Save 48%), so the 1374 fix is
