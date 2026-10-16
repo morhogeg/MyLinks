@@ -2675,6 +2675,8 @@ exact-match, capped.
   and "UNRATED" in Apple's purchase sheet are Apple's sandbox/pre-release
   look; the app can't change that sheet (expected to show the real icon
   once live; not verified). tsc + eslint clean. **Not verified on device.**
+  **SHIPPED** as merge `94a16d7`: Vercel (auto), TestFlight run #376 =
+  **build 1376**.
 
 - **2026-10-16 (evening) — PRICES CONFIRMED ON DEVICE; PER-MONTH ROUNDING
   FIXED; PURCHASE TEST WRITTEN UP (owner).** Owner's screenshot on build 1374
