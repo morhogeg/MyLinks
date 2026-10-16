@@ -2664,6 +2664,8 @@ exact-match, capped.
   cancel via Manage subscription, "Ends …" afterwards). Restore Purchases is
   hidden in Settings once subscribed (`canRestore` = `!lastingPro`), so the
   restore check runs before buying.
+  **SHIPPED** as merge `7a3fee4`: Vercel (auto), TestFlight run #375 =
+  **build 1375** (green).
 - **2026-10-16 (later) — PAYWALL PRICES: ROOT CAUSE FOUND AND FIXED (our
   bug, not Apple or RevenueCat).** The owner's trial workspace
   (`cJSmZgLy…`) had ~25 `client_errors` since build 1358 (2026-10-13), all
