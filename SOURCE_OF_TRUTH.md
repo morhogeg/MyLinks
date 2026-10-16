@@ -2673,6 +2673,8 @@ exact-match, capped.
   reports from the previous entry will now fire and name the next problem.
   **Rule for new code:** never `return` a Capacitor plugin object from an
   async function or `.then`; destructure it from the awaited module.
+  **SHIPPED** as merge `5193ecf`: Vercel (auto), TestFlight run #374 =
+  **build 1374** (green).
 - **2026-10-16 — PAYWALL PRICES NEVER LOAD: ERROR NOW LOGGED (owner: "why
   don't I see the prices still?").** Owner's device (paywall, trial) showed
   the plan tiles shimmering with no prices. Ruled out from owner screenshots:
