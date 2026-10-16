@@ -1,10 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { X, Check, Plus, MessagesSquare, Newspaper, Youtube, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { CitationGlyph } from '@/components/ui/Wordmark';
 import ProBadge from '@/components/ui/ProBadge';
+import OrbStatus from '@/components/ui/OrbStatus';
+import type { MarkMotion } from '@/components/ui/CitationMark';
 import { useEntitlement } from '@/components/EntitlementProvider';
 import { useScrollLock } from '@/lib/useScrollLock';
 import { useSheetDrag, useIsMobile } from '@/lib/useSheetDrag';
@@ -13,7 +15,9 @@ import { isNativeApp } from '@/lib/api';
 import { hapticLight, hapticSuccess, hapticWarning } from '@/lib/haptics';
 import { track } from '@/lib/analytics';
 import { reportError } from '@/lib/errorReporter';
-import { syncEntitlement, planDate, endsPhrase, daysLeftLabel, calendarDaysUntil, type PaywallReason } from '@/lib/entitlement';
+import {
+    syncEntitlement, warmEntitlementSync, planDate, endsPhrase, daysLeftLabel, calendarDaysUntil, type Entitlement, type PaywallReason,
+} from '@/lib/entitlement';
 import {
     ProPackage, ProPeriod, getOfferings, purchase, restore, purchasesAvailability, annualSavingsPercent, annualPerMonth,
 } from '@/lib/purchases';
@@ -33,14 +37,40 @@ import {
  *
  * On the web there is nothing to buy (purchases are native-only); the sheet
  * says so and keeps the legal links. Nothing here throws: every purchase call
- * resolves to an outcome, and a failed server sync after a successful purchase
- * still refreshes the plan and closes.
+ * resolves to an outcome.
+ *
+ * A purchase never waits on our server. Once Apple's answer says Pro is
+ * active, the plan flips to Pro on screen, the button says so, and the sheet
+ * closes; the server sync (the source of truth) runs behind it and replaces
+ * the optimistic plan when it answers. If it fails, the RevenueCat webhook
+ * still lands the entitlement. Every wait in between is narrated on the
+ * button by the animated Machina mark, never a spinner.
  */
 
 const PERIOD_LABEL: Record<ProPeriod, { name: string; per: string }> = {
     annual: { name: 'Yearly', per: 'per year' },
     monthly: { name: 'Monthly', per: 'per month' },
 };
+
+// What the Subscribe button says while a purchase runs, each with the mark's
+// motion for that kind of work (CitationMark's verb table): `store` while
+// Apple's sheet opens, `confirming` once it's up (by the time the user is
+// back from Apple's "You're all set", Apple and RevenueCat are still
+// finishing the transaction), `activating` only when Apple's answer didn't
+// carry Pro yet and the server has to confirm it, `done` the locked mark.
+type PurchaseStage = 'store' | 'confirming' | 'activating' | 'done';
+const STAGE: Record<PurchaseStage, { orb: MarkMotion; label: string }> = {
+    store: { orb: 'working', label: 'Opening the App Store…' },
+    confirming: { orb: 'working', label: 'Confirming your purchase…' },
+    activating: { orb: 'shaping', label: 'Turning on Pro…' },
+    done: { orb: 'listening', label: 'You’re on Pro' },
+};
+// Apple's sheet covers the button within about a second; the label switches
+// to `confirming` under it, so that's what the user sees on the way back.
+const CONFIRMING_AFTER_MS = 1500;
+// How long "You're on Pro" stays up before the sheet closes: long enough to
+// read, short enough not to feel like a wait.
+const DONE_HOLD_MS = 700;
 
 const HEADLINE: Record<PaywallReason, string> = {
     saves: 'You’ve used this month’s free saves',
@@ -80,13 +110,16 @@ export default function Paywall({
     isOpen,
     reason,
     onClose,
-    onPurchased,
+    onRefresh,
+    onEntitlement,
 }: {
     isOpen: boolean;
     reason: PaywallReason;
     onClose: () => void;
-    /** Re-fetch the entitlement after a purchase or restore. */
-    onPurchased: () => Promise<void>;
+    /** Re-fetch the entitlement from the server. */
+    onRefresh: () => Promise<void>;
+    /** Set the entitlement directly: optimistic Pro, then the sync's answer. */
+    onEntitlement: (next: Entitlement | ((prev: Entitlement) => Entitlement)) => void;
 }) {
     const {
         isTrial, isPro, source, waiting, endsAt, period: subPeriod, willRenew, billingIssue, freeLimits,
@@ -96,6 +129,8 @@ export default function Paywall({
     const [packages, setPackages] = useState<ProPackage[] | null>(null);
     const [period, setPeriod] = useState<ProPeriod>('annual');
     const [busy, setBusy] = useState<'purchase' | 'restore' | null>(null);
+    const [stage, setStage] = useState<PurchaseStage>('store');
+    const doneTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [note, setNote] = useState<string | null>(null);
     // Bumped by "Try again" when the offering failed to load.
     const [offeringsAttempt, setOfferingsAttempt] = useState(0);
@@ -135,21 +170,49 @@ export default function Paywall({
 
     const priceOf = (p: ProPeriod) => (p === 'annual' ? annual : monthly)?.priceString ?? null;
 
-    const finish = useCallback(async (kind: 'purchase' | 'restore', pro: boolean) => {
-        // The server is the source of truth: re-read the subscription from
-        // RevenueCat and rewrite the entitlement. A sync failure (the secret
-        // not configured yet, a blip) must not swallow a paid purchase: refresh
-        // anyway and tell the user in plain words. The server's own text
-        // ("REVENUECAT_SECRET_KEY missing", "HTTP 503") is for us, not them;
-        // the RevenueCat webhook still lands the entitlement on its own.
-        let synced = true;
+    useEffect(() => () => { if (doneTimer.current) clearTimeout(doneTimer.current); }, []);
+
+    // The server is the source of truth: it re-reads the subscription from
+    // RevenueCat, rewrites the entitlement, and answers with it, so no second
+    // fetch is needed. Its own error text ("REVENUECAT_SECRET_KEY missing",
+    // "HTTP 503") is for us, not the user. Null when the sync failed.
+    const sync = useCallback(async (kind: 'purchase' | 'restore'): Promise<Entitlement | null> => {
         try {
-            await syncEntitlement();
+            const next = await syncEntitlement();
+            onEntitlement(next);
+            return next;
         } catch (e) {
-            synced = false;
             reportError(e, `paywall.${kind}.sync`);
+            return null;
         }
-        await onPurchased();
+    }, [onEntitlement]);
+
+    // Apple says Pro is active: show it now, sync behind it. On a failed sync
+    // the optimistic plan stays (a refresh would read the old plan back before
+    // the webhook lands); the next foreground refresh reconciles it.
+    const activated = useCallback((bought: ProPackage) => {
+        onEntitlement((prev) => ({
+            ...prev, plan: 'pro', source: 'revenuecat', productId: bought.productId,
+            proUntil: null, willRenew: true, billingIssue: false,
+        }));
+        void sync('purchase');
+        track('paywall_purchase', { ok: true, kind: bought.period });
+        hapticSuccess();
+        setStage('done');
+        doneTimer.current = setTimeout(() => {
+            doneTimer.current = null;
+            setBusy(null);
+            onClose();
+        }, DONE_HOLD_MS);
+    }, [onEntitlement, sync, onClose]);
+
+    const finish = useCallback(async (kind: 'purchase' | 'restore', pro: boolean) => {
+        // Nothing on screen yet says Pro: wait for the server before closing.
+        // A sync failure must not swallow a paid purchase: refresh anyway and
+        // tell the user in plain words; the RevenueCat webhook still lands the
+        // entitlement on its own.
+        const synced = (await sync(kind)) !== null;
+        if (!synced) await onRefresh();
         track(kind === 'purchase' ? 'paywall_purchase' : 'paywall_restore', { ok: pro, kind: period });
         if (pro && synced) {
             hapticSuccess();
@@ -164,19 +227,30 @@ export default function Paywall({
         } else {
             setNote('Purchase received. It can take a moment to activate.');
         }
-    }, [onPurchased, onClose, period]);
+    }, [sync, onRefresh, onClose, period]);
 
     const buy = async () => {
         if (!selected || busy) return;
         hapticLight();
+        warmEntitlementSync();
         setBusy('purchase');
+        setStage('store');
         setNote(null);
+        const confirming = setTimeout(() => setStage('confirming'), CONFIRMING_AFTER_MS);
+        let closing = false;
         try {
             const r = await purchase(selected);
-            if (r.ok) await finish('purchase', r.pro);
-            else if (!r.cancelled) { hapticWarning(); setNote(r.message); }
+            clearTimeout(confirming);
+            if (r.ok && r.pro) {
+                activated(selected);
+                closing = true; // the done beat clears `busy` as it closes
+            } else if (r.ok) {
+                setStage('activating');
+                await finish('purchase', false);
+            } else if (!r.cancelled) { hapticWarning(); setNote(r.message); }
         } finally {
-            setBusy(null);
+            clearTimeout(confirming);
+            if (!closing) setBusy(null);
         }
     };
 
@@ -197,6 +271,7 @@ export default function Paywall({
     if (!isOpen) return null;
 
     const canBuy = availability.available && !!selected && busy === null;
+    const purchasing = busy === 'purchase';
     // At the save wall nothing was refused: the save was kept as `waiting`
     // (functions/deferred_capture.py). Say so, with the backlog, so the sheet
     // reads as an offer and not as a lost save.
@@ -392,14 +467,27 @@ export default function Paywall({
                                 </div>
                             )}
 
+                            {/* While buying, the button stays at full strength
+                                (not the faded disabled look, which read as stuck)
+                                and narrates each stage with the animated mark.
+                                `buy` ignores taps while busy. */}
                             <Button
                                 variant="primary"
                                 radius="full"
                                 onClick={buy}
-                                disabled={!canBuy}
-                                className={`${offeringsFailed ? 'mt-1' : 'mt-4'} w-full h-[52px] text-[17px] font-semibold`}
+                                disabled={!canBuy && !purchasing}
+                                aria-busy={purchasing}
+                                className={`${offeringsFailed ? 'mt-1' : 'mt-4'} w-full h-[52px] text-[17px] font-semibold ${purchasing ? 'pointer-events-none' : ''}`}
                             >
-                                {busy === 'purchase' ? 'Opening the App Store…' : isTrial ? 'Keep Pro' : 'Subscribe'}
+                                {purchasing ? (
+                                    <OrbStatus
+                                        orb={STAGE[stage].orb}
+                                        label={STAGE[stage].label}
+                                        stageKey={stage}
+                                        className="inline-flex items-center gap-2.5"
+                                        labelClassName=""
+                                    />
+                                ) : isTrial ? 'Keep Pro' : 'Subscribe'}
                             </Button>
                             <p className="mt-2.5 text-center text-[12px] text-text-muted leading-snug">{legalLine}</p>
                         </>

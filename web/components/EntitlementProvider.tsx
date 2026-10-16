@@ -1,7 +1,7 @@
 'use client';
 
 import {
-    createContext, useCallback, useContext, useEffect, useMemo, useState, ReactNode,
+    createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, ReactNode,
 } from 'react';
 import { useAuth } from '@/components/AuthProvider';
 import {
@@ -97,10 +97,27 @@ export function EntitlementProvider({ children }: { children: ReactNode }) {
         open: false, reason: 'manual',
     });
 
+    // Bumped by every direct write (a purchase's own answer). A fetch that
+    // started before one drops its result, so a slow read of the old plan
+    // can't land after the purchase and put the trial back on screen.
+    const writes = useRef(0);
+
     const refresh = useCallback(async () => {
         if (!uid) return;
+        const at = writes.current;
         const next = await fetchEntitlement();
-        if (next) setEnt({ uid, data: next });
+        if (next && writes.current === at) setEnt({ uid, data: next });
+    }, [uid]);
+
+    // Set the entitlement without a round trip: the paywall's optimistic Pro
+    // the moment Apple confirms, then the server's answer from the sync.
+    const apply = useCallback((next: Entitlement | ((prev: Entitlement) => Entitlement)) => {
+        if (!uid) return;
+        writes.current += 1;
+        setEnt((cur) => {
+            if (typeof next !== 'function') return { uid, data: next };
+            return cur && cur.uid === uid ? { uid, data: next(cur.data) } : cur;
+        });
     }, [uid]);
 
     // Load when the workspace resolves. A stale entry for a previous uid is
@@ -110,8 +127,9 @@ export function EntitlementProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         if (!uid) return;
         let cancelled = false;
+        const at = writes.current;
         fetchEntitlement().then((next) => {
-            if (!cancelled && next) setEnt({ uid, data: next });
+            if (!cancelled && next && writes.current === at) setEnt({ uid, data: next });
         });
         return () => { cancelled = true; };
     }, [uid]);
@@ -222,7 +240,8 @@ export function EntitlementProvider({ children }: { children: ReactNode }) {
                 isOpen={paywall.open}
                 reason={paywall.reason}
                 onClose={closePaywall}
-                onPurchased={refresh}
+                onRefresh={refresh}
+                onEntitlement={apply}
             />
         </EntitlementContext.Provider>
     );
