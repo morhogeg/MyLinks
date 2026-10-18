@@ -2678,6 +2678,19 @@ exact-match, capped.
   **SHIPPED** as merge `94a16d7`: Vercel (auto), TestFlight run #376 =
   **build 1376**.
 
+- **2026-10-18 — REVIEWER ACCOUNT RESET TO A FRESH TRIAL FOR QA (owner).**
+  `machinareviewer@gmail.com` (workspace `cJSmZgLy…`) carried the owner's
+  TestFlight purchase test (Monthly, `source: revenuecat`, bought 2026-10-17).
+  TestFlight subscriptions can't be cancelled; Apple renews them daily, up to
+  6 times, then turns renewal off (~Oct 23). Owner wanted to test trial/free
+  screens now with no spare Google account, so `entitlements/cJSmZgLy…` was
+  hand-set to `source: trial`, `trialEndsAt = proUntil` = 2026-11-01 09:34
+  UTC, `trialAnchorAt: null` (the stored-end form, which a lapse sync keeps;
+  an anchor would be clipped to createdAt + 60d = Oct 25). **It reverts** to
+  the subscription on the next RENEWAL webhook (~21:25 UTC daily until
+  renewal stops) or if the owner taps Restore Purchases on that account. On
+  submit day, re-check this doc and set a fresh trial again
+  (`pay-reviewer-plan`).
 - **2026-10-16 (evening) — PRICES CONFIRMED ON DEVICE; PER-MONTH ROUNDING
   FIXED; PURCHASE TEST WRITTEN UP (owner).** Owner's screenshot on build 1374
   showed real StoreKit prices ($49.99 / $7.99, Save 48%), so the 1374 fix is
