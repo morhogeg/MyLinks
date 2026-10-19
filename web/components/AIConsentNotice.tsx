@@ -41,10 +41,10 @@ export default function AIConsentNotice({ onAccept, onSignOut }: {
                     {/* Explicit consent: one primary action, and the app stays
                         gated until it is tapped. */}
                     <Button variant="primary" radius="full" onClick={onAccept} className="w-full h-12 text-[15px]">
-                        I understand, continue
+                        Agree and continue
                     </Button>
                     <p className="mt-3 text-[12px] text-text-muted text-center leading-relaxed">
-                        By continuing, you agree to this processing. Details in our{' '}
+                        Details in our{' '}
                         <a
                             href={privacyHref}
                             target="_blank"

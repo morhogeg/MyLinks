@@ -19,7 +19,7 @@ test('new account: consent → welcome → tour → empty library @desktop', asy
     // 1. AI consent (App Review 5.1.1/5.1.2) comes before anything else.
     await expect(page.getByRole('heading', { name: 'Machina uses AI' })).toBeVisible();
     await expectNoHorizontalOverflow(page);
-    await page.getByRole('button', { name: 'I understand, continue' }).click();
+    await page.getByRole('button', { name: 'Agree and continue' }).click();
 
     // 2. Welcome. Mentions the trial because the entitlement says trial.
     await expect(page.getByRole('heading', { name: /Bring what you/ })).toBeVisible();

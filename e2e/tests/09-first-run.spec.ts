@@ -26,7 +26,7 @@ test('web first run never mentions the browser extension @desktop', async ({ pag
     await installBackend(page, user);
     await page.goto('/');
     await signIn(page, user);
-    await page.getByRole('button', { name: 'I understand, continue' }).click();
+    await page.getByRole('button', { name: 'Agree and continue' }).click();
 
     // Welcome, both states: the three choices, then "Save your first thing" expanded.
     await expect(page.getByRole('heading', { name: /Bring what you/ })).toBeVisible();
@@ -67,7 +67,7 @@ test('self-serve workspace (claim down): the empty library is stamped without th
     const calls = await installBackend(page, user, { claim: 'down' });
     await page.goto('/');
     await signIn(page, user);
-    await page.getByRole('button', { name: 'I understand, continue' }).click({ timeout: 30_000 });
+    await page.getByRole('button', { name: 'Agree and continue' }).click({ timeout: 30_000 });
     await page.getByRole('button', { name: /^Not now/ }).click();
     await tour(page).getByRole('button', { name: 'Skip' }).click();
     await expect.poll(async () => (await adminGet(`users/${user.uid}`))?.graphVersion, { timeout: 20_000 }).toBe(2);

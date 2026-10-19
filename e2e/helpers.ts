@@ -365,7 +365,7 @@ export async function openAsNewUser(page: Page, opts: BackendOptions = {}) {
     const calls = await installBackend(page, user, opts);
     await page.goto('/');
     await signIn(page, user);
-    await page.getByRole('button', { name: 'I understand, continue' }).click();
+    await page.getByRole('button', { name: 'Agree and continue' }).click();
     await page.getByRole('button', { name: /^Not now/ }).click();
     await page.getByRole('dialog', { name: 'How Machina works' }).getByRole('button', { name: 'Skip' }).click();
     await expect(page.getByRole('button', { name: 'Add to Machina' })).toBeVisible();
