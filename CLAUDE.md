@@ -8,7 +8,7 @@ ranked backlog (§4), ship checklist (§5), and App Store / cost / marketing pla
 Rules:
 - When learning the codebase or picking work, start from `SOURCE_OF_TRUTH.md` §4.
 - **Launch checklist (owner ticks it, you read it):**
-  https://claude.ai/artifact/WBWKnkeZQyHtzuLBbKR6py — 78 steps across backend,
+  https://claude.ai/artifact/WBWKnkeZQyHtzuLBbKR6py — 72 steps across backend,
   security, iOS, payments, App Store, web, legal, marketing, launch week and
   after launch. Before answering "what's left to launch" or picking launch work,
   read its `progress` collection with the `ArtifactData` tool (`action: "list"`,
