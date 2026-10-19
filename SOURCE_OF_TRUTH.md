@@ -2732,8 +2732,9 @@ exact-match, capped.
   (submit-day: fresh trial + clear `aiConsentAt` on `machinareviewer`, after
   its TestFlight subscription stops renewing ~Oct 24). Refreshed the Payments
   and Web intros and `pay-reviewer-plan`. Ticked `sec-scanning` (GitHub API:
-  secret scanning + push protection enabled). Still open in Security:
-  `trigger/ask-debug` and `trigger/pipeline-debug` exist (checked today).
+  secret scanning + push protection enabled). Then (owner's go) deleted
+  `trigger/ask-debug` (b729c88) and `trigger/pipeline-debug` (029c8c1) via
+  the GitHub API; no unexpired workflow artifacts remain. `sec-branches` ticked.
   Checklist now 72 steps; CLAUDE.md updated.
 - **2026-10-19 — REVIEWER ACCESS: OPTION (A) CHOSEN, NOTES FILLED (owner).**
   `docs/APP_STORE.md` §3 no longer says `REVIEWER_EMAIL_TBD`: the demo
