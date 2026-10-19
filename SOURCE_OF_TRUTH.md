@@ -2690,6 +2690,8 @@ exact-match, capped.
   stays (no re-consent). e2e selectors updated (helpers, 02, 09). tsc +
   eslint clean; not render-checked (copy only). **Submit day:** the owner
   re-agreed on `machinareviewer`, so clear its `aiConsentAt` again.
+  **SHIPPED** as merge `976cda1`: Vercel (auto), TestFlight run #377 =
+  **build 1377** (green).
 - **2026-10-19 — "AI CONSENT NOTICE DOESN'T SHOW" (owner, build 1376) IS
   BY DESIGN, BUT IT BREAKS THE REVIEW NOTES.** Consent is per account:
   `aiConsentAt` on `users/{uid}` (plus a per-workspace localStorage cache,
