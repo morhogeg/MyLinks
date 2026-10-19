@@ -16,6 +16,8 @@ import { IconButton } from "@/components/ui/Button";
 import { useHeaderFade } from "@/lib/useHeaderFade";
 import { useSharedCaptureBanner } from "@/lib/useSharedCaptureBanner";
 import { ensureGraphVersion } from "@/lib/rebuildConnections";
+import { isNativeApp } from "@/lib/api";
+import { extensionInAStore } from "@/lib/extension";
 import type { LibraryFacetRequest } from "@/lib/stats";
 
 /** Pick the banner to show: prefer an active source in priority order, else the
@@ -252,6 +254,8 @@ export default function Home() {
     url.searchParams.delete('connect');
     url.searchParams.delete('settings');
     try { window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash); } catch { /* sandboxed */ }
+    // The iOS app has no extension screen until one is in a store (MainView).
+    if (isNativeApp() && !extensionInAStore()) return;
     // From a timer, not the effect body (the param is already consumed, so
     // this must not be cancelled by a re-render).
     setTimeout(() => { setSettingsSection(connect ? 'extension-connect' : 'extension'); setIsSettingsOpen(true); }, 0);

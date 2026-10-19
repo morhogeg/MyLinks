@@ -45,6 +45,12 @@ export function macAppStoreUrl(): string | null {
     return url && MAS_RE.test(url) ? url : null;
 }
 
+/** True once either store listing is set. The iOS app hides every mention of
+    the extension until then (Settings row, `?settings=extension` deep link). */
+export function extensionInAStore(): boolean {
+    return !!(chromeWebStoreUrl() || macAppStoreUrl());
+}
+
 /** Where the extension can run, from this browser's point of view. */
 export type BrowserKind = 'chromium' | 'safari' | 'other';
 
