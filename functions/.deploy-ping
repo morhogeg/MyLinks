@@ -6,3 +6,4 @@
 2026-08-02T10:45:00Z auth cutover: REQUIRE_AUTH=true (backend enforcement on)
 2026-09-17T15:00:00Z security round 2: redeploy after the rules compile fix (run #107 failed before deploying)
 2026-10-13T12:31:46Z RevenueCat secrets set (REVENUECAT_SECRET_KEY, REVENUECAT_WEBHOOK_AUTH): full redeploy so every function's .env carries them
+2026-10-19T08:40:00Z Gemini key rotated (sec-gemini): full redeploy so every function's .env carries the new GEMINI_API_KEY
