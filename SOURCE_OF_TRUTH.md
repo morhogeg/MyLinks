@@ -2671,8 +2671,9 @@ exact-match, capped.
   reachable on iOS (it lives on that screen); it is still on the website.
   Share sheet, import and paste copy untouched, so nothing implies saving from
   a browser is impossible. Privacy policy and terms still name the extension
-  (legal copy, left as is). tsc + eslint clean; not verified in the native
-  shell.
+  (legal copy, left as is). tsc + eslint clean; e2e 09 + 10 pass (web
+  unchanged); not verified in the native shell. **SHIPPED** as merge
+  `57ba874`: Vercel (auto), TestFlight run #378 = **build 1378**.
 
 - **2026-10-16 (night) — PURCHASE FEELS INSTANT; THE MARK NARRATES THE WAIT
   (owner: "after I tapped OK on purchase successful nothing happens for a few
