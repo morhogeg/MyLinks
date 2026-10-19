@@ -2671,8 +2671,9 @@ exact-match, capped.
   full screen, Advanced included (e2e asserts it). **Known gap:** Reset token
   is now reachable nowhere until an extension ships (iOS row hidden, web
   Advanced hidden); a leaked iOS share token can't be rotated by the user.
-  Low risk (the token lives in the share extension's Keychain), restore
-  somewhere neutral (e.g. Account) if that changes. e2e 09 + 10 updated and
+  Low risk (the token lives in the share extension's Keychain). **Owner
+  decision 2026-10-19: leave it hidden until the extension ships** (it
+  returns with Advanced). e2e 09 + 10 updated and
   green, light/dark render checked. Web only; no TestFlight needed (the
   native app never reaches this screen now).
 
