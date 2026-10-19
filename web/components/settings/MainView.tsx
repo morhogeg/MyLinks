@@ -5,7 +5,7 @@ import { RotateCcw } from 'lucide-react';
 import { Bell, Sun, Moon, Monitor, Clock, Compass, Lock, BarChart3, Heart, Crown, Puzzle, Upload } from 'lucide-react';
 import { policyUrl, openExternal } from '@/lib/share';
 import { isNativeApp } from '@/lib/api';
-import { browserKind, chromeWebStoreUrl, macAppStoreUrl } from '@/lib/extension';
+import { browserKind, chromeWebStoreUrl, extensionInAStore, macAppStoreUrl } from '@/lib/extension';
 import ProfileAvatar from '../ProfileAvatar';
 import DataExport from './DataExport';
 import { accountTitle, isPrivateRelay } from './AccountSection';
@@ -185,20 +185,24 @@ export function MainView({
             <SectionHeader>Your library</SectionHeader>
             <List>
                 <NavRow tile={<BarChart3 className="w-[17px] h-[17px]" />} title="Insights" onClick={() => go('stats')} />
-                {/* Desktop capture. On native the row stays (people set up their
-                    computer from their phone) with a sub-line saying it's a
-                    computer thing. The sub-line is honest about the store: until
-                    the Chrome Web Store listing exists (lib/extension.ts) it
-                    says "Coming soon" rather than reading like an install. Kept
-                    either way: this screen also holds the token and Reset. */}
-                <NavRow
-                    tile={<Puzzle className="w-[16px] h-[16px]" />}
-                    title="Browser extension"
-                    sub={isNativeApp() ? 'For Chrome or Safari on your computer'
-                        : browserKind() === 'safari' ? (macAppStoreUrl() ? 'Safari on your Mac' : 'Coming soon to Safari')
-                            : chromeWebStoreUrl() ? 'Chrome, Edge, and Brave' : 'Coming soon to Chrome'}
-                    onClick={() => go('extension')}
-                />
+                {/* Desktop capture. The iOS app shows no extension at all until
+                    one is in a store (owner, 2026-10-19: iOS launches first, the
+                    extension follows): a row pointing at a "Coming soon" screen
+                    reads as an unfinished feature to App Review. Once a store
+                    link is set (lib/extension.ts) the row comes back on native
+                    with a sub-line saying it's a computer thing. On the web the
+                    row always shows; it is honest about the store and also holds
+                    the token and Reset. */}
+                {(!isNativeApp() || extensionInAStore()) && (
+                    <NavRow
+                        tile={<Puzzle className="w-[16px] h-[16px]" />}
+                        title="Browser extension"
+                        sub={isNativeApp() ? 'For Chrome or Safari on your computer'
+                            : browserKind() === 'safari' ? (macAppStoreUrl() ? 'Safari on your Mac' : 'Coming soon to Safari')
+                                : chromeWebStoreUrl() ? 'Chrome, Edge, and Brave' : 'Coming soon to Chrome'}
+                        onClick={() => go('extension')}
+                    />
+                )}
             </List>
 
             <SectionHeader>Notifications</SectionHeader>

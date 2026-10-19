@@ -1370,7 +1370,12 @@ The multi-user auth work described below **was** fully written but not live:
     redeploy web). Decisions taken: host permission stays dropped; "Web
     history" unticked (only pages the user explicitly saves are sent).
 
-26c. **[ ] Machina for Safari on the Mac App Store — BUILDS LOCALLY 2026-10-05.**
+26c. **[ ] Machina for Safari on the Mac App Store — DEFERRED TO POST-LAUNCH
+    (owner, 2026-10-19: iOS launches first).** Until either store link is
+    set, the iOS app shows no extension at all (Settings row hidden,
+    `?settings=extension` ignored; `extensionInAStore()` in
+    `web/lib/extension.ts`); the website keeps its "Coming soon" screen.
+    BUILDS LOCALLY 2026-10-05.
     Committed project `safari/MachinaSafari.xcodeproj` (app
     `com.morhogeg.machina.safari`, extension `….safari.extension`, separate
     App Store record, macOS 14+); `./safari/build-safari.sh` builds + verifies
@@ -2651,6 +2656,23 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-10-19 (evening) — iOS APP NO LONGER MENTIONS THE BROWSER EXTENSION
+  (owner: "focus on the iOS app, add the Safari extension later").** Owner
+  found no Safari extension on their Mac: it was never submitted (§4 26c),
+  and the only copy registered was an ad-hoc Oct 5 build from an old
+  worktree, which Safari drops on each restart. On iOS, Settings → Browser
+  extension pointed people at a desktop screen that says "Coming soon" in
+  every browser (Chrome isn't listed either, 26b), which reads as an
+  unfinished feature to App Review. Now the row and the
+  `?settings=extension` / `?connect=extension` deep links are hidden on
+  native until `CHROME_WEB_STORE_ITEM_ID` or `MAC_APP_STORE_URL` is set, then
+  come back on their own. Web unchanged. Side effect: Reset token is no longer
+  reachable on iOS (it lives on that screen); it is still on the website.
+  Share sheet, import and paste copy untouched, so nothing implies saving from
+  a browser is impossible. Privacy policy and terms still name the extension
+  (legal copy, left as is). tsc + eslint clean; not verified in the native
+  shell.
 
 - **2026-10-16 (night) — PURCHASE FEELS INSTANT; THE MARK NARRATES THE WAIT
   (owner: "after I tapped OK on purchase successful nothing happens for a few
