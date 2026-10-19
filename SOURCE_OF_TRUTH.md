@@ -2721,6 +2721,20 @@ exact-match, capped.
   **SHIPPED** as merge `94a16d7`: Vercel (auto), TestFlight run #376 =
   **build 1376**.
 
+- **2026-10-19 (late) — LAUNCH CHECKLIST CUT TO LAUNCH-ONLY (owner: "just
+  what's important for launch").** Removed 11 steps that don't gate or
+  shape the launch: old-card cleanups (`be-normalize`, `be-retag`), log
+  housekeeping (`be-ttl`, `be-logmask`), `sec-ruleset` (only matters with
+  collaborators), `sec-pipaudit`, `ios-resolved` (Package.resolved pinning),
+  both browser extensions (`ext-chrome`, `ext-safari`; still §4 items 26b/26c),
+  `post-minbuild` (folded into `lw-crashes` as one line) and `post-tm` (the
+  Feb 2027 trademark re-check, still §4 item 8a). Added gate `as-prep`
+  (submit-day: fresh trial + clear `aiConsentAt` on `machinareviewer`, after
+  its TestFlight subscription stops renewing ~Oct 24). Refreshed the Payments
+  and Web intros and `pay-reviewer-plan`. Ticked `sec-scanning` (GitHub API:
+  secret scanning + push protection enabled). Still open in Security:
+  `trigger/ask-debug` and `trigger/pipeline-debug` exist (checked today).
+  Checklist now 72 steps; CLAUDE.md updated.
 - **2026-10-19 — REVIEWER ACCESS: OPTION (A) CHOSEN, NOTES FILLED (owner).**
   `docs/APP_STORE.md` §3 no longer says `REVIEWER_EMAIL_TBD`: the demo
   account is `machinareviewer@gmail.com`, entered in App Store Connect's
