@@ -2678,6 +2678,18 @@ exact-match, capped.
   **SHIPPED** as merge `94a16d7`: Vercel (auto), TestFlight run #376 =
   **build 1376**.
 
+- **2026-10-19 (later) — CONSENT BUTTON SAYS "AGREE AND CONTINUE" (owner).**
+  Owner saw the notice on device after clearing the reviewer's
+  `aiConsentAt` ("works perfectly") and asked whether to name Gemini and
+  whether to change "I understand, continue". Decision: keep "Google Gemini"
+  by name (5.1.2(i) asks to disclose third-party AI; the privacy policy and
+  review notes already name it); button `I understand, continue` → `Agree
+  and continue` (the tap is the consent, so it says agree; "Start with
+  Machina" was rejected as hiding that), footnote shortened to "Details in
+  our Privacy Policy." Not a material disclosure change, so `ai-consent-v1`
+  stays (no re-consent). e2e selectors updated (helpers, 02, 09). tsc +
+  eslint clean; not render-checked (copy only). **Submit day:** the owner
+  re-agreed on `machinareviewer`, so clear its `aiConsentAt` again.
 - **2026-10-19 — "AI CONSENT NOTICE DOESN'T SHOW" (owner, build 1376) IS
   BY DESIGN, BUT IT BREAKS THE REVIEW NOTES.** Consent is per account:
   `aiConsentAt` on `users/{uid}` (plus a per-workspace localStorage cache,
