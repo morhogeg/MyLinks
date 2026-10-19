@@ -2721,6 +2721,13 @@ exact-match, capped.
   **SHIPPED** as merge `94a16d7`: Vercel (auto), TestFlight run #376 =
   **build 1376**.
 
+- **2026-10-19 — GEMINI KEY ROTATED (task 5, half done).** Owner minted a
+  new key in the paid project `gen-lang-client-0057642876` (2nd brain),
+  updated the `GEMINI_API_KEY` repo secret, a session redeployed all functions
+  (`.deploy-ping`, commit `b00bdd8`, Deploy Cloud Functions #134 green), saves
+  verified on the new key (owner + clean function logs), old key deleted, saves
+  still work. Checklist `sec-gemini` ticked. **Still open from task 5:** rotate
+  the ASC `.p8` (`sec-asc`).
 - **2026-10-19 (late) — LAUNCH CHECKLIST CUT TO LAUNCH-ONLY (owner: "just
   what's important for launch").** Removed 11 steps that don't gate or
   shape the launch: old-card cleanups (`be-normalize`, `be-retag`), log
