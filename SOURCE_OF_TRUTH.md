@@ -2397,7 +2397,7 @@ cost is ≈$0.20/mo realistic, so margin is not the question; annual exists to
 carry people through the months their library is still building (the AI-churn
 problem). No second tier, no lifetime plan (a lifetime buyer costs Gemini
 forever), no BYO key. The only discount worth running: a launch-week "Founder"
-annual at $39.99 capped at the first 200 buyers — optional.
+annual at $39.99 capped at the first 200 buyers — optional. **Decided 2026-10-19 (owner): no Founder offer at launch.**
 
 **Model: free tier + 14-day reverse trial, no card.** Every new workspace gets
 Pro on day one for 14 days (server-side, no StoreKit involvement), then drops to
