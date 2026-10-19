@@ -2721,6 +2721,17 @@ exact-match, capped.
   **SHIPPED** as merge `94a16d7`: Vercel (auto), TestFlight run #376 =
   **build 1376**.
 
+- **2026-10-19 — REVIEWER ACCESS: OPTION (A) CHOSEN, NOTES FILLED (owner).**
+  `docs/APP_STORE.md` §3 no longer says `REVIEWER_EMAIL_TBD`: the demo
+  account is `machinareviewer@gmail.com`, entered in App Store Connect's
+  Sign-In Information; its password lives ONLY there (repo is public). Notes
+  now say how to sign in (Continue with Google), that the account is on the
+  14-day trial (Settings → Pro trial → Keep Pro), and to email
+  support@mymachina.app if Google adds a verification step. §5 lists the
+  owner's Google-account steps (2-Step Verification off, no passkey, recovery
+  phone removed, cold-device test). **Open risk:** `support@mymachina.app`
+  delivery is still unverified (checklist `as-support`), and Google can still
+  challenge an unfamiliar sign-in even without 2FA; only the cold test shows it.
 - **2026-10-19 (later) — CONSENT BUTTON SAYS "AGREE AND CONTINUE" (owner).**
   Owner saw the notice on device after clearing the reviewer's
   `aiConsentAt` ("works perfectly") and asked whether to name Gemini and

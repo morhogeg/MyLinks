@@ -301,14 +301,15 @@ browser, and no user-to-user interaction). Result: **4+**.
 
 ## 3. App Review notes (paste into "Notes" on the version page)
 
-> **Demo account** (Sign in with Apple/Google cannot be shared, so use this
-> reviewer account):
-> Email: `REVIEWER_EMAIL_TBD` Password: `PASSWORD_TBD`
-> ⚠️ Fill these in after the auth cutover: create a fresh Google account (or an
-> email+password test account if enabled) reserved for review. Note that ANY
-> fresh sign-in auto-creates a new, empty workspace with a one-screen welcome —
-> the reviewer does not need pre-provisioned data, but pre-seeding the demo
-> account with a few saved cards will demo Ask/synthesis better.
+> **Demo account (decided 2026-10-19: option (a), the seeded Google account).**
+> Goes in App Store Connect → version page → **App Review Information →
+> Sign-In Information** (tick "Sign-in required"):
+> User name: `machinareviewer@gmail.com` Password: **only in App Store
+> Connect, never in this file** (this repo is public).
+> The account must sign in from a cold device with no 2FA prompt; see the
+> owner steps in §5. On submit day, also: start a fresh 14-day trial for it
+> and clear its `aiConsentAt` so the consent notice shows (launch checklist
+> `pay-reviewer-plan`, `ios-consent`).
 >
 > Suggested wording for the notes field:
 >
@@ -316,9 +317,12 @@ browser, and no user-to-user interaction). Result: **4+**.
 > share sheet, AI analyzes them, and you can ask questions answered from your
 > own saves.
 >
-> • Sign-in: Google and Sign in with Apple are both supported. Signing in with
-> any new account automatically creates a fresh workspace — no invitation or
-> setup needed. Demo account above if preferred.
+> • Sign-in: tap Continue with Google and use the demo account in the Sign-In
+> Information (a Google account we created for review, already holding a
+> small library so Ask and the weekly synthesis have something to work
+> with). Sign in with Apple also works: any new account gets its own empty
+> workspace. If Google asks for an extra verification step, please contact us
+> at support@mymachina.app and we will respond within hours.
 >
 > • AI disclosure: on first run the app shows a consent notice explaining that
 > saved content and questions are processed by Google Gemini. This is also
@@ -332,9 +336,10 @@ browser, and no user-to-user interaction). Result: **4+**.
 >
 > • In-app purchase: Machina Pro, an auto-renewable subscription (monthly or
 > annual). Every new account gets a 14-day Pro trial on our server (not a
-> StoreKit free trial), so the free-plan limits won't appear during review.
-> To see the purchase sheet: Settings → Plan. Restore Purchases, the renewal
-> terms and the Terms / Privacy links are on the same sheet.
+> StoreKit free trial). The demo account is on that trial, so all features
+> are unlocked. To test the subscription: Settings → Pro trial → Keep Pro.
+> Restore Purchases, the renewal terms and the Terms / Privacy links are on
+> the same sheet.
 >
 > • No ads, no tracking."
 
@@ -492,15 +497,16 @@ build configs, so no iPad screenshots are needed.
       workspace seeded 2026-08-26 per the §4 seed library; owner resolved the
       stray card + missing screenshot. **Credentials are still NOT in §3** —
       see the next item.
-- [ ] **Fill the demo-account credentials into §3** (still literal
-      `REVIEWER_EMAIL_TBD` / `PASSWORD_TBD`). ⚠️ Auth is OAuth-only, so there
-      is no password to hand Apple for a 2FA-protected Google account. Decide
-      between: (a) make the demo account's Google sign-in usable from a cold
-      device by a reviewer, or (b) rely on §3's existing "any fresh sign-in
-      auto-creates a workspace" wording and state that no demo account is
-      needed. (a) is better — it is the only path where the reviewer sees a
-      populated Ask/synthesis demo. Whichever is chosen, TEST IT on a device
-      that has never signed into that account.
+- [ ] **Make `machinareviewer@gmail.com` usable from a cold device** (option
+      (a), decided 2026-10-19; §3 filled except the password, which goes only
+      into App Store Connect's Sign-In Information). Owner, signed into that
+      Google account at myaccount.google.com → Security: 2-Step Verification
+      **off**; no passkey sign-in ("Skip password when possible" off); a
+      strong unique password; recovery email set, recovery phone removed if
+      it is a number Apple can't reach. Then TEST: a browser profile or device
+      that has never signed into it (Safari private window → accounts.google.com)
+      signs in with email + password and no challenge. Then paste user name +
+      password into App Review Information → Sign-In Information.
 - [ ] Enter metadata per §2 (all copy is final and owner-approved — pure
       transcription into Connect).
 - [ ] **Terms of Use link for the subscription** (Guideline 3.1.2(c), added
