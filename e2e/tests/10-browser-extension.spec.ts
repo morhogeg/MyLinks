@@ -6,8 +6,9 @@ import { launchExtension } from '../extension/fixtures';
 
 // Settings → Browser extension, for a normal person (SOURCE_OF_TRUTH §4 item
 // 24, "Chrome Web Store listing for the extension"):
-//   - no store listing yet: an honest "Coming soon", never load-unpacked steps;
-//   - the token and Reset live under Advanced;
+//   - no store listing yet: an honest "Coming soon", never load-unpacked steps,
+//     and nothing else (no How to save, no Advanced) until an extension is here;
+//   - once one is here, the token and Reset live under Advanced;
 //   - with the real extension installed, one click (or the extension's own
 //     Connect button) connects it, no copy and paste.
 
@@ -20,7 +21,7 @@ const openExtensionSettings = async (page: Page) => {
     return dialog;
 };
 
-test('no listing yet: coming soon, no developer steps, token under Advanced @desktop', async ({ page }) => {
+test('no listing yet: coming soon alone, no developer steps, no usage or Advanced @desktop', async ({ page }) => {
     const errors = collectPageErrors(page);
     await openAsReturningUser(page, {}, { shareToken: TOKEN });
     const desktop = test.info().project.name === 'desktop';
@@ -35,21 +36,17 @@ test('no listing yet: coming soon, no developer steps, token under Advanced @des
         await expect(status).toContainText('Coming soon to the Chrome Web Store');
         await expect(status.getByRole('button', { name: 'Coming soon' })).toBeDisabled();
     } else {
-        await expect(status).toContainText('Works in Chrome, Edge, Brave, and Safari');
+        await expect(status).toContainText('Coming soon to Chrome, Edge, Brave, and Safari');
     }
     await expect(status.getByRole('button', { name: 'Add to Chrome' })).toHaveCount(0);
     // The old dead end for normal users.
     await expect(dialog).not.toContainText(/Load unpacked|Developer mode|chrome:\/\/extensions|extension folder/i);
 
-    // Advanced: masked until asked, then the real token.
-    const token = dialog.getByTestId('extension-token');
-    await expect(token).toBeHidden();
-    await dialog.getByText('Connect with a token').click();
-    await expect(token).toBeVisible();
-    await expect(token).not.toContainText(TOKEN);
-    await dialog.getByRole('button', { name: 'Reveal' }).click();
-    await expect(token).toHaveText(TOKEN);
-    await expect(dialog.getByRole('button', { name: 'Reset token' })).toBeVisible();
+    // Nothing to install and nothing here: no instructions for a button that
+    // doesn't exist, and saving stays possible through the + button.
+    await expect(dialog).toContainText('pasting its link with the + button');
+    await expect(dialog).not.toContainText(/How to save|Pin Machina|Connect with a token/);
+    await expect(dialog.getByTestId('extension-token')).toHaveCount(0);
     expect(errors).toEqual([]);
 });
 
@@ -71,7 +68,7 @@ test('/?settings=extension opens the screen and connects nothing @desktop', asyn
     expect(new URL(page.url()).searchParams.get('settings')).toBeNull();
 });
 
-test('Safari on a Mac: Mac App Store placeholder and how to allow the site @desktop', async ({ browser }) => {
+test('Safari on a Mac: Mac App Store placeholder, no site hint for an app nobody has @desktop', async ({ browser }) => {
     desktopOnly();
     const ctx = await browser.newContext({
         userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15',
@@ -86,7 +83,7 @@ test('Safari on a Mac: Mac App Store placeholder and how to allow the site @desk
     await dialog.getByRole('button', { name: /Browser extension/ }).click();
     const status = dialog.getByTestId('extension-status');
     await expect(status).toContainText('Coming soon to the Mac App Store');
-    await expect(status).toContainText('allow it on mymachina.app');
+    await expect(status).not.toContainText(/Already have it|allow it on mymachina\.app/);
     await expect(status).not.toContainText(/Chrome Web Store|Xcode/);
     await ctx.close();
 });
@@ -113,6 +110,9 @@ test('with the extension installed: one click connects it, and a deep link conne
         await expect(dialog.getByTestId('extension-status')).toContainText('Connected in this browser', { timeout: 20_000 });
         await expect.poll(async () => (await ext.storage()).token).toBe(TOKEN);
         expect((await ext.storage()).account).toBe(user.email);
+        // With an extension here, usage and Advanced (token, Reset) come back.
+        await expect(dialog).toContainText('How to save');
+        await expect(dialog.getByText('Connect with a token')).toBeVisible();
         // The param is consumed, so a reload doesn't reconnect.
         expect(new URL(page.url()).searchParams.get('connect')).toBeNull();
         // The token was checked with the server before it was kept.

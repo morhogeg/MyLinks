@@ -1374,7 +1374,9 @@ The multi-user auth work described below **was** fully written but not live:
     (owner, 2026-10-19: iOS launches first).** Until either store link is
     set, the iOS app shows no extension at all (Settings row hidden,
     `?settings=extension` ignored; `extensionInAStore()` in
-    `web/lib/extension.ts`); the website keeps its "Coming soon" screen.
+    `web/lib/extension.ts`); the website's screen is the "Coming soon" card
+    alone (no How to save, Safari hint or Advanced) until something is
+    installable or an extension is detected.
     BUILDS LOCALLY 2026-10-05.
     Committed project `safari/MachinaSafari.xcodeproj` (app
     `com.morhogeg.machina.safari`, extension `….safari.extension`, separate
@@ -2656,6 +2658,23 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-10-19 (evening, later) — WEBSITE EXTENSION SCREEN IS THE "COMING
+  SOON" CARD ALONE (owner screenshot, desktop Safari).** With nothing in a
+  store and no extension in the browser, `ExtensionView` still showed How to
+  save, the pin footnote, the Safari "Already have it?" hint and Advanced (the
+  token). Now gated on `live = listed || !!ext`: until either is true the
+  screen is the intro ("A one-click save button … is on its way. Until then,
+  add any page by pasting its link with the + button.") plus the coming-soon
+  card (clock icon instead of a lone "1"); the Safari hint shows only once
+  `MAC_APP_STORE_URL` is set. A side-loaded extension is detected and gets the
+  full screen, Advanced included (e2e asserts it). **Known gap:** Reset token
+  is now reachable nowhere until an extension ships (iOS row hidden, web
+  Advanced hidden); a leaked iOS share token can't be rotated by the user.
+  Low risk (the token lives in the share extension's Keychain), restore
+  somewhere neutral (e.g. Account) if that changes. e2e 09 + 10 updated and
+  green, light/dark render checked. Web only; no TestFlight needed (the
+  native app never reaches this screen now).
 
 - **2026-10-19 (evening) — iOS APP NO LONGER MENTIONS THE BROWSER EXTENSION
   (owner: "focus on the iOS app, add the Safari extension later").** Owner
