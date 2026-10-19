@@ -2678,6 +2678,20 @@ exact-match, capped.
   **SHIPPED** as merge `94a16d7`: Vercel (auto), TestFlight run #376 =
   **build 1376**.
 
+- **2026-10-19 — "AI CONSENT NOTICE DOESN'T SHOW" (owner, build 1376) IS
+  BY DESIGN, BUT IT BREAKS THE REVIEW NOTES.** Consent is per account:
+  `aiConsentAt` on `users/{uid}` (plus a per-workspace localStorage cache,
+  `ai-consent-v1:<uid>`, which re-uploads to the doc if the doc lacks it;
+  `AuthProvider.reconcileAiConsent`). Both accounts the owner can sign into
+  already agreed (owner Jul, `machinareviewer` 26 Aug), so a reinstall
+  correctly skips the notice. No code change. **Launch risk:** Apple's
+  reviewer signs into `machinareviewer`, which has consented, so the notice
+  the review notes promise would never appear. **Submit-day step:** delete
+  `aiConsentAt` from `users/cJSmZgLy…` (with the fresh trial). For the owner
+  to test now: clear the field, delete the app BEFORE reopening it (else the
+  local cache re-uploads it), reinstall, sign in. The session's Firestore
+  write was blocked by the permission classifier; owner to clear it or allow
+  it. Checklist `ios-consent` rewritten to say all this.
 - **2026-10-18 — REVIEWER ACCOUNT RESET TO A FRESH TRIAL FOR QA (owner).**
   `machinareviewer@gmail.com` (workspace `cJSmZgLy…`) carried the owner's
   TestFlight purchase test (Monthly, `source: revenuecat`, bought 2026-10-17).
