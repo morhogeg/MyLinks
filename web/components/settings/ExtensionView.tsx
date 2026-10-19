@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { AlertCircle, Check, ChevronRight, Copy, Eye, EyeOff, Loader2, RefreshCw, RotateCcw } from 'lucide-react';
+import { AlertCircle, Check, ChevronRight, Clock, Copy, Eye, EyeOff, Loader2, RefreshCw, RotateCcw } from 'lucide-react';
 import { fetchShareConfig, rotateShareToken } from '@/lib/shareConfig';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { copyToClipboard, openExternal } from '@/lib/share';
@@ -24,7 +24,10 @@ import { LargeTitle, SectionHeader, Footnote } from './primitives';
  *
  * Until the store listing exists (CHROME_WEB_STORE_ITEM_ID in lib/extension),
  * the install step says "Coming soon" instead of pretending; load-unpacked
- * instructions are for developers and live in extension/README.md.
+ * instructions are for developers and live in extension/README.md. While
+ * there is nothing to install AND no extension in this browser, the screen is
+ * that card alone: no "How to save", no Safari site hint, no Advanced (owner,
+ * 2026-10-19). A side-loaded extension is detected and gets the full screen.
  *
  * The token comes from the SAME source as the iOS Share Extension's:
  * `fetchShareConfig` (get_share_config), which mints one on first use.
@@ -105,6 +108,8 @@ export function ExtensionView({
     const safari = kind === 'safari';
     const storeUrl = chromeWebStoreUrl();
     const masUrl = macAppStoreUrl();
+    // Something this browser can install from.
+    const listed = safari ? !!masUrl : !!storeUrl;
 
     // ── The account's token ─────────────────────────────────────────────────
     const [token, setToken] = useState<string | null>(null);
@@ -160,6 +165,10 @@ export function ExtensionView({
             offReady();
         };
     }, [desktop, refreshExt]);
+
+    // Usage, the Safari hint and Advanced only make sense once there is an
+    // extension to install or one is already here.
+    const live = listed || !!ext;
 
     const connectedHere = !!ext?.connected && !!ext.tokenTag && !!myTag && ext.tokenTag === myTag;
     const connectedElsewhere = !!ext?.connected && !connectedHere && !!myTag;
@@ -241,8 +250,13 @@ export function ExtensionView({
     } else if (!desktop) {
         main = (
             <>
-                <StatusLine icon={<ChevronRight className="w-[14px] h-[14px]" />} title="Works in Chrome, Edge, Brave, and Safari">
-                    Open Machina in one of those browsers on a computer to add it.
+                <StatusLine
+                    icon={<ChevronRight className="w-[14px] h-[14px]" />}
+                    title={storeUrl ? 'Works in Chrome, Edge, Brave, and Safari' : 'Coming soon to Chrome, Edge, Brave, and Safari'}
+                >
+                    {storeUrl
+                        ? 'Open Machina in one of those browsers on a computer to add it.'
+                        : 'Once it is out, open Machina in one of those browsers on a computer to add it.'}
                 </StatusLine>
                 {storeUrl && <PrimaryButton onClick={() => openExternal(storeUrl)}>View in the Chrome Web Store</PrimaryButton>}
             </>
@@ -254,7 +268,7 @@ export function ExtensionView({
     } else if (ext === null && safari) {
         main = (
             <>
-                <StatusLine icon={<span className="text-[12px] font-bold">1</span>} title={masUrl ? 'Get Machina for Safari' : 'Coming soon to the Mac App Store'}>
+                <StatusLine icon={masUrl ? <span className="text-[12px] font-bold">1</span> : <Clock className="w-[13px] h-[13px]" />} title={masUrl ? 'Get Machina for Safari' : 'Coming soon to the Mac App Store'}>
                     {masUrl
                         ? 'Free, from the Mac App Store. Open the app once, then turn on the extension in Safari.'
                         : 'Machina for Safari is on its way. Once it is in the Mac App Store, you will get it from here.'}
@@ -264,11 +278,11 @@ export function ExtensionView({
                 ) : (
                     <ComingSoonButton />
                 )}
-                <div className="mt-3 rounded-xl bg-surface-inset px-3 py-2.5 text-[13.5px] text-text-secondary leading-snug">
+                {masUrl && <div className="mt-3 rounded-xl bg-surface-inset px-3 py-2.5 text-[13.5px] text-text-secondary leading-snug">
                     <span className="font-semibold text-text">Already have it?</span> Safari asks before an extension can
                     see a website. In Safari, open Settings, then Extensions, choose Machina, and allow it on
                     mymachina.app. This page notices and connects it.
-                </div>
+                </div>}
             </>
         );
     } else if (ext === null) {
@@ -284,7 +298,7 @@ export function ExtensionView({
             </>
         ) : (
             <>
-                <StatusLine icon={<span className="text-[12px] font-bold">1</span>} title="Coming soon to the Chrome Web Store">
+                <StatusLine icon={<Clock className="w-[13px] h-[13px]" />} title="Coming soon to the Chrome Web Store">
                     The Machina extension is on its way. Once it is in the store, you will add it from here in one click.
                 </StatusLine>
                 <ComingSoonButton />
@@ -327,7 +341,9 @@ export function ExtensionView({
         <div className="pb-2">
             <LargeTitle>Browser extension</LargeTitle>
             <p className="px-1 text-[15px] text-text-secondary leading-snug">
-                Save any page from your desktop browser in one click. Works in Chrome, Edge, Brave, and Safari.
+                {live
+                    ? 'Save any page from your desktop browser in one click. Works in Chrome, Edge, Brave, and Safari.'
+                    : 'A one-click save button for your desktop browser is on its way. Until then, add any page by pasting its link with the + button.'}
             </p>
 
             <SectionHeader>{connectedHere ? 'Status' : 'Get started'}</SectionHeader>
@@ -335,83 +351,85 @@ export function ExtensionView({
                 <Card>{main}</Card>
             </div>
 
-            <SectionHeader>How to save</SectionHeader>
-            <ul className="rounded-[14px] border border-border-subtle bg-card px-[14px] py-3 space-y-2 text-[14.5px] text-text-secondary leading-snug">
-                <li>Click the Machina icon in the toolbar, or press <Mono>Ctrl+Shift+S</Mono> (<Mono>Command+Shift+S</Mono> on a Mac).</li>
-                <li>Right-click a link to save the link, or select text and right-click to save it with the page.</li>
-                <li>Each save lands in your library, and Machina reads it in the background.</li>
-            </ul>
-            <Footnote>Pin Machina to the toolbar so the icon is always one click away.</Footnote>
+            {live && (<>
+                <SectionHeader>How to save</SectionHeader>
+                <ul className="rounded-[14px] border border-border-subtle bg-card px-[14px] py-3 space-y-2 text-[14.5px] text-text-secondary leading-snug">
+                    <li>Click the Machina icon in the toolbar, or press <Mono>Ctrl+Shift+S</Mono> (<Mono>Command+Shift+S</Mono> on a Mac).</li>
+                    <li>Right-click a link to save the link, or select text and right-click to save it with the page.</li>
+                    <li>Each save lands in your library, and Machina reads it in the background.</li>
+                </ul>
+                <Footnote>Pin Machina to the toolbar so the icon is always one click away.</Footnote>
 
-            <SectionHeader>Advanced</SectionHeader>
-            <details className="group rounded-[14px] border border-border-subtle bg-card">
-                <summary className="flex items-center justify-between gap-2 px-[14px] min-h-[46px] cursor-pointer list-none text-[16px] text-text [&::-webkit-details-marker]:hidden">
-                    Connect with a token
-                    <ChevronRight className="w-[18px] h-[18px] text-text-muted transition-transform group-open:rotate-90" aria-hidden />
-                </summary>
-                <div className="px-[14px] pb-[14px]">
-                    <p className="text-[14px] text-text-secondary leading-snug">
-                        For a browser that can&apos;t connect in one click. In the extension, open Settings, choose Use a token
-                        instead, and paste this.
-                    </p>
-                    <div className="mt-3 rounded-xl border border-border-subtle bg-surface-inset px-3 py-2.5">
-                        {!uid ? (
-                            <div className="text-[14px] text-text-secondary">Sign in to see your token.</div>
-                        ) : tokenState === 'loading' ? (
-                            <div className="text-[14px] text-text-muted">Loading your token</div>
-                        ) : tokenState === 'error' ? (
-                            <div>
-                                <div className="text-[14px] text-text">Could not load your token.</div>
-                                <button type="button" onClick={() => { setTokenState('loading'); setReload((n) => n + 1); }} className={`mt-2 ${SMALL_BTN}`}>
-                                    <RefreshCw className="w-[14px] h-[14px]" aria-hidden />
-                                    Try again
+                <SectionHeader>Advanced</SectionHeader>
+                <details className="group rounded-[14px] border border-border-subtle bg-card">
+                    <summary className="flex items-center justify-between gap-2 px-[14px] min-h-[46px] cursor-pointer list-none text-[16px] text-text [&::-webkit-details-marker]:hidden">
+                        Connect with a token
+                        <ChevronRight className="w-[18px] h-[18px] text-text-muted transition-transform group-open:rotate-90" aria-hidden />
+                    </summary>
+                    <div className="px-[14px] pb-[14px]">
+                        <p className="text-[14px] text-text-secondary leading-snug">
+                            For a browser that can&apos;t connect in one click. In the extension, open Settings, choose Use a token
+                            instead, and paste this.
+                        </p>
+                        <div className="mt-3 rounded-xl border border-border-subtle bg-surface-inset px-3 py-2.5">
+                            {!uid ? (
+                                <div className="text-[14px] text-text-secondary">Sign in to see your token.</div>
+                            ) : tokenState === 'loading' ? (
+                                <div className="text-[14px] text-text-muted">Loading your token</div>
+                            ) : tokenState === 'error' ? (
+                                <div>
+                                    <div className="text-[14px] text-text">Could not load your token.</div>
+                                    <button type="button" onClick={() => { setTokenState('loading'); setReload((n) => n + 1); }} className={`mt-2 ${SMALL_BTN}`}>
+                                        <RefreshCw className="w-[14px] h-[14px]" aria-hidden />
+                                        Try again
+                                    </button>
+                                </div>
+                            ) : (
+                                <div
+                                    dir="ltr"
+                                    data-testid="extension-token"
+                                    aria-label={revealed ? 'Your token' : 'Your token, hidden'}
+                                    className={`font-mono text-[13px] leading-relaxed break-all ${revealed ? 'text-text select-all' : 'text-text-muted select-none'}`}
+                                >
+                                    {revealed ? token : MASK}
+                                </div>
+                            )}
+                        </div>
+                        {tokenState === 'ready' && (
+                            <div className="flex flex-wrap items-center gap-2 mt-3">
+                                <button type="button" onClick={() => setRevealed((v) => !v)} className={SMALL_BTN} aria-pressed={revealed}>
+                                    {revealed ? <EyeOff className="w-[14px] h-[14px]" aria-hidden /> : <Eye className="w-[14px] h-[14px]" aria-hidden />}
+                                    {revealed ? 'Hide' : 'Reveal'}
+                                </button>
+                                <button type="button" onClick={doCopy} className={SMALL_BTN}>
+                                    {copied ? <Check className="w-[14px] h-[14px]" aria-hidden /> : <Copy className="w-[14px] h-[14px]" aria-hidden />}
+                                    {copied ? 'Copied' : 'Copy'}
+                                </button>
+                                <button type="button" onClick={() => setConfirmReset(true)} disabled={resetState === 'busy'} className={SMALL_BTN}>
+                                    <RotateCcw className="w-[14px] h-[14px]" aria-hidden />
+                                    {resetState === 'busy' ? 'Resetting' : 'Reset token'}
                                 </button>
                             </div>
-                        ) : (
-                            <div
-                                dir="ltr"
-                                data-testid="extension-token"
-                                aria-label={revealed ? 'Your token' : 'Your token, hidden'}
-                                className={`font-mono text-[13px] leading-relaxed break-all ${revealed ? 'text-text select-all' : 'text-text-muted select-none'}`}
-                            >
-                                {revealed ? token : MASK}
-                            </div>
                         )}
-                    </div>
-                    {tokenState === 'ready' && (
-                        <div className="flex flex-wrap items-center gap-2 mt-3">
-                            <button type="button" onClick={() => setRevealed((v) => !v)} className={SMALL_BTN} aria-pressed={revealed}>
-                                {revealed ? <EyeOff className="w-[14px] h-[14px]" aria-hidden /> : <Eye className="w-[14px] h-[14px]" aria-hidden />}
-                                {revealed ? 'Hide' : 'Reveal'}
-                            </button>
-                            <button type="button" onClick={doCopy} className={SMALL_BTN}>
-                                {copied ? <Check className="w-[14px] h-[14px]" aria-hidden /> : <Copy className="w-[14px] h-[14px]" aria-hidden />}
-                                {copied ? 'Copied' : 'Copy'}
-                            </button>
-                            <button type="button" onClick={() => setConfirmReset(true)} disabled={resetState === 'busy'} className={SMALL_BTN}>
-                                <RotateCcw className="w-[14px] h-[14px]" aria-hidden />
-                                {resetState === 'busy' ? 'Resetting' : 'Reset token'}
-                            </button>
+                        <div role="status" aria-live="polite">
+                            {resetState === 'done' && (
+                                <p className="mt-2.5 text-[13px] text-text-secondary leading-snug">
+                                    New token issued. The old one stopped working.
+                                    {resetPushed ? ' The extension in this browser already has the new one.' : ''}
+                                    {' '}Reconnect the extension in any other browser.
+                                </p>
+                            )}
+                            {resetState === 'error' && (
+                                <p className="mt-2.5 text-[13px] text-text leading-snug">Could not reset the token. Try again in a moment.</p>
+                            )}
                         </div>
-                    )}
-                    <div role="status" aria-live="polite">
-                        {resetState === 'done' && (
-                            <p className="mt-2.5 text-[13px] text-text-secondary leading-snug">
-                                New token issued. The old one stopped working.
-                                {resetPushed ? ' The extension in this browser already has the new one.' : ''}
-                                {' '}Reconnect the extension in any other browser.
-                            </p>
-                        )}
-                        {resetState === 'error' && (
-                            <p className="mt-2.5 text-[13px] text-text leading-snug">Could not reset the token. Try again in a moment.</p>
-                        )}
+                        <p className="mt-3 text-[12.5px] text-text-muted leading-snug">
+                            Anything saved with this token lands in this account, so keep it to yourself. If it ever leaks,
+                            Reset token makes the old one useless right away.
+                        </p>
                     </div>
-                    <p className="mt-3 text-[12.5px] text-text-muted leading-snug">
-                        Anything saved with this token lands in this account, so keep it to yourself. If it ever leaks,
-                        Reset token makes the old one useless right away.
-                    </p>
-                </div>
-            </details>
+                </details>
+            </>)}
 
             <ConfirmDialog
                 isOpen={confirmReset}
