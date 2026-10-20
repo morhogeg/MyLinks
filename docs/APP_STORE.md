@@ -385,9 +385,14 @@ Order matters: the first three can appear in search results.
 6. **Collection** — the Wellness collection opened as a place (Share, Ask
    about this). Caption: "Curate it. Share it (or don't)."
 
+**Chosen 2026-10-20 (owner): the LIGHT frame**, for the screenshots and the
+header/search creative alike. Upload exactly what is in
+`app-store-screenshots/final/upload/` (`screenshots-6.9-inch/` 1–6 in order,
+`header-and-search/`).
+
 Files (not in git: 46 MB): the session worktree's
-`app-store-screenshots/final/` — `raw/`, `captioned-dark/`,
-`captioned-light/` (same captions, two frame styles; upload ONE set),
+`app-store-screenshots/final/` — `upload/` (the chosen set), `raw/`,
+`captioned-dark/`, `captioned-light/` (same captions, two frame styles),
 `creative-dark/` and `creative-light/` (product-page header 21:9
 3840×1646, search-results 3:2 3840×2560, universal 16:9 5244×2950, per
 Apple's creative-assets specs), and `alternates/` (graph with a whole cluster
