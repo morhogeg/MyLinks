@@ -72,6 +72,13 @@ class AIAnalysis(BaseModel):
     videoDurationMinutes: Optional[int] = Field(None, description="Observed length of the video in whole minutes")
 
 
+class TakeawayRewrite(BaseModel):
+    """Answer to GeminiService.rewrite_takeaway: a card's "Do this" task
+    rewritten to fit two rows of the Revisit list, or null when the card
+    supports no concrete action (the caller then keeps the old task)."""
+    actionableTakeaway: Optional[str] = Field(None, description="The new task: one sentence, at most 14 words, built on one concrete detail from the card; null when there is no concrete action")
+
+
 class ScreenshotPlatform(BaseModel):
     """Answer to the one-question follow-up "which app's interface is this?"
     asked when a screenshot carried an author handle but the main analysis
