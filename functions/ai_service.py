@@ -528,7 +528,7 @@ def text_script(text) -> str:
 # make each item 1-2 rows max", then the short versions were "very plain, make
 # it more interesting, not generic". The three GOOD examples are the owner's.
 TAKEAWAY_RULE_BULLETS = """   - **LANGUAGE**: Write the takeaway in the SAME language as the input content.
-   - **SHORT, ONE ACTION**: ONE sentence that starts with the verb, at most 14 words and about 70 characters. It is a to-do item that must fit on two lines of a phone screen, so name the single most useful action. A short tail that says why or when ("so...", "before...", "while...") is welcome; a list of separate steps is not. A recipe or a how-to with real steps HAS a task: the ONE technique or step that makes it work, not the whole procedure.
+   - **SHORT, ONE ACTION**: ONE sentence that starts with the verb, at most 14 words and about 70 characters. It is a to-do item that must fit on two lines of a phone screen, so name the single most useful action. A short tail that says why or when ("so...", "before...", "while...") is welcome; a list of separate steps is not.
    - **SPECIFIC, NOT GENERIC**: Build the action on ONE concrete detail the content itself gives: a number, a time, a named technique, tool, ingredient, book, or place. A tip that could sit under a hundred other articles on the topic is a failure; name what THIS content tells the reader to do. Every detail must come from the content: never add a number, name, tool, or place it does not state.
      GOOD: "Switch your phone to black and white so the screen is easier to put down."
      GOOD: "Wait 90 minutes after waking for coffee, and skip caffeine after 2 PM."
@@ -536,7 +536,7 @@ TAKEAWAY_RULE_BULLETS = """   - **LANGUAGE**: Write the takeaway in the SAME lan
      GOOD (a recipe): "Chill the cookie dough for 24 hours before baking for a deeper flavor."
      BAD (generic, no detail from the content): "Limit your screen time to improve your focus."
      BAD (too long, several steps): "Track your caffeine intake, stop drinking coffee in the afternoon, and switch your evening drink to herbal tea for better sleep."
-   - **INCLUDE ONLY WHEN GENUINE**: Provide a takeaway ONLY if the content genuinely supports one concrete, specific action. If the content is not actionable (e.g. a news event, an anecdote, a personal note or update), OMIT this field entirely: leave it out of the JSON rather than manufacturing advice.
+   - **INCLUDE ONLY WHEN GENUINE**: Provide a takeaway ONLY if the content genuinely supports one concrete, specific action. A recipe or a how-to with real steps always does: its task is the ONE technique or step that makes it work, not the whole procedure. If the content is not actionable (e.g. a news event, an anecdote, a personal note or update), OMIT this field entirely: leave it out of the JSON rather than manufacturing advice.
    - **DO NOT INVENT ADVICE**: Never pad this with generic filler ("stay informed", "consider the implications"). An omitted takeaway is always better than a fabricated one."""
 
 # Professional system prompt
