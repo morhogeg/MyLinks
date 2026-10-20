@@ -533,6 +533,7 @@ TAKEAWAY_RULE_BULLETS = """   - **LANGUAGE**: Write the takeaway in the SAME lan
      GOOD: "Switch your phone to black and white so the screen is easier to put down."
      GOOD: "Wait 90 minutes after waking for coffee, and skip caffeine after 2 PM."
      GOOD: "Book a Tsukiji sushi-making class before you fly, while spots are still open."
+     GOOD (a recipe): "Chill the cookie dough for 24 hours before baking for a deeper flavor."
      BAD (generic, no detail from the content): "Limit your screen time to improve your focus."
      BAD (too long, several steps): "Track your caffeine intake, stop drinking coffee in the afternoon, and switch your evening drink to herbal tea for better sleep."
    - **INCLUDE ONLY WHEN GENUINE**: Provide a takeaway ONLY if the content genuinely supports one concrete, specific action. If the content is not actionable (e.g. a news event, an anecdote, a personal note or update), OMIT this field entirely: leave it out of the JSON rather than manufacturing advice.
