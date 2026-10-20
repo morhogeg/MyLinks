@@ -30,6 +30,7 @@ on:
           - backfill_storage_keys
           - normalize_created_at
           - demo_weekly_synthesis
+          - rewrite_long_takeaways
       args:
         description: "Extra arguments (e.g. `--all`, or a uid)"
         required: false
@@ -117,12 +118,13 @@ jobs:
       - name: Run tool
         working-directory: functions
         env:
-          # Only demo_weekly_synthesis calls Gemini; the other tools never read it.
+          # Only demo_weekly_synthesis and rewrite_long_takeaways call Gemini;
+          # the other tools never read it.
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           set -euo pipefail
           case "$TOOL" in
-            migrate_share_owners|backfill_storage_keys|normalize_created_at|demo_weekly_synthesis) ;;
+            migrate_share_owners|backfill_storage_keys|normalize_created_at|demo_weekly_synthesis|rewrite_long_takeaways) ;;
             *) echo "::error::unknown tool"; exit 1 ;;
           esac
           flags=()

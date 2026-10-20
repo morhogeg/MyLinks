@@ -2005,6 +2005,14 @@ The multi-user auth work described below **was** fully written but not live:
 
 ### 🟢 P3 — product roadmap (post-launch)
 
+G-2. **[ ] Shorten the "Do this" tasks saved before 2026-10-20 (owner OK
+    pending).** New saves already write two-row tasks (§9 2026-10-20). Older
+    open tasks are 3–5 rows; the 2026-10-20 dry run found 100 to rewrite in 3
+    workspaces (54 in the owner's, `uid#2f4ec22a`). Actions → Maintenance →
+    tool `rewrite_long_takeaways`, args `--all`, `apply` ticked. Undo:
+    same with args `--all --revert`. Only these existing workspaces have them;
+    accounts created after the deploy never do.
+
 G-1. **[ ] Retire the unused test-push endpoint.** The Settings → "Send a
     test notification" row was removed 2026-10-14 (owner); nothing calls
     `send_test_push_http` any more. Delete the function in
@@ -2658,6 +2666,80 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-10-20 — "DO THIS" TASKS FIT TWO ROWS AND NAME ONE CONCRETE DETAIL
+  (owner, during the App Store shoot: the list "looks super busy, make each
+  item 1-2 rows max", then the short ones were "very plain, make it more
+  interesting, not generic").** **New saves:** rule 8 of the analysis prompt
+  is now one constant, `ai_service.TAKEAWAY_RULE_BULLETS` (every save path
+  gets it through `SYSTEM_PROMPT`): one verb-first sentence, at most 14 words
+  and about 70 characters, built on ONE concrete detail the content gives (a
+  number, time, named technique, tool, ingredient, book or place; never one
+  it doesn't state); a recipe or how-to with real steps gets its one key
+  technique; the owner's three approved tasks are the GOOD examples. Rules
+  for WHEN a card gets a task are unchanged. **Why characters, not words:**
+  measured with HarfBuzz on Geist 14.5px at the row's real width (viewport −
+  100px): ≤ ~72 chars fit two rows even on a 375pt SE, 74–78 from 390pt,
+  82+ wrap to a third row on most phones; 14 words can be 66 or 86 chars.
+  `ai_service.takeaway_fits` = ≤80 chars and ≤15 words. **Evidence**
+  (`rewrite_long_takeaways.py --selftest`: made-up articles through the real
+  `analyze_text`, 3 runs each, Maintenance runs): the OLD 20-word rule, on a
+  throwaway branch (run 39391050725), fit two rows 4/24 times (84–110 chars)
+  and invented a task for a news story 3/3 ("Prepare for construction to
+  begin on the new pedestrian bridge…"); the final rule (run 39392316260)
+  passes 26/27: all 23 tasks fit (62–78 chars), news gets none 3/3, a bare
+  recipe gets its technique 2/3 ("Add pasta water gradually while tossing to
+  keep the cheese from clumping."), a how-to 3/3, Hebrew stays Hebrew;
+  rewrites 9/9. Iterations on the way (runs 39390718133 → 39392072841): at
+  "about 75 chars" one article landed at 81–84 (three rows on 390–393pt) and
+  a Hebrew rewrite added an air conditioner the card never mentions; at 70
+  the recipe lost its task until recipes/how-tos were named in the
+  inclusion bullet (a recipe GOOD example alone got 1/3). **Older cards:** new tool `functions/tools/rewrite_long_takeaways.py`
+  (Maintenance workflow) rewrites each open task that doesn't fit from the
+  card's stored title, summary and detailedSummary via
+  `GeminiService.rewrite_takeaway` (same rule; one retry naming the broken
+  rule; rejects an em dash, a changed script, a still-long answer). Dry run
+  by default (counts only, no Gemini). Skips done and "Not for me" tasks,
+  private cards (own flag or private collection, fail closed), Ask answers,
+  unsettled cards, and the demo account (resolved from
+  `machinareviewer@gmail.com` at run time; the run aborts if that fails).
+  Keeps the old task in `metadata.takeawayRewrite` {prev,new,at}: re-runs
+  skip the card, `--revert` restores it where the task is still the rewrite.
+  Writes carry a last-update precondition. Cards are NOT re-embedded (same
+  action; a mass re-embed would spend the shared embed budget). `--preview
+  N` drafts to the admin-only `migrations/takeaway_rewrite_preview` (an
+  `--apply` run deletes it); `--only <masked tag>` scopes a run to one
+  workspace without a raw uid in the public log. **Prod dry run** (run
+  39391080166): 4 workspaces (demo excluded), 224 cards, 108 tasks, **105
+  too long** (median 137 chars, p90 197, max 230, i.e. ~4 rows), **100 would
+  be rewritten**, 4 closed and 1 private skipped. Owner's library is
+  `uid#2f4ec22a` (54 of them). Preview of 12 owner tasks (run 39391420840,
+  "about 75" wording): 11 drafted at median 74 chars, 1 declined as still
+  too long (keeps its task); spot-checked two drafts against their cards,
+  both grounded. **No 2-line clamp in `TakeawayRow`:** suggested as a
+  safety net, but the owner rejected exactly that on 1343 ("cut every
+  instruction mid-sentence") and 4 lines on 1344; the row's comment now
+  points at the source-side fix. Offer it again only if the owner asks.
+  **Local gotcha:** `~/MyLinks/web/node_modules` is stale (no
+  `@capacitor/app`, `@capacitor/status-bar`,
+  `@revenuecat/purchases-capacitor`, `capacitor-native-settings`), so the
+  ship skill's `tsc` there fails 8 errors on untouched main; `npm ci` in a
+  worktree gives tsc 0. **SHIPPED** as merge `60e8871d` (backend + a
+  comment in `DigestView.tsx`; no TestFlight needed): Deploy Cloud Functions
+  run 39392638854 green, all 47 functions updated, deploy canary OK; Python
+  tests and E2E green on the merge. From `main`: dry run run 39392687470
+  (same counts as above) and a 12-task preview of the owner's library with
+  the shipped wording (run 39392697156: 11 drafted, median 74 chars, max
+  80; 1 declined as still too long, which keeps its old task and is retried
+  on a re-run). **Verified in production:** two pages queued for the
+  `ci-canary` workspace the way the deploy canary does it: Wikipedia
+  "Pomodoro Technique" → "Set a timer for 25 minutes of focused work
+  followed by a short break." (69 chars, two rows on every iPhone);
+  "Sleep hygiene" → no task, the same as the old prompt gave the demo
+  account for that page this morning. Both cards stay in `ci-canary` until
+  the next deploy canary purges it. **Not verified:** how the Revisit list
+  looks on a device after `--apply`. **Owner decision pending:** run
+  `--all --apply` (§4 G-2).
 
 - **2026-10-19 (evening, later) — WEBSITE EXTENSION SCREEN IS THE "COMING
   SOON" CARD ALONE (owner screenshot, desktop Safari).** With nothing in a

@@ -10,7 +10,7 @@ from typing import List, Optional
 from pydantic import Field
 from google import genai
 from google.cloud.firestore_v1.vector import Vector
-from models import AIAnalysis, BrainAnswer, WeeklySynthesis, ScreenshotPlatform, TagSuggestion
+from models import AIAnalysis, BrainAnswer, WeeklySynthesis, ScreenshotPlatform, TagSuggestion, TakeawayRewrite
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +124,7 @@ ASK_MAX_OUTPUT_TOKENS = 16384
 SYNTHESIS_MAX_OUTPUT_TOKENS = 16384
 JUDGE_MAX_OUTPUT_TOKENS = 8192
 VERIFIER_MAX_OUTPUT_TOKENS = 8192
-SMALL_JSON_MAX_OUTPUT_TOKENS = 4096  # tag follow-up, screenshot platform
+SMALL_JSON_MAX_OUTPUT_TOKENS = 4096  # tag follow-up, screenshot platform, takeaway rewrite
 
 # Weekly synthesis input: the newest this-many cards of the week, each summary
 # cut to this many characters. A heavy week (hundreds of saves) otherwise sent
@@ -478,6 +478,67 @@ def _retry_delay(attempt: int) -> float:
     base = 2 ** attempt
     return base + random.uniform(0, base)
 
+
+# The card's "Do this" task (actionableTakeaway) is a to-do row in Revisit:
+# Geist 14.5px in a column the viewport minus 100px wide. Measured with
+# HarfBuzz on 2026-10-20: about 72 characters fit two rows even on a 375pt
+# iPhone SE, 74-78 fit two rows from 390pt up, and 82+ wrap to a third row on
+# most phones. Words are a poor proxy (14 short words fit, 14 long ones don't),
+# so the ceiling is mainly characters. The prompt asks for 14 words and about
+# 70 characters (asked for 75, the model landed at 81-84 on some content);
+# these ceilings are what "too long" means for the rewrite of older tasks
+# (tools/rewrite_long_takeaways.py) and for its answers.
+TAKEAWAY_MAX_CHARS = 80
+TAKEAWAY_MAX_WORDS = 15
+
+
+def takeaway_fits(text) -> bool:
+    """True when a task fits two rows of the Revisit list (see above)."""
+    t = text.strip() if isinstance(text, str) else ""
+    return bool(t) and len(t) <= TAKEAWAY_MAX_CHARS and len(t.split()) <= TAKEAWAY_MAX_WORDS
+
+
+def text_script(text) -> str:
+    """The writing system most of `text`'s letters use: "hebrew", "arabic",
+    "cyrillic", "cjk", "latin", or "" with no letters. A rewritten task must
+    keep its card's script, whatever the model decides."""
+    counts = {}
+    for ch in text if isinstance(text, str) else "":
+        if not ch.isalpha():
+            continue
+        o = ord(ch)
+        if 0x0590 <= o <= 0x05FF:
+            s = "hebrew"
+        elif 0x0600 <= o <= 0x06FF:
+            s = "arabic"
+        elif 0x0400 <= o <= 0x04FF:
+            s = "cyrillic"
+        elif 0x3040 <= o <= 0x30FF or 0x4E00 <= o <= 0x9FFF or 0xAC00 <= o <= 0xD7AF:
+            s = "cjk"
+        else:
+            s = "latin"
+        counts[s] = counts.get(s, 0) + 1
+    return max(counts, key=counts.get) if counts else ""
+
+
+# Rule 8 of the analysis prompt, the "Do this" task. Its own constant because
+# two callers must use the same words: every save path (through SYSTEM_PROMPT)
+# and GeminiService.rewrite_takeaway, which shortens tasks written under the
+# older 20-word rule. Owner (2026-10-20): the Revisit list "looks super busy,
+# make each item 1-2 rows max", then the short versions were "very plain, make
+# it more interesting, not generic". The three GOOD examples are the owner's.
+TAKEAWAY_RULE_BULLETS = """   - **LANGUAGE**: Write the takeaway in the SAME language as the input content.
+   - **SHORT, ONE ACTION**: ONE sentence that starts with the verb, at most 14 words and about 70 characters. It is a to-do item that must fit on two lines of a phone screen, so name the single most useful action. A short tail that says why or when ("so...", "before...", "while...") is welcome; a list of separate steps is not.
+   - **SPECIFIC, NOT GENERIC**: Build the action on ONE concrete detail the content itself gives: a number, a time, a named technique, tool, ingredient, book, or place. A tip that could sit under a hundred other articles on the topic is a failure; name what THIS content tells the reader to do. Every detail must come from the content: never add a number, name, tool, or place it does not state.
+     GOOD: "Switch your phone to black and white so the screen is easier to put down."
+     GOOD: "Wait 90 minutes after waking for coffee, and skip caffeine after 2 PM."
+     GOOD: "Book a Tsukiji sushi-making class before you fly, while spots are still open."
+     GOOD (a recipe): "Chill the cookie dough for 24 hours before baking for a deeper flavor."
+     BAD (generic, no detail from the content): "Limit your screen time to improve your focus."
+     BAD (too long, several steps): "Track your caffeine intake, stop drinking coffee in the afternoon, and switch your evening drink to herbal tea for better sleep."
+   - **INCLUDE ONLY WHEN GENUINE**: Provide a takeaway ONLY if the content genuinely supports one concrete, specific action. A recipe or a how-to with real steps always does: its task is the ONE technique or step that makes it work, not the whole procedure. If the content is not actionable (e.g. a news event, an anecdote, a personal note or update), OMIT this field entirely: leave it out of the JSON rather than manufacturing advice.
+   - **DO NOT INVENT ADVICE**: Never pad this with generic filler ("stay informed", "consider the implications"). An omitted takeaway is always better than a fabricated one."""
+
 # Professional system prompt
 SYSTEM_PROMPT = """You are a professional knowledge extraction assistant for Machina, a personal knowledge capture and recall system.
 Your goal is to objectively summarize web content with accuracy and precision. Do NOT add opinions, interpretations, or subjective assessments.
@@ -545,10 +606,7 @@ Requirements for the analysis:
    - Prefer SPECIFIC tags over generic ones — the dish, person, place, technique, or topic actually named in the content (e.g. "spaghetti al limone", "pasta", "italian cuisine" — not just "recipe", which merely repeats the category).
 
 8. actionableTakeaway: One concrete, specific action the reader can apply. This field is OPTIONAL.
-   - **LANGUAGE**: Write the takeaway in the SAME language as the input content.
-   - **SHORT, ONE ACTION**: ONE sentence of at most 20 words, starting with the verb (e.g. "Get morning sunlight within an hour of waking."). It is shown as a to-do item, so name the single most useful action; never chain several actions with "and".
-   - **INCLUDE ONLY WHEN GENUINE**: Provide a takeaway ONLY if the content genuinely supports one concrete, specific action. If the content is not actionable (e.g. a news event, an anecdote, a personal note or update), OMIT this field entirely — leave it out of the JSON rather than manufacturing advice.
-   - **DO NOT INVENT ADVICE**: Never pad this with generic filler ("stay informed", "consider the implications"). An omitted takeaway is always better than a fabricated one.
+""" + TAKEAWAY_RULE_BULLETS + """
 
 CRITICAL RULES:
 - Be a neutral reporter, not a reviewer. Report WHAT is said, not HOW WELL it is said.
@@ -2690,6 +2748,62 @@ Return ONLY a JSON object matching the schema (title, narrative, themes[title,in
             "standoutReason": data.get("standoutReason") or "",
             "openQuestion": data.get("openQuestion") or "",
         }
+
+    def rewrite_takeaway(self, card: dict, previous: str) -> tuple:
+        """A new "Do this" task for a card whose stored one (`previous`) is too
+        long for two rows of the Revisit list, written from the card's own
+        stored title, summary and detailedSummary under the rule new saves
+        follow (TAKEAWAY_RULE_BULLETS). Used by tools/rewrite_long_takeaways.py
+        for cards analyzed under the older 20-word rule.
+
+        Returns (task, "ok"), or (None, reason) when nothing should be written:
+        "declined" (the model finds no concrete action), or "too_long",
+        "em_dash", "language" when its answer breaks that rule again after one
+        retry that names what was wrong. Raises AnalysisError when Gemini fails.
+        """
+        title = str(card.get("title") or "").strip()[:200]
+        summary = str(card.get("summary") or "").strip()[:1500]
+        detailed = str(card.get("detailedSummary") or "").strip()[:4000]
+        prompt = f"""Machina shows each saved card's "Do this" task as a to-do item on a phone. This card's task was written under an older, looser rule and is too long to fit on two lines. Write its replacement from the card below.
+
+Rules for the task:
+{TAKEAWAY_RULE_BULLETS}
+   - Write it in the SAME language as the current task.
+   - If the current task's action is the card's most useful one, keep that action, but rebuild the sentence around ONE concrete detail from the card instead of trimming the old wording.
+   - Never use an em dash.
+
+The card:
+Title: {title}
+Summary: {summary}
+Details:
+{detailed}
+
+Current task (too long): {previous}
+
+Return ONLY a JSON object matching the schema: actionableTakeaway is the new task, or null when the card supports no concrete action."""
+
+        want_script = text_script(previous)
+        ask, reason = prompt, "error"
+        for _ in range(2):
+            data = self._generate_json(
+                [ask], "takeaway rewrite", attempts=2,
+                config_extra={"response_schema": TakeawayRewrite,
+                              "max_output_tokens": SMALL_JSON_MAX_OUTPUT_TOKENS})
+            raw = data.get("actionableTakeaway") if isinstance(data, dict) else None
+            task = " ".join(raw.split()).strip('"“” ') if isinstance(raw, str) else ""
+            if not task:
+                return None, "declined"
+            if "—" in task:
+                reason, problem = "em_dash", "it uses an em dash"
+            elif want_script and text_script(task) != want_script:
+                reason, problem = "language", "it is not in the current task's language"
+            elif not takeaway_fits(task):
+                reason, problem = "too_long", f"it has {len(task.split())} words and {len(task)} characters"
+            else:
+                return task, "ok"
+            ask = (f'{prompt}\n\nYour last answer, "{task}", breaks a rule: {problem}. '
+                   "Write a new one: one sentence, at most 14 words and about 70 characters.")
+        return None, reason
 
     def embed_text(self, text: str) -> Optional[List[float]]:
         """Generate a vector embedding for text using Gemini.
