@@ -8,7 +8,7 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Probe share pages as WhatsApp
+      - name: Probe share pages as WhatsApp (post-deploy)
         run: |
           set +e
           for id in 16722ae12571406faa22fe530ef02415 d27fc269272e4f02a2de143a81dd3420 doesnotexist000; do
