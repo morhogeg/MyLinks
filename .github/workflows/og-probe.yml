@@ -1,0 +1,34 @@
+name: OG probe (throwaway)
+on:
+  push:
+    branches: [claude/og-probe]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe share pages as WhatsApp
+        run: |
+          set +e
+          for id in 16722ae12571406faa22fe530ef02415 d27fc269272e4f02a2de143a81dd3420 doesnotexist000; do
+            for host in https://mymachina.app https://secondbrain-app-94da2.web.app; do
+              for ua in "WhatsApp/2.24.20.80 i" "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)"; do
+                echo "================ $host  id=$id  ua=$ua"
+                curl -sS -m 40 -A "$ua" -D /tmp/h -o /tmp/b -w 'code=%{http_code} total=%{time_total}s ttfb=%{time_starttransfer}s size=%{size_download} redirects=%{num_redirects}\n' "$host/s?id=$id"
+                grep -iE '^(HTTP|content-type|cache-control|location|x-vercel|age|x-cache|server|content-length|vary)' /tmp/h
+                grep -oE '<meta[^>]*(og:|twitter:|description)[^>]*>|<title>[^<]*</title>|<link[^>]*>' /tmp/b | head -25
+                echo "-- head bytes before og:image: $(grep -bo 'og:image' /tmp/b | head -1)"
+              done
+            done
+          done
+          echo "================ OG IMAGES"
+          for id in 16722ae12571406faa22fe530ef02415 d27fc269272e4f02a2de143a81dd3420; do
+            curl -sS -m 40 -A "WhatsApp/2.24.20.80 i" "https://mymachina.app/s?id=$id" -o /tmp/b
+            img=$(grep -oE 'property="og:image" content="[^"]*"' /tmp/b | head -1 | sed 's/.*content="//;s/"$//' | sed 's/&amp;/\&/g')
+            echo "id=$id img=$img"
+            [ -n "$img" ] && curl -sS -m 40 -A "WhatsApp/2.24.20.80 i" -D - -o /tmp/i -w 'code=%{http_code} total=%{time_total}s size=%{size_download}\n' "$img" | grep -iE '^(HTTP|content-type|content-length|cache-control)|code='
+            [ -n "$img" ] && file /tmp/i
+          done
+          echo "================ FULL BODY HEAD (first id, mymachina)"
+          curl -sS -m 40 -A "WhatsApp/2.24.20.80 i" "https://mymachina.app/s?id=16722ae12571406faa22fe530ef02415" | head -c 3000
