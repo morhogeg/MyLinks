@@ -352,7 +352,15 @@ App Review reader is an Apple employee and it is their own precise terminology �
 "tap Share" would be *less* clear here. Same text rule, two audiences, opposite
 calls.
 
-## 4. Screenshot shot-list (6.9" iPhone required; reuse for 6.5")
+## 4. Screenshot shot-list (required slot: iPhone with Dynamic Island, medium display)
+
+**Which slot (checked against Apple's screenshot specifications page,
+2026-10-20):** the one REQUIRED iPhone size is now "iPhone with Dynamic Island
+(medium display)", 1206×2622 or 1179×2556 portrait. App Store Connect rejects
+1320×2868 there ("File dimensions are invalid", owner hit it 2026-10-20);
+1320×2868 belongs to the optional large-display slot. iPad 13" is required only
+if the app supports iPad (it doesn't: `TARGETED_DEVICE_FAMILY = 1`); iPhone
+Duo screenshots become required from April 2027 for apps on the iOS 27.1 SDK.
 
 **Final set, shot 2026-10-20 (owner-directed, light frame chosen).**
 iPhone 17 Pro Max simulator (1320×2868, the 6.9" size), light theme, status
@@ -415,11 +423,15 @@ Productivity were dismissed with the tile's ✕, so the suggestion
 on screen is the only one.
 
 Files (not in git, 52 MB): the session worktree's
-`app-store-screenshots/final/`. **Upload exactly `upload/`**:
-`screenshots-6.9-inch/` 1–7 in order, and `header-and-search/` (header 21:9
+`app-store-screenshots/final/`. **Upload `upload/screenshots-iphone-medium-1206x2622/`
+1–7 in order to the medium-display slot** (the 1320×2868 originals resized,
+text checked sharp; also on the owner's Desktop as "UPLOAD THESE - iPhone
+medium display (1206x2622)"). `upload/screenshots-6.9-inch/` (1320×2868) is
+optional, for the large-display slot. `header-and-search/` (header 21:9
 3840×1646, search 3:2 3840×2560, universal 16:9 5244×2950, per Apple's
-creative-assets specs). Also `raw/` (uncaptioned), `captioned-light/`,
-`creative-light/`, `alternates/`; superseded versions in `archive/`.
+creative-assets specs) is for featuring nominations, not a screenshot slot.
+Also `raw/` (uncaptioned), `captioned-light/`, `creative-light/`,
+`alternates/`; superseded versions in `archive/`.
 
 Captions revised 2026-08-26 (owner-approved) — this set had never had a review
 round (written 2026-07-03, before the rename and the 08-25 copy rules), and two
