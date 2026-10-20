@@ -2812,6 +2812,26 @@ exact-match, capped.
   **SHIPPED** as merge `94a16d7`: Vercel (auto), TestFlight run #376 =
   **build 1376**.
 
+- **2026-10-20 (final, recall) — APP STORE SET IS NOW 8: RECALL SHOT IN SLOT 5;
+  REQUIRED SLOT IS THE MEDIUM DISPLAY.** Owner: "Recall" is in the name and
+  no shot showed a reminder. New shot 5 = the Remind me sheet on Inside the
+  Mind of a Master Procrastinator with Smart review selected ("Tomorrow 9:00
+  AM · then 1 week & 1 month"), caption "Saved once, never forgotten."
+  (owner-approved after "It remembers, so you don't." and "No more saved and
+  forgotten." were rejected). Weekly synthesis, Do this and Collections moved
+  to 6–8. The lock-screen version (the reminder notification, "Time to
+  revisit", the server's wording, via `simctl push`) is in `alternates/`.
+  **Upload size finding:** App Store Connect rejected 1320×2868 in the one
+  required iPhone slot, "iPhone with Dynamic Island (medium display)"
+  (1206×2622 / 1179×2556 per Apple's spec page); the set now ships in both
+  sizes, and the owner uploaded the 1206×2622 set. **Demo account / simulator:**
+  a real pending Smart review reminder on that card (next: 2026-10-21 09:00
+  Israel), Push notifications turned on for `machinareviewer` on the
+  simulator (iOS permission granted), status bar now plain 9:41 with a blank
+  carrier, region back to English (Israel). **Simulator gotcha:** a dated
+  `--time` override (needs `2026-10-20T06:41:00.000Z` form) sets the status bar
+  but NOT the lock-screen clock; a plain `9:41` override pins the lock screen
+  to 1 Jan.
 - **2026-10-20 (final, shot 7) — SHOT 7 IS THE COLLECTIONS GALLERY: 8 TILES,
   ONE SUGGESTED; COVER MOSAIC FIX.** Owner: the single-collection frame didn't
   read as "a collection of cards"; asked for eight collections, one suggested by

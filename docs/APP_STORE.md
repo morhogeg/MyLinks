@@ -390,12 +390,21 @@ in search results.
    simulator; a third-party app hidden from the row). Caption: "Save from any
    app, in seconds." Not "two taps": in iOS 26 Safari, Share is under "…",
    so it is three. The page really was saved; it is now a card on the account.
-5. **Weekly synthesis**: last week's write-up (Standout, Worth sitting with)
+5. **Recall**: the "Remind me" sheet on Inside the Mind of a Master
+   Procrastinator, Smart review selected ("Tomorrow 9:00 AM · then 1 week &
+   1 month"). Caption: "Saved once, never forgotten." The reminder was then
+   really saved (pending smart reminder on that card). Shot with the
+   simulator region set to English (US) for 12-hour times, then set back to
+   English (Israel). Alternate in `alternates/5-recall-lock-screen.png`: the
+   same reminder arriving as a notification ("Time to revisit", the server's
+   exact wording, delivered with `simctl push`). It lost to the sheet because
+   it's mostly wallpaper, and its clock can't be pinned to 9:41.
+6. **Weekly synthesis**: last week's write-up (Standout, Worth sitting with)
    above three earlier weeks. Caption: "What you learned, week by week."
-6. **Do this**: Revisit's five next steps, two rows each, with last week's
+7. **Do this**: Revisit's five next steps, two rows each, with last week's
    synthesis and the archive below. Caption: "Turn what you save into what
    you do."
-7. **Collections**: the Collections tab, eight tiles in a 2×4 grid: seven
+8. **Collections**: the Collections tab, eight tiles in a 2×4 grid: seven
    collections, each with a 2×2 cover of its cards' images and a two-line
    description, then Machina's own dashed "Suggested · Japan Travel · 6
    cards" tile with Preview. Caption: "Collections that build themselves."
@@ -408,11 +417,15 @@ in search results.
 Captions 4–7 were rewritten 2026-10-20 with the owner: "Your week, in one
 card." misdescribed a screen showing several weeks; "Curate it. Share it (or
 don't)." read as a joke; YouTube key moments was dropped as a detail, not a
-reason to download; capture was missing from the set entirely. Shot 7 was
-redone the same day: a single collection didn't read as "a collection of
-cards", and the owner asked for eight collections with one suggested.
+reason to download; capture was missing from the set entirely. The
+collections shot was redone the same day: a single collection didn't read as
+"a collection of cards", and the owner asked for eight collections with one
+suggested. Shot 5 (Recall) was added the same day so each word of the app
+name has a shot: Save (4), Ask (2), Recall (5). The caption avoids
+personification ("It remembers, so you don't." was rejected) and the
+ungrammatical "No more saved and forgotten."
 
-Demo data behind shot 7 (`machinareviewer`): 25 YouTube talks and explainers
+Demo data behind shot 8 (`machinareviewer`): 25 YouTube talks and explainers
 imported through the app's own Import → Paste links (real pipeline, all
 analyzed), filed into five new collections (Sleep better, Talks to rewatch,
 Focus, Fitness, Happiness) plus the existing two, with descriptions and
@@ -423,8 +436,9 @@ Productivity were dismissed with the tile's ✕, so the suggestion
 on screen is the only one.
 
 Files (not in git, 52 MB): the session worktree's
-`app-store-screenshots/final/`. **Upload `upload/screenshots-iphone-medium-1206x2622/`
-1–7 in order to the medium-display slot** (the 1320×2868 originals resized,
+`app-store-screenshots/final/`; `preview-all-eight.jpg` shows the set in
+order. **Upload `upload/screenshots-iphone-medium-1206x2622/`
+1–8 in order to the medium-display slot** (the 1320×2868 originals resized,
 text checked sharp; also on the owner's Desktop as "UPLOAD THESE - iPhone
 medium display (1206x2622)"). `upload/screenshots-6.9-inch/` (1320×2868) is
 optional, for the large-display slot. `header-and-search/` (header 21:9
