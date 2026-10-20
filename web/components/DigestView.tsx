@@ -790,7 +790,10 @@ function SwipeableReminder({ onDone, onSnooze, snoozeLabel, children }: {
  *
  * - The task is shown whole: it IS the content. A clamp at two lines cut
  *   every instruction mid-sentence (owner QA on 1343), and four still cut
- *   older long tasks (1344); new saves are capped at 20 words upstream.
+ *   older long tasks (1344). Short is fixed at the source instead: new saves
+ *   are written to fit two rows (about 14 words, functions/ai_service.py
+ *   TAKEAWAY_RULE_BULLETS), and functions/tools/rewrite_long_takeaways.py
+ *   shortens the open tasks saved before that rule.
  * - The circle is a real checkbox. Ticking fills it, strikes the task, holds a
  *   beat, then folds the row away and THEN writes (Feed's toast carries Undo).
  *   Leaving the screen mid-animation flushes the write instead of losing it.
