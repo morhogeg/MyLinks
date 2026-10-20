@@ -2005,6 +2005,15 @@ The multi-user auth work described below **was** fully written but not live:
 
 ### 🟢 P3 — product roadmap (post-launch)
 
+G-3. **[ ] Crop YouTube letterboxing in 2- and 3-image collection covers.**
+    `CoverMosaic` (2026-10-20) fills each cell with `object-cover`, which is
+    clean for 1- and 4-image covers. With 2 or 3 images some cells are taller
+    than 16:9, so an `i.ytimg.com/.../hqdefault.jpg` (4:3 with black bars)
+    still shows a thin bar top and bottom. Same as before the fix for 2-image
+    covers; not in the App Store shots (all four-image). Fix idea: for known
+    letterboxed YouTube thumbs, size the image box to 133% of the cell height
+    at −16.7% top so only the 16:9 frame shows.
+
 G-2. **[ ] Shorten the "Do this" tasks saved before 2026-10-20 (owner OK
     pending).** New saves already write two-row tasks (§9 2026-10-20). Older
     open tasks are 3–5 rows; the 2026-10-20 dry run found 100 to rewrite in 3
@@ -2815,9 +2824,12 @@ exact-match, capped.
   every cell showed the top of its picture (a YouTube thumbnail's black
   letterbox bar included) and a three-image cover lost its third image. New
   `web/components/CoverMosaic.tsx`: each image absolutely fills its own cell;
-  three images = one tall beside two stacked. tsc + eslint clean, verified on
-  the iOS simulator (iPhone 17 Pro Max). **Not shipped yet**: the App Store
-  build must include it or shot 7 won't match the app. **Demo account**
+  three images = one tall beside two stacked. tsc + eslint clean; verified on
+  the iOS simulator (iPhone 17 Pro Max) and in Chrome (Playwright, the real
+  component's markup with the app's built CSS: all four cover sizes fill
+  their cells; the old markup lost the third image there too, so desktop web
+  had that half of the bug). Leftover: 2- and 3-image covers still show
+  YouTube letterbox bars in their taller cells (§4 G-3). **Demo account**
   (`machinareviewer`): 25 YouTube talks/explainers imported through Import →
   Paste links (real pipeline, all analyzed), five new collections (Sleep
   better, Talks to rewatch, Focus, Fitness, Happiness), descriptions and colors
