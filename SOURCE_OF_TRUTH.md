@@ -233,6 +233,14 @@ The multi-user auth work described below **was** fully written but not live:
 > device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
 > Everything else is P2/P3.
 
+> ## 🚨 OWNER ACTION (2026-10-20): install build **1380**, then share a card to WhatsApp
+>
+> WhatsApp share previews (§9 2026-10-20, merge `ce3cbde`). On 1380, share a
+> card you have NEVER shared before (a re-sent old link keeps WhatsApp's
+> first result) and check the message shows a card, not a bare link. Try one
+> card with an image and one without (that one shows the Machina icon as a
+> small thumbnail). Builds ≤ 1379 still open the sheet before the page exists.
+>
 > ## 🚨 OWNER ACTION (2026-10-06): install build **1347** (launch audit, shipped)
 >
 > The launch audit (207 findings, every high fixed) is merged as `7c82ffa`
@@ -2675,6 +2683,44 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-10-20 (evening) — WHATSAPP SHARE PREVIEW: PAGE LIVE BEFORE THE
+  SHEET, PREVIEW IMAGE ON FIRST VIEW (owner, again, WhatsApp screenshot:
+  "Saved on Machina <link>" with no card).** Live probe from a GitHub runner
+  (sandbox egress is blocked): today's `/s?id=16722ae…` answered 200 in 0.6s
+  with full og tags (icon image, 512×512 declared) — the page was fine by the
+  time anyone looked; the failure is at share time. WhatsApp on iOS builds
+  the preview ON THE SENDER'S PHONE the moment a chat is picked and never
+  retries, while `handleShareCard` (since 2026-07-22) opened the sheet BEFORE
+  the publish landed, and since 2026-08-24 the publish also downloaded,
+  downscaled and uploaded the og:image copy before its Firestore write —
+  seconds for an image card. Also seen: yesterday's `/s?id=d27fc…` is now a
+  404 (stopped or withdrawn; not investigated). **Fix:** (1) `web/lib/
+  useLinkActions.handleShareCard` — a card's FIRST share awaits
+  `publishCard` before `shareLink`; a card that already has a `shareId`
+  (server writes it only once the page is live) keeps the instant sheet and
+  republishes behind it. On mobile web a lost user activation degrades to
+  the existing clipboard path. (2) `_publish_share_logic` no longer builds
+  the preview (bare batch write). New `share_service.ensure_card_og_preview`,
+  called by `share_page` for cards: reuses `ogPreview`, else builds it
+  (`_generate_og_preview`, unchanged SSRF/size rules, no longer deletes),
+  records it with `update(..., option=db.write_option(last_update_time=
+  snap.update_time))` so a copy is never attached to a newer snapshot,
+  deletes the losing copy on a failed write, sweeps older copies on success
+  (`_delete_share_previews(keep=)`), and marks an unusable image `{"failed":
+  ms}` so later views don't refetch (page then uses the raw image).
+  Collections no longer get a preview built at publish — it was never
+  rendered (`_render_shared_collection` takes no og_preview). (3)
+  `share_page` gets `min_instances=1` like `publish_share_http` — **cost:**
+  one more always-warm instance (~a few $/month). Tests: new
+  `tests/test_share_og_preview.py` (7); full suite 1941 passed; `tsc` clean.
+  **SHIPPED** merge `ce3cbde` (`Deploy-Functions: publish_share_http,
+  share_page`) → functions run #137, Vercel, TestFlight run #380 = **build
+  1380**. **Not verified:** a real WhatsApp share (owner, §4 owner action
+  above), and the first-view image path against a live image card — an
+  end-to-end probe that writes a throwaway `shared_cards` doc with the deploy
+  service account was blocked by the session's permission classifier.
+  Read-only post-deploy probe results are in the follow-up commit.
 
 - **2026-10-20 — "DO THIS" TASKS FIT TWO ROWS AND NAME ONE CONCRETE DETAIL
   (owner, during the App Store shoot: the list "looks super busy, make each
