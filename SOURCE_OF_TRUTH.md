@@ -2720,7 +2720,12 @@ exact-match, capped.
   above), and the first-view image path against a live image card — an
   end-to-end probe that writes a throwaway `shared_cards` doc with the deploy
   service account was blocked by the session's permission classifier.
-  Read-only post-deploy probe results are in the follow-up commit.
+  **Verified after deploy** (functions run #137 green incl. canary;
+  TestFlight run #380 green = build 1380 uploaded): read-only probe from a
+  runner, WhatsApp UA, `/s?id=16722ae…` on the new code → 200, full og tags,
+  1.6s on the first hit through Vercel, 0.3–0.7s after. Throwaway branch
+  `claude/og-probe` (the probe workflow) is still on origin — the session's
+  git proxy 403s branch deletes; safe to delete.
 
 - **2026-10-20 — "DO THIS" TASKS FIT TWO ROWS AND NAME ONE CONCRETE DETAIL
   (owner, during the App Store shoot: the list "looks super busy, make each
