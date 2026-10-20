@@ -2721,6 +2721,40 @@ exact-match, capped.
   **SHIPPED** as merge `94a16d7`: Vercel (auto), TestFlight run #376 =
   **build 1376**.
 
+- **2026-10-20 (later) — APP STORE SCREENSHOTS REDONE: LIGHT MODE, REAL
+  WEEKLY SYNTHESES (owner: "the most important part of the listing, do it
+  perfect").** Owner rejected the first (dark) set: Ask's answer pushed its
+  sources off screen, wanted light mode, and the set must show feed, graph,
+  Ask and Revisit with several weekly syntheses. **New tool**
+  `functions/tools/demo_weekly_synthesis.py` (merge `19ba79e`): writes past
+  weeks of syntheses for a named demo account through the real pipeline
+  (`synthesize_week` + `_write_inapp_synthesis`), cards split by recency then
+  category, each dated to its closing Sunday; refuses to overwrite a week
+  without `--force`. Wired into the Maintenance workflow (`GEMINI_API_KEY` now
+  on its Run step). Run 39381297709 wrote W39–W42 for `machinareviewer` (4, 5,
+  4, 3 cards); W42's title hand-shortened to "Cognitive biases and human
+  control" so it fits the feed strip. **Final set** (docs/APP_STORE.md §4):
+  1 feed, 2 Ask ("What temperature should my bedroom be for sleep?": two
+  sentences, two sources, one screen), 3 graph (one card focused), 4 Revisit
+  synthesis + 3-week archive, 5 YouTube key moments (NEW caption "Every
+  video, down to its key moments.", needs owner OK; replaces the share-sheet
+  shot), 6 Wellness collection. Raw + captioned in two frame styles (dark,
+  light) + header/search creatives in both; all 1320×2868 / Apple creative
+  sizes, no alpha. **Not committed** (46 MB vs 9 MB of images in the whole
+  repo): they live in the session worktree's `app-store-screenshots/final/`
+  and vanish if that worktree is cleaned up. **Gotchas:** (1) a local
+  simulator build needs `web/ios/App/App/GoogleService-Info.plist` (gitignored;
+  `firebase_get_sdk_config` for the iOS app) and the REVERSED_CLIENT_ID URL
+  scheme in Info.plist (as CI adds; revert after), plus `web/.env.local`;
+  (2) `~/MyLinks/functions/.env` still holds the Gemini key deleted on
+  2026-10-19 (401), so Gemini-calling tools must run via Maintenance;
+  (3) a forked side session drove the same simulator at the same time and
+  taps collided (theme flips, Safari, Settings): one simulator per session.
+  **Risks, not verified:** the shots show TED/YouTube thumbnails and real
+  speakers' faces, which Apple sometimes questions under 5.2.2; creative safe
+  areas not checked against Apple's templates (use App Store Connect's
+  Preview). `machinareviewer` now: Pro trial to 2026-11-03, 4 syntheses,
+  `aiConsentAt` set (clear on submit day, `as-prep`).
 - **2026-10-20 — APP STORE SCREENSHOTS + CREATIVE; TEST SUB MOVED ACCOUNTS.**
   Six 6.9-inch screenshots captured on an iPhone 17 Pro Max simulator
   (local Debug build; GoogleService-Info.plist from Firebase, not committed)
