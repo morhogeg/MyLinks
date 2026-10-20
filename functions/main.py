@@ -5504,15 +5504,12 @@ def client_error_http(req: https_fn.Request) -> https_fn.Response:
 # for crawlers, and a readable page for humans with no JS required.
 
 
-# min_instances=1 keeps ONE instance warm. The card-share flow (web/lib/
-# useLinkActions.handleShareCard) opens the OS share sheet immediately and
-# publishes this snapshot in parallel, so the publish must land before the
-# messaging app's link-preview crawler fetches /s?id= (which happens a few
-# seconds later, after the user picks a recipient). A cold Python start (~3-6s)
-# lost that race and the crawler cached an empty preview. Warm ⇒ sub-second
-# publish ⇒ the snapshot is live well before the crawl. Only the publish path
-# needs warming: /s (share_page) can cold-start freely — crawlers wait for it,
-# and previews rendered fine while it was cold; the race was purely the write.
+# min_instances=1 keeps ONE instance warm. The first share of a card (web/lib/
+# useLinkActions.handleShareCard) waits for this publish before opening the OS
+# share sheet, so the page exists before any messenger can fetch /s?id= — a
+# cold Python start (~3-6s) here would be a 3-6s wait on every first share.
+# The publish is a bare Firestore write; the card's preview image is built on
+# the page's first view (share_service.ensure_card_og_preview).
 @https_fn.on_request(min_instances=1)
 def publish_share_http(req: https_fn.Request) -> https_fn.Response:
     """Publish (or re-publish) a card/collection/answer as a public snapshot.
@@ -5668,7 +5665,12 @@ def cleanup_deleted_card(event: firestore_fn.Event[firestore_fn.DocumentSnapshot
         logger.error(f"cleanup_deleted_card failed: {e}")
 
 
-@https_fn.on_request()
+# Warm, like publish_share_http: a messenger fetches /s the moment a share is
+# composed (WhatsApp on iOS builds the preview on the sender's phone, with a
+# short timeout), and the first view of a card page also builds its preview
+# image (share_service.ensure_card_og_preview). A cold Python start on top of
+# that can miss the window, and the message then goes out as a bare link.
+@https_fn.on_request(min_instances=1)
 def share_page(req: https_fn.Request) -> https_fn.Response:
     """Server-rendered public page for a shared card (/s), collection (/c) or
     Ask answer (/a).
@@ -5731,8 +5733,9 @@ def share_page(req: https_fn.Request) -> https_fn.Response:
         elif kind == "answer":
             html_out = _render_shared_answer(data, share_url)
         else:
+            from share_service import ensure_card_og_preview
             html_out = _render_shared_card(data.get("card", {}) or {}, share_url,
-                                           og_preview=data.get("ogPreview"))
+                                           og_preview=ensure_card_og_preview(db, share_id, data, snap))
         return https_fn.Response(html_out, status=200, headers=html_headers)
 
     except Exception as e:

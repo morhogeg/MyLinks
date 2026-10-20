@@ -752,10 +752,13 @@ def _card_thumb(card: dict) -> Optional[str]:
 # WhatsApp (and other messengers) silently DROP og:image when the file is too
 # heavy (~300 KB is the safe ceiling — a stored screenshot easily exceeds it)
 # or when no dimensions are declared, and the share then degrades to a bare
-# link with no card at all. So publishing generates a dedicated small JPEG copy
-# of the card's image and records its exact pixel size; the share page declares
-# them via og:image:width/height/type. Best-effort everywhere: a share must
-# never fail to publish because its preview couldn't be built.
+# link with no card at all. So the card page carries a dedicated small JPEG
+# copy of the card's image with its exact pixel size, declared via
+# og:image:width/height/type. The copy is made on the page's FIRST view
+# (ensure_card_og_preview), not at publish: the app opens the share sheet only
+# once the publish has landed, so the publish must stay a bare Firestore write.
+# Best-effort everywhere: a page must never fail to render because its preview
+# couldn't be built.
 _OG_PREVIEW_MAX_EDGE = 1000
 _OG_PREVIEW_MAX_BYTES = 280 * 1024
 _OG_SOURCE_MAX_BYTES = 10 * 1024 * 1024
@@ -794,26 +797,37 @@ def _downscale_og_preview(image_bytes: bytes):
     return buf.getvalue(), img.width, img.height
 
 
-def _delete_share_previews(share_id: str) -> None:
-    """Best-effort: remove the stored preview copies for one share."""
+def _delete_share_previews(share_id: str, keep: Optional[str] = None) -> None:
+    """Best-effort: remove the stored preview copies for one share (all but
+    `keep`, the blob path of the copy the page now references)."""
     try:
         from firebase_admin import storage as fb_storage
         bucket = fb_storage.bucket()
         for blob in bucket.list_blobs(prefix=f"share_previews/{share_id}/"):
-            blob.delete()
+            if blob.name != keep:
+                blob.delete()
+    except Exception:
+        pass
+
+
+def _delete_blob_quietly(path: str) -> None:
+    try:
+        from firebase_admin import storage as fb_storage
+        fb_storage.bucket().blob(path).delete()
     except Exception:
         pass
 
 
 def _generate_og_preview(share_type: str, doc: dict, share_id: str) -> Optional[dict]:
-    """{url, width, height} for the share's link preview, or None.
+    """{url, width, height, path} for the share's link preview, or None.
 
     The source image is fetched back through scraper.safe_get — the payload is
     client-supplied, so its URLs must pass the same SSRF guard as any queue-doc
-    URL. The copy is stored under a fresh token per publish, so a republish
-    changes the og:image URL and busts crawler-side image caches. The blob path
+    URL. Each copy gets a fresh blob name and token, so a republished page gets
+    a new og:image URL and crawler-side image caches are busted. The blob path
     embeds only the share id — never the owner's uid — because og:image is
-    world-visible.
+    world-visible. Nothing is deleted here: two first views can race, and the
+    winner cleans up (ensure_card_og_preview).
     """
     if share_type == "answer":
         # An answer has no image of its own, and the sources' thumbnails are not
@@ -843,7 +857,6 @@ def _generate_og_preview(share_type: str, doc: dict, share_id: str) -> Optional[
     import uuid
     from urllib.parse import quote
     from firebase_admin import storage as fb_storage
-    _delete_share_previews(share_id)  # a republish replaces, never accumulates
     bucket = fb_storage.bucket()
     blob_path = f"share_previews/{share_id}/{uuid.uuid4().hex[:12]}.jpg"
     blob = bucket.blob(blob_path)
@@ -852,7 +865,51 @@ def _generate_og_preview(share_type: str, doc: dict, share_id: str) -> Optional[
     blob.upload_from_string(jpeg, content_type="image/jpeg")
     url = (f"https://firebasestorage.googleapis.com/v0/b/{bucket.name}/o/"
            f"{quote(blob_path, safe='')}?alt=media&token={token}")
-    return {"url": url, "width": width, "height": height}
+    return {"url": url, "width": width, "height": height, "path": blob_path}
+
+
+def ensure_card_og_preview(db, share_id: str, data: dict, snap) -> Optional[dict]:
+    """The card page's stored link-preview image, made on first view.
+
+    Returns the doc's `ogPreview` when there is one, else builds it, records
+    it on shared_cards/{share_id} and returns it. The write is conditioned on
+    the snapshot this view read: if the page was republished (or a parallel
+    first view already wrote its copy) in between, this copy is dropped rather
+    than attached to a snapshot it wasn't made from. A card whose image can't
+    be turned into a preview is marked `{"failed": ...}` so later views don't
+    refetch it; the page then uses the raw image (_og_image_meta)."""
+    existing = data.get("ogPreview")
+    if isinstance(existing, dict):
+        return existing
+    if not _card_thumb(data.get("card") or {}):
+        return None  # imageless card: the page uses the brand icon
+    try:
+        preview = _generate_og_preview("card", data, share_id)
+    except Exception as e:
+        logger.warning(f"og preview generation failed for {share_id}: {e}")
+        preview = None
+    path = preview.pop("path", None) if preview else None
+    stored = preview or {"failed": int(datetime.now(timezone.utc).timestamp() * 1000)}
+    try:
+        ref = db.collection("shared_cards").document(share_id)
+        update_time = getattr(snap, "update_time", None)
+        if update_time is not None:
+            ref.update({"ogPreview": stored},
+                       option=db.write_option(last_update_time=update_time))
+        else:
+            ref.update({"ogPreview": stored})
+    except Exception as e:
+        # Lost the race (or the page went away): this copy is attached to
+        # nothing, so remove it. This view still renders with it.
+        logger.info(f"og preview not recorded for {share_id}: {e}")
+        if path:
+            _delete_blob_quietly(path)
+        return preview
+    # Recorded: earlier copies (a previous publish of this id, a racing view
+    # that lost) are now unreferenced.
+    if path:
+        _delete_share_previews(share_id, keep=path)
+    return preview
 
 
 def _render_collection_item(card: dict) -> str:
@@ -1407,16 +1464,10 @@ def _publish_share_logic(uid: str, share_type: str, share_id: str, payload: dict
     doc["shareId"] = share_id
     doc["publishedAt"] = now_ms
 
-    # Link-preview image for messengers (see _generate_og_preview). Best-effort:
-    # publishing must never fail because the preview couldn't be built, and an
-    # imageless card simply shares without one (the page falls back to the icon).
-    doc.pop("ogPreview", None)  # server-generated only — never trust a client copy
-    try:
-        preview = _generate_og_preview(share_type, doc, share_id)
-        if preview:
-            doc["ogPreview"] = preview
-    except Exception as e:
-        logger.warning(f"og preview generation failed for {share_id}: {e}")
+    # Server-generated only, never a client copy. Not built here: the card
+    # page makes it on first view (ensure_card_og_preview), because the app
+    # waits for this publish before opening the share sheet.
+    doc.pop("ogPreview", None)
 
     # One atomic batch: a public doc that exists with NO owner row would be
     # claimable by any account on its next publish (the owner check only
