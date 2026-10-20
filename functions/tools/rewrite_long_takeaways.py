@@ -437,6 +437,9 @@ App icons and notification badges come in bright, saturated colors because color
 Ingredients: 200 g spaghetti, 1 large lemon (zest and juice), 40 g butter, 50 g finely grated Parmigiano Reggiano, black pepper, salt.
 
 Steps: 1. Boil the spaghetti in well-salted water until just shy of al dente. 2. Before draining, save a full cup of the starchy pasta water. 3. Melt the butter with the lemon zest in a wide pan over low heat. 4. Add the drained pasta, half the lemon juice and a splash of pasta water, and toss. 5. Take the pan off the heat and add the cheese gradually, tossing hard and adding pasta water until the sauce turns glossy. The starch in the water is what keeps the cheese from clumping."""),
+    ("stripped_screw", True, """How to remove a stripped screw
+
+When a screwdriver keeps spinning in a worn screw head, lay a wide rubber band flat over the head before pushing the screwdriver in. The rubber fills the stripped grooves and gives the bit enough grip to turn. Press down hard and turn slowly; fast turns strip the head further. If the band tears, a small square of steel wool works the same way. For a screw that still will not move, a screw extractor bit costs a few dollars: drill a small pilot hole, then run the extractor in reverse to pull the screw out."""),
     ("travel", True, """Eating your way through Tokyo: practical tips
 
 The outer market at Tsukiji still draws crowds even though the wholesale fish market moved to Toyosu in 2018. Stalls open around 5 AM and the best tamagoyaki and grilled scallops sell out before 9, so arrive early. Several small schools near the market run two-hour sushi-making classes in English; they cap groups at eight people and often fill up three to four weeks ahead, so book before your trip. Many stalls take cash only. For dinner, the narrow alleys of Omoide Yokocho in Shinjuku have tiny yakitori counters that seat six to ten people."""),

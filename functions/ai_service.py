@@ -528,7 +528,7 @@ def text_script(text) -> str:
 # make each item 1-2 rows max", then the short versions were "very plain, make
 # it more interesting, not generic". The three GOOD examples are the owner's.
 TAKEAWAY_RULE_BULLETS = """   - **LANGUAGE**: Write the takeaway in the SAME language as the input content.
-   - **SHORT, ONE ACTION**: ONE sentence that starts with the verb, at most 14 words and about 70 characters. It is a to-do item that must fit on two lines of a phone screen, so name the single most useful action. A short tail that says why or when ("so...", "before...", "while...") is welcome; a list of separate steps is not. For a recipe or a how-to, the task is the ONE technique or step that makes it work, not the whole procedure.
+   - **SHORT, ONE ACTION**: ONE sentence that starts with the verb, at most 14 words and about 70 characters. It is a to-do item that must fit on two lines of a phone screen, so name the single most useful action. A short tail that says why or when ("so...", "before...", "while...") is welcome; a list of separate steps is not. A recipe or a how-to with real steps HAS a task: the ONE technique or step that makes it work, not the whole procedure.
    - **SPECIFIC, NOT GENERIC**: Build the action on ONE concrete detail the content itself gives: a number, a time, a named technique, tool, ingredient, book, or place. A tip that could sit under a hundred other articles on the topic is a failure; name what THIS content tells the reader to do. Every detail must come from the content: never add a number, name, tool, or place it does not state.
      GOOD: "Switch your phone to black and white so the screen is easier to put down."
      GOOD: "Wait 90 minutes after waking for coffee, and skip caffeine after 2 PM."
