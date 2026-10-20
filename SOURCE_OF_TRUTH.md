@@ -2754,7 +2754,9 @@ exact-match, capped.
   speakers' faces, which Apple sometimes questions under 5.2.2; creative safe
   areas not checked against Apple's templates (use App Store Connect's
   Preview). `machinareviewer` now: Pro trial to 2026-11-03, 4 syntheses,
-  `aiConsentAt` set (clear on submit day, `as-prep`).
+  `aiConsentAt` set (clear on submit day, `as-prep`). **Owner chose the light
+  frame** (screenshots and creative); the upload-ready set is
+  `app-store-screenshots/final/upload/`. Caption 5 still awaits owner OK.
 - **2026-10-20 — APP STORE SCREENSHOTS + CREATIVE; TEST SUB MOVED ACCOUNTS.**
   Six 6.9-inch screenshots captured on an iPhone 17 Pro Max simulator
   (local Debug build; GoogleService-Info.plist from Firebase, not committed)
