@@ -2724,7 +2724,22 @@ exact-match, capped.
   `@capacitor/app`, `@capacitor/status-bar`,
   `@revenuecat/purchases-capacitor`, `capacitor-native-settings`), so the
   ship skill's `tsc` there fails 8 errors on untouched main; `npm ci` in a
-  worktree gives tsc 0. **Owner decision pending:** run `--all --apply`.
+  worktree gives tsc 0. **SHIPPED** as merge `60e8871d` (backend + a
+  comment in `DigestView.tsx`; no TestFlight needed): Deploy Cloud Functions
+  run 39392638854 green, all 47 functions updated, deploy canary OK; Python
+  tests and E2E green on the merge. From `main`: dry run run 39392687470
+  (same counts as above) and a 12-task preview of the owner's library with
+  the shipped wording (run 39392697156: 11 drafted, median 74 chars, max
+  80; 1 declined as still too long, which keeps its old task and is retried
+  on a re-run). **Verified in production:** two pages queued for the
+  `ci-canary` workspace the way the deploy canary does it: Wikipedia
+  "Pomodoro Technique" → "Set a timer for 25 minutes of focused work
+  followed by a short break." (69 chars, two rows on every iPhone);
+  "Sleep hygiene" → no task, the same as the old prompt gave the demo
+  account for that page this morning. Both cards stay in `ci-canary` until
+  the next deploy canary purges it. **Not verified:** how the Revisit list
+  looks on a device after `--apply`. **Owner decision pending:** run
+  `--all --apply` (§4 G-2).
 
 - **2026-10-19 (evening, later) — WEBSITE EXTENSION SCREEN IS THE "COMING
   SOON" CARD ALONE (owner screenshot, desktop Safari).** With nothing in a
