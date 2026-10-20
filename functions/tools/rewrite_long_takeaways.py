@@ -30,6 +30,7 @@ What it changes, and what it leaves alone:
     python tools/rewrite_long_takeaways.py --all                 # dry run: counts only, no Gemini
     python tools/rewrite_long_takeaways.py --uid <uid>           # one workspace
     python tools/rewrite_long_takeaways.py --all --preview 30    # + draft 30 rewrites to an admin-only doc
+    python tools/rewrite_long_takeaways.py --all --only uid#1a2b3c4d --preview 12   # one workspace, by masked tag
     python tools/rewrite_long_takeaways.py --all --apply
     python tools/rewrite_long_takeaways.py --all --revert        # dry run of putting old tasks back
     python tools/rewrite_long_takeaways.py --all --revert --apply
@@ -282,6 +283,11 @@ def main() -> int:
         return 2
     uids = [uid] if uid else [r.id for r in db.collection("users").list_documents()]
     uids = [u for u in uids if u not in demo]
+    # A masked tag from an earlier run's output: one workspace without a raw
+    # uid (for the legacy workspace, a phone number) in the public run log.
+    only = _arg(argv, "--only")
+    if only:
+        uids = [u for u in uids if mask_uid(u) == only]
     mode = ("revert-" if revert else "") + ("apply" if apply else "dry-run")
     print(f"mode={mode} workspaces={len(uids)} demo_excluded={len(demo)}")
 
