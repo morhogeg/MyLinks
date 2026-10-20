@@ -392,9 +392,10 @@ in search results.
    description, then Machina's own dashed "Suggested · Japan Travel · 6
    cards" tile with Preview. Caption: "Collections that build themselves."
    (alternate in `alternates/`: "Every topic, in its own collection."). The
-   frame depends on the cover fix in `web/components/CoverMosaic.tsx` being
-   in the submitted build: before it, every cover cell showed the top of its
-   picture, a YouTube thumbnail's black letterbox bar included.
+   frame depends on the cover fix in `web/components/CoverMosaic.tsx`, which
+   is in **build 1379 and later** (merge `3240d78c`), so submit one of
+   those: before it, every cover cell showed the top of its picture, a
+   YouTube thumbnail's black letterbox bar included.
 
 Captions 4–7 were rewritten 2026-10-20 with the owner: "Your week, in one
 card." misdescribed a screen showing several weeks; "Curate it. Share it (or
