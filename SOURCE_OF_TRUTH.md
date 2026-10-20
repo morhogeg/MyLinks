@@ -2721,6 +2721,26 @@ exact-match, capped.
   **SHIPPED** as merge `94a16d7`: Vercel (auto), TestFlight run #376 =
   **build 1376**.
 
+- **2026-10-20 (final) — APP STORE SET LOCKED: 7 SHOTS, LIGHT FRAME (owner).**
+  Owner rejected captions 4 and 6 and asked whether key moments earned a
+  slot. Final lineup (docs/APP_STORE.md §4): feed, Ask, graph, **capture**
+  (new: Safari share sheet, Machina first), weekly synthesis, **Do this**
+  (new), collection. New captions: "Save from any app, in seconds." (not
+  "two taps": iOS 26 Safari needs "…" → Share → Machina), "What you learned,
+  week by week.", "Turn what you save into what you do.", "Share a whole
+  topic with one link." Key moments dropped. Upload-ready set:
+  `app-store-screenshots/final/upload/` in this session's worktree (not in
+  git). **Demo-account changes** (`machinareviewer`): Wikipedia "Sleep
+  hygiene" saved through the real share extension (worked in the simulator,
+  ~2 min to a finished card; earlier claim that the share sheet can't be shot
+  in the simulator was wrong); five legacy `metadata.actionableTakeaway`
+  values (Aug–Oct, 20–36 words) rewritten to today's prompt rule (one
+  verb-first sentence, ≤20 words) around one concrete detail from each card
+  (Panic Monster, black-and-white screen, 70% killer-cell drop, Tsukiji
+  class, 90-minute coffee delay). **Product gap found:** cards analyzed
+  before the ≤20-word rule still carry 3–5-row tasks in Revisit for real
+  users; nothing regenerates them. Simulator-only: Machina made a share-sheet
+  Favorite and a third-party app hidden from the row.
 - **2026-10-20 (later) — APP STORE SCREENSHOTS REDONE: LIGHT MODE, REAL
   WEEKLY SYNTHESES (owner: "the most important part of the listing, do it
   perfect").** Owner rejected the first (dark) set: Ask's answer pushed its
