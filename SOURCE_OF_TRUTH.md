@@ -2837,7 +2837,10 @@ exact-match, capped.
   card, and Longevity/Psychology/Mindset/Productivity dismissed with ✕ so
   Japan Travel is the one suggestion. Files: `app-store-screenshots/final/`
   (old shot 7 in `archive/superseded/7-collection-wellness/`); Desktop copy
-  updated.
+  updated. **SHIPPED** as merge `3240d78c`: Vercel (green), E2E journeys #66
+  green, TestFlight run #379 = **build 1379** (green). Submit 1379 or later so
+  shot 7 matches the app. Note: the global `/verify` skill is written for the
+  Drift app (localhost:5173), so it can't check Machina changes.
 - **2026-10-20 (final) — APP STORE SET LOCKED: 7 SHOTS, LIGHT FRAME (owner).**
   Owner rejected captions 4 and 6 and asked whether key moments earned a
   slot. Final lineup (docs/APP_STORE.md §4): feed, Ask, graph, **capture**
