@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { Collection, Link } from '@/lib/types';
 import { MoreHorizontal, Pencil, Share2, Trash2, Globe, LayoutGrid, Plus, X, Layers, Lock, Eye } from 'lucide-react';
 import { CitationGlyph } from '@/components/ui/Wordmark';
+import CoverMosaic from '@/components/CoverMosaic';
 import { getColorStyleByKey } from '@/lib/colors';
 import { CollectionSuggestion } from '@/lib/collectionSuggest';
 import { getDirection } from '@/lib/rtl';
@@ -135,11 +136,7 @@ export default function CollectionsGallery({
                                 </span>
                             )}
                             {hasCover ? (
-                                <div className={`absolute inset-0 grid gap-px ${thumbs.length >= 4 ? 'grid-cols-2 grid-rows-2' : thumbs.length >= 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                                    {thumbs.map((t, i) => (
-                                        <img key={i} src={t} alt="" loading="lazy" className="w-full h-full object-cover" />
-                                    ))}
-                                </div>
+                                <CoverMosaic thumbs={thumbs} />
                             ) : !locked && (
                                 <span className="absolute inset-0 flex items-center justify-center">
                                     <Layers className="w-7 h-7" style={{ color: style.color, opacity: 0.45 }} />
@@ -219,11 +216,7 @@ export default function CollectionsGallery({
                 >
                     <div className="relative h-20 w-full overflow-hidden rounded-t-[20px]">
                         {s.thumbnails.length > 0 ? (
-                            <div className={`absolute inset-0 grid gap-px opacity-60 ${s.thumbnails.length >= 4 ? 'grid-cols-2 grid-rows-2' : s.thumbnails.length >= 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                                {s.thumbnails.map((t, i) => (
-                                    <img key={i} src={t} alt="" loading="lazy" className="w-full h-full object-cover" />
-                                ))}
-                            </div>
+                            <CoverMosaic thumbs={s.thumbnails} className="opacity-60" />
                         ) : (
                             <span className="absolute inset-0 flex items-center justify-center">
                                 <CitationGlyph className="w-6 h-6 text-accent/40" />

@@ -2721,6 +2721,29 @@ exact-match, capped.
   **SHIPPED** as merge `94a16d7`: Vercel (auto), TestFlight run #376 =
   **build 1376**.
 
+- **2026-10-20 (final, shot 7) — SHOT 7 IS THE COLLECTIONS GALLERY: 8 TILES,
+  ONE SUGGESTED; COVER MOSAIC FIX.** Owner: the single-collection frame didn't
+  read as "a collection of cards"; asked for eight collections, one suggested by
+  Machina. New shot 7 = Collections tab: seven collections with 2×2 image
+  covers, then "Suggested · Japan Travel · 6 cards". Caption "Collections that
+  build themselves." (alternate "Every topic, in its own collection.").
+  **Bug found and fixed:** the cover mosaics (`CollectionsGallery` own +
+  suggestion tiles, `ShareCollectionSheet` preview) put each `<img>` straight
+  into the grid with `h-full`; in WKWebView it rendered at natural height, so
+  every cell showed the top of its picture (a YouTube thumbnail's black
+  letterbox bar included) and a three-image cover lost its third image. New
+  `web/components/CoverMosaic.tsx`: each image absolutely fills its own cell;
+  three images = one tall beside two stacked. tsc + eslint clean, verified on
+  the iOS simulator (iPhone 17 Pro Max). **Not shipped yet**: the App Store
+  build must include it or shot 7 won't match the app. **Demo account**
+  (`machinareviewer`): 25 YouTube talks/explainers imported through Import →
+  Paste links (real pipeline, all analyzed), five new collections (Sleep
+  better, Talks to rewatch, Focus, Fitness, Happiness), descriptions and colors
+  set on all seven, the accurate "japan travel" tag added to the Inside Kyoto
+  card, and Longevity/Psychology/Mindset/Productivity dismissed with ✕ so
+  Japan Travel is the one suggestion. Files: `app-store-screenshots/final/`
+  (old shot 7 in `archive/superseded/7-collection-wellness/`); Desktop copy
+  updated.
 - **2026-10-20 (final) — APP STORE SET LOCKED: 7 SHOTS, LIGHT FRAME (owner).**
   Owner rejected captions 4 and 6 and asked whether key moments earned a
   slot. Final lineup (docs/APP_STORE.md §4): feed, Ask, graph, **capture**

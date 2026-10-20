@@ -6,6 +6,7 @@ import {
     X, Globe, Share2, Copy, Check, ExternalLink, RefreshCw, Layers, Lock,
 } from 'lucide-react';
 import { getColorStyleByKey } from '@/lib/colors';
+import CoverMosaic from '@/components/CoverMosaic';
 import { publishCollection, unpublishCollection, isShareStale } from '@/lib/collections';
 import { shareLink, shareUrlFor, openExternal, copyToClipboard } from '@/lib/share';
 import { useToast } from '@/components/Toast';
@@ -202,13 +203,7 @@ export default function ShareCollectionSheet({
                     {/* Preview of what the public page leads with. */}
                     <div className="rounded-2xl border border-border-subtle overflow-hidden">
                         <div className="relative h-24" style={{ backgroundColor: style.backgroundColor }}>
-                            {thumbs.length > 0 && (
-                                <div className={`absolute inset-0 grid gap-px ${thumbs.length >= 4 ? 'grid-cols-2 grid-rows-2' : thumbs.length >= 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                                    {thumbs.map((t, i) => (
-                                        <img key={i} src={t} alt="" loading="lazy" className="w-full h-full object-cover" />
-                                    ))}
-                                </div>
-                            )}
+                            <CoverMosaic thumbs={thumbs} />
                             <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                             <div className="absolute bottom-2 start-3 end-3 flex items-center gap-2">
                                 <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: style.color }} />

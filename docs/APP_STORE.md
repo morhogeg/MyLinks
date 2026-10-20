@@ -387,13 +387,31 @@ in search results.
 6. **Do this**: Revisit's five next steps, two rows each, with last week's
    synthesis and the archive below. Caption: "Turn what you save into what
    you do."
-7. **Collection**: the Wellness collection (Share, Ask about this). Caption:
-   "Share a whole topic with one link."
+7. **Collections**: the Collections tab, eight tiles in a 2×4 grid: seven
+   collections, each with a 2×2 cover of its cards' images and a two-line
+   description, then Machina's own dashed "Suggested · Japan Travel · 6
+   cards" tile with Preview. Caption: "Collections that build themselves."
+   (alternate in `alternates/`: "Every topic, in its own collection."). The
+   frame depends on the cover fix in `web/components/CoverMosaic.tsx` being
+   in the submitted build: before it, every cover cell showed the top of its
+   picture, a YouTube thumbnail's black letterbox bar included.
 
 Captions 4–7 were rewritten 2026-10-20 with the owner: "Your week, in one
 card." misdescribed a screen showing several weeks; "Curate it. Share it (or
 don't)." read as a joke; YouTube key moments was dropped as a detail, not a
-reason to download; capture was missing from the set entirely.
+reason to download; capture was missing from the set entirely. Shot 7 was
+redone the same day: a single collection didn't read as "a collection of
+cards", and the owner asked for eight collections with one suggested.
+
+Demo data behind shot 7 (`machinareviewer`): 25 YouTube talks and explainers
+imported through the app's own Import → Paste links (real pipeline, all
+analyzed), filed into five new collections (Sleep better, Talks to rewatch,
+Focus, Fitness, Happiness) plus the existing two, with descriptions and
+palette colors set on all seven. The Japan Travel suggestion is the real
+clusterer's output once the Inside Kyoto itinerary card carries the accurate
+"japan travel" tag (added by hand). Longevity, Psychology, Mindset and
+Productivity were dismissed with the tile's ✕, so the suggestion
+on screen is the only one.
 
 Files (not in git, 52 MB): the session worktree's
 `app-store-screenshots/final/`. **Upload exactly `upload/`**:
