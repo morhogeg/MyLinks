@@ -240,8 +240,21 @@ export function useLinkActions(
             return;
         }
         const shareId = link.shareId || newShareId();
-        // Start the publish, but do NOT await it before opening the sheet.
         const publishPromise = publishCard(uid, link, shareId);
+        // First share: the page must exist BEFORE the sheet opens. WhatsApp on
+        // iOS fetches the link the moment the recipient is picked, on the
+        // sender's phone, and never retries — a page still being published
+        // goes out as a bare link. A card that already has a page (shareId is
+        // written by the server only once the page is live) keeps the instant
+        // sheet; its republish runs behind it.
+        if (!link.shareId) {
+            try {
+                await publishPromise;
+            } catch {
+                toast.error("Couldn't create a share link. Please try again.");
+                return;
+            }
+        }
 
         const outcome = await shareLink(
             shareUrlFor(`/s?id=${shareId}`),
@@ -259,8 +272,8 @@ export function useLinkActions(
                 toast.error("Couldn't create a share link. Please try again.");
             }
         } else if (outcome === 'shared') {
-            // Sheet opened instantly; the publish is racing the user. Warn only
-            // if it loses (otherwise the shared link would 404).
+            // On a re-share the republish ran behind the sheet; warn only if it
+            // failed (on a first share it already landed, so this is a no-op).
             publishPromise.catch(() =>
                 toast.error("The share link may not work. Please try sharing again.")
             );
