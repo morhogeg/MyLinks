@@ -2721,6 +2721,22 @@ exact-match, capped.
   **SHIPPED** as merge `94a16d7`: Vercel (auto), TestFlight run #376 =
   **build 1376**.
 
+- **2026-10-20 — APP STORE SCREENSHOTS + CREATIVE; TEST SUB MOVED ACCOUNTS.**
+  Six 6.9-inch screenshots captured on an iPhone 17 Pro Max simulator
+  (local Debug build; GoogleService-Info.plist from Firebase, not committed)
+  signed into `machinareviewer`: feed, Ask with 3 cited sources, card detail
+  with related cards, YouTube key moments, Revisit "Do this", Wellness
+  collection. §4's share-sheet shot skipped (phone only) and the synthesis
+  shot swapped for Revisit: the account has no `syntheses` docs yet. Also a
+  universal header/search-results creative (16:9 5244×2950 + 21:9 and 3:2
+  crops; Apple creative-assets specs). Files live in the session worktree's
+  `app-store-screenshots/` (not committed). **Finding:** on 2026-10-19 12:06
+  UTC the TestFlight test subscription TRANSFERRED from `machinareviewer` to
+  the owner's account (RevenueCat transfer on a purchase/restore made while
+  signed into the owner account), now Yearly; owner stays on the owner grant.
+  So renewals no longer touch `machinareviewer`, and it was hand-set to a
+  14-day trial (ends 2026-11-03, stored-end form). Submit-day prep still
+  needs a fresh trial + clearing `aiConsentAt`.
 - **2026-10-19 — GEMINI KEY ROTATED (task 5, half done).** Owner minted a
   new key in the paid project `gen-lang-client-0057642876` (2nd brain),
   updated the `GEMINI_API_KEY` repo secret, a session redeployed all functions
