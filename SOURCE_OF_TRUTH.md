@@ -2686,8 +2686,9 @@ exact-match, capped.
 
 - **2026-10-21 (later) — SCALE CHECK: SEARCH CAP 10 → 50, ERROR ALERTS LIVE
   (owner: "if I launch today, is the backend ready?").** Answer: yes to
-  ~200 active users; the binding limit is the Gemini spend cap (₪500, sized
-  for ~200; owner is raising it). Code: `search_links_http` and the
+  ~200 active users; the binding limit was the Gemini spend cap (₪500, sized
+  for ~200). **Owner raised it to ₪1,000 the same day**: ≈1,000 typical
+  active users (≈$0.20/mo each), ≈400 if every account maxed its quota. Code: `search_links_http` and the
   `search_links` callable `max_instances` 10 → **50** (concurrency 1, and the
   one endpoint serves typed search, the Related list on every card open and
   the graph, so it was the first cap a crowd would hit). Monitoring (created
