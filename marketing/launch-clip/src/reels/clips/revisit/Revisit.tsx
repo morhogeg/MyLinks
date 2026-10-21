@@ -1,8 +1,9 @@
 import React from 'react';
 import { AbsoluteFill } from 'remotion';
-import { BAND, CREEP, GLIDE, HITS, OPEN, OPENING, READS, TAKE, USE } from '../../../../clips/revisit-timeline.mjs';
+import { APP_SPEED, BAND, CREEP, GLIDE, HITS, OPEN, OPENING, READS, TAKE } from '../../../../clips/revisit-timeline.mjs';
 import { POINT_R } from './Opening';
-import { AppShot, Lift, Tap } from '../../kit/AppShot';
+import { AppShot, Tap } from '../../kit/AppShot';
+import { Lift } from './light/Lift';
 import { camAt, camVelocity, type Key } from '../../kit/camera';
 import { EASE_IN_OUT, EASE_MODAL, EASE_SPRING, mix, prog } from '../../kit/curves';
 import { steppedScroll } from '../../kit/scroll';
@@ -72,6 +73,7 @@ const TAB = at(T, 'tab');
 const dueRow = rectOf(T, TAB, 'dueRow');
 /** (round 5) the reminder's sheet and the opened save */
 const SHEET = at(T, 'sheet');
+const sheetBox = rectOf(T, SHEET, 'sheet');
 const bellBtn = rectOf(T, SHEET, 'bell');
 const smartRow = rectOf(T, SHEET, 'smart');
 const closeBtn = rectOf(T, SHEET, 'close');
@@ -109,7 +111,12 @@ const WIDE = { cx: 196.5, cy: 560, z: 2.3, fx: 540, fy: TOP - 20 + (560 - 280) *
  *  header, its current reminder and Smart review just under the band; the
  *  opened save from its title, then its Key Points */
 const BASE = { cx: 196.5, cy: 340, z: 2.4, fx: 540, fy: TOP - 30 + (340 - 124) * 2.4 };
-const SHEET_CAM = { cx: 196.5, cy: 340, z: 2.5, fx: 540, fy: TOP + (340 - 200) * 2.5 };
+// (light take: a morning capture, so the sheet carries a "Later today" row
+// and stands taller. Framed from its own top, set just inside the band so the
+// app's dimmed backdrop above it stays under the paper (on the light theme it
+// is a grey smudge), and a touch wider so Smart review sits well above the
+// bottom 35% that Reels covers)
+const SHEET_CAM = { cx: 196.5, cy: 340, z: 2.25, fx: 540, fy: 560 + (340 - sheetBox[1]) * 2.25 };
 const SAVE_CAM = { cx: 196.5, cy: 300, z: 2.2, fx: 540, fy: TOP + 10 + (300 - dueTitle[1]) * 2.2 };
 const POINTS_CAM = { cx: 196.5, cy: 480, z: 2.3, fx: 540, fy: TOP + 40 + (480 - keyPoints[1]) * 2.3 };
 
@@ -120,17 +127,17 @@ const keys: Key[] = [
   { f: HITS.settle, rx: 0, ease: EASE_MODAL },
   // (round 5) USE: up to the sheet as it slides in; it holds (a slow push)
   { f: HITS.bell, cy: 342, z: 2.42, ease: linear },
-  { f: HITS.bell + 32, ...SHEET_CAM, ease: EASE_IN_OUT },
-  { f: HITS.cancel, z: 2.56, ease: linear },
+  { f: HITS.bell + 20, ...SHEET_CAM, ease: EASE_IN_OUT },
+  { f: HITS.cancel, z: 2.31, ease: linear },
   // the sheet goes: back to the list
-  { f: HITS.openTap - 8, ...BASE, ease: EASE_IN_OUT },
+  { f: HITS.openTap - 4, ...BASE, ease: EASE_IN_OUT },
   // the save opens: its title and summary, then down to its Key Points
-  { f: HITS.openTap + 40, ...SAVE_CAM, ease: EASE_IN_OUT },
+  { f: HITS.openTap + 24, ...SAVE_CAM, ease: EASE_IN_OUT },
   { f: HITS.keyPoints[0], cy: SAVE_CAM.cy + 4, z: 2.24, ease: linear },
   { f: HITS.keyPoints[1], ...POINTS_CAM, ease: EASE_IN_OUT },
   { f: HITS.back, cy: POINTS_CAM.cy + 6, z: 2.34, ease: linear },
   // back to the list
-  { f: HITS.back + 48, ...BASE, ease: EASE_IN_OUT },
+  { f: HITS.back + 26, ...BASE, ease: EASE_IN_OUT },
   { f: HITS.wide[0], cy: 344, z: 2.44, ease: linear },
   // back a little: the list, the recap below it and where the toast will be
   { f: HITS.wide[1], ...WIDE, ease: EASE_IN_OUT },
@@ -149,14 +156,14 @@ const keys: Key[] = [
   { f: HITS.cardTap, cy: WINDOW_END.cy + GLIDE_CAMERA + 10, z: 2.44, ease: linear },
   // the save opens: the camera eases up and back to the whole card, its
   // title high, its "Do this" low, as the app's transition plays
-  { f: HITS.cardTap + 48, cx: 196.5, cy: 300, z: 2.1, fx: 540, fy: TOP + 10 + (300 - title[1]) * 2.1, ease: EASE_IN_OUT },
-  { f: HITS.out - 16, cy: 316, z: 2.14, ease: linear },
+  { f: HITS.cardTap + 24, cx: 196.5, cy: 300, z: 2.1, fx: 540, fy: TOP + 10 + (300 - title[1]) * 2.1, ease: EASE_IN_OUT },
+  { f: HITS.out - 4, cy: 312, z: 2.12, ease: linear },
   // thrown out of frame, into the lockup
-  { f: HITS.out + 14, fx: -760, z: 2.4, ease: EASE_IN_OUT },
+  { f: HITS.out + 12, fx: -760, z: 2.4, ease: EASE_IN_OUT },
 ];
 
 export const Revisit: React.FC<{ f: number }> = ({ f }) => {
-  if (f > HITS.out + 15 || f < OPENING.iris[0] - OPEN) return null;
+  if (f > HITS.out + 13 || f < OPENING.iris[0] - OPEN) return null;
   // (round 4) the tab arrives through the opening's point: an iris from the
   // point's own size, centred on the screen point the first camera puts
   // under it (Opening.tsx POINT)
@@ -167,9 +174,9 @@ export const Revisit: React.FC<{ f: number }> = ({ f }) => {
   // per output frame); the page, scrolled; the save, opening (60fps)
   const scrolled = scrollAt(f);
   const scroll = recap.view(scrolled);
-  // (round 5) USE: each app transition plays from the frame the app first
-  // answers the tap (+1), one captured 60fps frame per output frame
-  const use = (mark: string, hit: number, n: number) => at(T, mark, Math.min(n - 1, f - hit + 1));
+  // each app transition plays from the frame the app first answers the tap
+  // (+1), at the app's real speed (APP_SPEED captured 60fps frames a frame)
+  const use = (mark: string, hit: number, n: number) => at(T, mark, Math.min(n - 1, APP_SPEED * (f - hit) + 1));
   const i =
     f < HITS.bell
       ? TAB
@@ -179,24 +186,24 @@ export const Revisit: React.FC<{ f: number }> = ({ f }) => {
           ? use('sheetClose', HITS.cancel, 30)
           : f < HITS.back
             ? use('open', HITS.openTap, 41)
-            : f < USE.at + USE.len
+            : f < HITS.tab2
               ? use('back', HITS.back, 41)
               : f < HITS.tick
       ? TAB2
       : f < HITS.travel[1]
         ? // the tick (60fps); its last frame, the toast still up, holds until
           // the camera has left the toast below the frame
-          at(T, 'tick', Math.min(39, f - HITS.tick))
+          at(T, 'tick', Math.min(39, APP_SPEED * (f - HITS.tick)))
         : f < HITS.recapTap
           ? TICKED
           : f < READS[0][0]
-        ? at(T, 'expand', Math.min(35, f - HITS.recapTap))
+        ? at(T, 'expand', Math.min(35, APP_SPEED * (f - HITS.recapTap)))
         : f < HITS.cardTap
           ? scroll.i
-          : f < HITS.cardTap + 39
+          : f < HITS.cardTap + 20
             ? // (the capture's first frame after the click is unchanged: the
               // tap lands on the first frame the app visibly answers, +1)
-              at(T, 'card', f - HITS.cardTap + 1)
+              at(T, 'card', Math.min(39, APP_SPEED * (f - HITS.cardTap) + 1))
             : CARD;
   const reading = f >= READS[0][0] && f < HITS.cardTap;
 
@@ -226,26 +233,26 @@ export const Revisit: React.FC<{ f: number }> = ({ f }) => {
 
   return (
     <AbsoluteFill>
-      <AppShot take={T} i={i} cam={view} motion={motion} iris={iris}>
+      <AppShot take={T} i={i} cam={view} motion={motion} iris={iris} glow={0} shadow={0.45}>
         {f < HITS.tick && due > 0.01 && (
           <Lift take={T} i={i} rect={dueRow} radius={16} lift={due * 0.7} rise={3} grow={0.02} ring={0.55 * due} />
         )}
         {f >= HITS.bell && f < HITS.cancel && smart > 0.01 && (
           <Lift take={T} i={i} rect={smartRow} radius={10} lift={smart * 0.7} rise={3} grow={0.02} ring={0.55 * smart} />
         )}
-        <Tap x={center(bellBtn).x} y={center(bellBtn).y} t={tap(HITS.bell)} />
-        <Tap x={center(closeBtn).x} y={center(closeBtn).y} t={tap(HITS.cancel)} />
-        <Tap x={dueOpen[0] + 70} y={dueOpen[1] + 22} t={tap(HITS.openTap)} />
+        <Tap x={center(bellBtn).x} y={center(bellBtn).y} t={tap(HITS.bell)} tone="dark" />
+        <Tap x={center(closeBtn).x} y={center(closeBtn).y} t={tap(HITS.cancel)} tone="dark" />
+        <Tap x={dueOpen[0] + 70} y={dueOpen[1] + 22} t={tap(HITS.openTap)} tone="dark" />
         {f < HITS.tick && todo > 0.01 && (
           <Lift take={T} i={i} rect={todoRow} radius={14} lift={todo * 0.7} rise={3} grow={0.02} ring={0.55 * todo} />
         )}
         {/* the V60 step's circle: "Mark as done" */}
-        <Tap x={tickRow[0] + 26} y={tickRow[1] + 22} t={tap(HITS.tick)} />
-        <Tap x={bannerTap.x} y={bannerTap.y} t={tap(HITS.recapTap)} />
+        <Tap x={tickRow[0] + 26} y={tickRow[1] + 22} t={tap(HITS.tick)} tone="dark" />
+        <Tap x={bannerTap.x} y={bannerTap.y} t={tap(HITS.recapTap)} tone="dark" />
         {lifted && up > 0.01 && (
           <Lift take={T} i={i} rect={lifted} radius={16} lift={up * 0.8} rise={4} grow={0.03} ring={0.6 * up} />
         )}
-        <Tap x={standoutTap.x} y={standoutTap.y} t={tap(HITS.cardTap)} />
+        <Tap x={standoutTap.x} y={standoutTap.y} t={tap(HITS.cardTap)} tone="dark" />
       </AppShot>
     </AbsoluteFill>
   );

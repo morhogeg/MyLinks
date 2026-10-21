@@ -1,9 +1,10 @@
 import React from 'react';
 import { AbsoluteFill } from 'remotion';
 import { OPENING } from '../../../../clips/revisit-timeline.mjs';
-import { MarkAssembly, SaveChip, type SaveKind } from '../../kit/Brand';
+import type { SaveKind } from '../../kit/Brand';
+import { MarkAssembly, SaveChip } from './light/Brand';
+import { DAY } from './light/Paper';
 import { EASE_GATHER, EASE_IN_OUT, EASE_MODAL, EASE_SPRING, mix, prog } from '../../kit/curves';
-import { NIGHT, typeGlow } from '../../../look';
 
 /**
  * THE OPENING (round 4, owner: "present the issue, then our solutions"): the
@@ -59,8 +60,7 @@ const chipAt = (k: number, f: number) => {
   const b = prog(f, O.bleach, O.bleach + 30, EASE_MODAL) * (1 - prog(f, O.gather[0] - 8, O.gather[1] - 4, EASE_IN_OUT));
   return {
     x: POINT.x + (c.x - POINT.x) * push * (1 - g),
-    // (night look: lit and nearly sharp on frame 0, the poster; the focus
-    // pull is the last 3px)
+    // (nearly sharp on frame 0, the poster; the focus pull is the last 3px)
     y: POINT.y + ((c.y - POINT.y) * push + (1 - arrive) * 12 * c.s) * (1 - g),
     s: c.s * push * mix(0.95, 1, arrive) * mix(1, 0.06, Math.pow(g, 0.7)),
     r: c.r * (1 - g) + g * (k % 2 ? 16 : -16),
@@ -97,7 +97,7 @@ export const Opening: React.FC<{ f: number }> = ({ f }) => {
                   top: p.y,
                   transform: `translate(-50%, -50%) rotate(${p.r}deg) scale(${p.s})`,
                   opacity: p.o * alpha,
-                  filter: [p.blur > 0.2 ? `blur(${p.blur.toFixed(2)}px)` : '', p.grey > 0.01 ? `grayscale(${p.grey.toFixed(3)}) brightness(${(1 - 0.45 * p.grey).toFixed(3)})` : ''].join(' ').trim() || undefined,
+                  filter: [p.blur > 0.2 ? `blur(${p.blur.toFixed(2)}px)` : '', p.grey > 0.01 ? `grayscale(${p.grey.toFixed(3)})` : ''].join(' ').trim() || undefined,
                 }}
               >
                 <SaveChip kind={c.kind} title={c.title} />
@@ -109,7 +109,7 @@ export const Opening: React.FC<{ f: number }> = ({ f }) => {
       {/* the landing: a lift of white light */}
       <AbsoluteFill
         style={{
-          background: `radial-gradient(38% 22% at 50% ${(POINT.y / 1920) * 100}%, rgba(225,232,255,${(0.85 * flash).toFixed(3)}) 0%, rgba(${NIGHT.glow},${(0.3 * flash).toFixed(3)}) 30%, rgba(${NIGHT.glow},0) 65%)`,
+          background: `radial-gradient(38% 22% at 50% ${(POINT.y / 1920) * 100}%, rgba(255,255,255,${(0.9 * flash).toFixed(3)}) 0%, rgba(255,255,255,0) 70%)`,
         }}
       />
 
@@ -122,7 +122,7 @@ export const Opening: React.FC<{ f: number }> = ({ f }) => {
             top: POINT.y,
             transform: 'translate(-50%, -50%)',
             opacity: 1 - part,
-            filter: `drop-shadow(0 0 ${22 + flash * 34}px rgba(${NIGHT.glow},${(0.32 + flash * 0.4).toFixed(3)}))`,
+            filter: `drop-shadow(0 ${10 + flash * 10}px ${30 + flash * 40}px rgba(24,32,48,${(0.22 + flash * 0.2).toFixed(3)}))`,
           }}
         >
           <MarkAssembly close={Math.max(0, close * (1 - part * 0.35))} dot={0} width={MARK_W} />
@@ -139,9 +139,9 @@ export const Opening: React.FC<{ f: number }> = ({ f }) => {
             width: dotR * 2,
             height: dotR * 2,
             borderRadius: '50%',
-            background: NIGHT.ink,
+            background: DAY.mark,
             transform: `translate(-50%, -50%) scale(${dot})`,
-            boxShadow: `0 0 ${18 + flash * 30}px ${4 + flash * 6}px rgba(${NIGHT.glow},${(0.45 + flash * 0.35).toFixed(3)})`,
+            boxShadow: `0 ${8 + flash * 8}px ${26 + flash * 30}px rgba(24,32,48,${(0.3 + flash * 0.2).toFixed(3)})`,
             opacity: 1 - prog(f, O.iris[0], O.iris[0] + 8, EASE_MODAL),
           }}
         />

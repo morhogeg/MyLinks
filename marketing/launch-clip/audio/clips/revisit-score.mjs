@@ -4,9 +4,10 @@
  *   node audio/mix-vo.mjs revisit       →  public/clips/revisit/score-vo.wav
  *
  * The opening's saves lost in the dark; the light as they gather into the
- * point and iris into Revisit; the reminders drive; the weekly recap is CALM
- * (it is read, never rushed); the standout lifts back into the drive; the
- * lockup lands it. HITS are app frames: clip frame = HITS + OPEN.
+ * point and iris into Revisit; the app DRIVES from the first reminder to the
+ * recap (2026-10-21, owner: "too slow, make it more engaging": the recap was
+ * calm, it now keeps the drive on the quicker 128.6 BPM grid); the Standout
+ * lifts into the peak; the lockup lands it. HITS are app frames: clip frame = HITS + OPEN.
  */
 import * as T from '../../clips/revisit-timeline.mjs';
 import { writeScore } from '../score-lib.mjs';
@@ -25,8 +26,7 @@ writeScore({
     { from: 0, kind: 'dark' },
     { from: T.OPENING.gather[0], kind: 'turn' },
     { from: c(H.settle), kind: 'drive' },
-    { from: c(H.rise[0]), kind: 'calm' },
-    { from: c(H.standout), kind: 'drive' },
+    { from: c(H.standout), kind: 'peak' },
     { from: c(H.out), kind: 'end' },
   ],
   hits: {

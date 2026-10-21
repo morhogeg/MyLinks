@@ -2973,6 +2973,23 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-21 — REVISIT clip: the quick cut, in the light look.** Branch
+  `claude/night-revisit` (from `claude/videos-new-look`), NOT merged, NOT
+  posted. Owner: "pacing is too slow, make it more engaging" and "make this
+  in light mode". 56.5s → 40.6s with every line and story beat kept: a 128.6
+  BPM grid, the narrator 10% quicker (`tempo` 1.1 on the same Gemini takes,
+  nothing re-voiced), lines back to back, the app at its real speed (it
+  played at half speed), the recap scored in the drive instead of calm.
+  REVISIT alone is light: the kit's light-grade pieces copied into
+  `src/reels/clips/revisit/light/`, so the shared kit and the other eight
+  films stay on the night set (no shared code changed). The take is re-shot in
+  the app's light theme (`CAPTURE_THEME=light CAPTURE_ONLY=revisitClip`); it
+  was a morning capture, so the reminder sheet now has a real "Later today"
+  row (dates read Oct 21). `takes.json` changes only in its `revisitClip`
+  entry; a full re-capture without `CAPTURE_THEME=light` would shoot it dark
+  again. Verified: `npx tsc --noEmit`, the REVISIT section of
+  `audio/verify.mjs` (the full verify needs every film's score, not built in
+  this container), the dwell rule, −14.0 LUFS.
 - **2026-10-05/06 — ALL NINE FILMS RE-CUT IN A NEW LOOK ("the night look").
   Branch `claude/videos-new-look`, NOT merged, NOT posted.** Owner, via
   /onboard: re-edit every current video to an Apple product-film standard,

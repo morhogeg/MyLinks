@@ -2,7 +2,7 @@ import React from 'react';
 import { AbsoluteFill } from 'remotion';
 import { CAPTIONS, FPS, HITS, OPEN, TOTAL_FRAMES } from '../../../../clips/revisit-timeline.mjs';
 import VO from './vo.json';
-import { Lockup } from '../../kit/Brand';
+import { Lockup } from './light/Brand';
 import { prog } from '../../kit/curves';
 
 /**
