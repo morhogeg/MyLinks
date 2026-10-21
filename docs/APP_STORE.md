@@ -229,11 +229,12 @@ this list:
 > You save things all day: links, screenshots, videos, articles you meant to finish. Then you never open them again. Machina changes that.
 >
 > Share anything to Machina from any app. Each save becomes a card with a summary, tags, and connections to what you saved before.
+>
 > Ask about anything you saved, and Machina answers with the exact saves it used.
 >
 > Save from anywhere
 > • Any app: tap Share, pick Machina
-> • Screenshots are analyzed and categorized
+> • Screenshots, analyzed and categorized
 > • Links and notes, pasted or typed
 >
 > Find it again
@@ -255,7 +256,7 @@ CAPS, which shouted at phone width. Every bullet fits one line at phone width
 story: save, find, bring back. Dropped: personal notes on cards and publishing
 a collection as a page (real features, cut for length). Owner edits before
 it went live: "clean" dropped from the card line, the screenshot bullet now
-says they are analyzed and categorized (was "up to five per card"), "next
+reads "Screenshots, analyzed and categorized" (was "up to five per card"), "next
 step" became "action item", and the account-deletion sentence was cut from
 the close (deletion stays in Settings and the privacy policy). The notes history
 below explains the old two-bullet split; "Links and notes, pasted or typed"
