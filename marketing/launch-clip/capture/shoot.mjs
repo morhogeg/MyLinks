@@ -494,33 +494,11 @@ const takes = {
     t.mark('tab');
     await t.snap({ rects: RECAP });
 
-    // (clip round 5, owner: "show the usefulness") the due save's bell: its
-    // reminder's own sheet, Smart review (a day, a week, a month: "1 of 3"),
-    // then closed with its X (in frame, where Cancel is not)
-    const SHEET = {
-      sheet: ['[role=dialog]'],
-      current: ['[role=dialog] div[class*="bg-accent/10"]'],
-      smart: ['[role=dialog] button[role=radio]', 'Smart review'],
-      close: ['[role=dialog] button[aria-label="Close"]'],
-      bell: ['button[aria-label^="Change the reminder"]'],
-    };
-    await t.freeze();
-    await visible(page.locator('button[aria-label^="Change the reminder"]')).click();
-    t.mark('bell');
-    await t.roll(40, { rects: SHEET, step: 1000 / 60 });
-    await t.thaw();
-    await page.waitForTimeout(600);
-    t.mark('sheet');
-    await t.snap({ rects: SHEET });
-    await t.freeze();
-    await visible(page.locator('[role=dialog] button[aria-label="Close"]')).click();
-    t.mark('sheetClose');
-    await t.roll(30, { rects: SHEET, step: 1000 / 60 });
-    await t.thaw();
-    await page.waitForTimeout(700);
-
-    // …and the save itself, opened: it comes back as its point (the summary,
-    // the key points), then back to Revisit
+    // (light revisit, 2026-10-21: owner, "not clear enough") the order the
+    // story is told in: the save that came due is OPENED first (its summary,
+    // its Key Points), then its bell sets when it comes back next (This
+    // weekend, then Save: the app's own toast; the save leaves "Due now"),
+    // then the V60 step is ticked off
     const DUE = {
       dialog: R.dialog,
       dueTitle: ['h2', 'Four Thousand Weeks'],
@@ -545,10 +523,50 @@ const takes = {
     t.mark('tab2');
     await t.snap({ rects: RECAP });
 
-    // (clip round 3) the V60 step, ticked off: the app's own "Marked as done"
+    const SHEET = {
+      sheet: ['[role=dialog]'],
+      current: ['[role=dialog] div[class*="bg-accent/10"]'],
+      smart: ['[role=dialog] button[role=radio]', 'Smart review'],
+      later: ['[role=dialog] button[role=radio]', 'Later today'],
+      weekend: ['[role=dialog] button[role=radio]', 'This weekend'],
+      save: ['[role=dialog] button', 'Save'],
+      close: ['[role=dialog] button[aria-label="Close"]'],
+      bell: ['button[aria-label^="Change the reminder"]'],
+      toast: ['[role=status]', 'Reminder set'],
+    };
+    await t.freeze();
+    await visible(page.locator('button[aria-label^="Change the reminder"]')).click();
+    t.mark('bell');
+    await t.roll(40, { rects: SHEET, step: 1000 / 60 });
+    await t.thaw();
+    await page.waitForTimeout(600);
+    t.mark('sheet');
+    await t.snap({ rects: SHEET });
+    await t.freeze();
+    await visible(page.locator('[role=dialog] button[role=radio]', { hasText: 'This weekend' })).click();
+    t.mark('weekend');
+    await t.roll(20, { rects: SHEET, step: 1000 / 60 });
+    await t.thaw();
+    await page.waitForTimeout(400);
+    t.mark('picked');
+    await t.snap({ rects: SHEET });
+    await t.freeze();
+    await visible(page.locator('[role=dialog] button', { hasText: /^Save$/ })).click();
+    t.mark('save');
+    await t.roll(60, { rects: { ...SHEET, ...RECAP }, step: 1000 / 60 });
+    await t.thaw();
+    await page.waitForTimeout(400);
+    t.mark('saved');
+    await t.snap({ rects: { ...SHEET, ...RECAP } });
+    // (the toast has gone before the tick)
+    await page.waitForTimeout(6000);
+    t.mark('tab3');
+    await t.snap({ rects: RECAP });
+
+    // the V60 step, ticked off: the app's own "Marked as done"
     // (the row leaves the list, the step stays on its card)
     await t.freeze();
-    await visible(page.locator('div[class*="ps-1.5"]', { hasText: 'Tomorrow morning' }).getByRole('button', { name: 'Mark as done' })).click();
+    await visible(page.locator('div[class*="ps-1.5"]', { hasText: 'Tomorrow morning' }).locator('button[title="Mark as done"]')).click();
     t.mark('tick');
     await t.roll(40, { rects: RECAP, step: 1000 / 60 });
     await t.thaw();
