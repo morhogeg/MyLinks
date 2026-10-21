@@ -88,7 +88,9 @@ export function startServer(port = 4600) {
           return res.end();
         }
         const q = String(body.query ?? '').trim().toLowerCase();
-        const hits = q === SEARCH.query.toLowerCase() ? SEARCH.hits : [];
+        // the reel's query, and every clip query that names its hits
+        const answer = [SEARCH, ...Object.values(SEARCH.clip ?? {})].find((x) => x.hits && x.query.toLowerCase() === q);
+        const hits = answer ? answer.hits : [];
         return json(res, 200, { links: hits.map((id) => ({ id })), mode: 'judge' });
       }
       case '/api/share':

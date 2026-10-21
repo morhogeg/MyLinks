@@ -548,11 +548,15 @@ export const SEARCH = {
   //    other save's title or tags carries any of its words);
   //  - source: where it was saved; the Sources row offers it as you type
   //    (sources match by name only, so the card grid under it is empty),
-  //    and one tap shows every save from there.
+  //    and one tap shows every save from there;
+  //  - takeaway: words again, on a different card (the clip's last search).
   clip: {
     words: { query: 'easy dinner, empty fridge', hits: ['marcella'] },
     close: { query: 'sardinia swim spot', card: 'goloritze' },
     source: { query: 'youtube', source: 'YouTube' },
+    // the takeaway (owner 2026-10-21: not the first search again): one more
+    // own-words query, sharing no word with its one card
+    takeaway: { query: 'red shrine, sunrise', hits: ['fushimi'] },
   },
 };
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { AbsoluteFill } from 'remotion';
-import { DELETE_FRAMES, HITS, RETYPE_FRAMES, TYPE_FRAMES } from '../../../../clips/find-timeline.mjs';
+import { DELETE_FRAMES, HITS, TYPE_FRAMES } from '../../../../clips/find-timeline.mjs';
 import { AppShot, Lift, Tap } from '../../kit/AppShot';
 import { camAt, camVelocity, type Key } from '../../kit/camera';
 import { EASE_IN_OUT, EASE_MODAL, prog } from '../../kit/curves';
@@ -24,9 +24,10 @@ import TAKES from './takes.json';
  *  3.     "youtube": the Sources row offers YouTube as it types; one tap,
  *         and the feed is every video saved.
  *  4.     the first of them tapped open: its gist and its related saves.
- *  the takeaway: the first query typed again and its one card landing again
- *  ("Type what you remember. Get the one you meant."), then thrown out of
- *  frame into the lockup (End.tsx).
+ *  the takeaway: one more search in your own words, its own take
+ *  (`clips/find/takeaway`): "red shrine, sunrise" types and Fushimi Inari
+ *  lands ("Type what you remember. Get the one you meant."), then thrown
+ *  out of frame into the lockup (End.tsx).
  *
  * Emphasis is the reel's (a lift and an ink ring, on the next beat after the
  * app's own arrival, on the settled box). All in OUTPUT frames: a 60fps roll
@@ -36,6 +37,8 @@ import TAKES from './takes.json';
 addTakes(TAKES);
 
 const T = 'clips/find/search';
+/** the takeaway's own take: a fresh Home, one more own-words search */
+const T4 = 'clips/find/takeaway';
 const S = HITS;
 const linear = (t: number) => t;
 
@@ -47,6 +50,7 @@ const STEPS1 = span('clear1', 'typing2');
 const CHARS2 = span('typing2', 'result2');
 const STEPS2 = span('clear2', 'typing3');
 const CHARS3 = span('typing3', 'sources');
+const CHARS4 = at(T4, 'result') - at(T4, 'typing');
 /** the Sources row is offered from the first keystroke; the app's "No
  *  matches" panel under it (sources match by name, cards by content) only
  *  arrives 11 captured frames after the typing: the tap lands before it */
@@ -74,10 +78,10 @@ const frameAt = (f: number) => {
   if (f < S.chipTap) return at(T, 'sources', Math.min(OFFERED, f - typed3));
   if (f < S.cardTap) return at(T, 'filtered', Math.min(35, f - S.chipTap));
   if (f < TAKEAWAY) return at(T, 'detail', Math.min(39, f - S.cardTap));
-  // the takeaway: the first query typed again ("Type what you remember"),
-  // and its one card lands again ("Get the one you meant")
-  if (f < S.refound) return at(T, 'typing1', Math.min(CHARS1 - 1, (f - S.retype) / RETYPE_FRAMES));
-  return at(T, 'result1', Math.min(23, f - S.refound));
+  // the takeaway (its own take, T4): "Type what you remember"…
+  if (f < S.found4) return at(T4, 'typing', Math.min(CHARS4 - 1, (f - S.type4) / TYPE_FRAMES));
+  // …"Get the one you meant"
+  return at(T4, 'result', Math.min(23, f - S.found4));
 };
 
 /**
@@ -101,10 +105,10 @@ const scrollY = (f: number) =>
 /** the beat the narrator reaches "and the saves it connects to" */
 const RELATED = 624;
 /** the takeaway line's first frame: a cut on the beat, from the opened card
- *  back to the field, the first query typed again and its card found again
- *  (owner: the takeaway must not sit on the opened card; 2026-10-21: nor on
- *  an empty field, which showed nothing useful) */
-const TAKEAWAY = S.retype;
+ *  to the field and one more search (owner: the takeaway must not sit on the
+ *  opened card; 2026-10-21: nor on an empty field, which showed nothing
+ *  useful, nor on the first search again) */
+const TAKEAWAY = S.type4;
 
 /** the typing framing: the field just under the caption band, big, with
  *  Done in frame; what each query finds lands whole below it */
@@ -142,9 +146,9 @@ export const searchKeys: Key[] = [
   { f: TAKEAWAY - 1, cy: 646, z: 2.28, ease: linear },
   // CUT (on the beat, with the takeaway line) to the field, typing again…
   { f: TAKEAWAY, ...TYPE_CAM, ease: linear },
-  { f: S.refound, z: 2.76, ease: linear },
-  // …and the card read again, as in 1
-  { f: S.refound + 16, ...READ_CAM, ease: EASE_MODAL },
+  { f: S.found4, z: 2.76, ease: linear },
+  // …and its card read, as in 1
+  { f: S.found4 + 16, ...READ_CAM, ease: EASE_MODAL },
   { f: S.throwOut, z: 2.82, ease: linear },
   // thrown out of frame, into the lockup
   { f: S.lockup + 14, fx: -760, z: 2.36, ease: EASE_IN_OUT },
@@ -170,7 +174,7 @@ export const Search: React.FC<{ f: number }> = ({ f }) => {
     prog(f, S.back1 + 4, S.back1 + 20, EASE_IN_OUT) * (1 - prog(f, S.found2, S.found2 + 10, EASE_MODAL)),
     prog(f, S.back2 + 4, S.back2 + 20, EASE_IN_OUT) * (1 - prog(f, S.chipTap, S.chipTap + 10, EASE_MODAL)),
     // the takeaway's field: sharp from the cut, released as the card lands
-    f >= TAKEAWAY ? 1 - prog(f, S.refound, S.refound + 10, EASE_MODAL) : 0,
+    f >= TAKEAWAY ? 1 - prog(f, S.found4, S.found4 + 10, EASE_MODAL) : 0,
   );
   const open = 1 - prog(f, 0, 16, EASE_MODAL);
   const field = rectOf(T, at(T, 'focus', 8), 'search');
@@ -181,7 +185,10 @@ export const Search: React.FC<{ f: number }> = ({ f }) => {
 
   const marcella = rectOf(T, at(T, 'result1', 23), 'marcella');
   const goloritze = rectOf(T, at(T, 'result2', 23), 'goloritze');
-  const up1 = f >= S.found1 && f < S.clear1 ? lift(f, S.found1) : f >= S.refound ? lift(f, S.refound) : 0;
+  const up1 = f >= S.found1 && f < S.clear1 ? lift(f, S.found1) : 0;
+  const up4 = f >= S.found4 ? lift(f, S.found4) : 0;
+  const take = f >= TAKEAWAY ? T4 : T;
+  const fushimi = rectOf(T4, at(T4, 'result', 23), 'found');
   const up2 = f >= S.found2 && f < S.clear2 ? lift(f, S.found2) : 0;
   // (each Lift stays mounted, at rest, until the screen changes anyway: the
   // lifted copy is its own raster, and removing it on a still frame measured
@@ -193,7 +200,7 @@ export const Search: React.FC<{ f: number }> = ({ f }) => {
   return (
     <AbsoluteFill>
       <AppShot
-        take={T}
+        take={take}
         i={i}
         cam={cam}
         motion={motion}
@@ -202,8 +209,9 @@ export const Search: React.FC<{ f: number }> = ({ f }) => {
       >
         {/* each pad lands (t 0.35) on the frame the app responds and the tick sounds */}
         <Tap x={tapField.x} y={tapField.y} t={prog(f, S.fieldTap - 10, S.fieldTap + 18, linear)} />
-        {((f >= S.found1 + 16 && f < S.clear1) || f >= S.refound + 16) && <Lift take={T} i={i} rect={marcella} radius={20} lift={Math.max(up1, 0.002)} rise={1.5} grow={0.012} ring={0.75 * up1} />}
+        {f >= S.found1 + 16 && f < S.clear1 && <Lift take={T} i={i} rect={marcella} radius={20} lift={Math.max(up1, 0.002)} rise={1.5} grow={0.012} ring={0.75 * up1} />}
         {f >= S.found2 + 16 && f < S.clear2 && <Lift take={T} i={i} rect={goloritze} radius={20} lift={Math.max(up2, 0.002)} rise={1.5} grow={0.012} ring={0.75 * up2} />}
+        {f >= S.found4 + 16 && <Lift take={T4} i={i} rect={fushimi} radius={20} lift={Math.max(up4, 0.002)} rise={1.5} grow={0.012} ring={0.75 * up4} />}
         {upChip > 0.01 && <Lift take={T} i={i} rect={chip} radius={17} lift={upChip} rise={2} grow={0.04} ring={0.75 * upChip} />}
         <Tap x={center(chip).x} y={center(chip).y} t={prog(f, S.chipTap - 10, S.chipTap + 18, linear)} />
         <Tap x={card[0] + 120} y={card[1] + 40} t={prog(f, S.cardTap - 10, S.cardTap + 18, linear)} />

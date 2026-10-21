@@ -554,7 +554,7 @@ console.log('\n── find clip');
   const onFrame = (i) => T.frames[i].t.map((k) => T.texts[k]);
   const titles = L.CARDS.map((c) => c.title);
   const shownTitles = (i) => titles.filter((x) => onFrame(i).includes(x));
-  for (const q of [Q.words, Q.close, Q.source]) scan('search query', q.query);
+  for (const q of [Q.words, Q.close, Q.source, Q.takeaway]) scan('search query', q.query);
   // 1. your own words
   {
     const card = L.CARDS.find((c) => c.id === Q.words.hits[0]);
@@ -565,6 +565,22 @@ console.log('\n── find clip');
     for (let i = T.marks.result1 + 1; i < T.marks.clear1; i++) {
       const shown = shownTitles(i);
       if (shown.length !== 1 || shown[0] !== card.title) bad.push(`"${Q.words.query}" frame ${i} shows ${JSON.stringify(shown)}`);
+    }
+  }
+  // the takeaway's search (its own take): words again, on a different card
+  {
+    const T4 = takes['clips/find/takeaway'];
+    const q = Q.takeaway;
+    const card = L.CARDS.find((c) => c.id === q.hits[0]);
+    const cardWords = new Set(words([card.title, card.summary, card.tags.join(' '), card.category, card.sourceName, card.note ?? ''].join(' ')));
+    const shared = words(q.query).filter((w) => cardWords.has(w));
+    if (shared.length) bad.push(`"${q.query}" shares ${shared.join(', ')} with "${card.title}"`);
+    if (q.hits[0] === Q.words.hits[0]) bad.push('the takeaway finds the same card as the first search');
+    const on4 = (i) => T4.frames[i].t.map((k) => T4.texts[k]);
+    if (!on4(T4.marks.result - 1).includes(q.query)) bad.push(`the takeaway take never shows "${q.query}" typed whole`);
+    for (let i = T4.marks.result; i < T4.count; i++) {
+      const shown = titles.filter((x) => on4(i).includes(x));
+      if (shown.length !== 1 || shown[0] !== card.title) bad.push(`"${q.query}" frame ${i} shows ${JSON.stringify(shown)}`);
     }
   }
   // 2. close matches

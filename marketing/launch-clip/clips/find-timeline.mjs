@@ -38,9 +38,6 @@ export const onBeat = (f) => Math.round(f / BEAT_FRAMES) * BEAT_FRAMES;
 
 /** frames a typed character stays (K = 2: the capture's 30 a second at 15) */
 export const TYPE_FRAMES = K;
-/** frames a character stays when the takeaway types the first query again
- *  (quicker than the first time: a reminder, typed whole with a beat to spare) */
-export const RETYPE_FRAMES = 1.5;
 /** frames each deleted word stays (a held delete key: faster than typing) */
 export const DELETE_FRAMES = 3;
 
@@ -63,8 +60,8 @@ export const HITS = {
   type3: 464, // 3. "youtube": the Sources row offers YouTube as it types
   chipTap: 496, // one tap: every save from YouTube
   cardTap: 576, // 4. the first of them, opened
-  retype: 688, // the takeaway: the first query typed again, quicker…
-  refound: 736, // …and its one card lands again, on "Get the one you meant"
+  type4: 688, // the takeaway: one more own-words search, "red shrine, sunrise"…
+  found4: 736, // …and its one card lands, Fushimi Inari, on "Get the one you meant"
   throwOut: 768, // thrown out of frame…
   lockup: 784, // …into the lockup
   markStrike: 832, // the mark's point strikes (lockup + 48)

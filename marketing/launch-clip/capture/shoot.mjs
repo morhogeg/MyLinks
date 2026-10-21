@@ -557,6 +557,36 @@ const takes = {
     await t.thaw();
     return t.save();
   },
+
+  // The FIND clip's takeaway ("Type what you remember. Get the one you
+  // meant."): its own take, one more own-words search on a fresh Home (owner
+  // 2026-10-21: not the first search again). Field tapped, the query typed,
+  // its one card found and rolled at 60fps.
+  async findTakeaway() {
+    await fresh();
+    const Q = SEARCH.clip.takeaway;
+    const t = new Take(dev, OUT, 'clips/find/takeaway');
+    const RECTS = { search: R.search, firstCard: R.firstCard, found: ['main article.surface-card', 'Fushimi'] };
+    await t.freeze();
+    await visible(page.getByPlaceholder('Search your saves')).click();
+    t.mark('focus');
+    await t.roll(16, { rects: RECTS, step: 1000 / 60 });
+    t.mark('typing');
+    for (const ch of Q.query) {
+      await page.keyboard.type(ch);
+      await t.advance();
+      await t.snap({ rects: RECTS });
+    }
+    for (let k = 0; !(await page.evaluate(() => [...document.querySelectorAll('main article.surface-card h3')].some((h) => h.textContent.includes('Fushimi')))); k++) {
+      if (k > 300) throw new Error('findTakeaway: never showed the meaning card');
+      await page.waitForTimeout(20);
+      await t.advance(1000 / 60);
+    }
+    t.mark('result');
+    await t.roll(24, { rects: RECTS, step: 1000 / 60 });
+    await t.thaw();
+    return t.save();
+  },
 };
 
 /**
