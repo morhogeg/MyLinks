@@ -890,6 +890,14 @@ nebula cliffs; `scripts/ad-card-shots.mjs`, SVG, no photos), and as the
 lists are lost they fade like old prints (light blur, a trace of colour)
 rather than the text lists' full grey-out. 43.2s.
 
+Round 13 (owner, 2026-10-21): "and Machina reminds you" ended on an
+unnatural lift and did not say what it reminds you of. The line is now
+"Then pick a time, and Machina will remind you to read it.", directed as a
+plain statement with a falling close. Three reads were voiced in one run (the
+request's `takes`, keyed exactly as the script line would be); the one used
+falls steadily through "to read it" (about 200 to 150 Hz), where the others
+rose on "it" or paused after "time". 43.2s.
+
 **The Meta spec, and how the ad meets it.** 43.7s (owner, round 5: about
 30–35s; round 6's slower reminder took it over; verify notes over 35s and
 fails over 45s). Frame 0 is a legible picture with the
