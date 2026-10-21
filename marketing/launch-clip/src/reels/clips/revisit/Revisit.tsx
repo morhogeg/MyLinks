@@ -230,7 +230,7 @@ export const Revisit: React.FC<{ f: number }> = ({ f }) => {
       : f < HITS.save + 8
         ? {
             rect: mixRect(weekendRow, saveBtn, prog(f, HITS.weekend + 6, HITS.save - 6, EASE_IN_OUT)),
-            on: prog(f, HITS.weekend - 20, HITS.weekend - 6) * (1 - prog(f, HITS.save + 1, HITS.save + 7)),
+            on: prog(f, HITS.weekend - 20, HITS.weekend - 6) * (1 - prog(f, HITS.save, HITS.save + 3)),
             radius: f < HITS.weekend + 6 ? 6 : 12,
           }
         : { rect: tickRow, on: prog(f, HITS.todo[0] + 8, HITS.todo[1] + 8) * (1 - prog(f, HITS.tick + 2, HITS.tick + 8)), radius: 6 };

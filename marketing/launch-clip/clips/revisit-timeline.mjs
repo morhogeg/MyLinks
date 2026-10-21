@@ -90,7 +90,7 @@ export const HITS = {
   bell: 216, // its bell: the reminder's sheet slides up
   weekend: 280, // "This weekend", tapped
   save: 304, // Save: the sheet goes, the toast confirms, the save leaves "Due now"
-  todo: [324, 348], // up to the "Do this" list; the spotlight moves to the V60 step
+  todo: [312, 336], // up to the "Do this" list; the spotlight moves to the V60 step
   tick: 440, // …ticked off: "Marked as done"
   // ── the approved cut, from here
   travel: [320 + K, 352 + K], // into the reading window, the toast left below the frame
