@@ -1,10 +1,29 @@
 {
   "_": "Voice narration on GitHub with Gemini TTS (.github/workflows/narration-tts.yml). Edit, commit, push: the workflow voices what is listed and commits the takes to audio/vo-takes/. `scripts`: synth-vo.py scripts to voice in `voice`. Bump `run` to re-run with no other change. Voice each line once (the daily quota is shared).",
-  "run": 1,
+  "run": 2,
   "voice": "Sulafat",
   "model": "gemini-3.8-flash-tts",
-  "scripts": ["find"],
-  "takes": [],
+  "scripts": [],
+  "takes": [
+    {
+      "name": "find-connects-a",
+      "voice": "Sulafat",
+      "text": "Open it for the summary, and everything it connects to.",
+      "style": "Interested, opening up at the end. \"it connects to\" is one smooth, flowing phrase: no catch, no restart, no break before \"to\". Pace: Crisp and efficient, about 160 words a minute; the opening question given a real beat. The product name \"Machina\" is the Latin word, said the classical Latin way: MAH-kee-nah, stress on the FIRST syllable; \"ch\" is a hard \"k\"; open vowels, \"a\" as in \"father\" (not as in \"cat\"), a short \"ee\", and a clear \"ah\" at the end, not \"nuh\". Never mah-KEE-nah."
+    },
+    {
+      "name": "find-connects-b",
+      "voice": "Sulafat",
+      "text": "Open it for the summary, and everything it connects to.",
+      "style": "Warm and interested, one easy unbroken breath to the end; \"everything it connects to\" glides together, every consonant clean. Pace: Crisp and efficient, about 160 words a minute; the opening question given a real beat. The product name \"Machina\" is the Latin word, said the classical Latin way: MAH-kee-nah, stress on the FIRST syllable; \"ch\" is a hard \"k\"; open vowels, \"a\" as in \"father\" (not as in \"cat\"), a short \"ee\", and a clear \"ah\" at the end, not \"nuh\". Never mah-KEE-nah."
+    },
+    {
+      "name": "find-connects-c",
+      "voice": "Sulafat",
+      "text": "Open it for the summary, and everything it connects to.",
+      "style": "Interested and relaxed, opening up at the end; say \"connects to\" fluidly, as if it were one word, and land softly on \"to\". Pace: Crisp and efficient, about 160 words a minute; the opening question given a real beat. The product name \"Machina\" is the Latin word, said the classical Latin way: MAH-kee-nah, stress on the FIRST syllable; \"ch\" is a hard \"k\"; open vowels, \"a\" as in \"father\" (not as in \"cat\"), a short \"ee\", and a clear \"ah\" at the end, not \"nuh\". Never mah-KEE-nah."
+    }
+  ],
   "audition": [],
   "name_variants": []
 }
