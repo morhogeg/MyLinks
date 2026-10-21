@@ -228,26 +228,41 @@ this list:
 
 > You save things all day: links, screenshots, videos, articles you meant to finish. Then you never open them again. Machina changes that.
 >
-> Share anything to Machina from any app. Each save becomes a card with a summary, tags, and connections to what you saved before.
->
-> Ask about anything you saved, and Machina answers with the exact saves it used.
->
-> Save from anywhere
-> • Any app: tap Share, pick Machina
-> • Screenshots, analyzed and categorized
-> • Links and notes, pasted or typed
+> Share anything to Machina from any app:
+> A long video becomes a few key points.
+> A screenshot turns into searchable text.
+> A how-to article becomes your next step.
+> And it all connects to what you saved.
 >
 > Find it again
-> • Search by meaning, not just keywords
-> • Related saves, linked automatically
-> • Collections that Machina suggests for you
+> • Ask a question, get answers from your saves
+> • Search by meaning, not exact words
+> • Collections that build themselves
 >
 > Bring it back
-> • Reminders that resurface a save
-> • A weekly synthesis of what you saved
-> • A clear action item from each save
+> • A reminder when it's time to revisit
+> • A weekly synthesis of what you learned
+> • A to-do list built from your saves
 >
 > Private by design. No ads, no tracking, and your content is never used to train AI models.
+
+**Final version, live 2026-10-21 (owner-approved after many rounds).** What
+it settled, so later edits keep it:
+- **No "Save from anywhere" section.** The second paragraph already is the
+  save pitch; every capture bullet tried (app names, batch screenshots, notes,
+  "pasted or typed") either repeated it or claimed something too narrow.
+- **The second paragraph is one line per transformation**, each 40 characters
+  or less, so nothing wraps at phone width: no sentence-opening "A" stranded at
+  a line end and no "how-to" split at its hyphen. Keep every line in that block
+  under ~41 characters. Alternating "becomes / turns into" is the owner's choice.
+- **"How-to article", not "an article"**: Machina only writes an action item
+  when a save holds something to do, so "an article becomes your next step"
+  would overpromise.
+- **Bullets are benefits, one line each.** "Search by meaning" (not "Find…",
+  which doubled the heading); "A to-do list built from your saves" is how
+  Revisit's Do this list reads, and avoids repeating "your next step".
+- "Collections that build themselves" matches screenshot 5's caption; strictly,
+  Machina suggests and the user taps Create.
 
 **Rewritten 2026-10-21 (owner: the old one "looks TERRIBLE" in App Store
 Connect's preview).** About 40% shorter. Sentence-case headings instead of ALL
