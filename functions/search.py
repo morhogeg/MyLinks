@@ -2220,7 +2220,7 @@ def clamp_search_limit(raw, default: int = 10, cap: int = 50) -> int:
     return max(1, min(limit, cap))
 
 
-@https_fn.on_call(max_instances=10)
+@https_fn.on_call(max_instances=50)  # matches search_links_http (main.py)
 def search_links(req: https_fn.CallableRequest) -> Any:
     """
     Callable Function: Perform semantic search.

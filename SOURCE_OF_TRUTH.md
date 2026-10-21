@@ -2684,6 +2684,28 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-21 (later) — SCALE CHECK: SEARCH CAP 10 → 50, ERROR ALERTS LIVE
+  (owner: "if I launch today, is the backend ready?").** Answer: yes to
+  ~200 active users; the binding limit is the Gemini spend cap (₪500, sized
+  for ~200; owner is raising it). Code: `search_links_http` and the
+  `search_links` callable `max_instances` 10 → **50** (concurrency 1, and the
+  one endpoint serves typed search, the Related list on every card open and
+  the graph, so it was the first cap a crowd would hit). Monitoring (created
+  via the Monitoring API from owner ADC, emailed to the existing "Mor's
+  Gmail" channel that the uptime alert uses): **"Machina: backend errors
+  (5xx)"** (>3 in 10 min per function; baseline was 1 in the last 7 days),
+  **"Machina: requests turned away (429)"** (>25 in 10 min per function;
+  baseline 0), **"Machina: Gemini or Firestore quota exhausted"** (log match
+  on `RESOURCE_EXHAUSTED|spending cap` in function stderr, at most one email
+  per 30 min; 0 hits in the last 30 days). Note: our Python logs land in
+  `run.googleapis.com/stderr` with NO severity, so log alerts must match
+  text, never `severity>=ERROR`. **Verified:** policies listed back
+  enabled with the channel; the log filter ran clean against 30 days;
+  py_compile; pytest 1,941 passed. **Not verified:** a test fire (writing a
+  fake log line to prod was declined), so the first real email is the proof.
+  Seen in passing, not investigated: `rebuild-connections` callable logs
+  "The default Firebase app does not exist" on token verification (a few a
+  day), and one "Invalid APNs credential" push failure today.
 - **2026-10-21 — USAGE DATA OFF THE PRIVACY LABEL (owner: the App Store
   "Data Linked to You" box looked heavier than Notion's).** Machina actually
   declares fewer kinds of data than Notion (6 categories vs Notion's 5 linked +
