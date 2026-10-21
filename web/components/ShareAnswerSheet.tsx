@@ -10,7 +10,6 @@ import { publishAnswer, unpublishAnswer, resolveShareableSources, PublicAnswerSo
 import { shareLink, shareUrlFor, openExternal, copyToClipboard } from '@/lib/share';
 import { useToast } from '@/components/Toast';
 import { useVisualViewport } from '@/lib/useVisualViewport';
-import { track } from '@/lib/analytics';
 import { useScrollLock } from '@/lib/useScrollLock';
 import { useSheetDrag, useIsMobile } from '@/lib/useSheetDrag';
 import { getDominantDirection } from '@/lib/rtl';
@@ -142,7 +141,6 @@ export default function ShareAnswerSheet({
                 ungrounded,
             });
             onShareIdChange(id);
-            track('answer_shared', { sources: allowed.shareable.length });
             toast.success(shareId ? 'Public page updated' : 'Your answer is live');
         } catch {
             toast.error("Couldn't publish this answer. Please try again.");

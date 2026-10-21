@@ -7,7 +7,6 @@ import { useAuth } from '@/components/AuthProvider';
 import { useScrollLock } from '@/lib/useScrollLock';
 import { useSheetDrag, useIsMobile } from '@/lib/useSheetDrag';
 import { hapticLight, hapticSuccess, hapticWarning } from '@/lib/haptics';
-import { track } from '@/lib/analytics';
 import { apiUrl, fetchWithTimeout } from '@/lib/api';
 import { appCheckHeaders } from '@/lib/firebase';
 import { authHeaders } from '@/lib/auth';
@@ -166,7 +165,6 @@ export default function ImportSheet({
                     && parsed.links.length > fresh.length + alreadySaved,
                 unusable: parsed.skipped,
             });
-            track('import_scanned', { format: parsed.format, found: fresh.length });
         } catch {
             setNote('That file could not be read. Try exporting it again.');
         } finally {
@@ -244,7 +242,6 @@ export default function ImportSheet({
         if (queued > 0) {
             hapticSuccess();
             setFinished(queued);
-            track('import_completed', { count: queued, format: scanned.format });
             onImported?.(queued);
         }
     };

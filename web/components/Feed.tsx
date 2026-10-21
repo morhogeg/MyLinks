@@ -13,7 +13,6 @@ import Dropdown from './Dropdown';
 import { deleteLink, updateLinkReminder, markLinkReviewed, markTakeawayDone, markTakeawayDismissed, toLink, reminderSnapshot, restoreLinkReminder, snoozeLinkReminder } from '@/lib/storage';
 import { snoozeTarget, whenLabel } from '@/lib/reminderTime';
 import { closedTakeaways, isTakeawayDismissed, isTakeawayDone, openTakeaways } from '@/lib/takeaway';
-import { track } from '@/lib/analytics';
 import { collection, onSnapshot, doc, updateDoc, arrayUnion, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/components/AuthProvider';
@@ -1346,7 +1345,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         markTakeawayDone(uid, link.id, done).then(
             () => {
                 if (!done) return;
-                track('takeaway_done');
                 toast.success('Marked as done', {
                     label: 'Undo',
                     onClick: () => { void markTakeawayDone(uid, link.id, false); },
@@ -1362,7 +1360,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         if (!uid) return;
         markTakeawayDismissed(uid, link.id, true).then(
             () => {
-                track('takeaway_dismissed');
                 toast.success('Removed from Do this', {
                     label: 'Undo',
                     onClick: () => { void markTakeawayDismissed(uid, link.id, false); },
@@ -1379,10 +1376,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         const writes: Promise<void>[] = [];
         if (isTakeawayDone(link)) writes.push(markTakeawayDone(uid, link.id, false));
         if (isTakeawayDismissed(link)) writes.push(markTakeawayDismissed(uid, link.id, false));
-        Promise.all(writes).then(
-            () => { track('takeaway_reopened'); },
-            () => { toast.error('Could not save that. Try again.'); },
-        );
+        Promise.all(writes).catch(() => { toast.error('Could not save that. Try again.'); });
     }, [uid, toast]);
 
     // The card detail's "Not for me" label puts the task back on the list.
@@ -2080,7 +2074,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         try {
             const id = await createCollection(uid, { name: s.name });
             await addLinksToCollection(uid, linkIds, id);
-            track('collection_suggestion_accepted', { cards: linkIds.length });
             toast.success(`Created “${s.name}” with ${linkIds.length} ${linkIds.length === 1 ? 'card' : 'cards'}`);
             // Land the user inside the collection they just made — the natural
             // place to add more or fine-tune via Manage cards.

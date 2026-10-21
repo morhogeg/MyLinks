@@ -8,7 +8,6 @@ import {
     Entitlement, PaywallReason, PAYWALL_EVENT, fetchEntitlement, daysUntil, isPaywallReason, requestPaywall, consumePendingPaywall,
 } from '@/lib/entitlement';
 import { configurePurchases, logOutPurchases } from '@/lib/purchases';
-import { track } from '@/lib/analytics';
 import Paywall from '@/components/Paywall';
 
 /**
@@ -159,7 +158,6 @@ export function EntitlementProvider({ children }: { children: ReactNode }) {
     // through a DOM event; see lib/entitlement.ts requestPaywall.
     const openPaywall = useCallback((reason: PaywallReason = 'manual') => {
         setPaywall({ open: true, reason });
-        track('paywall_shown', { source: reason });
         // The save wall just kept a save as `waiting`: re-read the entitlement
         // so the sheet's "N saves waiting" counts the one that opened it.
         if (reason === 'saves') void refresh();

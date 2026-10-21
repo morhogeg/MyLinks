@@ -10,10 +10,9 @@
 	<array/>
 
 	<!-- Data the app collects. Must match the App Privacy label in App Store
-	     Connect (docs/APP_STORE.md §1, nine types). Everything is stored on the
+	     Connect (docs/APP_STORE.md §1, eight types). Everything is stored on the
 	     app's own Firebase backend, linked to the account, never used for
-	     tracking. Product Interaction is the only Analytics purpose: the app
-	     works the same if those first-party events are never written. -->
+	     tracking, and only for App Functionality (no usage analytics). -->
 	<key>NSPrivacyCollectedDataTypes</key>
 	<array>
 		<!-- Sign-in email (Google / Apple via Firebase Auth). -->
@@ -79,19 +78,6 @@
 			<key>NSPrivacyCollectedDataTypePurposes</key>
 			<array>
 				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
-			</array>
-		</dict>
-		<!-- First-party, content-free events in users/{uid}/analytics_events (web/lib/analytics.ts). -->
-		<dict>
-			<key>NSPrivacyCollectedDataType</key>
-			<string>NSPrivacyCollectedDataTypeProductInteraction</string>
-			<key>NSPrivacyCollectedDataTypeLinked</key>
-			<true/>
-			<key>NSPrivacyCollectedDataTypeTracking</key>
-			<false/>
-			<key>NSPrivacyCollectedDataTypePurposes</key>
-			<array>
-				<string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
 			</array>
 		</dict>
 		<!-- Uncaught errors and stacks in users/{uid}/client_errors (web/lib/errorReporter.ts). -->

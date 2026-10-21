@@ -17,16 +17,20 @@ Top-level answers:
   shared with data brokers):** → **NO.** There are no ads, no analytics SDKs,
   no data sale. Never check "used for tracking" on any item below.
 
-Declare exactly these **9 data types** (across 7 categories — Connect counts
-the types, not the categories, so "9 data types" on the summary screen is the
-correct total). ⚠️ **OWNER, 2026-10-06:** the label published 2026-08-26 has
+Declare exactly these **8 data types** (across 6 categories — Connect counts
+the types, not the categories, so "8 data types" on the summary screen is the
+correct total). ⚠️ **OWNER, 2026-10-21:** Usage Data → Product Interaction was
+REMOVED from the app (the self-hosted analytics pipe was deleted; nothing ever
+read it). Once the build without it is the one on the App Store, untick
+**Usage Data → Product Interaction** in Connect and publish the label; until
+then the live build still writes those events, so keep it declared. ⚠️ **OWNER, 2026-10-06:** the label published 2026-08-26 has
 the first 7 rows only. Add **Purchases → Purchase History** (Machina Pro
 shipped 2026-09-02: RevenueCat receives the purchase receipts, keyed to the
 Firebase auth uid) and **Identifiers → Device ID** (the FCM/APNs push token
 stored on the user doc) in App Store Connect before submitting. The app's
-`PrivacyInfo.xcprivacy` already declares all 9 (launch audit, 2026-10-06). For every one: **Used for Tracking = No** and **Linked to
-user = Yes**. Purpose is **App Functionality** for all of them EXCEPT Product
-Interaction, which is **Analytics** — see the two rows flagged below.
+`PrivacyInfo.xcprivacy` declares the same 8 (Product Interaction removed
+2026-10-21). For every one: **Used for Tracking = No**, **Linked to user =
+Yes**, and Purpose = **App Functionality**.
 
 | Connect data type | Collected? | Linked to user? | Why (justification you can defend) |
 |---|---|---|---|
@@ -35,14 +39,14 @@ Interaction, which is **Analytics** — see the two rows flagged below.
 | **Identifiers → User ID** | Yes | Yes | Firebase Auth UID + workspace ID key all user data (`users/{uid}`). |
 | **User Content → Photos or Videos** | Yes | Yes | Images/screenshots the user explicitly shares into the app (share sheet or in-app add); stored in Cloud Storage, analyzed by Gemini vision. No photo-library access — only items the user hands to the app. |
 | **User Content → Other User-Generated Content** | Yes | Yes | Saved URLs, extracted page text, notes/tags/collections, and Ask Machina questions + chat history. Sent server-side to Google Gemini for analysis. |
-| **Usage Data → Product Interaction** | **Yes** | Yes | ⚠️ CORRECTED 2026-08-26 (was wrongly "No"). `web/lib/analytics.ts` writes first-party, content-free events (app opened, save/ask/export happened) to `users/{uid}/analytics_events`. **Purpose = Analytics**, NOT App Functionality — the app behaves identically if every write fails, so it enables no user-facing feature. |
 | **Diagnostics → Crash Data** | **Yes** | Yes | ⚠️ CORRECTED 2026-08-26 (was wrongly "No"). `web/lib/errorReporter.ts` writes uncaught error messages + stack traces to `users/{uid}/client_errors` (and `/api/client-error` when no workspace resolves). Purpose = App Functionality — Apple lists "diagnosing bugs and troubleshooting" under it. |
 | **Purchases → Purchase History** | **Yes** | Yes | ⚠️ ADDED 2026-10-06 (owner: add in Connect). Machina Pro is an auto-renewable subscription; RevenueCat (`web/lib/purchases.ts`, app user id = Firebase auth uid) and `entitlements/{uid}` hold its state. Purpose = App Functionality. |
 | **Identifiers → Device ID** | **Yes** | Yes | ⚠️ ADDED 2026-10-06 (owner: add in Connect). The FCM/APNs push token (`users/{uid}.fcmTokens`), used only to deliver reminders and digests. Purpose = App Functionality. |
-| **Usage Data — all other subtypes** / **Diagnostics — performance, other** | No | — | Not collected. |
+| **Usage Data (all subtypes, incl. Product Interaction)** / **Diagnostics — performance, other** | No | — | Not collected. Product Interaction was declared 2026-08-26 → 2026-10-21 while `web/lib/analytics.ts` wrote content-free events to `users/{uid}/analytics_events`; that pipe was deleted 2026-10-21 because nothing ever read it, and App Store Connect's own App Analytics covers installs and retention without a label entry. Do not re-add usage events without re-declaring this row. |
 | **Location / Contacts / Health / Financial / Browsing history / Search history** | **No** | — | Never requested or collected. (In-app search queries stay in the session; Ask questions are declared under User Content above.) |
 
-**Why the two corrections (2026-08-26).** Both original rows reasoned about
+**Why the two corrections (2026-08-26; Product Interaction later removed
+2026-10-21, see its row).** Both original rows reasoned about
 THIRD-PARTY SDKs ("no Crashlytics/Sentry", "no analytics SDK"), but Apple's
 question is whether the data is collected at all — self-hosted collection into
 your own Firestore counts, and both pipes are keyed by uid so both are

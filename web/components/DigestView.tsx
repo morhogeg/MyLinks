@@ -5,7 +5,6 @@ import type { ReactNode } from 'react';
 import { CalendarCheck, ChevronRight, ChevronDown, Bell, BellRing, Check, CheckCircle2, CircleSlash, GalleryHorizontalEnd } from 'lucide-react';
 import { CitationGlyph } from '@/components/ui/Wordmark';
 import type { CuratedDigest, WeeklySynthesis, DigestCardRef, UserNote, Link } from '@/lib/types';
-import { track } from '@/lib/analytics';
 import { digestDisplayTitle, digestKindLabel } from '@/lib/digest';
 import { synthesisWeekLabel } from '@/lib/synthesis';
 import { cardThumbnailUrl } from '@/lib/cardThumbnail';
@@ -150,13 +149,6 @@ export default function DigestView({
     takeawayCards = [], onOpenTakeawayCard, onCompleteTakeaway, onDismissTakeaway,
     closedTakeawayCards = [], onReopenTakeaway,
 }: Props) {
-    // The Revisit tab mounts only when the user opens it (Feed swaps it in),
-    // so a mount is a genuine "digest opened" view. Fired once per mount (the
-    // event keeps its historical name so the analytics series stays whole).
-    useEffect(() => {
-        track('digest_opened');
-    }, []);
-
     // Every sidebar group collapses (owner QA: the synthesis chevron should not
     // be the only one). Open by default; only the groups the user has closed are
     // tracked, so a brand-new date bucket appears expanded like the rest.

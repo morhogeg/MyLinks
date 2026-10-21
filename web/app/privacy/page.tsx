@@ -61,7 +61,7 @@ export default function PrivacyPage() {
       <h1 className="mt-6 text-3xl font-semibold tracking-tight text-text">
         Privacy Policy
       </h1>
-      <p className="mt-2 text-sm text-text-muted">Last updated: October 6, 2026</p>
+      <p className="mt-2 text-sm text-text-muted">Last updated: October 21, 2026</p>
 
       <p className="mt-6 leading-relaxed text-text-secondary">
         Machina (&ldquo;we&rdquo;) is a personal knowledge base: you save
@@ -164,13 +164,11 @@ export default function PrivacyPage() {
             removed when you sign out or delete your account.
           </li>
           <li>
-            <span className="text-text">Product usage and diagnostics.</span>{" "}
-            To understand which features are used and to catch crashes, Machina records a small
-            number of first-party, content-free events: that the app was opened, that a save, ask,
-            or export happened, or that an error occurred, with its message and stack trace. These
-            live in your own workspace in our own database. They never include the content of your
-            saves, your titles, addresses, questions, tags, or email, and no third-party analytics
-            service is involved.
+            <span className="text-text">Diagnostics.</span>{" "}
+            When something breaks, Machina records the error, with its message and stack trace, so
+            we can fix it. These records live in your own workspace in our own database, they never
+            include the content of your saves, and no third-party crash or analytics service is
+            involved. Machina does not record which features you use.
           </li>
         </ul>
         <p className="mt-4 leading-relaxed text-text-secondary">

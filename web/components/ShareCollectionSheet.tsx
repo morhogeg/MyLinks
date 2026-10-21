@@ -11,7 +11,6 @@ import { publishCollection, unpublishCollection, isShareStale } from '@/lib/coll
 import { shareLink, shareUrlFor, openExternal, copyToClipboard } from '@/lib/share';
 import { useToast } from '@/components/Toast';
 import { useVisualViewport } from '@/lib/useVisualViewport';
-import { track } from '@/lib/analytics';
 import { useScrollLock } from '@/lib/useScrollLock';
 import { useSheetDrag, useIsMobile } from '@/lib/useSheetDrag';
 
@@ -119,7 +118,6 @@ export default function ShareCollectionSheet({
         setBusy('publish');
         try {
             await publishCollection(uid, collection, memberLinks);
-            track(isPublic ? 'collection_share_updated' : 'collection_shared', { cards: count });
             toast.success(isPublic ? 'Public page updated' : 'Collection is now live');
         } catch {
             toast.error("Couldn't publish the collection. Please try again.");

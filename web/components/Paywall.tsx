@@ -13,7 +13,6 @@ import { useSheetDrag, useIsMobile } from '@/lib/useSheetDrag';
 import { policyUrl, openExternal } from '@/lib/share';
 import { isNativeApp } from '@/lib/api';
 import { hapticLight, hapticSuccess, hapticWarning } from '@/lib/haptics';
-import { track } from '@/lib/analytics';
 import { reportError } from '@/lib/errorReporter';
 import {
     syncEntitlement, warmEntitlementSync, planDate, endsPhrase, daysLeftLabel, calendarDaysUntil, type Entitlement, type PaywallReason,
@@ -196,7 +195,6 @@ export default function Paywall({
             proUntil: null, willRenew: true, billingIssue: false,
         }));
         void sync('purchase');
-        track('paywall_purchase', { ok: true, kind: bought.period });
         hapticSuccess();
         setStage('done');
         doneTimer.current = setTimeout(() => {
@@ -213,7 +211,6 @@ export default function Paywall({
         // entitlement on its own.
         const synced = (await sync(kind)) !== null;
         if (!synced) await onRefresh();
-        track(kind === 'purchase' ? 'paywall_purchase' : 'paywall_restore', { ok: pro, kind: period });
         if (pro && synced) {
             hapticSuccess();
             onClose();
@@ -227,7 +224,7 @@ export default function Paywall({
         } else {
             setNote('Purchase received. It can take a moment to activate.');
         }
-    }, [sync, onRefresh, onClose, period]);
+    }, [sync, onRefresh, onClose]);
 
     const buy = async () => {
         if (!selected || busy) return;

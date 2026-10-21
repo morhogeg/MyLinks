@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'react';
 import { RefreshCw, BarChart3 } from 'lucide-react';
 import { loadStats, LibraryStats, LibraryFacetRequest } from '@/lib/stats';
 import { getCategoryColorStyle } from '@/lib/colors';
-import { track } from '@/lib/analytics';
 import { LargeTitle, SectionHeader, Footnote, List, RowShell, RowText, Chevron } from './primitives';
 
 /**
@@ -231,7 +230,6 @@ export function StatsView({ uid, onOpenFacet, restoreScroll }: {
     // sheet (so Back can land them right here), then hand off to the page.
     const openFacet = (req: LibraryFacetRequest) => {
         savedScrollTop = rootRef.current?.closest('.overflow-y-auto')?.scrollTop ?? null;
-        track('insights_facet_opened', { kind: req.kind });
         onOpenFacet?.(req);
     };
 
@@ -243,7 +241,6 @@ export function StatsView({ uid, onOpenFacet, restoreScroll }: {
             .then((s) => {
                 if (cancelled) return;
                 setStats(s);
-                track('insights_opened', { total: s.total });
             })
             .catch(() => { if (!cancelled) setFailed(true); });
         return () => { cancelled = true; };

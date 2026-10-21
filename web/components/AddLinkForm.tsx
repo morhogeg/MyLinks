@@ -10,7 +10,6 @@ import { authHeaders } from '@/lib/auth';
 import { progressFor } from '@/lib/shareProgress';
 import { stageProgress, type ProcessingStage } from '@/lib/scanPhases';
 import { apiUrl, fetchWithTimeout as apiFetch } from '@/lib/api';
-import { trackSaveSucceeded, trackFirstSave, trackSaveFailed } from '@/lib/analytics';
 import { useVisualViewport } from '@/lib/useVisualViewport';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import { useAuth } from '@/components/AuthProvider';
@@ -107,8 +106,8 @@ const UPLOAD_TIMEOUT_MS = 60_000;
 const MAX_IMAGES = 5;
 
 // A save can fail for a few distinct reasons; we surface an honest message to
-// the user AND record a short, fixed failure category for analytics (never the
-// raw error text). `category` rides on the Error so the catch block can read it.
+// the user, keyed by a short, fixed failure category (never the raw error
+// text). `category` rides on the Error so the catch block can read it.
 type SaveFailReason = 'timeout' | 'network' | 'analyze_failed' | 'save_failed';
 
 const saveError = (message: string, category: SaveFailReason): Error =>
@@ -514,8 +513,6 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
     // success, the form closes, and the user sees ONLY the paywall (free) or
     // one calm line (Pro). Never a failed card, a Retry, or an error toast.
     const finishWaitingSave = (waiting: WaitingSave) => {
-        trackSaveSucceeded('web_form');
-        trackFirstSave();
         hapticSuccess();
         const line = announceWaitingSave(waiting);
         if (line) toast.info(line);
@@ -574,15 +571,12 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
             try {
                 placeholder = startProcessingPlaceholder(uid, formattedUrl, { offline: true });
             } catch (writeErr) {
-                trackSaveFailed('save_failed');
                 reportError(writeErr, 'capture.link.offline');
                 setError(SAVE_COPY.link);
                 toast.error(SAVE_COPY.link);
                 return;
             }
             enqueueWhenOnline(uid, formattedUrl, placeholder.id, placeholder.written);
-            trackSaveSucceeded('web_form');
-            trackFirstSave();
             onLinkAdded();
             hapticSuccess();
             toast.info('Saved offline. Machina will analyze it when you’re back online.');
@@ -603,7 +597,6 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                 const probe = await settleWithin(findLinkIdByUrl(uid, formattedUrl), DEDUPE_PROBE_MS);
                 const existingId = probe.status === 'ok' ? probe.value : null;
                 if (existingId) {
-                    trackSaveFailed('duplicate');
                     toast.info("You already saved this. Opening it now.");
                     setUrl('');
                     setError(null);
@@ -638,7 +631,6 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
             if (ack.status === 'error') {
                 // The placeholder write IS the capture — if it fails, nothing was
                 // saved. Keep the URL in the field so retry is one tap.
-                trackSaveFailed('save_failed');
                 reportError(ack.error, 'capture.link.placeholder');
                 setError(SAVE_COPY.link);
                 toast.error(SAVE_COPY.link);
@@ -651,8 +643,6 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                 // queued, and it shows in the feed already: finish it as an
                 // offline save instead of a stepper stuck at 0% forever.
                 queueStalledSave(uid, formattedUrl, placeholder.id, placeholder.written);
-                trackSaveSucceeded('web_form');
-                trackFirstSave();
                 onLinkAdded();
                 hapticSuccess();
                 toast.info('Saved. Your connection is slow, so Machina will read it in the background.');
@@ -720,7 +710,6 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                 // Retry) takes over — and close cleanly.
                 setLinkCard(null);
                 lastLinkPct.current = 0;
-                trackSaveFailed('network');
                 toast.error("Saved your link, but analysis couldn't start. Tap the card to retry.");
                 setUrl('');
                 setIsExpanded(false);
@@ -729,11 +718,8 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                 return;
             }
 
-            // Durably captured AND queued. Record the save now: even if analysis
-            // later fails, the card survives as a retryable card, so this is the
-            // honest success moment for analytics.
-            trackSaveSucceeded('web_form');
-            trackFirstSave();
+            // Durably captured AND queued: even if analysis later fails, the
+            // card survives as a retryable card.
             onLinkAdded();
 
             if (!isPlainLink) {
@@ -783,7 +769,6 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
             const { id: cardId, written } = startNoteCard(uid, text);
             const ack = await settleWithin(written, NOTE_ACK_MS);
             if (ack.status === 'error') {
-                trackSaveFailed('save_failed');
                 reportError(ack.error, 'capture.note');
                 setError(SAVE_COPY.note);
                 toast.error(SAVE_COPY.note);
@@ -800,8 +785,6 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
             // Saved (queued, if offline). Record and close immediately — the
             // feed streams the note card in via onSnapshot, exactly like any
             // other capture.
-            trackSaveSucceeded('note');
-            trackFirstSave();
             setProgress(100);
             hapticSuccess();
             toast.success(ack.status === 'pending' && typeof navigator !== 'undefined' && navigator.onLine === false
@@ -888,8 +871,6 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
             // finish the video path was cured of (2026-08-01). Close now; the
             // feed's processing card + Firestore pill carry the real ramp until
             // the card actually resolves.
-            trackSaveSucceeded('web_form');
-            trackFirstSave();
             clearImages();
             setIsExpanded(false);
             // No toast: the pill and the card carry the read from here, and a
@@ -897,15 +878,12 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
             hapticSuccess();
             onLinkAdded();
         } catch (err) {
-            // Record a SHORT, FIXED failure category (never raw error text). An
-            // uncategorized error is an unexpected code path → 'analyze_failed',
-            // and its text (a canvas or browser error) is for the reporter, not
-            // the screen; a categorized one already carries plain copy.
+            // An uncategorized error is an unexpected code path: its text (a
+            // canvas or browser error) is for the reporter, not the screen; a
+            // categorized one already carries plain copy.
             const categorized = err instanceof Error && 'category' in err;
-            const category = (categorized ? (err as { category?: SaveFailReason }).category : undefined) ?? 'analyze_failed';
             if (!categorized) reportError(err, 'capture.unexpected');
             const message = categorized ? (err as Error).message : SAVE_COPY.unexpected;
-            trackSaveFailed(category);
             setError(message);
             toast.error(message);
         } finally {
