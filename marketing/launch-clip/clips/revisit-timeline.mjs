@@ -41,18 +41,18 @@ export const TAKE = 'revisitClip';
  * "never"); on "Machina brings them back to you." they gather into the
  * point, the brackets snap round it, and the point opens as an iris onto the
  * Revisit tab. (light revisit, 2026-10-21, owner: "the pacing is too slow")
- * 6.9s, was 8.5s: the lines follow each other without dead air.
+ * 8s, was 8.5s: each line as the narrator read it, a breath between them.
  * Everything after it is the app, whose clock (HITS, READS, CREEP, GLIDE
  * below) starts at OPEN: the scenes read `f - OPEN`, captions and the score
  * are absolute.
  */
-export const OPEN = 208;
+export const OPEN = 240;
 export const OPENING = {
   focus: [0, 24], // the saves come into focus (a soft scatter is already there on frame 0)
-  bleach: 112, // …bleach into the paper on "never"
-  gather: [152, 176], // …gather into one point, landing just after "Machina"
-  snap: 184, // the brackets snap round it: the mark
-  iris: [184, 208], // the point opens onto the Revisit tab
+  bleach: 128, // …bleach into the paper on "never"
+  gather: [184, 208], // …gather into one point, landing just after "Machina"
+  snap: 216, // the brackets snap round it: the mark
+  iris: [216, 240], // the point opens onto the Revisit tab
 };
 
 /**
@@ -79,19 +79,19 @@ export const OPENING = {
  * the one he approved, moved earlier by K: every later event is its old
  * frame minus the old splice (320) plus K.
  */
-export const K = 144;
+export const K = 192;
 
 export const HITS = {
   settle: 16, // the establishing tilt has settled
   due: [0, 24], // the due save is picked out (the spotlight lands on it)
-  openTap: 88, // the due save, tapped: it opens on its summary
-  keyPoints: [112, 136], // down to its Key Points
-  back: 184, // "‹ Revisit": back to the list
-  bell: 216, // its bell: the reminder's sheet slides up
-  weekend: 280, // "This weekend", tapped
-  save: 304, // Save: the sheet goes, the toast confirms, the save leaves "Due now"
-  todo: [312, 336], // up to the "Do this" list; the spotlight moves to the V60 step
-  tick: 440, // …ticked off: "Marked as done"
+  openTap: 104, // the due save, tapped: it opens on its summary
+  keyPoints: [128, 152], // down to its Key Points
+  back: 216, // "‹ Revisit": back to the list
+  bell: 248, // its bell: the reminder's sheet slides up
+  weekend: 312, // "This weekend", tapped
+  save: 336, // Save: the sheet goes, the toast confirms, the save leaves "Due now"
+  todo: [344, 368], // up to the "Do this" list; the spotlight moves to the V60 step
+  tick: 488, // …ticked off: "Marked as done"
   // ── the approved cut, from here
   travel: [320 + K, 352 + K], // into the reading window, the toast left below the frame
   recapTap: 368 + K, // tapped open, in the silence between the lines
@@ -166,23 +166,22 @@ export const TOTAL_SEC = TOTAL_FRAMES / FPS;
  * by Kokoro, which ignores both fields).
  */
 const PACE = 'Unhurried and warm, about 145 words a minute; let sentences breathe.';
-/** (light revisit) the new lines' pace: the owner found the cut slow */
-const PACE_QUICK = 'Natural and easy, about 165 words a minute; no dragging.';
 
 export const CAPTIONS = [
   // THE OPENING: the habit, then the problem (no chapter word: `open`).
-  // (light revisit) the approved takes, a touch quicker (`tempo`)
-  { at: 16, to: 76, open: true, text: 'You save things\nto come back to later.', style: 'Warm and knowing, gentle.', pace: PACE, tempo: 1.12 },
-  { at: 80, to: 154, open: true, text: 'But most of them,\nyou never open again.', style: 'Softly honest, a touch wistful, no guilt.', pace: PACE, tempo: 1.12 },
+  // (light revisit) the approved takes, as read (owner, round 2: the
+  // time-stretched read sounded fast and jittery; nothing is stretched)
+  { at: 16, to: 82, open: true, text: 'You save things\nto come back to later.', style: 'Warm and knowing, gentle.', pace: PACE },
+  { at: 96, to: 180, open: true, text: 'But most of them,\nyou never open again.', style: 'Softly honest, a touch wistful, no guilt.', pace: PACE },
   // the turn: the saves gather into the point as the name is said
-  { at: 160, to: 228, open: true, text: 'Machina brings them\nback to you.', style: 'The turn: kind and uplifting, a smile.', pace: PACE, tempo: 1.15 },
+  { at: 192, to: 266, open: true, text: 'Machina brings them\nback to you.', style: 'The turn: kind and uplifting, a smile.', pace: PACE },
   // 1. DUE: the save that came due, picked out, then opened
-  { at: OPEN + 32, to: OPEN + 96, text: 'Your saves come back\nwhen you want them.', style: 'Reassuring, a sense of being in control.', pace: PACE, tempo: 1.12 },
-  { at: OPEN + 96, to: OPEN + 186, text: 'Open one, and the key points\nare already there.', style: 'Pleased and easy.', pace: PACE, tempo: 1.15 },
+  { at: OPEN + 32, to: OPEN + 102, text: 'Your saves come back\nwhen you want them.', style: 'Reassuring, a sense of being in control.', pace: PACE },
+  { at: OPEN + 112, to: OPEN + 216, text: 'Open one, and the key points\nare already there.', style: 'Pleased and easy.', pace: PACE },
   // 2. REMIND: its bell, "This weekend", Save (a new line, 2026-10-21)
-  { at: OPEN + 224, to: OPEN + 304, text: 'Need it again?\nPick when it comes back.', style: 'Light and helpful, a friendly nudge.', pace: PACE_QUICK },
+  { at: OPEN + 256, to: OPEN + 340, text: 'Need it again?\nPick when it comes back.', style: 'Light and helpful, a friendly nudge.', pace: PACE },
   // 3. TO-DO: the V60 step, picked out and ticked off as the line lands
-  { at: OPEN + 336, to: OPEN + 464, text: 'When a save calls for action,\nMachina turns it into a to-do.', style: 'Practical, a little energised.', pace: PACE, tempo: 1.15 },
+  { at: OPEN + 368, to: OPEN + 504, text: 'When a save calls for action,\nMachina turns it into a to-do.', style: 'Practical, a little energised.', pace: PACE },
   // ── the approved cut, from here
   // "This week in Machina" is tapped open in the silence before this line;
   // it unfolds on "Every week," and rises into view on "Machina brings back"
