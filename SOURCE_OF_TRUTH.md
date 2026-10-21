@@ -2976,10 +2976,16 @@ exact-match, capped.
 - **2026-10-21 — REVISIT clip: the quick cut, in the light look.** Branch
   `claude/night-revisit` (from `claude/videos-new-look`), NOT merged, NOT
   posted. Owner: "pacing is too slow, make it more engaging" and "make this
-  in light mode". 56.5s → 40.6s with every line and story beat kept: a 128.6
-  BPM grid, the narrator 10% quicker (`tempo` 1.1 on the same Gemini takes,
-  nothing re-voiced), lines back to back, the app at its real speed (it
-  played at half speed), the recap scored in the drive instead of calm.
+  in light mode". 56.5s → 41.5s with every line and story beat kept: a 128.6
+  BPM grid, lines back to back at the narrator's natural speed (the same
+  Gemini takes, nothing re-voiced), the app at its real speed (it played at
+  half speed), the recap scored in the drive instead of calm. Round 2 (owner:
+  "a bit metallic and the music is too loud"): the 10% voice time-stretch is
+  gone, the lines are resampled to 44.1kHz with SoX before the mix
+  (`mix-vo.mjs` interpolates 24kHz voice linearly, which mirrors its top
+  octave into a sizzle: every other film still mixes that way), the bed is
+  4dB lower with its hats/sparks/glints pulled back, and every line ducks to
+  0.4. Voice over music in the speech band: median 15dB (was ~6).
   REVISIT alone is light: the kit's light-grade pieces copied into
   `src/reels/clips/revisit/light/`, so the shared kit and the other eight
   films stay on the night set (no shared code changed). The take is re-shot in

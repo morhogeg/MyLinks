@@ -794,17 +794,17 @@ audio device); the balance, the clarity and the loudness are only measured.
 
 ## Feature clip: REVISIT ("what you save comes back to you")
 
-`MachinaClipRevisit` is a 40.6s vertical clip, the reel's companion, built
+`MachinaClipRevisit` is a 41.5s vertical clip, the reel's companion, built
 from the kit plus one new kit primitive (`kit/scroll.ts`, below) and optional
 kit props (rounds 3 and 4). It opens on the PROBLEM (round 4), then one
 continuous use of the real app (take `revisitClip`), whose clock starts at
 `OPEN` (224): the scenes read `f - OPEN`, captions and the score are absolute.
 
 **The quick cut in the light look (2026-10-21, owner: "pacing is too slow,
-make it more engaging" and "make this in light mode").** 56.5s → 40.6s, every
-line and story beat kept: a 128.6 BPM grid (14 frames a beat), the narrator
-10% quicker (`tempo` 1.1, pauses held to 0.25s, the same Gemini takes), the
-lines back to back, the app at its REAL speed (`APP_SPEED` 2: two captured
+make it more engaging" and "make this in light mode").** 56.5s → 41.5s, every
+line and story beat kept: a 128.6 BPM grid (14 frames a beat), the lines
+back to back at the narrator's natural speed (pauses held to 0.25s, the same
+Gemini takes; a 10% time-stretch rang metallic and was dropped), the app at its REAL speed (`APP_SPEED` 2: two captured
 60fps frames per output frame), the recap kept in the drive instead of calm.
 REVISIT alone is in the light look: ink on paper, the app in its light theme
 (`CAPTURE_THEME=light`). Its light pieces live in
@@ -818,10 +818,10 @@ kit and every other video stay on the night set.
 | 160–224 | THE TURN: "Machina brings them back to you.": they gather into one point just after the name, the brackets snap round it (the mark), and the point opens as an iris onto the Revisit tab |
 | 224–322 | "Due now": a reminder set on Four Thousand Weeks lifts on "when you want them"; the chapter word REVISIT arrives with this line |
 | 322–574 | The bell opens the reminder's own sheet ("Later today, this weekend, or three times, so it sticks."; Smart review lifts on "three times"; the paper comes down to the sheet's top while it is up); closed with its X; the save opens on its summary and the camera goes down to its Key Points; back to the list |
-| 574–714 | The "Do this" list: "When a save calls for action, Machina turns it into a to-do."; The Tail End's row lifts; the V60 step is ticked off at 672, the app's "Marked as done" toast in frame; "This week in Machina" tapped open at 714 |
-| 714–938 | The recap READ: it rises on "Every week, Machina brings back what's worth remembering.", the themes land on "The themes of your week," (each hold drifts: `CREEP`), then ONE glide onto the Standout, which lifts |
-| 938–1015 | The Standout tapped: The Tail End opens, then is thrown out |
-| 1015–1218 | The lockup: "Machina. Everything you save, finally useful." |
+| 574–721 | The "Do this" list: "When a save calls for action, Machina turns it into a to-do."; The Tail End's row lifts; the V60 step is ticked off at 686, the app's "Marked as done" toast in frame; "This week in Machina" tapped open at 721 |
+| 721–952 | The recap READ: it rises on "Every week, Machina brings back what's worth remembering.", the themes land on "The themes of your week," (each hold drifts: `CREEP`), then ONE glide onto the Standout, which lifts |
+| 952–1029 | The Standout tapped: The Tail End opens, then is thrown out |
+| 1029–1246 | The lockup: "Machina. Everything you save, finally useful." |
 
 Everything is in OUTPUT frames on the clip's grid (128.6 BPM, 14 frames a
 beat); 60fps app motion plays at its real speed (`APP_SPEED`). Lines start
@@ -841,7 +841,7 @@ the gates `audio/clips/revisit-verify.mjs` (run by `npm run verify`).
 ```bash
 CAPTURE_THEME=light CAPTURE_ONLY=revisitClip npm run reel:capture    # after reel:app; the LIGHT take (~130MB PNGs)
 python3 audio/synth-vo.py revisit                # only after a line or its timing changes
-node audio/clips/revisit-score.mjs && node audio/mix-vo.mjs revisit
+node audio/clips/revisit-score.mjs && node audio/mix-vo.mjs revisit   # the score step also resamples the lines to 44.1kHz (SoX)
 npm run verify
 npx remotion render src/index.ts MachinaClipRevisit out/machina-clip-revisit.mp4
 ```
