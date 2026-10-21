@@ -43,7 +43,7 @@ export const MachinaAdTrip: React.FC<{
         <End f={f} />
 
         {/* type never sits on UI: the app fades out under the line's band */}
-        <AdBandScrim opacity={f < HITS.open ? 0 : 1 - prog(f, HITS.lockup, HITS.lockup + 8)} />
+        <AdBandScrim opacity={prog(f, HITS.open - 16, HITS.open - 8) * (1 - prog(f, HITS.lockup, HITS.lockup + 8))} />
         {withCaptions && <AdCaptions frame={f} fps={FPS} captions={CAPTIONS} timing={VO} />}
         <Lens />
       </AbsoluteFill>

@@ -71,9 +71,10 @@ const feedAt = (f: number) => prog(f, S.feed, S.ask2, EASE_IN_OUT) * (FEED - 1);
  * The cuts (2026-10-21, owner: the jumps were not good enough). Every change
  * of shot inside the chat is the same move: the old shot rises away and
  * softens while the new one rises into place over it, the way a sent message
- * moves up the screen. SLIDE frames, from the cut.
+ * moves up the screen; the old one is gone before the new one settles. SLIDE
+ * frames, from the cut (the opening only fades the chat up under the band).
  */
-const SLIDE = 14;
+const SLIDE = 16;
 const RISE = 110;
 const SLIDES = [S.open, S.send, S.feed, S.ask2, S.send2];
 const slideAt = (f: number) => {
@@ -204,14 +205,19 @@ export const AskChat: React.FC<{ f: number }> = ({ f }) => {
   // the new one rising into place
   const slide = slideAt(f);
   const se = slide ? EASE_MODAL(slide.t) : 1;
-  const rise = slide ? { opacity: Math.min(1, slide.t / 0.6), transform: `translateY(${(RISE * (1 - se)).toFixed(2)}px)` } : undefined;
+  // (the two shots barely overlap: text over text reads as a double exposure)
+  const rise = slide
+    ? slide.cut === S.open
+      ? { opacity: EASE_IN_OUT(slide.t) }
+      : { opacity: prog(slide.t, 0.4, 0.85, EASE_IN_OUT), transform: `translateY(${(RISE * (1 - se)).toFixed(2)}px)` }
+    : undefined;
   const out = slide && slide.cut !== S.open ? slide : null;
   const outSend = out && (out.cut === S.send || out.cut === S.send2) ? (out.cut === S.send ? send1 : send2) : null;
 
   return (
     <AbsoluteFill>
       {out && (
-        <AbsoluteFill style={{ opacity: 1 - prog(out.t, 0.35, 1, linear), transform: `translateY(${(-RISE * 0.7 * EASE_IN_OUT(out.t)).toFixed(2)}px)` }}>
+        <AbsoluteFill style={{ opacity: 1 - prog(out.t, 0, 0.5, EASE_IN_OUT), transform: `translateY(${(-RISE * 0.7 * ACCEL(out.t)).toFixed(2)}px)` }}>
           <AppShot take={T} i={frameAt(out.cut - 1)} cam={camAt(keys, out.cut - 1)} blur={6 * out.t} shadow={1 - out.t}>
             {outSend && <Tap x={outSend.x} y={outSend.y} tone="light" t={tapAt(f, out.cut)} />}
           </AppShot>
