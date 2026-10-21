@@ -2662,6 +2662,18 @@ exact-match, capped.
   this weekend, or three times, so it sticks."; "Open one, and the key points
   are already there." Verified: tsc, verify, render, frames at each line.
   Not verified: nobody has listened on speakers.
+- **2026-10-21 — REVISIT (light look): the cut before the recap, redone.**
+  Branch `claude/light-revisit` (from `claude/clip-revisit`), not merged.
+  Owner: from "Every week" the video is good; before it, not clear enough,
+  too slow, taps far from good enough. Now: a shorter opening (6.9s, same
+  lines, quicker), then one idea per beat with a visible fingertip on every
+  tap and a spotlight on the one thing each line is about: the due save
+  opened to its Key Points; its bell, "This weekend", Save (the app's own
+  "Reminder set" toast; the save leaves "Due now"); the V60 step ticked off.
+  App transitions play at real speed there. One new line, Gemini Sulafat:
+  "Need it again? Pick when it comes back." The recap onward is the
+  approved cut moved earlier (its reads offset for the recap sitting
+  higher). 48.0s (was 55.5s). Take `revisitClip` recaptured (578 frames).
 - **2026-09-29 — REVISIT round 5: two beats that show the usefulness.**
   Branch `claude/clip-revisit`, not merged. Owner approved both: after "Due
   now", the due save's bell opens its reminder sheet, Smart review lifting

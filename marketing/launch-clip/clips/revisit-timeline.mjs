@@ -90,7 +90,7 @@ export const HITS = {
   bell: 216, // its bell: the reminder's sheet slides up
   weekend: 280, // "This weekend", tapped
   save: 304, // Save: the sheet goes, the toast confirms, the save leaves "Due now"
-  todo: [336, 360], // the spotlight moves to the V60 step
+  todo: [324, 348], // up to the "Do this" list; the spotlight moves to the V60 step
   tick: 440, // …ticked off: "Marked as done"
   // ── the approved cut, from here
   travel: [320 + K, 352 + K], // into the reading window, the toast left below the frame
@@ -173,12 +173,12 @@ export const CAPTIONS = [
   // THE OPENING: the habit, then the problem (no chapter word: `open`).
   // (light revisit) the approved takes, a touch quicker (`tempo`)
   { at: 16, to: 76, open: true, text: 'You save things\nto come back to later.', style: 'Warm and knowing, gentle.', pace: PACE, tempo: 1.12 },
-  { at: 80, to: 152, open: true, text: 'But most of them,\nyou never open again.', style: 'Softly honest, a touch wistful, no guilt.', pace: PACE, tempo: 1.12 },
+  { at: 80, to: 154, open: true, text: 'But most of them,\nyou never open again.', style: 'Softly honest, a touch wistful, no guilt.', pace: PACE, tempo: 1.12 },
   // the turn: the saves gather into the point as the name is said
   { at: 160, to: 228, open: true, text: 'Machina brings them\nback to you.', style: 'The turn: kind and uplifting, a smile.', pace: PACE, tempo: 1.15 },
   // 1. DUE: the save that came due, picked out, then opened
   { at: OPEN + 32, to: OPEN + 96, text: 'Your saves come back\nwhen you want them.', style: 'Reassuring, a sense of being in control.', pace: PACE, tempo: 1.12 },
-  { at: OPEN + 96, to: OPEN + 184, text: 'Open one, and the key points\nare already there.', style: 'Pleased and easy.', pace: PACE, tempo: 1.15 },
+  { at: OPEN + 96, to: OPEN + 186, text: 'Open one, and the key points\nare already there.', style: 'Pleased and easy.', pace: PACE, tempo: 1.15 },
   // 2. REMIND: its bell, "This weekend", Save (a new line, 2026-10-21)
   { at: OPEN + 224, to: OPEN + 304, text: 'Need it again?\nPick when it comes back.', style: 'Light and helpful, a friendly nudge.', pace: PACE_QUICK },
   // 3. TO-DO: the V60 step, picked out and ticked off as the line lands

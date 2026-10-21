@@ -19,7 +19,7 @@
 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BAR, BAR_CHORDS, BAR_FRAMES, BEAT, FPS, HITS, OPEN, OPENING, RISERS, TOTAL_FRAMES, TOTAL_SEC, USE } from '../../clips/revisit-timeline.mjs';
+import { BAR, BAR_CHORDS, BAR_FRAMES, BEAT, FPS, HITS, K, OPEN, OPENING, RISERS, TOTAL_FRAMES, TOTAL_SEC } from '../../clips/revisit-timeline.mjs';
 import { createSynth } from '../synth.mjs';
 
 const S = createSynth({ seconds: TOTAL_SEC, beat: BEAT });
@@ -38,10 +38,11 @@ const CHORDS = {
 };
 
 const BARS = Math.ceil(TOTAL_FRAMES / BAR_FRAMES);
-/** how much of the band plays, per bar: light under the reading */
-// (round 5: bars 6–10 are USE, the band still out)
-const DENSITY = [0.18, 0.22, 0.28, 0.34, 0.34, 0.42, 0.44, 0.46, 0.46, 0.48, 0.48, 0.5, 0.56, 0.62, 0.66, 0.68, 0.7, 0.72, 0.74, 0.68, 0.7, 0.66, 0.62, 0.42, 0.36, 0.32];
-const DRUMS = [a(HITS.wide[0]), a(HITS.out)]; // from the tick (round 3) … the throw into the lockup
+/** how much of the band plays, per bar: light under the reading.
+ *  (light revisit) the band is in from the app's first bar: the cut before
+ *  the recap moves on a tap a second */
+const DENSITY = [0.18, 0.22, 0.28, 0.34, 0.4, 0.44, 0.48, 0.52, 0.56, 0.6, 0.64, 0.68, 0.7, 0.72, 0.74, 0.68, 0.7, 0.66, 0.62, 0.42, 0.36, 0.32, 0.3];
+const DRUMS = [s(OPEN + 48 - ((OPEN + 48) % BAR_FRAMES)), a(HITS.out)]; // from the app's first full bar … the throw into the lockup
 
 for (let bar = 0; bar < BARS; bar++) {
   const ch = CHORDS[BAR_CHORDS[bar]];
@@ -102,22 +103,25 @@ for (const m of [48, 64, 67, 72]) pad(a(HITS.out), TOTAL_SEC - a(HITS.out) - 0.2
 // ── melody (FM keys): quiet over the recap, home on C for the lockup. Placed
 // in the narrator's pauses (clips/revisit-timeline.mjs CAPTIONS; the words
 // are measured in src/reels/clips/revisit/vo.json), never on a word.
-const U = USE.len;
 const MELODY = [
-  // [frame, midi, level?]
-  [104, 64], [120, 67], // after "when it's due."
-  // (round 5) USE: after "…and a month."; after "…not just a link."
-  [264, 69], [280, 67], [296, 72],
-  [416, 67], [432, 71],
-  [240 + U, 69], [256 + U, 71], [288 + U, 72], // after the to-do line; the tick
-  [480 + U, 67], [496 + U, 69], [512 + U, 71], // the write-up, after its line
-  [528 + U, 72], [544 + U, 69], // read → the themes
-  [696 + U, 64], [712 + U, 65], [728 + U, 67], // the Standout and its question
-  [752 + U, 72], [768 + U, 71], [784 + U, 72], // (the tap)
-  [824 + U, 74], [856 + U, 69], // the save, opened
-  // home: C as the mark draws, E after its name, G after the last word
-  [916 + U, 72, 0.19], [976 + U, 76, 0.12], [1056 + U, 79, 0.19],
+  // [frame, midi, level?] (app frames)
+  // (light revisit) the cut before the recap: after "…when you want them.";
+  // after "…already there."; after "…comes back." (Save); the tick
+  [72, 64], [80, 67],
+  [168, 69], [176, 67],
+  [296, 69], [312, 72],
+  [448, 69], [456, 71],
 ];
+// the approved cut, from the recap: its own frames, moved by K
+for (const [fr, m, level] of [
+  [480, 67], [496, 69], [512, 71], // the write-up, after its line
+  [528, 72], [544, 69], // read → the themes
+  [696, 64], [712, 65], [728, 67], // the Standout and its question
+  [752, 72], [768, 71], [784, 72], // (the tap)
+  [824, 74], [856, 69], // the save, opened
+  // home: C as the mark draws, E after its name, G after the last word
+  [916, 72, 0.19], [976, 76, 0.12], [1056, 79, 0.19],
+]) MELODY.push([fr + K, m, level]);
 for (const [fr, m, level] of MELODY) keys(a(fr), m, level ?? 0.14, (fr / 16) % 2 ? 0.2 : -0.2, fr >= HITS.out ? 2.8 : 2);
 
 // ── risers, each ENDING on the reveal it leads into
@@ -139,27 +143,26 @@ tick(s(OPENING.snap), 0.1, 0.85);
 sub(s(OPENING.snap), 43, 0.16, 0.25);
 whoosh(s(OPENING.iris[0]) - 0.05, 0.5, 0.07, 0);
 shimmer(s(OPEN - 12), [72, 79, 84, 88], 0.04);
-// (round 3) the reminder that came due lifts (in the pause after "reminder,")
-bell(a(H.dueLift), 79, 0.045, 0.2, 1.4);
-sub(a(H.dueLift), 43, 0.14, 0.3);
-// (round 5) USE: the bell, tapped (the sheet slides up); Smart review lifts
-// after its name; the X; the save opens (a lift as its Key Points come up);
-// back to the list
-tick(a(H.bell), 0.08, 1.2);
-whoosh(a(H.bell) + 0.05, 0.45, 0.04, 0.2);
-bell(a(H.smartLift), 81, 0.045, -0.2, 1.4);
-sub(a(H.smartLift), 45, 0.14, 0.3);
-tick(a(H.cancel), 0.07, 1.1);
+// (light revisit) the cut before the recap: every tap ticks on the frame
+// the app answers; the due save picked out; it opens (a lift as its Key
+// Points come up); back; the bell and the sheet; "This weekend"; Save and
+// the toast's confirmation; the V60 step picked out and ticked off
+bell(a(H.due[0] + 8), 79, 0.045, 0.2, 1.4);
+sub(a(H.due[0] + 8), 43, 0.14, 0.3);
 tick(a(H.openTap), 0.09, 1.25);
-whoosh(a(H.openTap) + 0.07, 0.35, 0.045, -0.15);
+whoosh(a(H.openTap) + 0.05, 0.3, 0.045, -0.15);
 shimmer(a(H.keyPoints[1]) - 0.1, [76, 79, 84], 0.03);
-whoosh(a(H.back) + 0.05, 0.4, 0.04, 0.15);
-// (round 3) the V60 step ticked off: the tap, and the toast's confirmation
+whoosh(a(H.back) + 0.03, 0.3, 0.04, 0.15);
+tick(a(H.bell), 0.08, 1.2);
+whoosh(a(H.bell) + 0.04, 0.35, 0.04, 0.2);
+tick(a(H.weekend), 0.08, 1.2);
+bell(a(H.weekend) + 0.04, 81, 0.04, -0.2, 1.2);
+tick(a(H.save), 0.09, 1.25);
+shimmer(a(H.save + 6), [76, 79, 84], 0.032);
+bell(a(H.todo[1]), 84, 0.04, -0.2, 1.4);
+sub(a(H.todo[1]), 48, 0.12, 0.3);
 tick(a(H.tick), 0.09, 1.25);
 shimmer(a(H.tick + 6), [76, 79, 84], 0.03);
-// the "Do this" row lifts (in the pause after "action,")
-bell(a(H.todoLift), 84, 0.045, -0.2, 1.4);
-sub(a(H.todoLift), 48, 0.14, 0.3);
 // down to the recap
 whoosh(a(H.travel[0]) + 0.05, 0.9, 0.045, 0.2);
 // "This week in Machina", tapped open
