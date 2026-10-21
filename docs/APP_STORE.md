@@ -228,11 +228,12 @@ this list:
 
 > You save things all day: links, screenshots, videos, articles you meant to finish. Then you never open them again. Machina changes that.
 >
-> Share anything to Machina from any app. Each save becomes a clean card with a summary, tags, and connections to what you saved before. Ask about anything you saved, and Machina answers with the exact saves it used.
+> Share anything to Machina from any app. Each save becomes a card with a summary, tags, and connections to what you saved before.
+> Ask about anything you saved, and Machina answers with the exact saves it used.
 >
 > Save from anywhere
 > • Any app: tap Share, pick Machina
-> • Screenshots and photos, up to five per card
+> • Screenshots are analyzed and categorized
 > • Links and notes, pasted or typed
 >
 > Find it again
@@ -243,16 +244,20 @@ this list:
 > Bring it back
 > • Reminders that resurface a save
 > • A weekly synthesis of what you saved
-> • A clear next step from each save
+> • A clear action item from each save
 >
-> Private by design. No ads, no tracking, and your content is never used to train AI models. Delete your account and everything in it anytime, from Settings.
+> Private by design. No ads, no tracking, and your content is never used to train AI models.
 
 **Rewritten 2026-10-21 (owner: the old one "looks TERRIBLE" in App Store
 Connect's preview).** About 40% shorter. Sentence-case headings instead of ALL
 CAPS, which shouted at phone width. Every bullet fits one line at phone width
 (the old bullets wrapped to two). The three sections follow the screenshot
 story: save, find, bring back. Dropped: personal notes on cards and publishing
-a collection as a page (real features, cut for length). The notes history
+a collection as a page (real features, cut for length). Owner edits before
+it went live: "clean" dropped from the card line, the screenshot bullet now
+says they are analyzed and categorized (was "up to five per card"), "next
+step" became "action item", and the account-deletion sentence was cut from
+the close (deletion stays in Settings and the privacy policy). The notes history
 below explains the old two-bullet split; "Links and notes, pasted or typed"
 now covers note cards.
 
