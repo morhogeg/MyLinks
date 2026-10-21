@@ -3,7 +3,7 @@ import { AbsoluteFill } from 'remotion';
 import { FEED_STEPS, HITS, K, TAKE, TYPE_STEP } from '../../../../ads/trip-timeline.mjs';
 import { AppShot, Lift, Tap } from '../../kit/AppShot';
 import { camAt, camVelocity, type Key } from '../../kit/camera';
-import { EASE_GATHER, EASE_IN_OUT, EASE_MODAL, EASE_SPRING, mix, prog } from '../../kit/curves';
+import { EASE_IN_OUT, EASE_MODAL, EASE_SPRING, mix, prog } from '../../kit/curves';
 import { at, center, rectOf, takeOf, type Rect } from '../../kit/takes';
 import { useAdFrame, type AdFrame } from './format';
 
@@ -13,11 +13,11 @@ import { useAdFrame, type AdFrame } from './format';
  *  ask      a fresh chat, close on the composer: "What did that TED talk say
  *           about procrastination?" types itself (the promise line above it,
  *           "your 29 saves", stays out of shot under "hundreds of saves").
- *  answer   Send; the cut lands on the touch. A short answer from one save
+ *  answer   Send; the change of shot starts on the touch. A short answer from one save
  *           streams in, its source under it.
- *  feed     CUT to the Home feed rushing past (EASE_GATHER, the one move that
- *           ends at speed): "Even across hundreds of saves,".
- *  big      CUT to a new chat, "What do my saves say about time?" typed;
+ *  feed     into the Home feed scrolling past, easing in and settling under
+ *           "Even across hundreds of saves,".
+ *  big      into a new chat, "What do my saves say about time?" typing itself;
  *           Send; one answer streams, woven from three saves on three
  *           platforms. Its first line, the theme it found, lifts; then the
  *           three saves it connected lift as the voice says "you never
@@ -27,6 +27,7 @@ import { useAdFrame, type AdFrame } from './format';
  *  graph    CUT on the touch into the real graph: those three saves, lit and
  *           linked among the rest (round 5, owner). Thrown out into the lockup.
  *
+ * Each change of shot inside the chat is one slide (SLIDE, below), not a hard cut.
  * The app's thinking line is not in the take at all. Captured scrolls (the
  * feed) are stepped: the camera takes up each step's rounding.
  */
@@ -61,8 +62,26 @@ const GRAPH_JOIN = 45;
 const GRAPH_RATE = 0.75;
 const graphPos = (f: number) => Math.min(GRAPH - 1, GRAPH_JOIN + (f - S.graphTap) * GRAPH_RATE);
 
-/** where the feed's stepped scroll is (fractional steps) */
-const feedAt = (f: number) => prog(f, S.feed, S.ask2, EASE_GATHER) * (FEED - 1);
+/** where the feed's stepped scroll is (fractional steps): it eases in and
+ *  settles before the next shot (2026-10-21, owner: it used to end at speed
+ *  into a hard cut, and read as a jump) */
+const feedAt = (f: number) => prog(f, S.feed, S.ask2, EASE_IN_OUT) * (FEED - 1);
+
+/**
+ * The cuts (2026-10-21, owner: the jumps were not good enough). Every change
+ * of shot inside the chat is the same move: the old shot rises away and
+ * softens while the new one rises into place over it, the way a sent message
+ * moves up the screen. SLIDE frames, from the cut.
+ */
+const SLIDE = 14;
+const RISE = 110;
+const SLIDES = [S.open, S.send, S.feed, S.ask2, S.send2];
+const slideAt = (f: number) => {
+  const cut = SLIDES.find((c) => f >= c - (c === S.open ? SLIDE : 0) && f < c + (c === S.open ? 0 : SLIDE));
+  if (cut === undefined) return null;
+  const from = cut === S.open ? cut - SLIDE : cut;
+  return { cut, t: prog(f, from, from + SLIDE, linear) };
+};
 
 /** output frame → the take's frame */
 export const frameAt = (f: number) => {
@@ -72,7 +91,8 @@ export const frameAt = (f: number) => {
     return n < STREAMED1 ? at(T, 'stream1', n) : at(T, 'sources1', Math.min(SOURCED1 - 1, n - STREAMED1));
   }
   if (f < S.ask2) return at(T, 'feed', Math.round(feedAt(f)));
-  if (f < S.send2) return at(T, 'typing2', TYPED2 - 1);
+  // the big question types itself (its first words already in as the shot arrives)
+  if (f < S.send2) return at(T, 'typing2', Math.min(TYPED2 - 1, Math.max(0, f - S.ask2 + 10)));
   if (f < S.graphTap) {
     const n = Math.floor((f - S.send2) / K);
     return n < STREAMED2 ? at(T, 'stream2', n) : at(T, 'sources2', Math.min(SOURCED2 - 1, n - STREAMED2));
@@ -104,7 +124,7 @@ export const chatKeys = (L: AdFrame): Key[] => {
     { f: S.feed - 1, cy: 380, z: 2.42, ease: linear },
     // CUT to the feed rushing past, the camera pushing with it, at speed into the cut
     { f: S.feed, cx: 196.5, cy: 400, z: 2.0, fy: y(1000) },
-    { f: S.ask2 - 1, cy: 410, z: 2.3, ease: EASE_GATHER },
+    { f: S.ask2 - 1, cy: 410, z: 2.3, ease: EASE_IN_OUT },
     // CUT to a new chat: the big question, typed, Send in reach
     { f: S.ask2, cx: 196.5, cy: 768, z: 2.5, fy: y(900) }, // (a new chat's "More ideas" sits lower)
     { f: S.send2 - 1, cy: 766, z: 2.53, ease: linear },
@@ -142,7 +162,7 @@ const tapAt = (f: number, hit: number) => prog(f, hit - 10, hit + 18, linear);
 
 export const AskChat: React.FC<{ f: number }> = ({ f }) => {
   const L = useAdFrame();
-  if (f < S.open || f > S.lockup + 15) return null;
+  if (f < S.open - SLIDE || f > S.lockup + 15) return null;
   const i = frameAt(f);
   const keys = chatKeys(L);
   const cam = camAt(keys, f);
@@ -180,8 +200,23 @@ export const AskChat: React.FC<{ f: number }> = ({ f }) => {
   const push = { ...base, cx: graph.x, cy: graph.y, fx: p.x, fy: p.y, z: base.z * mix(1, 1.6, prog(f, S.graphTap, S.graphTap + INTO, ACCEL)) };
   const grow = into ? { opacity: e, transform: `scale(${mix(0.8, 1, e)})`, transformOrigin: `${p.x}px ${p.y}px` } : undefined;
 
+  // a change of shot: the old shot (held on its last frame) rises away under
+  // the new one rising into place
+  const slide = slideAt(f);
+  const se = slide ? EASE_MODAL(slide.t) : 1;
+  const rise = slide ? { opacity: Math.min(1, slide.t / 0.6), transform: `translateY(${(RISE * (1 - se)).toFixed(2)}px)` } : undefined;
+  const out = slide && slide.cut !== S.open ? slide : null;
+  const outSend = out && (out.cut === S.send || out.cut === S.send2) ? (out.cut === S.send ? send1 : send2) : null;
+
   return (
     <AbsoluteFill>
+      {out && (
+        <AbsoluteFill style={{ opacity: 1 - prog(out.t, 0.35, 1, linear), transform: `translateY(${(-RISE * 0.7 * EASE_IN_OUT(out.t)).toFixed(2)}px)` }}>
+          <AppShot take={T} i={frameAt(out.cut - 1)} cam={camAt(keys, out.cut - 1)} blur={6 * out.t} shadow={1 - out.t}>
+            {outSend && <Tap x={outSend.x} y={outSend.y} tone="light" t={tapAt(f, out.cut)} />}
+          </AppShot>
+        </AbsoluteFill>
+      )}
       {into && (
         <AbsoluteFill style={{ opacity: 1 - e }}>
           <AppShot take={T} i={at(T, 'graphChip')} cam={push}>
@@ -189,11 +224,11 @@ export const AskChat: React.FC<{ f: number }> = ({ f }) => {
           </AppShot>
         </AbsoluteFill>
       )}
-      <AbsoluteFill style={grow}>
+      <AbsoluteFill style={grow ?? rise}>
       <AppShot take={T} i={i} cam={view} motion={motion}>
         {/* Send: a light tap on the dark button; the cut lands on the touch */}
-        <Tap x={send1.x} y={send1.y} tone="light" t={tapAt(f, S.send)} />
-        <Tap x={send2.x} y={send2.y} tone="light" t={f >= S.ask2 ? tapAt(f, S.send2) : 0} />
+        <Tap x={send1.x} y={send1.y} tone="light" t={f < S.send ? tapAt(f, S.send) : 0} />
+        <Tap x={send2.x} y={send2.y} tone="light" t={f >= S.ask2 && f < S.send2 ? tapAt(f, S.send2) : 0} />
         {source > 0.01 && (
           <Lift take={T} i={i} rect={wholePoints(rectOf(T, i, 'chip'))} radius={12} lift={source} rise={5} grow={0.04} ring={0.7 * source} />
         )}

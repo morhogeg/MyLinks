@@ -64,11 +64,14 @@ export const HITS = {
   part: beat(9), // the mark and the wordmark leave
   open: beat(11), // CUT to the chat: the simple question types itself
   send: beat(14.5), // Send is tapped; the cut to its answer lands on the touch
-  source: 300, // its source lifts on "which save it came from" (vo.json)
-  feed: beat(21.5), // CUT to the feed rushing past ("…hundreds of saves")
-  ask2: beat(23.5), // CUT to a new chat, the big question typed
-  send2: beat(24), // Send is tapped; its answer arrives on the touch
-  sources2: beat(27), // its three sources and the suggested next questions arrive
+  source: 299, // its source lifts on "which save it came from" (vo.json)
+  feed: beat(21.5), // into the feed, scrolling past ("…hundreds of saves")
+  // (2026-10-21, owner: the jump here was too fast) the feed plays the whole
+  // phrase and settles; the big question types itself; the answer arrives on
+  // "one clear answer"
+  ask2: beat(24), // into a new chat, the big question typing itself
+  send2: beat(25.5), // Send is tapped; its answer arrives on the touch
+  sources2: beat(28.5), // its three sources and the suggested next questions arrive
   lead: beat(29.5), // the theme it found (the answer's first line) lifts
   chips: [540, 550, 560], // the three saves it connected lift ("you never noticed": vo.json)
   graphTap: beat(36), // its Graph chip is tapped: the saves it connected, lit in the real graph
@@ -105,11 +108,11 @@ const PACE = 'Brisk but unhurried, about 160 words a minute.';
 export const CAPTIONS = [
   { at: beat(0.5), to: beat(6), hook: true, pre: true, text: 'What if your saves\ncould talk back?', pace: PACE, style: 'Intriguing, playful wonder; the question hangs in the air, a small suspenseful pause after it.' },
   { at: beat(7), to: beat(10.5), text: 'With Machina, they can.', pace: PACE, style: 'Confident, a small knowing smile, answering the riddle.', duck: 0.4 },
-  { at: beat(11.5), to: beat(15.5), text: "Ask it about\nanything you've saved.", pace: PACE, style: 'Inviting and easy.' },
+  { at: beat(11), to: beat(15), text: "Ask it about\nanything you've saved.", pace: PACE, style: 'Inviting and easy.' },
   // (2026-10-04, owner: more detail) the answer's source, the real chip under it
   // (2026-10-21, owner: the line needs the answer between the ask and the source)
-  { at: beat(16), to: beat(21.5), split: 7, text: 'It answers, and shows you exactly\nwhich save it came from.', pace: PACE, style: "Reassuring and clear, a small emphasis on 'exactly'." },
-  { at: beat(21.5), to: beat(29), split: 5, text: 'Even across hundreds of saves,\nyou get one clear answer.', pace: PACE, style: "Impressed and clear; emphasis on 'one clear answer'." },
+  { at: beat(15), to: beat(22), split: 6, text: 'It answers, and shows you exactly\nwhich save it came from.', pace: PACE, style: "Reassuring and clear, a small emphasis on 'exactly'." },
+  { at: beat(22), to: beat(29.5), split: 5, text: 'Even across hundreds of saves,\nyou get one clear answer.', pace: PACE, style: "Impressed and clear; emphasis on 'one clear answer'." },
   // (round 5, owner: the graph plays under "you never noticed.", so the line
   // stays up while it blooms: `until`)
   { at: beat(29.5), to: beat(43), split: 7, until: true, text: 'And it finds the themes and connections\nyou never noticed.', pace: PACE, style: 'Delighted wonder, opening up at the end.' },

@@ -140,9 +140,10 @@ for (let fr = H.open; fr < Q1_END; fr += 4) tick(f(fr), 0.028, 1.6 + ((fr / 4) %
 tick(f(H.send), 0.11, 1.3);
 whoosh(f(H.send), 0.4, 0.05, 0.25);
 
-// the feed rushing past, accelerating into the cut; the big question lands
+// the feed scrolling past; the big question lands and types itself
 whoosh(f(H.feed), f(H.ask2 - H.feed), 0.06, -0.2);
 impact(f(H.ask2), 0.1);
+for (let fr = H.ask2; fr < H.send2 - 4; fr += 4) tick(f(fr), 0.028, 1.6 + ((fr / 4) % 3) * 0.08);
 tick(f(H.send2), 0.11, 1.3);
 whoosh(f(H.send2), 0.4, 0.05, 0.25);
 

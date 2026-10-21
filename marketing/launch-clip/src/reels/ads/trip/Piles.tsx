@@ -88,7 +88,7 @@ const PileCard: React.FC<{ p: Pile; soft: number; drop: number }> = ({ p, soft, 
       <div style={{ marginTop: 12, height: ROW * 2, overflow: 'hidden' }}>
       <div
         style={{
-          transform: `translateY(${Math.round(-ROW * (p.drop ? 1 - drop : 0))}px)`,
+          transform: `translateY(${(-ROW * (p.drop ? 1 - drop : 0)).toFixed(2)}px)`,
           filter: soft > 0.01 ? `blur(${(soft * 4).toFixed(2)}px) grayscale(${soft.toFixed(3)})` : undefined,
           opacity: 1 - 0.5 * soft,
         }}
@@ -128,8 +128,9 @@ export const Piles: React.FC<{ f: number }> = ({ f }) => {
 
   const pileAt = (k: number, fr: number) => {
     const c = L.piles[k];
-    // a slow push from frame 0 (the poster is already the five piles)
-    const push = 1 + 0.035 * prog(fr, 0, HITS.collapse, (t) => t);
+    // (2026-10-21, owner: the piles shook) no slow push under the hook: a
+    // push that slow steps the cards' text a pixel at a time
+    const push = 1;
     // "scattered": the piles drift apart and go soft
     const lost = prog(fr, HITS.lost, HITS.lost + 28, EASE_IN_OUT);
     const g = prog(fr, HITS.collapse, HITS.dotLands, EASE_GATHER);
@@ -143,8 +144,8 @@ export const Piles: React.FC<{ f: number }> = ({ f }) => {
       o: (1 - Math.pow(g, 5)) * (1 - 0.3 * lost * (1 - g)),
       blur: g * 2 + 0.8 * lost * (1 - g),
       soft: lost,
-      // the pile's newer save slides in (the app's spring)
-      drop: k < DROP_AT.length ? prog(fr, DROP_AT[k], DROP_AT[k] + 14, EASE_SPRING) : 0,
+      // the pile's newer save slides in, settling without a bounce
+      drop: k < DROP_AT.length ? prog(fr, DROP_AT[k], DROP_AT[k] + 16, EASE_MODAL) : 0,
       g,
     };
   };
@@ -177,9 +178,11 @@ export const Piles: React.FC<{ f: number }> = ({ f }) => {
                 key={`${k}-${lag}`}
                 style={{
                   position: 'absolute',
-                  left: q.x,
-                  top: q.y,
-                  transform: `translate(-50%, -50%) rotate(${q.r}deg) scale(${q.s})`,
+                  left: 0,
+                  top: 0,
+                  // positioned by transform, not left/top: layout rounds to
+                  // whole pixels, so a slow drift would step
+                  transform: `translate(${q.x.toFixed(2)}px, ${q.y.toFixed(2)}px) translate(-50%, -50%) rotate(${q.r}deg) scale(${q.s})`,
                   opacity: q.o * alpha,
                   filter: q.blur > 0.2 ? `blur(${q.blur.toFixed(2)}px)` : undefined,
                 }}
