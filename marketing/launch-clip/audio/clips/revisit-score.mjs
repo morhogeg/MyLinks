@@ -107,10 +107,10 @@ const MELODY = [
   // [frame, midi, level?] (app frames)
   // (light revisit) the cut before the recap: after "…when you want them.";
   // after "…already there."; after "…comes back." (Save); the tick
-  [72, 64], [80, 67],
-  [168, 69], [176, 67],
-  [296, 69], [312, 72],
-  [448, 69], [456, 71],
+  [88, 64], [96, 67],
+  [208, 69], [224, 67],
+  [328, 69], [344, 72],
+  [496, 69], [504, 71],
 ];
 // the approved cut, from the recap: its own frames, moved by K
 for (const [fr, m, level] of [

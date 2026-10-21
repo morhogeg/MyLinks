@@ -2673,7 +2673,11 @@ exact-match, capped.
   App transitions play at real speed there. One new line, Gemini Sulafat:
   "Need it again? Pick when it comes back." The recap onward is the
   approved cut moved earlier (its reads offset for the recap sitting
-  higher). 48.0s (was 55.5s). Take `revisitClip` recaptured (578 frames).
+  higher). Take `revisitClip` recaptured (578 frames).
+  Round 2 (owner: the narration "too fast and jittery"): the lines had been
+  time-stretched 12–15% (Rubber Band); now nothing is stretched, every line
+  plays as read with a breath between lines, the picture re-timed to the
+  voice, and the new line re-voiced at the house pace (run 3). 50.7s.
 - **2026-09-29 — REVISIT round 5: two beats that show the usefulness.**
   Branch `claude/clip-revisit`, not merged. Owner approved both: after "Due
   now", the due save's bell opens its reminder sheet, Smart review lifting

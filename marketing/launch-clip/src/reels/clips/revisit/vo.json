@@ -4,104 +4,104 @@
   "text": "You save things to come back to later.",
   "words": [
    0.05,
-   0.2,
-   0.387,
-   0.649,
-   0.761,
-   0.948,
-   1.136,
-   1.248
+   0.217,
+   0.426,
+   0.719,
+   0.844,
+   1.053,
+   1.262,
+   1.387
   ]
  },
  {
-  "frame": 80,
+  "frame": 96,
   "text": "But most of them, you never open again.",
   "words": [
    0.05,
-   0.253,
-   0.507,
-   0.659,
-   0.964,
-   1.167,
-   1.471,
-   1.725
+   0.266,
+   0.535,
+   0.697,
+   1.12,
+   1.338,
+   1.665,
+   1.938
   ]
  },
  {
-  "frame": 160,
+  "frame": 192,
   "text": "Makeena brings them back to you.",
   "words": [
    0.04,
-   0.474,
-   0.854,
-   1.125,
-   1.396,
-   1.559
+   0.539,
+   0.976,
+   1.288,
+   1.601,
+   1.788
   ]
  },
  {
-  "frame": 240,
+  "frame": 272,
   "text": "Your saves come back when you want them.",
   "words": [
-   0.04,
-   0.224,
-   0.445,
-   0.629,
-   0.813,
-   1.088,
-   1.235,
-   1.419
+   0.05,
+   0.256,
+   0.503,
+   0.71,
+   0.916,
+   1.212,
+   1.377,
+   1.583
   ]
  },
  {
-  "frame": 304,
+  "frame": 352,
   "text": "Open one, and the key points are already there.",
   "words": [
    0.01,
-   0.284,
-   0.558,
-   0.777,
-   0.996,
-   1.215,
-   1.599,
-   1.818,
-   2.256
+   0.945,
+   1.97,
+   2.082,
+   2.193,
+   2.305,
+   2.5,
+   2.612,
+   2.835
   ]
  },
  {
-  "frame": 432,
+  "frame": 496,
   "text": "Need it again? Pick when it comes back.",
   "words": [
-   0.05,
-   0.29,
-   0.434,
-   1.1,
-   1.364,
-   1.538,
-   1.642,
-   1.851
+   0.06,
+   0.3,
+   0.444,
+   1.14,
+   1.432,
+   1.634,
+   1.755,
+   1.998
   ]
  },
  {
-  "frame": 544,
+  "frame": 608,
   "text": "When a save calls for action, Makeena turns it into a to-do.",
   "words": [
    0.02,
-   0.252,
-   0.344,
-   0.576,
-   0.854,
-   1.039,
-   1.76,
-   2.17,
-   2.478,
-   2.722,
-   2.978,
-   3.081
+   0.287,
+   0.393,
+   0.66,
+   0.98,
+   1.193,
+   2.01,
+   2.48,
+   2.832,
+   3.128,
+   3.422,
+   3.539
   ]
  },
  {
-  "frame": 736,
+  "frame": 816,
   "text": "Every week, Makeena brings back what\u2019s worth remembering.",
   "words": [
    0.05,
@@ -115,7 +115,7 @@
   ]
  },
  {
-  "frame": 928,
+  "frame": 1008,
   "text": "The themes of your week, and the one save worth rereading.",
   "words": [
    0.04,
@@ -132,7 +132,7 @@
   ]
  },
  {
-  "frame": 1312,
+  "frame": 1392,
   "text": "Makeena. Everything you save, finally useful.",
   "words": [
    0.06,
