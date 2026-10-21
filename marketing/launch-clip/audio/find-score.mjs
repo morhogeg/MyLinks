@@ -29,6 +29,7 @@ import {
   DELETE_FRAMES,
   FPS,
   HITS,
+  RETYPE_FRAMES,
   RISERS,
   TOTAL_FRAMES,
   TOTAL_SEC,
@@ -60,6 +61,8 @@ const typing = [
   [H.type2, CHARS2],
   [H.type3, CHARS3],
 ].map(([from, n]) => [from, from + (n - 1) * TYPE_FRAMES]);
+// the takeaway types the first query again, quicker
+typing.push([H.retype, H.retype + Math.floor((CHARS1 - 1) * RETYPE_FRAMES)]);
 
 // the reel's voicings
 const VOICINGS = {
@@ -192,6 +195,9 @@ for (const f of [H.found1, H.found2]) {
   sub(t(f), 48, 0.3, 0.34);
   shimmer(t(clearOfVoice(f, 12)), [76, 83, 88], 0.045);
 }
+// the takeaway's card found again: the weight only (its line runs into the
+// throw, so a shimmer clear of the voice would land on the lockup)
+sub(t(H.refound), 48, 0.3, 0.34);
 // the source tapped: every video lands
 sub(t(H.chipTap), 43, 0.26, 0.3);
 swoosh(t(H.cardTap), 0.35, 0.05, -0.15);

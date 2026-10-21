@@ -622,8 +622,8 @@ Every pixel of app UI is the real app. `MachinaFindSilent` (no sound) and
 | 144–288 | Your own words | "easy dinner, empty fridge" types (160–208) under a rack focus, holds a beat whole, and ONE card lands (224): Marcella Hazan's tomato sauce, which shares no word with it; its ink ring on the next beat |
 | 288–432 | Close matches | deleted a word at a time (300); "sardinia swim spot" (320–354): no save says "swim", and the app's "Close matches" offers the one that has the rest, Cala Goloritzé (368). "Only half remember it? You still get what's close." (304–416) |
 | 432–576 | Where you saw it | "youtube" (464–476): the Sources row offers YouTube (7) as it types; one tap (496) and the feed is every video saved. "Type where you saw it, and get everything from there." (448–560) |
-| 576–688 | Open it | The first video tapped open (576): "Open it for the summary, and everything it connects to." (576–688); on "and" the camera travels down to its related saves (600–660) |
-| 688–784 | the takeaway | A cut on the beat to the empty search field: "Type what you remember. Get the one you meant." (688–776); thrown out of frame (768) |
+| 576–688 | Open it | The first video tapped open (576): "Open it for the summary, and everything it connects to." (576–672; re-voiced 2026-10-21, the old take stumbled on "connects to"); on "and" the camera travels down to its related saves (600–660) |
+| 688–784 | the takeaway | A cut on the beat to the field, the first query typed again, quicker (688–724), and Marcella Hazan's card landing again (736) with its ink ring: "Type what you remember. Get the one you meant." (688–776; owner 2026-10-21: the empty field it used to show said nothing); thrown out of frame (768) |
 | 784–976 | the close | The reel's lockup: the mark strikes (832), "Machina. Everything you save, finally useful." (848; the tagline, said only here, on ONE row at 48px under the wordmark: owner, 2026-09-29; the reel sets it on two rows at 60px) |
 
 **Finishing pass (2026-09-28).** Measured the full render again (frame

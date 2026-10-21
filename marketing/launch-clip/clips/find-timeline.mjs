@@ -38,6 +38,9 @@ export const onBeat = (f) => Math.round(f / BEAT_FRAMES) * BEAT_FRAMES;
 
 /** frames a typed character stays (K = 2: the capture's 30 a second at 15) */
 export const TYPE_FRAMES = K;
+/** frames a character stays when the takeaway types the first query again
+ *  (quicker than the first time: a reminder, typed whole with a beat to spare) */
+export const RETYPE_FRAMES = 1.5;
 /** frames each deleted word stays (a held delete key: faster than typing) */
 export const DELETE_FRAMES = 3;
 
@@ -60,6 +63,8 @@ export const HITS = {
   type3: 464, // 3. "youtube": the Sources row offers YouTube as it types
   chipTap: 496, // one tap: every save from YouTube
   cardTap: 576, // 4. the first of them, opened
+  retype: 688, // the takeaway: the first query typed again, quicker…
+  refound: 736, // …and its one card lands again, on "Get the one you meant"
   throwOut: 768, // thrown out of frame…
   lockup: 784, // …into the lockup
   markStrike: 832, // the mark's point strikes (lockup + 48)
@@ -111,7 +116,7 @@ export const CAPTIONS = [
   { at: 128, to: 208, text: 'Machina finds it\nin your own words.', kicker: 'Your own words', duck: 0.4, style: 'Calm relief, reassuring, a small smile.', pace: PACE },
   { at: 304, to: 395, text: 'Only half remember it?\nYou still get what’s close.', kicker: 'Close matches', style: 'Understanding, then easy reassurance.', pace: PACE },
   { at: 448, to: 519, text: 'Type where you saw it,\nand get everything from there.', kicker: 'Where you saw it', style: 'Practical and clear, a light "oh, nice" energy.', pace: PACE },
-  { at: 576, to: 664, text: 'Open it for the summary,\nand everything it connects to.', kicker: 'Open it', style: 'Interested, opening up at the end.', pace: PACE },
+  { at: 576, to: 672, text: 'Open it for the summary,\nand everything it connects to.', kicker: 'Open it', style: 'Warm and interested, one easy unbroken breath to the end; "everything it connects to" glides together, every consonant clean.', pace: PACE },
   // the takeaway
   { at: 688, to: 776, text: 'Type what you remember.\nGet the one you meant.', style: 'Crisp and satisfying; a confident landing on "the one you meant".', pace: PACE },
   // the close: the name (the drawn wordmark wipes in as it is said), then
