@@ -21,7 +21,7 @@
  *   LINKS   its Related cards, then the graph: "It links each save to what
  *           you saved before… so you see how your ideas connect."
  *   REMIND  the bell, "Remind me", Save; tomorrow, the "Reminders due" strip:
- *           "Then pick a time, and Machina brings it back… so you actually get
+ *           "Then pick a time, and Machina reminds you… so you actually get
  *           back to it."
  *   CLOSE   "Machina. Everything you save, finally useful."
  *
@@ -130,7 +130,7 @@ export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 const PAIN = 'Punchy and quick, like a friend teasing you; short pauses, no lingering.';
 const EASY = 'Conversational and easy, about 165 words a minute; short natural pauses.';
 const LINES = [
-  { at: 8, to: 116, text: 'How many things did you\nsave this month | and never open again?', say: 'How many things did you save this month… and never open again?', poster: true, style: 'Knowing, teasing smile, leaning in; a beat of mock guilt on "and never open again?"', pace: PAIN, tempo: 1.1, maxPause: 0.2 },
+  { at: 8, to: 116, text: 'How many things did you\nsave this month | and never open again?', say: 'How many things did you save this month… and never open again?', poster: true, style: 'Knowing, teasing smile, leaning in. Say "How many things did you save this month" as ONE smooth unbroken phrase, no pause anywhere inside it (none after "save"); then a beat of mock guilt on "and never open again?"', pace: PAIN, tempo: 1.1, maxPause: 0.2 },
   { at: 116, to: 200, text: "The article you promised\nyourself you'd read", say: "The article you promised yourself you'd read…", style: 'Wry, trailing off knowingly, as if listing evidence.', pace: PAIN, tempo: 1.1, maxPause: 0.2 },
   { at: 200, to: 272, text: 'the thread you\nbookmarked at midnight', say: 'the thread you bookmarked at midnight…', style: 'Amused, a little sheepish, late-night confession energy.', pace: PAIN, tempo: 1.1, maxPause: 0.2 },
   { at: 272, to: 355, text: "the screenshot you\nswore you'd remember.", style: 'Playful disbelief, landing the list with a smile.', pace: PAIN, tempo: 1.1, maxPause: 0.2 },
@@ -139,7 +139,7 @@ const LINES = [
   { at: 425, to: 528, text: 'From any app, just\nshare it to Machina.', until: 'the last share lands in the mark', style: 'Easy and effortless, like it is the simplest thing.', pace: EASY },
   { at: 528, to: 696, text: "It reads what you save | and pulls out\nthe key points | so you'll always remember\nwhy you kept it.", say: "It reads what you save and pulls out the key points… so you'll always remember why you kept it.", until: 'the Key Points lift', duck: 0.45, style: "Clear and genuinely pleased; warm and reassuring on 'so you'll always remember why you kept it'.", pace: EASY },
   { at: 696, to: 856, text: 'It links each save | to what you saved before | so you see how\nyour ideas connect.', say: 'It links each save to what you saved before… so you see how your ideas connect.', until: 'the graph opens on its ties', duck: 0.45, style: "A little wonder, opening up on 'how your ideas connect'.", pace: EASY },
-  { at: 872, to: 1024, text: 'Then pick a time, | and Machina brings it back', say: 'Then pick a time, and Machina brings it back…', until: 'the reminder is set and confirmed', style: "Anticipation, the reveal of the best part; a small lift on 'brings it back'.", pace: EASY },
+  { at: 872, to: 1024, text: 'Then pick a time, | and Machina reminds you', say: 'Then pick a time, and Machina reminds you…', until: 'the reminder is set and confirmed', style: "Anticipation, the reveal of the best part; a small lift on 'reminds you', the thought carrying straight on into the next line.", pace: EASY },
   { at: 1040, to: 1112, text: 'so you actually\nget back to it.', kicker: 'Tomorrow', kickerChunk: 0, until: 'the Reminders due strip lifts', style: "Satisfied and knowing, the payoff line; warm emphasis on 'actually'.", pace: EASY },
   // the close, on the lockup: the name (the drawn wordmark wipes in as it is
   // said), then the tagline, exactly as written (owner call 2026-09-28)
