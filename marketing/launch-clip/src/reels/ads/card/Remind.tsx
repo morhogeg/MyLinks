@@ -8,7 +8,7 @@ import { at, center, rectOf } from '../../kit/takes';
 import { useAdFrame } from './format';
 
 /**
- * "Then pick a time, and Machina reminds you… so you actually get back to it." The answer
+ * "Then pick a time, and Machina reminds you to read it. So you actually get back to it." The answer
  * to the hook's "Later never comes.", in the real app (take "adcard"):
  *
  *  REMIND  a cut back to the card; its bell is tapped and the app's own

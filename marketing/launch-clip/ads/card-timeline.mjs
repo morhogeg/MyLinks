@@ -21,7 +21,7 @@
  *   LINKS   its Related cards, then the graph: "It links each save to what
  *           you saved before… so you see how your ideas connect."
  *   REMIND  the bell, "Remind me", Save; tomorrow, the "Reminders due" strip:
- *           "Then pick a time, and Machina reminds you… so you actually get
+ *           "Then pick a time, and Machina reminds you to read it. So you actually get
  *           back to it."
  *   CLOSE   "Machina. Everything you save, finally useful."
  *
@@ -143,7 +143,7 @@ const LINES = [
   { at: 425, to: 528, text: 'From any app, just\nshare it to Machina.', until: 'the last share lands in the mark', style: 'Easy and effortless, like it is the simplest thing.', pace: EASY },
   { at: 528, to: 696, text: "It reads what you save | and pulls out\nthe key points | so you'll always remember\nwhy you kept it.", say: "It reads what you save and pulls out the key points… so you'll always remember why you kept it.", until: 'the Key Points lift', duck: 0.45, style: "Clear and genuinely pleased; warm and reassuring on 'so you'll always remember why you kept it'.", pace: EASY },
   { at: 696, to: 860, text: 'It links each save | to what you saved before | so you see how\nyour ideas connect.', say: 'It links each save to what you saved before… so you see how your ideas connect.', until: 'the graph opens on its ties', duck: 0.45, style: "A little wonder, opening up on 'how your ideas connect'.", pace: EASY },
-  { at: 912, to: 1016, text: 'Then pick a time, | and Machina reminds you', say: 'Then pick a time, and Machina reminds you…', until: 'the reminder is set and confirmed', style: "Anticipation, the reveal of the best part; a small lift on 'reminds you', the thought carrying straight on into the next line.", pace: EASY },
+  { at: 912, to: 1016, text: 'Then pick a time, | and Machina reminds you\nto read it.', say: 'Then pick a time, and Machina reminds you to read it.', until: 'the reminder is set and confirmed', style: "Warm and matter-of-fact, the reveal of the best part, said like normal everyday speech. End the sentence naturally with a gentle, settled downward close on 'read it', like a plain statement: no upward lift, no question tone, no trailing or hanging note.", pace: EASY },
   { at: 1020, to: 1096, text: 'so you actually\nget back to it.', kicker: 'Tomorrow', kickerChunk: 0, until: 'the Reminders due strip lifts', style: "Satisfied and knowing, the payoff line; warm emphasis on 'actually'.", pace: EASY },
   // the close, on the lockup: the name (the drawn wordmark wipes in as it is
   // said), then the tagline, exactly as written (owner call 2026-09-28)
