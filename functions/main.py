@@ -3078,7 +3078,11 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         return _server_error(headers, e)
 
 
-@https_fn.on_request(max_instances=10)
+# max_instances=50 (was 10, 2026-10-21): concurrency 1, and this one endpoint
+# serves typed search (each debounced keystroke), the Related list on every
+# card open and the graph's similarities, so 10 was the first cap a launch
+# crowd would hit. Same reasoning as analyze_link: cost follows use only.
+@https_fn.on_request(max_instances=50)
 def search_links_http(req: https_fn.Request) -> https_fn.Response:
     """HTTP twin of the `search_links` callable, for the native iOS shell.
 
