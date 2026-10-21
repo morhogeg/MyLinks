@@ -4,17 +4,17 @@
   "text": "How many things did you save this month\u2026 and never open again?",
   "words": [
    0.02,
-   0.179,
-   0.378,
-   0.656,
-   0.815,
-   0.974,
-   1.173,
-   1.622,
-   2.16,
-   2.338,
-   2.605,
-   2.828
+   0.2,
+   0.424,
+   0.738,
+   0.918,
+   1.097,
+   1.321,
+   1.546,
+   2.14,
+   2.325,
+   2.604,
+   2.835
   ]
  },
  {
@@ -128,22 +128,21 @@
   ]
  },
  {
-  "frame": 872,
-  "text": "Then pick a time, and Makeena brings it back\u2026",
+  "frame": 912,
+  "text": "Then pick a time, and Makeena reminds you\u2026",
   "words": [
    0.03,
-   0.23,
-   0.43,
-   0.51,
-   0.99,
-   1.17,
+   0.283,
+   0.536,
+   0.637,
+   1.3,
    1.53,
-   2.115,
-   2.25
+   2.081,
+   2.542
   ]
  },
  {
-  "frame": 1040,
+  "frame": 1020,
   "text": "so you actually get back to it.",
   "words": [
    0.01,
@@ -156,7 +155,7 @@
   ]
  },
  {
-  "frame": 1152,
+  "frame": 1136,
   "text": "Makeena. Everything you save, finally useful.",
   "words": [
    0.03,

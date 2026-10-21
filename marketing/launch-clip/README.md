@@ -876,6 +876,20 @@ word, across lines too, so two captions never show at once (checked frame by
 frame around a handover and a two-row chunk). The name beat stays
 uncaptioned and there is no "…" on screen.
 
+Round 12 (owner, 2026-10-21, light look, branch `claude/light-ad-card`):
+the hook is re-voiced so "How many things did you save this month" runs as
+one phrase (the old take paused 0.23s after "save"); "and Machina brings it
+back" became "and Machina reminds you" (re-voiced), which reads straight on
+into "so you actually get back to it."; the graph now holds until "…your
+ideas connect." has landed (`back` 832 → 864) instead of fading under it;
+the reminder runs tighter (bell 896, Save 976, tomorrow 1016) so the two
+reminder lines are about 0.7s apart, not 3s. Instagram's Saved tiles were
+flat colour fields that greyed into blank squares: they are now drawn
+scenes (a torii tunnel at dawn, the cove under its limestone spire, Webb's
+nebula cliffs; `scripts/ad-card-shots.mjs`, SVG, no photos), and as the
+lists are lost they fade like old prints (light blur, a trace of colour)
+rather than the text lists' full grey-out. 43.2s.
+
 **The Meta spec, and how the ad meets it.** 43.7s (owner, round 5: about
 30–35s; round 6's slower reminder took it over; verify notes over 35s and
 fails over 45s). Frame 0 is a legible picture with the

@@ -69,21 +69,25 @@ export const HITS = {
   // on down: its three Related cards, lifted as one block; then the graph
   related: 728,
   graphTap: 776,
-  // back to the card through a soft focus pull (round 8: no hard cut), a
-  // second to settle, then its bell, "Remind me" (Smart review ringed and
-  // held), down to Save; the app's confirmation held over the softened card
-  back: 832,
-  bellTap: 864,
-  smart: 888,
-  saveTap: 968,
-  reminderSet: 976,
+  // back to the card through a soft focus pull (round 8: no hard cut); the
+  // graph is held until "…your ideas connect." has landed (round 12, owner:
+  // it left mid-line). A moment to settle, then its bell, "Remind me" (Smart
+  // review ringed), down to Save; the app's confirmation held over the
+  // softened card. (round 12, owner: the pause between the two reminder
+  // lines was too long: the reminder runs tighter and the second line
+  // follows the first by about 0.7s)
+  back: 864,
+  bellTap: 896,
+  smart: 920,
+  saveTap: 976,
+  reminderSet: 984,
   // tomorrow, 9:00 AM: the feed's "Reminders due" strip
-  due: 1032,
-  dueLift: 1056,
+  due: 1016,
+  dueLift: 1040,
   // the close
-  throw: 1112,
-  lockup: 1128,
-  markStrike: 1152,
+  throw: 1096,
+  lockup: 1112,
+  markStrike: 1136,
 };
 
 /**
@@ -107,7 +111,7 @@ export const SCROLLS = [
 ];
 
 export const THROW_LEN = 30;
-export const TOTAL_FRAMES = 1312; // the tagline holds 1.6s after the voice ends
+export const TOTAL_FRAMES = 1296; // the tagline holds 1.6s after the voice ends
 export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 
 /**
@@ -138,9 +142,9 @@ const LINES = [
   { at: 356, to: 425, text: "That's exactly why\nwe made Machina.", place: 'voice', style: 'The turn: bright, warm and proud; the name lands with a smile.', pace: EASY },
   { at: 425, to: 528, text: 'From any app, just\nshare it to Machina.', until: 'the last share lands in the mark', style: 'Easy and effortless, like it is the simplest thing.', pace: EASY },
   { at: 528, to: 696, text: "It reads what you save | and pulls out\nthe key points | so you'll always remember\nwhy you kept it.", say: "It reads what you save and pulls out the key points… so you'll always remember why you kept it.", until: 'the Key Points lift', duck: 0.45, style: "Clear and genuinely pleased; warm and reassuring on 'so you'll always remember why you kept it'.", pace: EASY },
-  { at: 696, to: 856, text: 'It links each save | to what you saved before | so you see how\nyour ideas connect.', say: 'It links each save to what you saved before… so you see how your ideas connect.', until: 'the graph opens on its ties', duck: 0.45, style: "A little wonder, opening up on 'how your ideas connect'.", pace: EASY },
-  { at: 872, to: 1024, text: 'Then pick a time, | and Machina reminds you', say: 'Then pick a time, and Machina reminds you…', until: 'the reminder is set and confirmed', style: "Anticipation, the reveal of the best part; a small lift on 'reminds you', the thought carrying straight on into the next line.", pace: EASY },
-  { at: 1040, to: 1112, text: 'so you actually\nget back to it.', kicker: 'Tomorrow', kickerChunk: 0, until: 'the Reminders due strip lifts', style: "Satisfied and knowing, the payoff line; warm emphasis on 'actually'.", pace: EASY },
+  { at: 696, to: 860, text: 'It links each save | to what you saved before | so you see how\nyour ideas connect.', say: 'It links each save to what you saved before… so you see how your ideas connect.', until: 'the graph opens on its ties', duck: 0.45, style: "A little wonder, opening up on 'how your ideas connect'.", pace: EASY },
+  { at: 912, to: 1016, text: 'Then pick a time, | and Machina reminds you', say: 'Then pick a time, and Machina reminds you…', until: 'the reminder is set and confirmed', style: "Anticipation, the reveal of the best part; a small lift on 'reminds you', the thought carrying straight on into the next line.", pace: EASY },
+  { at: 1020, to: 1096, text: 'so you actually\nget back to it.', kicker: 'Tomorrow', kickerChunk: 0, until: 'the Reminders due strip lifts', style: "Satisfied and knowing, the payoff line; warm emphasis on 'actually'.", pace: EASY },
   // the close, on the lockup: the name (the drawn wordmark wipes in as it is
   // said), then the tagline, exactly as written (owner call 2026-09-28)
   { at: HITS.markStrike, to: TOTAL_FRAMES, place: 'lockup', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4, style: 'A confident, warm sign-off with a smile; the name proud, then the tagline unhurried and sincere.', pace: 'Unhurried.' },

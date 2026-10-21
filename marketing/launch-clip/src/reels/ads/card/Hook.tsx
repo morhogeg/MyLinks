@@ -100,7 +100,10 @@ const PileCard: React.FC<{ p: Pile; pending: number; grey: number }> = ({ p, pen
           <span style={{ display: 'block', marginTop: 2, fontSize: 23, fontWeight: 560, color: INK_SOFT }}>{p.list}</span>
         </span>
       </div>
-      <div style={{ marginTop: 16, height: ROW * 3, overflow: 'hidden', filter: grey > 0.01 ? `blur(${(grey * 4).toFixed(2)}px) grayscale(${grey.toFixed(3)})` : undefined, opacity: 1 - 0.5 * grey }}>
+      {/* (round 12, owner: Instagram's list read as grey squares) photos fade
+          like old prints: a light blur, a trace of colour, still legible as
+          pictures; the text lists keep the full grey-out */}
+      <div style={{ marginTop: 16, height: ROW * 3, overflow: 'hidden', filter: grey > 0.01 ? (p.kind === 'instagram' ? `blur(${(grey * 1.2).toFixed(2)}px) grayscale(${(grey * 0.75).toFixed(3)}) brightness(${(1 + 0.12 * grey).toFixed(3)})` : `blur(${(grey * 4).toFixed(2)}px) grayscale(${grey.toFixed(3)})`) : undefined, opacity: 1 - 0.5 * grey }}>
         {/* the strip: `pending` tiles are still off to the left; each arrival slides it right */}
         <div style={{ display: 'flex', gap: SHOT_GAP, paddingTop: 8, transform: `translateX(${Math.round(-(SHOT_W + SHOT_GAP) * pending)}px)` }}>
           {p.shots.map((f, k) => (
