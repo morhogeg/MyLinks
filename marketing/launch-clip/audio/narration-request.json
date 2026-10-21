@@ -1,1 +1,28 @@
-{"run": 6, "voice": "Sulafat", "model": "gemini-3.8-flash-tts", "scripts": ["adcard"], "takes": [], "audition": [], "name_variants": []}
+{
+ "run": 7,
+ "voice": "Sulafat",
+ "model": "gemini-3.8-flash-tts",
+ "scripts": [],
+ "takes": [
+  {
+   "name": "cand-a",
+   "voice": "Sulafat",
+   "text": "Then pick a time, and Machina reminds you to read it.",
+   "style": "Calm, warm and reassuring, like telling a friend a simple fact. A plain declarative sentence: the pitch steps down through 'to read it' and lands low and settled on 'it', the way a sentence ends at a full stop. Not excited, no upward inflection anywhere at the end. Pace: Conversational and easy, about 165 words a minute; short natural pauses. The product name \"Machina\" is the Latin word, said the classical Latin way: MAH-kee-nah, stress on the FIRST syllable; \"ch\" is a hard \"k\"; open vowels, \"a\" as in \"father\" (not as in \"cat\"), a short \"ee\", and a clear \"ah\" at the end, not \"nuh\". Never mah-KEE-nah."
+  },
+  {
+   "name": "cand-b",
+   "voice": "Sulafat",
+   "text": "Then pick a time, and Machina reminds you to read it.",
+   "style": "Quietly confident and warm, a touch lower in pitch. Stress 'reminds', then let the voice fall away gently on 'to read it.', finished and final, like the end of a thought. Pace: Conversational and easy, about 165 words a minute; short natural pauses. The product name \"Machina\" is the Latin word, said the classical Latin way: MAH-kee-nah, stress on the FIRST syllable; \"ch\" is a hard \"k\"; open vowels, \"a\" as in \"father\" (not as in \"cat\"), a short \"ee\", and a clear \"ah\" at the end, not \"nuh\". Never mah-KEE-nah."
+  },
+  {
+   "name": "cand-c",
+   "voice": "Sulafat",
+   "text": "Then pick a time, and Machina will remind you to read it.",
+   "style": "Calm, warm and reassuring, like telling a friend a simple fact. A plain declarative sentence: the pitch steps down through 'to read it' and lands low and settled on 'it', the way a sentence ends at a full stop. Not excited, no upward inflection anywhere at the end. Pace: Conversational and easy, about 165 words a minute; short natural pauses. The product name \"Machina\" is the Latin word, said the classical Latin way: MAH-kee-nah, stress on the FIRST syllable; \"ch\" is a hard \"k\"; open vowels, \"a\" as in \"father\" (not as in \"cat\"), a short \"ee\", and a clear \"ah\" at the end, not \"nuh\". Never mah-KEE-nah."
+  }
+ ],
+ "audition": [],
+ "name_variants": []
+}
