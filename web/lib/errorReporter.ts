@@ -1,10 +1,10 @@
 'use client';
 
 /**
- * Tiny, self-hosted client error reporter — the crash-visibility counterpart to
- * lib/analytics.ts. Instead of a third-party SDK (Sentry/Crashlytics) it writes
- * a compact record of each uncaught error to `users/{uid}/client_errors`, so we
- * can see what's breaking in the field for signed-in users.
+ * Tiny, self-hosted client error reporter. Instead of a third-party SDK
+ * (Sentry/Crashlytics) it writes a compact record of each uncaught error to
+ * `users/{uid}/client_errors`, so we can see what's breaking in the field for
+ * signed-in users.
  *
  * Sources covered:
  *   - window.onerror                (uncaught synchronous errors)
@@ -12,7 +12,7 @@
  *   - the app-root React error boundaries (app/error.tsx, app/global-error.tsx)
  *     which call reportError() directly.
  *
- * Design constraints, mirroring the analytics module:
+ * Design constraints:
  *   - Fire-and-forget: reporting never throws and never blocks.
  *   - Signed out (no uid ⇒ nothing to key the write to): the report is buffered
  *     in memory (capped) and flushed once a workspace uid resolves.
@@ -32,7 +32,6 @@ import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebase';
 import { isNativeApp, apiUrl, fetchWithTimeout, REQUIRE_AUTH } from './api';
 import { authHeaders } from './auth';
-import { getAnalyticsUid } from './analytics';
 
 const MAX_REPORTS_PER_SESSION = 20;
 const MAX_MESSAGE_LEN = 500;
@@ -49,6 +48,9 @@ let installed = false;
 let httpFallback = false;
 let httpReason = '';
 const seenMessages = new Set<string>();
+// The resolved workspace (data-doc) uid, NOT the Firebase Auth uid. AuthProvider
+// is its single writer via setReporterUid().
+let currentUid: string | null = null;
 const buffered: { error: unknown; source: string }[] = [];
 
 function platform(): 'web' | 'ios' {
@@ -57,6 +59,11 @@ function platform(): 'web' | 'ios' {
 
 function truncate(s: string, max: number): string {
     return s.length > max ? s.slice(0, max) : s;
+}
+
+/** Point error reporting at the resolved workspace, or clear it. */
+export function setReporterUid(uid: string | null): void {
+    currentUid = uid;
 }
 
 /**
@@ -73,7 +80,7 @@ function truncate(s: string, max: number): string {
  */
 export function reportError(error: unknown, source: string): void {
     try {
-        const uid = getAnalyticsUid();
+        const uid = currentUid;
         if (!uid) {
             // Once we know the workspace will never resolve, buffering is just
             // a slower way of losing the report — send it over HTTP instead.
@@ -92,7 +99,7 @@ export function reportError(error: unknown, source: string): void {
  * the moment a workspace uid resolves. No-op when still signed out or empty.
  */
 export function flushBufferedReports(): void {
-    if (!getAnalyticsUid() || buffered.length === 0) return;
+    if (!currentUid || buffered.length === 0) return;
     const pending = buffered.splice(0, buffered.length);
     for (const r of pending) reportError(r.error, r.source);
 }

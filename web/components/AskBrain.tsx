@@ -14,7 +14,6 @@ import { linkPlatform, platformIcon, platformColor, screenshotSource } from '@/l
 import { appCheckHeaders, db } from '@/lib/firebase';
 import { authHeaders } from '@/lib/auth';
 import { apiUrl, isNativeApp, fetchWithTimeout } from '@/lib/api';
-import { track, trackFirstAsk, trackAskNoCitations, trackAskSuggestionUsed, trackAskFollowupUsed, trackAskStopped } from '@/lib/analytics';
 import { reportError } from '@/lib/errorReporter';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import { ChatMessage, ChatSource, ChatSession, Link } from '@/lib/types';
@@ -801,7 +800,6 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                 answerRef: answerRefFor(chatId, idx, question, m.content),
             });
             patchMessageAt(idx, { savedCardId: id });
-            track('answer_saved_as_card', { sources: (m.sources ?? []).length, existed });
             // Keeping the same answer twice is not an error and never a second
             // card: it simply takes you to the one that already exists.
             if (existed) onOpenLink(id);
@@ -1270,7 +1268,6 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                             // (arrives after the prose, in place of source chips).
                             accUngrounded = true;
                             if (!isStale()) patchAt({ ungrounded: true });
-                            trackAskNoCitations();
                         } else if (evt.type === 'social') {
                             // A reply to a thank-you: kept out of contextIds.
                             accSocial = true;
@@ -1302,7 +1299,6 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                             done = true;
                         } else if (evt.type === 'done') {
                             done = true;
-                            trackFirstAsk();
                             // The ask was metered: keep the free plan's "N of 20
                             // left" line current, as the buffered path does.
                             if (!isPro) void refreshEntitlement();
@@ -1334,8 +1330,6 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                     ungrounded: Boolean(data.ungrounded),
                     ...(data.social ? { social: true } : {}),
                 };
-                trackFirstAsk();
-                if (data.ungrounded) trackAskNoCitations();
                 if (!isPro) void refreshEntitlement();
                 if (isStale()) { commitDetached([...withUser, answer]); return; }
                 setMessages(prev => [...prev, answer]);
@@ -1420,7 +1414,6 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
         bumpStreamGen();
         setIsThinking(false);
         setIsStreaming(false);
-        trackAskStopped();
     };
 
     // One-tap retry for a failed exchange: drop the trailing user+error pair
@@ -1560,7 +1553,6 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                                     // latest/rediscover chips are about ONE card we
                                     // suggested; the rest genuinely sweep the library.
                                     onClick={() => {
-                                        trackAskSuggestionUsed(s.kind);
                                         // Retire this chip for the session (moved
                                         // to the end = most recently used, so it
                                         // is the last to come back as backfill).
@@ -1796,7 +1788,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                                         // The chip shows the short label; what's SENT is the
                                         // self-contained question carrying the cited card's
                                         // title, so backend retrieval can actually find it.
-                                        onClick={() => { trackAskFollowupUsed(); send(f.question, undefined, 'followup', f.hints); }}
+                                        onClick={() => { send(f.question, undefined, 'followup', f.hints); }}
                                         // Full labels wrap instead of truncating (owner rule).
                                         className="max-w-full px-3 py-1.5 rounded-2xl border border-border-subtle text-text-muted text-[13px] text-start hover:text-text hover:border-accent/40 transition-colors cursor-pointer"
                                     >
@@ -1836,7 +1828,6 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, onBackTo
                                 // coming; keep the offer up rather than
                                 // dismissing it with nothing sent.
                                 if (busy) return;
-                                trackAskSuggestionUsed('fresh');
                                 // Full title in the sent bubble (owner rule: no truncation).
                                 send(`What's the gist of "${iso(fullTitle(freshCard.title) ?? freshCard.title)}"?`, undefined, 'card',
                                     { anchorTitles: [freshCard.title.trim().slice(0, 120)] });

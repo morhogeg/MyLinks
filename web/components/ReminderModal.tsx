@@ -6,7 +6,6 @@ import { Link } from '@/lib/types';
 import { X, Calendar, CalendarClock, Clock, BellOff, Loader2, Check, Repeat, Sun, Sofa } from 'lucide-react';
 import { updateLinkReminder } from '@/lib/storage';
 import { isNativeApp } from '@/lib/api';
-import { trackReminderSet } from '@/lib/analytics';
 import { useToast } from '@/components/Toast';
 import { useSheetDrag, useIsMobile } from '@/lib/useSheetDrag';
 import { hapticSelection, hapticSuccess, hapticWarning } from '@/lib/haptics';
@@ -226,7 +225,6 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
             // (+1d, +1w, +1mo); everything else here is a true one-shot and
             // MUST be stored as 'once' so it fires exactly once.
             await updateLinkReminder(uid, link.id, true, fireAt, selected === 'smart' ? 'smart' : 'once');
-            trackReminderSet();
             hapticSuccess();
             toast.success(`Reminder set for ${fmtDayTime(new Date(fireAt))}`);
             finish();

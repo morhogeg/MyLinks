@@ -13,8 +13,7 @@ import {
 } from '@/lib/auth';
 import { syncShareConfigToNative, clearNativeShareConfig } from '@/lib/shareConfig';
 import { readLocalAiConsent, writeLocalAiConsent } from '@/lib/aiConsent';
-import { setAnalyticsUid, flushSignIn, trackAppOpen, track } from '@/lib/analytics';
-import { installErrorReporter, reportError, flushBufferedReports, reportViaHttp } from '@/lib/errorReporter';
+import { installErrorReporter, reportError, flushBufferedReports, reportViaHttp, setReporterUid } from '@/lib/errorReporter';
 import {
     initPushListeners, refreshPushRegistration, unregisterPush,
     readLocalPushPrompt, writeLocalPushPrompt, getDevicePushPermission,
@@ -207,15 +206,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         installErrorReporter();
     }, []);
 
-    // Keep the analytics/error-reporter workspace uid in sync with the resolved
-    // data doc. When a workspace is active, emit the once-per-session `sign_in`
-    // (if a deliberate sign-in is pending) and the once-per-day `app_open`
-    // heartbeat that powers D1/D7 retention.
+    // Keep the error reporter's workspace uid in sync with the resolved data doc.
     useEffect(() => {
-        setAnalyticsUid(uid);
+        setReporterUid(uid);
         if (uid) {
-            flushSignIn();
-            trackAppOpen();
             // A workspace is now resolved — drain any errors captured while
             // signed out (the sign-in window where failures otherwise vanish).
             flushBufferedReports();
@@ -311,7 +305,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const acceptAiConsent = useCallback(() => {
         const now = Date.now();
         setAiConsented(true);
-        track('consent_accepted');
         if (uid) {
             writeLocalAiConsent(uid, now);
             updateDoc(doc(db, 'users', uid), { aiConsentAt: now })

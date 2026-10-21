@@ -2684,6 +2684,27 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-21 — USAGE DATA OFF THE PRIVACY LABEL (owner: the App Store
+  "Data Linked to You" box looked heavier than Notion's).** Machina actually
+  declares fewer kinds of data than Notion (6 categories vs Notion's 5 linked +
+  2 not linked, and no Search History), but Usage Data → Product Interaction
+  was the one row with no user-facing purpose: `web/lib/analytics.ts` wrote
+  content-free events to `users/{uid}/analytics_events` from 14 files and
+  NOTHING in the repo ever read them. **Removed the pipe:** `lib/analytics.ts`
+  deleted and every `track*`/`markSignIn` call gone; the workspace-uid holder
+  the error reporter needs moved into `lib/errorReporter.ts`
+  (`setReporterUid`, set by AuthProvider). Crash reporting (`client_errors`)
+  is unchanged. App `PrivacyInfo.xcprivacy` now declares 8 types (no
+  ProductInteraction); `/privacy` §2's "Product usage and diagnostics" bullet
+  is now "Diagnostics" and says Machina does not record which features you
+  use (Last updated → Oct 21); `docs/APP_STORE.md` §1 updated. Left alone:
+  the `analytics_events` rule match, the account-deletion sweep of that
+  subcollection (so old events still go with the account), and the events
+  already stored (not purged). **OWNER:** once a build carrying this is the
+  one live on the App Store, untick Usage Data → Product Interaction in
+  Connect → App Privacy and publish; not before (the live build still writes
+  the events). Verified: `tsc --noEmit` and eslint on touched files clean,
+  `plutil -lint` OK; not run on a device.
 - **2026-10-20 (evening) — WHATSAPP SHARE PREVIEW: PAGE LIVE BEFORE THE
   SHEET, PREVIEW IMAGE ON FIRST VIEW (owner, again, WhatsApp screenshot:
   "Saved on Machina <link>" with no card).** Live probe from a GitHub runner

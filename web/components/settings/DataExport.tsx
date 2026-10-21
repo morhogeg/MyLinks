@@ -8,7 +8,6 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { isNativeApp } from '@/lib/api';
-import { track } from '@/lib/analytics';
 import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
 import { getActionableTakeaway } from '@/lib/takeaway';
@@ -277,7 +276,6 @@ export default function DataExport() {
                 downloadBlob(markdown, mdName, 'text/markdown');
             }
 
-            track('export_used', { count: links.length });
             toast.success(`Exported ${links.length} card${links.length === 1 ? '' : 's'}.`);
         } catch {
             toast.error('Export failed. Please try again.');
