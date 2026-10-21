@@ -132,11 +132,23 @@ re-add it to keywords). Gained: `never`,
 
 **Promotional text** (170 chars, editable without review):
 
-> Everything you save, finally useful. Save links, screenshots, and videos from
-> any app. Machina summarizes and connects each one, so you can ask about
-> anything you saved.
+> Every link, screenshot, and video you save, summarized and connected.
 
-169/170 chars. **OWNER-APPROVED 2026-08-25**, after seven rounds. The rules
+69/170 chars. **LIVE 2026-10-21 (owner-chosen).** Replaced the 2026-08-25
+version below because the field is the first sentence a visitor reads on the
+product page and must show in full above "more" on a phone (two lines, no
+truncation). It no longer opens with the tagline: the new product page header
+(`header-21x9-3840x1646.png`) already says "Everything you save, finally
+useful." directly above it. The owner wanted the line to lead with the analysis
+(what each save becomes), not the recall ("brings them back when they matter"
+was rejected as less crucial here); "without reading it all" and "get the key
+points back" were also rejected. Previous text, kept for the record:
+"Everything you save, finally useful. Save links, screenshots, and videos from
+any app. Machina summarizes and connects each one, so you can ask about
+anything you saved."
+
+The 2026-08-25 rules below still hold for this field; the one that changed is
+rule 3 (the opening is no longer pinned to the tagline). The rules
 that survived, each earned by a rejection:
 
 1. **Carry the whole product**, not just the demo.
@@ -214,30 +226,35 @@ this list:
 
 **Description:**
 
-> You save things all day. Links, screenshots, videos, articles you meant to finish. Then you never open them again. Machina changes that.
+> You save things all day: links, screenshots, videos, articles you meant to finish. Then you never open them again. Machina changes that.
 >
-> Share anything to Machina from any app. It reads the page, watches the video, and pulls the text from your screenshot. Each save comes back as a clean card with a real summary, a category, tags, and connections to the things you already saved on the same subject.
+> Share anything to Machina from any app. Each save becomes a clean card with a summary, tags, and connections to what you saved before. Ask about anything you saved, and Machina answers with the exact saves it used.
 >
-> Then ask about anything you saved. Machina answers in plain language and cites the exact saves it used, so one tap takes you back to the source.
+> Save from anywhere
+> • Any app: tap Share, pick Machina
+> • Screenshots and photos, up to five per card
+> • Links and notes, pasted or typed
 >
-> CAPTURE FROM ANYWHERE
-> • Save from Safari, YouTube, X, or any other app: tap Share, pick Machina
-> • Screenshots and photos, up to five at once as a single card
-> • Paste a link, or write a note and save it as its own card
+> Find it again
+> • Search by meaning, not just keywords
+> • Related saves, linked automatically
+> • Collections that Machina suggests for you
 >
-> UNDERSTAND WHAT YOU SAVED
-> • A real summary, category, and tags on every save
-> • "See also" connections between related saves
-> • Search that finds meaning, not just matching words
+> Bring it back
+> • Reminders that resurface a save
+> • A weekly synthesis of what you saved
+> • A clear next step from each save
 >
-> COME BACK TO IT
-> • Ask Machina: cited answers from your own library
-> • Weekly synthesis: the themes and standouts from your week
-> • Add your own notes to any card, as many as you need
-> • Reminders and digests, on your schedule
-> • Collections you can keep private or publish as a page
->
-> Private by design. No ads, no tracking, and your content is never used to train AI models. Delete your account and everything in it at any time, from Settings.
+> Private by design. No ads, no tracking, and your content is never used to train AI models. Delete your account and everything in it anytime, from Settings.
+
+**Rewritten 2026-10-21 (owner: the old one "looks TERRIBLE" in App Store
+Connect's preview).** About 40% shorter. Sentence-case headings instead of ALL
+CAPS, which shouted at phone width. Every bullet fits one line at phone width
+(the old bullets wrapped to two). The three sections follow the screenshot
+story: save, find, bring back. Dropped: personal notes on cards and publishing
+a collection as a page (real features, cut for length). The notes history
+below explains the old two-bullet split; "Links and notes, pasted or typed"
+now covers note cards.
 
 **Notes split into two bullets 2026-08-26 (owner-caught).** The old capture
 line, "Or paste a link and write your own note, right in the app", implied
