@@ -2704,7 +2704,10 @@ exact-match, capped.
   one live on the App Store, untick Usage Data → Product Interaction in
   Connect → App Privacy and publish; not before (the live build still writes
   the events). Verified: `tsc --noEmit` and eslint on touched files clean,
-  `plutil -lint` OK; not run on a device.
+  unit tests 84/84, `next build` OK, `plutil -lint` OK; not run on a device.
+  **SHIPPED:** merge `511786b` → Vercel + TestFlight **build 1381** (run #381).
+  TestFlight is NOT the App Store: the Connect untick waits for an App Store
+  release of 1381 or later.
 - **2026-10-20 (evening) — WHATSAPP SHARE PREVIEW: PAGE LIVE BEFORE THE
   SHEET, PREVIEW IMAGE ON FIRST VIEW (owner, again, WhatsApp screenshot:
   "Saved on Machina <link>" with no card).** Live probe from a GitHub runner
