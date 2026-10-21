@@ -149,6 +149,8 @@ bell(f(H.article) + 0.15, 88, 0.018, 0.3, 1.2);
 bell(f(518) + 0.2, 84, 0.016, 0, 1.2);
 // the cut to the big question
 impact(f(H.ask2), 0.08);
+// the big question typing, as the first does
+for (let fr = H.ask2; fr < H.ask2 + 32 * TYPE_STEP; fr += 4) tick(f(fr), 0.028, 1.6 + ((fr / 4) % 3) * 0.08);
 tick(f(H.send2), 0.11, 1.3);
 whoosh(f(H.send2), 0.4, 0.05, 0.25);
 

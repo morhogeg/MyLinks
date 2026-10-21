@@ -16,7 +16,7 @@ import { useAdFrame, type AdFrame } from '../trip/format';
  *           TED talk say about procrastination?" types itself.
  *  answer   Send; the cut lands on the touch. The answer streams in, its
  *           source under it; on "one clear answer" the answer itself lifts.
- *  big      CUT to a new chat, "What do my saves say about time?" typed;
+ *  big      CUT to a new chat, "What do my saves say about time?" types itself;
  *           Send; one answer woven from three saves. Its first line, the
  *           theme, lifts on "finds what connects them"; the three saves it
  *           connected lift one by one; the finger lands on its Graph chip.
@@ -64,7 +64,7 @@ export const frameAt = (f: number) => {
     const n = Math.floor((f - S.send) / K);
     return n < STREAMED1 ? at(T, 'stream1', n) : at(T, 'sources1', Math.min(SOURCED1 - 1, n - STREAMED1));
   }
-  if (f < S.send2) return at(T, 'typing2', TYPED2 - 1);
+  if (f < S.send2) return at(T, 'typing2', Math.min(TYPED2 - 1, Math.floor((f - S.ask2) / TYPE_STEP)));
   if (f < S.graphTap) {
     const n = Math.floor((f - S.send2) / K);
     return n < STREAMED2 ? at(T, 'stream2', n) : at(T, 'sources2', Math.min(SOURCED2 - 1, n - STREAMED2));
