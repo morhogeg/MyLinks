@@ -19,11 +19,11 @@ Top-level answers:
 
 Declare exactly these **8 data types** (across 6 categories — Connect counts
 the types, not the categories, so "8 data types" on the summary screen is the
-correct total). ⚠️ **OWNER, 2026-10-21:** Usage Data → Product Interaction was
-REMOVED from the app (the self-hosted analytics pipe was deleted; nothing ever
-read it). Once the build without it is the one on the App Store, untick
-**Usage Data → Product Interaction** in Connect and publish the label; until
-then the live build still writes those events, so keep it declared. ⚠️ **OWNER, 2026-10-06:** the label published 2026-08-26 has
+correct total). **DONE 2026-10-21:** Usage Data → Product Interaction was
+removed from the app (the self-hosted analytics pipe was deleted; nothing ever
+read it) and unticked + published in Connect the same day, before the 1.0
+release, with build 1381 attached to 1.0. Product Page Preview now shows 5
+categories / 8 types, matching the app's `PrivacyInfo.xcprivacy`. ⚠️ **OWNER, 2026-10-06:** the label published 2026-08-26 has
 the first 7 rows only. Add **Purchases → Purchase History** (Machina Pro
 shipped 2026-09-02: RevenueCat receives the purchase receipts, keyed to the
 Firebase auth uid) and **Identifiers → Device ID** (the FCM/APNs push token

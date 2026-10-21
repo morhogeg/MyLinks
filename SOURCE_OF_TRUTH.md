@@ -2700,14 +2700,12 @@ exact-match, capped.
   use (Last updated → Oct 21); `docs/APP_STORE.md` §1 updated. Left alone:
   the `analytics_events` rule match, the account-deletion sweep of that
   subcollection (so old events still go with the account), and the events
-  already stored (not purged). **OWNER:** once a build carrying this is the
-  one live on the App Store, untick Usage Data → Product Interaction in
-  Connect → App Privacy and publish; not before (the live build still writes
-  the events). Verified: `tsc --noEmit` and eslint on touched files clean,
+  already stored (not purged). Verified: `tsc --noEmit` and eslint on touched files clean,
   unit tests 84/84, `next build` OK, `plutil -lint` OK; not run on a device.
   **SHIPPED:** merge `511786b` → Vercel + TestFlight **build 1381** (run #381).
-  TestFlight is NOT the App Store: the Connect untick waits for an App Store
-  release of 1381 or later.
+  **Connect label DONE (owner, same day):** 1.0 was never released, so build
+  1379 was swapped for 1381 on the 1.0 version page and Product Interaction
+  was unticked and published; the label now shows 5 categories / 8 types.
 - **2026-10-20 (evening) — WHATSAPP SHARE PREVIEW: PAGE LIVE BEFORE THE
   SHEET, PREVIEW IMAGE ON FIRST VIEW (owner, again, WhatsApp screenshot:
   "Saved on Machina <link>" with no card).** Live probe from a GitHub runner
