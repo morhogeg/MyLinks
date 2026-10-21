@@ -72,8 +72,11 @@ export const HITS = {
   send2: beat(41.5), // Send is tapped; its answer arrives on the touch
   lead: beat(42.5), // "It even finds…": the theme (its first line) lifts, and holds
   sources2: beat(44.5), // its three sources arrive…
-  chips: [beat(45.5), beat(46), beat(46.5)], // …and lift one by one on "so you see"
-  graphTap: beat(47.5), // its Graph chip: the saves it connected, lit in the real graph ("the theme running through your saves")
+  // (2026-10-21, owner: the move from the theme down to its sources was too
+  // fast to read) the camera glides down over "connects them…", lands, and
+  // only then do the three lift
+  chips: [beat(46), beat(46.5), beat(47)], // …and lift one by one on "so you see"
+  graphTap: beat(48), // its Graph chip on "running": the saves it connected, lit in the real graph ("the theme running through your saves")
   lockup: beat(52.5), // thrown out into the lockup; the mark launches
   markStrike: beat(53.5), // the mark's point strikes
 };

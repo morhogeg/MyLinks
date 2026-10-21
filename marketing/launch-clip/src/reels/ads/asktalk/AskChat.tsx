@@ -81,6 +81,15 @@ const wholePoints = ([x, y, w, h]: Rect): Rect => {
 
 const CHIPS = ['chip1', 'chip2', 'chip3'] as const;
 
+/**
+ * The glide from the theme to its sources (2026-10-21, owner: it jumped, too
+ * fast to follow). It starts once "what connects" is said and lands as
+ * the first source lifts: about 1.3s on a sine ease, whose top speed
+ * is half the old EASE_IN_OUT move's, so the answer stays readable on the way.
+ */
+const GLIDE = [S.lead + 16, S.chips[0]] as const;
+const GLIDE_EASE = (t: number) => 0.5 - 0.5 * Math.cos(Math.PI * t);
+
 export const chatKeys = (L: AdFrame): Key[] => {
   const y = (v: number) => v + L.dy;
   return [
@@ -102,12 +111,12 @@ export const chatKeys = (L: AdFrame): Key[] => {
     { f: S.send2, cx: 196.5, cy: 290, z: 2.3, fy: y(980) },
     { f: S.lead - 1, cy: 296, z: 2.34, ease: linear },
     // (the theme holds a moment, lifted, before the camera glides down)
-    { f: S.lead + 16, cy: 298, z: 2.35, ease: linear },
-    // the theme lifts; then down onto the three saves it connected, at rest as they lift
-    { f: S.chips[0] - 6, cx: 196.5, cy: 492, z: 2.4, fy: y(980), ease: EASE_IN_OUT },
-    { f: S.chips[2] + 4, cy: 496, z: 2.42, ease: linear },
-    // down a touch to its Graph chip, at rest as the finger lands
-    { f: S.graphTap - 1, cy: 540, z: 2.32, fy: y(980), ease: EASE_IN_OUT },
+    { f: GLIDE[0], cy: 298, z: 2.35, ease: linear },
+    // then a slow glide down onto the three saves it connected, framed with
+    // its Graph chip so nothing moves again: at rest as they lift and the
+    // finger lands
+    { f: GLIDE[1], cx: 196.5, cy: 512, z: 2.3, fy: y(980), ease: GLIDE_EASE },
+    { f: S.graphTap - 1, cy: 515, z: 2.32, ease: linear },
     // CUT on the touch into the graph: the three saves it connected, lit and
     // linked among the rest (framed below the graph's legend)
     // (it arrives a touch close and settles back, then drifts: no hard stop)
@@ -156,7 +165,7 @@ export const AskChat: React.FC<{ f: number }> = ({ f }) => {
   // the theme (the answer's first line) lifts with the line that names it,
   // and settles as the camera moves on
   const theme =
-    f >= S.send2 ? prog(f, S.lead - 2, S.lead + 12, EASE_SPRING) * (1 - prog(f, S.chips[0] - 20, S.chips[0] - 4, EASE_IN_OUT)) : 0;
+    f >= S.send2 ? prog(f, S.lead - 2, S.lead + 12, EASE_SPRING) * (1 - prog(f, GLIDE[0], GLIDE[0] + 20, EASE_IN_OUT)) : 0;
 
   // the move into the graph: the chat, held on its last frame, pushes in on
   // the Graph chip (which keeps its place on screen) as the graph grows out of it
