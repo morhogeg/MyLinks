@@ -314,12 +314,13 @@ is live. Nothing else in the film claims availability.
 
 ## The highlight reel (pilot)
 
-`MachinaReel` is an 81.6s vertical reel: the problem → "Introducing Machina.
-Never lose another great find." → "Save anything, from anywhere." (shares
+`MachinaReel` is an 80.5s vertical reel: the problem → "Introducing Machina."
+(round 16: no promise line under the mark; straight on to the shares) → "Save anything, from anywhere." (shares
 from YouTube, Instagram and Safari into the mark) → "A link, a screenshot, or
 a note." (the Add dialog's tabs) → "Machina reads it, summarizes it, and files
 it." (the five phases) → the new card, opened → Find → Ask → Connect
-→ the weekly recap, read → the lockup, "Everything you save, finally useful." It has
+→ the weekly recap, read ("And every week…": the "And" is voice only) → the
+lockup, "Machina." then "Everything you save, finally useful." It has
 its own score, the film's narrator and word-timed captions. **Every pixel of
 app UI in it is the real, shipped web app**, driven and recorded frame by
 frame; nothing is a mockup or a rebuilt screen. The one exception is not
@@ -497,17 +498,17 @@ Round 15 (owner, on round 14):
 | Output frames | Scene | What it does |
 |---|---|---|
 | 0–288 | `Hook` | Ten real saves come into focus (0–64); the problem is named over them (the `problem` hold, 64–288): each named save lifts on its word, then all bleach |
-| 288–456 | `Hook` | They collapse into the point (320), the brackets snap (336); "Introducing Machina." (the drawn wordmark under the mark), the `name` hold (416–448), "Never lose another great find." |
-| 456–648 | `ShareBeat` | "Save anything, from anywhere.": YouTube, Instagram and Safari saves shared into the mark (the `share` hold) |
-| 648–736 | `Hook` → `Save` | The point drops to become the **+** (the iris opens at 688), the + is tapped, Add to Machina |
-| 736–880 | `SaveModes` | "A link, a screenshot, or a note.": Link, Image, Note, back to Link, the link pasted, Save tapped |
-| 880–1008 | `Save` | "Machina reads it, summarizes it, and files it." over the five real phases, an 8th apart; saved; the dialog drops; the card lands (992) |
-| 1008–1200 | `CardDetail` | The new card opened: summary, **Key Points** (the `card` hold) |
-| 1200–1360 | `Find` | "easy dinner, empty fridge" → the one card it means (1264; lingers 1280–1320) → tap Ask |
-| 1360–1696 | `Ask` | The question → the answer and three sources (1504–1552; lingers 1560–1620) → the dive into the Graph chip |
-| 1696–1808 | `Connect` | The real graph (60fps; lingers 1744–1772); tap Revisit |
-| 1808–2254 | `Recall` | "Do this" (to 1952), then "This week in Machina", opened (1968) and read slowly: write-up, themes, Standout, question; thrown out into the lockup |
-| 2240–2448 | `End` | The mark launches (strike 2284), the wordmark, the tagline "Everything you save, finally useful." in Geist (spoken word for word, nothing else), held |
+| 288–424 | `Hook` | They collapse into the point (320), the brackets snap (336); "Introducing Machina." (the drawn wordmark under the mark) |
+| 424–600 | `ShareBeat` | "Save anything, from anywhere.": YouTube, Instagram and Safari saves shared into the mark (the `share` hold) |
+| 600–688 | `Hook` → `Save` | The point drops to become the **+** (the iris opens at 640), the + is tapped, Add to Machina |
+| 688–832 | `SaveModes` | "A link, a screenshot, or a note.": Link, Image, Note, back to Link, the link pasted, Save tapped |
+| 832–960 | `Save` | "Machina reads it, summarizes it, and files it." over the five real phases, an 8th apart; saved; the dialog drops; the card lands (944) |
+| 960–1152 | `CardDetail` | The new card opened: summary, **Key Points** (the `card` hold) |
+| 1152–1312 | `Find` | "easy dinner, empty fridge" → the one card it means (1216; lingers 1232–1272) → tap Ask |
+| 1312–1648 | `Ask` | The question → the answer and three sources (1456–1504; lingers 1512–1572) → the dive into the Graph chip |
+| 1648–1760 | `Connect` | The real graph (60fps; lingers 1696–1724); tap Revisit |
+| 1760–2206 | `Recall` | "Do this" (to 1904), then "This week in Machina", opened (1920) and read slowly: write-up, themes, Standout, question; thrown out into the lockup |
+| 2192–2416 | `End` | The mark launches (strike 2236), "Machina." said as the wordmark wipes in (round 16), then the tagline "Everything you save, finally useful." in Geist (spoken word for word), held |
 
 **The clock.** Scenes are written in SOURCE frames (the round-1 cut, 600
 frames). `MachinaReel` plays them at `K = 2` via `clockAt(frame)`; `HOLDS`

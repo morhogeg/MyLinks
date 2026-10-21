@@ -18,6 +18,16 @@ import { CardDetail } from './scenes/CardDetail';
 import { CLOCK } from './kit/camera';
 import { End } from './scenes/End';
 
+/** the narrator's word timing for what each caption SHOWS: a voice-only
+ *  lead-in (`say`, e.g. round 16's "And every week…") is spoken before the
+ *  shown words, so its timings are dropped and the line reveals on its own */
+const SHOWN_VO = VO.map((t) => {
+  const c = CAPTIONS.find((x) => x.at === t.frame);
+  if (!c?.say) return t;
+  const count = (x: string) => x.split(/\s+/).filter(Boolean).length;
+  return { ...t, words: t.words.slice(count(c.say) - count(c.text)) };
+});
+
 /**
  * Machina highlight reel (the pilot): 20s, 1080 × 1920, built from the reel
  * kit (src/reels/kit) on the reel's own clock (reel-timeline.mjs). Every
@@ -68,7 +78,7 @@ export const MachinaReel: React.FC<{
         frame={f}
         fps={FPS}
         captions={CAPTIONS as ReelCaption[]}
-        timing={VO}
+        timing={SHOWN_VO}
         kickers={KICKERS}
         showCaptions={withCaptions}
         showKickers={withCaptions}

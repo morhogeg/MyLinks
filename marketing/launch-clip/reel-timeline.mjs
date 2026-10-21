@@ -59,12 +59,14 @@ export const onBeat = (f) => Math.round(f / BEAT_FRAMES) * BEAT_FRAMES;
  * Inside two scene holds, in OUTPUT frames from the hold's start (the scenes
  * and the score both read these):
  *  - SHARE: when each app's card arrives (scenes/ShareBeat.tsx); the first
- *    waits for "All your saves, finally useful." to leave the screen;
+ *    arrives a beat-fraction before "Save anything, from anywhere.";
  *  - MODES: the tab taps, the paste and the Save tap (scenes/SaveModes.tsx);
  *    Save is tapped INSIDE the hold, so the source clock resumes on the
  *    tapped dialog and goes straight into the phases.
  */
-export const SHARE_STARTS = [36, 84, 132];
+// (round 16, owner: no promise line under the mark, and on to the shares
+// sooner: the shares start a beat earlier)
+export const SHARE_STARTS = [20, 68, 116];
 /** each share, from its start: the Share button is tapped, the card is
  *  pulled, it lands in the mark (scenes/ShareBeat.tsx and the score) */
 export const SHARE_BEAT = { tap: 20, pull: 24, land: 36 };
@@ -88,15 +90,18 @@ export const TODO_LEN = 144;
 
 export const HOLDS = [
   { id: 'problem', at: 32, len: 224, adv: 0 }, // the problem, named
-  { id: 'name', at: 96, len: 32, adv: 0 }, // the name holds
-  { id: 'share', at: 100, len: 192, adv: 0 }, // shared from YouTube, Instagram, Safari into the mark
+  // (round 16, owner: the "name" hold, which carried "Never lose another
+  // great find.", is gone with the line: the mark goes straight to the shares)
+  { id: 'share', at: 100, len: 176, adv: 0 }, // shared from YouTube, Instagram, Safari into the mark
   { id: 'modes', at: 144, len: 144, adv: 0 }, // Link, Image, Note
   { id: 'card', at: 208, len: 192, adv: 0 }, // the new card, opened
   { id: 'found', at: 248, len: 40, adv: 4 }, // linger: the one card it finds
   { id: 'sources', at: 372, len: 60, adv: 6 }, // linger: the answer and its sources
   { id: 'graph', at: 440, len: 28, adv: 6 }, // linger: the graph
   { id: 'recall', at: 464, len: 192 + 144, adv: 0 }, // Revisit: the "Do this" list (TODO_LEN), then this week's recap, read
-  { id: 'end', at: 584, len: 64, adv: 16 }, // linger: the end card holds ~2s once the line is whole
+  // (round 16: a bar longer, so the end card still holds ~2s once the
+  // tagline is whole, now that "Machina." is said before it)
+  { id: 'end', at: 584, len: 80, adv: 16 }, // linger: the end card holds ~2s once the line is whole
 ];
 
 /** source frame → output frame (at/after a scene hold → after it) */
@@ -244,11 +249,10 @@ export const CAPTIONS = [
   // (`duck`: the music steps further back under the two brand lines, the
   // name and the promise; round 13, measured masked in the speech band)
   { at: real(56), to: 410, place: 'mark', text: 'Machina.', say: 'Introducing Machina.', duck: 0.4 },
-  // (2026-09-28, owner: every film ENDS on the tagline and uses it once; the
-  // App Store subtitle, which can change with search tests, plays here)
-  { at: 416, to: 488, text: 'Never lose another\ngreat find.' },
+  // (round 16, owner: "Never lose another great find." is no longer said or
+  // shown; the mark goes on to the shares)
   // the share hold: from any app, into Machina (scenes/ShareBeat.tsx)
-  { at: holdStart('share') + 40, to: holdStart('share') + 176, text: 'Save anything, from anywhere.', until: 'the third share lands in the mark' },
+  { at: holdStart('share') + 24, to: holdStart('share') + 160, text: 'Save anything, from anywhere.', until: 'the third share lands in the mark' },
   // the modes hold: the Add dialog's three ways in
   // (to +122: within KICKER_BRIDGE of the next line, so SAVE stays up)
   { at: holdStart('modes'), to: holdStart('modes') + 122, text: 'A link, a screenshot, or a note.', until: 'the tour is back on Link, the link pasted' },
@@ -269,13 +273,20 @@ export const CAPTIONS = [
   // app makes an action item where one is relevant; it writes one only for a
   // save that calls for an action), then the weekly recap, read slowly
   { at: holdStart('recall') + 16, to: holdStart('recall') + TODO_LEN - 4, text: 'When a save calls for action,\nMachina turns it into a to-do.' },
-  { at: holdStart('recall') + TODO_LEN + 24, to: holdStart('recall') + TODO_LEN + 130, text: 'Every week, Machina brings back\nwhat’s worth remembering.' },
-  { at: holdStart('recall') + TODO_LEN + 136, to: holdStart('recall') + TODO_LEN + 256, text: 'The themes of your week,\nand the one save worth rereading.' },
+  // (round 16, owner: the voice leads in with "And", so it follows the
+  // to-do line naturally; the screen does not show it. "Every" keeps its
+  // capital so the shown line is the end of the said one: same audio)
+  { at: holdStart('recall') + TODO_LEN + 24, to: holdStart('recall') + TODO_LEN + 138, text: 'Every week, Machina brings back\nwhat’s worth remembering.', say: 'And Every week, Machina brings back what’s worth remembering.' },
+  { at: holdStart('recall') + TODO_LEN + 144, to: holdStart('recall') + TODO_LEN + 256, text: 'The themes of your week,\nand the one save worth rereading.' },
   // the close: the name (the drawn wordmark wipes in as it is said), then
   // the App Store subtitle, set big in the serif
   // (2026-09-28, owner: the close is the TAGLINE, word for word, and the
   // voice says exactly that and nothing else; the wordmark wipes in silently)
-  { at: onBeat(real(542)), to: real(600), place: 'lockup', text: 'Everything you save, finally useful.', duck: 0.4 },
+  // (round 16, owner: the close says the name first. "Machina." is spoken on
+  // the beat after the strike and the drawn wordmark wipes in on it
+  // (scenes/End.tsx); the tagline follows, still word for word)
+  { at: onBeat(real(HITS.markStrike)), to: onBeat(real(HITS.markStrike)) + 44, place: 'mark', text: 'Machina.', duck: 0.4 },
+  { at: onBeat(real(HITS.markStrike)) + 48, to: real(600), place: 'lockup', text: 'Everything you save, finally useful.', duck: 0.33 },
 ];
 
 /**
