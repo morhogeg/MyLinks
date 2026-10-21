@@ -1,4 +1,18 @@
-import { Easing, interpolate } from 'remotion';
+import { createContext, useContext } from 'react';
+import { Easing, interpolate, useCurrentFrame } from 'remotion';
+
+/**
+ * The frame on the film's DESIGN grid (timeline.mjs: 75 frames to the bar).
+ * src/Film.tsx provides it, scene-local, sampled SPEED× faster than the output
+ * frame; scenes read it instead of useCurrentFrame() so the whole picture
+ * follows the tempo. Fractional on purpose: rounding would skip a frame every
+ * twelve or so and judder the motion.
+ */
+export const FilmFrame = createContext<number | null>(null);
+export const useFilmFrame = () => {
+  const real = useCurrentFrame();
+  return useContext(FilmFrame) ?? real;
+};
 
 /**
  * Motion vocabulary. The app has exactly one modal-entrance curve

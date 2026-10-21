@@ -2460,6 +2460,18 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-21 — LAUNCH FILM (LIGHT) AT 104 BPM.** Branch
+  `claude/light-launch-film` (from `claude/film-gemini-vo`). Owner: faster and
+  more engaging; no full stop after "Introducing Machina".
+  - **Tempo:** the whole film plays at 104 BPM instead of 96 (80s → 73.8s).
+    The picture keeps its 96 BPM design grid and is sampled 1.083× faster
+    (`Film.tsx`, `useFilmFrame`); the score is re-synthesized at 104; the
+    narration keeps its natural speed (no re-voicing).
+  - **Act one lines** start at 1.9 / 3.45 / 4.9 bars (were 2.0 / 3.4 / 4.8)
+    so each read fits before the next at the shorter bars.
+  - **Verified:** `tsc`, verify (captions never overlap, tightest hand-over 4
+    frames), both spoken editions rendered; owner review pending.
+
 - **2026-10-04 (night) — LAUNCH FILM ENDS ON THE TAGLINE.** Branch
   `claude/film-gemini-vo`. Owner: the final frame uses the tagline
   "Everything you save, finally useful", and it leaves the beginning.

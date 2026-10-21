@@ -27,7 +27,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 VO = os.path.join(ROOT, "out", "vo")
 
-BAR_SEC = 2.5
+# real seconds to the bar: mirror timeline.mjs BPM (the film plays at 104;
+# the bars below are the design grid's, the narration keeps its natural speed)
+BAR_SEC = 60 / 104 * 4
 
 VOICE = "af_heart"  # Kokoro
 SPEED = 0.95  # Kokoro, for weight (owner-approved)
@@ -64,20 +66,21 @@ FILM_PACE = "Measured and cinematic, about 145 words a minute; room to breathe b
 # Act one speaks at 0.9 on Kokoro (round 13e: the owner heard the opening VO as
 # rushed), and the retimed caption windows put real air between the lines.
 FILM_LINES = [
-    {"bar": 1.05, "bars": 0.85, "text": "You save things everywhere.", "speed": 0.9,
+    {"bar": 1.05, "bars": 0.78, "text": "You save things everywhere.", "speed": 0.9,
      "style": "Soft, intimate opener, a knowing half-smile, as if noticing something true about the listener."},
     # Sulafat reads lines 2 and 3 longer than Kokoro did. Line 3 starts at bar 3.4
     # (was 3.6; its caption still ends at 4.3), and both lines run at tempo
     # 1.08 with pauses capped at 0.25s, so neither runs into the next line.
-    {"bar": 2.0, "bars": 1.35, "text": "An article here. A video there. A thread somewhere else.", "speed": 0.9,
+    # 2026-10-21 (104 BPM): lines 2-4 start at 1.9 / 3.45 / 4.9 to keep fitting.
+    {"bar": 1.9, "bars": 1.45, "text": "An article here. A video there. A thread somewhere else.", "speed": 0.9,
      "style": "Light, observational list, each item a small glance in a different direction; even rhythm.",
      "tempo": 1.08, "max_pause": 0.25},
-    {"bar": 3.4, "bars": 0.9, "text": "Multiple apps, countless saved links.", "speed": 0.9,
+    {"bar": 3.45, "bars": 1.0, "text": "Multiple apps, countless saved links.", "speed": 0.9,
      "style": "A touch heavier: the weight of the pile.",
      "tempo": 1.08, "max_pause": 0.25},
     # a deliberate beat of silence before this one — the first wrong pile
     # opens wordless (owner note, round 13c)
-    {"bar": 4.8, "bars": 1.3, "text": "Saved, and rarely seen again.", "speed": 0.9,
+    {"bar": 4.9, "bars": 1.3, "text": "Saved, and rarely seen again.", "speed": 0.9,
      "style": "Quiet and a little wistful, landing softly; the low point."},
     # the tagline moved to the closing line (owner, 2026-10-04)
     {"bar": 6.45, "bars": 1.35, "text": f"Introducing {SAY_NAME}.",

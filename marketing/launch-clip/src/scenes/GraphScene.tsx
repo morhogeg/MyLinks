@@ -1,9 +1,9 @@
 import React from 'react';
-import { AbsoluteFill, useCurrentFrame } from 'remotion';
+import { AbsoluteFill } from 'remotion';
 import { Phone } from '../ui/Phone';
 import { useFraming } from '../film/format';
 import { FloorGlow, Rig, SET_BG, Stage } from '../film/effects';
-import { drift, prog, ramp, EASE_IN_OUT, EASE_MODAL, EASE_OUT } from '../film/anim';
+import { drift, prog, ramp, EASE_IN_OUT, EASE_MODAL, EASE_OUT, useFilmFrame } from '../film/anim';
 import { GraphScreen } from '../ui/screens';
 
 /**
@@ -15,7 +15,7 @@ import { GraphScreen } from '../ui/screens';
  * that it was a whole library all along.
  */
 export const GraphScene: React.FC = () => {
-  const f = useCurrentFrame();
+  const f = useFilmFrame();
   const fr = useFraming();
 
   const draw = prog(f, 2, 108, EASE_IN_OUT);

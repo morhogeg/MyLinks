@@ -1,10 +1,10 @@
 import React from 'react';
-import { AbsoluteFill, useCurrentFrame } from 'remotion';
+import { AbsoluteFill } from 'remotion';
 
 import { SET_BG, Stage } from '../film/effects';
 import { useFraming } from '../film/format';
 import { CONSTELLATION, Silo, SILO_BASE_COUNT, SILO_OFFSET } from '../ui/platforms';
-import { drift, prog, ramp, EASE_IN_OUT, EASE_OUT } from '../film/anim';
+import { drift, prog, ramp, EASE_IN_OUT, EASE_OUT, useFilmFrame } from '../film/anim';
 
 /**
  * The turn: five places become one.
@@ -23,7 +23,7 @@ import { drift, prog, ramp, EASE_IN_OUT, EASE_OUT } from '../film/anim';
  * product, the same gesture the boot exits on.
  */
 export const WordmarkScene: React.FC = () => {
-  const f = useCurrentFrame();
+  const f = useFilmFrame();
   const fr = useFraming();
   // the same compression + camera the scatter ended on, so the gather undoes
   // the same scatter — round 13: what rushes back in is the SILOS (the piles

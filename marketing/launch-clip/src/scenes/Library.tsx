@@ -1,9 +1,9 @@
 import React from 'react';
-import { AbsoluteFill, useCurrentFrame } from 'remotion';
+import { AbsoluteFill } from 'remotion';
 import { Phone } from '../ui/Phone';
 import { useFraming } from '../film/format';
 import { FloorGlow, Rig, SET_BG, Stage } from '../film/effects';
-import { drift, prog, ramp, typed, EASE_IN_OUT, EASE_MODAL, EASE_OUT, EASE_SPRING } from '../film/anim';
+import { drift, prog, ramp, typed, EASE_IN_OUT, EASE_MODAL, EASE_OUT, EASE_SPRING, useFilmFrame } from '../film/anim';
 import { FeedScreen } from '../ui/screens';
 import { CARDS, SEARCH_HITS, SEARCH_QUERY } from '../data/library';
 
@@ -19,7 +19,7 @@ import { CARDS, SEARCH_HITS, SEARCH_QUERY } from '../data/library';
  * app finding THE thing.
  */
 export const Library: React.FC = () => {
-  const f = useCurrentFrame();
+  const f = useFilmFrame();
   const fr = useFraming();
 
   // THREE bars now (round 13 gave the browse bar to act one): the feed lands,

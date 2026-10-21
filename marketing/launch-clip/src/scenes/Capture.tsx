@@ -1,9 +1,9 @@
 import React from 'react';
-import { AbsoluteFill, useCurrentFrame } from 'remotion';
+import { AbsoluteFill } from 'remotion';
 import { Phone } from '../ui/Phone';
 import { useFraming } from '../film/format';
 import { FloorGlow, Rig, SET_BG, Stage } from '../film/effects';
-import { drift, prog, ramp, EASE_IN_OUT, EASE_MODAL, EASE_OUT, EASE_SPRING } from '../film/anim';
+import { drift, prog, ramp, EASE_IN_OUT, EASE_MODAL, EASE_OUT, EASE_SPRING, useFilmFrame } from '../film/anim';
 import {
   AnalyzingScreen,
   ArticleScreen,
@@ -43,7 +43,7 @@ const SOURCES = [
 const CUTS = [0, 46, 70, 94];
 
 export const Capture: React.FC = () => {
-  const f = useCurrentFrame();
+  const f = useFilmFrame();
   const fr = useFraming();
 
   // ── the device arrives

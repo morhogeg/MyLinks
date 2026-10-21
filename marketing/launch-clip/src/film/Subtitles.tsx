@@ -1,6 +1,7 @@
 import React from 'react';
-import { AbsoluteFill, useCurrentFrame, useVideoConfig } from 'remotion';
-import { SUBTITLES, BAR_FRAMES, FPS } from '../../timeline.mjs';
+import { AbsoluteFill, useVideoConfig } from 'remotion';
+import { SUBTITLES, BAR_FRAMES, FPS, SPEED } from '../../timeline.mjs';
+import { useFilmFrame } from './anim';
 import { sans } from '../fonts';
 import VO from './vo.json';
 
@@ -46,7 +47,8 @@ const LEAD = 3;
 export const CUE_FRAMES = SUBTITLES.map((s) => {
   const first = (VO as { bar: number; words: number[] }[]).find((v) => v.bar === s.bar)?.words[0] ?? 0;
   return {
-    from: Math.round(s.bar * BAR_FRAMES + first * FPS) - LEAD,
+    // word times are real seconds of narration; the cue grid is the design grid
+    from: Math.round(s.bar * BAR_FRAMES + first * FPS * SPEED) - LEAD,
     to: Math.round((s.bar + s.bars) * BAR_FRAMES),
   };
 });
@@ -88,7 +90,7 @@ const KICKER = (size: number): React.CSSProperties => ({
 });
 
 export const Subtitles: React.FC = () => {
-  const frame = useCurrentFrame();
+  const frame = useFilmFrame();
   const { width, height } = useVideoConfig();
   const vertical = height > width;
 

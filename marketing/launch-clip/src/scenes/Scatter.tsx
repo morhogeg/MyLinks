@@ -1,5 +1,5 @@
 import React from 'react';
-import { AbsoluteFill, useCurrentFrame } from 'remotion';
+import { AbsoluteFill } from 'remotion';
 import { SAVES, HITS } from '../../timeline.mjs';
 import {
   CONSTELLATION,
@@ -14,7 +14,7 @@ import {
 import { SET_BG, Stage } from '../film/effects';
 import { useFraming } from '../film/format';
 import { Tap } from '../ui/app';
-import { drift, prog, ramp, EASE_IN_OUT, EASE_MODAL, EASE_OUT } from '../film/anim';
+import { drift, prog, ramp, EASE_IN_OUT, EASE_MODAL, EASE_OUT, useFilmFrame } from '../film/anim';
 
 /**
  * Act one, rebuilt as a story (round 13): SCATTERED SAVING.
@@ -55,7 +55,7 @@ const WRONG_A = 3;
 const WRONG_B = 4;
 
 export const Scatter: React.FC = () => {
-  const f = useCurrentFrame();
+  const f = useFilmFrame();
   const fr = useFraming();
   const vx = fr.vertical ? 0.42 : 0.78;
   const vy = fr.vertical ? 1.45 : 0.82;

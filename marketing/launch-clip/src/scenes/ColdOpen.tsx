@@ -1,7 +1,7 @@
 import React from 'react';
-import { AbsoluteFill, useCurrentFrame } from 'remotion';
+import { AbsoluteFill } from 'remotion';
 import { mono } from '../fonts';
-import { prog, ramp, EASE_MODAL, EASE_OUT, EASE_SPRING } from '../film/anim';
+import { prog, ramp, EASE_MODAL, EASE_OUT, EASE_SPRING, useFilmFrame } from '../film/anim';
 
 /**
  * Cold open — the app launching, in the film's light grade (owner call: the
@@ -23,7 +23,7 @@ import { prog, ramp, EASE_MODAL, EASE_OUT, EASE_SPRING } from '../film/anim';
  *   exit      0.58s push-through + 0.34s dissolve
  */
 export const ColdOpen: React.FC = () => {
-  const f = useCurrentFrame();
+  const f = useFilmFrame();
 
   const brackets = prog(f, 4, 21, EASE_MODAL);
   const dot = prog(f, 18, 29, EASE_SPRING);

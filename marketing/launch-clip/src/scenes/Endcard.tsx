@@ -1,9 +1,9 @@
 import React from 'react';
-import { AbsoluteFill, useCurrentFrame } from 'remotion';
+import { AbsoluteFill } from 'remotion';
 import { AnimatedMark, MARK_LAUNCH_FRAMES, Wordmark } from '../ui/Brand';
 import { SET_BG, Stage } from '../film/effects';
 import { useFraming } from '../film/format';
-import { drift, prog, ramp, EASE_MODAL, EASE_OUT } from '../film/anim';
+import { drift, prog, ramp, EASE_MODAL, EASE_OUT, useFilmFrame } from '../film/anim';
 import { sans } from '../fonts';
 
 /**
@@ -34,7 +34,7 @@ import { sans } from '../fonts';
  * anything about learning: Machina is not a learning app.)
  */
 export const Endcard: React.FC = () => {
-  const f = useCurrentFrame();
+  const f = useFilmFrame();
   const fr = useFraming();
 
   // Slowed in round 13b (owner: the last slide was a bit fast) — each element

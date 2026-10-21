@@ -1,6 +1,6 @@
 # Machina — launch film
 
-An 80-second launch film, rendered from code. No editor project, no stock music, no
+A 74-second launch film, rendered from code. No editor project, no stock music, no
 screen recording: the picture is [Remotion](https://remotion.dev) (React → frames),
 the score is synthesized by a Node script, and both read their timing from one
 shared file.
@@ -24,8 +24,14 @@ npm run studio     # interactive editor at localhost:3000
 
 ## Why it is built this way
 
-**`timeline.mjs` is the single source of truth for TIME.** 96 BPM, 4/4, so one bar
-= 2.5s = 75 frames at 30fps. Every scene boundary is a bar line, and the score's
+**`timeline.mjs` is the single source of truth for TIME.** The film was cut at
+96 BPM, 4/4, so one bar = 75 frames at 30fps, and every scene's motion is
+authored on that grid. It PLAYS at 104 BPM (owner, 2026-10-21: faster, more
+engaging): `src/Film.tsx` samples the picture `SPEED`× faster (scenes read
+`useFilmFrame()`, never `useCurrentFrame()`), the score is synthesized at 104,
+and the narration keeps its natural speed. Tempo is the one `BPM` number;
+`audio/synth-vo.py` mirrors it in `BAR_SEC`. The table below keeps the
+design-grid times (2.5s bars); at 104 each is ×0.923. Every scene boundary is a bar line, and the score's
 arrangement walks the same bar map: risers land on the bar before a hard cut, the
 sub thumps on the frame the card lands. The edit and the music cannot drift,
 because neither one owns the clock.

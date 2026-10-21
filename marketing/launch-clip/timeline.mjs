@@ -12,12 +12,22 @@ export const FPS = 30;
 export const WIDTH = 1920;
 export const HEIGHT = 1080;
 
-export const BPM = 96;
-export const BEAT = 60 / BPM; // 0.625s
-export const BAR = BEAT * 4; // 2.5s
-export const BAR_FRAMES = Math.round(BAR * FPS); // 75
+// The film was CUT at 96 BPM: every scene's motion is authored in frames of
+// that grid (75 to the bar). It PLAYS at `BPM` (owner, 2026-10-21: "a little
+// bit faster and more engaging"): the picture is sampled `SPEED`× faster
+// (src/Film.tsx), the score is synthesized at `BPM`, and the narration keeps
+// its natural speed. So the edit, the music and the voice stay locked, and
+// tempo is one number.
+export const DESIGN_BPM = 96;
+export const BPM = 104;
+export const SPEED = BPM / DESIGN_BPM; // ≈1.083
 
-/** Bar index → seconds / frames. */
+export const BEAT = 60 / BPM; // real seconds (0.577s at 104)
+export const BAR = BEAT * 4; // real seconds (2.31s at 104)
+/** Frames to the bar on the DESIGN grid (96 BPM at 30fps) that scenes are authored in. */
+export const BAR_FRAMES = Math.round((60 / DESIGN_BPM) * 4 * FPS); // 75
+
+/** Bar index → real seconds / design-grid frames. */
 export const barToSec = (bar) => bar * BAR;
 export const barToFrame = (bar) => Math.round(bar * BAR_FRAMES);
 
@@ -56,7 +66,8 @@ export const SCENES = [
 ];
 
 export const TOTAL_BARS = SCENES.reduce((n, s) => Math.max(n, s.bar + s.bars), 0);
-export const TOTAL_FRAMES = barToFrame(TOTAL_BARS);
+/** The composition's real length in output frames (the design grid ÷ SPEED). */
+export const TOTAL_FRAMES = Math.round(TOTAL_BARS * BAR * FPS);
 export const TOTAL_SEC = barToSec(TOTAL_BARS);
 
 export const sceneAt = (id) => {
@@ -97,22 +108,27 @@ export const SUBTITLES = [
   // both, in that order — the film was starting mid-thought without the first).
   // Act-one lines carry real AIR between them (round 13e — the owner: VO too
   // fast, needs breaks) and their VO speaks at 0.9 speed (synth-vo.py).
-  { bar: 1.05, bars: 0.85, place: 'bottom', text: 'You save things everywhere.' },
-  { bar: 2.0, bars: 1.35, place: 'bottom', text: 'An article here. A video there. A thread somewhere else.' },
+  { bar: 1.05, bars: 0.78, place: 'bottom', text: 'You save things everywhere.' },
+  { bar: 1.9, bars: 1.45, place: 'bottom', text: 'An article here. A video there. A thread somewhere else.' },
   // Starts 0.2 bar earlier (was 3.6/0.7; 2026-10-04): Sulafat's read of this
   // line runs 3.1s, which did not fit before line 4. The caption still ends on
   // 4.3, so the silent beat before the loss line is unchanged.
-  { bar: 3.4, bars: 0.9, place: 'bottom', text: 'Multiple apps, countless saved links.' },
+  // 2026-10-21 (the film at 104 BPM; bars are shorter, the voice is not):
+  // line 2 starts at 1.9, line 3 at 3.45, line 4 at 4.9, so each read fits
+  // before the next one at its natural speed. Line 4 still lands over the
+  // second pile (opens 4.67, shuts 5.13).
+  { bar: 3.45, bars: 1.0, place: 'bottom', text: 'Multiple apps, countless saved links.' },
   // A DELIBERATE BEAT OF SILENCE (bars 4.3–4.8) — the first wrong pile opens
   // with no words at all, then the truth lands over the second one. Owner's
   // wording ("rarely", not "never" — bold but honest), on the bar-4 minor.
-  { bar: 4.8, bars: 1.3, place: 'bottom', text: 'Saved, and rarely seen again.' },
+  { bar: 4.9, bars: 1.3, place: 'bottom', text: 'Saved, and rarely seen again.' },
   // The turn is an INTRODUCTION now (owner call, round 13b) — the film stops
   // describing and presents the product by name. 2026-09-19 (owner): the line
   // after the name was the PROMISE (the product tagline). 2026-10-04 (owner):
   // the tagline moves to the END (the endcard and the closing line), and the
-  // turn just introduces the name.
-  { bar: 6.45, bars: 1.35, place: 'bottom', kicker: 'Introducing', text: 'Machina.' },
+  // turn just introduces the name. 2026-10-21 (owner): no full stop after the
+  // name on screen (the voice still lands it).
+  { bar: 6.45, bars: 1.35, place: 'bottom', kicker: 'Introducing', text: 'Machina' },
   // Value first (owner note, round 13c): anything + anywhere. No tap-count
   // claim — the share sheet is two touches (owner correction).
   { bar: 8.35, bars: 1.25, place: 'left', kicker: 'Capture', text: 'Save anything, from anywhere.' },

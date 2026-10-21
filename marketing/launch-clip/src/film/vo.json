@@ -10,7 +10,7 @@
   ]
  },
  {
-  "bar": 2.0,
+  "bar": 1.9,
   "text": "An article here. A video there. A thread somewhere else.",
   "words": [
    0.05,
@@ -26,7 +26,7 @@
   ]
  },
  {
-  "bar": 3.4,
+  "bar": 3.45,
   "text": "Multiple apps, countless saved links.",
   "words": [
    0.05,
@@ -37,7 +37,7 @@
   ]
  },
  {
-  "bar": 4.8,
+  "bar": 4.9,
   "text": "Saved, and rarely seen again.",
   "words": [
    0.04,

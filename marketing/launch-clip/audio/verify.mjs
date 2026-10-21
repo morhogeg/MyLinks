@@ -23,7 +23,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BAR, SUBTITLES, TOTAL_BARS } from '../timeline.mjs';
+import { BAR, BAR_FRAMES, SPEED, SUBTITLES, TOTAL_BARS } from '../timeline.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 let failed = false;
@@ -110,12 +110,11 @@ let failed = false;
 // on screen at once is the one thing the track must never do.
 {
   const vo = JSON.parse(fs.readFileSync(path.join(here, '..', 'src', 'film', 'vo.json'), 'utf8'));
-  const BAR_FRAMES = Math.round(BAR * 30);
   const cues = [...SUBTITLES]
     .sort((a, b) => a.bar - b.bar)
     .map((s) => {
       const first = vo.find((v) => v.bar === s.bar)?.words[0];
-      return { s, first, from: Math.round(s.bar * BAR_FRAMES + (first ?? 0) * 30) - 3, to: Math.round((s.bar + s.bars) * BAR_FRAMES) };
+      return { s, first, from: Math.round(s.bar * BAR_FRAMES + (first ?? 0) * 30 * SPEED) - 3, to: Math.round((s.bar + s.bars) * BAR_FRAMES) };
     });
   const bad = [];
   for (const c of cues) if (c.first === undefined) bad.push(`"${c.s.text}" has no voiced line at bar ${c.s.bar} (re-run audio/synth-vo.py film)`);

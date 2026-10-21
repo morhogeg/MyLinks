@@ -1,9 +1,9 @@
 import React from 'react';
-import { AbsoluteFill, useCurrentFrame } from 'remotion';
+import { AbsoluteFill } from 'remotion';
 import { Phone } from '../ui/Phone';
 import { useFraming } from '../film/format';
 import { FloorGlow, Rig, SET_BG, Stage } from '../film/effects';
-import { drift, prog, ramp, EASE_IN_OUT, EASE_MODAL } from '../film/anim';
+import { drift, prog, ramp, EASE_IN_OUT, EASE_MODAL, useFilmFrame } from '../film/anim';
 import { DigestScreen } from '../ui/screens';
 
 /**
@@ -15,7 +15,7 @@ import { DigestScreen } from '../ui/screens';
  * to the "never revisited" card as its own beat.
  */
 export const DigestScene: React.FC = () => {
-  const f = useCurrentFrame();
+  const f = useFilmFrame();
   const fr = useFraming();
 
   const digEnter = prog(f, 4, 32, EASE_MODAL);
